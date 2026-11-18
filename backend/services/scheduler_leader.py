@@ -209,6 +209,10 @@ def boot_lock(url, timeout=None, key=None):
 
 # A node whose scheduler process missed this many passes counts as gone
 STALE_PASSES = 3
+# Silent this many passes (15 minutes, the update campaign's NODE_GUARD_SECONDS): gone for good,
+# as a replaced pod whose name never comes back. /health counts it no more, the leader deletes
+# its row, and a node back under that identifier writes a new one with its next heartbeat
+GONE_PASSES = 15
 
 _SERVER_NOW_SQL = text("SELECT clock_timestamp() AT TIME ZONE 'UTC'")
 
@@ -412,7 +416,20 @@ def _release_at_exit(node_id, token) -> None:
             logger.warning(f"HA: node identifier {node_id} not released at exit: {type(e).__name__}")
         finally:
             engine.dispose()
+    global _claimed_release
+    _claimed_release = release
     atexit.register(release)
+
+
+# The release registered by this process's claim (a no-op in another process)
+_claimed_release = None
+
+
+def release_claimed_node() -> None:
+    """Clean stop, once this node's scheduler process exited: give the row up now; the atexit
+    release repeats it, matching nothing then."""
+    if _claimed_release is not None:
+        _claimed_release()
 
 
 def node_held_elsewhere(node_id, wake_interval) -> bool:
@@ -427,30 +444,40 @@ def _is_stale(node, wake_interval, now) -> bool:
     return (now - node.heartbeat_at).total_seconds() > STALE_PASSES * wake_interval
 
 
+def _is_gone(node, wake_interval, now) -> bool:
+    return (now - node.heartbeat_at).total_seconds() > GONE_PASSES * wake_interval
+
+
 def cluster_summary(wake_interval) -> dict:
     """{leader_node_id, nodes, stale, command_seen} as the public /health reports it; a stale
-    leader is no leader. The leader is the only node it names; command_seen is the answering node's."""
+    leader is no leader. The leader is the only node it names; command_seen is the answering node's.
+    A node stopped cleanly (its row released) or gone counts in neither nodes nor stale."""
     from config.settings import Config
     from models import ClusterNode
     now = cluster_utc_now()
-    nodes = ClusterNode.query.all()
+    rows = ClusterNode.query.all()
+    nodes = [n for n in rows if n.instance_token is not None and not _is_gone(n, wake_interval, now)]
     stale = {n.node_id for n in nodes if _is_stale(n, wake_interval, now)}
     leader = next((n.node_id for n in nodes if n.is_leader and n.node_id not in stale), None)
-    own = next((n.command_seen for n in nodes if n.node_id == Config.NODE_ID), None)
+    own = next((n.command_seen for n in rows if n.node_id == Config.NODE_ID), None)
     return {'leader_node_id': leader, 'nodes': len(nodes), 'stale': len(stale), 'command_seen': own}
 
 
 def cluster_nodes_detail(wake_interval) -> list:
-    """Every registered node, for authenticated status pages only."""
+    """Every registered node, for authenticated status pages only. A node stopped cleanly
+    (its row released) is ``stopped`` and never ``stale``, as /health counts it."""
     from models import ClusterNode
     from utils.datetime_utils import utc_isoformat
     now = cluster_utc_now()
-    return [{'node_id': n.node_id, 'leader': bool(n.is_leader),
-             'stale': _is_stale(n, wake_interval, now), 'version': n.version,
+    return [{'node_id': n.node_id, 'leader': bool(n.is_leader) and n.instance_token is not None,
+             'stopped': n.instance_token is None,
+             'stale': n.instance_token is not None and _is_stale(n, wake_interval, now),
+             'version': n.version,
              'started_at': utc_isoformat(n.started_at), 'heartbeat_at': utc_isoformat(n.heartbeat_at),
              'command_seen': n.command_seen, 'kek_fingerprint': n.kek_fingerprint,
              'package_family': n.package_family}
-            for n in ClusterNode.query.order_by(ClusterNode.node_id).all()]
+            for n in ClusterNode.query.order_by(ClusterNode.node_id).all()
+            if not _is_gone(n, wake_interval, now)]
 
 
 def node_registered(node_id) -> bool:
@@ -464,7 +491,7 @@ def node_is_leader(node_id, wake_interval) -> bool:
     """Whether this node's scheduler process holds the lock, as its last fresh heartbeat says."""
     from models import ClusterNode, db
     node = db.session.get(ClusterNode, node_id)
-    return bool(node and node.is_leader and node.instance_token in (None, instance_token())
+    return bool(node and node.is_leader and node.instance_token == instance_token()
                 and not _is_stale(node, wake_interval, cluster_utc_now()))
 
 
@@ -472,3 +499,17 @@ def fresh_node_ids(wake_interval) -> set:
     from models import ClusterNode
     now = cluster_utc_now()
     return {n.node_id for n in ClusterNode.query.all() if not _is_stale(n, wake_interval, now)}
+
+
+_PRUNE_SQL = text("DELETE FROM cluster_nodes WHERE heartbeat_at < :gone_from AND node_id <> :me"
+                  ).bindparams(bindparam('gone_from', type_=DateTime))
+
+
+def prune_gone_nodes(node_id, wake_interval) -> int:
+    """Leader: delete the rows of nodes silent for GONE_PASSES; its own row stays."""
+    from models import db
+    now = cluster_utc_now()
+    removed = db.session.execute(_PRUNE_SQL, {
+        'gone_from': now - timedelta(seconds=GONE_PASSES * wake_interval), 'me': node_id}).rowcount
+    db.session.commit()
+    return removed

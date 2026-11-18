@@ -19,6 +19,8 @@ from utils.key_codec import store_pem_bytes
 import pytest
 from tests.fixtures.templates import templates_created_here_removed
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_config_rows')
+
 
 @pytest.fixture(autouse=True, scope='module')
 def _templates_stay_in_this_module(app):
@@ -345,6 +347,43 @@ def test_merge_repoints_settings_naming_the_duplicate(app):
                         db.session.delete(row)
                 else:
                     row.value = v
+            db.session.commit()
+
+
+def test_merge_takes_the_challenge_of_the_scep_ca_named_by_a_padded_number(app):
+    """scep_ca_id '0<id>' still names the duplicate: its challenge replaces the keeper's."""
+    from models.system_config import SystemConfig
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    cert = _cert(key, 'Padded Scep Root')
+    with app.app_context():
+        saved = SystemConfig.query.filter_by(key='scep_ca_id').first()
+        before = saved.value if saved else None
+        try:
+            keeper_id = _row(cert, key)
+            dupe_id = _row(cert)
+            values = {'scep_ca_id': f'0{dupe_id}', f'scep_challenge_{dupe_id}': 'dupe-secret',
+                      f'scep_challenge_{keeper_id}': 'keeper-secret'}
+            for k, v in values.items():
+                row = SystemConfig.query.filter_by(key=k).first() or SystemConfig(key=k)
+                row.value = v
+                db.session.add(row)
+            db.session.commit()
+
+            backfill_ski_aki()
+
+            db.session.expire_all()
+            assert db.session.get(CA, dupe_id) is None
+            assert SystemConfig.query.filter_by(key=f'scep_challenge_{keeper_id}').first().value == 'dupe-secret'
+        finally:
+            db.session.rollback()
+            SystemConfig.query.filter(SystemConfig.key.like('scep_challenge_%')).delete(synchronize_session=False)
+            row = SystemConfig.query.filter_by(key='scep_ca_id').first()
+            if before is None:
+                if row:
+                    db.session.delete(row)
+            elif row:
+                row.value = before
             db.session.commit()
 
 

@@ -24,6 +24,7 @@ from tests.test_wstep_kerberos_issue import _build_rst, _issued_cert_from_rstr
 from tests.test_wstep_renew_tls import _cmc_renewal, _rst
 from tests.test_windows_profile_routing import (NEGOTIATE, SID, _as, _audits, _fault, _profile,  # noqa: F401
                                                 _top_audit, world)
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 MACHINE = 'hosta$@C04A.TEST'
@@ -363,9 +364,11 @@ def test_arrival_and_approval_give_one_verdict_on_the_renewed_certificate(
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     old = _template_less_certificate(app, world, key)
     _withdraw(app, old, state)
-    assert _fault(_renew(client, world, MACHINE, old, key)) == (400, 's:Sender', NO_TEMPLATE)
     expected = {'expired': wstep_service.RENEWED_EXPIRED, 'revoked': protocol_approval.RENEWED_REVOKED,
                 'superseded': wstep_service.RENEWED_SUPERSEDED}[state]
+    # Renewed already, the requester's own certificate is told so, as on the Certificate binding
+    arrival = wstep_service.RENEWED_SUPERSEDED if state == 'superseded' else NO_TEMPLATE
+    assert _fault(_renew(client, world, MACHINE, old, key)) == (400, 's:Sender', arrival)
     with approval_policy(app, world['cas']['A']['id'], f'r20-verdict-{state}') as pid:
         _request_id, approval_id, held = _held(app, client, world, MACHINE, pid)
         _withdraw(app, held, state)

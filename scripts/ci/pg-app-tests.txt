@@ -59,8 +59,14 @@ tests/test_migration_158*.py
 tests/test_migration_159*.py
 tests/test_migration_162*.py
 tests/test_migration_163*.py
+tests/test_migration_165*.py
+tests/test_migration_166*.py
+tests/test_migration_168*.py
+tests/test_ssh_serial_counter_matrix.py
+tests/test_ssh_serial_unique.py
 tests/test_restore_tsa_ca_signer.py
 tests/test_upgrade_from_2_254.py
+tests/test_major_upgrade_guard.py
 tests/test_fresh_install_interrupted.py
 tests/test_schema_rules_kept_from_2x.py
 tests/test_encryption_envelope*.py
@@ -75,6 +81,8 @@ tests/test_audit_stats_scale.py
 tests/test_audit_verify_rows.py
 tests/test_sso_login_identity.py
 tests/test_sso_return_path.py
+tests/test_sso_identities.py
+tests/test_sso_account_binding.py
 tests/test_cas_list_query_count.py
 tests/test_fresh_app.py
 tests/test_policy_algorithms_397.py
@@ -98,3 +106,7 @@ tests/test_msca_signed_elsewhere.py
 tests/test_msca_status_import_deploys.py
 tests/test_ssh_serial_concurrency.py
 tests/test_failed_login_count.py
+tests/test_background_jobs*.py
+tests/test_restore_job.py
+tests/test_sso_sign_in_test*.py
+tests/test_ca_deletion_setting_refs.py

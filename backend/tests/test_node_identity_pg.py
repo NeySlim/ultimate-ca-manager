@@ -248,6 +248,23 @@ def test_a_clean_stop_releases_the_row(app, ha):
     assert _row(app, node)[0] is None
 
 
+def test_the_claimed_row_is_released_before_the_process_exits(app, ha, monkeypatch):
+    """The master's stop releases the row as soon as its scheduler process is gone (the
+    supervisor's on_stopped), not only at exit: a kill at the end of a grace finds it released."""
+    import atexit
+    registered = []
+    monkeypatch.setattr(atexit, 'register', registered.append)
+    monkeypatch.setattr(scheduler_leader, '_claimed_release', None)
+    node = PREFIX + 'early'
+    with app.app_context():
+        scheduler_leader.claim_node_at_start(node, 'early-token')
+        assert scheduler_leader.write_heartbeat(node, False, scheduler_leader.cluster_utc_now(), 'early-token')
+        assert _row(app, node)[0] == 'early-token'
+        scheduler_leader.release_claimed_node()
+    assert _row(app, node)[0] is None
+    assert len(registered) == 1  # atexit still releases, a no-op once released
+
+
 # ------------------------------------------------------------ 3. no race
 
 def test_two_processes_claiming_together_one_wins(app, ha):
@@ -330,6 +347,10 @@ def test_a_leader_flag_written_by_another_token_is_not_this_node_leading(app, cl
     monkeypatch.setattr(Config, 'NODE_ID', node)
     monkeypatch.setattr(scheduler_service, '_scheduler', SchedulerService(wake_interval=60, node_id=node))
     _put(app, node, 'intruder', leader=True)
+    with app.app_context():
+        assert scheduler_leader.node_is_leader(node, 60) is False
+    assert client.get('/health').get_json()['leader'] is False
+    _put(app, node, None, leader=True)  # released by a clean stop, the flag left behind
     with app.app_context():
         assert scheduler_leader.node_is_leader(node, 60) is False
     assert client.get('/health').get_json()['leader'] is False

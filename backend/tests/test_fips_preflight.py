@@ -21,6 +21,7 @@ from sqlalchemy import create_engine, text
 
 import fips_mode
 from config.settings import Config
+from models import UserSSOIdentity
 from models import (CA, AcmeClientOrder, Certificate, CertificatePolicy, CertificateTemplate,
                     DeployTarget, DnsProvider, HsmKey, HsmProvider, MicrosoftCA, SSHCertificate,
                     SSHCertificateAuthority, SystemConfig, User, db)
@@ -176,8 +177,9 @@ def test_users_password_scrypt(session):
     session.add(User(username='scrypt-user', email='s@example.com', password_hash=SCRYPT_HASH))
     session.add(User(username='pbkdf2-user', email='p@example.com',
                      password_hash=hash_password('a long password')))
-    session.add(User(username='sso-user', email='o@example.com', password_hash=SCRYPT_HASH,
-                     auth_source='sso'))
+    sso = User(username='sso-user', email='o@example.com', password_hash=SCRYPT_HASH)
+    sso.sso_identities.append(UserSSOIdentity(orphan_of='oauth2:https://idp.example'))
+    session.add(sso)
     session.flush()
     _assert_found('users.password_scrypt', 1, 'scrypt-user')
 
@@ -273,10 +275,11 @@ def test_ssh_ca_eddsa_key(session):
 
 def test_ssh_certificates_eddsa_key(session):
     ca = _ssh_ca('Signer', 'ecdsa-p256', ec.generate_private_key(ec.SECP256R1()))
-    for key_id, key_type, valid_to in (('alice-ed', 'ed25519', 1), ('bob-ec', 'ecdsa-p256', 1),
-                                       ('old-ed', 'ed25519', -1)):
+    # One serial per certificate of a CA: the database holds each once
+    for serial, (key_id, key_type, valid_to) in enumerate((('alice-ed', 'ed25519', 1), ('bob-ec', 'ecdsa-p256', 1),
+                                                           ('old-ed', 'ed25519', -1)), start=1):
         session.add(SSHCertificate(ssh_ca_id=ca.id, cert_type='user', key_id=key_id,
-                                   public_key='k', certificate='c', principals='[]', serial=1,
+                                   public_key='k', certificate='c', principals='[]', serial=serial,
                                    valid_from=utc_now() - timedelta(days=2),
                                    valid_to=utc_now() + timedelta(days=valid_to),
                                    key_type=key_type, fingerprint=key_id))

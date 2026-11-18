@@ -6,6 +6,8 @@ from config.settings import Config
 from migration_marks import FULL_STOP_ASSET
 from utils.ha import reject_in_ha
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 ROUTES = [
     '/api/v2/database/switch',
     '/api/v2/database/migrate',
@@ -59,6 +61,7 @@ def test_scheduled_auto_update_never_installs_locally_in_ha(app, monkeypatch):
     import services.updates as updates
     monkeypatch.setattr(Config, 'HA_MODE', True)
     monkeypatch.delenv('UCM_DOCKER', raising=False)
+    monkeypatch.setattr(updates, 'get_current_version', lambda: '99.0-dev')
 
     def boom(*a, **k):
         raise AssertionError('no local install in HA mode')

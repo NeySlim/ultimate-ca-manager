@@ -42,3 +42,7 @@ def _guard(event, args):
 
 if _REPORT:
     sys.addaudithook(_guard)
+
+# The bench's job pauses (tests only): inert unless UCM_HA_PAUSE_DIR is set
+if os.environ.get('UCM_HA_PAUSE_DIR'):
+    import ha_bench_pauses  # noqa: F401,E402

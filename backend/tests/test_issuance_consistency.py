@@ -19,6 +19,8 @@ from models import CA, Certificate, db
 from models.certificate_template import CertificateTemplate
 from utils.key_codec import load_pem_bytes
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _post(client, url, payload):
     return client.post(url, data=json.dumps(payload), content_type='application/json')

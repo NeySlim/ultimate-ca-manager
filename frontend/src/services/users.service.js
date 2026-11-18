@@ -63,12 +63,17 @@ export const usersService = {
     return apiClient.post(`/users/${id}/toggle-active`)
   },
 
-  async linkSso(id, { provider_id, sso_username } = {}) {
-    return apiClient.post(`/users/${id}/link-sso`, { provider_id, sso_username })
+  // One row per provider that opens the account (sso_identities)
+  async attachSso(id, { provider_id, remove_password } = {}) {
+    return apiClient.post(`/users/${id}/sso-identities`, { provider_id, remove_password })
   },
 
-  async unlinkSso(id) {
-    return apiClient.post(`/users/${id}/unlink-sso`)
+  async resetSsoIdentity(id, identityId) {
+    return apiClient.post(`/users/${id}/sso-identities/${identityId}/reset`)
+  },
+
+  async detachSso(id, identityId) {
+    return apiClient.delete(`/users/${id}/sso-identities/${identityId}`)
   },
 
   // Bulk operations

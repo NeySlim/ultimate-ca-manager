@@ -269,7 +269,7 @@ def set_webauthn_second_factor():
     if not enabled and refused:
         db.session.rollback()
         return last_factor_refusal(_KEY_CHOICE_MESSAGE)
-    if not enabled and (user.auth_source or 'local') == 'local':
+    if not enabled and user.is_local:
         password = data.get('password')
         if not isinstance(password, str) or not password:
             return error_response('Invalid password', 403)

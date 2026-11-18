@@ -120,6 +120,10 @@ ROUTES = {
     'POST /api/v2/system/https/apply': ADMIN_SYSTEM,
     'POST /api/v2/system/https/regenerate': ADMIN_SYSTEM,
     'POST /api/v2/system/https/unbind': ADMIN_SYSTEM,
+    # api.v2.system.jobs: each job's own permission, checked inline
+    'GET /api/v2/system/jobs': SIGNED_IN,
+    'GET /api/v2/system/jobs/<job_id>': SIGNED_IN,
+    'POST /api/v2/system/jobs/<job_id>/cancel': SIGNED_IN,
     # api.v2.system.logs
     'GET /api/v2/system/logs': ADMIN_SYSTEM,
     'GET /api/v2/system/logs/bundle': ADMIN_SYSTEM,

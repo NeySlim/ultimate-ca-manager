@@ -94,7 +94,6 @@ def test_the_opnsense_import_skips_the_unreadable_row_and_names_why(app, auth_cl
 @pytest.mark.parametrize('ca', [True, False])
 def test_the_opnsense_file_importer_refuses_the_unreadable_row(app, monkeypatch, tmp_path, ca):
     from services.opnsense import importer
-    monkeypatch.setattr(importer, '__file__', str(tmp_path / 'services' / 'opnsense' / 'importer.py'))
     cn = f'Dup File {uuid.uuid4().hex[:8]}'
     row = {**_opnsense_row(_pem_with_repeated_extension(cn, ca=ca), cn), 'is_root': True,
            'subject': f'CN={cn}', 'issuer': f'CN={cn}', 'serial_number': '1'}

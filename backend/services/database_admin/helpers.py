@@ -541,6 +541,15 @@ def carry_id_high_water(engine, high_water, is_pg) -> None:
                              {'t': table, 'n': highest})
 
 
+def raise_ssh_serial_counters(engine) -> None:
+    """Every SSH CA of the target counts past the serials its certificates hold (utils/ssh_serials.py)."""
+    from sqlalchemy import inspect
+    from utils.ssh_serials import raise_counters
+    with engine.begin() as conn:
+        if 'ssh_cas' in inspect(conn).get_table_names():
+            raise_counters(lambda sql, params=None: conn.execute(text(sql), params or {}))
+
+
 def _type_name(col_type) -> str:
     name = getattr(col_type, "__visit_name__", None) or type(col_type).__name__
     return str(name).split("(", 1)[0].strip().upper()

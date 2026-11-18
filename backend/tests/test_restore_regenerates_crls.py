@@ -216,17 +216,19 @@ def test_a_clean_regeneration_adds_no_warning(app):
 @pytest.mark.parametrize('route', ('/api/v2/system/restore', '/api/v2/settings/backup/restore'))
 def test_both_restore_routes_name_an_authority_left_without_a_crl(app, auth_client, monkeypatch,
                                                                     route):
-    import importlib
     from tests.test_restore_facade_parity import _upload
-    for module in ('api.v2.system.backup', 'api.v2.settings.backup'):
-        loaded = importlib.import_module(module)
-        if hasattr(loaded, 'BackupService'):
-            monkeypatch.setattr(loaded.BackupService, 'restore_backup',
-                                lambda self, *a, **k: {'sections_carried': ['certificate_authorities']},
-                                raising=False)
+    # The class at its source: the routes hand the upload to the restore job
+    from services.backup_service import BackupService
+    monkeypatch.setattr(BackupService, 'restore_backup',
+                        lambda self, *a, **k: {'sections_carried': ['certificate_authorities']})
     import services.backup.restore.invalidate as invalidate
     monkeypatch.setattr(invalidate, 'invalidate_after_restore',
                         lambda *a, **k: {'crls_regenerated': [], 'crls_failed': ['Unsigned HSM CA']})
+    from tests.restore_job_support import sessions_kept
+    sessions_kept(monkeypatch)  # the restore job's own sessions step
+    # The restore job's CRL step
+    monkeypatch.setattr(invalidate, 'regenerate_crls_summary',
+                        lambda: {'crls_regenerated': [], 'crls_failed': ['Unsigned HSM CA']})
     monkeypatch.setattr('utils.service_manager.restart_service', lambda *a, **k: (False, 'no'))
     response = _upload(auth_client, route)
     assert response.status_code == 200, response.get_json()

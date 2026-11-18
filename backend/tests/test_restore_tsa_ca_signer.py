@@ -11,6 +11,8 @@ from services.backup.restore.tsa_signer import upgrade_archived_tsa_signer
 from tests.test_backup_cross_installation import Keys, _installation
 from tests.test_backup_hostile_corpus import PASSWORD, _forged, _service
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 KEY = 'tsa_require_dedicated_cert'
 CA_REFID = 'archived-tsa-ca'
 

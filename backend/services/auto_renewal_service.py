@@ -184,7 +184,8 @@ class AutoRenewalService:
     @staticmethod
     def renew_certificate(cert: Certificate, regenerate_crl: bool = True, known_serial=SERIAL_UNSET) -> tuple:
         """Renew one certificate in place for the scheduler: ``(True, id)``,
-        ``(None, message)`` when the row is gone, else ``(False, message)``."""
+        ``(None, message)`` when the row is gone or another request overtook the renewal,
+        else ``(False, message)``."""
         # Read before the call: a rollback expires the instance
         try:
             cert_id, common_name = cert.id, cert.common_name
@@ -198,7 +199,8 @@ class AutoRenewalService:
                 regenerate_crl=regenerate_crl, trigger='auto', known_serial=known_serial)
         except RenewalError as e:
             db.session.rollback()
-            if not AutoRenewalService._row_exists(cert_id):
+            # Gone, or overtaken by another request: the next pass reads the row anew
+            if e.overtaken or not AutoRenewalService._row_exists(cert_id):
                 logger.info(f"Auto-renewal skipped cert {cert_id}: {e.message}")
                 return None, e.message
             logger.warning(f"Auto-renewal of cert {cert_id} refused: {e.message}")
@@ -305,8 +307,8 @@ class AutoRenewalService:
         # otherwise come back as not yet due
         stats = {'renewed': 0, 'failed': 0, 'skipped': 0, 'queued': 0, 'errors': [],
                  'waiting': AutoRenewalService.waiting_certificates(config)}
-        # CAs whose CRL is published once, after the batch
-        renewed_carefs = set()
+        # Renewed rows: the CRL of the CA each names by then is published once, after the batch
+        renewed_ids = []
 
         # A renewal an operator queued for approval is a human decision the
         # scheduler does not pre-empt, as long as that decision (or the
@@ -391,12 +393,7 @@ class AutoRenewalService:
 
             if success:
                 stats['renewed'] += 1
-                # The renewal links the row to the CA that really signed it
-                # (resolved by signature when the row named none): that CA's
-                # CRL is the one carrying the superseded serial
-                for row in (cert, db.session.get(Certificate, partner_id) if partner_id else None):
-                    if row is not None and row.caref:
-                        renewed_carefs.add(row.caref)
+                renewed_ids += [cert_id] + ([partner_id] if partner_id else [])
                 if partner_id is not None:
                     done_with_pair[partner_id] = 'renewed'
             elif success is None:
@@ -409,7 +406,11 @@ class AutoRenewalService:
                     'error': result
                 })
 
-        AutoRenewalService._publish_crls(carefs=renewed_carefs)
+        # The renewal links a row to the CA that really signed it, and that record may have
+        # been merged into another one since: the CRL to publish is the one the row names now
+        from services.cert.renewal import current_issuer
+        issuers = [current_issuer(row_id) for row_id in renewed_ids]
+        AutoRenewalService._publish_crls(carefs={issuer[1] for issuer in issuers if issuer})
         logger.info(f"Auto-renewal complete: {stats['renewed']} renewed, {stats['failed']} failed")
 
         # Send notifications if configured

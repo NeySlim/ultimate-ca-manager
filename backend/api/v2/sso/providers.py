@@ -3,8 +3,8 @@ from flask import g, request
 from auth.unified import has_permission, require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
-from models import db, User
-from models.sso import SSOProvider, SSOSession
+from models import db, UserSSOIdentity
+from models.sso import SSOProvider, SSOSession, SSOSignInTest
 from services.audit_service import AuditService
 import json
 from .helpers import _encrypt_ldap_password, _parse_json_field, _parse_group_list, validate_role_mapping
@@ -12,6 +12,7 @@ from .connection_tests import _test_ldap_connection, _test_oauth2_connection, _t
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 from utils.secret_target import MASKS, keeps_saved_secret, retarget_error
 from services.oidc_id_token import clear_oidc_cache
+from utils.dn_parse import parse_dn
 from . import saml_sp
 
 
@@ -82,6 +83,19 @@ def _sp_signing_error(provider):
         logger.warning(f"SAML SP key for provider {provider.name} cannot be loaded: {e}")
         return "Cannot sign SAML requests: the SP certificate or its private key cannot be loaded"
     return None
+
+
+def _group_base_dn(value):
+    """Stored LDAP group search base: None when empty, ValueError when not a DN."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    if not isinstance(value, str):
+        raise ValueError('ldap_group_base_dn must be a distinguished name')
+    try:
+        parse_dn(value)
+    except ValueError:
+        raise ValueError('ldap_group_base_dn is not a valid distinguished name') from None
+    return value.strip()
 
 
 def _default_role(value):
@@ -192,6 +206,11 @@ def create_provider():
         provider.ldap_user_filter = data.get('ldap_user_filter', '(uid={username})')
         provider.ldap_group_filter = data.get('ldap_group_filter')
         provider.ldap_group_member_attr = data.get('ldap_group_member_attr', 'member')
+        try:
+            provider.ldap_group_base_dn = _group_base_dn(data.get('ldap_group_base_dn'))
+        except ValueError as e:
+            db.session.rollback()
+            return error_response(str(e), 400)
         provider.ldap_username_attr = data.get('ldap_username_attr', 'uid')
         provider.ldap_email_attr = data.get('ldap_email_attr', 'mail')
         provider.ldap_fullname_attr = data.get('ldap_fullname_attr', 'cn')
@@ -207,7 +226,7 @@ def create_provider():
             val = json.loads(val)
         provider.attribute_mapping = json.dumps(val)
     if data.get('role_mapping'):
-        val, role_error = validate_role_mapping(data['role_mapping'])
+        val, role_error = validate_role_mapping(data['role_mapping'], provider.provider_type)
         if role_error:
             db.session.rollback()
             return error_response(role_error, 400)
@@ -370,6 +389,12 @@ def update_provider(provider_id=None, provider_type_name=None):
                 setattr(provider, field, data[field])
         if 'ldap_start_tls' in data:
             provider.ldap_start_tls = bool(data['ldap_start_tls'])
+        if 'ldap_group_base_dn' in data:
+            try:
+                provider.ldap_group_base_dn = _group_base_dn(data['ldap_group_base_dn'])
+            except ValueError as e:
+                db.session.rollback()
+                return error_response(str(e), 400)
         # ldap_required_groups: normalize list/CSV string → JSON string (empty = clear)
         if 'ldap_required_groups' in data:
             required = _parse_group_list(data['ldap_required_groups'])
@@ -390,7 +415,7 @@ def update_provider(provider_id=None, provider_type_name=None):
             val = json.loads(val)
         provider.attribute_mapping = json.dumps(val)
     if 'role_mapping' in data:
-        val, role_error = validate_role_mapping(data['role_mapping'])
+        val, role_error = validate_role_mapping(data['role_mapping'], provider.provider_type)
         if role_error:
             db.session.rollback()
             return error_response(role_error, 400)
@@ -425,12 +450,13 @@ def delete_provider(provider_id):
     provider_name = provider.name
     provider_type = provider.provider_type
 
-    # Delete associated sessions first
+    # Delete associated sessions first, and its sign-in tests: a later provider may take its id
     SSOSession.query.filter_by(provider_id=provider_id).delete()
-    # Unlink its users on both backends (SQLite does not apply ON DELETE SET NULL),
-    # keeping its IdP so that only a provider recreated for that IdP takes them back.
-    User.query.filter_by(sso_provider_id=provider_id).update(
-        {User.sso_provider_id: None, User.sso_orphan_of: provider.idp_key()},
+    SSOSignInTest.query.filter_by(provider_id=provider_id).delete()
+    # Its attachments become orphans on both backends (SQLite does not apply ON DELETE
+    # SET NULL), keeping its IdP so that only a provider recreated for it takes them back.
+    UserSSOIdentity.query.filter_by(provider_id=provider_id).update(
+        {UserSSOIdentity.provider_id: None, UserSSOIdentity.orphan_of: provider.idp_key()},
         synchronize_session=False)
 
     db.session.delete(provider)

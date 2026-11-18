@@ -145,7 +145,7 @@ Click **New** to make one, or select a template and click **Copy** to start from
 
 ### Trust Store
 
-Open **Modules** > **PKI** > **Trust Store**. It keeps trusted root and intermediate CA certificates; a certificate's chain view and exports complete the chain with a trust store certificate whose subject matches the issuer. **Sync** imports the operating system's trusted CAs, **Export** downloads one certificate, and **Export Bundle** in the toolbar downloads all of them as one PEM file.
+Open **Modules** > **PKI** > **Trust Store**. It keeps trusted root and intermediate CA certificates; a certificate's chain view and exports complete the chain with a trust store certificate whose subject matches the issuer. **Sync** imports the operating system's trusted CAs, **Export** downloads one certificate, and **Export Bundle** in the toolbar downloads all of them as one PEM file. An entry that contains a private key is refused: the trust store keeps certificates only. When the bundle or another export leaves out unreadable entries, a warning gives their number.
 
 ### User Certificates
 
@@ -283,6 +283,8 @@ Open **Modules** > **Administration** > **System Logs** (administrators). It rea
 ### SSH CAs and SSH Certificates
 
 Open **Modules** > **Administration** > **SSH CAs** to create user and host CAs (Ed25519, ECDSA or RSA 4096, or on an RSA or NIST ECDSA key of an HSM provider) and to download a setup script that makes sshd trust the CA and a key revocation list. Open **Modules** > **Administration** > **SSH Certificates** to issue certificates by signing a public key you paste, or by generating a key pair, with principals, a validity and extensions.
+
+A key revocation list names the certificates of a CA by serial number, so UCM gives out each serial once per SSH CA, after restores, imports and changes of database as well. An installation upgraded from 2.x, or one that restored a 2.x archive, may hold two certificates of one CA sharing a serial: the list marks them **Shared serial**, and revoking one revokes them all; when one of them was already revoked, the upgrade or the restore revokes the others with it. Revoke them and issue new certificates.
 
 An SSH CA on an HSM key keeps its private key on the token and needs the `read:hsm` permission besides `write:ssh_cas`. An HSM key backs one authority, X.509 or SSH, user or host: the key list offers only unused keys, and a key already held is refused with the name of the CA that holds it, and neither the key nor its provider can be deleted while the CA exists.
 

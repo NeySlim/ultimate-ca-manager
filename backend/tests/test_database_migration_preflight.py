@@ -569,8 +569,8 @@ def test_dropped_columns_counts_the_values_it_leaves_behind(
         _add_legacy_columns(source, {'group_members': {'created_at': ''}})
         _execute(source, 'INSERT INTO "groups" (id, name) VALUES (1, \'g\')')
         _execute(source,
-                 'INSERT INTO "users" (id, username, email, password_hash, role, '
-                 'auth_source) VALUES (1, \'u\', \'u@x.test\', \'x\', \'viewer\', \'local\')')
+                 'INSERT INTO "users" (id, username, email, password_hash, role) '
+                 'VALUES (1, \'u\', \'u@x.test\', \'x\', \'viewer\')')
         _execute(source,
                  'INSERT INTO "group_members" (group_id, user_id, created_at) '
                  'VALUES (1, 1, \'2020-01-01\')')
@@ -624,7 +624,6 @@ def test_legacy_columns_match_the_baseline_schema(app):
     a column is removed from a model without a line in LEGACY_COLUMNS, the
     migration would drop it silently — this fails first.
     """
-    baseline = _baseline_schema()
     schema = expected_schema()
 
     unapproved = {}
@@ -640,10 +639,11 @@ def test_legacy_columns_match_the_baseline_schema(app):
         f"not approved in LEGACY_COLUMNS: {unapproved}"
     )
 
-    # And the reverse: an approval for a column no schema ever had is a typo.
+    # And the reverse: an approval for a column neither the baseline nor 2.254 had is a typo.
+    carried = _carried_schema()
     for table, columns in LEGACY_COLUMNS.items():
         for column in columns:
-            assert column in baseline.get(table, set()), f"{table}.{column}"
+            assert column in carried.get(table, set()), f"{table}.{column}"
 
 
 def test_no_unapproved_extra_column_in_the_test_database(app):

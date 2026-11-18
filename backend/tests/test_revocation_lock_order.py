@@ -166,3 +166,44 @@ def test_an_import_mark_during_a_revocation_does_not_deadlock(app, issuer):
         worker.join(30)
     assert outcome == {'mark': True, 'revoke': 'ok'}, outcome
     assert _row(app, row_id)[:2] == (True, 'keyCompromise')
+
+
+def test_the_pass_marks_rows_in_id_order_whatever_order_they_are_read_in(app, issuer, monkeypatch):
+    """Two passes, or a pass and a revocation, then lock the certificate rows in one order."""
+    from services.cert import issued_lookup
+    _, refid, ca_cert, ca_key = issuer
+    stored = []
+    for n in range(4):
+        real, key = _leaf(f'order-mark-{n}.example.test', ca_cert, ca_key, days=200)
+        row_id = _store(app, real, refid, key=key)
+        _record(app, refid, real, certificate_id=row_id)
+        stored.append(row_id)
+    read = issued_lookup.row_persisted_revocation
+    seen, marked = [], []
+
+    def reading(row):
+        seen.append(row.id)
+        return read(row)
+
+    def marking(row, record):
+        marked.append(row.id)
+        return False
+
+    class Backwards:
+        """The rows of the query, last id first: an order a database is free to return."""
+        def __init__(self, query):
+            self.query = query
+
+        def filter(self, *a, **k):
+            return Backwards(self.query.filter(*a, **k))
+
+        def all(self):
+            return sorted(self.query.all(), key=lambda row: -row.id)
+
+    monkeypatch.setattr(issued_lookup, 'row_persisted_revocation', reading)
+    monkeypatch.setattr(issued_lookup, '_mark_while_recorded', marking)
+    with app.app_context():
+        monkeypatch.setattr(issued_lookup.Certificate, 'query', Backwards(Certificate.query), raising=False)
+        issued_lookup.apply_persisted_revocations(ids=set(stored))
+    assert [i for i in seen if i in stored] == sorted(stored, reverse=True), 'the rows were not read backwards'
+    assert marked == sorted(stored)

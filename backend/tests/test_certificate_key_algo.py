@@ -14,6 +14,9 @@ from cryptography.x509.oid import NameOID
 
 from models import Certificate, db
 from tests.conftest import get_json
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 def _crt(key, cn='key-algo.test'):

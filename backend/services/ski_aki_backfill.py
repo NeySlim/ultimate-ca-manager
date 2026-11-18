@@ -134,7 +134,8 @@ def _move_ca_settings(dupe, keeper):
     from models import SystemConfig
     from services.ca.cross_repair import _move_publication, _move_scep_challenge, _move_settings
     scep_cfg = SystemConfig.query.filter_by(key='scep_ca_id').first()
-    was_scep_ca = bool(scep_cfg and scep_cfg.value in (str(dupe.id), dupe.refid))
+    from services.deletion_blockers import setting_names_ca
+    was_scep_ca = bool(scep_cfg and setting_names_ca(scep_cfg.value, dupe))
     _move_settings(dupe, keeper)
     _move_scep_challenge(dupe, keeper, was_scep_ca)
     _move_publication(dupe, keeper)

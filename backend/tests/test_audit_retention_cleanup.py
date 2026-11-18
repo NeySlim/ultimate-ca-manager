@@ -14,6 +14,8 @@ from services.audit_service import AuditService
 from services.retention_service import RetentionPolicy, scheduled_audit_cleanup
 from utils.datetime_utils import utc_now
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 
 def _row(row_id, age_days):
     db.session.add(AuditLog(id=row_id, username='retention-test',

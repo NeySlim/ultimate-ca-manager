@@ -16,7 +16,7 @@ from datetime import timedelta
 
 import pytest
 
-from models import db, User
+from models import db, User, UserSSOIdentity
 from models.sso import SSOProvider
 from utils.datetime_utils import utc_now
 
@@ -37,6 +37,8 @@ def ldap_provider(app):
         provider_id = provider.id
     yield provider_id
     with app.app_context():
+        # SQLite applies no ON DELETE CASCADE: the attachments go first
+        UserSSOIdentity.query.filter_by(provider_id=provider_id).delete()
         row = db.session.get(SSOProvider, provider_id)
         if row is not None:
             db.session.delete(row)
@@ -63,6 +65,8 @@ def local_user(app):
 
     yield _make
     with app.app_context():
+        ids = [u.id for u in User.query.filter(User.username.in_(created))]
+        UserSSOIdentity.query.filter(UserSSOIdentity.user_id.in_(ids)).delete(synchronize_session=False)
         User.query.filter(User.username.in_(created)).delete(synchronize_session=False)
         db.session.commit()
 
@@ -71,13 +75,14 @@ def _bind_succeeds(monkeypatch, username, error=None):
     """The directory accepted this user's own password."""
     import api.v2.sso.ldap_routes as ldap_routes
 
-    def _fake(provider, user, password):
+    def _fake(provider, user, password, before_bind=None):
+        entry = {'dn': f'uid={username}', 'uid': username, 'username': username,
+                 'email': f'{username}@example.test', 'fullname': username}
+        if before_bind is not None and not before_bind(dict(entry)):
+            return None, 'attempt_refused'
         if error:
             return None, error
-        return {
-            'dn': f'uid={username}', 'uid': username, 'username': username,
-            'email': f'{username}@example.test', 'fullname': username, 'groups': [],
-        }, None
+        return dict(entry, groups=[]), None
 
     monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user', _fake)
 
@@ -117,8 +122,8 @@ def test_the_ldap_door_names_a_deactivated_account(
     username = local_user(active=False)
     with client.application.app_context():
         # An account of this directory, disabled in UCM: a local one is never opened.
-        User.query.filter_by(username=username).update(
-            {'auth_source': 'ldap', 'sso_provider_id': ldap_provider})
+        from tests.sso_identity_support import attach
+        attach(username, ldap_provider)
         db.session.commit()
     _bind_succeeds(monkeypatch, username)
     assert _login(client, username, '/api/v2/sso/ldap/login', ldap_provider) == (
@@ -141,6 +146,15 @@ def test_the_ldap_door_names_a_missing_group(
     _bind_succeeds(monkeypatch, username, error='group_denied')
     assert _login(client, username, '/api/v2/sso/ldap/login', ldap_provider) == (
         403, 'Access denied: you are not a member of the required group(s)')
+
+
+def test_the_ldap_door_names_groups_it_could_not_read(
+    client, local_user, ldap_provider, monkeypatch
+):
+    username = local_user()
+    _bind_succeeds(monkeypatch, username, error='groups_unreadable')
+    assert _login(client, username, '/api/v2/sso/ldap/login', ldap_provider) == (
+        403, 'Access denied: your groups could not be read from the directory')
 
 
 def test_a_wrong_ldap_password_says_nothing_more(
@@ -205,9 +219,10 @@ class _Directory:
 
         class _Conn:
             def __init__(self):
-                self.user, self.entries = user, []
+                self.user, self.entries, self.result = user, [], None
 
-            def search(self, base, query, attributes=None):
+            def search(self, base, query, attributes=None, **kwargs):
+                self.result = {'result': 0}
                 entry = type('Entry', (), {'entry_dn': directory.USER_DN})()
                 if 'memberOf' in (attributes or []):
                     entry.memberOf = type('V', (), {'values': [f'CN={g},dc=example,dc=test'
@@ -249,7 +264,7 @@ def test_the_named_reasons_are_decided_after_the_bind(monkeypatch, disabled, gro
         account_status_attr=None, ldap_group_filter='(objectClass=group)',
         ldap_group_member_attr='memberOf', ldap_required_groups='["Admins"]',
         ldap_uid_attr=None, ldap_username_attr='uid', ldap_email_attr='mail',
-        ldap_fullname_attr='cn')
+        ldap_fullname_attr='cn', provider_type='ldap', role_mapping=None)
     for password_ok, expected in ((False, 'Invalid credentials'), (True, reason)):
         directory = _Directory(password_ok, disabled, groups)
         monkeypatch.setattr(ldap3, 'Server', lambda *a, **k: object())

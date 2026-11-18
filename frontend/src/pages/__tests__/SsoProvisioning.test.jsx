@@ -23,6 +23,11 @@ describe('SSO provisioning notice', () => {
     expect(screen.queryByText('sso.provisioningNoRulesNotice')).not.toBeInTheDocument()
   })
 
+  it('says where a sign-in refused for want of a rule is recorded', () => {
+    render(<SsoProviderForm provider={{ ...OIDC, role_mapping: { admins: 'admin' } }} onSave={vi.fn()} onCancel={() => {}} />)
+    expect(screen.getByText('sso.provisioningRefusalAudited')).toBeInTheDocument()
+  })
+
   it('keeps an empty default role empty on save', () => {
     const onSave = vi.fn()
     const { container } = render(<SsoProviderForm provider={{ ...OIDC, default_role: null }} onSave={onSave} onCancel={() => {}} />)

@@ -9,6 +9,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 
 from utils import issuance_defaults
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_config_rows')
+
 
 @pytest.fixture
 def rsa3072(monkeypatch):

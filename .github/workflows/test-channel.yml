@@ -4,7 +4,8 @@ name: Test Channel — RC Build Sanity
 # Builds a DEB package as a workflow artifact (NO publish, NO release).
 # This catches packaging regressions BEFORE we tag a -rcN release.
 #
-# To actually publish an RC: bump VERSION on `test` to `X.Y-rcN`, commit, then
+# To actually publish an RC: rehearse it first (build-release.yml dispatched with
+# dry_run), run `scripts/bump-version.sh X.Y-rcN` on `test`, commit, then
 # `git tag vX.Y-rcN && git push origin vX.Y-rcN`. That triggers build-release.yml
 # which publishes to GitHub Releases as a pre-release.
 
@@ -115,13 +116,15 @@ jobs:
           ============================================================
           DEB sanity build OK on `test`.
 
-          To publish a Release Candidate:
-            1. On the `test` branch, set VERSION to e.g. 2.137-rc1
-            2. Update frontend/package.json + package-lock.json to match
-            3. Commit and push
-            4. git tag v2.137-rc1 && git push origin v2.137-rc1
-            5. build-release.yml will publish DEB/RPM/Docker as a GitHub
-               pre-release (NOT marked as latest).
+          To publish a Release Candidate X.Y-rcN:
+            1. Rehearse it: run build-release.yml by workflow_dispatch with
+               version X.Y-rcN and dry_run on; it publishes nothing
+            2. On the `test` branch, run scripts/bump-version.sh X.Y-rcN
+               (VERSION, both npm files, the chart) and commit
+            3. Push, then git tag vX.Y-rcN && git push origin vX.Y-rcN
+            4. build-release.yml will publish DEB/RPM/Docker as a GitHub
+               pre-release (NOT marked as latest); the Helm chart is pushed
+               for a stable release only.
 
           Run the maintainer-local smoke-test matrix before promoting to stable.
           ============================================================

@@ -323,6 +323,9 @@ class SSHCAService:
 
         try:
             db.session.add(ca)
+            db.session.flush()
+            # An imported CA counts past any certificate this database already holds under its id
+            SSHCAService.raise_serial_counter(ca.id)
             db.session.commit()
         except Exception as e:
             db.session.rollback()
@@ -456,6 +459,9 @@ class SSHCAService:
 
         try:
             db.session.add(ca)
+            db.session.flush()
+            # An imported CA counts past any certificate this database already holds under its id
+            SSHCAService.raise_serial_counter(ca.id)
             db.session.commit()
         except Exception as e:
             db.session.rollback()
@@ -529,8 +535,24 @@ class SSHCAService:
         return ca_name
 
     @staticmethod
+    def raise_serial_counter(ca_id=None):
+        """In the caller's transaction: the counter of *ca_id* (every CA when None) moves past
+        the serials its certificates hold, never down."""
+        from utils.ssh_serials import raise_counters, session_run
+        raise_counters(session_run, ca_id)
+
+    @staticmethod
+    def lock_ca(ca_id):
+        """The CA row, locked until the caller commits (PostgreSQL; SQLite serializes writers):
+        revocations, issuances and imports under one CA take it first, then certificate rows."""
+        db.session.query(SSHCertificateAuthority.id).filter(
+            SSHCertificateAuthority.id == ca_id).with_for_update().first()
+
+    @staticmethod
     def get_next_serial(ca_id):
-        """Commit the next serial number of a CA and return it; a failed signature leaves a gap."""
+        """Commit the next serial number of a CA and return it; a failed signature leaves a gap.
+
+        An unknown CA raises ValueError with the caller's session as it was: nothing to undo."""
         from sqlalchemy import select, update
         table = SSHCertificateAuthority.__table__
         # One UPDATE adds one to the stored value under the row (PostgreSQL) or write (SQLite)
@@ -546,12 +568,13 @@ class SSHCAService:
                                             .where(table.c.id == ca_id)).scalar_one()
             else:
                 serial = None
-            if serial is None:
-                raise ValueError(f"SSH CA not found: {ca_id}")
-            db.session.commit()
+            if serial is not None:
+                db.session.commit()
         except Exception:
             db.session.rollback()
             raise
+        if serial is None:
+            raise ValueError(f"SSH CA not found: {ca_id}")
         return serial
 
     @staticmethod

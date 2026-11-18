@@ -416,9 +416,12 @@ def test_a_ca_a_template_or_a_connector_used_by_a_profile_is_not_deleted(app, cl
 
 @pytest.fixture
 def no_shared_keytab(app):
-    """No keytab in shared_files during the test; the one there before is put back."""
+    """No keytab in shared_files during the test; the one there before is put back, and so is
+    the node's keytab file a restore or a publication writes from it."""
     from models import SharedFile
     from services import shared_files
+    from services.kerberos.negotiate_auth import KEYTAB_PATH
+    on_disk = KEYTAB_PATH.read_bytes() if KEYTAB_PATH.exists() else None
     with app.app_context():
         row = db.session.get(SharedFile, shared_files.KERBEROS_KEYTAB)
         saved = (row.content, row.updated_at, row.updated_by) if row is not None else None
@@ -432,6 +435,10 @@ def no_shared_keytab(app):
             db.session.add(SharedFile(name=shared_files.KERBEROS_KEYTAB, content=saved[0],
                                       updated_at=saved[1], updated_by=saved[2]))
         db.session.commit()
+    if on_disk is None:
+        KEYTAB_PATH.unlink(missing_ok=True)
+    else:
+        KEYTAB_PATH.write_bytes(on_disk)
 
 
 def _connector_as(state):

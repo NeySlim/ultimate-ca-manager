@@ -5,7 +5,9 @@ import { ToggleSwitch } from '../../../components/ui/ToggleSwitch'
 import CopyableUrl from '../CopyableUrl'
 import MappingEditor from '../MappingEditor'
 import RoleMappingEditor from '../RoleMappingEditor'
+import LegacyGroupsNotice from './LegacyGroupsNotice'
 import ProvisioningNotice, { hasRoleRules } from './ProvisioningNotice'
+import SignInTestPanel from './SignInTestPanel'
 
 export default function SsoOAuth2Fields({
   formData,
@@ -20,6 +22,7 @@ export default function SsoOAuth2Fields({
   customRoles,
   oauthCallbackUrl,
   handleTestConnection,
+  dirty,
   secretProps,
 }) {
   const { t } = useTranslation()
@@ -114,6 +117,7 @@ export default function SsoOAuth2Fields({
               {t('sso.testConnection')}
             </Button>
           )}
+          <SignInTestPanel provider={provider} dirty={dirty} formData={formData} handleChange={handleChange} />
         </div>
       </CompactSection>
 
@@ -131,6 +135,7 @@ export default function SsoOAuth2Fields({
               keyPlaceholder="e.g., preferred_username"
               valuePlaceholder="e.g., username"
             />
+            <LegacyGroupsNotice mapping={formData.attribute_mapping} />
           </div>
           <div className="pt-2 border-t border-border">
             <p className="text-xs font-medium text-text-secondary mb-1">{t('sso.roleMapping')}</p>

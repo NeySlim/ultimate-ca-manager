@@ -267,6 +267,23 @@ def test_the_image_sbom_names_its_digest_variant_and_arch(tmp_path):
     assert subject['purl'].endswith('?arch=arm64')
 
 
+def test_a_license_id_trivy_gives_outside_the_spdx_list_is_kept_as_a_name(tmp_path):
+    # Debian packages carry such ids (debianutils: SMAIL-GPL): the schema takes ids of its own list only
+    frag = s.frontend(tmp_path)
+    digest = s.DIGEST[('standard', 'amd64')]
+    purl = 'pkg:deb/debian/debianutils@5.23.2'
+    doc = s.trivy(tmp_path, digest, components=[
+        {'type': 'operating-system', 'bom-ref': 'os', 'name': 'debian', 'version': '13.2'},
+        {'type': 'library', 'bom-ref': purl, 'name': 'debianutils', 'version': '5.23.2', 'purl': purl,
+         'licenses': [{'license': {'id': 'GPL-2.0-only'}}, {'license': {'name': 'public-domain'}},
+                      {'license': {'id': 'SMAIL-GPL'}}]}])
+    proc = s.image_sbom(tmp_path, frag, trivy_doc=doc)
+    assert proc.returncode == 0, proc.stderr
+    (utils,) = _by_name(_doc(tmp_path / 'ucm-3.0.rc1-image-standard-amd64.cdx.json'), 'debianutils')
+    assert utils['licenses'] == [{'license': {'id': 'GPL-2.0-only'}}, {'license': {'name': 'public-domain'}},
+                                 {'license': {'name': 'SMAIL-GPL'}}]
+
+
 def test_python_versions_and_licenses_come_from_the_installed_metadata(tmp_path):
     proc, out = _image(tmp_path)
     assert proc.returncode == 0, proc.stderr
@@ -277,6 +294,8 @@ def test_python_versions_and_licenses_come_from_the_installed_metadata(tmp_path)
     assert sa['version'] == '2.0.46' and sa['licenses'] == [{'license': {'id': 'MIT'}}]
     (pyjks,) = _by_name(doc, 'pyjks')
     assert pyjks['licenses'] == [{'license': {'name': 'MIT License'}}]
+    (accent,) = _by_name(doc, 'accent')
+    assert accent['licenses'] == [{'license': {'name': 'MIT © Société'}}]
     assert not _by_name(doc, 'twofish')
     # The tools left in the environment are components too, in both locations
     (pip,) = _by_name(doc, 'pip')

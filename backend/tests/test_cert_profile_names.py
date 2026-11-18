@@ -16,6 +16,8 @@ from utils.san_parse import (auto_san_buckets_from_cn, parse_cert_san_payload,
                              parse_csr_san_entries, validate_dns_san)
 from tests.fixtures.templates import templates_created_here_removed
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
+
 
 @pytest.fixture(autouse=True, scope='module')
 def _templates_stay_in_this_module(app):

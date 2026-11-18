@@ -129,7 +129,7 @@ def test_a_passkey_login_a_restore_overtakes_opens_no_valid_session(app, user, m
 def test_an_ldap_login_a_restore_overtakes_opens_no_valid_session(app, ldap, monkeypatch):
     from api.v2.sso import ldap_routes
     name = f'ldap-{uuid.uuid4().hex[:8]}'
-    monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user', lambda _p, username, _pw: (
+    monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user', lambda _p, username, _pw, before_bind=None: (
         {'username': username, 'dn': f'uid={username},dc=example', 'uid': f'uuid-{username}'}, None))
     done = _restore_meanwhile(monkeypatch, ldap_routes, '_ldap_authenticate_user')
     c = app.test_client()
@@ -349,3 +349,25 @@ def test_a_file_path_or_a_malformed_ocsp_request_costs_at_most_four_statements(a
     c = app.test_client()
     seen = _statements(app, lambda: getattr(c, method)(path))
     assert seen.epoch == 0 and seen.all <= 4, (path, seen.all)
+
+
+@pytest.fixture
+def epoch_check_due(monkeypatch):
+    """The process's cache check against the epoch is overdue, as in a long suite or a quiet worker."""
+    from services.backup.restore import invalidate
+    monkeypatch.setitem(invalidate._purged, 'checked', -1e9)
+
+
+@pytest.mark.parametrize('method,path', NO_SESSION_PATHS)
+def test_an_overdue_cache_check_reads_no_epoch_in_a_request_that_opens_no_session(
+        app, epoch_check_due, method, path):
+    c = app.test_client()
+    seen = _statements(app, lambda: getattr(c, method)(path))
+    assert seen.epoch == 0, (path, seen.all)
+
+
+def test_an_overdue_cache_check_leaves_a_login_one_epoch_read(app, user, epoch_check_due):
+    c = app.test_client()
+    seen = _statements(app, lambda: _password_step(c, user))
+    assert seen.epoch == 1, seen.all
+    assert _signed_in(c)

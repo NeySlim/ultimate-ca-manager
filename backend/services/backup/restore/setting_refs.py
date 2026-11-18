@@ -31,8 +31,11 @@ def reference_of(key: str) -> Optional[Tuple[SettingReference, 're.Match']]:
 def _value_names_a_row(section_name: str, value: Any) -> Optional[str]:
     """'id' or 'refid' when the value names a row of that section, else None."""
     text = str(value or '').strip()
-    if text.isdigit():
+    # A number as the setting's readers take it: int() reads ' +05 ' as 5
+    try:
         return 'id' if int(text) else None
+    except ValueError:
+        pass
     if text and SECTIONS[section_name].identity == ('refid',):
         return 'refid'
     return None

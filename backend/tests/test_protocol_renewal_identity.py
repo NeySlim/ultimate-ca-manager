@@ -20,6 +20,8 @@ from tests.test_est_rfc7030 import (  # noqa: F401  (EST harness)
     EST_BASE, _basic_auth, _post_csr, est_config,
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _csr(cn, key=None, sans=None):
     key = key or rsa.generate_private_key(public_exponent=65537, key_size=2048)

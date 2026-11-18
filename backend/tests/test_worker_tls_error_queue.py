@@ -154,3 +154,20 @@ def test_a_socket_class_without_the_expected_methods_is_left_alone(caplog):
     assert workers.clear_tls_errors_before_io(Renamed) is False
     assert dict(Renamed.__dict__) == before
     assert 'TLS errors may spread between connections' in caplog.text
+
+
+def test_a_socket_class_missing_only_its_wait_is_left_alone(caplog):
+    """Wrapping the five calls and then failing on the sixth would stop the worker at import."""
+    import workers
+
+    class NoWait:
+        def read(self): return 'read'
+        def write(self): return 'write'
+        def send(self): return 'send'
+        def do_handshake(self): return 'do_handshake'
+        def unwrap(self): return 'unwrap'
+
+    before = dict(NoWait.__dict__)
+    assert workers.clear_tls_errors_before_io(NoWait) is False
+    assert dict(NoWait.__dict__) == before
+    assert 'lacks _wait' in caplog.text and 'OpenSSL error queue' not in caplog.text

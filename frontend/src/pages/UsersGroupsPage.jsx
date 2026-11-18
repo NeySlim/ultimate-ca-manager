@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next'
 import { 
   User, Users, UsersThree, Plus, Trash, PencilSimple, Key,
   CheckCircle, XCircle, Crown, Clock, ShieldCheck, UserCircle, Certificate, Download,
-  LinkSimple, LinkBreak
+  LinkSimple, LinkBreak, ArrowCounterClockwise
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Input, Select,
@@ -105,6 +105,7 @@ export default function UsersGroupsPage() {
   const [linkProviders, setLinkProviders] = useState([])
   const [linkProviderId, setLinkProviderId] = useState('')
   const [linkSaving, setLinkSaving] = useState(false)
+  const [linkRemovePassword, setLinkRemovePassword] = useState(false)
 
   // Pagination
   const [page, setPage] = useState(1)
@@ -246,12 +247,22 @@ export default function UsersGroupsPage() {
     }
   }
 
-  // ============= SSO LINKING =============
-  const isLinked = (u) => !!(u && ((u.auth_source && u.auth_source !== 'local') || u.sso_provider_id))
+  // ============= SSO PROVIDERS =============
+  // One row per provider that opens the account; none: a local account
+  const ssoRows = (u) => (u && u.sso_identities) || []
+  const rowName = (row) => row.provider_name || t('users.sso.deletedProvider')
+  // A provider already attached is reset or detached from the account's page, not attached twice
+  const attachable = linkProviders.filter(p => !ssoRows(linkTarget).some(r => r.provider_id === p.id))
+
+  const afterSsoChange = async (id) => {
+    await loadData()
+    if (selectedUser?.id === id) await refreshSelectedUser(id)
+  }
 
   const handleOpenLinkModal = async (user) => {
     setLinkTarget(user)
     setLinkProviderId('')
+    setLinkRemovePassword(false)
     setShowLinkModal(true)
     try {
       const res = await ssoService.getProviders()
@@ -264,34 +275,56 @@ export default function UsersGroupsPage() {
 
   const handleSubmitLink = async () => {
     if (!linkTarget || !linkProviderId) return
+    // Removing the local password leaves the account to its providers alone: confirmed first.
+    if (linkRemovePassword) {
+      const confirmed = await showConfirm(t('users.sso.confirmRemovePassword', { name: linkTarget.username }),
+        { title: t('users.sso.attach'), confirmText: t('users.sso.attach') })
+      if (!confirmed) return
+    }
     setLinkSaving(true)
     try {
-      await usersService.linkSso(linkTarget.id, {
+      await usersService.attachSso(linkTarget.id, {
         provider_id: Number(linkProviderId),
+        remove_password: linkRemovePassword,
       })
-      showSuccess(t('users.sso.linkSuccess', { name: linkTarget.username }))
+      showSuccess(t('users.sso.attachSuccess', { name: linkTarget.username }))
+      const id = linkTarget.id
       setShowLinkModal(false)
       setLinkTarget(null)
-      await loadData()
+      await afterSsoChange(id)
     } catch (error) {
-      showError(error.message || t('users.sso.linkFailed'))
+      showError(error.message || t('users.sso.attachFailed'))
     } finally {
       setLinkSaving(false)
     }
   }
 
-  const handleUnlinkSso = async (user) => {
-    const confirmed = await showConfirm(t('users.sso.confirmUnlink', { name: user.username }), {
-      title: t('users.sso.unlink'),
-      confirmText: t('users.sso.unlink')
-    })
+  const handleDetachSso = async (user, row) => {
+    const last = ssoRows(user).length === 1
+    const confirmed = await showConfirm(
+      t(last ? 'users.sso.confirmDetachLast' : 'users.sso.confirmDetach', { name: user.username, provider: rowName(row) }),
+      { title: t('users.sso.detach'), confirmText: t('users.sso.detach') })
     if (!confirmed) return
     try {
-      const res = await usersService.unlinkSso(user.id)
-      showSuccess(res.message || t('users.sso.unlinkSuccess', { name: user.username }))
-      await loadData()
+      const res = await usersService.detachSso(user.id, row.id)
+      showSuccess(res?.message || t('users.sso.detachSuccess', { name: user.username }))
+      await afterSsoChange(user.id)
     } catch (error) {
-      showError(error.message || t('users.sso.unlinkFailed'))
+      showError(error.message || t('users.sso.detachFailed'))
+    }
+  }
+
+  const handleResetSso = async (user, row) => {
+    const confirmed = await showConfirm(
+      t('users.sso.confirmReset', { name: user.username, provider: rowName(row) }),
+      { title: t('users.sso.resetIdentity'), confirmText: t('users.sso.resetIdentity') })
+    if (!confirmed) return
+    try {
+      await usersService.resetSsoIdentity(user.id, row.id)
+      showSuccess(t('users.sso.resetSuccess', { name: user.username }))
+      await afterSsoChange(user.id)
+    } catch (error) {
+      showError(error.message || t('users.sso.resetFailed'))
     }
   }
 
@@ -703,18 +736,19 @@ export default function UsersGroupsPage() {
       hideOnMobile: true,
       sortable: true,
       render: (val, row) => {
-        const source = val || 'local'
-        const config = {
-          local:  { variant: 'default', label: t('users.authSource.local') },
-          ldap:   { variant: 'primary', label: t('users.authSource.ldap') },
-          oauth2: { variant: 'violet',  label: t('users.authSource.oauth2') },
-          saml:   { variant: 'teal',    label: t('users.authSource.saml') },
-        }[source] || { variant: 'default', label: source }
-        const label = row.sso_provider_name
-          ? `${config.label} · ${row.sso_provider_name}`
-          : config.label
+        const rows = row.sso_identities || []
+        if (!rows.length) {
+          return <Badge variant="default" size="sm">{t('users.authSource.local')}</Badge>
+        }
+        // Every provider that opens the account, by type and name
+        const type = (kind) => ({
+          ldap: t('users.authSource.ldap'), oauth2: t('users.authSource.oauth2'), saml: t('users.authSource.saml'),
+        }[kind] || kind || '')
+        const label = rows
+          .map(r => [type(r.provider_type), r.provider_name || t('users.sso.deletedProvider')].filter(Boolean).join(' · '))
+          .join(', ')
         return (
-          <Badge variant={config.variant} size="sm" title={label}>
+          <Badge variant={rows.length > 1 ? 'violet' : 'primary'} size="sm" title={label}>
             {label}
           </Badge>
         )
@@ -786,9 +820,7 @@ export default function UsersGroupsPage() {
     { label: row.active ? t('common.deactivate') : t('users.activate'), icon: row.active ? XCircle : CheckCircle, onClick: () => handleToggleUser(row) },
     { label: t('users.resetPassword'), icon: Key, onClick: () => handleResetPassword(row) },
     ...(canWrite('users') ? [
-      isLinked(row)
-        ? { label: t('users.sso.unlink'), icon: LinkBreak, onClick: () => handleUnlinkSso(row) }
-        : { label: t('users.sso.link'), icon: LinkSimple, onClick: () => handleOpenLinkModal(row) }
+      { label: t('users.sso.attach'), icon: LinkSimple, onClick: () => handleOpenLinkModal(row) },
     ] : []),
     ...(canDelete('users') ? [
       { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDeleteUser(row) }
@@ -842,15 +874,9 @@ export default function UsersGroupsPage() {
             <Button type="button" size="sm" variant="secondary" onClick={() => handleToggle2faExempt(selectedUser)}>
               <ShieldCheck size={14} /> {selectedUser.totp_exempt ? t('users.require2fa') : t('users.exempt2fa')}
             </Button>
-            {isLinked(selectedUser) ? (
-              <Button type="button" size="sm" variant="secondary" onClick={() => handleUnlinkSso(selectedUser)}>
-                <LinkBreak size={14} /> {t('users.sso.unlink')}
-              </Button>
-            ) : (
-              <Button type="button" size="sm" variant="secondary" onClick={() => handleOpenLinkModal(selectedUser)}>
-                <LinkSimple size={14} /> {t('users.sso.link')}
-              </Button>
-            )}
+            <Button type="button" size="sm" variant="secondary" onClick={() => handleOpenLinkModal(selectedUser)}>
+              <LinkSimple size={14} /> {t('users.sso.attach')}
+            </Button>
           </>
         )}
         {canDelete('users') && (
@@ -859,6 +885,37 @@ export default function UsersGroupsPage() {
           </Button>
         )}
       </div>
+
+      <CompactSection title={t('users.sso.providers')} icon={LinkSimple} iconClass="icon-bg-violet">
+        {ssoRows(selectedUser).length === 0 ? (
+          <p className="text-xs text-text-secondary">{t('users.sso.noProviders')}</p>
+        ) : (
+          <ul className="space-y-2">
+            {ssoRows(selectedUser).map(row => (
+              <li key={row.id} className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="truncate text-sm text-text-primary" title={row.orphan_of || rowName(row)}>{rowName(row)}</span>
+                  <Badge variant={{ bound: 'success', pending: 'orange', orphan: 'secondary' }[row.state] || 'default'} size="sm">
+                    {t(`users.sso.state.${row.state}`)}
+                  </Badge>
+                </div>
+                {canWrite('users') && (
+                  <div className="flex gap-1">
+                    {row.external_id && (
+                      <Button type="button" size="sm" variant="secondary" onClick={() => handleResetSso(selectedUser, row)}>
+                        <ArrowCounterClockwise size={14} /> {t('users.sso.resetIdentity')}
+                      </Button>
+                    )}
+                    <Button type="button" size="sm" variant="secondary" onClick={() => handleDetachSso(selectedUser, row)}>
+                      <LinkBreak size={14} /> {t('users.sso.detach')}
+                    </Button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </CompactSection>
 
       <CompactSection title={t('common.user') + ' ' + t('common.info')} icon={UserCircle} iconClass="icon-bg-blue">
         <CompactGrid columns={1}>
@@ -1190,31 +1247,44 @@ export default function UsersGroupsPage() {
         />
       </Modal>
 
-      {/* Link to SSO Modal (#136) */}
+      {/* Attach a provider (#136): the providers the account has keep opening it */}
       <Modal
         open={showLinkModal}
         onOpenChange={(open) => { setShowLinkModal(open); if (!open) setLinkTarget(null) }}
-        title={t('users.sso.linkTitle', { name: linkTarget?.username || '' })}
+        title={t('users.sso.attachTitle', { name: linkTarget?.username || '' })}
         size="md"
       >
         <div className="p-4 space-y-4">
-          <p className="text-sm text-text-secondary">{t('users.sso.linkHelp')}</p>
-          <Select
-            label={t('users.sso.provider')}
-            value={linkProviderId}
-            onChange={(val) => setLinkProviderId(val)}
-            placeholder={t('users.sso.selectProvider')}
-            options={linkProviders.map(p => ({
-              value: String(p.id),
-              label: `${p.display_name || p.name} (${(p.provider_type || '').toUpperCase()})`,
-            }))}
-          />
+          <p className="text-sm text-text-secondary">{t('users.sso.attachHelp')}</p>
+          {attachable.length === 0 && linkProviders.length > 0 ? (
+            <p className="text-sm text-text-secondary">{t('users.sso.noProviderLeft')}</p>
+          ) : (
+            <Select
+              label={t('users.sso.provider')}
+              value={linkProviderId}
+              onChange={(val) => setLinkProviderId(val)}
+              placeholder={t('users.sso.selectProvider')}
+              options={attachable.map(p => ({
+                value: String(p.id),
+                label: `${p.display_name || p.name} (${(p.provider_type || '').toUpperCase()})`,
+              }))}
+            />
+          )}
+          <label className="flex items-start gap-2 text-sm text-text-secondary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={linkRemovePassword}
+              onChange={(e) => setLinkRemovePassword(e.target.checked)}
+              className="mt-0.5 rounded border-border"
+            />
+            <span>{t('users.sso.removePassword')}</span>
+          </label>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => { setShowLinkModal(false); setLinkTarget(null) }}>
               {t('common.cancel')}
             </Button>
             <Button type="button" onClick={handleSubmitLink} disabled={!linkProviderId || linkSaving} loading={linkSaving}>
-              <LinkSimple size={16} /> {t('users.sso.link')}
+              <LinkSimple size={16} /> {t('users.sso.attach')}
             </Button>
           </div>
         </div>

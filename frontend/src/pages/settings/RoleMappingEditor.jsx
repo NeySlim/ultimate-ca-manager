@@ -17,7 +17,22 @@ export const serializeRoleEntry = ({ role, custom }) => {
 
 let nextRowId = 0
 const toRows = (obj) => Object.entries(obj || {}).map(([key, val]) => ({ id: ++nextRowId, key, ...normalizeRoleEntry(val) }))
-const toObject = (rows) => Object.fromEntries(rows.map(r => [r.key, serializeRoleEntry(r)]))
+// A repeated key keeps its first row; every later row of it is marked invalid (blocks a submit inside a <form>)
+const toObject = (rows) => {
+  const seen = new Set()
+  return Object.fromEntries(rows.filter(r => !seen.has(r.key) && seen.add(r.key)).map(r => [r.key, serializeRoleEntry(r)]))
+}
+
+// Ids of the rows whose non-empty key an earlier row already holds
+const repeatedRows = (rows) => {
+  const seen = new Set()
+  const repeated = new Set()
+  for (const r of rows) {
+    if (r.key && seen.has(r.key)) repeated.add(r.id)
+    seen.add(r.key)
+  }
+  return repeated
+}
 
 export default function RoleMappingEditor({ value, onChange, keyLabel, keyPlaceholder, roleOptions = [], customRoles = [] }) {
   const { t } = useTranslation()
@@ -43,6 +58,8 @@ export default function RoleMappingEditor({ value, onChange, keyLabel, keyPlaceh
   const removeRow = (id) => emit(rows.filter(r => r.id !== id))
   const addRow = () => emit([...rows, { id: ++nextRowId, key: '', role: '', custom: '' }])
 
+  const repeated = repeatedRows(rows)
+
   const none = { value: '', label: t('common.none') }
   const baseOptions = [none, ...roleOptions]
   // A custom role already in the mapping stays visible even if the list lacks it
@@ -56,12 +73,16 @@ export default function RoleMappingEditor({ value, onChange, keyLabel, keyPlaceh
       <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 text-xs text-text-secondary">
         <span>{keyLabel}</span><span>{t('sso.baseRole')}</span><span>{t('sso.customRole')}</span><span />
       </div>
-      {rows.map(row => (
-        <div key={row.id} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center">
+      {rows.map(row => {
+        const duplicate = repeated.has(row.id) ? t('common.duplicateKey', { key: row.key }) : ''
+        return (
+        <div key={row.id} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-start">
           <Input
+            ref={el => el?.setCustomValidity(duplicate)}
             value={row.key}
             onChange={e => updateRow(row.id, { key: e.target.value })}
             placeholder={keyPlaceholder}
+            error={duplicate || undefined}
             size="sm"
           />
           <Select value={row.role} onChange={role => updateRow(row.id, { role })} options={baseOptions} size="sm" />
@@ -70,7 +91,8 @@ export default function RoleMappingEditor({ value, onChange, keyLabel, keyPlaceh
             <Trash size={14} className="text-status-danger" />
           </Button>
         </div>
-      ))}
+        )
+      })}
       <Button size="sm" variant="secondary" onClick={addRow} type="button">
         <Plus size={14} /> {t('common.add')}
       </Button>

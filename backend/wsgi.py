@@ -8,10 +8,16 @@ from pathlib import Path
 backend_dir = Path(__file__).parent
 sys.path.insert(0, str(backend_dir))
 
-from app import create_app
+from startup_refusal import EXIT_CODE, DatabaseRefused  # noqa: E402
+from app import create_app  # noqa: E402
 
-# Create Flask application instance
-app = create_app()
+# Create Flask application instance; a refused database exits with a code of its own,
+# which gunicorn (it catches RuntimeError alone, as exit 1) passes on
+try:
+    app = create_app()
+except DatabaseRefused as exc:
+    print(f"\nError: {exc}\n", file=sys.stderr)
+    sys.exit(EXIT_CODE)
 
 if __name__ == "__main__":
     app.run()

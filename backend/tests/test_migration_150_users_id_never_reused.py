@@ -262,7 +262,11 @@ def test_the_runner_applies_it_to_a_database_file(tmp_path):
     assert migration_runner._run_pending_sqlite(['300_upgrade_from_2_254'], False, db_path=str(path))
     conn = sqlite3.connect(path)
     assert 'AUTOINCREMENT' in _table_sql(conn).upper()
-    assert conn.execute(f"SELECT * FROM {TABLE} ORDER BY id").fetchall() == _USERS
+    # Step 167, later in the same upgrade, takes auth_source out of users and adds, last,
+    # has_sso_identity: this schema has no provider columns, so no account gets a row
+    assert conn.execute("SELECT COUNT(*) FROM user_sso_identities").fetchone() == (0,)
+    assert conn.execute(f"SELECT * FROM {TABLE} ORDER BY id").fetchall() == \
+        [row[:3] + row[4:] + (0,) for row in _USERS]
     assert conn.execute("SELECT name FROM _migrations").fetchall() == [('300_upgrade_from_2_254',)]
 
 
@@ -285,5 +289,5 @@ def test_a_2254_install_upgraded_by_the_runner_never_reuses_an_id(tmp_path):
         assert upgraded[part] == fresh[part]
     assert [c for c in upgraded['columns'] if c[0] == 'id'] == [c for c in fresh['columns'] if c[0] == 'id']
     conn.execute(f"DELETE FROM {TABLE}")
-    assert conn.execute(f"INSERT INTO {TABLE} (username, email, password_hash, role, auth_source) "
-                        "VALUES ('b', 'b@x', 'h', 'admin', 'local')").lastrowid == 5
+    assert conn.execute(f"INSERT INTO {TABLE} (username, email, password_hash, role) "
+                        "VALUES ('b', 'b@x', 'h', 'admin')").lastrowid == 5

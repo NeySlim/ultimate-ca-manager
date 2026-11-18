@@ -19,9 +19,11 @@ from models.acme_models import AcmeAccount, AcmeOrder
 from services.acme import profiles as acme_profiles
 from services.acme.acme_service import AcmeService
 from utils import key_algorithms
+from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
+pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
 
 OPENSSL = shutil.which('openssl')
 

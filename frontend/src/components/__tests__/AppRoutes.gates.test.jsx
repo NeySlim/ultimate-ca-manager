@@ -4,7 +4,7 @@
  * left so a logout from the prompt does not land back on it.
  */
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 
 const auth = vi.hoisted(() => ({ value: {} }))
@@ -71,5 +71,18 @@ describe('AppRoutes under the forced gates', () => {
   it('mounts the pages once nothing is pending', async () => {
     renderAt('/dashboard', {})
     expect(await screen.findByText('dashboard-page')).toBeTruthy()
+  })
+})
+
+describe('AppRoutes: the sign-in page once signed in', () => {
+  it('goes to the page its next names', async () => {
+    // A page this test mocks: a lazy one keeps the old location until it loads
+    renderAt('/login?next=%2Fdashboard%3Ftab%3Dqueue')
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/dashboard?tab=queue'))
+  })
+
+  it('goes to the landing page for a next it refuses', async () => {
+    renderAt('/login?next=%2F%2Fevil.example')
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/'))
   })
 })

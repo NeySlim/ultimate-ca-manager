@@ -9,6 +9,8 @@ from werkzeug.test import Client
 from models import SystemConfig, db
 from protocol_http_server import ProtocolOnlyMiddleware
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 CAPS = '?operation=GetCACaps'
 
 

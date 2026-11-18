@@ -74,15 +74,21 @@ def _rate_limit_lan_exempt():
 
 
 def run_startup_housekeeping(app):
-    """Files missing on disk rewritten from the database, interrupted ACME orders reset."""
+    """Files reconciled with the database, a restored HTTPS pair settled, ACME orders reset."""
     try:
         with app.app_context():
-            from services.file_regen_service import regenerate_all_files
-            stats = regenerate_all_files()
-            if sum(stats.values()) > 0:
-                app.logger.info(f"✓ File regeneration completed: {stats}")
+            from services.file_regen_service import reconcile_files
+            stats = reconcile_files()
+            app.logger.info(f"File reconciliation at start: {stats}")
     except Exception as e:
-        app.logger.warning(f"File regeneration failed (non-fatal): {e}")
+        app.logger.error(f"File reconciliation failed, retried by its task: {e}")
+
+    try:
+        with app.app_context():
+            from services.https_binding import settle_restored_https
+            settle_restored_https()
+    except Exception as e:
+        app.logger.warning(f"Restored HTTPS certificate not settled (non-fatal): {e}")
 
     # No auto-poll thread survives a restart: its orders go back to pending
     try:
@@ -234,24 +240,15 @@ def create_app(config_name=None):
     # Failure here MUST stop startup: continuing with a broken schema causes
     # silent data corruption or 500s on every request. Operators should see
     # the failure immediately and fix it before the service comes back up.
-    from migration_runner import run_at_startup, _get_db_url
+    from migration_runner import _get_db_url
     from services.scheduler_leader import boot_lock
+    from startup_refusal import migrate_or_refuse
     db_path = config.DATABASE_PATH
     if db_path:
         os.environ.setdefault('DATABASE_PATH', str(db_path))
-    from utils.ha import ha_enabled as _ha_on
-    if _ha_on():
-        # A restore that has not committed holds the cluster: no migration or write before it ends
-        from services.cluster_maintenance import wait_while_restoring
-        wait_while_restoring(_get_db_url())
-    # HA: one node at a time migrates; the next one finds nothing left to apply
-    migrated = run_at_startup(boot_lock)
-    if not migrated:
-        raise RuntimeError(
-            "Schema migration failed or the database was refused at startup. "
-            "Refusing to start with an inconsistent database. Check the migration "
-            "log above and fix the issue before restarting the service."
-        )
+    # HA: once no restore holds the cluster, one node at a time migrates; the next one finds
+    # nothing left to apply
+    migrate_or_refuse(boot_lock)
     
     # A backend switch that asked for this restart has now been applied: the
     # configuration read above is the new one. Clearing the marker is what
@@ -381,6 +378,8 @@ def create_app(config_name=None):
     app.request_class = SpoolingRequest
     from services.backup.section_store import sweep_stale_stores
     sweep_stale_stores(spool=app.config['UPLOAD_SPOOL_DIR'])
+    from services.backup.storage import sweep_orphan_spools
+    sweep_orphan_spools()
 
     # Initialize cache
     cache.init_app(app, config={
@@ -427,6 +426,8 @@ def create_app(config_name=None):
             "origins": _cors_origins,
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
             "allow_headers": ["Content-Type", "Authorization", "X-CSRF-Token"],
+            "expose_headers": ["Content-Disposition", "X-Skipped-Certificates", "X-Skipped-Certificates-Count",
+                               "X-Skipped-CAs", "X-Skipped-CAs-Count"],
             "supports_credentials": True
         },
         r"/socket.io/*": {
@@ -696,6 +697,14 @@ def create_app(config_name=None):
                         "under an old one"
         )
 
+        from services.sso_sign_in_test_purge import scheduled_purge as purge_sign_in_tests
+        scheduler.register_task(
+            name="sso_sign_in_test_purge",
+            func=purge_sign_in_tests,
+            interval=60,
+            description="Purge OIDC and SAML sign-in tests and their reports past their expiry"
+        )
+
         from security.session_key import scheduled_retire as retire_session_key
         scheduler.register_task(
             name="session_key_retire",
@@ -860,7 +869,27 @@ def create_app(config_name=None):
             app.logger.info("Registered update check task (hourly)")
         except ImportError:
             pass
+
+        # Every node: its certificate and key files follow the rows, after a restore anywhere
+        from services.file_regen_service import reconcile_if_behind
+        scheduler.register_task(
+            name="files_reconcile",
+            func=reconcile_if_behind,
+            interval=60,
+            description="Write and remove this node's certificate and key files after a restore",
+            per_node=True
+        )
         
+        # SQLite only: its statistics stay as the last ANALYZE left them (PostgreSQL has autovacuum)
+        if app.config.get('SQLALCHEMY_DATABASE_URI', '').startswith('sqlite'):
+            from services.sqlite_statistics import scheduled_refresh
+            scheduler.register_task(
+                name="sqlite_statistics",
+                func=scheduled_refresh,
+                interval=3600,
+                description="Refresh the SQLite planner statistics (PRAGMA optimize from 3.46, bounded ANALYZE before)"
+            )
+
         # Register discovery scheduler task (checks every 60s for due profiles)
         try:
             from services.discovery_scheduler_task import DiscoverySchedulerTask
@@ -1066,6 +1095,16 @@ def create_app(config_name=None):
         check_pending_serial_index(app)
     except Exception as e:
         app.logger.debug(f"Serial index check skipped: {e}")
+    try:
+        from utils.trust_pem import report_removed_keys
+        report_removed_keys(app)
+    except Exception as e:
+        app.logger.warning(f"Trust store key report skipped: {e}")
+    try:
+        from utils import ssh_serials
+        ssh_serials.report_marked_duplicates(app)
+    except Exception as e:
+        app.logger.warning(f"SSH serial report skipped: {e}")
 
     # Auto-register SoftHSM provider if Docker entrypoint initialized a token
     try:
@@ -1159,7 +1198,9 @@ def create_app(config_name=None):
         # HSTS is operator-configurable (Settings -> General, or UCM_HSTS_*
         # env vars) so instances serving self-signed certs during setup can
         # opt out entirely — see issue #154.
-        if 'Strict-Transport-Security' not in response.headers:
+        from utils.public_endpoints import PROBE_PATHS
+        # HSTS settings live in the database: a probe answers without them
+        if 'Strict-Transport-Security' not in response.headers and request.path not in PROBE_PATHS:
             from utils.hsts import build_hsts_header
             hsts_value = build_hsts_header()
             if hsts_value:
@@ -1940,7 +1981,8 @@ def main():
     print(f"{'='*60}")
     print(f"  HTTPS Server: https://{config.HOST}:{config.HTTPS_PORT}")
     print(f"  Certificate: {config.HTTPS_CERT_PATH}")
-    print(f"  Database: {config.DATABASE_PATH}")
+    from utils.db_url import database_label
+    print(f"  Database: {database_label(os.getenv('DATABASE_URL'), config.DATABASE_PATH)}")
     print(f"{'='*60}\n")
     
     # Start HTTP protocol server for CDP/OCSP (dev mode, non-blocking thread)

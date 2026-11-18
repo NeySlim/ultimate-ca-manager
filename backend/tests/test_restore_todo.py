@@ -37,20 +37,21 @@ class TestTodoLines:
 class TestRoutesAnswerWithTheLines:
     @pytest.mark.parametrize('route', ('/api/v2/system/restore', '/api/v2/settings/backup/restore'))
     def test_data_carries_todo(self, app, auth_client, monkeypatch, route):
-        import importlib
         import services.backup.restore.invalidate as invalidate
-        from api.v2.system.backup import BackupService
+        from services.backup_service import BackupService
 
         monkeypatch.setattr(BackupService, 'restore_backup_from_stream',
                             lambda self, *a, **k: {k_: v for k_, v in DEGRADED.items() if k_ != 'invalidated'})
         monkeypatch.setattr(BackupService, 'check_archive_opens', lambda self, *a, **k: None)
         monkeypatch.setattr(invalidate, 'invalidate_after_restore',
                             lambda *a, **k: DEGRADED['invalidated'])
-        for module in ('api.v2.system.backup', 'api.v2.settings.backup'):
-            loaded = importlib.import_module(module)
-            for name in ('_request_restart_after_restore', 'request_restart'):
-                if hasattr(loaded, name):
-                    monkeypatch.setattr(loaded, name, lambda: (True, 'ok'))
+        from tests.restore_job_support import sessions_kept
+        sessions_kept(monkeypatch)  # the restore job's own sessions step
+        # The restore job's CRL step reports what the degraded aftermath says
+        monkeypatch.setattr(invalidate, 'regenerate_crls_summary',
+                            lambda: dict(DEGRADED['invalidated']))
+        # At its source, read at call time by the restore job: no restart file is written
+        monkeypatch.setattr('services.backup.restore_completion.request_restart', lambda: (True, 'ok'))
 
         response = auth_client.post(
             route, data={'file': (io.BytesIO(b'x'), 'x.ucmbkp'),
@@ -78,7 +79,7 @@ class TestListingAnnouncesTheRestoreLimits:
 class TestArchiveWithoutSection:
     @pytest.mark.parametrize('route', ('/api/v2/system/restore', '/api/v2/settings/backup/restore'))
     def test_early_answer_still_lists_what_was_not_restored(self, app, auth_client, monkeypatch, route):
-        from api.v2.system.backup import BackupService
+        from services.backup_service import BackupService
 
         monkeypatch.setattr(BackupService, 'restore_backup_from_stream',
                             lambda self, *a, **k: {'sections_carried': [],

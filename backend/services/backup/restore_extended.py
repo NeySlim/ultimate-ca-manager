@@ -27,8 +27,8 @@ from typing import Any, Dict, Optional
 from sqlalchemy import inspect as sa_inspect
 
 from models import db
-from config.settings import Config
 from utils.datetime_utils import to_naive_utc
+from utils import ssh_serials as SSHSerials
 
 from .errors import BackupSchemaError
 from .export_generic import REFERENCE_SUFFIX, load_model
@@ -312,6 +312,8 @@ class RestoreExtendedMixin:
         for sca_data in rows:
             refid = sca_data.get('refid')
             sca = _existing_row('ssh_cas', {'refid': refid})
+            # A serial this CA gave out here stays given out, whatever an older archive says
+            counter_here = sca.serial_counter if sca is not None else 0
             if sca is None:
                 # refid, descr, ca_type, public_key, private_key, key_type,
                 # fingerprint and serial_counter are NOT NULL; all but the
@@ -329,6 +331,7 @@ class RestoreExtendedMixin:
                 db.session.add(sca)
 
             apply_columns(sca, 'ssh_cas', sca_data, plan)
+            sca.serial_counter = max(counter_here or 0, sca.serial_counter or 0)
             if 'allow_any_principal' not in sca_data:
                 # An older archive: an empty list meant any principal then
                 sca.allow_any_principal = not sca.get_allowed_principals()
@@ -373,6 +376,7 @@ class RestoreExtendedMixin:
         the certificate and let the restore report the ones that worked.
         """
         results.setdefault('ssh_certificates', 0)
+        results.setdefault('ssh_revoked_with_serial', 0)
         rows = backup_data.get('ssh_certificates', [])
         if not rows:
             return
@@ -430,8 +434,15 @@ class RestoreExtendedMixin:
 
             if apply_columns(sc, 'ssh_certificates', sc_data, plan):
                 results['ssh_certificates'] += 1
+            # Out of the unique index before any later query autoflushes it: an archive may hold
+            # a 2.254 pair; settle_marks puts the oldest holder of each serial back after the flush.
+            if sc.serial:
+                sc.serial_duplicate = True
 
         db.session.flush()
+        aligned = SSHSerials.settle_marks(SSHSerials.session_run)
+        self._ssh_aligned = {**getattr(self, '_ssh_aligned', {}), **aligned}
+        results['ssh_revoked_with_serial'] = len(self._ssh_aligned)
 
     def _restore_microsoft_cas(self, backup_data: Dict, results: Dict,
                                plan: Optional[RestorePlan] = None) -> None:
@@ -730,31 +741,32 @@ class RestoreExtendedMixin:
 
         db.session.flush()
 
-    def _restore_https_files(self, backup_data: Dict, results: Dict,
-                             staged=None) -> None:
-        """Stage the HTTPS server certificate and key.
+    def _restore_https_files(self, backup_data: Dict, results: Dict, plan=None) -> None:
+        """The archive's HTTPS pair, stored in the restore's transaction for the next start.
 
-        Nothing is written where the server reads it until the database
-        transaction has committed: the pair used to be written in the middle
-        of the restore, so a failure afterwards left the server presenting a
-        certificate from an archive that was never applied. Failures are no
-        longer swallowed either — a restore that cannot place the key it was
-        asked to restore has not restored it.
+        Every node's gunicorn master writes it (boot_config.materialize_https): the
+        restore itself writes no file. Half a pair (the export skips a file it cannot
+        read) is left out with a warning: the HTTPS certificate in place is kept.
         """
         https_data = backup_data.get('https_server', {})
         if not https_data:
             return
-        if staged is None:
-            raise RuntimeError("HTTPS files must be staged, not written directly")
-
-        if https_data.get('cert_pem'):
-            staged.stage(Config.HTTPS_CERT_PATH,
-                         https_data['cert_pem'].encode(), mode=0o644)
-            results['https_server'] += 1
-        if https_data.get('key_pem'):
-            staged.stage(Config.HTTPS_KEY_PATH,
-                         https_data['key_pem'].encode(), mode=0o600)
-            results['https_server'] += 1
-        # A regenerated pair stored on the target would replace the restored one at start
+        cert_pem, key_pem = https_data.get('cert_pem'), https_data.get('key_pem')
+        if not cert_pem or not key_pem:
+            carried = ("neither its certificate nor its key" if not cert_pem and not key_pem
+                       else f"its {'certificate' if cert_pem else 'key'} without its "
+                            f"{'key' if cert_pem else 'certificate'}")
+            warning = ("the HTTPS certificate of the archive was not restored: the archive "
+                       f"carries {carried}; the HTTPS certificate in place is kept")
+            if plan is not None:
+                plan.warnings.append(warning)
+            else:
+                logger.warning("Restore: %s", warning)
+            return
+        import json
         from services import shared_files
+        shared_files.store_file(shared_files.HTTPS_RESTORED, json.dumps(
+            {'crt': cert_pem, 'key': key_pem}).encode('utf-8'), actor='restore')
+        results['https_server'] += 2
+        # A regenerated pair stored on the target would replace the restored one at start
         shared_files.drop_file(shared_files.HTTPS_GENERATED)

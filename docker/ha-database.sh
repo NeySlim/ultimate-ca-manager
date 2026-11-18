@@ -2,11 +2,24 @@
 # UCM_HA database handling: a node never owns a SQLite file, the database is PostgreSQL.
 # Functions only: the image entrypoint sources this file, and the tests source it too.
 
+# A flag as the application reads it: surrounding ASCII blanks dropped (C locale), lower case.
+ucm_flag_text() {
+    local LC_ALL=C v="${1:-}"
+    v="${v#"${v%%[![:space:]]*}"}"
+    v="${v%"${v##*[![:space:]]}"}"
+    printf '%s' "$v" | tr '[:upper:]' '[:lower:]'
+}
+
 ucm_ha_active() {
-    local ha
-    ha=$(printf '%s' "${UCM_HA:-}" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
-    case "$ha" in
+    case "$(ucm_flag_text "${UCM_HA:-}")" in
         1|true|yes|on) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+ucm_flag_set() {
+    case "$(ucm_flag_text "${1:-}")" in
+        1|true|yes) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -17,13 +30,26 @@ ucm_env_database_line() {
     echo "DATABASE_PATH=${UCM_DATABASE_PATH}"
 }
 
-# Value shown in the configuration summary.
+# Value shown in the configuration summary: the engine and the database name, never the
+# address or the password of DATABASE_URL.
 ucm_database_label() {
-    if ucm_ha_active; then
-        echo "PostgreSQL (DATABASE_URL)"
-    else
-        echo "${UCM_DATABASE_PATH}"
+    local url="${DATABASE_URL:-}" name
+    if [ -z "$url" ]; then
+        if ucm_ha_active; then
+            echo "PostgreSQL (DATABASE_URL)"
+        else
+            echo "SQLite, ${UCM_DATABASE_PATH}"
+        fi
+        return 0
     fi
+    case "$url" in
+        postgres://*|postgresql://*|postgresql+*://*)
+            name="${url%%\?*}"
+            name="${name#*://}"
+            case "$name" in */*) name="${name##*/}" ;; *) name="" ;; esac
+            if [ -n "$name" ]; then echo "PostgreSQL, database ${name}"; else echo "PostgreSQL (DATABASE_URL)"; fi ;;
+        *) echo "DATABASE_URL" ;;
+    esac
 }
 
 # Where the first password comes from; never the value itself.
@@ -36,6 +62,11 @@ ucm_initial_admin_notice() {
         # The application refuses to start then: which one was meant cannot be guessed
         echo "   • Password: INITIAL_ADMIN_PASSWORD and INITIAL_ADMIN_PASSWORD_FILE are both set:"
         echo "     the start will be refused, keep only one"
+    elif [ -n "$source" ] && ucm_flag_set "${INITIAL_ADMIN_PASSWORD_FORCE_CHANGE:-}"; then
+        # The Helm chart sets the flag for the value it draws into its Secret
+        echo "   • Password: drawn by the deployment (${source}), not chosen by anyone;"
+        echo "     with the Helm chart it is in the release's Secret, key UCM_INITIAL_ADMIN_PASSWORD."
+        echo "     It must be changed at first login."
     elif [ -n "$source" ]; then
         echo "   • Password: the one you provided (${source})"
     else
@@ -43,6 +74,105 @@ ucm_initial_admin_notice() {
         echo "       docker exec <container> cat /opt/ucm/data/initial-admin-password"
         echo "     It must be changed at first login, which removes the file."
     fi
+}
+
+# 78 (EX_CONFIG): a SQLite database the runner refuses (older than 2.254, or written by a
+# later release) stops the start before anything is written to the volume; any other
+# answer leaves the decision to the application. The database a path from before 2.70 still
+# holds is asked about too, before ucm_carry_old_data_paths copies it into the data.
+ucm_refuse_unstartable_database() {
+    local db out rc
+    ucm_ha_active && return 0
+    [ -n "${DATABASE_URL:-}" ] && return 0
+    for db in "$UCM_DATABASE_PATH" "$(ucm_old_database)"; do
+        [ -f "$db" ] || continue
+        rc=0
+        out=$(cd "${UCM_BASE_PATH:-/opt/ucm}/backend" && PYTHONDONTWRITEBYTECODE=1 DATABASE_URL= \
+            DATABASE_PATH="$db" python3 migration_runner.py check 2>&1) || rc=$?
+        case $rc in
+            4|6) ;;
+            *) continue ;;
+        esac
+        echo -e "${RED:-}❌ This release cannot start on $db:${NC:-}"
+        printf '%s\n' "$out" | sed -n '2,4p' | sed 's/^/   /'
+        echo "   Nothing was written to the volume. See UPGRADE.md, Upgrading to v3.0."
+        return 78
+    done
+}
+
+# 78: a database 2.254 started last stops the image of the new major before anything is written,
+# until UCM_ACCEPT_MAJOR_UPGRADE names that major (migration_runner.py major_upgrade_refusal).
+# Every node asks, PostgreSQL and HA included; an unreachable database is left to the application.
+ucm_refuse_unaccepted_major_upgrade() {
+    local db out rc dbs=()
+    if [ -n "${DATABASE_URL:-}" ] || ucm_ha_active; then
+        dbs=(DATABASE_URL)
+    else
+        for db in "$UCM_DATABASE_PATH" "$(ucm_old_database)"; do
+            [ -f "$db" ] && dbs+=("$db")
+        done
+    fi
+    for db in "${dbs[@]}"; do
+        rc=0
+        if [ "$db" = DATABASE_URL ]; then
+            out=$(cd "${UCM_BASE_PATH:-/opt/ucm}/backend" && PYTHONDONTWRITEBYTECODE=1 UCM_DOCKER=1 \
+                python3 migration_runner.py check --major-upgrade 2>&1) || rc=$?
+        else
+            out=$(cd "${UCM_BASE_PATH:-/opt/ucm}/backend" && PYTHONDONTWRITEBYTECODE=1 UCM_DOCKER=1 \
+                DATABASE_URL= DATABASE_PATH="$db" python3 migration_runner.py check --major-upgrade 2>&1) || rc=$?
+        fi
+        [ "$rc" -eq 7 ] || continue
+        echo -e "${RED:-}❌ This image will not upgrade the database without your consent:${NC:-}"
+        # The file is named (it may sit at a path from before 2.70); a URL never is
+        [ "$db" = DATABASE_URL ] || echo "   Database: $db"
+        printf '%s\n' "$out" | sed '1d' | sed 's/^/   /'
+        return 78
+    done
+}
+
+# The data directories of the images before 2.70, which some volumes are still mounted at
+ucm_old_data_paths() {
+    # shellcheck disable=SC2086  # a list of paths without spaces
+    printf '%s\n' ${UCM_OLD_DATA_PATHS:-/opt/ucm/backend/data /app/backend/data}
+}
+
+# The database ucm_carry_old_data_paths would copy into the data, if any, and only when the
+# application opens it there: with UCM_DATABASE_PATH elsewhere, that copy is never read
+ucm_old_database() {
+    local old data=${DATA_PATH:-/opt/ucm/data}
+    [ "$(realpath -m -- "${UCM_DATABASE_PATH:-$data/ucm.db}")" = "$(realpath -m -- "$data/ucm.db")" ] \
+        || return 0
+    [ ! -e "$data/ucm.db" ] || return 0
+    for old in $(ucm_old_data_paths); do
+        [ ! -f "$old/ucm.db" ] || { printf '%s\n' "$old/ucm.db"; return 0; }
+    done
+}
+
+# Copies into the data what a path from before 2.70 holds and the data lacks ('cas' is 'ca')
+ucm_carry_old_data_paths() {
+    local data=${DATA_PATH:-/opt/ucm/data} old item name sub
+    for old in $(ucm_old_data_paths); do
+        [ -d "$old" ] && [ -n "$(ls -A "$old" 2>/dev/null)" ] || continue
+        echo -e "${YELLOW:-}   Checking for data migration from $old...${NC:-}"
+        for item in "$old"/*; do
+            [ -e "$item" ] || continue
+            name=$(basename "$item")
+            [ "$name" != cas ] || name=ca
+            if [ ! -e "$data/$name" ]; then
+                echo -e "${YELLOW:-}   Migrating $(basename "$item") → $name...${NC:-}"
+                cp -a "$item" "$data/$name" 2>/dev/null || true
+            elif [ -d "$item" ] && [ -d "$data/$name" ]; then
+                for sub in "$item"/*; do
+                    [ -e "$sub" ] || continue
+                    if [ ! -e "$data/$name/$(basename "$sub")" ]; then
+                        echo -e "${YELLOW:-}   Migrating $name/$(basename "$sub")...${NC:-}"
+                        cp -a "$sub" "$data/$name/" 2>/dev/null || true
+                    fi
+                done
+            fi
+        done
+        echo -e "${GREEN:-}✅ Data migration complete${NC:-}"
+    done
 }
 
 # The database itself says whether this start upgrades it: a migration of the image missing from

@@ -12,7 +12,7 @@ export default function BackupSection({
   backups, backupMeta = {}, backupSchedule = {}, backupQuery = {}, updateBackupQuery,
   selectedBackups = [], toggleSelectBackup, toggleSelectAllBackups,
   handleBulkDeleteBackups, handleRunRetention, backupBusy,
-  setShowBackupModal, setShowRestoreModal, setRestoreFile,
+  setShowBackupModal, setShowRestoreModal, setRestoreFile, backupRunning = false,
   handleDownloadBackup, handleDeleteBackup, handleClearBackupPassword,
 }) {
   const { t } = useTranslation()
@@ -120,7 +120,7 @@ export default function BackupSection({
               </Button>
               <Button type="button" variant="secondary" onClick={() => setShowBackupModal(true)}>
                 <Database size={16} />
-                {t('settings.createBackup')}
+                {backupRunning ? t('settings.backupInProgress') : t('settings.createBackup')}
               </Button>
             </div>
           )}

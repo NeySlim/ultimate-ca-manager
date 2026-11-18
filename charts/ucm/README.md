@@ -1,6 +1,6 @@
 # UCM Helm Chart
 
-Deploy [Ultimate Certificate Manager](https://github.com/NeySlim/ultimate-ca-manager) (UCM) — a web-based Certificate Authority and PKI platform (ACME, SCEP, EST, OCSP, CRL/CDP) — into a Kubernetes cluster.
+Deploy [Ultimate Certificate Manager](https://github.com/NeySlim/ultimate-ca-manager) (UCM), a web-based Certificate Authority and PKI platform (ACME, SCEP, EST, OCSP, CRL/CDP), into a Kubernetes cluster.
 
 > Clusters can already *consume* UCM today via the cert-manager integration in `examples/kubernetes/cert-manager/`. This chart deploys UCM *itself* in-cluster.
 
@@ -15,6 +15,13 @@ helm install ucm ./charts/ucm \
 
 Then `kubectl -n ucm port-forward svc/ucm 8443:8443` and open <https://localhost:8443> (admin / your password).
 
+Each stable release also publishes the chart to `oci://ghcr.io/neyslim/charts/ucm`, versioned as the release in semver form (UCM 3.0 is chart `3.0.0`) and deploying the image of that release by default:
+
+```bash
+helm install ucm oci://ghcr.io/neyslim/charts/ucm --version 3.0.0 \
+  --namespace ucm --create-namespace --set fqdn=ucm.example.com
+```
+
 ## Prerequisites
 
 - Kubernetes 1.23+
@@ -27,6 +34,8 @@ Then `kubectl -n ucm port-forward svc/ucm 8443:8443` and open <https://localhost
 By default UCM runs as **one replica** (`replicaCount: 1`, `strategy: Recreate`) on a **SQLite** database (single writer) on a RWO volume. Do not raise `replicaCount` on its own: on SQLite two pods would share neither the database nor the volume.
 
 For several pods set `ha.enabled=true`, `database.type=postgresql` and `replicaCount` >= 2: the pods share the PostgreSQL database, one of them runs the scheduled tasks, and a rolling update replaces them one at a time. See `docs/HA.md`.
+
+An existing single-instance release moves to HA with the steps of `docs/HA.md`, From a single node. Its last step stops the single instance before the `helm upgrade` that sets `ha.enabled=true`, so that it never runs beside the HA pods on the same database: `kubectl -n <namespace> scale deployment/<fullname> --replicas=0`, then `kubectl -n <namespace> wait --for=delete pod -l app.kubernetes.io/instance=<release> --timeout=300s`.
 
 ## ⚠️ master.key — do not lose it
 
@@ -47,7 +56,7 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 | `redis.url` | `""` | Redis shared by the nodes (`REDIS_URL`, HA only) |
 | `secrets.keyEncryptionKey` | `""` | `KEY_ENCRYPTION_KEY`, passed to the pods whenever set or already in the Secret; generated once when empty only with `ha.enabled`, where a render without cluster access (`helm template`, GitOps) refuses to draw it |
 | `secrets.dbEncryptionKey` | `""` | `UCM_DB_ENCRYPTION_KEY` (Fernet key) for the integration secrets, passed to the pods whenever set or already in the Secret; generated once when empty only with `ha.enabled`, where a render without cluster access (`helm template`, GitOps) refuses to draw it |
-| `fqdn` | `ucm.local` | FQDN for the self-signed UI cert / default AIA-CRL-OCSP base URL |
+| `fqdn` | `ucm.local` | Default AIA-CRL-OCSP base URL, and FQDN of the self-signed UI certificate, generated at the first start only: a later change does not replace it (apply a certificate, or regenerate the self-signed one, in Settings > HTTPS) |
 | `initialAdminPassword` | `""` (generated into the Secret, kept across upgrades) | First-boot admin password; the generated one must be changed at first login, a value set here is not forced to change. Read the generated one with `kubectl get secret <fullname>-secrets -o jsonpath='{.data.UCM_INITIAL_ADMIN_PASSWORD}' \| base64 -d`. Unused when `extraEnv` sets `INITIAL_ADMIN_PASSWORD` (your own Secret) or `INITIAL_ADMIN_PASSWORD_FILE`: the chart then passes no password of its own and forces no change |
 | `secrets.secretKey` | `""` (auto-generated + persisted) | Flask session secret |
 | `database.type` | `sqlite` | `sqlite` or `postgresql` |
@@ -60,6 +69,7 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 | `persistence.data.accessMode` / `persistence.etc.accessMode` | `ReadWriteOnce` | Access modes of the claims |
 | `persistence.data.existingClaim` / `persistence.etc.existingClaim` | `""` | Use an existing claim; in HA a data claim must be ReadWriteMany |
 | `fips.enabled` | `false` | Run the `<tag>-fips` image with `UCM_FIPS=1`; the pod refuses to start without the FIPS provider |
+| `majorUpgrade.accept` | `true` | Sets `UCM_ACCEPT_MAJOR_UPGRADE` to the major of the chart's `appVersion` (`3`): a `helm upgrade` to this chart upgrades a database 2.254 started last. `false` keeps the image's gate, which stops the pod on such a database until the variable is set |
 | `service.type` | `ClusterIP` | Service type |
 | `service.httpsPort` / `service.httpPort` | `8443` / `8080` | UI/API (HTTPS) and protocol (HTTP) ports |
 | `service.annotations` | `{}` | Annotations of the Service |
@@ -75,10 +85,12 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 | `ingress.protocolHttp.host` | `pki.local` | Host of the cleartext protocol Ingress |
 | `proxy.behindProxy` | `false` | Set `UCM_BEHIND_PROXY=1` (honor `X-Forwarded-*` for one hop) |
 | `proxy.trustedProxies` | `[]` | `UCM_TRUSTED_PROXIES`: proxy IPs / CIDRs allowed to set forwarded / client-cert headers (CIDR entries need UCM 2.224 or later) |
-| `extraEnv` | `[]` | Extra `UCM_*` env vars |
+| `extraEnv` | `[]` | Extra `UCM_*` env vars, for example `UCM_WORKER_TIMEOUT`: the seconds a web request may run before gunicorn restarts the worker, 30 to 3600 (default 120); a value outside these bounds stops the pod at startup |
 | `resources` | requests 100m/512Mi, limit 1Gi | Pod resources |
 | `livenessProbe` | enabled, 40 s delay, every 30 s, timeout 10 s, 3 failures | Liveness probe on `/health/live` |
 | `readinessProbe` | enabled, 20 s delay, every 15 s, timeout 10 s, 3 failures | Readiness probe on `/health/ready` |
+| `lifecycle.preStopSleepSeconds` | `10` | Sleep of the `preStop` hook, before UCM receives `SIGTERM`: the pod leaves the Service's endpoints first, so new connections go to the other pods; `0` removes the hook |
+| `terminationGracePeriodSeconds` | `60` | Grace before Kubernetes kills a stopping pod; covers the `preStop` sleep and UCM's clean stop (at most 41 s); the render fails below `lifecycle.preStopSleepSeconds` + 45 |
 | `startupProbe` | enabled, every 10 s, timeout 10 s, 36 failures | Probe on `/health/live` that holds the liveness and readiness probes until UCM answers (360 s by default): a first start that upgrades a large database answers nothing until the upgrade ends |
 | `serviceAccount.create` / `serviceAccount.name` / `serviceAccount.annotations` | `true` / `""` / `{}` | Create a ServiceAccount (name defaults to the full name) |
 | `podSecurityContext` / `securityContext` | non-root UID/GID 1000, `fsGroup` 1000, seccomp `RuntimeDefault`; no privilege escalation, every capability dropped | Pod and container security contexts |
@@ -152,4 +164,4 @@ helm uninstall ucm -n ucm
 
 The `*-etc` PVC (master.key) is intentionally **retained**. Delete it manually only when you are certain no encrypted data needs recovery.
 
-The Secret is retained too whenever it holds `KEY_ENCRYPTION_KEY` (HA, or `secrets.keyEncryptionKey` set), and so is the `*-data` PVC of a former single-node release that an HA release still renders. Outside HA the `*-data` PVC is deleted with the release.
+The Secret is retained too whenever it holds `KEY_ENCRYPTION_KEY` or `UCM_DB_ENCRYPTION_KEY` (HA, or `secrets.keyEncryptionKey` or `secrets.dbEncryptionKey` set, on a single instance too), and so is the `*-data` PVC of a former single-node release that an HA release still renders. Outside HA the `*-data` PVC is deleted with the release.

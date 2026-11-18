@@ -33,8 +33,11 @@ ha:
 redis:
   url: ""
 
-## Fully qualified domain name UCM serves on. Used for the self-signed UI
-## certificate and as the default base URL for issued AIA/CRL/OCSP URLs.
+## Fully qualified domain name UCM serves on. Used as the default base URL for issued
+## AIA/CRL/OCSP URLs, and for the self-signed UI certificate, which is generated at the first
+## start only (kept on the data volume): changing fqdn later does not change it. To replace it,
+## apply a certificate in Settings > HTTPS, or regenerate the
+## self-signed one there.
 fqdn: ucm.local
 
 ## Initial admin password (first boot only). Empty: the chart generates one into its
@@ -108,10 +111,19 @@ proxy:
 fips:
   enabled: false
 
+## Upgrade from 2.x: the image stops on a database 2.254 started last unless
+## UCM_ACCEPT_MAJOR_UPGRADE names its major. A helm upgrade to this chart is
+## that consent: the chart sets the variable to the major of its appVersion.
+## false keeps the image's gate (set the variable yourself in extraEnv).
+majorUpgrade:
+  accept: true
+
 ## Extra environment variables (UCM_* etc.), passed verbatim.
 extraEnv: []
   # - name: UCM_LOG_LEVEL
   #   value: DEBUG
+  # - name: UCM_WORKER_TIMEOUT   # seconds a web request may run, 30 to 3600 (default 120)
+  #   value: "300"
 
 service:
   type: ClusterIP
@@ -205,6 +217,15 @@ readinessProbe:
   periodSeconds: 15
   timeoutSeconds: 10
   failureThreshold: 3
+
+## Stopping a pod: preStop sleeps preStopSleepSeconds, the time the endpoints and kube-proxy take
+## to stop sending it connections, then UCM receives SIGTERM. The grace covers that sleep and UCM's
+## clean stop (at most 41 s: a running scheduled task gets 30 s, the scheduler process 5 s more
+## before it is killed, then the node writes its stop in cluster_nodes); the render refuses a grace
+## shorter than preStopSleepSeconds + 45. 0 disables the preStop hook.
+lifecycle:
+  preStopSleepSeconds: 10
+terminationGracePeriodSeconds: 60
 
 serviceAccount:
   create: true

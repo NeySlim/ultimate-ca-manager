@@ -943,7 +943,7 @@ export const helpContent = {
           { label: 'Password Reset', text: 'Reset a user\'s password (admin action). The user\'s open sessions are signed out, as they are by a 2FA reset' },
           { label: 'Delete User', text: 'Deleting a user revokes the certificates they enrolled for mTLS (cessationOfOperation), then deletes them. A certificate the CA cannot revoke does not block the deletion: it stays valid, is named in the warning and the audit log, and must be revoked under Certificates. A failure after some revocations keeps the user and names the certificates already revoked. Removing a user or one of its mTLS certificates warns when the ACME CA that issued a certificate was not told of its revocation' },
           { label: 'API Keys', text: 'In a user\'s details, list their API keys and revoke a leaked or unused one: it stops working at once, and a revoked or expired key can then be deleted. Owners create their keys on their Account page' },
-          { label: 'Source', text: 'Shows where each user comes from: Local (managed in UCM) or LDAP / OAuth2 / SAML (provisioned by an SSO provider). The badge displays the originating provider name.' },
+          { label: 'Source', text: 'Shows what opens each account: Local (its UCM password), or each provider attached to it, by type and name (for example OAuth2 · Okta, SAML · AD FS). An account may be attached to several providers.' },
         ]
       },
       {
@@ -1076,7 +1076,7 @@ export const helpContent = {
         items: [
           { label: 'Export', text: 'Download logs in JSON or CSV format' },
           { label: 'Cleanup Old Logs', text: 'Purge old logs with configurable retention (days)' },
-          { label: 'Verify Integrity', text: 'Check log chain integrity to detect tampering' },
+          { label: 'Verify Integrity', text: 'Check log chain integrity to detect tampering; on a large ledger it runs in the background, with its progress and a cancel button' },
         ]
       },
     ],
@@ -1151,16 +1151,25 @@ export const helpContent = {
         ]
       },
       {
+        title: "Manual backup",
+        items: [
+          { label: "In the background", text: "Create Backup runs on the server: the dialog shows which part of the database is being exported and offers the archive for download when it is ready. A backup done within 25 seconds downloads at once, as before. Closing the dialog or reloading the page does not stop it: Create Backup shows it again" },
+          { label: "Cancel", text: "Cancel the backup stops it between two parts of the export: no archive is kept and its temporary file is removed" },
+          { label: "One at a time", text: "One manual backup runs at a time on the whole installation, HA cluster included: a second one is refused (409) and names the one running. A backup that finds a scheduled backup or a restore holding the backup lock waits up to 15 seconds, then is refused (409)" },
+        ]
+      },
+      {
         title: 'Restore (v2.251)',
         items: [
           { label: 'Replace or merge', text: 'Restore from Backup replaces the data here with the archive\'s and removes what the archive does not carry; the audit entry lists what was removed. The API also accepts mode=merge, which adds the archive to the data here' },
-          { label: 'Report and size', text: 'The picker accepts the archive sizes the server accepts: it reads the archive\'s header to apply the ceiling of its format before the upload, leaves a file it does not recognize to the server, and shows the upload progress. When the restore ends with something to do, a report stays open until closed: what was restored, then a To do list with one line per warning (sections not restored, CAs whose CRL could not be signed, secrets to enter again, deploy bindings reset to the automatic chain) and the state of the restart. With nothing to do, the page reloads after two seconds. An archive without data restores nothing, and the report says so. The report is not stored: the restore itself is recorded in the audit log' },
+          { label: 'Report and size', text: 'The picker accepts the archive sizes the server accepts: it reads the archive\'s header to apply the ceiling of its format before the upload, leaves a file it does not recognize to the server, and shows the upload progress. When the restore ends with something to do, a report stays open until closed: what was restored, then a To do list with one line per warning (sections not restored, CAs whose CRL could not be signed, secrets to enter again, deploy bindings reset to the automatic chain) and the state of the restart. With nothing to do, the page reloads after two seconds. An archive without data restores nothing, and the report says so. The report is kept with the restore\'s background job; the restore itself is recorded in the audit log' },
           { label: 'Shared lock', text: 'Backups and restores share one lock: a restore is refused (409) while a backup runs, and a manual backup waits for a running restore' },
           { label: 'HA mode', text: 'In HA mode, a restore from any node first has every node refuse writes (503) and leave the balancer\'s rotation until it ends; it is refused, naming the node, when a node does not acknowledge within 30 s. The nodes then restart one at a time, and each serves the restored state once restarted' },
           { label: 'Upload limit', text: 'An archive created since 3.0 is restored in chunks and has no size limit unless BACKUP_MAX_ARCHIVE_MB sets one. An older archive is accepted up to BACKUP_MAX_UPLOAD_MB (512 MB by default). Both are set in the server environment and a refusal names its setting. A reverse proxy in front of UCM keeps its own body limit' },
           { label: 'What an archive carries', text: 'Archives include ACME client orders, approval requests and key recovery requests. Restoring an archive written before this version leaves those rows here as they are' },
           { label: 'Same names', text: 'A DNS provider, ACME CA account or webhook whose name another row holds here is restored as "name (2)", and the restore result returned by the API lists it' },
           { label: 'Settings that name a row', text: 'The SCEP and ACME issuing CAs, OCSP responders and similar settings follow the archived rows. From an older archive restored on another installation, they are emptied and must be chosen again' },
+          { label: 'Background restore', text: 'The restore runs in the background, in the scheduler process. Past 25 seconds the dialog shows its progress and a Cancel the restore button, which restores nothing until the restore commits. While it runs every write is refused (503), on a single node as in HA, and reads, OCSP and CRLs are served. It ends by signing every session out: the dialog asks to sign in again, and the report shows after the sign-in. A sign-in refused meanwhile (503; in HA until that node has restarted) is tried again by the sign-in page itself, after the wait the server asks, and a Retry now button tries at once. A security key sign-in is never tried again by itself: Retry now asks for the key again. Nothing else runs beside a restore: a backup or a verification started meanwhile is refused (409). A restore that committed but could not finish says so in a message that stays until closed: restart the application before using it' },
         ]
       },
       {
@@ -1169,6 +1178,7 @@ export const helpContent = {
         items: [
           { label: 'Channel', text: 'Stable follows final releases only; Release candidates additionally accepts rcN versions only, alpha/beta never qualify' },
           { label: 'Notification', text: 'A newly available version fires the system.update_available webhook/email event, once per version' },
+          { label: 'Major versions', text: 'Updates stay within the installed major version, on both channels. The latest final release of the next major version (installed + 1) is shown apart with its own Upgrade button and a confirmation; automatic updates never install it, and system.update_available is emitted once per offered major version with major_upgrade set' },
           { label: 'Auto-install', text: 'Off by default. When enabled, UCM downloads, verifies and installs the update at the chosen hour, then restarts, DEB/RPM installs only' },
           { label: 'Checksum', text: "An unattended install requires the release's published SHA256 to verify; a manual install also verifies whenever a checksum is published" },
           { label: 'Docker', text: 'Containers cannot update themselves, the check and notification still work; pull the new image to update' },
@@ -1565,7 +1575,7 @@ export const helpContent = {
           { label: 'SP Certificate', text: 'UCM HTTPS certificate included in metadata, must be trusted by the IDP or metadata will be rejected' },
           { label: 'Entity ID', text: 'UCM service provider entity identifier' },
           { label: 'ACS URL', text: 'Assertion Consumer Service callback URL' },
-          { label: 'Attribute Mapping', text: 'Left column: the attribute name sent by the IdP. Right column: the UCM field it fills (username, email, fullname or groups). Example: user.userprincipalname → username.' },
+          { label: 'Attribute Mapping', text: 'Left column: the attribute name sent by the IdP. Right column: the UCM field it fills (username, email, fullname or groups). Example: user.userprincipalname → username. An attribute takes one row: a second row with the same name is marked and the provider is not saved until one of them is changed or removed.' },
           { label: 'Groups for role mapping', text: 'Read from the attributes mapped to groups, else from groups and the Microsoft Entra ID / AD FS group and role claims. When Entra ID sends groups.link instead of the groups (users in more than 150 groups), a warning is logged and, when role mapping rules exist, the user is refused: emit only the groups assigned to the application, or app roles.' },
           { label: 'IdP-initiated login', text: 'Accepts logins started from the IdP portal, checked like any other response. On for providers created before 2.243, off for new ones: turn it on only if users start from the IdP portal.' },
           { label: 'NameID format', text: 'Unspecified (IdP default), Persistent, Email address or Transient: sent in each login request and published in the SP metadata. Persistent gives a stable identifier; a transient NameID is never used to recognise the account.' },
@@ -1581,16 +1591,17 @@ export const helpContent = {
           { label: 'Client ID/Secret', text: 'OAuth2 client credentials from your IDP' },
           { label: 'Scopes', text: 'OAuth2 scopes to request (openid, profile, email)' },
           { label: 'Auto-Create Users', text: 'Automatically create UCM accounts on first SSO login' },
+          { label: 'Groups for role mapping', text: 'The values of the roles and groups claims, from the ID token of the login and from the UserInfo response together. Microsoft Entra ID sends them only in the ID token: add the groups claim in the token configuration of the application (its values are group object IDs, so the mapping keys are these IDs), or use app roles. A user in more than about 200 groups gets no groups claim from Entra ID: a warning is logged and only the app roles can match. Emit only the groups assigned to the application, or app roles.' },
         ]
       },
       {
         title: 'Role Provisioning (#81)',
         icon: UserPlus,
         items: [
-          { label: 'Identity matching', text: 'A login opens the account bound to the IdP identifier (OIDC sub, SAML persistent NameID, LDAP entryUUID or objectGUID). A username or email only matches an account of the same provider not bound yet; a local account, or one bound to another identity, is refused at sign-in. To merge a local account, use Link to SSO in Users first: its next sign-in through that provider binds the identifier.' },
+          { label: 'Identity matching', text: 'A login opens the account bound to the IdP identifier (OIDC sub, SAML persistent NameID, LDAP entryUUID or objectGUID). A username or email only matches an account attached to this provider and not bound yet; a local account, one attached to other providers only, or one bound to another identity, is refused at sign-in. Attach a provider in Users adds a provider to any account, whose other providers keep opening it: its next sign-in through the new one binds the identifier.' },
           { label: 'Default Role', text: 'Given to accounts created at first SSO login when the provider has no role mapping rule, and as the base role of a new account whose matching rule gives only a custom role (viewer when None). None: nobody signs in without a rule. Role changes made later in UCM are preserved.' },
           { label: 'Role Mapping', text: 'Map external groups (Azure AD, Okta, LDAP) → UCM roles (admin / operator / auditor / viewer) or custom roles. With at least one rule, a user no rule matches is refused at every SSO sign-in (OIDC, SAML, LDAP), new account or existing one; a passkey or certificate sign-in is not checked. Used at user creation, and at every login when role sync is enabled. When several groups match, the highest-privilege role wins (admin > operator > auditor > viewer): entry order does not matter (#221). Each group can also name a custom role (chosen from the existing custom roles): it is added to the base role, or used alone. If several matching groups give a custom role, the first one in the list wins. With role sync on, a custom role set by SSO is removed when no group gives one; a custom role assigned by hand in UCM is never touched. System roles cannot be used as the custom role.' },
-          { label: 'Sync role on each login', text: 'OFF (default): SSO never overrides UCM-managed roles. ON: role is re-synced from role_mapping at every login; a matching rule that gives no base role keeps the stored one (default_role is never re-applied).' },
+          { label: 'Sync role on each login', text: 'OFF (default): SSO never overrides UCM-managed roles. ON: role is re-synced from role_mapping at every login; a matching rule that gives no base role keeps the stored one (default_role is never re-applied). An account with several providers follows the rules of the provider it signed in through last.' },
           { label: 'Enforce 2FA', text: 'Users of this provider must enrol a second factor. LDAP sign-ins ask for an enrolled TOTP code or security key, as local sign-ins do, with or without this option; OIDC and SAML sign-ins only require the enrolment and rely on the identity provider for MFA.' },
           { label: 'Auto-update users', text: 'Updates email and full name on each login. Does NOT touch the role.' },
         ]
@@ -1605,7 +1616,8 @@ export const helpContent = {
           { label: 'Base DN', text: 'Search base for user lookups' },
           { label: 'User Filter', text: 'LDAP filter to match users (e.g., (uid={username}))' },
           { label: 'Attribute Mapping', text: 'Map LDAP attributes to username, email, full name' },
-          { label: 'Unique ID attribute', text: 'Immutable id that recognises the account (entryUUID, objectGUID). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until Unlink SSO then Link to SSO.' },
+          { label: 'Unique ID attribute', text: 'Immutable id that recognises the account (entryUUID, objectGUID). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until its identity is reset (Reset identity) on each account.' },
+          { label: 'Groups', text: 'With memberOf, read from the user\'s own entry; with member or uniqueMember, searched under the Group Search Base when set, else under the parent of the Base DN when the directory holds it, then under the Base DN if that search fails, otherwise under the Base DN; the group filter defaulting to (objectClass=*). Direct membership only: nested groups and the Active Directory primary group (Domain Users) are not seen. Names compare with rules and required groups ignoring case, edge spaces and the length of inner space runs. When rules or required groups exist and the groups cannot be read, the sign-in is refused saying so. Test Mapping reads the groups and decides as the sign-in does.' },
         ]
       },
     ],

@@ -3,6 +3,7 @@
 It never travels through the IdP: OAuth2 keeps it in the server session next to
 ``state``, SAML in the AuthnRequest row; it is used once and revalidated on return.
 """
+from tests.sso_identity_support import delete_users_of
 import re
 import uuid
 from pathlib import Path
@@ -16,6 +17,8 @@ from models.sso import SAMLMessageId, SSOProvider, SSOSession
 from tests.test_saml_strict_validation import (  # noqa: F401 (fixtures)
     ACS, SP_BASE, _module_provider, _response, idp_signer, provider,
 )
+
+pytestmark = pytest.mark.usefixtures('drop_new_users')
 
 DONE = '/login/sso-complete'
 REFUSED_FORMS = [
@@ -120,7 +123,7 @@ def oidc(app, monkeypatch):
     yield pid
     with app.app_context():
         SSOSession.query.filter_by(provider_id=pid).delete()
-        User.query.filter_by(sso_provider_id=pid).delete()
+        delete_users_of(pid)
         db.session.delete(db.session.get(SSOProvider, pid))
         for opid, enabled in others:
             db.session.get(SSOProvider, opid).enabled = enabled

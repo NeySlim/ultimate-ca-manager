@@ -22,6 +22,8 @@ from tests.test_est_rfc7030 import (
 )
 from utils import key_algorithms
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 AKEY_PACKAGE = '2.16.840.1.101.2.1.2.78.5'
 ASYMMETRIC_ID = '1.2.840.113549.1.9.16.2.54'
 SYMMETRIC_ID = '1.2.840.113549.1.9.16.2.37'

@@ -11,7 +11,7 @@ import base64
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Iterator, List, Optional, Tuple
+from typing import Callable, Dict, Any, Iterator, List, Optional, Tuple
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 from . import container
 from .container import ContainerError
 from .errors import BackupExportError
-from .export_generic import IdentityIndex, export_section, identity_of, load_model
+from .export_generic import IdentityIndex, export_section, identity_of, iter_section, load_model
 from .manifest import SECTIONS
 from .export_core import ExportCoreMixin
 from .export_extended import ExportExtendedMixin
@@ -158,7 +158,8 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
         password: str,
         backup_type: str = "full",
         include: Optional[Dict[str, bool]] = None,
-        kdf: Optional[str] = None
+        kdf: Optional[str] = None,
+        progress: Optional[Callable[..., None]] = None,
     ) -> Iterator[bytes]:
         """
         Yield an encrypted v4 archive: the header, then one chunk at a time
@@ -168,9 +169,11 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
             backup_type: "full", "database", or "certificates"
             include: Dict of what to include (cas, certificates, users, etc.)
             kdf: "pbkdf2" or "argon2id"; None picks Argon2id when it can
+            progress: called as progress(done, total) before each section and the end,
+                and as progress() between two rows; what it raises stops the export
 
-        Sections are exported one after the other and written as they come: no
-        step holds the whole payload, only the section being written.
+        Sections are read a page at a time and written as they come: no step
+        holds a section, only a page of rows and the chunk being filled.
         """
         # Validate password
         self._validate_password(password)
@@ -210,25 +213,35 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
         index = IdentityIndex()
         self.last_export_warnings = []
         self.last_payload_size = 0
-        custom_exporters = {
-            'configuration': self._export_configuration,
-            'certificate_authorities': self._export_cas,
-            'certificates': self._export_certificates,
-            'revoked_serials': self._export_revoked_serials,
-            'ssh_cas': self._export_ssh_cas,
+        # The dedicated part of one row, laid over the manifest's columns of it
+        row_exporters = {
+            'certificate_authorities': self._ca_row,
+            'certificates': self._certificate_row,
+            'revoked_serials': self._revoked_serial_row,
+            'ssh_cas': self._ssh_ca_row,
         }
+
+        def guarded(name, read):
+            """A section's rows as they are read: a failure on any of them aborts the backup."""
+            try:
+                yield from read()
+            except BackupExportError:
+                raise
+            except Exception as exc:
+                logger.error("Backup export of section '%s' failed: %s", name, exc,
+                             exc_info=True)
+                raise BackupExportError(
+                    f"Section '{name}' could not be exported"
+                ) from exc
 
         def export(name):
             section = SECTIONS[name]
             if not include.get(name, not section.optional):
                 return {} if name == 'configuration' else []
-            if name in custom_exporters:
-                rows = _section(name, custom_exporters[name], True)
-                if section.custom and name != 'configuration':
-                    rows = _section(
-                        name, self._merge_with_manifest, name, rows, index)
-                return rows
-            return _section(name, export_section, name, index, self.last_export_warnings)
+            if name == 'configuration':
+                return _section(name, self._export_configuration, True)
+            return guarded(name, lambda: iter_section(name, index, self.last_export_warnings,
+                                                      extra=row_exporters.get(name)))
 
         # Choose KDF: Argon2id if available, else strong PBKDF2. The profile
         # written here is the one the reader whitelists, taken from the same
@@ -285,8 +298,19 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
             except ContainerError as exc:
                 raise BackupExportError(str(exc)) from exc
 
+        def step(done):
+            if progress is not None:
+                progress(done, len(names))
+
+        def ticking(rows):
+            # Outside guarded(): a stop asked between two rows is not an export failure
+            for row in rows:
+                yield row
+                progress()
+
         yield header
 
+        step(0)
         metadata = self._get_metadata(backup_type)
         metadata.update({
             'schema_version': self.SCHEMA_VERSION,
@@ -300,17 +324,29 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
         # Group members and WebAuthn keys are not nested in their owner any
         # more: a reader of v4 applies their flat sections, always present.
         key_mismatches: List[str] = []
-        for name in SECTIONS:
+
+        def sealed_keys(name, rows):
+            # One row at a time: its key encrypted, a mismatch noted for the end record
+            for row in rows:
+                self._encrypt_section_keys((row,), master_key)
+                key_mismatches.extend(self._key_mismatches({name: (row,)}))
+                yield row
+
+        for done, name in enumerate(SECTIONS, start=1):
+            step(done)
             rows = export(name)
             if name in self._PRIVATE_KEY_SECTIONS:
-                self._encrypt_section_keys(rows, master_key)
-                key_mismatches.extend(self._key_mismatches({name: rows}))
+                rows = sealed_keys(name, rows)
+            if progress is not None and not isinstance(rows, dict):
+                rows = ticking(rows)
             yield from write(name, rows)
             del rows
 
         # Files, not a table: the HTTPS certificate and key the server serves
+        step(len(names) - 1)
         yield from write('https_server', _section('https_server', self._export_https_files))
 
+        step(len(names))
         yield writer.finish({'key_mismatches': key_mismatches})
         self.last_payload_size = writer.payload_bytes
 
@@ -322,28 +358,6 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
             if isinstance(row, dict) and '_private_key_plaintext' in row:
                 row['private_key_pem_encrypted'] = self._encrypt_private_key(
                     row.pop('_private_key_plaintext'), master_key)
-
-    def _merge_with_manifest(self, section_name, rows, index):
-        """Complete a hand-written section with every column of its model.
-
-        The dedicated exporters carry what is not a column (a PEM, a decrypted
-        key, a list of URLs). Everything else comes from the manifest, so a
-        column added to the model reaches the archive without anyone having to
-        remember this function exists.
-        """
-        from .manifest import SECTIONS as _SECTIONS
-        section = _SECTIONS[section_name]
-        generic = export_section(section_name, index)
-        by_identity = {
-            tuple(str(row.get(name)) for name in section.identity): row
-            for row in generic
-        }
-        merged = []
-        for row in rows:
-            key = tuple(str(row.get(name)) for name in section.identity)
-            base = by_identity.get(key, {})
-            merged.append({**base, **row})
-        return merged
 
     @staticmethod
     def _key_mismatches(backup_data: Dict[str, Any]) -> List[str]:

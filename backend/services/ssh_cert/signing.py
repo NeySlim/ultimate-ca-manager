@@ -8,10 +8,12 @@ from datetime import datetime, timezone
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.serialization import ssh as ssh_serialization
+from sqlalchemy.exc import IntegrityError
 
 from models import db
 from models.ssh import SSHCertificateAuthority, SSHCertificate
 from services.ssh_ca_service import SSHCAService, normalize_key_type
+from utils import ssh_serials as SSHSerials
 from .utils import SSHCertificateUtilsMixin
 
 logger = logging.getLogger(__name__)
@@ -51,6 +53,15 @@ def _checked_critical_options(cert_type, options):
             value = ','.join(entries)
         checked[name] = value
     return checked
+
+
+class SSHSerialConflict(Exception):
+    """The serial taken is held by another certificate of the CA, after one retry: 409."""
+
+
+def _serial_held(ca_id, serial):
+    """Another certificate of the CA holds this non-zero serial: the unique index refused it."""
+    return db.session.query(SSHCertificate.id).filter_by(ssh_ca_id=ca_id, serial=serial).first() is not None
 
 
 class SSHCertificateSigningMixin:
@@ -105,6 +116,9 @@ class SSHCertificateSigningMixin:
                 "or tick \"Let requesters set the key ID\" on the CA"
             )
         key_id = key_id or default_key_id
+        # before a serial is spent
+        named_by_ca = not ca.allow_custom_key_id
+        SSHSerials.refuse_revoked_key_id(ca_id, key_id, named_by_ca=named_by_ca)
 
         public_key = SSHCertificateUtilsMixin._parse_public_key(public_key_data)
         subject_key_type = SSHCertificateUtilsMixin._detect_key_type(public_key)
@@ -126,115 +140,144 @@ class SSHCertificateSigningMixin:
         valid_before = now_ts + validity_seconds
 
         ca_private_key = SSHCAService.get_private_key_object(ca_id)
-        serial = SSHCAService.get_next_serial(ca_id)
 
-        ssh_cert_type = (ssh_serialization.SSHCertificateType.USER
-                         if cert_type == 'user'
-                         else ssh_serialization.SSHCertificateType.HOST)
+        def _signed(serial):
+            nonlocal descr
+            ssh_cert_type = (ssh_serialization.SSHCertificateType.USER
+                             if cert_type == 'user'
+                             else ssh_serialization.SSHCertificateType.HOST)
 
-        builder = (ssh_serialization.SSHCertificateBuilder()
-                   .public_key(public_key)
-                   .serial(serial)
-                   .type(ssh_cert_type)
-                   .key_id(key_id.encode('utf-8'))
-                   .valid_principals([p.encode('utf-8') for p in principals])
-                   .valid_after(valid_after)
-                   .valid_before(valid_before))
+            builder = (ssh_serialization.SSHCertificateBuilder()
+                       .public_key(public_key)
+                       .serial(serial)
+                       .type(ssh_cert_type)
+                       .key_id(key_id.encode('utf-8'))
+                       .valid_principals([p.encode('utf-8') for p in principals])
+                       .valid_after(valid_after)
+                       .valid_before(valid_before))
 
-        if cert_type == 'user':
+            if cert_type == 'user':
+                if extensions is not None:
+                    if isinstance(extensions, list):
+                        ext_dict = {e: '' for e in extensions}
+                    else:
+                        ext_dict = extensions
+                    # Caller-supplied extensions were previously applied verbatim,
+                    # so a requester could grant itself permit-port-forwarding /
+                    # permit-agent-forwarding (etc.) regardless of the CA's policy —
+                    # the CA's configured list was consulted only when the caller
+                    # omitted extensions entirely. Constrain them the same way
+                    # principals are constrained, against the CA's own list.
+                    # get_default_extensions() distinguishes "unset" (NULL column —
+                    # standard OpenSSH set, preserving pre-existing CAs) from an
+                    # explicitly empty policy ('[]' — nothing may be requested).
+                    allowed_exts = set(ca.get_default_extensions())
+                    invalid = [e for e in ext_dict if e not in allowed_exts]
+                    if invalid:
+                        raise ValueError(
+                            "Extension(s) not permitted by this CA: "
+                            f"{', '.join(sorted(invalid))}"
+                        )
+                else:
+                    ext_dict = {e: '' for e in ca.get_default_extensions()}
+                for ext_name, ext_value in sorted(ext_dict.items()):
+                    val = ext_value if isinstance(ext_value, str) else ''
+                    builder = builder.add_extension(
+                        ext_name.encode('utf-8'),
+                        val.encode('utf-8')
+                    )
+
+            if critical_options:
+                for opt_name, opt_value in sorted(critical_options.items()):
+                    val = opt_value if isinstance(opt_value, str) else ''
+                    builder = builder.add_critical_option(
+                        opt_name.encode('utf-8'),
+                        val.encode('utf-8')
+                    )
+
+            cert = builder.sign(ca_private_key)
+            # The embedded verification key must equal the stored anchor before it is trusted.
+            SSHCAService.check_signing_public_key(ca, cert.signature_key())
+            try:
+                cert.verify_cert_signature()
+            except InvalidSignature:
+                raise ValueError('SSH certificate signature verification failed against the published CA key') from None
+            cert_bytes = cert.public_bytes().decode('utf-8')
+
+            pub_openssh = ssh_serialization.serialize_ssh_public_key(public_key).decode('utf-8')
+
+            valid_from_dt = datetime.fromtimestamp(valid_after, tz=timezone.utc)
+            valid_to_dt = datetime.fromtimestamp(valid_before, tz=timezone.utc)
+
+            if not descr:
+                descr = f"{cert_type.capitalize()} cert for {', '.join(principals)}"
+
             if extensions is not None:
                 if isinstance(extensions, list):
-                    ext_dict = {e: '' for e in extensions}
+                    stored_extensions = {e: '' for e in extensions}
                 else:
-                    ext_dict = extensions
-                # Caller-supplied extensions were previously applied verbatim,
-                # so a requester could grant itself permit-port-forwarding /
-                # permit-agent-forwarding (etc.) regardless of the CA's policy —
-                # the CA's configured list was consulted only when the caller
-                # omitted extensions entirely. Constrain them the same way
-                # principals are constrained, against the CA's own list.
-                # get_default_extensions() distinguishes "unset" (NULL column —
-                # standard OpenSSH set, preserving pre-existing CAs) from an
-                # explicitly empty policy ('[]' — nothing may be requested).
-                allowed_exts = set(ca.get_default_extensions())
-                invalid = [e for e in ext_dict if e not in allowed_exts]
-                if invalid:
-                    raise ValueError(
-                        "Extension(s) not permitted by this CA: "
-                        f"{', '.join(sorted(invalid))}"
-                    )
+                    stored_extensions = extensions
+            elif cert_type == 'user':
+                stored_extensions = {e: '' for e in ca.get_default_extensions()}
             else:
-                ext_dict = {e: '' for e in ca.get_default_extensions()}
-            for ext_name, ext_value in sorted(ext_dict.items()):
-                val = ext_value if isinstance(ext_value, str) else ''
-                builder = builder.add_extension(
-                    ext_name.encode('utf-8'),
-                    val.encode('utf-8')
-                )
+                stored_extensions = {}
 
-        if critical_options:
-            for opt_name, opt_value in sorted(critical_options.items()):
-                val = opt_value if isinstance(opt_value, str) else ''
-                builder = builder.add_critical_option(
-                    opt_name.encode('utf-8'),
-                    val.encode('utf-8')
-                )
+            ssh_cert = SSHCertificate(
+                refid=str(uuid.uuid4()),
+                descr=descr,
+                ssh_ca_id=ca_id,
+                cert_type=cert_type,
+                key_id=key_id,
+                public_key=pub_openssh,
+                certificate=cert_bytes,
+                principals=json.dumps(principals),
+                serial=serial,
+                valid_from=valid_from_dt,
+                valid_to=valid_to_dt,
+                key_type=subject_key_type,
+                fingerprint=subject_fingerprint,
+                extensions=json.dumps(stored_extensions) if stored_extensions else None,
+                critical_options=json.dumps(critical_options) if critical_options else None,
+                source=source,
+                created_by=username,
+                owner_group_id=owner_group_id,
+            )
+            return ssh_cert
 
-        cert = builder.sign(ca_private_key)
-        # The embedded verification key must equal the stored anchor before it is trusted.
-        SSHCAService.check_signing_public_key(ca, cert.signature_key())
-        try:
-            cert.verify_cert_signature()
-        except InvalidSignature:
-            raise ValueError('SSH certificate signature verification failed against the published CA key') from None
-        cert_bytes = cert.public_bytes().decode('utf-8')
-
-        pub_openssh = ssh_serialization.serialize_ssh_public_key(public_key).decode('utf-8')
-
-        valid_from_dt = datetime.fromtimestamp(valid_after, tz=timezone.utc)
-        valid_to_dt = datetime.fromtimestamp(valid_before, tz=timezone.utc)
-
-        if not descr:
-            descr = f"{cert_type.capitalize()} cert for {', '.join(principals)}"
-
-        if extensions is not None:
-            if isinstance(extensions, list):
-                stored_extensions = {e: '' for e in extensions}
-            else:
-                stored_extensions = extensions
-        elif cert_type == 'user':
-            stored_extensions = {e: '' for e in ca.get_default_extensions()}
-        else:
-            stored_extensions = {}
-
-        ssh_cert = SSHCertificate(
-            refid=str(uuid.uuid4()),
-            descr=descr,
-            ssh_ca_id=ca_id,
-            cert_type=cert_type,
-            key_id=key_id,
-            public_key=pub_openssh,
-            certificate=cert_bytes,
-            principals=json.dumps(principals),
-            serial=serial,
-            valid_from=valid_from_dt,
-            valid_to=valid_to_dt,
-            key_type=subject_key_type,
-            fingerprint=subject_fingerprint,
-            extensions=json.dumps(stored_extensions) if stored_extensions else None,
-            critical_options=json.dumps(critical_options) if critical_options else None,
-            source=source,
-            created_by=username,
-            owner_group_id=owner_group_id,
-        )
-
-        try:
-            db.session.add(ssh_cert)
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Failed to store SSH certificate: {e}")
-            raise
+        # A counter that trails the certificates of its CA (2.254 data, a restore, an import made
+        # elsewhere) meets the unique index: raised past them, the signature is tried once more
+        for attempt in (1, 2):
+            serial = SSHCAService.get_next_serial(ca_id)
+            ssh_cert = _signed(serial)
+            try:
+                # Explicit, so the guard does not rest on the lock the foreign key takes at the INSERT
+                SSHCAService.lock_ca(ca_id)
+                db.session.add(ssh_cert)
+                db.session.flush()
+                # Under the CA row, and after the write (SQLite's write lock): a revocation of
+                # the key ID that committed meanwhile is seen here
+                SSHSerials.refuse_revoked_key_id(ca_id, key_id, named_by_ca=named_by_ca)
+                db.session.commit()
+                break
+            except SSHSerials.RevokedKeyId:
+                db.session.rollback()
+                raise
+            except IntegrityError as e:
+                db.session.rollback()
+                if not _serial_held(ca_id, serial):
+                    logger.error(f"Failed to store SSH certificate: {e}")
+                    raise
+                if attempt == 2:
+                    raise SSHSerialConflict(
+                        f"SSH CA serial {serial} is already held by another certificate of this CA, "
+                        "even after its counter was raised: try again") from None
+                logger.warning(f"SSH CA {ca_id}: serial {serial} already held, counter raised")
+                SSHCAService.raise_serial_counter(ca_id)
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Failed to store SSH certificate: {e}")
+                raise
 
         logger.info(f"Issued SSH {cert_type} certificate #{serial} for "
                     f"{', '.join(principals)} (CA: {ca.descr})")

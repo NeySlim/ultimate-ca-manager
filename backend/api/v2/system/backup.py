@@ -3,12 +3,10 @@ System Backup Operations
 """
 
 from services.backup import shared_store, storage
+from services.jobs import backup as backup_job
 from services.backup.locking import BackupBusyError, backup_operation_lock
 from services.backup.restore.plan import RestoreValidationError
-from services.backup.restore_report import safe_restore_audit_details, with_restore_warnings
 from services.database_admin.lock import (
-    MigrationBusyError,
-    database_migration_lock,
     pending_switch_refusal,
 )
 from fips_mode import FipsRestricted
@@ -23,14 +21,9 @@ from auth.unified import require_auth
 from utils.sanitize import client_filename
 from utils.response import success_response, error_response
 from utils.pagination import parse_request_pagination
-from services.audit_service import AuditService
 from services.backup.backup_service import check_backup_kdf
 from services.backup_service import (
-    BackupService,
-    BackupExportError,
-    BackupPasswordError,
     BackupSchemaError,
-    BackupValidationError,
     ContainerError,
 )
 from datetime import datetime, timezone
@@ -47,12 +40,9 @@ logger = logging.getLogger(__name__)
 from services.backup.restore_completion import (
     record_failure as _audit_failure,
     record_request_refusal,
-    maintenance_refusal,
     record_restore as _safe_audit_log,
-    request_restart as _request_restart_after_restore,
-    restore_actor as _actor,
-    restore_message,
-    attach_restore_todo,
+    preflight_v4,
+    start_restore,
 )
 # Bounds of a listing or a bulk request; a restore's upload ceiling is
 # `storage.restore_upload_limit()`.
@@ -75,15 +65,6 @@ _SORT_KEYS = {
     'name_desc': (lambda item: (item['filename'].lower(), item['filename']), True),
 }
 _DEFAULT_SORT = 'created_desc'
-
-
-def _format_size(size_bytes: int) -> str:
-    """`N B`, `N.N KB` or `N.N MB`."""
-    if size_bytes < 1024:
-        return f'{size_bytes} B'
-    if size_bytes < 1024 * 1024:
-        return f'{size_bytes / 1024:.1f} KB'
-    return f'{size_bytes / (1024 * 1024):.1f} MB'
 
 
 def _scan_archives(directory) -> list:
@@ -131,7 +112,7 @@ def _disk_meta(directory) -> dict:
         return {
             'disk_total_bytes': usage.total,
             'disk_free_bytes': usage.free,
-            'disk_free': _format_size(usage.free),
+            'disk_free': backup_job.format_size(usage.free),
             'disk_used_pct': (round(usage.used * 100 / usage.total, 1)
                               if usage.total else None),
         }
@@ -145,6 +126,11 @@ def _disk_meta(directory) -> dict:
 @require_auth(['admin:system'])
 def create_backup():
     """Create an encrypted archive in the backup directory."""
+    # The gate lets this start through: a maintenance refuses it before any check or audit write
+    from api.v2.system.jobs import suspended_response
+    from services.cluster_maintenance import blocks_writes
+    if blocks_writes():
+        return suspended_response()
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         data = {}
@@ -169,58 +155,23 @@ def create_backup():
         _audit_failure('system_backup', 'manual', 'Backup refused: key derivation not accepted')
         return error_response(str(e), 400)
 
+    # The export runs as a job; within the bounded wait its answer is this route's own
+    return start_backup_job(backup_job.params_of(backup_job.ROUTE_SYSTEM, kdf), password)
+
+
+def start_backup_job(params, password, extra=None):
+    """Start the backup job for either route: 409 naming the active job (audited as the
+    busy refusal it replaces), 503 during a cluster maintenance, else the bounded wait."""
+    from api.v2.system.jobs import busy_response, started_response, suspended_response
+    from services import jobs
     try:
-        service = BackupService()
-        size, _filepath, filename = storage.export_archive(service, password, kdf=kdf)
-    except FipsRestricted:
-        _audit_failure('system_backup', 'manual', 'Backup refused: not allowed in FIPS mode')
-        raise  # the application maps it to its problem type
-    except BackupBusyError as busy:
-        logger.info('Backup refused: %s', busy)
-        _audit_failure('system_backup', 'manual', 'Backup refused: another backup or restore is running')
-        return error_response(str(busy), 409)
-    except BackupPasswordError as e:
-        _audit_failure('system_backup', 'manual', 'Backup refused: password rejected')
-        return error_response(str(e), 400)
-    except BackupExportError as e:
-        logger.error('Backup aborted: %s', e)
-        _audit_failure('system_backup', 'manual', 'Backup failed: export aborted')
-        return error_response(f'Backup aborted: {e}', 500)
-    except BackupValidationError as e:
-        logger.error('Backup written but not validated: %s', e)
-        _audit_failure('system_backup', 'manual', 'Backup failed: archive could not be validated')
-        return error_response(f'Backup could not be validated: {e}', 500)
-    except ValueError:
-        logger.exception('Backup refused: invalid parameters')
-        _audit_failure('system_backup', 'manual', 'Backup refused: invalid parameters')
-        return error_response('Invalid backup parameters', 400)
-    except Exception:
-        logger.exception('Backup failed')
-        _audit_failure('system_backup', 'manual', 'Backup failed: unexpected error')
-        return error_response('Backup failed', 500)
-
-    _safe_audit_log(
-        action='system_backup',
-        resource_type='system',
-        resource_name=filename,
-        details=f'Created backup: {filename}',
-        success=True,
-    )
-
-    from services.backup.schedule import safe_ceiling_warning
-    data = {
-        'filename': filename,
-        'size': _format_size(size),
-        'size_bytes': size,
-        'download_url': f'/api/v2/system/backup/{filename}/download',
-        # Creation removes nothing: the next retention brings the archives under the ceiling
-        'warning': safe_ceiling_warning(),
-    }
-    message = 'Backup created successfully'
-    if service.last_export_warnings:
-        data['export_warnings'] = list(service.last_export_warnings)
-        message = f"{message}. {'; '.join(service.last_export_warnings)}"
-    return success_response(data=data, message=message)
+        job_id = jobs.start_job(backup_job.KIND, params=params, secret=password)
+    except jobs.JobsSuspended:
+        return suspended_response()
+    except jobs.SlotBusy as busy:
+        _audit_failure('system_backup', 'manual', backup_job.BUSY)
+        return busy_response(busy)
+    return started_response(job_id, extra)
 
 
 @bp.route('/api/v2/system/backups', methods=['GET'])
@@ -249,7 +200,7 @@ def list_backups():
         start = (page - 1) * per_page
         items = [{
             'filename': item['filename'],
-            'size': _format_size(item['size_bytes']),
+            'size': backup_job.format_size(item['size_bytes']),
             'size_bytes': item['size_bytes'],
             'created_at': datetime.fromtimestamp(
                 item['_mtime'], timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC'),
@@ -262,9 +213,9 @@ def list_backups():
             'total': total,
             'total_all': len(everything),
             'total_size_bytes': total_size,
-            'total_size': _format_size(total_size),
+            'total_size': backup_job.format_size(total_size),
             'total_size_all_bytes': total_size_all,
-            'total_size_all': _format_size(total_size_all),
+            'total_size_all': backup_job.format_size(total_size_all),
             'page': page,
             'per_page': per_page,
             'pages': max(1, -(-total // per_page)),
@@ -481,7 +432,12 @@ def restore_backup():
 
     Only restore archives you produced yourself: a replacing restore puts back
     users, private keys and secrets exactly as the archive holds them.
+    The restore runs as a background job: within the bounded wait the answer is as it was.
     """
+    # The gate lets this start through: a maintenance or a restore refuses it before any check
+    from api.v2.system.jobs import suspended_response
+    if cluster_maintenance.blocks_writes():
+        return suspended_response()
     # Before anything reads the body: this route's ceiling, not the global one.
     # The archive's version decides the rest, once the upload is spooled.
     request.max_content_length = storage.restore_body_limit()
@@ -524,73 +480,9 @@ def restore_backup():
             record_request_refusal(audited_name, 'a backend switch is pending')
             return error_response(pending, 409)
 
-        # HA: every node refuses writes from here until the restore ends (services.cluster_maintenance)
-        with cluster_maintenance.restore_window(
-                _actor(), preflight=lambda: BackupService().check_archive_opens(
-                    file.stream, password)) as maintenance:
-            try:
-                # The backup lock too: an archive written meanwhile would read half of the restore
-                with database_migration_lock(purpose='the restore'), \
-                        backup_operation_lock(purpose='the restore'):
-                    results = BackupService().restore_backup_from_stream(
-                        file.stream, password, mode=mode)
-            except MigrationBusyError as busy:
-                record_request_refusal(audited_name, 'a backend migration or another restore is running')
-                return error_response(
-                    f'{busy} A backend migration or another restore is still '
-                    'running.', 409)
-            except BackupBusyError as busy:
-                record_request_refusal(audited_name, 'a backup or another restore is running')
-                return error_response(f'{busy} Retry once it has finished.', 409)
-
-            try:
-                carried = bool((results or {}).get('sections_carried'))
-                _safe_audit_log(
-                    action='system_restore',
-                    resource_type='system',
-                    resource_name=audited_name,
-                    details=safe_restore_audit_details(audited_name, results),
-                    success=True,
-                )
-
-                # Nothing changed, so no session is revoked and no restart is asked.
-                if not carried:
-                    if maintenance:
-                        maintenance.lift_unchanged()
-                    logger.warning('Restore: the archive carried no data section')
-                    attach_restore_todo(results)
-                    return success_response(
-                        data=results,
-                        message=('The archive carried no data: nothing was restored, '
-                                 'no session was revoked and no restart is needed.'),
-                    )
-
-                from services.backup.restore.invalidate import invalidate_after_restore
-                try:
-                    results['invalidated'] = invalidate_after_restore()
-                except Exception:
-                    logger.exception('Restore: sessions could not be revoked')
-                    return error_response(
-                        'Backup restored, but the sessions opened before it could not '
-                        'be revoked. Restart the application before using it.', 500)
-
-                restart_ok, restart_detail = (maintenance.finish() if maintenance
-                                              else _request_restart_after_restore())
-                results['restart_requested'] = restart_ok
-                results['restart_detail'] = restart_detail
-                results['filename'] = file.filename
-                attach_restore_todo(results)
-                return success_response(data=results, message=restore_message(results))
-            except Exception:
-                # The restore is committed and already audited as a success: no second, contradicting line
-                logger.exception('Restore: finishing after the restore failed')
-                return error_response(
-                    'Backup restored, but finishing the restore failed. '
-                    'Restart the application before using it.', 500)
-    except cluster_maintenance.MaintenanceRefused as refused:
-        logger.warning('Restore refused: %s', refused)
-        record_request_refusal(audited_name, 'the cluster maintenance could not be held')
-        return maintenance_refusal(refused)
+        # A v4's password is checked here; the job, run by the scheduler process, does the rest
+        preflight_v4(file.stream, password)
+        return start_restore(file, password, audited_name, mode)
     except FipsRestricted:
         _audit_failure('system_restore', audited_name, 'Restore refused: not allowed in FIPS mode')
         raise  # the application maps it to its problem type, message unchanged

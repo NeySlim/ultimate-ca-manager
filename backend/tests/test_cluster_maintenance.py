@@ -10,6 +10,8 @@ from config.settings import Config
 from services import cluster_maintenance as cm
 from utils.datetime_utils import utc_now
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _row(phase=cm.PHASE_MANUAL, reason=cm.REASON_MANUAL, minutes=5, restored_at=None):
     now = utc_now()
@@ -19,8 +21,10 @@ def _row(phase=cm.PHASE_MANUAL, reason=cm.REASON_MANUAL, minutes=5, restored_at=
 
 
 @pytest.fixture
-def held(app, monkeypatch):
+def held(app, auth_client, monkeypatch):
     """HA on, this application's view in maintenance; never read again from the database."""
+    # A test before this one may have ended every session: signing in again is a write
+    assert auth_client.get('/api/v2/cas').status_code == 200
     monkeypatch.setattr(Config, 'HA_MODE', True)
     monkeypatch.setattr(cm, 'OBSERVE_TTL_SECONDS', 3600)
     view = cm.view_of(app)
@@ -157,11 +161,12 @@ def test_no_session_row_is_written_during_maintenance(app, held, monkeypatch):
 
 
 def test_outside_ha_a_row_changes_nothing(app, auth_client, monkeypatch):
-    """A single node never reads the maintenance, holds none and answers as before."""
+    """A single node never reads the maintenance, holds none and answers as before; its view
+    is only the local gate of a restore job, down here."""
     from models import db
     monkeypatch.setattr(Config, 'HA_MODE', False)
     with app.app_context():
-        assert cm.current() is None
+        assert not cm.current().active() and not cm.blocks_writes()
         with cm.restore_window('admin') as hold:
             assert hold is None
         assert db.session.execute(db.text("SELECT count(*) FROM cluster_maintenance")).scalar() == 0

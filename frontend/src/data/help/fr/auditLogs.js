@@ -19,7 +19,7 @@ export default {
         items: [
           { label: 'Exporter', text: 'Télécharger les journaux au format JSON ou CSV' },
           { label: 'Nettoyer les anciens journaux', text: 'Purger les anciens journaux avec une rétention configurable (jours)' },
-          { label: 'Vérifier l\'intégrité', text: 'Vérifier l\'intégrité de la chaîne de journaux pour détecter les altérations' },
+          { label: 'Vérifier l\'intégrité', text: 'Vérifier l\'intégrité de la chaîne de journaux pour détecter les altérations ; sur un gros journal, elle tourne en tâche de fond, avec son avancement et un bouton d\'annulation' },
         ]
       },
     ],
@@ -89,6 +89,8 @@ Purgez les anciens journaux selon la période de rétention :
 ## Vérification d'intégrité
 
 Cliquez sur **Vérifier l'intégrité** pour contrôler la chaîne de journaux d'audit. UCM utilise le chaînage de hachages pour détecter une entrée modifiée ou supprimée à l'intérieur de la chaîne ; la suppression des dernières entrées ne laisse aucune trace dans la chaîne elle-même, c'est pourquoi le transfert syslog en garde une copie ailleurs.
+
+Sur un gros journal, la vérification tourne en tâche de fond : le bouton indique combien d'entrées sont déjà contrôlées, **Annuler la vérification** l'arrête, et quitter ou recharger la page ne l'arrête pas (la page la reprend). Une seule vérification tourne à la fois.
 
 ## Transfert Syslog
 

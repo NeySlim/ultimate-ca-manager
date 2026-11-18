@@ -115,6 +115,8 @@ Content-Type: application/json
 }
 ```
 
+**Lockout.** Each attempt is counted before its password is checked, on every node: here on a known, active account; at `POST /api/v2/sso/ldap/login` on the local account the directory entry opens, active or not, whatever name the user filter matched, and an entry with no local account yet is not counted. After `max_login_attempts` attempts without a success, the next ones answer 401 `Invalid credentials` without checking the password, the right one included, until `lockout_duration` has passed. An account whose count already reached a lowered `max_login_attempts` is locked by its next attempt, refused unchecked. A bind that proves the password but opens no session (account disabled here or in the directory, not in the required groups, no role mapped) stays counted, except the attempt that armed the lock, while that lock still runs: it lifts it and is not counted, so such binds never lock the account by themselves. Each lock is logged and sends the `account_locked` alert once. A success resets the count, and so does a new password: reset by link, set by an administrator (`POST /api/v2/users/{id}/reset-password`) or changed in a session (`POST /api/v2/account/password`). The count and the lock are those of the password and the LDAP bind: a client certificate or a passkey is not refused by them, and its success neither resets the count nor lifts the lock. When the count cannot be stored, the login answers 500 `Failed to record login attempt`; when a success cannot reset it, 500 `Failed to update login stats`, with no session opened and a lock armed by that attempt left in place.
+
 **Forced password change.** While `force_password_change` is `true` (the first-boot `admin` account when its password was generated, for instance), the session may only set a new password with `POST /api/v2/account/password` and `{"new_password": "..."}`, or log out. Every other call answers `403` with `"must_change_password": true`. API keys are not affected: creating one already needs a session past the change.
 
 ### Login with WebAuthn
@@ -225,6 +227,8 @@ Content-Type: application/json
   "email": "user@example.com"
 }
 ```
+
+The answer is the same whether or not an account holds the address. No link is sent to an SSO account (linked to a provider or left without one) that has no local password: its provider alone opens it, and a token cannot set a password on it either. An administrator can still give it one.
 
 ### Reset Password
 ```http
@@ -671,6 +675,8 @@ result of the OPNsense file importer list such CAs in `unverifiable_parents`: `c
 DELETE /api/v2/cas/{ca_id}
 ```
 
+Answers `204`, or `409` with the reason while the CA is still in use: intermediate CAs or certificates under it, SCEP or Windows enrollment profiles, ACME domains, issuance policies, CRL deployments, or a setting that names it (the default SCEP, ACME issuing or EST CA, the TSA CA, the trusted mTLS CA, an EST label). The message says where to change it; the CA is deleted once nothing names it.
+
 ### List CA Certificates
 ```http
 GET /api/v2/cas/{ca_id}/certificates
@@ -701,6 +707,8 @@ POST /api/v2/cas/export
 `chain_variant` adds cross-certificates after each CA certificate: `primary` (default) adds none,
 `auto` the served ones, `all` every attached one, `cross:<id>` that one.
 
+An unreadable CA certificate (or cross-certificate, named `cross:<id>`) is skipped, logged, and named in `X-Skipped-CAs` (the first 100) with the total in `X-Skipped-CAs-Count`; the others are exported. When none is readable the answer is `404` in both PEM and P7B, with `details.skipped` (the first 100) and `details.skipped_count` (the total).
+
 ### Bulk Delete CAs
 ```http
 POST /api/v2/cas/bulk/delete
@@ -716,10 +724,12 @@ Content-Type: application/json
 {
   "data": {
     "success": [1, 2],
-    "failed": [3]
+    "failed": [{"id": 3, "error": "default ACME issuing CA"}]
   }
 }
 ```
+
+Each CA is judged as `DELETE /api/v2/cas/{ca_id}` judges it; a refused one is listed in `failed` with the short reason and the others are still deleted.
 
 ### Bulk Export CAs
 ```http
@@ -731,7 +741,9 @@ Content-Type: application/json
 }
 ```
 
-Returns a ZIP file containing the exported CA certificates.
+Returns the selected CA certificates as `format` `pem` (default) or `p7b`.
+
+An unreadable CA certificate (or cross-certificate, named `cross:<id>`) is skipped, logged, and named in `X-Skipped-CAs` (the first 100) with the total in `X-Skipped-CAs-Count`; the others are exported. When none is readable the answer is `404` in both PEM and P7B, with `details.skipped` (the first 100) and `details.skipped_count` (the total).
 
 ### Cross-certificates
 
@@ -991,7 +1003,9 @@ Content-Type: application/json
 
 Renewing a member of a hybrid pair renews both, and the new B names the new A; the response
 lists the other member in `related_renewed`. When the two members require approval under
-different policies, the renewal answers `409` and only an administrator can perform it.
+different policies, the renewal answers `409` and only an administrator can perform it. A
+certificate or a pair link changed by another request while the renewal runs also answers
+`409`: reload the certificate and retry.
 
 ### Revoke Certificate
 ```http
@@ -1094,6 +1108,8 @@ GET /api/v2/certificates/export
 POST /api/v2/certificates/export
 ```
 
+An unreadable certificate is skipped, logged, and named in `X-Skipped-Certificates` (its first 100 ids) with the total in `X-Skipped-Certificates-Count`; the others are exported. When no certificate is readable the answer is `404` in both PEM and P7B, with `details.skipped` (the first 100) and `details.skipped_count` (the total).
+
 ### Bulk Revoke Certificates
 ```http
 POST /api/v2/certificates/bulk/revoke
@@ -1152,7 +1168,9 @@ Content-Type: application/json
 }
 ```
 
-Returns a ZIP file containing the exported certificates.
+Returns the selected certificates as `format` `pem` (default) or `p7b`.
+
+An unreadable certificate is skipped, logged, and named in `X-Skipped-Certificates` (its first 100 ids) with the total in `X-Skipped-Certificates-Count`; the others are exported. When no certificate is readable the answer is `404` in both PEM and P7B, with `details.skipped` (the first 100) and `details.skipped_count` (the total).
 
 ### Certificate Metadata, Linting and Transparency
 ```http
@@ -1647,11 +1665,12 @@ POST /api/v2/truststore
 Content-Type: application/json
 
 {
-  "certificate": "-----BEGIN CERTIFICATE-----\n...",
+  "certificate_pem": "-----BEGIN CERTIFICATE-----\n...",
   "name": "External Root CA",
   "description": "Third-party CA for partner integration"
 }
 ```
+The trust store holds certificates only: an entry that contains a private key (any `... PRIVATE KEY` block, encrypted or not) is refused with `400` and `A trust store holds certificates only; remove the private key`, and so is an entry with a `CERTIFICATE` (or legacy `X509 CERTIFICATE`) block that cannot be read or is left open; other blocks and the text around are left out. A certificate offered under the legacy label is stored and returned under `CERTIFICATE`. The entry is judged and fingerprinted by its first certificate and stored as its certificates re-encoded in PEM; other text is dropped. `certificate_pem` in the list and the detail holds only certificates. The same rules apply to the file upload below.
 
 ### Get Trusted Certificate
 ```http
@@ -1693,10 +1712,11 @@ Content-Type: multipart/form-data
 
 file: <certificate file>
 name: "External Root CA"
-purpose: "trust_anchor"
+purpose: "root_ca"
 description: "Third-party CA"
 notes: "Optional notes"
 ```
+A PEM or DER file; a file that contains a private key is refused with `400` as above.
 
 ### Trust Store Bulk Operations
 ```http
@@ -1708,7 +1728,7 @@ GET /api/v2/truststore/export?format=pem&purpose=all
 - `add-from-ca` (`write:truststore`) adds a managed CA's certificate. Optional body `purpose` (default `root_ca` for a root, else `intermediate_ca`) and `notes`. `201`; `409` when it is already there, `400` when the CA awaits its certificate or the purpose is invalid, `404` for an unknown CA.
 - `bulk/delete` (`delete:truststore`) takes `{"ids": [1, 2]}` (a non-empty list of at most 100) and returns `success` (the removed ids) and `failed` (`{id, error}`).
 - `expiring` (`read:truststore`) lists trusted certificates expiring within `days` (default 90).
-- `export` (`read:truststore`) downloads a bundle: `format` `pem` (default) or `p7b`, `purpose` filters (default `all`). `404` when nothing matches.
+- `export` (`read:truststore`) downloads a bundle: `format` `pem` (default) or `p7b`, `purpose` filters (default `all`). `404` when nothing matches. Unreadable entries are skipped and named in `X-Skipped-Certificates` and `X-Skipped-Certificates-Count` (first 100 ids and the total); `404` also when none is readable, with `details.skipped` (the first 100) and `details.skipped_count` (the total).
 
 ---
 
@@ -2104,7 +2124,7 @@ GET /api/v2/ssh/cas/{ca_id}/setup-script?type=user&hostname=host.example.com&pla
 - `PUT` updates the same metadata (`descr`, `default_ttl`, `max_ttl`, `comment`, `default_extensions`, `allowed_principals`); `400` for an invalid value.
 - `DELETE` answers `204`, or `409` when the service refuses (certificates still depend on the CA).
 - `POST /import` imports an existing CA from `private_key` (required) with `descr`, `ca_type` (`user` or `host`), `default_ttl`, `max_ttl` and `comment`; `201`, or `400` for an unusable key.
-- `public-key` downloads the CA public key in OpenSSH format. `krl` downloads the CA's key revocation list. `setup-script` returns a server setup script for trusting the CA: `type` (`user` or `host`), `hostname` (validated, `400` when invalid) and `platform` (`unix` by default, or `windows`).
+- `public-key` downloads the CA public key in OpenSSH format. `krl` downloads the CA's key revocation list; a revoked certificate of serial 0, which OpenSSH reads as not numbered, is listed as `ssh-keygen -k` lists it, by its key ID under the CA, which revokes every certificate of the CA with that key ID, whatever its serial, an empty key ID included. Revoking it revokes those certificates too and lists them in `revoked_with`; issuing or importing a certificate with that key ID under the CA is refused with `400`. `setup-script` returns a server setup script for trusting the CA: `type` (`user` or `host`), `hostname` (validated, `400` when invalid) and `platform` (`unix` by default, or `windows`).
 
 ### SSH Certificates
 ```http
@@ -2121,10 +2141,10 @@ GET /api/v2/ssh/stats
 ```
 - The list is paginated; `status`, `type` and `ca_id` may be repeated, an unknown `status` answers `400`.
 - `POST` signs a public key (`write:ssh`, `201`). Body: `ca_id` and `public_key` (required), `cert_type` (`user` by default, or `host`), `principals` (a list or a comma-separated string, at least one, no comma inside a name, 64 at most), `validity_seconds` (an integer from 60 to ten years), `key_id`, `extensions`, `critical_options`, `descr`. `400` for any invalid field or a CA policy refusal.
-- `POST /generate` takes the same fields without `public_key`, plus `key_type`: UCM creates the key pair and returns the certificate with the `private_key` once.
+- `POST /generate` takes the same fields without `public_key`, plus `key_type`: UCM creates the key pair and returns the certificate with the `private_key` once. Both answer `409` when the serial they take is held by another certificate of the CA even after its counter was moved past its certificates; try again.
 - `POST /import` stores an existing certificate: `certificate` (required), optional `descr` and `ssh_ca_id`; `201`.
 - `POST /verify` (`read:ssh`) decodes and verifies `certificate` (required) and returns the result.
-- `export` returns the certificate in OpenSSH format. `revoke` takes an optional `reason` (default `unspecified`) and returns the certificate. `DELETE` answers `204` or `409` when it cannot be deleted.
+- `export` returns the certificate in OpenSSH format. `revoke` takes an optional `reason` (default `unspecified`) and returns the certificate, with `revoked_with`: the ids of the other certificates of the CA that this revocation revoked with it, since the KRL revokes by serial, or by key ID for a certificate of serial 0: those holding the same serial, or bearing the same key ID whatever their serial (a certificate already revoked is not listed; empty but for a pair kept by an upgrade from 2.x or by the restore of a 2.x archive, and for a serial 0 certificate, which only an import brings), and `revoked_by`: the KRL entries that took them, in order, each `{"serial": n}` or `{"key_id": "..."}` (a key ID takes numbered certificates, whose serial then takes its other holders, so a serial 0 revocation may list its key ID and serials). Every certificate carries `serial_shared_with`, the ids of the other holders of its serial (always empty for serial 0). `DELETE` answers `204` or `409` when it cannot be deleted.
 - `stats` returns the counts shown on the SSH dashboard.
 
 ---
@@ -2370,7 +2390,7 @@ GET /ca/{ca_refid}.p7c
 ```
 
 **Response**: `application/pkcs7-mime`: certs-only CMS (RFC 5280 section 4.2.2.1) holding the CA certificate
-and its servable cross-certificates.
+and its servable cross-certificates. An unreadable certificate is left out and logged; `404` when none is readable.
 
 ### Download a Cross-certificate
 ```http
@@ -2455,19 +2475,17 @@ Content-Type: application/json
 ### Import Users
 ```http
 POST /api/v2/users/import
-Content-Type: application/json
+Content-Type: multipart/form-data
 
-{
-  "users": [
-    {
-      "username": "user1",
-      "email": "user1@example.com",
-      "role": "viewer"
-    }
-  ],
-  "send_invites": true
-}
+file=@users.csv
 ```
+```csv
+username,email,full_name,role,password
+john.doe,john@example.com,John Doe,operator,SecurePass123!
+```
+- The `file` field holds a UTF-8 CSV file whose name ends in `.csv` (`400` otherwise), of 5 MB at most (`413`); the import stops after 10 000 rows and says so in `errors`. `username`, `email` and `password` are required on each row, `role` is one of the built-in roles (`viewer` when empty) and `full_name` is optional. Each account is local and created active with that password.
+- A row is skipped, and named in `errors`, when a field is missing, the password fails the password policy, the role is unknown, the username exists or a local account already uses the e-mail (an SSO account's e-mail may be taken). The answer gives `imported`, `skipped` and `errors`; `409` names the e-mail or username another request took first, and nothing is imported then.
+- It needs `write:users` and an admin caller (`403` otherwise). Audit action `user_import`.
 
 ### Delete User
 ```http
@@ -2479,8 +2497,10 @@ DELETE /api/v2/users/{user_id}
 POST /api/v2/users/{user_id}/toggle-active
 POST /api/v2/users/{user_id}/unlock
 POST /api/v2/users/{user_id}/reset-2fa
-POST /api/v2/users/{user_id}/link-sso
-POST /api/v2/users/{user_id}/unlink-sso
+GET /api/v2/users/{user_id}/sso-identities
+POST /api/v2/users/{user_id}/sso-identities
+POST /api/v2/users/{user_id}/sso-identities/{identity_id}/reset
+DELETE /api/v2/users/{user_id}/sso-identities/{identity_id}
 POST /api/v2/users/bulk/delete
 GET /api/v2/users/password-policy
 POST /api/v2/users/password-strength
@@ -2488,7 +2508,11 @@ POST /api/v2/users/password-strength
 - `toggle-active` is the same route as `PATCH /api/v2/users/{user_id}/toggle`. `403` for your own account, `409` when it would deactivate the last active admin. These routes need `write:users` and an admin caller (`403` otherwise); `404` for an unknown user.
 - `unlock` clears a lockout and answers `Account is not locked` when there was none.
 - `reset-2fa` clears the user's second factor, the break-glass for a locked-out user.
-- `link-sso` takes `{"provider_id": 1}` (required) and links a local account to an SSO provider; `400` when the user is already linked, `404` for an unknown provider. `unlink-sso` turns an SSO-linked account back into a local one (`400` when it is not linked).
+- `sso-identities` lists the providers that open the account (`read:users`): `id`, `provider_id`, `provider_name`, `provider_type`, `external_id` (the stable identity, `null` until the first sign-in binds it), `orphan_of` (the IdP key a deleted provider left, `provider_id` then `null`), `state` (`bound`, `pending` or `orphan`), `created_at`, `bound_at` and `created_by` (the administrator who attached it). The user objects carry the same list as `sso_identities`, and `auth_source` is `local` (no row) or `sso`.
+- `POST sso-identities` takes `{"provider_id": 1}` (required, `400` otherwise) and attaches that provider to any account; the providers it has keep opening it, and an orphan the same IdP left on it is taken back with its identity. It answers `201` with the user, `409` when the provider is already attached (reset its identity instead) or when the identity of that orphan already opens another account through the provider, `404` for an unknown user or provider. The next sign-in through the provider with the account's username or email binds its identity. A password the account has is kept unless `"remove_password": true` is sent (a boolean, `400` otherwise), which removes it and any pending reset link so no password login opens the account (the password reset by e-mail sends it no link either; `400` on the caller's own account), and an account without password is not asked to set one. Audit action `user_sso_attach`, which names the account's providers before.
+- `POST sso-identities/{identity_id}/reset` clears the stable identity of that attachment (the IdP changed it): the next sign-in through the provider with the account's username or verified e-mail binds the new one. An attachment not bound yet is left as it is (`200`, nothing closed). Audit action `user_sso_reset`.
+- `DELETE sso-identities/{identity_id}` detaches that provider; the account's other providers keep opening it. When the last one goes the account becomes local, and one without password must set one (`force_password_change`); `409` while a local account already uses its e-mail (e-mail is unique among local accounts). Audit action `user_sso_detach`; `404` for an attachment of another account.
+- Attaching, resetting and detaching close the account's sessions (the caller's own session stays) and give their count in `meta.other_sessions_closed` (`null` when the session store cannot count them); API keys, security keys and mTLS certificates are kept. They need `write:users`, a permission reserved to the administrator role (`403` otherwise), and an API key cannot use them on its owner's account.
 - `bulk/delete` needs `delete:users` and an admin caller, and takes `{"ids": [...]}` (a non-empty list of at most 100). Each user is deleted with the mTLS certificates it enrolled. The result lists `success` ids, `failed` entries (`{id, error}`: own account, last active admin, pending approval requests, not found) and `unrevoked` certificates left valid.
 - `password-policy` and `password-strength` are public: the first returns the password requirements, the second takes `{"password": "..."}` and returns its strength.
 
@@ -2806,7 +2830,15 @@ Content-Type: application/json
 ```http
 GET /api/v2/audit/verify
 GET /api/v2/audit/verify?start_id=1&end_id=1000
+POST /api/v2/audit/verify          {"start_id": 1, "end_id": 1000}
 ```
+
+Permission `read:audit`. The verification runs as a [background job](#background-jobs) of
+kind `audit_verify`. `GET` joins the verification already running over the same range, or
+starts one; `POST` starts one and answers `409` while another runs (as does `GET` for another
+range). A verification finished within 25 seconds answers `200` with the body below, as before;
+a longer one answers `202 Accepted` with a `Location` to follow, its result then in the job's
+`result.data`.
 
 **Response:**
 ```json
@@ -2941,6 +2973,9 @@ Content-Type: application/json
 
 # Create backup ("kdf": "pbkdf2" writes an archive a FIPS-mode instance can restore)
 # Removes nothing for the ceiling: "warning" is set when the archives are then above it, null otherwise
+# A background job (see Background Jobs): 200 as before within 25 s, else 202. Without "password"
+# one is generated and given in this answer only ("password", "password_generated"), 200 or 202:
+# the job never holds it in clear and its result does not carry it
 POST /api/v2/settings/backup/create
 {
   "password": "...",
@@ -2954,6 +2989,7 @@ GET /api/v2/settings/backup/history
 GET /api/v2/settings/backup/{backup_id}/download
 
 # Restore backup (in HA, as POST /api/v2/system/backup/restore: see Backup Operations)
+# A background job, like the system route: 200 as before within 25 s, else 202 (see Background Jobs)
 POST /api/v2/settings/backup/restore
 Content-Type: multipart/form-data
 
@@ -3022,6 +3058,89 @@ Permission `admin:system`. Audit entries, newest first, with `meta` (`total`, `p
 
 ## System
 
+### Background Jobs
+
+Long operations (the manual backup, the audit chain verification) run outside the web
+worker, in the scheduler process. The route that starts one waits at most 25 seconds:
+
+- finished by then, it answers exactly what it answered before jobs existed (code, `message`,
+  `data`);
+- otherwise `202 Accepted`, a `Location: /api/v2/system/jobs/<id>` header and
+  `{"data": {"job": {...}}}`.
+
+`Prefer: respond-async` (RFC 7240) answers `202` at once, with
+`Preference-Applied: respond-async`; `Prefer: wait=N` shortens the wait to `N` seconds (never
+beyond 25). A second start while the job's slot is taken answers `409` with
+`details.job` naming the active job (`id`, `kind`, `state`, `created_at`, `requested_by`).
+One job is active per slot on the whole installation, HA cluster included. During an HA
+cluster maintenance no job starts: `GET` and `POST` of a starting route both answer `503`
+with `Retry-After: 30`, code `maintenance` and the message `A cluster maintenance is in
+progress, no background job starts until it ends`, and no job is created. A `GET` that would
+join a job already running answers `503` too: follow that job at `GET /api/v2/system/jobs/<id>`.
+
+```http
+GET  /api/v2/system/jobs                  # ?kind=backup|audit_verify&state=active|final&limit=20 (max 100)
+GET  /api/v2/system/jobs/<id>
+POST /api/v2/system/jobs/<id>/cancel
+```
+
+Each job is read and cancelled with its own permission (`admin:system` for `backup`,
+`read:audit` for `audit_verify`); the
+list shows only the kinds the caller may read, and the id of another kind answers `404`.
+
+```json
+{
+  "data": {
+    "id": "0b6f5c1e-...", "kind": "audit_verify", "state": "running", "reason": null,
+    "phase": "verifying", "progress": {"done": 400000, "total": 1000000},
+    "cancel_requested": false, "requested_by": {"id": 1, "username": "admin"},
+    "created_at": "2026-11-16T10:00:00Z", "started_at": "2026-11-16T10:00:01Z",
+    "finished_at": null,
+    "result": null
+  }
+}
+```
+
+- `state`: `pending`, `running`, then one of `succeeded`, `failed`, `cancelled`.
+- `reason` once final: `done`; `refused` (the operation answered a `4xx`, kept in `result`);
+  `error` (the operation answered a `5xx`, kept in `result`, or its run failed, `result` then
+  `null`); `cancelled`; `executor_lost` (the process running it stopped: run it again) or
+  `not_taken` (no process took it within 5 minutes). A lost job is never started again on its own.
+- A `restore` job that committed but could not finish (sessions not revoked, or a later step
+  failed) ends `succeeded`, reason `done`, with `result.code` 500: the backup is restored, and `result.message`
+  asks to restart the application before using it.
+- `result` once final, for `done`, `refused` and an `error` the operation answered:
+  `{"code", "message", "data"}`, the answer the starting route would have given, plus
+  `problem_type` when that answer was a typed problem (RFC 9457 `type`, such as a refusal in FIPS
+  mode); `null` otherwise.
+- Cancel: a pending job ends at once (`200`, `Job cancelled`); a running one stops at its next
+  page (`200`, `Cancellation requested`); an ended one answers `409`. A backup stops between two
+  sections of the export, or within a second inside one: no archive is kept. During a cluster
+  maintenance, or a restore on a single node, the cancel route answers the maintenance's `503`
+  for every job but the restore holding it.
+
+A job of an audited operation (the backup) writes one audit line when it ends. If that write
+fails twice, the job still ends, without the line, and the service log records it at level
+`ERROR` (`Background job <id> concluded without its audit line: ...`, with the line's action,
+resource, success and phrase).
+
+A finished job is kept 30 days, and the latest of each kind always.
+
+A `restore` job (`admin:system`) holds every slot: nothing else runs beside it. Its `phase` is
+`checking`, `reading`, `applying` and `committing`, then, once the restore has committed,
+`committed`, `sessions_revoked`, `session_files_removed`, `caches_purged` and
+`crls_regenerated` as each step after the commit is done; `progress` counts the steps of the
+restore before the commit. It can be cancelled until its commit: nothing is restored. From
+`committed` on, the cancel route answers `409` `The restore has committed: it can no longer be
+cancelled`. A restore that commits revokes every session, the caller's included: following the
+job then answers `401`; sign in again and read the job, whose `result` is the restore's answer.
+A restore whose process stopped before its commit fails (`executor_lost`, `The restore stopped
+before it committed: nothing was restored`); one that stopped after it is finished by the next
+start of the scheduler process, each step done once. A restore refused by the HA maintenance
+keeps its members in `result.problem` (`code`, and `nodes` for `maintenance_not_acknowledged`),
+and the route answers them as before. Every audit line of a restore job names its archive, a
+cancelled, lost or never started one included.
+
 ### Database Operations
 ```http
 GET /api/v2/system/database/stats
@@ -3036,7 +3155,7 @@ Permission `admin:system`. Downloads a SQL dump (`application/sql`). Only a SQLi
 ```http
 POST /api/v2/system/database/optimize
 ```
-Permission `admin:system`. Runs VACUUM and ANALYZE (SQLite and PostgreSQL).
+Permission `admin:system`. Runs VACUUM and ANALYZE (SQLite and PostgreSQL). On SQLite, ANALYZE reads about 1,000 rows of each index (`PRAGMA analysis_limit`).
 
 ```http
 POST /api/v2/system/database/integrity-check
@@ -3118,6 +3237,10 @@ GET /api/v2/system/backups
 # Create backup (body: "password", optional "kdf": "pbkdf2" or "argon2id"; POST /api/v2/system/backup is the same route)
 # Removes nothing for the ceiling: "warning" is set when the
 # archives are then above it, null otherwise; the next retention applies it
+# A background job of kind "backup" (see Background Jobs): within 25 s the answer of before
+# (200, or 400, 409 and 500 with their messages), else 202 with the job, its "result.data" once
+# succeeded; 409 naming the job while another backup is active; the password is stored only
+# encrypted until the job is taken, then cleared
 POST /api/v2/system/backup/create
 POST /api/v2/system/backup
 
@@ -3136,11 +3259,25 @@ In HA mode a restore holds the cluster maintenance (see [HA](HA.md#restoring-a-b
 code `maintenance_in_progress` while another maintenance holds, `maintenance_not_acknowledged` when a node with a
 fresh heartbeat did not acknowledge it within 30 s (`nodes` maps each one to the processes missing, `web` or
 `scheduler`), and `maintenance_lost` when the maintenance ended or was lifted before the commit; in each case
-nothing is restored. A successful restore answers `restart_detail` "Rolling restart requested: the nodes
+nothing is restored. Both restore routes answer `409` "The restore was refused: this server cannot write to
+<directories>. Nothing has been changed." when the CA, certificate or key directory is not writable, and `409`
+when the backup lock cannot be taken. A restore writes no file: `data.files` gives the files `generation` it
+committed and the number of `removals` listed, and each node then reconciles its files (see the
+[Administration Guide](ADMIN_GUIDE.md#files-after-a-restore)). A successful restore answers `restart_detail` "Rolling restart requested: the nodes
 restart one at a time". Both restore routes also answer `data.todo`, a list of strings with one line per warning
 (sections not restored, a CA whose CRL could not be signed, a secret to enter again); it is empty when there is
 nothing to do. The backup listing's `meta.restore_limits` gives `upload_bytes` (archives before v4) and
 `archive_bytes` (v4, `0` for no ceiling), the sizes a restore accepts.
+
+Both restore routes start a background job of kind `restore` (see Background Jobs). The route
+keeps the uploaded archive in a file of its own, still encrypted, and answers what it answered
+before when the restore ends within 25 seconds, failures included: a wrong password of a v4
+archive is still refused at once, that of an older archive once the job has decrypted it, with
+the same `400`. Past 25 seconds it answers `202`. While a restore runs, on a single node as in
+HA, writes answer `503` with `Retry-After: 30`, code `maintenance` and the message `This UCM
+instance is restoring a backup: writes are refused until the restore ends. Retry later.`
+(single node); reads, OCSP, CRL, health and `GET /api/v2/system/jobs/<id>` are served. Another
+job, or a second restore, answers `409` naming the active job, and no archive file is kept.
 
 ```http
 DELETE /api/v2/system/backup/{filename}
@@ -3240,6 +3377,8 @@ Content-Type: application/json
   "master_password": "secure-master-password"
 }
 ```
+
+`data.key_files` says what became of the plaintext key files the disable writes: `written`, `incomplete` (a file could not be written), or `pending` when the file directories were busy (another reconciliation, a restore, another node) or could not be locked; they are then written at the next start of the service, and `key_files_written` is `0`.
 
 ### Security - Generate Encryption Key
 ```http
@@ -3387,13 +3526,23 @@ POST /api/v2/system/alerts/expiry/check
 
 ### Updates
 ```http
-# Check for updates
+# Check for updates (within the installed major version; the highest final release of the
+# next major version (installed + 1) is reported apart in major_upgrade: {version, published_at,
+# release_notes, html_url, download_url, package_name, checksum_url, assets}, null when
+# there is none, never a release candidate)
 GET /api/v2/system/updates/check
+
+# Upgrade to the next major version reported by the check (502 with the message of a
+# failed check, 400 without one or without
+# version, 409 when version is not the one the check now reports; without
+# "major_upgrade": true the route refuses any release of another major version)
+POST /api/v2/system/updates/install
+{"major_upgrade": true, "version": "<major_upgrade.version>"}
 
 # Install update (HA mode: starts a rolling update of every node, 409 when one runs, a node
 # has no package family (Docker, unknown), the release lacks a present family's package or
 # SHA-256, or its full-stop-migrations.json is missing or names a migration not yet applied;
-# Docker/Kubernetes: 400, the orchestrator updates)
+# Docker/Kubernetes: 400, the orchestrator updates; 502 with the message of a failed check)
 POST /api/v2/system/updates/install
 
 # HA rolling update state: {ha, campaign: {status (running|stopped|done), target, order,
@@ -3452,7 +3601,8 @@ GET /api/v2/system/service/status
 }
 
 # "cluster.nodes" in the response (HA mode): every registered node with node_id, leader,
-# stale, version, started_at, heartbeat_at, command_seen and package_family (deb, rpm-elN,
+# stale, stopped (released by a clean stop: never stale, never leader), version, started_at,
+# heartbeat_at, command_seen, kek_fingerprint and package_family (deb, rpm-elN,
 # rpm-fedora, container or unknown: the package a rolling update gives the node)
 
 # Restart service
@@ -4357,7 +4507,7 @@ Additional fields depend on `provider_type` (ldap, oauth2, saml).
 
 Custom roles are referenced by name. Among the groups a user belongs to, the base role is the most privileged one given; the custom role is the first one, in mapping order, that names one. A custom role never grants the permissions reserved to administrators.
 
-The mapping is checked when the provider is created or updated: an unknown base role, an unknown custom role or a malformed entry returns `400` and nothing is saved. At login, a value that has become invalid is not trusted: an invalid base role counts as `viewer` and an unknown custom role is ignored.
+The mapping is checked when the provider is created or updated: an unknown base role, an unknown custom role, a malformed entry, or two keys the provider compares equal (an LDAP provider ignores case, edge spaces and the length of inner space runs) returns `400` and nothing is saved. A key is saved without its edge spaces. For an LDAP provider, `ldap_group_base_dn` sets where the groups are searched: an empty value clears it, a value that is not a DN returns `400`. At login, a value that has become invalid is not trusted: an invalid base role counts as `viewer` and an unknown custom role is ignored.
 
 With `sync_role_on_login` on, each login also updates the custom role, and removes it when no matching group names one, but only if it came from the mapping (`custom_role_source` is `"sso"`). A custom role assigned by hand is never replaced nor removed. System roles cannot be used as the custom role of a mapping. Changes are recorded in the audit log as `role_change`.
 
@@ -4383,6 +4533,14 @@ POST /api/v2/sso/providers/{provider_id}/toggle
 ```http
 POST /api/v2/sso/providers/{provider_id}/test
 ```
+
+### Test an OIDC or SAML Sign-in (admin)
+```http
+POST /api/v2/sso/providers/{provider_id}/test-sign-in
+GET /api/v2/sso/sign-in-tests/{test_id}
+```
+- `test-sign-in` (`write:sso`, no body) starts a sign-in test of the saved OIDC or SAML provider, enabled or not, and returns `id`, `url` (the IdP address to open in the browser) and `expires_at` (10 minutes); it sets a cookie that ties the test to this browser. The IdP returns to the login callback (`/api/v2/sso/callback/oauth2` or the ACS URL), which recognises the test by its server-side transaction, runs the login's checks and its account decision, opens no session and changes no account, and redirects to `/sso-test-complete?result=done` (`used`, `expired` or `other_browser` when the return is refused). At the expiry the report and the secrets of the test are erased, but its transaction is kept for 24 hours, so a late return still redirects to `result=expired` (`used` once it returned) and is audited as a failed `sso_sign_in_test`, never as a login. `400` for an LDAP provider or one without an authorization URL and client ID or a SAML SSO URL; `404` for an unknown provider; `503` with `Retry-After` during a cluster maintenance.
+- `sign-in-tests/{test_id}` (`write:sso`) returns `state` (`pending`, `running` or `done`), `provider_id`, `protocol`, `expires_at` and, once done, `report`: `verdict` (`accepted` or `refused`), `stage` (`protocol` for a refusal of the IdP's answer, `account` for one of the account decision), `code` (the login page's error code), `reason`, `identity` (`username`, `email`, `fullname`, `external_id`), `groups` (at most 20 values of 64 characters, `groups_more` counts the rest), `group_source`, `candidates` (at most 20 names of received claims or attributes that may carry groups, when none was read), `diagnosis` and `detail` (the audit text of a refusal), `account` (`outcome`: `open`, `create`, `disabled` or `refused`, with `username`, and for `open` whether it `binds_identity`), `role`, `custom_role`, `role_change`, `not_verified` (compatibility mode), `provider_enabled` and `other_enabled_providers` (`id` and `name` of every other enabled provider of the same type, by `id`; a login goes through one enabled provider per type, which is not necessarily the one tested). No token, assertion, authorization code or PKCE verifier is part of it. `404` for a test another account started, an unknown one, or one whose 10 minutes after the return have passed.
 
 ### List SSO Sessions (admin)
 ```http
@@ -4437,7 +4595,7 @@ POST /api/v2/sso/providers/{provider_id}/test-mapping
 - `certificates` (`read:sso`) lists the valid certificates usable for the SP metadata, the HTTPS certificate included.
 - `metadata` is public and returns the SAML 2.0 SP metadata XML to give the IdP.
 - `metadata/fetch` (`write:sso`) fetches and parses IdP metadata from `{"metadata_url": "https://..."}` (required; http or https with a hostname, not loopback or a cloud metadata address: `400`); optional `provider_id`, `verify_ssl` (default true) and `ca_bundle`.
-- `test-mapping` (`write:sso`) is a dry run of the LDAP group lookup for `{"username": "..."}` (required) without creating a session. `400` for a provider that is not LDAP or a failed lookup.
+- `test-mapping` (`write:sso`) is a dry run of an LDAP login past the password for `{"username": "..."}` (required), without creating a session: the same entry, groups and verdict as the login. `found: false` when the user filter finds no entry; otherwise `user_dn`, `username`, `email`, `groups`, `groups_readable`, `access_allowed`, `refusal` (`null`, `account_disabled`, `groups_unreadable`, `group_denied`, `unmapped` or `no_default_role`), `resolved_role` and `resolved_custom_role` (`null` when refused), `group_source` (where the groups were read: the group search base, the `memberOf` attribute of the user entry, or not read), `diagnosis` (for `unmapped` and `no_default_role` only, else `null`: the groups read, bounded to 20 values of 64 characters, their source and the remedy, the same text as the audit entry of the login), `role_mapping`, `default_role`, `required_groups`, and `account_checked: false` with a `note`: the password and the UCM account the sign-in would open are not checked. `400` for a provider that is not LDAP, without `username` ("Username is required") or for a failed user lookup; `404` for an unknown provider.
 
 ---
 
@@ -5122,7 +5280,7 @@ GET /api/v2/health
 GET /api/v2/health/ready
 ```
 
-Verifies the application can serve traffic (database, filesystem, Redis when configured). Returns 200 if ready, 503 if not. The response also carries `ha`, `node_id` and `leader` as above.
+Verifies the application can serve traffic (database, filesystem, Redis when configured). Returns 200 if ready, 503 if not. The response also carries `ha`, `node_id` and `leader` as above. A database that does not answer `SELECT 1` within 5 seconds fails the check; once it failed nothing else is read from the database, so in HA mode `checks.cluster` is an error too and `leader` is `null`.
 
 **Response:**
 ```json
@@ -5145,7 +5303,7 @@ In safe mode, `status` is `"safe_mode"`, `reason` gives the cause and `checks` i
 GET /api/v2/health/live
 ```
 
-Returns 200 if the application process is alive, regardless of dependency status.
+Returns 200 if the application process is alive, regardless of dependency status. Neither the route nor any request hook reads the database for it (nor for the readiness check, apart from its own checks), and neither response carries `Strict-Transport-Security`, whose settings are in the database.
 
 **Response:**
 ```json

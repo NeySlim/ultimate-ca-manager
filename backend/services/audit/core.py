@@ -10,6 +10,28 @@ from .staging import fit_to_columns, forward_to_syslog, syslog_copy
 
 logger = logging.getLogger(__name__)
 
+VERIFY_PAGE = 2000
+VERIFY_ATTEMPTS = 3
+
+
+def _first_entry_id(conditions):
+    return db.session.execute(db.select(db.func.min(AuditLog.id)).where(*conditions)).scalar()
+
+
+def _pages(query, on_page):
+    """The rows of ``query`` by keyset pages, ``on_page(done)`` after each full one."""
+    last, done = None, 0
+    while True:
+        page = query if last is None else query.where(AuditLog.id > last)
+        rows = db.session.execute(page.limit(VERIFY_PAGE)).all()
+        yield from rows
+        if len(rows) < VERIFY_PAGE:
+            return
+        done += len(rows)
+        last = rows[-1].id
+        if on_page is not None:
+            on_page(done)
+
 
 class AuditCoreLoggingMixin:
 
@@ -24,7 +46,9 @@ class AuditCoreLoggingMixin:
         username: Optional[str] = None,
         user_id: Optional[int] = None,
         ip_address: Optional[str] = None,
+        syslog_unsaved: bool = True,
     ) -> AuditLog:
+        """``syslog_unsaved=False``: a failed write sends no syslog copy (the caller tries again)."""
         audit_log = None
         try:
             in_request = has_request_context()
@@ -86,7 +110,7 @@ class AuditCoreLoggingMixin:
 
         except Exception as e:
             # The action is already committed: its trace must still leave somewhere
-            unsaved = syslog_copy(audit_log) if audit_log is not None else None
+            unsaved = syslog_copy(audit_log) if audit_log is not None and syslog_unsaved else None
             logger.error(f"Failed to create audit log: {e}; lost entry: action={action} "
                          f"resource={resource_type}:{resource_id} user={username} details={details}")
             db.session.rollback()
@@ -95,15 +119,34 @@ class AuditCoreLoggingMixin:
             return None
 
     @staticmethod
-    def verify_integrity(start_id: int = None, end_id: int = None) -> dict:
-        # Plain rows, not ORM objects: building one per entry cost as much as the hashing
-        query = db.select(AuditLog.__table__).order_by(AuditLog.id.asc())
+    def _verify_range(start_id, end_id):
+        conditions = []
         if start_id:
-            query = query.where(AuditLog.id >= start_id)
+            conditions.append(AuditLog.id >= start_id)
         if end_id:
-            query = query.where(AuditLog.id <= end_id)
+            conditions.append(AuditLog.id <= end_id)
+        return conditions
 
-        # Streamed: memory stays flat on a large ledger. Only a check from the
-        # first row can tell a purge from a prefix deleted by hand.
-        return verify_chain(db.session.execute(query.execution_options(yield_per=2000)),
-                            whole_table=start_id is None and end_id is None)
+    @staticmethod
+    def count_entries(start_id: int = None, end_id: int = None) -> int:
+        conditions = AuditCoreLoggingMixin._verify_range(start_id, end_id)
+        return db.session.execute(db.select(db.func.count(AuditLog.id)).where(*conditions)).scalar()
+
+    @staticmethod
+    def verify_integrity(start_id: int = None, end_id: int = None, on_page=None) -> dict:
+        """Walk the chain by pages of VERIFY_PAGE ids; ``on_page(done)`` is called between two
+        pages (progress, cancellation). A purge that removed the first rows meanwhile makes the
+        walk start again, so it never reads as a break."""
+        conditions = AuditCoreLoggingMixin._verify_range(start_id, end_id)
+        # Plain rows, not ORM objects: building one per entry cost as much as the hashing
+        query = db.select(AuditLog.__table__).where(*conditions).order_by(AuditLog.id.asc())
+        whole_table = start_id is None and end_id is None
+        for attempt in range(VERIFY_ATTEMPTS):
+            first = _first_entry_id(conditions)
+            # Each page its own statement: SQLite writers get in between two pages.
+            # Only a check from the first row can tell a purge from a prefix deleted by hand.
+            report = verify_chain(_pages(query, on_page), whole_table=whole_table)
+            if _first_entry_id(conditions) == first or attempt == VERIFY_ATTEMPTS - 1:
+                return report
+            logger.info("Audit entries purged during the verification: it starts again")
+        return report

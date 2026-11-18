@@ -162,6 +162,16 @@ export function exportToJSON(data, filename = 'export') {
   URL.revokeObjectURL(link.href)
 }
 /**
+ * Warn that an export left unreadable rows out of its file; the client sets blob.skippedCount
+ * from the X-Skipped-*-Count header. Returns the count.
+ */
+export function warnSkippedExport(blob, t, showWarning) {
+  const count = blob?.skippedCount || 0
+  if (count) showWarning(t('export.skippedUnreadable', { count }))
+  return count
+}
+
+/**
  * Trigger a browser file download from a Blob
  * @param {Blob} blob - The blob to download
  * @param {string} filename - Target filename for download

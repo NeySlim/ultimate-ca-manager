@@ -17,9 +17,11 @@ from models import CA, Certificate, db
 from services.ca.ca_service import CAService
 from services.trust_store import TrustStoreService
 from utils import key_algorithms
+from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
+pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
 
 OPENSSL = shutil.which('openssl')
 

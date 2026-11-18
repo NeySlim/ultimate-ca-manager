@@ -11,7 +11,7 @@ import pytest
 from models import CA, Certificate, db
 from models.policy import ApprovalRequest, CertificatePolicy
 
-pytestmark = pytest.mark.usefixtures('drop_new_users')
+pytestmark = pytest.mark.usefixtures('drop_new_users', 'drop_new_cas_and_certificates')
 
 
 def _json(client, method, url, payload=None):
@@ -374,7 +374,7 @@ class TestMootRequestsAreResolved:
         from services.cert import renewal
         from services.cert.related_pair import RelatedCertificateRefused
         ca, pid, cert_id, approval_id = self._queue_renew(app, create_ca, create_user, f'warn-{refusal}')
-        error = (renewal.RenewalError(renewal._renewed_meanwhile_message('manual'), 409)
+        error = (renewal._renewed_meanwhile('manual')
                  if refusal == 'renewed' else RelatedCertificateRefused('The related certificate is revoked'))
 
         def refused(*_a, **_k):
@@ -887,9 +887,9 @@ class TestSecondReviewFollowUps:
                     stats = AutoRenewalService.run_auto_renewal()
                 finally:
                     AutoRenewalService.set_renewal_config(previous)
-                assert stats['renewed'] == 0 and stats['failed'] == 1, stats
-                assert 'another request' in stats['errors'][0]['error']
-                assert 'reload' not in stats['errors'][0]['error']  # nobody to retry in a batch
+                # Overtaken: skipped, the next pass reads the row anew
+                assert (stats['renewed'], stats['failed'], stats['skipped']) == (0, 0, 1), stats
+                assert stats['errors'] == []
                 assert db.session.get(Certificate, cert_id).serial_number == 'deadbeef'
         finally:
             _drop_rows(app, cert_id)

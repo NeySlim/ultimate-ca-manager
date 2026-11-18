@@ -18,6 +18,8 @@ from tests.test_scep_rfc8894_operations import (
 )
 from utils.csr_extensions import csr_extensions
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 CHALLENGE = 'windows horse battery staple'
 
 

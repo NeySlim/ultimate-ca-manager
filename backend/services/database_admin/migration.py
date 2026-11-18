@@ -28,6 +28,7 @@ from migration_runner import (
     PIVOT_VERSION,
     UPGRADE_MIGRATION,
     _get_state,
+    major_upgrade_refusal,
     pivot_refusal,
     record_fresh_registry,
 )
@@ -43,6 +44,7 @@ from .helpers import (
     _force_register_all_models,
     _reset_pg_sequences,
     carry_id_high_water,
+    raise_ssh_serial_counters,
     read_id_high_water,
     _short_err,
     _topo_sort_tables,
@@ -118,6 +120,8 @@ BOOTSTRAP_AUTH_TABLES = (
     "pro_custom_roles",
     "pro_role_permissions",
     "pro_sso_providers",
+    # The providers that open each account, and the flag users.has_sso_identity reads them by
+    "user_sso_identities",
     "pro_sso_sessions",
     "webauthn_credentials",
     "webauthn_challenges",
@@ -441,7 +445,7 @@ def _target_has_users(target_engine) -> bool:
 def _start_refusal(engine, has_users: bool):
     """Why the next start would refuse the database behind *engine*, or None; read-only."""
     state, applied = _get_state(engine)
-    refusal = pivot_refusal(state, applied)
+    refusal = pivot_refusal(state, applied) or major_upgrade_refusal(state, applied, engine)
     if refusal:
         return f"The target would not start with this release. {refusal}"
     # A 2.254 registry awaits its upgrade: a fresh 3.0 registry over it would skip that upgrade
@@ -461,7 +465,7 @@ def start_refusal(database_url: str):
                            connect_args=postgres_connect_args(database_url))
     try:
         state, applied = _get_state(engine)
-        return pivot_refusal(state, applied)
+        return pivot_refusal(state, applied) or major_upgrade_refusal(state, applied, engine)
     finally:
         engine.dispose()
 
@@ -674,6 +678,7 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
             _reset_pg_sequences(target_engine)
         # A deleted account's id stays unused on the target too
         carry_id_high_water(target_engine, high_water, target_is_pg)
+        raise_ssh_serial_counters(target_engine)
 
         # 6. What landed is checked before the caller is told it can switch.
         stats["validation"] = verify_migration(

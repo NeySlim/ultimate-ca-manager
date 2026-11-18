@@ -9,7 +9,7 @@ import os
 
 import pytest
 
-from boot_config import database_url, mtls_client_ca, wstep_enabled
+from boot_config import MTLS_UNDECIDED, database_url, mtls_client_ca, wstep_enabled
 
 PG_URL = os.getenv('UCM_TEST_PG_URL')
 
@@ -130,7 +130,7 @@ class TestSqliteInstall:
     def test_no_database_yet_is_not_an_error(self, tmp_path, monkeypatch):
         monkeypatch.delenv('DATABASE_URL', raising=False)
         monkeypatch.delenv('DATABASE_PATH', raising=False)
-        assert mtls_client_ca(str(tmp_path)) is None
+        assert mtls_client_ca(str(tmp_path)) is MTLS_UNDECIDED
         assert wstep_enabled(str(tmp_path)) is False
 
 
@@ -175,3 +175,106 @@ class TestAnchor:
 
         pem, _name, _required = mtls_client_ca(str(tmp_path))
         assert pem == _pem('LEAF')
+
+
+def _three_boot_reads(data_path, capsys):
+    """What the gunicorn master reads before the schema exists, and what it printed."""
+    from boot_config import materialize_https
+    found = (wstep_enabled(data_path), mtls_client_ca(data_path),
+             materialize_https(data_path, os.path.join(data_path, 'c.pem'), os.path.join(data_path, 'k.pem')))
+    return found, capsys.readouterr().err
+
+
+def test_a_sqlite_database_without_its_tables_is_read_as_no_settings(tmp_path, monkeypatch, capsys):
+    """A first start cut before create_all: an empty file, read as a new installation."""
+    import sqlite3
+    monkeypatch.delenv('DATABASE_URL', raising=False)
+    monkeypatch.delenv('DATABASE_PATH', raising=False)
+    sqlite3.connect(str(tmp_path / 'ucm.db')).close()
+    assert _three_boot_reads(str(tmp_path), capsys) == ((False, MTLS_UNDECIDED, None), '')
+
+
+def _master_on(tmp_path, monkeypatch):
+    """The gunicorn configuration as the master loads it over the data directory *tmp_path*."""
+    import importlib.util
+    import gevent.monkey
+    monkeypatch.setattr(gevent.monkey, 'patch_all', lambda *a, **k: None)
+    monkeypatch.setenv('UCM_SCHEDULER_SUPERVISED', '')  # set by the config, undone after
+    monkeypatch.setenv('DATA_DIR', str(tmp_path))
+    for name in ('DATABASE_URL', 'DATABASE_PATH', 'HTTPS_CERT_PATH', 'HTTPS_KEY_PATH', 'UCM_HA'):
+        monkeypatch.delenv(name, raising=False)
+    spec = importlib.util.spec_from_file_location(
+        '_ucm_gunicorn_config_boot', os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                                                  'gunicorn_config.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_a_lost_settings_table_keeps_the_last_known_mtls_mode(tmp_path, monkeypatch, capsys):
+    """Required at the last start, settings table gone: still required, and still on record."""
+    import sqlite3
+    sqlite3.connect(str(tmp_path / 'ucm.db')).close()
+    (tmp_path / 'mtls_ca.pem').write_text(_pem('LEAF'))
+    (tmp_path / 'mtls_mode').write_text('required')
+    master = _master_on(tmp_path, monkeypatch)
+    assert (master.cert_reqs, master.ca_certs) == (2, str(tmp_path / 'mtls_ca.pem'))
+    assert (tmp_path / 'mtls_mode').read_text() == 'required'
+    assert 'keeping the last known configuration (REQUIRED)' in capsys.readouterr().err
+
+
+def test_a_lost_database_file_keeps_the_last_known_mtls_mode(tmp_path, monkeypatch, capsys):
+    (tmp_path / 'mtls_ca.pem').write_text(_pem('LEAF'))
+    (tmp_path / 'mtls_mode').write_text('required')
+    master = _master_on(tmp_path, monkeypatch)
+    assert (master.cert_reqs, master.ca_certs) == (2, str(tmp_path / 'mtls_ca.pem'))
+    assert (tmp_path / 'mtls_mode').read_text() == 'required'
+
+
+def test_mtls_turned_off_is_recorded_and_stays_off_when_the_table_is_lost(tmp_path, monkeypatch, capsys):
+    """Off is not optional: a CA file left by an earlier setting asks no client for a certificate."""
+    import sqlite3
+    connection = sqlite3.connect(str(tmp_path / 'ucm.db'))
+    for statement in SCHEMA:
+        connection.execute(statement)
+    connection.execute("INSERT INTO system_config VALUES ('mtls_enabled', 'false')")
+    connection.commit()
+    (tmp_path / 'mtls_ca.pem').write_text(_pem('LEAF'))
+    master = _master_on(tmp_path, monkeypatch)
+    assert (master.cert_reqs, (tmp_path / 'mtls_mode').read_text()) == (0, 'off')
+    connection.execute("DROP TABLE system_config")
+    connection.commit()
+    connection.close()
+    capsys.readouterr()
+    master = _master_on(tmp_path, monkeypatch)
+    assert (master.cert_reqs, master.ca_certs) == (0, None)
+    assert ((tmp_path / 'mtls_mode').read_text(), capsys.readouterr().err) == ('off', '')
+
+
+@pytest.mark.parametrize('database', ['empty file', 'no file'])
+def test_a_first_start_records_no_mtls_mode(tmp_path, monkeypatch, capsys, database):
+    import sqlite3
+    if database == 'empty file':
+        sqlite3.connect(str(tmp_path / 'ucm.db')).close()
+    master = _master_on(tmp_path, monkeypatch)
+    assert (master.cert_reqs, master.ca_certs) == (0, None)
+    assert not (tmp_path / 'mtls_mode').exists()
+    assert 'mTLS' not in capsys.readouterr().err
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_an_empty_postgres_database_is_read_as_no_settings(tmp_path, monkeypatch, capsys):
+    """A first start on an empty PostgreSQL database: no warning before the schema is built."""
+    import psycopg
+    schema = f'boot_empty_{os.getpid()}'
+    with psycopg.connect(PG_URL, autocommit=True) as connection:
+        connection.execute(f'DROP SCHEMA IF EXISTS {schema} CASCADE')
+        connection.execute(f'CREATE SCHEMA {schema}')
+    try:
+        sep = '&' if '?' in PG_URL else '?'
+        monkeypatch.setenv('DATABASE_URL', f'{PG_URL}{sep}options=-csearch_path%3D{schema}')
+        assert _three_boot_reads(str(tmp_path), capsys) == ((False, MTLS_UNDECIDED, None), '')
+    finally:
+        with psycopg.connect(PG_URL, autocommit=True) as connection:
+            connection.execute(f'DROP SCHEMA IF EXISTS {schema} CASCADE')

@@ -85,8 +85,9 @@ class _ClaimNotGivenBack(Exception):
 
 
 def _ha_from_environment():
-    # The master reads this before config.settings: the same test as env_bool('UCM_HA')
-    return os.getenv('UCM_HA', '').strip().lower() in ('1', 'true', 'yes', 'on')
+    # The master reads this before config.settings: the same test as env_bool('UCM_HA'),
+    # with its blanks (settings.FLAG_BLANKS) written out
+    return os.getenv('UCM_HA', '').strip(' \t\n\v\f\r').lower() in ('1', 'true', 'yes', 'on')
 
 
 def snapshot_committed_restarts(data_path):

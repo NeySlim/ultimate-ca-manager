@@ -16,7 +16,8 @@ UCM_TEST_HA=1 UCM_TEST_PG_URL=postgresql://user:password@host:5432/dbname pytest
 role owns the database (`CREATE` on it, and closing it to new connections from
 the `postgres` database in `test_database_cut.py`). Without both variables the `ha` tests are
 skipped. On GitHub Actions, run the *Tests & Quality Checks* workflow by hand
-with the `ha` input ticked (job *HA bench (three nodes)*).
+with the `ha` input ticked (jobs *HA bench (three nodes, …)*, one per shard of
+`scripts/ci/ha-bench-shard.sh`: the whole bench in one job outlasts its time limit).
 
 ## What a node gets
 

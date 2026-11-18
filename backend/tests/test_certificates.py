@@ -23,7 +23,12 @@ Uses shared conftest fixtures: app, client, auth_client, create_ca, create_cert.
 import pytest
 import json
 import uuid
+import base64
+from cryptography.hazmat.primitives.serialization import pkcs7
+from models import db, Certificate
 from tests.conftest import get_json, assert_success, assert_error, assert_refused
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
 
 CONTENT_JSON = 'application/json'
 BASE = '/api/v2/certificates'
@@ -423,6 +428,29 @@ class TestExportAll:
         r = auth_client.get(f'{BASE}/export?format=pem')
         assert r.status_code == 200
         assert b'BEGIN CERTIFICATE' in r.data
+
+    @pytest.mark.parametrize('fmt', ['pem', 'p7b'])
+    def test_an_unreadable_row_is_skipped_and_named(self, app, auth_client, create_cert, fmt):
+        good = create_cert(cn='export-readable.example.com')
+        bad = create_cert(cn='export-unreadable.example.com')
+        with app.app_context():
+            row = db.session.get(Certificate, bad['id'])
+            saved = row.crt
+            row.crt = base64.b64encode(b'not a certificate').decode()
+            db.session.commit()
+        try:
+            r = auth_client.get(f'{BASE}/export?format={fmt}')
+        finally:
+            with app.app_context():
+                db.session.get(Certificate, bad['id']).crt = saved
+                db.session.commit()
+        assert r.status_code == 200
+        assert str(bad['id']) in r.headers['X-Skipped-Certificates'].split(',')
+        assert str(good['id']) not in r.headers['X-Skipped-Certificates'].split(',')
+        if fmt == 'pem':
+            assert b'BEGIN CERTIFICATE' in r.data
+        else:
+            assert pkcs7.load_der_pkcs7_certificates(r.data)
 
     def test_export_unsupported_format(self, auth_client, create_cert):
         create_cert(cn='export-bad-fmt.example.com')

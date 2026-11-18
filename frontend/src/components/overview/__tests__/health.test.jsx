@@ -3,7 +3,7 @@
  * that cannot look healthy while tasks fail or its published state is old.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within, configure } from '@testing-library/react'
+import { render, screen, within, configure, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import fr from '../../../i18n/locales/fr.json'
 
@@ -44,9 +44,12 @@ const tsa = (over) => ({ basis: 'signer', periods: null, state: 'dedicated', rea
 const sched = (over) => ({ basis: 'scheduler', periods: null, tasks: 20, by_status: { ok: 20 }, stale: false,
   last_operation_at: '2026-11-01T10:00:00Z', last_status: 'ok', ...over })
 const show = async (protocols) => {
-  api.getHealth.mockResolvedValue({ data: { protocols } })
+  // The answer comes after the first render, as on a loaded machine: the card is read once loaded
+  api.getHealth.mockImplementation(() => new Promise((done) => setTimeout(() => done({ data: { protocols } }), 20)))
   render(<MemoryRouter><HealthCard /></MemoryRouter>)
-  return screen.findByTestId('card-health')
+  const card = await screen.findByTestId('card-health')
+  await waitFor(() => expect(within(card).queryByRole('status')).toBeNull())
+  return card
 }
 const row = (card, name) => within(card).getByTestId(`health-${name}`)
 

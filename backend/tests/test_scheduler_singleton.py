@@ -170,6 +170,24 @@ def test_the_grace_period_counts_from_the_scheduler_process_start(sched):
     assert not scheduler.tasks['t'].should_run()
 
 
+def test_a_hidden_entry_in_the_request_directory_is_no_request(sched, data_dir):
+    """A local archive of a removed UCM may sit there: it is neither a request nor removed."""
+    directory = scheduler_service._data_path(scheduler_service.REQUESTS_DIR)
+    kept = os.path.join(directory, '.ucm-archive-20260101T000000Z')
+    os.makedirs(kept)
+    with open(os.path.join(kept, 'old'), 'w') as f:
+        f.write('kept')
+    node = sched()
+    node.register_task('t', lambda: None, interval=3600)
+    assert node._has_requests() is False
+    with open(os.path.join(directory, 't'), 'w'):
+        pass
+    assert node._has_requests() is True
+    assert node._take_local_requests() == [node.tasks['t']]
+    assert os.listdir(directory) == [os.path.basename(kept)] and os.listdir(kept) == ['old']
+    assert node._has_requests() is False
+
+
 def _pair(sched, monkeypatch, task):
     """The scheduler process's scheduler and a web worker's copy of the same tasks."""
     monkeypatch.setenv(scheduler_service.SUPERVISED_ENV, '1')

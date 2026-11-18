@@ -120,7 +120,6 @@ def test_opnsense_route_skips_a_second_row_with_the_same_ca_serial(app, auth_cli
 
 def test_opnsense_service_skips_a_second_row_with_the_same_ca_serial(app, monkeypatch, tmp_path):
     from services.opnsense import importer
-    monkeypatch.setattr(importer, '__file__', str(tmp_path / 'services' / 'opnsense' / 'importer.py'))
     ca_pem, leaf_pem = _pki()
     ca_refid = uuid.uuid4().hex[:13]
     rows = [{'refid': uuid.uuid4().hex[:13], 'caref': ca_refid, 'descr': f'copy {i}',

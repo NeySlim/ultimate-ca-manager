@@ -67,24 +67,56 @@ def install_update():
     if is_container_install():
         if in_ha:
             return error_response(CONTAINER_HA_REFUSAL, 400)
+        # The FIPS image is published under <version>-fips
+        import fips_mode
+        tag = '<version>-fips' if fips_mode.requested() else '<version>'
         return error_response(
-            "Auto-update is not available in Docker. Pull the new image instead: "
-            "docker pull ghcr.io/neyslim/ultimate-ca-manager:latest", 400
+            "Auto-update is not available in a container (Docker, Kubernetes). Pull the image tag of the new "
+            f"version instead: ghcr.io/neyslim/ultimate-ca-manager:{tag}", 400
         )
 
     try:
         from services.updates import (
             check_for_updates, download_update, fetch_expected_sha256,
-            install_update as do_install,
+            install_update as do_install, get_current_version, major_of,
         )
 
-        # Get update info
-        include_prereleases = request.json.get('include_prereleases', False)
-        include_dev = request.json.get('include_dev', False)
+        body = request.get_json(silent=True) or {}
+        if not isinstance(body, dict):
+            return error_response("JSON object expected", 400)
+        include_prereleases = body.get('include_prereleases', False)
+        include_dev = body.get('include_dev', False)
+        # Another major version is installed only on this explicit request,
+        # naming the version the operator confirmed.
+        major_upgrade = body.get('major_upgrade') is True
         update_info = check_for_updates(include_prereleases=include_prereleases, include_dev=include_dev)
 
-        if not update_info.get('update_available'):
-            return error_response("No update available", 400)
+        if update_info.get('error'):
+            return error_response(update_info['error'], 502)
+
+        if major_upgrade:
+            target = update_info.get('major_upgrade')
+            if not target:
+                return error_response("No later major version available", 400)
+            if not body.get('version'):
+                return error_response("version is required to upgrade to another major version", 400)
+            if body['version'] != target['version']:
+                return error_response(
+                    f"The available major version is {target['version']}: check again", 409)
+            update_info = {
+                **update_info,
+                'latest_version': target['version'],
+                'download_url': target.get('download_url'),
+                'package_name': target.get('package_name'),
+                'checksum_url': target.get('checksum_url'),
+                'assets': target.get('assets') or [],
+            }
+        else:
+            if not update_info.get('update_available'):
+                return error_response("No update available", 400)
+            if major_of(update_info['latest_version']) != major_of(get_current_version()):
+                return error_response(
+                    "Another major version is only installed with major_upgrade=true", 400)
 
         if in_ha:
             return _start_rolling_update(update_info)
@@ -225,7 +257,7 @@ def update_update_settings():
     from services.updates import is_container_install
     if data.get('auto_install') and is_container_install():
         return error_response(
-            "Auto-update is not available in Docker. Pull the new image instead.", 400
+            "Auto-update is not available in a container (Docker, Kubernetes). Pull the new image instead.", 400
         )
 
     # All fields in one transaction: a commit failure must yield an error,

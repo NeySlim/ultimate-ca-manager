@@ -51,12 +51,13 @@ import sys
 import sqlite3
 import time
 import importlib.util
+from contextlib import contextmanager
 from pathlib import Path
 
 from sqlalchemy import create_engine, event, text, inspect
 
 from migration_marks import full_stop_reason
-from utils.db_url import is_postgres_url, postgres_engine_options, sqlalchemy_url
+from utils.db_url import is_postgres_url, postgres_connect_args, postgres_engine_options, sqlalchemy_url
 
 
 def say(*args, **kwargs):
@@ -162,13 +163,19 @@ UPGRADE_MIGRATION = "300_upgrade_from_2_254"
 PIVOT_VERSION = "2.254"
 
 
+def unknown_migrations(applied):
+    """Registry names neither 2.254 (2.254.N adds none) nor this release knows: a later release
+    or a hand edit wrote them."""
+    from migrations._from_2_254 import PIVOT_NAMES, RECORDED_BEFORE_2_52
+    return sorted(set(applied) - PIVOT_NAMES - RECORDED_BEFORE_2_52 - set(_list_migration_names()))
+
+
 def pivot_refusal(state, applied):
     """None when this database may be migrated, else the message that refuses it."""
-    from migrations._from_2_254 import PIVOT_NAMES, RECORDED_BEFORE_2_52
+    from migrations._from_2_254 import PIVOT_NAMES
     if state == "fresh":
         return None
-    # A name neither 2.254 (2.254.N adds none) nor this release knows: a later release or a hand edit
-    unknown = sorted(set(applied) - PIVOT_NAMES - RECORDED_BEFORE_2_52 - set(_list_migration_names()))
+    unknown = unknown_migrations(applied)
     if unknown:
         return (f"This database names {len(unknown)} migration(s) this release does not know, first "
                 f"{', '.join(unknown[:3])}: a later release started it, or its registry was edited. "
@@ -184,6 +191,35 @@ def pivot_refusal(state, applied):
     return (f"This database was last started by a release older than {PIVOT_VERSION} ({what}). "
             f"Install {PIVOT_VERSION}, start it once, then upgrade. Nothing was changed: "
             f"{PIVOT_VERSION} still starts on this database.")
+
+
+# The Docker image moves to a new major only when the operator names it: pulling `latest` is not
+# consent. UCM_DOCKER=1 is set by the Dockerfile alone (Kubernetes included); a package installed
+# in a container has /.dockerenv but not this variable, and installing a package is consent.
+MAJOR = "3"
+ACCEPT_MAJOR_VARIABLE = "UCM_ACCEPT_MAJOR_UPGRADE"
+MAJOR_UPGRADE_REFUSAL = (
+    f"This database was last started by UCM {PIVOT_VERSION} and this image is UCM {MAJOR}: starting it "
+    f"would upgrade the database to the new major version, which {PIVOT_VERSION} cannot start "
+    f"afterwards. Nothing was changed.\n"
+    f"To upgrade: back up the data volume (and the PostgreSQL database if you use one), then set "
+    f"{ACCEPT_MAJOR_VARIABLE}={MAJOR} and start again. See UPGRADE.md, Upgrading to v3.0.\n"
+    f"To stay on 2.x: pin the image tag '2' (or an exact version, 2.254.N) instead of 'latest'.")
+
+
+def major_upgrade_refusal(state, applied, engine):
+    """In the image, a database the pivot accepts and 300 has not upgraded (2.254 started it last)
+    waits for UCM_ACCEPT_MAJOR_UPGRADE to be exactly the major of this release. The marker of an
+    upgrade already begun (SQLite) is that consent: it was given for this database, which 2.254
+    must not start again."""
+    if os.environ.get("UCM_DOCKER") != "1" or state == "fresh" or UPGRADE_MIGRATION in applied:
+        return None
+    if os.environ.get(ACCEPT_MAJOR_VARIABLE) == MAJOR:
+        return None
+    from pre_upgrade_copy import MARKER_TABLE
+    if MARKER_TABLE in inspect(engine).get_table_names():
+        return None
+    return MAJOR_UPGRADE_REFUSAL
 
 
 # ---------------------------------------------------------------------------
@@ -391,6 +427,64 @@ def build_fresh_schema(create_all):
     create_all()
 
 
+def _server_encoding(engine) -> str:
+    """server_encoding read on a bare driver connection: SQLAlchemy's first connect reads the
+    server version with a text pattern, which a SQL_ASCII database answers in bytes (TypeError)."""
+    cargs, cparams = engine.dialect.create_connect_args(engine.url)
+    # An unreachable server is given up in 10 s, as elsewhere, unless the URL sets its own
+    cparams.setdefault("connect_timeout", 10)
+    conn = engine.dialect.dbapi.connect(*cargs, **cparams)
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SHOW server_encoding")
+            value = cursor.fetchone()[0]
+    finally:
+        conn.close()
+    return value.decode("ascii", "replace") if isinstance(value, bytes) else str(value)
+
+
+def encoding_refusal(engine):
+    """None on SQLite or a UTF8 PostgreSQL database, else the message that refuses it."""
+    if engine.dialect.name != "postgresql":
+        return None
+    encoding = _server_encoding(engine)
+    if encoding.upper() in ("UTF8", "UTF-8"):
+        return None
+    return (f"This PostgreSQL database uses the encoding {encoding}; UCM needs UTF8. Create a "
+            f"database with ENCODING 'UTF8' (docs/ADMIN_GUIDE.md, PostgreSQL Backend) and point "
+            f"DATABASE_URL at it. Nothing was changed.")
+
+
+def startup_encoding_refusal():
+    """encoding_refusal of the configured database, before any SQLAlchemy connection; None
+    when the server cannot be asked (the steps after it fail on that as they would)."""
+    db_url = _get_db_url()
+    if not _is_postgres(db_url):
+        return None
+    try:
+        engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True,
+                               connect_args=postgres_connect_args(db_url))
+    except Exception:  # noqa: BLE001
+        return None
+    try:
+        return encoding_refusal(engine)
+    except Exception:  # noqa: BLE001
+        return None
+    finally:
+        engine.dispose()
+
+
+def _pending(applied):
+    return [n for n in _list_migration_names() if n not in applied]
+
+
+def pending_migrations(engine) -> list[str]:
+    """What this release applies at its next start to the database of *engine*: none for a
+    fresh one (built whole) or one it refuses."""
+    state, applied = _get_state(engine)
+    if state == "fresh" or pivot_refusal(state, applied):
+        return []
+    return _pending(applied)
 def start_schema(engine, metadata, create_all) -> bool:
     """The schema step of a start, after the migrations: a database without its core tables is
     built fresh (True); any other is a 3.0 one, where create_all and the index pass add only
@@ -439,6 +533,11 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
         return False
 
     try:
+        # Before the first SQLAlchemy connection, which fails on it without naming it
+        refusal = encoding_refusal(engine)
+        if refusal:
+            say(f"✗ {refusal}")
+            return False
         state, applied = _get_state(engine)
 
         if state == "fresh":
@@ -448,14 +547,14 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
             )
             return True
 
-        # Checked before any write, the creation of `_migrations` included
-        refusal = pivot_refusal(state, applied)
+        # Checked before any write, the creation of `_migrations` included; an older database
+        # keeps its own refusal first
+        refusal = pivot_refusal(state, applied) or major_upgrade_refusal(state, applied, engine)
         if refusal:
             say(f"✗ {refusal}")
             return False
 
-        all_names = _list_migration_names()
-        pending = [n for n in all_names if n not in applied]
+        pending = _pending(applied)
         try:
             refusal = full_stop_refusal(engine, pending)
         except ValueError as exc:
@@ -474,6 +573,13 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
 
         if pending:
             say(f"Found {len(pending)} pending migration(s) for {backend}:")
+            if UPGRADE_MIGRATION in pending:
+                refusal = upgrade_refusal(engine)
+                if refusal:
+                    say(f"✗ {refusal}")
+                    return False
+                if not _copy_before_upgrade(is_pg, sqlite_path, dry_run):
+                    return False
             done = (_run_pending_pg(engine, pending, dry_run) if is_pg
                     else _run_pending_sqlite(pending, dry_run, db_path=sqlite_path))
             if not done:
@@ -484,6 +590,38 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
         return _replay_serial_steps(engine, is_pg, sqlite_path) if serial_replay else True
     finally:
         engine.dispose()
+
+
+def upgrade_refusal(engine):
+    """What migration 300 refuses in the 2.254 data, read before the copy and its marker are
+    written, so a refused database is left exactly as 2.254 left it."""
+    check = getattr(_load_module(MIGRATIONS_DIR / f"{UPGRADE_MIGRATION}.py"), "refusal", None)
+    if check is None:
+        return None
+    with engine.connect() as conn:
+        return check(conn)
+
+
+def _sqlite_file(sqlite_path):
+    return sqlite_path or os.environ.get("DATABASE_PATH", "/opt/ucm/data/ucm.db")
+
+
+def _copy_before_upgrade(is_pg: bool, sqlite_path, dry_run: bool) -> bool:
+    """SQLite: migration 300 starts once a verified copy exists and the marker is set, or the
+    marker shows an earlier start began it (pre_upgrade_copy.prepare)."""
+    import pre_upgrade_copy
+    if is_pg:
+        say(f"  ! {pre_upgrade_copy.PG_NOTE}")
+        return True
+    if dry_run:
+        say(f"  → {pre_upgrade_copy.plan(_sqlite_file(sqlite_path))} (dry run)")
+        return True
+    try:
+        say(f"  {pre_upgrade_copy.prepare(_sqlite_file(sqlite_path))}")
+    except pre_upgrade_copy.CopyFailed as exc:
+        say(f"  ✗ {exc}")
+        return False
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -586,6 +724,9 @@ def _run_one_sqlite(conn, path: Path, db_path: str, dry_run: bool) -> bool:
         else:
             say(f"  ✗ {name}: no upgrade(), skipped")
             return False
+        if name == UPGRADE_MIGRATION:
+            import pre_upgrade_copy
+            pre_upgrade_copy.clear_started(conn)
         conn.execute("INSERT OR IGNORE INTO _migrations (name) VALUES (?)", (name,))
         conn.commit()
         say(f"  ✓ {name}: done in {time.monotonic() - started:.1f} s")
@@ -686,6 +827,10 @@ def show_status():
         say(f"✗ Cannot connect: {e}")
         return
     try:
+        refusal = encoding_refusal(engine)
+        if refusal:
+            say(f"Refused: {refusal}")
+            return
         state, applied = _get_state(engine)
         say(f"State:   {state}")
         refusal = pivot_refusal(state, applied)
@@ -706,10 +851,115 @@ def show_status():
             say(f"  ✓ {n}")
         for n in pending:
             say(f"  ○ {n}")
+        if not refusal and UPGRADE_MIGRATION in pending:
+            import pre_upgrade_copy
+            sqlite_path = db_url.replace("sqlite:///", "", 1) if db_url.startswith("sqlite:///") else None
+            say(f"Copy:    {pre_upgrade_copy.PG_NOTE if is_pg else pre_upgrade_copy.plan(_sqlite_file(sqlite_path))}")
         if not refusal and UPGRADE_MIGRATION in applied and _serial_steps_pending(engine):
             say(f"Replay:  {SERIAL_REPLAY_NOTE}")
     finally:
         engine.dispose()
+
+
+# Exit codes of `check`; any other code (a crash) means the answer is unknown. REFUSED is a
+# database older than 2.254, UNKNOWN one whose registry names migrations this release lacks,
+# MAJOR_UPGRADE (with --major-upgrade only, the image's entrypoint) major_upgrade_refusal.
+CHECK_STARTABLE, CHECK_FRESH, CHECK_REFUSED, CHECK_UNREADABLE, CHECK_UNKNOWN = 0, 3, 4, 5, 6
+CHECK_MAJOR_UPGRADE = 7
+
+
+def _journal_holds_data(path: str) -> bool:
+    """A non-empty -wal or -journal: SQLite would replay it into the read (a hot journal is
+    rolled back before any read), which a read-only open of the file cannot do unwritten."""
+    return any(os.path.isfile(path + suffix) and os.path.getsize(path + suffix) > 0
+               for suffix in ("-wal", "-journal"))
+
+
+@contextmanager
+def _probe_engine(db_url: str):
+    """An engine on *db_url* that writes nothing there. A SQLite file whose journal is absent
+    or empty is opened in place with immutable=1 (no lock, no -wal or -shm created, as a WAL
+    database opened otherwise would); one whose journal holds data is read from a private
+    copy, with that journal."""
+    if db_url.startswith("sqlite:///"):
+        path = db_url[len("sqlite:///"):]
+        if not _journal_holds_data(path):
+            import sqlite3
+            from urllib.parse import quote
+            # The URI goes to sqlite3 as written: a URL parser would decode it again (#, ?, %)
+            uri = f"file:{quote(os.path.abspath(path))}?immutable=1"
+            engine = create_engine("sqlite://", creator=lambda: sqlite3.connect(uri, uri=True))
+            try:
+                yield engine
+            finally:
+                engine.dispose()
+            return
+        import shutil
+        import tempfile
+        with tempfile.TemporaryDirectory(prefix="ucm-check-") as tmp:
+            copy = os.path.join(tmp, "probe.db")
+            shutil.copyfile(path, copy)
+            for suffix in ("-wal", "-journal"):
+                if os.path.isfile(path + suffix):
+                    shutil.copyfile(path + suffix, copy + suffix)
+            engine = create_engine(f"sqlite:///{copy}")
+            try:
+                yield engine
+            finally:
+                engine.dispose()
+        return
+    args = dict(postgres_connect_args(db_url))
+    if _is_postgres(db_url) and "connect_timeout" not in db_url:
+        args["connect_timeout"] = 10
+    engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True, connect_args=args)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+
+
+def check_database(major_upgrade: bool = False) -> int:
+    """For the package scripts and the image: whether this release starts on the configured database.
+
+    Prints the backend first ("sqlite <path>", "postgresql", or "other" for any other URL),
+    then the reason of a refusal or of an unreadable database, and returns one of the
+    CHECK_* codes: a missing or empty SQLite file is fresh, a registry naming unknown
+    migrations is UNKNOWN even when 2.254 migrations are missing too. *major_upgrade* (the
+    image) also answers MAJOR_UPGRADE for a database major_upgrade_refusal refuses.
+    """
+    db_url = _get_db_url()
+    sqlite_path = db_url[len("sqlite:///"):] if db_url.startswith("sqlite:///") else None
+    say(f"sqlite {sqlite_path}" if sqlite_path else
+        "postgresql" if _is_postgres(db_url) else "other")
+    if sqlite_path is not None and not os.path.lexists(sqlite_path):
+        return CHECK_FRESH
+    try:
+        with _probe_engine(db_url) as engine:
+            refusal = encoding_refusal(engine)
+            if refusal:
+                say(f"unreadable: {refusal}")
+                return CHECK_UNREADABLE
+            # _get_state takes a table listing that fails for an empty file: read it here first
+            with engine.connect() as conn:
+                if sqlite_path is not None:
+                    conn.execute(text("SELECT name FROM sqlite_master LIMIT 1")).fetchall()
+            state, applied = _get_state(engine)
+            refusal = pivot_refusal(state, applied)
+            major = (major_upgrade_refusal(state, applied, engine)
+                     if major_upgrade and not refusal else None)
+    except Exception as exc:  # noqa: BLE001
+        cause = getattr(exc, "orig", None) or exc
+        # Never the URL: only the driver's first line, which names no password
+        say(f"unreadable: {type(cause).__name__}: {str(cause).splitlines()[0] if str(cause) else ''}")
+        return CHECK_UNREADABLE
+    if refusal:
+        say(refusal)
+        return CHECK_UNKNOWN if unknown_migrations(applied) else CHECK_REFUSED
+    refusal = major
+    if refusal:
+        say(refusal)
+        return CHECK_MAJOR_UPGRADE
+    return CHECK_FRESH if state == "fresh" else CHECK_STARTABLE
 
 
 if __name__ == "__main__":
@@ -718,15 +968,19 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="UCM Database Migration Runner")
     parser.add_argument(
         "command",
-        choices=["run", "status", "dry-run", "mark-applied"],
+        choices=["run", "status", "dry-run", "mark-applied", "check"],
         nargs="?",
         default="status",
     )
     parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument("--major-upgrade", action="store_true",
+                        help="check: also refuse an unaccepted upgrade from 2.254 (image only)")
     args = parser.parse_args()
 
     if args.command == "status":
         show_status()
+    elif args.command == "check":
+        sys.exit(check_database(major_upgrade=args.major_upgrade))
     elif args.command == "dry-run":
         run_all_migrations(dry_run=True, verbose=args.verbose)
     elif args.command == "run":

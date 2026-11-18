@@ -162,6 +162,8 @@ def rootfs(tmp, dist_from, variant='standard', arch='amd64', psycopg='psycopg_bi
                  metadata('pyjks', '20.0.0', classifiers=['License :: OSI Approved :: MIT License']))
         _tar_add(tar, f'{SITE}/pip-25.3.dist-info/METADATA', metadata('pip', '25.3', license_='MIT'))
         _tar_add(tar, f'{SITE}/nolic-1.0.dist-info/METADATA', metadata('nolic', '1.0'))
+        # Real METADATA files are UTF-8: an author's name or a sign in the License field
+        _tar_add(tar, f'{SITE}/accent-1.0.dist-info/METADATA', metadata('accent', '1.0', license_='MIT © Société'))
         if psycopg == 'psycopg_binary':
             _tar_add(tar, f'{SITE}/psycopg_binary-3.2.3.dist-info/METADATA',
                      metadata('psycopg-binary', '3.2.3', license_='LGPL-3.0-only'))

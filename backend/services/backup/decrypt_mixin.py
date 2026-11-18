@@ -175,9 +175,11 @@ class DecryptMixin:
         The payload metadata is completed from the end record: the counts of
         every section and the key mismatches known only once all were written.
         """
+        from .restore.transaction import checkpoint
         master_key, reader = self._open_v4(stream, password)
         with _first_chunk_is_the_password():
             for name, part, rows in reader.parts():
+                checkpoint('read')
                 store.add_part(name, part, rows)
         store.seal()
 

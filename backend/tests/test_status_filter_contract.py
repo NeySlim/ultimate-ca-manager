@@ -23,6 +23,8 @@ import json
 
 import pytest
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 LISTINGS = (
     '/api/v2/certificates',
@@ -112,9 +114,11 @@ class TestTheSpellingIsNotTheQuestion:
 
     def test_the_ca_spelling_does_not_return_the_whole_table(
             self, auth_client, a_mixed_bag):
+        # Narrowed to this fixture's rows: a full run leaves over a page of others
         asked = _rows(auth_client.get(
-            '/api/v2/certificates?status=Expired&per_page=100'))
-        everything = _rows(auth_client.get('/api/v2/certificates?per_page=100'))
+            '/api/v2/certificates?status=Expired&search=status-filter-&per_page=100'))
+        everything = _rows(auth_client.get(
+            '/api/v2/certificates?search=status-filter-&per_page=100'))
         assert len(asked) < len(everything), (
             'asking for the expired ones by the CA spelling handed back '
             'every certificate there is')
@@ -138,8 +142,9 @@ class TestAKnownStatusStillFilters:
     def test_asking_for_a_status_is_not_asking_for_everything(
             self, auth_client, a_mixed_bag):
         filtered = _rows(auth_client.get(
-            '/api/v2/certificates?status=revoked&per_page=100'))
-        everything = _rows(auth_client.get('/api/v2/certificates?per_page=100'))
+            '/api/v2/certificates?status=revoked&search=status-filter-&per_page=100'))
+        everything = _rows(auth_client.get(
+            '/api/v2/certificates?search=status-filter-&per_page=100'))
         assert len(filtered) < len(everything), (
             'the filter returned as much as no filter at all')
 

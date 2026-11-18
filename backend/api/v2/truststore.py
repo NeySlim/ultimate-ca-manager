@@ -8,12 +8,14 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.db_transaction import safe_commit
 from utils.sanitize import sanitize_filename
+from utils.export_pems import readable_pems, skipped_headers, nothing_readable
 from models import db
 from models.truststore import TrustedCertificate
 from services.audit_service import AuditService
 from services.deletion_blockers import parse_bulk_ids
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.serialization import pkcs7
 from cryptography.hazmat.backends import default_backend
 import hashlib
 from datetime import datetime
@@ -25,6 +27,8 @@ import logging
 from utils.datetime_utils import utc_now, utc_isoformat
 from utils.days_remaining import days_remaining as compute_days_remaining
 from utils.certificate_readability import UnreadableCertificate, require_readable_extensions
+from utils.trust_pem import (PrivateKeyInEntry, canonical_certificates, certificate_blocks, holds_private_key,
+                             is_der_certificate, opens_a_pem_certificate)
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +37,7 @@ logger = logging.getLogger(__name__)
 _VALID_PURPOSES = {'root_ca', 'intermediate_ca', 'system', 'custom', 'code_signing', 'email'}
 _MAX_PEM_BYTES = 256 * 1024   # 256 KB — well above any X.509 cert
 _MAX_SYNC_LIMIT = 1000
+SYSTEM_CA_BUNDLE = '/etc/ssl/certs/ca-certificates.crt'
 
 
 def _validate_purpose(purpose):
@@ -42,11 +47,7 @@ def _validate_purpose(purpose):
 
 
 def parse_certificate(pem_data):
-    """
-    Parse certificate and extract details
-    
-    Returns dict with subject, issuer, fingerprints, etc.
-    """
+    """Details of the entry's first certificate; the entry is judged and fingerprinted by it."""
     try:
         cert = x509.load_pem_x509_certificate(pem_data.encode(), default_backend())
         require_readable_extensions(cert)
@@ -73,6 +74,20 @@ def parse_certificate(pem_data):
         raise
     except Exception as e:
         raise ValueError(f'Invalid certificate: {str(e)}')
+
+
+def parse_entry(pem_data):
+    """``(PEM to store, details)``: the entry's certificates re-serialized, never the text received.
+
+    Raises PrivateKeyInEntry for an entry carrying a private key, ValueError for a certificate block
+    that cannot be read or is left open."""
+    try:
+        pem, _ = canonical_certificates(pem_data)
+    except PrivateKeyInEntry:
+        raise
+    except Exception as e:
+        raise ValueError(f'Invalid certificate: {type(e).__name__}')
+    return pem, parse_certificate(pem)
 
 
 def parse_der_certificate(der_data):
@@ -139,12 +154,15 @@ def import_trusted_certificate():
         return error_response(err, 400)
     
     try:
-        # Try PEM first
-        if b'-----BEGIN CERTIFICATE-----' in file_content:
-            pem_data = file_content.decode('utf-8')
-            cert_details = parse_certificate(pem_data)
+        # A DER certificate first: a field of it may name any armour line. Then PEM when a
+        # certificate block opens in the file (the legacy label included), else the DER refusal.
+        if is_der_certificate(file_content):
+            pem_data, cert_details = parse_der_certificate(file_content)
+        elif holds_private_key(file_content):
+            raise PrivateKeyInEntry()
+        elif opens_a_pem_certificate(file_content):
+            pem_data, cert_details = parse_entry(file_content.decode('utf-8'))
         else:
-            # Try DER
             pem_data, cert_details = parse_der_certificate(file_content)
         
         # Check if already exists
@@ -191,7 +209,7 @@ def import_trusted_certificate():
             message=f'Certificate "{name}" imported to trust store'
         )
         
-    except UnreadableCertificate as e:
+    except (UnreadableCertificate, PrivateKeyInEntry) as e:
         db.session.rollback()
         return error_response(str(e), 400)
     except ValueError as e:
@@ -274,9 +292,11 @@ def add_trusted_certificate():
         return error_response(err, 400)
     
     # Parse certificate
+    if not isinstance(pem, str):
+        return error_response('Invalid certificate data', 400)
     try:
-        cert_details = parse_certificate(data['certificate_pem'])
-    except UnreadableCertificate as e:
+        pem, cert_details = parse_entry(pem)
+    except (UnreadableCertificate, PrivateKeyInEntry) as e:
         return error_response(str(e), 400)
     except ValueError as e:
         logger.error(f'Trust store certificate parse failed: {e}')
@@ -294,7 +314,7 @@ def add_trusted_certificate():
     trusted_cert = TrustedCertificate(
         name=data['name'],
         description=data.get('description', ''),
-        certificate_pem=data['certificate_pem'],
+        certificate_pem=pem,
         fingerprint_sha256=cert_details['fingerprint_sha256'],
         fingerprint_sha1=cert_details['fingerprint_sha1'],
         subject=cert_details['subject'],
@@ -437,8 +457,8 @@ def sync_trust_store():
     if limit < 1 or limit > _MAX_SYNC_LIMIT:
         return error_response(f'limit must be between 1 and {_MAX_SYNC_LIMIT}', 400)
     
-    CA_BUNDLE_PATH = '/etc/ssl/certs/ca-certificates.crt'
-    
+    CA_BUNDLE_PATH = SYSTEM_CA_BUNDLE
+
     if source != 'system':
         return error_response('Only "system" source is currently supported', 400)
     
@@ -472,7 +492,7 @@ def sync_trust_store():
 
     for pem in certs_pem[:limit]:
         try:
-            cert_details = parse_certificate(pem)
+            pem, cert_details = parse_entry(pem)
 
             # Check if already exists
             existing = TrustedCertificate.query.filter_by(
@@ -566,47 +586,30 @@ def export_trust_bundle():
         if not certs:
             return error_response('No certificates found matching criteria', 404)
         
+        # an entry is readable when its first certificate is, as when it was added
+        pems, skipped = readable_pems(((c.id, c.certificate_pem) for c in certs),
+                                      load=x509.load_pem_x509_certificate)
+        if not pems:
+            return nothing_readable(skipped)
+        headers = skipped_headers(skipped)
+        by_pem = {certificate_blocks(c.certificate_pem): c for c in certs if c.certificate_pem}
         if fmt == 'pem':
             bundle_lines = []
-            for cert in certs:
-                bundle_lines.append(f'# {cert.name}')
-                bundle_lines.append(cert.certificate_pem.strip())
+            for pem in pems:
+                bundle_lines.append(f'# {by_pem[pem].name}')
+                bundle_lines.append(pem.decode().strip())
                 bundle_lines.append('')
-            
-            bundle = '\n'.join(bundle_lines)
+
             filename = f'truststore-{sanitize_filename(purpose)}-bundle.pem'
-            
-            return Response(
-                bundle,
-                mimetype='application/x-pem-file',
-                headers={'Content-Disposition': f'attachment; filename="{filename}"'}
-            )
-        
-        elif fmt == 'p7b':
-            from cryptography.hazmat.primitives.serialization import pkcs7
-            
-            x509_certs = []
-            for cert in certs:
-                try:
-                    x509_cert = x509.load_pem_x509_certificate(
-                        cert.certificate_pem.encode(), default_backend()
-                    )
-                    x509_certs.append(x509_cert)
-                except Exception:
-                    continue
-            
-            if not x509_certs:
-                return error_response('No valid certificates to export', 400)
-            
-            p7b_data = pkcs7.serialize_certificates(x509_certs, serialization.Encoding.DER)
-            
-            filename = f'truststore-{sanitize_filename(purpose)}-bundle.p7b'
-            return Response(
-                p7b_data,
-                mimetype='application/x-pkcs7-certificates',
-                headers={'Content-Disposition': f'attachment; filename="{filename}"'}
-            )
-    
+            headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return Response('\n'.join(bundle_lines), mimetype='application/x-pem-file', headers=headers)
+
+        filename = f'truststore-{sanitize_filename(purpose)}-bundle.p7b'
+        headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        p7b = pkcs7.serialize_certificates([x509.load_pem_x509_certificate(p) for p in pems],
+                                           serialization.Encoding.DER)
+        return Response(p7b, mimetype='application/x-pkcs7-certificates', headers=headers)
+
     except Exception as e:
         logger.error(f'Failed to export trust store bundle: {e}')
         return error_response('Failed to export bundle', 500)
@@ -696,9 +699,11 @@ def add_ca_to_truststore(ca_refid):
     
     # Check if already in Trust Store
     try:
-        cert_info = parse_certificate(pem_data)
-    except UnreadableCertificate as e:
+        pem_data, cert_info = parse_entry(pem_data)
+    except (UnreadableCertificate, PrivateKeyInEntry) as e:
         return error_response(str(e), 400)
+    except ValueError:
+        return error_response('Failed to parse CA certificate', 500)
     if not cert_info:
         return error_response('Failed to parse CA certificate', 500)
     

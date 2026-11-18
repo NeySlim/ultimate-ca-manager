@@ -14,7 +14,7 @@ from tests.fixtures.cross_pki import build_cross_pki, key_pem, openssl_verify, p
 from utils.key_codec import store_pem_bytes
 from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
-pytestmark = pytest.mark.usefixtures('drop_new_users')
+pytestmark = pytest.mark.usefixtures('drop_new_users', 'drop_new_cas_and_certificates')
 
 FINDINGS = '/api/v2/cas/cross-findings'
 
@@ -217,6 +217,26 @@ def _config(key):
     return row.value if row else None
 
 
+def test_convert_moves_a_setting_that_names_the_ca_by_a_padded_number(app, auth_client):
+    """'07' reads as CA 7 (int()), as the readers and the deletion blocker take it."""
+    from models import SystemConfig
+    pki, ids = _world(app)
+    keys = ('acme.issuing_ca_id', 'scep_ca_id')
+    with app.app_context():
+        for key in keys:
+            SystemConfig.query.filter_by(key=key).delete()
+        _set_config(acme__issuing_ca_id=f"0{ids['x']}", scep_ca_id=f" +0{ids['x']} ")
+    assert auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={}).status_code == 200
+    with app.app_context():
+        try:
+            for key in keys:
+                assert _config(key) == str(ids['b']), key
+        finally:
+            for key in keys:
+                SystemConfig.query.filter_by(key=key).delete()
+            db.session.commit()
+
+
 def test_convert_moves_the_ca_settings_to_the_root(app, auth_client):
     from models import SystemConfig
     from tests import windows_profile_support as profile
@@ -412,6 +432,25 @@ def test_convert_moves_the_scep_challenge_with_the_scep_ca(app, auth_client):
         from models import SystemConfig
         SystemConfig.query.filter(SystemConfig.key.like('scep_%')).delete(synchronize_session=False)
         db.session.commit()
+
+
+def test_convert_takes_the_challenge_of_the_scep_ca_named_by_a_padded_number(app, auth_client):
+    """scep_ca_id '0<id>' still names the converted record: its challenge replaces the root's."""
+    from models import SystemConfig
+    pki, ids = _world(app)
+    with app.app_context():
+        SystemConfig.query.filter_by(key='scep_ca_id').delete()
+        _set_config(scep_ca_id=f"0{ids['x']}")
+        _set_config(**{f"scep_challenge_{ids['x']}": 'secret-x', f"scep_challenge_{ids['b']}": 'secret-b'})
+    try:
+        assert auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={}).status_code == 200
+        with app.app_context():
+            assert _config(f"scep_challenge_{ids['b']}") == 'secret-x'
+            assert _config(f"scep_challenge_{ids['x']}") is None
+    finally:
+        with app.app_context():
+            SystemConfig.query.filter(SystemConfig.key.like('scep_%')).delete(synchronize_session=False)
+            db.session.commit()
 
 
 def test_convert_drops_the_challenge_of_a_non_scep_duplicate_when_the_root_has_one(app, auth_client):

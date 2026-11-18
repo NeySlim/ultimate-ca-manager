@@ -11,6 +11,8 @@ import pytest
 
 from models import db, SystemConfig
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 URL = '/api/v2/settings/general'
 
 # One value per reserved key, each different from the defaults. Values that

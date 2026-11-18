@@ -7,6 +7,8 @@ import pytest
 
 from tests.conftest import assert_error, assert_success
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 BASE = '/api/v2/deploy'
 _seq = [0]
 

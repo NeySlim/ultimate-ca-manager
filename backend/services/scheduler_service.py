@@ -173,6 +173,8 @@ class SchedulerService:
         self._started_cluster = None  # _started_at on the cluster clock, set by the first heartbeat
         self._last_heartbeat = None
         self._heartbeat_error_logged = False
+        self._led_since = None  # monotonic instant this process took the lock (HA)
+        self._last_prune = None
         self._claimed: Dict[str, list] = {}
         self._leadership_hooks: list = []
         self.tasks: Dict[str, ScheduledTask] = {}
@@ -497,7 +499,8 @@ class SchedulerService:
             except Exception:
                 self._in_app(_rollback)
         try:
-            return bool(os.listdir(_data_path(REQUESTS_DIR)))
+            # A request is named after its task: a hidden entry (a local archive) is none
+            return any(not name.startswith('.') for name in os.listdir(_data_path(REQUESTS_DIR)))
         except OSError:
             return False
 
@@ -662,6 +665,10 @@ class SchedulerService:
             self._leader_lock_pid = os.getpid()
         return self._leader_lock
 
+    def holds_lock(self) -> bool:
+        """This loop runs the scheduled tasks: the host lock, or the HA leader lock."""
+        return bool(self._running and self._owns_lock and not self.deposed)
+
     def _still_leader(self, lock) -> bool:
         """Checked before every task: once the lock is gone no task starts here."""
         if lock.still_held():
@@ -694,6 +701,7 @@ class SchedulerService:
                     self._heartbeat()  # a process whose row another one holds never takes the lock
                 if not lost and not self._owns_lock and not self.deposed and lock.acquire():
                     self._owns_lock, self._owner_pid = True, os.getpid()
+                    self._led_since = time.monotonic()
                     logger.info(f"Scheduler lock acquired: pid {os.getpid()} on node {self.node_id} "
                                 "runs the scheduled tasks")
                     self._heartbeat(force=True)
@@ -705,12 +713,14 @@ class SchedulerService:
                     # Nothing claimed, run or published; the heartbeat above goes on
                     self._wake.wait(LOCK_RETRY_SECONDS)
                     continue
+                self._refresh_caches()
                 if not self._owns_lock:
                     if _ha() and not self.deposed:
                         self._start_node_tasks()
                         self._publish_state()  # this node's per-node runs, for its web workers
                     self._wake.wait(LOCK_RETRY_SECONDS)
                     continue
+                self._prune_registry()
                 try:
                     requested = self._take_deferred()
                     taken = self._take_requests() if supervised() or _ha() else []
@@ -828,6 +838,27 @@ class SchedulerService:
                 logger.error(f"Node heartbeat not written: {type(e).__name__}: {e}")
                 self._heartbeat_error_logged = True
 
+    def _prune_registry(self) -> None:
+        """HA leader, once a pass: delete the rows of nodes gone for good. Only after leading a
+        stale window: past a database cut every live node has beaten again by then."""
+        if not _ha() or not self._owns_lock or self._led_since is None:
+            return
+        now = time.monotonic()
+        from services.scheduler_leader import GONE_PASSES, STALE_PASSES, prune_gone_nodes
+        if now - self._led_since < STALE_PASSES * self.wake_interval:
+            return
+        if self._last_prune is not None and now - self._last_prune < self.wake_interval:
+            return
+        self._last_prune = now
+        try:
+            removed = self._in_app(prune_gone_nodes, self.node_id, self.wake_interval)
+        except Exception as e:
+            self._in_app(_rollback)
+            logger.warning(f"Cluster registry not pruned: {type(e).__name__}: {e}")
+            return
+        if removed:
+            logger.info(f"Cluster registry: {removed} node(s) silent for {GONE_PASSES} passes removed")
+
     @property
     def instance_token(self) -> str:
         if self._instance_token:
@@ -851,15 +882,28 @@ class SchedulerService:
             self._release_lock()
 
     def _in_maintenance(self) -> bool:
-        """HA: this process refuses writes for a cluster maintenance, so no task starts."""
-        if not _ha() or self._app is None:
+        """This process refuses writes (HA cluster maintenance, or a single node's restore
+        gate), so no task starts."""
+        if self._app is None:
             return False
         from services import cluster_maintenance
         try:
             self._in_app(cluster_maintenance.current)
+            return cluster_maintenance.blocks_writes(self._app)
         except Exception as e:
+            # The gate's own reading failed: the engine guard still refuses the writes
             logger.error(f"Cluster maintenance not read by the scheduler: {type(e).__name__}")
-        return cluster_maintenance.blocks_writes(self._app)
+            return False
+
+    def _refresh_caches(self):
+        """A restore advanced the session epoch: this process drops its caches once."""
+        if self._app is None:
+            return
+        from services.backup.restore.invalidate import refresh_caches_on_epoch
+        try:
+            self._in_app(refresh_caches_on_epoch)
+        except Exception as e:
+            logger.error(f"Caches not checked against the session epoch: {type(e).__name__}")
 
     def _in_app(self, fn, *args):
         if self._app is not None:

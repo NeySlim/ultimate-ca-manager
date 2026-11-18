@@ -14,6 +14,8 @@ import pytest
 from utils.datetime_utils import utc_now
 from utils.days_remaining import days_remaining
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 @pytest.fixture()
 def twelve_hours_left():

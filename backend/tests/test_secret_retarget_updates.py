@@ -531,6 +531,10 @@ class TestADConnector:
 
 
 class TestHsmProvider:
+    @pytest.fixture(autouse=True)
+    def _drop_made(self, dropped):
+        self._made = dropped
+
     def _make(self, app, kind, config):
         from models.hsm import HsmProvider
         with app.app_context():
@@ -538,6 +542,7 @@ class TestHsmProvider:
             row.set_config(config)
             db.session.add(row)
             db.session.commit()
+            self._made.append((HsmProvider, row.id))
             return row.id
 
     def _config(self, app, provider_id):

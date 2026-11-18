@@ -18,6 +18,8 @@ from cryptography import x509
 from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 SM2_OID = '1.2.156.10197.1.301'
 SM2_SIG_OID = '1.2.156.10197.1.501'
 GOST256_OID = '1.2.643.7.1.1.1.1'

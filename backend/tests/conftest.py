@@ -161,8 +161,34 @@ if _pg_app.ENABLED:
     _app_module.create_app = _pg_app.isolating(_app_module.create_app, _settings.TestingConfig)
 
 
+def pytest_addoption(parser):
+    parser.addoption('--order-seed', type=int, default=None,
+                     help='shuffle the order of the test FILES with this seed, never the tests inside a file; the seed is '
+                          'printed at the top of the report (one process; xdist assigns files itself)')
+
+
+def pytest_report_header(config):
+    seed = config.getoption('--order-seed')
+    if seed is not None:
+        return f'order-seed: {seed}'
+
+
+def _shuffle_files(items, seed):
+    """Files in a seeded pseudo-random order, each file's place depending on its own name and the
+    seed only (a subset of the suite keeps the relative order of the full run); tests keep their order."""
+    import hashlib
+    groups = {}
+    for item in items:
+        groups.setdefault(item.nodeid.split('::')[0], []).append(item)
+    names = sorted(groups, key=lambda name: hashlib.sha256(f'{seed}/{name}'.encode()).hexdigest())
+    items[:] = [item for name in names for item in groups[name]]
+
+
 def pytest_collection_modifyitems(config, items):
-    """Skip the tests marked sqlite_only when the session app runs on PostgreSQL."""
+    """Order the files by --order-seed; skip the sqlite_only tests when the session app runs on PostgreSQL."""
+    seed = config.getoption('--order-seed')
+    if seed is not None:
+        _shuffle_files(items, seed)
     if not _pg_app.ENABLED:
         return
     for item in items:
@@ -418,7 +444,7 @@ def _seeded_rows_stay_in_their_module():
 _LEAK_TABLES = (
     'certificate_authorities', 'certificates', 'acme_orders', 'acme_domains',
     'users', 'certificate_templates', 'scep_profiles', 'certificate_policies',
-    'windows_enrollment_profiles', 'hsm_providers',
+    'windows_enrollment_profiles', 'hsm_providers', 'pro_sso_providers', 'user_sso_identities',
 )
 # Tables whose rows are compared too: a default profile edited in place keeps the count.
 _LEAK_CONTENT = {'windows_enrollment_profiles': ('updated_at', 'updated_by')}
@@ -430,6 +456,12 @@ _LEAK_EXEMPT = {
 
 
 _ORPHAN_RECORDS = 'revocation records of a deleted certificate'
+# Rows SQLite keeps when their ACME account is deleted behind the service (no foreign key
+# enforcement): a database check of a later file reports them as dangling references
+_ORPHAN_ACME = {
+    'ACME authorizations of a deleted account': 'acme_authorizations',
+    'ACME orders of a deleted account': 'acme_orders',
+}
 
 
 def _leak_counts():
@@ -449,6 +481,12 @@ def _leak_counts():
             counts[_ORPHAN_RECORDS] = db.session.execute(_text(
                 'SELECT COUNT(*) FROM revoked_serials r WHERE r.certificate_id IS NOT NULL AND NOT EXISTS'
                 ' (SELECT 1 FROM certificates c WHERE c.id = r.certificate_id)')).scalar()
+        if 'acme_accounts' in present:
+            for label, table in _ORPHAN_ACME.items():
+                if table in present:
+                    counts[label] = db.session.execute(_text(
+                        f'SELECT COUNT(*) FROM "{table}" o WHERE o.account_id IS NOT NULL AND NOT EXISTS'
+                        ' (SELECT 1 FROM acme_accounts a WHERE a.account_id = o.account_id)')).scalar()
         for table, ignored in _LEAK_CONTENT.items():
             if table in present:
                 rows = db.session.execute(_text(f'SELECT * FROM "{table}" ORDER BY id')).mappings()
@@ -503,6 +541,95 @@ def _shared_tables_stay_in_their_module(request):
     warnings.warn(message, stacklevel=1)
 
 
+def _drop_planner_statistics():
+    """Remove the SQLite planner statistics (sqlite_stat1, and sqlite_stat4 where SQLite is built with
+    STAT4; Debian 13's SQLite 3.46 is not) an ANALYZE left; a plan test reads them. The session never stays open."""
+    if not _SESSION_APP:
+        return
+    from sqlalchemy import text as _text
+    from models import db
+    with _SESSION_APP[0].app_context():
+        try:
+            if db.engine.dialect.name == 'sqlite':
+                db.session.rollback()
+                tables = [t for t in ('sqlite_stat1', 'sqlite_stat4')
+                          if db.session.execute(_text('SELECT 1 FROM sqlite_master WHERE name = :n'), {'n': t}).first()]
+                # Dropping a table leaves the loaded statistics in the connection: empty them, reload, drop
+                for table in tables:
+                    db.session.execute(_text(f'DELETE FROM {table}'))
+                if tables:
+                    db.session.execute(_text('ANALYZE sqlite_master'))
+                for table in tables:
+                    db.session.execute(_text(f'DELETE FROM {table}'))
+                    db.session.execute(_text(f'DROP TABLE {table}'))
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
+        finally:
+            db.session.remove()
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _planner_statistics_stay_in_their_module():
+    """A file that runs ANALYZE (the optimize route) does not hand its statistics to the next one."""
+    yield
+    _drop_planner_statistics()
+
+
+def _sweep_deliveries(webhook_endpoints_before=None):
+    """Delivery rows must not outlive what they were queued for: SQLite hands a deleted endpoint's or
+    binding's id to the next one, which then inherits the old rows. Endpoints a file created go too."""
+    if not _SESSION_APP:
+        return
+    from sqlalchemy import text as _text
+    from models import db
+    with _SESSION_APP[0].app_context():
+        try:
+            present = set(db.inspect(db.engine).get_table_names())
+            if 'webhook_endpoints' in present and 'webhook_deliveries' in present:
+                if webhook_endpoints_before is not None:
+                    for (row_id,) in db.session.execute(_text('SELECT id FROM webhook_endpoints')).all():
+                        if row_id not in webhook_endpoints_before:
+                            db.session.execute(_text('DELETE FROM webhook_deliveries WHERE endpoint_id = :i'), {'i': row_id})
+                            db.session.execute(_text('DELETE FROM webhook_endpoints WHERE id = :i'), {'i': row_id})
+                db.session.execute(_text('DELETE FROM webhook_deliveries WHERE endpoint_id NOT IN (SELECT id FROM webhook_endpoints)'))
+            for kind, table in (('certificate', 'deploy_bindings'), ('crl', 'crl_deploy_bindings')):
+                if {'deploy_deliveries', table} <= present:
+                    db.session.execute(_text(
+                        f"DELETE FROM deploy_deliveries WHERE binding_type = '{kind}' "
+                        f'AND binding_id NOT IN (SELECT id FROM {table})'))
+            db.session.commit()
+        except Exception as exc:
+            db.session.rollback()
+            import warnings
+            warnings.warn(f'deliveries not swept: {type(exc).__name__}', stacklevel=1)
+        finally:
+            db.session.remove()
+
+
+def _webhook_endpoint_ids():
+    if not _SESSION_APP:
+        return None
+    from sqlalchemy import text as _text
+    from models import db
+    with _SESSION_APP[0].app_context():
+        try:
+            if 'webhook_endpoints' not in db.inspect(db.engine).get_table_names():
+                return None
+            return {row[0] for row in db.session.execute(_text('SELECT id FROM webhook_endpoints')).all()}
+        finally:
+            db.session.rollback()
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _deliveries_stay_with_their_endpoints():
+    """No webhook endpoint a file created, and no delivery without its endpoint or binding, reaches the next file."""
+    before = _webhook_endpoint_ids()
+    yield
+    _sweep_deliveries(before)
+
+
 def _epoch_row():
     """The stored session epoch: its value, None when absent (a fresh database)."""
     if not _SESSION_APP:
@@ -533,6 +660,36 @@ def _session_epoch_stays_in_its_module():
             db.session.add(SystemConfig(key=EPOCH_KEY, value=before))
         else:
             row.value = before
+        db.session.commit()
+        db.session.remove()
+
+
+def _restored_https_row():
+    """The stored restored HTTPS pair (shared_files), None when absent."""
+    if not _SESSION_APP:
+        return None
+    from models import SharedFile, db
+    from services.shared_files import HTTPS_RESTORED
+    with _SESSION_APP[0].app_context():
+        content = db.session.query(SharedFile.content).filter_by(name=HTTPS_RESTORED).scalar()
+        db.session.rollback()
+        return content
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _restored_https_pair_stays_in_its_module():
+    """A restore of an archive with an HTTPS pair stores it for a next start no test makes;
+    put back what was found before the file, as the epoch above."""
+    before = _restored_https_row()
+    yield
+    if not _SESSION_APP or _restored_https_row() == before:
+        return
+    from models import SharedFile, db
+    from services.shared_files import HTTPS_RESTORED
+    with _SESSION_APP[0].app_context():
+        db.session.query(SharedFile).filter_by(name=HTTPS_RESTORED).delete()
+        if before is not None:
+            db.session.add(SharedFile(name=HTTPS_RESTORED, content=before))
         db.session.commit()
         db.session.remove()
 
@@ -586,21 +743,106 @@ def _database_key_stays_readable(request):
 
 @pytest.fixture(scope='module')
 def drop_new_cas_and_certificates(app):
-    """Deletes the certificates then the CAs a module created, with their dependent rows."""
+    """Deletes what a module created above the ids present before it: the ACME orders, ACME
+    domains, ACME local domains, CRL deploy bindings, certificate policies and SCEP profiles
+    that would block a CA, then certificates, then CAs (children first, until a pass removes
+    nothing). Yields the cleanup itself, which runs once however often it is called."""
     from models import db, CA, Certificate
+    from models.acme_models import AcmeDomain, AcmeLocalDomain, AcmeOrder
+    from models.deploy import CRLDeployBinding
+    from models.policy import CertificatePolicy
+    from models.scep import ScepProfile
     from services.ca_service import CAService
     from services.cert_service import CertificateService
+    import warnings
 
     def _top(model):
         with app.app_context():
             return db.session.query(db.func.max(model.id)).scalar() or 0
-    floors = {Certificate: _top(Certificate), CA: _top(CA)}
-    yield
-    for model, delete in ((Certificate, CertificateService.delete_certificate),
-                          (CA, CAService.delete_ca)):
+    # What blocks deleting a CA goes with it
+    blockers = (AcmeOrder, AcmeDomain, AcmeLocalDomain, CRLDeployBinding, CertificatePolicy, ScepProfile)
+    floors = {m: _top(m) for m in (Certificate, CA, *blockers)}
+
+    def _ids(model):
+        return [row.id for row in model.query.filter(model.id > floors[model]).order_by(model.id.desc())]
+
+    def _try(delete, row_id, errors):
+        try:
+            return delete(row_id)
+        except Exception as exc:
+            db.session.rollback()
+            errors[row_id] = exc
+            return False
+
+    done = []
+
+    def cleanup():
+        if done:
+            return
+        done.append(True)
         with app.app_context():
-            for row_id in [row.id for row in model.query.filter(model.id > floors[model])]:
-                delete(row_id)
+            for model in blockers:
+                for row in model.query.filter(model.id > floors[model]).all():
+                    db.session.delete(row)
+                db.session.commit()
+            errors = {}
+            for row_id in _ids(Certificate):
+                _try(CertificateService.delete_certificate, row_id, errors)
+            for row_id, exc in errors.items():
+                warnings.warn(f'drop_new_cas_and_certificates kept certificate {row_id}: {exc}', stacklevel=1)
+            pending, errors = _ids(CA), {}
+            while pending:
+                left = [i for i in pending if not _try(CAService.delete_ca, i, errors)]
+                if len(left) == len(pending):
+                    break
+                pending = left
+            # A CA refused on one pass is often deleted once its children are gone: only the last word counts
+            for row_id in _ids(CA):
+                warnings.warn(f'drop_new_cas_and_certificates kept CA {row_id}: {errors.get(row_id)}', stacklevel=1)
+            db.session.remove()
+    yield cleanup
+    cleanup()
+
+
+@pytest.fixture(scope='module')
+def drop_new_config_rows(app, request):
+    """Deletes the policies, SCEP profiles, templates and HSM providers (with their keys) a
+    module created above the ids present before it, after the module's CAs and certificates
+    when it uses drop_new_cas_and_certificates: those hold templates and HSM keys."""
+    from models import db, HsmKey, HsmProvider
+    from models.certificate_template import CertificateTemplate
+    from models.policy import CertificatePolicy
+    from models.scep import ScepProfile
+    models = (CertificatePolicy, ScepProfile, CertificateTemplate, HsmKey, HsmProvider)
+    drop_cas = (request.getfixturevalue('drop_new_cas_and_certificates')
+                if 'drop_new_cas_and_certificates' in request.fixturenames else None)
+
+    def _top(model):
+        with app.app_context():
+            return db.session.query(db.func.max(model.id)).scalar() or 0
+    floors = {m: _top(m) for m in models}
+    yield
+    if drop_cas is not None:
+        drop_cas()
+    with app.app_context():
+        errors = {}
+        for _ in range(2):
+            for model in models:
+                for row in model.query.filter(model.id > floors[model]).all():
+                    key = (model.__name__, row.id)
+                    try:
+                        db.session.delete(row)
+                        db.session.commit()
+                        errors.pop(key, None)
+                    except Exception as exc:
+                        db.session.rollback()
+                        errors[key] = exc
+        import warnings
+        for model in models:
+            for row in model.query.filter(model.id > floors[model]).all():
+                key = (model.__name__, row.id)
+                warnings.warn(f'drop_new_config_rows kept {key[0]} {key[1]}: {errors.get(key)}', stacklevel=1)
+        db.session.remove()
 
 
 @pytest.fixture(scope='module')
@@ -624,9 +866,14 @@ def drop_new_users(app):
     assert r.status_code == 200, r.data
     import warnings
     for user_id in made:
+        with app.app_context():
+            # A pending approval of the account would refuse its deletion
+            from models.policy import ApprovalRequest
+            ApprovalRequest.query.filter_by(requester_id=user_id, status='pending').delete()
+            db.session.commit()
         r = admin.delete(f'/api/v2/users/{user_id}')
         if r.status_code != 200:
-            warnings.warn(f'drop_new_users could not delete user {user_id}: HTTP {r.status_code}')
+            warnings.warn(f'drop_new_users could not delete user {user_id}: HTTP {r.status_code} {r.data[:200]}')
 
 
 def sandbox_paths(application, replaced=None):
@@ -668,6 +915,40 @@ def configure_test_app(application):
     application.config['FQDN'] = 'ucm.test'
 
 
+# The session database never hands out an id twice, as PostgreSQL never does: a file's
+# cleanup frees ids, and audit or queue rows naming them must not reach the next file.
+_SESSION_ENGINE = {'building': False, 'engine': None}
+
+
+def _is_session_engine(connection):
+    if connection.dialect.name != 'sqlite':
+        return False
+    if _SESSION_ENGINE['engine'] is not None:
+        return connection.engine is _SESSION_ENGINE['engine']
+    if not _SESSION_ENGINE['building']:
+        return False
+    from flask import has_app_context
+    from models import db
+    return has_app_context() and connection.engine is db.engine
+
+
+def _autoincrement_on(table, connection, **kw):
+    if _is_session_engine(connection):
+        table.info['_flk_autoincrement'] = table.dialect_options['sqlite']['autoincrement']
+        table.dialect_options['sqlite']['autoincrement'] = True
+
+
+def _autoincrement_restored(table, connection, **kw):
+    # The model metadata stays as the product declares it for every other database
+    if '_flk_autoincrement' in table.info:
+        table.dialect_options['sqlite']['autoincrement'] = table.info.pop('_flk_autoincrement')
+
+
+from sqlalchemy import Table as _SaTable, event as _sa_event  # noqa: E402
+_sa_event.listen(_SaTable, 'before_create', _autoincrement_on)
+_sa_event.listen(_SaTable, 'after_create', _autoincrement_restored)
+
+
 @pytest.fixture(scope='session')
 def app():
     """Create Flask app with test configuration (shared across all tests)."""
@@ -686,7 +967,14 @@ def app():
     if _pg_app.ENABLED:
         application = _pg_app.session_app(create_app, 'testing')
     else:
-        application = create_app('testing')
+        _SESSION_ENGINE['building'] = True
+        try:
+            application = create_app('testing')
+        finally:
+            _SESSION_ENGINE['building'] = False
+        from models import db as _db
+        with application.app_context():
+            _SESSION_ENGINE['engine'] = _db.engine
 
     _sandbox, _ = sandbox_paths(application)
     configure_test_app(application)
@@ -696,6 +984,7 @@ def app():
     _SESSION_APP.append(application)
     yield application
     _SESSION_APP.clear()
+    _SESSION_ENGINE['engine'] = None
     if _pg_app.ENABLED:
         from models import db as _db
         with application.app_context():

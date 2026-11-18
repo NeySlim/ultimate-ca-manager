@@ -110,6 +110,19 @@ def test_an_unknown_ca_has_no_serial(app):
             SSHCAService.get_next_serial(-1)
 
 
+def test_an_unknown_ca_leaves_the_callers_work_in_its_session(app):
+    from models import SystemConfig
+    with app.app_context():
+        pending = SystemConfig(key=f'ssh-serial-{uuid.uuid4().hex[:8]}', value='kept')
+        db.session.add(pending)
+        db.session.flush()
+        with pytest.raises(ValueError, match='not found'):
+            SSHCAService.get_next_serial(-1)
+        assert pending in db.session
+        db.session.rollback()
+        db.session.remove()
+
+
 def _sign_together(app, ca_id):
     """Every worker has loaded the CA before any of them takes a serial."""
     errors, serials, loaded = [], [], threading.Barrier(WORKERS)

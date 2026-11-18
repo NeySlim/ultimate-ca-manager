@@ -22,6 +22,8 @@ from tests.test_scep_rfc8894_operations import (  # reuse the SCEP harness
     _load_ca_material, _response_attributes,
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 CHALLENGE = 'correct horse battery staple'
 
 

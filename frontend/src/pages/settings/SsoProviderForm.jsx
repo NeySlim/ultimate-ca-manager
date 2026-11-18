@@ -61,6 +61,7 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     ldap_user_filter: provider?.ldap_user_filter || '(uid={username})',
     ldap_group_filter: provider?.ldap_group_filter || '',
     ldap_group_member_attr: provider?.ldap_group_member_attr || 'member',
+    ldap_group_base_dn: provider?.ldap_group_base_dn || '',
     ldap_username_attr: provider?.ldap_username_attr || 'uid',
     ldap_email_attr: provider?.ldap_email_attr || 'mail',
     ldap_fullname_attr: provider?.ldap_fullname_attr || 'cn',
@@ -280,7 +281,10 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
 
   const defaultRoleOptions = [{ value: '', label: t('sso.defaultRoleNone') }, ...roleOptions]
 
-  const sharedProps = { formData, handleChange, provider, testingConnection, connectionBadge, roleOptions, defaultRoleOptions, customRoles, handleTestConnection,
+  // A sign-in test runs on the saved provider: the screen says so when the form differs
+  const dirty = JSON.stringify(formData) !== JSON.stringify(savedForm)
+
+  const sharedProps = { formData, handleChange, provider, testingConnection, connectionBadge, roleOptions, defaultRoleOptions, customRoles, handleTestConnection, dirty,
     secretProps: secretTarget ? secretInputProps(t, secretTarget) : {} }
 
   return (

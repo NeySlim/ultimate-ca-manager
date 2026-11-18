@@ -9,7 +9,7 @@ from models import CA, Certificate, db
 from tests.fixtures.cross_pki import make_cert, new_key, pem
 import pytest
 
-pytestmark = pytest.mark.usefixtures('drop_new_users')
+pytestmark = pytest.mark.usefixtures('drop_new_users', 'drop_new_cas_and_certificates')
 
 
 def _ca_row(cert, label):

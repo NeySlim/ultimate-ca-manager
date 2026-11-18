@@ -39,6 +39,7 @@ spec:
         {{- end }}
     spec:
       serviceAccountName: {{ include "ucm.serviceAccountName" . }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -51,6 +52,13 @@ spec:
         - name: ucm
           image: {{ include "ucm.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if gt (int .Values.lifecycle.preStopSleepSeconds) 0 }}
+          # Out of the Service's endpoints before SIGTERM: no new connection reaches a stopping pod
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "{{ .Values.lifecycle.preStopSleepSeconds }}"]
+          {{- end }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
@@ -150,6 +158,11 @@ spec:
             - name: UCM_DNS_UPDATE_HOST
               value: {{ . | quote }}
             {{- end }}
+            {{- end }}
+            {{- if .Values.majorUpgrade.accept }}
+            # helm upgrade to this chart is the operator's consent to its major (see values.yaml)
+            - name: UCM_ACCEPT_MAJOR_UPGRADE
+              value: {{ splitList "." (toString .Chart.AppVersion) | first | quote }}
             {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}

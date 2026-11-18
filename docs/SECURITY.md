@@ -197,7 +197,10 @@ database can recompute, and the check reports the log as not protected. A retent
 removes the oldest entries only and records, sealed, where the log now starts.
 
 `GET /api/v2/audit/verify` (Audit Logs > Verify Integrity) reports `intact`, `broken` at
-entry N, or `unprotected`. Once the key has sealed an entry, an entry written after it
+entry N, or `unprotected`. It runs as a background job in the scheduler process, page by page,
+so the web worker stays available and other writes go on meanwhile; past 25 seconds the route
+answers `202` and the job is followed at `/api/v2/system/jobs/<id>` (see API_REFERENCE.md,
+Background Jobs). A purge during the check makes it start again, so it never reads as a break. Once the key has sealed an entry, an entry written after it
 without the key is a break.
 
 Changing the master key re-anchors the chain. UCM keeps the ids of the keys it has sealed
@@ -274,7 +277,8 @@ WebAuthn authentication includes rate limiting:
 - Attempts counted per username in the database, as are second-factor attempts per pending login: the count and the lockout apply on every node and survive a restart
 - A code checked in an open session (disabling 2FA, regenerating recovery codes) counts against the same per-account budget as the login's second step
 - A password checked in an open session counts on a per-account counter of its own, with the same threshold and duration, and never locks the login
-- Account lockout after repeated failures
+- Account lockout after repeated failures; at the password and LDAP login each attempt is counted before its password is checked (at LDAP on the local account the directory entry opens, not the name typed), so attempts sent together on any node check at most `max_login_attempts` passwords
+- The lockout is the password's and the LDAP bind's: a client certificate or a passkey is not refused by it, and its success neither resets the password's count nor lifts its lock
 - Separate rate limit from password login
 
 ### 9. SSO Audit Logging (v2.52+)

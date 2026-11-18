@@ -4,6 +4,8 @@ import pytest
 from models import db
 from services.acme.domain_match import is_valid_entry
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 BOTH_MODES = pytest.mark.parametrize('single', [True, False], ids=['local', 'dns'])
 
 

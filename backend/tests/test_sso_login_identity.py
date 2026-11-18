@@ -9,8 +9,11 @@ import uuid
 
 import pytest
 
-from models import db, User
+from models import db, User, UserSSOIdentity
 from models.sso import SSOProvider, SSOSession
+from tests.sso_identity_support import (
+    by_identity, delete_users_of, ext, identities, legacy_user, orphan, prov,
+)
 
 
 def _cleanup(names):
@@ -88,7 +91,7 @@ def oidc(app, monkeypatch):
     yield login
     with app.app_context():
         SSOSession.query.filter_by(provider_id=pid).delete()
-        User.query.filter_by(sso_provider_id=pid).delete()
+        delete_users_of(pid)
         db.session.delete(db.session.get(SSOProvider, pid))
         for opid, enabled in others:
             db.session.get(SSOProvider, opid).enabled = enabled
@@ -99,7 +102,7 @@ def test_oidc_email_local_part_does_not_open_the_local_admin(app, oidc):
     with app.app_context():
         _cleanup(['tkadmin'])
         db.session.add(User(username='tkadmin', email='tkadmin@corp.test', full_name='A',
-                            role='admin', active=True, password_hash='hash', auth_source='local'))
+                            role='admin', active=True, password_hash='hash'))
         db.session.commit()
     try:
         location, verify = oidc({'sub': 'attacker-sub-1', 'email': 'tkadmin@attacker.example'})
@@ -107,7 +110,7 @@ def test_oidc_email_local_part_does_not_open_the_local_admin(app, oidc):
         assert verify.get('authenticated') is not True
         with app.app_context():
             admin = User.query.filter_by(username='tkadmin').one()
-            assert admin.sso_external_id is None and admin.auth_source == 'local'
+            assert admin.sso_identities == [] and admin.auth_source == 'local'
             from models import AuditLog
             assert AuditLog.query.filter(
                 AuditLog.action == 'login_failure',
@@ -120,7 +123,7 @@ def test_oidc_email_local_part_does_not_open_the_local_admin(app, oidc):
 def test_oidc_preferred_username_does_not_open_another_sso_account(app, oidc):
     with app.app_context():
         _cleanup(['tkbob'])
-        db.session.add(User(username='tkbob', email='bob@corp.test', full_name='Bob',
+        db.session.add(legacy_user(username='tkbob', email='bob@corp.test', full_name='Bob',
                             role='operator', active=True, password_hash='!SSO_NO_PASSWORD!',
                             auth_source='oauth2', sso_provider_id=oidc.provider_id,
                             sso_external_id='bob-sub'))
@@ -131,7 +134,7 @@ def test_oidc_preferred_username_does_not_open_another_sso_account(app, oidc):
         assert location.endswith('/login?error=sso_username_conflict')
         assert verify.get('authenticated') is not True
         with app.app_context():
-            assert User.query.filter_by(username='tkbob').one().sso_external_id == 'bob-sub'
+            assert ext(User.query.filter_by(username='tkbob').one()) == 'bob-sub'
         # Bob himself still signs in.
         location, verify = oidc({'sub': 'bob-sub', 'preferred_username': 'tkbob'})
         assert location.endswith('/login/sso-complete')
@@ -144,7 +147,7 @@ def test_oidc_preferred_username_does_not_open_another_sso_account(app, oidc):
 def test_oidc_email_never_adopts_an_account_bound_to_another_sub(app, oidc):
     with app.app_context():
         _cleanup(['tkcarol', 'tkcarol2'])
-        db.session.add(User(username='tkcarol', email='carol@corp.test', full_name='C',
+        db.session.add(legacy_user(username='tkcarol', email='carol@corp.test', full_name='C',
                             role='admin', active=True, password_hash='!SSO_NO_PASSWORD!',
                             auth_source='oauth2', sso_provider_id=oidc.provider_id,
                             sso_external_id='carol-sub'))
@@ -154,8 +157,8 @@ def test_oidc_email_never_adopts_an_account_bound_to_another_sub(app, oidc):
                             'email': 'carol@corp.test'})
         assert location.endswith('/login/sso-complete')
         with app.app_context():
-            assert User.query.filter_by(username='tkcarol').one().sso_external_id == 'carol-sub'
-            assert User.query.filter_by(username='tkcarol2').one().sso_external_id == 'other-sub'
+            assert ext(User.query.filter_by(username='tkcarol').one()) == 'carol-sub'
+            assert ext(User.query.filter_by(username='tkcarol2').one()) == 'other-sub'
     finally:
         with app.app_context():
             _cleanup(['tkcarol', 'tkcarol2'])
@@ -165,7 +168,7 @@ def test_oidc_adopts_an_admin_linked_account_and_binds_its_sub(app, oidc):
     """The documented merge path: Link to SSO, then the first login binds the sub."""
     with app.app_context():
         _cleanup(['tkdave'])
-        db.session.add(User(username='tkdave', email='dave@corp.test', full_name='D',
+        db.session.add(legacy_user(username='tkdave', email='dave@corp.test', full_name='D',
                             role='admin', active=True, password_hash='hash',
                             auth_source='oauth2', sso_provider_id=oidc.provider_id))
         db.session.commit()
@@ -173,7 +176,7 @@ def test_oidc_adopts_an_admin_linked_account_and_binds_its_sub(app, oidc):
         location, verify = oidc({'sub': 'dave-sub', 'preferred_username': 'tkdave'})
         assert location.endswith('/login/sso-complete')
         with app.app_context():
-            assert User.query.filter_by(username='tkdave').one().sso_external_id == 'dave-sub'
+            assert ext(User.query.filter_by(username='tkdave').one()) == 'dave-sub'
     finally:
         with app.app_context():
             _cleanup(['tkdave'])
@@ -187,7 +190,7 @@ def test_oidc_email_match_needs_an_email_the_idp_did_not_mark_unverified(
     """Step 3 trusts the e-mail only when the IdP does not say it is unverified (OIDC Core §5.7)."""
     with app.app_context():
         _cleanup(['tkev', 'tkevx'])
-        db.session.add(User(username='tkev', email='ev@corp.test', full_name='E', role='admin',
+        db.session.add(legacy_user(username='tkev', email='ev@corp.test', full_name='E', role='admin',
                             active=True, password_hash='hash', auth_source='oauth2',
                             sso_provider_id=oidc.provider_id))
         db.session.commit()
@@ -198,7 +201,7 @@ def test_oidc_email_match_needs_an_email_the_idp_did_not_mark_unverified(
         _location, verify = oidc(userinfo)
         assert ((verify.get('user') or {}).get('username') == 'tkev') is opened
         with app.app_context():
-            bound = User.query.filter_by(username='tkev').one().sso_external_id
+            bound = ext(User.query.filter_by(username='tkev').one())
             assert bound == ('ev-sub' if opened else None)
     finally:
         with app.app_context():
@@ -221,7 +224,7 @@ def ldap(app, monkeypatch):
         pid = row.id
     directory = {}
     monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user',
-                        lambda _p, username, _pw: (dict(directory, username=username), None))
+                        lambda _p, username, _pw, before_bind=None: (dict(directory, username=username), None))
 
     def login(username, **entry):
         directory.clear()
@@ -234,7 +237,7 @@ def ldap(app, monkeypatch):
     yield login
     with app.app_context():
         SSOSession.query.filter_by(provider_id=pid).delete()
-        User.query.filter_by(sso_provider_id=pid).delete()
+        delete_users_of(pid)
         db.session.delete(db.session.get(SSOProvider, pid))
         for opid, enabled in others:
             db.session.get(SSOProvider, opid).enabled = enabled
@@ -245,14 +248,14 @@ def test_ldap_directory_admin_does_not_open_the_local_admin(app, ldap):
     with app.app_context():
         _cleanup(['tkroot'])
         db.session.add(User(username='tkroot', email='root@corp.test', full_name='R',
-                            role='admin', active=True, password_hash='hash', auth_source='local'))
+                            role='admin', active=True, password_hash='hash'))
         db.session.commit()
     try:
         r = ldap('tkroot', dn='uid=tkroot,dc=example', uid='uuid-root')
         assert r.status_code == 403
         assert 'local account' in r.get_json()['message']
         with app.app_context():
-            assert User.query.filter_by(username='tkroot').one().sso_external_id is None
+            assert ext(User.query.filter_by(username='tkroot').one()) is None
     finally:
         with app.app_context():
             _cleanup(['tkroot'])
@@ -262,7 +265,7 @@ def test_ldap_adopts_a_pre_stable_id_account_of_the_same_provider(app, ldap):
     """Accounts created before stable ids keep matching by name, once."""
     with app.app_context():
         _cleanup(['tkold'])
-        db.session.add(User(username='tkold', email='old@corp.test', full_name='O',
+        db.session.add(legacy_user(username='tkold', email='old@corp.test', full_name='O',
                             role='operator', active=True, password_hash='!SSO_NO_PASSWORD!',
                             auth_source='ldap', sso_provider_id=ldap.provider_id))
         db.session.commit()
@@ -270,7 +273,7 @@ def test_ldap_adopts_a_pre_stable_id_account_of_the_same_provider(app, ldap):
         r = ldap('tkold', dn='uid=tkold,dc=example', uid='uuid-old')
         assert r.status_code == 200, r.get_json()
         with app.app_context():
-            assert User.query.filter_by(username='tkold').one().sso_external_id == 'uuid-old'
+            assert ext(User.query.filter_by(username='tkold').one()) == 'uuid-old'
     finally:
         with app.app_context():
             _cleanup(['tkold'])
@@ -280,16 +283,15 @@ def test_ldap_adopts_a_pre_024_account_the_migration_tied_to_this_provider(app, 
     """Migration 024 could keep auth_source 'local' yet set the provider."""
     with app.app_context():
         _cleanup(['tk024'])
-        db.session.add(User(username='tk024', email='m024@corp.test', full_name='M',
-                            role='operator', active=True, password_hash='!SSO_NO_PASSWORD!',
-                            auth_source='local', sso_provider_id=ldap.provider_id))
+        db.session.add(legacy_user(username='tk024', email='m024@corp.test', full_name='M',
+                            role='operator', active=True, password_hash='!SSO_NO_PASSWORD!', sso_provider_id=ldap.provider_id))
         db.session.commit()
     try:
         r = ldap('tk024', dn='uid=tk024,dc=example', uid='uuid-024')
         assert r.status_code == 200, r.get_json()
         with app.app_context():
             u = User.query.filter_by(username='tk024').one()
-            assert (u.auth_source, u.sso_external_id) == ('ldap', 'uuid-024')
+            assert (u.auth_source, prov(u), ext(u)) == ('sso', ldap.provider_id, 'uuid-024')
     finally:
         with app.app_context():
             _cleanup(['tk024'])
@@ -299,7 +301,7 @@ def test_ldap_account_bound_by_dn_moves_to_the_uid(app, ldap):
     """An account bound by its DN fallback keeps working once a uid attribute is set."""
     with app.app_context():
         _cleanup(['tkdn'])
-        db.session.add(User(username='tkdn', email='dn@corp.test', full_name='D',
+        db.session.add(legacy_user(username='tkdn', email='dn@corp.test', full_name='D',
                             role='operator', active=True, password_hash='!SSO_NO_PASSWORD!',
                             auth_source='ldap', sso_provider_id=ldap.provider_id,
                             sso_external_id='uid=tkdn,dc=example'))
@@ -308,7 +310,7 @@ def test_ldap_account_bound_by_dn_moves_to_the_uid(app, ldap):
         r = ldap('tkdn', dn='uid=tkdn,dc=example', uid='new-uuid')
         assert r.status_code == 200, r.get_json()
         with app.app_context():
-            assert User.query.filter_by(username='tkdn').one().sso_external_id == 'new-uuid'
+            assert ext(User.query.filter_by(username='tkdn').one()) == 'new-uuid'
         # Another entry's DN does not move it.
         r = ldap('tkdn', dn='uid=other,dc=example', uid='other-uuid')
         assert r.status_code == 403
@@ -326,14 +328,14 @@ def test_bind_never_replaces_an_existing_external_id(app):
         db.session.add(provider)
         db.session.commit()
         pid = provider.id
-        u = User(username='tkbound', email='b@corp.test', full_name='B', role='viewer',
+        u = legacy_user(username='tkbound', email='b@corp.test', full_name='B', role='viewer',
                  active=True, password_hash='!SSO_NO_PASSWORD!', auth_source='oauth2',
                  sso_provider_id=pid, sso_external_id='first')
         db.session.add(u)
         db.session.commit()
         try:
-            assert _bind_external_id(u, provider, 'second') is False
-            assert u.sso_external_id == 'first'
+            assert _bind_external_id(u.sso_identities[0], provider, 'second') is False
+            assert ext(u) == 'first'
         finally:
             db.session.rollback()
             _cleanup(['tkbound'])
@@ -400,7 +402,7 @@ def test_an_empty_default_role_is_stored_and_admits_nobody(app, auth_client, oid
     assert r.get_json()['data']['default_role'] is None
     try:
         location, _ = oidc({'sub': 'none-sub', 'preferred_username': 'tknone'})
-        assert location.endswith('/login?error=sso_unmapped')
+        assert location.endswith('/login?error=sso_no_default_role')
         with app.app_context():
             assert User.query.filter_by(username='tknone').count() == 0
     finally:
@@ -437,7 +439,7 @@ def test_ldap_with_enforced_2fa_asks_the_enrolled_totp(app, ldap):
     with app.app_context():
         _cleanup(['tkotp'])
         db.session.get(SSOProvider, ldap.provider_id).enforce_2fa = True
-        db.session.add(User(username='tkotp', email='otp@corp.test', full_name='O', role='viewer',
+        db.session.add(legacy_user(username='tkotp', email='otp@corp.test', full_name='O', role='viewer',
                             active=True, password_hash='!SSO_NO_PASSWORD!', auth_source='ldap',
                             sso_provider_id=ldap.provider_id, sso_external_id='uuid-otp',
                             totp_secret=secret, totp_confirmed=True))
@@ -466,7 +468,7 @@ def test_ldap_second_factor_after_a_closed_session_starts_a_new_one(app, ldap):
     secret = pyotp.random_base32()
     with app.app_context():
         _cleanup(['tkotpver'])
-        db.session.add(User(username='tkotpver', email='otpver@corp.test', full_name='O', role='viewer',
+        db.session.add(legacy_user(username='tkotpver', email='otpver@corp.test', full_name='O', role='viewer',
                             active=True, password_hash='!SSO_NO_PASSWORD!', auth_source='ldap',
                             sso_provider_id=ldap.provider_id, sso_external_id='uuid-otpver',
                             totp_secret=secret, totp_confirmed=True, session_version=3))
@@ -491,7 +493,7 @@ def test_ldap_second_factor_after_a_closed_session_starts_a_new_one(app, ldap):
 def test_an_account_of_another_provider_is_not_opened(app, oidc, ldap):
     with app.app_context():
         _cleanup(['tkcross'])
-        db.session.add(User(username='tkcross', email='cross@corp.test', full_name='X', role='admin',
+        db.session.add(legacy_user(username='tkcross', email='cross@corp.test', full_name='X', role='admin',
                             active=True, password_hash='!SSO_NO_PASSWORD!', auth_source='oauth2',
                             sso_provider_id=oidc.provider_id))
         db.session.commit()
@@ -500,7 +502,7 @@ def test_an_account_of_another_provider_is_not_opened(app, oidc, ldap):
         assert r.status_code == 403
         with app.app_context():
             u = User.query.filter_by(username='tkcross').one()
-            assert u.sso_provider_id == oidc.provider_id and u.sso_external_id is None
+            assert prov(u) == oidc.provider_id and ext(u) is None
     finally:
         with app.app_context():
             _cleanup(['tkcross'])
@@ -518,12 +520,12 @@ def _orphan(app, username, sub, through_api=None, issuer='https://idp.example/')
         db.session.add(old)
         db.session.commit()
         old_id = old.id
-        db.session.add(User(username=username, email=f'{username}@corp.test', full_name='C',
+        db.session.add(legacy_user(username=username, email=f'{username}@corp.test', full_name='C',
                             role='admin', active=True, password_hash='!SSO_NO_PASSWORD!',
                             auth_source='oauth2', sso_provider_id=old_id, sso_external_id=sub))
         db.session.commit()
         if through_api is None:
-            User.query.filter_by(username=username).update({User.sso_provider_id: None})
+            UserSSOIdentity.query.filter_by(provider_id=old_id).update({'provider_id': None})
             db.session.delete(db.session.get(SSOProvider, old_id))
             db.session.commit()
     if through_api is not None:
@@ -536,8 +538,8 @@ def test_deleting_a_provider_unlinks_its_users_and_keeps_its_idp(app, auth_clien
     try:
         with app.app_context():
             u = User.query.filter_by(username='rvdel').one()
-            assert u.sso_provider_id is None
-            assert u.sso_orphan_of == 'oauth2:https://idp.example'
+            assert prov(u) is None
+            assert orphan(u) == 'oauth2:https://idp.example'
     finally:
         with app.app_context():
             _cleanup(['rvdel'])
@@ -551,8 +553,8 @@ def test_a_provider_recreated_for_the_same_idp_opens_its_bound_users(app, auth_c
         assert verify['user']['username'] == 'rvcarol'
         with app.app_context():
             u = User.query.filter_by(username='rvcarol').one()
-            assert u.sso_provider_id == oidc.provider_id and u.sso_external_id == 'carol-sub'
-            assert u.sso_orphan_of is None
+            assert prov(u) == oidc.provider_id and ext(u) == 'carol-sub'
+            assert orphan(u) is None
     finally:
         with app.app_context():
             _cleanup(['rvcarol'])
@@ -571,7 +573,7 @@ def test_an_orphan_is_not_opened_by_its_id_from_another_or_unknown_idp(
         location, verify = oidc({'sub': 'orph-sub', 'preferred_username': 'rvorphx'})
         assert verify['user']['username'] == 'rvorphx'  # a new account, not the orphan
         with app.app_context():
-            assert User.query.filter_by(username='rvorph').one().sso_provider_id is None
+            assert prov(User.query.filter_by(username='rvorph').one()) is None
     finally:
         with app.app_context():
             _cleanup(['rvorph', 'rvorphx'])
@@ -589,7 +591,7 @@ def test_a_saml_orphan_is_not_opened_by_another_idp(app, auth_client):
         db.session.add_all(rows)
         db.session.commit()
         a_id, b_id = rows[0].id, rows[1].id
-        db.session.add(User(username='rvorph2', email='alice@corp.example', full_name='A', role='admin',
+        db.session.add(legacy_user(username='rvorph2', email='alice@corp.example', full_name='A', role='admin',
                             active=True, password_hash='!SSO_NO_PASSWORD!', auth_source='saml',
                             sso_provider_id=a_id, sso_external_id='alice@corp.example'))
         db.session.commit()
@@ -601,7 +603,7 @@ def test_a_saml_orphan_is_not_opened_by_another_idp(app, auth_client):
                 {'name_id': 'alice@corp.example', 'name_id_format': email_fmt})
             assert user is None and err == 'sso_username_conflict'
             db.session.rollback()
-            assert User.query.filter_by(username='rvorph2').one().sso_provider_id is None
+            assert prov(User.query.filter_by(username='rvorph2').one()) is None
     finally:
         with app.app_context():
             _cleanup(['rvorph2'])
@@ -624,21 +626,21 @@ def test_an_unbound_orphan_is_not_opened_by_name_or_email_from_another_idp(
         db.session.add_all(rows)
         db.session.commit()
         a_id, b_id = rows[0].id, rows[1].id
-        db.session.add(User(username='rvlink', email='rvlink@corp.example', full_name='L', role='admin',
+        db.session.add(legacy_user(username='rvlink', email='rvlink@corp.example', full_name='L', role='admin',
                             active=True, password_hash='!SSO_NO_PASSWORD!' if legacy else 'hash',
                             auth_source='local' if legacy else 'saml', sso_provider_id=a_id))
         db.session.commit()
     assert auth_client.delete(f'/api/v2/sso/providers/{a_id}').status_code == 200
     try:
         with app.test_request_context():
-            assert User.query.filter_by(username='rvlink').one().sso_orphan_of == 'saml:https://a.example/idp'
+            assert orphan(User.query.filter_by(username='rvlink').one()) == 'saml:https://a.example/idp'
             user, _err = _get_or_create_sso_user(
                 db.session.get(SSOProvider, b_id), login_name, 'rvlink@corp.example', 'M',
                 {'name_id': 'mallory-at-b'})
             assert user is None or user.username != 'rvlink'
             db.session.rollback()
             u = User.query.filter_by(username='rvlink').one()
-            assert u.sso_provider_id is None and u.sso_external_id is None
+            assert prov(u) is None and ext(u) is None
     finally:
         with app.app_context():
             _cleanup(['rvlink', 'rvlinkx'])
@@ -656,7 +658,7 @@ def test_an_unbound_orphan_is_taken_back_by_a_provider_for_the_same_idp(app, aut
         db.session.add_all(rows)
         db.session.commit()
         a_id, b_id = rows[0].id, rows[1].id
-        db.session.add(User(username='rvback', email='rvback@corp.example', full_name='B', role='admin',
+        db.session.add(legacy_user(username='rvback', email='rvback@corp.example', full_name='B', role='admin',
                             active=True, password_hash='hash', auth_source='saml', sso_provider_id=a_id))
         db.session.commit()
     assert auth_client.delete(f'/api/v2/sso/providers/{a_id}').status_code == 200
@@ -665,7 +667,7 @@ def test_an_unbound_orphan_is_taken_back_by_a_provider_for_the_same_idp(app, aut
             user, err = _get_or_create_sso_user(
                 db.session.get(SSOProvider, b_id), 'rvback', 'rvback@corp.example', 'B',
                 {'name_id': 'back-id'})
-            assert err is None and user.username == 'rvback' and user.sso_external_id == 'back-id'
+            assert err is None and user.username == 'rvback' and ext(user) == 'back-id'
             db.session.rollback()
     finally:
         with app.app_context():
@@ -684,7 +686,7 @@ def test_an_unbound_account_with_no_recorded_idp_is_not_opened_by_name_or_email(
     no provider may claim the account by a name or e-mail its IdP chose."""
     with app.app_context():
         _cleanup(['rvnull', 'rvnullx'])
-        db.session.add(User(username='rvnull', email='rvnull@corp.test', full_name='N', role='admin',
+        db.session.add(legacy_user(username='rvnull', email='rvnull@corp.test', full_name='N', role='admin',
                             active=True, password_hash='hash', auth_source='oauth2',
                             sso_provider_id=None, sso_orphan_of=None))
         db.session.commit()
@@ -693,7 +695,7 @@ def test_an_unbound_account_with_no_recorded_idp_is_not_opened_by_name_or_email(
         assert (verify.get('user') or {}).get('username') != 'rvnull'
         with app.app_context():
             u = User.query.filter_by(username='rvnull').one()
-            assert u.sso_provider_id is None and u.sso_external_id is None
+            assert prov(u) is None and ext(u) is None
     finally:
         with app.app_context():
             _cleanup(['rvnull', 'rvnullx'])
@@ -702,16 +704,15 @@ def test_an_unbound_account_with_no_recorded_idp_is_not_opened_by_name_or_email(
 def test_a_pre_024_account_with_no_provider_is_still_adopted_by_name(app, ldap):
     with app.app_context():
         _cleanup(['tk024n'])
-        db.session.add(User(username='tk024n', email='n024@corp.test', full_name='M',
-                            role='operator', active=True, password_hash='!SSO_NO_PASSWORD!',
-                            auth_source='local', sso_provider_id=None))
+        db.session.add(legacy_user(username='tk024n', email='n024@corp.test', full_name='M',
+                            role='operator', active=True, password_hash='!SSO_NO_PASSWORD!', sso_provider_id=None))
         db.session.commit()
     try:
         r = ldap('tk024n', dn='uid=tk024n,dc=example', uid='uuid-024n')
         assert r.status_code == 200, r.get_json()
         with app.app_context():
             u = User.query.filter_by(username='tk024n').one()
-            assert (u.sso_provider_id, u.sso_external_id) == (ldap.provider_id, 'uuid-024n')
+            assert (prov(u), ext(u)) == (ldap.provider_id, 'uuid-024n')
     finally:
         with app.app_context():
             _cleanup(['tk024n'])
@@ -720,7 +721,7 @@ def test_a_pre_024_account_with_no_provider_is_still_adopted_by_name(app, ldap):
 def test_an_orphan_of_another_type_is_not_opened_by_its_id(app, oidc):
     with app.app_context():
         _cleanup(['rvsaml'])
-        db.session.add(User(username='rvsaml', email='s@corp.test', full_name='S', role='admin',
+        db.session.add(legacy_user(username='rvsaml', email='s@corp.test', full_name='S', role='admin',
                             active=True, password_hash='!SSO_NO_PASSWORD!', auth_source='saml',
                             sso_provider_id=None, sso_external_id='shared-id'))
         db.session.commit()
@@ -728,7 +729,7 @@ def test_an_orphan_of_another_type_is_not_opened_by_its_id(app, oidc):
         location, verify = oidc({'sub': 'shared-id', 'preferred_username': 'rvsamlx'})
         assert (verify.get('user') or {}).get('username') != 'rvsaml'
         with app.app_context():
-            assert User.query.filter_by(username='rvsaml').one().sso_provider_id is None
+            assert prov(User.query.filter_by(username='rvsaml').one()) is None
     finally:
         with app.app_context():
             _cleanup(['rvsaml', 'rvsamlx'])
@@ -740,7 +741,7 @@ def test_a_legacy_sso_account_is_not_opened_by_email(app, oidc):
     with app.app_context():
         _cleanup(['rvleg', 'rvother'])
         db.session.add(User(username='rvleg', email='leg@corp.test', full_name='L', role='operator',
-                            active=True, password_hash='!SSO_NO_PASSWORD!', auth_source='local'))
+                            active=True, password_hash='!SSO_NO_PASSWORD!'))
         db.session.commit()
     try:
         location, verify = oidc({'sub': 'att-x', 'preferred_username': 'rvother',
@@ -748,7 +749,7 @@ def test_a_legacy_sso_account_is_not_opened_by_email(app, oidc):
         assert (verify.get('user') or {}).get('username') != 'rvleg'
         with app.app_context():
             leg = User.query.filter_by(username='rvleg').one()
-            assert leg.sso_external_id is None and leg.auth_source == 'local'
+            assert ext(leg) is None and leg.auth_source == 'local'
     finally:
         with app.app_context():
             _cleanup(['rvleg', 'rvother'])
@@ -773,7 +774,7 @@ def test_ldap_asks_a_totp_the_user_enrolled_without_enforcement(app, ldap):
     with app.app_context():
         _cleanup(['tkvolotp'])
         assert db.session.get(SSOProvider, ldap.provider_id).enforce_2fa is not True
-        db.session.add(User(username='tkvolotp', email='vol@corp.test', full_name='V', role='viewer',
+        db.session.add(legacy_user(username='tkvolotp', email='vol@corp.test', full_name='V', role='viewer',
                             active=True, password_hash='!SSO_NO_PASSWORD!', auth_source='ldap',
                             sso_provider_id=ldap.provider_id, sso_external_id='uuid-vol',
                             totp_secret=pyotp.random_base32(), totp_confirmed=True))
@@ -787,9 +788,9 @@ def test_ldap_asks_a_totp_the_user_enrolled_without_enforcement(app, ldap):
             _cleanup(['tkvolotp'])
 
 
-def test_link_to_sso_drops_an_external_id_left_on_a_local_account(app, auth_client):
-    """Older releases bound the id of any same-named identity onto local accounts:
-    after Link to SSO, the first sign-in of the provider binds the id again."""
+def test_attaching_drops_an_external_id_left_on_a_local_account(app, auth_client):
+    """Older releases bound the id of any same-named identity onto local accounts: the
+    upgrade leaves it out, and after an attachment the first sign-in binds the id again."""
     from api.v2.sso.ldap_routes import _get_or_create_sso_user
     with app.app_context():
         _cleanup(['rvstale', 'rvstalex'])
@@ -797,13 +798,13 @@ def test_link_to_sso_drops_an_external_id_left_on_a_local_account(app, auth_clie
                         enabled=False, saml_entity_id='https://stale.example/idp',
                         default_role='viewer')
         db.session.add(p)
-        db.session.add(User(username='rvstale', email='rvstale@corp.example', full_name='S',
-                            role='admin', active=True, password_hash='hash', auth_source='local',
+        db.session.add(legacy_user(username='rvstale', email='rvstale@corp.example', full_name='S',
+                            role='admin', active=True, password_hash='hash',
                             sso_external_id='stale-attacker-id'))
         db.session.commit()
         pid, uid = p.id, User.query.filter_by(username='rvstale').one().id
-    r = auth_client.post(f'/api/v2/users/{uid}/link-sso', json={'provider_id': pid})
-    assert r.status_code == 200
+    r = auth_client.post(f'/api/v2/users/{uid}/sso-identities', json={'provider_id': pid})
+    assert r.status_code == 201
     try:
         with app.test_request_context():
             provider = db.session.get(SSOProvider, pid)
@@ -813,7 +814,7 @@ def test_link_to_sso_drops_an_external_id_left_on_a_local_account(app, auth_clie
             db.session.rollback()
             user, err = _get_or_create_sso_user(provider, 'rvstale', 'rvstale@corp.example', 'S',
                                                 {'name_id': 'real-id'})
-            assert err is None and user.username == 'rvstale' and user.sso_external_id == 'real-id'
+            assert err is None and user.username == 'rvstale' and ext(user) == 'real-id'
             db.session.rollback()
     finally:
         with app.app_context():

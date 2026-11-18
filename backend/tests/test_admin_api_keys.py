@@ -13,6 +13,8 @@ from models.api_key import APIKey
 from models.audit_log import AuditLog
 from tests.conftest import get_json
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 
 def _login(app, username, password):
     c = app.test_client()

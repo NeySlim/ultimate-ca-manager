@@ -92,9 +92,10 @@ SECTIONS: Dict[str, Section] = {
             'password_reset_expires': 'goes with the reset token',
             'totp_last_step': 'live replay guard of the TOTP codes',
             'session_version': 'live session state: an older value would reopen sessions closed since the backup',
+            'has_sso_identity': 'derived from user_sso_identities, set again once the restore wrote them',
         },
         secrets=('totp_secret', 'backup_codes'),
-        references={'custom_role_id': 'custom_roles', 'sso_provider_id': 'sso_providers'},
+        references={'custom_role_id': 'custom_roles'},
     ),
     'certificate_authorities': Section(
         model='models:CA',
@@ -523,6 +524,14 @@ SECTIONS: Dict[str, Section] = {
         exclude={**_SURROGATE},
         references={'group_id': 'groups', 'user_id': 'users'},
     ),
+    # The providers that open each account; one whose provider the restore cannot place is
+    # left as an orphan of an unknown IdP, which no sign-in takes back by itself.
+    'user_sso_identities': Section(
+        model='models.user:UserSSOIdentity',
+        identity=('user_id', 'provider_id', 'orphan_of'),
+        exclude={**_SURROGATE},
+        references={'user_id': 'users', 'provider_id': 'sso_providers'},
+    ),
     'webauthn_credentials': Section(
         model='models.webauthn:WebAuthnCredential',
         identity=('credential_id',),
@@ -553,6 +562,7 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'pro_sso_sessions': 'live SSO sessions',
     'flask_sessions': 'the SQL session store (PostgreSQL without Redis): live sessions, emptied after every restore',
     'pro_sso_saml_message_ids': 'pending SAML request ids and a replay cache, valid for minutes',
+    'pro_sso_sign_in_tests': 'OIDC and SAML sign-in tests: reports valid for minutes, emptied rows kept a day',
     'webauthn_challenges': 'single-use registration and login challenges',
     'related_cert_requests': 'a replay cache of relatedCertRequests, each honoured for at most 7 days',
     'cluster_nodes': 'heartbeats of the running HA nodes: runtime state of one cluster, never restored',
@@ -568,6 +578,9 @@ EXCLUDED_TABLES: Dict[str, str] = {
                      'carried as the https_server files instead'),
     'backup_archives': 'the HA archive store: earlier archives, never carried inside a new one',
     'backup_archive_chunks': 'the bytes of the HA archive store, never carried inside a new archive',
+    'file_removals': 'paths a restore removed, deleted by each node from its own disk: never restored',
+    'background_jobs': ('backups, restores and audit verifications in progress or done: runtime state '
+                        'of this installation, kept across a restore, never exported'),
     'second_factor_failures': 'second-factor and WebAuthn lockout counters: runtime state, never restored',
     'schema_migrations': 'migration bookkeeping of the target, never of the source',
     'alembic_version': 'migration bookkeeping of the target',
@@ -599,4 +612,12 @@ SETTING_REFERENCES: Tuple[SettingReference, ...] = (
     SettingReference(r'scep_challenge_(\d+)(?:_generated_at)?', key='certificate_authorities'),
     SettingReference(r'cert_scts_(\d+)', key='certificates'),
     SettingReference(r'ca_url_cross_.+', value='ca_cross_certificates'),
+)
+
+# Settings naming a CA by refid: carried as they are by a backup (a refid reads the
+# same everywhere), but a CA they name is not deleted (services/deletion_blockers.py).
+CA_REFID_SETTINGS: Tuple[SettingReference, ...] = (
+    SettingReference(r'est_ca_refid', value='certificate_authorities'),
+    SettingReference(r'tsa_ca_refid', value='certificate_authorities'),
+    SettingReference(r'mtls_trusted_ca_id', value='certificate_authorities'),
 )

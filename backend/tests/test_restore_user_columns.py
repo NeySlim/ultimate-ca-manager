@@ -10,7 +10,7 @@ rights -- and the restore reported a success.
 """
 import pytest
 
-from models import db, User
+from models import db, User, UserSSOIdentity
 from services.backup import manifest
 
 from tests.fresh_app import fresh_app_fixtures
@@ -42,26 +42,28 @@ def furnished_user(app, create_user):
         user.mfa_enabled = True
         user.totp_confirmed = True
         user.backup_codes = '["code-one", "code-two"]'
-        user.sso_external_id = 'zz-external-id'
+        user.sso_identities.append(UserSSOIdentity(orphan_of='oauth2:https://zz.example',
+                                                   external_id='zz-external-id'))
         db.session.commit()
         carried = {
             'totp_secret': user.totp_secret,
             'backup_codes': user.backup_codes,
-            'sso_external_id': user.sso_external_id,
+            'sso_external_id': 'zz-external-id',
             'full_name': user.full_name,
         }
 
     yield carried
 
     with app.app_context():
-        User.query.filter_by(username='zzrestore-columns').delete(
-            synchronize_session=False)
+        user = User.query.filter_by(username='zzrestore-columns').first()
+        if user is not None:
+            db.session.delete(user)
         db.session.commit()
 
 
-def _archive_of_users(app):
+def _archive_of_users(app, *more):
     with app.app_context():
-        return _service().create_backup(PASSWORD, include=_only('users'))
+        return _service().create_backup(PASSWORD, include=_only('users', *more))
 
 
 class TestEveryColumnComesBack:
@@ -88,18 +90,19 @@ class TestEveryColumnComesBack:
 
     def test_the_sso_identity_survives(self, app, furnished_user):
         """Without it the account is no longer the one the provider knows."""
-        blob = _archive_of_users(app)
+        blob = _archive_of_users(app, 'user_sso_identities')
 
         with app.app_context():
             user = User.query.filter_by(username='zzrestore-columns').first()
-            user.sso_external_id = None
+            user.sso_identities[0].external_id = None
             db.session.commit()
 
             _service().restore_backup(blob, PASSWORD, mode='merge')
             db.session.expire_all()
             restored = User.query.filter_by(username='zzrestore-columns').first()
 
-            assert restored.sso_external_id == furnished_user['sso_external_id']
+            assert [r.external_id for r in restored.sso_identities] == \
+                [furnished_user['sso_external_id']]
 
     def test_no_declared_column_is_left_behind(self, app, furnished_user):
         """The contract, rather than a list of columns written by hand: what

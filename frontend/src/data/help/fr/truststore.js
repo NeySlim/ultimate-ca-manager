@@ -52,7 +52,7 @@ Le magasin de confiance conserve les certificats AC de confiance. Remplissez-le 
 **Ajouter** liste les AC que UCM gère : sélectionnez celles à approuver.
 
 ### Certificats externes
-La page n'a pas de formulaire de téléversement pour un certificat extérieur à UCM. Ajoutez-le via l'API : \`POST /api/v2/truststore\` avec son PEM, ou \`POST /api/v2/truststore/import\` avec un fichier PEM ou DER.
+La page n'a pas de formulaire de téléversement pour un certificat extérieur à UCM. Ajoutez-le via l'API : \`POST /api/v2/truststore\` avec son PEM, ou \`POST /api/v2/truststore/import\` avec un fichier PEM ou DER. Une entrée qui contient une clé privée est refusée : le magasin de confiance ne garde que des certificats, et seuls les certificats d'un fichier sont conservés.
 
 ### Synchroniser depuis le système
 Importez les AC de confiance du magasin de confiance du système d'exploitation (par ex. le bundle AC de Mozilla sous Linux), jusqu'au nombre choisi : 500 par défaut, 1000 au maximum.

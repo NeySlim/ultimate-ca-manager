@@ -267,14 +267,14 @@ def test_the_history_command_is_gone(tmp_path):
     assert _cli('history', '3.0', str(tmp_path / 'CHANGELOG.md')).returncode == 2
 
 
-def _notes_step(tmp_path, v, changelog):
+def _notes_step(tmp_path, v, changelog, env=None):
     work = tmp_path / 'w'
     (work / 'scripts').mkdir(parents=True)
     (work / 'scripts' / 'ci').symlink_to(ROOT / 'scripts' / 'ci')
     (work / 'CHANGELOG.md').write_text(changelog)
     step = _step('build-release.yml', 'release', 'Generate release notes')
     result = _run_step(step, work, subst={'${{ needs.build-deb.outputs.version }}': v,
-                                          '${{ github.repository }}': 'o/r'})
+                                          '${{ github.repository }}': 'o/r'}, env=env)
     return result, work / 'notes.md'
 
 
@@ -293,12 +293,49 @@ def test_the_release_notes_step_names_the_published_files(tmp_path, v):
     assert f'https://github.com/o/r/blob/v{v}/CHANGELOG.md' in text
 
 
+@pytest.mark.parametrize('v', ['3.0', '3.0-rc1'])
+def test_every_link_of_the_release_notes_is_absolute(tmp_path, v):
+    """A release page resolves no relative link: each one names the repository, the docs at the tag."""
+    result, notes = _notes_step(tmp_path, v, '## [Unreleased]\n- x\n' if '-rc' in v else f'## [{v}] - d\n- x\n')
+    assert result.returncode == 0, result.stderr
+    links = re.findall(r'\]\(([^)]+)\)', notes.read_text())
+    assert links and all(link.startswith('https://') for link in links), links
+    for doc in ('docs/installation/README.md', 'UPGRADE.md'):
+        assert f'https://github.com/o/r/blob/v{v}/{doc}' in links, doc
+        assert (ROOT / doc).is_file(), doc
+
+
 @pytest.mark.parametrize('v,changelog', [('3.0', '## [Unreleased]\n- x\n'), ('3.0-rc1', '## [2.254] - d\n- x\n')])
 def test_the_release_notes_step_fails_without_its_section(tmp_path, v, changelog):
     result, notes = _notes_step(tmp_path, v, changelog)
     assert result.returncode != 0
     assert 'CHANGELOG' in result.stdout + result.stderr
 
+
+
+@pytest.mark.parametrize('v', ['3.0', '2.254.1'])
+def test_a_rehearsed_stable_without_its_section_takes_unreleased_with_a_warning(tmp_path, v):
+    """A stable is rehearsed before its bump commit: the dry run borrows [Unreleased], the tag run stays strict."""
+    changelog = '## [Unreleased]\n- Marker.\n\n## [2.200] - 2026-01-01\n- Old.\n'
+    result, notes = _notes_step(tmp_path, v, changelog, env={'REHEARSAL': 'true'})
+    assert result.returncode == 0, result.stderr
+    assert 'Marker.' in notes.read_text() and 'Old.' not in notes.read_text()
+    assert f'::warning::CHANGELOG.md has no [{v}] section' in result.stdout + result.stderr
+    for strict in ({'REHEARSAL': 'false'}, {'REHEARSAL': ''}):
+        assert _notes_step(tmp_path / ('s' + strict['REHEARSAL']), v, changelog, env=strict)[0].returncode != 0
+
+
+def test_the_notes_step_reads_the_rehearsal_flag_from_the_dispatch():
+    step = _step('build-release.yml', 'release', 'Generate release notes')
+    assert step['env']['REHEARSAL'] == '${{ inputs.dry_run }}'
+
+
+def test_a_rehearsal_does_not_relax_the_notes_of_a_rc_or_a_present_section(tmp_path):
+    r = _notes(tmp_path, '3.0', CHANGELOG)
+    rr = _cli('notes', '3.0', str(tmp_path / 'CHANGELOG.md'), '--rehearsal')
+    assert rr.returncode == 0 and rr.stdout == r.stdout and '::warning::' not in rr.stderr
+    assert _notes(tmp_path, '3.0-rc1', '## [2.254] - d\n- x\n').returncode == 1
+    assert _cli('notes', '3.0-rc1', str(tmp_path / 'CHANGELOG.md'), '--rehearsal').returncode == 1
 
 # ---- 3b. the branch a tag must sit on -------------------------------------------------------------
 
@@ -391,10 +428,11 @@ def test_a_later_maintenance_release_of_the_previous_line_is_not_offered(instanc
     assert updates.check_for_updates(channel='rc')['update_available'] is False
 
 
-def test_the_last_previous_line_release_is_offered_the_new_line(instance):
+def test_the_new_line_is_a_major_upgrade_not_an_update_of_the_previous_line(instance):
     instance('2.254.2', [_release('2.254.2'), _release('3.0')])
     result = updates.check_for_updates(channel='stable')
-    assert (result['update_available'], result['latest_version']) == (True, '3.0')
+    assert (result['update_available'], result['latest_version']) == (False, '2.254.2')
+    assert result['major_upgrade']['version'] == '3.0'
 
 
 # ---- 5. version files and the bump script ------------------------------------------------------
@@ -412,6 +450,22 @@ def test_npm_form_refuses_another_grammar(version):
     assert _cli('npm', version).returncode == 1
 
 
+@pytest.mark.parametrize('version,chart,prerelease', [
+    ('3.0', '3.0.0', 'false'), ('3.0-rc1', '3.0.0-rc1', 'true'), ('3.1', '3.1.0', 'false'),
+    ('2.254.2', '2.254.2', 'false'), ('2.254.2-rc1', '2.254.2-rc1', 'true'),
+])
+def test_chart_version_and_prerelease_of_a_tag(version, chart, prerelease):
+    assert _cli('chart', version).stdout.strip() == chart
+    assert _cli('prerelease', version).stdout.strip() == prerelease
+
+
+@pytest.mark.parametrize('cmd', ['chart', 'prerelease'])
+@pytest.mark.parametrize('version', ['3.0-dev', '3.0.0', 'v3.0', ''])
+def test_chart_and_prerelease_refuse_what_is_not_a_tag(cmd, version):
+    r = _cli(cmd, version)
+    assert r.returncode == 1 and not r.stdout
+
+
 def test_a_dev_version_is_never_a_tag():
     assert _cli('validate', '3.0-dev').returncode == 1
     assert _cli('deb', '3.0-dev').returncode == 1
@@ -422,6 +476,8 @@ def test_version_files_agree():
     pkg = json.loads((ROOT / 'frontend' / 'package.json').read_text())
     lock = json.loads((ROOT / 'frontend' / 'package-lock.json').read_text())
     assert npm and pkg['version'] == lock['version'] == lock['packages']['']['version'] == npm
+    # The chart is versioned with the application it deploys
+    assert yaml.safe_load((ROOT / 'charts' / 'ucm' / 'Chart.yaml').read_text())['version'] == npm
 
 
 def _scratch_tree(tmp_path):
@@ -458,18 +514,22 @@ def test_bump_version_updates_every_file(tmp_path, v, npm, chart_app):
     assert lock['version'] == lock['packages']['']['version'] == npm
     after = _chart(root)
     assert after['appVersion'] == (chart_app or before['appVersion'])
-    # The chart version follows chart changes, not the application
-    assert after['version'] == before['version']
+    # The chart is versioned with the application, in the semver form helm requires
+    assert after['version'] == npm
+    assert {k: v for k, v in after.items() if k not in ('version', 'appVersion')} == \
+        {k: v for k, v in before.items() if k not in ('version', 'appVersion')}
 
 
 @pytest.mark.parametrize('v', ['2.254-1', '3.0.0', 'v3', ''])
 def test_bump_version_refuses_a_version_the_release_grammar_refuses(tmp_path, v):
     root = _scratch_tree(tmp_path)
     pkg = (root / 'frontend' / 'package.json').read_text()
+    chart = (root / 'charts' / 'ucm' / 'Chart.yaml').read_text()
     r = subprocess.run([BASH, str(root / 'scripts' / 'bump-version.sh'), v], capture_output=True, text=True)
     assert r.returncode != 0
     assert not (root / 'VERSION').exists()
     assert (root / 'frontend' / 'package.json').read_text() == pkg
+    assert (root / 'charts' / 'ucm' / 'Chart.yaml').read_text() == chart
 
 
 # ---- 6. smoke_release compares the reported version exactly -------------------------------------

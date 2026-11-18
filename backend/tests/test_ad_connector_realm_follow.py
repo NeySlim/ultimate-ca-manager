@@ -169,10 +169,11 @@ def test_the_list_costs_the_same_queries_for_any_number_of_flagged_profiles(app,
                 event.remove(db.engine, 'before_cursor_execute', hook)
         return len(seen)
     _profile(app, 'p00', 'ELSE0.EXAMPLE', world)
-    few = count()
+    # The lower of two calls: a setting whose cached value has just lapsed costs one read more
+    few = min(count(), count())
     for i in range(1, 12):
         _profile(app, f'p{i:02d}', f'ELSE{i}.EXAMPLE', world)
-    assert count() == few
+    assert min(count(), count()) == few
 
 
 def test_a_profile_with_no_realm_or_already_on_the_new_domain_does_not_block_the_save(app, auth_client, world):

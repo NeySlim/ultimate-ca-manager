@@ -13,7 +13,7 @@ export default {
           { label: 'Réinitialisation du mot de passe', text: 'Réinitialiser le mot de passe d\'un utilisateur (action administrateur). Les sessions ouvertes de l\'utilisateur sont fermées, comme par une réinitialisation de la 2FA' },
           { label: 'Supprimer un utilisateur', text: "Supprimer un utilisateur révoque les certificats qu'il a inscrits pour mTLS (cessationOfOperation), puis les supprime. Un certificat que l'AC ne peut pas révoquer ne bloque pas la suppression : il reste valide, est nommé dans l'avertissement et le journal d'audit, et doit être révoqué sous Certificats. Un échec après certaines révocations conserve l'utilisateur et nomme les certificats déjà révoqués. Retirer un utilisateur ou l'un de ses certificats mTLS avertit quand l'AC ACME qui a émis un certificat n'a pas été informée de sa révocation" },
           { label: 'Clés API', text: 'Dans le détail d\'un utilisateur, liste ses clés API et révoque une clé compromise ou inutilisée : elle cesse de fonctionner immédiatement, et une clé révoquée ou expirée peut ensuite être supprimée. Les propriétaires créent leurs clés depuis leur page Compte' },
-          { label: 'Source', text: 'Indique l\'origine de chaque utilisateur : Local (géré dans UCM) ou LDAP / OAuth2 / SAML (provisionné par un fournisseur SSO). Le badge affiche le nom du fournisseur d\'origine.' },
+          { label: 'Source', text: 'Indique ce qui ouvre chaque compte : Local (son mot de passe UCM), ou chaque fournisseur qui lui est rattaché, par type et par nom (par exemple OAuth2 · Okta, SAML · AD FS). Un compte peut être rattaché à plusieurs fournisseurs.' },
         ]
       },
       {
@@ -102,11 +102,13 @@ Créez des rôles avec des permissions granulaires sur la page **RBAC**.
 
 ## Source d'authentification
 
-La colonne **Source** indique d'où provient chaque utilisateur :
+La colonne **Source** indique ce qui ouvre chaque compte :
 - **Local** : créé et géré dans UCM (mot de passe local)
-- **LDAP / OAuth2 / SAML** : provisionné automatiquement à la première connexion SSO ; le nom du fournisseur d'origine apparaît sur le badge (ex. \`LDAP · Corporate AD\`).
+- **LDAP / OAuth2 / SAML** : une entrée par fournisseur rattaché au compte, par type et par nom (ex. \`LDAP · Corporate AD\`) ; un compte peut en avoir plusieurs.
 
 Depuis la v2.133, les rôles modifiés manuellement dans UCM sur des utilisateurs SSO sont **conservés** entre deux connexions, sauf si **« Synchroniser le rôle à chaque connexion »** est activé sur le fournisseur (voir page **Paramètres → SSO**).
+
+Le panneau du compte liste ses **fournisseurs d'authentification unique**, chacun lié, en attente de sa première connexion, ou laissé par un fournisseur supprimé. **Rattacher un fournisseur** en ajoute un : les fournisseurs déjà rattachés continuent d'ouvrir le compte, et la prochaine connexion via le nouveau avec le nom d'utilisateur ou l'e-mail du compte lie son identité. **Réinitialiser l'identité** efface l'identité d'un fournisseur dont l'IdP l'a changée, et **Détacher** retire un fournisseur, chacun après confirmation ; rattacher, réinitialiser et détacher ferment toutes les sessions du compte. Pour déplacer un compte vers un autre fournisseur, rattachez le nouveau, puis détachez l'ancien. Le mot de passe du compte, s'il en a un, est conservé, sauf si la case qui le retire est cochée, après quoi aucune connexion par mot de passe n'ouvre le compte ; un mot de passe n'est demandé à un compte qui n'en a pas que lorsque son dernier fournisseur est détaché, et il redevient alors un compte local.
 `
   }
 }

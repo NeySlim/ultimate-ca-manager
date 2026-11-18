@@ -134,7 +134,7 @@ def _session_directory() -> Optional[Path]:
     return path
 
 
-def _remove_session_files() -> int:
+def _remove_session_files(older_than: Optional[float] = None) -> int:
     """Remove the session files, which are what a cookie actually resolves to.
 
     The database rows are the operator-visible list of sessions; the file in
@@ -161,6 +161,9 @@ def _remove_session_files() -> int:
         for entry in entries:
             try:
                 if not entry.is_file(follow_symlinks=False):
+                    continue
+                # A replay leaves the sessions opened since the first pass (the epoch refuses the rest)
+                if older_than is not None and entry.stat(follow_symlinks=False).st_mtime > older_than:
                     continue
                 os.unlink(entry.path)
                 removed += 1
@@ -259,6 +262,13 @@ def _purge_oidc_cache() -> None:
     clear_oidc_cache()
 
 
+def _purge_sso_sign_in_tests() -> None:
+    """OIDC and SAML sign-in tests: their owner and provider are rows of the content replaced."""
+    from models.sso import SSOSignInTest
+    SSOSignInTest.query.delete(synchronize_session=False)
+    db.session.commit()
+
+
 def _purge_smtp_oauth_tokens() -> None:
     """Access tokens obtained with the SMTP credentials that were replaced."""
     from services import smtp_oauth
@@ -296,6 +306,7 @@ CACHE_PURGES: Tuple[Tuple[str, Callable[[], None]], ...] = (
     ('ocsp_responses', _purge_ocsp_responses),
     ('certificate_fingerprints', _purge_fingerprint_cache),
     ('oidc_discovery', _purge_oidc_cache),
+    ('sso_sign_in_tests', _purge_sso_sign_in_tests),
     ('smtp_oauth_tokens', _purge_smtp_oauth_tokens),
     ('kerberos_contexts', _purge_kerberos_contexts),
     ('ca_request_chain', _purge_ca_request_caches),
@@ -443,6 +454,166 @@ def invalidate_after_restore(*, request_restart: bool = False) -> Dict[str, Any]
         len(summary['crls_delta_failed']), summary['restart_requested'],
     )
     return summary
+
+
+# -- the end steps of a restore job, each one replayable ---------------------------------
+
+def revoke_sessions_with(claim) -> Optional[Dict[str, int]]:
+    """Every session row and the epoch, in one transaction with ``claim(counts)``, the job's
+    mark of the step: the counts, or None (rolled back) when the claim says another actor did it."""
+    from auth.session_epoch import advance_epoch
+    try:
+        counts = {
+            'sessions_revoked': UserSession.query.delete(synchronize_session=False),
+            'sso_sessions_revoked': SSOSession.query.delete(synchronize_session=False),
+            'flask_sessions_revoked': 0,
+        }
+        if current_app.config.get('SESSION_TYPE') == 'sqlalchemy':
+            table = current_app.config.get('SESSION_SQLALCHEMY_TABLE', 'flask_sessions')
+            counts['flask_sessions_revoked'] = db.session.execute(
+                db.text(f'DELETE FROM "{table}"')).rowcount
+        if not claim(counts):
+            db.session.rollback()
+            return None
+        epoch = advance_epoch()  # commits the deletions and the claim with it
+    except Exception:
+        db.session.rollback()
+        logger.error("Restore: the sessions could not be revoked; access granted before the "
+                     "restore may still be usable")
+        raise
+    note_purged_epoch(epoch)
+    logger.info("Restore: session epoch %s, every session begun before it is refused", epoch)
+    return counts
+
+
+def remove_session_files(older_than: Optional[float] = None) -> int:
+    return _remove_session_files(older_than)
+
+
+# The OCSP cache is a table: purged once by the restore, not by every process
+_TABLE_PURGES = frozenset({'ocsp_responses'})
+
+
+def purge_caches(with_tables: bool = False) -> Tuple[list, list]:
+    """This process's caches (and the cache tables when ``with_tables``): (cleared, failed)."""
+    cleared, failed = [], []
+    for name, purge in CACHE_PURGES:
+        if name in _TABLE_PURGES and not with_tables:
+            continue
+        try:
+            purge()
+        except Exception as exc:
+            db.session.rollback()
+            logger.warning("Restore: the %s cache was not cleared: %s", name, exc)
+            failed.append(name)
+        else:
+            cleared.append(name)
+    return cleared, failed
+
+
+def regenerate_crls_summary() -> Dict[str, Any]:
+    summary: Dict[str, Any] = {'crls_not_regenerated': False}
+    try:
+        (summary['crls_regenerated'], summary['crls_failed'],
+         summary['crls_delta_failed']) = _regenerate_crls()
+    except Exception as exc:
+        db.session.rollback()
+        logger.warning("Restore: the CRLs were not regenerated: %s", exc)
+        summary.update(crls_regenerated=[], crls_failed=[], crls_delta_failed=[],
+                       crls_not_regenerated=True)
+    return summary
+
+
+# -- every process drops its caches once the epoch has moved (Q4) -------------------------
+
+EPOCH_CHECK_SECONDS = 2.0
+_purged = {'epoch': None, 'checked': 0.0}
+
+
+def note_purged_epoch(epoch: Optional[int] = None) -> None:
+    """This process's caches hold nothing older than ``epoch`` (read now when None)."""
+    if epoch is None:
+        from auth.session_epoch import current_epoch
+        try:
+            epoch = current_epoch()
+        except Exception:
+            db.session.rollback()
+            return
+    _purged['epoch'] = epoch
+
+
+def refresh_caches_on_epoch(force: bool = False) -> bool:
+    """A restore elsewhere advanced the epoch: this process purges its caches once.
+    Read at most every EPOCH_CHECK_SECONDS; True when it purged."""
+    import time
+    now = time.monotonic()
+    if not force and now - _purged['checked'] < EPOCH_CHECK_SECONDS:
+        return False
+    _purged['checked'] = now
+    from services.cluster_maintenance import blocks_writes
+    if blocks_writes():
+        return False  # a restore runs: its end purges, and the database may be held
+    from auth.session_epoch import current_epoch
+    try:
+        epoch = current_epoch()
+    except Exception:
+        db.session.rollback()
+        return False
+    seen = _purged['epoch']
+    _purged['epoch'] = epoch
+    if seen is None or epoch == seen:
+        return False
+    cleared, failed = purge_caches()
+    logger.warning("Session epoch moved to %s: this process cleared %s caches (%s failed)",
+                   epoch, len(cleared), len(failed))
+    return True
+
+
+class _EpochWatcher:
+    """A web worker's own timer for refresh_caches_on_epoch: no request ever pays its read."""
+
+    def __init__(self, app, interval):
+        import threading
+        self.app, self.interval = app, interval
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._loop, daemon=True, name='EpochCacheWatcher')
+
+    def _loop(self):
+        while not self._stop.wait(self.interval):
+            try:
+                with self.app.app_context():
+                    try:
+                        refresh_caches_on_epoch(force=True)
+                    finally:
+                        db.session.remove()
+            except Exception as e:
+                logger.error(f"Caches not checked against the session epoch: {type(e).__name__}")
+
+    def start(self):
+        self._thread.start()
+        return self
+
+    def stop(self, timeout=5.0):
+        self._stop.set()
+        self._thread.join(timeout)
+
+
+_watcher: Optional[_EpochWatcher] = None
+
+
+def start_epoch_watcher(app, interval: float = EPOCH_CHECK_SECONDS) -> _EpochWatcher:
+    """Web worker (post_worker_init): the scheduler process checks from its own loop."""
+    global _watcher
+    if _watcher is None:
+        _watcher = _EpochWatcher(app, interval).start()
+    return _watcher
+
+
+def stop_epoch_watcher() -> None:
+    global _watcher
+    watcher, _watcher = _watcher, None
+    if watcher is not None:
+        watcher.stop()
 
 
 __all__ = ['invalidate_after_restore', 'CACHE_PURGES']

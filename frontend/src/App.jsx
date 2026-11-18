@@ -3,7 +3,7 @@ import { Suspense } from 'react'
 import { AuthProvider, ThemeProvider, NotificationProvider, MobileProvider, InspectorProvider, useAuth } from './contexts'
 import { WebSocketProvider } from './hooks/useWebSocket'
 import { MODULES, REDIRECTS } from './navigation/registry'
-import { loginUrl } from './navigation/safeNext'
+import { loginUrl, safeNext } from './navigation/safeNext'
 import { pages, lazyWithRetry } from './navigation/pages'
 import { AppShell, ErrorBoundary, LoadingSpinner, SessionWarning, ForcePasswordChange, ForceEnroll2FA, SafeModeOverlay, InspectorDock } from './components'
 
@@ -12,6 +12,8 @@ const LoginPage = lazyWithRetry(() => import('./pages/LoginPage'))
 const ForgotPasswordPage = lazyWithRetry(() => import('./pages/ForgotPasswordPage'))
 const ResetPasswordPage = lazyWithRetry(() => import('./pages/ResetPasswordPage'))
 const DevShowcasePage = lazyWithRetry(() => import('./pages/DevShowcasePage'))
+const SsoTestCompletePage = lazyWithRetry(() => import('./pages/SsoTestCompletePage'))
+const SsoTestLaunchPage = lazyWithRetry(() => import('./pages/SsoTestLaunchPage'))
 
 // Loading fallback for lazy components
 function PageLoader() {
@@ -20,6 +22,12 @@ function PageLoader() {
       <LoadingSpinner size="lg" />
     </div>
   )
+}
+
+// Signed in on the sign-in page: the page its ?next= names (checked), else the landing page
+function SignedIn() {
+  const { search } = useLocation()
+  return <Navigate to={safeNext(new URLSearchParams(search).get('next')) || '/'} replace />
 }
 
 function ProtectedRoute({ children }) {
@@ -112,7 +120,7 @@ export function AppRoutes() {
           path="/login" 
           element={
             loading ? <PageLoader /> :
-            isAuthenticated ? <Navigate to="/" replace /> : 
+            isAuthenticated ? <SignedIn /> :
             <LoginPage />
           } 
         />
@@ -121,6 +129,9 @@ export function AppRoutes() {
           element={<LoginPage />} 
         />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        {/* An SSO sign-in test's landing: no application shell, whoever signed in at the IdP */}
+        <Route path="/sso-test-complete" element={<SsoTestCompletePage />} />
+        <Route path="/sso-test-launch" element={<SsoTestLaunchPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         
         <Route element={<AppShell />}>

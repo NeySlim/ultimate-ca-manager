@@ -13,7 +13,7 @@ from services.updates import get_current_version
 from services import compliance_preflight, fips_preflight
 import compliance_profiles
 from models import db
-from config.settings import is_docker
+from config.settings import CONTAINER_RESTART_REFUSAL, is_docker
 from utils.ha import ha_enabled
 import os
 import psutil
@@ -50,6 +50,8 @@ _TASK_LABELS = {
     'ocsp_cache_cleanup': 'OCSP cache cleanup',
     'update_check': 'Update check',
     'update_result': 'Update result',
+    'files_reconcile': 'Certificate and key files',
+    'sqlite_statistics': 'Database statistics',
     'discovery_scan': 'Discovery scans',
     'scheduled_reports': 'Scheduled reports',
     'scheduled_backup': 'Scheduled backups',
@@ -239,7 +241,7 @@ def get_compliance_preflight():
 def restart_service():
     """Restart the UCM service; in HA mode, every node in turn"""
     if is_docker() and not ha_enabled():
-        return error_response("Service restart is not available in Docker. Restart the container instead.", 400)
+        return error_response(CONTAINER_RESTART_REFUSAL, 400)
 
     try:
         AuditService.log_action(

@@ -17,6 +17,8 @@ from sqlalchemy import create_engine, inspect as sa_inspect, text
 from services.database_admin import verify as verify_mod
 from services.database_admin.verify import (
     VerificationError,
+    check_local_email_flags,
+    check_ssh_serials,
     check_foreign_keys,
     check_row_counts,
     check_schema,
@@ -51,24 +53,38 @@ def target(app):
         os.unlink(path)
 
 
-def _add_user(engine, user_id, username, *, email=None, auth_source='local',
+def _add_user(engine, user_id, username, *, email=None, sso=False,
               totp_secret=None):
     """Insert one user row directly, the way the bulk loader does."""
     with engine.begin() as conn:
         conn.execute(
             text('INSERT INTO users (id, username, email, password_hash, role, '
-                 'auth_source, totp_secret) VALUES (:id, :username, :email, '
-                 ':password_hash, :role, :auth_source, :totp_secret)'),
+                 'has_sso_identity, totp_secret) VALUES (:id, :username, :email, '
+                 ':password_hash, :role, :sso, :totp_secret)'),
             {
                 'id': user_id,
                 'username': username,
                 'email': email or f'{username}@example.test',
                 'password_hash': 'not-a-real-hash',
                 'role': 'viewer',
-                'auth_source': auth_source,
+                'sso': sso,
                 'totp_secret': totp_secret,
             },
         )
+
+
+PARTIAL = 'uq_windows_enrollment_profiles_default'
+
+
+def _add_profile(engine, profile_id, *, is_default=False):
+    """One Windows enrolment profile: at most one is the default (a partial unique index)."""
+    with engine.begin() as conn:
+        conn.execute(
+            text('INSERT INTO windows_enrollment_profiles (id, name, is_default, enabled, '
+                 'policy_id, policy_oid_root, validity_days) VALUES (:id, :name, :is_default, 1, '
+                 ':policy, :oid, 365)'),
+            {'id': profile_id, 'name': f'profile-{profile_id}', 'is_default': is_default,
+             'policy': f'policy-{profile_id}', 'oid': f'1.2.3.{profile_id}'})
 
 
 def _populate(engine):
@@ -137,7 +153,7 @@ class TestVerifyMigration:
         assert report['target_backend'] == 'sqlite'
         assert set(report['checks']) == {
             'schema', 'row_counts', 'foreign_keys', 'unique_constraints',
-            'sequences', 'secrets',
+            'local_email_flags', 'ssh_serials', 'sequences', 'secrets',
         }
         assert report['checks']['row_counts']['rows'] == 4
         assert report['checks']['foreign_keys']['constraints_checked'] > 0
@@ -291,32 +307,28 @@ class TestUniqueConstraints:
         assert result['constraints_checked'] > 0
         assert result['unique_indexes_checked'] > 0
         skipped = {entry['constraint'] for entry in result['skipped']}
-        assert 'ix_users_email_local' in skipped
+        assert PARTIAL in skipped
         assert result['skipped_count'] == len(result['skipped'])
         assert all(entry['reason'] for entry in result['skipped'])
 
     def test_partial_unique_index_is_not_a_false_positive(self, target):
-        # Email is unique among LOCAL accounts only (ix_users_email_local is a
-        # partial index): an SSO account sharing the address is legitimate and
-        # a global GROUP BY would wrongly condemn the migration.
-        _add_user(target, 1, 'local_user', email='shared@example.test',
-                  auth_source='local')
-        _add_user(target, 2, 'sso_user', email='shared@example.test',
-                  auth_source='sso')
+        # One default profile at most (a partial index): two profiles that are not
+        # the default are legitimate and a global GROUP BY would wrongly condemn
+        # the migration.
+        _add_profile(target, 1)
+        _add_profile(target, 2)
 
         result = check_unique_constraints(target)
 
         assert result['duplicate_groups'] == 0
         partial = [entry for entry in result['skipped']
-                   if entry['constraint'] == 'ix_users_email_local']
+                   if entry['constraint'] == PARTIAL]
         assert len(partial) == 1
         assert 'partial index' in partial[0]['reason']
 
     def test_duplicate_on_a_unique_constraint_is_detected(self, target, monkeypatch):
-        _add_user(target, 1, 'local_user', email='shared@example.test',
-                  auth_source='local')
-        _add_user(target, 2, 'sso_user', email='shared@example.test',
-                  auth_source='sso')
+        _add_user(target, 1, 'local_user', email='shared@example.test')
+        _add_user(target, 2, 'sso_user', email='shared@example.test', sso=True)
 
         monkeypatch.setattr(verify_mod, 'inspect', lambda engine: _InspectorWithExtras(
             sa_inspect(engine), 'users',
@@ -330,10 +342,8 @@ class TestUniqueConstraints:
         assert 'users' in message
 
     def test_duplicate_on_a_unique_index_is_detected(self, target, monkeypatch):
-        _add_user(target, 1, 'local_user', email='shared@example.test',
-                  auth_source='local')
-        _add_user(target, 2, 'sso_user', email='shared@example.test',
-                  auth_source='sso')
+        _add_user(target, 1, 'local_user', email='shared@example.test')
+        _add_user(target, 2, 'sso_user', email='shared@example.test', sso=True)
 
         monkeypatch.setattr(verify_mod, 'inspect', lambda engine: _InspectorWithExtras(
             sa_inspect(engine), 'users',
@@ -356,6 +366,95 @@ class TestUniqueConstraints:
                       'unique': 1, 'dialect_options': {}}]))
 
         assert check_unique_constraints(target)['duplicate_groups'] == 0
+
+
+class TestLocalEmailFlags:
+    """has_sso_identity, which the local e-mail index reads, agrees with the identity rows."""
+
+    def test_agreeing_flags_pass(self, target):
+        _add_user(target, 1, 'local_user', email='shared@example.test')
+        _add_user(target, 2, 'sso_user', email='shared@example.test', sso=True)
+        with target.begin() as conn:
+            conn.execute(text("INSERT INTO user_sso_identities (user_id, orphan_of) "
+                              "VALUES (2, 'oauth2:https://idp.example')"))
+        assert check_local_email_flags(target)['accounts_checked'] == 2
+
+    def test_a_flag_without_its_row_is_refused(self, target):
+        # Out of the index, this account could share the e-mail of a local one unnoticed
+        _add_user(target, 1, 'flagged', sso=True)
+        with pytest.raises(VerificationError) as excinfo:
+            check_local_email_flags(target)
+        assert 'has_sso_identity' in str(excinfo.value)
+
+    def test_a_row_without_its_flag_is_refused(self, target):
+        _add_user(target, 1, 'unflagged')
+        with target.begin() as conn:
+            conn.execute(text("INSERT INTO user_sso_identities (user_id, orphan_of) "
+                              "VALUES (1, 'oauth2:https://idp.example')"))
+        with pytest.raises(VerificationError):
+            check_local_email_flags(target)
+
+
+def _ssh_ca(engine, ca_id, counter):
+    with engine.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO ssh_cas (id, refid, descr, ca_type, public_key, private_key, key_type, fingerprint, "
+            "serial_counter, allow_any_principal, allow_custom_key_id) VALUES (:i, :r, 'CA', 'user', 'pub', "
+            "'prv', 'ed25519', :f, :c, 1, 0)"), {'i': ca_id, 'r': f'ca-{ca_id}', 'f': f'f{ca_id}', 'c': counter})
+
+
+def _ssh_cert(engine, cert_id, ca_id, serial, marked=False, revoked=False):
+    with engine.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO ssh_certificates (id, refid, ssh_ca_id, cert_type, key_id, public_key, certificate, "
+            "principals, serial, serial_duplicate, valid_from, valid_to, key_type, fingerprint, revoked) VALUES "
+            "(:i, :r, :c, 'user', 'k', 'pub', 'cert', '[]', :s, :m, '2026-01-01', '2027-01-01', 'ed25519', :f, :v)"),
+            {'i': cert_id, 'r': f'c-{cert_id}', 'c': ca_id, 's': serial, 'm': marked, 'f': f'f{cert_id}',
+             'v': revoked})
+
+
+class TestSSHSerials:
+    """Every SSH CA counts past its certificates, and no serial is held twice unmarked."""
+
+    def test_a_counter_past_its_certificates_and_a_marked_pair_pass(self, target):
+        _ssh_ca(target, 1, 3)
+        _ssh_cert(target, 1, 1, 3)
+        _ssh_cert(target, 2, 1, 3, marked=True)
+        _ssh_cert(target, 3, 1, 0)
+        _ssh_cert(target, 4, 1, 0)
+        assert check_ssh_serials(target) == {'cas_checked': 1, 'lagging': 0, 'unmarked_duplicates': 0,
+                                             'diverging_revocations': 0}
+
+    @pytest.mark.parametrize('revoked', ['older', 'newer'])
+    def test_a_pair_revoked_on_one_holder_only_is_refused(self, target, revoked):
+        """The KRL revokes the serial: a valid holder beside a revoked one is a revoked certificate."""
+        _ssh_ca(target, 1, 3)
+        _ssh_cert(target, 1, 1, 3, revoked=revoked == 'older')
+        _ssh_cert(target, 2, 1, 3, marked=True, revoked=revoked == 'newer')
+        _ssh_cert(target, 3, 1, 0, revoked=True)
+        _ssh_cert(target, 4, 1, 0)
+        with pytest.raises(VerificationError) as excinfo:
+            check_ssh_serials(target)
+        valid = '#2' if revoked == 'older' else '#1'
+        assert valid in str(excinfo.value) and 'revoked' in str(excinfo.value), str(excinfo.value)
+
+    def test_a_counter_behind_its_certificates_is_refused(self, target):
+        _ssh_ca(target, 1, 2)
+        _ssh_cert(target, 1, 1, 3)
+        with pytest.raises(VerificationError) as excinfo:
+            check_ssh_serials(target)
+        assert 'serial_counter' in str(excinfo.value) and 'CA #1' in str(excinfo.value)
+
+    def test_an_unmarked_pair_is_refused(self, target):
+        # Only a target that lost the index can hold one
+        with target.begin() as conn:
+            conn.execute(text('DROP INDEX uq_ssh_certificates_ca_serial'))
+        _ssh_ca(target, 1, 3)
+        _ssh_cert(target, 1, 1, 3)
+        _ssh_cert(target, 2, 1, 3)
+        with pytest.raises(VerificationError) as excinfo:
+            check_ssh_serials(target)
+        assert 'serial' in str(excinfo.value) and '#2' in str(excinfo.value)
 
 
 # ---------------------------------------------------------------------------

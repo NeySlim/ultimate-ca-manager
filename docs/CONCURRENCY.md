@@ -26,6 +26,8 @@ PostgreSQL (`UCM_TEST_PG_URL`); SQLite serializes writers on its own.
 | A delegated OCSP responder is renewed once | Binding rebound only if it still names the old certificate | `services/ocsp_responder_renewal.py` |
 | An HA backup archive is listed only once whole | Row and chunks in one transaction, read back before the commit | `services/backup/shared_store.py` `store_archive` |
 | HA backup retention and deletions run one at a time across nodes | Transaction advisory lock keyed by schema | `services/backup/shared_store.py` `_take_lock` |
+| One active background job per slot (`backup`, `audit_verify`; a `restore` holds them all), on the whole installation, HA included | Partial unique index `uq_background_jobs_active_slot` on the slot of pending and running jobs; the cross-slot check runs after the insert, under `pg_advisory_xact_lock` on PostgreSQL and the SQLite write lock; every state change is a conditional `UPDATE` on the previous state | `services/jobs/store.py` `create_job`, `claim_job`, `conclude_job` |
+| A restore is cancelled or commits, never both; each step after its commit runs once | The `committed` phase is written in the restore's own transaction, only while no cancellation is flagged; the cancellation flag is written only before that phase; each later step moves the phase from the previous one (rowcount 1), the session epoch in the same transaction as its step | `services/jobs/restore.py` `_Run.mark`, `_Ledger.advance`, `claim_sessions`; `services/jobs/store.py` `cancel_or_flag` |
 
 Scheduled backups reserve their run in the database (`services/backup/schedule.py`
 `_claim_run`: a compare-and-set of `backup.last_run`), so of two nodes finding a run due,

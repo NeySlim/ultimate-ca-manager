@@ -7,6 +7,9 @@ from models.ca_cross_certificate import CACrossCertificate
 from tests.fixtures.cross_pki import new_key, openssl_verify
 from tests.test_cross_sign import _cert_of, _sign
 from tests.test_cross_sign_review import _drop, _import, _mk, _pair, _policy, _tag, db_pem
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 POLICY = ObjectIdentifier('1.3.6.1.4.1.99999.1')
 

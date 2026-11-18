@@ -112,7 +112,7 @@ def spool_archive(backup_dir: Path, chunks) -> SpooledArchive:
     if isinstance(chunks, (bytes, bytearray)):
         chunks = (chunks,)
     fd, temp_path = tempfile.mkstemp(
-        dir=str(backup_dir), prefix='.ucm_backup_', suffix='.tmp')
+        dir=str(backup_dir), prefix=_SPOOL_PREFIX, suffix=_SPOOL_SUFFIX)
     try:
         digest = hashlib.sha256()
         size = 0
@@ -131,6 +131,41 @@ def spool_archive(backup_dir: Path, chunks) -> SpooledArchive:
             logger.warning("Could not remove temporary backup %s", temp_path)
         raise
     return SpooledArchive(temp_path, size, digest.hexdigest())
+
+
+_SPOOL_PREFIX, _SPOOL_SUFFIX = '.ucm_backup_', '.tmp'
+
+
+def sweep_orphan_spools() -> int:
+    """Remove the spools of backups killed mid-write; return how many went.
+
+    Every spool is written under the backup lock, so one seen while this
+    thread holds that lock by flock belongs to no live backup.
+    """
+    from .locking import BackupBusyError, backup_operation_lock, operation_lock_held
+    directory = backup_directory()
+    removed = 0
+    try:
+        with backup_operation_lock(timeout=0, purpose='sweeping interrupted backups',
+                                   fail_open=False):
+            if not operation_lock_held():
+                return 0
+            for entry in os.scandir(directory):
+                if (entry.name.startswith(_SPOOL_PREFIX)
+                        and entry.name.endswith(_SPOOL_SUFFIX)
+                        and entry.is_file(follow_symlinks=False)):
+                    try:
+                        os.unlink(entry.path)
+                        removed += 1
+                    except FileNotFoundError:
+                        pass
+    except BackupBusyError as exc:
+        logger.debug("Interrupted backups not swept: %s", exc)
+    except OSError as exc:
+        logger.info("Interrupted backups not swept: %s", exc)
+    if removed:
+        logger.warning("Removed %d temporary file(s) of interrupted backups", removed)
+    return removed
 
 
 def write_archive_atomically(backup_dir: Path, filename: str, data) -> Path:
@@ -439,13 +474,17 @@ def restore_size_refusal(stream):
     return None
 
 
-# Seconds a manual backup waits for the backup lock before it is refused.
+# Seconds the scheduled backup waits for the backup lock before it is refused
+# (a manual one waits services.jobs.backup.LOCK_WAIT_SECONDS).
 EXPORT_LOCK_WAIT = 30
 
 
-def export_archive(service, password: str, *, kdf=None, timeout=None) -> tuple:
+def export_archive(service, password: str, *, kdf=None, timeout=None, progress=None) -> tuple:
     """Export and publish one archive under the backup lock. Returns ``(size, path, filename)``,
     path None in HA, where the archive is in the database.
+
+    ``progress`` is handed to ``iter_backup``: what it raises stops the export, and no
+    archive is published (the spool is removed, the HA transaction rolled back).
 
     The archive is streamed to disk as it is produced, never held whole. The
     export runs inside the lock too: a restore holds it until it commits, so
@@ -455,7 +494,9 @@ def export_archive(service, password: str, *, kdf=None, timeout=None) -> tuple:
 
     wait = EXPORT_LOCK_WAIT if timeout is None else timeout
     with backup_operation_lock(timeout=wait, purpose='creating a backup'):
-        path, filename, size = _create_archive(service.iter_backup(password, kdf=kdf))
+        stream = (service.iter_backup(password, kdf=kdf) if progress is None
+                  else service.iter_backup(password, kdf=kdf, progress=progress))
+        path, filename, size = _create_archive(stream)
     return size, path, filename
 
 
@@ -485,6 +526,8 @@ def _create_archive(data, backup_dir=None) -> tuple:
     if backup_dir is None and shared_store.enabled():
         filename, size, _sha256 = shared_store.store_archive(data, new_archive_filename)
         return None, filename, size
+    if backup_dir is None:
+        sweep_orphan_spools()
     directory = Path(backup_dir) if backup_dir is not None else backup_directory()
     # A stream is consumed once: spooled first, so a name collision can retry
     spooled = None

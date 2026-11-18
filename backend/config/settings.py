@@ -55,17 +55,25 @@ def redis_url() -> Optional[str]:
     return os.getenv("REDIS_URL") or os.getenv("UCM_REDIS_URL") or None
 
 
+# The blanks a shell [:space:] trims, so the image scripts read a flag as the application does
+FLAG_BLANKS = " \t\n\v\f\r"
+
+
 def env_bool(name: str, default: bool = False) -> bool:
     """Boolean environment variable: 1/true/yes/on (any case) are true."""
     raw = os.getenv(name)
-    if raw is None or not raw.strip():
+    if raw is None or not raw.strip(FLAG_BLANKS):
         return default
-    return raw.strip().lower() in ("1", "true", "yes", "on")
+    return raw.strip(FLAG_BLANKS).lower() in ("1", "true", "yes", "on")
 
 
 def rate_limit_enabled() -> bool:
     """RATE_LIMIT_ENABLED, the one reading both limiters (route limits, tiered limiter) follow."""
     return env_bool("RATE_LIMIT_ENABLED", True)
+
+
+CONTAINER_RESTART_REFUSAL = ("Service restart is not available in a container (Docker, Kubernetes). "
+                             "Restart the container or pod instead.")
 
 
 def is_docker():
@@ -77,7 +85,7 @@ def restart_ucm_service():
     """
     Restart UCM service via signal file.
     ucm-watcher.path detects the file and ucm-watcher.service runs systemctl restart.
-    Not available in Docker — container must be restarted externally, except in HA
+    Not available in a container (Docker, Kubernetes), restarted externally, except in HA
     mode, where a rolling restart of every node is queued instead.
     Returns: (success: bool, message: str)
     """
@@ -86,7 +94,7 @@ def restart_ucm_service():
         from services.cluster_commands import request_restart
         return request_restart()
     if is_docker():
-        return False, "Service restart not available in Docker. Restart the container instead."
+        return False, CONTAINER_RESTART_REFUSAL
     try:
         restart_signal = DATA_DIR / '.restart_requested'
         restart_signal.write_text('restart')
@@ -247,6 +255,10 @@ class Config:
     # Pre-ping, keepalives and connect timeout, plus UCM_PG_PREPARE_THRESHOLD (utils/db_url)
     if _db_url:
         SQLALCHEMY_ENGINE_OPTIONS.update(postgres_engine_options(_db_url))
+    if SQLALCHEMY_DATABASE_URI.startswith('sqlite'):
+        # A SQLite connection plans with the statistics it loaded when it opened: reopened hourly,
+        # as often as the sqlite_statistics task refreshes them
+        SQLALCHEMY_ENGINE_OPTIONS["pool_recycle"] = 3600
     
     
     @classmethod

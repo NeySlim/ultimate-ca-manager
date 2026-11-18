@@ -36,6 +36,6 @@ export default defineConfig({
     { name: 'chromium', use: desktop, testIgnore: [...LAB, RESTORE, OVERVIEW] },
     { name: 'overview', use: desktop, testMatch: [OVERVIEW], dependencies: ['chromium'], fullyParallel: false },
     // A restore replaces the database under every other test: it runs alone, last
-    ...(managed ? [{ name: 'restore', use: desktop, testMatch: [RESTORE], dependencies: ['overview'] }] : []),
+    ...(managed ? [{ name: 'restore', use: desktop, testMatch: [RESTORE], dependencies: ['overview'], fullyParallel: false }] : []),
   ],
 })

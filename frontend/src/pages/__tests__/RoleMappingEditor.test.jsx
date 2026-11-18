@@ -7,7 +7,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key) => key,
+    t: (key, opts) => (opts?.key !== undefined ? `${key}:${opts.key}` : key),
     i18n: { language: 'en', changeLanguage: vi.fn(), on: vi.fn(), off: vi.fn() },
   }),
   Trans: ({ children }) => children,
@@ -86,5 +86,29 @@ describe('RoleMappingEditor', () => {
     render(<Harness initial={{}} onEmit={onEmit} />)
     fireEvent.click(screen.getByText('common.add'))
     expect(onEmit).toHaveBeenLastCalledWith({ '': '' })
+  })
+})
+
+describe('rows of one key', () => {
+  it('names the second row of a key, makes its form refuse to submit and keeps the first row', () => {
+    const onEmit = vi.fn()
+    render(
+      <form>
+        <Harness initial={{ staff: 'viewer' }} onEmit={onEmit} />
+      </form>
+    )
+    fireEvent.click(screen.getByText('common.add'))
+    const keys = () => screen.getAllByPlaceholderText('ext-group')
+    fireEvent.change(keys()[1], { target: { value: 'staff' } })
+
+    expect(screen.getAllByText('common.duplicateKey:staff')).toHaveLength(1)
+    expect(keys()[0].validity.valid).toBe(true)
+    expect(keys()[1].validationMessage).toBe('common.duplicateKey:staff')
+    expect(document.querySelector('form').checkValidity()).toBe(false)
+    expect(onEmit).toHaveBeenLastCalledWith({ staff: 'viewer' })
+
+    fireEvent.change(keys()[1], { target: { value: 'ops' } })
+    expect(screen.queryByText(/^common\.duplicateKey/)).toBeNull()
+    expect(document.querySelector('form').checkValidity()).toBe(true)
   })
 })

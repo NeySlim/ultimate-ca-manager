@@ -17,6 +17,8 @@ from models import db, Certificate, RevokedSerial, AuditLog
 from models.policy import ApprovalRequest
 from utils.datetime_utils import utc_now
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 DELETE_VALID_MESSAGE = ('Cannot delete a valid certificate: revoke it first so the '
                         'CRL and OCSP responder reflect the change.')
 

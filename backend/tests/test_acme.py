@@ -17,6 +17,8 @@ from tests.conftest import get_json, assert_success, assert_error, assert_refuse
 from services.acme.jws_problems import UNKNOWN_ACCOUNT
 from tests.seeded_rows import delete_client_accounts
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 CONTENT_JSON = 'application/json'
@@ -702,9 +704,27 @@ class TestAcmeClientProxy:
             assert data['acme_account_id'] == account_id
             assert 'account_url' in data
 
-    def test_proxy_register_missing_email(self, auth_client):
-        r = post_json(auth_client, '/api/v2/acme/client/proxy/register', {})
-        assert_error(r, 400)
+    def test_proxy_register_missing_email(self, auth_client, app):
+        # The proxy account is the test's own, without an email: any other account of the
+        # session (a default one with a contact) would otherwise be registered upstream.
+        from models import db, AcmeClientAccount, SystemConfig
+        from services.acme.acme_proxy_account import PROXY_ACCOUNT_ID_KEY
+
+        with app.app_context():
+            SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
+            acct = AcmeClientAccount(directory_url='https://proxy-noemail-test.example/directory',
+                                     label='Proxy no email', email='')
+            db.session.add(acct)
+            db.session.commit()
+            account_id = acct.id
+        try:
+            r = post_json(auth_client, '/api/v2/acme/client/proxy/register', {'acme_account_id': account_id})
+            assert_error(r, 400)
+        finally:
+            with app.app_context():
+                db.session.rollback()
+                delete_client_accounts(AcmeClientAccount.query.filter_by(id=account_id))
+                db.session.commit()
 
     def test_proxy_register_empty_email(self, auth_client):
         r = post_json(auth_client, '/api/v2/acme/client/proxy/register', {'email': ''})

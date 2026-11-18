@@ -1655,7 +1655,7 @@ The Trust Store keeps trusted CA certificates. Fill it from the CAs UCM manages 
 **Add** lists the CAs UCM manages: select those to trust.
 
 ### External certificates
-The page has no upload form for a certificate from outside UCM. Add it through the API: \`POST /api/v2/truststore\` with its PEM, or \`POST /api/v2/truststore/import\` with a PEM or DER file.
+The page has no upload form for a certificate from outside UCM. Add it through the API: \`POST /api/v2/truststore\` with its PEM, or \`POST /api/v2/truststore/import\` with a PEM or DER file. An entry that contains a private key is refused: the trust store holds certificates only, and only the certificates of a file are kept.
 
 ### Sync from System
 Import the trusted CAs of the operating system's trust store (e.g., Mozilla's CA bundle on Linux), up to the chosen count: 500 by default, 1000 at most.
@@ -1749,11 +1749,13 @@ Create roles with granular permissions on the **RBAC** page.
 
 ## Authentication Source
 
-The **Source** column shows where each user comes from:
+The **Source** column shows what opens each account:
 - **Local**: created and managed in UCM (local password)
-- **LDAP / OAuth2 / SAML**: auto-provisioned on first SSO login. The originating provider name is shown on the badge (e.g. \`LDAP · Corporate AD\`).
+- **LDAP / OAuth2 / SAML**: one entry per provider attached to the account, by type and name (e.g. \`LDAP · Corporate AD\`); an account may have several.
 
 Since v2.133, roles changed manually in UCM for SSO users are **preserved** between logins, unless **"Sync role on every login"** is enabled on the provider (see **Settings → SSO**).
+
+The account panel lists its **Single sign-on providers**, each linked, waiting for its first sign-in, or left by a deleted provider. **Attach a provider** adds one: the providers already attached keep opening the account, and the next sign-in through the new one with the account's username or email binds its identity. **Reset identity** clears the identity of one provider whose IdP changed it, and **Detach** removes one provider, each after a confirmation; attaching, resetting and detaching close every session of the account. To move an account to another provider, attach the new one, then detach the old one. A password the account has is kept unless the box that removes it is ticked, after which no password login opens the account; an account without a password is asked to set one only when its last provider is detached, and then becomes a local account.
 `
   },
 
@@ -1955,6 +1957,8 @@ Purge old logs based on retention period:
 
 Click **Verify Integrity** to check the audit log chain. UCM uses hash chaining to detect an entry modified or removed inside the chain; removing the latest entries leaves no trace in the chain itself, which is why syslog forwarding keeps a copy elsewhere.
 
+On a large ledger the verification runs in the background: the button shows how many entries are checked so far, **Cancel verification** stops it, and leaving or reloading the page does not stop it (the page picks it up again). One verification runs at a time.
+
 ## Syslog Forwarding
 
 Configure remote syslog forwarding in **Settings → Audit** to send log events to an external SIEM or syslog server in real-time.
@@ -2067,6 +2071,8 @@ A new installation creates the master key at its first start (in a container, on
 ### Manual Backup
 Click **Create Backup** to generate a database snapshot. Backups include the certificates, CAs, keys and settings; the audit log and other history tables are not included.
 
+A manual backup runs on the server: the dialog shows its progress, can cancel it (no archive is kept) and offers the archive for download when it is ready; closing the dialog or reloading the page does not stop it. One manual backup runs at a time on the whole installation.
+
 ### Scheduled Backup
 Configure automatic backups:
 - Frequency (daily, weekly, monthly)
@@ -2079,6 +2085,7 @@ Upload a backup file to restore UCM to a previous state.
 - Backups and restores share one lock: a restore is refused (409) while a backup runs, and a manual backup waits for a running restore
 - In HA mode, a restore from any node first has every node refuse writes (503) and leave the balancer's rotation until it ends; it is refused, naming the node, when a node does not acknowledge within 30 s. The nodes then restart one at a time, and each serves the restored state once restarted
 - An archive created since 3.0 is restored in chunks, with no size limit unless \`BACKUP_MAX_ARCHIVE_MB\` sets one; an older archive is accepted up to \`BACKUP_MAX_UPLOAD_MB\` (512 MB by default). Both are set in the server environment; a reverse proxy in front of UCM keeps its own body limit
+- The restore runs in the background: past 25 seconds its dialog follows it and can cancel it until it commits; meanwhile every write is refused (503), on a single node too, and the report shows after the sign-in its end asks for
 - Archives carry ACME client orders, approval requests and key recovery requests (v2.251)
 - A DNS provider, ACME CA account or webhook whose name another row holds here is restored as \`name (2)\`
 - The API also accepts \`mode=merge\`, which adds the archive to the data here instead of replacing it
@@ -2299,6 +2306,8 @@ XML-DSig has no ML-DSA signature method, so an **ML-DSA** certificate cannot ren
 Windows can also renew with \`certreq ... Renew\`, authenticated by the certificate being renewed as TLS client certificate: enable mTLS with the WSTEP CA, or one of its ancestors, trusted. A renewal keeps the template and EKUs of the certificate it renews (v2.248). Since 3.0 only a certificate issued through Windows enrollment renews this way: one signed in the interface is refused (\`not issued through Windows enrollment\`) and must be reissued through Windows enrollment.
 
 Since 3.0 a renewal by certificate is served by the profile the certificate records (a 2.x WSTEP certificate: the default profile), under that profile's issuing CA, and refused when the profile was deleted or is disabled; each refusal is audited with the profile and the reason. Only the SID is checked again, by the profile's connector: revoke the certificate of a computer removed from the group. The TLS client certificate works only for a profile whose issuing CA is the mTLS CA or a CA under it: a certificate the listener does not trust is refused during the TLS handshake, before UCM sees a request, so nothing is audited by UCM (read the client output and the service log). The other profiles renew over Kerberos only (the profile of the principal's realm serves and the new certificate records it), and when Kerberos refuses (requester removed from the AD group, profile disabled) they cannot renew. The Kerberos keytab keeps the keys of disabled profiles, so their requests are refused with an audit entry: only deleting the profile removes them.
+
+Over Kerberos, a request signed by the requester's own valid certificate of the profile renews it when it names that certificate's template (or the certificate carries none, as one issued before 3.0): the renewed certificate is marked superseded by the new one, as on the Certificate binding, the audit entry is \`certificate.renewed\` and the webhook \`cert.renewed\`, and a second renewal of it is refused on either binding (\`Renewed certificate superseded by a newer one\`). A request naming another template is an enrollment (\`certificate.issued\`), even when the certificate that signs it was renewed already. After a change of the profile's issuing CA, a certificate of the former CA renews the same way: the new CA issues it, and the audit entry \`certificate.renewed\` names the old serial and the old CA.
 
 ### SID Security Extension (KB5014754)
 
@@ -2771,6 +2780,8 @@ Map IDP SAML attributes to UCM user fields:
 - \`email\` → UCM email (required)
 - \`groups\` → read by the role mapping rules (optional); it does not make the user a member of UCM groups
 
+Groups are read from the attributes mapped to \`groups\`, else from \`groups\` and the Microsoft claim URIs. Keycloak sends roles in \`Role\` and groups in \`member\`, Shibboleth sends \`urn:oid:1.3.6.1.4.1.5923.1.5.1.1\` (isMemberOf), other IdPs \`memberOf\`: these are read only once mapped to \`groups\`. The buttons under the attribute mapping add such a row, which takes effect once you save it. An attribute is matched by its Name, never by its FriendlyName (SAML Core 2.0 §2.7.3.1): map \`urn:oid:1.3.6.1.4.1.5923.1.5.1.1\`, not \`isMemberOf\`. A row of the new form (\`attribute → groups\`) replaces a row of the legacy form (\`groups → attribute\`), which is then no longer read; the screen names, under the mapping, the attributes no row reads any more. To keep reading both, replace the legacy row with a row \`attribute → groups\`.
+
 ### Single Logout
 When the IdP ends a session, it sends a signed **LogoutRequest** through the browser to the SLO URL. UCM checks the IdP signature, issuer, Destination (required), IssueInstant (within the clock window) and that the request was not used before, closes the UCM session of that NameID in this browser (when the request carries SessionIndex values, only a session they name), then sends a **LogoutResponse** to the IdP's SLO URL, signed with the SP key; an SP certificate that is not RSA sends it unsigned, which a strict IdP such as AD FS refuses. Without an IdP SLO URL, the browser returns to the UCM login page. An unsigned or forged LogoutRequest is refused and the session stays open.
 
@@ -2794,12 +2805,17 @@ A login started from the IdP portal reaches UCM without a request from UCM. **Al
 ### Auto-Create Users
 When enabled, a new UCM user account is automatically created on first SSO login, using the IDP-provided attributes, with the role its mapping rule gives, else the default role.
 
+### Groups for role mapping
+Role mapping rules compare their keys with the values of the **roles** and **groups** claims, read from the ID token of the login and from the UserInfo response together. Microsoft Entra ID sends groups and app roles only in the ID token: in the application registration, add the groups claim under **Token configuration** (the values are group object IDs, so the mapping keys are these IDs), or define app roles and map their values. A user in more than about 200 groups gets no groups claim from Entra ID: UCM logs a warning and only the app roles can match. Emit only the groups assigned to the application, or app roles. With **Verify ID token signature** off, the groups of the ID token count only when the Token URL is HTTPS with TLS verification on, and the issuer and client ID are set and match the token.
+
+A row \`claim → groups\` in the attribute mapping makes that claim the source of the groups, in the ID token and in UserInfo under the same conditions, in place of **roles** and **groups**. The name is looked up as it is first (\`https://example.com/groups\`), then as a dotted path through nested objects: for Keycloak, \`realm_access.roles\` for realm roles and \`resource_access.<client id>.roles\` for client roles. A value that is neither a string nor a list of strings gives no group. A row of the new form (\`attribute → groups\`) replaces a row of the legacy form (\`groups → attribute\`), which is then no longer read; the screen names, under the mapping, the attributes no row reads any more. To keep reading both, replace the legacy row with a row \`attribute → groups\`.
+
 ## Who can sign in
 
 ### Identity matching
-A login opens the account bound to the IdP identifier: OIDC \`sub\`, SAML persistent NameID, LDAP \`entryUUID\` or \`objectGUID\`. A username or email matches only an account of the same provider that is not bound yet (created before stable identifiers, or linked by an administrator); an email the OIDC IdP marks unverified (\`email_verified\` false) matches none. A local account, or one bound to another identity, is never opened by an SSO login: the login is refused and recorded in the audit log. To merge a local account into an SSO identity, use **Link to SSO** on that user first; its next sign-in through that provider binds the IdP identifier.
+A login opens the account bound to the IdP identifier: OIDC \`sub\`, SAML persistent NameID, LDAP \`entryUUID\` or \`objectGUID\`. A username or email matches only an account of the same provider that is not bound yet (created before stable identifiers, or linked by an administrator); an email the OIDC IdP marks unverified (\`email_verified\` false) matches none. A local account, or one bound to another identity, is never opened by an SSO login: the login is refused and recorded in the audit log. When no account matches, a sign-in whose email belongs to an account attached to other providers only or left by another or an unknown IdP (after a restore, for instance), or, while the email is unverified, to one attached to this provider and not bound yet, is refused rather than given a second account. An account may be attached to several providers, each with its own identity, and no sign-in attaches a provider to an existing account by its name or email: an administrator does, with **Attach a provider** on that user. It accepts a local account and one of other providers, which keep opening it; **Reset identity** clears the identity of an attachment the IdP changed. The next sign-in through that provider binds the IdP identifier, and an account without a local password is not asked for one.
 
-When a provider is deleted, its users are kept: a provider created again for the same IdP (same issuer, entity ID, or LDAP server and base DN) takes them back at their next sign-in. Otherwise, and for users a restore left without a provider, use **Unlink SSO** then **Link to SSO** on each account.
+When a provider is deleted, its attachments are kept as orphans and the other providers of each account keep opening it: a provider created again for the same IdP (same issuer, entity ID, or LDAP server and base DN) takes them back at their next sign-in. Otherwise, and for attachments a restore could not place, use **Attach a provider** on each account.
 
 ### Role mapping rules
 - **At least one rule**: a user no rule matches is refused at every SSO sign-in (OIDC, SAML, LDAP), whether the account is new or already exists; a passkey or certificate sign-in is not checked
@@ -2808,6 +2824,12 @@ When a provider is deleted, its users are kept: a provider created again for the
 - **Default Role: None** with no rule: nobody can sign in through the provider
 
 The **User Provisioning** section opens by itself and shows a warning when the provider has no rule.
+
+### Diagnosing a refused sign-in
+A sign-in refused because no rule matches, or because the provider has no rule and no default role, is recorded in the **Audit Logs** as a failed login (quick filter **Failed Logins**). The entry gives the group values UCM read (at most 20, each cut at 64 characters) and where they were read: the ID token, UserInfo or both for OIDC, with the reason the ID token was not used; the attributes read for SAML; the group search base or \`memberOf\` for LDAP. When nothing was read through OIDC or SAML, it names the claims or attributes received that look like group lists, never their values: map one of them to \`groups\`. Then add a role mapping rule for one of the values, or set a default role. The refused user sees only the refusal message (no rule matched, or no default role and no role mapping rule), never the group values.
+
+### Testing a sign-in
+**Test sign-in**, beside **Test Connection** on a saved OIDC or SAML provider, enabled or not, opens the IdP in a new window: sign in there with the identity to try. The IdP returns to the same redirect URI or ACS URL as a sign-in, and UCM runs the same checks and the same account decision. The provider screen then shows the identity and groups read, the verdict, the role, the account that would be opened or created and, for a refusal, its reason with the attributes to map to \`groups\`. Nobody is signed in and no account changes; the window only says the test is over. The test uses the saved provider (unsaved changes are announced, not sent); only the administrator who started it reads the result, for 10 minutes. The audit log records it as \`sso_sign_in_test\`, apart from sign-ins.
 
 ## LDAP
 
@@ -2819,8 +2841,16 @@ The **User Provisioning** section opens by itself and shows a warning when the p
 5. Enter the **Bind DN** and **Bind Password** (service account credentials)
 6. Enter the **Base DN** (search base for user lookups)
 7. Configure the **User Filter** (e.g., \`(uid={username})\` or \`(sAMAccountName={username})\` for AD)
-8. Map LDAP attributes: **username**, **email**, **full name**, and the **unique ID attribute** (\`entryUUID\`, \`objectGUID\`). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until **Unlink SSO** then **Link to SSO**
+8. Map LDAP attributes: **username**, **email**, **full name**, and the **unique ID attribute** (\`entryUUID\`, \`objectGUID\`). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until **Reset identity** on each account
 9. Click **Test Connection** to verify, then **Save** and **Enable**
+
+### Groups
+- **memberOf**: read from the user's own entry (a base search on its DN); the group filter is not used
+- **member / uniqueMember**: searched under the Group Search Base alone when it is set; otherwise under the parent of the Base DN when the directory holds it, then under the Base DN if that search fails, with the group filter (\`(objectClass=*)\` when empty); groups beside the users (\`ou=groups\` next to \`ou=people\`) are found
+- **Direct membership only**: nested groups and the Active Directory primary group (Domain Users) are not seen
+- **Matching**: group names compare with rules and required groups ignoring case and edge spaces, a run of inner spaces counting as one
+- **Unreadable groups**: with rules or required groups, a sign-in whose groups cannot be read is refused with "your groups could not be read from the directory"
+- **Test Mapping** reads the groups and decides as the sign-in does, without the password; it shows a role only for an admitted user
 
 ### Active Directory
 For Microsoft Active Directory, use:
@@ -3759,6 +3789,8 @@ On clients, add the Host CA to known_hosts:
 4. Download and deploy the updated KRL to servers (from SSH CAs page)
 
 A revoked certificate stays in the KRL, and in the list, until it expires: deleting it earlier is refused, since the KRL is built from these records and the certificate would be accepted again. Each KRL download carries a higher version number (v2.252).
+
+The KRL names a certificate by its serial number, which UCM gives out once per CA. An installation upgraded from 2.x, or one that restored a 2.x archive, may hold two certificates of one CA sharing a serial: the list marks them **Shared serial**, and revoking one revokes them all; when one of them was already revoked, the others are revoked with it. Revoke them and issue new certificates. A certificate of serial 0, which OpenSSH reads as not numbered (an imported one, for instance), is listed in the KRL by its key ID once revoked, as OpenSSH does: every certificate of the CA with that key ID, whatever its serial, is refused with it, and UCM revokes them with it. A certificate with that key ID can then no longer be issued or imported under the CA. The key itself and certificates from other CAs stay valid.
 
 > ⚠ Revocation only takes effect when servers check the KRL via \`RevokedKeys\` in sshd_config.
 

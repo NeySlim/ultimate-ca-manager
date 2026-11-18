@@ -79,7 +79,7 @@ def _rows_holding(cert: x509.Certificate, *criteria) -> list:
         # Every spelling: rows the upgrade step 144 left pending may hold the revoked twin
         Certificate.serial_number.in_(serial_variants(cert.serial_number)),
         Certificate.crt.isnot(None),
-    ).all()
+    ).order_by(Certificate.id).all()    # one order on both engines: callers read the first row
     rows = []
     for row in candidates:
         try:
@@ -389,6 +389,8 @@ def apply_persisted_revocations(ids=None) -> list:
             record = row_persisted_revocation(row)
             if record is not None:
                 found.append((row, record))
+    # Rows marked in id order, whatever order the database returned them in
+    found.sort(key=lambda pair: pair[0].id)
     # Every record locked before any row is marked, as an unhold takes them
     held = _records_still_held(record for _, record in found)
     return [(row, record) for row, record in found

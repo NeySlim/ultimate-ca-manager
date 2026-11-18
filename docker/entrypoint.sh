@@ -175,6 +175,10 @@ check_ha_secret || exit 1
 # Copy of the SQLite database taken by this script before each start
 : "${UCM_BACKUP_ENABLED:=true}"
 : "${UCM_BACKUP_RETENTION_DAYS:=30}"
+# Before the first write to the volumes: a refused database is never copied
+ucm_refuse_unstartable_database || exit $?
+# Then, on every backend: a 2.254 database moves to this major only with UCM_ACCEPT_MAJOR_UPGRADE
+ucm_refuse_unaccepted_major_upgrade || exit $?
 
 # Initial Admin User (the unprefixed names, as set by older Helm charts, still count)
 : "${UCM_INITIAL_ADMIN_USERNAME:="${INITIAL_ADMIN_USERNAME:-admin}"}"
@@ -224,38 +228,9 @@ echo -e "${BLUE}📁 Setting up directories...${NC}"
 # Unified data path: /opt/ucm/data (same as DEB/RPM)
 DATA_PATH="/opt/ucm/data"
 
-# Migration: if old path has data, migrate everything to new path
-OLD_DATA_PATH="/opt/ucm/backend/data"
-OLD_APP_PATH="/app/backend/data"
-for old_path in "$OLD_DATA_PATH" "$OLD_APP_PATH"; do
-if [ -d "$old_path" ] && [ "$(ls -A $old_path 2>/dev/null)" ]; then
-    echo -e "${YELLOW}   Checking for data migration from $old_path...${NC}"
-    # Copy everything that doesn't already exist in new path
-    for item in "$old_path"/*; do
-        [ -e "$item" ] || continue
-        basename_item=$(basename "$item")
-        # Rename 'cas' → 'ca' (old Docker naming mismatch)
-        target_name="$basename_item"
-        if [ "$basename_item" = "cas" ]; then
-            target_name="ca"
-        fi
-        if [ ! -e "$DATA_PATH/$target_name" ]; then
-            echo -e "${YELLOW}   Migrating $basename_item → $target_name...${NC}"
-            cp -a "$item" "$DATA_PATH/$target_name" 2>/dev/null || true
-        elif [ -d "$item" ] && [ -d "$DATA_PATH/$target_name" ]; then
-            for subitem in "$item"/*; do
-                [ -e "$subitem" ] || continue
-                sub_basename=$(basename "$subitem")
-                if [ ! -e "$DATA_PATH/$target_name/$sub_basename" ]; then
-                    echo -e "${YELLOW}   Migrating $target_name/$sub_basename...${NC}"
-                    cp -a "$subitem" "$DATA_PATH/$target_name/" 2>/dev/null || true
-                fi
-            done
-        fi
-    done
-    echo -e "${GREEN}✅ Data migration complete${NC}"
-fi
-done
+# A path from before 2.70 that still holds data: what the data lacks is copied in (its
+# database was asked about by ucm_refuse_unstartable_database, before any write)
+ucm_carry_old_data_paths
 
 # Create necessary directories (must match backend/config/settings.py)
 mkdir -p "$DATA_PATH"/{ca,certs,private,crl,scep,backups,sessions,logs,temp} 2>/dev/null || true

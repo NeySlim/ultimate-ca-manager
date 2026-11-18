@@ -556,6 +556,10 @@ def _drifted(column, current):
 # ---------------------------------------------------------------------------
 
 
+# A serial this CA gave out here stays given out (PROTOCOL.krl): a restore never lowers the counter
+NEVER_LOWERED = {('ssh_cas', 'serial_counter')}
+
+
 class TestARowAlreadyHereGoesBackToTheArchive:
     """The restorers wrote a hand-picked list of columns onto rows they were
     creating, and nothing at all onto a row they found: the section was
@@ -568,6 +572,8 @@ class TestARowAlreadyHereGoesBackToTheArchive:
             payload = _archived_with_targets(section_name)
             archived = payload[section_name][0]
             _drift(section_name)
+            held = {column: getattr(_row(section_name), column)
+                    for name, column in NEVER_LOWERED if name == section_name}
             _restore(payload, section_name)
 
             section = _section(section_name)
@@ -578,6 +584,8 @@ class TestARowAlreadyHereGoesBackToTheArchive:
                 expected = archived[column]
                 if column not in section.secrets:
                     expected = _as_column_value(model, column, expected)
+                if column in held:
+                    expected = max(expected, held[column])
                 found = _value_here(row, section, column)
                 if found != expected:
                     wrong.append(f'{column}: {found!r} instead of {expected!r}')

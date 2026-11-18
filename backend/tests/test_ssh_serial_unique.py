@@ -1,0 +1,361 @@
+"""A non-zero SSH certificate serial is held once under its CA, and the database says so.
+
+A signature whose serial an older certificate already holds (a counter that trailed its rows)
+raises the counter and signs once more; a second refusal answers 409, never 500. A pair the
+upgrade marked keeps its oldest holder under the index, and revoking one of a pair revokes all.
+"""
+import os
+import threading
+import uuid
+from datetime import datetime
+from unittest.mock import patch
+
+import pytest
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+
+from models import db
+from models.ssh import SSHCertificate, SSHCertificateAuthority
+from services.ssh_ca_service import SSHCAService
+from services.ssh_cert import SSHCertificateService
+
+_PG_URL = os.environ.get('UCM_TEST_PG_URL')
+CAS = SSHCertificateAuthority.__table__
+WORKERS = 6
+
+
+def _ca(label):
+    return SSHCAService.create_ca(descr=f'{label} {uuid.uuid4().hex[:8]}', ca_type='user', key_type='ed25519',
+                                  username='t', allow_any_principal=True).id
+
+
+def _pubkey():
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    return ed25519.Ed25519PrivateKey.generate().public_key().public_bytes(
+        serialization.Encoding.OpenSSH, serialization.PublicFormat.OpenSSH).decode()
+
+
+def _sign(ca_id):
+    return SSHCertificateService.sign_certificate(ca_id, _pubkey(), 'user', ['u']).serial
+
+
+def _counter(ca_id):
+    return db.session.execute(select(CAS.c.serial_counter).where(CAS.c.id == ca_id)).scalar_one()
+
+
+def _set_counter(ca_id, value):
+    db.session.execute(CAS.update().where(CAS.c.id == ca_id).values(serial_counter=value))
+    db.session.commit()
+
+
+def _row(ca_id, serial, marked=False):
+    return SSHCertificate(
+        refid=str(uuid.uuid4()), ssh_ca_id=ca_id, cert_type='user', key_id='k', public_key='pub',
+        certificate='cert', principals='[]', serial=serial, valid_from=datetime(2026, 1, 1),
+        valid_to=datetime(2030, 1, 1), key_type='ed25519', fingerprint=f'SHA256:{uuid.uuid4().hex}',
+        serial_duplicate=marked)
+
+
+def _drop(ca_id):
+    db.session.rollback()
+    SSHCertificate.query.filter_by(ssh_ca_id=ca_id).delete()
+    SSHCertificateAuthority.query.filter_by(id=ca_id).delete()
+    db.session.commit()
+
+
+def test_the_database_holds_a_serial_once_per_ca_zero_aside(app):
+    with app.app_context():
+        ca_id, other = _ca('index'), _ca('index other')
+        try:
+            db.session.add_all([_row(ca_id, 5), _row(other, 5), _row(ca_id, 0), _row(ca_id, 0)])
+            db.session.commit()
+            db.session.add(_row(ca_id, 5))
+            with pytest.raises(IntegrityError):
+                db.session.commit()
+            db.session.rollback()
+            # A marked row is out of the index; the oldest holder stays in it
+            db.session.add(_row(ca_id, 5, marked=True))
+            db.session.commit()
+        finally:
+            _drop(ca_id), _drop(other)
+
+
+def test_a_signature_behind_a_trailing_counter_raises_it_and_signs(app):
+    with app.app_context():
+        ca_id = _ca('trailing')
+        try:
+            assert [_sign(ca_id) for _ in range(3)] == [1, 2, 3]
+            _set_counter(ca_id, 1)
+            assert _sign(ca_id) == 4
+            assert _counter(ca_id) == 4
+        finally:
+            _drop(ca_id)
+
+
+def test_a_signature_refused_twice_is_a_conflict(app):
+    from services.ssh_cert.signing import SSHSerialConflict
+    with app.app_context():
+        ca_id = _ca('conflict')
+        try:
+            _sign(ca_id), _sign(ca_id)
+            _set_counter(ca_id, 0)
+            with patch.object(SSHCAService, 'raise_serial_counter'), pytest.raises(SSHSerialConflict):
+                _sign(ca_id)
+            assert SSHCertificate.query.filter_by(ssh_ca_id=ca_id).count() == 2
+        finally:
+            _drop(ca_id)
+
+
+def test_another_refusal_is_not_taken_for_a_serial(app):
+    """Only the serial index is retried: any other refusal surfaces as it is, one serial spent."""
+    with app.app_context():
+        ca_id = _ca('other refusal')
+        try:
+            taken = db.session.get(SSHCertificate, _sign_row(ca_id)).refid
+            with patch('services.ssh_cert.signing.uuid.uuid4', return_value=taken), \
+                    pytest.raises(IntegrityError):
+                _sign(ca_id)
+            assert _counter(ca_id) == 2
+        finally:
+            _drop(ca_id)
+
+
+def _sign_row(ca_id):
+    return SSHCertificateService.sign_certificate(ca_id, _pubkey(), 'user', ['u']).id
+
+
+@pytest.mark.parametrize('route, body', [
+    ('/api/v2/ssh/certificates', {'public_key': 'KEY'}),
+    ('/api/v2/ssh/certificates/generate', {'key_type': 'ed25519'}),
+])
+def test_the_api_answers_409_when_the_serial_stays_taken(app, auth_client, route, body):
+    with app.app_context():
+        ca_id = _ca('api conflict')
+        _sign(ca_id), _sign(ca_id)
+        _set_counter(ca_id, 0)
+    try:
+        payload = {'ca_id': ca_id, 'cert_type': 'user', 'principals': ['u'],
+                   **{k: (_pubkey() if v == 'KEY' else v) for k, v in body.items()}}
+        with patch.object(SSHCAService, 'raise_serial_counter'):
+            response = auth_client.post(route, json=payload)
+        assert response.status_code == 409, response.get_json()
+        assert 'already held' in response.get_json()['message']
+    finally:
+        with app.app_context():
+            _drop(ca_id)
+
+
+# --- signatures together behind a trailing counter ------------------------------------------
+
+def _sign_together(app, ca_id):
+    errors, serials, ready = [], [], threading.Barrier(WORKERS)
+    real = SSHCAService.get_private_key_object
+
+    def wait_for_the_others(cid):
+        try:
+            ready.wait(10)
+        except threading.BrokenBarrierError:
+            pass
+        return real(cid)
+
+    def worker(n):
+        try:
+            with app.app_context():
+                serials.append(SSHCertificateService.sign_certificate(ca_id, _pubkey(), 'user', [f'w{n}']).serial)
+                db.session.remove()
+        except Exception as exc:  # noqa: BLE001
+            errors.append(repr(exc))
+
+    with patch.object(SSHCAService, 'get_private_key_object', side_effect=wait_for_the_others):
+        threads = [threading.Thread(target=worker, args=(n,)) for n in range(WORKERS)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(60)
+    return errors, serials
+
+
+def _together_behind_a_trailing_counter(app):
+    with app.app_context():
+        ca_id = _ca('race')
+        held = [_sign(ca_id) for _ in range(3)]
+        _set_counter(ca_id, 0)
+        db.session.remove()
+    errors, serials = _sign_together(app, ca_id)
+    with app.app_context():
+        stored = sorted(s for (s,) in db.session.query(SSHCertificate.serial).filter_by(ssh_ca_id=ca_id))
+        db.session.remove()
+    assert errors == []
+    assert len(set(serials)) == WORKERS and not set(serials) & set(held)
+    assert stored == sorted(held + serials)
+
+
+def test_signatures_together_behind_a_trailing_counter_on_sqlite(app, tmp_path):
+    from tests.test_backup_cross_installation import _bound_to
+    with _bound_to(app, f"sqlite:///{tmp_path / 'ssh-unique.db'}"):
+        _together_behind_a_trailing_counter(app)
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_signatures_together_behind_a_trailing_counter_on_postgresql(app):
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+    with _a_schema_of_our_own(f'ssh_unique_race_{uuid.uuid4().hex[:6]}') as url, \
+            _bound_to(app, url, is_postgresql=True):
+        _together_behind_a_trailing_counter(app)
+
+
+# --- a pair the upgrade marked: shown, and revoked together ---------------------------------
+
+def _pair(label):
+    """A CA holding serial 7 twice, as an upgraded 2.254 database may: the newer one marked."""
+    ca_id = _ca(label)
+    first, second = _row(ca_id, 7), _row(ca_id, 7, marked=True)
+    alone = _row(ca_id, 8)
+    db.session.add_all([first, second, alone])
+    db.session.commit()
+    return ca_id, first.id, second.id, alone.id
+
+
+def test_each_certificate_of_a_pair_names_the_other(app, auth_client):
+    with app.app_context():
+        ca_id, first, second, alone = _pair('shown')
+    try:
+        listed = {c['id']: c for c in auth_client.get(
+            f'/api/v2/ssh/certificates?ca_id={ca_id}&per_page=100').get_json()['data']}
+        assert listed[first]['serial_shared_with'] == [second]
+        assert listed[second]['serial_shared_with'] == [first]
+        assert listed[alone]['serial_shared_with'] == []
+        one = auth_client.get(f'/api/v2/ssh/certificates/{second}').get_json()['data']
+        assert one['serial_shared_with'] == [first]
+    finally:
+        with app.app_context():
+            _drop(ca_id)
+
+
+def test_revoking_one_of_a_pair_revokes_both_and_says_so(app, auth_client):
+    from models import AuditLog
+    with app.app_context():
+        ca_id, first, second, alone = _pair('revoked')
+        floor = db.session.query(db.func.max(AuditLog.id)).scalar() or 0
+    try:
+        response = auth_client.post(f'/api/v2/ssh/certificates/{first}/revoke', json={'reason': 'keyCompromise'})
+        assert response.status_code == 200, response.get_json()
+        body = response.get_json()
+        assert body['data']['revoked_with'] == [second]
+        assert body['data']['revoked_by'] == [{'serial': 7}]
+        assert 'serial 7' in body['message'] and 'KRL' in body['message']
+        with app.app_context():
+            assert db.session.get(SSHCertificate, second).revoked is True
+            assert db.session.get(SSHCertificate, alone).revoked is False
+            details = [e.details for e in AuditLog.query.filter(
+                AuditLog.id > floor, AuditLog.action == 'ssh_cert_revoked')]
+            assert any(f'#{second}' in d for d in details), details
+        lone = auth_client.post(f'/api/v2/ssh/certificates/{alone}/revoke', json={})
+        assert lone.get_json()['data']['revoked_with'] == []
+        assert lone.get_json()['data']['revoked_by'] == []
+        assert lone.get_json()['message'] == 'SSH certificate revoked'
+    finally:
+        with app.app_context():
+            _drop(ca_id)
+
+
+def test_revoking_one_of_a_pair_names_only_what_it_revokes(app, auth_client, monkeypatch):
+    """The partner was revoked before: the response, the audit and the events leave it alone."""
+    import websocket.emitters as emitters
+    from models import AuditLog
+    events = []
+    monkeypatch.setattr(emitters, 'on_ssh_certificate_revoked', lambda cert_id, *a, **k: events.append(cert_id))
+    with app.app_context():
+        ca_id, first, second, _ = _pair('revoked before')
+        partner = db.session.get(SSHCertificate, second)
+        partner.revoked, partner.revoke_reason = True, 'superseded'
+        db.session.commit()
+        floor = db.session.query(db.func.max(AuditLog.id)).scalar() or 0
+    try:
+        response = auth_client.post(f'/api/v2/ssh/certificates/{first}/revoke', json={'reason': 'keyCompromise'})
+        assert response.status_code == 200, response.get_json()
+        body = response.get_json()
+        assert body['data']['revoked_with'] == []
+        assert body['message'] == 'SSH certificate revoked'
+        assert events == [first]
+        with app.app_context():
+            assert db.session.get(SSHCertificate, second).revoke_reason == 'superseded'
+            details = [e.details for e in AuditLog.query.filter(
+                AuditLog.id > floor, AuditLog.action == 'ssh_cert_revoked')]
+            assert details and not any(f'#{second}' in d for d in details), details
+    finally:
+        with app.app_context():
+            _drop(ca_id)
+
+
+def test_revoking_serial_zero_says_it_takes_its_key_id(app, auth_client):
+    """The KRL revokes a serial 0 certificate by its key ID under the CA: the response and the
+    audit name the key ID and the certificates it takes, not a serial."""
+    from models import AuditLog
+    with app.app_context():
+        ca_id = _ca('serial zero message')
+        rows = [_row(ca_id, 0), _row(ca_id, 5), _row(ca_id, 6)]
+        rows[0].key_id = rows[1].key_id = 'alice'
+        rows[2].key_id = 'bob'
+        db.session.add_all(rows)
+        db.session.commit()
+        zero, same, other = (r.id for r in rows)
+        floor = db.session.query(db.func.max(AuditLog.id)).scalar() or 0
+    try:
+        response = auth_client.post(f'/api/v2/ssh/certificates/{zero}/revoke', json={'reason': 'keyCompromise'})
+        assert response.status_code == 200, response.get_json()
+        body = response.get_json()
+        assert body['data']['revoked_with'] == [same]
+        assert body['message'] == ("SSH certificate revoked with 1 other certificate(s) the KRL revokes "
+                                   "with it under this CA, by key ID 'alice'")
+        with app.app_context():
+            details = [e.details for e in AuditLog.query.filter(
+                AuditLog.id > floor, AuditLog.action == 'ssh_cert_revoked', AuditLog.resource_id == str(zero))]
+            assert details == [f"SSH certificate revoked: keyCompromise; key ID 'alice' also revokes #{same} 'alice'"]
+            assert db.session.get(SSHCertificate, other).revoked is False
+        assert body['data']['revoked_by'] == [{'key_id': 'alice'}]
+    finally:
+        with app.app_context():
+            _drop(ca_id)
+
+
+def test_a_chain_names_the_krl_entry_that_takes_each_certificate(app, auth_client):
+    """Serial 0 'alice' takes #B by its key ID, and #C, of another key ID, by the serial it shares
+    with #B: the response, the audit and the toast data name each entry, not alice for all."""
+    from models import AuditLog
+    with app.app_context():
+        ca_id = _ca('chain message')
+        rows = [_row(ca_id, 0), _row(ca_id, 5), _row(ca_id, 5, marked=True), _row(ca_id, 6)]
+        rows[0].key_id = rows[1].key_id = 'alice'
+        rows[2].key_id, rows[3].key_id = 'carol', 'dave'
+        db.session.add_all(rows)
+        db.session.commit()
+        zero, same, mate, other = (r.id for r in rows)
+        floor = db.session.query(db.func.max(AuditLog.id)).scalar() or 0
+    try:
+        response = auth_client.post(f'/api/v2/ssh/certificates/{zero}/revoke', json={'reason': 'keyCompromise'})
+        assert response.status_code == 200, response.get_json()
+        body = response.get_json()
+        assert body['data']['revoked_with'] == [same, mate]
+        assert body['data']['revoked_by'] == [{'key_id': 'alice'}, {'serial': 5}]
+        assert body['message'] == ("SSH certificate revoked with 2 other certificate(s) the KRL revokes "
+                                   "with it under this CA, by key ID 'alice' and serial 5")
+        with app.app_context():
+            details = [e.details for e in AuditLog.query.filter(
+                AuditLog.id > floor, AuditLog.action == 'ssh_cert_revoked', AuditLog.resource_id == str(zero))]
+            assert details == [f"SSH certificate revoked: keyCompromise; key ID 'alice' also revokes "
+                               f"#{same} 'alice'; serial 5 also revokes #{mate} 'carol'"]
+            assert db.session.get(SSHCertificate, other).revoked is False
+    finally:
+        with app.app_context():
+            _drop(ca_id)
+
+
+def test_the_entries_of_a_chained_revocation_read_as_a_list():
+    from api.v2.ssh_certificates import _listed
+    assert _listed(["key ID 'alice'"]) == "key ID 'alice'"
+    assert _listed(["key ID 'alice'", 'serial 5']) == "key ID 'alice' and serial 5"
+    assert _listed(["key ID 'alice'", 'serial 5', 'serial 6']) == "key ID 'alice', serial 5 and serial 6"

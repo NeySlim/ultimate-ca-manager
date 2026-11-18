@@ -10,6 +10,8 @@ import pytest
 
 from tests.conftest import assert_success
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 FACTOR_ROUTES = [
     ('post', '/api/v2/account/password', {'current_password': 'x', 'new_password': 'Xx1!xxxxxxxxxxx'}),
     ('patch', '/api/v2/account/profile', {'email': 'attacker@example.com'}),
@@ -95,8 +97,9 @@ SELF_ADMIN_ROUTES = [
     ('put', '/api/v2/users/{id}', {'email': 'attacker@example.com'}),
     ('post', '/api/v2/users/{id}/reset-password', {}),
     ('post', '/api/v2/users/{id}/reset-2fa', {}),
-    ('post', '/api/v2/users/{id}/link-sso', {'provider_id': 1, 'external_id': 'attacker'}),
-    ('post', '/api/v2/users/{id}/unlink-sso', {}),
+    ('post', '/api/v2/users/{id}/sso-identities', {'provider_id': 1, 'external_id': 'attacker'}),
+    ('post', '/api/v2/users/{id}/sso-identities/999999/reset', {}),
+    ('delete', '/api/v2/users/{id}/sso-identities/999999', None),
     ('delete', '/api/v2/users/{id}/webauthn/999999', None),
     ('patch', '/api/v2/users/{id}/webauthn/999999', {'enabled': False}),
     ('post', '/api/v2/users/{id}/mtls/certificates', {}),

@@ -183,7 +183,10 @@ def reload_pending(app) -> bool:
 def reload_if_pending() -> None:
     """Before a request: the last load failed and its delay is over, load again. Without
     this a node would refuse the new key's tokens until the next command or a restart."""
-    from flask import current_app
+    from flask import current_app, request
+    from utils.public_endpoints import PROBE_PATHS
+    if request.path in PROBE_PATHS:
+        return  # the load reads the database; a probe answers without it
     app = current_app._get_current_object()
     retry = (app.extensions.get(_STATE) or {}).get('retry')
     if retry is None or time.monotonic() < retry[0]:

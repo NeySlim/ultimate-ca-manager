@@ -59,17 +59,13 @@ class TestAMigrationHoldsBothRoutes:
     @pytest.mark.parametrize('route', ROUTES)
     def test_a_busy_lock_refuses_the_restore(self, app, auth_client,
                                              monkeypatch, route):
-        import importlib
-
         from services.database_admin.lock import MigrationBusyError
 
         def busy(*args, **kwargs):
             raise MigrationBusyError('A migration is running.')
 
-        for module in ('api.v2.system.backup', 'api.v2.settings.backup'):
-            loaded = importlib.import_module(module)
-            if hasattr(loaded, 'database_migration_lock'):
-                monkeypatch.setattr(loaded, 'database_migration_lock', busy)
+        # At its source: the restore job takes the lock for both routes
+        monkeypatch.setattr('services.database_admin.lock.database_migration_lock', busy)
 
         response = _upload(auth_client, route)
 
@@ -121,21 +117,18 @@ class TestAnArchiveThatCarriesNothingChangesNothing:
     @pytest.mark.parametrize('route', ROUTES)
     def test_no_session_is_revoked_for_an_empty_archive(
             self, app, auth_client, monkeypatch, route):
-        import importlib
-
         revoked = []
 
-        for module in ('api.v2.system.backup', 'api.v2.settings.backup'):
-            loaded = importlib.import_module(module)
-            if hasattr(loaded, 'BackupService'):
-                monkeypatch.setattr(
-                    loaded.BackupService, 'restore_backup',
-                    lambda self, *a, **k: {'sections_carried': []},
-                    raising=False)
+        # The class at its source: the routes hand the upload to the restore job
+        from services.backup_service import BackupService
+        monkeypatch.setattr(BackupService, 'restore_backup',
+                            lambda self, *a, **k: {'sections_carried': []})
 
         import services.backup.restore.invalidate as invalidate
         monkeypatch.setattr(invalidate, 'invalidate_after_restore',
                             lambda *a, **k: revoked.append('revoked'))
+        from tests.restore_job_support import sessions_kept
+        sessions_kept(monkeypatch)  # the restore job's own sessions step
 
         response = _upload(auth_client, route)
 
@@ -161,23 +154,21 @@ class TestBothRoutesSayWhatTheArchiveGotWrong:
     @pytest.mark.parametrize('route', ROUTES)
     def test_a_key_that_cannot_sign_is_named(self, app, auth_client,
                                              monkeypatch, route):
-        import importlib
-
         results = {
             'sections_carried': ['certificate_authorities'],
             'key_mismatches': ['certificate authority Root CA'],
             'sections_not_restored': ['something_newer'],
         }
-        for module in ('api.v2.system.backup', 'api.v2.settings.backup'):
-            loaded = importlib.import_module(module)
-            if hasattr(loaded, 'BackupService'):
-                monkeypatch.setattr(loaded.BackupService, 'restore_backup',
-                                    lambda self, *a, **k: dict(results),
-                                    raising=False)
+        # The class at its source: the routes hand the upload to the restore job
+        from services.backup_service import BackupService
+        monkeypatch.setattr(BackupService, 'restore_backup',
+                            lambda self, *a, **k: dict(results))
 
         import services.backup.restore.invalidate as invalidate
         monkeypatch.setattr(invalidate, 'invalidate_after_restore',
                             lambda *a, **k: None)
+        from tests.restore_job_support import sessions_kept
+        sessions_kept(monkeypatch)  # the restore job's own sessions step
 
         response = _upload(auth_client, route)
         body = response.data.lower()
@@ -203,25 +194,26 @@ class TestAnUploadLeavesATrace:
     @pytest.mark.parametrize('route', ROUTES)
     def test_an_empty_archive_is_still_recorded(self, app, auth_client,
                                                 monkeypatch, route):
-        import importlib
-
         recorded = []
 
-        for module in ('api.v2.system.backup', 'api.v2.settings.backup'):
-            loaded = importlib.import_module(module)
-            if hasattr(loaded, 'BackupService'):
-                monkeypatch.setattr(loaded.BackupService, 'restore_backup',
-                                    lambda self, *a, **k: {'sections_carried': []},
-                                    raising=False)
+        # The class at its source: the routes hand the upload to the restore job
+        from services.backup_service import BackupService
+        monkeypatch.setattr(BackupService, 'restore_backup',
+                            lambda self, *a, **k: {'sections_carried': []})
 
         from services.audit_service import AuditService
         monkeypatch.setattr(
             AuditService, 'log_action',
             staticmethod(lambda **kw: recorded.append(kw.get('action'))))
 
-        auth_client.post(route, data={'file': (io.BytesIO(b'x'), 'x.ucmbkp'),
-                                      'password': 'a-password-long-enough'},
-                         content_type='multipart/form-data')
+        response = auth_client.post(
+            route, data={'file': (io.BytesIO(b'x'), 'x.ucmbkp'),
+                         'password': 'a-password-long-enough'},
+            content_type='multipart/form-data')
+
+        # The archive must reach the restore, or the line below is the
+        # refusal's own and proves nothing about an empty archive
+        assert b'no data' in response.data.lower(), response.data
 
         assert 'system_restore' in recorded, (
             f'{route} left no trace of an archive that was uploaded')

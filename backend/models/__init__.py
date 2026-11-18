@@ -4,7 +4,7 @@ from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy()
 
 # Core models
-from models.user import User, UserSession
+from models.user import User, UserSession, UserSSOIdentity
 from models.system_config import SystemConfig
 from models.ca import CA
 from models.certificate import Certificate
@@ -27,7 +27,7 @@ from models.ocsp import OCSPResponse
 from models.webauthn import WebAuthnCredential, WebAuthnChallenge
 from models.hsm import HsmProvider, HsmKey
 from models.rbac import CustomRole, RolePermission
-from models.sso import SSOProvider, SSOSession, SAMLMessageId
+from models.sso import SSOProvider, SSOSession, SAMLMessageId, SSOSignInTest
 from models.policy import CertificatePolicy, ApprovalRequest
 from models.ssh import SSHCertificateAuthority, SSHCertificate
 from models.msca import MicrosoftCA, MSCARequest
@@ -49,6 +49,8 @@ from models.websocket_relay import WebsocketRelayEvent
 from models.shared_file import SharedFile
 from models.backup_archive import BackupArchive, BackupArchiveChunk
 from models.second_factor_failure import SecondFactorFailure
+from models.file_removal import FileRemoval
+from models.background_job import BackgroundJob
 
 from utils.datetime_utils import utc_now, utc_isoformat
 
@@ -74,5 +76,5 @@ __all__ = [
     "RevokedSerial", "CompromisedKeyRecord", "EstSignerCert",
     "DeployTarget", "DeployBinding", "CRLDeployBinding", "DeployDelivery",
     "ClusterCommand", "ClusterMaintenance", "ClusterNode", "SchedulerRequest", "EncryptionKey", "WebsocketRelayEvent",
-    "SharedFile", "BackupArchive", "BackupArchiveChunk", "SecondFactorFailure",
+    "SharedFile", "BackupArchive", "BackupArchiveChunk", "SecondFactorFailure", "FileRemoval", "BackgroundJob",
 ]

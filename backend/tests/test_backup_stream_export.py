@@ -22,15 +22,14 @@ def small_chunks(app, tmp_path, monkeypatch):
 
     monkeypatch.setattr(Config, 'BACKUP_DIR', tmp_path, raising=False)
     monkeypatch.setattr(BackupService, 'CHUNK_MAX', CHUNK_MAX)
-    real = backup_service.export_section
+    real = backup_service.iter_section
 
-    def with_synthetic_rows(name, index, warnings=None):
-        rows = real(name, index, warnings)
+    def with_synthetic_rows(name, index, warnings=None, extra=None):
+        yield from real(name, index, warnings, extra=extra)
         if name == 'deploy_targets':
-            rows += [{'name': f'synthetic-{n}', 'note': 'x' * 1000} for n in range(400)]
-        return rows
+            yield from ({'name': f'synthetic-{n}', 'note': 'x' * 1000} for n in range(400))
 
-    monkeypatch.setattr(backup_service, 'export_section', with_synthetic_rows)
+    monkeypatch.setattr(backup_service, 'iter_section', with_synthetic_rows)
     return tmp_path
 
 
@@ -88,12 +87,12 @@ def test_a_failed_export_leaves_no_temporary_file(app, small_chunks, monkeypatch
     from services.backup import backup_service
     from services.backup.errors import BackupExportError
 
-    def broken(name, index, warnings=None):
+    def broken(name, index, warnings=None, extra=None):
         if name == 'deploy_targets':
             raise RuntimeError('database gone')
-        return []
+        yield from ()
 
-    monkeypatch.setattr(backup_service, 'export_section', broken)
+    monkeypatch.setattr(backup_service, 'iter_section', broken)
     with app.app_context():
         from services.backup_service import BackupService
         with pytest.raises(BackupExportError):

@@ -12,6 +12,7 @@ from sqlalchemy import or_
 from models import db, Certificate
 from utils.cert_status import issued_certificates
 from utils.p7b import p7b_from_pems
+from utils.export_pems import readable_pems, skipped_headers, nothing_readable
 from services.cert_service import CertificateService
 from services.cert.renewal import (
     RenewalError, check_renewable, renew_certificate_in_place, renewal_partner,
@@ -163,8 +164,8 @@ def bulk_renew_certificates():
     results = {'success': [], 'failed': []}
     from api.v2.certificates.cert_renew import _actor, _approval_for_renewal
     username, actor_user_id = _actor()
-    # CAs that renewed at least one certificate: one CRL each, after the loop
-    renewed_ca_ids = []
+    # Renewed certificates: one CRL for each CA they name, after the loop
+    renewed_cert_ids = []
     # Members of a related pair renewed with the other one earlier in the batch
     renewed_with_pair = set()
     # Partners covered by a request queued earlier in the batch: id -> that pending entry
@@ -206,8 +207,7 @@ def bulk_renew_certificates():
             results['success'].append(cert_id)
             for done in [outcome] + list(outcome.get('related') or []):
                 renewed_with_pair.add(done['cert_id'])
-                if done.get('ca_id') is not None and done['ca_id'] not in renewed_ca_ids:
-                    renewed_ca_ids.append(done['ca_id'])
+                renewed_cert_ids.append(done['cert_id'])
         except RenewalError as refusal:
             db.session.rollback()
             logger.info("Bulk renewal of certificate %s refused: %s", cert_id, refusal.message)
@@ -217,7 +217,7 @@ def bulk_renew_certificates():
             logger.error("Bulk renewal of certificate %s failed: %s", cert_id, e, exc_info=True)
             results['failed'].append({'id': cert_id, 'error': 'Renewal failed'})
 
-    _publish_crls(renewed_ca_ids, username)
+    _publish_crls(renewed_cert_ids, username)
 
     AuditService.log_action(
         action='certificates_bulk_renewed',
@@ -231,19 +231,25 @@ def bulk_renew_certificates():
     return success_response(data=results, message=f'{len(results["success"])} certificates renewed')
 
 
-def _publish_crls(ca_ids, username):
-    """Regenerate once the CRL of each CA whose CDP is enabled; a failure is
-    logged and leaves the bulk answer unchanged."""
-    from models import CA
+def _publish_crls(cert_ids, username):
+    """Regenerate once the CRL of each CA the renewed certificates name now, when its CDP is
+    enabled: the record a certificate was signed under may have been merged since. A failure
+    is logged and leaves the bulk answer unchanged."""
+    from services.cert.renewal import current_issuer
     from services.crl import CRLService
-    for ca_id in ca_ids:
+    seen = set()
+    for cert_id in cert_ids:
+        issuer = current_issuer(cert_id)
+        if issuer is None or issuer[0] in seen:
+            continue
+        seen.add(issuer[0])
+        if not issuer[2]:
+            continue
         try:
-            ca = db.session.get(CA, ca_id)
-            if ca is not None and ca.cdp_enabled:
-                CRLService.generate_crl(ca_id, username=username)
+            CRLService.generate_crl(issuer[0], username=username)
         except Exception as e:
             db.session.rollback()
-            logger.error("CRL of CA %s not regenerated after bulk renewal: %s", ca_id, e, exc_info=True)
+            logger.error("CRL of CA %s not regenerated after bulk renewal: %s", issuer[0], e, exc_info=True)
 
 
 @bp.route('/api/v2/certificates/bulk/delete', methods=['POST'])
@@ -308,21 +314,19 @@ def bulk_export_certificates():
     if not certs:
         return error_response('No certificates found', 404)
 
+    if export_format not in ('pem', 'pkcs7', 'p7b'):
+        return error_response('Supported formats: pem, p7b', 400)
     try:
+        pems, skipped = readable_pems((c.id, c.crt) for c in certs)
+        if not pems:
+            return nothing_readable(skipped)
+        headers = skipped_headers(skipped)
         if export_format == 'pem':
-            pem_data = b''
-            for cert in certs:
-                pem_data += base64.b64decode(cert.crt)
-                if not pem_data.endswith(b'\n'):
-                    pem_data += b'\n'
-            return Response(pem_data, mimetype='application/x-pem-file',
-                headers={'Content-Disposition': 'attachment; filename="certificates.pem"'})
-        elif export_format in ('pkcs7', 'p7b'):
-            p7b_output = p7b_from_pems(base64.b64decode(cert.crt) for cert in certs)
-            return Response(p7b_output, mimetype='application/x-pkcs7-certificates',
-                headers={'Content-Disposition': 'attachment; filename="certificates.p7b"'})
-        else:
-            return error_response('Supported formats: pem, p7b', 400)
+            headers['Content-Disposition'] = 'attachment; filename="certificates.pem"'
+            return Response(b''.join(p if p.endswith(b'\n') else p + b'\n' for p in pems),
+                            mimetype='application/x-pem-file', headers=headers)
+        headers['Content-Disposition'] = 'attachment; filename="certificates.p7b"'
+        return Response(p7b_from_pems(pems), mimetype='application/x-pkcs7-certificates', headers=headers)
     except Exception as e:
         logger.error(f"Bulk export failed: {e}")
         return error_response('Export failed', 500)

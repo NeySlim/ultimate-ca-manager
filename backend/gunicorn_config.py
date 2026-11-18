@@ -35,7 +35,9 @@ backlog = 2048
 workers = 1
 worker_class = 'workers.MTLSGeventWebSocketWorker'
 worker_connections = 1000
-timeout = 120
+# UCM_WORKER_TIMEOUT, 120 s by default; out of bounds the start is refused
+from worker_timeout import worker_timeout  # noqa: E402
+timeout = worker_timeout()
 keepalive = 5
 
 # Security
@@ -120,8 +122,8 @@ def ssl_context(conf, default_ssl_context_factory):
     return ctx
 
 
-from boot_config import (HttpsMaterialError, anchor_client_verification, materialize_https,
-                         mtls_client_ca, wstep_enabled)
+from boot_config import (MTLS_UNDECIDED, HttpsMaterialError, anchor_client_verification,
+                         materialize_https, mtls_client_ca, wstep_enabled)
 
 # Drives the TLS 1.2 cap in ssl_context().
 WSTEP_TLS12_CAP_NEEDED = wstep_enabled(data_path)
@@ -130,11 +132,11 @@ WSTEP_TLS12_CAP_NEEDED = wstep_enabled(data_path)
 MTLS_MODE_FILE = 'mtls_mode'
 
 
-def _remember_mtls_mode(required):
-    """What the last successful read decided, for the next start."""
+def _remember_mtls_mode(mode):
+    """What the last successful read decided (required, optional or off), for the next start."""
     try:
         with open(os.path.join(data_path, MTLS_MODE_FILE), 'w') as handle:
-            handle.write('required' if required else 'optional')
+            handle.write(mode)
     except OSError as e:
         print(f"mTLS: could not record the mode: {e}", file=sys.stderr)
 
@@ -151,15 +153,18 @@ def _reuse_last_known_mtls():
 
     ca_file_path = os.path.join(data_path, 'mtls_ca.pem')
     mode_path = os.path.join(data_path, MTLS_MODE_FILE)
-    if not (os.path.exists(ca_file_path) and os.path.exists(mode_path)):
+    try:
+        with open(mode_path) as handle:
+            mode = handle.read().strip()
+    except OSError:
+        mode = None
+    if mode == 'off':  # off at the last start: a CA file an earlier setting left is not asked for
+        return
+    if mode is None or not os.path.exists(ca_file_path):
         print("mTLS: no previous configuration to fall back on; the socket "
               "will not ask for a client certificate", file=sys.stderr)
         return
-    try:
-        with open(mode_path) as handle:
-            required = handle.read().strip() == 'required'
-    except OSError:
-        required = False
+    required = mode == 'required'
     ca_certs = ca_file_path
     cert_reqs = 2 if required else 1
     print(f"mTLS: settings unreadable, keeping the last known configuration "
@@ -172,8 +177,13 @@ def _load_mtls_config():
 
     try:
         found = mtls_client_ca(data_path)
+        if found is MTLS_UNDECIDED:
+            # No settings to read: a first start has no mode on record, a lost table keeps the last one
+            if os.path.exists(os.path.join(data_path, MTLS_MODE_FILE)):
+                _reuse_last_known_mtls()
+            return
         if not found:
-            _remember_mtls_mode(False)
+            _remember_mtls_mode('off')
             return
         ca_pem, ca_name, required = found
 
@@ -196,7 +206,7 @@ def _load_mtls_config():
 
         ca_certs = ca_file_path
         cert_reqs = 2 if required else 1
-        _remember_mtls_mode(required)
+        _remember_mtls_mode('required' if required else 'optional')
 
         mode = "REQUIRED" if cert_reqs == 2 else "OPTIONAL"
         print(f"mTLS: {mode}, trusted CA: {ca_name}", file=sys.stderr)
@@ -262,9 +272,15 @@ tmp_upload_dir = None
 def on_starting(server):
     server.log.info("Starting UCM with Gunicorn")
 
+def _release_node():
+    # After the scheduler process's last heartbeat: the node's next start takes its row at once
+    from services.scheduler_leader import release_claimed_node
+    release_claimed_node()
+
 def when_ready(server):
     from scheduler_supervisor import supervisor
-    supervisor.start(server)
+    # Run as soon as the master stops (beside the workers' drain), else by on_exit
+    supervisor.start(server, on_stopped=_release_node)
 
 def on_reload(server):
     server.log.info("Reloading UCM")
@@ -274,8 +290,8 @@ def on_reload(server):
 
 def on_exit(server):
     from scheduler_supervisor import supervisor
-    supervisor.stop()
-    # After the scheduler process's last heartbeat: a full-stop migration need not wait for this node
+    supervisor.stop(on_stopped=_release_node)
+    # Only once Arbiter.stop() drained the workers: a full-stop migration must not run under them
     from migration_runner import mark_node_stopped
     mark_node_stopped()
 
@@ -291,6 +307,8 @@ def worker_exit(server, worker):
     stop_applier()
     from services.ws_relay import stop_reader
     stop_reader()
+    from services.backup.restore.invalidate import stop_epoch_watcher
+    stop_epoch_watcher()
 
 def post_worker_init(worker):
     """Post-worker initialization:
@@ -358,6 +376,16 @@ def post_worker_init(worker):
     except Exception as e:
         import logging
         logging.getLogger('ucm.cluster').error("Cluster command applier not started: %s", e)
+
+    # A restore run by another process advanced the session epoch: this worker drops its
+    # caches within EPOCH_CHECK_SECONDS, on its own timer rather than on a request
+    try:
+        from services.backup.restore.invalidate import start_epoch_watcher
+        from wsgi import app as flask_app
+        start_epoch_watcher(flask_app)
+    except Exception as e:
+        import logging
+        logging.getLogger('ucm.backup').error("Session epoch cache watcher not started: %s", e)
 
     # Without Redis: this worker emits to its clients the events of the scheduler process,
     # and in HA those of the other workers and nodes, to which it also publishes its own

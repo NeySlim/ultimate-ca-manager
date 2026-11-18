@@ -29,8 +29,8 @@ permissions:
 
 # A new push to a branch replaces the run of its previous commit, except on
 # test and main, where every run is a release record, and on the 3.0 integration
-# branch, whose sequential job must not die with a superseded run: one group per
-# commit there, so no run is cancelled or queued behind another
+# branch, where a push carries the FIPS build and a manual run the sequential job:
+# one group per commit and event there, so a newer commit never cancels a run
 concurrency:
   group: tests-${{ github.workflow }}-${{ github.event_name }}-${{ (github.ref_name == 'test' || github.ref_name == 'main' || github.ref_name == 'sextant') && github.sha || github.ref }}
   cancel-in-progress: ${{ github.ref_name != 'test' && github.ref_name != 'main' && github.ref_name != 'sextant' }}
@@ -93,7 +93,7 @@ jobs:
           output: 'trivy-results.sarif'
       
       - name: Upload Trivy results
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: 'trivy-results.sarif'
         continue-on-error: true
@@ -145,15 +145,15 @@ jobs:
 
   # One database for the whole suite, as a user runs it: the integration judge.
   # Release branches, the nightly run of dev, and on demand. A schedule runs only
-  # the default branch's copy, so the 3.0 line runs it on each push of the 3.0
-  # integration branch instead.
+  # the default branch's copy, so the 3.0 line runs it on a manual run of its
+  # integration branch instead, each push having played it in one process before.
   test-backend-sequential:
     name: Backend Tests (sequential)
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'test' || github.ref_name == 'main' || github.ref_name == 'sextant'))
-    timeout-minutes: 120
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'test' || github.ref_name == 'main'))
+    timeout-minutes: 150
     # On the 3.0 integration branch one run at a time: the running one finishes, the
-    # newest push waits and replaces any older waiting one; elsewhere one group per commit
+    # newest manual run waits and replaces any older waiting one; elsewhere one group per commit
     concurrency:
       group: tests-sequential-${{ github.event_name }}-${{ github.ref_name == 'sextant' && github.ref || github.sha }}
       cancel-in-progress: false
@@ -162,7 +162,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event_name == 'schedule' && 'dev' || github.ref }}
+          # The commit of the run, not the branch tip a waiting job would find later
+          ref: ${{ github.event_name == 'schedule' && 'dev' || github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -191,12 +192,13 @@ jobs:
           UCM_DEV_MODE: 'true'
         run: |
           cd backend
-          pytest -v --tb=short --durations=30
+          # The tests marked slow (an hour of fault scenarios) stay with the shards: this job has a time limit
+          pytest -v --tb=short --durations=30 -m "not ha and not slow"
 
-      # The same suite in random order on the nightly run and on pushes of the 3.0
+      # The same suite in random order on the nightly run and on manual runs of the 3.0
       # integration branch: a report, not a gate. The job summary gives the seed that replays the order.
       - name: Run tests in random order (report only)
-        if: ${{ !cancelled() && (github.event_name == 'schedule' || (github.event_name == 'push' && github.ref_name == 'sextant')) && steps.deterministic.outcome != 'skipped' }}
+        if: ${{ !cancelled() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.ref_name == 'sextant')) && steps.deterministic.outcome != 'skipped' }}
         continue-on-error: true
         timeout-minutes: 45
         env:
@@ -213,14 +215,14 @@ jobs:
           seed=$(od -An -N4 -tu4 /dev/urandom | tr -d ' ')
           set +e
           # Inside the step timeout, so a slow run still writes its summary (exit 124).
-          timeout 40m pytest -p randomly --randomly-seed="$seed" -q --tb=line -rfE > random-order.log 2>&1
+          timeout 40m pytest -p randomly --randomly-seed="$seed" -m "not ha and not slow" -q --tb=line -rfE > random-order.log 2>&1
           status=$?
           set -e
           tail -n 60 random-order.log
           {
             echo "### Random order: seed $seed, commit $sha, pytest exit $status"
             echo
-            echo "Replay: \`git checkout $sha && pip install pytest-randomly==5.0.0 && cd backend && pytest -p randomly --randomly-seed=$seed\`"
+            echo "Replay: \`git checkout $sha && pip install pytest-randomly==5.0.0 && cd backend && pytest -p randomly --randomly-seed=$seed -m 'not ha and not slow'\`"
             echo
             echo "Files with failures or errors:"
             echo
@@ -490,12 +492,17 @@ jobs:
           pytest --tb=short -rs -m needs_redis tests/
 
   # Real UCM nodes (two, then three) in HA mode on one PostgreSQL (docs/testing/ha-bench.md).
-  # Manual only: run the workflow by hand with the `ha` input ticked.
+  # Manual only: run the workflow by hand with the `ha` input ticked. In shards
+  # (scripts/ci/ha-bench-shard.sh): the whole bench in one job outlasts the time limit.
   test-ha-bench:
-    name: HA bench (three nodes)
+    name: HA bench (three nodes, ${{ matrix.shard }})
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && inputs.ha
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [crash-crl, jobs, restore, rest]
 
     services:
       postgres:
@@ -553,7 +560,10 @@ jobs:
           UCM_TEST_PG_URL: postgresql://ucm_migtest:ucm_migtest_ci@localhost:5432/ucm_migtest
         run: |
           cd backend
-          pytest --tb=short -m ha tests/ha
+          # A failed or empty list stops the step: pytest without files runs the whole suite
+          files=$(../scripts/ci/ha-bench-shard.sh ${{ matrix.shard }})
+          [ -n "$files" ]
+          pytest --tb=short -m ha $files
 
   # The pytest tests that call `helm template` are skipped without helm: they run here.
   test-helm:
@@ -567,7 +577,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Helm
-        uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
+        uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
         with:
           version: v3.16.3
 

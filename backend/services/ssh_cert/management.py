@@ -2,6 +2,7 @@ import logging
 
 from models import db
 from models.ssh import SSHCertificateAuthority, SSHCertificate
+from services.ssh_ca_service import SSHCAService
 from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
@@ -15,12 +16,41 @@ class SSHCertificateManagementMixin:
         if not cert:
             raise ValueError(f"SSH certificate not found: {cert_id}")
 
+        # The CA row before the search: an issuance or import under it waits, then sees this
+        # revocation; one that wrote first is committed when the search below reads it
+        SSHCAService.lock_ca(cert.ssh_ca_id)
+        cert = db.session.get(SSHCertificate, cert_id, populate_existing=True)
+        if not cert:
+            raise ValueError(f"SSH certificate not found: {cert_id}")
         if cert.revoked:
             raise ValueError("Certificate is already revoked")
 
         cert.revoked = True
         cert.revoked_at = utc_now()
         cert.revoke_reason = reason
+        # The KRL revokes a non-zero serial, and the key ID of a serial 0 certificate under its CA
+        # (ssh-keygen -k): every certificate it revokes is revoked; `revoked_with` names only those
+        # this revocation turned from valid to revoked, `revoked_through` the KRL entry of each
+        siblings, pending, through = [], [cert], {}
+        while pending:
+            held = pending.pop(0)
+            entry = {'serial': int(held.serial)} if held.serial else {'key_id': held.key_id}
+            match = (SSHCertificate.serial == held.serial if held.serial
+                     else SSHCertificate.key_id == held.key_id)
+            for sibling in (SSHCertificate.query.filter(SSHCertificate.ssh_ca_id == cert.ssh_ca_id, match,
+                                                        SSHCertificate.id != held.id)
+                            .order_by(SSHCertificate.id).populate_existing().all()):
+                if sibling.revoked:
+                    continue
+                sibling.revoked = True
+                sibling.revoked_at = cert.revoked_at
+                sibling.revoke_reason = reason
+                siblings.append(sibling)
+                through[sibling.id] = entry
+                pending.append(sibling)
+        siblings.sort(key=lambda s: s.id)
+        cert.revoked_with = siblings
+        cert.revoked_through = through
 
         try:
             db.session.commit()

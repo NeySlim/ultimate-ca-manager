@@ -19,9 +19,9 @@ def _migration():
     return importlib.import_module('migrations._from_2_254.163_ssh_ca_hsm_key')
 
 
-def test_the_step_is_the_last_of_the_upgrade():
+def test_the_step_follows_the_tsa_step():
     from migrations._from_2_254 import STEPS
-    assert STEPS[-1] == '163_ssh_ca_hsm_key'
+    assert STEPS.index('163_ssh_ca_hsm_key') == STEPS.index('162_tsa_ca_signer_kept') + 1
 
 
 def test_the_model_declares_what_the_step_writes():

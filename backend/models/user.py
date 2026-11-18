@@ -39,20 +39,17 @@ class User(db.Model):
     """User model for authentication"""
     __tablename__ = "users"
     __table_args__ = (
-        # Email is unique only among LOCAL accounts (partial index). SSO users are
-        # identified by sso_external_id, never by email, so an SSO account may
-        # share an email with a local one (see #136/#138). Matches migration 045.
+        # E-mail is unique among local accounts (#136); an SSO account may share it
         db.Index('ix_users_email_local', 'email', unique=True,
-                 sqlite_where=db.text("auth_source = 'local'"),
-                 postgresql_where=db.text("auth_source = 'local'")),
-        db.Index('ix_users_sso_identity', 'sso_provider_id', 'sso_external_id'),
+                 sqlite_where=db.text('NOT has_sso_identity'),
+                 postgresql_where=db.text('NOT has_sso_identity')),
         # A deleted account's id is never handed out again (migration 150 on upgrades)
         {'sqlite_autoincrement': True},
     )
 
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
-    # Not globally UNIQUE — see __table_args__ (unique per local account only).
+    # Unique among local accounts only: see ix_users_email_local.
     email = db.Column(db.String(120), nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     full_name = db.Column(db.String(255))  # Full name for WebAuthn/certificates
@@ -92,27 +89,27 @@ class User(db.Model):
     # User preferences (JSON-encoded; language, theme, density, etc.)
     # Persisted server-side so they follow the user across browsers/devices.
     preferences = db.Column(db.Text, nullable=True)
-
-    # Authentication source — distinguishes locally-managed users from those
-    # provisioned by an SSO provider. Values: 'local', 'ldap', 'oauth2', 'saml'.
-    # `sso_provider_id` links to the originating provider when applicable.
-    auth_source = db.Column(db.String(20), nullable=False, default='local')
-    sso_provider_id = db.Column(
-        db.Integer,
-        db.ForeignKey('pro_sso_providers.id', ondelete='SET NULL'),
-        nullable=True,
-    )
-    # Immutable identifier from the IdP (OIDC `sub` / SAML persistent NameID /
-    # LDAP entryUUID·objectGUID). Bound on first SSO login; the primary key used
-    # to recognise the directory account across username/email changes.
-    sso_external_id = db.Column(db.String(255), nullable=True)
-    # IdP of the deleted provider that last owned this account (SSOProvider.idp_key):
-    # only a provider for that same IdP may take it back by its stable id. Migration 137.
-    sso_orphan_of = db.Column(db.String(600), nullable=True)
+    # Whether the account has a row in user_sso_identities, for ix_users_email_local only:
+    # written by sync_sso_flags alone, in the transaction that changes the rows.
+    has_sso_identity = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
 
     # Relationships
     custom_role = db.relationship('CustomRole', foreign_keys=[custom_role_id], lazy='select')
-    sso_provider = db.relationship('SSOProvider', foreign_keys=[sso_provider_id], lazy='select')
+    # The providers that open this account, one row each (UserSSOIdentity)
+    sso_identities = db.relationship('UserSSOIdentity', back_populates='user', lazy='selectin',
+                                     cascade='all, delete-orphan', passive_deletes=True,
+                                     order_by='UserSSOIdentity.id')
+
+    @property
+    def is_local(self):
+        """No provider opens this account, nor did a deleted one: its e-mail is unique
+        among local accounts (#136)."""
+        return not self.sso_identities
+
+    @property
+    def auth_source(self):
+        """'local', or 'sso' for an account with at least one identity row."""
+        return 'local' if self.is_local else 'sso'
     
     @property
     def groups(self):
@@ -147,18 +144,79 @@ class User(db.Model):
         set_committed_value(self, 'session_version', new)
         self._sessions_bump = (new - 1, new)
 
-    def count_failed_login(self) -> int:
-        """Count one failed login in SQL and return the stored count; the caller commits.
+    def reserve_login_attempt(self, max_attempts: int, lockout_seconds: int):
+        """Count one login attempt before its secret is checked: ``(rank, armed)``, rank
+        None when the attempt is refused unchecked, armed the stored ``locked_until`` for
+        the one attempt whose count armed the lock, else None. The caller commits before
+        checking the secret.
 
-        Concurrent failures on any node add up: the UPDATE holds the row (PostgreSQL)
-        or write (SQLite) lock until the commit, so the read sees this failure's count."""
-        db.session.execute(
-            update(User).where(User.id == self.id)
-            .values(failed_logins=func.coalesce(User.failed_logins, 0) + 1)
-            .execution_options(synchronize_session=False))
-        count = db.session.execute(select(User.failed_logins).where(User.id == self.id)).scalar_one()
-        set_committed_value(self, 'failed_logins', count)
-        return count
+        One UPDATE decides on every node: at most ``max_attempts`` attempts get a rank,
+        the one reaching it (or, past a lowered threshold, the next one) arms the lock,
+        and an expired lock restarts the count at 1."""
+        from datetime import timedelta
+        from sqlalchemy import and_, case, or_
+        now = utc_now()
+        expired = and_(User.locked_until.is_not(None), User.locked_until <= now)
+        count = case((expired, 1), else_=func.coalesce(User.failed_logins, 0) + 1)
+        stmt = (update(User)
+                .where(User.id == self.id,
+                       or_(User.locked_until.is_(None), User.locked_until <= now))
+                .values(failed_logins=count,
+                        locked_until=case((count >= max_attempts,
+                                           now + timedelta(seconds=lockout_seconds)), else_=None))
+                .execution_options(synchronize_session=False))
+        columns = (User.failed_logins, User.locked_until)
+        if db.session.get_bind().dialect.update_returning:
+            row = db.session.execute(stmt.returning(*columns)).one_or_none()
+        else:
+            # No RETURNING: the UPDATE holds the write lock until the commit, so the read
+            # sees this attempt's count. No row changed = account locked.
+            row = None
+            if db.session.execute(stmt.execution_options(preserve_rowcount=True)).rowcount:
+                row = db.session.execute(select(*columns).where(User.id == self.id)).one()
+        if row is None:
+            return None, None
+        set_committed_value(self, 'failed_logins', row[0])
+        set_committed_value(self, 'locked_until', row[1])
+        # Only an unlocked row is updated, so an attempt whose count reaches max armed it.
+        return (row[0] if row[0] <= max_attempts else None), \
+            (row[1] if row[0] >= max_attempts else None)
+
+    def release_login_attempt(self, armed):
+        """Give back a reserved attempt whose secret was proved but opened no session.
+
+        Only the attempt that armed the lock can show its window is still open: the stored
+        lock is the one it wrote (``armed``) and still runs. It then lifts that lock and
+        gives its unit back. Any other stays counted, so no window gets back a unit taken in
+        another and each window checks at most ``max_attempts`` wrong secrets. The caller commits."""
+        if armed:
+            db.session.execute(
+                update(User).where(User.id == self.id, User.locked_until == armed,
+                                   User.locked_until > utc_now())
+                .values(failed_logins=func.coalesce(User.failed_logins, 0) - 1,
+                        locked_until=None)
+                .execution_options(synchronize_session=False))
+        self._reload_lockout()
+
+    def clear_failed_logins(self) -> bool:
+        """Reset the stored count and lock, whatever this copy holds: True when the row
+        held either. The caller commits."""
+        from sqlalchemy import or_
+        result = db.session.execute(
+            update(User).where(User.id == self.id,
+                               or_(func.coalesce(User.failed_logins, 0) != 0,
+                                   User.locked_until.is_not(None)))
+            .values(failed_logins=0, locked_until=None)
+            .execution_options(synchronize_session=False, preserve_rowcount=True))
+        set_committed_value(self, 'failed_logins', 0)
+        set_committed_value(self, 'locked_until', None)
+        return bool(result.rowcount)
+
+    def _reload_lockout(self):
+        row = db.session.execute(
+            select(User.failed_logins, User.locked_until).where(User.id == self.id)).one()
+        set_committed_value(self, 'failed_logins', row[0])
+        set_committed_value(self, 'locked_until', row[1])
 
     def check_password(self, password: str) -> bool:
         """Verify password; a hash of an older method is replaced on success
@@ -210,19 +268,192 @@ class User(db.Model):
             "last_login": utc_isoformat(self.last_login),
             "login_count": self.login_count or 0,
             "failed_logins": self.failed_logins or 0,
-            "auth_source": self.auth_source or 'local',
-            "sso_provider_id": self.sso_provider_id,
-            "sso_external_id": self.sso_external_id,
+            "auth_source": self.auth_source,
+            "sso_identities": [row.to_dict() for row in self.sso_identities],
         }
         try:
             if self.custom_role_id and self.custom_role:
                 result["custom_role_name"] = self.custom_role.name
         except Exception:
             pass
-        try:
-            if self.sso_provider_id and self.sso_provider:
-                result["sso_provider_name"] = self.sso_provider.name
-                result["sso_provider_type"] = self.sso_provider.provider_type
-        except Exception:
-            pass
         return result
+
+
+def local_email_holder(email, other_than=None):
+    """A local account (no identity row) holding ``email``: e-mail is unique among local
+    accounts only (#136), which every path making an account local checks here."""
+    query = User.query.filter(User.email == email, ~User.sso_identities.any())
+    if other_than is not None:
+        query = query.filter(User.id != other_than)
+    return query.order_by(User.id).first()
+
+
+def local_email_taken(email, other_than=None, message='Email already in use'):
+    """A 409 when a local account holds ``email``: the ``on_conflict`` of a commit the local
+    e-mail index refused, whichever request won the race."""
+    from utils.response import error_response
+    if email and local_email_holder(email, other_than=other_than) is not None:
+        return error_response(message, 409)
+    return None
+
+
+def sync_sso_flags(connection, user_ids=None):
+    """Set ``users.has_sso_identity`` from the identity rows, for ``user_ids`` or every account.
+
+    The one writer of the flag: the flush hooks below call it for the accounts whose rows an
+    ORM flush changed, and a path writing the rows in SQL calls it itself before committing.
+    The local e-mail index checks the accounts it turns local; returns the ids it changed."""
+    from sqlalchemy import exists
+    users, rows = User.__table__, UserSSOIdentity.__table__
+    held = exists().where(rows.c.user_id == users.c.id)
+    stmt = select(users.c.id).where(users.c.has_sso_identity != held)
+    ids = sorted(user_ids) if user_ids is not None else None
+    if ids is None:
+        changed = [uid for (uid,) in connection.execute(stmt)]
+    else:
+        changed = [uid for start in range(0, len(ids), 500) for (uid,) in connection.execute(
+            stmt.where(users.c.id.in_(ids[start:start + 500])))]
+    for start in range(0, len(changed), 500):
+        connection.execute(update(users).where(users.c.id.in_(changed[start:start + 500]))
+                           .values(has_sso_identity=held))
+    return changed
+
+
+_TOUCHED = '_sso_flag_accounts'
+
+
+def _accounts_touched(session, _context, _instances):
+    """Before a flush: the accounts whose identity rows it changes. One gaining a row is flagged
+    in its own row, so its INSERT or UPDATE never meets the local e-mail index."""
+    from sqlalchemy.orm.attributes import get_history
+    touched = []
+    with session.no_autoflush:
+        for obj in list(session.new) + list(session.dirty) + list(session.deleted):
+            if isinstance(obj, UserSSOIdentity):
+                touched.append(obj)
+                touched.extend(get_history(obj, 'user_id').deleted or ())
+                if obj not in session.deleted and obj.user is not None:
+                    obj.user.has_sso_identity = True
+            elif isinstance(obj, User) and obj not in session.deleted:
+                if get_history(obj, 'sso_identities').has_changes():
+                    touched.append(obj)
+    session.info[_TOUCHED] = touched
+
+
+def _flags_synced(session, _context):
+    """After a flush, in its transaction: the flag of each account touched, from the rows."""
+    touched = session.info.pop(_TOUCHED, None)
+    if not touched:
+        return
+    ids = set()
+    for item in touched:
+        if isinstance(item, User):
+            ids.add(item.id)
+        elif isinstance(item, UserSSOIdentity):
+            ids.add(item.user_id)
+        else:
+            ids.add(item)
+    ids.discard(None)
+    if not ids:
+        return
+    changed = sync_sso_flags(session.connection(), ids)
+    if changed:
+        _reload_flags(session, changed)
+
+
+def _reload_flags(session, ids):
+    """The flag of the accounts this session holds, as the database has it now."""
+    wanted = set(ids)
+    # By identity key: an account a statement deleted is expired, and reading its id raises
+    held = {key[1][0]: obj for key, obj in session.identity_map.items()
+            if key[0] is User and key[1][0] in wanted}
+    if not held:
+        return
+    users = User.__table__
+    for uid, flag in session.connection().execute(
+            select(users.c.id, users.c.has_sso_identity).where(users.c.id.in_(list(held)))):
+        set_committed_value(held[uid], 'has_sso_identity', bool(flag))
+
+
+def sync_sso_flags_in_session(session, user_ids=None):
+    """``sync_sso_flags`` on the session's connection, the accounts it holds reloaded."""
+    changed = sync_sso_flags(session.connection(), user_ids)
+    if changed:
+        _reload_flags(session, changed)
+    return changed
+
+
+class UserSSOIdentity(db.Model):
+    """One provider that opens an account, and the stable identity it does so with.
+
+    ``external_id`` NULL: attached, not bound yet (the first sign-in binds it). ``provider_id``
+    NULL: its provider was deleted; ``orphan_of`` keeps that provider's IdP key, and only a
+    provider for that exact key takes it back (OIDC Core §5.7: iss and sub together identify).
+    """
+    __tablename__ = 'user_sso_identities'
+    __table_args__ = (
+        # One account per stable identity of a provider; one attachment per provider per account
+        db.UniqueConstraint('provider_id', 'external_id', name='uq_user_sso_identities_provider_identity'),
+        db.UniqueConstraint('user_id', 'provider_id', name='uq_user_sso_identities_user_provider'),
+        db.Index('ix_user_sso_identities_orphan', 'orphan_of', 'external_id'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'),
+                        nullable=False, index=True)
+    provider_id = db.Column(db.Integer, db.ForeignKey('pro_sso_providers.id', ondelete='SET NULL'),
+                            nullable=True)
+    orphan_of = db.Column(db.String(600), nullable=True)
+    # OIDC `sub`, SAML persistent NameID, LDAP entryUUID/objectGUID (or the DN fallback)
+    external_id = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    bound_at = db.Column(db.DateTime, nullable=True)
+    # The administrator who attached the provider; NULL when a sign-in or an upgrade made the row
+    created_by = db.Column(db.String(80), nullable=True)
+
+    user = db.relationship('User', back_populates='sso_identities')
+    # A provider deleted through the session leaves its rows orphans of an unknown IdP (SQLite
+    # applies no ON DELETE SET NULL); the provider routes record the IdP key first.
+    provider = db.relationship('SSOProvider', foreign_keys=[provider_id], lazy='joined',
+                               backref=db.backref('identities', lazy='select'))
+
+    @property
+    def provider_type(self):
+        if self.provider is not None:
+            return self.provider.provider_type
+        return self.orphan_of.split(':', 1)[0] if self.orphan_of else None
+
+    @property
+    def state(self):
+        if self.provider_id is None:
+            return 'orphan'
+        return 'bound' if self.external_id else 'pending'
+
+    def bind(self, external_id):
+        self.external_id = external_id
+        self.bound_at = utc_now() if external_id else None
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'provider_id': self.provider_id,
+            'provider_name': self.provider.name if self.provider is not None else None,
+            'provider_type': self.provider_type,
+            'orphan_of': self.orphan_of,
+            'external_id': self.external_id,
+            'state': self.state,
+            'created_at': utc_isoformat(self.created_at),
+            'bound_at': utc_isoformat(self.bound_at),
+            'created_by': self.created_by,
+        }
+
+
+def _listen():
+    from sqlalchemy import event
+    from sqlalchemy.orm import Session
+    if not event.contains(Session, 'before_flush', _accounts_touched):
+        event.listen(Session, 'before_flush', _accounts_touched)
+        event.listen(Session, 'after_flush', _flags_synced)
+
+
+_listen()

@@ -6,6 +6,7 @@ UCM_CONFIG_DIR, logs and port under the bench directory, its own database URL
 UCM_DB_ENCRYPTION_KEY.
 The guard on its PYTHONPATH stops a node that touches an installation path.
 """
+import json
 import os
 import re
 import secrets
@@ -17,7 +18,7 @@ import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit, urlunsplit
 
 import requests
 import urllib3
@@ -37,9 +38,22 @@ NODE_NAMES = ('node-a', 'node-b', 'node-c')
 
 
 def free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(('127.0.0.1', 0))
-        return sock.getsockname()[1]
+    return free_ports(1)[0]
+
+
+def free_ports(count) -> list:
+    """`count` distinct free ports: every probe socket stays bound until all are drawn,
+    since a port released is free to be handed out again."""
+    socks = []
+    try:
+        for _ in range(count):
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            socks.append(sock)
+            sock.bind(('127.0.0.1', 0))
+        return [sock.getsockname()[1] for sock in socks]
+    finally:
+        for sock in socks:
+            sock.close()
 
 
 def wait_until(predicate, timeout, what):
@@ -84,11 +98,77 @@ def group_pids(pgid) -> set:
     return pids
 
 
+class SilentProxy:
+    """TCP relay from the nodes to PostgreSQL that can fall silent: while `silent()` lasts it
+    forwards nothing either way and leaves new connections unanswered, so the database neither
+    answers nor refuses (a frozen server, or an address that no longer routes)."""
+
+    def __init__(self, host, port):
+        self.upstream = (host, port)
+        self.listener = socket.create_server(('127.0.0.1', 0))
+        self.port = self.listener.getsockname()[1]
+        self.quiet = threading.Event()
+        self.closed = threading.Event()
+        self.held = []
+        threading.Thread(target=self._accept, daemon=True, name='silent-proxy').start()
+
+    def _accept(self):
+        while not self.closed.is_set():
+            try:
+                client, _ = self.listener.accept()
+            except OSError:
+                return
+            if self.quiet.is_set():
+                self.held.append(client)
+                continue
+            try:
+                server = socket.create_connection(self.upstream, timeout=10)
+                server.settimeout(None)
+            except OSError:
+                client.close()
+                continue
+            for src, dst in ((client, server), (server, client)):
+                threading.Thread(target=self._pump, args=(src, dst), daemon=True).start()
+
+    def _pump(self, src, dst):
+        try:
+            while True:
+                data = src.recv(65536)
+                if not data:
+                    break
+                while self.quiet.is_set() and not self.closed.is_set():
+                    self.closed.wait(0.05)
+                dst.sendall(data)
+        except OSError:
+            pass
+        finally:
+            for sock in (src, dst):
+                try:
+                    sock.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+
+    @contextmanager
+    def silent(self):
+        self.quiet.set()
+        try:
+            yield
+        finally:
+            self.quiet.clear()
+            held, self.held = self.held, []
+            for client in held:
+                client.close()
+
+    def close(self):
+        self.closed.set()
+        self.listener.close()
+
+
 class Node:
-    def __init__(self, name, root: Path, shared_env: dict):
+    def __init__(self, name, root: Path, shared_env: dict, port=None):
         self.name = name
         self.root = root
-        self.port = free_port()
+        self.port = port or free_port()
         self.data_dir = root / 'data'
         self.config_dir = root / 'config'
         self.console = root / 'console.log'
@@ -105,6 +185,8 @@ class Node:
             'PYTHONPATH': os.pathsep.join([str(GUARD_DIR), str(BACKEND)]),
             'PYTHONDONTWRITEBYTECODE': '1',
             'UCM_HA_GUARD_FILE': str(self.guard_file),
+            # tests/ha/guard/ha_bench_pauses.py: inert until the bench writes a pause file there
+            'UCM_HA_PAUSE_DIR': str(root),
             'UCM_NODE_ID': name,
             'UCM_CONFIG_DIR': str(self.config_dir),
             'UCM_BASE_PATH': str(root),
@@ -156,12 +238,21 @@ class Node:
             r = self.http.get(self.url('/health/ready'), timeout=5)
         except requests.ConnectionError:
             return None
-        return r.json() if r.status_code == 200 else None
+        if r.status_code != 200:
+            return None
+        report = r.json()
+        if report.get('node_id', self.name) != self.name:
+            raise AssertionError(f'{self.name} at {self.base} answered by {report["node_id"]}: {report}')
+        return report
 
     def health(self) -> dict:
         r = self.http.get(self.url('/health'), timeout=10)
         r.raise_for_status()
-        return r.json()
+        report = r.json()
+        # Another node's process listening on this node's address must not pass for this node
+        if report.get('node_id') != self.name:
+            raise AssertionError(f'{self.name} at {self.base} answered by {report.get("node_id")}: {report}')
+        return report
 
     def pids(self) -> set:
         return group_pids(self.proc.pid) if self.proc is not None else set()
@@ -203,6 +294,27 @@ class Node:
             self.proc.wait(timeout=STOP_TIMEOUT)
             wait_until(lambda: not self.pids(), STOP_TIMEOUT, f'node {self.name} processes gone')
 
+    def pause(self, point):
+        """Hold this node's jobs at `point` (tests/ha/guard/ha_bench_pauses.py) until release()."""
+        (self.root / f'pause-{point}').touch()
+
+    def release(self, point=None):
+        """Let a paused point go on; every point when none is named (and the markers a killed
+        node left)."""
+        for path in self.root.glob(f'pause-{point or "*"}'):
+            path.unlink(missing_ok=True)
+        if point is None:
+            for path in self.root.glob('paused-*'):
+                path.unlink(missing_ok=True)
+
+    def paused(self, point) -> bool:
+        """A process of this node waits at `point` now."""
+        return (self.root / f'paused-{point}').exists()
+
+    def job_file(self, name) -> Path:
+        """A job's file on this node's disk (DATA_DIR/tmp)."""
+        return self.data_dir / 'tmp' / name
+
     def log_text(self) -> str:
         parts = []
         for path in (self.console, self.app_log, self.guard_file):
@@ -220,10 +332,13 @@ class Node:
 class Cluster:
     """Nodes A and B (and C), on a schema created here and dropped by close()."""
 
-    def __init__(self, root: Path, names=NODE_NAMES[:2]):
+    def __init__(self, root: Path, names=NODE_NAMES[:2], silent_proxy=False):
         self.schema = f'{SCHEMA_PREFIX}{os.getpid()}_{secrets.token_hex(3)}'
         self.root = root
         self._admin = None
+        # The nodes reach PostgreSQL through it; the bench's own connections do not
+        parts = urlsplit(PG_URL)
+        self.proxy = SilentProxy(parts.hostname, parts.port or 5432) if silent_proxy else None
         self.password = f'Ha-{secrets.token_hex(8)}-9z'
         from cryptography.fernet import Fernet
         shared = {
@@ -234,8 +349,16 @@ class Cluster:
             'INITIAL_ADMIN_PASSWORD': self.password,
             'FQDN': 'ucm-ha.test',
         }
-        self.nodes = [Node(name, root / name, {**shared, 'DATABASE_URL': self.database_url(name)})
-                      for name in names]
+        self.shared = shared
+        self.nodes = [Node(name, root / name, {**shared, 'DATABASE_URL': self.database_url(name)}, port)
+                      for name, port in zip(names, free_ports(len(names)))]
+
+    def add_node(self, name):
+        """One more node on the same schema and secrets (a replacement pod of another name);
+        started by the caller, stopped by close()."""
+        node = Node(name, self.root / name, {**self.shared, 'DATABASE_URL': self.database_url(name)})
+        self.nodes.append(node)
+        return node
 
     def app_name(self, node_name):
         """A node's application_name: it names the node in pg_stat_activity whatever client
@@ -246,8 +369,14 @@ class Cluster:
         return [self.app_name(node.name) for node in self.nodes]
 
     def database_url(self, node_name):
-        separator = '&' if '?' in PG_URL else '?'
-        return (f'{PG_URL}{separator}options={quote(f"-csearch_path={self.schema}")}'
+        url = PG_URL
+        if self.proxy is not None:
+            parts = urlsplit(PG_URL)
+            userinfo = parts.netloc.rpartition('@')[0]
+            netloc = f'{userinfo}@127.0.0.1:{self.proxy.port}' if userinfo else f'127.0.0.1:{self.proxy.port}'
+            url = urlunsplit(parts._replace(netloc=netloc))
+        separator = '&' if '?' in url else '?'
+        return (f'{url}{separator}options={quote(f"-csearch_path={self.schema}")}'
                 f'&application_name={quote(self.app_name(node_name))}')
 
     def __getitem__(self, index):
@@ -344,6 +473,8 @@ class Cluster:
                 cur.execute(f'DROP SCHEMA IF EXISTS "{self.schema}" CASCADE')
             self._admin.close()
             self._admin = None
+        if self.proxy is not None:
+            self.proxy.close()
         if errors:
             raise AssertionError('; '.join(errors))
 
@@ -395,6 +526,55 @@ class Client:
     def patch(self, path, payload=None, **kw):
         return self.http.patch(self.node.url(path), json=payload or {}, headers=self._headers(),
                                timeout=120, **kw)
+
+
+class _Answer:
+    """The answer a restore route would have given, read back from its job."""
+
+    def __init__(self, result):
+        self.status_code = result['code']
+        if result['code'] < 400:
+            self._body = {'data': result.get('data'), 'message': result.get('message')}
+        else:
+            self._body = {'message': result.get('message'), 'code': result['code'],
+                          **(result.get('problem') or {})}
+        self.text = json.dumps(self._body)
+
+    def json(self):
+        return self._body
+
+
+def restore_answer(client, node, name, content, password, cluster, timeout=300, prefer=None):
+    """POST a restore to ``node``; past the route's wait (202) follow its job and answer what the
+    route would have. Once the restore has revoked the session (401) the job is read in the
+    jobs table: signing in again is refused (503) until the node restarts after the restore."""
+    headers = dict(client._headers(), **({'Prefer': prefer} if prefer else {}))
+    r = client.http.post(node.url('/api/v2/system/restore'), headers=headers,
+                         files={'file': (name, content)}, data={'password': password},
+                         timeout=timeout)
+    if r.status_code != 202:
+        return r
+    job_id, location = r.json()['data']['job']['id'], r.headers['Location']
+    deadline, revoked = time.monotonic() + timeout, False
+    while time.monotonic() < deadline:
+        if not revoked:
+            seen = client.http.get(node.url(location), timeout=60)
+            revoked = seen.status_code == 401
+            if not revoked:
+                assert seen.status_code == 200, seen.text[:500]
+        if revoked:
+            (state, result), = cluster.sql(
+                'SELECT state, result FROM background_jobs WHERE id = %s', (job_id,))
+        else:
+            state, result = seen.json()['data']['state'], seen.json()['data']['result']
+        if state in ('succeeded', 'failed', 'cancelled'):
+            result = json.loads(result) if isinstance(result, str) else result
+            assert result is not None, (job_id, state)
+            answer = _Answer(result)
+            answer.accepted = r
+            return answer
+        time.sleep(1)
+    raise AssertionError(f'restore job not final within {timeout}s')
 
 
 TASK_LINE = re.compile(r"Task '([A-Za-z0-9_]+)' (?:completed|skipped|failed)")

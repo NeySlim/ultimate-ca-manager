@@ -36,10 +36,16 @@ def backup_dir(app, tmp_path, monkeypatch):
 
 @pytest.fixture
 def audit_spy(monkeypatch):
+    from models import db
     from services.audit_service import AuditService
     calls = []
-    monkeypatch.setattr(AuditService, 'log_action',
-                        staticmethod(lambda **kw: calls.append(kw)))
+
+    # Commits and returns the line as log_action does: a backup job concludes in that commit
+    def log_action(**kw):
+        calls.append(kw)
+        db.session.commit()
+        return kw
+    monkeypatch.setattr(AuditService, 'log_action', staticmethod(log_action))
     return calls
 
 
@@ -551,7 +557,8 @@ class TestOneLockForArchivesAndRestores:
 
     @pytest.fixture
     def quick_export_wait(self, monkeypatch):
-        monkeypatch.setattr(storage, 'EXPORT_LOCK_WAIT', 0.3)
+        from services.jobs import backup as backup_job
+        monkeypatch.setattr(backup_job, 'LOCK_WAIT_SECONDS', 0.3)
 
     @pytest.mark.parametrize('url', ['/api/v2/system/backup/create',
                                      '/api/v2/settings/backup/create'])
@@ -625,10 +632,18 @@ def fake_restore(monkeypatch):
 @pytest.fixture
 def invalidations(monkeypatch):
     import services.backup.restore.invalidate as invalidate
+    from models import db
     from utils import service_manager
     done = []
-    monkeypatch.setattr(invalidate, 'invalidate_after_restore',
-                        lambda *a, **k: done.append(1) or {'sessions_revoked': 4})
+
+    # The restore job's sessions step: its mark is claimed and committed, as the real one does
+    def revoke(claim):
+        done.append(1)
+        counts = {'sessions_revoked': 4}
+        assert claim(counts)
+        db.session.commit()
+        return counts
+    monkeypatch.setattr(invalidate, 'revoke_sessions_with', revoke)
     monkeypatch.setattr(service_manager, 'restart_service',
                         lambda: (True, 'restart requested'))
     return done
@@ -748,7 +763,7 @@ class TestRestore:
         assert response.status_code == 200, response.data
         data = response.get_json()['data']
         assert invalidations == [1]
-        assert data['invalidated'] == {'sessions_revoked': 4}
+        assert data['invalidated']['sessions_revoked'] == 4
         assert data['restart_requested'] is True
         assert data['restart_detail'] == 'restart requested'
         assert data['admin_allowlist_cleared'] is True

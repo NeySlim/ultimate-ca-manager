@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Release version grammar, conversions, release notes and `latest` rule, shared by the workflows and scripts.
+"""Release version grammar, conversions, release notes, `latest` and line rules, shared by the workflows and scripts.
 
 Tags: X.Y, X.Y-rcN (this line), X.Y.Z, X.Y.Z-rcN with Z >= 1 (maintenance of the previous line).
 A development version (X.Y-dev, X.Y.Z-dev) has an npm form but is never a tag.
-Usage: release_version.py <validate|deb|rpm|tar|file|npm|assets|notes|latest> <version> [CHANGELOG]
+Usage: release_version.py <validate|deb|rpm|tar|file|npm|chart|prerelease|assets|notes|latest|line> <version> [CHANGELOG] [--rehearsal]
 `latest` reads the published tags (refs/tags/vX or vX, one per line) on stdin and prints true or false.
+`line` reads them the same way and prints the line tag (the major) to apply, or an empty line.
 """
 import re
 import sys
@@ -60,6 +61,12 @@ def npm_version(version):
     return base + (f"-{m.group('rc')}" if m.group('rc') else '')
 
 
+def chart_version(version):
+    """Helm chart version of a tag: the semver form, the chart being versioned with its application."""
+    parse(version)
+    return npm_version(version)
+
+
 def asset_names(version):
     fv = file_version(version)
     return {
@@ -95,17 +102,30 @@ def changelog_section(version, text):
             or _section(re.compile(r'^## ' + re.escape(version) + r'(\s|$)'), text, '## '))
 
 
-def release_notes(version, text):
-    """Its own section when it has entries; a RC without one ships `[Unreleased]`, a stable fails."""
+def release_notes(version, text, rehearsal=False):
+    """Its own section when it has entries; a RC without one ships `[Unreleased]`, a stable fails.
+
+    A rehearsal of a stable runs before its bump commit: it borrows `[Unreleased]` and warns instead.
+    """
     body = changelog_section(version, text)
     if body.strip():
         return body
     if is_stable(version):
-        raise ValueError(f'CHANGELOG.md has no [{version}] section with entries for {version}')
+        missing = f'CHANGELOG.md has no [{version}] section with entries for {version}'
+        if not rehearsal:
+            raise ValueError(missing)
+        print(f'::warning::{missing}: the rehearsal takes [Unreleased]', file=sys.stderr)
     body = _section(re.compile(r'^## \[Unreleased\]'), text, '## [')
     if not body.strip():
         raise ValueError(f'CHANGELOG.md has no [{version}] or [Unreleased] section with entries for {version}')
     return body
+
+
+def _stable_tags(published):
+    for tag in published:
+        tag = tag.strip().removeprefix('refs/tags/').removeprefix('v')
+        if VERSION_RE.fullmatch(tag) and is_stable(tag):
+            yield numeric(tag)
 
 
 def is_latest(version, published):
@@ -113,11 +133,19 @@ def is_latest(version, published):
     if not is_stable(version):
         return False
     top = numeric(version)
-    for tag in published:
-        tag = tag.strip().removeprefix('refs/tags/').removeprefix('v')
-        if VERSION_RE.fullmatch(tag) and is_stable(tag) and numeric(tag) > top:
-            return False
-    return True
+    return not any(tag > top for tag in _stable_tags(published))
+
+
+def line_tag(version, published):
+    """The major of a stable `version` that no stable published tag of the same major exceeds, else ''.
+
+    Unlike `latest`, a higher major does not count: a 2.254.N released after 3.0 still takes `2`."""
+    if not is_stable(version):
+        return ''
+    top = numeric(version)
+    if any(tag[0] == top[0] and tag > top for tag in _stable_tags(published)):
+        return ''
+    return str(top[0])
 
 
 def main(argv):
@@ -138,15 +166,23 @@ def main(argv):
             print(file_version(version))
         elif cmd == 'npm':
             print(npm_version(version))
+        elif cmd == 'chart':
+            print(chart_version(version))
+        elif cmd == 'prerelease':
+            print('false' if is_stable(version) else 'true')
         elif cmd == 'assets':
             print('\n'.join(asset_names(version).values()))
         elif cmd == 'latest':
             print('true' if is_latest(version, sys.stdin.read().splitlines()) else 'false')
+        elif cmd == 'line':
+            print(line_tag(version, sys.stdin.read().splitlines()))
         elif cmd == 'notes':
-            path = argv[3] if len(argv) > 3 else 'CHANGELOG.md'
+            rehearsal = '--rehearsal' in argv[3:]
+            rest = [a for a in argv[3:] if a != '--rehearsal']
+            path = rest[0] if rest else 'CHANGELOG.md'
             with open(path, encoding='utf-8') as fh:
                 text = fh.read()
-            sys.stdout.write(release_notes(version, text))
+            sys.stdout.write(release_notes(version, text, rehearsal))
         else:
             print(f'Unknown command: {cmd}', file=sys.stderr)
             return 2

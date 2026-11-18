@@ -453,7 +453,8 @@ def scan_rootfs(fileobj, app):
             data = tar.extractfile(member).read()
             m = _DIST_INFO.match(name)
             if m:
-                meta = email.parser.BytesParser().parsebytes(data, headersonly=True)
+                # METADATA is UTF-8 text: parsed as bytes, a non-ASCII field comes back as a Header object
+                meta = email.parser.Parser().parsestr(data.decode('utf-8', 'replace'), headersonly=True)
                 dists.append({'loc': m['loc'], 'name': meta.get('Name'), 'version': meta.get('Version'),
                               'expression': meta.get('License-Expression'), 'license': meta.get('License'),
                               'classifiers': [c for c in meta.get_all('Classifier', []) if c.startswith('License ::')]})
@@ -511,6 +512,10 @@ def cmd_image(args):
     comps = []
     for c in trivy.get('components', []):
         c = json.loads(json.dumps(c))
+        # Trivy gives ids the schema's SPDX list does not hold (Debian's SMAIL-GPL): kept, as names
+        for lic in (entry.get('license') or {} for entry in c.get('licenses') or []):
+            if 'id' in lic and lic['id'] not in spdx_ids():
+                lic['name'] = lic.pop('id')
         c.setdefault('properties', []).insert(0, prop('ucm:role', 'content'))
         c['properties'].append(prop('ucm:evidence', 'trivy (os packages)'))
         if not c.get('licenses'):
