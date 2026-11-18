@@ -546,14 +546,14 @@ def _detach_kept_rows(replacement: Replacement, name: str, table) -> None:
                 or _primary(dependent) is None):
             continue
         values = [row[0] for row in _select([named], primary, ids)]
+        if (dependent.name, column.name) == ORPHANED_WITH_PROVIDER:
+            # A kept identity the writes do not take keeps its IdP, as a removed provider's do
+            _orphan_identities(replacement, dependent, values)
+            continue
         gone = replacement.doomed.get(dependent_section, set())
         dependent_primary = _primary(dependent)
         kept = [row[0] for row in _select([dependent_primary], column, values)
                 if row[0] not in gone]
-        if (dependent.name, column.name) == ORPHANED_WITH_PROVIDER:
-            # A kept identity the writes do not take keeps its IdP, as a removed provider's do
-            _orphan_identities(replacement, dependent, values, rows=kept)
-            continue
         for chunk in _chunks(kept):
             db.session.execute(update(dependent).where(dependent_primary.in_(chunk))
                                .values({column.name: None}))
@@ -606,21 +606,14 @@ def _release_dependents(replacement: Replacement, table, key_column, keys, owner
             _count(replacement.cleared, dependent.name, result.rowcount)
 
 
-def _orphan_identities(replacement: Replacement, table, provider_ids, rows=None) -> None:
-    """The identity rows of removed providers (only ``rows`` when given) become orphans of
-    their IdP."""
+def _orphan_identities(replacement: Replacement, table, provider_ids) -> None:
+    """The identity rows of removed providers become orphans of their IdP."""
     from models.sso import SSOProvider
 
     for provider in SSOProvider.query.filter(SSOProvider.id.in_(provider_ids)):
-        orphaned = update(table).where(table.c.provider_id == provider.id).values(
-            provider_id=None, orphan_of=provider.idp_key())
-        if rows is None:
-            result = db.session.execute(orphaned)
-            _count(replacement.unlinked, f'{table.name}.provider_id', result.rowcount)
-            continue
-        # Kept rows: the writes may still set them again, so they are not counted as unlinked
-        for chunk in _chunks(rows):
-            db.session.execute(orphaned.where(_primary(table).in_(chunk)))
+        result = db.session.execute(update(table).where(table.c.provider_id == provider.id)
+                                    .values(provider_id=None, orphan_of=provider.idp_key()))
+        _count(replacement.unlinked, f'{table.name}.provider_id', result.rowcount)
 
 
 def _close_requests(replacement: Replacement, table, column, values) -> None:
