@@ -137,7 +137,7 @@ export default {
           '1. Mappatura domini locali: corrispondenza esatta del dominio, poi dominio padre',
           '2. Mappatura domini DNS: verifica la CA emittente configurata per il provider DNS',
           '3. Predefinito globale: la CA impostata nella configurazione del server ACME',
-          '4. Prima CA disponibile con chiave privata',
+          '4. Prima CA disponibile con chiave privata, solo se nulla è impostato sopra: una CA impostata sopra che non può firmare rifiuta l\'ordine',
         ]
       },
       {
@@ -457,7 +457,7 @@ Quando un client ACME richiede un certificato, UCM determina la CA firmataria in
 1. **Mappatura domini locali**: Corrispondenza esatta, poi corrispondenza dominio padre
 2. **Mappatura domini DNS**: La CA configurata per il provider DNS
 3. **Predefinito globale**: La CA impostata nella configurazione del server ACME
-4. **Prima disponibile**: Qualsiasi CA con chiave privata
+4. **Prima disponibile**: Qualsiasi CA con chiave privata, solo se nulla è impostato sopra. Una CA impostata sopra senza chiave privata, offline o eliminata rifiuta l'ordine: nessun'altra CA firma al suo posto
 
 ### Credenziali EAB (lato server)
 Quando UCM è il server ACME (o il proxy), puoi richiedere l'**External Account Binding**: i client devono presentare una coppia kid + chiave HMAC pre-emessa per registrare un account. Emetti e revoca le credenziali da **ACME → EAB Credentials**.
