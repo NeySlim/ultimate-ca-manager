@@ -228,3 +228,24 @@ def test_what_counts_as_another_idp(app, here, archived, other):
     with app.app_context():
         provider = SSOProvider(name=NAME, provider_type='oauth2', **here)
         assert another_idp(provider, {'name': NAME, **archived}) is other
+
+
+@pytest.mark.parametrize('kind', ['oauth2', 'saml', 'ldap'])
+@pytest.mark.parametrize('mode', ['replace', 'merge'])
+def test_accounts_without_their_provider_in_the_archive_are_named(target, mode, kind):
+    """Accounts restored without their provider bind by name to the one here: the report says so."""
+    from models.sso import SSOProvider
+    provider = _provider(kind, 'B')
+    _account('kate', provider, 'kate-archived')
+    _account('mona', provider, 'mona-archived')
+    db.session.commit()
+    blob = _service().create_backup(PASSWORD, include=_only('users'))
+    _instance(kind)
+
+    results = _restore(blob, mode)
+
+    here = SSOProvider.query.filter_by(name=NAME).one()
+    assert here.idp_key() == KEY_OF[kind]['A']
+    warnings = _sso_warnings(results)
+    assert len(warnings) == 1, warnings
+    assert all(part in warnings[0] for part in (repr(NAME), 'kate', 'mona')), warnings

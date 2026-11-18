@@ -54,6 +54,7 @@ def settle_other_idp_providers(backup_data: Dict[str, Any], replacing: bool,
     """Apply the module's rule to the archive; ``displaced`` gets the rows a replacement removes."""
     from models.sso import SSOProvider
     rows = backup_data.get(SECTION)
+    _name_unchecked_bindings(backup_data, rows if isinstance(rows, list) else [], warnings)
     if not isinstance(rows, list):
         return
     left_out = []
@@ -77,6 +78,27 @@ def settle_other_idp_providers(backup_data: Dict[str, Any], replacing: bool,
                 "accounts the archive attaches to it come back as orphans of its IdP")
     if left_out:
         _leave_out(backup_data, left_out)
+
+
+def _name_unchecked_bindings(backup_data: Dict[str, Any], rows: List[Any],
+                             warnings: List[str]) -> None:
+    """Accounts whose provider the archive does not carry bind by name to the one here, IdP unchecked."""
+    from models.sso import SSOProvider
+    carried = {row.get('name') for row in rows if isinstance(row, dict)}
+    accounts: Dict[str, List[str]] = {}
+    for user in backup_data.get('users') or []:
+        ref = user.get(f'sso_provider_id{REFERENCE_SUFFIX}') if isinstance(user, dict) else None
+        name = ref.get('name') if isinstance(ref, dict) else None
+        if isinstance(name, str) and name not in carried:
+            accounts.setdefault(name, []).append(str(user.get('username')))
+    for name, usernames in sorted(accounts.items()):
+        here = SSOProvider.query.filter_by(name=name).first()
+        if here is None:
+            continue
+        warnings.append(
+            f"sso_providers: the archive binds {', '.join(sorted(usernames))} to a provider "
+            f"{name!r} it does not carry; they are bound to the provider of that name here "
+            f"(#{here.id}), whose IdP could not be checked against theirs")
 
 
 def _leave_out(backup_data: Dict[str, Any], rows: List[Dict[str, Any]]) -> None:
