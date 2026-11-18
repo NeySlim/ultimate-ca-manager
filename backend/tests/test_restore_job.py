@@ -589,6 +589,42 @@ def test_the_gate_is_down_before_the_job_says_it_is_over(app, archive, created, 
     assert seen == [False], 'the job concluded while the write gate was still up'
 
 
+@pytest.mark.parametrize('carried', [True, False], ids=['restored', 'nothing_carried'])
+def test_a_lease_lapsed_during_the_restore_lets_no_recovery_take_the_job_before_its_end(
+        app, archive, created, monkeypatch, no_restart, carried):
+    """SQLite: the lease is not renewed while the transaction holds the database. A recovery
+    pass that runs once the gate is down, before the conclusion, finds the job still its own."""
+    def lapse():
+        db.session.execute(update(T).where(T.c.id == created[-1]).values(
+            lease_expires_at=jobs._now() - timedelta(seconds=1)))
+        db.session.commit()
+    if carried:
+        real_marked = restore_job._marked
+
+        def marked(*args, **kwargs):
+            real_marked(*args, **kwargs)
+            lapse()
+        monkeypatch.setattr(restore_job, '_marked', marked)
+    else:
+        monkeypatch.setattr('services.backup_service.BackupService.restore_backup_from_stream',
+                            lambda self, *a, **k: lapse() or {'sections_carried': []})
+    passes, taken, real = [], [], restore_job._conclude
+
+    def concluding(job_id, executor, *args, **kwargs):
+        if not passes:  # once: a resume concludes through this function too
+            passes.append(1)
+            taken.append(store.recover_orphans(
+                db.session, now=jobs._now(), all_running=False, audit_for=jobs.audit_writer,
+                resume_for=jobs.resumer, executor=executor))
+        return real(job_id, executor, *args, **kwargs)
+    monkeypatch.setattr(restore_job, '_conclude', concluding)
+    before = _lines_in(app)
+    job_id, name = _start(app, archive, created)
+    _assert_final(app, job_id, 'succeeded', 'done', before, name, carried)
+    assert taken == [0], 'a recovery pass took the job over between the gate and its end'
+    assert no_restart == ([1] if carried else [])
+
+
 def _gate(app):
     ctx = types.SimpleNamespace(job_id=str(uuid.uuid4()), node_id=None, requested_by='admin',
                                 view={'id': 'x', 'kind': 'restore'}, app=app)
@@ -829,3 +865,47 @@ def test_the_cancellation_and_the_mark_never_both_win(pg_jobs, first):
     finally:
         mark.close()
         flag.close()
+
+
+@pytest.mark.postgres
+def test_a_backup_started_while_a_restore_is_created_waits_and_is_refused(pg_jobs, monkeypatch):
+    """The restore holds every slot: the index sees only its own, so the creation lock makes a
+    backup created meanwhile wait for the restore's commit and answer 409 naming it."""
+    from sqlalchemy.orm import Session
+    from utils.datetime_utils import utc_now
+    real, checked, go = store._conflict, threading.Event(), threading.Event()
+
+    def conflict(session, job_id, slot, *args):
+        found = real(session, job_id, slot, *args)
+        if slot == 'restore':  # checked, not yet committed: the backup comes now
+            checked.set()
+            assert go.wait(10)
+        return found
+    monkeypatch.setattr(store, '_conflict', conflict)
+    restore_s, backup_s, answers = Session(pg_jobs), Session(pg_jobs), {}
+
+    def create(session, name, slot):
+        try:
+            answers[name] = store.create_job(session, kind=name, slot=slot,
+                                             exclusive=slot == 'restore',
+                                             exclusive_slots={'restore'}, now=utc_now())
+        except store.SlotBusy as busy:
+            answers[name] = busy
+    try:
+        restore = threading.Thread(target=create, args=(restore_s, 'restore', 'restore'))
+        restore.start()
+        assert checked.wait(10)
+        backup = threading.Thread(target=create, args=(backup_s, 'backup', 'backup'))
+        backup.start()
+        backup.join(1.0)
+        assert backup.is_alive(), 'the backup did not wait for the creation lock'
+        go.set()
+        restore.join(10)
+        backup.join(10)
+        assert isinstance(answers['restore'], str)
+        assert isinstance(answers['backup'], store.SlotBusy), answers
+        assert answers['backup'].job['id'] == answers['restore']
+    finally:
+        go.set()
+        restore_s.close()
+        backup_s.close()

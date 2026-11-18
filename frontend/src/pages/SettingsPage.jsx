@@ -232,6 +232,11 @@ export default function SettingsPage() {
     holdingSignOut.current = false
     holdSignOut(false)
   }
+  // A restore's server error stays until closed: a committed restore's asks a restart
+  const showRestoreError = (message, status) => {
+    if (status >= 500) showError(message, 0)
+    else showError(message)
+  }
   const restoreJob = useRestoreJob({
     enabled: hasPermission('admin:system'),
     account: user?.username,
@@ -244,7 +249,7 @@ export default function SettingsPage() {
       setShowRestoreModal(false)
       if (job.state === 'cancelled') showWarning(t('settings.restoreCancelled'))
       else if (job.reason === 'executor_lost' || job.reason === 'not_taken') showError(t('settings.restoreLost'))
-      else showError(job.result?.message || t('messages.errors.backup.restoreFailed'))
+      else showRestoreError(job.result?.message || t('messages.errors.backup.restoreFailed'), job.result?.code)
     },
     // The job can no longer be followed and no commit was seen: its end shows at the next visit
     onLost: (error) => {
@@ -1512,7 +1517,7 @@ export default function SettingsPage() {
     } catch (error) {
       holdingSignOut.current = false
       holdSignOut(false)
-      showError(error.message || t('messages.errors.backup.restoreFailed'))
+      showRestoreError(error.message || t('messages.errors.backup.restoreFailed'), error.status)
     } finally {
       setBackupLoading(false)
       setRestoreProgress(null)

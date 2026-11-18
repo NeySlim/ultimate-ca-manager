@@ -46,7 +46,9 @@ class AuditCoreLoggingMixin:
         username: Optional[str] = None,
         user_id: Optional[int] = None,
         ip_address: Optional[str] = None,
+        syslog_unsaved: bool = True,
     ) -> AuditLog:
+        """``syslog_unsaved=False``: a failed write sends no syslog copy (the caller tries again)."""
         audit_log = None
         try:
             in_request = has_request_context()
@@ -108,7 +110,7 @@ class AuditCoreLoggingMixin:
 
         except Exception as e:
             # The action is already committed: its trace must still leave somewhere
-            unsaved = syslog_copy(audit_log) if audit_log is not None else None
+            unsaved = syslog_copy(audit_log) if audit_log is not None and syslog_unsaved else None
             logger.error(f"Failed to create audit log: {e}; lost entry: action={action} "
                          f"resource={resource_type}:{resource_id} user={username} details={details}")
             db.session.rollback()

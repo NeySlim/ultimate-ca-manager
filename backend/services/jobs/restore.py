@@ -623,7 +623,10 @@ def finish(job_id, executor, results, name, filename, maintenance=None, gate=Non
     details = safe_restore_audit_details(name, results)
 
     def lift_gate():
-        # Down before the job is final: a client that sees the end and writes is never refused
+        # Down before the job is final: a client that sees the end and writes is never refused.
+        # The lease, lapsed while a SQLite transaction held the database, is renewed first: no
+        # recovery pass that the lifted gate lets run takes the job over before its conclusion.
+        _renew_lease(job_id, executor)
         if gate is not None:
             gate.lift()
     if not results.get('sections_carried'):
@@ -676,6 +679,17 @@ def finish(job_id, executor, results, name, filename, maintenance=None, gate=Non
     if tuple(actual) != (ok, detail):
         _amend_restart(job_id, results, actual)
     return JobOutcome(concluded=True)
+
+
+def _renew_lease(job_id, executor):
+    from models import db
+    from services import cluster_maintenance, jobs
+    try:
+        with cluster_maintenance.exempt(), db.engine.begin() as conn:
+            store.renew_lease(conn, job_id, executor, jobs._now(conn))
+    except Exception as e:
+        logger.error(f"Restore job {job_id}: lease not renewed before its conclusion: "
+                     f"{type(e).__name__}")
 
 
 def _ha():

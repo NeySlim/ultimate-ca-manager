@@ -131,9 +131,24 @@ describe('SettingsPage: restore as a job', () => {
     jobsApi.get.mockResolvedValue({ data: { ...running, state: 'succeeded', result: { code: 500, message, data: null } } })
     await startRestore()
     await act(async () => { await vi.advanceTimersByTimeAsync(1500) })
-    expect(notificationSpies.showError).toHaveBeenCalledWith(message)
+    // It stays until closed: the restart it asks must not go unread
+    expect(notificationSpies.showError).toHaveBeenCalledWith(message, 0)
     expect(screen.queryByTestId('restore-job')).toBeNull()
     expect(window.localStorage.getItem(PENDING_RESTORE_KEY)).toBeNull()
+  })
+
+  it('keeps the restart a restore answered within the request asks until it is closed', async () => {
+    const message = 'Backup restored, but finishing the restore failed. Restart the application before using it.'
+    systemService.restore = vi.fn().mockRejectedValue(Object.assign(new Error(message), { status: 500 }))
+    await startRestore()
+    expect(notificationSpies.showError).toHaveBeenCalledWith(message, 0)
+  })
+
+  it('lets a refused restore go as any other message', async () => {
+    systemService.restore = vi.fn().mockRejectedValue(Object.assign(new Error('Wrong password'), { status: 400 }))
+    await startRestore()
+    expect(notificationSpies.showError).toHaveBeenCalledWith('Wrong password')
+    expect(notificationSpies.showError).not.toHaveBeenCalledWith('Wrong password', 0)
   })
 
   it('says a cancelled restore restored nothing', async () => {

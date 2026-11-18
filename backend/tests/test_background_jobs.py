@@ -407,6 +407,29 @@ def test_a_run_whose_result_line_fails_twice_still_ends_and_logs_it(app, fake_ty
     assert job_id in errors[0] and FAKE_ACTION in errors[0] and 'Fake job finished' in errors[0]
 
 
+@pytest.mark.parametrize('failures', [1, 2])
+def test_a_result_line_leaves_for_syslog_once_whatever_its_attempts(app, fake_types, created,
+                                                                     monkeypatch, failures):
+    """A SIEM sees one copy per line: the written one, or the last unsaved one."""
+    import services.audit.core as core
+    real_append, sent, refused = core.append_entry, [], []
+
+    def append(entry, *a, **k):
+        if entry.action == FAKE_ACTION and len(refused) < failures:
+            refused.append(entry)
+            raise RuntimeError('audit down')
+        return real_append(entry, *a, **k)
+    monkeypatch.setattr(core, 'append_entry', append)
+    monkeypatch.setattr(core, 'forward_to_syslog',
+                        lambda entry, *a, **k: sent.append(entry) if entry.action == FAKE_ACTION
+                        else None)
+    job_id, _ = _start(app, fake_types[jobs.SLOT_BACKUP], created)
+    assert runner.join_local(job_id, 10)
+    with app.app_context():
+        assert len(refused) == failures and len(_result_lines(job_id)) == (failures == 1)
+    assert len(sent) == 1, sent
+
+
 def test_the_audit_line_names_the_requester(app, fake_types, created):
     job_id, _ = _start(app, fake_types[jobs.SLOT_BACKUP], created)
     assert runner.join_local(job_id, 10)

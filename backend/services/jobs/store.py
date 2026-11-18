@@ -90,7 +90,8 @@ def create_job(session, *, kind, slot, exclusive, exclusive_slots, now, params=N
 
     PostgreSQL: a transaction lock serialises creations, so the check below sees every
     committed job. SQLite: the insert takes the write lock first. The partial unique index
-    on the active slot holds whatever the path."""
+    on the active slot holds whatever the path, but within one slot only: a restore, which
+    holds every slot, and a backup created at the same time are kept apart by the lock."""
     job_id = job_id or str(uuid.uuid4())
     user_id, username, ip = requester
     try:

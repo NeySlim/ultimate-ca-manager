@@ -178,24 +178,19 @@ def test_a_fips_refused_restore_is_audited(auth_client, audit, monkeypatch, rout
 
 @pytest.mark.parametrize('route', RESTORE)
 def test_a_failure_after_the_restore_committed_leaves_no_failure_line(auth_client, audit, monkeypatch, route):
-    import importlib
     from services.backup.restore import invalidate
     from services.backup_service import BackupService
-    module = importlib.import_module('api.v2.system.backup' if route == RESTORE[0] else 'api.v2.settings.backup')
 
     monkeypatch.setattr(BackupService, 'restore_backup_from_stream',
                         lambda self, *a, **k: {'sections_carried': ['users']})
     monkeypatch.setattr(invalidate, 'invalidate_after_restore', lambda: 0)
     from tests.restore_job_support import sessions_kept
     sessions_kept(monkeypatch)  # the restore job's own sessions step
-    monkeypatch.setattr(module, '_request_restart_after_restore' if route == RESTORE[0] else 'request_restart',
-                        lambda: (False, 'no'))
     # The restore job finishes it, from the completion module
     monkeypatch.setattr('services.backup.restore_completion.request_restart', lambda: (False, 'no'))
 
     def boom(results):
         raise RuntimeError(LEAKY)
-    monkeypatch.setattr(module, 'restore_message', boom)
     monkeypatch.setattr('services.backup.restore_completion.restore_message', boom)
 
     response = _restore(auth_client, route, _form())
@@ -209,16 +204,12 @@ def test_a_committed_restore_is_audited_even_when_its_details_cannot_be_built(au
     from services.backup import restore_report
     from services.backup.restore import invalidate
     from services.backup_service import BackupService
-    import importlib
-    module = importlib.import_module('api.v2.system.backup' if route == RESTORE[0] else 'api.v2.settings.backup')
 
     monkeypatch.setattr(BackupService, 'restore_backup_from_stream',
                         lambda self, *a, **k: {'sections_carried': ['users']})
     monkeypatch.setattr(invalidate, 'invalidate_after_restore', lambda: 0)
     from tests.restore_job_support import sessions_kept
     sessions_kept(monkeypatch)  # the restore job's own sessions step
-    monkeypatch.setattr(module, '_request_restart_after_restore' if route == RESTORE[0] else 'request_restart',
-                        lambda: (False, 'no'))
     # The restore job finishes it, from the completion module
     monkeypatch.setattr('services.backup.restore_completion.request_restart', lambda: (False, 'no'))
 
@@ -248,18 +239,16 @@ def _raw_restore(client, route, filename, **fields):
 @pytest.mark.parametrize('outcome', ['restored', 'refused'])
 def test_the_audited_file_name_is_its_base_name_on_one_line(auth_client, audit, monkeypatch,
                                                            route, outcome):
-    import importlib
     from services.backup.restore import invalidate
     from services.backup_service import BackupService
-    module = importlib.import_module('api.v2.system.backup' if route == RESTORE[0] else 'api.v2.settings.backup')
     if outcome == 'restored':
         monkeypatch.setattr(BackupService, 'restore_backup_from_stream',
                             lambda self, *a, **k: {'sections_carried': ['users']})
         monkeypatch.setattr(invalidate, 'invalidate_after_restore', lambda: 0)
         from tests.restore_job_support import sessions_kept
         sessions_kept(monkeypatch)  # the restore job's own sessions step
-        monkeypatch.setattr(module, '_request_restart_after_restore' if route == RESTORE[0]
-                            else 'request_restart', lambda: (False, 'no'))
+        monkeypatch.setattr('services.backup.restore_completion.request_restart',
+                            lambda: (False, 'no'))
         _raw_restore(auth_client, route, '../../x\r\nforged.ucmbkp')
         audited = 'xforged.ucmbkp'
     else:
@@ -284,17 +273,14 @@ def test_client_filename(raw, audited):
 @pytest.mark.parametrize('lock', ['migration', 'backup'])
 def test_a_restore_refused_while_busy_carries_the_request_marker(auth_client, audit, monkeypatch, route, lock):
     import contextlib
-    import importlib
     from services.backup.locking import BackupBusyError
     from services.database_admin.lock import MigrationBusyError
-    module = importlib.import_module('api.v2.system.backup' if route == RESTORE[0] else 'api.v2.settings.backup')
     exc = MigrationBusyError(LEAKY) if lock == 'migration' else BackupBusyError(LEAKY)
 
     @contextlib.contextmanager
     def busy(*a, **k):
         raise exc
         yield
-    monkeypatch.setattr(module, 'database_migration_lock', busy)
     # The restore job takes it, from its own module
     monkeypatch.setattr('services.database_admin.lock.database_migration_lock', busy)
     response = _restore(auth_client, route, _form())
