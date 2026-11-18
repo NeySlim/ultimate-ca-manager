@@ -15,6 +15,8 @@ logger = logging.getLogger('ucm.scheduler_main')
 
 
 def main() -> int:
+    # Read before anything loads: a master that dies while this process starts is noticed below
+    parent = os.getppid()
     from services.scheduler_service import SUPERVISED_ENV, get_scheduler
     os.environ[SUPERVISED_ENV] = '1'  # create_app registers the tasks, the loop starts below
 
@@ -43,7 +45,6 @@ def main() -> int:
     start_applier(app, record=False)
     logger.info("Scheduler process %s started", os.getpid())
 
-    parent = os.getppid()
     while not stop.wait(1):
         if os.getppid() != parent:
             logger.warning("The gunicorn master is gone: the scheduler process stops")

@@ -410,3 +410,44 @@ def test_on_exit_waits_for_the_stop_the_watcher_is_recording(supervisor):
     s.stop()  # on_exit: returns only once the row is recorded, or the exit would cut it off
     assert calls == ['recorded']
     watcher.join(5)
+
+
+def test_a_master_that_dies_while_the_scheduler_process_starts_is_noticed(monkeypatch, caplog):
+    """The parent is read before the application loads: read after, the orphan would never stop."""
+    import app as app_module
+    import scheduler_main
+    from services import scheduler_service
+
+    handlers, started, asked = {}, [], []
+    monkeypatch.setenv('UCM_SCHEDULER_GRACEFUL_TIMEOUT', '1')
+    monkeypatch.setenv(scheduler_service.SUPERVISED_ENV, '')
+    monkeypatch.setattr(scheduler_main.signal, 'signal', lambda sig, h: handlers.__setitem__(sig, h))
+
+    def getppid():
+        asked.append(1)
+        if len(asked) > 5:  # a process that never notices is stopped, and the test fails below
+            handlers[signal.SIGTERM]()
+        return 1 if started else 4242  # the master dies once the loop runs, before main() goes on
+    monkeypatch.setattr(scheduler_main.os, 'getppid', getppid)
+
+    class Scheduler:
+        join = staticmethod(lambda timeout: True)
+        rearm_grace = relinquish = staticmethod(lambda: None)
+        start = staticmethod(lambda app: started.append(app))
+
+    class Runner:
+        def __init__(self, app, scheduler):
+            pass
+        start = lambda self: self  # noqa: E731
+        stop = lambda self: None  # noqa: E731
+        join = lambda self, timeout: True  # noqa: E731
+
+    monkeypatch.setattr(app_module, 'create_app', lambda: 'the-app')
+    monkeypatch.setattr(app_module, 'run_startup_housekeeping', lambda a: None)
+    monkeypatch.setattr(scheduler_service, 'get_scheduler', lambda: Scheduler())
+    monkeypatch.setattr('services.ws_relay.start_publisher', lambda a: None)
+    monkeypatch.setattr('services.ws_relay.stop_publisher', lambda **kw: None)
+    monkeypatch.setattr('services.jobs.runner.JobRunner', Runner)
+    with caplog.at_level('WARNING', logger='ucm.scheduler_main'):
+        assert scheduler_main.main() == 0
+    assert 'The gunicorn master is gone' in caplog.text
