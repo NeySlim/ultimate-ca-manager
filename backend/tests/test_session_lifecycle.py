@@ -4,6 +4,7 @@ RFC 6265 §8.4 (session fixation): every login hands out a new identifier.
 RFC 6238 §5.2: a TOTP code accepted once is refused the second time.
 A password change or reset, a 2FA reset and "revoke all" close the other sessions.
 """
+from tests.sso_identity_support import step_aside
 import hashlib
 import json
 import threading
@@ -365,9 +366,7 @@ def test_oidc_login_issues_a_new_identifier(app, make_user, monkeypatch):
 
     username = f'oidcsess{uuid.uuid4().hex[:6]}'
     with app.app_context():
-        others = [p.id for p in SSOProvider.query.filter_by(provider_type='oauth2', enabled=True)]
-        for pid in others:
-            db.session.get(SSOProvider, pid).enabled = False
+        others = step_aside('oauth2')
         provider = SSOProvider(
             name=f'oidc-sess-{uuid.uuid4().hex[:6]}', provider_type='oauth2', enabled=True,
             oauth2_client_id='ucm', oauth2_client_secret='secret',
@@ -386,6 +385,7 @@ def test_oidc_login_issues_a_new_identifier(app, make_user, monkeypatch):
     victim = app.test_client()
     with victim.session_transaction() as planted_session:
         planted_session['sso_state'] = 'state'
+        planted_session['sso_provider_id'] = provider_id
         planted_session['sso_pkce_verifier'] = 'verifier'
     planted = _sid(victim)
     try:
@@ -399,9 +399,7 @@ def test_oidc_login_issues_a_new_identifier(app, make_user, monkeypatch):
             SSOSession.query.filter_by(provider_id=provider_id).delete()
             User.query.filter_by(username=username).delete()
             db.session.delete(db.session.get(SSOProvider, provider_id))
-            for pid in others:
-                db.session.get(SSOProvider, pid).enabled = True
-            db.session.commit()
+            others.back()
 
 
 # --- concurrent bumps: a stale session never keeps itself ---------------------

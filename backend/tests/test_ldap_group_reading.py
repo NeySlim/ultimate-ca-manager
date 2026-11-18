@@ -4,6 +4,7 @@ The directory is ldap3's MOCK_SYNC strategy behind the real ``_ldap_authenticate
 the real ``/api/v2/sso/ldap/login`` door and the real mapping test route.
 """
 from models import UserSSOIdentity
+from tests.sso_identity_support import step_aside
 import json
 import logging
 import uuid
@@ -109,9 +110,7 @@ def _provider(**kw):
 def env(app, monkeypatch):
     created_p, created_u = [], []
     with app.app_context():
-        others = [(p.id, p.enabled) for p in SSOProvider.query.filter_by(provider_type='ldap').all()]
-        for pid, _ in others:
-            db.session.get(SSOProvider, pid).enabled = False
+        others = step_aside('ldap')
         db.session.commit()
 
     class E:
@@ -151,11 +150,7 @@ def env(app, monkeypatch):
             p = db.session.get(SSOProvider, pid)
             if p:
                 db.session.delete(p)
-        for opid, enabled in others:
-            p = db.session.get(SSOProvider, opid)
-            if p:
-                p.enabled = enabled
-        db.session.commit()
+        others.back()
 
 
 def _openldap(monkeypatch, user, groups_ou='ou=groups,dc=example,dc=com', group_cn='pki-admins',
@@ -447,8 +442,11 @@ def test_ldap_rule_and_group_compare_ignoring_case_and_edge_spaces(env, monkeypa
     assert env.role(user) == 'operator'
     other = env.user()
     _ad(monkeypatch, other, ['CN=VPN,OU=Groups,DC=example,DC=com'])
-    pid2 = _ad_provider(env, role_mapping=json.dumps({' pki-admins ': 'operator'}))
-    assert env.login(pid2, other)[0] == 403
+    # The same provider without required groups: one LDAP provider at a time
+    with env.app.app_context():
+        db.session.get(SSOProvider, pid).ldap_required_groups = None
+        db.session.commit()
+    assert env.login(pid, other)[0] == 403
 
 
 @pytest.mark.parametrize('rule,group', [('PKI  Admins', 'PKI Admins'), ('pki admins', 'PKI \t Admins'),

@@ -13,7 +13,7 @@ import pytest
 
 from models import db, User, AuditLog
 from models.sso import SSOProvider
-from tests.sso_identity_support import ext, identities, identity_for, legacy_user, prov
+from tests.sso_identity_support import ext, identities, identity_for, legacy_user, prov, several_per_type
 
 NOPASS = '!SSO_NO_PASSWORD!'
 PREFIX = 'sb3'
@@ -48,19 +48,21 @@ def providers(app):
 
     with app.app_context():
         _cleanup()
-    a = make(name=f'{PREFIX}-a-{tag}', oauth2_issuer='https://a.example',
-             oauth2_userinfo_url='https://a.example/userinfo')
-    b = make(name=f'{PREFIX}-b-{tag}', oauth2_issuer='https://b.example',
-             oauth2_userinfo_url='https://b.example/userinfo')
-    make.a, make.b = a, b
-    yield make
-    with app.app_context():
-        _cleanup()
-        for pid in made:
-            row = db.session.get(SSOProvider, pid)
-            if row is not None:
-                db.session.delete(row)
-        db.session.commit()
+    # Two OIDC providers: what binds an account to its provider, not to its type
+    with several_per_type(app):
+        a = make(name=f'{PREFIX}-a-{tag}', oauth2_issuer='https://a.example',
+                 oauth2_userinfo_url='https://a.example/userinfo')
+        b = make(name=f'{PREFIX}-b-{tag}', oauth2_issuer='https://b.example',
+                 oauth2_userinfo_url='https://b.example/userinfo')
+        make.a, make.b = a, b
+        yield make
+        with app.app_context():
+            _cleanup()
+            for pid in made:
+                row = db.session.get(SSOProvider, pid)
+                if row is not None:
+                    db.session.delete(row)
+            db.session.commit()
 
 
 def _name():

@@ -3,7 +3,7 @@
 It never travels through the IdP: OAuth2 keeps it in the server session next to
 ``state``, SAML in the AuthnRequest row; it is used once and revalidated on return.
 """
-from tests.sso_identity_support import delete_users_of
+from tests.sso_identity_support import step_aside, delete_users_of
 import re
 import uuid
 from pathlib import Path
@@ -88,9 +88,7 @@ def oidc(app, monkeypatch):
     from api.v2.sso import login_routes
 
     with app.app_context():
-        others = [(p.id, p.enabled) for p in SSOProvider.query.filter_by(provider_type='oauth2').all()]
-        for pid, _ in others:
-            db.session.get(SSOProvider, pid).enabled = False
+        others = step_aside('oauth2')
         row = SSOProvider(
             name=f'next-oidc-{uuid.uuid4().hex[:6]}', provider_type='oauth2', enabled=True,
             oauth2_client_id='ucm-client', oauth2_client_secret='secret',
@@ -125,8 +123,7 @@ def oidc(app, monkeypatch):
         SSOSession.query.filter_by(provider_id=pid).delete()
         delete_users_of(pid)
         db.session.delete(db.session.get(SSOProvider, pid))
-        for opid, enabled in others:
-            db.session.get(SSOProvider, opid).enabled = enabled
+        others.back()
         db.session.commit()
 
 

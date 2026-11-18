@@ -3,6 +3,7 @@
 Each case stores a token made under another database key (another node, or the
 machine-derived key of the single instance a cluster came from).
 """
+from tests.sso_identity_support import step_aside
 import logging
 import smtplib
 import uuid
@@ -105,9 +106,7 @@ def test_oauth2_login_with_an_unreadable_client_secret_is_not_attempted(app, mon
     posted = []
     monkeypatch.setattr(login_routes, 'safe_request_post', lambda *a, **k: posted.append(k))
     with app.app_context():
-        others = [(p.id, p.enabled) for p in SSOProvider.query.filter_by(provider_type='oauth2').all()]
-        for pid, _ in others:
-            db.session.get(SSOProvider, pid).enabled = False
+        others = step_aside('oauth2')
         row = SSOProvider(
             name=f'unreadable-{uuid.uuid4().hex[:6]}', provider_type='oauth2', enabled=True,
             oauth2_client_id='ucm-client', oauth2_auth_url='https://idp.example/authorize',
@@ -121,6 +120,7 @@ def test_oauth2_login_with_an_unreadable_client_secret_is_not_attempted(app, mon
         client = app.test_client()
         with client.session_transaction() as s:
             s['sso_state'] = 'st'
+            s['sso_provider_id'] = pid
             s['sso_pkce_verifier'] = 'v'
         r = client.get('/api/v2/sso/callback/oauth2?state=st&code=c')
         assert r.status_code == 302
@@ -129,8 +129,7 @@ def test_oauth2_login_with_an_unreadable_client_secret_is_not_attempted(app, mon
     finally:
         with app.app_context():
             db.session.delete(db.session.get(SSOProvider, pid))
-            for opid, enabled in others:
-                db.session.get(SSOProvider, opid).enabled = enabled
+            others.back()
             db.session.commit()
 
 

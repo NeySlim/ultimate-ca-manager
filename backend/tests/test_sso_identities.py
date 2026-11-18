@@ -739,7 +739,8 @@ def test_an_archive_from_before_the_rows_skips_an_identity_another_account_holds
 def _claimable_by_name(app, providers, uid, name):
     """Whether an identity of another provider opens the account by its name alone."""
     from api.v2.sso.account_state import legacy_sso_account
-    other = providers()
+    # The fixture holds the OIDC and the SAML slot: the other provider is the LDAP one
+    other = providers(provider_type='ldap', ldap_server='other.example.test', ldap_base_dn='dc=other')
     with app.app_context():
         legacy = legacy_sso_account(db.session.get(User, uid))
     return legacy, _login(app, other, name, 'attacker')

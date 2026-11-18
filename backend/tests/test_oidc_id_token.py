@@ -1,5 +1,6 @@
 """OIDC ID token verification regression tests."""
 
+from tests.sso_identity_support import step_aside
 import base64
 import json
 import time
@@ -296,12 +297,7 @@ def test_callback_rejects_invalid_id_token_and_audits(app, monkeypatch):
     from services.oidc_id_token import OIDCValidationError
 
     with app.app_context():
-        existing_states = [
-            (item.id, item.enabled)
-            for item in SSOProvider.query.filter_by(provider_type='oauth2').all()
-        ]
-        for provider_id, _enabled in existing_states:
-            db.session.get(SSOProvider, provider_id).enabled = False
+        aside = step_aside('oauth2')
         provider = SSOProvider(
             name='OIDC callback',
             provider_type='oauth2',
@@ -316,6 +312,7 @@ def test_callback_rejects_invalid_id_token_and_audits(app, monkeypatch):
         )
         db.session.add(provider)
         db.session.commit()
+        provider_id = provider.id
 
     class TokenResponse:
         ok = True
@@ -341,6 +338,7 @@ def test_callback_rejects_invalid_id_token_and_audits(app, monkeypatch):
     client = app.test_client()
     with client.session_transaction() as sso_session:
         sso_session['sso_state'] = 'state'
+        sso_session['sso_provider_id'] = provider_id
         sso_session['sso_pkce_verifier'] = 'verifier'
         sso_session['sso_nonce'] = 'nonce'
 
@@ -356,8 +354,4 @@ def test_callback_rejects_invalid_id_token_and_audits(app, monkeypatch):
             if provider:
                 SSOSession.query.filter_by(provider_id=provider.id).delete()
                 db.session.delete(provider)
-            for provider_id, enabled in existing_states:
-                existing = db.session.get(SSOProvider, provider_id)
-                if existing:
-                    existing.enabled = enabled
-            db.session.commit()
+            aside.back()

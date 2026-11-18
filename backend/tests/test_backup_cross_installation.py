@@ -426,8 +426,9 @@ def _seed_source():
                      template_type='server', extensions_template='{}')
                  for suffix in 'ab']
 
+    # One provider per type (uq_pro_sso_providers_provider_type)
     providers = [add('sso_providers', name=f'xinst-sso-{suffix}',
-                     provider_type='oauth2') for suffix in 'ab']
+                     provider_type=kind) for suffix, kind in (('a', 'saml'), ('b', 'oauth2'))]
     for column in ('oauth2_client_secret', 'ldap_bind_password'):
         secret(providers[1], 'sso_providers', column)
 

@@ -12,7 +12,7 @@ import pytest
 from models import db, User, UserSSOIdentity
 from models.sso import SSOProvider, SSOSession
 from tests.sso_identity_support import (
-    by_identity, delete_users_of, ext, identities, legacy_user, orphan, prov,
+    by_identity, delete_users_of, ext, identities, legacy_user, orphan, prov, step_aside,
 )
 
 
@@ -32,9 +32,7 @@ def oidc(app, monkeypatch):
     from api.v2.sso import login_routes
 
     with app.app_context():
-        others = [(p.id, p.enabled) for p in SSOProvider.query.filter_by(provider_type='oauth2').all()]
-        for pid, _ in others:
-            db.session.get(SSOProvider, pid).enabled = False
+        others = step_aside('oauth2')
         row = SSOProvider(
             name=f'takeover-oidc-{uuid.uuid4().hex[:6]}', provider_type='oauth2', enabled=True,
             oauth2_client_id='ucm-client', oauth2_client_secret='secret',
@@ -79,6 +77,7 @@ def oidc(app, monkeypatch):
         client = app.test_client()
         with client.session_transaction() as s:
             s['sso_state'] = 'st'
+            s['sso_provider_id'] = pid
             s['sso_pkce_verifier'] = 'v'
             s['sso_nonce'] = 'n'
         r = client.get('/api/v2/sso/callback/oauth2?state=st&code=c')
@@ -93,8 +92,7 @@ def oidc(app, monkeypatch):
         SSOSession.query.filter_by(provider_id=pid).delete()
         delete_users_of(pid)
         db.session.delete(db.session.get(SSOProvider, pid))
-        for opid, enabled in others:
-            db.session.get(SSOProvider, opid).enabled = enabled
+        others.back()
         db.session.commit()
 
 
@@ -213,9 +211,7 @@ def ldap(app, monkeypatch):
     from api.v2.sso import ldap_routes
 
     with app.app_context():
-        others = [(p.id, p.enabled) for p in SSOProvider.query.filter_by(provider_type='ldap').all()]
-        for pid, _ in others:
-            db.session.get(SSOProvider, pid).enabled = False
+        others = step_aside('ldap')
         row = SSOProvider(name=f'takeover-ldap-{uuid.uuid4().hex[:6]}', provider_type='ldap',
                           enabled=True, ldap_server='ldap.example.test',
                           auto_create_users=True, default_role='viewer')
@@ -239,8 +235,7 @@ def ldap(app, monkeypatch):
         SSOSession.query.filter_by(provider_id=pid).delete()
         delete_users_of(pid)
         db.session.delete(db.session.get(SSOProvider, pid))
-        for opid, enabled in others:
-            db.session.get(SSOProvider, opid).enabled = enabled
+        others.back()
         db.session.commit()
 
 
@@ -515,6 +510,8 @@ def _orphan(app, username, sub, through_api=None, issuer='https://idp.example/')
     through the API or, as before this release, by a bare row delete."""
     with app.app_context():
         _cleanup([username])
+        # The provider a test fixture holds steps aside while the deleted one exists
+        aside = step_aside('oauth2')
         old = SSOProvider(name=f'gone-{uuid.uuid4().hex[:6]}', provider_type='oauth2', enabled=False,
                           oauth2_issuer=issuer)
         db.session.add(old)
@@ -530,6 +527,8 @@ def _orphan(app, username, sub, through_api=None, issuer='https://idp.example/')
             db.session.commit()
     if through_api is not None:
         assert through_api.delete(f'/api/v2/sso/providers/{old_id}').status_code == 200
+    with app.app_context():
+        aside.back()
     return old_id
 
 
@@ -579,23 +578,30 @@ def test_an_orphan_is_not_opened_by_its_id_from_another_or_unknown_idp(
             _cleanup(['rvorph', 'rvorphx'])
 
 
+def _saml_provider(n, entity_id=None):
+    """One SAML provider at a time: the second IdP's is created once the first is deleted."""
+    row = SSOProvider(name=f'saml-{n}-{uuid.uuid4().hex[:6]}', provider_type='saml', enabled=False,
+                      saml_entity_id=entity_id or f'https://{n}.example/idp', default_role='viewer')
+    db.session.add(row)
+    db.session.commit()
+    return row.id
+
+
 def test_a_saml_orphan_is_not_opened_by_another_idp(app, auth_client):
     """A SAML NameID only means something for the IdP that issued it."""
     from api.v2.sso.ldap_routes import _get_or_create_sso_user
     email_fmt = 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress'
     with app.app_context():
         _cleanup(['rvorph2'])
-        rows = [SSOProvider(name=f'saml-{n}-{uuid.uuid4().hex[:6]}', provider_type='saml',
-                            enabled=False, saml_entity_id=f'https://{n}.example/idp',
-                            default_role='viewer') for n in ('a', 'b')]
-        db.session.add_all(rows)
-        db.session.commit()
-        a_id, b_id = rows[0].id, rows[1].id
+        aside = step_aside('saml')
+        a_id = _saml_provider('a')
         db.session.add(legacy_user(username='rvorph2', email='alice@corp.example', full_name='A', role='admin',
                             active=True, password_hash='!SSO_NO_PASSWORD!', auth_source='saml',
                             sso_provider_id=a_id, sso_external_id='alice@corp.example'))
         db.session.commit()
     assert auth_client.delete(f'/api/v2/sso/providers/{a_id}').status_code == 200
+    with app.app_context():
+        b_id = _saml_provider('b')
     try:
         with app.test_request_context():
             user, err = _get_or_create_sso_user(
@@ -608,7 +614,7 @@ def test_a_saml_orphan_is_not_opened_by_another_idp(app, auth_client):
         with app.app_context():
             _cleanup(['rvorph2'])
             db.session.delete(db.session.get(SSOProvider, b_id))
-            db.session.commit()
+            aside.back()
 
 
 @pytest.mark.parametrize('login_name', ['rvlink', 'rvlinkx'])  # step 2 (username), step 3 (email)
@@ -620,17 +626,15 @@ def test_an_unbound_orphan_is_not_opened_by_name_or_email_from_another_idp(
     from api.v2.sso.ldap_routes import _get_or_create_sso_user
     with app.app_context():
         _cleanup(['rvlink', 'rvlinkx'])
-        rows = [SSOProvider(name=f'saml-{n}-{uuid.uuid4().hex[:6]}', provider_type='saml',
-                            enabled=False, saml_entity_id=f'https://{n}.example/idp',
-                            default_role='viewer') for n in ('a', 'b')]
-        db.session.add_all(rows)
-        db.session.commit()
-        a_id, b_id = rows[0].id, rows[1].id
+        aside = step_aside('saml')
+        a_id = _saml_provider('a')
         db.session.add(legacy_user(username='rvlink', email='rvlink@corp.example', full_name='L', role='admin',
                             active=True, password_hash='!SSO_NO_PASSWORD!' if legacy else 'hash',
                             auth_source='local' if legacy else 'saml', sso_provider_id=a_id))
         db.session.commit()
     assert auth_client.delete(f'/api/v2/sso/providers/{a_id}').status_code == 200
+    with app.app_context():
+        b_id = _saml_provider('b')
     try:
         with app.test_request_context():
             assert orphan(User.query.filter_by(username='rvlink').one()) == 'saml:https://a.example/idp'
@@ -645,23 +649,21 @@ def test_an_unbound_orphan_is_not_opened_by_name_or_email_from_another_idp(
         with app.app_context():
             _cleanup(['rvlink', 'rvlinkx'])
             db.session.delete(db.session.get(SSOProvider, b_id))
-            db.session.commit()
+            aside.back()
 
 
 def test_an_unbound_orphan_is_taken_back_by_a_provider_for_the_same_idp(app, auth_client):
     from api.v2.sso.ldap_routes import _get_or_create_sso_user
     with app.app_context():
         _cleanup(['rvback'])
-        rows = [SSOProvider(name=f'saml-{n}-{uuid.uuid4().hex[:6]}', provider_type='saml',
-                            enabled=False, saml_entity_id='https://same.example/idp',
-                            default_role='viewer') for n in ('old', 'new')]
-        db.session.add_all(rows)
-        db.session.commit()
-        a_id, b_id = rows[0].id, rows[1].id
+        aside = step_aside('saml')
+        a_id = _saml_provider('old', 'https://same.example/idp')
         db.session.add(legacy_user(username='rvback', email='rvback@corp.example', full_name='B', role='admin',
                             active=True, password_hash='hash', auth_source='saml', sso_provider_id=a_id))
         db.session.commit()
     assert auth_client.delete(f'/api/v2/sso/providers/{a_id}').status_code == 200
+    with app.app_context():
+        b_id = _saml_provider('new', 'https://same.example/idp')
     try:
         with app.test_request_context():
             user, err = _get_or_create_sso_user(
@@ -673,7 +675,7 @@ def test_an_unbound_orphan_is_taken_back_by_a_provider_for_the_same_idp(app, aut
         with app.app_context():
             _cleanup(['rvback'])
             db.session.delete(db.session.get(SSOProvider, b_id))
-            db.session.commit()
+            aside.back()
 
 
 @pytest.mark.parametrize('userinfo', [

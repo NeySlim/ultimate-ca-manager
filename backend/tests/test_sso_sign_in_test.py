@@ -4,6 +4,7 @@ Each case of the parity matrix runs the test against a simulated IdP, checks tha
 identity, SSO session, provider row or browser session moved, then plays the login with the
 same IdP answer on the same database and compares the verdicts.
 """
+from tests.sso_identity_support import several_per_type, step_aside
 import base64
 import hashlib
 import json
@@ -152,9 +153,7 @@ class OIDCIdP:
 def oidc_provider(app):
     """The only enabled OAuth2 provider while a test runs (the login picks the first one)."""
     with app.app_context():
-        others = [(p.id, p.enabled) for p in SSOProvider.query.filter_by(provider_type='oauth2')]
-        for pid, _ in others:
-            db.session.get(SSOProvider, pid).enabled = False
+        others = step_aside('oauth2')
         row = SSOProvider(
             name=_uid('sit-oidc'), provider_type='oauth2', enabled=True,
             oauth2_client_id='ucm-client', oauth2_client_secret=SECRET_CLIENT,
@@ -169,8 +168,7 @@ def oidc_provider(app):
     yield pid
     _drop_provider(app, pid)
     with app.app_context():
-        for opid, enabled in others:
-            db.session.get(SSOProvider, opid).enabled = enabled
+        others.back()
         db.session.commit()
 
 
@@ -179,9 +177,7 @@ def saml_provider(app, idp_signer, monkeypatch):
     monkeypatch.setattr(saml_sp, 'get_admin_base_url', lambda: None)
     monkeypatch.setattr(saml_sp, 'get_admin_canonical_origin', lambda: None)
     with app.app_context():
-        others = [(p.id, p.enabled) for p in SSOProvider.query.filter_by(provider_type='saml')]
-        for pid, _ in others:
-            db.session.get(SSOProvider, pid).enabled = False
+        others = step_aside('saml')
         row = SSOProvider(
             name=_uid('sit-saml'), provider_type='saml', enabled=True,
             saml_entity_id=IDP_ENTITY, saml_sso_url='https://idp.example.test/sso',
@@ -192,8 +188,7 @@ def saml_provider(app, idp_signer, monkeypatch):
     yield pid
     _drop_provider(app, pid)
     with app.app_context():
-        for opid, enabled in others:
-            db.session.get(SSOProvider, opid).enabled = enabled
+        others.back()
         db.session.commit()
 
 
@@ -677,6 +672,11 @@ def _second_oidc(app, enabled=True):
 def test_a_report_lists_every_other_enabled_provider_of_the_type(
         app, oidc_provider, monkeypatch, tried_enabled):
     """Whatever order the database returns rows in, no report claims which one the login takes."""
+    with several_per_type(app):
+        _lists_every_other_enabled_provider(app, oidc_provider, monkeypatch, tried_enabled)
+
+
+def _lists_every_other_enabled_provider(app, oidc_provider, monkeypatch, tried_enabled):
     case = Case(app, oidc_provider, 'oauth2')
     others = [_second_oidc(app), _second_oidc(app), _second_oidc(app, enabled=False)]
     try:

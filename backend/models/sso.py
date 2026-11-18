@@ -13,7 +13,9 @@ from utils.datetime_utils import utc_now, utc_isoformat
 class SSOProvider(db.Model):
     """SSO Provider configuration"""
     __tablename__ = 'pro_sso_providers'
-    
+    # One provider per type: every sign-in, return and restore finds "the provider of the type"
+    __table_args__ = (db.Index('uq_pro_sso_providers_provider_type', 'provider_type', unique=True),)
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
     provider_type = db.Column(db.String(50), nullable=False)  # saml, oauth2, ldap
