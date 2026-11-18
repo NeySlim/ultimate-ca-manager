@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
-- CA deletion: a CA named by the default ACME issuing, SCEP, EST, TSA, WSTEP, XCEP or trusted mTLS CA setting, or by an EST label, is no longer deleted (409); on SQLite the next CA created took its number and became the ACME issuing CA. An ACME issuing CA setting that names a CA already gone now refuses the order instead of signing with the first CA.
+- CA deletion: a CA named by the default ACME issuing, EST, TSA, WSTEP, XCEP or trusted mTLS CA setting, or by an EST label, is no longer deleted (409), as the default SCEP CA already was; on SQLite the next CA created took its number and became the ACME issuing CA. An ACME issuing CA setting that names a CA already gone now refuses the order instead of signing with the first CA.
 - ACME issuance: a CA chosen for an ACME domain or as the default ACME issuing CA that had no private key was skipped in silence, and the default CA or the first CA able to sign issued the certificate. Such an order, or one whose chosen CA is offline, is now refused as a server error and nothing is issued.
 
 ## [2.254.4] - 2026-11-16

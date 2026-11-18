@@ -26,6 +26,22 @@ NO_KEY = 'has no private key'
 _FORMS = {'refid': lambda ca: ca.refid, 'id': lambda ca: str(ca.id), 'padded': lambda ca: f' +0{ca.id} '}
 
 
+@pytest.fixture(scope='module', autouse=True)
+def _drop_the_orders_of_this_module(app):
+    """The ACME orders and accounts these tests create leave with the module."""
+    from models.acme_models import AcmeAccount, AcmeOrder
+    with app.app_context():
+        orders = db.session.query(db.func.coalesce(db.func.max(AcmeOrder.id), 0)).scalar()
+        accounts = db.session.query(db.func.coalesce(db.func.max(AcmeAccount.id), 0)).scalar()
+    yield
+    with app.app_context():
+        for row in AcmeOrder.query.filter(AcmeOrder.id > orders).all():
+            db.session.delete(row)
+        for row in AcmeAccount.query.filter(AcmeAccount.id > accounts).all():
+            db.session.delete(row)
+        db.session.commit()
+
+
 @pytest.fixture(scope='module')
 def drop_local_domains(app):
     yield
@@ -257,7 +273,7 @@ def test_the_finalize_route_answers_a_server_error_and_the_order_stays_ready(app
 
 def test_a_chosen_ca_offline_with_its_key_is_named_in_the_audit_only(app, client, monkeypatch,
                                                                       create_ca, default_setting):
-    """An offline CA keeping its key is refused by the signing path: never another CA instead."""
+    """An offline CA keeping its key is refused before signing: never another CA instead."""
     create_ca(cn='A CA able to sign, not chosen')
     chosen = create_ca(cn='Default CA offline keeping its key')
     with app.app_context():
@@ -334,6 +350,22 @@ def test_a_ca_named_with_caa_outside_its_window_is_still_a_server_error(app, cli
     response, order_id = _finalize_by_route(app, client, monkeypatch, _domain())
     _assert_refused_by_route(app, response, order_id, "issuing CA 'Window CAA CA'")
     assert 'Window CAA CA' not in response.get_data(as_text=True)
+
+
+def test_a_ca_whose_name_is_a_word_of_the_refusal_is_still_named(app, client, monkeypatch, create_ca,
+                                                                 default_setting):
+    from services.cert_service import CertificateService
+    from utils.ca_signing_window import IssuerWindowError
+
+    def outside_window(*_a, **_k):
+        raise IssuerWindowError('Issuing CA certificate has expired (since 2020-01-01T00:00:00Z)')
+
+    chosen = create_ca(cn='Issuing CA')
+    with app.app_context():
+        _set_default(db.session.get(CA, chosen['id']).refid)
+    monkeypatch.setattr(CertificateService, 'sign_csr', staticmethod(outside_window))
+    response, order_id = _finalize_by_route(app, client, monkeypatch, _domain())
+    _assert_refused_by_route(app, response, order_id, "issuing CA 'Issuing CA'")
 
 
 def test_a_domain_with_a_caa_label_mapped_to_a_keyless_ca_is_a_server_error(app, client, monkeypatch,

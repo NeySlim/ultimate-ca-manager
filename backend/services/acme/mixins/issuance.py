@@ -223,8 +223,9 @@ class IssuanceMixin:
                 self._last_finalize_error_type = 'serverInternal'
                 # The log and the audit name the CA that could not sign; the client never sees it
                 name = getattr(self, '_last_signing_ca_name', None)
-                if name and name not in error:
-                    error = f"{error} (issuing CA '{name}')"
+                named = f"issuing CA '{name}'"
+                if name and named not in error:
+                    error = f"{error} ({named})"
                 logger.error("ACME order %s not signed: %s", order_id, error)
                 return False, error
             from services.acme.requested_validity import RequestedValidityError

@@ -18,6 +18,22 @@ pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 CA_SECTION = 'certificate_authorities'
 
 
+@pytest.fixture(scope='module', autouse=True)
+def _drop_the_orders_of_this_module(app):
+    """The ACME orders and accounts these tests create leave with the module."""
+    from models.acme_models import AcmeAccount, AcmeOrder
+    with app.app_context():
+        orders = db.session.query(db.func.coalesce(db.func.max(AcmeOrder.id), 0)).scalar()
+        accounts = db.session.query(db.func.coalesce(db.func.max(AcmeAccount.id), 0)).scalar()
+    yield
+    with app.app_context():
+        for row in AcmeOrder.query.filter(AcmeOrder.id > orders).all():
+            db.session.delete(row)
+        for row in AcmeAccount.query.filter(AcmeAccount.id > accounts).all():
+            db.session.delete(row)
+        db.session.commit()
+
+
 def _fixed_key(pattern):
     """The one key a declaration without wildcards matches."""
     key = re.sub(r'\\(.)', r'\1', pattern)
