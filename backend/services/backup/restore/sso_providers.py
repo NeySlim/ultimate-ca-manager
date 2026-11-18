@@ -9,7 +9,8 @@ Decided before the plan, on the archive itself, in either mode and for archives 
   identities it bound to that IdP's subjects (OIDC Core §5.7: a sub is unique per issuer);
 * a merge keeps the provider here and leaves the archived one out: the accounts the archive
   attaches to it come back as orphans of its IdP, or attached to the provider here when both
-  speak to the same IdP (one subject of one IdP is one row).
+  speak to the same IdP (one subject of one IdP is one row), never over an account's own row
+  there.
 
 Each case is a warning of the restore's report.
 """
@@ -19,6 +20,9 @@ from ..errors import BackupSchemaError
 from ..export_generic import REFERENCE_SUFFIX
 
 SECTION = 'sso_providers'
+# On an identity row moved to the provider here: the IdP key it falls back to as an orphan
+# when the account already holds a row at that provider (restore_core._identities_free_here)
+REPOINTED = '_orphan_of_if_held'
 _IDP_FIELDS = ('provider_type', 'oauth2_issuer', 'oauth2_userinfo_url', 'saml_entity_id',
                'ldap_server', 'ldap_base_dn')
 
@@ -117,7 +121,7 @@ def _leave_out(backup_data, rows: List[Any]) -> None:
         ref = row.get(f'provider_id{REFERENCE_SUFFIX}') if isinstance(row, dict) else None
         found = fate(ref)
         if found and found[1] is not None:
-            row[f'provider_id{REFERENCE_SUFFIX}'] = {'name': found[1]}
+            row.update({f'provider_id{REFERENCE_SUFFIX}': {'name': found[1]}, REPOINTED: found[0]})
         elif found:
             row.update({'provider_id': None, f'provider_id{REFERENCE_SUFFIX}': None,
                         'orphan_of': found[0]})

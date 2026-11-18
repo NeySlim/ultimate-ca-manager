@@ -883,16 +883,40 @@ class RestoreCoreMixin:
         logger.warning("Restore: %s", warning)
         return warning
 
+    @staticmethod
+    def _kept_binding(plan, user_id, provider_id) -> None:
+        from models import User
+        from models.sso import SSOProvider
+        account, provider = db.session.get(User, user_id), db.session.get(SSOProvider, provider_id)
+        warning = (f"user_sso_identities: the account {account.username!r} is bound here to provider "
+                   f"{provider.name!r} under another subject than the archive's: the binding here is "
+                   "kept, the archive's subject comes back as an orphan of its IdP")
+        plan.warnings.append(warning)
+        logger.warning("Restore: %s", warning)
+
     def _identities_free_here(self, rows, plan):
         """The archive's identity rows, those whose identity opens another account here made
-        orphans of an unknown IdP: an account without a row nor a password is claimable by name."""
-        from models import User
+        orphans of an unknown IdP: an account without a row nor a password is claimable by name.
+        A row moved to the provider here never replaces the account's own row there: the same
+        subject is dropped, another one (pairwise subjects) becomes an orphan of its IdP."""
+        from models import User, UserSSOIdentity
+        from .restore.sso_providers import REPOINTED
         db.session.flush()
         plan.refresh(['users', 'sso_providers'])
         kept = []
         for row in rows:
             user_id = plan.resolve('user_sso_identities', row, 'user_id')
             provider_id = plan.resolve('user_sso_identities', row, 'provider_id')
+            idp = row.get(REPOINTED)
+            if idp and user_id is not None and provider_id is not None:
+                held = UserSSOIdentity.query.filter_by(user_id=user_id, provider_id=provider_id).first()
+                if held is not None and held.external_id == row.get('external_id'):
+                    continue
+                if held is not None:
+                    self._kept_binding(plan, user_id, provider_id)
+                    kept.append({**row, 'provider_id': None, f'provider_id{REFERENCE_SUFFIX}': None,
+                                 'orphan_of': idp})
+                    continue
             holder = self._identity_holder(user_id, provider_id, row.get('external_id'))
             if holder is None:
                 kept.append(row)

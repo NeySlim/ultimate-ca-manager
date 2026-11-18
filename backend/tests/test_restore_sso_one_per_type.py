@@ -302,3 +302,31 @@ def test_a_replacement_by_a_provider_of_the_same_idp_leaves_one_row_per_subject(
     okta = SSOProvider.query.filter_by(name='okta').one()
     assert _rows('gina') == [(okta.id, 'gina-sub', None)]
     _one_per_type_and_no_dangling_provider()
+
+
+@pytest.mark.parametrize('fmt', FORMATS)
+def test_a_merge_keeps_the_live_binding_at_the_provider_of_the_same_idp(target, fmt):
+    """One IdP behind two registrations can give two subjects (OIDC Core §8, pairwise): the
+    binding here stays; a 3.0 archive's subject comes back as an orphan of the IdP, a 2.254
+    account that holds rows here keeps them alone (the legacy merge rule)."""
+    okta = _here('okta', 'oauth2', 'https://same.example')
+    _account('gina', okta, 'gina-new')
+    db.session.commit()
+    results = _restore({'sso_providers': [_archived_provider('corp', 'oauth2', 'https://same.example')],
+                        **_archived_account(fmt, 'gina', 'corp', 'gina-old')}, 'merge')
+    db.session.expire_all()
+    orphan = [(None, 'gina-old', 'oauth2:https://same.example')] if fmt == '3.0' else []
+    assert _rows('gina') == [(okta, 'gina-new', None)] + orphan
+    kept = [w for w in results['warnings'] if "'gina' is bound here to provider 'okta'" in w]
+    assert len(kept) == (1 if fmt == '3.0' else 0), results['warnings']
+    _one_per_type_and_no_dangling_provider()
+
+
+def test_a_merge_adds_no_row_for_the_live_binding_of_the_same_idp(target):
+    okta = _here('okta', 'oauth2', 'https://same.example')
+    _account('gina', okta, 'gina-sub')
+    db.session.commit()
+    _restore({'sso_providers': [_archived_provider('corp', 'oauth2', 'https://same.example')],
+              **_archived_account('3.0', 'gina', 'corp', 'gina-sub')}, 'merge')
+    db.session.expire_all()
+    assert _rows('gina') == [(okta, 'gina-sub', None)]
