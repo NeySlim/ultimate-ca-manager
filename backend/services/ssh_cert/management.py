@@ -1,5 +1,8 @@
 import logging
 
+from sqlalchemy import or_, update
+from sqlalchemy.orm.attributes import set_committed_value
+
 from models import db
 from models.ssh import SSHCertificateAuthority, SSHCertificate
 from services.ssh_ca_service import SSHCAService
@@ -25,9 +28,18 @@ class SSHCertificateManagementMixin:
         if cert.revoked:
             raise ValueError("Certificate is already revoked")
 
-        cert.revoked = True
-        cert.revoked_at = utc_now()
-        cert.revoke_reason = reason
+        # A conditional write: a revocation committed since the read above (SQLite locks no
+        # row) is refused as already revoked, its date and reason kept
+        now = utc_now()
+        table = SSHCertificate.__table__
+        written = db.session.execute(update(table).where(
+            table.c.id == cert.id, or_(table.c.revoked.is_(False), table.c.revoked.is_(None))
+        ).values(revoked=True, revoked_at=now, revoke_reason=reason))
+        if written.rowcount != 1:
+            db.session.rollback()
+            raise ValueError("Certificate is already revoked")
+        for name, value in (('revoked', True), ('revoked_at', now), ('revoke_reason', reason)):
+            set_committed_value(cert, name, value)
         # The KRL revokes a non-zero serial, and the key ID of a serial 0 certificate under its CA
         # (ssh-keygen -k): every certificate it revokes is revoked; `revoked_with` names only those
         # this revocation turned from valid to revoked, `revoked_through` the KRL entry of each
