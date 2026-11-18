@@ -2981,7 +2981,7 @@
     "memory": "Mémoire",
     "serviceStatusUnavailable": "État du service indisponible.",
     "dockerRestartNotice": "Dans un conteneur (Docker, Kubernetes), redémarrez-le pour appliquer les changements.",
-    "dockerCertNotice": "Certificat enregistré. Redémarrez le conteneur pour appliquer : docker restart <conteneur>",
+    "dockerCertNotice": "Certificat enregistré. Redémarrez le conteneur pour appliquer (Docker : docker restart <conteneur> ; Kubernetes : redémarrez le pod).",
     "smtpConfig": "Configuration SMTP",
     "testEmailSuccess": "Email de test envoyé avec succès",
     "smtpHost": "Serveur SMTP",

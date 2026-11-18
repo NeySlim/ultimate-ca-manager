@@ -3050,7 +3050,7 @@
     "memory": "Memory",
     "serviceStatusUnavailable": "Service status unavailable.",
     "dockerRestartNotice": "In a container (Docker, Kubernetes), restart it to apply changes.",
-    "dockerCertNotice": "Certificate saved. Restart the container to apply: docker restart <container>",
+    "dockerCertNotice": "Certificate saved. Restart the container to apply (Docker: docker restart <container>; Kubernetes: restart the pod).",
     "settingSavedInBrowser": "This setting is saved in your browser and persists between sessions.",
     "smtpConfig": "SMTP Configuration",
     "testEmailSuccess": "Test email sent successfully",

@@ -38,8 +38,10 @@ def refuse_archived_shared_types(backup_data) -> None:
     or a provider whose type is not text."""
     by_type: Dict[str, List[str]] = {}
     for row in _archived(backup_data):
-        kind = row.get('provider_type') or 'oauth2'
-        if not isinstance(kind, str):
+        kind = row.get('provider_type')
+        if kind is None or kind == '':
+            kind = 'oauth2'
+        elif not isinstance(kind, str):
             raise BackupSchemaError(
                 f"Cannot restore: the type of the archive's SSO provider {row['name']!r} is not "
                 "text. Nothing has been changed.")

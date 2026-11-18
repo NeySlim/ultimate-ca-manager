@@ -147,3 +147,43 @@ def test_a_certificate_overtaken_or_gone_before_the_gate_is_skipped(
     finally:
         _drop_policy(app, pid)
         _drop_rows(app, bad_id)
+
+
+def test_a_pair_under_two_policies_fails_before_the_gate_and_the_pass_goes_on(
+        app, create_ca, monkeypatch):
+    import services.auto_renewal_service as scheduler
+    from services.approval_gate import PairApprovalConflict
+    from types import SimpleNamespace
+    svc = scheduler.AutoRenewalService
+    ca = create_ca(cn='pair-conflict CA')
+    bad_id = _cert_row(app, ca['id'], 'bad-pair.example.test')
+    next_id = _cert_row(app, ca['id'], 'next-pair.example.test')
+    reasons = []
+    monkeypatch.setattr(svc, '_log_failure', staticmethod(
+        lambda cert_id, cn, reason: reasons.append((cert_id, reason))))
+    monkeypatch.setattr(svc, '_send_failure_notification', staticmethod(lambda stats: None))
+    monkeypatch.setattr(svc, '_publish_crls', staticmethod(lambda carefs: None))
+    conflict = PairApprovalConflict(SimpleNamespace(name='one'), SimpleNamespace(name='other'))
+
+    def held(cert, already_queued=False):
+        if cert.id == bad_id:
+            raise conflict
+        return False
+
+    monkeypatch.setattr(svc, '_held_for_approval', staticmethod(held))
+    try:
+        with app.app_context():
+            previous = dict(svc.get_renewal_config())
+            monkeypatch.setattr(svc, 'get_certificates_for_renewal', staticmethod(
+                lambda: [db.session.get(Certificate, i) for i in (bad_id, next_id)]))
+            svc.set_renewal_config({**previous, 'enabled': True})
+            try:
+                stats = svc.run_auto_renewal()
+            finally:
+                svc.set_renewal_config(previous)
+            assert (db.session.get(Certificate, next_id).renewed_times or 0) == 1
+            db.session.remove()
+        assert (stats['renewed'], stats['failed'], stats['skipped']) == (1, 1, 0), stats
+        assert reasons == [(bad_id, str(conflict))]
+    finally:
+        _drop_rows(app, bad_id, next_id)
