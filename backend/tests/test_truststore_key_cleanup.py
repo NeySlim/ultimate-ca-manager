@@ -123,6 +123,17 @@ def test_the_start_removes_stored_keys_once_and_keeps_the_rows(here, caplog):
     assert _audited(again) == [] and not caplog.messages
 
 
+def test_the_start_keeps_a_headered_certificate_beside_a_plain_one(here):
+    """A block with RFC 1421 headers stays with the plain blocks of its row once the key is removed."""
+    from utils.trust_pem import strip_stored_private_keys
+    first, key, first_fp = _issue('headered-first')
+    second, _, _ = _issue('plain-second')
+    headered = first.replace('-----BEGIN CERTIFICATE-----\n', '-----BEGIN CERTIFICATE-----\nComment: x\n\n')
+    row_id = _row('headered', headered + key + second, first_fp)
+    assert strip_stored_private_keys() == 1
+    assert _stored()[row_id] == first + second
+
+
 def test_a_row_the_start_cannot_read_is_left_and_named(here, caplog):
     """A value that is not text (SQLite stores what it is given) stops neither the pass nor the start."""
     from utils.trust_pem import strip_stored_private_keys

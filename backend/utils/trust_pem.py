@@ -78,14 +78,16 @@ def canonical_certificates(data):
 def served_certificates(stored) -> str:
     """What any read hands out of a stored entry: its certificate blocks, or '' when it has none.
 
-    A row whose blocks carry RFC 1421 headers is handed out as the certificates cryptography reads in it."""
-    blocks = certificate_blocks(stored)
-    if blocks:
+    The blocks are taken as they are only when the pattern matched every opening line; a row where some
+    carry RFC 1421 headers is handed out as the certificates cryptography reads in it, or its blocks if none."""
+    data = _bytes(stored)
+    blocks = certificate_blocks(data)
+    if len(_CERTIFICATE_BLOCK.findall(data)) == len(_CERTIFICATE_OPENING.findall(data)):
         return blocks.decode('ascii')
     try:
-        certs = x509.load_pem_x509_certificates(_bytes(stored))
+        certs = x509.load_pem_x509_certificates(data)
     except Exception:
-        return ''
+        return blocks.decode('ascii')
     return b''.join(c.public_bytes(serialization.Encoding.PEM) for c in certs).decode('ascii')
 
 

@@ -293,3 +293,36 @@ def test_a_backup_carries_the_certificate_only(app, keyed_row):
     (entry,) = [e for e in rows if e['fingerprint_sha256'] == _fp(cert)]
     assert entry['certificate_pem'].encode() == _pem(cert)
     assert body not in json.dumps(rows)
+
+
+def _headered(cert):
+    return _pem(cert).replace(b'-----BEGIN CERTIFICATE-----\n', b'-----BEGIN CERTIFICATE-----\nComment: x\n\n')
+
+
+def test_a_headered_block_beside_a_plain_one_is_handed_out_with_it(app, auth_client, drop):
+    """A row 2.254.4 stored as sent keeps every certificate it holds, not only the blocks without headers."""
+    from services.backup.export_generic import IdentityIndex, export_section
+    _, first = _issue('headered-first')
+    _, second = _issue('plain-second')
+    drop(first)
+    with app.app_context():
+        row = TrustedCertificate(name='headered and plain', certificate_pem=(_headered(first) + _pem(second)).decode(),
+                                 fingerprint_sha256=_fp(first), subject=first.subject.rfc4514_string(),
+                                 purpose='custom')
+        db.session.add(row)
+        db.session.commit()
+        row_id = row.id
+    detail = auth_client.get(f'{TS}/{row_id}')
+    assert detail.status_code == 200
+    assert detail.get_json()['data']['certificate_pem'].encode() == _pem(first) + _pem(second)
+    with app.app_context():
+        rows = export_section('trusted_certificates', IdentityIndex())
+    (entry,) = [e for e in rows if e['fingerprint_sha256'] == _fp(first)]
+    assert entry['certificate_pem'].encode() == _pem(first) + _pem(second)
+
+
+def test_a_row_cryptography_cannot_read_still_hands_out_its_plain_blocks():
+    from utils.trust_pem import served_certificates
+    _, cert = _issue('plain-beside-broken')
+    broken = b'-----BEGIN CERTIFICATE-----\nComment: x\n\nAAAA\n-----END CERTIFICATE-----\n'
+    assert served_certificates((broken + _pem(cert)).decode()).encode() == _pem(cert)
