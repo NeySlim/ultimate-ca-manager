@@ -411,3 +411,72 @@ def test_a_backup_whose_scheduler_is_killed_is_lost_once_and_leaves_nothing(tmp_
             if child is not None and child.poll() is None:
                 child.kill()
                 child.wait()
+
+
+_HELD_IN_A_VERIFICATION = r'''
+import os, time
+from services.jobs import runner
+taken = os.environ['TEST_VERIFY_TAKEN']
+real = runner.JobContext.progress
+
+
+def progress(ctx, *args, **kwargs):
+    # The real verification, held once its first progress is written: taken and running
+    real(ctx, *args, **kwargs)
+    open(taken, 'w').write(ctx.job_id)
+    time.sleep(300)
+
+
+runner.JobContext.progress = progress
+import scheduler_main  # noqa: E402
+os._exit(scheduler_main.exit_code(scheduler_main.main))
+'''
+
+
+@pytest.mark.slow
+def test_a_verification_whose_scheduler_is_killed_is_lost_once_without_an_audit_line(tmp_path):
+    """kill -9 of the scheduler process during a real audit verification: the next start
+    concludes it executor_lost, writes no audit line (none before jobs) and frees the slot."""
+    from tests.test_scheduler_process import _scheduler_env
+    env, data = _scheduler_env(tmp_path)
+    (tmp_path / 'etc').mkdir()
+    env = {k: v for k, v in env.items() if not k.startswith('GIT_')}
+    taken = tmp_path / 'taken'
+    env.update(UCM_CONFIG_DIR=str(tmp_path / 'etc'), TEST_VERIFY_TAKEN=str(taken), UCM_HA='')
+    url = f"sqlite:///{data / 'ucm.db'}"
+    first = subprocess.Popen([sys.executable, '-c', _HELD_IN_A_VERIFICATION], cwd=BACKEND, env=env,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    second = None
+    try:
+        _until(lambda: (data / 'scheduler_state.json').exists(), first)
+        engine = create_engine(url)
+        with Session(engine) as session:
+            job_id = store.create_job(
+                session, kind='audit_verify', slot='audit_verify', exclusive=False,
+                exclusive_slots=EXCLUSIVE, now=utc_now(), params={'start_id': None, 'end_id': None},
+                requester=(None, 'admin', None))
+        engine.dispose()
+        _until(taken.exists, first)
+        assert _job_state(url, job_id)[0] == 'running'
+        os.kill(first.pid, signal.SIGKILL)
+        first.wait(timeout=10)
+        assert _job_state(url, job_id)[0] == 'running'
+        second = subprocess.Popen([sys.executable, '-m', 'scheduler_main'], cwd=BACKEND, env=env,
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        _until(lambda: _job_state(url, job_id)[0] != 'running', second)
+        assert _job_state(url, job_id)[:2] == ('failed', 'executor_lost')
+        engine = create_engine(url)
+        with engine.connect() as conn:
+            lines = conn.execute(text('SELECT count(*) FROM audit_logs WHERE resource_id = :id'),
+                                 {'id': job_id}).scalar()
+            active = conn.execute(text(
+                "SELECT count(*) FROM background_jobs WHERE state IN ('pending', 'running')")).scalar()
+        engine.dispose()
+        assert (lines, active) == (0, 0)
+        second.send_signal(signal.SIGTERM)
+        assert second.wait(timeout=15) == 0
+    finally:
+        for child in (first, second):
+            if child is not None and child.poll() is None:
+                child.kill()
+                child.wait()
