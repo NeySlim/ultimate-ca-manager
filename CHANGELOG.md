@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
-- Dependencies: cbor2 6.3.0. A passkey sign-in response carrying crafted extension data crashed the worker before any signature was checked; it is now refused like any failed sign-in.
+- Dependencies: cbor2 6.1.2 → 6.3.0 (GHSA-6rgc-8hxm-rj7p, GHSA-55vx-2phh-7grr, GHSA-p6xp-9h6j-r278). A passkey sign-in response carrying crafted extension data crashed the worker before any signature was checked; it is now refused like any failed sign-in.
 
 ## [2.254.5] - 2026-11-18
 

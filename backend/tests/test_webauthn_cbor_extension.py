@@ -57,9 +57,22 @@ def key_holder(app):
         db.session.commit()
 
 
-def test_a_sign_in_carrying_it_is_refused_without_a_session(app, client, key_holder):
+def test_a_sign_in_carrying_it_is_refused_without_a_session(app, client, key_holder, monkeypatch):
     if _decoder_refuses() != (0, 'refused'):
         pytest.fail('the CBOR decoder crashes on a cyclic tag: not sent through this process')
+    import webauthn.authentication.verify_authentication_response as library
+    from webauthn.helpers.exceptions import InvalidCBORData
+    decoded = []
+
+    def parse(data):
+        try:
+            return real_parse(data)
+        except Exception as error:
+            decoded.append(type(error))
+            raise
+
+    real_parse = library.parse_authenticator_data
+    monkeypatch.setattr(library, 'parse_authenticator_data', parse)
     started = client.post('/api/v2/auth/login/webauthn/start', json={'username': key_holder})
     assert started.status_code == 200, started.get_json()
     options = started.get_json()['data']['options']
@@ -73,4 +86,5 @@ def test_a_sign_in_carrying_it_is_refused_without_a_session(app, client, key_hol
                                   'authenticatorData': _b64url(AUTHENTICATOR_DATA),
                                   'signature': _b64url(b'\x30\x00')}}})
     assert answer.status_code == 401, answer.get_json()
+    assert decoded == [InvalidCBORData]  # the request went as far as the decoder
     assert client.get('/api/v2/auth/verify').get_json()['data']['authenticated'] is False
