@@ -639,7 +639,7 @@ class IssuanceMixin:
     @staticmethod
     def _is_request_failure(exc) -> bool:
         """Whether a signing failure is the request's fault (badCSR, order
-        invalid) rather than the server's (order retryable)."""
+        ready) rather than the server's (serverInternal, order invalid)."""
         if exc is None:
             return True
         from services.policy_service import PolicyViolation

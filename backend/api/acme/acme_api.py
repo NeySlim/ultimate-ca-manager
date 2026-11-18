@@ -176,9 +176,8 @@ def require_jose_content_type():
 
 
 def _is_caa_failure(error: Any) -> bool:
-    """True only for a definitive CAA policy denial. A DNS lookup error is
-    transient: it must NOT terminally invalidate the order (the client may
-    retry once the resolver recovers)."""
+    """True only for a definitive CAA policy denial. A DNS lookup error is a
+    server failure (serverInternal), not a caa refusal."""
     from utils import caa_checker
     text = str(error or '')
     if caa_checker.is_transient_caa_failure(text):
