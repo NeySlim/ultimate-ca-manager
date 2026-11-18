@@ -2,6 +2,7 @@ import logging
 
 from models import db
 from models.ssh import SSHCertificateAuthority, SSHCertificate
+from services.ssh_ca_service import SSHCAService
 from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
@@ -15,6 +16,12 @@ class SSHCertificateManagementMixin:
         if not cert:
             raise ValueError(f"SSH certificate not found: {cert_id}")
 
+        # The CA row before the search: an issuance or import under it waits, then sees this
+        # revocation; one that wrote first is committed when the search below reads it
+        SSHCAService.lock_ca(cert.ssh_ca_id)
+        cert = db.session.get(SSHCertificate, cert_id, populate_existing=True)
+        if not cert:
+            raise ValueError(f"SSH certificate not found: {cert_id}")
         if cert.revoked:
             raise ValueError("Certificate is already revoked")
 
@@ -32,7 +39,7 @@ class SSHCertificateManagementMixin:
                      else SSHCertificate.key_id == held.key_id)
             for sibling in (SSHCertificate.query.filter(SSHCertificate.ssh_ca_id == cert.ssh_ca_id, match,
                                                         SSHCertificate.id != held.id)
-                            .order_by(SSHCertificate.id).all()):
+                            .order_by(SSHCertificate.id).populate_existing().all()):
                 if sibling.revoked:
                     continue
                 sibling.revoked = True
