@@ -647,7 +647,8 @@ def test_matches_compares_a_tag_to_the_version_file(tmp_path, version, content, 
     r = _cli('matches', version, str(f))
     assert r.returncode == code and not r.stdout
     if code:
-        assert version in r.stderr
+        assert r.stderr.startswith('::error::') and version in r.stderr
+        assert repr(content.strip()) in r.stderr
 
 
 def test_matches_refuses_a_missing_file(tmp_path):

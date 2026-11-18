@@ -184,7 +184,8 @@ def main(argv):
             with open(argv[3], encoding='utf-8') as fh:
                 found = fh.read().strip()
             if found != version:
-                raise ValueError(f'{argv[3]} says {found!r} but the tag is {version!r}')
+                print(f'::error::{argv[3]} says {found!r} but the tag is {version!r}', file=sys.stderr)
+                return 1
         elif cmd == 'notes':
             rehearsal = '--rehearsal' in argv[3:]
             rest = [a for a in argv[3:] if a != '--rehearsal']
