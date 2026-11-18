@@ -311,3 +311,8 @@ def test_a_line_of_repeated_armour_openers_is_scanned_in_linear_time():
     start = time.monotonic()
     assert holds_private_key(b'----BEGIN ' * 80_000) is False
     assert time.monotonic() - start < 5
+
+
+def test_a_long_upper_case_label_is_still_taken_for_a_key():
+    from utils.trust_pem import holds_private_key
+    assert holds_private_key(b'-----BEGIN ' + b'A' * 65 + b' PRIVATE KEY-----\nAAAA\n')
