@@ -1,16 +1,17 @@
 name: Test Channel — RC Build Sanity
 
-# Runs on every push to the `test` branch.
+# Runs on every push to the `test` branch and to the maintenance branch `v2.x`.
 # Builds a DEB package as a workflow artifact (NO publish, NO release).
 # This catches packaging regressions BEFORE we tag a -rcN release.
 #
-# To actually publish an RC: bump VERSION on `test` to `X.Y-rcN` (or `X.Y.Z-rcN`), commit, then
-# `git tag vX.Y-rcN && git push origin vX.Y-rcN`. That triggers build-release.yml
+# The 2.254.N maintenance RCs come out of `v2.x` only: commit `chore: 2.254.N-rc1` there,
+# then tag `v2.254.N-rc1` at the head of `v2.x`. Other RCs: bump VERSION on `test` to `X.Y-rcN`,
+# commit, then `git tag vX.Y-rcN && git push origin vX.Y-rcN`. The tag triggers build-release.yml,
 # which publishes to GitHub Releases as a pre-release.
 
 on:
   push:
-    branches: [test]
+    branches: [test, v2.x]
   workflow_dispatch:
 
 permissions:
@@ -87,13 +88,14 @@ jobs:
         run: |
           cat <<'EOF'
           ============================================================
-          DEB sanity build OK on `test`.
+          DEB sanity build OK.
 
           To publish a Release Candidate:
-            1. On the `test` branch, set VERSION to e.g. 2.137-rc1
+            1. On the release branch (`v2.x` for a 2.254.N maintenance RC,
+               `test` otherwise), set VERSION to e.g. 2.254.5-rc1
             2. Update frontend/package.json + package-lock.json to match
             3. Commit and push
-            4. git tag v2.137-rc1 && git push origin v2.137-rc1
+            4. git tag v2.254.5-rc1 && git push origin v2.254.5-rc1
             5. build-release.yml will publish DEB/RPM/Docker as a GitHub
                pre-release (NOT marked as latest).
 

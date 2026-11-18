@@ -23,11 +23,11 @@ permissions:
   security-events: write
 
 # A new push to a branch replaces the run of its previous commit, except on
-# test and main where every run is a release record: one group per commit
-# there, so nothing is cancelled or queued away
+# test, main and the maintenance branch v2.x where every run is a release record:
+# one group per commit there, so nothing is cancelled or queued away
 concurrency:
-  group: tests-${{ github.workflow }}-${{ github.event_name }}-${{ (github.ref_name == 'test' || github.ref_name == 'main') && github.sha || github.ref }}
-  cancel-in-progress: ${{ github.ref_name != 'test' && github.ref_name != 'main' }}
+  group: tests-${{ github.workflow }}-${{ github.event_name }}-${{ (github.ref_name == 'test' || github.ref_name == 'main' || github.ref_name == 'v2.x') && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref_name != 'test' && github.ref_name != 'main' && github.ref_name != 'v2.x' }}
 
 jobs:
   lint:
@@ -137,11 +137,11 @@ jobs:
           pytest -v --tb=short -n 4 --dist loadfile $files
 
   # One database for the whole suite, as a user runs it: the integration judge.
-  # Release branches, the nightly run of dev, and on demand. Not on dev pushes.
+  # Release branches (test, main, v2.x), the nightly run of dev, and on demand. Not on dev pushes.
   test-backend-sequential:
     name: Backend Tests (sequential)
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'test' || github.ref_name == 'main'))
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'test' || github.ref_name == 'main' || github.ref_name == 'v2.x'))
     timeout-minutes: 120
 
     steps:
@@ -477,12 +477,12 @@ jobs:
           
           docker stop ucm-test && docker rm ucm-test
 
-  # Pushes to dev only: the source build is too slow for every PR
+  # Pushes to dev and to the maintenance branch v2.x only: the source build is too slow for every PR
   build-test-fips:
     name: Docker Build Test (FIPS)
     runs-on: ubuntu-24.04
     needs: [test-frontend]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/v2.x')
     timeout-minutes: 60
 
     steps:
