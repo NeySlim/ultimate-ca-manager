@@ -280,9 +280,34 @@ def test_an_unreachable_remote_never_validates_a_tag(tmp_path):
     (['v2.254.1'], '2.254', 'false'),
     (['v2.254', 'v2.254.1'], '2.254.1', 'true'),
     (['v2.9', 'v2.10'], '2.9', 'false'),
+    (['v2.254.4', 'v2.254.5', 'v9.0'], '2.254.5', 'false'),
+    (['v2.254.4', 'v2.254.5', 'v9.0-rc1'], '2.254.5', 'true'),
+    (['v2.254.4', 'v2.254.5'], '2.254.5', 'true'),
 ])
 def test_latest_table(published, tag, expected):
     assert _cli('latest', tag, stdin='\n'.join(published)).stdout.strip() == expected
+
+
+# The line tag is the major of the highest stable of that major, whatever a later major published
+@pytest.mark.parametrize('published,tag,expected', [
+    (['v2.254.4', 'v2.254.5', 'v9.0'], '2.254.5', '2'),
+    (['refs/tags/v2.254.4', 'refs/tags/v2.254.5'], '2.254.5', '2'),
+    (['v2.254.4', 'v2.254.5', 'v2.254.6-rc1'], '2.254.6-rc1', ''),
+    (['v2.254.4', 'v2.254.5-rc1'], '2.254.5-rc1', ''),
+    (['v2.254.4', 'v2.254.5', 'v9.0'], '2.254.4', ''),
+    (['v2.254.5', 'v2.254.6-rc1'], '2.254.5', '2'),
+    (['v2.9', 'v2.10'], '2.10', '2'),
+    (['v2.9', 'v2.10'], '2.9', ''),
+    (['v9.0', 'v2.254.5'], '9.0', '9'),
+])
+def test_line_table(published, tag, expected):
+    res = _cli('line', tag, stdin='\n'.join(published))
+    assert res.returncode == 0, res.stderr
+    assert res.stdout == expected + '\n'
+
+
+def test_line_refuses_an_invalid_version():
+    assert _cli('line', '2.254.5-dev', stdin='').returncode == 1
 
 
 def _origin_with_tags(tmp_path, tags):
@@ -334,6 +359,40 @@ def test_a_run_of_another_tag_never_takes_latest(tmp_path, job):
     result = _run_step(step, work, {'GITHUB_OUTPUT': str(out), 'VERSION': '2.254.2', 'GITHUB_REF': 'refs/tags/v2.254'})
     assert result.returncode == 0, result.stderr
     assert out.read_text().strip() == 'latest=false'
+
+
+@pytest.mark.parametrize('job', ['docker-manifest', 'docker-fips-manifest'])
+@pytest.mark.parametrize('tags,version,expected', [
+    (['v2.254.4', 'v2.254.5', 'v9.0'], '2.254.5', '2'),
+    (['v2.254.4', 'v2.254.5', 'v2.254.6-rc1'], '2.254.6-rc1', ''),
+    (['v2.254.4', 'v2.254.5'], '2.254.4', ''),
+])
+def test_the_line_step_reads_the_remote_tags(tmp_path, job, tags, version, expected):
+    work = _origin_with_tags(tmp_path, tags)
+    out = tmp_path / 'gh_output'
+    step = _step('build-release.yml', job, 'Decide the line tag')
+    result = _run_step(step, work, {'GITHUB_OUTPUT': str(out), 'VERSION': version, 'GITHUB_REF': f'refs/tags/v{version}'})
+    assert result.returncode == 0, result.stderr
+    assert out.read_text() == f'line={expected}\n'
+
+
+@pytest.mark.parametrize('job', ['docker-manifest', 'docker-fips-manifest'])
+@pytest.mark.parametrize('ref', ['refs/heads/v2.x', 'refs/tags/v2.254.4'])
+def test_only_the_run_of_its_own_tag_takes_the_line(tmp_path, job, ref):
+    work = _origin_with_tags(tmp_path, ['v2.254.4', 'v2.254.5'])
+    out = tmp_path / 'gh_output'
+    step = _step('build-release.yml', job, 'Decide the line tag')
+    result = _run_step(step, work, {'GITHUB_OUTPUT': str(out), 'VERSION': '2.254.5', 'GITHUB_REF': ref})
+    assert result.returncode == 0, result.stderr
+    assert out.read_text() == 'line=\n'
+
+
+def test_an_unreachable_remote_never_decides_the_line(tmp_path):
+    work = _origin_with_tags(tmp_path, ['v2.254.5'])
+    subprocess.run(['git', 'remote', 'set-url', 'origin', str(tmp_path / 'missing.git')], cwd=work, check=True)
+    step = _step('build-release.yml', 'docker-manifest', 'Decide the line tag')
+    result = _run_step(step, work, {'GITHUB_OUTPUT': str(tmp_path / 'o'), 'VERSION': '2.254.5', 'GITHUB_REF': 'refs/tags/v2.254.5'})
+    assert result.returncode != 0
 
 
 def test_an_unreachable_remote_never_decides_latest(tmp_path):

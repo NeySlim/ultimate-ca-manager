@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""Release version grammar, conversions, notes and `latest` rule, shared by the workflows.
+"""Release version grammar, conversions, notes, `latest` and line rules, shared by the workflows.
 
 Accepted: X.Y, X.Y-rcN, X.Y.Z, X.Y.Z-rcN (Z >= 1). Usage: release_version.py <command> <version> [args].
+`latest` reads the published tags (refs/tags/vX or vX, one per line) on stdin and prints true or false.
+`line` reads them the same way and prints the line tag (the major) to apply, or an empty line.
 """
 import re
 import sys
@@ -81,16 +83,31 @@ def changelog_section(version, text):
     return ''
 
 
+def _stable_tags(published):
+    for tag in published:
+        tag = tag.strip().removeprefix('refs/tags/').removeprefix('v')
+        if VERSION_RE.fullmatch(tag) and is_stable(tag):
+            yield numeric(tag)
+
+
 def is_latest(version, published):
     """True when a stable `version` is not lower than any stable published tag."""
     if not is_stable(version):
         return False
     top = numeric(version)
-    for tag in published:
-        tag = tag.strip().removeprefix('refs/tags/').removeprefix('v')
-        if VERSION_RE.fullmatch(tag) and is_stable(tag) and numeric(tag) > top:
-            return False
-    return True
+    return not any(tag > top for tag in _stable_tags(published))
+
+
+def line_tag(version, published):
+    """The major of a stable `version` that no stable published tag of the same major exceeds, else ''.
+
+    Unlike `latest`, a higher major does not count: a maintenance stable still takes its major."""
+    if not is_stable(version):
+        return ''
+    top = numeric(version)
+    if any(tag[0] == top[0] and tag > top for tag in _stable_tags(published)):
+        return ''
+    return str(top[0])
 
 
 def main(argv):
@@ -120,6 +137,8 @@ def main(argv):
         elif cmd == 'latest':
             tags = sys.stdin.read().splitlines()
             print('true' if is_latest(version, tags) else 'false')
+        elif cmd == 'line':
+            print(line_tag(version, sys.stdin.read().splitlines()))
         else:
             print(f'Unknown command: {cmd}', file=sys.stderr)
             return 2

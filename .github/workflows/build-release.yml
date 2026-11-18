@@ -379,7 +379,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  # Tags the two per-arch digests as <version> and latest
+  # Tags the two per-arch digests as <version> and, by their rules, latest and the line (major)
   docker-manifest:
     name: Publish Docker Image
     runs-on: ubuntu-latest
@@ -404,6 +404,22 @@ jobs:
           LATEST=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2 | python3 scripts/ci/release_version.py latest "$VERSION")
           echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
           echo "latest for $VERSION: $LATEST"
+
+      # The line tag (the major) goes to the highest published stable of its major, whatever latest does
+      - name: Decide the line tag
+        id: line
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/tags/v$VERSION" ]]; then
+            echo "line=" >> "$GITHUB_OUTPUT"
+            echo "line tag for $VERSION: none (not the run of tag v$VERSION)"
+            exit 0
+          fi
+          LINE=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2 | python3 scripts/ci/release_version.py line "$VERSION")
+          echo "line=$LINE" >> "$GITHUB_OUTPUT"
+          echo "line tag for $VERSION: ${LINE:-none}"
 
       - name: Download digests
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -451,6 +467,7 @@ jobs:
           tags: |
             type=raw,value=${{ needs.build-deb.outputs.version }}
             type=raw,value=latest,enable=${{ steps.latest.outputs.latest == 'true' }}
+            type=raw,value=${{ steps.line.outputs.line }},enable=${{ steps.line.outputs.line != '' }}
 
       - name: Create manifest lists
         working-directory: ${{ runner.temp }}/digests
@@ -466,7 +483,9 @@ jobs:
             docker buildx imagetools inspect "${tags[0]}"
           done
 
+      # The page describes the latest image: a RC or an older line leaves it as it is
       - name: Update Docker Hub description
+        if: steps.latest.outputs.latest == 'true'
         uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -601,7 +620,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  # Tags the two per-arch digests as <version>-fips and latest-fips
+  # Tags the two per-arch digests as <version>-fips and, by their rules, latest-fips and <line>-fips
   docker-fips-manifest:
     name: Publish Docker Image (FIPS)
     runs-on: ubuntu-latest
@@ -629,6 +648,22 @@ jobs:
           LATEST=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2 | python3 scripts/ci/release_version.py latest "$VERSION")
           echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
           echo "latest for $VERSION: $LATEST"
+
+      # The line tag (the major) goes to the highest published stable of its major, whatever latest does
+      - name: Decide the line tag
+        id: line
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/tags/v$VERSION" ]]; then
+            echo "line=" >> "$GITHUB_OUTPUT"
+            echo "line tag for $VERSION: none (not the run of tag v$VERSION)"
+            exit 0
+          fi
+          LINE=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2 | python3 scripts/ci/release_version.py line "$VERSION")
+          echo "line=$LINE" >> "$GITHUB_OUTPUT"
+          echo "line tag for $VERSION: ${LINE:-none}"
 
       - name: Download digests
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -678,6 +713,7 @@ jobs:
           tags: |
             type=raw,value=${{ needs.build-deb.outputs.version }}-fips
             type=raw,value=latest-fips,enable=${{ steps.latest.outputs.latest == 'true' }}
+            type=raw,value=${{ steps.line.outputs.line }}-fips,enable=${{ steps.line.outputs.line != '' }}
 
       - name: Create manifest lists
         working-directory: ${{ runner.temp }}/digests
