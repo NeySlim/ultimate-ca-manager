@@ -3024,7 +3024,7 @@ The \`allowed_signature_schemes\` rule, set through the API only (the policy for
 **Allowed Signature Hashes** restricts the signature hash the same way (SHA-256, SHA-384, SHA-512); none selected allows any. When nobody chose the hash, the default applies if allowed, else the weakest allowed one. The issue form offers only the allowed key types, Create CA only the allowed key types and hashes.
 
 ### SAN Restrictions
-- **Max SANs**: Limit the number of DNS names in the SAN; IP, e-mail and URI entries are not counted
+- **Max SANs**: Limit the number of DNS names in the SAN; IP, e-mail and URI entries are not counted. Over ACME, a DNS name the CN alone carries counts too (RFC 8555 §7.4)
 - **DNS Pattern**: Scopes the policy to the requests whose CN or DNS SANs match, label by label and ignoring case: \`*.company.com\` covers the names under company.com, \`company.com\` covers company.com as well. Other names are not refused: the policy does not apply to them
 
 ## Approval Workflows

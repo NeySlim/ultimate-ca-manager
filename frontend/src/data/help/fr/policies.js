@@ -84,7 +84,7 @@ La règle \`allowed_signature_schemes\`, définie par l'API seulement (le formul
 **Algorithmes de hachage de signature autorisés** restreint le hachage de signature de la même façon (SHA-256, SHA-384, SHA-512) ; aucun sélectionné autorise tout. Quand personne n'a choisi le hachage, celui par défaut s'applique s'il est autorisé, sinon le plus faible autorisé. Le formulaire d'émission ne propose que les types de clé autorisés, Créer une AC que les types de clé et hachages autorisés.
 
 ### Restrictions SAN
-- **SANs max** : Limiter le nombre de noms DNS du SAN ; les entrées IP, e-mail et URI ne sont pas comptées
+- **SANs max** : Limiter le nombre de noms DNS du SAN ; les entrées IP, e-mail et URI ne sont pas comptées. En ACME, un nom DNS porté par le seul CN compte aussi (RFC 8555 §7.4)
 - **Motif DNS** : Limite la politique aux requêtes dont le CN ou les SAN DNS correspondent, étiquette par étiquette et sans tenir compte de la casse : \`*.company.com\` couvre les noms sous company.com, \`company.com\` couvre aussi company.com. Les autres noms ne sont pas refusés : la politique ne s'applique pas à eux
 
 ## Flux d'approbation
