@@ -154,3 +154,33 @@ def test_sub_wins_over_id_when_both_are_sent(app, github):
     assert github({'sub': 'stable-sub', 'id': 7, 'login': 'both-example'}) == '/login/sso-complete'
     with app.app_context():
         assert [r.external_id for u in users_of(github.pid) for r in u.sso_identities] == ['stable-sub']
+
+
+def _github_token_endpoint(sent):
+    """GitHub answers form-encoded unless the client asks for JSON in Accept."""
+    import requests
+
+    def post(*_a, **kwargs):
+        sent.append(kwargs.get('headers'))
+        response = requests.Response()
+        response.status_code = 200
+        if 'application/json' in ((kwargs.get('headers') or {}).get('Accept') or ''):
+            response._content = b'{"access_token": "gho_example", "scope": "read:user", "token_type": "bearer"}'
+            response.headers['Content-Type'] = 'application/json'
+        else:
+            response._content = b'access_token=gho_example&scope=read%3Auser&token_type=bearer'
+            response.headers['Content-Type'] = 'application/x-www-form-urlencoded'
+        return response
+    return post
+
+
+def test_github_signs_in_against_its_real_token_response(app, github, monkeypatch):
+    """The token request asks for JSON (RFC 6749 section 5.1), which GitHub only sends on Accept."""
+    from api.v2.sso import login_routes
+
+    sent = []
+    monkeypatch.setattr(login_routes, 'safe_request_post', _github_token_endpoint(sent))
+    assert github({'id': 583231, 'login': 'octo-example'}) == '/login/sso-complete'
+    assert sent and sent[0]['Accept'] == 'application/json'
+    with app.app_context():
+        assert users_of(github.pid).count() == 1

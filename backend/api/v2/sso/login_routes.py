@@ -384,6 +384,8 @@ def oidc_sign_in(provider, code, code_verifier, expected_nonce):
             token_response = safe_request_post(
                 provider.oauth2_token_url,
                 data=token_data,
+                # RFC 6749 5.1 answers in JSON; GitHub sends form-encoded unless asked
+                headers={'Accept': 'application/json'},
                 timeout=10,
                 verify=verify,
                 allow_redirects=False,
