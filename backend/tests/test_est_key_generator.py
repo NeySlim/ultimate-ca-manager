@@ -294,6 +294,7 @@ def test_a_delegate_renewed_in_place_meanwhile_is_not_archived(app, use, caplog)
         db.session.remove()
     original = est_key_generator._certificate_row
     renewed = str(x509.random_serial_number())
+    caplog.clear()  # the issuance above logs too, whatever level the logger was left at
 
     def renewed_in_place_meanwhile(*args):
         from sqlalchemy import update

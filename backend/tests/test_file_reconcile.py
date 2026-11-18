@@ -227,8 +227,9 @@ def test_a_stale_reconciliation_never_leaves_the_old_files_under_the_new_marker(
         assert issued['crt'].read_bytes() == wanted
 
 
-def test_a_renewal_between_the_read_and_the_rename_wins(app, issued, regen, monkeypatch):
+def test_a_renewal_between_the_read_and_the_rename_wins(app, issued, regen, monkeypatch, create_cert):
     from models import Certificate, db
+    create_cert(cn=f'renewed-{uuid.uuid4().hex[:8]}.example.com')
     with app.app_context():
         other = Certificate.query.filter(Certificate.id != issued['id'],
                                          Certificate.crt.isnot(None)).first()
