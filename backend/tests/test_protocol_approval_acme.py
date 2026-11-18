@@ -170,7 +170,10 @@ def test_unreadable_policies_refuse_the_finalize(app, client, acme_ca, monkeypat
     account, order_id, r = _held(app, client, acme_ca)
     assert r.status_code == 500
     assert r.get_json()['type'] == 'urn:ietf:params:acme:error:serverInternal'
-    assert _read(client, account, order_id).get_json()['status'] == 'ready'
+    # RFC 8555 §7.1.6: an error once processing leaves the order invalid
+    read = _read(client, account, order_id).get_json()
+    assert read['status'] == 'invalid'
+    assert read['error']['type'] == 'urn:ietf:params:acme:error:serverInternal'
 
 
 def _order_certificate(app, order_id):
@@ -231,8 +234,7 @@ def test_a_bad_csr_at_approval_closes_the_request(app, client, auth_client, acme
         assert read['error']['type'] == 'urn:ietf:params:acme:error:badCSR'
 
 
-def test_a_caa_dns_error_at_approval_keeps_the_request_pending(app, client, auth_client, acme_ca,
-                                                               monkeypatch):
+def test_a_caa_dns_error_at_approval_closes_the_request(app, client, auth_client, acme_ca, monkeypatch):
     import utils.caa_checker as caa
     with approval_policy(app, acme_ca[0], 'acme-held-caa-dns') as pid:
         account, order_id, _r = _held(app, client, acme_ca)
@@ -241,9 +243,13 @@ def test_a_caa_dns_error_at_approval_keeps_the_request_pending(app, client, auth
         monkeypatch.setattr(caa, 'check_caa_for_domains', lambda *a, **k: (
             False, 'CAA check failed for x: CAA DNS lookup failed (DNS error) for x'))
         r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
-        assert r.get_json()['message'] != 'Request closed', r.get_json()
-        assert requests_of(app, pid, 'acme_order')[0][1] == 'pending'
-        assert _read(client, account, order_id).get_json()['status'] == 'processing'
+        assert r.get_json()['message'] == 'Request closed', r.get_json()
+        assert requests_of(app, pid, 'acme_order')[0][1] == 'rejected'
+        # A server-side failure, as on finalize: invalid, its cause kept from the client
+        read = _read(client, account, order_id).get_json()
+        assert read['status'] == 'invalid'
+        assert read['error']['type'] == 'urn:ietf:params:acme:error:serverInternal'
+        assert 'DNS' not in read['error']['detail']
 
 
 def test_a_profile_withdrawn_while_held_closes_the_request(app, client, auth_client, acme_ca):
@@ -291,8 +297,8 @@ def test_a_key_material_refusal_reaches_nobody_raw(app, client, auth_client, acm
 
 def test_finalize_and_approval_agree_on_a_transient_caa_failure(app, client, auth_client, acme_ca,
                                                                 monkeypatch):
-    """One judge of a transient CAA failure: a message it calls transient
-    keeps the order retryable on both the direct finalize and the approval."""
+    """One judge of a transient CAA failure: a message it calls transient is
+    a server failure, the order invalid, on both the direct finalize and the approval."""
     import utils.caa_checker as caa
     message = 'CAA check failed for x: resolver timed out'
     monkeypatch.setattr(caa, 'is_transient_caa_failure', lambda text: message in str(text or ''))
@@ -301,12 +307,16 @@ def test_finalize_and_approval_agree_on_a_transient_caa_failure(app, client, aut
         (approval_id, *_), = requests_of(app, pid, 'acme_order')
         monkeypatch.setattr(caa, 'check_caa_for_domains', lambda *a, **k: (False, message))
         r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
-        assert r.get_json()['message'] != 'Request closed', r.get_json()
-        assert requests_of(app, pid, 'acme_order')[0][1] == 'pending'
-        assert _read(client, account, order_id).get_json()['status'] == 'processing'
+        assert r.get_json()['message'] == 'Request closed', r.get_json()
+        assert requests_of(app, pid, 'acme_order')[0][1] == 'rejected'
+        held = _read(client, account, order_id).get_json()
     direct_account, direct_id, direct = _held(app, client, acme_ca)
-    assert direct.get_json()['type'] != 'urn:ietf:params:acme:error:caa'
-    assert _read(client, direct_account, direct_id).get_json()['status'] == 'ready'
+    assert direct.status_code == 500
+    assert direct.get_json()['type'] == 'urn:ietf:params:acme:error:serverInternal'
+    read = _read(client, direct_account, direct_id).get_json()
+    assert read['status'] == held['status'] == 'invalid'
+    assert read['error'] == held['error']
+    assert read['error']['type'] == 'urn:ietf:params:acme:error:serverInternal'
 
 
 def test_an_approved_order_does_not_hold_its_policy(app, client, auth_client, acme_ca):

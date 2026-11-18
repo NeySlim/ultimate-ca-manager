@@ -239,7 +239,7 @@ class TestMisconfiguredTemplate:
                     order, pem, db.session.get(CA, ca['id']).refid)
                 assert not ok and cert_id is None
                 assert name not in err and 'misconfigured on the server' in err
-                # serverInternal: the order stays retryable instead of going invalid as badCSR
+                # serverInternal, a server failure: never a badCSR blamed on the request
                 assert service._is_request_failure(service._last_signing_exception) is False
         finally:
             _clear_profiles(app)
