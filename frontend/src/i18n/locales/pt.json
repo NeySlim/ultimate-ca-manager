@@ -2719,6 +2719,7 @@
     "upToDateTitle": "Up para Data",
     "installUpdate": "Instalar atualização",
     "installUpdateConfirm": "Instalar atualização v{{version}}?\n\nO serviço será reiniciado e você pode precisar fazer login novamente.",
+    "installUpdateConfirmHa": "Install update v{{version}}?\n\nThis starts a rolling update: the nodes update one at a time. It is refused, and nothing is installed, if the release needs every node stopped for its migrations.",
     "prerelease": "Pré-lançamento",
     "viewReleaseNotes": "Ver notas de lançamento",
     "includePreReleaseVersions": "Incluir versões pré-lançamento",

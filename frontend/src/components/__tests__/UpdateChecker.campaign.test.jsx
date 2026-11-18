@@ -76,6 +76,29 @@ describe('rolling update on the update screen', () => {
     expect(screen.getByText('n1, n2')).toBeInTheDocument()
   })
 
+  it('asks the rolling update confirmation in HA', async () => {
+    mocks.get.mockResolvedValue(checkAnswer(null))
+    mocks.post.mockResolvedValue({ data: { campaign: running } })
+    render(<UpdateChecker />)
+    await tick(0)
+    fireEvent.click(screen.getByText('Install Update'))
+    await tick(0)
+    expect(mocks.showConfirm.mock.calls.at(-1)[0]).toBe('settings.installUpdateConfirmHa:3.1')
+  })
+
+  it('asks the restart confirmation outside HA', async () => {
+    const answer = checkAnswer(null)
+    answer.data.ha_mode = false
+    mocks.get.mockResolvedValue(answer)
+    mocks.showConfirm.mockResolvedValue(false)
+    render(<UpdateChecker />)
+    await tick(0)
+    fireEvent.click(screen.getByText('Install Update'))
+    await tick(0)
+    expect(mocks.showConfirm.mock.calls.at(-1)[0]).toBe('settings.installUpdateConfirm:3.1')
+    expect(mocks.post).not.toHaveBeenCalled()
+  })
+
   it('shows the package family each node installs', async () => {
     mocks.get.mockResolvedValue(checkAnswer({ ...running, families: { n1: 'deb', n2: 'rpm-el9', n3: 'rpm-fedora' } }))
     render(<UpdateChecker />)

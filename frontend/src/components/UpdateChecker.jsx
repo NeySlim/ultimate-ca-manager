@@ -63,7 +63,8 @@ export function UpdateChecker() {
     if (!updateInfo?.update_available) return
     
     const confirmed = await showConfirm(
-      t('settings.installUpdateConfirm', { version: updateInfo.latest_version }),
+      t(updateInfo.ha_mode ? 'settings.installUpdateConfirmHa' : 'settings.installUpdateConfirm',
+        { version: updateInfo.latest_version }),
       { title: t('settings.installUpdate'), confirmText: t('settings.installUpdate'), variant: 'primary' }
     )
     if (!confirmed) return
