@@ -294,8 +294,9 @@ class TestRequestedValidity:
                 ca_refid)
             assert not ok
             assert 'acme-window-cap' in error
+            # The order's own dates: no other CSR lifts the refusal (RFC 8555 §7.1.6)
             assert status == 'invalid'
-            assert error_type == 'badCSR'  # a policy refusal, as every policy refusal at finalize
+            assert error_type == 'malformed'
         finally:
             with app.app_context():
                 db.session.delete(db.session.get(CertificatePolicy, pid))
@@ -335,7 +336,7 @@ class TestRequestedValidity:
               'none': {}, 'not_after_on_horizon': {'not_after': on_horizon}}[dates]
         try:
             order_id = _ready_order(app, account, [{'type': 'dns', 'value': 'horizon.example'}], **kw)
-            ok, error, status, _, _ = _finalize(
+            ok, error, status, _, error_type = _finalize(
                 app, order_id, _csr_pem(rsa.generate_private_key(65537, 2048), dns=['horizon.example']),
                 ca_refid)
             if dates in ('none', 'not_after_on_horizon'):
@@ -343,7 +344,8 @@ class TestRequestedValidity:
             else:
                 assert not ok
                 assert f'acme-horizon-{dates}' in error
-                assert status == 'invalid'
+                # Another key may pass the horizon: badCSR, the order left ready (RFC 8555 §7.4)
+                assert (status, error_type) == ('ready', 'badCSR')
         finally:
             self._drop_policy(app, pid)
 

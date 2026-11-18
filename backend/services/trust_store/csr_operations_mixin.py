@@ -802,8 +802,9 @@ class CSROperationsMixin:
 
         # Issuance policies: key type and signature hash (#397)
         from services.policy_service import (PolicyEvaluationService, PolicyViolation,
-                                             key_label_for_public_key)
+                                             RequestedValidityRefused, key_label_for_public_key)
         policies = []
+        window_refused = False
         if policy_scope is not None:
             cn_attrs = subject.get_attributes_for_oid(NameOID.COMMON_NAME)
             policies = PolicyEvaluationService.applicable_policies(
@@ -835,13 +836,14 @@ class CSROperationsMixin:
                 context=policy_context, pq_hybrid=related_a is not None)
             violations = list(dict.fromkeys(list(violations) + limit_violations))
             if capped_by and not_after is not None:
+                window_refused = True
                 violations.append(f"The requested validity exceeds the {capped} days "
                                   f"allowed by policy '{capped_by}'")
             elif capped_by:
                 logger.info(f"Validity capped to {capped} days by policy '{capped_by}'")
                 validity_days = capped
         if violations:
-            raise PolicyViolation('; '.join(violations))
+            raise (RequestedValidityRefused if window_refused else PolicyViolation)('; '.join(violations))
 
         # Build certificate from CSR
         builder = x509.CertificateBuilder()

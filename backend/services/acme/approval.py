@@ -58,13 +58,15 @@ def _issue(approval, data):
     if not success:
         error_type = 'caa' if _is_caa_failure(error) else (
             getattr(service, '_last_finalize_error_type', None) or 'badCSR')
-        from utils import caa_checker
-        if error_type == 'serverInternal' or caa_checker.is_transient_caa_failure(error):
-            # Transient (CA down, CAA lookup failed): the order stays processing
-            # and the approver may try again once the cause is gone
-            raise ValueError(error)
         # Nothing is committed here: the approval route rolls the vote back
         # and closes the request, whose closed handler invalidates the order
+        if error_type == 'serverInternal':
+            # RFC 8555 §7.1.6, as on finalize: the approver reads the cause, the client a generic text
+            from services.acme.mixins.issuance import SERVER_FAILURE_DETAIL
+            logger.error("ACME order %s not issued at approval: %s", order_id, error)
+            text = (protocol_approval.GENERIC_ISSUE_ERROR if protocol_approval.is_key_material_error(error)
+                    else f'The ACME order could not be issued: {error}')
+            raise ProtocolRequestGone(text, refusal={'type': error_type, 'detail': SERVER_FAILURE_DETAIL})
         if protocol_approval.is_key_material_error(error):
             # One sanitized text for the order, the vote, the audit and the webhook
             logger.error("ACME order %s refused at approval: %s", order_id, error)

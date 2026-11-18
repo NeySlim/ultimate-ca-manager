@@ -223,7 +223,9 @@ class TestWithdrawnProfileAtFinalize:
         assert response.get_json()['type'].endswith(':invalidProfile')
         with app.app_context():
             refused = AcmeOrder.query.filter_by(order_id=order_id).first()
-            assert refused.status == 'ready' and refused.certificate_id is None
+            # No CSR lifts it: the order is invalid (RFC 8555 §7.1.6)
+            assert refused.status == 'invalid' and refused.certificate_id is None
+            assert json.loads(refused.error)['type'].endswith(':invalidProfile')
 
 
 class TestDefaultDigest:

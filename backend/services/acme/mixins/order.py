@@ -669,15 +669,31 @@ class OrderMixin:
         self._commit_state_change('mark ACME order processing')
         return True
 
-    def restore_processing_order(self, order_id: str) -> None:
-        """Restore retryable finalize failures that did not invalidate the order."""
+    def reopen_order_after_bad_csr(self, order_id: str) -> None:
+        """Put a processing order back to ready after a badCSR refusal, the
+        only way back (RFC 8555 §7.4); any other failure invalidates it."""
         order = AcmeOrder.query.filter_by(order_id=order_id).first()
         if order is None:
             return
         db.session.refresh(order)
         if order.status == 'processing':
             order.status = 'ready'
-            self._commit_state_change('restore ACME order ready status')
+            self._commit_state_change('reopen ACME order after badCSR')
+
+    def refuse_ready_order(self, order: AcmeOrder, error_type: str, detail: str) -> bool:
+        """Make a ready order that no CSR can satisfy invalid (RFC 8555 §7.1.6).
+        False when another request took it first."""
+        refused = db.session.query(AcmeOrder).filter(
+            AcmeOrder.id == order.id, AcmeOrder.status == 'ready',
+        ).update({AcmeOrder.status: 'invalid', AcmeOrder.error: self._problem(error_type, detail)},
+                 synchronize_session=False)
+        if refused != 1:
+            db.session.rollback()
+            db.session.refresh(order)
+            return False
+        self._commit_state_change('mark ACME order invalid')
+        db.session.refresh(order)
+        return True
 
     def invalidate_processing_order(
         self,

@@ -1106,8 +1106,10 @@ class TestRfc8555StateMachine:
 
             assert success is False
             assert error == 'signing failed'
+            # A request failure: badCSR, the route then reopens the order (RFC 8555 §7.4)
+            assert service._last_finalize_error_type == 'badCSR'
             db.session.refresh(order)
-            assert order.status == 'invalid'
+            assert order.status == 'processing'
 
 
 class TestExternalAccountBinding:

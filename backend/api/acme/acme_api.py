@@ -18,6 +18,7 @@ from services.acme.account_requests import (
     require_valid_account,
 )
 from services.acme.caa_identities import caa_identities
+from services.acme.mixins.issuance import SERVER_FAILURE_DETAIL
 from services.acme.jws_problems import BAD_NONCE, UNKNOWN_ACCOUNT, jws_problem
 from models.acme_models import (
     AcmeAccount,
@@ -1211,6 +1212,15 @@ def order_info(order_id: str):
     return response
 
 
+def _refuse_order(service, order, error_type: str, detail: str):
+    """Answer a refusal of the order itself, which leaves it invalid (RFC 8555 §7.1.6)."""
+    if not service.refuse_ready_order(order, error_type, detail):
+        return acme_error('orderNotReady', f'Order status is {order.status}, must be ready', 403)
+    _audit_acme('acme.order.finalize', resource_type='acme_order', resource_id=order.order_id,
+                details=f'failed: {detail}', success=False)
+    return acme_error(error_type, detail)
+
+
 @acme_bp.route('/order/<order_id>/finalize', methods=['POST'])
 def finalize_order(order_id: str):
     """Finalize order with CSR (RFC 8555 Section 7.4)"""
@@ -1264,13 +1274,21 @@ def finalize_order(order_id: str):
             )
 
         # draft-ietf-acme-profiles: a profile withdrawn since newOrder is
-        # refused, not silently replaced by the historical defaults
+        # refused, not silently replaced by the historical defaults; like any
+        # refusal of the order itself, it leaves the order invalid
         from services.acme import profiles as acme_profiles
         if existing_order.profile and not acme_profiles.is_known(existing_order.profile):
-            return acme_error(
-                'invalidProfile',
-                'The certificate profile of this order is no longer offered by this server',
-            )
+            return _refuse_order(service, existing_order, 'invalidProfile',
+                                 'The certificate profile of this order is no longer offered by this server')
+
+        # RFC 8555 §7.4: what the CSR alone refuses answers badCSR and leaves
+        # the order ready, judged before it is taken
+        refusal = service.csr_refusal(existing_order, csr)
+        if refusal:
+            return acme_error('badCSR', refusal)
+        refusal = service.order_refusal(existing_order)
+        if refusal:
+            return _refuse_order(service, existing_order, 'rejectedIdentifier', refusal)
 
         # Persist the RFC 8555 processing transition before signing begins;
         # a concurrent finalize of the same order loses here
@@ -1284,31 +1302,37 @@ def finalize_order(order_id: str):
         try:
             success, error = service.finalize_order(order_id, csr_pem)
         except Exception as finalize_error:
-            if _is_caa_failure(finalize_error):
-                service.invalidate_processing_order(
-                    order_id,
-                    'caa',
-                    str(finalize_error),
-                )
-                _audit_acme(
-                    'acme.order.finalize',
-                    resource_type='acme_order',
-                    resource_id=order_id,
-                    details=f'failed: {finalize_error}',
-                    success=False,
-                )
+            # RFC 8555 §7.1.6: an error once processing makes the order invalid
+            db.session.rollback()
+            caa = _is_caa_failure(finalize_error)
+            if caa:
+                service.invalidate_processing_order(order_id, 'caa', str(finalize_error))
+            else:
+                service.invalidate_processing_order(order_id, 'serverInternal', SERVER_FAILURE_DETAIL)
+            _audit_acme(
+                'acme.order.finalize',
+                resource_type='acme_order',
+                resource_id=order_id,
+                details=f'failed: {finalize_error}',
+                success=False,
+            )
+            if caa:
                 return acme_error('caa', str(finalize_error), 400)
-            service.restore_processing_order(order_id)
             raise
         finally:
             service._finalizing_order_id = None
 
         if not success:
-            is_caa_failure = _is_caa_failure(error)
-            if is_caa_failure:
-                service.invalidate_processing_order(order_id, 'caa', error)
+            error_type = ('caa' if _is_caa_failure(error)
+                          else getattr(service, '_last_finalize_error_type', None) or 'badCSR')
+            if error_type == 'badCSR':
+                # RFC 8555 §7.4: the client may finalize again with an amended CSR
+                service.reopen_order_after_bad_csr(order_id)
             else:
-                service.restore_processing_order(order_id)
+                # RFC 8555 §7.1.6; the cause of a server failure is for the
+                # logs and the audit, not for the client
+                service.invalidate_processing_order(
+                    order_id, error_type, SERVER_FAILURE_DETAIL if error_type == 'serverInternal' else error)
             _audit_acme(
                 'acme.order.finalize',
                 resource_type='acme_order',
@@ -1316,18 +1340,9 @@ def finalize_order(order_id: str):
                 details=f"failed: {error}",
                 success=False,
             )
-            if is_caa_failure:
-                error_type = 'caa'
-            else:
-                # The type the service recorded on the order (badCSR when the
-                # order was invalidated, serverInternal when it went back to
-                # ready for a retry); never badCSR for a server-side fault
-                error_type = getattr(service, '_last_finalize_error_type', None) or 'badCSR'
             if error_type == 'serverInternal':
-                # The cause (key material, HSM, CA state) is for the logs,
-                # not for the client
-                error = 'Certificate signing failed on the server; retry later'
-            return acme_error(error_type, error, 500 if error_type == 'serverInternal' else 400)
+                return acme_error(error_type, SERVER_FAILURE_DETAIL, 500)
+            return acme_error(error_type, error, 400)
 
         held = getattr(service, '_pending_approval', None)
         # Return updated order

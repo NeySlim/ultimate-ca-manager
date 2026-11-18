@@ -246,9 +246,10 @@ def test_acme_refuses_a_taken_subject_as_bad_csr_and_serves_the_same_account(app
     account, success, error, _type, status, holder = _acme_finalize(app, monkeypatch, ca, 'acme.unique.test', _rsa())
     assert (success, error, status, holder) == (True, None, 'valid', f'acme:{account}')
     other = _acme_finalize(app, monkeypatch, ca, 'acme.unique.test', _rsa())
+    # badCSR leaves the order to the route, which reopens it (RFC 8555 §7.4, test_acme_finalize_outcome)
     assert other[1:5] == (False, 'Certificate signing failed: the subject CN=acme.unique.test is already '
                                  'carried by a certificate of this CA issued to another entity',
-                          'badCSR', 'invalid')
+                          'badCSR', 'processing')
     assert _refusals(app, ca['id'])[-1].startswith('acme issuance refused: the subject CN=acme.unique.test')
     # The same account, a new key (proof 3)
     same = _acme_finalize(app, monkeypatch, ca, 'acme.unique.test', _rsa(), account=account)

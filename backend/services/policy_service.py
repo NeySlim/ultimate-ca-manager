@@ -35,6 +35,10 @@ class PolicyViolation(ValueError):
     """A request breaks a policy Rule (#335); the message names the rule."""
 
 
+class RequestedValidityRefused(PolicyViolation):
+    """A policy refuses the notAfter the requester fixed: no other key or CSR lifts it."""
+
+
 # Signature hashes a policy can allow, weakest first
 POLICY_DIGESTS = ('sha256', 'sha384', 'sha512')
 

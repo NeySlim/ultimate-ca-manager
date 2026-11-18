@@ -744,7 +744,8 @@ class TestFinalizeUnderAComplianceProfile:
         body = r.get_json()
         assert r.status_code == 400 and body['type'] == 'urn:ietf:params:acme:error:badCSR', body
         assert f'Key type {label} is not allowed by policy' in body['detail'], body
-        assert status == 'invalid' and cert_id is None
+        # RFC 8555 §7.4: ready for a CSR with another key
+        assert status == 'ready' and cert_id is None
 
     def test_a_key_type_the_profile_lists_is_issued(self, app, client, rsa_account, signing_ca, bsi_ca):
         from cryptography.hazmat.primitives.asymmetric import ec
