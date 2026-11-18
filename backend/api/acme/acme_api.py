@@ -1285,6 +1285,8 @@ def finalize_order(order_id: str):
         # the order ready, judged before it is taken
         refusal = service.csr_refusal(existing_order, csr)
         if refusal:
+            _audit_acme('acme.order.finalize', resource_type='acme_order', resource_id=order_id,
+                        details=f'failed: {refusal}', success=False)
             return acme_error('badCSR', refusal)
         refusal = service.order_refusal(existing_order)
         if refusal:
