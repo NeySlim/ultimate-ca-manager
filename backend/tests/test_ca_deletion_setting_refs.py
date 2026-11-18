@@ -87,6 +87,23 @@ def test_a_ca_named_by_a_setting_is_not_deleted(app, auth_client, create_ca, key
     assert auth_client.delete(f"/api/v2/cas/{ca['id']}").status_code == 204
 
 
+@pytest.mark.parametrize('key', ['est_ca_refid', 'tsa_ca_refid', 'mtls_trusted_ca_id',
+                                 'wstep_ca_refid', 'xcep_ca_refid'])
+def test_each_refid_setting_blocks_by_its_name(app, auth_client, create_ca, key):
+    """Listed by hand, not from the manifest: a declaration dropped there still fails here."""
+    ca = create_ca(cn=f'Named by {key}')
+    with app.app_context():
+        before = _set(key, db.session.get(CA, ca['id']).refid)
+    try:
+        r = auth_client.delete(f"/api/v2/cas/{ca['id']}")
+        assert r.status_code == 409, r.data
+        assert CA_SETTING_WORDING[key][0] in r.get_json()['message']
+    finally:
+        with app.app_context():
+            _put_back(key, before)
+    assert auth_client.delete(f"/api/v2/cas/{ca['id']}").status_code == 204
+
+
 def test_the_scep_message_is_unchanged(app, create_ca):
     ca = create_ca(cn='Default SCEP wording')
     with app.app_context():
