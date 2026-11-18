@@ -7,19 +7,36 @@ import json
 import logging
 import math
 import numbers
+import re
 import threading
 import time
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa
+from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, padding, rsa
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 
+import fips_mode
+from utils.key_algorithms import fips_rsa_bits_approved
 from utils.ssrf_protection import safe_request_get, validate_url_not_cloud_metadata
 
 logger = logging.getLogger(__name__)
 
-_ALLOWED_ALGORITHMS = frozenset({'RS256', 'ES256'})
+# RFC 7518 §3.1 and RFC 8037: (kty, curve for EC, hash). Never none nor HS*: a shared
+# secret would make the client secret a signing key (RFC 8725 §3.1).
+_ALGORITHMS = {
+    'RS256': ('RSA', None, hashes.SHA256), 'RS384': ('RSA', None, hashes.SHA384),
+    'RS512': ('RSA', None, hashes.SHA512), 'PS256': ('RSA', None, hashes.SHA256),
+    'PS384': ('RSA', None, hashes.SHA384), 'PS512': ('RSA', None, hashes.SHA512),
+    'ES256': ('EC', 'P-256', hashes.SHA256), 'ES384': ('EC', 'P-384', hashes.SHA384),
+    'ES512': ('EC', 'P-521', hashes.SHA512), 'EdDSA': ('OKP', None, None),
+}
+_ALLOWED_ALGORITHMS = frozenset(_ALGORITHMS)
+_EC_CURVES = {'P-256': (ec.SECP256R1, 32), 'P-384': (ec.SECP384R1, 48), 'P-521': (ec.SECP521R1, 66)}
+_OKP_CURVES = {'Ed25519': ed25519.Ed25519PublicKey, 'Ed448': ed448.Ed448PublicKey}
+# RFC 7518 §3.3: "A key of size 2048 bits or larger MUST be used with these algorithms."
+_MIN_RSA_BITS = 2048
+_SHOWN_ALGORITHM = re.compile(r'[A-Za-z0-9+._-]{1,32}')
 _CACHE_TTL_SECONDS = 3600
 _CLOCK_SKEW_SECONDS = 60
 _MAX_DOCUMENT_BYTES = 1024 * 1024
@@ -194,38 +211,84 @@ def _jwk_int(jwk, field):
 
 
 def _public_key_from_jwk(jwk, algorithm):
+    """The key of ``jwk`` if its type, and curve, are the ones ``algorithm`` names (RFC 8725 §3.1)."""
+    kty, curve, _hash = _ALGORITHMS[algorithm]
+    if jwk.get('kty') != kty:
+        raise OIDCValidationError('JWKS key type does not match algorithm')
     try:
-        if algorithm == 'RS256':
-            if jwk.get('kty') != 'RSA':
+        if kty == 'RSA':
+            key = rsa.RSAPublicNumbers(_jwk_int(jwk, 'e'), _jwk_int(jwk, 'n')).public_key()
+            if key.key_size < _MIN_RSA_BITS:
+                raise OIDCValidationError(f'JWKS RSA key is shorter than {_MIN_RSA_BITS} bits')
+            if fips_mode.enabled() and not fips_rsa_bits_approved(key.key_size):
+                raise OIDCValidationError(
+                    f'RSA key of {key.key_size} bits not available in FIPS mode')
+            return key
+        if kty == 'EC':
+            # The key's own curve, then the one the algorithm names: never one for the other
+            curve_class, _size = _EC_CURVES.get(jwk.get('crv'), (None, 0))
+            if curve_class is None or jwk.get('crv') != curve:
                 raise OIDCValidationError('JWKS key type does not match algorithm')
-            return rsa.RSAPublicNumbers(
-                _jwk_int(jwk, 'e'),
-                _jwk_int(jwk, 'n'),
-            ).public_key()
-
-        if jwk.get('kty') != 'EC' or jwk.get('crv') != 'P-256':
+            return ec.EllipticCurvePublicNumbers(
+                _jwk_int(jwk, 'x'), _jwk_int(jwk, 'y'), curve_class()).public_key()
+        okp_class = _OKP_CURVES.get(jwk.get('crv'))
+        if okp_class is None:
             raise OIDCValidationError('JWKS key type does not match algorithm')
-        return ec.EllipticCurvePublicNumbers(
-            _jwk_int(jwk, 'x'),
-            _jwk_int(jwk, 'y'),
-            ec.SECP256R1(),
-        ).public_key()
+        # The rule of every EdDSA key in FIPS mode: allowed when the loaded module approves it
+        fips_mode.refuse_unless_approved(jwk['crv'].upper(), f"{jwk['crv']} ID token signatures")
+        return okp_class.from_public_bytes(_b64url_decode(jwk.get('x')))
+    except fips_mode.FipsRestricted as exc:
+        raise OIDCValidationError(str(exc)) from exc
     except OIDCValidationError:
         raise
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, KeyError) as exc:
         raise OIDCValidationError('malformed JWKS signing key') from exc
 
 
 def _verify_signature(jwk, algorithm, signing_input, signature):
     key = _public_key_from_jwk(jwk, algorithm)
-    if algorithm == 'RS256':
-        key.verify(signature, signing_input, padding.PKCS1v15(), hashes.SHA256())
+    _kty, _curve, hash_class = _ALGORITHMS[algorithm]
+    if algorithm.startswith('RS'):
+        key.verify(signature, signing_input, padding.PKCS1v15(), hash_class())
+    elif algorithm.startswith('PS'):
+        # RFC 7518 §3.5: MGF1 with the same hash, salt as long as the hash output
+        key.verify(signature, signing_input,
+                   padding.PSS(padding.MGF1(hash_class()), hash_class.digest_size), hash_class())
+    elif algorithm.startswith('ES'):
+        # RFC 7518 §3.4: R || S, each as long as the order of the key's curve
+        size = _EC_CURVES[jwk['crv']][1]
+        if len(signature) != 2 * size:
+            raise InvalidSignature
+        r = int.from_bytes(signature[:size], 'big')
+        s = int.from_bytes(signature[size:], 'big')
+        key.verify(encode_dss_signature(r, s), signing_input, ec.ECDSA(hash_class()))
+    else:
+        key.verify(signature, signing_input)
+
+
+def _shown(algorithm):
+    """``algorithm`` as a refusal names it: a JWS name as is, anything else escaped and cut."""
+    if isinstance(algorithm, str) and _SHOWN_ALGORITHM.fullmatch(algorithm):
+        return algorithm
+    return json.dumps(algorithm, ensure_ascii=True)[:40]
+
+
+def _check_discovery_algorithm(provider, issuer, verify, algorithm):
+    """OIDC Discovery: the header algorithm is one the provider says it signs ID tokens with.
+
+    Read only where the discovery document is loaded anyway (no JWKS URI configured)."""
+    if getattr(provider, 'oauth2_jwks_uri', None):
         return
-    if len(signature) != 64:
-        raise InvalidSignature
-    r = int.from_bytes(signature[:32], 'big')
-    s = int.from_bytes(signature[32:], 'big')
-    key.verify(encode_dss_signature(r, s), signing_input, ec.ECDSA(hashes.SHA256()))
+    supported = _get_discovery(provider, issuer, verify).get(
+        'id_token_signing_alg_values_supported')
+    if supported is None:
+        return
+    if not isinstance(supported, list):
+        raise OIDCValidationError(
+            'OIDC discovery has an invalid id_token_signing_alg_values_supported')
+    if algorithm not in supported:
+        raise OIDCValidationError(f'ID token signing algorithm {algorithm} is not listed '
+                                  'in the provider discovery document')
 
 
 def _numeric_date(claims, name, required=False):
@@ -335,9 +398,10 @@ def verify_id_token(id_token, provider, expected_nonce, verify=True, ssl_verify=
     algorithm = header.get('alg')
     kid = header.get('kid')
     if algorithm not in _ALLOWED_ALGORITHMS:
-        raise OIDCValidationError('unsupported ID token signing algorithm')
+        raise OIDCValidationError(f'unsupported ID token signing algorithm {_shown(algorithm)}')
     if not isinstance(kid, str) or not kid:
         raise OIDCValidationError('ID token is missing key ID')
+    _check_discovery_algorithm(provider, issuer, ssl_verify, algorithm)
 
     for force_refresh in (False, True):
         try:
