@@ -3,7 +3,8 @@
 An archive holding two of a type is refused. A replacement removes the provider here that the
 archive's provider of its type replaces: its accounts keep its IdP as orphans. A merge keeps the
 provider here and leaves the archive's out: the accounts the archive attaches to it come back as
-orphans of its IdP. Each case runs on a database of its own, SQLite and PostgreSQL, with archives
+orphans of its IdP, or, when it speaks to the IdP of the provider here, attached to that provider
+if the account holds no row of the IdP yet (one subject of one IdP is one row). Each case runs on a database of its own, SQLite and PostgreSQL, with archives
 of 3.0 (identity rows) and of 2.254 (the provider on the account row).
 """
 import os
