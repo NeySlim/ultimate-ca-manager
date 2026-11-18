@@ -131,6 +131,15 @@ IdP 结束会话时，会通过浏览器向 SLO URL 发送已签名的 **LogoutR
 9. 配置范围（openid、profile、email）
 10. 点击**保存**并**启用**
 
+### 预设
+- **Microsoft Entra ID**（单租户）填写 URL 和颁发者 \`https://login.microsoftonline.com/{tenant}/v2.0\`：在这三处将 \`{tenant}\` 替换为目录（租户）ID。保留 \`{tenant}\` 保存的提供者会被拒绝。不支持多租户（\`common\`、\`organizations\`）。
+- **Google** 填写颁发者 \`https://accounts.google.com\`。
+- **GitHub** 不是 OpenID Connect 提供者，不签发 ID 令牌：该预设关闭**验证 ID 令牌签名**，并将 \`login\` 映射为用户名。账户通过其 GitHub 数字 \`id\` 识别（UCM 读取 UserInfo 的 \`sub\`，否则读取 \`id\`），从不通过登录名或电子邮件。
+- 切换预设会恢复上一个预设设置的颁发者和验证设置，除非之后已被修改。
+
+### ID 令牌签名
+接受 RS256、RS384、RS512、PS256、PS384、PS512、ES256、ES384、ES512 和 EdDSA（Ed25519、Ed448），从不接受 \`none\` 以及 HS256、HS384 或 HS512。签名密钥必须是算法所指定的类型和曲线，其 \`alg\` 和 \`use\`（如有）必须是令牌的算法和 \`sig\`，RSA 密钥须为 2048 位或以上。未配置 JWKS URI 时，算法还必须列在发现文档中。在 FIPS 模式下，只有 FIPS 模块批准时才接受 EdDSA，RSA 密钥大小须为 2048 到 16384 之间的偶数位。拒绝时会在审计条目中写明算法。
+
 ### 自动创建用户
 启用后，首次 SSO 登录时会自动创建新的 UCM 用户账户，使用 IDP 提供的属性。分配默认角色。
 
