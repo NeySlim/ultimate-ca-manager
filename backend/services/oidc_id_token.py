@@ -211,12 +211,14 @@ def _jwk_int(jwk, field):
 
 
 def _public_key_from_jwk(jwk, algorithm):
-    """The key of ``jwk`` if its type, and curve, are the ones ``algorithm`` names (RFC 8725 §3.1)."""
+    """The key ``jwk`` holds, once its type and curve are the ones ``algorithm`` names:
+    a key never verifies a token announced for another type (RFC 8725 §3.1)."""
     kty, curve, _hash = _ALGORITHMS[algorithm]
-    if jwk.get('kty') != kty:
+    key_kty, key_crv = jwk.get('kty'), jwk.get('crv')
+    if key_kty != kty or (curve is not None and key_crv != curve):
         raise OIDCValidationError('JWKS key type does not match algorithm')
     try:
-        if kty == 'RSA':
+        if key_kty == 'RSA':
             key = rsa.RSAPublicNumbers(_jwk_int(jwk, 'e'), _jwk_int(jwk, 'n')).public_key()
             if key.key_size < _MIN_RSA_BITS:
                 raise OIDCValidationError(f'JWKS RSA key is shorter than {_MIN_RSA_BITS} bits')
@@ -224,19 +226,14 @@ def _public_key_from_jwk(jwk, algorithm):
                 raise OIDCValidationError(
                     f'RSA key of {key.key_size} bits not available in FIPS mode')
             return key
-        if kty == 'EC':
-            # The key's own curve, then the one the algorithm names: never one for the other
-            curve_class, _size = _EC_CURVES.get(jwk.get('crv'), (None, 0))
-            if curve_class is None or jwk.get('crv') != curve:
-                raise OIDCValidationError('JWKS key type does not match algorithm')
+        if key_kty == 'EC' and key_crv in _EC_CURVES:
             return ec.EllipticCurvePublicNumbers(
-                _jwk_int(jwk, 'x'), _jwk_int(jwk, 'y'), curve_class()).public_key()
-        okp_class = _OKP_CURVES.get(jwk.get('crv'))
-        if okp_class is None:
-            raise OIDCValidationError('JWKS key type does not match algorithm')
-        # The rule of every EdDSA key in FIPS mode: allowed when the loaded module approves it
-        fips_mode.refuse_unless_approved(jwk['crv'].upper(), f"{jwk['crv']} ID token signatures")
-        return okp_class.from_public_bytes(_b64url_decode(jwk.get('x')))
+                _jwk_int(jwk, 'x'), _jwk_int(jwk, 'y'), _EC_CURVES[key_crv][0]()).public_key()
+        if key_kty == 'OKP' and key_crv in _OKP_CURVES:
+            # The rule of every EdDSA key in FIPS mode: allowed when the loaded module approves it
+            fips_mode.refuse_unless_approved(key_crv.upper(), f'{key_crv} ID token signatures')
+            return _OKP_CURVES[key_crv].from_public_bytes(_b64url_decode(jwk.get('x')))
+        raise OIDCValidationError('JWKS key type does not match algorithm')
     except fips_mode.FipsRestricted as exc:
         raise OIDCValidationError(str(exc)) from exc
     except OIDCValidationError:

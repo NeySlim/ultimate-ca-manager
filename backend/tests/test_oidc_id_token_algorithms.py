@@ -237,6 +237,20 @@ def test_a_key_alg_other_than_the_header_is_refused(idp):
         _verify(_token(key, 'PS256'))
 
 
+def test_pss_takes_a_salt_as_long_as_the_hash(idp):
+    """RFC 7518 §3.5: "The size of the salt value is the same size as the hash function output"."""
+    from services.oidc_id_token import OIDCValidationError
+    key = _rsa_key()
+    idp['keys'] = [_jwk(key)]
+    header = _b64(json.dumps({'alg': 'PS256', 'kid': 'k1'}).encode())
+    payload = _b64(json.dumps(_claims()).encode())
+    signing_input = f'{header}.{payload}'.encode('ascii')
+    unsalted = key.sign(signing_input, padding.PSS(padding.MGF1(hashes.SHA256()), 0),
+                        hashes.SHA256())
+    with pytest.raises(OIDCValidationError, match='signature is invalid'):
+        _verify(f'{header}.{payload}.{_b64(unsalted)}')
+
+
 def test_an_encryption_key_never_verifies(idp):
     from services.oidc_id_token import OIDCValidationError
     key = _rsa_key()
