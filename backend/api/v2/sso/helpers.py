@@ -335,6 +335,19 @@ def oidc_identity(userinfo, attr_mapping):
     return username, email, get('fullname', 'name')
 
 
+def oidc_stable_id(userinfo):
+    """The account's stable id in UserInfo: ``sub``, else (GitHub, not an OIDC provider) the
+    numeric ``id``; never ``login`` nor the e-mail, which can pass to another person."""
+    userinfo = userinfo if isinstance(userinfo, dict) else {}
+    value = userinfo.get('sub')
+    if value is None:
+        value = userinfo.get('id')
+        if isinstance(value, bool) or not isinstance(value, (int, str)):
+            return None
+    value = str(value).strip()
+    return value or None
+
+
 def saml_identity(attrs, name_id, attr_mapping):
     """(username, email, fullname) from SAML attributes through the attribute mapping."""
     attrs = attrs if isinstance(attrs, dict) else {}

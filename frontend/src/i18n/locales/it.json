@@ -4114,6 +4114,8 @@
     "idTokenVerify": "Verifica la firma dell'ID token (consigliato)",
     "idTokenVerifyWarning": "Disattivare la verifica della firma indebolisce la sicurezza dell'accesso. Usare solo come misura temporanea di compatibilità.",
     "idTokenVerifyIssuerMissing": "La verifica è attiva ma nessun issuer è impostato: gli accessi OIDC falliranno finché non viene configurato.",
+    "githubNotOidc": "GitHub is not an OpenID Connect provider: it issues no ID token, so its signature cannot be verified. The account is recognised by its numeric GitHub id.",
+    "tenantPlaceholderHint": "Replace {tenant} in the URLs and the issuer with your directory (tenant) ID.",
     "defaultRoleNone": "Nessuno: rifiuta gli utenti che nessuna regola riconosce",
     "provisioningRulesNotice": "Sono definite regole di mappatura dei ruoli: un utente che nessuna regola riconosce viene rifiutato all'accesso.",
     "provisioningNoRulesNotice": "Nessuna regola di mappatura dei ruoli: ogni utente autenticato da questo provider può accedere, e i nuovi account ricevono il ruolo {{role}}.",

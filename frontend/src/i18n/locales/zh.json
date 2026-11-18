@@ -4114,6 +4114,8 @@
     "idTokenVerify": "验证 ID 令牌签名（推荐）",
     "idTokenVerifyWarning": "禁用签名验证会削弱登录安全性。仅作为临时兼容性措施使用。",
     "idTokenVerifyIssuerMissing": "已启用验证但未设置颁发者：在配置颁发者之前 OIDC 登录将失败。",
+    "githubNotOidc": "GitHub is not an OpenID Connect provider: it issues no ID token, so its signature cannot be verified. The account is recognised by its numeric GitHub id.",
+    "tenantPlaceholderHint": "Replace {tenant} in the URLs and the issuer with your directory (tenant) ID.",
     "defaultRoleNone": "无：拒绝没有匹配规则的用户",
     "provisioningRulesNotice": "已设置角色映射规则：没有任何规则匹配的用户在登录时会被拒绝。",
     "provisioningNoRulesNotice": "没有角色映射规则：此提供方认证的所有用户都可以登录，新账户获得 {{role}} 角色。",

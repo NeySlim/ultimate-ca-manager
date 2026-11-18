@@ -4117,6 +4117,8 @@
     "idTokenVerify": "Verify ID token signature (recommended)",
     "idTokenVerifyWarning": "Disabling signature verification weakens login security. Only use as a temporary compatibility measure.",
     "idTokenVerifyIssuerMissing": "Verification is enabled but no issuer is set: OIDC logins will fail until the issuer is configured.",
+    "githubNotOidc": "GitHub is not an OpenID Connect provider: it issues no ID token, so its signature cannot be verified. The account is recognised by its numeric GitHub id.",
+    "tenantPlaceholderHint": "Replace {tenant} in the URLs and the issuer with your directory (tenant) ID.",
     "defaultRoleNone": "None: refuse users no rule matches",
     "provisioningRulesNotice": "Role mapping rules are set: a user no rule matches is refused at sign-in.",
     "provisioningNoRulesNotice": "No role mapping rule: every user this provider authenticates can sign in, and new accounts get the {{role}} role.",

@@ -4164,6 +4164,8 @@
     "idTokenVerify": "Перевіряти підпис ID-токена (рекомендовано)",
     "idTokenVerifyWarning": "Вимкнення перевірки підпису послаблює безпеку входу. Використовуйте лише як тимчасовий захід сумісності.",
     "idTokenVerifyIssuerMissing": "Перевірку ввімкнено, але емітента не задано: входи OIDC не працюватимуть, доки його не налаштовано.",
+    "githubNotOidc": "GitHub is not an OpenID Connect provider: it issues no ID token, so its signature cannot be verified. The account is recognised by its numeric GitHub id.",
+    "tenantPlaceholderHint": "Replace {tenant} in the URLs and the issuer with your directory (tenant) ID.",
     "defaultRoleNone": "Немає: відхиляти користувачів, яких не розпізнає жодне правило",
     "provisioningRulesNotice": "Правила зіставлення ролей задано: користувача, якого не розпізнає жодне правило, буде відхилено під час входу.",
     "provisioningNoRulesNotice": "Немає правил зіставлення ролей: кожен користувач, автентифікований цим постачальником, може увійти, а нові облікові записи отримують роль {{role}}.",
