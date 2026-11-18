@@ -59,19 +59,13 @@ class TestAMigrationHoldsBothRoutes:
     @pytest.mark.parametrize('route', ROUTES)
     def test_a_busy_lock_refuses_the_restore(self, app, auth_client,
                                              monkeypatch, route):
-        import importlib
-
         from services.database_admin.lock import MigrationBusyError
 
         def busy(*args, **kwargs):
             raise MigrationBusyError('A migration is running.')
 
-        # The routes, and the restore job that takes the lock for them
-        for module in ('api.v2.system.backup', 'api.v2.settings.backup',
-                       'services.database_admin.lock'):
-            loaded = importlib.import_module(module)
-            if hasattr(loaded, 'database_migration_lock'):
-                monkeypatch.setattr(loaded, 'database_migration_lock', busy)
+        # At its source: the restore job takes the lock for both routes
+        monkeypatch.setattr('services.database_admin.lock.database_migration_lock', busy)
 
         response = _upload(auth_client, route)
 

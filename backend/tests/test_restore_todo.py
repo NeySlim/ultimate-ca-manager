@@ -37,7 +37,6 @@ class TestTodoLines:
 class TestRoutesAnswerWithTheLines:
     @pytest.mark.parametrize('route', ('/api/v2/system/restore', '/api/v2/settings/backup/restore'))
     def test_data_carries_todo(self, app, auth_client, monkeypatch, route):
-        import importlib
         import services.backup.restore.invalidate as invalidate
         from services.backup_service import BackupService
 
@@ -51,11 +50,8 @@ class TestRoutesAnswerWithTheLines:
         # The restore job's CRL step reports what the degraded aftermath says
         monkeypatch.setattr(invalidate, 'regenerate_crls_summary',
                             lambda: dict(DEGRADED['invalidated']))
-        for module in ('api.v2.system.backup', 'api.v2.settings.backup'):
-            loaded = importlib.import_module(module)
-            for name in ('_request_restart_after_restore', 'request_restart'):
-                if hasattr(loaded, name):
-                    monkeypatch.setattr(loaded, name, lambda: (True, 'ok'))
+        # At its source, read at call time by the restore job: no restart file is written
+        monkeypatch.setattr('services.backup.restore_completion.request_restart', lambda: (True, 'ok'))
 
         response = auth_client.post(
             route, data={'file': (io.BytesIO(b'x'), 'x.ucmbkp'),
