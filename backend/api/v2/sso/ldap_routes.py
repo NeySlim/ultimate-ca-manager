@@ -68,10 +68,10 @@ def ldap_login():
     if provider_id:
         provider = db.session.get(SSOProvider, provider_id)
     else:
-        # Use first enabled LDAP provider
-        provider = SSOProvider.query.filter_by(provider_type='ldap', enabled=True).first()
+        # The LDAP provider: one per type, the lowest id should a database hold two
+        provider = SSOProvider.query.filter_by(provider_type='ldap', enabled=True).order_by(SSOProvider.id).first()
 
-    if not provider:
+    if not provider or provider.provider_type != 'ldap':
         return error_response("No LDAP provider configured", 400)
 
     if not provider.enabled:
