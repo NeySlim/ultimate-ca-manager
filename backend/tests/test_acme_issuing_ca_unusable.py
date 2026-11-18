@@ -208,11 +208,11 @@ def test_the_refusal_issues_and_counts_nothing(app, monkeypatch, create_ca, defa
         assert db.session.query(db.func.coalesce(db.func.sum(CA.serial), 0)).scalar() == counted
 
 
-def _finalize_by_route(app, client, monkeypatch, domain):
+def _finalize_by_route(app, client, monkeypatch, domain, caa=(True, 'allowed')):
     """(response, order_id) of a finalize sent to the ACME route for a ready order on *domain*."""
     from tests.test_acme_server_rfc_conformance import _b64u, _new_account, _ready_order, _signed
     from utils import caa_checker
-    monkeypatch.setattr(caa_checker, 'check_caa_for_domains', lambda *a, **k: (True, 'allowed'))
+    monkeypatch.setattr(caa_checker, 'check_caa_for_domains', lambda *a, **k: caa)
     acct = _new_account(app)
     order_id = _ready_order(app, acct, [{'type': 'dns', 'value': domain}])
     key = ec.generate_private_key(ec.SECP256R1())
@@ -305,3 +305,56 @@ def test_a_chosen_ca_taken_offline_is_named_as_offline(app, monkeypatch, create_
         success, error, service, order = _finalize(monkeypatch, _domain())
         assert not success and 'is offline' in error and NO_KEY not in error, error
         assert service._last_finalize_error_type == 'serverInternal' and order.certificate_id is None
+
+
+def test_a_ca_named_with_caa_without_key_is_still_a_server_error(app, client, monkeypatch,
+                                                                 create_ca, default_setting):
+    """A server-side refusal is never read as a CAA denial, whatever the CA is called."""
+    chosen = create_ca(cn='Corp CAA Issuing')
+    with app.app_context():
+        _set_default(db.session.get(CA, chosen['id']).refid)
+        _drop_key(chosen['id'])
+    response, order_id = _finalize_by_route(app, client, monkeypatch, _domain())
+    _assert_refused_by_route(app, response, order_id, NO_KEY)
+    assert 'Corp CAA Issuing' not in response.get_data(as_text=True)
+
+
+def test_a_ca_named_with_caa_outside_its_window_is_still_a_server_error(app, client, monkeypatch,
+                                                                        create_ca, default_setting):
+    from services.cert_service import CertificateService
+    from utils.ca_signing_window import IssuerWindowError
+
+    def outside_window(*_a, **_k):
+        raise IssuerWindowError('Issuing CA certificate has expired (since 2020-01-01T00:00:00Z)')
+
+    chosen = create_ca(cn='Window CAA CA')
+    with app.app_context():
+        _set_default(db.session.get(CA, chosen['id']).refid)
+    monkeypatch.setattr(CertificateService, 'sign_csr', staticmethod(outside_window))
+    response, order_id = _finalize_by_route(app, client, monkeypatch, _domain())
+    _assert_refused_by_route(app, response, order_id, "issuing CA 'Window CAA CA'")
+    assert 'Window CAA CA' not in response.get_data(as_text=True)
+
+
+def test_a_domain_with_a_caa_label_mapped_to_a_keyless_ca_is_a_server_error(app, client, monkeypatch,
+                                                                            create_ca, default_setting):
+    chosen = create_ca(cn='Local domain CA without key, caa label')
+    domain = f'caa.{_domain()}'
+    with app.app_context():
+        _drop_key(chosen['id'])
+        _LOCAL_DOMAINS.append(domain)
+        db.session.add(AcmeLocalDomain(domain=domain, issuing_ca_id=chosen['id']))
+        db.session.commit()
+    response, order_id = _finalize_by_route(app, client, monkeypatch, domain)
+    _assert_refused_by_route(app, response, order_id, NO_KEY)
+
+
+def test_a_real_caa_denial_still_invalidates_the_order(app, client, monkeypatch):
+    """The CAA check's own refusal stays a terminal caa error."""
+    domain = _domain()
+    response, order_id = _finalize_by_route(app, client, monkeypatch, domain,
+                                            caa=(False, f'CAA record forbids issuance for {domain}'))
+    assert response.status_code == 400, response.get_data(as_text=True)
+    assert response.get_json()['type'] == 'urn:ietf:params:acme:error:caa'
+    with app.app_context():
+        assert AcmeOrder.query.filter_by(order_id=order_id).one().status == 'invalid'

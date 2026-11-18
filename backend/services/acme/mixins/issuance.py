@@ -71,6 +71,7 @@ class IssuanceMixin:
         Returns:
             Tuple of (success, error_message)
         """
+        self._last_finalize_error_type = None
         order = self.get_order(order_id)
         
         if not order:
