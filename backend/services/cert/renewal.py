@@ -263,7 +263,7 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
         staged_all, renewed_a = [], None
         for index, member in enumerate(members):
             is_cert = member is cert
-            # B names A as renewed a moment ago; any other member the A its locked row links to
+            # B names A as renewed a moment ago; any other member the A its locked row hashes
             related_to = renewed_a if pair and index == 1 else CURRENT_RELATED
             try:
                 staged_member = _stage_renewal(
@@ -320,7 +320,8 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
         'ca_id': staged['ca_id'],
         'ca_refid': staged['ca_refid'],
         'rekeyed': bool(rekey),
-        'notices': staged['notices'],
+        # A partner's dropped extension is said too: the caller renewed that member as well
+        'notices': staged['notices'] + [s['dropped'] for s in others if s['dropped']],
         'related': [{'cert_id': s['cert_id'], 'ca_id': s['ca_id'], 'new_serial': s['new_serial']}
                     for s in others],
     }
@@ -391,7 +392,28 @@ def _linked_members(cert):
     from services.cert.issued_lookup import row_revoked
     if row_revoked(partner):  # by its row or by the record of its serial
         return [cert], linked
+    _refuse_unreadable(partner, related=True)
+    _refuse_unreadable(cert)
     return list(anchor_first(cert, partner)), linked
+
+
+def _refuse_unreadable(row, related=False):
+    """Refuse, naming *row*, when its certificate or its RelatedCertificate extension cannot be
+    read: a corrupt row never unlinks a pair in silence."""
+    from services.cert.related_pair import row_certificate
+    from utils.related_cert import read_related_certificate
+    try:
+        certificate = row_certificate(row)
+        if certificate is not None:
+            read_related_certificate(certificate)
+    except ValueError as e:  # RelatedCertError included
+        raise _unreadable(row.id, related) from e
+
+
+def _unreadable(row_id, related) -> 'RenewalError':
+    what = f'Related certificate {row_id}' if related else f'Certificate {row_id}'
+    return RenewalError(f'{what} cannot be read: renewing would drop its RFC 9763 link, so the '
+                        f'renewal is refused', 409)
 
 
 def _as_stored(row_id):
@@ -406,33 +428,62 @@ def renewal_partner(cert):
 
 
 def _current_related(row):
-    """The certificate A that *row*'s certificate names, while A is held, valid,
-    unrevoked and not superseded; None otherwise (the renewed certificate then names nothing)."""
+    """The certificate A that *row*'s RelatedCertificate extension hashes, None when none is
+    named (RFC 9763 §4.1): see :func:`_named_related`."""
+    return _named_related(row)[0]
+
+
+def _named_related(row):
+    """``(A, why)``: the A *row*'s extension hashes (RFC 9763 §4.1) while held, valid, unrevoked and
+    unarchived, else None and why it is no longer named (None: the original named nothing).
+    Refused when that extension, or a linked row that could hold A, cannot be read."""
     from services.cert.related_pair import row_certificate
+    from utils import related_cert
     try:
-        if not row.related_certificate_id or not row.crt:
-            return None
+        if not row.crt:
+            return None, None
+        row_id, linked_id = row.id, row.related_certificate_id
     except InvalidRequestError:  # deleted since the caller read it: _reread answers 404
-        return None
+        return None, None
     original = x509.load_pem_x509_certificate(b64decode(row.crt))
     try:
-        original.extensions.get_extension_for_oid(RELATED_CERT_EXTENSION_OID)
-    except x509.ExtensionNotFound:
-        return None
-    a_row = _as_stored(row.related_certificate_id)
-    if a_row is None or a_row.archived or not a_row.crt:
-        return None
+        if related_cert.read_related_certificate(original) is None:
+            return None, None
+    except related_cert.RelatedCertError as e:  # an unreadable hash: refused, not dropped
+        raise _unreadable(row_id, False) from e
+    a_row = _row_named_by(original, row_id, linked_id)
+    if a_row is None:
+        return None, 'has been replaced or removed'
+    if a_row.archived:
+        return None, 'is archived'
     from services.cert.issued_lookup import row_revoked
     if row_revoked(a_row):  # by its row or by the record of its serial
-        return None
+        return None, 'has been revoked'
     cert_a = row_certificate(a_row)
-    # A row linked to its own B (whose certificate names this one) names nothing B holds
-    from utils.related_cert import references
-    if references(cert_a, original):
-        return None
     if cert_a.not_valid_after_utc.replace(tzinfo=None) < utc_now():
-        return None
-    return cert_a
+        return None, 'has expired'
+    return cert_a, None
+
+
+def _row_named_by(original, row_id, linked_id):
+    """The row, as stored now, holding the certificate *original*'s extension hashes (RFC 9763
+    §4.1): the linked row, else a row linked to *row_id*. One unreadable refuses the renewal."""
+    from services.cert.related_pair import row_certificate
+    from utils.related_cert import references
+
+    def hashed(candidate):
+        try:
+            return bool(candidate.crt) and references(original, row_certificate(candidate))
+        except ValueError as e:  # it may be the one hashed: never read as "not named"
+            raise _unreadable(candidate.id, True) from e
+
+    if linked_id:
+        linked = _as_stored(linked_id)
+        if linked is not None and hashed(linked):
+            return linked
+    linking = (Certificate.query.populate_existing()
+               .filter(Certificate.related_certificate_id == row_id).order_by(Certificate.id).all())
+    return next((c for c in linking if hashed(c)), None)
 
 
 def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, related_to=None,
@@ -441,8 +492,10 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
     is the certificate A the renewed one names (RFC 9763), CURRENT_RELATED to read it
     from the locked row, *link* the row the members were chosen on."""
     cert = _reread(cert, known_serial, trigger, was_archived, link)
+    dropped = None
     if related_to is CURRENT_RELATED:
-        related_to = _current_related(cert)
+        related_to, why = _named_related(cert)
+        dropped = why and notices_mod.related_certificate_dropped(cert.id, why)
     check_renewable(cert, trigger)
     ca, ca_cert, ca_key = _signing_ca(cert, ca, trigger)
 
@@ -459,6 +512,8 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
     if not_after < wanted:
         notices.append(notices_mod.validity_shortened(
             granted, max((not_after - now).days, 0), notices_mod.issuer_expiry_reason(not_after)))
+    if dropped:
+        notices.append(dropped)
     _check_name_constraints(ca_cert, original)
 
     new_key = None
@@ -494,6 +549,7 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
         'old_serial': old_serial,
         'new_serial': new_serial, 'valid_from': cert.valid_from, 'valid_to': cert.valid_to,
         'notices': notices, 'cert_pem': cert_pem, 'key_pem': key_pem, 'related_to': related_to,
+        'dropped': dropped,
     }
 
 
@@ -886,7 +942,7 @@ def _after_commit(cert, issuer, staged, *, username, actor_user_id, rekey, regen
             resource_name=cert.subject,
             details=(f"Renewed until {utc_isoformat(valid_to)} (trigger: {trigger}, "
                      f"{'rekeyed' if rekey else 'same key'}); serial {old_serial} -> "
-                     f"{staged['new_serial']}"),
+                     f"{staged['new_serial']}" + (f"; {staged['dropped']}" if staged['dropped'] else '')),
             success=True,
             username=username,
             user_id=actor_user_id,

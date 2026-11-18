@@ -745,9 +745,8 @@ class TestAWriterNeverReplacesAGraverReason:
 class TestRelatedAndMtlsReadTheRecord:
 
     def test_a_partner_revoked_by_its_record_is_not_named(self, app, issuer):
-        from cryptography.x509 import UnrecognizedExtension
         from services.cert.renewal import _current_related
-        from utils.related_cert import RELATED_CERT_EXTENSION_OID
+        from utils.related_cert import related_certificate_extension
         _, refid, ca_cert, ca_key = issuer
         first, key_a = _leaf('related-a.example.test', ca_cert, ca_key)
         now = datetime.now(timezone.utc)
@@ -757,7 +756,7 @@ class TestRelatedAndMtlsReadTheRecord:
                   .issuer_name(ca_cert.subject).public_key(key_b.public_key())
                   .serial_number(x509.random_serial_number())
                   .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=30))
-                  .add_extension(UnrecognizedExtension(RELATED_CERT_EXTENSION_OID, b'\x30\x00'), critical=False)
+                  .add_extension(related_certificate_extension(first), critical=False)
                   .sign(ca_key, hashes.SHA256()))
         a_id, b_id = _store(app, first, refid, key=key_a), _store(app, second, refid, key=key_b)
         with app.app_context():

@@ -53,6 +53,13 @@ def key_usage_dropped(bits, key_label: str, family=None, signature_added=False) 
     return text
 
 
+def related_certificate_dropped(cert_id, why: str) -> str:
+    """A renewal left out the RelatedCertificate extension the original carried."""
+    return (f'Certificate {cert_id} was renewed without its RelatedCertificate extension '
+            f'(RFC 9763): the certificate it named {why}, and a CA names only a certificate '
+            f'the request lists.')
+
+
 def collect(*notices) -> List[str]:
     """The notices that are actually there, in order, without blanks; a list
     among them (policy advisories) is spread."""
@@ -79,6 +86,7 @@ __all__ = [
     'digest_ignored',
     'digest_replaced',
     'key_usage_dropped',
+    'related_certificate_dropped',
     'collect',
     'meta_with_notices',
 ]

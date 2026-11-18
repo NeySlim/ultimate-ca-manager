@@ -71,6 +71,8 @@ def renew_certificate(cert_id):
         policy, approval = _approval_for_renewal(g.current_user, cert, data, validity_days)
     except PairApprovalConflict as e:
         return error_response(str(e), 409)
+    except RenewalError as refusal:  # the pair could not be read
+        return error_response(refusal.message, refusal.status, problem_type=refusal.problem_type)
     except Exception as e:
         logger.error(f"Policy evaluation failed for renewal of {cert_id}: {e}", exc_info=True)
         return error_response('Policy evaluation failed; the certificate was not renewed', 500)

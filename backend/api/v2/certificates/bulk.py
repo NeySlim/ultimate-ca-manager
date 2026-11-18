@@ -189,6 +189,8 @@ def bulk_renew_certificates():
             except PairApprovalConflict as e:
                 results['failed'].append({'id': cert_id, 'error': str(e)})
                 continue
+            except RenewalError:  # the pair could not be read: reported per item below
+                raise
             except Exception as e:
                 db.session.rollback()
                 logger.error(f"Policy evaluation failed for renewal of {cert_id}: {e}", exc_info=True)
@@ -205,6 +207,8 @@ def bulk_renew_certificates():
                 cert, username=username, actor_user_id=actor_user_id, rekey=True,
                 regenerate_crl=False, trigger='bulk')
             results['success'].append(cert_id)
+            if outcome.get('notices'):
+                results.setdefault('notices', []).append({'id': cert_id, 'notices': outcome['notices']})
             for done in [outcome] + list(outcome.get('related') or []):
                 renewed_with_pair.add(done['cert_id'])
                 renewed_cert_ids.append(done['cert_id'])
