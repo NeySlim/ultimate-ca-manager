@@ -263,3 +263,15 @@ def test_a_provider_whose_idp_is_unknown_on_both_sides_is_updated_in_place(targe
     db.session.expire_all()
     assert not [w for w in results['warnings'] if w.startswith('sso_providers:')]
     assert SSOProvider.query.filter_by(provider_type='saml').one().id == corp.id
+
+
+@pytest.mark.parametrize('kind', sorted(IDPS))
+def test_an_identity_removed_with_its_provider_is_not_reported_as_unlinked(target, kind):
+    """The report counts as unlinked the rows that stay, never one the replacement removes."""
+    _instance(kind)
+    archive = _archive('3.0', kind, IDPS[kind][2], 'kate-sub-b')
+    mona = [user for user in archive['users'] if user['username'] == 'mona']
+    results = _restore({'sso_providers': [], 'user_sso_identities': [], 'users': mona}, 'replace')
+    db.session.expire_all()
+    assert _rows('kate') is None and SSOProvider.query.filter_by(provider_type=kind).count() == 0
+    assert 'user_sso_identities.provider_id' not in results['unlinked_dependents'], results

@@ -537,7 +537,9 @@ def _defer_what_kept_rows_need(replacement: Replacement) -> None:
 
 
 def _detach_kept_rows(replacement: Replacement, name: str, table) -> None:
-    """Kept rows naming a doomed row through an optional column: the writes set it again."""
+    """Kept rows naming a doomed row through an optional column: the writes set it again.
+    A kept identity of a removed provider becomes an orphan of its IdP instead: the writes
+    add the archive's row beside it."""
     primary = _primary(table)
     ids = replacement.doomed[name]
     for dependent, column, named in _foreign_keys_into(table.name):
@@ -546,14 +548,13 @@ def _detach_kept_rows(replacement: Replacement, name: str, table) -> None:
                 or _primary(dependent) is None):
             continue
         values = [row[0] for row in _select([named], primary, ids)]
-        if (dependent.name, column.name) == ORPHANED_WITH_PROVIDER:
-            # A kept identity the writes do not take keeps its IdP, as a removed provider's do
-            _orphan_identities(replacement, dependent, values)
-            continue
         gone = replacement.doomed.get(dependent_section, set())
         dependent_primary = _primary(dependent)
         kept = [row[0] for row in _select([dependent_primary], column, values)
                 if row[0] not in gone]
+        if (dependent.name, column.name) == ORPHANED_WITH_PROVIDER:
+            _orphan_identities(replacement, dependent, values, only=kept)
+            continue
         for chunk in _chunks(kept):
             db.session.execute(update(dependent).where(dependent_primary.in_(chunk))
                                .values({column.name: None}))
@@ -606,14 +607,19 @@ def _release_dependents(replacement: Replacement, table, key_column, keys, owner
             _count(replacement.cleared, dependent.name, result.rowcount)
 
 
-def _orphan_identities(replacement: Replacement, table, provider_ids) -> None:
-    """The identity rows of removed providers become orphans of their IdP."""
+def _orphan_identities(replacement: Replacement, table, provider_ids, only=None) -> None:
+    """The identity rows of removed providers become orphans of their IdP; *only* names the
+    rows concerned when some of them are removed too."""
     from models.sso import SSOProvider
 
     for provider in SSOProvider.query.filter(SSOProvider.id.in_(provider_ids)):
-        result = db.session.execute(update(table).where(table.c.provider_id == provider.id)
-                                    .values(provider_id=None, orphan_of=provider.idp_key()))
-        _count(replacement.unlinked, f'{table.name}.provider_id', result.rowcount)
+        mine = table.c.provider_id == provider.id
+        scopes = [mine] if only is None else [mine & _primary(table).in_(chunk)
+                                              for chunk in _chunks(only)]
+        for scope in scopes:
+            result = db.session.execute(update(table).where(scope)
+                                        .values(provider_id=None, orphan_of=provider.idp_key()))
+            _count(replacement.unlinked, f'{table.name}.provider_id', result.rowcount)
 
 
 def _close_requests(replacement: Replacement, table, column, values) -> None:
