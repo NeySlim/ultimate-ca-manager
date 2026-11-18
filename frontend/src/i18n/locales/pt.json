@@ -4169,9 +4169,7 @@
     "signInTestCompleteBack": "Voltar aos provedores SSO",
     "signInTestLaunching": "Abrindo o provedor de identidade…",
     "signInTestCompleteClose": "Esta janela não fechou sozinha: feche-a para voltar à tela do provedor.",
-    "signInTestCancel": "Cancelar",
-    "signInTestShadowed": "Outros provedores habilitados deste tipo: {{names}}. Um login passa por apenas um provedor habilitado por tipo, e não necessariamente este: desabilite {{names}}.",
-    "signInTestShadowedDisabled": "Provedores habilitados deste tipo: {{names}}. Um login passa por apenas um provedor habilitado por tipo: desabilite {{names}} antes de habilitar este, ou os logins podem não passar por ele."
+    "signInTestCancel": "Cancelar"
   },
   "notifications": {
     "certificateIssued": "Certificado emitido: {{name}}",

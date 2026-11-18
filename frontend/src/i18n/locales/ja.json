@@ -4172,9 +4172,7 @@
     "signInTestCompleteBack": "SSO プロバイダーに戻る",
     "signInTestLaunching": "ID プロバイダーを開いています…",
     "signInTestCompleteClose": "このウィンドウは自動で閉じませんでした：閉じてプロバイダー画面に戻ってください。",
-    "signInTestCancel": "キャンセル",
-    "signInTestShadowed": "この種類で有効な他のプロバイダー：{{names}}。ログインは種類ごとに有効な 1 つのプロバイダーしか通らず、それがこのプロバイダーとは限りません：{{names}} を無効にしてください。",
-    "signInTestShadowedDisabled": "この種類で有効なプロバイダー：{{names}}。ログインは種類ごとに有効な 1 つのプロバイダーしか通りません：このプロバイダーを有効にする前に {{names}} を無効にしてください。そうしないと、ログインがこのプロバイダーを通らない場合があります。"
+    "signInTestCancel": "キャンセル"
   },
   "notifications": {
     "certificateIssued": "証明書が発行されました：{{name}}",

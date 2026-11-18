@@ -4169,9 +4169,7 @@
     "signInTestCompleteBack": "Torna ai provider SSO",
     "signInTestLaunching": "Apertura del provider di identità…",
     "signInTestCompleteClose": "Questa finestra non si è chiusa da sola: chiudila per tornare alla schermata del provider.",
-    "signInTestCancel": "Annulla",
-    "signInTestShadowed": "Altri provider abilitati di questo tipo: {{names}}. Un accesso passa da un solo provider abilitato per tipo, non necessariamente questo: disabilita {{names}}.",
-    "signInTestShadowedDisabled": "Provider abilitati di questo tipo: {{names}}. Un accesso passa da un solo provider abilitato per tipo: disabilita {{names}} prima di abilitare questo, altrimenti gli accessi potrebbero non passare da esso."
+    "signInTestCancel": "Annulla"
   },
   "notifications": {
     "certificateIssued": "Certificato emesso: {{name}}",

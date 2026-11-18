@@ -4169,9 +4169,7 @@
     "signInTestCompleteBack": "返回 SSO 提供商",
     "signInTestLaunching": "正在打开身份提供商…",
     "signInTestCompleteClose": "此窗口未自动关闭：请关闭它以返回提供商界面。",
-    "signInTestCancel": "取消",
-    "signInTestShadowed": "此类型的其他已启用提供商：{{names}}。每种类型只有一个已启用的提供商处理登录，且不一定是此提供商：请禁用 {{names}}。",
-    "signInTestShadowedDisabled": "此类型的已启用提供商：{{names}}。每种类型只有一个已启用的提供商处理登录：请先禁用 {{names}} 再启用此提供商，否则登录可能不会经过它。"
+    "signInTestCancel": "取消"
   },
   "notifications": {
     "certificateIssued": "证书已颁发：{{name}}",
