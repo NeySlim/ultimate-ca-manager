@@ -171,8 +171,6 @@ def check_renewable(cert: Certificate, trigger: str = 'manual') -> None:
     since it was read."""
     if not cert.crt:
         raise RenewalError('Certificate data not available', 400)
-    if _stored(cert) is None:
-        raise _unreadable(cert.id, False, link=False)
     # Any revocation, a suspension included: renewing would hand back a good serial
     if cert.revoked:
         raise RenewalError('Cannot renew a revoked certificate. Issue a new certificate instead.', 409)
@@ -202,6 +200,10 @@ def check_renewable(cert: Certificate, trigger: str = 'manual') -> None:
                 fips_mode.refuse_unless_approved(name.upper(), f'{name} key of certificate {cert.id}')
             except FipsRestricted as e:
                 raise RenewalError.from_fips(e) from e
+
+    # After the refusals above, before the first decoding of the certificate below
+    if _stored(cert) is None:
+        raise _unreadable(cert.id, False, link=False)
 
     # The template's SAN types bind the renewed names as they bound the issuance
     template_id = getattr(cert, 'template_id', None)
