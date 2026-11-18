@@ -195,10 +195,14 @@ class IssuanceMixin:
                 self._last_finalize_error_type = 'serverInternal'
                 return False, error
             from services.acme.requested_validity import RequestedValidityError
-            from services.policy_service import RequestedValidityRefused
+            from services.policy_service import DnsNameCountRefused, RequestedValidityRefused
             if isinstance(exc, (RequestedValidityError, RequestedValidityRefused)):
                 # The order's own dates: no other CSR can be issued on it
                 return self._refuse_order(order, 'malformed', error, approval)
+            if isinstance(exc, DnsNameCountRefused):
+                # A CSR carries exactly the order's names: their count refuses
+                # the order itself (RFC 8555 §6.7 rejectedIdentifier)
+                return self._refuse_order(order, 'rejectedIdentifier', error, approval)
             self._last_finalize_error_type = 'badCSR'
             return False, error
 

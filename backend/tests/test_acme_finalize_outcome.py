@@ -246,6 +246,29 @@ def test_a_window_a_policy_refuses_invalidates_the_order(app, client, served):
     assert read['status'] == 'invalid' and 'allowed by policy' in read['error']['detail']
 
 
+def test_a_dns_name_count_a_policy_refuses_invalidates_the_order(app, client, served):
+    """The CSR must carry the order's names: no other CSR lowers their count."""
+    from models.policy import CertificatePolicy
+    account, ca_id, domain = served
+    second = f'two-{domain}'
+    with app.app_context():
+        db.session.add(AcmeLocalDomain(domain=second, issuing_ca_id=ca_id))
+        policy = CertificatePolicy(name=f'acme-outcome-names-{uuid.uuid4().hex[:6]}', policy_type='issuance',
+                                   ca_id=ca_id, requires_approval=False, min_approvers=1,
+                                   is_active=True, priority=100, notify_on_violation=False)
+        policy.set_rules({'san_restrictions': {'max_dns_names': 1}})
+        db.session.add(policy)
+        db.session.commit()
+    order_id = _ready_order(app, account, [{'type': 'dns', 'value': domain}, {'type': 'dns', 'value': second}])
+    r = _finalize(client, account, order_id, domain, dns=[domain, second])
+    assert r.status_code == 400, r.get_json()
+    assert r.get_json()['type'] == 'urn:ietf:params:acme:error:rejectedIdentifier'
+    read = _read(client, account, order_id)
+    assert read['status'] == 'invalid'
+    assert read['error']['type'] == 'urn:ietf:params:acme:error:rejectedIdentifier'
+    assert 'DNS names' in read['error']['detail']
+
+
 def test_a_withdrawn_profile_invalidates_the_order(app, client, served):
     account, _ca_id, domain = served
     order_id = _order(app, account, domain)

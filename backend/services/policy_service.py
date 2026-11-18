@@ -39,6 +39,21 @@ class RequestedValidityRefused(PolicyViolation):
     """A policy refuses the notAfter the requester fixed: no other key or CSR lifts it."""
 
 
+class DnsNameCountRefused(PolicyViolation):
+    """A policy refuses the number of DNS names: an ACME order fixes them, no other CSR lifts it."""
+
+
+def _dns_count_violation(rules, policy_name, dns_name_count):
+    """The refusal of *dns_name_count* by ``san_restrictions.max_dns_names``, or None."""
+    san_rules = rules.get('san_restrictions') or {}
+    max_dns = san_rules.get('max_dns_names') if isinstance(san_rules, dict) else None
+    if (dns_name_count is not None and isinstance(max_dns, int)
+            and not isinstance(max_dns, bool) and max_dns > 0
+            and dns_name_count > max_dns):
+        return f'{dns_name_count} DNS names exceed the {max_dns} allowed by policy "{policy_name}"'
+    return None
+
+
 # Signature hashes a policy can allow, weakest first
 POLICY_DIGESTS = ('sha256', 'sha384', 'sha512')
 
@@ -420,15 +435,9 @@ class PolicyEvaluationService:
                     if text not in notices:
                         notices.append(text)
 
-            san_rules = rules.get('san_restrictions') or {}
-            max_dns = san_rules.get('max_dns_names') if isinstance(san_rules, dict) else None
-            if (dns_name_count is not None and isinstance(max_dns, int)
-                    and not isinstance(max_dns, bool) and max_dns > 0
-                    and dns_name_count > max_dns):
-                violations.append(
-                    f'{dns_name_count} DNS names exceed the {max_dns} allowed by policy '
-                    f'"{policy.name}"'
-                )
+            count_refused = _dns_count_violation(rules, policy.name, dns_name_count)
+            if count_refused:
+                violations.append(count_refused)
             if len(violations) > before:
                 by_policy[id(policy)] = violations[before:]
         if by_policy and notify:
@@ -438,6 +447,12 @@ class PolicyEvaluationService:
             except Exception as e:  # never turns a refusal into a 500
                 logger.warning("Policy violation notification failed: %s", e)
         return violations, effective_validity, capped_by
+
+    @staticmethod
+    def dns_name_count_violations(policies: list, dns_name_count, ca_id=None):
+        """The messages of enforce_rules that refuse *dns_name_count* alone."""
+        return [msg for policy in with_system_policies(policies, ca_id)
+                if (msg := _dns_count_violation(policy.get_rules() or {}, policy.name, dns_name_count))]
 
     @staticmethod
     def allowed_digests(policies: list):
