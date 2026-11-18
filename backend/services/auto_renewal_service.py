@@ -372,6 +372,13 @@ class AutoRenewalService:
                     cert, already_queued=bool(deadlines))
             except (PairApprovalConflict, RenewalError) as e:  # RenewalError: refused, or the pair not read
                 db.session.rollback()
+                # Gone, or overtaken by another request: the next pass reads the row anew
+                if isinstance(e, RenewalError) and (
+                        e.overtaken or not AutoRenewalService._row_exists(cert_id)):
+                    logger.info(f"Auto-renewal skipped cert {cert_id}: {e.message}")
+                    stats['skipped'] += 1
+                    continue
+                logger.warning(f"Auto-renewal of cert {cert_id} refused: {e}")
                 AutoRenewalService._log_failure(cert_id, common_name, str(e))
                 stats['failed'] += 1
                 stats['errors'].append({'cert_id': cert_id, 'common_name': common_name, 'error': str(e)})

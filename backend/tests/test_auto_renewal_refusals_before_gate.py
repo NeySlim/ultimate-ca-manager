@@ -103,3 +103,47 @@ def test_a_refused_certificate_fails_with_the_routes_reason_before_the_gate(
     finally:
         _drop_policy(app, pid)
         _drop_rows(app, bad_id, held_id, next_id)
+
+
+@pytest.mark.parametrize('kind', ['overtaken', 'gone'])
+def test_a_certificate_overtaken_or_gone_before_the_gate_is_skipped(
+        app, create_ca, monkeypatch, kind):
+    """As when the renewal itself is overtaken: the next pass reads the row anew, nothing is
+    recorded as a failure and no approval request is opened."""
+    import services.auto_renewal_service as scheduler
+    from services.cert.renewal import RenewalError
+    svc = scheduler.AutoRenewalService
+    gated = create_ca(cn=f'gate-{kind} CA')
+    pid = _renewal_policy(app, gated['id'], f'gate-{kind}')
+    bad_id = _cert_row(app, gated['id'], f'bad-{kind}.example.test')
+    reasons = []
+    monkeypatch.setattr(svc, '_log_failure', staticmethod(
+        lambda cert_id, cn, reason: reasons.append((cert_id, reason))))
+    monkeypatch.setattr(svc, '_send_failure_notification', staticmethod(lambda stats: None))
+    monkeypatch.setattr(svc, '_publish_crls', staticmethod(lambda carefs: None))
+
+    def refuse(cert, trigger):
+        if kind == 'overtaken':
+            raise RenewalError('Certificate was renewed by another request', 409, overtaken=True)
+        db.session.execute(Certificate.__table__.delete().where(Certificate.id == bad_id))
+        db.session.commit()
+        raise RenewalError('Certificate no longer exists', 404)
+
+    monkeypatch.setattr(scheduler, 'check_renewable', refuse)
+    try:
+        with app.app_context():
+            previous = dict(svc.get_renewal_config())
+            monkeypatch.setattr(svc, 'get_certificates_for_renewal', staticmethod(
+                lambda: [db.session.get(Certificate, bad_id)]))
+            svc.set_renewal_config({**previous, 'enabled': True})
+            try:
+                stats = svc.run_auto_renewal()
+            finally:
+                svc.set_renewal_config(previous)
+            assert _requests_naming(bad_id) == []
+            db.session.remove()
+        assert (stats['skipped'], stats['failed'], stats['queued']) == (1, 0, 0), stats
+        assert reasons == []
+    finally:
+        _drop_policy(app, pid)
+        _drop_rows(app, bad_id)
