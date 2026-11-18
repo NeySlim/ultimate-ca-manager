@@ -47,7 +47,8 @@ _DEFAULT_MODE = 0o640
 _TEMP_PREFIX = ".ucm.env."
 _TEMP_SUFFIX = ".tmp"
 
-_DOCKER_REFUSAL = "Cannot modify ucm.env in Docker. Set DATABASE_URL env var instead."
+_DOCKER_REFUSAL = ("Cannot modify ucm.env in a container (Docker, Kubernetes). "
+                   "Set the DATABASE_URL environment variable instead.")
 
 
 @dataclass(frozen=True)
@@ -345,7 +346,7 @@ def persist_database_url(database_url: Optional[str]) -> Tuple[bool, str]:
     """
     Write DATABASE_URL to ucm.env under UCM_CONFIG_DIR (set/update/remove).
     Pass None or empty string to remove (= use SQLite default).
-    Refuses in Docker (caller must check first).
+    Refuses in a container (caller must check first).
 
     Every other variable, comment and line order in the file is preserved.
     Use :func:`persist_database_url_with_backup` when the change may need to
