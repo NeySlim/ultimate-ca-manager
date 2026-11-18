@@ -1300,7 +1300,9 @@ def finalize_order(order_id: str):
             service._finalizing_order_id = None
 
         if not success:
-            is_caa_failure = _is_caa_failure(error)
+            # A server-side refusal names a CA or a domain: never read it as a CAA denial
+            is_caa_failure = (getattr(service, '_last_finalize_error_type', None) != 'serverInternal'
+                              and _is_caa_failure(error))
             if is_caa_failure:
                 service.invalidate_processing_order(order_id, 'caa', error)
             else:

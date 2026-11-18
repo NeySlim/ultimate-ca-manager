@@ -103,13 +103,15 @@ def _record(ca_id) -> CA:
 def _move_settings(record, root, cross=None):
     """Point the CA settings, the OCSP responder choice and the public URLs of *record* at *root*."""
     from models import SystemConfig
+    from services.deletion_blockers import _int_or_none
     for key in _SETTINGS:
         cfg = SystemConfig.query.filter_by(key=key).first()
         if cfg is None:
             continue
-        if cfg.value == record.refid:
+        value = (cfg.value or '').strip()
+        if value == record.refid:
             cfg.value = root.refid
-        elif cfg.value == str(record.id):
+        elif _int_or_none(value) == record.id:  # '07' names CA 7, as the deletion blocker reads it
             cfg.value = str(root.id)
     labels_cfg = SystemConfig.query.filter_by(key='est_labels').first()
     try:

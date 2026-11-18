@@ -20,6 +20,10 @@ def _is_ip_text(value: str) -> bool:
         return False
 
 
+class IssuingCAUnusable(Exception):
+    """An issuing CA was chosen (domain or default) but cannot sign: the order is refused."""
+
+
 class IssuanceMixin:
     def _caa_request_context(self, order):
         """Return the RFC 8657 account URL and validation method per DNS authz."""
@@ -67,6 +71,7 @@ class IssuanceMixin:
         Returns:
             Tuple of (success, error_message)
         """
+        self._last_finalize_error_type = None
         order = self.get_order(order_id)
         
         if not order:
@@ -188,14 +193,21 @@ class IssuanceMixin:
                     return False, "CAA check failed (DNS error): lookup error"
                 logger.warning(f"CAA check error (non-blocking): {e}")
         
-        # Resolve CA: domain-specific → global default → first available
+        # Resolve CA: domain-specific → global default; first available only when nothing was chosen
         # IP-only orders have no domains: skips the per-domain mappings and
         # resolves straight to the global default (acme.issuing_ca_id)
         if not ca_refid:
-            ca_refid = self._resolve_ca_for_domains(order_domains)
+            # A chosen CA that is gone, keyless or offline refuses the order: never another CA instead
+            try:
+                ca_refid = self._resolve_ca_for_domains(order_domains)
+            except IssuingCAUnusable as e:
+                logger.error("ACME order %s refused: %s", order_id, e)
+                self._last_finalize_error_type = 'serverInternal'
+                return False, str(e)
         
         # Sign certificate with UCM CA
         self._last_signing_exception = None
+        self._last_signing_ca_name = None
         success, cert_id, error = self._sign_certificate_with_ca(
             order=order,
             csr_pem=csr_pem,
@@ -209,6 +221,12 @@ class IssuanceMixin:
                 # `ready` (restore_processing_order) so the client may retry,
                 # and the error is reported as serverInternal, not badCSR
                 self._last_finalize_error_type = 'serverInternal'
+                # The log and the audit name the CA that could not sign; the client never sees it
+                name = getattr(self, '_last_signing_ca_name', None)
+                named = f"issuing CA '{name}'"
+                if name and named not in error:
+                    error = f"{error} ({named})"
+                logger.error("ACME order %s not signed: %s", order_id, error)
                 return False, error
             from services.acme.requested_validity import RequestedValidityError
             self._last_finalize_error_type = (
@@ -456,47 +474,60 @@ class IssuanceMixin:
     
     def _resolve_ca_for_domains(self, domains: list) -> Optional[str]:
         """Resolve which CA should sign for the given domains.
-        
-        Resolution order:
+
+        Resolution order, the first choice found decides:
         1. Local ACME domain mapping (acme_local_domains table)
         2. DNS domain-specific CA (acme_domains.issuing_ca_id)
         3. Global default from acme.issuing_ca_id config
-        4. None (will fall back to first available CA in _sign_certificate_with_ca)
+        4. None: nothing chosen, _sign_certificate_with_ca takes the first CA able to sign
+
+        Raises IssuingCAUnusable when the chosen CA is gone, offline or has no private key.
         """
         from api.v2.acme_local_domains import find_local_domain_ca
         from api.v2.acme_domains import find_provider_for_domain
         from models import SystemConfig, CA
-        
+        from services.deletion_blockers import _int_or_none
+
         # Check local ACME domain mapping first
         for domain in domains:
             ca_id = find_local_domain_ca(domain)
             if ca_id:
-                ca = db.session.get(CA, ca_id)
-                if ca and ca.has_private_key:
-                    return ca.refid
-        
+                return self._chosen_ca_refid(db.session.get(CA, ca_id), f'for the ACME domain {domain}',
+                                             'the ACME local domain settings')
+
         # Check DNS domain-specific CA
         for domain in domains:
             result = find_provider_for_domain(domain)
             if result and result.get('issuing_ca_id'):
-                ca = db.session.get(CA, result['issuing_ca_id'])
-                if ca and ca.has_private_key:
-                    return ca.refid
-        
-        # Fall back to global default
-        ca_id_cfg = SystemConfig.query.filter_by(key='acme.issuing_ca_id').first()
-        if ca_id_cfg and ca_id_cfg.value:
-            ca = CA.query.filter_by(refid=ca_id_cfg.value).first()
-            if not ca:
-                try:
-                    ca = db.session.get(CA, int(ca_id_cfg.value))
-                except (ValueError, TypeError):
-                    pass
-            if ca and ca.has_private_key:
-                return ca.refid
-        
+                return self._chosen_ca_refid(db.session.get(CA, result['issuing_ca_id']),
+                                             f'for the ACME domain {domain}', 'the ACME domain settings')
+
+        # Global default, read as the deletion blocker reads it (refid, else what int() takes)
+        cfg = SystemConfig.query.filter_by(key='acme.issuing_ca_id').first()
+        value = (cfg.value or '').strip() if cfg else ''
+        if value:
+            ca = CA.query.filter_by(refid=value).first()
+            number = _int_or_none(value)
+            if ca is None and number is not None:
+                ca = db.session.get(CA, number)
+            return self._chosen_ca_refid(ca, 'in the ACME settings', 'the ACME settings')
+
         return None
-    
+
+    @staticmethod
+    def _chosen_ca_refid(ca, chosen, where) -> str:
+        """The refid of a chosen CA that can sign; IssuingCAUnusable naming it otherwise."""
+        if ca is None:
+            raise IssuingCAUnusable(f'The ACME issuing CA chosen {chosen} no longer exists: '
+                                    f'choose another one in {where}')
+        if ca.offline:
+            raise IssuingCAUnusable(f"The ACME issuing CA '{ca.descr}' chosen {chosen} is offline: "
+                                    f'bring it back online, or choose a CA able to sign in {where}')
+        if not ca.has_private_key:
+            raise IssuingCAUnusable(f"The ACME issuing CA '{ca.descr}' chosen {chosen} has no private key: "
+                                    f'choose a CA able to sign in {where}')
+        return ca.refid
+
     @staticmethod
     def _is_request_failure(exc) -> bool:
         """Whether a signing failure is the request's fault (badCSR, order
@@ -566,6 +597,7 @@ class IssuanceMixin:
         if not ca:
             self._last_signing_exception = RuntimeError("No CA available for signing")
             return False, None, "No CA available for signing"
+        self._last_signing_ca_name = ca.descr
         
         if not ca.has_private_key:
             self._last_signing_exception = RuntimeError("CA has no private key")

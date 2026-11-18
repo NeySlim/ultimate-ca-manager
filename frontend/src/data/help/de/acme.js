@@ -137,7 +137,7 @@ export default {
           '1. Lokale Domänenzuordnung: exakter Domänenabgleich, dann übergeordnete Domäne',
           '2. DNS-Domänenzuordnung: prüft die für den DNS-Anbieter konfigurierte ausstellende CA',
           '3. Globaler Standard: die in der ACME-Serverkonfiguration festgelegte CA',
-          '4. Erste verfügbare CA mit einem privaten Schlüssel',
+          '4. Erste verfügbare CA mit einem privaten Schlüssel, nur wenn oben nichts festgelegt ist: eine oben festgelegte CA, die nicht signieren kann, lehnt die Bestellung ab',
         ]
       },
       {
@@ -457,7 +457,7 @@ Wenn ein ACME-Client ein Zertifikat anfordert, bestimmt UCM die signierende CA i
 1. **Lokale Domänenzuordnung**: Exakter Abgleich, dann übergeordneter Domänenabgleich
 2. **DNS-Domänenzuordnung**: Die für den DNS-Anbieter konfigurierte CA
 3. **Globaler Standard**: Die in der ACME-Serverkonfiguration festgelegte CA
-4. **Erste verfügbare**: Jede CA mit einem privaten Schlüssel
+4. **Erste verfügbare**: Jede CA mit einem privaten Schlüssel, nur wenn oben nichts festgelegt ist. Eine oben festgelegte CA ohne privaten Schlüssel, offline oder gelöscht, lehnt die Bestellung ab: keine andere CA signiert an ihrer Stelle
 
 ### EAB Credentials (serverseitig)
 Wenn UCM der ACME-Server (oder Proxy) ist, können Sie **External Account Binding** verlangen: Clients müssen ein vorab ausgestelltes kid + HMAC-Schlüsselpaar vorlegen, um ein Konto zu registrieren. Stellen Sie Credentials unter **ACME → EAB Credentials** aus und widerrufen Sie sie dort.

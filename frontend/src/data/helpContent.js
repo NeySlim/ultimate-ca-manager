@@ -780,7 +780,7 @@ export const helpContent = {
           '1. Local Domain mapping: exact domain match, then parent domain',
           '2. DNS Domain mapping: checks the issuing CA configured for the DNS provider',
           '3. Global default: the CA set in ACME server configuration',
-          '4. First available CA with a private key',
+          '4. First available CA with a private key, only when none of the above is set: a CA set above that cannot sign refuses the order',
         ]
       },
       {

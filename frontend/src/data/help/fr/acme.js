@@ -137,7 +137,7 @@ export default {
           '1. Mappage de domaine local : correspondance exacte du domaine, puis domaine parent',
           '2. Mappage de domaine DNS : vérifie la CA émettrice configurée pour le fournisseur DNS',
           '3. Valeur par défaut globale : la CA définie dans la configuration du serveur ACME',
-          '4. Première CA disponible avec une clé privée',
+          '4. Première AC disponible avec une clé privée, seulement si rien n\'est défini ci-dessus : une AC définie ci-dessus qui ne peut pas signer fait refuser la commande',
         ]
       },
       {
@@ -457,7 +457,7 @@ Lorsqu'un client ACME demande un certificat, UCM détermine la CA de signature d
 1. **Mappage de domaine local** : Correspondance exacte, puis correspondance de domaine parent
 2. **Mappage de domaine DNS** : La CA configurée pour le fournisseur DNS
 3. **Valeur par défaut globale** : La CA définie dans la configuration du serveur ACME
-4. **Première disponible** : Toute CA avec une clé privée
+4. **Première disponible** : Toute AC avec une clé privée, seulement si rien n'est défini ci-dessus. Une AC définie ci-dessus sans clé privée, hors ligne ou supprimée fait refuser la commande : aucune autre AC ne signe à sa place
 
 ### Identifiants EAB (côté serveur)
 Quand UCM est le serveur ACME (ou le proxy), vous pouvez exiger le **External Account Binding** : les clients doivent présenter un kid + une clé HMAC pré-émis pour enregistrer un compte. Émettez et révoquez les identifiants depuis **ACME → EAB Credentials**.
