@@ -181,8 +181,12 @@ def main(argv):
             if len(argv) < 4:
                 print(__doc__, file=sys.stderr)
                 return 2
-            with open(argv[3], encoding='utf-8') as fh:
-                found = fh.read().strip()
+            try:
+                with open(argv[3], encoding='utf-8') as fh:
+                    found = fh.read().strip()
+            except OSError as exc:
+                print(f'::error::{argv[3]} cannot be read: {exc}', file=sys.stderr)
+                return 1
             if found != version:
                 print(f'::error::{argv[3]} says {found!r} but the tag is {version!r}', file=sys.stderr)
                 return 1

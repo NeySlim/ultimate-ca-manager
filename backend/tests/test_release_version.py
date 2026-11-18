@@ -653,4 +653,4 @@ def test_matches_compares_a_tag_to_the_version_file(tmp_path, version, content, 
 
 def test_matches_refuses_a_missing_file(tmp_path):
     r = _cli('matches', '3.0-rc3', str(tmp_path / 'absent'))
-    assert r.returncode == 1 and r.stderr
+    assert r.returncode == 1 and r.stderr.startswith('::error::') and 'absent' in r.stderr
