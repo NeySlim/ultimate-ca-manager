@@ -36,6 +36,10 @@ def _validate_sso_outbound_urls(data):
         value = data.get(field)
         if not value:
             continue
+        # The Entra preset leaves {tenant} for the administrator to fill in
+        if isinstance(value, str) and '{tenant}' in value:
+            return error_response(
+                f"{field}: replace {{tenant}} with the directory (tenant) ID", 400)
         try:
             validate_url_not_cloud_metadata(value)
         except ValueError as e:

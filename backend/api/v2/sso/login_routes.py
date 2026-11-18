@@ -1,7 +1,7 @@
 from . import bp, VALID_ROLES
 from .helpers import (_get_ssl_verify, _cleanup_ssl_verify, _parse_json_field,
                       saml_groups, oidc_groups, mapped_attributes, oidc_identity,
-                      saml_identity)
+                      saml_identity, oidc_stable_id)
 from .ldap_routes import _get_or_create_sso_user, _get_saml_auth
 from . import return_path, saml_sp
 from onelogin.saml2.constants import OneLogin_Saml2_Constants
@@ -482,7 +482,7 @@ def oidc_sign_in(provider, code, code_verifier, expected_nonce):
             if not id_token:
                 not_verified.append('no ID token was returned: the identity rests on UserInfo alone')
         return SignInIdentity(username, email, fullname, external_data, group_source,
-                              session_id=userinfo.get('sub', username),
+                              session_id=oidc_stable_id(userinfo) or username,
                               not_verified=not_verified), None
     finally:
         _cleanup_ssl_verify(verify)

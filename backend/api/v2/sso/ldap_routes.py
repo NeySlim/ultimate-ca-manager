@@ -26,7 +26,7 @@ from . import saml_sp
 from .account_state import (
     SSO_NO_PASSWORD, bounded, describe_conflict, legacy_sso_account, orphan_text, own_identity,
 )
-from .helpers import _clear_ldap_failed_attempts, _ldap_attempt_failed, _release_ldap_attempt, _reserve_ldap_attempt, _resolve_mapped_roles, _resolve_role, _build_ldap_tls, _decrypt_ldap_password, sso_admission, _mapping_rules, _external_groups
+from .helpers import _clear_ldap_failed_attempts, _ldap_attempt_failed, _release_ldap_attempt, _reserve_ldap_attempt, _resolve_mapped_roles, _resolve_role, _build_ldap_tls, _decrypt_ldap_password, sso_admission, _mapping_rules, _external_groups, oidc_stable_id
 from .diagnostics import GroupSource, refusal_diagnosis
 
 @bp.route('/api/v2/sso/ldap/login', methods=['POST'])
@@ -328,7 +328,7 @@ def _get_saml_auth(flask_request, provider, relay_state=None, sign_request=False
 def _extract_external_id(provider, external_data):
     """Stable, immutable identifier of the directory account, or None.
 
-    OIDC → `sub`; SAML → persistent `NameID`; LDAP → the configured uid attr
+    OIDC → `sub`, else GitHub's numeric `id` (:func:`oidc_stable_id`); SAML → persistent `NameID`; LDAP → the configured uid attr
     (entryUUID/objectGUID), falling back to the DN. This is the primary key used
     to recognise an SSO account across username/email changes — email is never
     used as an identity key (avoids account pre-hijacking).
@@ -336,7 +336,7 @@ def _extract_external_id(provider, external_data):
     ed = external_data or {}
     ptype = (provider.provider_type or '').lower()
     if ptype == 'oauth2':
-        val = ed.get('sub')
+        val = oidc_stable_id(ed)
     elif ptype == 'saml':
         # Transient NameIDs change every login → not a stable identifier.
         fmt = str(ed.get('name_id_format', '')).lower()
