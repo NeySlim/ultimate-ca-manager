@@ -1,7 +1,7 @@
 #!/bin/sh
 # Prints the test files of one shard of the HA bench, one per line; run from backend/.
-# Usage: ha-bench-shard.sh SHARD | --list   "rest" is every tests/ha/test_*.py no other shard
-# names, so a new file always runs. A named file that is gone fails, never skips.
+# Usage: ha-bench-shard.sh SHARD | --list   "rest" is every test_*.py under tests/ha no other
+# shard names, so a new file always runs. A named file that is gone fails, never skips.
 set -eu
 crash_crl="tests/ha/test_crash_crl.py"
 jobs="tests/ha/test_jobs.py"
@@ -12,7 +12,7 @@ case "${1:-}" in
   jobs) files=$jobs ;;
   restore) files=$restore ;;
   rest)
-    files=$(for f in tests/ha/test_*.py; do
+    files=$(find tests/ha -name 'test_*.py' | sort | while read -r f; do
       case " $crash_crl $jobs $restore " in *" $f "*) ;; *) echo "$f" ;; esac
     done) ;;
   *) echo "usage: ha-bench-shard.sh crash-crl|jobs|restore|rest|--list" >&2; exit 2 ;;

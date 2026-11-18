@@ -29,7 +29,8 @@ def _job():
 
 
 def test_the_shards_together_are_every_bench_file_once():
-    every = sorted(f'tests/ha/{f.name}' for f in (ROOT / 'backend' / 'tests' / 'ha').glob('test_*.py'))
+    backend = ROOT / 'backend'
+    every = sorted(str(f.relative_to(backend)) for f in (backend / 'tests' / 'ha').rglob('test_*.py'))
     assert every
     dealt = [f for name in _names() for f in _shard(name).stdout.split()]
     assert sorted(dealt) == every
