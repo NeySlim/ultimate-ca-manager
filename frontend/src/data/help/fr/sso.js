@@ -138,7 +138,7 @@ Une connexion lancée depuis le portail de l'IdP arrive sans requête d'UCM. **A
 - Changer de préréglage remet l'émetteur et le réglage de vérification que le précédent avait posés, sauf s'ils ont été modifiés depuis.
 
 ### Signature du jeton d'identité
-RS256, RS384, RS512, PS256, PS384, PS512, ES256, ES384, ES512 et EdDSA (Ed25519, Ed448) sont acceptés, jamais \`none\` ni HS256, HS384 ou HS512. La clé de signature doit être du type et de la courbe que l'algorithme nomme, son \`alg\` et son \`use\`, s'ils sont présents, l'algorithme du jeton et \`sig\`, et une clé RSA doit faire 2048 bits ou plus. Sans URI JWKS, l'algorithme doit aussi figurer dans le document de découverte. En mode FIPS, EdDSA n'est accepté que si le module FIPS l'approuve, et une clé RSA doit avoir une taille paire de 2048 à 16384 bits. Un refus nomme l'algorithme dans l'entrée d'audit.
+RS256, RS384, RS512, PS256, PS384, PS512, ES256, ES384, ES512 et EdDSA (Ed25519, Ed448) sont acceptés, jamais \`none\` ni HS256, HS384 ou HS512. La clé de signature doit être du type et de la courbe que l'algorithme nomme, son \`alg\` et son \`use\`, s'ils sont présents, l'algorithme du jeton et \`sig\`, et une clé RSA doit faire 2048 bits ou plus. Sans URI JWKS, l'algorithme doit aussi figurer dans le document de découverte. En mode FIPS, EdDSA n'est accepté que si le module FIPS l'approuve, et une clé RSA doit avoir une taille paire de 2048 à 16384 bits. Un algorithme refusé est nommé dans l'entrée d'audit.
 
 ### Création automatique d'utilisateurs
 Lorsqu'elle est activée, un nouveau compte utilisateur UCM est automatiquement créé à la première connexion SSO, en utilisant les attributs fournis par l'IDP, avec le rôle que donne sa règle de mappage, sinon le rôle par défaut.

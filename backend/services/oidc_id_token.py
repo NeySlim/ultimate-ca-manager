@@ -232,7 +232,11 @@ def _public_key_from_jwk(jwk, algorithm):
         if key_kty == 'OKP' and key_crv in _OKP_CURVES:
             # The rule of every EdDSA key in FIPS mode: allowed when the loaded module approves it
             fips_mode.refuse_unless_approved(key_crv.upper(), f'{key_crv} ID token signatures')
-            return _OKP_CURVES[key_crv].from_public_bytes(_b64url_decode(jwk.get('x')))
+            try:
+                point = _b64url_decode(jwk.get('x'))
+            except OIDCValidationError as exc:
+                raise OIDCValidationError('malformed JWKS signing key') from exc
+            return _OKP_CURVES[key_crv].from_public_bytes(point)
         raise OIDCValidationError('JWKS key type does not match algorithm')
     except fips_mode.FipsRestricted as exc:
         raise OIDCValidationError(str(exc)) from exc
@@ -394,7 +398,7 @@ def verify_id_token(id_token, provider, expected_nonce, verify=True, ssl_verify=
     header, claims, signature, signing_input = _parse_token(id_token)
     algorithm = header.get('alg')
     kid = header.get('kid')
-    if algorithm not in _ALLOWED_ALGORITHMS:
+    if not isinstance(algorithm, str) or algorithm not in _ALLOWED_ALGORITHMS:
         raise OIDCValidationError(f'unsupported ID token signing algorithm {_shown(algorithm)}')
     if not isinstance(kid, str) or not kid:
         raise OIDCValidationError('ID token is missing key ID')

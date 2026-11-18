@@ -347,3 +347,27 @@ def test_fips_mode_keeps_the_rsa_rule_of_the_product(idp, fips):
     idp['keys'] = [_jwk(good, kid='k2'), _jwk(ec_key, kid='k3')]
     assert _verify(_token(good, 'PS256', kid='k2'))['sub'] == 'user-123'
     assert _verify(_token(ec_key, 'ES384', kid='k3'))['sub'] == 'user-123'
+
+
+@pytest.mark.parametrize('alg', [['RS256'], {'alg': 'RS256'}, 256, None])
+def test_an_algorithm_that_is_not_text_is_refused_as_unsupported(idp, alg):
+    from services.oidc_id_token import OIDCValidationError
+    idp['keys'] = [_jwk(_rsa_key())]
+    with pytest.raises(OIDCValidationError, match='unsupported ID token signing algorithm'):
+        _verify(_token(None, alg, signature=b'x'))
+    assert idp['fetched'] == []
+
+
+@pytest.mark.parametrize('x', [None, '', '***'])
+def test_an_okp_key_without_its_point_is_a_malformed_signing_key(idp, x):
+    """Named like an RSA or EC key that lacks a member, so the JWKS is read anew once."""
+    from services.oidc_id_token import OIDCValidationError
+    key = _key_for('EdDSA')
+    jwk = _jwk(key)
+    if x is None:
+        jwk.pop('x')
+    else:
+        jwk['x'] = x
+    idp['keys'] = [jwk]
+    with pytest.raises(OIDCValidationError, match='malformed JWKS signing key'):
+        _verify(_token(key, 'EdDSA'))

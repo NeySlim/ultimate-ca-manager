@@ -2809,7 +2809,7 @@ A login started from the IdP portal reaches UCM without a request from UCM. **Al
 - Switching preset puts back the issuer and the verification setting the previous one set, unless they were changed since.
 
 ### ID token signature
-RS256, RS384, RS512, PS256, PS384, PS512, ES256, ES384, ES512 and EdDSA (Ed25519, Ed448) are accepted, never \`none\` nor HS256, HS384 or HS512. The signing key must be of the type and curve the algorithm names, its \`alg\` and \`use\`, when present, the token's algorithm and \`sig\`, and an RSA key 2048 bits or more. Without a JWKS URI, the algorithm must also be listed in the discovery document. In FIPS mode, EdDSA is accepted only when the FIPS module approves it, and an RSA key must have an even size of 2048 to 16384 bits. A refusal names the algorithm in the audit entry.
+RS256, RS384, RS512, PS256, PS384, PS512, ES256, ES384, ES512 and EdDSA (Ed25519, Ed448) are accepted, never \`none\` nor HS256, HS384 or HS512. The signing key must be of the type and curve the algorithm names, its \`alg\` and \`use\`, when present, the token's algorithm and \`sig\`, and an RSA key 2048 bits or more. Without a JWKS URI, the algorithm must also be listed in the discovery document. In FIPS mode, EdDSA is accepted only when the FIPS module approves it, and an RSA key must have an even size of 2048 to 16384 bits. A refused algorithm is named in the audit entry.
 
 ### Auto-Create Users
 When enabled, a new UCM user account is automatically created on first SSO login, using the IDP-provided attributes, with the role its mapping rule gives, else the default role.
