@@ -254,3 +254,15 @@ def test_an_idp_field_that_is_not_text_names_no_idp(target, mode, kind, value):
         assert _bindings()['kate'] == (NAME, 'kate-a', None)
     else:
         assert _bindings()['kate'] == (None, 'kate-a', a)
+
+
+def test_a_merge_that_leaves_the_provider_out_still_says_the_archive_carried_it(target):
+    from services.backup.restore_report import restore_audit_details
+    blob = _archive('oauth2', 'B', 'provider')
+    _instance('oauth2')
+
+    results = _restore(blob, 'merge')
+
+    # Otherwise the route answers "the archive carried no data" and drops the warning
+    assert results['sections_carried'] == ['sso_providers']
+    assert 'carried no data' not in restore_audit_details('a.ucmbkp', results)

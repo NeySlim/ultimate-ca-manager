@@ -329,10 +329,6 @@ class RestoreCoreMixin:
         displaced: Dict[str, set] = {}
         renamed = rename_clashing_rows(backup_data, ambiguous_references,
                                        replacing=frozenset(pruned), displaced=displaced)
-        # Before the plan too: a provider of another IdP is another provider, never rewritten
-        sso_warnings: List[str] = []
-        settle_other_idp_providers(backup_data, 'sso_providers' in pruned, sso_warnings, displaced)
-
         # An archive of metadata alone restores nothing. Announcing it as a
         # success made the caller revoke every session and ask for a restart
         # over a file that changed not one row.
@@ -340,6 +336,10 @@ class RestoreCoreMixin:
             name for name in SECTIONS
             if backup_data.get(name)
         )
+        # After `carried`: a provider left out was still carried. Before the plan, which
+        # finds providers by name: a provider of another IdP is another provider
+        sso_warnings: List[str] = []
+        settle_other_idp_providers(backup_data, 'sso_providers' in pruned, sso_warnings, displaced)
 
         # Named before anything is written, so the answer can say what this
         # version will not put back even though the archive carries it.
