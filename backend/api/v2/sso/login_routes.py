@@ -215,8 +215,32 @@ def get_available_providers():
 
 
 def login_provider(provider_type):
-    """The provider a login of this type goes through: the first enabled one, in no set order."""
-    return SSOProvider.query.filter_by(provider_type=provider_type, enabled=True).first()
+    """The provider a login of this type goes through: the one of its type, the lowest id
+    should a database hold two (uq_pro_sso_providers_provider_type refuses it)."""
+    return SSOProvider.query.filter_by(provider_type=provider_type, enabled=True).order_by(SSOProvider.id).first()
+
+
+def noted_provider(provider_id, provider_type):
+    """The provider a login's start noted, while it exists, is enabled and is of this type; else None."""
+    if not isinstance(provider_id, int) or isinstance(provider_id, bool):
+        return None
+    provider = db.session.get(SSOProvider, provider_id)
+    if provider is None or not provider.enabled or provider.provider_type != provider_type:
+        return None
+    return provider
+
+
+def _return_provider(provider_type):
+    """The provider that answers this return: the one its start noted, never another of the type.
+    OIDC notes it in the session; SAML in the AuthnRequest row of this browser's request cookie.
+    A SAML response that names no request of this browser (IdP-initiated, logout) has none noted."""
+    if provider_type == 'oauth2':
+        return noted_provider(session.get('sso_provider_id'), 'oauth2')
+    if not (request.method == 'GET' and 'SAMLRequest' in request.args):
+        noted = saml_sp.request_provider_id(request.cookies.get(saml_sp.REQUEST_COOKIE) or None)
+        if noted is not None:
+            return noted_provider(noted, 'saml')
+    return login_provider('saml')
 
 
 @bp.route('/api/v2/sso/login/<provider_type>', methods=['GET'])
@@ -617,8 +641,8 @@ def sso_callback(provider_type):
     # Spent by any OAuth2 return, used only by a successful one.
     oauth2_next = session.pop('sso_next', None) if provider_type == 'oauth2' else None
 
-    provider = login_provider(provider_type)
-    if not provider:
+    # No enabled provider of the type: refused first, as the start would be
+    if login_provider(provider_type) is None:
         return redirect(_login_error('provider_not_found', oauth2_next))
 
     # Verify state for CSRF protection (OAuth2 only — SAML uses its own mechanisms)
@@ -627,6 +651,10 @@ def sso_callback(provider_type):
         stored_state = session.get('sso_state', '')
         if not state or not hmac.compare_digest(state, stored_state):
             return redirect(_login_error('invalid_state', oauth2_next))
+
+    provider = _return_provider(provider_type)
+    if not provider:
+        return redirect(_login_error('provider_not_found', oauth2_next))
 
     if provider.provider_type == 'oauth2':
         code = request.args.get('code')

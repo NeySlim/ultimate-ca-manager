@@ -77,6 +77,21 @@ def installation(request, app, tmp_path_factory):
             db.session.rollback()
 
 
+def _a_clean_target():
+    """No provider and no account of an earlier case: one provider per type, and each case's
+    restore decides what its own names resolve to."""
+    from api.v2.users.crud import _purge_user_dependencies
+    earlier = [uid for (uid,) in db.session.query(User.id).filter(User.username.like('mx-%'))]
+    UserSSOIdentity.query.filter(UserSSOIdentity.user_id.in_(earlier)).delete(synchronize_session=False)
+    for uid in earlier:
+        _purge_user_dependencies(uid)
+    User.query.filter(User.id.in_(earlier)).delete(synchronize_session=False)
+    UserSSOIdentity.query.filter(UserSSOIdentity.provider_id.isnot(None)).update(
+        {UserSSOIdentity.provider_id: None}, synchronize_session=False)
+    SSOProvider.query.delete(synchronize_session=False)
+    db.session.commit()
+
+
 def _provider(name, kind='oauth2'):
     row = SSOProvider(name=name, provider_type=kind, oauth2_issuer=f'https://{name}.example',
                       enabled=True, auto_create_users=True, default_role='viewer')
@@ -110,10 +125,11 @@ def claimable_by_name(user):
     from api.v2.sso.account_state import legacy_sso_account
     from api.v2.sso.ldap_routes import _get_or_create_sso_user
     name, email, uid = user.username, user.email, user.id
-    stranger = _provider(f'stranger-{uuid.uuid4().hex[:8]}')
+    # The cases use the OIDC and the LDAP slot: the stranger is the SAML provider
+    stranger = _provider(f'stranger-{uuid.uuid4().hex[:8]}', 'saml')
     db.session.commit()
     with current_app.test_request_context():
-        opened, _error = _get_or_create_sso_user(stranger, name, email, 'N', {'sub': 'attacker'})
+        opened, _error = _get_or_create_sso_user(stranger, name, email, 'N', {'name_id': 'attacker'})
         opened_id = opened.id if opened is not None else None
         db.session.rollback()
     return legacy_sso_account(db.session.get(User, uid)), opened_id == uid
@@ -163,12 +179,13 @@ def test_no_restore_leaves_an_sso_account_claimable_by_name(installation, fmt, m
                                                            account):
     from services.database_admin.verify import check_local_email_flags
     t = uuid.uuid4().hex[:10]
+    _a_clean_target()
     here = _provider(f'src-{t}') if provider in ('same', 'moved') else None
     data, held = _archive(fmt, t, source, password, provider, identity, orphan,
                           here.id if here else None)
     own = []
     if account == 'own':
-        elsewhere = _provider(f'own-{t}')
+        elsewhere = _provider(f'own-{t}', 'ldap')
         own = [(elsewhere.id, f'own-{t}', None), (None, f'own-orphan-{t}', None)]
         _account(f'mx-{t}', rows=own)
     elif account == 'bare':
@@ -243,7 +260,7 @@ def _restored(app, dialect, tmp_path, mode):
             stack.enter_context(_installation(app, url, keys, is_postgresql=True))
         stack.enter_context(app.app_context())
         # The target numbers its provider otherwise than the source: the archive names it
-        _provider('padding')
+        _provider('padding', 'saml')
         _provider('p-one')
         db.session.commit()
         _restore({'users': users, 'sso_providers': [

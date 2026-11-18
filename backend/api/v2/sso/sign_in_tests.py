@@ -295,8 +295,8 @@ def _run(test_id, protocol, secret, callback_key):
                 'reason': 'the provider was deleted or changed type'}
     base = {'protocol': protocol, 'provider_id': provider.id, 'provider_name': provider.name,
             'provider_enabled': bool(provider.enabled)}
-    # A login goes through one enabled provider of the type, in no set order: every other one
-    # is listed, never a guess at which the login would take.
+    # One provider per type; should a database hold two, every other enabled one is listed,
+    # never a guess at which the login would take.
     others = SSOProvider.query.filter_by(provider_type=protocol, enabled=True).filter(
         SSOProvider.id != provider.id).order_by(SSOProvider.id)
     base['other_enabled_providers'] = [{'id': p.id, 'name': _cut(p.name)} for p in others]

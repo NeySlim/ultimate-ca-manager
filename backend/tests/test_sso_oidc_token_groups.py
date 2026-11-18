@@ -4,7 +4,7 @@ Microsoft Entra ID's UserInfo endpoint never returns ``groups`` nor ``roles``:
 they only exist in the ID token. The groups of a login are those of its ID
 token (same ``sub``, same nonce) and of its UserInfo response, nothing else.
 """
-from tests.sso_identity_support import users_of
+from tests.sso_identity_support import step_aside, users_of
 import base64
 import json
 import logging
@@ -39,9 +39,7 @@ def entra(app, monkeypatch):
     from api.v2.sso import login_routes
 
     with app.app_context():
-        others = [(p.id, p.enabled) for p in SSOProvider.query.filter_by(provider_type='oauth2').all()]
-        for pid, _ in others:
-            db.session.get(SSOProvider, pid).enabled = False
+        others = step_aside('oauth2')
         row = SSOProvider(
             name=f'entra-{uuid.uuid4().hex[:6]}', provider_type='oauth2', enabled=True,
             oauth2_client_id='ucm-client', oauth2_client_secret='secret',
@@ -93,6 +91,7 @@ def entra(app, monkeypatch):
         client = app.test_client()
         with client.session_transaction() as s:
             s['sso_state'] = 'st'
+            s['sso_provider_id'] = pid
             s['sso_pkce_verifier'] = 'v'
             if nonce:
                 s['sso_nonce'] = nonce
@@ -112,8 +111,7 @@ def entra(app, monkeypatch):
         SSOSession.query.filter_by(provider_id=pid).delete()
         _cleanup([u.username for u in users_of(pid).all()])
         db.session.delete(db.session.get(SSOProvider, pid))
-        for opid, enabled in others:
-            db.session.get(SSOProvider, opid).enabled = enabled
+        others.back()
         db.session.commit()
 
 

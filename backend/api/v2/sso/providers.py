@@ -108,6 +108,16 @@ def _default_role(value):
     return value
 
 
+def _taken(data):
+    """The answer to a creation whose name or type a provider already holds, else None."""
+    if SSOProvider.query.filter_by(name=data['name']).first():
+        return error_response("Provider name already exists", 400)
+    if SSOProvider.query.filter_by(provider_type=data['provider_type']).first():
+        return error_response(f"A {data['provider_type'].upper()} provider already exists. "
+                              "Only one provider per type is allowed.", 400)
+    return None
+
+
 @bp.route('/api/v2/sso/providers', methods=['POST'])
 @require_auth(['write:sso'])
 def create_provider():
@@ -125,10 +135,9 @@ def create_provider():
     if SSOProvider.query.filter_by(name=data['name']).first():
         return error_response("Provider name already exists", 400)
 
-    # Enforce 1 provider per type
-    existing = SSOProvider.query.filter_by(provider_type=data['provider_type']).first()
-    if existing:
-        return error_response(f"A {data['provider_type'].upper()} provider already exists. Only one provider per type is allowed.", 400)
+    # Enforce 1 provider per type (uq_pro_sso_providers_provider_type holds it against a race)
+    if SSOProvider.query.filter_by(provider_type=data['provider_type']).first():
+        return _taken(data)
 
     # SSRF guard on URLs the backend will dereference
     err = _validate_sso_outbound_urls(data)
@@ -238,7 +247,7 @@ def create_provider():
         return error_response(signing_error, 400)
 
     db.session.add(provider)
-    ok, _err = safe_commit(logger, "Failed to create SSO provider")
+    ok, _err = safe_commit(logger, "Failed to create SSO provider", on_conflict=lambda: _taken(data))
     if not ok:
         return _err
     clear_oidc_cache()
@@ -295,7 +304,7 @@ def update_provider(provider_id=None, provider_type_name=None):
         provider = db.get_or_404(SSOProvider, provider_id)
     elif provider_type_name:
         # Find provider by type (for backward compatibility / simple configs)
-        provider = SSOProvider.query.filter_by(provider_type=provider_type_name).first()
+        provider = SSOProvider.query.filter_by(provider_type=provider_type_name).order_by(SSOProvider.id).first()
         if not provider:
             return error_response(f"No provider found with type: {provider_type_name}", 404)
         provider_id = provider.id

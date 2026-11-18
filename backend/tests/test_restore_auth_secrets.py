@@ -262,6 +262,9 @@ def _drift(rows):
     for section_name, instance in rows.items():
         section = manifest.SECTIONS[section_name]
         columns, attribute_of = _columns_of(type(instance))
+        # A unique index on one column makes it as much an identity as `unique` does (the SSO provider type)
+        indexed = {c.name for i in type(instance).__table__.indexes if i.unique and len(i.columns) == 1
+                   for c in i.columns}
 
         for column_name, column in columns.items():
             if column.primary_key or column_name == 'id':
@@ -270,7 +273,7 @@ def _drift(rows):
                 continue
             if column_name in section.exclude or column_name in section.handled:
                 continue
-            if column.unique or column.foreign_keys:
+            if column.unique or column_name in indexed or column.foreign_keys:
                 # Identity and links: drifting them would move the row rather
                 # than change it, and a foreign key pointing nowhere is a
                 # different test than this one.

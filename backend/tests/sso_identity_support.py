@@ -1,6 +1,8 @@
 """Accounts described as 2.254 held them (``auth_source``, ``sso_provider_id``, ``sso_external_id``,
 ``sso_orphan_of``), built with the identity rows the upgrade (step 167) gives them, and the reads
 the tests make of those rows."""
+from contextlib import contextmanager
+
 from models import db, User, UserSSOIdentity
 from models.user import sync_sso_flags
 from utils.sso_identity_upgrade import identity_rows, ids_here
@@ -93,3 +95,45 @@ def orphan(user):
     """The IdP key a deleted provider left on it (2.254: ``sso_orphan_of``)."""
     row = only(user)
     return row.orphan_of if row else None
+
+
+class step_aside:
+    """The providers already holding a type (one per type, uq_pro_sso_providers_provider_type) leave
+    it while a test holds its own; ``back()``, once the test's provider of that type is gone,
+    returns it to them."""
+
+    def __init__(self, provider_type):
+        from models.sso import SSOProvider
+        self.provider_type = provider_type
+        self.ids = [pid for (pid,) in db.session.query(SSOProvider.id).filter_by(provider_type=provider_type)]
+        for pid in self.ids:
+            db.session.get(SSOProvider, pid).provider_type = f'aside-{pid}'
+        db.session.commit()
+
+    def back(self):
+        from models.sso import SSOProvider
+        db.session.flush()
+        for pid in self.ids:
+            row = db.session.get(SSOProvider, pid)
+            if row is not None:
+                row.provider_type = self.provider_type
+        db.session.commit()
+
+
+@contextmanager
+def several_per_type(app):
+    """uq_pro_sso_providers_provider_type lifted for a test of what the code does with a state the
+    schema refuses (two providers of one type); put back after, which fails if the test left two."""
+    from sqlalchemy import text
+    from models.sso import SSOProvider
+    index = next(i for i in SSOProvider.__table__.indexes if i.name == 'uq_pro_sso_providers_provider_type')
+    with app.app_context():
+        db.session.execute(text(f'DROP INDEX IF EXISTS {index.name}'))
+        db.session.commit()
+    try:
+        yield
+    finally:
+        with app.app_context():
+            db.session.rollback()
+            index.create(db.session.connection(), checkfirst=True)
+            db.session.commit()

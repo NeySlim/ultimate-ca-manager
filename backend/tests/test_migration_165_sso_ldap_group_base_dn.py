@@ -5,13 +5,15 @@ import sqlite3
 
 import pytest
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import IntegrityError
 
 from models.sso import SSOProvider
 
 PG_URL = os.getenv('UCM_TEST_PG_URL')
 TABLE = SSOProvider.__tablename__
-CREATE = f"CREATE TABLE {TABLE} (id {{pk}}, name VARCHAR(100) NOT NULL, ldap_base_dn VARCHAR(500))"
-ROW = f"INSERT INTO {TABLE} (name, ldap_base_dn) VALUES ('corp', 'dc=example,dc=com')"
+CREATE = (f"CREATE TABLE {TABLE} (id {{pk}}, name VARCHAR(100) NOT NULL, provider_type VARCHAR(50) NOT NULL, "
+          "ldap_base_dn VARCHAR(500))")
+ROW = f"INSERT INTO {TABLE} (name, provider_type, ldap_base_dn) VALUES ('corp', 'ldap', 'dc=example,dc=com')"
 
 
 def _migration():
@@ -32,6 +34,33 @@ def test_sqlite_adds_the_column_once_and_keeps_the_rows():
         _migration().upgrade(conn)
         assert conn.execute(f"SELECT name, ldap_base_dn, ldap_group_base_dn FROM {TABLE}").fetchall() \
             == [('corp', 'dc=example,dc=com', None)]
+
+
+def test_sqlite_holds_one_provider_per_type_once_upgraded():
+    conn = sqlite3.connect(':memory:')
+    conn.execute(f"CREATE TABLE {TABLE} (id INTEGER PRIMARY KEY, name VARCHAR(100) NOT NULL, "
+                 "provider_type VARCHAR(50) NOT NULL, ldap_base_dn VARCHAR(500))")
+    conn.execute(f"INSERT INTO {TABLE} (name, provider_type) VALUES ('corp', 'oauth2')")
+    conn.commit()
+    _migration().upgrade(conn)
+    _migration().upgrade(conn)
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(f"INSERT INTO {TABLE} (name, provider_type) VALUES ('okta', 'oauth2')")
+    conn.execute(f"INSERT INTO {TABLE} (name, provider_type) VALUES ('dir', 'ldap')")
+
+
+def test_the_refusal_names_each_provider_of_a_shared_type():
+    conn = sqlite3.connect(':memory:')
+    conn.execute(f"CREATE TABLE {TABLE} (id INTEGER PRIMARY KEY, name VARCHAR(100) NOT NULL, "
+                 "provider_type VARCHAR(50) NOT NULL)")
+    conn.executemany(f"INSERT INTO {TABLE} (id, name, provider_type) VALUES (?, ?, ?)",
+                     [(2, 'a', 'saml'), (3, 'b', 'saml'), (4, 'c', 'ldap'), (5, 'd', 'saml')])
+    message = _migration().refusal(conn)
+    assert message.startswith("Upgrade refused: 3 SSO providers of type saml: 'a' (#2), 'b' (#3), 'd' (#5).")
+    assert message.endswith("Nothing was changed: 2.254 still starts on this database.")
+    with pytest.raises(RuntimeError, match='Upgrade refused'):
+        _migration().upgrade(conn)
+    assert conn.execute("SELECT count(*) FROM sqlite_master WHERE type = 'index'").fetchone()[0] == 0
 
 
 def test_sqlite_without_the_table_is_a_no_op():
@@ -59,6 +88,10 @@ def test_postgres(with_table):
         if with_table:
             assert conn.execute(text(f"SELECT name, ldap_base_dn, ldap_group_base_dn FROM {TABLE}")) \
                 .fetchall() == [('corp', 'dc=example,dc=com', None)]
+            conn.commit()
+            with pytest.raises(IntegrityError):
+                conn.execute(text(f"INSERT INTO {TABLE} (name, provider_type) VALUES ('dir2', 'ldap')"))
+            conn.rollback()
         else:
             assert conn.execute(text("SELECT count(*) FROM information_schema.tables "
                                      "WHERE table_schema = :s"), {'s': schema}).scalar() == 0

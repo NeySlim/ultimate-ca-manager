@@ -32,6 +32,7 @@ from .section_store import SectionStore, section_kind, section_length
 from .restore.apply import apply_columns, apply_section, relink_references
 from .restore.names import rename_clashing_rows
 from .restore.orders import keep_newer_orders
+from .restore.sso_providers import refuse_archived_shared_types, settle_provider_types
 from .restore.repairs import replay_repairs
 from .restore.conflict import conflict_from_integrity_error, is_value_too_long
 from .restore.replace import plan_replacement, remove_after_writes, remove_before_writes
@@ -351,6 +352,10 @@ class RestoreCoreMixin:
         # Before the plan, which finds these rows again by name.
         ambiguous_references: List[str] = []
         displaced: Dict[str, set] = {}
+        # One SSO provider per type at the end, whatever the mode (restore/sso_providers.py)
+        refuse_archived_shared_types(backup_data)
+        sso_warnings: List[str] = []
+        settle_provider_types(backup_data, 'sso_providers' in pruned, sso_warnings, displaced)
         renamed_here: Dict[str, dict] = {}
         renamed = rename_clashing_rows(backup_data, ambiguous_references,
                                        replacing=frozenset(pruned), displaced=displaced,
@@ -426,7 +431,7 @@ class RestoreCoreMixin:
         order_warnings = keep_newer_orders(backup_data, mode)
         checkpoint('plan')
         plan = RestorePlan.build(backup_data, pruned=pruned)
-        plan.warnings.extend(order_warnings + windows_warnings)
+        plan.warnings.extend(order_warnings + windows_warnings + sso_warnings)
         for warning in plan.warnings:
             logger.warning("Restore: %s", warning)
         built_with = len(plan.warnings)

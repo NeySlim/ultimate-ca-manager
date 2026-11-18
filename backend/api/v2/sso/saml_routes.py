@@ -95,8 +95,8 @@ def get_sp_metadata():
 
     base = saml_sp.sp_base_url(request)
     endpoints = saml_sp.sp_endpoints(base)
-    provider = (SSOProvider.query.filter_by(provider_type='saml', enabled=True).first()
-                or SSOProvider.query.filter_by(provider_type='saml').first())
+    provider = (SSOProvider.query.filter_by(provider_type='saml', enabled=True).order_by(SSOProvider.id).first()
+                or SSOProvider.query.filter_by(provider_type='saml').order_by(SSOProvider.id).first())
     sign = bool(provider and provider.saml_sign_requests)
 
     sp_cert = sp_key = None

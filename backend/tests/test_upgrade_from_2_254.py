@@ -543,6 +543,51 @@ def test_two_x509_cas_on_one_hsm_key_stop_the_upgrade_untouched(dialect, tmp_pat
         assert db.upgrade() is True, capsys.readouterr().out
 
 
+def _sso_provider(db, provider_id, name, provider_type):
+    db.run("INSERT INTO pro_sso_providers (id, name, provider_type, saml_allow_idp_initiated, id_token_verify, "
+           "ldap_start_tls, sync_role_on_login, enforce_2fa) VALUES (:i, :n, :t, FALSE, TRUE, FALSE, FALSE, FALSE)",
+           {'i': provider_id, 'n': name, 't': provider_type})
+
+
+def test_two_sso_providers_of_one_type_stop_the_upgrade_untouched(dialect, tmp_path, monkeypatch, capsys):
+    for db in make_base(dialect, tmp_path, monkeypatch, 'sso2'):
+        _sso_provider(db, 5, 'Corp', 'oauth2')
+        _sso_provider(db, 6, 'Directory', 'ldap')
+        _sso_provider(db, 8, 'Okta', 'oauth2')
+        before = _untouched(db)
+        assert db.upgrade() is False
+        assert _untouched(db) == before
+        out = capsys.readouterr().out
+        assert "2 SSO providers of type oauth2: 'Corp' (#5), 'Okta' (#8)" in out, out
+        assert 'Directory' not in out, out
+        assert 'keep one provider of each type and delete the others' in out, out
+        assert 'Nothing was changed: 2.254 still starts on this database' in out, out
+        assert 'IntegrityError' not in out and 'UNIQUE constraint' not in out, out
+        # Once one of them is deleted, the same database upgrades and holds the rule
+        db.run("DELETE FROM pro_sso_providers WHERE id = 8")
+        assert db.upgrade() is True, capsys.readouterr().out
+        from sqlalchemy.exc import IntegrityError
+        with pytest.raises(IntegrityError):
+            _sso_provider(db, 9, 'Okta', 'oauth2')
+
+
+def test_a_fresh_install_refuses_a_second_sso_provider_of_one_type(fresh):
+    from sqlalchemy.exc import IntegrityError
+    _sso_provider(fresh, 5, 'Corp', 'oauth2')
+    with pytest.raises(IntegrityError):
+        _sso_provider(fresh, 6, 'Okta', 'oauth2')
+    _sso_provider(fresh, 7, 'Idp', 'saml')
+
+
+def test_one_sso_provider_of_each_type_upgrades_unchanged(dialect, tmp_path, monkeypatch):
+    for db in make_base(dialect, tmp_path, monkeypatch, 'sso1'):
+        for provider_id, name, kind in ((5, 'Corp', 'oauth2'), (6, 'Directory', 'ldap'), (7, 'Idp', 'saml')):
+            _sso_provider(db, provider_id, name, kind)
+        assert db.upgrade() is True
+        assert db.run("SELECT id, name, provider_type FROM pro_sso_providers ORDER BY id") == [
+            (5, 'Corp', 'oauth2'), (6, 'Directory', 'ldap'), (7, 'Idp', 'saml')]
+
+
 # --- Pivot guard ------------------------------------------------------------------------------
 
 def _untouched(db):

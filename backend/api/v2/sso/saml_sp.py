@@ -234,6 +234,16 @@ def request_next_path(request_id, provider_id):
     ).scalar()
 
 
+def request_provider_id(request_id):
+    """The provider an AuthnRequest was sent for, expired or not; None when no row holds it."""
+    if not request_id or len(request_id) > MAX_MESSAGE_ID_LENGTH:
+        return None
+    return db.session.query(SAMLMessageId.provider_id).filter(
+        SAMLMessageId.kind == SAMLMessageId.KIND_REQUEST,
+        SAMLMessageId.message_id == request_id,
+    ).order_by(SAMLMessageId.id).limit(1).scalar()
+
+
 def take_request(request_id, provider_id):
     """Consume a pending AuthnRequest id; False when unknown, expired or already used."""
     if not request_id or len(request_id) > MAX_MESSAGE_ID_LENGTH:
