@@ -129,8 +129,9 @@ def test_a_manual_renewal_naming_an_unreadable_certificate_is_refused(app, auth_
     assert _rows(app, a_id, b_id) == before
 
 
-def test_a_bulk_renewal_naming_an_unreadable_certificate_is_refused(app, auth_client):
-    a_id, b_id, before = _a_unreadable(app, held=False)
+@pytest.mark.parametrize('held', [True, False])
+def test_a_bulk_renewal_naming_an_unreadable_certificate_is_refused(app, auth_client, held):
+    a_id, b_id, before = _a_unreadable(app, held)
     r = _json(auth_client, 'post', '/api/v2/certificates/bulk/renew', {'ids': [b_id]})
     assert r.status_code == 200, r.get_json()
     data = r.get_json()['data']
@@ -165,20 +166,30 @@ def test_a_scheduled_renewal_naming_an_unreadable_certificate_fails_and_goes_on(
 
 
 def test_a_pair_member_whose_partner_cannot_be_read_is_refused_by_the_scheduler(app, monkeypatch):
-    """A's key held: the pair is chosen, and its unreadable A refuses B's renewal."""
+    """A's key held: the pair is chosen, and its unreadable A refuses B's renewal, from the
+    approval check on."""
     from services.auto_renewal_service import AutoRenewalService as svc
     a_id, b_id, before = _a_unreadable(app, held=True)
     reasons = []
     monkeypatch.setattr(svc, '_log_failure', staticmethod(
         lambda cert_id, cn, reason: reasons.append((cert_id, reason))))
-    stats, _sent, _audits = _auto_pass(app, monkeypatch, b_id)
+    monkeypatch.setattr(svc, '_send_failure_notification', staticmethod(lambda stats: None))
+    monkeypatch.setattr(svc, '_publish_crls', staticmethod(lambda carefs: None))
+    with app.app_context():
+        svc.set_renewal_config({'enabled': True})
+        monkeypatch.setattr(svc, 'get_certificates_for_renewal',
+                            staticmethod(lambda: [db.session.get(Certificate, b_id)]))
+        stats = svc.run_auto_renewal()
+        db.session.remove()
     assert stats['failed'] == 1, stats
     assert [c for c, _ in reasons] == [b_id] and _refusal(reasons[0][1], a_id), reasons
     assert _rows(app, a_id, b_id) == before
 
 
-def test_a_malformed_extension_refuses_the_renewal(app, auth_client):
-    """B's extension carries a hash that cannot be read: refused naming B, nothing written."""
+@pytest.mark.parametrize('held', [True, False])
+def test_a_malformed_extension_refuses_the_renewal(app, auth_client, held):
+    """B's extension carries a hash that cannot be read: refused naming B, nothing written,
+    whether B renews with A or alone."""
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.x509 import UnrecognizedExtension
     from models import CA
@@ -196,8 +207,8 @@ def test_a_malformed_extension_refuses_the_renewal(app, auth_client):
                                  critical=False)
                   .sign(get_ca_signing_key(CA.query.filter_by(refid=b.caref).one()), hashes.SHA256()))
         b.crt = base64.b64encode(broken.public_bytes(serialization.Encoding.PEM)).decode()
-        a = db.session.get(Certificate, a_id)
-        a.prv = None  # B renews alone, so its own extension is what decides
+        if not held:  # B renews alone
+            db.session.get(Certificate, a_id).prv = None
         db.session.commit()
         db.session.remove()
     before = _rows(app, a_id, b_id)
