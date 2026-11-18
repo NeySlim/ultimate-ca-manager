@@ -4116,6 +4116,8 @@
     "idTokenVerify": "IDトークンの署名を検証（推奨）",
     "idTokenVerifyWarning": "署名検証を無効にするとログインの安全性が低下します。互換性のための一時的な措置としてのみ使用してください。",
     "idTokenVerifyIssuerMissing": "検証が有効ですが発行者が未設定です。設定されるまでOIDCログインは失敗します。",
+    "githubNotOidc": "GitHub is not an OpenID Connect provider: it issues no ID token, so its signature cannot be verified. The account is recognised by its numeric GitHub id.",
+    "tenantPlaceholderHint": "Replace {tenant} in the URLs and the issuer with your directory (tenant) ID.",
     "defaultRoleNone": "なし: どのルールにも一致しないユーザーを拒否",
     "provisioningRulesNotice": "ロールマッピングルールが設定されています。どのルールにも一致しないユーザーはサインイン時に拒否されます。",
     "provisioningNoRulesNotice": "ロールマッピングルールがありません。このプロバイダーで認証されたすべてのユーザーがサインインでき、新しいアカウントには {{role}} ロールが付与されます。",

@@ -18,6 +18,46 @@ import SsoLdapFields from './sso/SsoLdapFields'
 import SsoOAuth2Fields from './sso/SsoOAuth2Fields'
 import SsoSamlFields, { NAMEID_UNSPECIFIED } from './sso/SsoSamlFields'
 
+// Entra keeps {tenant} in its URLs and issuer for the administrator to replace (the server
+// refuses it left in). GitHub is not an OpenID Connect provider: no ID token to verify.
+const OAUTH2_PRESETS = {
+  azure: { fields: {
+    oauth2_auth_url: 'https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize',
+    oauth2_token_url: 'https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token',
+    oauth2_userinfo_url: 'https://graph.microsoft.com/oidc/userinfo',
+    oauth2_scopes: 'openid profile email',
+    oauth2_issuer: 'https://login.microsoftonline.com/{tenant}/v2.0',
+    id_token_verify: true,
+  } },
+  google: { fields: {
+    oauth2_auth_url: 'https://accounts.google.com/o/oauth2/v2/auth',
+    oauth2_token_url: 'https://oauth2.googleapis.com/token',
+    oauth2_userinfo_url: 'https://openidconnect.googleapis.com/v1/userinfo',
+    oauth2_scopes: 'openid profile email',
+    oauth2_issuer: 'https://accounts.google.com',
+    id_token_verify: true,
+  } },
+  github: { fields: {
+    oauth2_auth_url: 'https://github.com/login/oauth/authorize',
+    oauth2_token_url: 'https://github.com/login/oauth/access_token',
+    oauth2_userinfo_url: 'https://api.github.com/user',
+    oauth2_scopes: 'read:user user:email',
+    oauth2_issuer: '',
+    id_token_verify: false,
+  }, mapping: { login: 'username' } },
+}
+// What a field a preset set goes back to when another preset is chosen
+const PRESET_RESET = { oauth2_issuer: '', id_token_verify: true }
+
+const mapsUsername = (mapping) => Object.entries(mapping || {}).some(([k, v]) => k === 'username' || v === 'username')
+const withPresetRows = (mapping, rows) => (rows && !mapsUsername(mapping) ? { ...mapping, ...rows } : mapping)
+const withoutPresetRows = (mapping, rows) => {
+  if (!rows) return mapping
+  const kept = { ...mapping }
+  for (const [key, value] of Object.entries(rows)) if (kept[key] === value) delete kept[key]
+  return kept
+}
+
 // Stored as JSON array string in DB — display as comma-separated text
 const requiredGroupsToText = (raw) => {
   if (!raw) return ''
@@ -226,33 +266,25 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     onSave(data)
   }
 
+  // Switching preset first puts back what the previous one set and nobody changed since
   const applyOAuth2Preset = (preset) => {
+    const previous = OAUTH2_PRESETS[oauth2Preset]
+    const next = OAUTH2_PRESETS[preset]
     setOauth2Preset(preset)
-    if (preset === 'azure') {
-      setFormData(prev => ({
-        ...prev,
-        oauth2_auth_url: 'https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize',
-        oauth2_token_url: 'https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token',
-        oauth2_userinfo_url: 'https://graph.microsoft.com/oidc/userinfo',
-        oauth2_scopes: 'openid profile email',
-      }))
-    } else if (preset === 'google') {
-      setFormData(prev => ({
-        ...prev,
-        oauth2_auth_url: 'https://accounts.google.com/o/oauth2/v2/auth',
-        oauth2_token_url: 'https://oauth2.googleapis.com/token',
-        oauth2_userinfo_url: 'https://openidconnect.googleapis.com/v1/userinfo',
-        oauth2_scopes: 'openid profile email',
-      }))
-    } else if (preset === 'github') {
-      setFormData(prev => ({
-        ...prev,
-        oauth2_auth_url: 'https://github.com/login/oauth/authorize',
-        oauth2_token_url: 'https://github.com/login/oauth/access_token',
-        oauth2_userinfo_url: 'https://api.github.com/user',
-        oauth2_scopes: 'read:user user:email',
-      }))
-    }
+    setFormData(prev => {
+      const data = { ...prev }
+      if (previous) {
+        for (const [field, value] of Object.entries(PRESET_RESET)) {
+          if (data[field] === previous.fields[field]) data[field] = value
+        }
+        data.attribute_mapping = withoutPresetRows(data.attribute_mapping, previous.mapping)
+      }
+      if (next) {
+        Object.assign(data, next.fields)
+        data.attribute_mapping = withPresetRows(data.attribute_mapping, next.mapping)
+      }
+      return data
+    })
   }
 
   const baseUrl = window.location.origin

@@ -3927,6 +3927,8 @@
     "idTokenVerify": "Vérifier la signature de l'ID token (recommandé)",
     "idTokenVerifyWarning": "Désactiver la vérification de signature affaiblit la sécurité de connexion. À n'utiliser que temporairement pour compatibilité.",
     "idTokenVerifyIssuerMissing": "La vérification est active mais aucun issuer n'est défini : les connexions OIDC échoueront tant que l'issuer n'est pas configuré.",
+    "githubNotOidc": "GitHub is not an OpenID Connect provider: it issues no ID token, so its signature cannot be verified. The account is recognised by its numeric GitHub id.",
+    "tenantPlaceholderHint": "Replace {tenant} in the URLs and the issuer with your directory (tenant) ID.",
     "defaultRoleNone": "Aucun : refuser les utilisateurs qu'aucune règle ne reconnaît",
     "provisioningRulesNotice": "Des règles de correspondance des rôles existent : un utilisateur qu'aucune règle ne reconnaît est refusé à la connexion.",
     "provisioningNoRulesNotice": "Aucune règle de correspondance des rôles : tout utilisateur authentifié par ce fournisseur peut se connecter, et les nouveaux comptes reçoivent le rôle {{role}}.",

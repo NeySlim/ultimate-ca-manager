@@ -4113,6 +4113,8 @@
     "idTokenVerify": "Verificar la firma del ID token (recomendado)",
     "idTokenVerifyWarning": "Desactivar la verificación de firma debilita la seguridad del inicio de sesión. Úselo solo como medida temporal de compatibilidad.",
     "idTokenVerifyIssuerMissing": "La verificación está activada pero no hay emisor definido: los inicios de sesión OIDC fallarán hasta configurarlo.",
+    "githubNotOidc": "GitHub is not an OpenID Connect provider: it issues no ID token, so its signature cannot be verified. The account is recognised by its numeric GitHub id.",
+    "tenantPlaceholderHint": "Replace {tenant} in the URLs and the issuer with your directory (tenant) ID.",
     "defaultRoleNone": "Ninguno: rechazar a los usuarios que ninguna regla reconoce",
     "provisioningRulesNotice": "Hay reglas de asignación de roles: un usuario que ninguna regla reconoce es rechazado al iniciar sesión.",
     "provisioningNoRulesNotice": "Ninguna regla de asignación de roles: cualquier usuario autenticado por este proveedor puede iniciar sesión, y las cuentas nuevas reciben el rol {{role}}.",
