@@ -200,6 +200,9 @@ def test_a_restore_runs_to_the_end(app, archive, created, no_restart, mode):
     job_id, name = _start(app, archive, created, mode)
     row = _assert_final(app, job_id, 'succeeded', 'done', before, name, True)
     assert row['phase'] == restore_job.CRLS
+    # Every step passed: the job says so, even where the SQLite transaction kept it from writing
+    total = len(restore_job.STEPS)
+    assert (row['progress_done'], row['progress_total']) == (total, total)
     result = json.loads(row['result'])
     assert result['code'] == 200 and result['data']['restart_requested'] is True
     assert set(result['data']['invalidated']) >= {'sessions_revoked', 'caches_cleared',

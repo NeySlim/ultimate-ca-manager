@@ -78,6 +78,11 @@ def single_transaction(report=None):
     session.rollback = refuse_rollback
     inside_token = _inside.set(True)
     try:
+        if session.get_bind().dialect.name == 'postgresql':
+            # The tables fill from empty: a plan cached on their first rows would scan them
+            # for every later lookup (psycopg prepares from the sixth run), so plan each run
+            from sqlalchemy import text
+            session.execute(text("SET LOCAL plan_cache_mode = force_custom_plan"))
         yield session
         # HA: the cluster maintenance is still this restore's, or everything rolls back
         from services.cluster_maintenance import before_restore_commit

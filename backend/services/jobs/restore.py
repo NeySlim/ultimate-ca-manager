@@ -303,10 +303,12 @@ class _Run:
             self.gate.set_view(phase=COMMITTING)
         if cancel_flagged(self.ctx.job_id):
             raise JobCancelled(self.ctx.job_id)
+        # Every step has passed: the progress is complete, also where SQLite kept it unwritten
         done = session.execute(update(T).where(
             T.c.id == self.ctx.job_id, T.c.state == store.RUNNING,
             T.c.executor == self.ctx.executor, T.c.cancel_requested.is_(False),
-        ).values(phase=COMMITTED, result=_stored(report))).rowcount
+        ).values(phase=COMMITTED, progress_done=len(STEPS), progress_total=len(STEPS),
+                 result=_stored(report))).rowcount
         if done != 1:
             asked = session.execute(T.select().where(T.c.id == self.ctx.job_id)).mappings().first()
             if asked is not None and asked['state'] == store.RUNNING and asked['cancel_requested']:
