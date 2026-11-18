@@ -202,8 +202,14 @@ class RestoreRbacMixin:
         archive's PEM: a row describing a certificate it was not.
         """
         from models.truststore import TrustedCertificate
+        from utils.trust_pem import removal_warning, stored_without_key
         plan = plan if plan is not None else RestorePlan()
+        removed = results.setdefault('truststore_private_keys_removed', [])
         for tc_data in backup_data.get('trusted_certificates', []):
+            # An archive made before the trust store refused keys may carry one: never restored
+            pem, keyed = stored_without_key(tc_data.get('certificate_pem'))
+            if keyed:
+                tc_data = {**tc_data, 'certificate_pem': pem}
             trusted = TrustedCertificate.query.filter_by(
                 fingerprint_sha256=tc_data['fingerprint_sha256']
             ).first()
@@ -216,3 +222,7 @@ class RestoreRbacMixin:
                 db.session.add(trusted)
             apply_columns(trusted, 'trusted_certificates', tc_data, plan)
             results['trusted_certificates'] += 1
+            if keyed:
+                db.session.flush()
+                removed.append({'id': trusted.id, 'name': trusted.name})
+                plan.warnings.append(removal_warning(trusted.id, trusted.name))

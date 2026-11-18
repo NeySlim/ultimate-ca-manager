@@ -24,6 +24,8 @@ bp = Blueprint('truststore_v2', __name__)
 import logging
 from utils.datetime_utils import utc_now, utc_isoformat
 from utils.days_remaining import days_remaining as compute_days_remaining
+from utils.trust_pem import (PrivateKeyInEntry, canonical_certificates, holds_private_key, is_der_certificate,
+                             opens_a_pem_certificate)
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,7 @@ logger = logging.getLogger(__name__)
 _VALID_PURPOSES = {'root_ca', 'intermediate_ca', 'system', 'custom', 'code_signing', 'email'}
 _MAX_PEM_BYTES = 256 * 1024   # 256 KB — well above any X.509 cert
 _MAX_SYNC_LIMIT = 1000
+SYSTEM_CA_BUNDLE = '/etc/ssl/certs/ca-certificates.crt'
 
 
 def _validate_purpose(purpose):
@@ -69,6 +72,20 @@ def parse_certificate(pem_data):
         }
     except Exception as e:
         raise ValueError(f'Invalid certificate: {str(e)}')
+
+
+def parse_entry(pem_data):
+    """``(PEM to store, details)``: the entry's certificates re-serialized, never the text received.
+
+    Raises PrivateKeyInEntry for an entry carrying a private key, ValueError for a certificate block
+    that cannot be read or is left open."""
+    try:
+        pem, _ = canonical_certificates(pem_data)
+    except PrivateKeyInEntry:
+        raise
+    except Exception as e:
+        raise ValueError(f'Invalid certificate: {type(e).__name__}')
+    return pem, parse_certificate(pem)
 
 
 def parse_der_certificate(der_data):
@@ -133,12 +150,15 @@ def import_trusted_certificate():
         return error_response(err, 400)
     
     try:
-        # Try PEM first
-        if b'-----BEGIN CERTIFICATE-----' in file_content:
-            pem_data = file_content.decode('utf-8')
-            cert_details = parse_certificate(pem_data)
+        # A DER certificate first: a field of it may name any armour line. Then PEM when a
+        # certificate block opens in the file (the legacy label included), else the DER refusal.
+        if is_der_certificate(file_content):
+            pem_data, cert_details = parse_der_certificate(file_content)
+        elif holds_private_key(file_content):
+            raise PrivateKeyInEntry()
+        elif opens_a_pem_certificate(file_content):
+            pem_data, cert_details = parse_entry(file_content.decode('utf-8'))
         else:
-            # Try DER
             pem_data, cert_details = parse_der_certificate(file_content)
         
         # Check if already exists
@@ -185,6 +205,9 @@ def import_trusted_certificate():
             message=f'Certificate "{name}" imported to trust store'
         )
         
+    except PrivateKeyInEntry as e:
+        db.session.rollback()
+        return error_response(str(e), 400)
     except ValueError as e:
         db.session.rollback()
         logger.error(f'Trust store import validation error: {e}')
@@ -265,8 +288,12 @@ def add_trusted_certificate():
         return error_response(err, 400)
     
     # Parse certificate
+    if not isinstance(pem, str):
+        return error_response('Invalid certificate data', 400)
     try:
-        cert_details = parse_certificate(data['certificate_pem'])
+        pem, cert_details = parse_entry(pem)
+    except PrivateKeyInEntry as e:
+        return error_response(str(e), 400)
     except ValueError as e:
         logger.error(f'Trust store certificate parse failed: {e}')
         return error_response('Invalid certificate data', 400)
@@ -283,7 +310,7 @@ def add_trusted_certificate():
     trusted_cert = TrustedCertificate(
         name=data['name'],
         description=data.get('description', ''),
-        certificate_pem=data['certificate_pem'],
+        certificate_pem=pem,
         fingerprint_sha256=cert_details['fingerprint_sha256'],
         fingerprint_sha1=cert_details['fingerprint_sha1'],
         subject=cert_details['subject'],
@@ -426,7 +453,7 @@ def sync_trust_store():
     if limit < 1 or limit > _MAX_SYNC_LIMIT:
         return error_response(f'limit must be between 1 and {_MAX_SYNC_LIMIT}', 400)
     
-    CA_BUNDLE_PATH = '/etc/ssl/certs/ca-certificates.crt'
+    CA_BUNDLE_PATH = SYSTEM_CA_BUNDLE
     
     if source != 'system':
         return error_response('Only "system" source is currently supported', 400)
@@ -461,7 +488,7 @@ def sync_trust_store():
 
     for pem in certs_pem[:limit]:
         try:
-            cert_details = parse_certificate(pem)
+            pem, cert_details = parse_entry(pem)
 
             # Check if already exists
             existing = TrustedCertificate.query.filter_by(
@@ -562,9 +589,14 @@ def export_trust_bundle():
         if fmt == 'pem':
             bundle_lines = []
             for cert in certs:
+                served = cert.served_certificate_pem
+                if not served:
+                    continue
                 bundle_lines.append(f'# {cert.name}')
-                bundle_lines.append(cert.certificate_pem.strip())
+                bundle_lines.append(served.strip())
                 bundle_lines.append('')
+            if not bundle_lines:
+                return error_response('No valid certificates to export', 400)
             
             bundle = '\n'.join(bundle_lines)
             filename = f'truststore-{sanitize_filename(purpose)}-bundle.pem'
@@ -582,7 +614,7 @@ def export_trust_bundle():
             for cert in certs:
                 try:
                     x509_cert = x509.load_pem_x509_certificate(
-                        cert.certificate_pem.encode(), default_backend()
+                        cert.served_certificate_pem.encode(), default_backend()
                     )
                     x509_certs.append(x509_cert)
                 except Exception:
@@ -688,7 +720,12 @@ def add_ca_to_truststore(ca_refid):
         return error_response('Failed to decode CA certificate', 500)
     
     # Check if already in Trust Store
-    cert_info = parse_certificate(pem_data)
+    try:
+        pem_data, cert_info = parse_entry(pem_data)
+    except PrivateKeyInEntry as e:
+        return error_response(str(e), 400)
+    except ValueError:
+        return error_response('Failed to parse CA certificate', 500)
     if not cert_info:
         return error_response('Failed to parse CA certificate', 500)
     

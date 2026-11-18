@@ -482,6 +482,15 @@ class RestoreCoreMixin:
             for entry in aligned:
                 AuditService.log_action(username='system', **entry)
 
+        if results.get('truststore_private_keys_removed'):
+            from services.audit_service import AuditService
+            from utils.trust_pem import REMOVED_ACTION, removal_warning
+            for entry in results['truststore_private_keys_removed']:
+                AuditService.log_action(
+                    action=REMOVED_ACTION, resource_type='truststore', resource_id=entry['id'],
+                    resource_name=entry['name'], username='system', success=True,
+                    details=removal_warning(entry['id'], entry['name']))
+
         from utils import admin_allowlist
         admin_allowlist.invalidate_cache()
         if results.get('admin_allowlist_cleared'):
@@ -604,7 +613,7 @@ class RestoreCoreMixin:
         db.session.flush()
         from services.acme import profiles as acme_profiles
         results['acme_profile_bindings'] = acme_profiles.remap_template_bindings()
-        self._restore_truststore(backup_data, results)
+        self._restore_truststore(backup_data, results, plan)
 
         # Auth restores
         self._restore_sso_providers(backup_data, results)

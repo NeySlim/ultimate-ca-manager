@@ -13,6 +13,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Account: wrong passwords sent at the same time to the password or LDAP login could all be checked before the lockout took effect, and at LDAP a name typed in another case or spelling escaped the count, so `max_login_attempts` did not bound a parallel guess. Each attempt is now counted before its password is checked, at LDAP on the local account the directory entry opens or the account of the same name it may not open, so at most `max_login_attempts` passwords are checked before the account locks, and a success clears the stored count and lock.
 - Account: an LDAP sign-in whose password is right but which opens no session (account disabled, not in the required groups, groups unreadable, no role mapped) now counts toward `max_login_attempts`. Such sign-ins alone never lock the account.
+- Trust store: an imported file holding a private key with its certificate was stored whole, and the key could be read back through the API, the exports and the backups by every account allowed to read the trust store. Such an entry is now refused, only certificates are stored and handed out, and a key already stored is removed at start and must be treated as compromised.
 
 ## [2.254.4] - 2026-11-16
 
