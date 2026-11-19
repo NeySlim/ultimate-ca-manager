@@ -238,6 +238,37 @@ def _named_cas(ca_certs):
     return named
 
 
+def key_only_response(certificate, password, audit_type, audit_name, download_name):
+    """The private key alone, PKCS#8 encrypted when a password is given; audited."""
+    if not certificate.prv:
+        return error_response('Certificate has no private key', 400)
+    key_pem = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
+    key_pem = encrypt_key_pem(key_pem, password)
+    audit_key_export(audit_type, certificate.id, audit_name, 'key', password)
+    return Response(
+        key_pem,
+        mimetype='application/x-pem-file',
+        headers={'Content-Disposition': content_disposition(download_name, '.key', fallback=certificate.refid)}
+    )
+
+
+def der_response(cert_pem, download_name, fallback):
+    cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
+    return Response(
+        cert.public_bytes(serialization.Encoding.DER),
+        mimetype='application/x-x509-ca-cert',
+        headers={'Content-Disposition': content_disposition(download_name, '.der', fallback=fallback)}
+    )
+
+
+def p7b_response(pems, download_name, fallback):
+    return Response(
+        p7b_from_pems(pems),
+        mimetype='application/x-pkcs7-certificates',
+        headers={'Content-Disposition': content_disposition(download_name, '.p7b', fallback=fallback)}
+    )
+
+
 def inapplicable_option(export_format, include_key, include_chain):
     """Message for a ticked option the format cannot carry (DER holds one
     certificate, P7B no key); None when the combination is possible."""
@@ -401,17 +432,8 @@ def export_certificate(cert_id):
 
         # Private key only export
         if export_format == 'key':
-            if not certificate.prv:
-                return error_response('Certificate has no private key', 400)
-            key_pem = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
-            key_pem = encrypt_key_pem(key_pem, password)
-            audit_key_export('certificate', certificate.id, certificate.descr or certificate.refid,
-                             export_format, password)
-            return Response(
-                key_pem,
-                mimetype='application/x-pem-file',
-                headers={'Content-Disposition': content_disposition(certificate.descr or certificate.refid, '.key', fallback=certificate.refid)}
-            )
+            return key_only_response(certificate, password, 'certificate', certificate.descr or certificate.refid,
+                                     certificate.descr or certificate.refid)
 
         if export_format == 'pem':
             # A stored certificate may already contain an inline full chain.
@@ -452,14 +474,7 @@ def export_certificate(cert_id):
             )
 
         elif export_format == 'der':
-            cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
-            der_bytes = cert.public_bytes(serialization.Encoding.DER)
-
-            return Response(
-                der_bytes,
-                mimetype='application/x-x509-ca-cert',
-                headers={'Content-Disposition': content_disposition(certificate.descr or certificate.refid, '.der', fallback=certificate.refid)}
-            )
+            return der_response(cert_pem, certificate.descr or certificate.refid, certificate.refid)
 
         elif export_format == 'pkcs12':
             if not password:
@@ -499,11 +514,7 @@ def export_certificate(cert_id):
             if include_chain:
                 pems += [ca_cert.public_bytes(serialization.Encoding.PEM) for ca_cert in _build_ca_chain(
                     certificate, cert_pem, include_root=include_root, variant=variant)]
-            return Response(
-                p7b_from_pems(pems),
-                mimetype='application/x-pkcs7-certificates',
-                headers={'Content-Disposition': content_disposition(certificate.descr or certificate.refid, '.p7b', fallback=certificate.refid)}
-            )
+            return p7b_response(pems, certificate.descr or certificate.refid, certificate.refid)
 
         elif export_format == 'pfx':
             # PFX is same as PKCS12

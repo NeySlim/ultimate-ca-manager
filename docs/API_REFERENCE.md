@@ -1303,11 +1303,11 @@ With `format=pem` and `include_key`, a `password` (POST) encrypts the key as PKC
 **Query Parameters**:
 | Param | Type | Description |
 |-------|------|-------------|
-| format | string | `pem` (default) or `pkcs12` |
-| include_key | bool | Include private key (default: true) |
-| include_chain | bool | Include CA chain (default: true) |
+| format | string | `pem` (default), `der`, `pkcs7` (or `p7b`), `key` (the private key alone, `.key`), `pkcs12` (`p12`, `pfx`) or `jks`; any other value is `400` |
+| include_key | bool | Include private key (default: true, false for `der`, `pkcs7`, `p7b`; `true` with those is `400`) |
+| include_chain | bool | Include CA chain (default: true, false for `der` and `key`; `true` with `der` is `400`) |
 | include_root | bool | Include the final self-signed Root CA when the chain is included (default: false) |
-| password | string | PKCS12 password (required for pkcs12, min 8 chars) |
+| password | string | PKCS12 and JKS password (required, min 8 chars); optional for `key`, where it encrypts the key as PKCS#8 |
 | legacy | bool | PKCS12 compatibility profile, 3DES/SHA-1 instead of AES-256/SHA-256 (default: false) |
 
 **Response** `200`: Binary file download with `Content-Disposition` header. A name that is not ASCII is sent as an ASCII `filename` fallback plus `filename*=UTF-8''<percent-encoded name>` (RFC 6266); every export route named after an object does the same (a CRL keeps its ASCII name).

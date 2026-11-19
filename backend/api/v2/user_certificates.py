@@ -46,6 +46,19 @@ logger = logging.getLogger(__name__)
 bp = Blueprint('user_certificates', __name__, url_prefix='/api/v2/user-certificates')
 
 
+# Formats that carry no key or no chain default those options off, so a plain
+# DER or P7B request is not refused for an option nobody ticked.
+def _key_by_default(export_format):
+    return export_format not in ('der', 'pkcs7', 'p7b')
+
+
+def _chain_by_default(export_format):
+    return export_format not in ('der', 'key')
+
+
+_EXPORT_FORMATS = ('pem', 'der', 'pkcs7', 'p7b', 'key', 'pkcs12', 'p12', 'pfx', 'jks')
+
+
 def _is_admin_or_operator(user):
     """Check if user has admin or operator role."""
     return getattr(user, 'role', '') in ('admin', 'operator')
@@ -306,8 +319,8 @@ def export_user_certificate(cert_id):
         export_format = data.get('format', 'pem').lower()
         password = data.get('password', '')
         try:
-            include_key = json_boolean(data, 'include_key', True)
-            include_chain = json_boolean(data, 'include_chain', True)
+            include_key = json_boolean(data, 'include_key', _key_by_default(export_format))
+            include_chain = json_boolean(data, 'include_chain', _chain_by_default(export_format))
             include_root = json_boolean(data, 'include_root', False)
             legacy_value = json_boolean(data, 'legacy', False)
         except ValueError as exc:
@@ -318,8 +331,8 @@ def export_user_certificate(cert_id):
         password = request.args.get('password', '')
         legacy = False
         try:
-            include_key = query_boolean(request.args, 'include_key', True)
-            include_chain = query_boolean(request.args, 'include_chain', True)
+            include_key = query_boolean(request.args, 'include_key', _key_by_default(export_format))
+            include_chain = query_boolean(request.args, 'include_chain', _chain_by_default(export_format))
             include_root = query_boolean(request.args, 'include_root', False)
         except ValueError as exc:
             return error_response(str(exc), 400)
@@ -336,7 +349,12 @@ def export_user_certificate(cert_id):
                 400,
             )
 
-    from api.v2.certificates.export import requested_chain_variant
+    if export_format not in _EXPORT_FORMATS:
+        return error_response(f'Unsupported format: {export_format}', 400)
+    from api.v2.certificates.export import inapplicable_option, requested_chain_variant
+    option_err = inapplicable_option(export_format, include_key, include_chain)
+    if option_err:
+        return error_response(option_err, 400)
     variant, variant_err = requested_chain_variant(
         data if request.method == 'POST' and request.is_json else request.args, cert)
     if variant_err:
@@ -345,7 +363,7 @@ def export_user_certificate(cert_id):
     # Somebody else's key needs `read:private_keys`, as on the certificate
     # route, or the approval-gated Key Recovery flow is bypassable (#232).
     # Your own key stays: that is what the account page is for.
-    wants_key = include_key or export_format in ('pkcs12', 'p12', 'pfx', 'jks')
+    wants_key = include_key or export_format in ('pkcs12', 'p12', 'pfx', 'jks', 'key')
     if wants_key and auth_cert.user_id != user.id:
         if not has_permission('read:private_keys', g.permissions):
             return error_response(
@@ -358,6 +376,45 @@ def export_user_certificate(cert_id):
         # The raw name goes to content_disposition(), which falls back to the refid.
         raw_name = auth_cert.name or cert.descr or cert.refid
         filename_base = sanitize_filename(raw_name)
+
+        if export_format == 'key':
+            pw_err = validate_export_password(password, allow_empty=True)
+            if pw_err:
+                return error_response(pw_err, 400)
+            from api.v2.certificates.export import key_only_response
+            answer = key_only_response(cert, password, 'user_certificate', filename_base, raw_name)
+            if answer.status_code == 200:
+                AuditService.log_action(
+                    action='user_certificate_exported',
+                    resource_type='user_certificate',
+                    resource_id=cert_id,
+                    resource_name=filename_base,
+                    details=f'Exported private key only for user cert: {filename_base}',
+                    success=True
+                )
+            return answer
+
+        if export_format in ('der', 'pkcs7', 'p7b'):
+            from api.v2.certificates.export import (
+                _build_ca_chain, _split_pem_certs, der_response, p7b_response)
+            if export_format == 'der':
+                answer = der_response(cert_pem, raw_name, cert.refid)
+            else:
+                leaf = _split_pem_certs(cert_pem)
+                pems = [leaf[0].public_bytes(serialization.Encoding.PEM) if leaf else cert_pem]
+                if include_chain:
+                    pems += [c.public_bytes(serialization.Encoding.PEM) for c in _build_ca_chain(
+                        cert, cert_pem, include_root=include_root, variant=variant)]
+                answer = p7b_response(pems, raw_name, cert.refid)
+            AuditService.log_action(
+                action='user_certificate_exported',
+                resource_type='user_certificate',
+                resource_id=cert_id,
+                resource_name=filename_base,
+                details=f'Exported {export_format.upper()} for user cert: {filename_base}',
+                success=True
+            )
+            return answer
 
         if export_format in ('pkcs12', 'p12', 'pfx'):
             pw_err = validate_export_password(password)
