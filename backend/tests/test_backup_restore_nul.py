@@ -174,7 +174,7 @@ def test_two_rows_that_become_one_are_named(target, mode):
     _postgresql_only(target)
     results = _restore({'custom_roles': [{'name': 'twin\x00', 'permissions': []},
                                          {'name': f'twin{ESCAPED}', 'permissions': []}]}, mode)
-    merged = [w for w in results['warnings'] if 'restored as one row' in w]
+    merged = [w for w in results['warnings'] if 'restored as one' in w]
     assert [w.split(':')[0] for w in merged] == ['custom_roles.name'], results['warnings']
 
 
@@ -182,7 +182,7 @@ def test_rows_already_alike_are_not_named_as_merged(target):
     _postgresql_only(target)
     results = _restore({'custom_roles': [{'name': 'same\x00a', 'permissions': []},
                                          {'name': 'same\x00b', 'permissions': []}]}, 'merge')
-    assert not [w for w in results['warnings'] if 'restored as one row' in w]
+    assert not [w for w in results['warnings'] if 'restored as one' in w]
 
 
 def test_the_report_names_a_bounded_number_of_fields(target):
@@ -342,7 +342,7 @@ def _rewritten(payload):
 
 def test_the_rewrite_names_two_rows_that_become_one():
     payload = {'custom_roles': [{'name': 'twin\x00'}, {'name': f'twin{ESCAPED}'}]}
-    merged = [w for w in _rewritten(payload) if 'restored as one row' in w]
+    merged = [w for w in _rewritten(payload) if 'restored as one' in w]
     assert [w.split(':')[0] for w in merged] == ['custom_roles.name']
     assert [r['name'] for r in payload['custom_roles']] == [f'twin{ESCAPED}'] * 2
 
@@ -350,7 +350,7 @@ def test_the_rewrite_names_two_rows_that_become_one():
 def test_the_rewrite_does_not_name_rows_that_stay_apart():
     payload = {'custom_roles': [{'name': 'same\x00a'}, {'name': 'same\x00b'}, {'name': 'plain'},
                                 {'name': 'plain'}]}
-    assert not [w for w in _rewritten(payload) if 'restored as one row' in w]
+    assert not [w for w in _rewritten(payload) if 'restored as one' in w]
 
 
 def test_the_rewrite_escapes_and_bounds_a_name_from_the_archive():
@@ -369,5 +369,67 @@ def test_the_rewrite_names_a_field_no_column_takes_as_ignored():
     assert sorted(warnings) == sorted([
         'deploy_targets.host: a NUL character, which PostgreSQL cannot store in text, was '
         'restored as the two characters \\0',
-        f'deploy_targets.no{ESCAPED}col\\x0aumn: a field no column takes, ignored, its name '
-        'holding a NUL character'])
+        f'deploy_targets.no{ESCAPED}col\\x0aumn: a field no column takes, ignored, holding a '
+        'NUL character'])
+
+
+@pytest.mark.parametrize('mode', MODES)
+def test_a_list_in_an_identity_beside_a_nul_is_named_not_a_server_error(target, mode):
+    """The shape of a field is checked before the rewrite: 400 naming it, on both engines."""
+    from models.rbac import CustomRole
+    from services.backup.restore import RestoreValidationError
+    with pytest.raises(RestoreValidationError) as refused:
+        _restore({'custom_roles': [{'name': ['x'], 'description': 'a\x00', 'permissions': []}]},
+                 mode)
+    db.session.rollback()
+    assert 'custom_roles.name' in str(refused.value)
+    assert CustomRole.query.count() == 0
+
+
+def test_the_rewrite_never_fails_on_an_identity_that_is_a_list():
+    payload = {'custom_roles': [{'name': ['x'], 'description': 'a\x00'},
+                                {'name': ['x'], 'description': 'b'}]}
+    assert _rewritten(payload)
+
+
+def test_the_rewrite_names_two_mapping_keys_that_become_one():
+    payload = {'configuration': {'settings': {'k\x00': 'one', f'k{ESCAPED}': 'two'}}}
+    merged = [w for w in _rewritten(payload) if 'restored as one' in w]
+    assert [w.split(':')[0] for w in merged] == ['configuration.settings'], merged
+
+
+def test_the_rewrite_names_two_json_keys_of_a_column_that_become_one():
+    payload = {'custom_roles': [{'name': 'r', 'permissions': [{'k\x00': 1, f'k{ESCAPED}': 2}]}]}
+    merged = [w for w in _rewritten(payload) if 'restored as one' in w]
+    assert [w.split(':')[0] for w in merged] == ['custom_roles.permissions'], merged
+
+
+def test_the_rewrite_does_not_blame_the_nul_for_rows_already_alike():
+    payload = {'custom_roles': [{'name': 'g\x00'}, {'name': 'g\x00'}]}
+    assert not [w for w in _rewritten(payload) if 'restored as one' in w]
+
+
+def test_the_rewrite_names_a_field_no_column_takes_as_ignored_by_its_value():
+    warnings = _rewritten({'deploy_targets': [_target('n', no_column='x\x00')]})
+    assert warnings == ['deploy_targets.no_column: a field no column takes, ignored, holding a '
+                        'NUL character'], warnings
+
+
+@pytest.mark.parametrize('mode', MODES)
+def test_a_text_pem_holding_a_nul_is_stored_as_it_reads(target, mode):
+    """What happens today, not a promise: the restore does not parse an archived certificate
+    PEM, so one holding a NUL is written, the NUL kept (SQLite) or as \\0 (PostgreSQL)."""
+    import base64
+    from models import Certificate
+    pem = '-----BEGIN CERTIFICATE-----\nMII\x00\n-----END CERTIFICATE-----\n'
+    _restore({'certificates': [{'refid': 'nul-pem', 'descr': 'nul-pem', 'certificate_pem': pem}]},
+             mode)
+    db.session.expire_all()
+    stored = Certificate.query.filter_by(refid='nul-pem').one().crt
+    assert base64.b64decode(stored).decode() == _stored(target, pem)
+
+
+def test_the_rewrite_names_two_keys_of_a_mapping_section_that_become_one():
+    payload = {'configuration': {'a\x00': 'one', f'a{ESCAPED}': 'two'}}
+    merged = [w for w in _rewritten(payload) if 'restored as one' in w]
+    assert [w.split(':')[0] for w in merged] == ['configuration'], merged
