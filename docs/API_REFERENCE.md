@@ -1920,10 +1920,10 @@ GET /api/v2/scep/stats
 ### List Requests
 ```http
 GET /api/v2/scep/requests
-GET /api/v2/scep/requests?status=pending
+GET /api/v2/scep/requests?status=pending&search=host&page=2&per_page=50
 GET /api/v2/scep/requests/{request_id}
 ```
-The list holds the latest 50; the last form reads any one request (`read:scep`), 404 when it does not exist.
+The list is newest first and paged: `page` and `per_page` (default 50, 100 at most), `meta` carries `total` and `total_pages`; `status` (repeatable) and `search` (subject, transaction ID or client address) filter before the page is cut. The last form reads any one request (`read:scep`), 404 when it does not exist.
 
 ### Approve Request
 ```http

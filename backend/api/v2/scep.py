@@ -143,17 +143,26 @@ def update_scep_config():
 @bp.route('/api/v2/scep/requests', methods=['GET'])
 @require_auth(['read:scep'])
 def list_scep_requests():
-    """List SCEP certificate requests"""
-    status = request.args.get('status')
+    """List SCEP certificate requests, newest first, paged."""
+    from utils.pagination import parse_request_pagination, paginate
+    page, per_page = parse_request_pagination(default_per_page=50)
+    statuses = [v for v in request.args.getlist('status') if v]
+    search = request.args.get('search', '').strip()
     query = SCEPRequest.query
-    
-    if status:
-        query = query.filter_by(status=status)
-        
-    requests_list = query.order_by(SCEPRequest.created_at.desc()).limit(50).all()
-    
-    data = [req.to_dict() for req in requests_list]
-    return success_response(data=data)
+
+    if statuses:
+        query = query.filter(SCEPRequest.status.in_(statuses))
+    if search:
+        safe = search.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+        pattern = f'%{safe}%'
+        query = query.filter(db.or_(
+            SCEPRequest.subject.ilike(pattern, escape='\\'),
+            SCEPRequest.transaction_id.ilike(pattern, escape='\\'),
+            SCEPRequest.client_ip.ilike(pattern, escape='\\')))
+
+    query = query.order_by(SCEPRequest.created_at.desc(), SCEPRequest.id.desc())
+    result = paginate(query, page, per_page)
+    return success_response(data=[req.to_dict() for req in result['items']], meta=result['meta'])
 
 
 @bp.route('/api/v2/scep/requests/<int:request_id>', methods=['GET'])
