@@ -103,11 +103,23 @@ def test_truststore_bundle_named_after_the_purpose(app, auth_client, fmt, ext, n
             db.session.commit()
 
 
+@pytest.fixture
+def template_ids(app):
+    """Ids of the templates a test creates, deleted after it."""
+    ids = []
+    yield ids
+    from models.certificate_template import CertificateTemplate
+    with app.app_context():
+        CertificateTemplate.query.filter(CertificateTemplate.id.in_(ids)).delete(synchronize_session=False)
+        db.session.commit()
+
+
 @each_name
-def test_template_export(auth_client, name):
+def test_template_export(auth_client, template_ids, name):
     from tests.test_templates import _create_template
     r, created = _create_template(auth_client, name=name)
     assert r.status_code in (200, 201), r.data
+    template_ids.append(created['id'])
     out = auth_client.get(f"/api/v2/templates/{created['id']}/export")
     assert_named(out, name, '.json', fallback_stem=plain_stem(name, f"template-{created['id']}"))
 
@@ -153,9 +165,8 @@ def test_report_downloads(auth_client):
 
 @each_name
 def test_custom_pdf_named_after_the_requested_template(auth_client, name):
+    pytest.importorskip('fpdf')
     sections = auth_client.get('/api/v2/reports/pdf/templates').get_json()['data']['sections']
     r = auth_client.post('/api/v2/reports/pdf/generate', json={'template': name, 'sections': sections[:1]})
-    if r.status_code == 500:
-        pytest.skip('PDF dependencies are not installed')
     today = datetime.date.today().isoformat()
-    assert_named(r, f'{name}-{today}', '.pdf', prefix='ucm-report-')
+    assert_named(r, f'{name}-{today}', '.pdf', f"{plain_stem(name, '')}-{today}", prefix='ucm-report-')

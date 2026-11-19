@@ -22,8 +22,8 @@ def disposition_of(response):
     return value
 
 
-def assert_named(response, stem, ext, fallback_stem=None, disposition='attachment', prefix=''):
-    """200, ASCII header, ``filename*`` decoding to prefix+stem+ext, and a readable plain name."""
+def assert_named(response, stem, ext, fallback_stem, disposition='attachment', prefix=''):
+    """200, ASCII header, ``filename*`` decoding to prefix+stem+ext, and ``filename`` = prefix+fallback_stem+ext."""
     value = disposition_of(response)
     match = PARSE.match(value)
     assert match, value
@@ -32,7 +32,5 @@ def assert_named(response, stem, ext, fallback_stem=None, disposition='attachmen
     plain = match['plain']
     assert plain.endswith(ext) and plain != ext
     assert plain[len(prefix):len(plain) - len(ext)].strip('_'), plain
-    assert any(c.isalnum() for c in plain[:-len(ext)] if c not in prefix) or fallback_stem is None
-    if fallback_stem is not None:
-        assert plain == f'{prefix}{fallback_stem}{ext}', plain
+    assert plain == f'{prefix}{fallback_stem}{ext}', plain
     return plain
