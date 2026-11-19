@@ -20,9 +20,9 @@ import { truststoreService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { useMobile } from '../contexts/MobileContext'
 import { usePermission, useModals, usePersistedState } from '../hooks'
-import { formatDate, cn, downloadBlob, warnSkippedExport } from '../lib/utils'
+import { formatDate, cn, downloadBlob, warnSkippedExport, daysRemaining } from '../lib/utils'
 import { soleImported } from '../lib/importResult'
-import { trustStoreExpiryStatus } from '../lib/expiry'
+import { expiryBucket, trustStoreExpiryStatus } from '../lib/expiry'
 import { runInBatches } from '../lib/bulkChunks'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 import { TrustCertPanel } from '../components/detail/TrustCertPanel'
@@ -342,10 +342,9 @@ export default function TrustStorePage() {
         </div>
       ),
       mobileRender: (val, row) => {
-        const date = row.not_after ? new Date(row.not_after) : null
-        const isExpired = date && date < new Date()
-        const daysLeft = date ? Math.floor((date - new Date()) / (1000 * 60 * 60 * 24)) : null
-        const isExpiringSoon = daysLeft !== null && daysLeft > 0 && daysLeft <= 30
+        const bucket = expiryBucket(daysRemaining(row.not_after))
+        const isExpired = bucket === 'expired'
+        const isExpiringSoon = bucket === 'expiring'
         return (
           <div className="flex items-center justify-between gap-2 w-full">
             <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -388,10 +387,9 @@ export default function TrustStorePage() {
       mono: true,
       render: (val) => {
         if (!val) return <span className="text-text-tertiary">—</span>
-        const date = new Date(val)
-        const isExpired = date < new Date()
-        const daysLeft = Math.floor((date - new Date()) / (1000 * 60 * 60 * 24))
-        const isExpiringSoon = daysLeft > 0 && daysLeft <= 30
+        const bucket = expiryBucket(daysRemaining(val))
+        const isExpired = bucket === 'expired'
+        const isExpiringSoon = bucket === 'expiring'
         return (
           <Badge variant={isExpired ? 'danger' : isExpiringSoon ? 'orange' : 'success'} size="sm" dot pulse={isExpired || isExpiringSoon}>
             {formatDate(val)}
