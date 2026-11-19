@@ -75,7 +75,8 @@ def remember(auth_result):
                                                    'force_password_change', False)),
              'auth_method': auth_result['auth_method'],
              'permissions': list(auth_result['permissions'] or []),
-             'api_key_id': auth_result.get('api_key_id')}
+             'api_key_id': auth_result.get('api_key_id'),
+             'expires_at': auth_result.get('api_key_expires_at')}
     if key[0] == 'session':
         from auth.unified import AuthManager
         entry['fingerprint'] = _fingerprint()
@@ -105,6 +106,11 @@ def _checked(view):
         entry = _entries_for(_gate_key(view)).get(key)
     if entry is None or entry['host'] != request.host:
         return False
+    # A key that expired since its check is refused as the database would refuse it
+    if entry['expires_at'] is not None:
+        from utils.datetime_utils import utc_now
+        if entry['expires_at'] < utc_now():
+            return None
     if key[0] == 'session':
         if entry['fingerprint'] != _fingerprint():
             return False

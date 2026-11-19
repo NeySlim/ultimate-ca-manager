@@ -354,6 +354,49 @@ def test_a_session_checked_before_the_restore_only_is_not_trusted(held_app):
     assert not restore_job.cancel_flagged(job_id)
 
 
+def _api_key(app, user_id, lifetime):
+    from datetime import timedelta
+    from auth.unified import AuthManager
+    from utils.datetime_utils import utc_now
+    with app.app_context():
+        made = AuthManager().create_api_key(user_id, f'held-{uuid.uuid4().hex[:6]}', ['*'],
+                                            not_after=utc_now() + timedelta(seconds=lifetime))
+        db.session.remove()
+    return made['key']
+
+
+def test_an_api_key_that_expires_during_the_restore_reads_nothing(held_app):
+    """Checked during the gate, then expired: the held window refuses it as the database would."""
+    app, path = held_app
+    job_id = _restore_job(app)
+    url = f'/api/v2/system/jobs/{job_id}'
+    user = _admin_user(app)
+    lifetime = 2.0
+    made_at = time.monotonic()
+    key = _api_key(app, user['id'], lifetime)
+    lasting = _api_key(app, user['id'], 3600)
+    client = app.test_client()
+    gate = _gate(app, job_id).raise_gate()
+    try:
+        assert client.get(url, headers={'X-API-Key': key}).status_code == 200
+        assert client.get(url, headers={'X-API-Key': lasting}).status_code == 200
+        time.sleep(max(0.0, lifetime + 0.5 - (time.monotonic() - made_at)))
+        gate.set_view(phase=restore_job.APPLYING, held=True)
+        with holding(path):
+            expired = client.get(url, headers={'X-API-Key': key})
+            expired_cancel = client.post(f'{url}/cancel', headers={'X-API-Key': key})
+            still = client.get(url, headers={'X-API-Key': lasting})
+    finally:
+        gate.lift()
+        with app.app_context():
+            db.session.execute(T.delete().where(T.c.id == job_id))
+            db.session.commit()
+    assert still.status_code == 200, still.data
+    assert expired.status_code == 401, expired.data
+    assert expired_cancel.status_code == 401, expired_cancel.data
+    assert not restore_job.cancel_flagged(job_id)
+
+
 def test_a_session_without_the_right_reads_nothing(restore_held, viewer_client):
     app, job_id = restore_held.app, restore_held.job_id
     url = f'/api/v2/system/jobs/{job_id}'
