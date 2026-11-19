@@ -225,3 +225,61 @@ describe('scheduler card', () => {
     expect(line.textContent).not.toContain('tasksFailed')
   })
 })
+
+describe('protocol rows', () => {
+  const periods = (rows) => rows.map(([ok, failed], i) => ({ date: `2026-11-${13 + i}`, ok, failed }))
+  const busy = { periods: periods([[1, 0], [0, 0], [2, 3], [0, 0], [0, 0], [0, 0], [4, 1]]), last_operation_at: '2026-11-19T10:00:00Z', last_status: 'ok' }
+  const idle = { periods: periods(Array(7).fill([0, 0])), last_operation_at: null, last_status: null }
+
+  it('draws a curve only for a protocol that has data', async () => {
+    const card = await show({ acme: busy, scep: idle })
+    expect(within(row(card, 'acme')).getByTestId('health-spark').getAttribute('role')).toBe('img')
+    expect(within(row(card, 'scep')).queryByTestId('health-spark')).toBeNull()
+    expect(row(card, 'scep').textContent).toContain('overview.health.noOperation')
+    expect(row(card, 'scep').textContent).not.toContain('–')
+  })
+
+  it('the curve reads as its figures, oldest day first', async () => {
+    lang.fr = true
+    const card = await show({ acme: busy })
+    expect(within(row(card, 'acme')).getByTestId('health-spark').getAttribute('aria-label'))
+      .toBe('ACME, par jour, du plus ancien au plus récent. Succès : 1, 0, 2, 0, 0, 0, 4. Échecs : 0, 0, 3, 0, 0, 0, 1.')
+  })
+
+  it('gives today and the whole period in figures', async () => {
+    const card = await show({ acme: busy })
+    const text = row(card, 'acme').textContent
+    expect(text).toContain('overview.health.todayoverview.health.successes:4overview.health.failures:1')
+    expect(text).toContain('overview.days:7overview.health.successes:7overview.health.failures:4')
+    expect(row(card, 'acme').querySelectorAll('.ov-health-fail')).toHaveLength(2)
+  })
+
+  it('a day without failure shows its zero without the alert mark', async () => {
+    const card = await show({ est: { ...busy, periods: periods([[3, 0], [2, 0]]) } })
+    expect(row(card, 'est').querySelectorAll('.ov-health-fail')).toHaveLength(0)
+    expect(row(card, 'est').textContent).toContain('overview.health.failures:0')
+  })
+
+  it('the state is a pill with an icon: good, failed, or neutral', async () => {
+    const card = await show({ acme: busy, scep: { ...busy, last_status: 'failed' }, est: { ...busy, last_status: 'quarantined' } })
+    expect(row(card, 'acme').querySelector('.ov-pill.is-good svg')).not.toBeNull()
+    expect(row(card, 'scep').querySelector('.ov-pill.is-bad svg')).not.toBeNull()
+    expect(row(card, 'est').querySelector('.ov-pill').className).not.toMatch(/is-(good|bad|warn)/)
+  })
+})
+
+describe('summary under the rows', () => {
+  it('counts the lines that report a problem', async () => {
+    const card = await show({
+      acme: { periods: [], last_operation_at: null, last_status: 'failed' },
+      scheduler: sched({ stale: true }), smtp: witness('ready'),
+    })
+    expect(card.querySelector('.ov-health-foot').textContent).toBe('overview.health.alerts:2')
+    expect(card.querySelector('.ov-health-foot.is-good')).toBeNull()
+  })
+
+  it('says so when nothing does', async () => {
+    const card = await show({ scheduler: sched({}), smtp: witness('not_configured') })
+    expect(card.querySelector('.ov-health-foot.is-good').textContent).toBe('overview.health.allFine')
+  })
+})

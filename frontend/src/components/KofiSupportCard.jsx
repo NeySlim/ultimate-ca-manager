@@ -1,6 +1,6 @@
 /**
  * KofiSupportCard: a dismissible corner card inviting admins to support UCM,
- * shown once per UCM version. The dismissed version is a server-side
+ * shown once per UCM version; `inline` puts it in the page flow, where it covers nothing. The dismissed version is a server-side
  * preference (`kofi_seen_version`), so it follows the user across browsers.
  */
 import { useCallback, useEffect, useState } from 'react'
@@ -20,7 +20,7 @@ function isDialogOpen() {
   return typeof document !== 'undefined' && !!document.querySelector(OPEN_DIALOG_SELECTOR)
 }
 
-export function KofiSupportCard({ version = __APP_VERSION__ }) {
+export function KofiSupportCard({ version = __APP_VERSION__, inline = false }) {
   const { t } = useTranslation()
   const location = useLocation()
   const { user, forcePasswordChange, mustEnroll2fa } = useAuth()
@@ -59,7 +59,9 @@ export function KofiSupportCard({ version = __APP_VERSION__ }) {
   return (
     <aside
       aria-label={t('kofi.label')}
-      className="kofi-card fixed z-30 bottom-3 left-3 right-3 sm:left-auto sm:right-8 sm:bottom-12 sm:w-80 rounded-xl border border-border bg-bg-secondary shadow-xl p-3"
+      className={inline
+        ? 'kofi-card w-full sm:w-80 rounded-xl border border-border bg-bg-secondary p-3'
+        : 'kofi-card fixed z-30 bottom-3 left-3 right-3 sm:left-auto sm:right-8 sm:bottom-12 sm:w-80 rounded-xl border border-border bg-bg-secondary shadow-xl p-3'}
     >
       <div className="flex items-start gap-3">
         <div className="kofi-badge flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center">

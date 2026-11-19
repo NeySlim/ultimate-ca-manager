@@ -6555,7 +6555,9 @@
       "label": "Пресети макета",
       "operator": "Оператор",
       "manager": "Керівник",
-      "all": "Усі картки"
+      "all": "Усі картки",
+      "short": "Preset",
+      "allHint": "Every card, in the initial order"
     },
     "cards": {
       "queue": "До опрацювання",
@@ -6563,7 +6565,9 @@
       "hierarchy": "Ієрархія",
       "horizon": "Горизонт закінчення",
       "compliance": "Відповідність",
-      "activity": "Останні операції"
+      "activity": "Останні операції",
+      "trend": "Certificate activity",
+      "states": "Status distribution"
     },
     "state": {
       "loading": "Завантаження...",
@@ -6575,9 +6579,49 @@
       "partialForbidden": "У вас немає доступу до частини цієї картки."
     },
     "queue": {
-      "fold": "Згорнути підсумки за видами",
-      "unfold": "Показати підсумки за видами",
-      "perKind": "Підсумки за видами"
+      "sub": "By urgency: critical items first, then by due date; what only needs watching comes last.",
+      "subFiltered": "{{shown}} of {{total}}, filter \"{{name}}\".",
+      "toRenew_one": "{{count}} manual renewal due",
+      "toRenew_other": "{{count}} manual renewals due",
+      "toRenew_few": "{{count}} manual renewals due",
+      "toRenew_many": "{{count}} manual renewals due",
+      "filterLabel": "Filter the queue by type",
+      "listLabel": "Items to act on, most urgent first",
+      "none": "Nothing waits for an action.",
+      "emptyHint": "Nothing waits for an action or for watching.",
+      "unfold_one": "Show the {{count}} other",
+      "unfold_other": "Show the {{count}} others",
+      "unfold_few": "Show the {{count}} others",
+      "unfold_many": "Show the {{count}} others",
+      "watch_one": "{{count}} to watch",
+      "watch_other": "{{count}} to watch",
+      "watch_few": "{{count}} to watch",
+      "watch_many": "{{count}} to watch",
+      "watchNote": "client-side renewals, authorities and trust anchors far from expiry: nothing to do today",
+      "watchShow": "Show the rows to watch",
+      "watchHide": "Hide the rows to watch",
+      "show": "Show",
+      "hide": "Hide",
+      "partial": "{{shown}} of {{total}} listed: the queue shows its most urgent items.",
+      "overdue": "overdue by {{span}}",
+      "critical": "Critical:",
+      "retry": "Retry",
+      "retried": "Renewal started again",
+      "publish": "Publish now",
+      "review": "Review",
+      "viewCa": "View the CA",
+      "open": "Open",
+      "actionFailed": "The operation failed.",
+      "group": {
+        "all": "All",
+        "renew": "Renewals",
+        "acme": "ACME failures",
+        "request": "Requests",
+        "crl": "CRL",
+        "ca": "Authorities",
+        "deploy": "Deployments"
+      },
+      "less": "Show fewer"
     },
     "kind": {
       "acme_order_failed": "Замовлення ACME не вдалося",
@@ -6603,7 +6647,8 @@
       "incomplete_chain": "Неповний ланцюжок",
       "no_private_key": "Без приватного ключа",
       "byAlgorithm": "Алгоритми ключів",
-      "unknownAlgo": "Невідомо"
+      "unknownAlgo": "Невідомо",
+      "sub": "Over the live certificates. A figure with a list opens it, filtered."
     },
     "health": {
       "acme": "ACME",
@@ -6663,7 +6708,30 @@
           "disabled": "Вимкнено"
         },
         "unavailable": "Стан недоступний"
-      }
+      },
+      "sub_one": "Per UTC day, over {{count}} day.",
+      "sub_other": "Per UTC day, over {{count}} days.",
+      "sub_few": "Per UTC day, over {{count}} days.",
+      "sub_many": "Per UTC day, over {{count}} days.",
+      "subScheduler": "Scheduler: last run {{when}}.",
+      "lastOperation": "Last operation {{when}}",
+      "noOperation": "No operation recorded",
+      "today": "Today",
+      "successes_one": "{{count}} success",
+      "successes_other": "{{count}} successes",
+      "successes_few": "{{count}} successes",
+      "successes_many": "{{count}} successes",
+      "failures_one": "{{count}} failure",
+      "failures_other": "{{count}} failures",
+      "failures_few": "{{count}} failures",
+      "failures_many": "{{count}} failures",
+      "sparkAlt": "{{name}}, per day, oldest first. Successes: {{ok}}. Failures: {{failed}}.",
+      "alerts_one": "{{count}} line reports a problem.",
+      "alerts_other": "{{count}} lines report a problem.",
+      "alerts_few": "{{count}} lines report a problem.",
+      "alerts_many": "{{count}} lines report a problem.",
+      "seeQueue": "See To handle",
+      "allFine": "No line reports a problem."
     },
     "filter": {
       "status": "Статус",
@@ -6698,22 +6766,129 @@
       "ocspOff": "OCSP вимк.",
       "issued7d": "Видано за 7 днів:",
       "offline": "Офлайн",
-      "crossSigned": "Перехресно підписаний"
+      "crossSigned": "Перехресно підписаний",
+      "sub": "Authorities: {{total}}, roots: {{roots}}. CRL, OCSP and certificates issued over 7 days.",
+      "explore": "Explore",
+      "branch": "Branch {{name}}",
+      "bounded": "{{shown}} of {{total}} authorities shown, the most active trees first.",
+      "all": "See all ({{total}})",
+      "below_one": "{{count}} more below",
+      "below_other": "{{count}} more below",
+      "below_few": "{{count}} more below",
+      "below_many": "{{count}} more below"
     },
     "horizon": {
       "expiring": "Закінчуються",
       "expired": "Прострочені",
       "soonest": "Найближчі до закінчення",
       "tsaSigner": "Підписувач TSA",
-      "ocspResponder": "Респондер OCSP"
+      "ocspResponder": "Респондер OCSP",
+      "sub": "The certificates that expire next, soonest first.",
+      "expiresIn_one": "Expires in {{count}} day",
+      "expiresIn_other": "Expires in {{count}} days",
+      "expiresIn_few": "Expires in {{count}} days",
+      "expiresIn_many": "Expires in {{count}} days",
+      "elapsed": "{{percent}} % of the validity elapsed"
     },
     "activity": {
-      "all": "Показати всі"
+      "all": "Показати всі",
+      "sub": "The latest entries of the audit trail.",
+      "subOwn": "Your own latest operations."
     },
     "link": {
       "handled": "Елемент #{{id}} більше не очікує дій (статус: {{status}}).",
       "gone": "Елемента #{{id}} більше не існує."
     },
-    "refresh": "Оновити"
+    "refresh": "Оновити",
+    "intent": "What needs your action today, then the state of automation, of the hierarchy and of compliance.",
+    "actions": {
+      "issue": "Issue",
+      "newCa": "New CA",
+      "discovery": "Network discovery"
+    },
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "days_few": "{{count}} days",
+    "days_many": "{{count}} days",
+    "layout": {
+      "cards": "Cards",
+      "cardsLabel": "Cards: show, hide, reorder",
+      "dialogTitle": "Overview cards",
+      "dialogSub": "Show, hide and reorder.",
+      "saved": "The order and the hidden cards are saved with your account.",
+      "up": "Move {{name}} up",
+      "down": "Move {{name}} down",
+      "grip": "Move the card {{name}}: drag it, or use the arrow keys",
+      "gripHint": "Drag to move, or use the arrow keys",
+      "menu": "Options of the card {{name}}",
+      "menuTitle": "Card options",
+      "earlier": "Move earlier",
+      "later": "Move later",
+      "hide": "Hide the card",
+      "customize": "Customize the cards…",
+      "moved": "{{name}} is now card {{position}} of {{total}}.",
+      "hidden": "{{name}} is hidden. The Cards button shows it again."
+    },
+    "metrics": {
+      "label": "Key figures",
+      "cas_one": "{{count}} authority",
+      "cas_other": "{{count}} authorities",
+      "cas_few": "{{count}} authorities",
+      "cas_many": "{{count}} authorities",
+      "pending_one": "{{count}} pending request",
+      "pending_other": "{{count}} pending requests",
+      "pending_few": "{{count}} pending requests",
+      "pending_many": "{{count}} pending requests",
+      "ssh_one": "{{count}} SSH certificate",
+      "ssh_other": "{{count}} SSH certificates",
+      "ssh_few": "{{count}} SSH certificates",
+      "ssh_many": "{{count}} SSH certificates",
+      "queueSub": "To act on: {{act}}, to watch: {{watch}}",
+      "expiringSoon_one": "{{count}} expiring soon",
+      "expiringSoon_other": "{{count}} expiring soon",
+      "expiringSoon_few": "{{count}} expiring soon",
+      "expiringSoon_many": "{{count}} expiring soon",
+      "failures": "Failures today",
+      "failuresSub": "ACME, SCEP and EST, UTC day"
+    },
+    "cause": {
+      "acme_order_failed": "An ACME order ended invalid in the last 7 days",
+      "acme_client_renewal_failed": "The ACME client could not renew this certificate",
+      "approval_pending": "A request waits for a decision",
+      "scep_request_pending": "A SCEP enrolment waits for approval",
+      "key_recovery_pending": "A key recovery request waits for approval",
+      "crl_due": "The current CRL reaches its next update",
+      "crl_missing": "The CRL distribution point is on and no CRL exists",
+      "manual_renewal_due": "No automation renews this certificate",
+      "client_renewal_overdue": "Its client should have renewed it already",
+      "auto_renewal_blocked": "Auto-renewal cannot run: the issuing CA cannot sign",
+      "renewal_declined": "Auto-renewal was declined for this certificate",
+      "ca_expiring": "The certificates it issued are to be moved before it expires",
+      "deploy_binding_left_behind": "A deployment still serves the previous certificate",
+      "https_binding_left_behind": "The HTTPS listener still serves the previous certificate",
+      "truststore_expiring": "A trust anchor to replace in the trust store"
+    },
+    "trend": {
+      "sub_one": "Certificates issued, revoked and expired per day, last {{count}} day.",
+      "sub_other": "Certificates issued, revoked and expired per day, last {{count}} days.",
+      "sub_few": "Certificates issued, revoked and expired per day, last {{count}} days.",
+      "sub_many": "Certificates issued, revoked and expired per day, last {{count}} days.",
+      "period": "Period shown",
+      "short": "{{count}} d",
+      "day": "Day",
+      "quiet_one": "No certificate was issued, revoked or expired over the last {{count}} day.",
+      "quiet_other": "No certificate was issued, revoked or expired over the last {{count}} days.",
+      "quiet_few": "No certificate was issued, revoked or expired over the last {{count}} days.",
+      "quiet_many": "No certificate was issued, revoked or expired over the last {{count}} days.",
+      "alt_one": "Certificate activity over {{count}} day: {{issued}} issued, {{revoked}} revoked, {{expired}} expired.",
+      "alt_other": "Certificate activity over {{count}} days: {{issued}} issued, {{revoked}} revoked, {{expired}} expired.",
+      "alt_few": "Certificate activity over {{count}} days: {{issued}} issued, {{revoked}} revoked, {{expired}} expired.",
+      "alt_many": "Certificate activity over {{count}} days: {{issued}} issued, {{revoked}} revoked, {{expired}} expired.",
+      "keys": "Chart: the left and right arrow keys read it day by day"
+    },
+    "states": {
+      "sub": "Certificates by state. Each line opens its list.",
+      "alt": "{{total}} certificates: {{valid}} valid, {{expiring}} expiring, {{expired}} expired, {{revoked}} revoked."
+    }
   }
 }

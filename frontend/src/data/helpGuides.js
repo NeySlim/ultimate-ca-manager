@@ -13,36 +13,48 @@ export const helpGuides = {
     content: `
 ## Overview
 
-The Overview is the home page: six independent cards over the live data of your PKI. Each card loads on its own and shows its own loading, empty, error or missing-permission state.
+The Overview is the home page: a strip of four figures, then independent cards over the live data of your PKI. Each card loads on its own and shows its own loading, empty, error or missing-permission state.
+
+## Figures
+Four figures head the page: the certificates (with the number of authorities and, when there are any, the pending requests and the SSH certificates), the items to handle (split between what to act on and what to watch), the expired certificates (with those expiring soon), and the ACME, SCEP and EST failures of the current UTC day. Certificates and Expired open the certificate list; the two others lead to their card when it is shown. A figure the server did not give reads as a dash.
 
 ## Cards
 
 ### To handle
-The six most urgent items, critical first, each linking to its record. With the right to read the trust store, the trust store certificates that expire within 90 days or have already expired are listed too (the expired ones as critical). A folded tier gives the total per kind; the four renewal kinds open the certificate list.
+The six most urgent interventions, critical first, then by due date; **Show the others** lists the rest. Each row has two lines: the name, which opens the record, with its type, then the cause. On the right, the delay ("in 12 days", "overdue by 6 months") with the exact date under it, and a button: **Renew** for a manual renewal, **Retry** for a renewal the ACME client failed, **Publish now** for a CRL due or missing, each with the matching write permission; any other row, or a row without that permission, has a link to its record. The chips above the list filter by type and carry the total of each. What needs no action today (certificates their client renews, authorities and trust anchors still far from expiry) is counted on a line of its own, **Show** unfolds it; a critical item is never put there. With the right to read the trust store, the trust store certificates that expire within 90 days or have already expired are listed too (the expired ones as critical).
 
 ### Automation health
-Per protocol (ACME, SCEP, EST), the daily successes and failures and the last operation, plus the scheduler state and, while the TSA is enabled, the state of its signer: a warning while the CA certificate signs, since those tokens do not satisfy RFC 3161. With the right to read settings, three more lines tell whether email, webhooks and auto-renewal are set up: a setting that is not configured is information, not an alert; email configured but disabled or incomplete, or webhooks with none active, show as alerts.
+Per protocol (ACME, SCEP, EST), the successes and failures of the current UTC day and of the period, the last operation, the last status, and a curve of the daily figures when there are any. Below, the scheduler state and, while the TSA is enabled, the state of its signer: a warning while the CA certificate signs, since those tokens do not satisfy RFC 3161. With the right to read settings, three more tiles tell whether email, webhooks and auto-renewal are set up: a setting that is not configured is information, not an alert; email configured but disabled or incomplete, or webhooks with none active, show as alerts. A line under the card counts the lines that report a problem.
 
 ### Hierarchy
-The authorities as a tree under their parent, with CRL and OCSP state, an offline or cross-signed mark, and the certificates each issued over 7 days. Each authority opens its page.
+At most ten authorities, whatever the installation holds: the trees that issued most over 7 days come first, then the largest, each authority under its parent with its CRL and OCSP state, an offline or cross-signed mark, and the certificates it issued over 7 days when there are any. An authority whose children are not all shown says how many are below. Each authority opens its page; **Explore** and **See all** open the Certificate Authorities page.
 
 ### Expiry horizon
-The expiring and expired counters, each opening its list, and the five certificates that expire next.
+The expiring and expired counters, each opening its list, and the six certificates that expire next. Each row gives the days left, coloured by urgency (7 days or less, 30 days or less, beyond), and a bar as long as the share of the validity already spent.
+
+### Certificate activity
+Certificates issued, revoked and expired per day, over 7, 15 or 30 days, as three curves with their totals under the chart. Pointing at the chart, or focusing it and pressing the left and right arrow keys, reads one day at a time. A period without any event shows a sentence instead of an empty chart.
+
+### Status distribution
+Valid, expiring, expired and revoked certificates as a ring around their total. Each line gives the count and the share of a state and opens the certificate list filtered on it.
 
 ### Compliance
-Live certificates by key algorithm and weakness: RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key. Each counter opens the matching list.
+Live certificates by key algorithm and weakness: RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key. Each figure that has a list opens it.
 
 ### Latest operations
-The five most recent operations. Without **read:audit** you only see your own events; with it, a link opens the whole trail on the Audit Logs page.
+The six most recent operations with their delay; the exact date shows when pointing at it. A **Live** mark shows while the live link is up. Without **read:audit** you only see your own events; with it, a link opens the whole trail on the Audit Logs page.
 
 ## Opening a filtered list
-Every counter that has a list opens the Certificates page filtered to exactly the certificates it counts. The filter appears as a chip above the table; remove it with its x.
+Every figure that has a list opens the Certificates page filtered to exactly the certificates it counts. The filter appears as a chip above the table; remove it with its x.
 
-## Choosing the cards
-Pick the **Operator**, **Manager** or **All cards** preset in the page header to choose which cards are shown. The layout is saved with your account and follows you across browsers.
+## Choosing and ordering the cards
+Pick the **Operator** or **Manager** preset in the page header, or open **Cards** to tick the cards to show, move them up and down, or apply a preset (**All cards** shows every card in the initial order). To move a card on the page itself, drag it by the grip at the left of its title onto the place of another card, or focus the grip and press an arrow key; the menu of a card also moves it or hides it. The order and the hidden cards are saved with your account and follow you across browsers.
+
+## Quick actions
+The header offers **Issue** (opens the certificate form), **New CA** and **Network discovery**, each shown only with the permission it needs.
 
 ## Refreshing
-Cards load when the page opens and reload on their own, without leaving the page, when certificates or CAs change, when the live link comes back and when you return to the tab; **Refresh** reloads them all at once. While the live link is down they reload once a minute. A card in error offers **Retry**. The connection icon in the top bar shows the state of the live link, and the status bar at the bottom shows the version and whether the service answers.
+Cards load when the page opens and reload on their own, without leaving the page, when certificates or CAs change, when the live link comes back and when you return to the tab; the refresh button of the header reloads them all at once. While the live link is down they reload once a minute. A card in error offers **Retry**. The connection icon in the top bar shows the state of the live link, and the status bar at the bottom shows the version and whether the service answers.
 `
   },
 

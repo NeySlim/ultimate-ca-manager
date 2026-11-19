@@ -62,7 +62,7 @@
 - **Hardening** -- Operator-configurable HSTS (Settings → Security or env override), trusted-proxy gating of client-cert headers, API key permissions capped to the creator's own; trusted proxies can be given as CIDR networks and, once proxy support is on, `X-Forwarded-*` headers are honoured only from them, so a client reaching the backend directly cannot spoof its address; the web interface and management API can be **restricted to listed IP addresses and networks** while PKI protocol endpoints stay reachable
 
 ### Operations & Monitoring
-- **Overview** -- Six independent cards (work queue, automation health, hierarchy, expiry horizon, compliance, latest operations) with layout presets saved per user, reloaded on their own when the data changes
+- **Overview** -- Four headline figures and eight independent cards (work queue with renew, retry and publish actions, automation health, hierarchy, expiry horizon, certificate activity, status distribution, compliance, latest operations), reordered by drag and drop or keyboard, with layout presets saved per user, reloaded on their own when the data changes
 - **Reports** -- Scheduled PDF reports, executive summaries, revoked certificates, custom templates
 - **Certificate Toolbox** -- SSL checker, CSR/cert decoder, key matcher, format converter
 - **Email Notifications** -- SMTP with STARTTLS or implicit TLS (port 465), **OAuth2 (XOAUTH2)** for Gmail, Outlook.com & Microsoft 365, customizable HTML/text templates, certificate expiry alerts with several day thresholds (one e-mail per threshold and validity period, escalating 30/14/7/1 style), optionally leaving out the certificates ACME clients renew themselves

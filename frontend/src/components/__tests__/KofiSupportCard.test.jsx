@@ -64,6 +64,18 @@ describe('KofiSupportCard', () => {
     expect(screen.getByText('kofi.message')).toBeInTheDocument()
   })
 
+  it('floats in a corner by default, and sits in the page flow when asked to', async () => {
+    const floating = renderCard('3.0')
+    await loadServerPrefs({})
+    expect(screen.getByLabelText('kofi.label').className).toMatch(/\bfixed\b/)
+    floating.unmount()
+    render(<MemoryRouter><KofiSupportCard version="3.0" inline /></MemoryRouter>)
+    const card = screen.getByLabelText('kofi.label')
+    expect(card.className).not.toMatch(/\b(fixed|absolute|sticky)\b/)
+    fireEvent.click(screen.getByLabelText('kofi.dismiss'))
+    await waitFor(() => expect(mocks.updatePreferences).toHaveBeenCalledWith(expect.objectContaining({ kofi_seen_version: '3.0' })))
+  })
+
   it('does not show for a non-admin', async () => {
     state.admin = false
     await loadServerPrefs({})

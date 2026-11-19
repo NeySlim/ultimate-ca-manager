@@ -1,6 +1,9 @@
 import { test, expect, createCA } from './support/fixtures'
 
-const CARDS = ['To handle', 'Automation health', 'Hierarchy', 'Expiry horizon', 'Compliance', 'Latest operations']
+const CARDS = [
+  'To handle', 'Automation health', 'Hierarchy', 'Expiry horizon', 'Certificate activity', 'Status distribution',
+  'Compliance', 'Latest operations',
+]
 
 test('the overview cards load their data', async ({ page, api }) => {
   const ca = await createCA(api)
@@ -20,13 +23,12 @@ test('a queue entry opens the object it names', async ({ page, api }) => {
   const ca = await createCA(api, { validityDays: 100 })
   await page.goto('/')
   const queue = page.getByRole('region', { name: 'To handle' })
-  // Six entries are shown folded, critical ones first: unfold to list them all, unless the
-  // account's saved preference already did
-  const fold = queue.getByRole('button', { name: /the totals per kind$/ })
+  await expect(queue.getByRole('heading', { name: 'To handle' })).toBeVisible()
   await expect(queue.getByRole('status')).toHaveCount(0)
-  if (await fold.getAttribute('aria-expanded') !== 'true') await fold.click()
-  await expect(fold).toHaveAttribute('aria-expanded', 'true')
-  const entry = queue.getByRole('link', { name: new RegExp(`^${ca.common_name} CA expiring`) })
+  // A CA still far from expiry is only to watch: those rows are folded apart from the interventions,
+  // where the same CA may also stand for its missing CRL
+  await queue.getByRole('button', { name: 'Show the rows to watch' }).click()
+  const entry = queue.locator('#overview-queue-watch').getByRole('link', { name: ca.common_name, exact: true })
   await expect(entry).toBeVisible()
   await entry.click()
 

@@ -164,8 +164,8 @@ export function AppShell() {
       {/* Optional what's-new window after an update (#308) */}
       <UpdatePopup />
 
-      {/* Ko-fi support card, once per version for admins */}
-      <KofiSupportCard />
+      {/* Ko-fi support card, once per version for admins; the overview shows it in its own flow */}
+      {activePage !== '' && activePage !== 'dashboard' && <KofiSupportCard />}
     </div>
   )
 }

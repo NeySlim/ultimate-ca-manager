@@ -116,7 +116,7 @@ export function NotificationProvider({ children }) {
 
   return (
     <NotificationContext.Provider value={value}>
-      <Toast.Provider swipeDirection="right">
+      <Toast.Provider swipeDirection="down">
         {children}
         
         {toasts.map(toast => (
@@ -143,7 +143,8 @@ export function NotificationProvider({ children }) {
           </Toast.Root>
         ))}
 
-        <Toast.Viewport className="fixed top-4 right-4 flex flex-col gap-3 w-96 max-w-[calc(100vw-2rem)] z-[300] outline-none" />
+        {/* Bottom centre, above the status bar: a toast never covers a page header's commands */}
+        <Toast.Viewport className="fixed bottom-10 left-1/2 -translate-x-1/2 flex flex-col gap-3 w-96 max-w-[calc(100vw-2rem)] z-[300] outline-none" />
       </Toast.Provider>
 
       {/* Confirm Dialog */}

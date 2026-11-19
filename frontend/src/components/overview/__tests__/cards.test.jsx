@@ -6,12 +6,14 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k, o) => (o?.defa
 const api = vi.hoisted(() => ({
   getQueue: vi.fn(), getHealth: vi.fn(), getCompliance: vi.fn(), getIssuance: vi.fn(),
   getStats: vi.fn(), getAll: vi.fn(), getNext: vi.fn(), getActivity: vi.fn(), can: vi.fn(),
+  getDashStats: vi.fn(), getTrend: vi.fn(),
 }))
 vi.mock('../../../services', () => ({
   overviewService: { getQueue: api.getQueue, getHealth: api.getHealth, getCompliance: api.getCompliance, getIssuance: api.getIssuance },
   certificatesService: { getStats: api.getStats },
   casService: { getAll: api.getAll },
-  dashboardService: { getNextExpirations: api.getNext, getActivityLog: api.getActivity },
+  dashboardService: { getNextExpirations: api.getNext, getActivityLog: api.getActivity,
+    getStats: api.getDashStats, getCertificateTrend: api.getTrend },
 }))
 vi.mock('../../../hooks/useWebSocket', () => ({
   useWebSocket: () => ({ connectionState: 'connected' }),
@@ -19,7 +21,7 @@ vi.mock('../../../hooks/useWebSocket', () => ({
 }))
 vi.mock('../../../hooks/usePermission', () => ({ usePermission: () => ({ hasPermission: api.can }) }))
 
-import { QueueCard, ComplianceCard, HealthCard, HierarchyCard, HorizonCard, ActivityCard } from '..'
+import { QueueCard, ComplianceCard, HealthCard, HierarchyCard, HorizonCard, ActivityCard, TrendCard, StatesCard } from '..'
 
 const show = (ui) => render(<MemoryRouter>{ui}</MemoryRouter>)
 const item = (i) => ({ kind: 'manual_renewal_due', tier: 'warning', id: i, label: `cert-${i}`, due_at: null, href_hint: `/certificates/${i}` })
@@ -40,6 +42,8 @@ describe('card states', () => {
     ['hierarchy', HierarchyCard, api.getAll, []],
     ['horizon', HorizonCard, api.getStats, { total: 0 }],
     ['activity', ActivityCard, api.getActivity, { activity: [] }],
+    ['trend', TrendCard, api.getTrend, { trend: [{ date: '2026-11-19', issued: 0, revoked: 0, expired: 0 }] }],
+    ['states', StatesCard, api.getDashStats, { valid: 0, expiring_soon: 0, expired: 0, revoked: 0 }],
   ]
   it.each(cases)('%s: loading, empty, error with retry, missing permission', async (id, Card, fetcher, empty) => {
     fetcher.mockReturnValueOnce(new Promise(() => {}))
@@ -63,7 +67,7 @@ describe('card states', () => {
 })
 
 describe('queue card', () => {
-  it('lists 6 rows, folds the totals per kind, and each row opens its href_hint', async () => {
+  it('lists 6 rows, gives the totals per type as chips, and each row opens its href_hint', async () => {
     api.getQueue.mockResolvedValue({ data: {
       items: [1, 2, 3, 4, 5, 6, 7, 8].map(item), counts: { manual_renewal_due: 8, crl_due: 2 }, total: 10,
       filter_hints: { manual_renewal_due: { renewal: 'manual_renewal_due' } },
@@ -73,7 +77,8 @@ describe('queue card', () => {
     expect(screen.queryByText('cert-7')).toBeNull()
     expect(screen.getByText('cert-6').closest('a').getAttribute('href')).toBe('/certificates/6')
     expect(screen.getByTestId('queue-total').textContent).toBe('10')
-    expect(screen.getByLabelText('overview.queue.perKind').textContent).toContain('2')
+    expect(screen.getByText('overview.queue.group.crl').closest('button').textContent).toContain('2')
+    expect(screen.getByText('overview.queue.group.renew').closest('button').textContent).toContain('8')
     const toList = screen.getAllByRole('link').find((a) => a.getAttribute('href') === '/certificates?renewal=manual_renewal_due')
     expect(toList).toBeTruthy()
     fireEvent.click(screen.getByText('overview.queue.unfold'))
@@ -91,7 +96,7 @@ describe('queue card preference', () => {
     expect(screen.queryByText('cert-8')).toBeNull()
     view.rerender(<MemoryRouter><QueueCard defaultOpen /></MemoryRouter>)
     expect(await screen.findByText('cert-8')).toBeTruthy()
-    expect(screen.getByText('overview.queue.fold').getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('overview.queue.less').getAttribute('aria-expanded')).toBe('true')
   })
 })
 
@@ -115,12 +120,28 @@ describe('compliance card', () => {
     expect(screen.getByText('RSA 2048').closest('a').getAttribute('href')).toBe('/certificates?live=true&key_algo=RSA+2048')
   })
 
+  it('a tile is a warning above zero, fine at zero, and neutral for a plain count; each algorithm has its bar', async () => {
+    api.getCompliance.mockResolvedValue({ data: {
+      total: 10, by_key_algorithm: [{ key_algo: 'RSA 2048', count: 4 }, { key_algo: 'EC P-256', count: 6 }],
+      counters: { rsa_below_3072: entry(4, null), weak_signature_hash: entry(0, null), no_private_key: entry(3, null) },
+    } })
+    show(<ComplianceCard />)
+    const tone = async (name) => (await screen.findByTestId(`compliance-${name}`)).querySelector('.ov-tile-value').className
+    expect(await tone('rsa_below_3072')).toContain('is-warn')
+    expect(await tone('weak_signature_hash')).toContain('is-good')
+    expect(await tone('no_private_key')).not.toMatch(/is-(warn|good)/)
+    for (const name of ['rsa_below_3072', 'weak_signature_hash', 'no_private_key']) {
+      expect(screen.getByTestId(`compliance-${name}`).querySelector('svg')).not.toBeNull()
+    }
+    expect(screen.getAllByTestId('algo-bar').map((b) => b.style.width)).toEqual(['40%', '60%'])
+  })
+
   it('shows a dash, not zero, for a figure the response lacks', async () => {
     api.getCompliance.mockResolvedValue({ data: { total: 3, counters: { rsa_below_3072: {} }, by_key_algorithm: [] } })
     show(<ComplianceCard />)
-    const row = (await screen.findByText('overview.compliance.rsa_below_3072')).parentElement
-    expect(row.textContent).toContain('–')
-    expect(row.textContent.replace('overview.compliance.rsa_below_3072', '')).toBe('–')
+    const tile = await screen.findByTestId('compliance-rsa_below_3072')
+    expect(tile.textContent.replace('overview.compliance.rsa_below_3072', '')).toBe('–')
+    expect(tile.querySelector('.is-warn, .is-good')).toBeNull()
   })
 })
 
@@ -131,7 +152,7 @@ describe('missing figures read as a dash on every card', () => {
     api.getAll.mockResolvedValue({ data: [{ id: 1, refid: 'r', descr: 'Root' }], meta: {} })
     const a = show(<HierarchyCard />)
     expect((await screen.findByText('Root')).closest('a').textContent).toContain('overview.hierarchy.issued7d –')
-    expect(a.container.querySelector('a[href="/cas"]').textContent).toBe('–')
+    expect(screen.getByTestId('hierarchy-total').textContent).toBe('–')
     a.unmount()
     show(<HorizonCard />)
     expect((await screen.findByText('overview.horizon.expiring')).parentElement.textContent).toContain('–')
