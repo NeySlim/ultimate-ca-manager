@@ -66,19 +66,34 @@ def material(app, create_ca, create_cert, auth_client):
             db.session.commit()
 
 
-def _recovery_url(app, auth_client, cert_id):
+def _set_dual_control(app, value):
+    """Set the dual-control setting, return its previous value (None when absent)."""
     from models import SystemConfig
     with app.app_context():
         row = SystemConfig.query.filter_by(key='key_recovery_dual_control').first()
-        if not row:
-            row = SystemConfig(key='key_recovery_dual_control', value='')
-            db.session.add(row)
-        row.value = 'false'
+        previous = row.value if row else None
+        if value is None:
+            if row:
+                db.session.delete(row)
+        else:
+            if not row:
+                row = SystemConfig(key='key_recovery_dual_control', value='')
+                db.session.add(row)
+            row.value = value
         db.session.commit()
-    r = auth_client.post(f'/api/v2/certificates/{cert_id}/key-recovery', json={'reason': 'shape'})
-    assert r.status_code == 201, r.data
-    rid = r.get_json()['data']['id']
-    assert auth_client.post(f'/api/v2/key-recovery/{rid}/approve', json={}).status_code == 200
+        return previous
+
+
+def _recovery_url(app, auth_client, cert_id):
+    # Dual control is off only while the request is approved; the shared setting is put back.
+    previous = _set_dual_control(app, 'false')
+    try:
+        r = auth_client.post(f'/api/v2/certificates/{cert_id}/key-recovery', json={'reason': 'shape'})
+        assert r.status_code == 201, r.data
+        rid = r.get_json()['data']['id']
+        assert auth_client.post(f'/api/v2/key-recovery/{rid}/approve', json={}).status_code == 200
+    finally:
+        _set_dual_control(app, previous)
     return f'/api/v2/key-recovery/{rid}/recover'
 
 
@@ -353,15 +368,18 @@ def test_the_shapes_the_interface_sends_are_unchanged(auth_client, material, app
         assert r.status_code == 200, (r.request.path, r.data[:200])
 
 
-def test_a_permission_refusal_keeps_its_code(app, material, create_user):
-    create_user(username='shape_viewer', role='viewer')
-    client = app.test_client()
-    assert client.post('/api/v2/auth/login', json={
-        'username': 'shape_viewer', 'password': 'TestPass123!'}).status_code == 200
-    r = client.post(f"/api/v2/csrs/{material['csr']}/export", json={'format': 'key', 'password': PASSWORD})
-    assert r.status_code == 403
-    r = client.post(f"/api/v2/cas/{material['ca']}/export", json={'format': 'key', 'password': PASSWORD})
-    assert r.status_code == 403
+def test_a_permission_refusal_keeps_its_code(app, auth_client, material, create_user):
+    viewer = create_user(username='shape_viewer', role='viewer')
+    try:
+        client = app.test_client()
+        assert client.post('/api/v2/auth/login', json={
+            'username': 'shape_viewer', 'password': 'TestPass123!'}).status_code == 200
+        r = client.post(f"/api/v2/csrs/{material['csr']}/export", json={'format': 'key', 'password': PASSWORD})
+        assert r.status_code == 403
+        r = client.post(f"/api/v2/cas/{material['ca']}/export", json={'format': 'key', 'password': PASSWORD})
+        assert r.status_code == 403
+    finally:
+        assert auth_client.delete(f"/api/v2/users/{viewer['id']}").status_code == 200
 
 
 # 6. A password given with a PEM that carries the key encrypts that key
