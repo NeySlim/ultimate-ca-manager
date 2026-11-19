@@ -29,6 +29,7 @@ from utils.datetime_utils import utc_now
 
 from . import container
 from .container import ContainerError
+from .errors import BackupSchemaError
 
 logger = logging.getLogger(__name__)
 
@@ -225,3 +226,15 @@ class DecryptMixin:
         plaintext = aesgcm.decrypt(nonce, ciphertext, None)
 
         return plaintext.decode()
+
+    def _decrypt_archived_key(self, encrypted_data: Dict[str, str], master_key: bytes,
+                              what: str) -> str:
+        """The key of ``what`` (e.g. "CA x"); an archive error naming it when it does not decrypt.
+
+        The library's message is not passed on: the archive is the fault, not the server."""
+        try:
+            return self._decrypt_private_key(encrypted_data, master_key)
+        except Exception as exc:
+            raise BackupSchemaError(
+                f"Invalid backup: the private key of {what} could not be decrypted. Nothing "
+                "has been changed.") from exc

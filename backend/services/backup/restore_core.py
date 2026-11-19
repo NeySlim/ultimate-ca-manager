@@ -1176,10 +1176,8 @@ class RestoreCoreMixin:
             # Decrypt private key if encrypted
             prv_pem = None
             if ca_data.get('private_key_pem_encrypted'):
-                prv_pem = self._decrypt_private_key(
-                    ca_data['private_key_pem_encrypted'],
-                    master_key
-                )
+                prv_pem = self._decrypt_archived_key(
+                    ca_data['private_key_pem_encrypted'], master_key, f"CA {ca_data['refid']}")
             prv_b64 = base64.b64encode(prv_pem.encode()).decode() if prv_pem else None
             if prv_b64:
                 from security.encryption import encrypt_private_key
@@ -1233,10 +1231,9 @@ class RestoreCoreMixin:
             # Decrypt private key if encrypted
             prv_pem = None
             if cert_data.get('private_key_pem_encrypted'):
-                prv_pem = self._decrypt_private_key(
-                    cert_data['private_key_pem_encrypted'],
-                    master_key
-                )
+                prv_pem = self._decrypt_archived_key(
+                    cert_data['private_key_pem_encrypted'], master_key,
+                    f"certificate {cert_data['refid']}")
 
             prv_b64 = None
             if prv_pem:
