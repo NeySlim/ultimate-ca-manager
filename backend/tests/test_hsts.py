@@ -131,3 +131,31 @@ class TestHstsHeaderInResponse:
             _set_cfg('hsts_include_subdomains', 'false')
         r = client.get('/api/v2/health')
         assert r.headers['Strict-Transport-Security'] == 'max-age=3600'
+
+
+
+class _Unreadable:
+    """SystemConfig.query on a database that cannot answer."""
+    def __get__(self, obj, owner):
+        raise RuntimeError('database is locked')
+
+
+@pytest.fixture
+def unreadable():
+    SystemConfig.query = _Unreadable()
+    try:
+        yield
+    finally:
+        del SystemConfig.query
+
+
+class TestHstsUnreadableSetting:
+    def test_no_header_when_the_setting_cannot_be_read(self, app, unreadable):
+        """A database that cannot answer may hold hsts_enabled=false: no header then."""
+        with app.app_context():
+            assert build_hsts_header() is None
+
+    def test_the_environment_still_decides_when_it_is_set(self, app, monkeypatch, unreadable):
+        monkeypatch.setenv('UCM_HSTS_ENABLED', '1')
+        with app.app_context():
+            assert build_hsts_header() == 'max-age=31536000; includeSubDomains'

@@ -658,3 +658,25 @@ def test_a_lock_held_past_the_jobs_wait_still_concludes_it_as_its_error(crossing
     job_id = crossing_job.start()
     row = _final(crossing_job.app, job_id)
     assert (row['state'], row['reason']) == ('failed', 'error'), row
+
+
+def test_no_hsts_header_while_its_setting_cannot_be_read(restore_held, monkeypatch):
+    """hsts_enabled=false in the database: a 503 of the held window sends no HSTS either."""
+    for var in ('UCM_HSTS_ENABLED', 'ucm_hsts_enabled'):
+        monkeypatch.delenv(var, raising=False)
+    app, path = restore_held.app, restore_held.path
+    other = sqlite3.connect(path)  # written outside the gate's guard, as before the restore
+    other.execute("DELETE FROM system_config WHERE key = 'hsts_enabled'")
+    other.execute("INSERT INTO system_config (key, value) VALUES ('hsts_enabled', 'false')")
+    other.commit()
+    other.close()
+    try:
+        with restore_held.hold():
+            refused = restore_held.admin.get('/api/v2/groups')
+        assert refused.status_code == 503, refused.data
+        assert 'Strict-Transport-Security' not in refused.headers
+    finally:
+        other = sqlite3.connect(path)
+        other.execute("DELETE FROM system_config WHERE key = 'hsts_enabled'")
+        other.commit()
+        other.close()
