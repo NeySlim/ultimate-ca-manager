@@ -11,7 +11,7 @@ from models.email_notification import SMTPConfig
 URL = '/api/v2/settings/email'
 _COLUMNS = ('enabled', 'smtp_host', 'smtp_port', 'smtp_from', 'smtp_use_tls', 'smtp_use_ssl',
             'smtp_auth', 'smtp_auth_method', 'smtp_user', 'smtp_oauth_provider',
-            'smtp_oauth_client_id')
+            'smtp_oauth_client_id', '_smtp_oauth_client_secret', '_smtp_oauth_refresh_token')
 
 
 def _patch(client, data):
@@ -82,3 +82,30 @@ def test_authentication_is_still_attempted_when_it_is_on(app, auth_client, resto
                          content_type='application/json')
     assert r.status_code == 200, r.data[:300]
     smtp_server.login.assert_called_once()
+
+
+def test_none_erases_the_saved_oauth2_secrets(app, auth_client, restore_smtp):
+    _oauth_then_none(auth_client)
+    with app.app_context():
+        row = SMTPConfig.query.first()
+        assert row.smtp_oauth_client_secret in (None, '')
+        assert row.smtp_oauth_refresh_token in (None, '')
+        assert row.smtp_oauth_client_id in (None, '')
+
+
+def test_auth_off_with_a_stored_user_and_password_sends_no_auth(app, auth_client, restore_smtp, smtp_server):
+    assert _patch(auth_client, {
+        'enabled': True, 'smtp_host': 'smtp.example.com', 'smtp_port': 25,
+        'from_email': 'ucm@example.com', 'smtp_security': 'none',
+        'smtp_auth_method': 'password', 'smtp_username': 'u@example.com',
+        'smtp_password': 'pw-value-1',
+    }).status_code == 200
+    assert _patch(auth_client, {'smtp_auth': False}).status_code == 200
+    with app.app_context():
+        row = SMTPConfig.query.first()
+        assert row.smtp_user and row.smtp_password  # still stored: only the guard stops AUTH
+    r = auth_client.post(URL + '/test', data=json.dumps({'email': 'admin@example.com'}),
+                         content_type='application/json')
+    assert r.status_code == 200, r.data[:300]
+    smtp_server.login.assert_not_called()
+    smtp_server.docmd.assert_not_called()

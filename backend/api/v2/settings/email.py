@@ -183,10 +183,11 @@ def update_email_settings():
     if 'smtp_auth_method' in data:
         method = data['smtp_auth_method']
         if method == 'none':
-            # Authentication off: no method is left stored, so no OAuth2 setting
-            # outlives the choice (#322)
+            # Authentication off: no method and no OAuth2 secret is left stored (#322)
             smtp.smtp_auth = False
             smtp.smtp_auth_method = 'password'
+            stale += [k for k in ('smtp_oauth_client_secret', 'smtp_oauth_client_id',
+                                  'smtp_oauth_refresh_token') if k not in stale]
         elif method in ('password', 'oauth2'):
             smtp.smtp_auth_method = method
             if 'smtp_auth' not in data:
