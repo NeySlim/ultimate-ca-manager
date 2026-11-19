@@ -295,7 +295,7 @@ def test_a_certificate_of_a_ca_that_never_was_the_profile_s_renews_nothing(
 # --- Invariant 3: the operator cuts at once; a revoked former CA renews nothing --------------------
 
 @pytest.mark.parametrize('binding', ['tls', 'xml-dsig', 'kerberos'])
-@pytest.mark.parametrize('cut', ['removed', 'ca-revoked', 'ca-deleted'])
+@pytest.mark.parametrize('cut', ['removed', 'ca-revoked'])
 def test_a_cut_closes_the_former_ca_s_renewals_at_once(
         app, client, auth_client, world, realm_a, directory, request, listener, binding, cut):
     old, key = _old(app, client, world, realm_a, True)
@@ -310,11 +310,7 @@ def test_a_cut_closes_the_former_ca_s_renewals_at_once(
             db.session.get(CA, world['cas']['A']['id']).revoked = True
             db.session.commit()
     else:
-        with app.app_context():
-            # A deleted CA: its record gone, its refid left on the list
-            ca = db.session.get(CA, world['cas']['A']['id'])
-            ca.refid, keep = str(uuid.uuid4()), ca.refid
-            db.session.commit()
+        raise AssertionError(cut)
     try:
         floor = _top_audit(app)
         r = _renew_by(binding, client, world, realm_a, old, key)
@@ -332,9 +328,26 @@ def test_a_cut_closes_the_former_ca_s_renewals_at_once(
         with app.app_context():
             ca = db.session.get(CA, world['cas']['A']['id'])
             ca.revoked = False
-            if cut == 'ca-deleted':
-                ca.refid = keep
             db.session.commit()
+
+
+def test_a_deleted_former_ca_renews_nothing_and_is_shown_without_name(app, auth_client, world, request):
+    """A CA deleted since stays on the list until removed, named None, and counts nowhere: neither as an
+    issuer of renewals nor in the listener's trust (its certificates are gone with it)."""
+    from services.windows_profiles import former_cas, listener_former_refids
+    _data, _a2, profile_id = request.getfixturevalue('moved_by_api')
+    gone = str(uuid.uuid4())
+    with app.app_context():
+        profile = _profile('c04-a')
+        profile.renewal_ca_refids = json.dumps([gone, world['cas']['A']['refid']])
+        db.session.commit()
+        assert [ca.refid for ca in former_cas(profile)] == [world['cas']['A']['refid']]
+        assert listener_former_refids() == [world['cas']['A']['refid']]
+    data = auth_client.get(f'{URL}/{profile_id}').get_json()['data']
+    assert {'refid': gone, 'name': None} in data['renewal_cas']
+    # The operator removes it like any other
+    assert _remove_former(auth_client, profile_id, [world['cas']['A']['refid']])['renewal_cas'] == [
+        {'refid': world['cas']['A']['refid'], 'name': 'C04 A CA'}]
 
 
 # --- Invariant 4: the listener trusts a former CA for WSTEP renewal only ----------------------------
