@@ -4002,7 +4002,7 @@
     "groupBaseDn": "グループ検索ベース",
     "groupBaseDnHelp": "グループを検索する場所。空の場合: ディレクトリに存在すればベース DN の親を使い、その検索が拒否されたらベース DN を使います。存在しなければベース DN を使います。",
     "ldapNestedGroups": "Nested groups and primary group (Active Directory)",
-    "ldapNestedGroupsHelp": "Also reads the groups that contain the user's groups, at any depth, and the primary group (Domain Users). Active Directory only: on another directory, or when the search fails, the sign-in is refused.",
+    "ldapNestedGroupsHelp": "Also reads the groups that contain the user's groups, at any depth, and the primary group (usually RID 513, \"Domain Users\" on an English-language domain). The parent groups are searched under the Group Search Base (when empty, where a member search would look). Active Directory only: when role mapping rules or required groups exist, the sign-in is refused on another directory or when the search fails.",
     "ldapNestedGroupsWarning": "Gives the roles of parent groups: a user receives the role of every group above their own. Check the role mapping rules and required groups before saving.",
     "isDefault": "デフォルトログインプロバイダー",
     "lastUsed": "最終使用日時",

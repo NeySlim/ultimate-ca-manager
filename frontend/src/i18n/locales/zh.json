@@ -3999,7 +3999,7 @@
     "groupBaseDn": "组搜索基准",
     "groupBaseDnHelp": "搜索组的位置。留空：若目录包含基准 DN 的上级则使用上级，该搜索被拒绝时使用基准 DN；否则使用基准 DN。",
     "ldapNestedGroups": "Nested groups and primary group (Active Directory)",
-    "ldapNestedGroupsHelp": "Also reads the groups that contain the user's groups, at any depth, and the primary group (Domain Users). Active Directory only: on another directory, or when the search fails, the sign-in is refused.",
+    "ldapNestedGroupsHelp": "Also reads the groups that contain the user's groups, at any depth, and the primary group (usually RID 513, \"Domain Users\" on an English-language domain). The parent groups are searched under the Group Search Base (when empty, where a member search would look). Active Directory only: when role mapping rules or required groups exist, the sign-in is refused on another directory or when the search fails.",
     "ldapNestedGroupsWarning": "Gives the roles of parent groups: a user receives the role of every group above their own. Check the role mapping rules and required groups before saving.",
     "isDefault": "默认登录提供者",
     "lastUsed": "最近使用",
