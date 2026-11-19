@@ -36,7 +36,7 @@ from utils.db_transaction import safe_commit
 from utils.sanitize import sanitize_filename
 from utils.datetime_utils import utc_now, utc_isoformat
 from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message, revocable
-from utils.export_options import json_boolean, query_boolean
+from utils.export_options import json_boolean, query_boolean, check_export_request
 
 logger = logging.getLogger(__name__)
 
@@ -302,6 +302,10 @@ def export_user_certificate(cert_id):
     cert = _get_certificate_for_auth_cert(auth_cert)
     if not cert:
         return error_response('Certificate data not found', 404)
+
+    shape_err = check_export_request()
+    if shape_err:
+        return shape_err
 
     if request.method == 'POST' and request.is_json:
         data = request.get_json()

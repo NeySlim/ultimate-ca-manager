@@ -33,7 +33,7 @@ from utils.key_codec import load_pem_bytes
 from utils.cert_issuer import (
     authority_key_identifier_hex, certificate_signed_by, is_self_signed,
 )
-from utils.export_options import json_boolean, query_boolean
+from utils.export_options import json_boolean, query_boolean, check_export_request
 from services.key_export_audit import audit_key_export
 from services.cert.related_pair import row_certificate
 from utils import related_cert
@@ -245,6 +245,10 @@ def export_all_certificates():
     """Export all certificates in various formats"""
 
     # Support both GET (query params) and POST (body) for security
+    shape_err = check_export_request()
+    if shape_err:
+        return shape_err
+
     if request.method == 'POST' and request.is_json:
         data = request.get_json()
         export_format = data.get('format', 'pem').lower()
@@ -322,6 +326,10 @@ def export_certificate(cert_id):
         return error_response('Certificate data not available', 400)
 
     # Support both GET (query params) and POST (body) for security
+    shape_err = check_export_request()
+    if shape_err:
+        return shape_err
+
     if request.method == 'POST' and request.is_json:
         data = request.get_json()
         export_format = data.get('format', 'pem').lower()

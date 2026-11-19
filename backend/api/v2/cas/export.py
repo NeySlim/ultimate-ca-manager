@@ -9,6 +9,7 @@ import logging
 
 from auth.unified import require_auth, has_permission
 from utils.response import success_response, error_response
+from utils.export_options import check_export_request
 from utils.sanitize import sanitize_filename
 from utils.datetime_utils import utc_isoformat
 from models import CA, Certificate, db
@@ -99,6 +100,10 @@ def _audit_key_export(ca, export_format, password):
 def export_all_cas():
     """Export all CA certificates in various formats"""
 
+    shape_err = check_export_request()
+    if shape_err:
+        return shape_err
+
     if request.method == 'POST' and request.is_json:
         data = request.get_json()
         export_format = data.get('format', 'pem').lower()
@@ -165,6 +170,11 @@ def export_ca(ca_id):
 
     if not ca.crt:
         return error_response('CA certificate data not available', 400)
+
+    shape_err = check_export_request(
+        'Password and private key exports must use POST with a JSON body, not the query string')
+    if shape_err:
+        return shape_err
 
     if request.method == 'POST' and request.is_json:
         data = request.get_json()

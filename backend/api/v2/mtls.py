@@ -37,7 +37,7 @@ from utils.response import success_response, error_response, created_response
 from utils.export_password import validate_export_password
 from utils.db_transaction import safe_commit
 from utils.sanitize import sanitize_filename
-from utils.export_options import json_boolean, query_boolean
+from utils.export_options import json_boolean, query_boolean, check_export_request
 
 logger = logging.getLogger(__name__)
 
@@ -350,6 +350,10 @@ def download_mtls_certificate(cert_id):
     """Download mTLS certificate as PEM or PKCS12"""
 
     user = g.current_user
+    shape_err = check_export_request('PKCS12 export requires POST with JSON body (format, password)')
+    if shape_err:
+        return shape_err
+
     if request.method == 'POST' and request.is_json:
         data = request.get_json() or {}
         fmt = str(data.get('format', 'pem')).lower()
