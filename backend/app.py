@@ -430,6 +430,10 @@ def create_app(config_name=None):
         path = unquote(request.path)
         for pattern, options in _cors_resources:
             if pattern.match(path):
+                if not request.headers.get('Origin'):
+                    # Not a CORS request: nothing to allow, no database read (health probes)
+                    resp.vary.add('Origin')
+                    return resp
                 from utils.public_endpoints import get_cors_origins
                 # Literal origins only (no '*', no pattern): an Origin is echoed only when listed
                 origins = [o for o in get_cors_origins() if not probably_regex(o)]

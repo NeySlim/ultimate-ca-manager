@@ -107,3 +107,15 @@ def test_a_path_outside_the_resources_has_no_headers(app, client, base_url):
     origin = base_url(LATE)
     assert client.get('/health', headers={'Origin': origin}).headers.get(
         'Access-Control-Allow-Origin') is None
+
+
+def test_a_request_without_origin_reads_no_allowlist(app, client, base_url, monkeypatch):
+    import utils.public_endpoints as public_endpoints
+    base_url(LATE)
+
+    def refused():
+        raise AssertionError('the allowlist was read for a request without Origin')
+    monkeypatch.setattr(public_endpoints, 'get_cors_origins', refused)
+    r = client.get(URL)
+    assert r.headers.get('Access-Control-Allow-Origin') is None
+    assert 'Origin' in r.headers.get('Vary', '')
