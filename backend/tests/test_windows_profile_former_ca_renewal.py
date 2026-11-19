@@ -475,3 +475,55 @@ def test_a_worker_that_loaded_a_former_ca_keeps_its_certificates_aside_after_a_r
     client.post('/api/v2/auth/login/mtls',
                 environ_base={'peercert': old.public_bytes(serialization.Encoding.DER)})
     assert seen == []
+
+
+# --- A save that changes the listener's trust restarts the service: admin:system ---------------------
+
+def _scoped(auth_client, permissions):
+    r = auth_client.post('/api/v2/account/apikeys', json={'name': 'c20-scope', 'permissions': permissions})
+    assert r.status_code == 201, r.data
+    data = r.get_json()['data']
+    return data['id'], {'X-API-Key': data['key']}
+
+
+def test_a_save_that_changes_the_listener_trust_needs_admin_system(
+        app, auth_client, world, create_ca, restarts, mtls_on_a2):
+    """write:xcep alone edits a profile, never the CAs the TLS listener trusts (that restarts it)."""
+    a2 = create_ca(cn='C20 A2b CA')
+    mtls_on_a2(a2['refid'])
+    with app.app_context():
+        profile_id = _profile('c04-a').id
+    key_id, headers = _scoped(auth_client, ['read:xcep', 'write:xcep'])
+    try:
+        r = app.test_client().put(f'{URL}/{profile_id}', headers=headers, json={'issuing_ca_refid': a2['refid']})
+        assert r.status_code == 403, r.get_json()
+        assert 'admin:system' in r.get_json()['message']
+        assert restarts == []
+        with app.app_context():
+            profile = _profile('c04-a')
+            assert (profile.issuing_ca_refid, profile.renewal_ca_refids or '[]') == (world['cas']['A']['refid'], '[]')
+        # A save that leaves the listener's trust as it is stays open to write:xcep
+        r = app.test_client().put(f'{URL}/{profile_id}', headers=headers, json={'allowed_ad_group': None})
+        assert r.status_code == 200, r.get_json()
+    finally:
+        auth_client.delete(f'/api/v2/account/apikeys/{key_id}')
+        with app.app_context():
+            profile = _profile('c04-a')
+            profile.issuing_ca_refid, profile.renewal_ca_refids = world['cas']['A']['refid'], '[]'
+            db.session.commit()
+
+
+def test_a_removal_from_the_list_by_write_xcep_alone_is_refused(app, auth_client, world, moved_by_api, restarts):
+    _data, _a2, profile_id = moved_by_api
+    restarts.clear()
+    key_id, headers = _scoped(auth_client, ['read:xcep', 'write:xcep'])
+    try:
+        r = app.test_client().put(f'{URL}/{profile_id}', headers=headers, json={'renewal_ca_refids': []})
+        assert r.status_code == 403 and 'admin:system' in r.get_json()['message']
+        r = app.test_client().delete(f'{URL}/{profile_id}', headers=headers)
+        assert r.status_code == 403 and 'admin:system' in r.get_json()['message']
+        assert restarts == []
+        with app.app_context():
+            assert json.loads(_profile('c04-a').renewal_ca_refids) == [world['cas']['A']['refid']]
+    finally:
+        auth_client.delete(f'/api/v2/account/apikeys/{key_id}')

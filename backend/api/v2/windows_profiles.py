@@ -372,6 +372,21 @@ def _queue_listener_restart(trusted_before):
     return False
 
 
+# The same scope as the mTLS settings, whose save restarts the listener as well
+LISTENER_TRUST_PERMISSION = 'admin:system'
+
+
+def _listener_trust_refused(trusted_before):
+    """A 403 when this change moves the CAs the TLS listener trusts (a service restart) and the
+    account lacks the scope of the mTLS settings; None otherwise. The change is rolled back."""
+    if (windows_profiles.listener_former_refids() == trusted_before
+            or has_permission(LISTENER_TRUST_PERMISSION, getattr(g, 'permissions', None) or [])):
+        return None
+    db.session.rollback()
+    return error_response('This change alters the CAs the TLS listener trusts for Windows renewal and '
+                          f'restarts the service: permission required: {LISTENER_TRUST_PERMISSION}', 403)
+
+
 def _listener_restart(rolling):
     """``(needs_restart, message)`` once the change is committed, the local restart asked for."""
     if rolling is None:
@@ -568,6 +583,9 @@ def update_windows_profile(profile_id):
         return taken
     profile.updated_by = _actor()
     _store_templates(profile)
+    refused = _listener_trust_refused(trusted_before)
+    if refused is not None:
+        return refused
     rolling = _queue_listener_restart(trusted_before)
     ok, err = safe_commit(logger, 'Failed to update the Windows enrollment profile')
     if not ok:
@@ -603,6 +621,9 @@ def delete_windows_profile(profile_id):
         problem = _recompose_keytab()
         if problem:
             return error_response(problem[0], problem[1])
+    refused = _listener_trust_refused(trusted_before)
+    if refused is not None:
+        return refused
     rolling = _queue_listener_restart(trusted_before)
     ok, err = safe_commit(logger, 'Failed to delete the Windows enrollment profile')
     if not ok:
