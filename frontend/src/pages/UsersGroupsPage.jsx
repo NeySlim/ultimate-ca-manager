@@ -107,6 +107,10 @@ export default function UsersGroupsPage() {
   const [linkProviderId, setLinkProviderId] = useState('')
   const [linkSaving, setLinkSaving] = useState(false)
   const [linkRemovePassword, setLinkRemovePassword] = useState(false)
+  const [linkTenant, setLinkTenant] = useState('')
+  // Expected tenant of an attachment to a multi-tenant provider: { user, row, tenant }
+  const [tenantEdit, setTenantEdit] = useState(null)
+  const [tenantSaving, setTenantSaving] = useState(false)
 
   // Pagination
   const [page, setPage] = useState(1)
@@ -264,6 +268,9 @@ export default function UsersGroupsPage() {
   const rowName = (row) => row.provider_name || t('users.sso.deletedProvider')
   // A provider already attached is reset or detached from the account's page, not attached twice
   const attachable = linkProviders.filter(p => !ssoRows(linkTarget).some(r => r.provider_id === p.id))
+  const tenantsOf = (p) => (p && Array.isArray(p.oauth2_tenants) ? p.oauth2_tenants : [])
+  const linkTenants = tenantsOf(attachable.find(p => String(p.id) === linkProviderId))
+  const tenantOptions = (tenants) => tenants.map(tid => ({ value: tid, label: tid }))
 
   const afterSsoChange = async (id) => {
     await loadData()
@@ -273,6 +280,7 @@ export default function UsersGroupsPage() {
   const handleOpenLinkModal = async (user) => {
     setLinkTarget(user)
     setLinkProviderId('')
+    setLinkTenant('')
     setLinkRemovePassword(false)
     setShowLinkModal(true)
     try {
@@ -285,7 +293,7 @@ export default function UsersGroupsPage() {
   }
 
   const handleSubmitLink = async () => {
-    if (!linkTarget || !linkProviderId) return
+    if (!linkTarget || !linkProviderId || (linkTenants.length > 0 && !linkTenant)) return
     // Removing the local password leaves the account to its providers alone: confirmed first.
     if (linkRemovePassword) {
       const confirmed = await showConfirm(t('users.sso.confirmRemovePassword', { name: linkTarget.username }),
@@ -294,10 +302,9 @@ export default function UsersGroupsPage() {
     }
     setLinkSaving(true)
     try {
-      await usersService.attachSso(linkTarget.id, {
-        provider_id: Number(linkProviderId),
-        remove_password: linkRemovePassword,
-      })
+      const body = { provider_id: Number(linkProviderId), remove_password: linkRemovePassword }
+      if (linkTenants.length > 0) body.expected_tenant = linkTenant
+      await usersService.attachSso(linkTarget.id, body)
       showSuccess(t('users.sso.attachSuccess', { name: linkTarget.username }))
       const id = linkTarget.id
       setShowLinkModal(false)
@@ -325,7 +332,36 @@ export default function UsersGroupsPage() {
     }
   }
 
+  // A multi-tenant provider: the reset (or a pending row) names the tenant that may adopt it,
+  // the former identity's by default
+  const openTenantEdit = (user, row) => {
+    const former = (row.external_id || '').split('/')[0].toLowerCase()
+    const tenants = row.provider_tenants || []
+    const tenant = tenants.includes(former) ? former : (row.expected_tenant || '')
+    setTenantEdit({ user, row, tenant })
+  }
+
+  const handleSubmitTenant = async () => {
+    if (!tenantEdit || !tenantEdit.tenant) return
+    const { user, row, tenant } = tenantEdit
+    setTenantSaving(true)
+    try {
+      await usersService.resetSsoIdentity(user.id, row.id, { expected_tenant: tenant })
+      showSuccess(t(row.external_id ? 'users.sso.resetSuccess' : 'users.sso.tenantSet', { name: user.username }))
+      setTenantEdit(null)
+      await afterSsoChange(user.id)
+    } catch (error) {
+      showError(error.message || t('users.sso.resetFailed'))
+    } finally {
+      setTenantSaving(false)
+    }
+  }
+
   const handleResetSso = async (user, row) => {
+    if ((row.provider_tenants || []).length > 0) {
+      openTenantEdit(user, row)
+      return
+    }
     const confirmed = await showConfirm(
       t('users.sso.confirmReset', { name: user.username, provider: rowName(row) }),
       { title: t('users.sso.resetIdentity'), confirmText: t('users.sso.resetIdentity') })
@@ -909,12 +945,22 @@ export default function UsersGroupsPage() {
                   <Badge variant={{ bound: 'success', pending: 'orange', orphan: 'secondary' }[row.state] || 'default'} size="sm">
                     {t(`users.sso.state.${row.state}`)}
                   </Badge>
+                  {row.state === 'pending' && (row.provider_tenants || []).length > 0 && (
+                    <span className="truncate font-mono text-xs text-text-secondary">
+                      {row.expected_tenant ? t('users.sso.expectedTenantShort', { tenant: row.expected_tenant }) : t('users.sso.noExpectedTenant')}
+                    </span>
+                  )}
                 </div>
                 {canWrite('users') && (
                   <div className="flex gap-1">
                     {row.external_id && (
                       <Button type="button" size="sm" variant="secondary" onClick={() => handleResetSso(selectedUser, row)}>
                         <ArrowCounterClockwise size={14} /> {t('users.sso.resetIdentity')}
+                      </Button>
+                    )}
+                    {!row.external_id && (row.provider_tenants || []).length > 0 && (
+                      <Button type="button" size="sm" variant="secondary" onClick={() => openTenantEdit(selectedUser, row)}>
+                        {t('users.sso.setTenant')}
                       </Button>
                     )}
                     <Button type="button" size="sm" variant="secondary" onClick={() => handleDetachSso(selectedUser, row)}>
@@ -1282,6 +1328,16 @@ export default function UsersGroupsPage() {
               }))}
             />
           )}
+          {linkTenants.length > 0 && (
+            <Select
+              label={t('users.sso.expectedTenant')}
+              value={linkTenant}
+              onChange={(val) => setLinkTenant(val)}
+              placeholder={t('users.sso.selectTenant')}
+              helperText={t('users.sso.expectedTenantHelp')}
+              options={tenantOptions(linkTenants)}
+            />
+          )}
           <label className="flex items-start gap-2 text-sm text-text-secondary cursor-pointer">
             <input
               type="checkbox"
@@ -1295,11 +1351,45 @@ export default function UsersGroupsPage() {
             <Button type="button" variant="secondary" onClick={() => { setShowLinkModal(false); setLinkTarget(null) }}>
               {t('common.cancel')}
             </Button>
-            <Button type="button" onClick={handleSubmitLink} disabled={!linkProviderId || linkSaving} loading={linkSaving}>
+            <Button type="button" onClick={handleSubmitLink} disabled={!linkProviderId || (linkTenants.length > 0 && !linkTenant) || linkSaving} loading={linkSaving}>
               <LinkSimple size={16} /> {t('users.sso.attach')}
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Expected tenant of an attachment to a multi-tenant provider, set on a reset or a pending row */}
+      <Modal
+        open={!!tenantEdit}
+        onOpenChange={(open) => { if (!open) setTenantEdit(null) }}
+        title={tenantEdit?.row?.external_id ? t('users.sso.resetIdentity') : t('users.sso.setTenant')}
+        size="md"
+      >
+        {tenantEdit && (
+          <div className="p-4 space-y-4">
+            {tenantEdit.row.external_id && (
+              <p className="text-sm text-text-secondary">
+                {t('users.sso.confirmReset', { name: tenantEdit.user.username, provider: rowName(tenantEdit.row) })}
+              </p>
+            )}
+            <Select
+              label={t('users.sso.expectedTenant')}
+              value={tenantEdit.tenant}
+              onChange={(val) => setTenantEdit({ ...tenantEdit, tenant: val })}
+              placeholder={t('users.sso.selectTenant')}
+              helperText={t('users.sso.expectedTenantHelp')}
+              options={tenantOptions(tenantEdit.row.provider_tenants || [])}
+            />
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="secondary" onClick={() => setTenantEdit(null)}>
+                {t('common.cancel')}
+              </Button>
+              <Button type="button" onClick={handleSubmitTenant} disabled={!tenantEdit.tenant || tenantSaving} loading={tenantSaving}>
+                {tenantEdit.row.external_id ? t('users.sso.resetIdentity') : t('users.sso.setTenant')}
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Member Transfer Modal */}

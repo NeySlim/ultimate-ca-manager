@@ -103,6 +103,20 @@ def provider_tenants(provider):
         raise OIDCValidationError('the accepted tenants of this provider are not readable') from exc
 
 
+def provider_role_tenants(provider):
+    """The accepted tenants whose role and group claims ``provider`` honours; () for none, and for
+    a stored value that does not read as tenant ids within the accepted ones."""
+    raw = getattr(provider, 'oauth2_role_tenants', None)
+    if not isinstance(raw, (str, list)) or raw == '':
+        return ()
+    try:
+        honoured = normalize_tenants(json.loads(raw) if isinstance(raw, str) else raw)
+        accepted = provider_tenants(provider)
+    except (TypeError, ValueError, OIDCValidationError):
+        return ()
+    return tuple(t for t in honoured if t in accepted)
+
+
 def has_tenants(provider):
     """Whether ``provider`` is set up for several tenants (its list may still be unreadable)."""
     try:
@@ -533,6 +547,8 @@ def verify_id_token(id_token, provider, expected_nonce, verify=True, ssl_verify=
     if tenants:
         # The template comes from the authority's discovery document, never from the token
         template = _get_discovery(provider, issuer, ssl_verify)['issuer']
+        # Checked on the document used: one cached while the provider had a single issuer is not a template
+        _check_issuer_template(template, issuer)
         tid = _token_tenant(claims)
     _check_discovery_algorithm(provider, issuer, ssl_verify, algorithm)
 

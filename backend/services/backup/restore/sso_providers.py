@@ -34,8 +34,9 @@ def _archived(backup_data) -> List[Dict[str, Any]]:
 
 
 def refuse_archived_shared_types(backup_data) -> None:
-    """BackupSchemaError, before any write, when the archive itself holds two providers of one type
-    or a provider whose type is not one the product knows (an absent type is oauth2)."""
+    """BackupSchemaError, before any write, when the archive itself holds two providers of one type,
+    a provider whose type is not one the product knows (an absent type is oauth2), or accepted
+    tenants a sign-in would refuse."""
     from models.sso import SSOProvider
     rows = backup_data.get(SECTION)
     # Every row the restorer would write is checked: one without a text name escapes _archived
@@ -56,6 +57,8 @@ def refuse_archived_shared_types(backup_data) -> None:
                 f"Cannot restore: the archive's SSO provider {row['name']!r} has the type "
                 f"{kind!r}, which is none of {', '.join(SSOProvider.TYPES)}. Nothing has been "
                 "changed.")
+        if kind == 'oauth2':
+            _refuse_archived_tenants(row)
         by_type.setdefault(kind, []).append(row['name'])
     for kind, names in by_type.items():
         if len(names) > 1:
@@ -64,6 +67,43 @@ def refuse_archived_shared_types(backup_data) -> None:
                 f"{', '.join(repr(n) for n in names)}. UCM uses one SSO provider per type: restore "
                 "it on the release that wrote it, keep one provider of each type, then take a new "
                 "backup. Nothing has been changed.")
+
+
+def _archived_tenants(row: Dict[str, Any], field: str) -> List[str]:
+    """The tenant ids ``field`` of an archived row lists; ValueError when it does not read as such."""
+    import json
+    from services.oidc_id_token import normalize_tenants
+    raw = row.get(field)
+    if raw is None or raw == '':
+        return []
+    if not isinstance(raw, str):
+        raise ValueError(field)
+    return normalize_tenants(json.loads(raw))
+
+
+def _refuse_archived_tenants(row: Dict[str, Any]) -> None:
+    """BackupSchemaError for tenants a sign-in would refuse or misread: unreadable, without ID
+    token verification, or role tenants outside the accepted ones."""
+    name = row['name']
+    try:
+        tenants = _archived_tenants(row, 'oauth2_tenants')
+    except (TypeError, ValueError):
+        raise BackupSchemaError(
+            f"Cannot restore: the accepted tenants of the archive's SSO provider {name!r} do not "
+            "read as a list of tenant ids (GUIDs). Nothing has been changed.") from None
+    try:
+        honoured = _archived_tenants(row, 'oauth2_role_tenants')
+    except (TypeError, ValueError):
+        honoured = None
+    if honoured is None or any(t not in tenants for t in honoured):
+        raise BackupSchemaError(
+            f"Cannot restore: the role tenants of the archive's SSO provider {name!r} are not a "
+            "list of its accepted tenants. Nothing has been changed.")
+    if tenants and row.get('id_token_verify', True) is False:
+        raise BackupSchemaError(
+            f"Cannot restore: the archive's SSO provider {name!r} lists accepted tenants with ID "
+            "token verification off, and accepted tenants require ID token verification. "
+            "Nothing has been changed.")
 
 
 def _key_of(fields: Dict[str, Any]) -> Optional[str]:

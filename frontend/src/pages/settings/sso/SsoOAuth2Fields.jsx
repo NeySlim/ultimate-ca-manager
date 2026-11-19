@@ -104,6 +104,17 @@ export default function SsoOAuth2Fields({
               helperText={t('sso.oidcTenantsHelp')}
             />
           )}
+          {showTenants && (
+            <Textarea
+              label={t('sso.oidcRoleTenants')}
+              value={formData.oauth2_role_tenants}
+              onChange={e => handleChange('oauth2_role_tenants', e.target.value)}
+              placeholder="00000000-0000-0000-0000-000000000000"
+              rows={2}
+              mono
+              helperText={t('sso.oidcRoleTenantsHelp')}
+            />
+          )}
           {hasTenants && !formData.id_token_verify && (
             <p className="text-xs text-status-warning">{t('sso.oidcTenantsNeedVerify')}</p>
           )}

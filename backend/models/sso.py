@@ -55,6 +55,8 @@ class SSOProvider(db.Model):
     # Microsoft Entra multi-tenant: JSON array of accepted tenant ids (GUIDs). Empty: one issuer.
     # Migration 173.
     oauth2_tenants = db.Column(db.Text)
+    # Those of them whose role claims role_mapping reads (migration 173); other tenants get default_role
+    oauth2_role_tenants = db.Column(db.Text)
     # Explicit compatibility opt-out. OIDC ID tokens are verified by default.
     id_token_verify = db.Column(db.Boolean, default=True, nullable=False)
     oauth2_verify_ssl = db.Column(db.Boolean, default=True)
@@ -134,13 +136,16 @@ class SSOProvider(db.Model):
             val = ''
         return f"{self.provider_type}:{val}" if val else None
 
-    def _tenant_list(self):
-        """The accepted tenants as stored (an unreadable value shows as none; sign-in refuses it)."""
-        try:
-            value = json.loads(self.oauth2_tenants) if self.oauth2_tenants else []
-        except ValueError:
+    @staticmethod
+    def _tenant_list(raw):
+        """A stored tenant list: [] for none, the raw text when it does not read as a list."""
+        if not raw:
             return []
-        return value if isinstance(value, list) else []
+        try:
+            value = json.loads(raw)
+        except ValueError:
+            return raw
+        return value if isinstance(value, list) else raw
 
     # Encrypted property accessors for secrets
     @property
@@ -233,7 +238,8 @@ class SSOProvider(db.Model):
                 'oauth2_scopes': json.loads(self.oauth2_scopes) if self.oauth2_scopes else [],
                 'oauth2_issuer': self.oauth2_issuer,
                 'oauth2_jwks_uri': self.oauth2_jwks_uri,
-                'oauth2_tenants': self._tenant_list(),
+                'oauth2_tenants': self._tenant_list(self.oauth2_tenants),
+                'oauth2_role_tenants': self._tenant_list(self.oauth2_role_tenants),
                 # Set false only for legacy providers that cannot publish JWKS.
                 'id_token_verify': self.id_token_verify is not False,
                 'oauth2_client_secret': '***' if self.oauth2_client_secret else None,

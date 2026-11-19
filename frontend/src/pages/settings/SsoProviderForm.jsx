@@ -69,6 +69,9 @@ const requiredGroupsToText = (raw) => {
   return raw
 }
 
+// A stored list one per line; a value the server could not read is shown as it is
+const tenantLines = (value) => (Array.isArray(value) ? value.join('\n') : (value || ''))
+
 export default function SsoProviderForm({ provider, forcedType, onSave, onCancel }) {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
@@ -120,8 +123,9 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     oauth2_ca_bundle: '',
     oauth2_issuer: provider?.oauth2_issuer || '',
     oauth2_jwks_uri: provider?.oauth2_jwks_uri || '',
-    // Entra multi-tenant: accepted tenant ids, one per line
-    oauth2_tenants: (provider?.oauth2_tenants || []).join('\n'),
+    // Entra multi-tenant: accepted tenant ids, and those whose roles are honoured, one per line
+    oauth2_tenants: tenantLines(provider?.oauth2_tenants),
+    oauth2_role_tenants: tenantLines(provider?.oauth2_role_tenants),
     id_token_verify: provider?.id_token_verify ?? true,
     // SAML
     saml_metadata_url: provider?.saml_metadata_url || '',
@@ -252,8 +256,10 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     if (data.provider_type === 'oauth2') {
       data.oauth2_scopes = data.oauth2_scopes.split(/\s+/).filter(Boolean)
       data.oauth2_tenants = (data.oauth2_tenants || '').split(/[\s,;]+/).filter(Boolean)
+      data.oauth2_role_tenants = (data.oauth2_role_tenants || '').split(/[\s,;]+/).filter(Boolean)
     } else {
       delete data.oauth2_tenants
+      delete data.oauth2_role_tenants
     }
     if (data.provider_type === 'ldap') {
       const groups = (data.ldap_required_groups || '').split(',').map(s => s.trim()).filter(Boolean)

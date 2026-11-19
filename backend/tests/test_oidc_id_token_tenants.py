@@ -202,3 +202,11 @@ def test_normalize_tenants_lowers_dedups_and_refuses_anything_else():
     for bad in (['*'], ['common'], ['organizations'], [42], 42, {'a': 1}, [f'{{{TENANT_A}}}']):
         with pytest.raises(ValueError):
             normalize_tenants(bad)
+
+
+def test_a_discovery_cached_for_one_issuer_does_not_serve_tenants(monkeypatch):
+    """The template rule holds for the document used, cached ones included (another node's cache)."""
+    _serve(monkeypatch, issuer=AUTHORITY)
+    single = _provider(oauth2_tenants=None)
+    assert _verify(_claims(TENANT_A, iss=AUTHORITY), single)['tid'] == TENANT_A
+    _refused(_claims(TENANT_A, iss=AUTHORITY), 'not a {tenantid} template')

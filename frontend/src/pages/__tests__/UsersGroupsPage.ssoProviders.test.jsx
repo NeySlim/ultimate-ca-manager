@@ -16,7 +16,12 @@ const mocks = vi.hoisted(() => ({
   showSuccess: vi.fn(), showError: vi.fn(), showConfirm: vi.fn(), attachSso: vi.fn(), detachSso: vi.fn(),
   resetSsoIdentity: vi.fn(),
   users: [],
+  providers: null,
 }))
+const TWO_PROVIDERS = [
+  { id: 1, name: 'idp-a', provider_type: 'oauth2' },
+  { id: 2, name: 'idp-b', display_name: 'IdP B', provider_type: 'saml' },
+]
 const stable = vi.hoisted(() => ({
   i18n: {
     t: (key, opts) => (opts && opts.provider ? `${key}:${opts.provider}` : key),
@@ -73,10 +78,7 @@ vi.mock('../../services', () => ({
   casService: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
   accountService: {},
   ssoService: {
-    getProviders: () => Promise.resolve({ data: [
-      { id: 1, name: 'idp-a', provider_type: 'oauth2' },
-      { id: 2, name: 'idp-b', display_name: 'IdP B', provider_type: 'saml' },
-    ] }),
+    getProviders: () => Promise.resolve({ data: mocks.providers || TWO_PROVIDERS }),
   },
 }))
 
@@ -125,6 +127,7 @@ describe('UsersGroupsPage single sign-on providers of an account', () => {
     mocks.attachSso.mockResolvedValue({ data: {} })
     mocks.detachSso.mockResolvedValue({ data: {} })
     mocks.resetSsoIdentity.mockResolvedValue({ data: {} })
+    mocks.providers = null
   })
 
   it('lists each provider with its state; only a bound one offers a reset', async () => {
@@ -203,5 +206,50 @@ describe('UsersGroupsPage single sign-on providers of an account', () => {
     await waitFor(() => expect(mocks.showConfirm).toHaveBeenCalledWith(
       'users.sso.confirmReset:idp-a', expect.anything()))
     await waitFor(() => expect(mocks.resetSsoIdentity).toHaveBeenCalledWith(7, 11))
+  })
+
+  describe('a provider with accepted tenants (Microsoft Entra multi-tenant)', () => {
+    const A = '0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1'
+    const B = '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d'
+    const ENTRA = { id: 3, name: 'entra', provider_type: 'oauth2', oauth2_tenants: [A, B] }
+    const row = (over) => ({ id: 21, provider_id: 3, provider_name: 'entra', provider_type: 'oauth2',
+      provider_tenants: [A, B], expected_tenant: null, ...over })
+    const ENTRA_USER = (identity) => ({ ...LOCAL, id: 10, username: 'erin', auth_source: 'sso',
+      sso_identities: [identity] })
+
+    it('asks for the expected tenant when attaching, and only for that provider', async () => {
+      mocks.providers = [...TWO_PROVIDERS, ENTRA]
+      await open(LOCAL)
+      fireEvent.click(await screen.findByRole('button', { name: /users\.sso\.attach/ }))
+      await choose(1)
+      expect(screen.queryByLabelText('users.sso.expectedTenant')).toBeNull()
+      await choose(3)
+      const attach = screen.getAllByRole('button', { name: /users\.sso\.attach$/ }).pop()
+      expect(attach.disabled).toBe(true)
+      fireEvent.change(screen.getByLabelText('users.sso.expectedTenant'), { target: { value: B } })
+      fireEvent.click(attach)
+      await waitFor(() => expect(mocks.attachSso).toHaveBeenCalledWith(
+        9, { provider_id: 3, remove_password: false, expected_tenant: B }))
+    })
+
+    it('resets a bound identity keeping its former tenant unless another is chosen', async () => {
+      await open(ENTRA_USER(row({ external_id: `${B}/sub`, state: 'bound' })))
+      fireEvent.click(await screen.findByRole('button', { name: /users\.sso\.resetIdentity/ }))
+      const select = await screen.findByLabelText('users.sso.expectedTenant')
+      expect(select.value).toBe(B)
+      expect(mocks.showConfirm).not.toHaveBeenCalled()
+      fireEvent.change(select, { target: { value: A } })
+      fireEvent.click(screen.getAllByRole('button', { name: /users\.sso\.resetIdentity/ }).pop())
+      await waitFor(() => expect(mocks.resetSsoIdentity).toHaveBeenCalledWith(10, 21, { expected_tenant: A }))
+    })
+
+    it('sets the tenant of a pending attachment that has none', async () => {
+      await open(ENTRA_USER(row({ external_id: null, state: 'pending' })))
+      expect(await screen.findByText('users.sso.noExpectedTenant')).toBeTruthy()
+      fireEvent.click(screen.getByRole('button', { name: 'users.sso.setTenant' }))
+      fireEvent.change(await screen.findByLabelText('users.sso.expectedTenant'), { target: { value: A } })
+      fireEvent.click(screen.getAllByRole('button', { name: 'users.sso.setTenant' }).pop())
+      await waitFor(() => expect(mocks.resetSsoIdentity).toHaveBeenCalledWith(10, 21, { expected_tenant: A }))
+    })
   })
 })

@@ -61,15 +61,15 @@ def entra(app, monkeypatch):
         {'access_token': 'at', 'id_token': _token(KEY, state['claims'])}))
     monkeypatch.setattr(login_routes, 'safe_request_get', lambda *_a, **_k: _Response(state['userinfo']))
 
-    def claims(tid, sub):
+    def claims(tid, sub, **extra):
         now = int(time.time())
         return {'iss': TEMPLATE.replace('{tenantid}', tid), 'tid': tid, 'aud': 'ucm-client',
-                'sub': sub, 'exp': now + 300, 'iat': now, 'nonce': 'n'}
+                'sub': sub, 'exp': now + 300, 'iat': now, 'nonce': 'n', **extra}
 
-    def login(tid, sub, username):
-        state['claims'] = claims(tid, sub)
+    def login(tid, sub, username, email=None, **extra):
+        state['claims'] = claims(tid, sub, **extra)
         state['userinfo'] = {'sub': sub, 'preferred_username': username,
-                             'email': f'{username}@{tid[:8]}.example'}
+                             'email': email or f'{username}@{tid[:8]}.example'}
         client = app.test_client()
         with client.session_transaction() as s:
             s.update(sso_state='st', sso_provider_id=pid, sso_pkce_verifier='v', sso_nonce='n')
@@ -190,3 +190,210 @@ def test_a_single_tenant_provider_keeps_the_bare_subject(entra):
     entra.configure(oauth2_tenants=None)
     provider = db.session.get(SSOProvider, entra.pid)
     assert _extract_external_id(provider, {'sub': 'bare', OIDC_TENANT_KEY: TENANT_A}) == 'bare'
+
+
+def _attached(pid, username, email, **row):
+    """An account an administrator attached to the provider, not bound yet; ``row`` sets the
+    attachment's columns (its expected tenant)."""
+    user = User(username=username, email=email, role='admin', active=True,
+                password_hash='!SSO_NO_PASSWORD!')
+    user.sso_identities.append(UserSSOIdentity(provider_id=pid, **row))
+    db.session.add(user)
+    db.session.commit()
+
+
+def test_an_attachment_without_a_tenant_is_not_adopted_by_e_mail(entra):
+    """Another listed tenant's administrator chooses the e-mail of its users: no adoption by it."""
+    _attached(entra.pid, 'mt-boss', 'boss@corp.example')
+    location = entra(TENANT_B, 'sub-x', 'mt-intruder', email='boss@corp.example')
+    assert not location.endswith(OK) and 'sso_email_conflict' in location
+    assert entra.ids_of('mt-boss') == [None]
+    assert entra.ids_of('mt-intruder') is None
+
+
+def test_an_attachment_without_a_tenant_is_not_adopted_by_name(entra):
+    _attached(entra.pid, 'mt-boss2', 'boss2@corp.example')
+    location = entra(TENANT_B, 'sub-y', 'mt-boss2')
+    assert not location.endswith(OK) and 'sso_username_conflict' in location
+    assert entra.ids_of('mt-boss2') == [None]
+
+
+def test_an_attachment_is_adopted_from_its_expected_tenant_only(entra):
+    _attached(entra.pid, 'mt-chief', 'chief@corp.example', expected_tenant=TENANT_A)
+    location = entra(TENANT_B, 'sub-b', 'mt-other', email='chief@corp.example')
+    assert 'sso_email_conflict' in location
+    assert entra.ids_of('mt-chief') == [None] and entra.ids_of('mt-other') is None
+    detail = AuditLog.query.filter(AuditLog.action == 'login_failure').order_by(AuditLog.id.desc()).first()
+    assert f'it expects tenant {TENANT_A}' in detail.details
+    assert entra(TENANT_A, 'sub-a', 'mt-other', email='chief@corp.example').endswith(OK)
+    assert entra.ids_of('mt-chief') == [f'{TENANT_A}/sub-a'] and entra.ids_of('mt-other') is None
+
+
+def test_an_attachment_is_adopted_by_name_from_its_expected_tenant_only(entra):
+    _attached(entra.pid, 'mt-chief2', 'chief2@corp.example', expected_tenant=TENANT_A)
+    assert 'sso_username_conflict' in entra(TENANT_B, 'sub-b', 'mt-chief2')
+    assert entra.ids_of('mt-chief2') == [None]
+    assert entra(TENANT_A, 'sub-a', 'mt-chief2').endswith(OK)
+    assert entra.ids_of('mt-chief2') == [f'{TENANT_A}/sub-a']
+
+
+def test_an_expected_tenant_taken_off_the_list_adopts_nothing(entra):
+    """Read by the account resolution itself: the token check refuses that tenant first."""
+    from api.v2.sso.helpers import OIDC_TENANT_KEY
+    from api.v2.sso.ldap_routes import _resolve_sso_account
+    _attached(entra.pid, 'mt-gone', 'gone@corp.example', expected_tenant=TENANT_B)
+    identity = {'sub': 'sub-g', OIDC_TENANT_KEY: TENANT_B}
+    provider = db.session.get(SSOProvider, entra.pid)
+    assert _resolve_sso_account(provider, 'mt-gone', 'gone@corp.example', identity)[0] is not None
+    entra.configure(oauth2_tenants=f'["{TENANT_A}"]')
+    db.session.expire_all()
+    provider = db.session.get(SSOProvider, entra.pid)
+    user, row, _rebind, conflict, owner = _resolve_sso_account(
+        provider, 'mt-gone', 'gone@corp.example', identity)
+    assert user is None and row is None and conflict.username == 'mt-gone'
+    assert owner.username == 'mt-gone'
+
+
+def test_a_legacy_account_is_not_taken_by_name(entra):
+    """An account without row nor password is claimable by name by a single-issuer provider only."""
+    db.session.add(User(username='mt-legacy', email='legacy@corp.example', role='admin', active=True,
+                        password_hash='!SSO_NO_PASSWORD!', force_password_change=False))
+    db.session.commit()
+    try:
+        assert 'sso_username_conflict' in entra(TENANT_A, 'sub-l', 'mt-legacy')
+        assert entra.ids_of('mt-legacy') == []
+    finally:
+        User.query.filter_by(username='mt-legacy').delete()
+        db.session.commit()
+
+
+def _identity(username):
+    db.session.expire_all()
+    return User.query.filter_by(username=username).one().sso_identities[0]
+
+
+@pytest.fixture
+def plain(entra):
+    """Makes local accounts, removed after the test whether a provider was attached or not."""
+    from api.v2.users.crud import _purge_user_dependencies
+    made = []
+
+    def make(username):
+        db.session.add(User(username=username, email=f'{username}@corp.example', role='viewer',
+                            active=True, password_hash='x'))
+        db.session.commit()
+        made.append(username)
+        return User.query.filter_by(username=username).one().id
+    yield make
+    db.session.rollback()
+    for user in User.query.filter(User.username.in_(made)).all():
+        _purge_user_dependencies(user.id)
+        db.session.delete(user)
+    db.session.commit()
+
+
+@pytest.mark.parametrize('tenant', [TENANT_B.upper(), None], ids=['listed', 'none'])
+def test_attaching_sets_the_expected_tenant_from_the_list(entra, auth_client, plain, tenant):
+    uid = plain('mt-attach')
+    body = {'provider_id': entra.pid} if tenant is None else {'provider_id': entra.pid, 'expected_tenant': tenant}
+    r = auth_client.post(f'/api/v2/users/{uid}/sso-identities', json=body)
+    assert r.status_code == 201, r.get_json()
+    assert _identity('mt-attach').expected_tenant == (tenant.lower() if tenant else None)
+    shown = r.get_json()['data']['sso_identities'][0]
+    assert shown['expected_tenant'] == (tenant.lower() if tenant else None)
+    assert shown['provider_tenants'] == [TENANT_A, TENANT_B]
+
+
+@pytest.mark.parametrize('tenant', ['9188040d-6c67-4c5b-b112-36a304b66dad', 'common', 42],
+                         ids=['unlisted', 'word', 'number'])
+def test_attaching_refuses_a_tenant_off_the_list(entra, auth_client, plain, tenant):
+    uid = plain('mt-attach2')
+    r = auth_client.post(f'/api/v2/users/{uid}/sso-identities',
+                         json={'provider_id': entra.pid, 'expected_tenant': tenant})
+    assert r.status_code == 400
+    db.session.expire_all()
+    assert User.query.get(uid).sso_identities == []
+
+
+def test_an_expected_tenant_needs_a_provider_with_tenants(entra, auth_client, plain):
+    entra.configure(oauth2_tenants=None)
+    uid = plain('mt-attach3')
+    r = auth_client.post(f'/api/v2/users/{uid}/sso-identities',
+                         json={'provider_id': entra.pid, 'expected_tenant': TENANT_A})
+    assert r.status_code == 400 and 'accepted tenants' in r.get_json()['message']
+
+
+def test_a_reset_keeps_the_former_tenant_and_takes_another_listed_one(entra, auth_client):
+    assert entra(TENANT_A, 'sub-r', 'mt-reset').endswith(OK)
+    row = _identity('mt-reset')
+    uid, rid = row.user_id, row.id
+    reset = f'/api/v2/users/{uid}/sso-identities/{rid}/reset'
+    assert auth_client.post(reset).status_code == 200
+    assert (_identity('mt-reset').external_id, _identity('mt-reset').expected_tenant) == (None, TENANT_A)
+    # From another tenant the same name adopts nothing; from the former one it binds again
+    assert 'sso_username_conflict' in entra(TENANT_B, 'sub-r', 'mt-reset')
+    assert entra(TENANT_A, 'sub-r2', 'mt-reset').endswith(OK)
+    assert _identity('mt-reset').external_id == f'{TENANT_A}/sub-r2'
+    r = auth_client.post(reset, json={'expected_tenant': TENANT_B})
+    assert r.status_code == 200 and _identity('mt-reset').expected_tenant == TENANT_B
+    assert auth_client.post(reset, json={'expected_tenant': '9188040d-6c67-4c5b-b112-36a304b66dad'}) \
+        .status_code == 400
+    assert _identity('mt-reset').expected_tenant == TENANT_B
+
+
+def test_a_reset_of_a_former_tenant_taken_off_the_list_sets_none(entra, auth_client):
+    assert entra(TENANT_B, 'sub-o', 'mt-reset2').endswith(OK)
+    row = _identity('mt-reset2')
+    entra.configure(oauth2_tenants=f'["{TENANT_A}"]')
+    assert auth_client.post(f'/api/v2/users/{row.user_id}/sso-identities/{row.id}/reset').status_code == 200
+    assert (_identity('mt-reset2').external_id, _identity('mt-reset2').expected_tenant) == (None, None)
+
+
+def _role_of(username):
+    db.session.expire_all()
+    return User.query.filter_by(username=username).one().role
+
+
+def test_role_claims_are_read_from_the_honoured_tenants_only(entra):
+    """Each listed tenant's administrators assign the app roles of their users."""
+    entra.configure(role_mapping='{"UCM.Admin": "admin"}', default_role='viewer',
+                    oauth2_role_tenants=f'["{TENANT_A}"]')
+    assert entra(TENANT_A, 'sub-ra', 'mt-roles-a', roles=['UCM.Admin']).endswith(OK)
+    assert _role_of('mt-roles-a') == 'admin'
+    assert entra(TENANT_B, 'sub-rb', 'mt-roles-b', roles=['UCM.Admin']).endswith(OK)
+    assert _role_of('mt-roles-b') == 'viewer'
+
+
+def test_a_tenant_whose_roles_are_not_honoured_changes_no_role_on_sign_in(entra):
+    entra.configure(role_mapping='{"UCM.Admin": "admin", "UCM.Reader": "auditor"}',
+                    default_role='viewer', sync_role_on_login=True,
+                    oauth2_role_tenants=f'["{TENANT_A}"]')
+    assert entra(TENANT_B, 'sub-sb', 'mt-sync-b', roles=['UCM.Reader']).endswith(OK)
+    assert _role_of('mt-sync-b') == 'viewer'
+    User.query.filter_by(username='mt-sync-b').one().role = 'operator'
+    db.session.commit()
+    assert entra(TENANT_B, 'sub-sb', 'mt-sync-b', roles=['UCM.Admin']).endswith(OK)
+    assert _role_of('mt-sync-b') == 'operator'
+    # The same claim from an honoured tenant syncs the role
+    assert entra(TENANT_A, 'sub-sa', 'mt-sync-a', roles=['UCM.Reader']).endswith(OK)
+    assert entra(TENANT_A, 'sub-sa', 'mt-sync-a', roles=['UCM.Admin']).endswith(OK)
+    assert _role_of('mt-sync-a') == 'admin'
+
+
+def test_group_claims_follow_the_same_rule(entra):
+    """Group values (object ids, or names a tenant chooses) are mapped like app roles."""
+    group = '5b6c7d8e-9f01-4a2b-8c3d-4e5f60718293'
+    entra.configure(role_mapping=f'{{"{group}": "admin"}}', default_role='viewer',
+                    oauth2_role_tenants=f'["{TENANT_A}"]')
+    assert entra(TENANT_B, 'sub-gb', 'mt-group-b', groups=[group]).endswith(OK)
+    assert _role_of('mt-group-b') == 'viewer'
+    assert entra(TENANT_A, 'sub-ga', 'mt-group-a', groups=[group]).endswith(OK)
+    assert _role_of('mt-group-a') == 'admin'
+
+
+def test_without_a_default_role_a_tenant_whose_roles_are_not_honoured_is_refused(entra):
+    entra.configure(role_mapping='{"UCM.Admin": "admin"}', default_role=None,
+                    oauth2_role_tenants=f'["{TENANT_A}"]')
+    assert 'sso_no_default_role' in entra(TENANT_B, 'sub-nd', 'mt-nodefault', roles=['UCM.Admin'])
+    detail = AuditLog.query.filter(AuditLog.action == 'login_failure').order_by(AuditLog.id.desc()).first()
+    assert 'role claims of its tenant are not honoured' in detail.details

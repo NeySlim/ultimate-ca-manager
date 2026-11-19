@@ -26,7 +26,7 @@ from . import saml_sp
 from .account_state import (
     SSO_NO_PASSWORD, bounded, describe_conflict, legacy_sso_account, orphan_text, own_identity,
 )
-from .helpers import _clear_ldap_failed_attempts, _ldap_attempt_failed, _release_ldap_attempt, _reserve_ldap_attempt, _resolve_mapped_roles, _resolve_role, _build_ldap_tls, _decrypt_ldap_password, sso_admission, _mapping_rules, _external_groups, oidc_external_id
+from .helpers import _clear_ldap_failed_attempts, _ldap_attempt_failed, _release_ldap_attempt, _reserve_ldap_attempt, _resolve_mapped_roles, _resolve_role, _build_ldap_tls, _decrypt_ldap_password, sso_admission, _mapping_rules, _external_groups, oidc_external_id, OIDC_TENANT_KEY, roles_honoured
 from .diagnostics import GroupSource, refusal_diagnosis
 
 @bp.route('/api/v2/sso/ldap/login', methods=['POST'])
@@ -400,11 +400,42 @@ def _claimable(user, provider):
     return next((row for row in _same_idp_orphans(user, provider) if row.external_id is None), None)
 
 
-def _adoptable(user, provider):
+def _tenant_bar(row, provider, external_data):
+    """Why an identity of a multi-tenant provider may not adopt ``row`` by name or e-mail, else
+    None: only the tenant the administrator set on it, while the provider still accepts it,
+    since each listed tenant's administrators choose their users' names and e-mails."""
+    from services.oidc_id_token import OIDCValidationError, has_tenants, provider_tenants
+    if row is None or not has_tenants(provider):
+        return None
+    expected = row.expected_tenant
+    if not expected:
+        return 'no expected tenant is set on it'
+    try:
+        accepted = provider_tenants(provider)
+    except OIDCValidationError:
+        accepted = ()
+    if expected.lower() not in accepted:
+        return f'its expected tenant {expected} is no longer accepted by the provider'
+    tid = (external_data or {}).get(OIDC_TENANT_KEY)
+    if not isinstance(tid, str) or tid.lower() != expected.lower():
+        return f'it expects tenant {expected}, not {bounded(str(tid))}'
+    return None
+
+
+def _adoptable_row(user, provider, external_data):
+    """The row of ``user`` this identity may take (:func:`_claimable`, within its tenant)."""
+    row = _claimable(user, provider)
+    return row if row is not None and _tenant_bar(row, provider, external_data) is None else None
+
+
+def _adoptable(user, provider, external_data):
     """Whether an identity whose stable id matches nobody may claim ``user`` by name.
     An account attached to other providers only is never claimed: an administrator
-    attaches this one to it."""
-    return _claimable(user, provider) is not None or legacy_sso_account(user)
+    attaches this one to it. A multi-tenant provider never takes a legacy account."""
+    from services.oidc_id_token import has_tenants
+    if _adoptable_row(user, provider, external_data) is not None:
+        return True
+    return legacy_sso_account(user) and not has_tenants(provider)
 
 
 def _orphan_with_id(provider, external_id):
@@ -455,17 +486,34 @@ def _refuse(username, details, code):
     return None, code
 
 
-def _username_conflict_text(provider, username, account):
-    state, remedy = describe_conflict(account, provider)
+def _tenant_conflict(provider, account, external_data):
+    """(state, remedy) of an account whose attachment this identity's tenant may not adopt, else None."""
+    row = _claimable(account, provider)
+    bar = _tenant_bar(row, provider, external_data)
+    if bar is None:
+        return None
+    held = (f"is attached to {provider.name!r}, not bound yet" if row.provider_id is not None
+            else f"has {orphan_text(row)}, left by this same IdP")
+    return (f"{held}, but {bar}",
+            "if it is the same person, set the expected tenant of the attachment to this "
+            "identity's tenant (attach the provider, or reset its identity)")
+
+
+def _username_conflict_text(provider, username, account, external_data=None):
+    state, remedy = (_tenant_conflict(provider, account, external_data)
+                     or describe_conflict(account, provider))
     return (f"SSO login via {provider.name!r} refused: the name {username!r} "
             f"belongs to an account it may not open, which {state} ({remedy})")
 
 
-def _email_conflict_text(provider, username, email, account, unverified):
+def _email_conflict_text(provider, username, email, account, unverified, external_data=None):
     """No second account for an e-mail an account this identity may not open owns."""
     # This provider may adopt it: only a verified e-mail matches it, attaching would not.
     row = _claimable(account, provider) if unverified else None
-    if row is not None:
+    tenant = _tenant_conflict(provider, account, external_data) if row is None else None
+    if tenant is not None:
+        state, remedy = tenant
+    elif row is not None:
         held = (f"is attached to {provider.name!r}, not bound yet" if row.provider_id is not None
                 else f"has {orphan_text(row)}, left by this same IdP")
         state = (f"{held} but the IdP marks the e-mail unverified "
@@ -486,7 +534,10 @@ _GENERIC_SOURCES = {'oauth2': "the IdP's claims", 'saml': 'the assertion', 'ldap
 def _unmapped_refusal(provider, username, external_data=None, group_source=None):
     """(code, text, diagnosis) of the refusal for want of a role: the groups read, their
     source and the remedy."""
-    if _mapping_rules(provider):
+    if _mapping_rules(provider) and not roles_honoured(provider, external_data):
+        reason, code = ("the role claims of its tenant are not honoured (role tenants) and the "
+                        "provider has no default role"), NO_DEFAULT_ROLE
+    elif _mapping_rules(provider):
         reason, code = 'no role mapping rule matches it', UNMAPPED
     else:
         reason, code = 'the provider has no role mapping rule and no default role', NO_DEFAULT_ROLE
@@ -497,16 +548,18 @@ def _unmapped_refusal(provider, username, external_data=None, group_source=None)
                   f"{reason}; {diagnosis}"), diagnosis
 
 
-def _email_owner(provider, account, unverified):
+def _email_owner(provider, account, unverified, external_data=None):
     """An account owning the presented e-mail that this identity may not open and whose
     existence a new account would duplicate: one attached to other providers or left by
-    another or unknown IdP only, or one this provider may adopt that an unverified e-mail
-    cannot match. One bound to another identity of this IdP is another person's."""
+    another or unknown IdP only, or one this provider may adopt that an unverified e-mail,
+    or an identity of another tenant, cannot match. One bound to another identity of this
+    IdP is another person's."""
     if account.is_local:
         return False  # e-mail is unique among local accounts only (#136)
     if own_identity(account, provider) is None and not _same_idp_orphans(account, provider):
         return True
-    return unverified and _claimable(account, provider) is not None
+    row = _claimable(account, provider)
+    return row is not None and (unverified or _tenant_bar(row, provider, external_data) is not None)
 
 
 def _resolve_sso_account(provider, username, email, external_data):
@@ -537,8 +590,8 @@ def _resolve_sso_account(provider, username, email, external_data):
     conflict = None
     user = User.query.filter_by(username=username).first()
     if user is not None:
-        if _adoptable(user, provider):
-            return user, _claimable(user, provider), False, None, None
+        if _adoptable(user, provider, external_data):
+            return user, _adoptable_row(user, provider, external_data), False, None, None
         conflict = user
 
     # 3. An account an admin attached to this provider that owns this email but
@@ -551,10 +604,11 @@ def _resolve_sso_account(provider, username, email, external_data):
         candidates = User.query.filter(func.lower(User.email) == norm).order_by(User.id).all()
         if not unverified:
             for candidate in candidates:
-                found = _claimable(candidate, provider)
+                found = _adoptable_row(candidate, provider, external_data)
                 if found is not None:
                     return candidate, found, False, None, None
-        email_owner = next((u for u in candidates if _email_owner(provider, u, unverified)), None)
+        email_owner = next((u for u in candidates
+                            if _email_owner(provider, u, unverified, external_data)), None)
     return None, None, False, conflict, email_owner
 
 
@@ -601,7 +655,8 @@ def decide_sso_account(provider, username, email, fullname, external_data, group
 
     if not user and conflict:
         return AccountDecision(REFUSED, username, code=USERNAME_CONFLICT, user=conflict,
-                               refusal=_username_conflict_text(provider, username, conflict))
+                               refusal=_username_conflict_text(provider, username, conflict,
+                                                               external_data))
 
     if user and not user.active:
         # A disabled account is a refused login: every caller checks it. Synchronising
@@ -655,7 +710,7 @@ def decide_sso_account(provider, username, email, fullname, external_data, group
         return AccountDecision(REFUSED, username, code=EMAIL_CONFLICT, user=email_owner,
                                refusal=_email_conflict_text(
                                    provider, username, email, email_owner,
-                                   _email_unverified(provider, external_data)))
+                                   _email_unverified(provider, external_data), external_data))
 
     # A distinct SSO account. The email may belong to a LOCAL account: the identity is the
     # stable id, so both coexist; an admin who wants one attaches the provider to it

@@ -11,7 +11,7 @@ from .helpers import _encrypt_ldap_password, _parse_json_field, _parse_group_lis
 from .connection_tests import _test_ldap_connection, _test_oauth2_connection, _test_saml_connection
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 from utils.secret_target import MASKS, keeps_saved_secret, retarget_error
-from services.oidc_id_token import clear_oidc_cache, has_tenants, normalize_tenants
+from services.oidc_id_token import clear_oidc_cache, has_tenants, normalize_tenants, provider_tenants, OIDCValidationError
 from utils.dn_parse import parse_dn
 from . import saml_sp
 
@@ -131,6 +131,22 @@ def _tenants_error(provider):
     return None
 
 
+def _role_tenants_error(provider):
+    """Why ``oauth2_role_tenants`` is not a subset of the accepted tenants, else None."""
+    honoured = json.loads(provider.oauth2_role_tenants) if provider.oauth2_role_tenants else []
+    if not honoured:
+        return None
+    try:
+        accepted = provider_tenants(provider)
+    except OIDCValidationError:
+        accepted = ()
+    outside = [t for t in honoured if t not in accepted]
+    if outside:
+        return (f'Role tenant {outside[0]} is not an accepted tenant: the roles of a tenant are '
+                'honoured only among the accepted tenants')
+    return None
+
+
 def _taken(data):
     """The answer to a creation whose name or type a provider already holds, else None."""
     if SSOProvider.query.filter_by(name=data['name']).first():
@@ -221,6 +237,7 @@ def create_provider():
         provider.id_token_verify = data.get('id_token_verify', True) is not False
         try:
             provider.oauth2_tenants = _tenants(data.get('oauth2_tenants'))
+            provider.oauth2_role_tenants = _tenants(data.get('oauth2_role_tenants'))
         except ValueError as e:
             db.session.rollback()
             return error_response(str(e), 400)
@@ -274,7 +291,8 @@ def create_provider():
             return error_response(role_error, 400)
         provider.role_mapping = json.dumps(val)
 
-    signing_error = _sp_signing_error(provider) or _tenants_error(provider)
+    signing_error = (_sp_signing_error(provider) or _tenants_error(provider)
+                     or (_role_tenants_error(provider) if provider.provider_type == 'oauth2' else None))
     if signing_error:
         db.session.rollback()
         return error_response(signing_error, 400)
@@ -421,13 +439,15 @@ def update_provider(provider_id=None, provider_type_name=None):
             provider.oauth2_scopes = json.dumps(data['oauth2_scopes'])
         if 'id_token_verify' in data:
             provider.id_token_verify = data['id_token_verify'] is not False
-        if 'oauth2_tenants' in data:
-            try:
+        try:
+            if 'oauth2_tenants' in data:
                 provider.oauth2_tenants = _tenants(data['oauth2_tenants'])
-            except ValueError as e:
-                db.session.rollback()
-                return error_response(str(e), 400)
-        tenants_error = _tenants_error(provider)
+            if 'oauth2_role_tenants' in data:
+                provider.oauth2_role_tenants = _tenants(data['oauth2_role_tenants'])
+        except ValueError as e:
+            db.session.rollback()
+            return error_response(str(e), 400)
+        tenants_error = _tenants_error(provider) or _role_tenants_error(provider)
         if tenants_error:
             db.session.rollback()
             return error_response(tenants_error, 400)
