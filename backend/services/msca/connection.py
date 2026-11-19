@@ -76,8 +76,10 @@ class MicrosoftCAConnectionMixin:
                     auth_method='basic',
                     cafile=cafile,
                 )
+                # principal selects the credential in the cache or keytab (None: default)
                 client.session.auth = HTTPKerberosAuth(
-                    mutual_authentication=OPTIONAL
+                    mutual_authentication=OPTIONAL,
+                    principal=msca.kerberos_principal or None,
                 )
 
             elif msca.auth_method == 'basic':

@@ -88,3 +88,39 @@ def test_a_typed_key_shaped_like_a_token_is_written_as_typed(app, certsrv):
             MicrosoftCAConnectionMixin._cleanup_client = staticmethod(real_cleanup)
     assert result.get('success') is True, result
     assert seen['key'] == typed
+
+
+def test_kerberos_principal_picks_the_identity(app, certsrv, monkeypatch):
+    # requests-kerberos is faked at the library boundary: no KDC is contacted
+    seen = {}
+
+    def fake_auth(**kwargs):
+        seen.update(kwargs)
+        return object()
+
+    monkeypatch.setitem(sys.modules, 'requests_kerberos',
+                        SimpleNamespace(HTTPKerberosAuth=fake_auth, OPTIONAL=2))
+    monkeypatch.setenv('KRB5_CLIENT_KTNAME', '')  # restored on teardown
+    from services.msca.connection import MicrosoftCAConnectionMixin
+    with app.app_context():
+        result = MicrosoftCAConnectionMixin.test_connection_inline(
+            {'server': 'ca.example', 'auth_method': 'kerberos',
+             'kerberos_principal': 'svc-ucm@CORP.LOCAL', 'kerberos_keytab_path': '/k/ucm.keytab'})
+    assert result.get('success') is True, result
+    assert seen.get('principal') == 'svc-ucm@CORP.LOCAL'
+
+
+def test_kerberos_without_a_principal_uses_the_ambient_identity(app, certsrv, monkeypatch):
+    seen = {}
+
+    def fake_auth(**kwargs):
+        seen.update(kwargs)
+        return object()
+
+    monkeypatch.setitem(sys.modules, 'requests_kerberos',
+                        SimpleNamespace(HTTPKerberosAuth=fake_auth, OPTIONAL=2))
+    from services.msca.connection import MicrosoftCAConnectionMixin
+    with app.app_context():
+        MicrosoftCAConnectionMixin.test_connection_inline(
+            {'server': 'ca.example', 'auth_method': 'kerberos'})
+    assert seen.get('principal') is None
