@@ -354,29 +354,64 @@ def _role_of(username):
     return User.query.filter_by(username=username).one().role
 
 
+REFUSED = 'error=sso_unmapped'
+NOT_HONOURED = 'the role claims of its tenant are not honoured'
+
+
+def _last_failure():
+    return AuditLog.query.filter(AuditLog.action == 'login_failure').order_by(AuditLog.id.desc()).first()
+
+
 def test_role_claims_are_read_from_the_honoured_tenants_only(entra):
-    """Each listed tenant's administrators assign the app roles of their users."""
+    """Each listed tenant's administrators assign the app roles of their users; another tenant's
+    claims satisfy no rule, so its user is refused like one no rule matches."""
     entra.configure(role_mapping='{"UCM.Admin": "admin"}', default_role='viewer',
                     oauth2_role_tenants=f'["{TENANT_A}"]')
     assert entra(TENANT_A, 'sub-ra', 'mt-roles-a', roles=['UCM.Admin']).endswith(OK)
     assert _role_of('mt-roles-a') == 'admin'
-    assert entra(TENANT_B, 'sub-rb', 'mt-roles-b', roles=['UCM.Admin']).endswith(OK)
-    assert _role_of('mt-roles-b') == 'viewer'
+    assert entra(TENANT_B, 'sub-rb', 'mt-roles-b', roles=['UCM.Admin']).endswith(REFUSED)
+    assert User.query.filter_by(username='mt-roles-b').first() is None
+    assert NOT_HONOURED in _last_failure().details
 
 
-def test_a_tenant_whose_roles_are_not_honoured_changes_no_role_on_sign_in(entra):
+def test_with_rules_a_user_without_role_of_a_tenant_not_honoured_is_refused(entra):
+    entra.configure(role_mapping='{"UCM.Admin": "admin"}', default_role='viewer',
+                    oauth2_role_tenants=f'["{TENANT_A}"]')
+    assert entra(TENANT_A, 'sub-na', 'mt-norole-a').endswith(REFUSED)
+    assert 'no role mapping rule matches it' in _last_failure().details
+    assert entra(TENANT_B, 'sub-nb', 'mt-norole-b').endswith(REFUSED)
+    assert NOT_HONOURED in _last_failure().details
+    assert User.query.filter_by(username='mt-norole-b').first() is None
+
+
+def test_with_rules_and_no_honoured_tenant_every_tenant_is_refused(entra):
+    entra.configure(role_mapping='{"UCM.Admin": "admin"}', default_role='viewer')
+    for tid, sub in ((TENANT_A, 'sub-ea'), (TENANT_B, 'sub-eb')):
+        assert entra(tid, sub, f'mt-empty-{sub}', roles=['UCM.Admin']).endswith(REFUSED)
+        assert entra(tid, sub, f'mt-empty-{sub}').endswith(REFUSED)
+    assert users_of(entra.pid).count() == 0
+
+
+def test_an_admin_default_role_gives_no_tenant_not_honoured_an_administrator(entra):
+    entra.configure(role_mapping='{"UCM.Admin": "admin"}', default_role='admin',
+                    oauth2_role_tenants=f'["{TENANT_A}"]')
+    assert entra(TENANT_B, 'sub-db', 'mt-admin-b').endswith(REFUSED)
+    assert entra(TENANT_B, 'sub-db2', 'mt-admin-b2', roles=['UCM.Admin']).endswith(REFUSED)
+    assert User.query.filter(User.username.in_(['mt-admin-b', 'mt-admin-b2'])).count() == 0
+
+
+def test_an_account_of_a_tenant_taken_off_the_honoured_list_is_refused(entra):
+    """An administrator made by a rule does not keep signing in once its tenant's roles are not
+    honoured; its stored role is left as it was."""
     entra.configure(role_mapping='{"UCM.Admin": "admin", "UCM.Reader": "auditor"}',
                     default_role='viewer', sync_role_on_login=True,
                     oauth2_role_tenants=f'["{TENANT_A}"]')
-    assert entra(TENANT_B, 'sub-sb', 'mt-sync-b', roles=['UCM.Reader']).endswith(OK)
-    assert _role_of('mt-sync-b') == 'viewer'
-    User.query.filter_by(username='mt-sync-b').one().role = 'operator'
-    db.session.commit()
-    assert entra(TENANT_B, 'sub-sb', 'mt-sync-b', roles=['UCM.Admin']).endswith(OK)
-    assert _role_of('mt-sync-b') == 'operator'
-    # The same claim from an honoured tenant syncs the role
     assert entra(TENANT_A, 'sub-sa', 'mt-sync-a', roles=['UCM.Reader']).endswith(OK)
     assert entra(TENANT_A, 'sub-sa', 'mt-sync-a', roles=['UCM.Admin']).endswith(OK)
+    assert _role_of('mt-sync-a') == 'admin'
+    entra.configure(oauth2_role_tenants=f'["{TENANT_B}"]')
+    assert entra(TENANT_A, 'sub-sa', 'mt-sync-a', roles=['UCM.Reader']).endswith(REFUSED)
+    assert NOT_HONOURED in _last_failure().details
     assert _role_of('mt-sync-a') == 'admin'
 
 
@@ -385,8 +420,8 @@ def test_group_claims_follow_the_same_rule(entra):
     group = '5b6c7d8e-9f01-4a2b-8c3d-4e5f60718293'
     entra.configure(role_mapping=f'{{"{group}": "admin"}}', default_role='viewer',
                     oauth2_role_tenants=f'["{TENANT_A}"]')
-    assert entra(TENANT_B, 'sub-gb', 'mt-group-b', groups=[group]).endswith(OK)
-    assert _role_of('mt-group-b') == 'viewer'
+    assert entra(TENANT_B, 'sub-gb', 'mt-group-b', groups=[group]).endswith(REFUSED)
+    assert User.query.filter_by(username='mt-group-b').first() is None
     assert entra(TENANT_A, 'sub-ga', 'mt-group-a', groups=[group]).endswith(OK)
     assert _role_of('mt-group-a') == 'admin'
 
@@ -394,6 +429,34 @@ def test_group_claims_follow_the_same_rule(entra):
 def test_without_a_default_role_a_tenant_whose_roles_are_not_honoured_is_refused(entra):
     entra.configure(role_mapping='{"UCM.Admin": "admin"}', default_role=None,
                     oauth2_role_tenants=f'["{TENANT_A}"]')
-    assert 'sso_no_default_role' in entra(TENANT_B, 'sub-nd', 'mt-nodefault', roles=['UCM.Admin'])
-    detail = AuditLog.query.filter(AuditLog.action == 'login_failure').order_by(AuditLog.id.desc()).first()
-    assert 'role claims of its tenant are not honoured' in detail.details
+    assert entra(TENANT_B, 'sub-nd', 'mt-nodefault', roles=['UCM.Admin']).endswith(REFUSED)
+    assert NOT_HONOURED in _last_failure().details
+
+
+def test_the_sign_in_test_says_the_role_claims_are_not_honoured(entra):
+    from api.v2.sso.ldap_routes import REFUSED as OUTCOME_REFUSED, decide_sso_account
+    entra.configure(role_mapping='{"UCM.Admin": "admin"}', default_role='viewer',
+                    oauth2_role_tenants=f'["{TENANT_A}"]')
+    identity, refusal = entra.sign_in(TENANT_B, 'sub-tb', 'mt-test-b')
+    assert refusal is None
+    decision = decide_sso_account(db.session.get(SSOProvider, entra.pid), identity.username,
+                                  identity.email, identity.fullname, identity.external_data)
+    assert decision.outcome == OUTCOME_REFUSED and decision.code == 'sso_unmapped'
+    assert NOT_HONOURED in decision.refusal
+
+
+@pytest.mark.parametrize('default_role', ['viewer', 'admin'])
+def test_without_rules_every_accepted_tenant_gets_the_default_role(entra, default_role):
+    entra.configure(default_role=default_role, oauth2_role_tenants=f'["{TENANT_A}"]')
+    assert entra(TENANT_A, 'sub-wa', 'mt-norules-a', roles=['UCM.Admin']).endswith(OK)
+    assert entra(TENANT_B, 'sub-wb', 'mt-norules-b', roles=['UCM.Admin']).endswith(OK)
+    assert _role_of('mt-norules-a') == _role_of('mt-norules-b') == default_role
+
+
+def test_role_resolution_reads_no_rule_for_a_tenant_not_honoured(entra):
+    """The role a rule gives is never read from such a tenant's claims, whatever the caller."""
+    from api.v2.sso.helpers import OIDC_TENANT_KEY, _resolve_mapped_roles
+    entra.configure(role_mapping='{"UCM.Admin": "admin"}', oauth2_role_tenants=f'["{TENANT_A}"]')
+    provider = db.session.get(SSOProvider, entra.pid)
+    assert _resolve_mapped_roles(provider, {OIDC_TENANT_KEY: TENANT_A, 'groups': ['UCM.Admin']})[0] == 'admin'
+    assert _resolve_mapped_roles(provider, {OIDC_TENANT_KEY: TENANT_B, 'groups': ['UCM.Admin']}) == (None, None)

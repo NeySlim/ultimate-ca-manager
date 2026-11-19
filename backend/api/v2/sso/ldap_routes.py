@@ -535,8 +535,7 @@ def _unmapped_refusal(provider, username, external_data=None, group_source=None)
     """(code, text, diagnosis) of the refusal for want of a role: the groups read, their
     source and the remedy."""
     if _mapping_rules(provider) and not roles_honoured(provider, external_data):
-        reason, code = ("the role claims of its tenant are not honoured (role tenants) and the "
-                        "provider has no default role"), NO_DEFAULT_ROLE
+        reason, code = 'the role claims of its tenant are not honoured (role tenants)', UNMAPPED
     elif _mapping_rules(provider):
         reason, code = 'no role mapping rule matches it', UNMAPPED
     else:
