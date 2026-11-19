@@ -29,7 +29,7 @@ KEY_ROUTES = {
     'key_recovery': (None, False),
 }
 OTHER_ROUTES = ['certificates_all', 'cas_all']
-# What each route encrypts with a password (a user certificate's PEM carries its key in clear)
+# A format each route encrypts with a password (section 6 covers the PEM of the first three)
 PROTECTED_FORMAT = {'certificate': 'key', 'ca': 'key', 'user_certificate': 'pkcs12', 'csr': 'key',
                     'mtls': 'pkcs12', 'key_recovery': None}
 ALL_ROUTES = list(KEY_ROUTES) + OTHER_ROUTES
@@ -362,3 +362,72 @@ def test_a_permission_refusal_keeps_its_code(app, material, create_user):
     assert r.status_code == 403
     r = client.post(f"/api/v2/cas/{material['ca']}/export", json={'format': 'key', 'password': PASSWORD})
     assert r.status_code == 403
+
+
+# 6. A password given with a PEM that carries the key encrypts that key
+
+PEM_KEY_ROUTES = {
+    'certificate': ({'format': 'pem', 'include_key': True}, 'certificate',
+                    'Private key exported as PEM (password-protected)'),
+    'ca': ({'format': 'pem', 'include_key': True}, 'ca',
+           'Private key exported as PEM (password-protected)'),
+    'user_certificate': ({'format': 'pem'}, None,
+                         'Exported PEM with private key (password-protected) for user cert: export-shape'),
+}
+
+
+def _key_blocks(data, label):
+    begin, end = f'-----BEGIN {label}-----'.encode(), f'-----END {label}-----'.encode()
+    blocks = []
+    for chunk in data.split(begin)[1:]:
+        blocks.append(begin + chunk.split(end)[0] + end + b'\n')
+    return blocks
+
+
+def _last_audit(app, kind, material):
+    from models import AuditLog
+    with app.app_context():
+        if kind == 'user_certificate':
+            query = AuditLog.query.filter_by(action='user_certificate_exported',
+                                             resource_id=str(material['enrolment']))
+        else:
+            rid = material['cert'] if kind == 'certificate' else material['ca']
+            query = AuditLog.query.filter_by(action='private_key_exported',
+                                             resource_type=PEM_KEY_ROUTES[kind][1], resource_id=str(rid))
+        entry = query.order_by(AuditLog.id.desc()).first()
+        return entry.details if entry else None
+
+
+@pytest.mark.parametrize('kind', list(PEM_KEY_ROUTES))
+def test_a_password_with_a_pem_export_encrypts_its_key(auth_client, material, app, kind):
+    from cryptography.hazmat.primitives import serialization
+    url = _url(kind, material, app, auth_client)
+    body, _rtype, audit = PEM_KEY_ROUTES[kind]
+    plain = auth_client.post(url, json=body)
+    assert plain.status_code == 200, plain.data[:300]
+    original = [serialization.load_pem_private_key(b, None)
+                for label in ('PRIVATE KEY', 'RSA PRIVATE KEY', 'EC PRIVATE KEY')
+                for b in _key_blocks(plain.data, label)]
+    assert len(original) == 1
+
+    r = auth_client.post(url, json={**body, 'password': PASSWORD})
+    assert r.status_code == 200, r.data[:300]
+    for label in ('PRIVATE KEY', 'RSA PRIVATE KEY', 'EC PRIVATE KEY'):
+        assert not _key_blocks(r.data, label), f'{label} in clear'
+    encrypted = _key_blocks(r.data, 'ENCRYPTED PRIVATE KEY')
+    assert len(encrypted) == 1
+    key = serialization.load_pem_private_key(encrypted[0], PASSWORD.encode())
+    assert key.private_numbers() == original[0].private_numbers()
+    assert b'BEGIN CERTIFICATE' in r.data
+    assert _last_audit(app, kind, material) == audit
+
+
+@pytest.mark.parametrize('empty', [None, ''])
+@pytest.mark.parametrize('kind', list(PEM_KEY_ROUTES))
+def test_a_pem_export_without_a_password_keeps_its_key_in_clear(auth_client, material, app, kind, empty):
+    url = _url(kind, material, app, auth_client)
+    body, _rtype, audit = PEM_KEY_ROUTES[kind]
+    r = auth_client.post(url, json={**body, 'password': empty})
+    assert r.status_code == 200, r.data[:300]
+    assert b'PRIVATE KEY-----' in r.data and b'ENCRYPTED PRIVATE KEY' not in r.data
+    assert _last_audit(app, kind, material) == audit.replace('password-protected', 'unencrypted')

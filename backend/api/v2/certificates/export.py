@@ -34,7 +34,7 @@ from utils.cert_issuer import (
     authority_key_identifier_hex, certificate_signed_by, is_self_signed,
 )
 from utils.export_options import json_boolean, query_boolean, check_export_request
-from services.key_export_audit import audit_key_export
+from services.key_export_audit import audit_key_export, encrypt_key_pem
 from services.cert.related_pair import row_certificate
 from utils import related_cert
 from . import bp
@@ -434,7 +434,8 @@ def export_certificate(cert_id):
 
             # Include private key if requested
             if include_key and certificate.prv:
-                key_pem = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
+                key_pem = encrypt_key_pem(
+                    load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}"), password)
                 if not result.endswith(b'\n'):
                     result += b'\n'
                 result += key_pem

@@ -452,7 +452,7 @@ def test_the_bundle_holds_both_certificates(auth_client, create_ca):
     assert related_cert.references(cert_b, cert_a)
 
 
-def test_the_bundle_holds_both_keys_when_asked(auth_client, create_ca):
+def test_the_bundle_holds_both_keys_when_asked(app, auth_client, create_ca):
     a, b = _pair(auth_client, create_ca, 'pair-export-keys.example.com')
     bundle = _zip(auth_client.post(f"/api/v2/certificates/{a['id']}/export", json={
         'format': 'hybrid-bundle', 'include_key': True, 'password': 'BundlePass123!'}))
@@ -460,6 +460,11 @@ def test_the_bundle_holds_both_keys_when_asked(auth_client, create_ca):
         cert = x509.load_pem_x509_certificate(bundle.read(f"{role}-{row['id']}.crt"))
         key = serialization.load_pem_private_key(bundle.read(f"{role}-{row['id']}.key"), b'BundlePass123!')
         assert key.public_key() == cert.public_key()
+    from models import AuditLog
+    with app.app_context():
+        entry = AuditLog.query.filter_by(action='private_key_exported', resource_id=str(a['id'])).order_by(
+            AuditLog.id.desc()).first()
+        assert entry.details == 'Private key exported as HYBRID-BUNDLE (password-protected)'
 
 
 def test_the_bundle_keys_need_the_private_key_permission(app, auth_client, create_ca, create_user):
