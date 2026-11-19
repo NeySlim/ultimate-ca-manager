@@ -436,6 +436,16 @@ class UserSSOIdentity(db.Model):
         self.external_id = external_id
         self.bound_at = utc_now() if external_id else None
 
+    def _provider_tenants(self):
+        """The tenants its provider accepts, those an expected tenant is chosen from; [] for none."""
+        from services.oidc_id_token import OIDCValidationError, provider_tenants
+        if self.provider is None:
+            return []
+        try:
+            return list(provider_tenants(self.provider))
+        except OIDCValidationError:
+            return []
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -445,6 +455,7 @@ class UserSSOIdentity(db.Model):
             'orphan_of': self.orphan_of,
             'external_id': self.external_id,
             'expected_tenant': self.expected_tenant,
+            'provider_tenants': self._provider_tenants(),
             'state': self.state,
             'created_at': utc_isoformat(self.created_at),
             'bound_at': utc_isoformat(self.bound_at),

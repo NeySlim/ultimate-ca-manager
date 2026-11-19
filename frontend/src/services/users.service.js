@@ -67,12 +67,15 @@ export const usersService = {
   },
 
   // One row per provider that opens the account (sso_identities)
-  async attachSso(id, { provider_id, remove_password } = {}) {
-    return apiClient.post(`/users/${id}/sso-identities`, { provider_id, remove_password })
+  // expected_tenant: a provider with accepted tenants adopts the attachment from that tenant only
+  async attachSso(id, { provider_id, remove_password, expected_tenant } = {}) {
+    const body = { provider_id, remove_password }
+    if (expected_tenant) body.expected_tenant = expected_tenant
+    return apiClient.post(`/users/${id}/sso-identities`, body)
   },
 
-  async resetSsoIdentity(id, identityId) {
-    return apiClient.post(`/users/${id}/sso-identities/${identityId}/reset`)
+  async resetSsoIdentity(id, identityId, body) {
+    return apiClient.post(`/users/${id}/sso-identities/${identityId}/reset`, body)
   },
 
   async detachSso(id, identityId) {

@@ -57,4 +57,18 @@ describe('Accepted Entra tenants', () => {
     expect(screen.getByText('sso.oidcTenantsNeedVerify')).toBeInTheDocument()
     expect(saved().oauth2_tenants).toEqual([TENANT_A])
   })
+
+  it('saves the tenants whose roles are honoured as a list', () => {
+    const saved = open({ id: 3, provider_type: 'oauth2', oauth2_tenants: [TENANT_A, TENANT_B],
+      oauth2_role_tenants: [TENANT_A], id_token_verify: true })
+    const roles = screen.getByLabelText('sso.oidcRoleTenants')
+    expect(roles.value).toBe(TENANT_A)
+    fireEvent.change(roles, { target: { value: `${TENANT_A}\n${TENANT_B}` } })
+    expect(saved().oauth2_role_tenants).toEqual([TENANT_A, TENANT_B])
+  })
+
+  it('shows a stored value the server could not read as it is', () => {
+    open({ id: 3, provider_type: 'oauth2', oauth2_tenants: 'not-a-list', id_token_verify: true })
+    expect(field().value).toBe('not-a-list')
+  })
 })

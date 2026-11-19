@@ -299,7 +299,9 @@ def test_attaching_sets_the_expected_tenant_from_the_list(entra, auth_client, pl
     r = auth_client.post(f'/api/v2/users/{uid}/sso-identities', json=body)
     assert r.status_code == 201, r.get_json()
     assert _identity('mt-attach').expected_tenant == (tenant.lower() if tenant else None)
-    assert r.get_json()['data']['sso_identities'][0]['expected_tenant'] == (tenant.lower() if tenant else None)
+    shown = r.get_json()['data']['sso_identities'][0]
+    assert shown['expected_tenant'] == (tenant.lower() if tenant else None)
+    assert shown['provider_tenants'] == [TENANT_A, TENANT_B]
 
 
 @pytest.mark.parametrize('tenant', ['9188040d-6c67-4c5b-b112-36a304b66dad', 'common', 42],
