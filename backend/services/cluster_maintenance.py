@@ -183,6 +183,7 @@ def observe_local(app):
     if reader is None:
         reader = view.local_reader = restore_job.StateReader()
     state = reader.read()
+    view.local_state = state
     row = None
     if state is not None:
         now = utc_now()
@@ -194,6 +195,12 @@ def observe_local(app):
     elif view.row is not None:
         view.set(None, None)
     return view
+
+
+def held_locally(view) -> bool:
+    """The single node's restore transaction holds the SQLite database (its local state says so)."""
+    state = getattr(view, 'local_state', None)
+    return bool(view.active() and state and (state.get('view') or {}).get('held'))
 
 
 def _from_epoch(seconds):
@@ -312,6 +319,8 @@ def install_engine_guard(app, engine):
 
 LOCAL_MESSAGE = ("This UCM instance is restoring a backup: writes are refused until the restore "
                  "ends. Retry later.")
+HELD_MESSAGE = ("This UCM instance is restoring a backup and its transaction holds the database: "
+                "only the health checks and the restore job are served until it ends. Retry later.")
 
 
 def _what(view):
@@ -401,7 +410,12 @@ def gate():
 def init_app(app):
     """Gate, write guard and 503 answer; outside HA only a local restore job raises it."""
     from models import db
+    from auth import restore_hold
+    from utils import sqlite_wait
     view_of(app)
+    sqlite_wait.install()
+    # First of all (after the admin allowlist): the hooks below it read the database
+    app.before_request_funcs.setdefault(None, []).insert(0, restore_hold.before_request)
     app.before_request(gate)
     app.register_error_handler(MaintenanceActive, lambda e: refusal())
     with app.app_context():

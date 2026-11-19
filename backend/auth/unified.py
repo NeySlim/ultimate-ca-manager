@@ -366,6 +366,8 @@ def require_auth(permissions=None, session_only=False):
             auth_result = auth_manager.authenticate_request(request)
             
             if not auth_result:
+                from auth import restore_hold
+                restore_hold.forget()
                 from utils.response import error_response, AUTHENTICATION_REQUIRED_PROBLEM
                 return error_response('Authentication required', 401,
                                       problem_type=AUTHENTICATION_REQUIRED_PROBLEM)
@@ -416,6 +418,9 @@ def require_auth(permissions=None, session_only=False):
             g.permissions = auth_result['permissions']
             g.user_id = auth_result['user_id']
             g.api_key_id = auth_result.get('api_key_id')
+            # Checked against the database during a restore's gate: kept for its held window
+            from auth import restore_hold
+            restore_hold.remember(auth_result)
 
             # Call the actual route function
             return f(*args, **kwargs)

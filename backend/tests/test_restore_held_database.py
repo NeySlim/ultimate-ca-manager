@@ -1,0 +1,404 @@
+"""SQLite: while a restore's transaction holds the database, the web worker never waits on it.
+
+A second sqlite3 connection really holds the database file (BEGIN EXCLUSIVE), as the restore's
+transaction does once it has written enough: the job's read and its cancellation answer from
+the local state for a caller checked during the restore, anything else answers 503 with
+Retry-After at once, and no request waits in sqlite3's own busy handler. A job whose progress
+or conclusion crosses another writer ends with its own outcome, never executor_lost.
+"""
+import contextlib
+import json
+import sqlite3
+import threading
+import time
+import types
+import uuid
+
+import pytest
+from flask import g
+from sqlalchemy import update
+
+from models import BackgroundJob, User, db
+from services import cluster_maintenance, jobs
+from services.jobs import JobOutcome, JobType, runner, store
+from services.jobs import restore as restore_job
+from tests.test_restore_job import archive, created, no_restart  # noqa: F401 (fixtures)
+
+T = BackgroundJob.__table__
+PASSWORD = 'Held-Database-Pass-9'
+# A request the worker serves while the database is held answers well under this
+FAST = 1.0
+
+
+def _on_sqlite(app):
+    with app.app_context():
+        return db.engine.dialect.name == 'sqlite'
+
+
+@contextlib.contextmanager
+def file_database(app, path):
+    """The session database copied to a file the app opens with the product's engine options
+    (one connection per checkout, sqlite3's default 5 s busy timeout)."""
+    from sqlalchemy import create_engine
+    with app.app_context():
+        db.session.commit()
+        db.session.remove()
+        engines = db._app_engines[app]
+        memory = engines[None]
+        raw = memory.raw_connection()
+        try:
+            target = sqlite3.connect(path)
+            raw.driver_connection.backup(target)
+            target.close()
+        finally:
+            raw.close()
+        engines[None] = create_engine(f'sqlite:///{path}', hide_parameters=True)
+        cluster_maintenance.install_engine_guard(app, engines[None])
+    try:
+        yield
+    finally:
+        with app.app_context():
+            db.session.remove()
+            engines[None].dispose()
+            engines[None] = memory
+
+
+@contextlib.contextmanager
+def holding(path):
+    """Another connection holds the database file exclusively: no reader, no writer."""
+    holder = sqlite3.connect(path, timeout=0, isolation_level=None)
+    holder.execute('BEGIN EXCLUSIVE')
+    try:
+        yield
+    finally:
+        holder.execute('ROLLBACK')
+        holder.close()
+
+
+@pytest.fixture
+def held_app(app, tmp_path):
+    if not _on_sqlite(app):
+        pytest.skip('SQLite: the database file held by another connection')
+    path = str(tmp_path / 'held.db')
+    with file_database(app, path):
+        yield app, path
+
+
+def _admin_user(app):
+    with app.app_context():
+        user = User(username=f'held-{uuid.uuid4().hex[:8]}', role='admin',
+                    email=f'{uuid.uuid4().hex[:8]}@example.test')
+        user.set_password(PASSWORD)
+        db.session.add(user)
+        db.session.commit()
+        info = {'id': user.id, 'username': user.username}
+        db.session.remove()
+    return info
+
+
+def _client(app, username, password=PASSWORD):
+    c = app.test_client()
+    r = c.post('/api/v2/auth/login', data=json.dumps({'username': username, 'password': password}),
+               content_type='application/json')
+    assert r.status_code == 200, r.data
+    return c
+
+
+def _restore_job(app):
+    """A running restore taken by an executor that is not this test."""
+    with app.app_context():
+        jt = jobs.job_type(restore_job.KIND)
+        job_id = store.create_job(db.session, kind=restore_job.KIND, slot=jt.slot, exclusive=True,
+                                  exclusive_slots=jobs.EXCLUSIVE_SLOTS, now=jobs._now())
+        assert store.claim_job(db.session, job_id, 'elsewhere/1/x', jobs._now()) is not None
+        db.session.remove()
+    return job_id
+
+
+def _gate(app, job_id):
+    ctx = types.SimpleNamespace(job_id=job_id, node_id=None, requested_by='admin', app=app,
+                                view={'id': job_id, 'kind': restore_job.KIND, 'state': 'running',
+                                      'phase': restore_job.CHECKING})
+    return restore_job.LocalGate(app, ctx)
+
+
+@pytest.fixture
+def restore_held(held_app):
+    """A restore whose gate is up; ``hold()`` then marks its transaction as holding the file."""
+    app, path = held_app
+    job_id = _restore_job(app)
+    admin = _client(app, 'admin', 'changeme123')  # a login is a write: before the gate
+    gate = _gate(app, job_id).raise_gate()
+    state = types.SimpleNamespace(app=app, path=path, job_id=job_id, gate=gate, admin=admin)
+
+    @contextlib.contextmanager
+    def hold():
+        gate.set_view(phase=restore_job.APPLYING, held=True)
+        with holding(path):
+            yield
+    state.hold = hold
+    try:
+        yield state
+    finally:
+        gate.lift()
+        store.purge_file(store.file_name_for(job_id, restore_job.CANCEL_SUFFIX))
+        with app.app_context():
+            db.session.execute(T.delete().where(T.c.id == job_id))
+            db.session.commit()
+            db.session.remove()
+
+
+def _timed(call, *args, **kwargs):
+    started = time.monotonic()
+    response = call(*args, **kwargs)
+    return response, time.monotonic() - started
+
+
+def test_the_job_is_read_and_cancelled_while_the_transaction_holds_the_database(restore_held):
+    job_id, admin = restore_held.job_id, restore_held.admin
+    url = f'/api/v2/system/jobs/{job_id}'
+    # Checked against the database once the restore began
+    assert admin.get(url).status_code == 200
+    with restore_held.hold():
+        seen, took = _timed(admin.get, url)
+        assert seen.status_code == 200, seen.data
+        assert took < FAST, f'the job read waited {took:.1f}s on the held database'
+        data = seen.get_json()['data']
+        assert data['id'] == job_id and data['phase'] == restore_job.APPLYING
+        assert 'held' not in data
+        cancelled, took = _timed(admin.post, f'{url}/cancel')
+        assert cancelled.status_code == 200, cancelled.data
+        assert took < FAST
+        assert cancelled.get_json()['data']['cancel_requested'] is True
+    assert restore_job.cancel_flagged(job_id), 'the cancellation was not taken'
+
+
+def test_an_ordinary_request_answers_503_with_retry_after_at_once(restore_held):
+    app, admin = restore_held.app, restore_held.admin
+    assert admin.get('/api/v2/groups').status_code == 200
+    with restore_held.hold():
+        refused, took = _timed(admin.get, '/api/v2/groups')
+        live, live_took = _timed(admin.get, '/health/live')
+        anonymous, anonymous_took = _timed(app.test_client().get, '/api/v2/cas')
+    assert refused.status_code == 503, refused.data
+    assert refused.headers['Retry-After'] == str(cluster_maintenance.RETRY_AFTER_SECONDS)
+    assert took < FAST, f'the refusal took {took:.1f}s'
+    assert anonymous.status_code == 503 and anonymous_took < FAST
+    assert live.status_code == 200 and live_took < FAST
+
+
+def test_a_request_in_the_window_never_waits_in_sqlite(restore_held):
+    """Before the transaction is marked as holding the file, a request that meets the lock
+    retries in Python, a yield between tries, and is refused 503 within a bound."""
+    app, admin = restore_held.app, restore_held.admin
+    assert admin.get('/api/v2/groups').status_code == 200
+    with holding(restore_held.path):
+        refused, took = _timed(admin.get, '/api/v2/groups')
+    assert refused.status_code == 503, refused.data
+    assert refused.headers['Retry-After']
+    assert took < 2.0, f"the request waited {took:.1f}s"
+
+
+def test_a_session_revoked_before_the_restore_reads_nothing(held_app):
+    app, path = held_app
+    job_id = _restore_job(app)
+    url = f'/api/v2/system/jobs/{job_id}'
+    user = _admin_user(app)
+    revoked = _client(app, user['username'])
+    assert revoked.get(url).status_code == 200
+    # Its sessions closed before the restore: refused during it, held database or not
+    with app.app_context():
+        db.session.execute(update(User).where(User.id == user['id']).values(
+            session_version=User.session_version + 1))
+        db.session.commit()
+        db.session.remove()
+    gate = _gate(app, job_id).raise_gate()
+    try:
+        assert revoked.get('/api/v2/groups').status_code == 401
+        gate.set_view(phase=restore_job.APPLYING, held=True)
+        with holding(path):
+            anonymous = app.test_client().get(url)
+            stale = revoked.get(url)
+            stale_cancel = revoked.post(f'{url}/cancel')
+    finally:
+        gate.lift()
+        with app.app_context():
+            db.session.execute(T.delete().where(T.c.id == job_id))
+            db.session.commit()
+    assert anonymous.status_code == 401, anonymous.data
+    assert stale.status_code in (401, 503) and stale.status_code != 200, stale.data
+    assert stale_cancel.status_code in (401, 503), stale_cancel.data
+    assert not restore_job.cancel_flagged(job_id)
+
+
+def test_a_session_checked_before_the_restore_only_is_not_trusted(held_app):
+    """A check made before the gate went up may predate a revocation: refused, not answered."""
+    app, path = held_app
+    job_id = _restore_job(app)
+    user = _admin_user(app)
+    before = _client(app, user['username'])
+    url = f'/api/v2/system/jobs/{job_id}'
+    assert before.get(url).status_code == 200
+    gate = _gate(app, job_id).raise_gate()
+    try:
+        gate.set_view(phase=restore_job.APPLYING, held=True)
+        with holding(path):
+            seen = before.get(url)
+            cancel = before.post(f'{url}/cancel')
+    finally:
+        gate.lift()
+        with app.app_context():
+            db.session.execute(T.delete().where(T.c.id == job_id))
+            db.session.commit()
+    assert seen.status_code == 503, seen.data
+    assert seen.headers['Retry-After']
+    assert cancel.status_code == 503
+    assert not restore_job.cancel_flagged(job_id)
+
+
+def test_a_session_without_the_right_reads_nothing(restore_held, viewer_client):
+    app, job_id = restore_held.app, restore_held.job_id
+    url = f'/api/v2/system/jobs/{job_id}'
+    assert viewer_client.get('/api/v2/system/jobs').status_code == 200  # checked during the gate
+    assert viewer_client.get(url).status_code == 404
+    with restore_held.hold():
+        seen = viewer_client.get(url)
+        cancel = viewer_client.post(f'{url}/cancel')
+    assert seen.status_code == 404, seen.data
+    assert cancel.status_code == 404, cancel.data
+    assert not restore_job.cancel_flagged(job_id)
+
+
+def test_a_cancellation_at_the_commit_is_too_late(restore_held):
+    job_id, admin = restore_held.job_id, restore_held.admin
+    url = f'/api/v2/system/jobs/{job_id}'
+    assert admin.get(url).status_code == 200
+    with restore_held.hold():
+        restore_held.gate.set_view(phase=restore_job.COMMITTING)
+        late = admin.post(f'{url}/cancel')
+    assert late.status_code == 409, late.data
+    assert not restore_job.cancel_flagged(job_id)
+
+
+def test_the_held_mark_drops_once_the_transaction_ends(app, archive, created, no_restart,
+                                                       monkeypatch):
+    """The worker reads the database again as soon as the restore's transaction is over."""
+    from tests.test_restore_job import _assert_final, _lines_in, _start
+    views, real = [], restore_job.LocalGate.set_view
+
+    def set_view(gate, **view):
+        if 'held' in view:
+            views.append(view['held'])
+        return real(gate, **view)
+    monkeypatch.setattr(restore_job.LocalGate, 'set_view', set_view)
+    before = _lines_in(app)
+    job_id, name = _start(app, archive, created)
+    _assert_final(app, job_id, 'succeeded', 'done', before, name, True)
+    if _on_sqlite(app):
+        assert True in views, 'the transaction never said it holds the database'
+        assert views[-1] is False, 'the gate still says the database is held after the commit'
+    else:
+        assert True not in views
+
+
+# -- a job's own writes wait for another writer -------------------------------------------
+
+HOLD_SECONDS = 7  # past sqlite3's 5 s busy timeout
+
+
+def _holder_thread(path, seconds):
+    taken = threading.Event()
+
+    def hold():
+        with holding(path):
+            taken.set()
+            time.sleep(seconds)
+    thread = threading.Thread(target=hold, name='other-writer', daemon=True)
+    thread.start()
+    assert taken.wait(10)
+    return thread
+
+
+@pytest.fixture
+def crossing_job(held_app):
+    app, path = held_app
+    kind = f'test_crossing_{uuid.uuid4().hex[:6]}'
+    behaviour = {}
+
+    def run(ctx):
+        behaviour['run'](ctx, path)
+        return JobOutcome(code=200, message='Crossing done', data={'ok': True},
+                          audit_details='Crossing job finished')
+    jobs.register(JobType(kind=kind, slot=jobs.SLOT_BACKUP, permission='admin:system', run=run,
+                          label='Crossing', audit_action='test_crossing_job'))
+    ids = []
+
+    def start():
+        with app.test_request_context():
+            g.current_user = types.SimpleNamespace(id=4545, username='crossing-requester')
+            g.user_id = 4545
+            job_id = jobs.start_job(kind)
+        ids.append(job_id)
+        return job_id
+    try:
+        yield types.SimpleNamespace(app=app, behaviour=behaviour, start=start)
+    finally:
+        jobs.unregister(kind)
+        with app.app_context():
+            for job_id in ids:
+                runner.join_local(job_id, 30)
+            db.session.execute(T.delete().where(T.c.id.in_(ids)))
+            db.session.commit()
+
+
+def _final(app, job_id):
+    assert runner.join_local(job_id, 60)
+    with app.app_context():
+        executor = store.job_row(db.session, job_id)['executor']
+        # What the scheduler's next pass does with a job whose thread is gone
+        store.recover_orphans(db.session, now=jobs._now(), all_running=False,
+                              audit_for=jobs.audit_writer, mine={job_id: executor})
+        row = store.job_row(db.session, job_id)
+        db.session.remove()
+    return row
+
+
+def test_a_conclusion_that_crosses_another_writer_keeps_the_jobs_outcome(crossing_job):
+    holders = []
+    crossing_job.behaviour['run'] = lambda ctx, path: holders.append(
+        _holder_thread(path, HOLD_SECONDS))
+    job_id = crossing_job.start()
+    row = _final(crossing_job.app, job_id)
+    assert (row['state'], row['reason']) == ('succeeded', 'done'), row
+    for thread in holders:
+        thread.join(30)
+
+
+def test_a_progress_that_crosses_another_writer_keeps_the_jobs_outcome(crossing_job):
+    holders = []
+
+    def run(ctx, path):
+        holders.append(_holder_thread(path, HOLD_SECONDS))
+        ctx.progress(done=1, total=2, phase='working')
+        holders[-1].join(30)
+    crossing_job.behaviour['run'] = run
+    job_id = crossing_job.start()
+    row = _final(crossing_job.app, job_id)
+    assert (row['state'], row['reason']) == ('succeeded', 'done'), row
+    assert row['progress_done'] == 1
+
+
+def test_a_lock_held_past_the_jobs_wait_still_concludes_it_as_its_error(crossing_job, monkeypatch):
+    """The wait is bounded: past it, the write raises like any other database error."""
+    monkeypatch.setattr(runner, 'JOB_LOCK_WAIT_SECONDS', 0.5)
+
+    def run(ctx, path):
+        thread = _holder_thread(path, 6)
+        try:
+            ctx.progress(done=1)
+        finally:
+            thread.join(30)
+    crossing_job.behaviour['run'] = run
+    job_id = crossing_job.start()
+    row = _final(crossing_job.app, job_id)
+    assert (row['state'], row['reason']) == ('failed', 'error'), row

@@ -268,6 +268,13 @@ def _find_ca_by_issuer_hash(issuer_name_hash, issuer_key_hash, hash_algorithm):
         return None
 
 
+def try_later_response():
+    """tryLater (RFC 6960 section 2.3): the responder cannot answer now, the client asks again."""
+    response = _error_response(ocsp.OCSPResponseStatus.TRY_LATER)
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
 def _error_response(status):
     """Build an unsuccessful OCSP response"""
     response = ocsp.OCSPResponseBuilder.build_unsuccessful(status)

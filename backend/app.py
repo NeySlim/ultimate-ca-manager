@@ -1381,6 +1381,12 @@ def create_app(config_name=None):
             return response, 400
         if isinstance(e, (OverflowError, ValueError)):
             return _json_error(400, 'Invalid parameter value')
+        # A SQLite lock this request may not wait for is a 503 with Retry-After, never a 500
+        from utils.sqlite_wait import locked_refusal
+        refused = locked_refusal(e)
+        if refused is not None:
+            app.logger.warning("Database busy on %s: answered 503", request.path)
+            return refused
         app.logger.error("Unhandled exception on %s: %s", request.path, e, exc_info=True)
         return _json_error(500, 'Internal server error')
 

@@ -294,6 +294,11 @@ class _Run:
             return  # the restore transaction holds the SQLite database: no other connection writes
         self.ctx.progress(done=self._done, total=len(STEPS), phase=phase)
 
+    def transaction_over(self):
+        """Committed or rolled back: the web worker may read the database again."""
+        if self.gate is not None and self.sqlite:
+            self.gate.set_view(held=False)
+
     def mark(self, session, report):
         """In the restore transaction, last before its commit: the job is ``committed``
         with the report known so far, unless a cancellation was asked first."""
@@ -401,7 +406,10 @@ def _restore(ctx, current, stream, password):
                             transaction.marking(current.mark), \
                             transaction.progressing(current.checkpoint):
                         try:
-                            results = service.restore_backup_from_stream(stream, password, mode=mode)
+                            try:
+                                results = service.restore_backup_from_stream(stream, password, mode=mode)
+                            finally:
+                                current.transaction_over()
                         except (JobCancelled, JobLost):
                             raise
                         except BaseException:
