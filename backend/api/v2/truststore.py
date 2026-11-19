@@ -18,7 +18,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.serialization import pkcs7
 from cryptography.hazmat.backends import default_backend
 import hashlib
-from datetime import datetime
+from datetime import datetime, timedelta
 import base64
 import os
 
@@ -245,9 +245,9 @@ def list_trusted_certificates():
         search_pattern = f'%{safe_search}%'
         query = query.filter(
             db.or_(
-                TrustedCertificate.name.ilike(search_pattern),
-                TrustedCertificate.subject.ilike(search_pattern),
-                TrustedCertificate.fingerprint_sha256.ilike(search_pattern)
+                TrustedCertificate.name.ilike(search_pattern, escape='\\'),
+                TrustedCertificate.subject.ilike(search_pattern, escape='\\'),
+                TrustedCertificate.fingerprint_sha256.ilike(search_pattern, escape='\\')
             )
         )
     
@@ -556,6 +556,22 @@ def sync_trust_store():
     )
 
 
+_EXPIRY_STATES = ('expired', 'expiring', 'valid')
+
+
+def _expiry_condition(states):
+    """The page's own buckets: under a day left is expired, up to 90 days expiring."""
+    now = utc_now()
+    soon, later = now + timedelta(days=1), now + timedelta(days=91)
+    col = TrustedCertificate.not_after
+    parts = {
+        'expired': col < soon,
+        'expiring': db.and_(col >= soon, col < later),
+        'valid': db.or_(col.is_(None), col >= later),
+    }
+    return db.or_(*[parts[v] for v in states])
+
+
 @bp.route('/api/v2/truststore/export', methods=['GET'])
 @require_auth(['read:truststore'])
 def export_trust_bundle():
@@ -567,6 +583,7 @@ def export_trust_bundle():
     Query params:
       - format: pem (default), p7b
       - purpose: root_ca, intermediate_ca, system, all (default); may be repeated
+      - expiry: expired, expiring, valid; may be repeated (as the page lists them)
     """
     from flask import Response
     
@@ -578,11 +595,16 @@ def export_trust_bundle():
     
     if fmt not in ('pem', 'p7b'):
         return error_response('Unsupported format. Use: pem, p7b', 400)
-    
+    expiries = [v for v in request.args.getlist('expiry') if v]
+    if any(v not in _EXPIRY_STATES for v in expiries):
+        return error_response('Unsupported expiry. Use: ' + ', '.join(_EXPIRY_STATES), 400)
+
     try:
         query = TrustedCertificate.query
         if purposes != ['all']:
             query = query.filter(TrustedCertificate.purpose.in_(purposes))
+        if expiries:
+            query = query.filter(_expiry_condition(expiries))
         
         certs = query.order_by(TrustedCertificate.name).all()
         

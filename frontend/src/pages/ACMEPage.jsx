@@ -216,14 +216,18 @@ export default function ACMEPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(historyFilterStatus), historyFilterCA, historyFilterSource, historySearch, historySort])
 
+  const historySeq = useRef(0)
   const loadHistory = useCallback(async () => {
+    // An answer older than the last request sent is dropped
+    const seq = ++historySeq.current
     try {
       const res = await acmeService.getHistory(historyParams({ page: historyPage, per_page: historyPerPage }))
+      if (seq !== historySeq.current) return
       setHistory(res.data || [])
       setHistoryTotal(res.meta?.total ?? (res.data || []).length)
       setHistoryCAs((res.meta?.cas || []).map((name) => ({ value: name, label: name })))
     } catch (error) {
-      notifyRef.current(error.message)
+      if (seq === historySeq.current) notifyRef.current(error.message)
     }
   }, [historyParams, historyPage, historyPerPage])
   const notifyRef = useRef(() => {})

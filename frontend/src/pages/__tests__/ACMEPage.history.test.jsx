@@ -59,4 +59,21 @@ describe('ACME history tab', () => {
     await waitFor(() => expect(exported.csv).toHaveBeenCalled())
     expect(exported.csv.mock.calls[0][0]).toHaveLength(TOTAL)
   })
+
+  it('keeps the answer of the last search when an older one arrives later', async () => {
+    await openHistory()
+    const pending = {}
+    acmeService.getHistory.mockImplementation((p) => new Promise((resolve) => { pending[p.search] = resolve }))
+    const reply = (id) => ({ data: [row(id)], meta: { total: 1, cas: [] } })
+    const box = screen.getByPlaceholderText('common.searchCertificates')
+    fireEvent.change(box, { target: { value: 'ab' } })
+    await waitFor(() => expect(pending.ab).toBeTruthy())
+    fireEvent.change(box, { target: { value: 'abc' } })
+    await waitFor(() => expect(pending.abc).toBeTruthy())
+    pending.abc(reply(51))
+    await screen.findByText('h51.example.com')
+    pending.ab(reply(26))
+    await new Promise((r) => setTimeout(r, 50))
+    expect(screen.queryByText('h26.example.com')).toBeNull()
+  })
 })

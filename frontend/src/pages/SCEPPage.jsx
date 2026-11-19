@@ -83,16 +83,20 @@ export default function SCEPPage() {
   }, [linkedId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // The requests are paged, filtered and searched by the server
+  const requestSeq = useRef(0)
   const loadRequests = useCallback(async () => {
+    // An answer older than the last request sent is dropped
+    const seq = ++requestSeq.current
     try {
       const params = { page, per_page: perPage }
       if (searchQuery) params.search = searchQuery
       if (statusFilter.length > 0) params.status = statusFilter
       const res = await scepService.getRequests(params)
+      if (seq !== requestSeq.current) return
       setRequests(res.data || [])
       setTotalRequests(res.meta?.total ?? (res.data || []).length)
     } catch (error) {
-      notifyRef.current(error.message)
+      if (seq === requestSeq.current) notifyRef.current(error.message)
     }
   }, [page, perPage, searchQuery, statusFilter])
   const notifyRef = useRef(() => {})

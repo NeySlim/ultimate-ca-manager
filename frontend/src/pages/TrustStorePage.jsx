@@ -284,7 +284,7 @@ export default function TrustStorePage() {
 
   const handleExportBundle = async (format = 'pem') => {
     try {
-      const response = await truststoreService.exportBundle(format, filterPurpose.length > 0 ? filterPurpose : 'all')
+      const response = await truststoreService.exportBundle(format, filterPurpose.length > 0 ? filterPurpose : 'all', filterExpiryStatus)
       const blob = response instanceof Blob ? response : response?.data instanceof Blob ? response.data : new Blob([response?.data || response], { type: 'application/x-pem-file' })
       downloadBlob(blob, `truststore-bundle.${format}`)
       showSuccess(t('trustStore.bundleExported'))

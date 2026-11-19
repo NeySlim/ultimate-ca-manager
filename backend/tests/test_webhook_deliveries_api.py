@@ -67,6 +67,9 @@ class TestDeliveriesList:
         assert first['meta']['total'] == 27 and first['meta']['total_pages'] == 3
         assert len(second['data']) == 10
         assert not {d['id'] for d in first['data']} & {d['id'] for d in second['data']}
+        # newest first: the first page holds the highest ids, the second the next ones
+        ids = [d['id'] for d in first['data'] + second['data']]
+        assert ids == sorted(ids, reverse=True)
         failed = json.loads(auth_client.get(f'{url}?status=failed&per_page=10&page=3').data)
         assert failed['meta']['total'] == 25 and len(failed['data']) == 5
 

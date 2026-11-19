@@ -331,6 +331,19 @@ describe('API Client', () => {
     })
   })
 
+  describe('exported count', () => {
+    it.each([['12', 12], ['0', 0], ['x', undefined]])('carries X-Exported-Count %s on the blob', async (value, expected) => {
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'content-type': 'application/x-pem-file', 'x-exported-count': value }),
+        blob: () => Promise.resolve(new Blob(['pem'])),
+      })
+      const { apiClient } = await import('../apiClient')
+      const result = await apiClient.post('/certificates/bulk/export', {}, { responseType: 'blob' })
+      expect(result.exportedCount).toBe(expected)
+    })
+  })
+
   describe('401 Handling', () => {
     it('redirects to login on 401 for non-auth endpoints', async () => {
       window.location = { pathname: '/dashboard', href: '' }

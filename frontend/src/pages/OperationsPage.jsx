@@ -711,7 +711,7 @@ export default function OperationsPage() {
               if (blob) {
                 downloadBlob(blob, `${bulkResourceType}_export.pem`)
               }
-              showSuccess(t('operations.bulkSuccess', { action: 'export', count: ids.length, defaultValue: `Exported ${ids.length} items` }))
+              showSuccess(t('operations.bulkSuccess', { action: 'export', count: blob?.exportedCount ?? ids.length, defaultValue: `Exported ${blob?.exportedCount ?? ids.length} items` }))
               warnSkippedExport(blob, t, showWarning)
             } catch (e) { showError(e.message || 'Export failed') }
           }}>

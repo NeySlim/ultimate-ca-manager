@@ -6,7 +6,7 @@ import { cn, daysRemaining, formatDate } from '../../lib/utils'
 import CertDetailPanel from './CertDetailPanel'
 
 // The columns the server can sort by; the others are not sortable here
-const SERVER_SORT_KEYS = ['common_name', 'valid_to', 'created_at']
+const SERVER_SORT_KEYS = ['common_name', 'valid_to', 'created_at', 'source']
 
 export default function HistoryTab({ history, total, page, perPage, onPageChange, onPerPageChange, search, onSearchChange, onSortChange, caOptions, exportLoader, filterStatus, onFilterStatusChange, filterCA, onFilterCAChange, filterSource, onFilterSourceChange, selectedCert, onSelectCert }) {
   const { t } = useTranslation()
@@ -166,6 +166,7 @@ export default function HistoryTab({ history, total, page, perPage, onPageChange
     {
       key: 'source',
       header: t('common.source'),
+      sortable: true,
       priority: 3,
       hideOnMobile: true,
       render: (value, row) => {

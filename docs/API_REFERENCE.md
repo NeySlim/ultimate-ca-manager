@@ -745,7 +745,7 @@ Content-Type: application/json
 }
 ```
 
-Returns the selected CA certificates as `format` `pem` (default) or `p7b`.
+Returns the selected CA certificates as `format` `pem` (default) or `p7b`. `X-Exported-Count` holds the number of certificates in the file: unknown ids and unreadable ones are not counted.
 
 An unreadable CA certificate (or cross-certificate, named `cross:<id>`) is skipped, logged, and named in `X-Skipped-CAs` (the first 100) with the total in `X-Skipped-CAs-Count`; the others are exported. When none is readable the answer is `404` in both PEM and P7B, with `details.skipped` (the first 100) and `details.skipped_count` (the total).
 
@@ -1190,7 +1190,7 @@ Content-Type: application/json
 }
 ```
 
-Returns the selected certificates as `format` `pem` (default) or `p7b`.
+Returns the selected certificates as `format` `pem` (default) or `p7b`. `X-Exported-Count` holds the number of certificates in the file: unknown ids, certificate requests and unreadable ones are not counted.
 
 An unreadable certificate is skipped, logged, and named in `X-Skipped-Certificates` (its first 100 ids) with the total in `X-Skipped-Certificates-Count`; the others are exported. When no certificate is readable the answer is `404` in both PEM and P7B, with `details.skipped` (the first 100) and `details.skipped_count` (the total).
 
@@ -1240,10 +1240,10 @@ GET /api/v2/user-certificates?status=valid&page=1&per_page=50
 **Query Parameters**:
 | Param | Type | Description |
 |-------|------|-------------|
-| status | string | Filter by status: `valid`, `expiring`, `expired`, `revoked` (repeatable). Applied before paging: `total` and `pages` count the matching rows only |
+| status | string | Filter by status: `valid`, `expiring`, `expired`, `revoked` (repeatable; `valid` does not include `expiring`). Applied before paging: `total` and `pages` count the matching rows only; an unknown value answers `400` |
 | search | string | Name, subject or serial contains |
 | sort_by | string | `created_at` (default), `name`, `valid_until`, `last_used_at` |
-| sort_order | string | `asc` or `desc` (default) |
+| sort_order | string | `asc` or `desc` (default); rows with no value in the sorted column come last in both directions |
 | page | int | Page number (default: 1) |
 | per_page | int | Items per page (default: 25) |
 
@@ -1757,7 +1757,7 @@ GET /api/v2/truststore/export?format=pem&purpose=all
 - `add-from-ca` (`write:truststore`) adds a managed CA's certificate. Optional body `purpose` (default `root_ca` for a root, else `intermediate_ca`) and `notes`. `201`; `409` when it is already there, `400` when the CA awaits its certificate or the purpose is invalid, `404` for an unknown CA.
 - `bulk/delete` (`delete:truststore`) takes `{"ids": [1, 2]}` (a non-empty list of at most 100) and returns `success` (the removed ids) and `failed` (`{id, error}`).
 - `expiring` (`read:truststore`) lists trusted certificates expiring within `days` (default 90).
-- `export` (`read:truststore`) downloads a bundle: `format` `pem` (default) or `p7b`, `purpose` filters (default `all`; repeat it to keep several purposes). `404` when nothing matches. Unreadable entries are skipped and named in `X-Skipped-Certificates` and `X-Skipped-Certificates-Count` (first 100 ids and the total); `404` also when none is readable, with `details.skipped` (the first 100) and `details.skipped_count` (the total).
+- `export` (`read:truststore`) downloads a bundle: `format` `pem` (default) or `p7b`, `purpose` filters (default `all`; repeat it to keep several purposes) and `expiry` (`expired`, `expiring` or `valid`, repeatable, `400` for another value; under a day left counts as expired and up to 90 days as expiring, as the page lists them). `404` when nothing matches. Unreadable entries are skipped and named in `X-Skipped-Certificates` and `X-Skipped-Certificates-Count` (first 100 ids and the total); `404` also when none is readable, with `details.skipped` (the first 100) and `details.skipped_count` (the total).
 
 ---
 
@@ -1872,7 +1872,7 @@ DELETE /api/v2/acme/orders/{order_pk}
 POST /api/v2/acme/orders/purge
 GET /api/v2/acme/history?source=all
 ```
-`DELETE` (`delete:acme`) removes one local order with its authorizations and challenges (`404` when unknown). `purge` (`delete:acme`) runs the expired-order purge now and returns the counts of orders, authorizations and challenges removed. `history` (`read:acme`) lists certificates issued through ACME, local and external CAs; `source` filters. `history` filters on `status` (`valid` or `revoked`), `ca` (an issuer name listed in `meta.cas`) and `search`, sorts by `sort_by` (`common_name`, `valid_to`, `created_at`) and `sort_order`, and pages with `page` and `per_page` (default 50, 100 at most); `meta` carries `total` and `cas`.
+`DELETE` (`delete:acme`) removes one local order with its authorizations and challenges (`404` when unknown). `purge` (`delete:acme`) runs the expired-order purge now and returns the counts of orders, authorizations and challenges removed. `history` (`read:acme`) lists certificates issued through ACME, local and external CAs; `source` filters. `history` filters on `status` (`valid` or `revoked`), `ca` (an issuer name listed in `meta.cas`) and `search`, sorts by `sort_by` (`common_name`, `valid_to`, `source`, `created_at`) and `sort_order` (rows with no value come last in both directions), and pages with `page` and `per_page` (default 50, 100 at most); `meta` carries `total` and `cas`.
 
 ### External Account Binding
 ```http
@@ -1932,7 +1932,7 @@ GET /api/v2/scep/requests
 GET /api/v2/scep/requests?status=pending&search=host&page=2&per_page=50
 GET /api/v2/scep/requests/{request_id}
 ```
-The list is newest first and paged: `page` and `per_page` (default 50, 100 at most), `meta` carries `total` and `total_pages`; `status` (repeatable) and `search` (subject, transaction ID or client address) filter before the page is cut. The last form reads any one request (`read:scep`), 404 when it does not exist.
+The list is newest first and paged: `page` and `per_page` (default 50, 100 at most), `meta` carries `total` and `total_pages`; `status` (repeatable: `pending`, `approved` or `rejected`, `400` for any other value) and `search` (subject, transaction ID or client address) filter before the page is cut. The last form reads any one request (`read:scep`), 404 when it does not exist.
 
 ### Approve Request
 ```http
@@ -2938,7 +2938,7 @@ Content-Type: application/json
 }
 ```
 
-Some keys need `admin:settings` (session, password and HSTS policy, public addresses, the whole backup schedule, OCSP responder renewal). Without it they are dropped, and the response lists them in `data.ignored_keys` (empty when nothing was dropped); a body made only of such keys is refused with 403.
+Some keys need `admin:settings`: `enforce_2fa`, `session_timeout`, `session_max_lifetime`, `max_login_attempts`, `lockout_duration`, `metrics_token`, `key_recovery_dual_control`, the password policy (`min_password_length`, `max_password_length`, `password_require_uppercase`, `password_require_lowercase`, `password_require_numbers`, `password_require_special`), `hsts_enabled`, `hsts_include_subdomains`, `hsts_max_age`, the public addresses (`base_url`, `protocol_base_url`, `acme_public_vhost`, `acme_public_port`, `acme_public_tls_cert_id`), the whole backup schedule (`auto_backup_enabled`, `backup_frequency`, `backup_retention_days`, `backup_max_total_mb`, `backup_password`, `backup_kdf`, `clear_backup_password`), OCSP responder renewal (`ocsp_responder_auto_renew`, `ocsp_responder_renew_days`), the CRL housekeeping (`crl_auto_delete_expired_revoked`, `crl_auto_purge_stale_serials`), `audit_retention_days`, `admin_allowed_networks` and `compliance_profile_default`. Without it they are dropped, and the response lists them in `data.ignored_keys` (empty when nothing was dropped); a body made only of such keys is refused with 403.
 
 ### Email Settings
 ```http

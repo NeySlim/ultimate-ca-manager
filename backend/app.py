@@ -413,7 +413,7 @@ def create_app(config_name=None):
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
             "allow_headers": ["Content-Type", "Authorization", "X-CSRF-Token"],
             "expose_headers": ["Content-Disposition", "X-Skipped-Certificates", "X-Skipped-Certificates-Count",
-                               "X-Skipped-CAs", "X-Skipped-CAs-Count"],
+                               "X-Skipped-CAs", "X-Skipped-CAs-Count", "X-Exported-Count"],
             "supports_credentials": True
         }),
         (re.compile(r"/socket.io/*"), {
