@@ -862,7 +862,6 @@
     "parentCA": "AC parente",
     "hierarchy": "Hiérarchie",
     "hierarchyView": "Vue hiérarchique",
-    "orgView": "Vue organigramme",
     "columnsView": "Vue colonnes",
     "listView": "Vue en liste",
     "orphanCAs": "AC orphelines",
@@ -1102,7 +1101,47 @@
     "uniqueSubjectChanged": "Réglage du sujet unique mis à jour",
     "uniqueSubjectChangeFailed": "Le réglage du sujet unique n'a pas pu être mis à jour",
     "uniqueSubjectShared_one": "{{count}} sujet est déjà porté par plusieurs entités : {{examples}}. Rien ne dit à laquelle un nouveau certificat est destiné : les renouvellements de ses certificats sont refusés tels quels, seules une émission manuelle ou une signature de CSR de ce sujet passent, avec la dérogation",
-    "uniqueSubjectShared_other": "{{count}} sujets sont déjà portés par plusieurs entités, dont {{examples}}. Rien ne dit à laquelle un nouveau certificat est destiné : les renouvellements de leurs certificats sont refusés tels quels, seules une émission manuelle ou une signature de CSR de ces sujets passent, avec la dérogation"
+    "uniqueSubjectShared_other": "{{count}} sujets sont déjà portés par plusieurs entités, dont {{examples}}. Rien ne dit à laquelle un nouveau certificat est destiné : les renouvellements de leurs certificats sont refusés tels quels, seules une émission manuelle ou une signature de CSR de ces sujets passent, avec la dérogation",
+    "total_one": "{{count, number}} autorité",
+    "total_other": "{{count, number}} autorités",
+    "intent": "La hiérarchie de confiance et ses autorités de signature.",
+    "viewsLabel": "Filtrer les autorités",
+    "views": {
+      "all": "Toutes",
+      "roots": "Racines",
+      "intermediates": "Intermédiaires",
+      "expired": "Expirées",
+      "offline": "Hors ligne",
+      "revoked": "Révoquées",
+      "pending": "En attente du certificat"
+    },
+    "searchPlaceholder": "Nom, nom commun, sujet…",
+    "viewMode": "Affichage",
+    "treeView": "Vue arbre",
+    "state": {
+      "expiring": "Expire bientôt"
+    },
+    "range_one": "{{start}}–{{end}} sur {{count, number}} autorité",
+    "range_other": "{{start}}–{{end}} sur {{count, number}} autorités",
+    "downloadCertificate": "Télécharger le certificat (PEM)",
+    "tree": {
+      "title": "Hiérarchie de confiance",
+      "hint": "Flèches pour parcourir, Entrée pour ouvrir, droite et gauche pour déplier ou replier.",
+      "expandAll": "Tout déplier",
+      "collapseAll": "Tout replier",
+      "expand": "Déplier {{name}}",
+      "collapse": "Replier {{name}}",
+      "level": "niveau {{level}}",
+      "subCaCount_one": "{{count}} sous-autorité",
+      "subCaCount_other": "{{count}} sous-autorités",
+      "idleRoots_one": "{{count}} racine sans sous-autorité ni certificat",
+      "idleRoots_other": "{{count}} racines sans sous-autorité ni certificat",
+      "noMatch": "Aucune autorité ne correspond.",
+      "orphan": "AC parente inconnue",
+      "crossLink": "Signature croisée",
+      "showMore_one": "Afficher {{count}} de plus",
+      "showMore_other": "Afficher {{count}} de plus"
+    }
   },
   "certificates": {
     "createCertificate": "Créer un certificat",

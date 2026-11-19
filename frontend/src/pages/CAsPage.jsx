@@ -1,22 +1,26 @@
 /**
- * CAs (Certificate Authorities) Page - Using ResponsiveLayout
+ * CAsPage: the list template (page head, state tabs) over the trust hierarchy.
+ * The tree is the default view; columns and list stay one click away.
+ *
+ * DESKTOP: a node opens the authority in the inspector dock, where its actions live
+ * MOBILE: full-screen slide-over
  */
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams, useParams, useNavigate } from 'react-router-dom'
-import { 
-  Certificate, UploadSimple, Clock, Plus, Crown, ShieldCheck, Columns, SquaresFour, List, Prohibit } from '@phosphor-icons/react'
 import {
-  Button, LoadingSpinner, MultiSelectFilter
-} from '../components'
+  UploadSimple, Plus, ShieldCheck, Columns, List, TreeStructure, LinkSimple, MagnifyingGlass, X } from '@phosphor-icons/react'
+import { Button, LoadingSpinner } from '../components'
+import { ListButton } from '../components/list'
 import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout } from '../components/ui/responsive'
 import { casService } from '../services'
-import { useNotification } from '../contexts'
-import { usePermission, useModals, useRecentHistory, useWebSocket, usePersistedState } from '../hooks'
+import { useNotification, useInspector } from '../contexts'
+import { usePermission, useModals, useRecentHistory, useWebSocket } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
-import { extractData, cn } from '../lib/utils'
-import { OrgView } from './cas/OrgView'
+import { extractData } from '../lib/utils'
+import { downloadExport } from '../lib/exportDownload'
+import { HierarchyTree } from './cas/HierarchyTree'
 import { ColumnsView } from './cas/ColumnsView'
 import { ListView } from './cas/ListView'
 import { CADetailsPanel } from './cas/CADetailsPanel'
@@ -26,6 +30,23 @@ import { CreateCAModal } from './cas/CreateCAModal'
 import { RestorePrimaryModal } from '../components/cas/RestorePrimaryModal'
 import { soleImported } from '../lib/importResult'
 import { useOpenEntity } from '../hooks/useOpenEntity'
+import { buildForest, nestedForest, filterCAs, viewCounts, chainNeedsAttention, nameOfCA } from './cas/caTree'
+import './cas/hierarchy.css'
+
+const VIEW_MODES = [
+  { mode: 'tree', icon: TreeStructure, label: 'cas.treeView' },
+  { mode: 'columns', icon: Columns, label: 'cas.columnsView' },
+  { mode: 'list', icon: List, label: 'cas.listView' },
+]
+// 'org' is what the tree replaced: a stored choice of it opens the tree
+const storedViewMode = () => {
+  try {
+    const mode = localStorage.getItem('ucm-ca-view-mode')
+    return VIEW_MODES.some((v) => v.mode === mode) ? mode : 'tree'
+  } catch { return 'tree' }
+}
+// Cross-certificate issuers are read per authority: only the first holders are asked
+const CROSS_LINK_HOLDERS = 12
 
 export default function CAsPage() {
   const { t } = useTranslation()
@@ -47,34 +68,29 @@ export default function CAsPage() {
   const { modals, open: openModal, close: closeModal } = useModals(['create'])
   const [showImportModal, setShowImportModal] = useState(false)
   
-  // Filter state
-  const [filterType, setFilterType] = usePersistedState('ucm-filter-cas-type', [])
-  const [filterStatus, setFilterStatus] = usePersistedState('ucm-filter-cas-status', [])
+  // The search filters the three views; the state tab lives in the URL (`view`)
   const [searchQuery, setSearchQuery] = useState('')
 
   // Chain repair state
   const [chainRepair, setChainRepair] = useState(null)
   const [chainRepairRunning, setChainRepairRunning] = useState(false)
+  const [repairOpen, setRepairOpen] = useState(false)
   // CA records damaged before cross-certificates existed (#400), with their explicit repairs
   const [crossFindings, setCrossFindings] = useState([])
   const [restoreFinding, setRestoreFinding] = useState(null)
-  
-  // Pagination state
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(25)
-  
-  // Tree expanded state
-  const [expandedNodes, setExpandedNodes] = useState(new Set())
-  
-  // View mode: 'tree' or 'list'
-  const [viewMode, setViewMode] = useState(() => {
-    try { return localStorage.getItem('ucm-ca-view-mode') || 'org' } catch { return 'org' }
-  })
-  
-  // Save view mode preference
+  // { from, to } authority ids: `from` issued a cross-certificate to `to`
+  const [crossLinks, setCrossLinks] = useState([])
+
+  const [viewMode, setViewMode] = useState(storedViewMode)
   useEffect(() => {
-    try { localStorage.setItem('ucm-ca-view-mode', viewMode) } catch {}
+    try { localStorage.setItem('ucm-ca-view-mode', viewMode) } catch { /* Storage is optional. */ }
   }, [viewMode])
+
+  // The authority on top in the dock marks its node
+  const { opened = [], activeKey } = useInspector()
+  const docked = opened.find((o) => o.key === activeKey)
+  const dockedId = docked?.type === 'ca' ? Number(docked.entityId) : undefined
+  const selectedId = isMobile ? selectedCA?.id : dockedId
 
   // Memoised so the 'ucm:data-changed' listener below can depend on it without
   // re-subscribing on every render. canWrite() is a fresh function each render,
@@ -167,16 +183,6 @@ export default function CAsPage() {
     }
   }, [urlCAId, loading])
 
-  // Every CA starts expanded, one created after the first load included;
-  // a node the user folded stays folded
-  const seenCAs = useRef(new Set())
-  useEffect(() => {
-    const fresh = cas.map(c => c.id).filter(id => !seenCAs.current.has(id))
-    if (fresh.length === 0) return
-    fresh.forEach(id => seenCAs.current.add(id))
-    setExpandedNodes(prev => new Set([...prev, ...fresh]))
-  }, [cas])
-
   const getParentName = (ca) => {
     if (ca.is_root) return t('common.rootCA')
     if (ca.parent_id) {
@@ -245,165 +251,97 @@ export default function CAsPage() {
   // useEntityActions and announce themselves with 'ucm:data-changed', which
   // this page already listens to.
 
-  // Check if intermediate CA is orphan
-  const isOrphanIntermediate = useCallback((ca) => {
-    if (ca.type !== 'intermediate') return false
-    if (!ca.parent_id) return true
-    return !cas.some(c => c.id === ca.parent_id)
-  }, [cas])
-
-  // Build tree structure
-  const treeData = useMemo(() => {
-    const rootCAs = cas.filter(ca => !ca.parent_id || ca.type === 'root' || isOrphanIntermediate(ca))
-    
-    const buildTree = (parentId) => {
-      return cas
-        .filter(ca => ca.parent_id === parentId && ca.type !== 'root')
-        .map(ca => ({
-          ...ca,
-          children: buildTree(ca.id)
-        }))
+  const handleDownload = async (ca) => {
+    try {
+      await downloadExport(casService.export(ca.id, 'pem'), { format: 'pem', name: nameOfCA(ca) || 'ca' })
+      showSuccess(t('messages.success.export.ca'))
+    } catch (error) {
+      showError(error?.status ? error.message : t('messages.errors.exportFailed.generic'))
     }
-    
-    return rootCAs.map(ca => ({
-      ...ca,
-      children: buildTree(ca.id)
-    }))
-  }, [cas, isOrphanIntermediate])
-
-  // Filter tree
-  const filteredTree = useMemo(() => {
-    let result = treeData
-    
-    // Apply search
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      const matches = (ca) => 
-        (ca.name || '').toLowerCase().includes(query) ||
-        (ca.common_name || '').toLowerCase().includes(query) ||
-        (ca.subject || '').toLowerCase().includes(query)
-      
-      const filterTree = (nodes) => nodes.filter(node => {
-        if (matches(node)) return true
-        if (node.children?.length) {
-          node.children = filterTree(node.children)
-          return node.children.length > 0
-        }
-        return false
-      })
-      result = filterTree([...result])
-    }
-    
-    // Apply type filter
-    if (filterType.length > 0) {
-      const filterByType = (nodes) => nodes.filter(node => {
-        if (filterType.includes(node.type)) return true
-        if (node.children?.length) {
-          node.children = filterByType(node.children)
-          return node.children.length > 0
-        }
-        return false
-      })
-      result = filterByType([...result])
-    }
-    
-    // Apply status filter (map: Active/Expired from API)
-    if (filterStatus.length > 0) {
-      const filterByStatus = (nodes) => nodes.filter(node => {
-        if (filterStatus.includes(node.status)) return true
-        if (node.children?.length) {
-          node.children = filterByStatus(node.children)
-          return node.children.length > 0
-        }
-        return false
-      })
-      result = filterByStatus([...result])
-    }
-    
-    return result
-  }, [treeData, searchQuery, filterType, filterStatus])
-
-  // Stats
-  const stats = useMemo(() => {
-    const rootCount = cas.filter(c => c.type === 'root').length
-    const intermediateCount = cas.filter(c => c.type === 'intermediate').length
-    const activeCount = cas.filter(c => c.status === 'Active').length
-    const expiredCount = cas.filter(c => c.status === 'Expired').length
-    const pendingCount = cas.filter(c => c.status === 'Pending').length
-    const revokedCount = cas.filter(c => c.status === 'Revoked').length
-
-    return [
-      { icon: Crown, label: t('common.rootCA'), value: rootCount, variant: 'warning' },
-      { icon: ShieldCheck, label: t('common.intermediateCA'), value: intermediateCount, variant: 'primary' },
-      { icon: Certificate, label: t('common.active'), value: activeCount, variant: 'success' },
-      { icon: Clock, label: t('common.expired'), value: expiredCount, variant: 'danger' },
-      ...(pendingCount > 0
-        ? [{ icon: Clock, label: t('cas.awaitingCertificate'), value: pendingCount, variant: 'warning' }]
-        : []),
-      ...(revokedCount > 0
-        ? [{ icon: Prohibit, label: t('common.revoked'), value: revokedCount, variant: 'danger' }]
-        : [])
-    ]
-  }, [cas, t])
-
-  // Filters config
-  const filters = useMemo(() => [
-    {
-      key: 'type',
-      label: t('common.type'),
-      type: 'multiSelect',
-      value: filterType,
-      onChange: setFilterType,
-      placeholder: t('common.allTypes'),
-      options: [
-        { value: 'root', label: t('common.rootCA') },
-        { value: 'intermediate', label: t('common.intermediateCA') }
-      ]
-    },
-    {
-      key: 'status',
-      label: t('common.status'),
-      type: 'multiSelect',
-      value: filterStatus,
-      onChange: setFilterStatus,
-      placeholder: t('common.allStatus'),
-      options: [
-        { value: 'Active', label: t('common.active') },
-        { value: 'Expired', label: t('common.expired') },
-        { value: 'Revoked', label: t('common.revoked') },
-        { value: 'Pending', label: t('cas.awaitingCertificate') },
-      ]
-    }
-  ], [filterType, filterStatus, t])
-
-  const activeFiltersCount = (filterType.length > 0 ? 1 : 0) + (filterStatus.length > 0 ? 1 : 0)
-
-  // Toggle tree node
-  const toggleNode = (id) => {
-    setExpandedNodes(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
-      }
-      return next
-    })
   }
+
+  // Who cross-certified whom, for the links of the tree
+  const crossKey = cas.filter((c) => c.cross_certificate_count > 0).map((c) => `${c.id}:${c.cross_certificate_count}`).join(',')
+  useEffect(() => {
+    const holders = cas.filter((c) => c.cross_certificate_count > 0).slice(0, CROSS_LINK_HOLDERS)
+    if (holders.length === 0) { setCrossLinks([]); return undefined }
+    let live = true
+    const byRef = new Map(cas.map((c) => [c.refid, c.id]))
+    Promise.all(holders.map((ca) => casService.getCrossCertificates(ca.id)
+      .then((res) => (res.data || []).map((x) => ({ from: byRef.get(x.issuer_caref), to: ca.id })))
+      .catch(() => [])))
+      .then((lists) => {
+        if (!live) return
+        const seen = new Set()
+        setCrossLinks(lists.flat().filter((l) => {
+          const key = `${l.from}-${l.to}`
+          if (l.from === undefined || l.from === l.to || seen.has(key)) return false
+          seen.add(key)
+          return true
+        }))
+      })
+    return () => { live = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [crossKey])
+
+  // State tabs: the counters cover every authority, whatever the search
+  const counts = useMemo(() => viewCounts(cas), [cas])
+  const views = useMemo(() => counts.map(({ id, count }) => ({
+    id, count, label: t(`cas.views.${id || 'all'}`),
+  })), [counts, t])
+  const urlView = searchParams.get('view') || ''
+  const activeView = counts.some((v) => v.id === urlView) ? urlView : ''
+  const setView = (id) => {
+    const next = new URLSearchParams(searchParams)
+    if (id) next.set('view', id)
+    else next.delete('view')
+    setSearchParams(next, { replace: true })
+  }
+
+  const forest = useMemo(() => buildForest(cas, { view: activeView, query: searchQuery }), [cas, activeView, searchQuery])
+  const nested = useMemo(() => (viewMode === 'columns' ? nestedForest(forest) : []), [viewMode, forest])
+  const listed = useMemo(() => filterCAs(cas, { view: activeView, query: searchQuery }), [cas, activeView, searchQuery])
+
+  const repairNeeded = chainNeedsAttention(chainRepair, crossFindings, chainRepairRunning)
+  const showRepair = !!chainRepair && (repairNeeded || repairOpen)
 
   return (
     <>
       <ResponsiveLayout
         title={t('common.cas')}
-        subtitle={t('cas.subtitle', { count: cas.length })}
-        icon={ShieldCheck}
-        stats={stats}
-        afterStats={<ChainRepairBar data={chainRepair} running={chainRepairRunning} onRun={runChainRepair} canRunRepair={canWrite('cas')} t={t}
-          findings={crossFindings} canConvert={canWrite('cas') && canDelete('cas')} canRestore={canWrite('cas')}
-          onConvert={handleConvertToCross} onRestore={(finding, caId) => setRestoreFinding({ ...finding, caId })}
-          caName={(id) => cas.find(c => c.id === id)?.name || `#${id}`} />}
-        helpPageKey="cas"
-        // Split view on xl+ screens - panel always visible
+        total={t('cas.total', { count: cas.length })}
+        intent={t('cas.intent')}
+        actions={(
+          <>
+            {chainRepair && !repairNeeded && (
+              <ListButton quiet icon={LinkSimple} aria-expanded={repairOpen} onClick={() => setRepairOpen((v) => !v)}>
+                {t('dashboard.chainRepair')}
+              </ListButton>
+            )}
+            {canWrite('cas') && (
+              <>
+                <ListButton quiet icon={UploadSimple} onClick={() => setShowImportModal(true)}>
+                  {t('common.import')}
+                </ListButton>
+                <ListButton primary icon={Plus} title={t('common.createCA')} onClick={() => openModal('create')}>
+                  {t('common.create')}
+                </ListButton>
+              </>
+            )}
+          </>
+        )}
+        views={views}
+        activeView={activeView}
+        onViewChange={setView}
+        viewsLabel={t('cas.viewsLabel')}
+        afterStats={showRepair && (
+          <div className="ca-repair">
+            <ChainRepairBar data={chainRepair} running={chainRepairRunning} onRun={runChainRepair} canRunRepair={canWrite('cas')} t={t}
+              findings={crossFindings} canConvert={canWrite('cas') && canDelete('cas')} canRestore={canWrite('cas')}
+              onConvert={handleConvertToCross} onRestore={(finding, caId) => setRestoreFinding({ ...finding, caId })}
+              caName={(id) => cas.find(c => c.id === id)?.name || `#${id}`} />
+          </div>
+        )}
         splitView={isMobile}
         splitEmptyContent={isMobile ? (
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">
@@ -430,158 +368,97 @@ export default function CAsPage() {
           />
         ) : null}
       >
-        {/* Tree View Content */}
-        <div className="flex flex-col h-full">
-          {/* Search Bar + Filters + Actions */}
-          <div className="shrink-0 p-3 border-b border-border-op50 bg-secondary-op30">
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1 min-w-0">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={t('common.searchPlaceholder')}
-                  className={cn(
-                    'w-full rounded-lg border border-border bg-bg-primary',
-                    'text-text-primary placeholder:text-text-tertiary',
-                    'focus:outline-none focus:ring-2 focus:ring-accent-primary-op30 focus:border-accent-primary',
-                    isMobile ? 'h-11 px-4 text-base' : 'h-8 px-3 text-sm'
-                  )}
-                />
-              </div>
-              {!isMobile && (
-                <>
-                  {/* View Mode Toggle — 3 views */}
-                  <div className="flex items-center rounded-lg border border-border bg-secondary-op50 p-0.5">
-                    {[
-                      { mode: 'org', icon: SquaresFour, tip: t('cas.orgView') },
-                      { mode: 'columns', icon: Columns, tip: t('cas.columnsView') },
-                      { mode: 'list', icon: List, tip: t('cas.listView') },
-                    ].map(({ mode, icon: Icon, tip }) => (
-                      <button
-                        key={mode}
-                        onClick={() => setViewMode(mode)}
-                        className={cn(
-                          'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors',
-                          viewMode === mode
-                            ? 'bg-accent-primary text-on-accent'
-                            : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
-                        )}
-                        title={tip}
-                      >
-                        <Icon size={14} weight={viewMode === mode ? 'fill' : 'regular'} />
-                      </button>
-                    ))}
-                  </div>
-                  
-                  <div className="w-px h-5 bg-border-op50" />
-                  
-                  <MultiSelectFilter
-                    value={filterType}
-                    onChange={setFilterType}
-                    placeholder={t('common.allTypes')}
-                    options={[
-                      { value: 'root', label: t('common.rootCA') },
-                      { value: 'intermediate', label: t('common.intermediateCA') },
-                    ]}
-                  />
-                  <MultiSelectFilter
-                    value={filterStatus}
-                    onChange={setFilterStatus}
-                    placeholder={t('common.allStatus')}
-                    options={[
-                      { value: 'Active', label: t('common.active') },
-                      { value: 'Expired', label: t('common.expired') },
-                      { value: 'Revoked', label: t('common.revoked') },
-                      { value: 'Pending', label: t('cas.awaitingCertificate') },
-                    ]}
-                  />
-                </>
+        <div className="ca-page">
+          <div className="lv-toolbar">
+            <label className="lv-search">
+              <MagnifyingGlass size={15} aria-hidden="true" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t('cas.searchPlaceholder')}
+                aria-label={t('cas.searchPlaceholder')}
+              />
+              {searchQuery && (
+                <button type="button" className="lv-search-clear" aria-label={t('common.clear')} onClick={() => setSearchQuery('')}>
+                  <X size={13} aria-hidden="true" />
+                </button>
               )}
-              {canWrite('cas') && (
-                isMobile ? (
-                  <Button type="button" size="lg" onClick={() => openModal('create')} className="w-11 h-11 p-0 shrink-0">
-                    <Plus size={22} weight="bold" />
-                  </Button>
-                ) : (
-                  <>
-                    <Button type="button" size="sm" onClick={() => openModal('create')} className="shrink-0">
-                      <Plus size={14} weight="bold" />
-                      {t('common.create')}
-                    </Button>
-                    <Button type="button" size="sm" variant="secondary" onClick={() => setShowImportModal(true)} className="shrink-0">
-                      <UploadSimple size={14} />
-                      {t('common.import')}
-                    </Button>
-                  </>
-                )
-              )}
+            </label>
+            <div className="ca-switch" role="group" aria-label={t('cas.viewMode')}>
+              {VIEW_MODES.map(({ mode, icon: Icon, label }) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={viewMode === mode}
+                  aria-label={t(label)}
+                  title={t(label)}
+                  onClick={() => setViewMode(mode)}
+                >
+                  <Icon size={15} aria-hidden="true" />
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Tree List */}
-          <div className="flex-1 overflow-auto">
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <LoadingSpinner />
+          {loading && cas.length === 0 ? (
+            <div className="flex items-center justify-center py-12">
+              <LoadingSpinner />
+            </div>
+          ) : cas.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 px-4">
+              <div className="w-16 h-16 rounded-2xl bg-bg-tertiary flex items-center justify-center mb-4">
+                <ShieldCheck size={32} className="text-text-secondary" />
               </div>
-            ) : filteredTree.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 px-4">
-                <div className="w-16 h-16 rounded-2xl bg-bg-tertiary flex items-center justify-center mb-4">
-                  <ShieldCheck size={32} className="text-text-secondary" />
-                </div>
-                <h3 className="text-lg font-medium text-text-primary mb-1">{t('common.noCA')}</h3>
-                <p className="text-sm text-text-secondary text-center mb-4">{t('cas.createFirst')}</p>
-                {canWrite('cas') && (
-                  <Button type="button" onClick={() => openModal('create')}>
-                    <Plus size={16} /> {t('common.createCA')}
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className={cn('p-3', viewMode === 'columns' ? '' : 'space-y-3')}>
-                {viewMode === 'org' ? (
-                  <OrgView
-                    tree={filteredTree}
-                    selectedId={selectedCA?.id}
-                    expandedNodes={expandedNodes}
-                    onToggle={toggleNode}
-                    onSelect={loadCADetails}
-                    isMobile={isMobile}
-                    t={t}
-                  />
-                ) : viewMode === 'columns' ? (
-                  <ColumnsView
-                    tree={filteredTree}
-                    orphans={filteredTree.filter(ca => ca.type !== 'root')}
-                    selectedId={selectedCA?.id}
-                    onSelect={loadCADetails}
-                    isMobile={isMobile}
-                    t={t}
-                  />
-                ) : (
-                  <ListView
-                    cas={cas.filter(ca => {
-                      if (searchQuery) {
-                        const q = searchQuery.toLowerCase()
-                        if (!(ca.name || '').toLowerCase().includes(q) &&
-                            !(ca.common_name || '').toLowerCase().includes(q) &&
-                            !(ca.subject || '').toLowerCase().includes(q)) return false
-                      }
-                      if (filterType.length > 0 && !filterType.includes(ca.type)) return false
-                      if (filterStatus.length > 0 && !filterStatus.includes(ca.status)) return false
-                      return true
-                    })}
-                    allCAs={cas}
-                    selectedId={selectedCA?.id}
-                    onSelect={loadCADetails}
-                    isMobile={isMobile}
-                    t={t}
-                  />
-                )}
-              </div>
-            )}
-          </div>
+              <h3 className="text-lg font-medium text-text-primary mb-1">{t('common.noCA')}</h3>
+              <p className="text-sm text-text-secondary text-center mb-4">{t('cas.createFirst')}</p>
+              {canWrite('cas') && (
+                <Button type="button" onClick={() => openModal('create')}>
+                  <Plus size={16} /> {t('common.createCA')}
+                </Button>
+              )}
+            </div>
+          ) : viewMode === 'list' ? (
+            <div className="ca-body is-table">
+              <ListView
+                cas={listed}
+                allCAs={cas}
+                selectedId={selectedId}
+                onSelect={loadCADetails}
+                onDownload={handleDownload}
+                emptyTitle={t('cas.tree.noMatch')}
+                t={t}
+              />
+            </div>
+          ) : viewMode === 'columns' ? (
+            <div className="ca-body">
+              {nested.length === 0 ? (
+                <p className="ca-empty" role="status">{t('cas.tree.noMatch')}</p>
+              ) : (
+                <ColumnsView
+                  tree={nested}
+                  selectedId={selectedId}
+                  onSelect={loadCADetails}
+                  isMobile={isMobile}
+                  t={t}
+                />
+              )}
+            </div>
+          ) : (
+            <div className="ca-body">
+              <HierarchyTree
+                // A search or a tab opens the branches it kept; leaving it starts from the default folds
+                key={searchQuery.trim() || activeView ? 'filtered' : 'browse'}
+                forest={forest}
+                query={searchQuery}
+                filtered={!!activeView}
+                crossLinks={crossLinks}
+                selectedId={selectedId}
+                onSelect={loadCADetails}
+                t={t}
+              />
+            </div>
+          )}
         </div>
       </ResponsiveLayout>
 
@@ -623,7 +500,6 @@ export default function CAsPage() {
         ca={pinsModalCA}
         t={t}
       />
-      
     </>
   )
 }
