@@ -15,6 +15,7 @@ archive restorable somewhere else at all.
 import base64
 import json
 import logging
+import unicodedata
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -490,29 +491,61 @@ def _without_nul(value: Any) -> Any:
     return value
 
 
+def _shown(name: str) -> str:
+    """An archive's field or key name as a report line may hold it: control characters
+    escaped, at most NAME_SHOWN characters."""
+    shown = ''.join(c if unicodedata.category(c) != 'Cc' else f'\\x{ord(c):02x}' for c in name)
+    return shown if len(shown) <= NAME_SHOWN else shown[:NAME_SHOWN] + '...'
+
+
 def _mapping_fields_with_nul(mapping: Dict[str, Any]) -> List[str]:
     """The keys of ``mapping`` whose key or value holds a NUL; one level down in a mapping
     value (configuration.settings), so a field is a setting rather than the whole section."""
     fields = []
     for key, value in mapping.items():
         if isinstance(value, dict) and not _holds_nul(key):
-            fields.extend(f"{escape_nul(key)}.{escape_nul(inner)}" for inner, held in value.items()
-                          if _holds_nul(inner) or _holds_nul(held))
+            fields.extend(f"{_shown(key)}.{_shown(escape_nul(inner))}"
+                          for inner, held in value.items() if _holds_nul(inner) or _holds_nul(held))
         elif _holds_nul(key) or _holds_nul(value):
-            fields.append(escape_nul(key))
+            fields.append(_shown(escape_nul(key)))
     return fields
+
+
+def _merged_identities(section_name: str, rows) -> List[str]:
+    """The identity fields under which two archived rows of the section become one once
+    rewritten: each such field is named, the rows are not."""
+    section = SECTIONS.get(section_name)
+    if section is None or not section.identity:
+        return []
+    seen: Dict[tuple, bool] = {}
+    merged = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        before = tuple(row.get(field) for field in section.identity)
+        after = tuple(_without_nul(value) for value in before)
+        if after in seen and (seen[after] or before != after):
+            merged.append('.'.join(section.identity))
+        seen[after] = seen.get(after, False) or before != after
+    return sorted(set(merged))
 
 
 # Fields named one by one in the report; past this many, a count
 NUL_WARNING_FIELDS = 20
+# Characters of an archive's field name a warning shows
+NAME_SHOWN = 64
 
 
 def escape_nul_in_archive(backup_data, sections) -> List[str]:
     """Every text of ``sections`` (rows and mappings, keys and identities included, at any
     depth) through escape_nul, before anything compares or follows them: a reference still
-    names the row it named. One warning per section.field, the value never echoed."""
+    names the row it named. For a PostgreSQL target only, which stores no NUL.
+
+    One warning per section.field, the value never echoed; one more per identity under which
+    two archived rows become one."""
     from ..section_store import SectionStore, section_kind
     fields: List[str] = []
+    merged: List[str] = []
     for section_name in sorted(sections):
         kind = section_kind(backup_data, section_name)
         if kind == 'mapping':
@@ -520,7 +553,7 @@ def escape_nul_in_archive(backup_data, sections) -> List[str]:
             hit = _mapping_fields_with_nul(mapping)
             if hit:
                 backup_data[section_name] = _without_nul(mapping)
-                fields.extend(f"{section_name}.{name}" for name in hit)
+                fields.extend((f"{section_name}.{name}", False) for name in hit)
             continue
         if kind != 'list':
             continue
@@ -531,26 +564,29 @@ def escape_nul_in_archive(backup_data, sections) -> List[str]:
             if isinstance(row, dict):
                 for name, value in row.items():
                     if _holds_nul(name) or _holds_nul(value):
-                        hit.setdefault(escape_nul(name), None)
+                        # No column name holds a NUL: such a field is never written
+                        hit.setdefault(_shown(escape_nul(name)), _holds_nul(name))
             elif _holds_nul(row):
-                hit.setdefault('(row)', None)
+                hit.setdefault('(row)', False)
         if hit:
             # Loaded only when it holds one: written back through the store
-            backup_data[section_name] = _without_nul(backup_data[section_name])
-            fields.extend(f"{section_name}.{name}" for name in hit)
+            loaded = backup_data[section_name]
+            merged.extend(f"{section_name}.{field}"
+                          for field in _merged_identities(section_name, loaded))
+            backup_data[section_name] = _without_nul(loaded)
+            fields.extend((f"{section_name}.{name}", ignored) for name, ignored in hit.items())
     warnings = [
-        f"{field}: a NUL character, which PostgreSQL cannot store in text, was restored as "
-        "the two characters \\0" + (_AUDIT_NOTE if field.startswith('audit_logs.') else '')
-        for field in fields[:NUL_WARNING_FIELDS]]
+        f"{field}: a field no column takes, ignored, its name holding a NUL character" if ignored
+        else f"{field}: a NUL character, which PostgreSQL cannot store in text, was restored as "
+             "the two characters \\0"
+        for field, ignored in fields[:NUL_WARNING_FIELDS]]
     if len(fields) > NUL_WARNING_FIELDS:
         warnings.append(f"{len(fields) - NUL_WARNING_FIELDS} more fields held a NUL character, "
                         "restored the same way")
+    warnings.extend(
+        f"{field}: two archived rows hold the same value once their NUL characters are "
+        "rewritten as \\0, and are restored as one row" for field in merged)
     return warnings
-
-
-# The seal of an audit entry covers its original text: the chain check no longer matches it
-_AUDIT_NOTE = ("; the audit log integrity check reports each such entry as altered, its seal "
-               "having been computed over the original text")
 
 
 def refuse_containers_in_columns(backup_data) -> None:
