@@ -8,6 +8,7 @@ from models.msca import MicrosoftCA, MSCARequest
 from utils.datetime_utils import utc_now
 from utils.encryption import decrypt_required
 from utils.secret_target import MASKS, changed_targets, keeps_saved_secret
+from .client_keytab import client_keytab
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +83,13 @@ class MicrosoftCAConnectionMixin:
                     )
 
                 # KRB5_KTNAME is the acceptor's keytab: a client never writes it (A12)
-                if msca.kerberos_principal:
-                    os.environ['KRB5_CLIENT_KTNAME'] = msca.kerberos_keytab_path or ''
+                keytab = msca.kerberos_keytab_path or None
+
+                class _ConnectionKerberosAuth(HTTPKerberosAuth):
+                    # The credential is acquired here: the connection keytab is named only meanwhile
+                    def generate_request_header(self, *args, **kwargs):
+                        with client_keytab(keytab):
+                            return super().generate_request_header(*args, **kwargs)
 
                 # auth_method='basic' is a placeholder: the real auth is the
                 # Kerberos handler set below. 'ntlm' would make certsrv import
@@ -96,7 +102,7 @@ class MicrosoftCAConnectionMixin:
                     cafile=cafile,
                 )
                 # principal selects the credential in the cache or keytab (None: default)
-                client.session.auth = HTTPKerberosAuth(
+                client.session.auth = _ConnectionKerberosAuth(
                     mutual_authentication=OPTIONAL,
                     principal=msca.kerberos_principal or None,
                 )

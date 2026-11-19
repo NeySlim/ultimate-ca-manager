@@ -13,6 +13,7 @@ import re
 from models import db
 from models.msca import MicrosoftCA
 from utils.datetime_utils import utc_now
+from services.msca.client_keytab import client_keytab
 
 logger = logging.getLogger(__name__)
 
@@ -184,13 +185,11 @@ class MicrosoftCAAdminChannelMixin:
         server_cert_validation = 'validate' if (msca.winrm_use_ssl and msca.winrm_verify_ssl) else 'ignore'
 
         if transport == 'kerberos':
-            # Kerberos reuses the enroll keytab/principal already on the host.
-            import os
-            if msca.kerberos_keytab_path:
-                os.environ['KRB5_CLIENT_KTNAME'] = msca.kerberos_keytab_path
+            # The enrollment principal and keytab, unless the channel names its own account;
+            # _run_ps names the keytab for the time of the exchange
             return winrm.Session(
                 endpoint,
-                auth=(msca.winrm_effective_username or '', ''),
+                auth=(msca.winrm_effective_username or msca.kerberos_principal or '', ''),
                 transport='kerberos',
                 server_cert_validation=server_cert_validation,
             )
@@ -227,8 +226,11 @@ class MicrosoftCAAdminChannelMixin:
         so stderr is only surfaced when the exit code is non-zero.
         """
         session = MicrosoftCAAdminChannelMixin._build_session(msca)
+        kerberos = (msca.winrm_transport or 'kerberos').lower() == 'kerberos'
         try:
-            result = session.run_ps(script)
+            # pywinrm acquires the credential during the exchange: the lock spans it
+            with client_keytab(msca.kerberos_keytab_path if kerberos else None):
+                result = session.run_ps(script)
         except Exception as e:
             raise MSCAAdminChannelError(f'WinRM execution failed: {e}')
 
