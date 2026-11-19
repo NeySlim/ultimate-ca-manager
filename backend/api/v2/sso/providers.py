@@ -129,6 +129,11 @@ def _tenants_error(provider):
     return None
 
 
+def _blank_name(name) -> bool:
+    """A provider is named by non-blank text: what a restore of its own backup expects."""
+    return not isinstance(name, str) or not name.strip()
+
+
 def _taken(data):
     """The answer to a creation whose name or type a provider already holds, else None."""
     if SSOProvider.query.filter_by(name=data['name']).first():
@@ -145,7 +150,7 @@ def create_provider():
     """Create new SSO provider"""
     data = request.get_json()
 
-    if not data.get('name'):
+    if _blank_name(data.get('name')):
         return error_response("Provider name is required", 400)
     if not data.get('provider_type'):
         return error_response("Provider type is required", 400)
@@ -352,6 +357,8 @@ def update_provider(provider_id=None, provider_type_name=None):
 
     # Update common fields
     if 'name' in data:
+        if _blank_name(data['name']):
+            return error_response("Provider name is required", 400)
         # Check uniqueness
         existing = SSOProvider.query.filter_by(name=data['name']).first()
         if existing and existing.id != provider_id:

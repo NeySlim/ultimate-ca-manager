@@ -4546,6 +4546,8 @@ Content-Type: application/json
 
 Additional fields depend on `provider_type` (ldap, oauth2, saml).
 
+`name` is required and must be text that is not blank; a creation or an update with an empty, blank, null or non-text `name` returns `400`.
+
 For an `oauth2` provider, `oauth2_tenants` is the list of Microsoft Entra tenant IDs accepted through a multi-tenant authority (`oauth2_issuer` of `organizations` or `common`): GUIDs, given as a list or as text separated by commas or blanks, saved in lower case without repeats and returned as a list (`[]` when none). A value that is not a GUID (a wildcard, `common`, a name) returns `400`; so do tenants with `id_token_verify` false or without `oauth2_issuer`. An empty list clears them and the provider validates one issuer again.
 
 #### Role mapping
