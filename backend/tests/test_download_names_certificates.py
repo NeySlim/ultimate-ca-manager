@@ -1,4 +1,4 @@
-"""Certificate, CA, CSR, cross-certificate and external-CSR downloads named in Japanese (#448).
+"""Certificate, CA, CSR and external-CSR downloads named outside ASCII (#448).
 
 The test app refuses a non Latin-1 response header like the real server, so an unfixed route
 raises here instead of answering 200.
@@ -6,7 +6,7 @@ raises here instead of answering 200.
 import pytest
 
 from models import AuditLog, CA, Certificate, db
-from tests.download_names import JAPANESE, assert_named
+from tests.download_names import NAME_IDS, NAMES, assert_named, plain_stem
 
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
 
@@ -21,16 +21,21 @@ def _rename(app, model, row_id, descr):
         return row.refid
 
 
+@pytest.fixture(scope='module', params=NAMES, ids=NAME_IDS)
+def name(request):
+    return request.param
+
+
 @pytest.fixture(scope='module')
-def cert(app, create_cert):
+def cert(app, create_cert, name):
     row = create_cert(cn='jp-download.example.com')
-    return row['id'], _rename(app, Certificate, row['id'], JAPANESE)
+    return row['id'], plain_stem(name, _rename(app, Certificate, row['id'], name))
 
 
 @pytest.fixture(scope='module')
-def ca(app, create_ca):
+def ca(app, create_ca, name):
     row = create_ca(cn='JP Download CA')
-    return row['id'], _rename(app, CA, row['id'], JAPANESE)
+    return row['id'], plain_stem(name, _rename(app, CA, row['id'], name))
 
 
 def _key_audits(app, resource_type, resource_id):
@@ -54,25 +59,25 @@ CERT_CASES = [
 
 
 @pytest.mark.parametrize('body, ext', CERT_CASES, ids=[c[1] + str(i) for i, c in enumerate(CERT_CASES)])
-def test_certificate_export(app, auth_client, cert, body, ext):
-    cert_id, refid = cert
+def test_certificate_export(app, auth_client, cert, name, body, ext):
+    cert_id, plain = cert
     before = _key_audits(app, 'certificate', cert_id)
     r = auth_client.post(f'/api/v2/certificates/{cert_id}/export', json=body)
-    assert_named(r, JAPANESE, ext, fallback_stem=refid)
+    assert_named(r, name, ext, fallback_stem=plain)
     keyed = body['format'] in ('key', 'pkcs12', 'pfx') or body.get('include_key')
     assert _key_audits(app, 'certificate', cert_id) == before + (1 if keyed else 0)
 
 
-def test_certificate_export_get(auth_client, cert):
-    cert_id, refid = cert
-    assert_named(auth_client.get(f'/api/v2/certificates/{cert_id}/export?format=pem'), JAPANESE, '.crt', refid)
+def test_certificate_export_get(auth_client, cert, name):
+    cert_id, plain = cert
+    assert_named(auth_client.get(f'/api/v2/certificates/{cert_id}/export?format=pem'), name, '.crt', plain)
 
 
-def test_certificate_jks_export(app, auth_client, cert):
+def test_certificate_jks_export(app, auth_client, cert, name):
     pytest.importorskip('jks')
-    cert_id, refid = cert
+    cert_id, plain = cert
     r = auth_client.post(f'/api/v2/certificates/{cert_id}/export', json={'format': 'jks', 'password': PASSWORD})
-    assert_named(r, JAPANESE, '.jks', refid)
+    assert_named(r, name, '.jks', plain)
 
 
 CA_CASES = [
@@ -88,35 +93,35 @@ CA_CASES = [
 
 
 @pytest.mark.parametrize('body, ext', CA_CASES, ids=[c[1] + str(i) for i, c in enumerate(CA_CASES)])
-def test_ca_export(app, auth_client, ca, body, ext):
-    ca_id, refid = ca
+def test_ca_export(app, auth_client, ca, name, body, ext):
+    ca_id, plain = ca
     before = _key_audits(app, 'ca', ca_id)
     r = auth_client.post(f'/api/v2/cas/{ca_id}/export', json=body)
-    assert_named(r, JAPANESE, ext, fallback_stem=refid)
+    assert_named(r, name, ext, fallback_stem=plain)
     keyed = body['format'] in ('key', 'pkcs12', 'pfx') or body.get('include_key')
     assert _key_audits(app, 'ca', ca_id) == before + (1 if keyed else 0)
 
 
-def test_ca_jks_export(auth_client, ca):
+def test_ca_jks_export(auth_client, ca, name):
     pytest.importorskip('jks')
-    ca_id, refid = ca
+    ca_id, plain = ca
     r = auth_client.post(f'/api/v2/cas/{ca_id}/export', json={'format': 'jks', 'password': PASSWORD})
-    assert_named(r, JAPANESE, '.jks', refid)
+    assert_named(r, name, '.jks', plain)
 
 
-def test_ca_taken_offline_to_a_file(auth_client, create_ca, app):
+def test_ca_taken_offline_to_a_file(auth_client, create_ca, app, name):
     row = create_ca(cn='JP Offline CA')
-    refid = _rename(app, CA, row['id'], JAPANESE)
+    plain = plain_stem(name, _rename(app, CA, row['id'], name))
     r = auth_client.post(f'/api/v2/cas/{row["id"]}/offline', json={'password': 'OfflineP@ss2026!', 'mode': 'file_exported'})
-    assert_named(r, JAPANESE, '-offline.key', refid)
+    assert_named(r, name, '-offline.key', plain)
 
 
-def test_external_ca_csr(app, auth_client):
+def test_external_ca_csr(app, auth_client, name):
     r = auth_client.post('/api/v2/cas', json={'type': 'external', 'commonName': 'JP External CSR CA'})
     assert r.status_code in (200, 201), r.data
     data = r.get_json()['data']
-    refid = _rename(app, CA, data['id'], JAPANESE)
-    assert_named(auth_client.get(f"/api/v2/cas/{data['id']}/csr"), JAPANESE, '.csr', refid)
+    plain = plain_stem(name, _rename(app, CA, data['id'], name))
+    assert_named(auth_client.get(f"/api/v2/cas/{data['id']}/csr"), name, '.csr', plain)
 
 
 def _csr(auth_client, cn):
@@ -125,8 +130,8 @@ def _csr(auth_client, cn):
     return r.get_json()['data']['id']
 
 
-def test_csr_and_its_key(app, auth_client):
+def test_csr_and_its_key(app, auth_client, name):
     csr_id = _csr(auth_client, 'jp-csr.example.com')
-    refid = _rename(app, Certificate, csr_id, JAPANESE)
-    assert_named(auth_client.get(f'/api/v2/csrs/{csr_id}/export'), JAPANESE, '.csr', refid)
-    assert_named(auth_client.get(f'/api/v2/csrs/{csr_id}/export?format=key'), JAPANESE, '.key', refid)
+    plain = plain_stem(name, _rename(app, Certificate, csr_id, name))
+    assert_named(auth_client.get(f'/api/v2/csrs/{csr_id}/export'), name, '.csr', plain)
+    assert_named(auth_client.get(f'/api/v2/csrs/{csr_id}/export?format=key'), name, '.key', plain)
