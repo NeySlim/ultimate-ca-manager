@@ -1,8 +1,9 @@
 """LDAP option ``ldap_nested_groups``: on Active Directory, the nested groups and the primary group.
 
-ldap3's MOCK_SYNC cannot evaluate LDAP_MATCHING_RULE_TRANSITIVE_EVAL (MS-ADTS 3.1.1.3.4.4.4):
-``Chain`` answers that clause at the library boundary as a domain controller would (a visited
-set, so a cycle ends) and records the filter as sent, which is what these tests pin.
+ldap3's MOCK_SYNC cannot evaluate LDAP_MATCHING_RULE_TRANSITIVE_EVAL (MS-ADTS 3.1.1.3.4.4.4)
+nor resolve a ``<SID=…>`` base (MS-ADTS 3.1.1.3.1.2.4): ``Chain`` answers both at the library
+boundary as a domain controller would (a visited set, so a cycle ends) and records the requests
+as sent, which is what these tests pin.
 """
 import json
 import logging
@@ -50,11 +51,20 @@ class Chain:
 
     def __init__(self, d, monkeypatch):
         self.d, self.filters, self.error = d, [], None
+        self.sid_bases, self.sid_error = [], False
         chain = self
         base_conn = ldap3.Connection
 
         class _Conn(base_conn):
             def search(self, base, flt, *a, **kw):
+                if base.startswith('<SID='):
+                    chain.sid_bases.append((base, kw.get('search_scope')))
+                    if chain.sid_error:
+                        raise ldap3.core.exceptions.LDAPOperationsErrorResult('insufficientAccessRights')
+                    sid = bytes.fromhex(base[5:-1])
+                    base = next((dn for dn, attrs in chain.d.server.dit.items()
+                                 if sid in attrs.get('objectSid', [])), 'cn=no-such-sid')
+                    return super().search(base, flt, *a, **kw)
                 if IN_CHAIN not in flt:
                     return super().search(base, flt, *a, **kw)
                 chain.filters.append((base, flt, kw.get('size_limit'), kw.get('time_limit')))
@@ -105,7 +115,8 @@ def _group(d, dn, members=(), rid=None, cn=None):
     d.add(dn, attrs)
 
 
-def _forest(monkeypatch, user, rdn=None, primary=513, ad=True):
+def _forest(monkeypatch, user, rdn=None, primary=513, ad=True,
+            staff='OU=Staff,DC=example,DC=com', groups=GROUPS):
     """User in PKI-Ops (direct), PKI-Ops in PKI-Team in PKI-Admins; Domain Users (primary)
     in VPN-All; a group the user is not in."""
     contexts = ['DC=example,DC=com', 'CN=Configuration,DC=example,DC=com']
@@ -114,19 +125,19 @@ def _forest(monkeypatch, user, rdn=None, primary=513, ad=True):
         d.server.info.supported_features = [f for f in d.server.info.supported_features
                                             if f[0] != '1.2.840.113556.1.4.800']
     d.add(USERS, {'objectClass': ['top']})
-    udn = f'CN={rdn or user},OU=Staff,DC=example,DC=com'
+    udn = f'CN={rdn or user},{staff}'
     d.add(udn, {'objectClass': ['user'], 'sAMAccountName': user, 'cn': user, 'displayName': user,
                 'mail': f'{user}@example.com', 'userPassword': PW, 'distinguishedName': udn,
-                'memberOf': [f'CN=PKI-Ops,{GROUPS}'], 'primaryGroupID': str(primary),
+                'memberOf': [f'CN=PKI-Ops,{groups}'], 'primaryGroupID': str(primary),
                 'objectSid': _sid(1105), 'userAccountControl': '512',
                 'objectGUID': uuid.uuid4().bytes_le})
     udn = next(k for k in d.server.dit if k.lower() == safe_dn(udn).lower())
-    _group(d, f'CN=PKI-Ops,{GROUPS}', [udn], rid=1201)
-    _group(d, f'CN=PKI-Team,{GROUPS}', [f'CN=PKI-Ops,{GROUPS}'], rid=1202)
-    _group(d, f'CN=PKI-Admins,{GROUPS}', [f'CN=PKI-Team,{GROUPS}'], rid=1203)
+    _group(d, f'CN=PKI-Ops,{groups}', [udn], rid=1201)
+    _group(d, f'CN=PKI-Team,{groups}', [f'CN=PKI-Ops,{groups}'], rid=1202)
+    _group(d, f'CN=PKI-Admins,{groups}', [f'CN=PKI-Team,{groups}'], rid=1203)
     _group(d, DOMAIN_USERS, rid=513)
-    _group(d, f'CN=VPN-All,{GROUPS}', [DOMAIN_USERS], rid=1204)
-    _group(d, f'CN=Unrelated,{GROUPS}', [f'CN=someone,{GROUPS}'], rid=1205)
+    _group(d, f'CN=VPN-All,{groups}', [DOMAIN_USERS], rid=1204)
+    _group(d, f'CN=Unrelated,{groups}', [f'CN=someone,{groups}'], rid=1205)
     return d, Chain(d, monkeypatch), udn
 
 
@@ -198,9 +209,10 @@ def test_on_reads_three_levels_and_the_primary_group(env, monkeypatch, member_at
     assert flt == (f'(&(objectClass=group)(|(member:{IN_CHAIN}:={escape_filter_chars(udn)})'
                    f'(member:{IN_CHAIN}:={escape_filter_chars(DOMAIN_USERS)})))')
     assert size and seconds
-    # The primary group is found by its SID: the user's domain SID and primaryGroupID
-    sid_filters = [f for _, f, _ in d.searches if 'objectSid=' in f]
-    assert sid_filters == [f'(objectSid={ldap3.utils.conv.escape_bytes(_sid(513))})']
+    # The primary group is read by its SID wherever it lies: the user's domain SID and
+    # primaryGroupID, as a <SID=hex> base object (MS-ADTS 3.1.1.3.1.2.4)
+    assert chain.sid_bases == [(f'<SID={_sid(513).hex()}>', ldap3.BASE)]
+    assert not [f for _, f, _ in d.searches if 'objectSid=' in f]
 
 
 def test_on_a_rule_reached_only_through_a_parent_gives_its_role(env, monkeypatch, auth_client):
@@ -228,6 +240,88 @@ def test_on_required_groups_see_the_nested_groups(env, monkeypatch):
     pid = _provider(env, ldap_nested_groups=True, role_mapping=None,
                     ldap_required_groups=json.dumps(['PKI-Team']))
     assert env.login(pid, user)[0] == 200
+
+
+# ── Where the groups are searched: the primary group is read wherever it lies ─────
+
+def test_a_group_base_limited_to_an_ou_still_reads_the_parents(env, monkeypatch):
+    """The primary group (CN=Users) is outside OU=Groups: its own name does not count, its
+    parents under the base do, and the login goes through."""
+    user = env.user()
+    _forest(monkeypatch, user)
+    pid = _provider(env, ldap_nested_groups=True, ldap_group_base_dn=GROUPS,
+                    role_mapping=json.dumps({'VPN-All': 'operator', 'PKI-Admins': 'admin'}))
+    info, err = _groups(env, pid, user)
+    assert err is None, err
+    assert set(info['groups']) == ALL - {'Domain Users'}
+    assert env.login(pid, user)[0] == 200 and env.role(user) == 'admin'
+
+
+def test_a_deduced_group_base_still_reads_the_parents(env, monkeypatch):
+    """No group base, a base DN two levels under the domain: the groups are searched under
+    its parent OU=Corp, which does not hold CN=Users."""
+    user = env.user()
+    corp = 'OU=Corp,DC=example,DC=com'
+    d, chain, _ = _forest(monkeypatch, user, staff=f'OU=People,{corp}', groups=f'OU=Groups,{corp}')
+    pid = _provider(env, ldap_nested_groups=True, ldap_base_dn=f'OU=People,{corp}',
+                    role_mapping=json.dumps({'VPN-All': 'operator', 'PKI-Admins': 'admin'}))
+    info, err = _groups(env, pid, user)
+    assert err is None, err
+    assert set(info['groups']) == ALL - {'Domain Users'}
+    [(base, _, _, _)] = chain.filters
+    assert base.lower() == corp.lower()
+    assert env.login(pid, user)[0] == 200 and env.role(user) == 'admin'
+
+
+def test_a_limit_under_the_deduced_base_is_not_retried_under_the_base_dn(
+        env, monkeypatch, auth_client, caplog):
+    """Under OU=People, the base DN, there are fewer groups: retrying there is a partial answer."""
+    import api.v2.sso.connection_tests as connection_tests
+    user = env.user()
+    corp = 'OU=Corp,DC=example,DC=com'
+    _forest(monkeypatch, user, staff=f'OU=People,{corp}', groups=f'OU=Groups,{corp}')
+    monkeypatch.setattr(connection_tests, 'NESTED_GROUPS_LIMIT', 3)
+    pid = _provider(env, ldap_nested_groups=True, ldap_base_dn=f'OU=People,{corp}',
+                    role_mapping=json.dumps({'PKI-Ops': 'admin'}))
+    _refused(env, pid, user, auth_client, 'sizeLimitExceeded', caplog)
+
+
+def test_a_name_twin_of_a_primary_group_outside_the_base_gives_no_role(env, monkeypatch):
+    """A group under the base named like the user's primary group, which lies outside it:
+    the rule on that name must not reach the user through the primary group."""
+    user = env.user()
+    d, _, _ = _forest(monkeypatch, user)
+    _group(d, f'CN=Domain Users,{GROUPS}', [f'CN=someone,{GROUPS}'], rid=1300)
+    pid = _provider(env, ldap_nested_groups=True, ldap_group_base_dn=GROUPS,
+                    role_mapping=json.dumps({'Domain Users': 'admin'}))
+    info, err = _groups(env, pid, user)
+    assert err is None and 'Domain Users' not in info['groups']
+    assert env.login(pid, user)[0] == 403
+
+
+def test_the_group_filter_applies_to_the_primary_group(env, monkeypatch):
+    user = env.user()
+    _forest(monkeypatch, user)
+    pid = _provider(env, ldap_nested_groups=True,
+                    ldap_group_filter='(&(objectClass=group)(cn=PKI-*))')
+    info, err = _groups(env, pid, user)
+    assert err is None, err
+    assert set(info['groups']) == {'PKI-Ops', 'PKI-Team', 'PKI-Admins'}
+
+
+def test_each_connection_of_the_nested_read_has_a_receive_timeout(env, monkeypatch):
+    import api.v2.sso.connection_tests as connection_tests
+    user = env.user()
+    _forest(monkeypatch, user)
+    real, bounds = connection_tests._service_connection, []
+
+    def spy(provider, server, **kw):
+        bounds.append(kw)
+        return real(provider, server, **kw)
+    monkeypatch.setattr(connection_tests, '_service_connection', spy)
+    pid = _provider(env, ldap_nested_groups=True)
+    assert _groups(env, pid, user)[1] is None
+    assert {'receive_timeout': connection_tests.NESTED_GROUPS_SECONDS} in bounds
 
 
 def test_a_cycle_of_groups_ends(env, monkeypatch):
@@ -297,8 +391,8 @@ def test_a_primary_group_not_found_is_refused(env, monkeypatch, auth_client, cap
 
 def test_a_refused_sid_read_is_refused(env, monkeypatch, auth_client, caplog):
     user = env.user()
-    d, _, _ = _forest(monkeypatch, user)
-    d.fail_on = '(objectSid='
+    _, chain, _ = _forest(monkeypatch, user)
+    chain.sid_error = True
     pid = _provider(env, ldap_nested_groups=True, role_mapping=json.dumps({'PKI-Ops': 'admin'}))
     _refused(env, pid, user, auth_client, 'insufficientAccessRights', caplog)
 
@@ -403,3 +497,25 @@ def test_the_option_goes_through_a_backup_and_a_restore(app):
             SSOProvider.query.filter_by(name=name).delete()
             db.session.commit()
             others.back()
+
+
+@pytest.mark.parametrize('value', ['true', 1, 'false', 0, None, [True]])
+def test_a_value_that_is_not_a_boolean_is_refused(app, auth_client, value):
+    name = f'nest-{uuid.uuid4().hex[:6]}'
+    body = {'name': name, 'provider_type': 'ldap', 'ldap_server': 'ldap.example.com',
+            'ldap_base_dn': 'dc=example,dc=com'}
+    try:
+        r = auth_client.post('/api/v2/sso/providers', json={**body, 'ldap_nested_groups': value})
+        assert r.status_code == 400 and 'ldap_nested_groups' in r.get_json()['message']
+        with app.app_context():
+            assert SSOProvider.query.filter_by(name=name).count() == 0
+        r = auth_client.post('/api/v2/sso/providers', json={**body, 'ldap_nested_groups': True})
+        pid = r.get_json()['data']['id']
+        r = auth_client.put(f'/api/v2/sso/providers/{pid}', json={'ldap_nested_groups': value})
+        assert r.status_code == 400 and 'ldap_nested_groups' in r.get_json()['message']
+        with app.app_context():
+            assert db.session.get(SSOProvider, pid).ldap_nested_groups is True
+    finally:
+        with app.app_context():
+            SSOProvider.query.filter_by(name=name).delete()
+            db.session.commit()

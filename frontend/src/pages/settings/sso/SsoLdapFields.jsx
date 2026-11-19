@@ -225,7 +225,8 @@ export default function SsoLdapFields({
           {formData.ldap_nested_groups === true && (
             <p className="text-xs text-status-warning">{t('sso.ldapNestedGroupsWarning')}</p>
           )}
-          {(formData.ldap_group_member_attr || 'member') !== 'memberOf' && (
+          {/* With the nested option, the parent groups are searched under this base, memberOf included */}
+          {((formData.ldap_group_member_attr || 'member') !== 'memberOf' || formData.ldap_nested_groups === true) && (
             <Input
               label={t('sso.groupBaseDn')}
               value={formData.ldap_group_base_dn || ''}
