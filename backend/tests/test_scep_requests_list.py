@@ -59,3 +59,9 @@ def test_the_default_page_is_still_fifty(auth_client, requests_rows):
 def test_several_statuses_are_kept(auth_client, requests_rows):
     body = _get(auth_client, f'search={requests_rows}&status=approved&status=pending&per_page=10')
     assert body['meta']['total'] == 60
+
+
+def test_an_unknown_status_is_refused_like_the_user_certificates(auth_client, requests_rows):
+    r = auth_client.get(f'/api/v2/scep/requests?search={requests_rows}&status=bogus')
+    assert r.status_code == 400
+    assert 'bogus' in r.get_json()['message']

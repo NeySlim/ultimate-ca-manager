@@ -146,7 +146,12 @@ def list_scep_requests():
     """List SCEP certificate requests, newest first, paged."""
     from utils.pagination import parse_request_pagination, paginate
     page, per_page = parse_request_pagination(default_per_page=50)
-    statuses = [v for v in request.args.getlist('status') if v]
+    from utils.cert_status import (
+        SCEP_REQUEST_STATUS_FILTERS, normalize_status_filters, unknown_status_message)
+    statuses, unknown = normalize_status_filters(
+        [v for v in request.args.getlist('status') if v], SCEP_REQUEST_STATUS_FILTERS)
+    if unknown:
+        return error_response(unknown_status_message(unknown, SCEP_REQUEST_STATUS_FILTERS), 400)
     search = request.args.get('search', '').strip()
     query = SCEPRequest.query
 

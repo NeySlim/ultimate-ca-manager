@@ -60,6 +60,8 @@ USER_CERTIFICATE_STATUS_FILTERS = ('valid', 'expiring', 'expired', 'revoked')
 
 SSH_CERTIFICATE_STATUS_FILTERS = ('valid', 'expiring', 'expired', 'revoked')
 
+SCEP_REQUEST_STATUS_FILTERS = ('pending', 'approved', 'rejected')
+
 
 def normalize_status_filters(values, vocabulary):
     """``(canonical_names, unrecognised)`` for the requested statuses.
