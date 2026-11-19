@@ -908,6 +908,7 @@ class RestoreCoreMixin:
         for row in rows:
             user_id = plan.resolve('user_sso_identities', row, 'user_id')
             provider_id = plan.resolve('user_sso_identities', row, 'provider_id')
+            row = self._expected_tenant_here(plan, row, user_id)
             holder = self._identity_holder(user_id, provider_id, row.get('external_id'))
             if holder is None:
                 kept.append(row)
@@ -917,6 +918,26 @@ class RestoreCoreMixin:
             kept.append({**row, 'provider_id': None, f'provider_id{REFERENCE_SUFFIX}': None,
                          'orphan_of': None})
         return kept
+
+    @staticmethod
+    def _expected_tenant_here(plan, row, user_id):
+        """``row`` with its expected tenant as a sign-in reads it, a lower-case GUID; any other
+        value binds no sign-in and is dropped with a warning."""
+        from models import User
+        from services.oidc_id_token import is_tenant_id
+        value = row.get('expected_tenant')
+        if value is None:
+            return row
+        tenant = value.strip().lower() if isinstance(value, str) else None
+        if is_tenant_id(tenant):
+            return {**row, 'expected_tenant': tenant}
+        account = db.session.get(User, user_id) if user_id is not None else None
+        warning = (f"user_sso_identities: the expected tenant of account "
+                   f"{(account.username if account else None)!r} is not a tenant id (GUID) and "
+                   f"was dropped: an attachment not bound yet without one is bound by no sign-in")
+        plan.warnings.append(warning)
+        logger.warning("Restore: %s", warning)
+        return {**row, 'expected_tenant': None}
 
     def _restore_legacy_sso_identities(self, results: Dict, plan) -> None:
         """The identity rows of an archive's account rows that carry their provider (2.254, or

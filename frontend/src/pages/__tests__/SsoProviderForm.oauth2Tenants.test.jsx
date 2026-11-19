@@ -67,6 +67,27 @@ describe('Accepted Entra tenants', () => {
     expect(saved().oauth2_role_tenants).toEqual([TENANT_A, TENANT_B])
   })
 
+  it('warns that role rules with no honoured tenant refuse every sign-in', () => {
+    const warning = () => screen.queryByText('sso.oidcRoleTenantsNoneWarning')
+    open({ id: 3, provider_type: 'oauth2', oauth2_tenants: [TENANT_A, TENANT_B],
+      oauth2_role_tenants: [], role_mapping: { 'UCM.Admin': 'admin' }, id_token_verify: true })
+    expect(warning()).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('sso.oidcRoleTenants'), { target: { value: TENANT_A } })
+    expect(warning()).toBeNull()
+  })
+
+  it('does not warn without role rules, nor for a provider without tenants', () => {
+    const warning = () => screen.queryByText('sso.oidcRoleTenantsNoneWarning')
+    const { unmount } = render(<SsoProviderForm forcedType="oauth2" onSave={vi.fn()} onCancel={vi.fn()}
+      provider={{ id: 3, provider_type: 'oauth2', oauth2_tenants: [TENANT_A], oauth2_role_tenants: [],
+        role_mapping: {}, id_token_verify: true }} />)
+    expect(warning()).toBeNull()
+    unmount()
+    open({ id: 4, provider_type: 'oauth2', oauth2_issuer: 'https://login.microsoftonline.com/x/v2.0',
+      oauth2_role_tenants: [], role_mapping: { 'UCM.Admin': 'admin' }, id_token_verify: true })
+    expect(warning()).toBeNull()
+  })
+
   it('shows a stored value the server could not read as it is', () => {
     open({ id: 3, provider_type: 'oauth2', oauth2_tenants: 'not-a-list', id_token_verify: true })
     expect(field().value).toBe('not-a-list')

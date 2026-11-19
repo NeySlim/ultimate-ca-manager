@@ -210,3 +210,13 @@ def test_a_discovery_cached_for_one_issuer_does_not_serve_tenants(monkeypatch):
     single = _provider(oauth2_tenants=None)
     assert _verify(_claims(TENANT_A, iss=AUTHORITY), single)['tid'] == TENANT_A
     _refused(_claims(TENANT_A, iss=AUTHORITY), 'not a {tenantid} template')
+
+
+def test_role_tenants_are_kept_among_the_accepted_ones_only():
+    """A stored role tenant the accepted list does not hold honours nothing, whatever wrote it."""
+    from services.oidc_id_token import provider_role_tenants
+    both = f'["{TENANT_A.upper()}", "{TENANT_C}"]'
+    assert provider_role_tenants(_provider(oauth2_role_tenants=both)) == (TENANT_A,)
+    assert provider_role_tenants(_provider(oauth2_role_tenants=f'["{TENANT_C}"]')) == ()
+    assert provider_role_tenants(_provider(oauth2_tenants=None, oauth2_role_tenants=both)) == ()
+    assert provider_role_tenants(_provider(oauth2_role_tenants='not json')) == ()

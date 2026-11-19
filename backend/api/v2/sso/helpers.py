@@ -653,10 +653,12 @@ def _honoured_rules(provider, external_data):
 
 def sso_admission(provider, external_data):
     """Whether a login may proceed. With mapping rules, only a user one of them
-    matches; without rules, every user gets the default role, and no default
-    role admits nobody (no implicit role)."""
-    rules = _honoured_rules(provider, external_data)
+    matches, and a tenant whose role claims are not honoured matches none; without
+    rules, every user gets the default role, and no default role admits nobody."""
+    rules = _mapping_rules(provider)
     if rules:
+        if not roles_honoured(provider, external_data):
+            return False
         key = group_match_key(provider)
         groups = _external_group_keys(provider, external_data)
         return any(key(rule) in groups for rule in rules)
