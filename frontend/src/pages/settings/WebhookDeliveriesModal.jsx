@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowsClockwise, ArrowClockwise } from '@phosphor-icons/react'
+import { ArrowsClockwise, ArrowClockwise, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import { Modal, Button, Badge } from '../../components'
 import { useNotification } from '../../contexts'
 import { settingsService } from '../../services'
 
+const PER_PAGE = 25
 const STATUS_VARIANT = { delivered: 'success', failed: 'danger', pending: 'warning' }
 
 function rel(iso) {
@@ -26,20 +27,25 @@ export default function WebhookDeliveriesModal({ webhook, onClose, canRetry }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
   const [retrying, setRetrying] = useState({})
 
   const load = useCallback(async () => {
     if (!webhook) return
     setLoading(true)
     try {
-      const res = await settingsService.getWebhookDeliveries(webhook.id, { status: statusFilter || undefined })
+      const res = await settingsService.getWebhookDeliveries(webhook.id, { page, perPage: PER_PAGE, status: statusFilter || undefined })
       setItems((res.data || res) || [])
+      setTotal(res.meta?.total ?? 0)
+      setTotalPages(Math.max(1, res.meta?.total_pages ?? 1))
     } catch (e) {
       showError(e.message || t('webhooks.deliveries.loadFailed'))
     } finally {
       setLoading(false)
     }
-  }, [webhook, statusFilter, showError, t])
+  }, [webhook, statusFilter, page, showError, t])
 
   useEffect(() => { load() }, [load])
 
@@ -65,7 +71,7 @@ export default function WebhookDeliveriesModal({ webhook, onClose, canRetry }) {
             {['', 'pending', 'delivered', 'failed'].map((s) => (
               <Button key={s || 'all'} type="button" size="sm"
                       variant={statusFilter === s ? 'primary' : 'secondary'}
-                      onClick={() => setStatusFilter(s)}>
+                      onClick={() => { setStatusFilter(s); setPage(1) }}>
                 {s ? t(`webhooks.deliveries.status.${s}`) : t('common.all')}
               </Button>
             ))}
@@ -123,6 +129,22 @@ export default function WebhookDeliveriesModal({ webhook, onClose, canRetry }) {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between text-xs text-text-secondary">
+            <span className="tabular-nums">{page} / {totalPages} ({total})</span>
+            <div className="flex gap-1">
+              <Button type="button" size="sm" variant="secondary" aria-label={t('common.back')}
+                      disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                <CaretLeft size={14} />
+              </Button>
+              <Button type="button" size="sm" variant="secondary" aria-label={t('common.next')}
+                      disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+                <CaretRight size={14} />
+              </Button>
+            </div>
           </div>
         )}
       </div>

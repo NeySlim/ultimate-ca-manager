@@ -1238,9 +1238,12 @@ GET /api/v2/user-certificates?status=valid&page=1&per_page=50
 **Query Parameters**:
 | Param | Type | Description |
 |-------|------|-------------|
-| status | string | Filter by status: `valid`, `expired`, `revoked` |
+| status | string | Filter by status: `valid`, `expiring`, `expired`, `revoked` (repeatable). Applied before paging: `total` and `pages` count the matching rows only |
+| search | string | Name, subject or serial contains |
+| sort_by | string | `created_at` (default), `name`, `valid_until`, `last_used_at` |
+| sort_order | string | `asc` or `desc` (default) |
 | page | int | Page number (default: 1) |
-| per_page | int | Items per page (default: 50) |
+| per_page | int | Items per page (default: 25) |
 
 **Response** `200`:
 ```json
@@ -1752,7 +1755,7 @@ GET /api/v2/truststore/export?format=pem&purpose=all
 - `add-from-ca` (`write:truststore`) adds a managed CA's certificate. Optional body `purpose` (default `root_ca` for a root, else `intermediate_ca`) and `notes`. `201`; `409` when it is already there, `400` when the CA awaits its certificate or the purpose is invalid, `404` for an unknown CA.
 - `bulk/delete` (`delete:truststore`) takes `{"ids": [1, 2]}` (a non-empty list of at most 100) and returns `success` (the removed ids) and `failed` (`{id, error}`).
 - `expiring` (`read:truststore`) lists trusted certificates expiring within `days` (default 90).
-- `export` (`read:truststore`) downloads a bundle: `format` `pem` (default) or `p7b`, `purpose` filters (default `all`). `404` when nothing matches. Unreadable entries are skipped and named in `X-Skipped-Certificates` and `X-Skipped-Certificates-Count` (first 100 ids and the total); `404` also when none is readable, with `details.skipped` (the first 100) and `details.skipped_count` (the total).
+- `export` (`read:truststore`) downloads a bundle: `format` `pem` (default) or `p7b`, `purpose` filters (default `all`; repeat it to keep several purposes). `404` when nothing matches. Unreadable entries are skipped and named in `X-Skipped-Certificates` and `X-Skipped-Certificates-Count` (first 100 ids and the total); `404` also when none is readable, with `details.skipped` (the first 100) and `details.skipped_count` (the total).
 
 ---
 
@@ -1867,7 +1870,7 @@ DELETE /api/v2/acme/orders/{order_pk}
 POST /api/v2/acme/orders/purge
 GET /api/v2/acme/history?source=all
 ```
-`DELETE` (`delete:acme`) removes one local order with its authorizations and challenges (`404` when unknown). `purge` (`delete:acme`) runs the expired-order purge now and returns the counts of orders, authorizations and challenges removed. `history` (`read:acme`) lists certificates issued through ACME, local and external CAs; `source` filters.
+`DELETE` (`delete:acme`) removes one local order with its authorizations and challenges (`404` when unknown). `purge` (`delete:acme`) runs the expired-order purge now and returns the counts of orders, authorizations and challenges removed. `history` (`read:acme`) lists certificates issued through ACME, local and external CAs; `source` filters. `history` filters on `status` (`valid` or `revoked`), `ca` (an issuer name listed in `meta.cas`) and `search`, sorts by `sort_by` (`common_name`, `valid_to`, `created_at`) and `sort_order`, and pages with `page` and `per_page` (default 50, 100 at most); `meta` carries `total` and `cas`.
 
 ### External Account Binding
 ```http
@@ -1924,10 +1927,10 @@ GET /api/v2/scep/stats
 ### List Requests
 ```http
 GET /api/v2/scep/requests
-GET /api/v2/scep/requests?status=pending
+GET /api/v2/scep/requests?status=pending&search=host&page=2&per_page=50
 GET /api/v2/scep/requests/{request_id}
 ```
-The list holds the latest 50; the last form reads any one request (`read:scep`), 404 when it does not exist.
+The list is newest first and paged: `page` and `per_page` (default 50, 100 at most), `meta` carries `total` and `total_pages`; `status` (repeatable) and `search` (subject, transaction ID or client address) filter before the page is cut. The last form reads any one request (`read:scep`), 404 when it does not exist.
 
 ### Approve Request
 ```http
@@ -2142,7 +2145,7 @@ GET /api/v2/ssh/cas/{ca_id}/public-key
 GET /api/v2/ssh/cas/{ca_id}/krl
 GET /api/v2/ssh/cas/{ca_id}/setup-script?type=user&hostname=host.example.com&platform=unix
 ```
-- `GET` list filters by `search` and by `type` (repeatable).
+- `GET` list filters by `search` and by `type` (repeatable). Without `page` or `per_page` it returns every CA; with either it returns that page (`per_page` defaults to 20, 100 at most) and `meta` carries `total` and `total_pages`.
 - `POST` creates a CA (`201`): `descr` (or `name`, required), `ca_type` (`user` by default, or `host`), `key_type`, `default_ttl`, `max_ttl` (default `0`), `default_extensions`, `allowed_principals` (a list of non-empty strings), `allow_any_principal` and `allow_custom_key_id` (JSON booleans, default off), `comment`. `400` for an invalid value.
 - `POST` with `hsm_key_id` (a JSON integer above zero, `400` otherwise) creates a CA whose key stays on an HSM token: the key must be an RSA or NIST P-256, P-384 or P-521 signing key, `key_type` is read from it and the CA carries `key_source: "hsm"` and `hsm_key_id` (`"software"` and `null` for any other CA). It requires `read:hsm` besides `write:ssh_cas` (`403` naming the missing permission otherwise). An HSM key backs one authority: `409` names the X.509 or SSH CA that already holds it. A token that cannot be reached answers `503`, a key no longer on its token `409`, a misconfigured provider `400`, any other HSM failure `502`. In FIPS mode a key FIPS mode does not approve is refused before the CA is created; in HA mode a SoftHSM or local smart card reader (OpenSC, YubiKey PIV) key answers `409` with code `ha_mode`.
 - `PUT` updates the same metadata (`descr`, `default_ttl`, `max_ttl`, `comment`, `default_extensions`, `allowed_principals`); `400` for an invalid value. `default_ttl` or `max_ttl` sent as `null` is emptied (no default, no maximum); a key left out is kept.
@@ -2232,14 +2235,14 @@ GET /api/v2/discovery?limit=50&offset=0&profile_id=1&status=new&search=example
 GET /api/v2/discovery/{disc_id}
 DELETE /api/v2/discovery/{disc_id}
 DELETE /api/v2/discovery?profile_id=1
-GET /api/v2/discovery/export?format=csv&profile_id=1&status=new
+GET /api/v2/discovery/export?format=csv&profile_id=1&status=new&search=example
 GET /api/v2/discovery/stats?profile_id=1
 POST /api/v2/discovery/bulk-resolve-dns
 ```
 - The list returns `items` and `total`; `limit` defaults to 50 (200 at most), `status` may be repeated.
 - `GET /{disc_id}` adds the parsed `extensions`, key and signature details and the SHA-1 and SHA-256 fingerprints; `404` when unknown. `DELETE /{disc_id}` answers `204`.
 - `DELETE /api/v2/discovery` (`admin:system`) deletes every record, or those of `profile_id`, and returns `deleted`.
-- `export` returns CSV (default) or JSON (`format=json`) as a download.
+- `export` returns CSV (default) or JSON (`format=json`) as a download, for the same `profile_id`, `status` and `search` filters as the list (10 000 rows at most).
 - `bulk-resolve-dns` (`admin:system`) re-resolves reverse DNS for every record and returns the counts `updated` and `total`.
 
 ### Scan Profiles and Runs
@@ -2931,6 +2934,8 @@ Content-Type: application/json
   "require_approval": false
 }
 ```
+
+Some keys need `admin:settings` (session, password and HSTS policy, public addresses, the whole backup schedule, OCSP responder renewal). Without it they are dropped, and the response lists them in `data.ignored_keys` (empty when nothing was dropped); a body made only of such keys is refused with 403.
 
 ### Email Settings
 ```http

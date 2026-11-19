@@ -48,6 +48,8 @@ export default function UserCertificatesPage() {
   // Filters
   const [filterStatus, setFilterStatus] = usePersistedState('ucm-filter-usercerts-status', [])
   const [searchValue, setSearchValue] = useState('')
+  // The server sorts the whole list; null keeps its default (newest first)
+  const [sort, setSort] = useState(null)
 
   // Export — ExportModal owns the format, password and PKCS#12 profile (#331);
   // exportFormat only says which tile it opens on.
@@ -61,6 +63,10 @@ export default function UserCertificatesPage() {
       const params = { page, per_page: perPage }
       if (filterStatus.length > 0) params.status = filterStatus
       if (searchValue) params.search = searchValue
+      if (sort) {
+        params.sort_by = sort.by
+        params.sort_order = sort.order
+      }
 
       const [certRes, statsRes] = await Promise.all([
         userCertificatesService.getAll(params),
@@ -75,9 +81,30 @@ export default function UserCertificatesPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, perPage, JSON.stringify(filterStatus), searchValue, showError, t])
+  }, [page, perPage, JSON.stringify(filterStatus), searchValue, sort, showError, t])
 
   useEffect(() => { loadData() }, [loadData])
+
+  const SERVER_SORT_KEYS = { name: 'name', valid_to: 'valid_until' }
+  const handleSortChange = useCallback((next) => {
+    const by = next && SERVER_SORT_KEYS[next.key]
+    setSort(by ? { by, order: next.direction } : null)
+    setPage(1)
+  }, [])
+
+  // Every page of the list as filtered and sorted on screen, for the table's export
+  const exportLoader = useCallback(async (paging) => {
+    const params = { ...paging }
+    if (filterStatus.length > 0) params.status = filterStatus
+    if (searchValue) params.search = searchValue
+    if (sort) {
+      params.sort_by = sort.by
+      params.sort_order = sort.order
+    }
+    const res = await userCertificatesService.getAll(params)
+    return { data: res.data?.items || [], meta: { total: res.data?.total || 0 } }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(filterStatus), searchValue, sort])
 
   // Listen for data change events (from inspectors)
   useEffect(() => {
@@ -245,6 +272,7 @@ export default function UserCertificatesPage() {
       key: 'owner',
       header: t('userCertificates.columns.owner'),
       priority: 3,
+      sortable: false,
       hideOnMobile: true,
       render: (_val, row) => (
         <div className="flex items-center gap-1.5">
@@ -257,6 +285,7 @@ export default function UserCertificatesPage() {
       key: 'status',
       header: t('common.status'),
       priority: 2,
+      sortable: false,
       hideOnMobile: true,
       render: (_val, row) => getStatusBadge(row),
     },
@@ -399,7 +428,10 @@ export default function UserCertificatesPage() {
             { value: 'revoked', label: t('common.revoked') },
           ],
         }]}
+        sortable
+        onSortChange={handleSortChange}
         exportEnabled
+        exportLoader={exportLoader}
         exportFilename="user-certificates"
         pagination={{
           page,

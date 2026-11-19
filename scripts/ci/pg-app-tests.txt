@@ -114,3 +114,4 @@ tests/test_restore_held_database.py
 tests/test_sso_sign_in_test*.py
 tests/test_ca_deletion_setting_refs.py
 tests/test_restore_transaction_plans.py
+tests/test_user_certificates_list.py

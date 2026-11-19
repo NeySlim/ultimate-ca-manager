@@ -276,3 +276,17 @@ def test_an_operator_still_reads_the_reserved_values(app, operator_client, confi
     assert data['session_timeout'] == 4321
     assert data['backup_password'] == ''
     assert data['metrics_token'] == ''
+
+
+def test_a_partial_save_names_the_refused_keys(operator_client, config_snapshot):
+    r = _patch(operator_client, {'system_name': 'x', 'session_timeout': 999,
+                                 'backup_retention_days': 1})
+    assert r.status_code == 200, r.data
+    assert r.get_json()['data']['ignored_keys'] == [
+        'backup_retention_days', 'session_timeout']
+
+
+def test_a_full_save_names_no_refused_key(auth_client, config_snapshot):
+    r = _patch(auth_client, {'system_name': 'x', 'session_timeout': 999})
+    assert r.status_code == 200, r.data
+    assert r.get_json()['data']['ignored_keys'] == []

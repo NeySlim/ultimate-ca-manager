@@ -2,6 +2,7 @@
  * Settings Page - Horizontal tabs for desktop, scrollable for mobile
  * Uses DetailCard design system
  */
+import { withoutAdminOnly } from './settings/adminOnlySettings'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
@@ -1187,6 +1188,7 @@ export default function SettingsPage() {
   const handleSave = async (section) => {
     setSaving(true)
     let restartMessage = null
+    let ignoredKeys = []
     try {
       if (section === 'email') {
         const targets = smtpSecretTargets(savedEmail, settings)
@@ -1217,10 +1219,15 @@ export default function SettingsPage() {
           smtp_oauth_redirect_uri: settings.smtp_oauth_redirect_uri,
         })
       } else {
-        const response = await settingsService.updateBulk(settings)
+        const response = await settingsService.updateBulk(
+          withoutAdminOnly(settings, hasPermission('admin:settings')))
         restartMessage = response?.data?.restart_message
+        ignoredKeys = response?.data?.ignored_keys || []
       }
       showSuccess(t('messages.success.update.settings'))
+      if (ignoredKeys.length) {
+        showWarning(t('settings.adminKeysIgnored', { keys: ignoredKeys.join(', ') }))
+      }
       if (restartMessage) showWarning(restartMessage)
       if (section === 'email') setOauthDirty(false)
       if (settings.timezone) setAppTimezone(settings.timezone)

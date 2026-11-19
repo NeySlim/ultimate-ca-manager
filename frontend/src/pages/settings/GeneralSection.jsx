@@ -176,6 +176,7 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
         settings={settings}
         updateSetting={updateSetting}
         refreshKey={endpointsRefresh}
+        adminLocked={adminLocked}
       />
       <DetailSection title={t('settings.sessionTimezone')} icon={Clock} iconClass="icon-bg-teal">
         <div className="space-y-4">

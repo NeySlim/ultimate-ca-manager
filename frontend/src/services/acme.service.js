@@ -52,8 +52,8 @@ export const acmeService = {
   },
 
   // History
-  async getHistory() {
-    return apiClient.get('/acme/history')
+  async getHistory(params = {}) {
+    return apiClient.get(`/acme/history${buildQueryString(params)}`)
   },
 
   // =========================================================================

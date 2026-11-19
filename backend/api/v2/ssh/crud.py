@@ -65,6 +65,8 @@ def _opt_in(data, name):
 def list_ssh_cas():
     """List all SSH CAs with optional filtering."""
     page, per_page = parse_request_pagination(default_per_page=20)
+    # Without page or per_page every authority comes back, as for /api/v2/cas
+    paginated = 'page' in request.args or 'per_page' in request.args
     search = request.args.get('search', '').strip()
     ca_types = request.args.getlist('type')
 
@@ -81,7 +83,13 @@ def list_ssh_cas():
             SSHCertificateAuthority.descr.ilike(f'%{safe}%', escape='\\')
         )
 
-    query = query.order_by(SSHCertificateAuthority.created_at.desc())
+    query = query.order_by(SSHCertificateAuthority.created_at.desc(),
+                           SSHCertificateAuthority.id.desc())
+    if not paginated:
+        items = query.all()
+        return success_response(
+            data=[ca.to_dict() for ca in items],
+            meta={'total': len(items), 'page': 1, 'per_page': len(items), 'total_pages': 1})
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 
     return success_response(

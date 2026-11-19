@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Key, Plus, CheckCircle, ShieldCheck,
@@ -117,6 +117,13 @@ export default function ACMEPage() {
   const [historyFilterStatus, setHistoryFilterStatus] = useState([])
   const [historyFilterCA, setHistoryFilterCA] = useState('')
   const [historyFilterSource, setHistoryFilterSource] = useState('')
+  // The history is paged, filtered and sorted by the server
+  const [historyPage, setHistoryPage] = useState(1)
+  const [historyPerPage, setHistoryPerPage] = useState(25)
+  const [historyTotal, setHistoryTotal] = useState(0)
+  const [historyCAs, setHistoryCAs] = useState([])
+  const [historySearch, setHistorySearch] = useState('')
+  const [historySort, setHistorySort] = useState(null)
 
   // EAB — only required flag stays in parent; credentials state lives in EabTab
   const [eabRequired, setEabRequired] = useState(false)
@@ -195,14 +202,46 @@ export default function ACMEPage() {
     return () => { cancelled = true; clearInterval(interval) }
   }, [selectedClientOrder?.id, selectedClientOrder?.status])
 
+  const historyParams = useCallback((paging) => {
+    const params = { ...paging }
+    if (historyFilterStatus.length > 0) params.status = historyFilterStatus
+    if (historyFilterCA) params.ca = historyFilterCA
+    if (historyFilterSource) params.source = historyFilterSource
+    if (historySearch) params.search = historySearch
+    if (historySort) {
+      params.sort_by = historySort.key
+      params.sort_order = historySort.direction
+    }
+    return params
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(historyFilterStatus), historyFilterCA, historyFilterSource, historySearch, historySort])
+
+  const loadHistory = useCallback(async () => {
+    try {
+      const res = await acmeService.getHistory(historyParams({ page: historyPage, per_page: historyPerPage }))
+      setHistory(res.data || [])
+      setHistoryTotal(res.meta?.total ?? (res.data || []).length)
+      setHistoryCAs((res.meta?.cas || []).map((name) => ({ value: name, label: name })))
+    } catch (error) {
+      notifyRef.current(error.message)
+    }
+  }, [historyParams, historyPage, historyPerPage])
+  const notifyRef = useRef(() => {})
+  notifyRef.current = (message) => showError(message || t('messages.errors.loadFailed.acme'))
+  const loadHistoryRef = useRef(loadHistory)
+  loadHistoryRef.current = loadHistory
+  useEffect(() => { loadHistory() }, [loadHistory])
+
+  // Every page of the history as filtered and sorted on screen, for the table's export
+  const exportHistory = useCallback((paging) => acmeService.getHistory(historyParams(paging)), [historyParams])
+
   const loadData = async () => {
     setLoading(true)
     try {
-      const [accountsRes, settingsRes, casRes, historyRes, clientOrdersRes, clientSettingsRes, dnsProvidersRes, dnsTypesRes, domainsRes, localDomainsRes, eabReqRes, caAccountsRes] = await Promise.all([
+      const [accountsRes, settingsRes, casRes, clientOrdersRes, clientSettingsRes, dnsProvidersRes, dnsTypesRes, domainsRes, localDomainsRes, eabReqRes, caAccountsRes] = await Promise.all([
         acmeService.getAccounts(),
         acmeService.getSettings(),
         casService.getAll(),
-        acmeService.getHistory(),
         fetchPages((page) => acmeService.getClientOrders(undefined, undefined, page), { max: CLIENT_ORDERS_MAX })
           .then(({ rows, total, complete }) => ({ data: rows, partial: complete ? null : { loaded: rows.length, total } }))
           .catch(() => ({ data: [] })),
@@ -218,7 +257,6 @@ export default function ACMEPage() {
       setAcmeSettings(settingsRes.data || settingsRes || {})
       setSavedProfiles((settingsRes.data || settingsRes || {}).profiles || {})
       setCas(casRes.data || casRes.cas || [])
-      setHistory(historyRes.data || [])
       setClientOrders(clientOrdersRes.data || [])
       setClientOrdersPartial(clientOrdersRes.partial || null)
       setClientSettings(clientSettingsRes.data || {})
@@ -241,6 +279,7 @@ export default function ACMEPage() {
       setDnsProviderTypes(dnsTypesRes.data || [])
       setAcmeDomains(domainsRes.data || [])
       setLocalDomains(localDomainsRes.data || [])
+      loadHistoryRef.current()
     } catch (error) {
       showError(error.message || t('messages.errors.loadFailed.acme'))
     } finally {
@@ -1021,7 +1060,7 @@ export default function ACMEPage() {
     { id: 'localorders', label: t('acme.localOrders'), icon: ClockCounterClockwise },
     { id: 'accounts', label: t('acme.accounts'), icon: Key, count: accounts.length },
     { id: 'eab', label: t('acme.eab.tab'), icon: LockKey },
-    { id: 'history', label: t('common.history'), icon: ClockCounterClockwise, count: history.length }
+    { id: 'history', label: t('common.history'), icon: ClockCounterClockwise, count: historyTotal }
   ]
 
   // Detail tabs (when account selected)
@@ -1141,7 +1180,7 @@ export default function ACMEPage() {
         stats={[
           { icon: Key, label: t('acme.accounts'), value: accounts.length },
           { icon: CheckCircle, label: t('common.active'), value: stats.active, variant: 'success' },
-          { icon: ClockCounterClockwise, label: t('common.certificates'), value: history.length, variant: 'primary' },
+          { icon: ClockCounterClockwise, label: t('common.certificates'), value: historyTotal, variant: 'primary' },
         ]}
         tabs={tabs}
         activeTab={activeTab}
@@ -1375,12 +1414,22 @@ export default function ACMEPage() {
         {activeTab === 'history' && (
           <HistoryTab
             history={history}
+            total={historyTotal}
+            page={historyPage}
+            perPage={historyPerPage}
+            onPageChange={setHistoryPage}
+            onPerPageChange={(v) => { setHistoryPerPage(v); setHistoryPage(1) }}
+            search={historySearch}
+            onSearchChange={(v) => { setHistorySearch(v); setHistoryPage(1) }}
+            onSortChange={(next) => { setHistorySort(next); setHistoryPage(1) }}
+            caOptions={historyCAs}
+            exportLoader={exportHistory}
             filterStatus={historyFilterStatus}
-            onFilterStatusChange={setHistoryFilterStatus}
+            onFilterStatusChange={(v) => { setHistoryFilterStatus(v); setHistoryPage(1) }}
             filterCA={historyFilterCA}
-            onFilterCAChange={setHistoryFilterCA}
+            onFilterCAChange={(v) => { setHistoryFilterCA(v); setHistoryPage(1) }}
             filterSource={historyFilterSource}
-            onFilterSourceChange={setHistoryFilterSource}
+            onFilterSourceChange={(v) => { setHistoryFilterSource(v); setHistoryPage(1) }}
             selectedCert={selectedCert}
             onSelectCert={setSelectedCert}
           />

@@ -13,9 +13,13 @@ import {
 } from '@phosphor-icons/react'
 import { useMobile } from '../../../contexts'
 import { cn, exportToCSV, exportToJSON } from '../../../lib/utils'
+import { fetchPages } from '../../../lib/fetchAllPages'
 import { FilterSelect } from '../Select'
 import { MultiSelectFilter } from '../MultiSelectFilter'
 import { FilterChips } from '../FilterChips'
+
+const EXPORT_MAX_ROWS = 10000
+const EXPORT_PAGE_SIZE = 100
 
 export function ResponsiveDataTable({
   // Data
@@ -59,6 +63,9 @@ export function ResponsiveDataTable({
   // Export
   exportEnabled = false, // Enable export button
   exportFilename = 'export', // Base filename for exports
+  // A server-paged table exports through this: ({ page, per_page }) => Promise<{ data: rows[], meta: { total } }>
+  // returning a page of the list as filtered and sorted on screen. Without it such a table offers no export.
+  exportLoader,
   
   // Sorting
   sortable = false,
@@ -551,15 +558,48 @@ export function ResponsiveDataTable({
   }, [userVisibleColumns, isDesktop])
   
   // Export functions (must be after sortedData and visibleColumns)
-  const handleExportCSV = useCallback(() => {
-    exportToCSV(sortedData, visibleColumns, exportFilename)
+  // A table is paged by the server when it is handed a pagination object: its rows
+  // are then one page, and the file is built from the loader walking every page.
+  const serverPaged = useExternalPagination
+  const exportCount = serverPaged ? Math.min(pagination.total || 0, EXPORT_MAX_ROWS) : sortedData.length
+  const canExport = exportEnabled && (!serverPaged || typeof exportLoader === 'function')
+  const [exportState, setExportState] = useState({ busy: false, notice: null })
+
+  const runExport = useCallback(async (write) => {
     setShowExportMenu(false)
-  }, [sortedData, visibleColumns, exportFilename])
-  
-  const handleExportJSON = useCallback(() => {
-    exportToJSON(sortedData, exportFilename)
-    setShowExportMenu(false)
-  }, [sortedData, exportFilename])
+    if (!serverPaged) {
+      write(sortedData)
+      return
+    }
+    setExportState({ busy: true, notice: null })
+    try {
+      const { rows, total, complete } = await fetchPages(exportLoader, {
+        perPage: EXPORT_PAGE_SIZE, max: EXPORT_MAX_ROWS,
+      })
+      if (!complete) {
+        setExportState({ busy: false, notice: { key: 'table.exportFailed' } })
+        return
+      }
+      write(rows)
+      const available = pagination.total || total
+      setExportState({
+        busy: false,
+        notice: available > EXPORT_MAX_ROWS
+          ? { key: 'table.exportTruncated', values: { count: EXPORT_MAX_ROWS, total: available } }
+          : null,
+      })
+    } catch {
+      setExportState({ busy: false, notice: { key: 'table.exportFailed' } })
+    }
+  }, [serverPaged, sortedData, exportLoader, pagination])
+
+  const handleExportCSV = useCallback(
+    () => runExport((rows) => exportToCSV(rows, visibleColumns, exportFilename)),
+    [runExport, visibleColumns, exportFilename])
+
+  const handleExportJSON = useCallback(
+    () => runExport((rows) => exportToJSON(rows, exportFilename)),
+    [runExport, exportFilename])
   
   // Get primary and secondary columns for mobile cards
   // NOTE: If secondaryCol has mobileRender, it likely includes tertiary info already
@@ -677,13 +717,15 @@ export function ResponsiveDataTable({
           deletePreset={deletePreset}
           applyPreset={applyPreset}
           // Export
-          exportEnabled={exportEnabled}
+          exportEnabled={canExport}
+          exportBusy={exportState.busy}
+          exportNotice={exportState.notice}
           showExportMenu={showExportMenu}
           setShowExportMenu={setShowExportMenu}
           exportMenuRef={exportMenuRef}
           handleExportCSV={handleExportCSV}
           handleExportJSON={handleExportJSON}
-          dataCount={sortedData.length}
+          dataCount={exportCount}
           densityStorageKey={densityStorageKey}
           density={density}
           cycleDensity={cycleDensity}
@@ -807,6 +849,8 @@ function SearchBar({
   applyPreset,
   // Export
   exportEnabled,
+  exportBusy,
+  exportNotice,
   showExportMenu,
   setShowExportMenu,
   exportMenuRef,
@@ -1163,6 +1207,11 @@ function SearchBar({
         )}
         
         {/* Export Button (desktop only) */}
+        {!isMobile && exportNotice && (
+          <span role="status" className="text-2xs text-status-warning shrink-0">
+            {t(exportNotice.key, exportNotice.values)}
+          </span>
+        )}
         {!isMobile && exportEnabled && dataCount > 0 && (
           <div className="relative shrink-0" ref={exportMenuRef}>
             <button
@@ -1182,10 +1231,11 @@ function SearchBar({
             {showExportMenu && (
               <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-lg border border-border bg-bg-primary shadow-lg py-1">
                 <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider border-b border-border mb-1">
-                  {t('table.exportItems', { count: dataCount })}
+                  {exportBusy ? t('table.exporting') : t('table.exportItems', { count: dataCount })}
                 </div>
                 <button
                   onClick={handleExportCSV}
+                  disabled={exportBusy}
                   className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-bg-hover transition-colors"
                 >
                   <Export size={14} />
@@ -1193,6 +1243,7 @@ function SearchBar({
                 </button>
                 <button
                   onClick={handleExportJSON}
+                  disabled={exportBusy}
                   className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-bg-hover transition-colors"
                 >
                   <Export size={14} />
