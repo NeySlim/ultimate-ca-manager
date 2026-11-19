@@ -1863,7 +1863,7 @@ DELETE /api/v2/acme/orders/{order_pk}
 POST /api/v2/acme/orders/purge
 GET /api/v2/acme/history?source=all
 ```
-`DELETE` (`delete:acme`) removes one local order with its authorizations and challenges (`404` when unknown). `purge` (`delete:acme`) runs the expired-order purge now and returns the counts of orders, authorizations and challenges removed. `history` (`read:acme`) lists certificates issued through ACME, local and external CAs; `source` filters.
+`DELETE` (`delete:acme`) removes one local order with its authorizations and challenges (`404` when unknown). `purge` (`delete:acme`) runs the expired-order purge now and returns the counts of orders, authorizations and challenges removed. `history` (`read:acme`) lists certificates issued through ACME, local and external CAs; `source` filters. `history` filters on `status` (`valid` or `revoked`), `ca` (an issuer name listed in `meta.cas`) and `search`, sorts by `sort_by` (`common_name`, `valid_to`, `created_at`) and `sort_order`, and pages with `page` and `per_page` (default 50, 100 at most); `meta` carries `total` and `cas`.
 
 ### External Account Binding
 ```http

@@ -253,6 +253,19 @@ def list_account_challenges(account_id):
     return success_response(data=data)
 
 
+def _history_issuer_name(source, caref, issuer, external_sources):
+    """The issuer a history row shows: the X.509 issuer of an external certificate, else the UCM CA."""
+    if source in external_sources:
+        if not issuer:
+            return ''
+        from utils.dn_parse import stored_dn_common_name
+        return stored_dn_common_name(issuer) or issuer
+    if not caref:
+        return None
+    ca = CA.query.filter_by(refid=caref).first()
+    return ca.common_name if ca else None
+
+
 @bp.route('/api/v2/acme/history', methods=['GET'])
 @require_auth(['read:acme'])
 def get_acme_history():
@@ -262,6 +275,10 @@ def get_acme_history():
         page: Page number (default: 1)
         per_page: Items per page (default: 50, max: 100)
         source: Filter by source ('acme', 'acme_client', 'letsencrypt', or 'all')
+        status: 'valid' or 'revoked' (repeatable)
+        ca: issuer name as listed in meta.cas
+        search: common name, serial number or issuer contains
+        sort_by: common_name, valid_to or created_at (default); sort_order: asc or desc (default)
     """
     # Bounded from both ends: `min(..., 100)` let a negative page size
     # through, and a negative LIMIT means no limit on SQLite and an error on
@@ -283,7 +300,46 @@ def get_acme_history():
     else:
         query = Certificate.query.filter_by(source=source_filter)
 
-    query = query.order_by(Certificate.created_at.desc())
+    # Issuer names as the list shows them, over the source filter alone, so the
+    # CA choices cover every page and a chosen name selects exactly its rows
+    issuer_groups = {}
+    for src, caref, issuer in query.with_entities(
+            Certificate.source, Certificate.caref, Certificate.issuer).distinct():
+        issuer_groups.setdefault(_history_issuer_name(src, caref, issuer, external_sources), []).append(
+            (src, caref, issuer))
+    issuer_groups.pop(None, None)
+
+    statuses = [v for v in request.args.getlist('status') if v in ('valid', 'revoked')]
+    if len(statuses) == 1:
+        if statuses[0] == 'revoked':
+            query = query.filter(Certificate.revoked.is_(True))
+        else:
+            query = query.filter(db.or_(Certificate.revoked.is_(False), Certificate.revoked.is_(None)))
+    ca_name = request.args.get('ca', '').strip()
+    if ca_name:
+        keys = issuer_groups.get(ca_name, [])
+        query = query.filter(db.or_(db.false(), *[
+            db.and_(Certificate.source == src,
+                    Certificate.caref.is_(None) if caref is None else Certificate.caref == caref,
+                    Certificate.issuer.is_(None) if issuer is None else Certificate.issuer == issuer)
+            for src, caref, issuer in keys]))
+    search = request.args.get('search', '').strip()
+    if search:
+        safe = search.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+        pattern = f'%{safe}%'
+        query = query.filter(db.or_(
+            Certificate.subject_cn.ilike(pattern, escape='\\'),
+            Certificate.descr.ilike(pattern, escape='\\'),
+            Certificate.serial_number.ilike(pattern, escape='\\'),
+            Certificate.issuer.ilike(pattern, escape='\\')))
+
+    sort_columns = {'common_name': Certificate.subject_cn, 'valid_to': Certificate.valid_to,
+                    'created_at': Certificate.created_at}
+    sort_col = sort_columns.get(request.args.get('sort_by', 'created_at'), Certificate.created_at)
+    if request.args.get('sort_order') == 'asc':
+        query = query.order_by(sort_col.asc(), Certificate.id.asc())
+    else:
+        query = query.order_by(sort_col.desc(), Certificate.id.desc())
     total = query.count()
     certs = query.offset((page - 1) * per_page).limit(per_page).all()
 
@@ -392,5 +448,6 @@ def get_acme_history():
 
     return success_response(
         data=data,
-        meta={'total': total, 'page': page, 'per_page': per_page}
+        meta={'total': total, 'page': page, 'per_page': per_page,
+              'cas': sorted(issuer_groups)}
     )
