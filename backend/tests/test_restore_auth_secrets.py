@@ -48,6 +48,7 @@ from sqlalchemy.types import (
 from models import db, User
 from services.backup import manifest
 from services.backup.export_generic import IdentityIndex, export_section, load_model
+from services.backup.restore.sso_providers import _IDP_FIELDS
 
 from tests.fresh_app import fresh_app_fixtures
 
@@ -275,6 +276,8 @@ def _drift(rows):
                 # than change it, and a foreign key pointing nowhere is a
                 # different test than this one.
                 continue
+            if column_name in _TELLS_ANOTHER_ROW.get(section_name, ()):
+                continue
             drifted = _drifted_value(column, getattr(instance, attribute_of[column_name]))
             if drifted is not _UNCHANGED:
                 setattr(instance, attribute_of[column_name], drifted)
@@ -290,6 +293,9 @@ def _drift(rows):
 
 
 _UNCHANGED = object()
+
+# A provider that names another IdP is another provider: the restore replaces it instead of writing it
+_TELLS_ANOTHER_ROW = {'sso_providers': frozenset(_IDP_FIELDS)}
 
 
 def _drifted_value(column, current):
