@@ -7,7 +7,8 @@ import logging
 from flask import Blueprint, request, g
 from auth.unified import require_auth, has_permission as _has_perm
 from services.settings_registry import as_boolean_word
-from utils.secret_target import MASKS, SECRET_TARGET_MESSAGE, keeps_saved_secret, retarget_error
+from utils.secret_target import (MASKS, SECRET_TARGET_MESSAGE, changed_targets, keeps_saved_secret,
+                                 retarget_error)
 from utils.response import success_response, error_response, created_response, no_content_response
 from models import db
 from models.msca import MicrosoftCA, MSCARequest, basic_password_reaches
@@ -129,8 +130,60 @@ _WINRM_OVERRIDE_FIELDS = ('winrm_enabled', 'winrm_host', 'winrm_port', 'winrm_us
                           'winrm_password', 'ca_config')
 
 
-# Kerberos credentials a channel test may retype: the keytab and the principal it signs in as
+# Kerberos credentials a channel test may override: the keytab and the principal it signs in as
 _WINRM_KERBEROS_FIELDS = ('kerberos_principal', 'kerberos_keytab_path')
+
+KERBEROS_ADMIN_MESSAGE = ('Setting a Kerberos keytab or principal, or moving a connection or test '
+                          'that uses one, requires the admin:system permission')
+_CERTSRV_TARGET_FIELDS = ('server', 'use_ssl', 'verify_ssl', 'ca_bundle')
+
+
+def _text(value):
+    return value.strip() if isinstance(value, str) else (value or '')
+
+
+def _kerberos_forbidden():
+    """403 unless the caller holds admin:system: a keytab path names a credential the server reads itself."""
+    if _has_perm('admin:system', getattr(g, 'permissions', None) or []):
+        return None
+    return error_response(KERBEROS_ADMIN_MESSAGE, 403)
+
+
+def _saved_kerberos(msca):
+    return (_text(msca.kerberos_principal), _text(msca.kerberos_keytab_path))
+
+
+def _kerberos_after(msca, data):
+    """(principal, keytab) the connection would hold or use with ``data`` applied, or None off Kerberos."""
+    method = data.get('auth_method', msca.auth_method if msca else 'certificate')
+    if method != 'kerberos':
+        return None
+    saved = _saved_kerberos(msca) if msca and msca.auth_method == 'kerberos' else ('', '')
+    return tuple(_text(data[field]) if field in data else value
+                 for field, value in zip(('kerberos_principal', 'kerberos_keytab_path'), saved))
+
+
+def _kerberos_save_forbidden(msca, data):
+    """A save that sets or changes a keytab or principal, or moves a connection holding one."""
+    after = _kerberos_after(msca, data)
+    if after is None:
+        return None
+    saved = _saved_kerberos(msca) if msca and msca.auth_method == 'kerberos' else ('', '')
+    moved = msca is not None and any(saved) and (
+        changed_targets({k: getattr(msca, k) for k in _CERTSRV_TARGET_FIELDS}, data)
+        or changed_targets(_winrm_target_fields(msca), data))
+    return _kerberos_forbidden() if after != saved or moved else None
+
+
+def _kerberos_test_forbidden(msca, data):
+    """A test that uses a keytab or principal other than the saved ones, or toward another target."""
+    after = _kerberos_after(msca, data)
+    if not after or not any(after):
+        return None
+    if msca is not None and after == _saved_kerberos(msca) and not changed_targets(
+            {k: getattr(msca, k) for k in _CERTSRV_TARGET_FIELDS + ('auth_method',)}, data):
+        return None
+    return _kerberos_forbidden()
 
 
 def _winrm_channel(cfg):
@@ -144,22 +197,6 @@ def _winrm_channel(cfg):
             'winrm_port': cfg.winrm_port or (5986 if use_ssl else 5985),
             'winrm_use_ssl': use_ssl, 'winrm_verify_ssl': bool(cfg.winrm_verify_ssl),
             'winrm_transport': transport, 'winrm_username': (account or '').strip() or None}
-
-
-def _kept_kerberos_credentials(msca, data):
-    """Saved keytab and principal a Kerberos channel built from ``msca`` and ``data``
-    would use without ``data`` naming them. A blank value is none, never the saved one."""
-    kept = []
-    if keeps_saved_secret(data, 'kerberos_keytab_path', msca.kerberos_keytab_path, blank_clears=True):
-        kept.append('kerberos_keytab_path')
-    # A channel account (or the basic user) is a target; the enrollment principal a credential
-    account = data.get('winrm_username', msca.winrm_username)
-    if data.get('auth_method', msca.auth_method) == 'basic' and not str(account or '').strip():
-        account = data.get('username', msca.username)
-    if not str(account or '').strip() and keeps_saved_secret(
-            data, 'kerberos_principal', msca.kerberos_principal, blank_clears=True):
-        kept.append('kerberos_principal')
-    return kept
 
 
 def _transient_winrm_config(msca, overrides):
@@ -209,13 +246,9 @@ def _transient_winrm_config(msca, overrides):
     for field in _WINRM_KERBEROS_FIELDS:
         if field in data:
             setattr(cfg, field, (data[field] or '').strip() or None)
-    # No saved credential of the transport used follows a moved channel: it is retyped
+    # The saved NTLM password does not follow a moved channel; Kerberos is the route's admin:system
     changed = sorted(k for k, v in _winrm_channel(cfg).items() if saved_channel[k] != v)
-    if cfg.winrm_transport == 'kerberos':
-        kept = _kept_kerberos_credentials(msca, data)
-    else:
-        kept = [] if 'winrm_password' in data else ['winrm_password']
-    if changed and kept:
+    if changed and cfg.winrm_transport != 'kerberos' and 'winrm_password' not in data:
         return None, error_response(SECRET_TARGET_MESSAGE, 400,
                                     details={'code': 'secret_required_for_target', 'fields': changed})
 
@@ -293,7 +326,7 @@ def create_connection():
         return error_response(f"Server too long (max {MAX_SERVER_LEN})", 400)
     if auth_method not in ('certificate', 'kerberos', 'basic'):
         return error_response("Invalid auth method", 400)
-    err = _keytab_error(data)
+    err = _kerberos_save_forbidden(None, data) or _keytab_error(data)
     if err:
         return err
 
@@ -405,19 +438,18 @@ def _winrm_target_fields(msca):
 
 
 def _msca_retarget_error(msca, data):
-    """Saved passwords stay with their saved host. A TLS client key is never sent.
+    """Saved passwords and client keys stay with their saved target; Kerberos is a permission instead.
     Stored tokens are read: a password this node cannot open is kept all the same."""
     current = _winrm_target_fields(msca)
     winrm_err = retarget_error(current, data, keeps_saved_secret(
         data, 'winrm_password', msca._winrm_password, blank_clears=True))
     if winrm_err:
         return winrm_err
-    # A Kerberos channel's saved keytab and principal stay with the saved channel too
-    transport = str(data.get('winrm_transport', msca.winrm_transport) or 'kerberos').strip().lower()
-    if transport == 'kerberos' and _kept_kerberos_credentials(msca, data):
-        winrm_err = retarget_error(current, data, True)
-        if winrm_err:
-            return winrm_err
+    # The saved password or client key stays with the saved certsrv target, whatever the channel
+    fields = saved_credential_retargets(msca, data)
+    if fields:
+        return error_response(SECRET_TARGET_MESSAGE, 400,
+                              details={'code': 'secret_required_for_target', 'fields': fields})
     if msca.auth_method != 'basic' or data.get('auth_method', 'basic') != 'basic':
         return None
     if not keeps_saved_secret(data, 'password', msca._password, blank_clears=True):
@@ -447,7 +479,8 @@ def update_connection(msca_id):
     if not data:
         return error_response("Request body required", 400)
     # A transport refused outright is the answer, before any question of secrets
-    err = (_winrm_transport_error(data) if 'winrm_transport' in data else None) \
+    err = _kerberos_save_forbidden(msca, data) \
+        or (_winrm_transport_error(data) if 'winrm_transport' in data else None) \
         or _keytab_error(data) or _msca_retarget_error(msca, data)
     if err:
         return err
@@ -600,7 +633,8 @@ def test_connection_inline():
     data = request.get_json()
     if not data or not data.get('server'):
         return error_response("Server hostname is required", 400)
-    err = _keytab_error(data)
+    # An unsaved connection has no saved target: any keytab or principal needs admin:system
+    err = _kerberos_test_forbidden(None, {'auth_method': 'basic', **data}) or _keytab_error(data)
     if err:
         return err
     result = MicrosoftCAService.test_connection_inline(data)
@@ -625,26 +659,21 @@ def _test_overrides(msca, data):
             return None, error_response(f"{field} must be a boolean", 400)
     if 'server' in data and not data['server'].strip():
         return None, error_response("Server hostname is required", 400)
-    err = _keytab_error(data)
-    if err:
-        return None, err
     if data.get('auth_method', msca.auth_method) not in ('certificate', 'kerberos', 'basic'):
         return None, error_response("Invalid auth method", 400)
+    err = _kerberos_test_forbidden(msca, data) or _keytab_error(data)
+    if err:
+        return None, err
     for field, limit in (('client_cert_pem', MAX_PEM_FIELD_BYTES), ('client_key_pem', MAX_PEM_FIELD_BYTES),
                          ('ca_bundle', MAX_PEM_FIELD_BYTES), ('kerberos_keytab_path', MAX_KEYTAB_PATH_LEN),
                          ('server', MAX_SERVER_LEN)):
         err = _check_size(field, data.get(field), limit)
         if err:
             return None, err
-    # A saved password never follows a changed target (as on save)
+    # A saved password or client key never follows a changed target (as on save), a new method included
     err = _msca_retarget_error(msca, data)
     if err:
         return None, err
-    # Nor does any saved credential of the tested method, a new method included
-    fields = saved_credential_retargets(msca, data)
-    if fields:
-        return None, error_response(SECRET_TARGET_MESSAGE, 400,
-                                    details={'code': 'secret_required_for_target', 'fields': fields})
     return {**data, **({'server': data['server'].strip()} if 'server' in data else {})}, None
 
 

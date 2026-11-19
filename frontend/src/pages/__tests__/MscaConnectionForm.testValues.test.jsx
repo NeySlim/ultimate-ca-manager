@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import './pageRenderingSetup.jsx'
+import { notificationSpies } from './pageRenderingSetup.jsx'
 
 import { apiClient } from '../../services/apiClient'
 import MscaConnectionForm from '../settings/MscaConnectionForm'
@@ -39,6 +39,20 @@ describe('MscaConnectionForm: test connection', () => {
     await new Promise((r) => setTimeout(r, 20))
     expect(posted()).toHaveLength(0)
   })
+
+  it("shows the server's refusal of a Kerberos test it may not run", async () => {
+    const message = 'Setting a Kerberos keytab or principal, or moving a connection or test that uses one, '
+      + 'requires the admin:system permission'
+    apiClient.post.mockRejectedValueOnce(Object.assign(new Error(message), { status: 403 }))
+    notificationSpies.showError.mockClear()
+    const connection = { ...CONNECTION, auth_method: 'kerberos', kerberos_principal: 'svc@CORP.EXAMPLE',
+      kerberos_keytab_path: '/srv/keytabs/ucm.keytab' }
+    render(<MscaConnectionForm connection={connection} onSave={() => {}} onCancel={() => {}} />)
+    fireEvent.change(screen.getByDisplayValue('adcs.corp.example'), { target: { value: 'other.example' } })
+    test()
+    await waitFor(() => expect(notificationSpies.showError).toHaveBeenCalledWith(message))
+    expect(posted()[0][1]).toMatchObject({ server: 'other.example', kerberos_keytab_path: '/srv/keytabs/ucm.keytab' })
+  })
 })
 
 describe('MscaConnectionForm: test the admin channel', () => {
@@ -47,7 +61,7 @@ describe('MscaConnectionForm: test the admin channel', () => {
     apiClient.post.mockResolvedValue({ data: { templates: [] } })
   })
 
-  it('sends the Kerberos keytab and principal of the form: the saved ones stay with the saved channel', async () => {
+  it('sends the Kerberos keytab and principal of the form', async () => {
     const connection = { ...CONNECTION, auth_method: 'kerberos', kerberos_principal: 'svc@CORP.EXAMPLE',
       kerberos_keytab_path: '/srv/keytabs/ucm.keytab', winrm_enabled: true }
     render(<MscaConnectionForm connection={connection} onSave={() => {}} onCancel={() => {}} />)

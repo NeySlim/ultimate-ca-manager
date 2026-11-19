@@ -15,17 +15,16 @@ logger = logging.getLogger(__name__)
 # What a form can change in a connection test; the secrets are handled apart
 _TESTED_FIELDS = ('server', 'ca_name', 'auth_method', 'username', 'client_cert_pem',
                   'kerberos_principal', 'kerberos_keytab_path', 'use_ssl', 'verify_ssl', 'ca_bundle')
-# Where and how a saved credential is sent, and the saved credential of each method
+# Where and how a saved secret is sent, and the saved secret of each method. A Kerberos keytab
+# path and principal are read back in clear: moving them is a permission (admin:system), not a retype
 _TARGET_FIELDS = ('server', 'use_ssl', 'verify_ssl', 'ca_bundle', 'auth_method')
 _SAVED_CREDENTIALS = {'basic': (('password', '_password'),),
-                      'certificate': (('client_key_pem', '_client_key_pem'),),
-                      'kerberos': (('kerberos_principal', 'kerberos_principal'),
-                                   ('kerberos_keytab_path', 'kerberos_keytab_path'))}
+                      'certificate': (('client_key_pem', '_client_key_pem'),)}
 
 
 def saved_credential_retargets(msca, overrides):
-    """Fields of a test form that would send a saved credential it did not retype elsewhere.
-    A blank value is no credential, never the saved one."""
+    """Fields of a test or save that would send a saved secret it did not retype elsewhere.
+    A blank value is no secret, never the saved one."""
     method = overrides.get('auth_method', msca.auth_method)
     if not any(keeps_saved_secret(overrides, field, getattr(msca, column), blank_clears=True)
                for field, column in _SAVED_CREDENTIALS.get(method, ())):
