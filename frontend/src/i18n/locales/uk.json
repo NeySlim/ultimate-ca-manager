@@ -1754,6 +1754,7 @@
     "providerNamePlaceholder": "напр., Мій обліковий запис Cloudflare",
     "credentials": "Облікові дані API",
     "missingCredentials": "Відсутні необхідні облікові дані: {{fields}}",
+    "credentialsEitherOr": "Provide an API token, or the Global API Key together with its email",
     "providerNameRequired": "Назва провайдера є обов'язковою",
     "manualDnsInfo": "Ручний режим вимагає створення DNS TXT-записів вручну.",
     "setAsDefault": "Встановити за замовчуванням",

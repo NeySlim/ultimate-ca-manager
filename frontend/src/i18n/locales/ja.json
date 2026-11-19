@@ -1724,6 +1724,7 @@
     "providerNamePlaceholder": "例：マイCloudflareアカウント",
     "credentials": "API資格情報",
     "missingCredentials": "必要な資格情報が不足: {{fields}}",
+    "credentialsEitherOr": "Provide an API token, or the Global API Key together with its email",
     "providerNameRequired": "プロバイダー名は必須です",
     "manualDnsInfo": "手動モードでは、DNS TXTレコードを手動で作成する必要があります。",
     "setAsDefault": "デフォルトに設定",

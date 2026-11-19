@@ -1754,6 +1754,7 @@
     "providerNamePlaceholder": "например, Моя учётная запись Cloudflare",
     "credentials": "Учётные данные API",
     "missingCredentials": "Не хватает обязательных учётных данных: {{fields}}",
+    "credentialsEitherOr": "Укажите токен API или глобальный ключ API вместе с адресом электронной почты",
     "providerNameRequired": "Укажите имя провайдера",
     "manualDnsInfo": "В ручном режиме TXT-записи DNS нужно создавать самостоятельно при запросе сертификатов.",
     "setAsDefault": "Сделать провайдером по умолчанию",

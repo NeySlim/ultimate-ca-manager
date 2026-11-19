@@ -1724,6 +1724,7 @@
     "providerNamePlaceholder": "e.g., My Cloudflare Account",
     "credentials": "API Credentials",
     "missingCredentials": "Missing required credentials: {{fields}}",
+    "credentialsEitherOr": "Provide an API token, or the Global API Key together with its email",
     "providerNameRequired": "Provider name is required",
     "manualDnsInfo": "Manual mode requires you to create DNS TXT records manually when requesting certificates.",
     "setAsDefault": "Set as default provider",

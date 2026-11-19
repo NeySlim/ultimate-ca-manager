@@ -1724,6 +1724,7 @@
     "providerNamePlaceholder": "z.B. Mein Cloudflare-Konto",
     "credentials": "API-Zugangsdaten",
     "missingCredentials": "Fehlende Zugangsdaten: {{fields}}",
+    "credentialsEitherOr": "Provide an API token, or the Global API Key together with its email",
     "providerNameRequired": "Anbietername ist erforderlich",
     "manualDnsInfo": "Im manuellen Modus müssen Sie DNS-TXT-Einträge selbst erstellen.",
     "setAsDefault": "Als Standard festlegen",

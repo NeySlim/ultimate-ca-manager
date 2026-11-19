@@ -4153,6 +4153,8 @@ Content-Type: application/json
 }
 ```
 
+Cloudflare takes `api_token`, or `api_key` together with `email` (400 otherwise, on creation and on update). Alwaysdata takes `api_key`; `account` is optional and, when given, is sent with the token as `<token> account=<name>`.
+
 ### Get DNS Provider
 ```http
 GET /api/v2/dns-providers/{provider_id}

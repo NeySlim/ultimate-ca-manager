@@ -697,6 +697,8 @@ def _full_entry(provider_class):
     wanted = set(provider_class.REQUIRED_CREDENTIALS)
     if secret and not wanted & secret:
         wanted.add(sorted(secret)[0])
+    if not provider_class.REQUIRED_CREDENTIALS:
+        wanted = {f['name'] for f in schema}  # an either-or rule (Cloudflare): fill every field
     entry = {}
     for field in schema:
         name = field['name']
