@@ -353,7 +353,11 @@ class RestoreCoreMixin:
         # discovered halfway through a restore.
         self._check_payload_schema(backup_data)
         # Before every check, plan and rename: they compare the rewritten text alone
-        nul_warnings = escape_nul_in_archive(backup_data, set(SECTIONS) | RESTORED_SECTIONS)
+        # SQLite stores the NUL an audit entry was sealed over: rewriting it would break the seal
+        rewritten = set(SECTIONS) | RESTORED_SECTIONS
+        if db.session.get_bind().dialect.name != 'postgresql':
+            rewritten.discard('audit_logs')
+        nul_warnings = escape_nul_in_archive(backup_data, rewritten)
         refuse_containers_in_columns(backup_data)
         self._check_serial_duplicates(backup_data)
         upgrade_archived_permissions(backup_data)

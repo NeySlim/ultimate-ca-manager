@@ -185,33 +185,68 @@ def test_a_description_written_through_the_api_restores_in_both_modes(app, auth_
 
 # --- The audit log -------------------------------------------------------------------------------
 
-@pytest.mark.parametrize('mode', MODES)
-def test_an_audit_entry_older_than_the_escaping_is_restored_and_flagged(target, mode):
-    """An entry written before the audit log escaped NUL, sealed over the NUL: restored
-    rewritten, it fails the chain check alone, and the report says the check will say so."""
+def _sealed_entries():
+    """Three entries sealed as before the audit log escaped NUL, the second over a NUL."""
     from datetime import datetime
     from models.audit_log import AuditLog
-    from services.audit.chain import verify_chain
-    from services.backup import manifest
-    if target == 'postgresql':
-        pytest.skip('PostgreSQL never held such an entry: the archive comes from SQLite')
-    prev = None
+    rows, prev = [], None
     for i, details in enumerate(['clean one', 'with\x00nul', 'clean two']):
         row = AuditLog(id=1000 + i, timestamp=datetime(2025, 1, 1, 0, 0, i), username='u',
                        action='nul-probe', resource_type='t', resource_id=str(i),
                        details=details, success=True, prev_hash=prev)
         row.entry_hash = row.compute_hash(prev)
         prev = row.entry_hash
+        rows.append(row)
+    return rows
+
+
+def _chain_errors():
+    from models.audit_log import AuditLog
+    from services.audit.chain import verify_chain
+    return [(e['id'], e['code']) for e in verify_chain(
+        AuditLog.query.order_by(AuditLog.id).all(), True)['errors']]
+
+
+def _probe_details():
+    from models.audit_log import AuditLog
+    return [r.details for r in AuditLog.query.filter_by(action='nul-probe').order_by(AuditLog.id)]
+
+
+@pytest.mark.parametrize('mode', MODES)
+def test_an_audit_entry_holding_a_nul_keeps_its_seal_on_sqlite(target, mode):
+    """SQLite stores the NUL: the entry comes back as sealed, the chain checks, no warning."""
+    from services.backup import manifest
+    if target != 'sqlite':
+        pytest.skip('PostgreSQL never held such an entry')
+    for row in _sealed_entries():
         db.session.add(row)
     db.session.commit()
-    assert verify_chain(AuditLog.query.order_by(AuditLog.id).all(), True)['valid']
+    assert _chain_errors() == []
     svc = _service()
     blob = svc.create_backup(PASSWORD, include={n: n == 'audit_logs' for n in manifest.SECTIONS})
     results = svc.restore_backup(blob, PASSWORD, mode=mode)
     db.session.expire_all()
-    rows = AuditLog.query.filter_by(action='nul-probe').order_by(AuditLog.id).all()
-    assert [r.details for r in rows] == ['clean one', f'with{ESCAPED}nul', 'clean two']
-    checked = verify_chain(AuditLog.query.order_by(AuditLog.id).all(), True)
-    assert [(e['id'], e['code']) for e in checked['errors']] == [(rows[1].id, 'tampered')]
+    assert _probe_details() == ['clean one', 'with\x00nul', 'clean two']
+    assert _chain_errors() == []
+    assert _nul_warnings(results) == []
+
+
+@pytest.mark.parametrize('mode', MODES)
+def test_an_archived_audit_entry_holding_a_nul_is_rewritten_and_flagged_on_postgresql(target,
+                                                                                       mode):
+    """An archive from SQLite, presented by hand: PostgreSQL cannot store the NUL, so the entry
+    is rewritten, fails the chain check alone, and the report says the check will say so."""
+    if target != 'postgresql':
+        pytest.skip('SQLite keeps the text as sealed')
+    from models.audit_log import AuditLog
+    columns = [c.name for c in AuditLog.__table__.columns]
+    payload = {'audit_logs': [
+        {name: (getattr(row, name).isoformat() if name == 'timestamp' else getattr(row, name))
+         for name in columns} for row in _sealed_entries()]}
+    results = _restore(payload, mode)
+    db.session.expire_all()
+    assert _probe_details() == ['clean one', f'with{ESCAPED}nul', 'clean two']
+    flagged = AuditLog.query.filter_by(action='nul-probe', resource_id='1').one().id
+    assert _chain_errors() == [(flagged, 'tampered')]
     warning, = _nul_warnings(results)
     assert warning.startswith('audit_logs.details:') and 'integrity check' in warning
