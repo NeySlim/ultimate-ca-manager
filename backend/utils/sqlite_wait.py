@@ -3,8 +3,9 @@
 sqlite3 waits for a lock in its own busy handler, inside C: under gevent that stops every
 request of the worker, probes included. While a single node's restore gate is up, a request's
 connection waits at most IN_C_MS in C and retries in Python, where time.sleep yields; the
-retries stop at once while the restore's transaction holds the database. Elsewhere (the
-scheduler process, a job's thread, no gate) nothing changes.
+retries stop at once while the restore's transaction holds the database. Outside a request
+(the scheduler process, a job's thread) nothing changes; in the web worker, a request that met
+a lock and would answer 500 answers 503, gate or not.
 """
 import logging
 import sqlite3

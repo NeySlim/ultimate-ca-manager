@@ -136,7 +136,7 @@ def forget():
 
 
 def _checked(view):
-    """The credential's earlier check for this gate: an entry, None (no credential) or False."""
+    """The credential's earlier check for this gate: an entry, None (none, expired or ended) or False."""
     key = _credential()
     if key is None:
         return None

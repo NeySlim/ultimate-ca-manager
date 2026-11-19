@@ -3320,8 +3320,8 @@ instance is restoring a backup: writes are refused until the restore ends. Retry
 single node with SQLite, while the restore's transaction holds the database (or its writes keep
 it locked past a request's one-second wait), only the health probes, `GET /api/v2/system/jobs/<id>` and `POST /api/v2/system/jobs/<id>/cancel` of the restore
 are answered, from its local state and for a session or API key checked during this restore
-(same host; a session also sends its CSRF token; the restore's own start request checks its
-caller again once the restore begins): a credential not checked since the restore began answers
+(same host; a session also sends its CSRF token; a start request still waiting when the restore
+begins checks its caller again at that moment): a credential not checked since the restore began answers
 `503`, a request with none `401`. A start request whose wait meets the held database answers
 `202` with the job as its local state shows it. Every other request answers `503` with
 `Retry-After: 30` and the message `This UCM instance is restoring a backup and its transaction
