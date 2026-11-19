@@ -129,6 +129,12 @@ def test_a_cancellation_in_the_middle_of_a_loop_is_taken_before_it_ends(app, arc
     job_id, name = _start(app, archive, created)
     assert hold.reached.wait(60), 'the run never reached the middle of the groups'
     try:
+        with app.app_context():
+            from services.backup.section_store import store_directory
+            directory = store_directory()
+        # The sections being read carry the job's id: whoever concludes the job removes them
+        owned = [n for n in os.listdir(directory) if n.startswith(f'.ucm_restore_{job_id}.')]
+        assert len(owned) == 1, os.listdir(directory)
         done, total = _reported(app, job_id)
         # The progress counts the rows written so far, not only the steps passed
         assert total is not None and total >= len(restore_job.STEPS) + GROUPS
@@ -149,6 +155,7 @@ def test_a_cancellation_in_the_middle_of_a_loop_is_taken_before_it_ends(app, arc
     assert 'auth' not in hold.steps
     assert not os.path.exists(os.path.join(store.jobs_tmp_dir(), name))
     assert not restore_job.cancel_flagged(job_id)
+    assert not os.path.exists(os.path.join(directory, owned[0]))
 
 
 # -- the brake ------------------------------------------------------------------------------
