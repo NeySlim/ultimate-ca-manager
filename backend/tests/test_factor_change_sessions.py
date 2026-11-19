@@ -13,6 +13,8 @@ import uuid
 import pyotp
 import pytest
 
+from tests.header_guard import guarded
+
 from models import AuditLog, User, db
 from models.webauthn import WebAuthnCredential
 from tests.redis_support import needs_redis
@@ -39,7 +41,7 @@ def _sql_store_app(monkeypatch, url, database_type):
     monkeypatch.setattr(TestingConfig, 'SESSION_TYPE', 'sqlalchemy')
     monkeypatch.setattr(TestingConfig, 'SESSION_SQLALCHEMY_TABLE', 'flask_sessions', raising=False)
     from app import create_app
-    return create_app('testing')
+    return guarded(create_app('testing'))
 
 
 def _dispose(*applications):

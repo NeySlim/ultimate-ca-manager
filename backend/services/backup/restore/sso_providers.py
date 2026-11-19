@@ -35,16 +35,27 @@ def _archived(backup_data) -> List[Dict[str, Any]]:
 
 def refuse_archived_shared_types(backup_data) -> None:
     """BackupSchemaError, before any write, when the archive itself holds two providers of one type
-    or a provider whose type is not text."""
+    or a provider whose type is not one the product knows (an absent type is oauth2)."""
+    from models.sso import SSOProvider
+    rows = backup_data.get(SECTION)
+    # Every row the restorer would write is checked: one without a text name escapes _archived
+    for row in rows if isinstance(rows, list) else []:
+        if isinstance(row, dict) and not (isinstance(row.get('name'), str) and row['name'].strip()):
+            raise BackupSchemaError(
+                "Cannot restore: one of the archive's SSO providers has no name, or a name "
+                "that is not text. Nothing has been changed.")
     by_type: Dict[str, List[str]] = {}
     for row in _archived(backup_data):
-        kind = row.get('provider_type')
-        if kind is None or kind == '':
-            kind = 'oauth2'
-        elif not isinstance(kind, str):
+        kind = row.get('provider_type', 'oauth2')
+        if kind is not None and not isinstance(kind, str):
             raise BackupSchemaError(
                 f"Cannot restore: the type of the archive's SSO provider {row['name']!r} is not "
                 "text. Nothing has been changed.")
+        if kind not in SSOProvider.TYPES:
+            raise BackupSchemaError(
+                f"Cannot restore: the archive's SSO provider {row['name']!r} has the type "
+                f"{kind!r}, which is none of {', '.join(SSOProvider.TYPES)}. Nothing has been "
+                "changed.")
         by_type.setdefault(kind, []).append(row['name'])
     for kind, names in by_type.items():
         if len(names) > 1:
@@ -107,7 +118,7 @@ def settle_provider_types(backup_data, replacing: bool, warnings: List[str],
         by_type.setdefault(provider.provider_type, []).append(provider)
     left_out, removed = [], set()
     for row in rows:
-        kind = row.get('provider_type') or 'oauth2'
+        kind = row.get('provider_type', 'oauth2')  # in TYPES: refuse_archived_shared_types
         holder = by_name.get(row['name'])
         # The holder of the name is another provider when its type or its IdP differs
         elsewhere = holder is not None and holder.provider_type == kind and _another_idp(holder, row)
@@ -144,19 +155,45 @@ def settle_provider_types(backup_data, replacing: bool, warnings: List[str],
         _leave_out(backup_data, left_out)
 
 
+def _held_here(account, key: Optional[str], external_id) -> bool:
+    """Whether the account ``account`` names is already bound here to ``external_id`` by a
+    provider of the IdP ``key``: an orphan of that identity would never be signed in with."""
+    from models import User, UserSSOIdentity
+    from models.sso import SSOProvider
+    if (key is None or not isinstance(external_id, str) or not external_id
+            or not isinstance(account, dict) or not isinstance(account.get('username'), str)):
+        return False
+    providers = (SSOProvider.query
+                 .join(UserSSOIdentity, UserSSOIdentity.provider_id == SSOProvider.id)
+                 .join(User, User.id == UserSSOIdentity.user_id)
+                 .filter(User.username == account['username'],
+                         UserSSOIdentity.external_id == external_id))
+    return any(_comparable(provider.idp_key()) == _comparable(key) for provider in providers)
+
+
 def _leave_out(backup_data, rows: List[Dict[str, Any]]) -> None:
-    """Drop ``rows`` from the archive; what names them becomes an orphan of their IdP."""
+    """Drop ``rows`` from the archive; what names them becomes an orphan of their IdP, unless
+    the account already holds that identity here."""
     keys = {row['name']: _idp_key(row) for row in rows}
     backup_data[SECTION] = [row for row in backup_data.get(SECTION) if not any(row is r for r in rows)]
 
     def named(ref):
         return isinstance(ref, dict) and ref.get('name') in keys
 
-    for row in backup_data.get('user_sso_identities') or []:
+    identities = backup_data.get('user_sso_identities')
+    redundant = []
+    for row in identities if isinstance(identities, list) else []:
         ref = row.get(f'provider_id{REFERENCE_SUFFIX}') if isinstance(row, dict) else None
         if named(ref):
+            if _held_here(row.get(f'user_id{REFERENCE_SUFFIX}'), keys[ref['name']],
+                          row.get('external_id')):
+                redundant.append(row)
+                continue
             row.update({'provider_id': None, f'provider_id{REFERENCE_SUFFIX}': None,
                         'orphan_of': keys[ref['name']]})
+    if redundant:
+        backup_data['user_sso_identities'] = [
+            row for row in identities if not any(row is r for r in redundant)]
     # An archive of 2.254 names the provider on the account row
     for row in backup_data.get('users') or []:
         ref = row.get(f'sso_provider_id{REFERENCE_SUFFIX}') if isinstance(row, dict) else None

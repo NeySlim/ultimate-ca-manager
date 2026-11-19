@@ -132,7 +132,7 @@ def create_provider():
         return error_response("Provider name is required", 400)
     if not data.get('provider_type'):
         return error_response("Provider type is required", 400)
-    if data['provider_type'] not in ['saml', 'oauth2', 'ldap']:
+    if data['provider_type'] not in SSOProvider.TYPES:
         return error_response("Invalid provider type. Must be: saml, oauth2, ldap", 400)
 
     # Check name uniqueness

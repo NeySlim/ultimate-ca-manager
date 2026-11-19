@@ -218,6 +218,34 @@ def test_a_merge_keeps_the_provider_of_the_type_here(target, fmt):
     _one_per_type_and_no_dangling_provider()
 
 
+@pytest.mark.parametrize('fmt', FORMATS)
+def test_a_merge_adds_no_orphan_for_an_identity_the_account_holds_here(target, fmt):
+    """The archive's provider talks to the IdP here under another name: erin's identity is
+    already bound here, so only what is absent here (gina's other subject, hank) comes back."""
+    corp = _here('corp', 'oauth2', 'https://corp.example')
+    _account('erin', corp, 'erin-at-corp')
+    _account('gina', corp, 'gina-at-corp')
+    db.session.commit()
+    data = {'sso_providers': [_archived_provider('corp-old', 'oauth2', 'https://corp.example')]}
+    for number, (name, subject) in enumerate([('erin', 'erin-at-corp'), ('gina', 'gina-before'),
+                                              ('hank', 'hank-at-corp')]):
+        for section, rows in _archived_account(fmt, name, 'corp-old', subject, 41).items():
+            for row in rows:
+                if section == 'user_sso_identities':
+                    row['user_id'] = 900 + number
+            data.setdefault(section, []).extend(rows)
+    _restore(data, 'merge')
+    db.session.expire_all()
+    key = 'oauth2:https://corp.example'
+    assert _providers() == [('oauth2', 'corp', corp)]
+    assert _rows('erin') == [(corp, 'erin-at-corp', None)]
+    # A merge keeps the rows of a 2.254 account that holds some here
+    gina = [(corp, 'gina-at-corp', None)] + ([(None, 'gina-before', key)] if fmt == '3.0' else [])
+    assert _rows('gina') == gina
+    assert _rows('hank') == [(None, 'hank-at-corp', key)]
+    _one_per_type_and_no_dangling_provider()
+
+
 def test_a_merge_whose_name_is_held_by_another_type_leaves_it_out(target):
     sso = _here('sso', 'saml', 'https://saml.example')
     db.session.commit()

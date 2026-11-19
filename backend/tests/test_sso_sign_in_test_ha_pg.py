@@ -9,6 +9,8 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
+from tests.header_guard import guarded
+
 from api.v2.sso import saml_sp, sign_in_tests
 from models import db
 from models.sso import SSOProvider
@@ -55,8 +57,8 @@ def nodes(monkeypatch):
     created = []
     try:
         from app import create_app
-        created.append(create_app('testing'))
-        created.append(create_app('testing'))
+        created.append(guarded(create_app('testing')))
+        created.append(guarded(create_app('testing')))
         yield created[0], created[1]
     finally:
         pg_app_harness._creating_session_app.pop()
