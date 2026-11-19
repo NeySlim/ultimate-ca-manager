@@ -372,10 +372,12 @@ def download_mtls_certificate(cert_id):
         except ValueError as exc:
             return error_response(str(exc), 400)
         legacy = legacy_flag(legacy_value)  # 3DES/SHA-1 profile (#331)
+        chain_sent = 'include_chain' in data or 'include_root' in data
     else:
         fmt = request.args.get('format', 'pem')
         password = request.args.get('password', '')
         legacy = False
+        chain_sent = 'include_chain' in request.args or 'include_root' in request.args
         try:
             include_chain = query_boolean(request.args, 'include_chain', True)
             include_root = query_boolean(request.args, 'include_root', False)
@@ -455,7 +457,13 @@ def download_mtls_certificate(cert_id):
             headers={'Content-Disposition': content_disposition(user.username, '-mtls.p12', fallback=f'user-{user.id}')},
         )
 
-    # Default: PEM
+    # Default: PEM. The certificate alone, plus its chain only when the caller asked for it
+    if chain_sent and include_chain:
+        from api.v2.certificates.export import _build_ca_chain
+        issuers = _build_ca_chain(cert, cert_pem, include_root=include_root)
+        cert_pem = cert_pem.rstrip(b'\n') + b'\n' + b''.join(
+            c.public_bytes(serialization.Encoding.PEM) for c in issuers)
+
     AuditService.log_action(
         action='mtls_cert_download',
         resource_type='certificate',
