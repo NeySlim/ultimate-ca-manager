@@ -163,6 +163,9 @@ def test_a_description_written_through_the_api_restores_in_both_modes(app, auth_
                                                                       create_cert):
     """SQLite keeps the NUL a PATCH writes; its backup restores, merged then replacing."""
     from models import Certificate
+    with app.app_context():
+        if db.engine.dialect.name != 'sqlite':
+            pytest.skip('only SQLite stores the NUL a request writes')
     cert = create_cert()
     cert_id = cert.get('id') or cert.get('cert_id')
     response = auth_client.patch(f'/api/v2/certificates/{cert_id}',
