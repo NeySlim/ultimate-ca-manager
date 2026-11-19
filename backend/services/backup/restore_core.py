@@ -29,7 +29,8 @@ from .restore import RestorePlan, single_transaction
 from .restore.transaction import checkpoint, expect_rows, tick, ticking
 from .manifest import SECTIONS
 from .section_store import SectionStore, section_kind, section_length
-from .restore.apply import (apply_columns, apply_section, refuse_containers_in_columns,
+from .restore.apply import (apply_columns, apply_section, escape_nul_in_archive,
+                            refuse_containers_in_columns,
                             relink_references)
 from .restore.names import rename_clashing_rows
 from .restore.orders import keep_newer_orders
@@ -351,7 +352,9 @@ class RestoreCoreMixin:
         # holding fewer rows than the archive says it holds, must not be
         # discovered halfway through a restore.
         self._check_payload_schema(backup_data)
-        refuse_containers_in_columns(backup_data, mappings=RESTORED_SECTIONS)
+        # Before every check, plan and rename: they compare the rewritten text alone
+        nul_warnings = escape_nul_in_archive(backup_data, set(SECTIONS) | RESTORED_SECTIONS)
+        refuse_containers_in_columns(backup_data)
         self._check_serial_duplicates(backup_data)
         upgrade_archived_permissions(backup_data)
         windows_warnings: List[str] = []
@@ -448,7 +451,7 @@ class RestoreCoreMixin:
                         if name in RESTORED_SECTIONS and section_kind(backup_data, name) == 'list'))
         checkpoint('plan')
         plan = RestorePlan.build(backup_data, pruned=pruned)
-        plan.warnings.extend(order_warnings + windows_warnings + sso_warnings)
+        plan.warnings.extend(nul_warnings + order_warnings + windows_warnings + sso_warnings)
         for warning in plan.warnings:
             logger.warning("Restore: %s", warning)
         built_with = len(plan.warnings)
