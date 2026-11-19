@@ -119,6 +119,8 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     oauth2_ca_bundle: '',
     oauth2_issuer: provider?.oauth2_issuer || '',
     oauth2_jwks_uri: provider?.oauth2_jwks_uri || '',
+    // Entra multi-tenant: accepted tenant ids, one per line
+    oauth2_tenants: (provider?.oauth2_tenants || []).join('\n'),
     id_token_verify: provider?.id_token_verify ?? true,
     // SAML
     saml_metadata_url: provider?.saml_metadata_url || '',
@@ -248,6 +250,9 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     if (!data.ldap_ca_bundle) delete data.ldap_ca_bundle
     if (data.provider_type === 'oauth2') {
       data.oauth2_scopes = data.oauth2_scopes.split(/\s+/).filter(Boolean)
+      data.oauth2_tenants = (data.oauth2_tenants || '').split(/[\s,;]+/).filter(Boolean)
+    } else {
+      delete data.oauth2_tenants
     }
     if (data.provider_type === 'ldap') {
       const groups = (data.ldap_required_groups || '').split(',').map(s => s.trim()).filter(Boolean)

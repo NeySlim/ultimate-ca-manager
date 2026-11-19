@@ -132,7 +132,7 @@ IdP 结束会话时，会通过浏览器向 SLO URL 发送已签名的 **LogoutR
 10. 点击**保存**并**启用**
 
 ### 预设
-- **Microsoft Entra ID**（单租户）填写 URL 和颁发者 \`https://login.microsoftonline.com/{tenant}/v2.0\`：在这三处将 \`{tenant}\` 替换为目录（租户）ID。保留 \`{tenant}\` 保存的提供者会被拒绝。不支持多租户（\`common\`、\`organizations\`）。
+- **Microsoft Entra ID**（单租户）填写 URL 和颁发者 \`https://login.microsoftonline.com/{tenant}/v2.0\`：在这三处将 \`{tenant}\` 替换为目录（租户）ID。保留 \`{tenant}\` 保存的提供者会被拒绝。对于多租户应用，将颁发者设为 \`https://login.microsoftonline.com/organizations/v2.0\`（或 \`common\`），URL 使用同一授权机构，并在**接受的租户**中列出租户 ID（GUID）：仅当令牌的 \`tid\` 在列表中、其颁发者等于发现文档模板 \`https://login.microsoftonline.com/{tenantid}/v2.0\` 代入该 \`tid\` 后的值、且其签名密钥在指明颁发者时指明的正是该颁发者，令牌才被接受。没有通配符：个人 Microsoft 帐户租户只有在列出时才被接受，且必须保持 ID 令牌验证开启。身份属于其租户：两个租户中的同一 \`sub\` 是两个帐户，从列表中移除的租户无法再登录。在提供者接受多个租户之前绑定的帐户只保留 \`sub\`：重置其 SSO 身份，使其下次登录绑定租户身份。
 - **Google** 填写颁发者 \`https://accounts.google.com\`。
 - **GitHub** 不是 OpenID Connect 提供者，不签发 ID 令牌：该预设关闭**验证 ID 令牌签名**，并将 \`login\` 映射为用户名。账户通过其 GitHub 数字 \`id\` 识别（UCM 读取 UserInfo 的 \`sub\`，否则读取 \`id\`），从不通过登录名或电子邮件。
 - 切换预设会恢复上一个预设设置的颁发者和验证设置，除非之后已被修改。
