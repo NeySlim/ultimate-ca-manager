@@ -13,6 +13,12 @@ ENV = 'KRB5_CLIENT_KTNAME'
 _FILE_TYPES = ('FILE', 'WRFILE')
 # gevent patches threading under gunicorn: a greenlet waits here, it does not block the hub
 _LOCK = threading.RLock()
+# The lock spans one credential acquisition (a KDC exchange), never a whole request
+LOCK_WAIT_SECONDS = 30
+
+
+class KerberosBusy(RuntimeError):
+    """Another connection's Kerberos sign-in kept the process-wide keytab variable too long."""
 
 
 def managed_keytab_error(path):
@@ -35,15 +41,20 @@ def managed_keytab_error(path):
 
 
 @contextmanager
-def client_keytab(path):
-    """KRB5_CLIENT_KTNAME is ``path`` inside the block and what it was before outside it."""
+def client_keytab(path, principal=None, owner=None):
+    """KRB5_CLIENT_KTNAME is ``path`` inside the block and what it was before outside it.
+    Without a keytab nothing is set and no lock is taken."""
     error = managed_keytab_error(path)
     if error:
         raise ValueError(error)
-    with _LOCK:
+    if not path:
+        yield
+        return
+    if not _LOCK.acquire(timeout=LOCK_WAIT_SECONDS):
+        raise KerberosBusy('Another Kerberos sign-in to a Microsoft CA is in progress: try again')
+    try:
         before = os.environ.get(ENV)
-        if path:
-            os.environ[ENV] = path
+        os.environ[ENV] = path
         try:
             yield
         finally:
@@ -51,3 +62,5 @@ def client_keytab(path):
                 os.environ.pop(ENV, None)
             else:
                 os.environ[ENV] = before
+    finally:
+        _LOCK.release()

@@ -83,11 +83,12 @@ class MicrosoftCAConnectionMixin:
 
                 # KRB5_KTNAME is the acceptor's keytab: a client never writes it (A12)
                 keytab = msca.kerberos_keytab_path or None
+                principal = msca.kerberos_principal or None
 
                 class _ConnectionKerberosAuth(HTTPKerberosAuth):
                     # The credential is acquired here: the connection keytab is named only meanwhile
                     def generate_request_header(self, *args, **kwargs):
-                        with client_keytab(keytab):
+                        with client_keytab(keytab, principal=principal, owner=msca.id):
                             return super().generate_request_header(*args, **kwargs)
 
                 # auth_method='basic' is a placeholder: the real auth is the
@@ -103,7 +104,7 @@ class MicrosoftCAConnectionMixin:
                 # principal selects the credential in the cache or keytab (None: default)
                 client.session.auth = _ConnectionKerberosAuth(
                     mutual_authentication=OPTIONAL,
-                    principal=msca.kerberos_principal or None,
+                    principal=principal,
                 )
 
             elif msca.auth_method == 'basic':

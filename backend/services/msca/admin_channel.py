@@ -219,6 +219,40 @@ class MicrosoftCAAdminChannelMixin:
         )
 
     @staticmethod
+    def _bind_client_keytab(session, msca):
+        """Name the keytab only around pywinrm's credential acquisition, never a whole command.
+
+        pywinrm 0.5.0 acquires in its HTTPKerberosAuth.generate_request_header, called
+        preemptively by the first request: the message encryption setup that build_session
+        sends over HTTP, else open_shell. The session is built with that setup held back so
+        the wrapper is in place, then the setup is sent as build_session would have.
+        """
+        keytab = msca.kerberos_keytab_path
+        principal = msca.winrm_effective_username or msca.kerberos_principal or None
+        owner = getattr(msca, 'id', None)
+        transport = session.protocol.transport
+        wanted = transport.message_encryption
+        transport.message_encryption = 'never'
+        try:
+            http = transport.build_session()
+        finally:
+            transport.message_encryption = wanted
+        acquire = http.auth.generate_request_header
+
+        def generate_request_header(*args, **kwargs):
+            with client_keytab(keytab, principal=principal, owner=owner):
+                return acquire(*args, **kwargs)
+
+        http.auth.generate_request_header = generate_request_header
+        # The end of Transport.build_session, skipped above
+        available = bool(getattr(http.auth, 'winrm_encryption_available', False))
+        if wanted == 'always' and not available:
+            raise MSCAAdminChannelError('WinRM message encryption is not available with this Kerberos library')
+        if available and (wanted == 'always' or (
+                wanted == 'auto' and not transport.endpoint.lower().startswith('https'))):
+            transport.setup_encryption(http)
+
+    @staticmethod
     def _run_ps(msca, script):
         """Run a PowerShell script on the CA; raise on non-zero exit.
 
@@ -228,9 +262,9 @@ class MicrosoftCAAdminChannelMixin:
         session = MicrosoftCAAdminChannelMixin._build_session(msca)
         kerberos = (msca.winrm_transport or 'kerberos').lower() == 'kerberos'
         try:
-            # pywinrm acquires the credential during the exchange: the lock spans it
-            with client_keytab(msca.kerberos_keytab_path if kerberos else None):
-                result = session.run_ps(script)
+            if kerberos and msca.kerberos_keytab_path:
+                MicrosoftCAAdminChannelMixin._bind_client_keytab(session, msca)
+            result = session.run_ps(script)
         except Exception as e:
             raise MSCAAdminChannelError(f'WinRM execution failed: {e}')
 
