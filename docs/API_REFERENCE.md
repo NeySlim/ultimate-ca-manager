@@ -699,7 +699,7 @@ GET /api/v2/cas/{ca_id}/export?format=pem&include_chain=true&chain_variant=cross
 `POST` takes `format`, `include_key`, `include_chain`, `password` (required for the PKCS12, PFX and JKS formats; with `format=pem` and `include_key` or with `key`, it encrypts the key as PKCS#8) and `legacy` in a JSON body. `chain_variant` is `auto` (default: the chain UCM serves), `primary` (the self-signed root)
 or `cross:<id>`; any other value, or one that is not part of the chain of this CA, answers 400.
 
-`include_key` with a format that carries no key (`der`, `p7b`, `pkcs7`) answers `400`. A `password` outside the rule (8 to 256 characters, at most 1023 bytes in UTF-8) answers `400` whatever the format; a valid one is ignored when the output carries no private key (`der`, `p7b`, `pkcs7`, `pem` without `include_key`). A key export is audited as `private_key_exported`, `password-protected` or `unencrypted`. `legacy` applies to `pkcs12` and `pfx` only and is ignored for the other formats: a JKS keeps its own format, the Sun key protector for the key entry and a SHA-1 integrity digest, whatever `legacy` says.
+`include_key` with a format that carries no key (`der`, `p7b`, `pkcs7`) answers `400`. A `password` that is not a string, or outside the rule (8 to 256 characters, at most 1023 bytes in UTF-8), answers `400` whatever the format; a valid one is ignored when the output carries no private key (`der`, `p7b`, `pkcs7`, `pem` without `include_key`). A key export is audited as `private_key_exported`, `password-protected` or `unencrypted`. `legacy` applies to `pkcs12` and `pfx` only and is ignored for the other formats: a JKS keeps its own format, the Sun key protector for the key entry and a SHA-1 integrity digest, whatever `legacy` says.
 
 ### Export All CAs
 ```http
@@ -992,7 +992,7 @@ JSON booleans in POST bodies; strings such as `"false"` are rejected.
 `include_key` with `der`, `pkcs7` or `p7b`, and `include_chain` with `der`, answer `400`
 naming the field: those formats carry no key, and DER a single certificate.
 
-The `password` encrypts every private key the response carries: required for `pkcs12`, `pfx` and `jks`; optional for `key`, `hybrid-bundle` and `pem` with `include_key`, where the key is PKCS#8 encrypted when one is given and written in clear when not. A `password` outside the rule (8 to 256 characters and at most 1023 bytes in UTF-8, valid Unicode) answers `400` whatever the format, `der` and `pkcs7` included; a valid one is ignored when the output carries no private key (`der`, `pkcs7`/`p7b`, `pem` without `include_key`). The `private_key_exported` audit entry says `password-protected` or `unencrypted` accordingly. `legacy` applies to PKCS#12/PFX only: the JKS format keeps its own protection (Sun key protector and SHA-1 integrity digest) whatever `legacy` says.
+The `password` encrypts every private key the response carries: required for `pkcs12`, `pfx` and `jks`; optional for `key`, `hybrid-bundle` and `pem` with `include_key`, where the key is PKCS#8 encrypted when one is given and written in clear when not. A `password` that is not a string, or outside the rule (8 to 256 characters and at most 1023 bytes in UTF-8, valid Unicode), answers `400` whatever the format, `der` and `pkcs7` included; a valid one is ignored when the output carries no private key (`der`, `pkcs7`/`p7b`, `pem` without `include_key`). The `private_key_exported` audit entry says `password-protected` or `unencrypted` accordingly. `legacy` applies to PKCS#12/PFX only: the JKS format keeps its own protection (Sun key protector and SHA-1 integrity digest) whatever `legacy` says.
 
 `chain_variant` (`auto` by default, `primary`, or `cross:<id>`) picks the chain a cross-certificate makes
 possible; it is read from the JSON body or the query string. The variants of a certificate are listed in
@@ -1212,7 +1212,7 @@ POST /api/v2/certificates/export
 ```
 - Reads need `read:certificates`. `lint` checks one stored certificate against `profile` (`rfc5280` by default, `cabf` or `etsi`; `400` for another); `422` when the certificate cannot be linted. `lint/status` reports which linters are available and the accepted `profiles`. `compliance` returns aggregate compliance statistics (score and grade) across all certificates.
 - `submit-ct` (`write:certificates`) submits the certificate to the configured Certificate Transparency logs and returns the `logs` that accepted it with their `timestamp`. `400` when CT is not enabled in the [settings](#certificate-transparency), no valid log is configured, the certificate has no PEM, or no log accepted it.
-- `POST /certificates/export` is the body form of `GET /certificates/export`: `format` (`pem` or `p7b`, else `400`), `password` and `include_chain`; `404` when there is nothing to export. The bulk export carries public certificates only, so `password` and `legacy` are ignored there.
+- `POST /certificates/export` is the body form of `GET /certificates/export`: `format` (`pem` or `p7b`, else `400`), `password` and `include_chain`; `404` when there is nothing to export. The bulk export carries public certificates only, so `password` and `legacy` are ignored there, and `include_chain` is checked as a boolean (`400` otherwise) but adds nothing.
 
 ### Catalogs
 ```http
@@ -1305,7 +1305,7 @@ POST /api/v2/user-certificates/{id}/export
 {"format": "pkcs12", "password": "mypassword", "include_chain": true, "include_root": false}
 ```
 
-With `format=pem` and `include_key`, a `password` (POST) encrypts the key as PKCS#8; without one the key is written in clear. `password` is not read when the output carries no private key (it is not checked either), the same rule applies to the ones that are read (400 outside 8 to 256 characters and 1023 bytes in UTF-8), and `legacy` applies to `pkcs12` only (a JKS keeps the Sun key protector and its SHA-1 integrity digest). Each export is audited as `user_certificate_exported`; an export of the key alone also writes `private_key_exported`.
+With `format=pem` and `include_key`, a `password` (POST) encrypts the key as PKCS#8; without one the key is written in clear. `password` is not read when the output carries no private key (it is not checked either), the same rule applies to the ones that are read (400 for a value that is not a string, or outside 8 to 256 characters and 1023 bytes in UTF-8), and `legacy` applies to `pkcs12` only (a JKS keeps the Sun key protector and its SHA-1 integrity digest). Each export is audited as `user_certificate_exported`; an export of the key alone also writes `private_key_exported`.
 
 **Query Parameters**:
 | Param | Type | Description |
@@ -3264,7 +3264,7 @@ Content-Type: application/json
   "private_key": "-----BEGIN PRIVATE KEY-----\n..."
 }
 ```
-`password` opens an encrypted input (PKCS#12, encrypted key). `output_password` (the older name `pkcs12_password` is still accepted; two different values answer `400`) protects the OUTPUT: it is required for `pkcs12` and `jks`, and encrypts a private key written as `pem` (PKCS#8, 8 to 256 characters, else `400`). A `der` output that would carry a private key refuses an `output_password` with `400`; with a certificate or a request in `der`, or a `pem` without a key, it is ignored.
+`password` opens an encrypted input (PKCS#12, encrypted key). `output_password` (the older name `pkcs12_password` is still accepted; two different values answer `400`) protects the OUTPUT: it is required for `pkcs12` and `jks`, and encrypts a private key written as `pem` (PKCS#8, 8 to 256 characters, else `400`). A `der` output that would carry a private key refuses an `output_password` with `400`; with a certificate or a request in `der`, a `pkcs7` output, or a `pem` without a key, it is ignored. A value that is not a string answers `400` whatever the output.
 
 ### Backup Operations
 ```http
