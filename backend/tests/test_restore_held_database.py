@@ -734,3 +734,137 @@ def test_one_account_cannot_evict_another_from_the_held_memory(held_app, monkeyp
     assert victim_seen.status_code == 200, victim_seen.data
     assert latest.status_code == 200, latest.data
     assert first.status_code == 503, first.data
+
+
+# -- the session that starts the restore follows it through the held database -------------
+
+RESTORE_PASSWORD = 'Restore-Job-Password-9'  # the archive fixture's
+
+
+class StartedElsewhere:
+    """The restore the route starts is run by a script: its gate goes up ``gate_at`` seconds
+    after the start, its transaction holds the file from ``held_at`` until released."""
+
+    def __init__(self, app, path, monkeypatch, gate_at, held_at, before_gate=None):
+        self.app, self.path = app, path
+        self.gate_at, self.held_at, self.before_gate = gate_at, held_at, before_gate
+        self.held, self.release, self.done = (threading.Event(), threading.Event(),
+                                              threading.Event())
+        self.job_id, self.thread = None, None
+        monkeypatch.setattr(runner, 'dispatch_job', self._dispatch)
+
+    def _dispatch(self, job_id):
+        self.job_id = job_id
+        assert store.claim_job(db.session, job_id, 'elsewhere/1/x', jobs._now()) is not None
+        db.session.commit()
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
+
+    def _run(self):
+        started = time.monotonic()
+        try:
+            time.sleep(self.gate_at)
+            if self.before_gate:
+                self.before_gate()
+            gate = _gate(self.app, self.job_id).raise_gate()
+            try:
+                time.sleep(max(0.0, self.held_at - (time.monotonic() - started)))
+                gate.set_view(phase=restore_job.APPLYING, held=True)
+                with holding(self.path):
+                    self.held.set()
+                    self.release.wait(60)
+            finally:
+                gate.lift()
+        finally:
+            self.done.set()
+
+    def finish(self):
+        self.release.set()
+        assert self.done.wait(60)
+        if self.job_id:
+            for suffix in (restore_job.CANCEL_SUFFIX, restore_job.ARCHIVE_SUFFIX):
+                store.purge_file(store.file_name_for(self.job_id, suffix))
+            with self.app.app_context():
+                db.session.execute(T.delete().where(T.c.id == self.job_id))
+                db.session.commit()
+                db.session.remove()
+            restore_job.remove_state()
+
+
+def _post_restore(client, blob):
+    import io
+    return client.post('/api/v2/system/restore', data={
+        'file': (io.BytesIO(blob), 'r.ucmbkp'), 'password': RESTORE_PASSWORD},
+        content_type='multipart/form-data')
+
+
+@pytest.fixture
+def started_elsewhere(archive, held_app, monkeypatch):
+    app, path = held_app
+    monkeypatch.setattr(jobs, 'JOB_WAIT_SECONDS', 3)
+    made = []
+
+    def make(**kwargs):
+        made.append(StartedElsewhere(app, path, monkeypatch, **kwargs))
+        return made[-1]
+    yield types.SimpleNamespace(app=app, path=path, archive=archive, make=make)
+    for script in made:
+        script.finish()
+
+
+def test_a_restore_held_before_its_wait_ends_answers_202_and_its_session_follows(
+        started_elsewhere):
+    """No Prefer: the POST waits; the transaction holds the database before the wait ends."""
+    app = started_elsewhere.app
+    admin = _client(app, 'admin', 'changeme123')
+    script = started_elsewhere.make(gate_at=0.3, held_at=1.5)
+    started, took = _timed(_post_restore, admin, started_elsewhere.archive)
+    assert script.held.is_set()
+    assert started.status_code == 202, started.data
+    assert took < 5, took
+    job = started.get_json()['data']['job']
+    assert job['id'] == script.job_id and job['phase'] == restore_job.APPLYING
+    url = started.headers['Location']
+    seen = admin.get(url)
+    assert seen.status_code == 200, seen.data
+    cancelled = admin.post(f'{url}/cancel')
+    assert cancelled.status_code == 200, cancelled.data
+    assert restore_job.cancel_flagged(script.job_id)
+
+
+def test_a_session_revoked_between_the_start_and_the_gate_reads_nothing(started_elsewhere):
+    app, path = started_elsewhere.app, started_elsewhere.path
+    user = _admin_user(app)
+    client = _client(app, user['username'])
+
+    def revoke():
+        other = sqlite3.connect(path)
+        other.execute('UPDATE users SET session_version = session_version + 1 WHERE id = ?',
+                      (user['id'],))
+        other.commit()
+        other.close()
+    script = started_elsewhere.make(gate_at=0.3, held_at=1.5, before_gate=revoke)
+    started = _post_restore(client, started_elsewhere.archive)
+    assert script.held.is_set()
+    assert started.status_code == 202, started.data
+    url = started.headers['Location']
+    seen = client.get(url)
+    cancel = client.post(f'{url}/cancel')
+    assert seen.status_code in (401, 503), seen.data
+    assert cancel.status_code in (401, 503), cancel.data
+    assert not restore_job.cancel_flagged(script.job_id)
+
+
+def test_the_dialogs_first_poll_after_the_wait_reads_the_held_job(started_elsewhere):
+    """The interface's case: 202 at the end of the wait, then the database held, then the
+    dialog's first poll."""
+    app = started_elsewhere.app
+    admin = _client(app, 'admin', 'changeme123')
+    script = started_elsewhere.make(gate_at=0.3, held_at=3.5)
+    started = _post_restore(admin, started_elsewhere.archive)
+    assert started.status_code == 202, started.data
+    assert not script.held.is_set()
+    assert script.held.wait(10)
+    seen = admin.get(started.headers['Location'])
+    assert seen.status_code == 200, seen.data
+    assert seen.get_json()['data']['phase'] == restore_job.APPLYING

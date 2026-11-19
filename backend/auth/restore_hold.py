@@ -104,6 +104,28 @@ def _make_room(entries, user_id):
         entries.pop(next(k for k, e in entries.items() if e['user_id'] == largest))
 
 
+def recheck():
+    """The request still in flight when its restore's gate goes up (the one that started it):
+    its credential checked again against the database, then remembered. True once done."""
+    from utils.sqlite_wait import is_locked, window
+    if window() != 'gate' or not request.path.startswith('/api/') or _credential() is None:
+        return False
+    from auth.unified import AuthManager
+    from models import db
+    try:
+        result = AuthManager().authenticate_request(request)
+    except Exception as e:  # noqa: BLE001 - a lock: tried again at the next slice
+        if not is_locked(e):
+            raise
+        db.session.rollback()
+        return False
+    if result:
+        remember(result)
+    else:
+        forget()
+    return True
+
+
 def forget():
     """A credential the database refused during the gate is never answered from memory."""
     key = _credential()
