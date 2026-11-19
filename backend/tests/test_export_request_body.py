@@ -318,3 +318,121 @@ def test_mtls_pkcs12_spellings(auth_client, enrolled, fmt):  # noqa: F811
 @pytest.mark.parametrize('fmt', ['der', 'jks'])
 def test_mtls_unknown_format_is_refused(auth_client, enrolled, fmt):  # noqa: F811
     _refused(auth_client.get(f'{enrolled}?format={fmt}'), 'format must be one of')
+
+
+# A JSON name given twice: the last one used to win, and a trailing null read as no password
+
+@pytest.mark.parametrize('repeat', ['null', '""'])
+def test_a_repeated_json_name_is_refused(auth_client, route, repeat):
+    kind, url = route
+    fmt = f'"format": "{KEY_FORMAT[kind]}", ' if KEY_FORMAT[kind] else ''
+    body = '{%s"password": "%s", "password": %s}' % (fmt, PASSWORD, repeat)
+    _refused(auth_client.post(url, data=body, content_type='application/json'),
+             'password is given more than once')
+
+
+def test_a_repeated_name_inside_a_nested_object_is_refused(auth_client, route):
+    _kind, url = route
+    body = '{"options": {"x": "%s", "x": null}}' % SECRET
+    _refused(auth_client.post(url, data=body, content_type='application/json'),
+             'x is given more than once')
+
+
+@pytest.mark.parametrize('raw, fragment', [
+    (b'', 'JSON body holding an object'),
+    (b'{"format": ', 'not valid JSON'),
+    (b'{"password": "\xff\xfe"}', 'UTF-8'),
+])
+def test_a_body_that_is_not_utf8_json_is_refused(auth_client, route, raw, fragment):
+    """Guard: what get_json refused stays refused, now without a 500."""
+    _kind, url = route
+    _refused(auth_client.post(url, data=raw, content_type='application/json'), fragment)
+
+
+def test_the_body_size_limit_still_applies(app, auth_client, route, monkeypatch):
+    """Guard: the raw body is read through the request stream, which the limit bounds."""
+    kind, url = route
+    monkeypatch.setitem(app.config, 'MAX_CONTENT_LENGTH', 64)
+    body = json.dumps(_key_body(kind, password=PASSWORD + 'x' * 100))
+    r = auth_client.post(url, data=body, content_type='application/json')
+    assert r.status_code == 413, r.data[:300]
+    assert b'PRIVATE KEY' not in r.data
+
+
+# A HEAD is answered like a GET: it never decrypts a key nor writes an export audit line
+
+def _audit_count(app):
+    from models.audit_log import AuditLog
+    with app.app_context():
+        return AuditLog.query.count()
+
+
+def test_head_asking_for_a_key_is_refused_and_audits_nothing(app, auth_client, get_route):
+    kind, url = get_route
+    before = _audit_count(app)
+    fmt = 'pkcs12' if kind == 'mtls' else 'key'
+    r = auth_client.head(f'{url}?format={fmt}')
+    assert r.status_code == 400, r.status_code
+    assert _audit_count(app) == before
+
+
+# No password: null and "" read as none, a key in clear where that is wanted, a refusal where one is needed
+
+@pytest.mark.parametrize('empty', [None, ''])
+@pytest.mark.parametrize('kind_body', [
+    ('certificate', {'format': 'key'}), ('certificate', {'format': 'pem', 'include_key': True}),
+    ('ca', {'format': 'key'}), ('ca', {'format': 'pem', 'include_key': True}),
+    ('user_certificate', {'format': 'key'}), ('csr', {'format': 'key'}),
+])
+def test_an_empty_password_means_a_key_in_clear(request, app, auth_client, create_ca, create_cert,
+                                                create_user, kind_body, empty):
+    kind, body = kind_body
+    url = _route(kind, request, app, auth_client, create_ca, create_cert, create_user)
+    r = auth_client.post(url, json={**body, 'password': empty})
+    assert r.status_code == 200, r.data[:300]
+    assert b'PRIVATE KEY' in r.data and b'ENCRYPTED PRIVATE KEY' not in r.data
+
+
+@pytest.mark.parametrize('empty', [None, ''])
+@pytest.mark.parametrize('kind_fmt', [
+    ('certificate', 'pkcs12'), ('certificate', 'jks'), ('ca', 'pkcs12'), ('ca', 'jks'),
+    ('user_certificate', 'pkcs12'), ('user_certificate', 'jks'), ('mtls', 'pkcs12'), ('key_recovery', None),
+])
+def test_an_empty_password_is_refused_where_one_is_needed(request, app, auth_client, create_ca,
+                                                         create_cert, create_user, kind_fmt, empty):
+    kind, fmt = kind_fmt
+    url = _route(kind, request, app, auth_client, create_ca, create_cert, create_user)
+    body = {'password': empty} if fmt is None else {'format': fmt, 'password': empty}
+    r = auth_client.post(url, json=body)
+    assert r.status_code == 400, r.data[:300]
+    assert b'PRIVATE KEY' not in r.data
+
+
+# Query booleans and messages
+
+def test_a_query_boolean_ignores_case_but_not_spaces(auth_client, get_route):
+    kind, url = get_route
+    if kind == 'csr':
+        pytest.skip('no boolean option in this route query')
+    assert auth_client.get(f'{url}?format=pem&include_chain=TRUE').status_code == 200
+    _refused(auth_client.get(f'{url}?format=pem&include_chain=%20true'), 'include_chain must be true or false')
+
+
+def test_a_long_unknown_name_is_cut_in_the_message(auth_client, route):
+    _kind, url = route
+    name = 'n' * 64 + 'TAIL'
+    r = auth_client.post(url, json={name: 1})
+    _refused(r, 'Unknown export option: ' + 'n' * 64)
+    assert 'TAIL' not in r.get_json()['message']
+
+
+def test_an_empty_name_has_its_own_message(auth_client, get_route):
+    _kind, url = get_route
+    _refused(auth_client.get(f'{url}?=x'), 'An export option has an empty name')
+
+
+def test_an_empty_format_has_its_own_message(auth_client, get_route):
+    _kind, url = get_route
+    r = auth_client.get(f'{url}?format=')
+    _refused(r, 'format is empty')
+    assert ' :' not in r.get_json()['message']

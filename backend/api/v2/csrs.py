@@ -812,6 +812,9 @@ def export_csr(csr_id):
         return refused
     export_format = opts.get('format', 'csr')
     password = opts.get('password') or None
+    # A HEAD would decrypt and audit a key it never sends
+    if export_format == 'key' and request.method not in ('GET', 'POST'):
+        return error_response('A key export is a GET or a POST', 400)
 
     if export_format == 'key':
         if not has_permission('read:private_keys', getattr(g, 'permissions', []) or []):

@@ -187,7 +187,7 @@ def export_ca(ca_id):
     legacy = opts.get('legacy', False)  # 3DES/SHA-1 profile (#331)
     variant, variant_err = _requested_variant(opts, ca)
     # A GET reads no password, so it serves no key
-    if request.method == 'GET' and (include_key or export_format in ('pkcs12', 'pfx', 'jks', 'key')):
+    if request.method != 'POST' and (include_key or export_format in ('pkcs12', 'pfx', 'jks', 'key')):
         return error_response(
             'Password and private key exports must use POST with a JSON body, '
             'not the query string', 400)
