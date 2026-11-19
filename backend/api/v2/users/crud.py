@@ -255,9 +255,9 @@ def list_users():
         search_pattern = f'%{safe_search}%'
         query = query.filter(
             db.or_(
-                User.username.ilike(search_pattern),
-                User.email.ilike(search_pattern),
-                User.full_name.ilike(search_pattern)
+                User.username.ilike(search_pattern, escape='\\'),
+                User.email.ilike(search_pattern, escape='\\'),
+                User.full_name.ilike(search_pattern, escape='\\')
             )
         )
 
