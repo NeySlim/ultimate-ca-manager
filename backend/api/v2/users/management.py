@@ -231,6 +231,45 @@ def _locked(user_id):
     return owner
 
 
+def _expected_tenant(provider, data, default=None):
+    """(tenant, None): the tenant an unbound attachment to ``provider`` may be adopted from, read
+    from ``expected_tenant`` in ``data`` else ``default``; it must be one the provider accepts
+    now. (None, answer) when it is refused."""
+    from services.oidc_id_token import OIDCValidationError, has_tenants, provider_tenants
+    value = data.get('expected_tenant', default)
+    if value is None:
+        return None, None
+    if provider is None or not has_tenants(provider):
+        return None, error_response('expected_tenant applies only to a provider with accepted '
+                                    'tenants', 400)
+    try:
+        accepted = provider_tenants(provider)
+    except OIDCValidationError:
+        return None, error_response('The accepted tenants of this provider are not readable', 400)
+    tenant = value.strip().lower() if isinstance(value, str) else None
+    if tenant not in accepted:
+        return None, error_response("expected_tenant must be one of the provider's accepted "
+                                    "tenants", 400)
+    return tenant, None
+
+
+def _former_tenant(provider, external_id):
+    """The tenant of a bound ``<tid>/<sub>`` identity while ``provider`` still accepts it, else None."""
+    from services.oidc_id_token import OIDCValidationError, has_tenants, provider_tenants
+    if provider is None or not has_tenants(provider) or not external_id or '/' not in external_id:
+        return None
+    try:
+        accepted = provider_tenants(provider)
+    except OIDCValidationError:
+        return None
+    tid = external_id.split('/', 1)[0].lower()
+    return tid if tid in accepted else None
+
+
+def _tenant_note(row):
+    return f', expected tenant {row.expected_tenant}' if row.expected_tenant else ''
+
+
 @bp.route('/api/v2/users/<int:user_id>/sso-identities', methods=['GET'])
 @require_auth(['read:users'])
 def list_user_sso_identities(user_id):
@@ -250,7 +289,9 @@ def attach_user_sso_provider(user_id):
     the same IdP left on the account is taken back with its identity. The username is kept (#138).
 
     POST /api/v2/users/{user_id}/sso-identities
-    Body: {"provider_id": int, "remove_password": bool (optional, default false)}
+    Body: {"provider_id": int, "remove_password": bool (optional, default false),
+           "expected_tenant": str (optional; a provider with accepted tenants adopts the
+           attachment from this tenant only, none without it)}
     """
     from models.sso import SSOProvider
     from api.v2.sso.account_state import SSO_NO_PASSWORD, attachments_text, own_identity
@@ -271,6 +312,9 @@ def attach_user_sso_provider(user_id):
     # Changing one's own password asks for the current one: removing it is another admin's act
     if remove_password and g.current_user.id == user_id:
         return error_response('You cannot remove the local password of your own account', 400)
+    expected_tenant, refused = _expected_tenant(provider, data)
+    if refused:
+        return refused
 
     # A new provider opens the account: the sessions opened before it end.
     user = _locked(user.id)
@@ -288,8 +332,9 @@ def attach_user_sso_provider(user_id):
     taken_back = next((row for row in orphans if row.external_id), orphans[0] if orphans else None)
     if taken_back is not None:
         taken_back.provider, taken_back.orphan_of = provider, None
+        taken_back.expected_tenant = expected_tenant
     else:
-        user.sso_identities.append(UserSSOIdentity(provider=provider,
+        user.sso_identities.append(UserSSOIdentity(provider=provider, expected_tenant=expected_tenant,
                                                    created_by=g.current_user.username))
     identity = taken_back.external_id if taken_back is not None else None
     drop_password = remove_password and user.password_hash != SSO_NO_PASSWORD
@@ -321,6 +366,7 @@ def attach_user_sso_provider(user_id):
         return err
     closed = sessions_closed_by(user)
     note = ', taking back its orphan of the same IdP' if taken_back is not None else ''
+    note += f', expected tenant {expected_tenant}' if expected_tenant else ''
     note += ', local password removed' if drop_password else ''
     AuditService.log_action(
         action='user_sso_attach',
@@ -343,9 +389,11 @@ def attach_user_sso_provider(user_id):
 def reset_user_sso_identity(user_id, identity_id):
     """Clear the stable identity of one attachment (admin only): the IdP changed it, and
     the next sign-in through that provider with the account's name or its verified e-mail
-    binds the new one.
+    binds the new one. Through a provider with accepted tenants, only from the expected tenant:
+    the former identity's by default, or ``expected_tenant`` (also settable on an unbound row).
 
     POST /api/v2/users/{user_id}/sso-identities/{identity_id}/reset
+    Body (optional): {"expected_tenant": str | null}
     """
     from api.v2.sso.account_state import bounded, identity_text
 
@@ -359,13 +407,20 @@ def reset_user_sso_identity(user_id, identity_id):
     if row is None:
         db.session.rollback()
         return error_response('SSO attachment not found', 404)
-    if row.external_id is None:
+    data = request.get_json(silent=True) or {}
+    data = data if isinstance(data, dict) else {}
+    if row.external_id is None and 'expected_tenant' not in data:
         db.session.rollback()
         return success_response(data=user.to_dict(), message='This attachment is not bound yet',
                                 meta={'other_sessions_closed': 0})
     former = row.external_id
+    expected, refused = _expected_tenant(row.provider, data, _former_tenant(row.provider, former))
+    if refused:
+        db.session.rollback()
+        return refused
     where = identity_text(row)
     row.bind(None)
+    row.expected_tenant = expected
     ok, err = safe_commit(logger, f"Failed to reset the SSO identity of user {user_id}")
     if not ok:
         return err
@@ -375,11 +430,13 @@ def reset_user_sso_identity(user_id, identity_id):
         resource_type='user',
         resource_id=str(user.id),
         resource_name=user.username,
-        details=(f'Reset identity {bounded(former)!r} of account {user.username!r} '
-                 f'({where}, {closed_sessions_note(closed)})'),
+        details=((f'Reset identity {bounded(former)!r} of account {user.username!r} ' if former
+                  else f'Set the expected tenant of an unbound attachment of {user.username!r} ')
+                 + f'({where}{_tenant_note(row)}, {closed_sessions_note(closed)})'),
         success=True,
     )
-    return success_response(data=user.to_dict(), message='SSO identity reset',
+    return success_response(data=user.to_dict(),
+                            message='SSO identity reset' if former else 'Expected tenant set',
                             meta={'other_sessions_closed': closed})
 
 

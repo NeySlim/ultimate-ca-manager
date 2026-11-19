@@ -55,6 +55,8 @@ class SSOProvider(db.Model):
     # Microsoft Entra multi-tenant: JSON array of accepted tenant ids (GUIDs). Empty: one issuer.
     # Migration 173.
     oauth2_tenants = db.Column(db.Text)
+    # Those of them whose role claims role_mapping reads (migration 173); other tenants get default_role
+    oauth2_role_tenants = db.Column(db.Text)
     # Explicit compatibility opt-out. OIDC ID tokens are verified by default.
     id_token_verify = db.Column(db.Boolean, default=True, nullable=False)
     oauth2_verify_ssl = db.Column(db.Boolean, default=True)
