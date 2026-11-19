@@ -944,7 +944,6 @@
     "parentCA": "父CA",
     "hierarchy": "层级",
     "hierarchyView": "层级视图",
-    "orgView": "组织图视图",
     "columnsView": "分栏视图",
     "listView": "列表视图",
     "orphanCAs": "孤立CA",
@@ -1184,7 +1183,47 @@
     "uniqueSubjectChanged": "唯一主题设置已更新",
     "uniqueSubjectChangeFailed": "无法更新唯一主题设置",
     "uniqueSubjectShared_one": "有 {{count}} 个主题已被多个实体使用：{{examples}}。无法判断新证书属于哪一个：这些证书的续期将按原样被拒绝，只有手动签发或对其进行 CSR 签名才能通过，且需使用覆盖选项",
-    "uniqueSubjectShared_other": "有 {{count}} 个主题已被多个实体使用，包括 {{examples}}。无法判断新证书属于哪一个：这些证书的续期将按原样被拒绝，只有手动签发或对其进行 CSR 签名才能通过，且需使用覆盖选项"
+    "uniqueSubjectShared_other": "有 {{count}} 个主题已被多个实体使用，包括 {{examples}}。无法判断新证书属于哪一个：这些证书的续期将按原样被拒绝，只有手动签发或对其进行 CSR 签名才能通过，且需使用覆盖选项",
+    "total_one": "{{count, number}} 个 CA",
+    "total_other": "{{count, number}} 个 CA",
+    "intent": "信任层级及其签发机构。",
+    "viewsLabel": "筛选证书颁发机构",
+    "views": {
+      "all": "全部",
+      "roots": "根CA",
+      "intermediates": "中间CA",
+      "expired": "已过期",
+      "offline": "离线",
+      "revoked": "已吊销",
+      "pending": "等待证书"
+    },
+    "searchPlaceholder": "名称、通用名称、主题…",
+    "viewMode": "显示方式",
+    "treeView": "树状视图",
+    "state": {
+      "expiring": "即将过期"
+    },
+    "range_one": "{{start}}–{{end}}，共 {{count, number}} 个 CA",
+    "range_other": "{{start}}–{{end}}，共 {{count, number}} 个 CA",
+    "downloadCertificate": "下载证书 (PEM)",
+    "tree": {
+      "title": "信任层级",
+      "hint": "方向键移动，Enter 打开，左右键展开或折叠。",
+      "expandAll": "全部展开",
+      "collapseAll": "全部折叠",
+      "expand": "展开 {{name}}",
+      "collapse": "折叠 {{name}}",
+      "level": "第 {{level}} 级",
+      "subCaCount_one": "{{count}} 个下级 CA",
+      "subCaCount_other": "{{count}} 个下级 CA",
+      "idleRoots_one": "{{count}} 个没有下级 CA 也没有证书的根CA",
+      "idleRoots_other": "{{count}} 个没有下级 CA 也没有证书的根CA",
+      "noMatch": "没有匹配的证书颁发机构。",
+      "orphan": "上级 CA 未知",
+      "crossLink": "交叉签名",
+      "showMore_one": "再显示 {{count}} 个",
+      "showMore_other": "再显示 {{count}} 个"
+    }
   },
   "csrs": {
     "uploadCSR": "上传CSR",

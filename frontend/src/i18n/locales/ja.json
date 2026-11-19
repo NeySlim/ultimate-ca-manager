@@ -944,7 +944,6 @@
     "parentCA": "親CA",
     "hierarchy": "階層",
     "hierarchyView": "階層ビュー",
-    "orgView": "組織図ビュー",
     "columnsView": "カラムビュー",
     "listView": "リストビュー",
     "orphanCAs": "孤立CA",
@@ -1184,7 +1183,47 @@
     "uniqueSubjectChanged": "サブジェクトの一意性の設定を更新しました",
     "uniqueSubjectChangeFailed": "サブジェクトの一意性の設定を更新できませんでした",
     "uniqueSubjectShared_one": "{{count}} 件のサブジェクトが複数のエンティティですでに使用されています: {{examples}}。新しい証明書がどのエンティティのものか判別できないため、これらの証明書の更新はそのままでは拒否されます。手動発行または CSR の署名のみ、上書きを指定すれば実行できます",
-    "uniqueSubjectShared_other": "{{count}} 件のサブジェクトが複数のエンティティですでに使用されています（例: {{examples}}）。新しい証明書がどのエンティティのものか判別できないため、これらの証明書の更新はそのままでは拒否されます。手動発行または CSR の署名のみ、上書きを指定すれば実行できます"
+    "uniqueSubjectShared_other": "{{count}} 件のサブジェクトが複数のエンティティですでに使用されています（例: {{examples}}）。新しい証明書がどのエンティティのものか判別できないため、これらの証明書の更新はそのままでは拒否されます。手動発行または CSR の署名のみ、上書きを指定すれば実行できます",
+    "total_one": "{{count, number}} authority",
+    "total_other": "{{count, number}} authorities",
+    "intent": "The trust hierarchy and its signing authorities.",
+    "viewsLabel": "Filter the authorities",
+    "views": {
+      "all": "All",
+      "roots": "Roots",
+      "intermediates": "Intermediates",
+      "expired": "Expired",
+      "offline": "Offline",
+      "revoked": "Revoked",
+      "pending": "Awaiting certificate"
+    },
+    "searchPlaceholder": "Name, common name, subject…",
+    "viewMode": "Display",
+    "treeView": "Tree view",
+    "state": {
+      "expiring": "Expiring soon"
+    },
+    "range_one": "{{start}}–{{end}} of {{count, number}} authority",
+    "range_other": "{{start}}–{{end}} of {{count, number}} authorities",
+    "downloadCertificate": "Download certificate (PEM)",
+    "tree": {
+      "title": "Trust hierarchy",
+      "hint": "Arrow keys to move, Enter to open, right and left to expand or collapse.",
+      "expandAll": "Expand all",
+      "collapseAll": "Collapse all",
+      "expand": "Expand {{name}}",
+      "collapse": "Collapse {{name}}",
+      "level": "level {{level}}",
+      "subCaCount_one": "{{count}} sub-authority",
+      "subCaCount_other": "{{count}} sub-authorities",
+      "idleRoots_one": "{{count}} root with neither a sub-authority nor a certificate",
+      "idleRoots_other": "{{count}} roots with neither a sub-authority nor a certificate",
+      "noMatch": "No authority matches.",
+      "orphan": "No known parent",
+      "crossLink": "Cross-signature",
+      "showMore_one": "Show {{count}} more",
+      "showMore_other": "Show {{count}} more"
+    }
   },
   "csrs": {
     "uploadCSR": "CSRをアップロード",

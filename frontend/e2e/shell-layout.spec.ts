@@ -13,7 +13,7 @@ const apart = (a: Box, b: Box) =>
 test('the status bar keeps the bottom of the window under the open dock', async ({ page, api }) => {
   const cert = await issueCert(api, (await createCA(api)).id)
   await page.goto('/certificates')
-  await page.getByRole('main').getByRole('cell', { name: cert.common_name }).click()
+  await page.getByRole('main').getByRole('button', { name: cert.common_name, exact: true }).click()
   const dock = page.getByTestId('inspector-dock')
   await expect(dock).toBeVisible()
   const view = page.viewportSize()!

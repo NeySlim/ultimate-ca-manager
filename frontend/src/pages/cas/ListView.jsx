@@ -1,71 +1,94 @@
 /**
- * CAs Page — list/table view (View C)
+ * CAs page: flat list, on the list template (one action per row and a chevron;
+ * everything else lives in the detail).
  */
-import { TreeStructure } from '@phosphor-icons/react'
-import { CATypeIcon } from '../../components'
-import { cn } from '../../lib/utils'
-import { CAInfoLine, TypeBadge, HsmBadge, StatusBadge, OfflineBadge, CertificateOnlyBadge, ChainRevokedBadge } from './CAListUtils'
+import { useMemo } from 'react'
+import { ShieldCheck, TreeStructure, DownloadSimple } from '@phosphor-icons/react'
+import { ResponsiveDataTable } from '../../components/ui/responsive'
+import { EntityName, DueDate } from '../../components/list'
+import { EXPIRY_WINDOW_DAYS } from '../../lib/expiry'
+import { caState, nameOfCA } from './caTree'
+import { CAStatePill, CAMarks } from './CAState'
 
-// =============================================================================
-// VIEW C: LIST — Flat card rows
-// =============================================================================
+export function ListView({ cas, allCAs, selectedId, onSelect, onDownload, loading, emptyTitle, t }) {
+  const rows = useMemo(() => {
+    const byId = new Map((allCAs || cas).map((ca) => [ca.id, ca]))
+    return cas.map((ca) => ({
+      ...ca,
+      label: nameOfCA(ca) || t('cas.unnamedCA'),
+      type_label: t(ca.type === 'root' ? 'common.rootCA' : 'common.intermediateCA'),
+      state: caState(ca),
+      parent_name: ca.type === 'root' ? '' : nameOfCA(byId.get(ca.parent_id)),
+      orphan: ca.type !== 'root' && !byId.has(ca.parent_id),
+      certs: ca.certs || 0,
+    }))
+  }, [cas, allCAs, t])
 
-export function ListView({ cas, allCAs, selectedId, onSelect, isMobile, t }) {
+  const columns = useMemo(() => [
+    {
+      key: 'label',
+      header: t('common.name'),
+      priority: 1,
+      grow: true,
+      title: (row) => row.subject || row.label,
+      render: (val, row) => (
+        <>
+          <EntityName icon={row.type === 'root' ? ShieldCheck : TreeStructure}>{val}</EntityName>
+          <CAMarks ca={row} t={t} orphan={row.orphan} compact />
+        </>
+      ),
+      mobileRender: (val, row) => (
+        <div className="flex items-center justify-between gap-2 w-full">
+          <span className="font-medium truncate">{val}</span>
+          <span className="shrink-0"><CAStatePill ca={row} t={t} /></span>
+        </div>
+      ),
+    },
+    { key: 'type_label', header: t('common.type'), muted: true, hideOnMobile: true },
+    { key: 'state', header: t('common.status'), priority: 2, hideOnMobile: true, render: (val, row) => <CAStatePill ca={row} t={t} /> },
+    {
+      key: 'parent_name',
+      header: t('cas.parentCA'),
+      priority: 3,
+      muted: true,
+      maxWidth: 240,
+      render: (val) => val || '—',
+    },
+    { key: 'certs', header: t('common.certificates'), hideOnMobile: true, className: 'tabular-nums' },
+    {
+      key: 'valid_to',
+      header: t('common.expires'),
+      priority: 4,
+      render: (val, row) => (row.state === 'pending' || !val ? '—' : (
+        <DueDate
+          date={val}
+          warnDays={EXPIRY_WINDOW_DAYS}
+          tone={row.state === 'revoked' ? '' : undefined}
+          relative={row.state === 'revoked' ? null : undefined}
+        />
+      )),
+    },
+    { key: 'key_algorithm', header: t('common.algorithm'), muted: true, small: true, hideOnMobile: true, render: (val, row) => val || row.key_type || '—' },
+  ], [t])
+
   return (
-    <div className="rounded-xl border border-border-op60 bg-secondary-op30 overflow-hidden">
-      <div className={cn(isMobile ? 'p-1.5 space-y-0.5' : 'p-2 space-y-0.5')}>
-        {cas.map(ca => {
-          const isSelected = selectedId === ca.id
-          const parentCA = ca.parent_id ? allCAs.find(c => c.id === ca.parent_id) : null
-
-          return (
-            <div
-              key={ca.id}
-              onClick={() => onSelect(ca)}
-              className={cn(
-                'relative rounded-lg cursor-pointer transition-all duration-150',
-                'border border-transparent',
-                isMobile ? 'px-3 py-2.5' : 'px-3 py-2',
-                isSelected
-                  ? 'ca-org-child-selected border-accent-primary'
-                  : 'hover:bg-bg-tertiary hover:border-border'
-              )}
-            >
-              {isSelected && (
-                <div className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-accent-primary" />
-              )}
-              {/* Row 1 */}
-              <div className="flex items-center gap-2">
-                <CATypeIcon isRoot={ca.type === 'root'} size={isMobile ? 'md' : 'sm'} />
-                <span className={cn(
-                  'font-semibold truncate flex-1',
-                  isMobile ? 'text-sm' : 'text-xs',
-                  isSelected ? 'text-accent-primary' : 'text-text-primary'
-                )}>
-                  {ca.name || ca.common_name || t('cas.unnamedCA')}
-                </span>
-                <TypeBadge type={ca.type} isMobile={isMobile} t={t} />
-                <HsmBadge ca={ca} t={t} />
-          <CertificateOnlyBadge ca={ca} t={t} />
-          <ChainRevokedBadge ca={ca} t={t} />
-                <StatusBadge status={ca.status} offline={ca.offline} />
-                <OfflineBadge ca={ca} t={t} />
-              </div>
-              {/* Row 2 */}
-              <div className={cn('mt-1 flex items-center gap-2 text-2xs text-text-tertiary', isMobile ? 'ml-9' : 'ml-7')}>
-                {parentCA && (
-                  <span className="flex items-center gap-1 shrink-0">
-                    <TreeStructure size={10} className="text-text-tertiary" />
-                    <span className="text-text-secondary truncate max-w-[100px]">{parentCA.name || parentCA.common_name}</span>
-                    <span className="text-border">·</span>
-                  </span>
-                )}
-                <CAInfoLine ca={ca} isMobile={isMobile} t={t} />
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
+    <ResponsiveDataTable
+      variant="list"
+      data={rows}
+      columns={columns}
+      loading={loading}
+      onRowClick={onSelect}
+      selectedId={selectedId}
+      rowLabel={(row) => row.label}
+      tableLabel={t('common.cas')}
+      rangeLabel={({ start, end, total }) => t('cas.range', { start, end, count: total })}
+      sortable
+      defaultSort={{ key: 'label', direction: 'asc' }}
+      rowActions={(row) => (row.state === 'pending' ? [] : [
+        { label: t('cas.downloadCertificate'), icon: DownloadSimple, onClick: () => onDownload?.(row) },
+      ])}
+      emptyIcon={ShieldCheck}
+      emptyTitle={emptyTitle}
+    />
   )
 }

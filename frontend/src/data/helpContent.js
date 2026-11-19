@@ -114,9 +114,12 @@ export const helpContent = {
         title: 'Views',
         icon: TreeStructure,
         items: [
-          { label: 'Organigramme view', text: 'Hierarchy drawn as a chart, each CA under its parent' },
+          { label: 'Tabs', text: 'All, Roots, Intermediates and Expired, each with its count, then Offline, Revoked and Awaiting certificate when there are some. The tab is part of the address' },
+          { label: 'Tree view', text: 'The trust hierarchy, opened by default: each root with its sub-authorities on its right, folded beyond the first level. A node shows its state, its certificates and its sub-authorities; a dotted line joins a CA to the one that cross-certified it. Roots without a sub-authority take one line each, and those without a certificate either fold into one group once there are many' },
+          { label: 'Keyboard', text: 'In the tree, the arrow keys move, right and left unfold and fold, Enter opens the CA in the detail panel' },
+          { label: 'Search', text: 'Filters the three views on the name, the common name and the subject; the tree keeps the branch that leads to each match' },
           { label: 'Columns view', text: 'Hierarchy browsed level by level, one column per level' },
-          { label: 'List view', text: 'Flat table view with sorting and filtering' },
+          { label: 'List view', text: 'Flat sortable table: one action per row (download the certificate) and a chevron that opens the detail' },
         ]
       },
       {
@@ -127,7 +130,7 @@ export const helpContent = {
           { label: 'Import CA', text: 'Import existing CA certificate (with or without private key)' },
           { label: 'Export', text: 'PEM, DER, or PKCS#12 (P12/PFX) with password protection' },
           { label: 'Revoke', text: 'Revoke an intermediate CA from its parent: published on the parent\'s CRL and OCSP, and the CA can no longer sign (permanent)' },
-          { label: 'Chain Repair', text: 'Fix broken parent-child relationships automatically' },
+          { label: 'Chain Repair', text: 'Fix broken parent-child relationships automatically. Its strip shows by itself when a CA is orphaned, a record waits for its repair or a repair runs; otherwise the Chain Repair button of the page head opens it' },
           { label: 'Import private key', text: 'Attach the private key of a CA that holds only its certificate, so it can sign' },
           { label: 'Key and validity', text: 'RSA-3072 by default, local or HSM. Validity of 1, 2, 3, 5, 10, 15 or 20 years, or Custom (days) up to 50 years. An RSA-2048 CA that would outlive 2030 is flagged: ANSSI accepts RSA-2048 until the end of 2030, ETSI TS 119 312 until the end of 2026' },
           { label: 'Post-quantum (ML-DSA)', text: 'ML-DSA-44, ML-DSA-65 or ML-DSA-87 (FIPS 204, NIST levels 2, 3 and 5), generated in software or on an HSM provider that holds ML-DSA; in FIPS mode only a software key, offered when the FIPS module approves ML-DSA (the -fips Docker image does). An ML-DSA key signs without a separate digest, so the CA, its CRLs and its OCSP responses have no digest to choose. An ML-DSA CA can sign RSA or EC certificates, and an RSA or EC CA can sign an ML-DSA intermediate' },

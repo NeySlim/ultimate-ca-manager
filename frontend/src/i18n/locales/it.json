@@ -944,7 +944,6 @@
     "parentCA": "CA padre",
     "hierarchy": "Gerarchia",
     "hierarchyView": "Vista gerarchica",
-    "orgView": "Vista organigramma",
     "columnsView": "Vista colonne",
     "listView": "Vista elenco",
     "orphanCAs": "CA orfane",
@@ -1184,7 +1183,47 @@
     "uniqueSubjectChanged": "Impostazione del soggetto univoco aggiornata",
     "uniqueSubjectChangeFailed": "Impossibile aggiornare l'impostazione del soggetto univoco",
     "uniqueSubjectShared_one": "{{count}} soggetto è già presente in più entità: {{examples}}. Nulla indica a quale sia destinato un nuovo certificato: i rinnovi dei suoi certificati vengono rifiutati così come sono e solo un'emissione manuale o una firma CSR di questo soggetto va a buon fine, con l'override",
-    "uniqueSubjectShared_other": "{{count}} soggetti sono già presenti in più entità, tra cui {{examples}}. Nulla indica a quale sia destinato un nuovo certificato: i rinnovi dei loro certificati vengono rifiutati così come sono e solo un'emissione manuale o una firma CSR di questi soggetti va a buon fine, con l'override"
+    "uniqueSubjectShared_other": "{{count}} soggetti sono già presenti in più entità, tra cui {{examples}}. Nulla indica a quale sia destinato un nuovo certificato: i rinnovi dei loro certificati vengono rifiutati così come sono e solo un'emissione manuale o una firma CSR di questi soggetti va a buon fine, con l'override",
+    "total_one": "{{count, number}} authority",
+    "total_other": "{{count, number}} authorities",
+    "intent": "The trust hierarchy and its signing authorities.",
+    "viewsLabel": "Filter the authorities",
+    "views": {
+      "all": "All",
+      "roots": "Roots",
+      "intermediates": "Intermediates",
+      "expired": "Expired",
+      "offline": "Offline",
+      "revoked": "Revoked",
+      "pending": "Awaiting certificate"
+    },
+    "searchPlaceholder": "Name, common name, subject…",
+    "viewMode": "Display",
+    "treeView": "Tree view",
+    "state": {
+      "expiring": "Expiring soon"
+    },
+    "range_one": "{{start}}–{{end}} of {{count, number}} authority",
+    "range_other": "{{start}}–{{end}} of {{count, number}} authorities",
+    "downloadCertificate": "Download certificate (PEM)",
+    "tree": {
+      "title": "Trust hierarchy",
+      "hint": "Arrow keys to move, Enter to open, right and left to expand or collapse.",
+      "expandAll": "Expand all",
+      "collapseAll": "Collapse all",
+      "expand": "Expand {{name}}",
+      "collapse": "Collapse {{name}}",
+      "level": "level {{level}}",
+      "subCaCount_one": "{{count}} sub-authority",
+      "subCaCount_other": "{{count}} sub-authorities",
+      "idleRoots_one": "{{count}} root with neither a sub-authority nor a certificate",
+      "idleRoots_other": "{{count}} roots with neither a sub-authority nor a certificate",
+      "noMatch": "No authority matches.",
+      "orphan": "No known parent",
+      "crossLink": "Cross-signature",
+      "showMore_one": "Show {{count}} more",
+      "showMore_other": "Show {{count}} more"
+    }
   },
   "csrs": {
     "uploadCSR": "Carica CSR",

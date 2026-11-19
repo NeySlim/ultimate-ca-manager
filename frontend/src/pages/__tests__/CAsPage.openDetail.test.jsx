@@ -59,15 +59,14 @@ vi.mock('../../services', () => ({
 vi.mock('../../components', () => ({
   Button: ({ children, ...props }) => <button {...props}>{children}</button>,
   LoadingSpinner: () => <div>loading</div>,
-  MultiSelectFilter: () => null,
 }))
 vi.mock('../../components/ui/responsive', () => ({
-  ResponsiveLayout: ({ children }) => <div>{children}</div>,
+  ResponsiveLayout: ({ actions, children }) => <div>{actions}{children}</div>,
 }))
 vi.mock('../../components/cas/ManageTemplatePinsModal', () => ({
   ManageTemplatePinsModal: () => null,
 }))
-vi.mock('../cas/OrgView', () => ({ OrgView: () => null }))
+vi.mock('../cas/HierarchyTree', () => ({ HierarchyTree: () => null }))
 vi.mock('../cas/ColumnsView', () => ({ ColumnsView: () => null }))
 vi.mock('../cas/ListView', () => ({ ListView: () => null }))
 vi.mock('../cas/CADetailsPanel', () => ({ CADetailsPanel: () => null }))
