@@ -898,7 +898,32 @@
     "renewed": "証明書を更新しました",
     "subjectTakenTitle": "サブジェクトは使用済みです",
     "subjectTakenConfirm": "サブジェクト {{subject}} は、この CA のシリアル {{serial}} の証明書にすでに使用されています。この証明書がそのサブジェクトを持つ既存の証明書と同じエンティティのものである場合にのみ確認してください。その場合、そのエンティティに発行され、確認内容は監査ログに記録されます。",
-    "issueAnyway": "同じエンティティに発行"
+    "issueAnyway": "同じエンティティに発行",
+    "intent": "証明書の確認、発行、維持を行います。",
+    "issue": "発行",
+    "total_one": "証明書 {{count, number}} 件",
+    "total_other": "証明書 {{count, number}} 件",
+    "range_one": "証明書 {{count, number}} 件中 {{start}}–{{end}}",
+    "range_other": "証明書 {{count, number}} 件中 {{start}}–{{end}}",
+    "searchPlaceholder": "名前、説明、発行者、シリアル番号…",
+    "viewsLabel": "状態で絞り込む",
+    "views": {
+      "all": "すべて",
+      "expiring": "要更新",
+      "valid": "有効",
+      "expired": "期限切れ",
+      "revoked": "失効済み",
+      "orphan": "孤立",
+      "archived": "アーカイブ済み"
+    },
+    "state": "状態",
+    "expiry": "有効期限",
+    "keyHeld": "秘密鍵を UCM が保持",
+    "compareHint": "比較する証明書を 1 件または 2 件選択してください",
+    "exportSelectedPem": "PEM でエクスポート",
+    "bulkExported_one": "証明書 {{count}} 件をエクスポートしました",
+    "bulkExported_other": "証明書 {{count}} 件をエクスポートしました",
+    "listLabel": "証明書の一覧"
   },
   "cas": {
     "chainRevoked": "上位で失効",
@@ -4251,7 +4276,13 @@
     "hoursAgo_one": "{{count}} 時間前",
     "hoursAgo_other": "{{count}} 時間前",
     "daysAgo_one": "{{count}} 日前",
-    "daysAgo_other": "{{count}} 日前"
+    "daysAgo_other": "{{count}} 日前",
+    "inHours_one": "{{count}} 時間後",
+    "inHours_other": "{{count}} 時間後",
+    "inDays_one": "{{count}} 日後",
+    "inDays_other": "{{count}} 日後",
+    "overdueDays_one": "{{count}} 日前に期限切れ",
+    "overdueDays_other": "{{count}} 日前に期限切れ"
   },
   "validation": {
     "required": "この項目は必須です",
@@ -4682,7 +4713,21 @@
     "density": "密度",
     "compact": "コンパクト",
     "default": "デフォルト",
-    "comfortable": "快適"
+    "comfortable": "快適",
+    "columns": "列",
+    "range": "{{total, number}} 件中 {{start}}–{{end}}",
+    "perPage": "{{size}} 件 / ページ",
+    "previousPage": "前のページ",
+    "nextPage": "次のページ",
+    "selectedCount_one": "{{count}} 件を選択中",
+    "selectedCount_other": "{{count}} 件を選択中",
+    "clearSelection": "選択を解除",
+    "selection": "選択",
+    "selectPage": "このページを選択",
+    "selectRow": "{{name}} を選択",
+    "open": "開く",
+    "openRow": "{{name}} を開く",
+    "rowAction": "{{action}}: {{name}}"
   },
   "reconnect": {
     "countdown": "サービスを再起動中...",

@@ -898,7 +898,32 @@
     "renewed": "Certificado renovado",
     "subjectTakenTitle": "Sujeito já em uso",
     "subjectTakenConfirm": "O sujeito {{subject}} já é usado pelo certificado de série {{serial}} desta CA. Confirme apenas se este certificado se destina à mesma entidade que já usa este sujeito: será então emitido para essa entidade, e a sua confirmação fica registada no registo de auditoria.",
-    "issueAnyway": "Emitir para a mesma entidade"
+    "issueAnyway": "Emitir para a mesma entidade",
+    "intent": "Inspecionar, emitir e manter os seus certificados.",
+    "issue": "Emitir",
+    "total_one": "{{count, number}} certificado",
+    "total_other": "{{count, number}} certificados",
+    "range_one": "{{start}}–{{end}} de {{count, number}} certificado",
+    "range_other": "{{start}}–{{end}} de {{count, number}} certificados",
+    "searchPlaceholder": "Nome, descrição, emissor, número de série…",
+    "viewsLabel": "Filtrar por estado",
+    "views": {
+      "all": "Todos",
+      "expiring": "A renovar",
+      "valid": "Válidos",
+      "expired": "Expirados",
+      "revoked": "Revogados",
+      "orphan": "Órfãos",
+      "archived": "Arquivados"
+    },
+    "state": "Estado",
+    "expiry": "Expiração",
+    "keyHeld": "Chave privada guardada no UCM",
+    "compareHint": "Selecione um ou dois certificados para comparar",
+    "exportSelectedPem": "Exportar como PEM",
+    "bulkExported_one": "{{count}} certificado exportado",
+    "bulkExported_other": "{{count}} certificados exportados",
+    "listLabel": "Lista de certificados"
   },
   "cas": {
     "chainRevoked": "Revogada a montante",
@@ -4248,7 +4273,13 @@
     "hoursAgo_one": "{{count}} hora atrás",
     "hoursAgo_other": "{{count}} horas atrás",
     "daysAgo_one": "{{count}} dia atrás",
-    "daysAgo_other": "{{count}} dias atrás"
+    "daysAgo_other": "{{count}} dias atrás",
+    "inHours_one": "em {{count}} hora",
+    "inHours_other": "em {{count}} horas",
+    "inDays_one": "em {{count}} dia",
+    "inDays_other": "em {{count}} dias",
+    "overdueDays_one": "expirado há {{count}} dia",
+    "overdueDays_other": "expirado há {{count}} dias"
   },
   "validation": {
     "required": "Este campo é obrigatório",
@@ -4679,7 +4710,21 @@
     "density": "Densidade",
     "compact": "Compacto",
     "default": "Padrão",
-    "comfortable": "Confortável"
+    "comfortable": "Confortável",
+    "columns": "Colunas",
+    "range": "{{start}}–{{end}} de {{total, number}}",
+    "perPage": "{{size}} / página",
+    "previousPage": "Página anterior",
+    "nextPage": "Página seguinte",
+    "selectedCount_one": "{{count}} selecionado",
+    "selectedCount_other": "{{count}} selecionados",
+    "clearSelection": "Cancelar a seleção",
+    "selection": "Seleção",
+    "selectPage": "Selecionar a página",
+    "selectRow": "Selecionar {{name}}",
+    "open": "Abrir",
+    "openRow": "Abrir {{name}}",
+    "rowAction": "{{action}}: {{name}}"
   },
   "reconnect": {
     "countdown": "O serviço está reiniciando...",

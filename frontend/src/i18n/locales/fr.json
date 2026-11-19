@@ -1288,7 +1288,32 @@
     "renewed": "Certificat renouvelé",
     "subjectTakenTitle": "Sujet déjà utilisé",
     "subjectTakenConfirm": "Le sujet {{subject}} est déjà porté par le certificat de numéro de série {{serial}} de cette AC. Ne confirmez que si ce certificat est pour la même entité que celle qui porte déjà ce sujet : il est alors émis pour cette entité, et votre confirmation est inscrite au journal d'audit.",
-    "issueAnyway": "Émettre pour la même entité"
+    "issueAnyway": "Émettre pour la même entité",
+    "intent": "Inspecter, émettre et maintenir vos certificats.",
+    "issue": "Émettre",
+    "total_one": "{{count, number}} certificat",
+    "total_other": "{{count, number}} certificats",
+    "range_one": "{{start}}–{{end}} sur {{count, number}} certificat",
+    "range_other": "{{start}}–{{end}} sur {{count, number}} certificats",
+    "searchPlaceholder": "Nom, description, émetteur, numéro de série…",
+    "viewsLabel": "Filtrer par état",
+    "views": {
+      "all": "Tous",
+      "expiring": "À renouveler",
+      "valid": "Valides",
+      "expired": "Expirés",
+      "revoked": "Révoqués",
+      "orphan": "Orphelins",
+      "archived": "Archivés"
+    },
+    "state": "État",
+    "expiry": "Expiration",
+    "keyHeld": "Clé privée détenue par UCM",
+    "compareHint": "Sélectionnez un ou deux certificats à comparer",
+    "exportSelectedPem": "Exporter en PEM",
+    "bulkExported_one": "{{count}} certificat exporté",
+    "bulkExported_other": "{{count}} certificats exportés",
+    "listLabel": "Liste des certificats"
   },
   "common": {
     "duplicateKey": "Une ligne plus haut utilise déjà « {{key}} » : une seule des deux peut être enregistrée",
@@ -4170,7 +4195,13 @@
     "hoursAgo_one": "il y a {{count}} heure",
     "hoursAgo_other": "il y a {{count}} heures",
     "daysAgo_one": "il y a {{count}} jour",
-    "daysAgo_other": "il y a {{count}} jours"
+    "daysAgo_other": "il y a {{count}} jours",
+    "inHours_one": "dans {{count}} heure",
+    "inHours_other": "dans {{count}} heures",
+    "inDays_one": "dans {{count}} jour",
+    "inDays_other": "dans {{count}} jours",
+    "overdueDays_one": "échu depuis {{count}} jour",
+    "overdueDays_other": "échu depuis {{count}} jours"
   },
   "tools": {
     "groups": {
@@ -4682,7 +4713,21 @@
     "density": "Densité",
     "compact": "Compact",
     "default": "Défaut",
-    "comfortable": "Confortable"
+    "comfortable": "Confortable",
+    "columns": "Colonnes",
+    "range": "{{start}}–{{end}} sur {{total, number}}",
+    "perPage": "{{size}} / page",
+    "previousPage": "Page précédente",
+    "nextPage": "Page suivante",
+    "selectedCount_one": "{{count}} sélectionné",
+    "selectedCount_other": "{{count}} sélectionnés",
+    "clearSelection": "Annuler la sélection",
+    "selection": "Sélection",
+    "selectPage": "Sélectionner la page",
+    "selectRow": "Sélectionner {{name}}",
+    "open": "Ouvrir",
+    "openRow": "Ouvrir {{name}}",
+    "rowAction": "{{action}} : {{name}}"
   },
   "reconnect": {
     "countdown": "Le service redémarre...",
