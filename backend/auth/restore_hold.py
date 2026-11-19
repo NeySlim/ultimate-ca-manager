@@ -14,6 +14,8 @@ import types
 from flask import g, request, session
 
 MAX_ENTRIES = 4096
+# One account's checks push out its own oldest ones first, never another account's
+MAX_PER_USER = 32
 # The restore job's own routes, served from its local state while the database is held
 HELD_ENDPOINTS = frozenset({'system_v2.get_job', 'system_v2.cancel_job'})
 _FINGERPRINT = ('user_id', 'session_version', 'restore_epoch', 'account_created', 'login_time')
@@ -83,9 +85,23 @@ def remember(auth_result):
         entry['limits'] = AuthManager.session_limits()
     with _lock:
         entries = _entries_for(gate)
-        if key not in entries and len(entries) >= MAX_ENTRIES:
-            entries.pop(next(iter(entries)))
+        entries.pop(key, None)
+        _make_room(entries, entry['user_id'])
         entries[key] = entry
+
+
+def _make_room(entries, user_id):
+    """Under _lock: the account's oldest check past its share; when full, the oldest check of
+    the account holding the most."""
+    own = [k for k, e in entries.items() if e['user_id'] == user_id]
+    if len(own) >= MAX_PER_USER:
+        entries.pop(own[0])
+    elif len(entries) >= MAX_ENTRIES:
+        counts = {}
+        for e in entries.values():
+            counts[e['user_id']] = counts.get(e['user_id'], 0) + 1
+        largest = max(counts, key=counts.get)
+        entries.pop(next(k for k, e in entries.items() if e['user_id'] == largest))
 
 
 def forget():

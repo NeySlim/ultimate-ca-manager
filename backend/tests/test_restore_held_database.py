@@ -700,3 +700,37 @@ def test_an_untrusted_forwarded_host_is_refused_while_held(restore_held, monkeyp
     assert cancel.status_code == 403, cancel.data
     assert plain.status_code == 200, plain.data
     assert not restore_job.cancel_flagged(job_id)
+
+
+
+@pytest.mark.parametrize('per_user', [2, 100], ids=['own-share', 'memory-full'])
+def test_one_account_cannot_evict_another_from_the_held_memory(held_app, monkeypatch, per_user):
+    """The memory is bounded; what one account brings in pushes out its own checks first."""
+    from auth import restore_hold
+    app, path = held_app
+    monkeypatch.setattr(restore_hold, 'MAX_ENTRIES', 4)
+    monkeypatch.setattr(restore_hold, 'MAX_PER_USER', per_user)
+    job_id = _restore_job(app)
+    url = f'/api/v2/system/jobs/{job_id}'
+    victim, crowd = _admin_user(app), _admin_user(app)
+    victim_key = _api_key(app, victim['id'], 3600)
+    keys = [_api_key(app, crowd['id'], 3600) for _ in range(6)]
+    client = app.test_client()
+    gate = _gate(app, job_id).raise_gate()
+    try:
+        assert client.get(url, headers={'X-API-Key': victim_key}).status_code == 200
+        for key in keys:
+            assert client.get(url, headers={'X-API-Key': key}).status_code == 200
+        gate.set_view(phase=restore_job.APPLYING, held=True)
+        with holding(path):
+            victim_seen = client.get(url, headers={'X-API-Key': victim_key})
+            latest = client.get(url, headers={'X-API-Key': keys[-1]})
+            first = client.get(url, headers={'X-API-Key': keys[0]})
+    finally:
+        gate.lift()
+        with app.app_context():
+            db.session.execute(T.delete().where(T.c.id == job_id))
+            db.session.commit()
+    assert victim_seen.status_code == 200, victim_seen.data
+    assert latest.status_code == 200, latest.data
+    assert first.status_code == 503, first.data
