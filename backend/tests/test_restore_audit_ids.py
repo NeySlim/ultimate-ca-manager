@@ -16,7 +16,8 @@ from sqlalchemy import text
 from models import AuditLog, db
 from services.backup import manifest
 from services.backup.restore import RestoreValidationError
-from services.backup.restore.audit_ids import IMPORTED, OTHER_KEY, WITHOUT_IDS
+from services.backup.restore.audit_ids import (ID_LIMIT, IMPORTED, OTHER_KEY, WITHOUT_IDS,
+                                               carried_ids, sealed_under_a_key_unknown_here)
 from tests.test_backup_cross_installation import _bound_to
 from tests.test_backup_hostile_corpus import _reseal
 from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
@@ -256,6 +257,19 @@ class TestUnderAnotherMasterKey:
             report = _verify()
             assert [error['code'] for error in report['errors']] == ['unattested_key'], report
 
+    def test_a_key_the_ledger_rotated_from_is_not_another_key(self, world):
+        """Its own backup, taken after a key rotation: as verifiable here as before, no advice."""
+        here = world('here', Fernet.generate_key().decode('ascii'))
+        with here.on():
+            _entries('first_key', 3)
+        here.master = Fernet.generate_key().decode('ascii')
+        with here.on():
+            _entries('second_key', 2)
+            assert _verify()['status'] == 'intact'
+            results = _restore(_backup())
+            assert _audit_warnings(results) == []
+            assert _verify()['status'] == 'intact'
+
     def test_a_keyless_archive_on_a_keyed_target_warns_nothing(self, world):
         source = world('source')
         target = world('target', Fernet.generate_key().decode('ascii'))
@@ -316,6 +330,7 @@ HOSTILE = {
     'negative': _set_first(-3),
     'zero': _set_first(0),
     'huge': _set_first(2 ** 31),
+    'past-the-limit': _set_first(ID_LIMIT + 1),
     'null': _set_first(None),
     'duplicate': _duplicate,
     'some-without': _one_without,
@@ -338,6 +353,51 @@ class TestAHostileIdIsRefused:
                         _restore(archive, mode)
                     db.session.rollback()
                     assert _ledger() == before, (name, mode)
+
+
+def _keyed(entry_id, key_id, rotated_from=None):
+    import json
+    return {'id': entry_id, 'hash_version': 2, 'hash_key_id': key_id,
+            'retired_keys': json.dumps({'attested': True, 'keys': rotated_from})
+            if rotated_from else None}
+
+
+@pytest.mark.parametrize('rows, counted', [
+    # The rotation covers the old key up to the id it names, and no further
+    ([_keyed(1, 'old'), _keyed(2, 'old'), _keyed(3, 'old'), _keyed(4, 'own', {'old': 2})], 1),
+    ([_keyed(1, 'old'), _keyed(2, 'old'), _keyed(4, 'own', {'old': 2})], 0),
+    # A key the rotation does not name; an entry under the old key after this server's first
+    ([_keyed(1, 'old'), _keyed(2, 'else'), _keyed(4, 'own', {'old': 2})], 1),
+    ([_keyed(1, 'old'), _keyed(4, 'own', {'old': 5}), _keyed(5, 'old')], 1),
+    # A rotation record that does not read: nothing is taken as recorded
+    ([_keyed(1, 'old'), {**_keyed(4, 'own'), 'retired_keys': '{"keys": ["old"]}'}], 1),
+    ([_keyed(1, 'old'), {**_keyed(4, 'own'), 'retired_keys': 'not json'}], 1),
+    ([_keyed(1, 'old'), {**_keyed(4, 'own'), 'retired_keys': '{"keys": {"old": "1"}}'}], 1),
+])
+def test_only_keys_the_ledger_rotated_from_count_as_known(rows, counted):
+    assert sealed_under_a_key_unknown_here(rows, 'own') == counted
+    # Without a key here, no keyed entry verifies
+    assert sealed_under_a_key_unknown_here(rows, None) == len(rows)
+
+
+class TestTheCounterKeepsItsRoom:
+    def test_the_last_number_of_the_column_is_refused(self):
+        """An archive cannot bring the id counter to its end: half its range stays free."""
+        assert carried_ids([{'id': ID_LIMIT}]) is True
+        assert 2 ** 31 - 1 - ID_LIMIT >= 2 ** 30 - 1
+        with pytest.raises(RestoreValidationError, match='audit_logs'):
+            carried_ids([{'id': 2 ** 31 - 1}])
+
+    def test_entries_are_still_written_after_the_highest_id_accepted(self, world):
+        """Proof on PostgreSQL, whose sequence ends; SQLite numbers past it either way."""
+        source, target = world('source'), world('target')
+        with source.on():
+            _source_entries(2, first_id=ID_LIMIT - 1)
+            blob = _backup()
+        with target.on():
+            _restore(blob)
+            assert _log('after_restore') > ID_LIMIT
+            assert _verify()['error_count'] == 0
 
 
 class TestAMerge:

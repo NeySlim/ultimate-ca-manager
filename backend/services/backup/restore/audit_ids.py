@@ -6,6 +6,7 @@ the ids; a replacing restore writes each entry back under its own, and the id
 counter goes past them. A merge, and an archive without ids, still number the
 entries here, and the report says that those do not verify.
 """
+import json
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
@@ -15,8 +16,9 @@ from models import db
 from .plan import RestoreValidationError, _normalise, shared_identity_warning
 
 SECTION = 'audit_logs'
-# The column is an integer on PostgreSQL: its sequence hands out nothing past this
-ID_LIMIT = 2 ** 31 - 1
+# Half the range of the column, an integer on PostgreSQL: an archive cannot bring the
+# sequence to its end, after which no entry would be written
+ID_LIMIT = 2 ** 30
 KEYED_CHAIN = 2
 
 OTHER_KEY = ("{count} audit log entries sealed under another master key cannot be verified "
@@ -111,6 +113,30 @@ def advance_counter() -> None:
                      {'s': sequence, 'n': highest})
 
 
+def sealed_under_a_key_unknown_here(rows: List[Dict[str, Any]], local: Optional[str]) -> int:
+    """Keyed entries this server cannot verify: neither under its key, nor under a key the
+    first entry sealed with its key records the ledger rotated from (as the verification reads it)."""
+    other = [row for row in rows if row.get('hash_version') == KEYED_CHAIN
+             and row.get('hash_key_id') != local]
+    own = [row for row in rows if row.get('hash_version') == KEYED_CHAIN
+           and row.get('hash_key_id') == local]
+    if not other or not own:
+        return len(other)
+    first = min(own, key=lambda row: row['id'])
+    try:
+        limits = json.loads(first.get('retired_keys') or '{}').get('keys')
+    except (TypeError, ValueError, AttributeError):
+        limits = None
+    if not isinstance(limits, dict):
+        limits = {}
+
+    def recorded(row) -> bool:
+        key_id = row.get('hash_key_id')
+        limit = limits.get(key_id) if isinstance(key_id, str) else None
+        return type(limit) is int and row['id'] <= limit and row['id'] < first['id']
+    return sum(1 for row in other if not recorded(row))
+
+
 def settle(plan) -> None:
     """After the section is written: the counter, and what the report says of the entries."""
     rows = plan.rows.get(SECTION) or []
@@ -121,9 +147,7 @@ def settle(plan) -> None:
         advance_counter()
         from services.audit.chain import chain_key
         key = chain_key()
-        local = key[1] if key else None
-        other = sum(1 for row in rows if row.get('hash_version') == KEYED_CHAIN
-                    and row.get('hash_key_id') != local)
+        other = sealed_under_a_key_unknown_here(rows, key[1] if key else None)
         if other:
             plan.warnings.append(OTHER_KEY.format(count=other))
     elif plan.audit_new:
