@@ -15,7 +15,7 @@ import {
 const EMPTY = {
   name: '', realm: '', enabled: true, connector_id: null, issuing_ca_refid: '', policy_ca_refid: '',
   validity_days: 365, allowed_ad_group: '', pinned_subject_fields: '', template_ids: [],
-  xcep_username: '', wstep_username: '', is_default: false,
+  xcep_username: '', wstep_username: '', is_default: false, renewal_ca_refids: [],
 }
 
 function ChecklistRow({ ok, label, action, onAction }) {
@@ -64,7 +64,7 @@ export function KeytabEntries({ entries, profileRealm }) {
 export default function WindowsProfileEditor({ profile, cas, canWrite, canUploadKeytab, onSaved, onCancel }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showInfo } = useNotification()
   const isNew = !profile?.id
   const [detail, setDetail] = useState(null)
   const [form, setForm] = useState({ ...EMPTY })
@@ -102,6 +102,7 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
             pinned_subject_fields: p.pinned_subject_fields || '', template_ids: p.template_ids || [],
             xcep_username: p.xcep_username || '', wstep_username: p.wstep_username || '',
             is_default: Boolean(p.is_default),
+            renewal_ca_refids: (p.renewal_cas || []).map(ca => ca.refid),
           })
         } catch (error) {
           showError(error.message || t('messages.errors.loadFailed.generic'))
@@ -175,6 +176,9 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
     if (isNew || form.connector_id !== (detail?.connector_id ?? null)) payload.connector_id = form.connector_id
     if (isDefault && form.xcep_password) payload.xcep_password = form.xcep_password
     if (isDefault && form.wstep_password) payload.wstep_password = form.wstep_password
+    // The API only takes former CAs off the list; sent when the operator removed one
+    const listed = (detail?.renewal_cas || []).map(ca => ca.refid)
+    if (!isNew && form.renewal_ca_refids.length !== listed.length) payload.renewal_ca_refids = form.renewal_ca_refids
     return payload
   }
 
@@ -196,6 +200,8 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
         await windowsProfilesService.uploadKeytab(saved.id, keytabFile)
       }
       showSuccess(t('messages.success.update.settings'))
+      // The TLS listener reloads the former CAs it trusts on a restart
+      if (saved?.restart_message) showInfo(saved.restart_message)
       onSaved(saved)
     } catch (error) {
       showError(error.message || t('messages.errors.updateFailed.settings'))
@@ -300,6 +306,28 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
           disabled={readOnly}
         />
       </div>
+
+      {!isNew && (
+        <div>
+          <p className="text-xs font-medium text-text-secondary mb-1">{t('xcepWstep.renewalCas')}</p>
+          <p className="text-xs text-text-tertiary mb-2">{t('xcepWstep.renewalCasHelp')}</p>
+          {form.renewal_ca_refids.length === 0
+            ? <p className="text-xs text-text-tertiary">{t('xcepWstep.renewalCasNone')}</p>
+            : (
+              <ul className="border border-border rounded-lg p-2 space-y-1">
+                {(detail?.renewal_cas || []).filter(ca => form.renewal_ca_refids.includes(ca.refid)).map(ca => (
+                  <li key={ca.refid} className="flex items-center justify-between gap-2 text-sm">
+                    <span>{ca.name || `${t('xcepWstep.renewalCaDeleted')} (${ca.refid})`}</span>
+                    <Button type="button" size="sm" variant="ghost" disabled={readOnly}
+                      onClick={() => update('renewal_ca_refids')(form.renewal_ca_refids.filter(r => r !== ca.refid))}>
+                      {t('xcepWstep.renewalCaRemove')}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+        </div>
+      )}
 
       <Input
         label={t('xcepWstep.validityDays')}

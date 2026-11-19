@@ -378,3 +378,31 @@ describe('default profile', () => {
     expect(box()).toBeNull()
   })
 })
+
+describe('former CAs that still renew', () => {
+  const MOVED = { ...PROFILE, renewal_cas: [{ refid: 'ca-old', name: 'Old CA' }, { refid: 'ca-gone', name: null }] }
+
+  it('lists them, names a deleted one, and sends the list only once one is removed', async () => {
+    mocks.get.mockResolvedValue({ data: MOVED })
+    mocks.notify.showInfo = vi.fn()
+    mocks.update.mockResolvedValue({ data: { ...MOVED, restart_message: 'restarting' } })
+    renderEditor()
+    expect(await screen.findByText('Old CA')).toBeInTheDocument()
+    expect(screen.getByText('xcepWstep.renewalCaDeleted (ca-gone)')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('common.save'))
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1))
+    expect(mocks.update.mock.calls[0][1]).not.toHaveProperty('renewal_ca_refids')
+    fireEvent.click(screen.getAllByText('xcepWstep.renewalCaRemove')[0])
+    expect(screen.queryByText('Old CA')).toBeNull()
+    fireEvent.click(screen.getByText('common.save'))
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(2))
+    expect(mocks.update.mock.calls[1][1].renewal_ca_refids).toEqual(['ca-gone'])
+    // The listener reloads the former CAs on a restart: the operator is told
+    await waitFor(() => expect(mocks.notify.showInfo).toHaveBeenCalledWith('restarting'))
+  })
+
+  it('says none are listed for a profile whose CA never changed', async () => {
+    renderEditor()
+    expect(await screen.findByText('xcepWstep.renewalCasNone')).toBeInTheDocument()
+  })
+})
