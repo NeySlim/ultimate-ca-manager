@@ -33,6 +33,7 @@ from utils.export_password import validate_export_password
 from utils.key_codec import load_pem_bytes
 from utils.datetime_utils import utc_now
 from utils.db_transaction import safe_commit
+from utils.sanitize import content_disposition
 from models import db, Certificate, CA, KeyRecoveryRequest
 from models.key_recovery import (
     STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED, STATUS_RECOVERED,
@@ -264,6 +265,6 @@ def recover_key(rid):
         return err
     _audit('key_recovery.recovered', req)
 
-    filename = f"{(cert.descr or cert.refid or 'recovered')}.p12"
     return Response(p12, mimetype='application/x-pkcs12',
-                    headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+                    headers={'Content-Disposition': content_disposition(
+                        cert.descr or cert.refid, '.p12', fallback=cert.refid or 'recovered')})

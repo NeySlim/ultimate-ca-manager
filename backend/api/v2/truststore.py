@@ -7,7 +7,7 @@ from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.db_transaction import safe_commit
-from utils.sanitize import sanitize_filename
+from utils.sanitize import content_disposition
 from utils.export_pems import readable_pems, skipped_headers, nothing_readable
 from models import db
 from models.truststore import TrustedCertificate
@@ -600,12 +600,10 @@ def export_trust_bundle():
                 bundle_lines.append(pem.decode().strip())
                 bundle_lines.append('')
 
-            filename = f'truststore-{sanitize_filename(purpose)}-bundle.pem'
-            headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+            headers['Content-Disposition'] = content_disposition(purpose, '-bundle.pem', fallback='all', prefix='truststore-')
             return Response('\n'.join(bundle_lines), mimetype='application/x-pem-file', headers=headers)
 
-        filename = f'truststore-{sanitize_filename(purpose)}-bundle.p7b'
-        headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        headers['Content-Disposition'] = content_disposition(purpose, '-bundle.p7b', fallback='all', prefix='truststore-')
         p7b = pkcs7.serialize_certificates([x509.load_pem_x509_certificate(p) for p in pems],
                                            serialization.Encoding.DER)
         return Response(p7b, mimetype='application/x-pkcs7-certificates', headers=headers)

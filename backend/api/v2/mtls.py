@@ -37,7 +37,7 @@ from services.mtls_enrollment import (
 from utils.response import success_response, error_response, created_response
 from utils.export_password import validate_export_password
 from utils.db_transaction import safe_commit
-from utils.sanitize import sanitize_filename
+from utils.sanitize import content_disposition
 from utils.export_options import json_boolean, query_boolean
 
 logger = logging.getLogger(__name__)
@@ -452,7 +452,7 @@ def download_mtls_certificate(cert_id):
         return Response(
             p12_bytes,
             mimetype='application/x-pkcs12',
-            headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(user.username)}-mtls.p12"'},
+            headers={'Content-Disposition': content_disposition(user.username, '-mtls.p12', fallback=f'user-{user.id}')},
         )
 
     # Default: PEM
@@ -468,7 +468,7 @@ def download_mtls_certificate(cert_id):
     return Response(
         cert_pem,
         mimetype='application/x-pem-file',
-        headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(user.username)}-mtls.pem"'},
+        headers={'Content-Disposition': content_disposition(user.username, '-mtls.pem', fallback=f'user-{user.id}')},
     )
 
 

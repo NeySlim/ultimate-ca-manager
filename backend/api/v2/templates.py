@@ -13,7 +13,7 @@ from utils.validity import DEFAULT_TEMPLATE_VALIDITY_DAYS
 from utils.issuance_defaults import default_issue_key_type
 from utils.db_transaction import safe_commit
 from utils.file_validation import validate_upload, JSON_EXTENSIONS
-from utils.sanitize import sanitize_filename
+from utils.sanitize import content_disposition
 from models import db, Certificate, CA
 from models.certificate_template import CertificateTemplate
 from models.policy import CertificatePolicy
@@ -751,7 +751,7 @@ def export_template(template_id):
     return Response(
         json.dumps(export_data, indent=2),
         mimetype='application/json',
-        headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(template.name)}.json"'}
+        headers={'Content-Disposition': content_disposition(template.name, '.json', fallback=f'template-{template.id}')}
     )
 
 

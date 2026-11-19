@@ -19,6 +19,7 @@ from sqlalchemy.exc import IntegrityError
 
 from config.settings import Config
 from utils.process_lock import busy_message
+from utils.sanitize import content_disposition
 
 from .locking import _SUBJECT, BackupBusyError
 
@@ -417,7 +418,7 @@ def download_response(filename: str):
         response = Response(
             FileWrapper(reader, buffer_size=row.chunk_size),
             mimetype='application/octet-stream', direct_passthrough=True, headers={
-                'Content-Disposition': f'attachment; filename={filename}',
+                'Content-Disposition': content_disposition(filename),
                 'Repr-Digest': f'sha-256=:{digest}:',
             })
         response.content_length = size

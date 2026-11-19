@@ -29,7 +29,7 @@ from models.truststore import TrustedCertificate
 from utils.response import success_response, error_response
 from utils.export_password import (export_password_policy,
                                    validate_export_password)
-from utils.sanitize import sanitize_filename
+from utils.sanitize import content_disposition
 from utils.key_codec import load_pem_bytes
 from utils.cert_issuer import (
     authority_key_identifier_hex, certificate_signed_by, is_self_signed,
@@ -91,9 +91,8 @@ def _hybrid_bundle(certificate, include_key, password):
     if include_key:
         for row in members:
             audit_key_export('certificate', row.id, row.descr or row.refid, 'hybrid-bundle', password)
-    filename = f"{sanitize_filename(certificate.descr or certificate.refid)}_hybrid.zip"
     return Response(buffer.getvalue(), mimetype='application/zip',
-                    headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+                    headers={'Content-Disposition': content_disposition(certificate.descr or certificate.refid, '_hybrid.zip', fallback=certificate.refid)})
 
 
 def _normalized_key_identifier(value):
@@ -406,7 +405,7 @@ def export_certificate(cert_id):
             return Response(
                 key_pem,
                 mimetype='application/x-pem-file',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.key"'}
+                headers={'Content-Disposition': content_disposition(certificate.descr or certificate.refid, '.key', fallback=certificate.refid)}
             )
 
         if export_format == 'pem':
@@ -414,7 +413,7 @@ def export_certificate(cert_id):
             # Start with the leaf only so include_chain/include_root are honored.
             result = leaf_pem
             content_type = 'application/x-pem-file'
-            filename = f"{sanitize_filename(certificate.descr or certificate.refid)}.crt"
+            suffix = '.crt'
 
             # Include private key if requested
             if include_key and certificate.prv:
@@ -422,7 +421,7 @@ def export_certificate(cert_id):
                 if not result.endswith(b'\n'):
                     result += b'\n'
                 result += key_pem
-                filename = f"{sanitize_filename(certificate.descr or certificate.refid)}_with_key.pem"
+                suffix = '_with_key.pem'
 
             # Include CA chain if requested
             if include_chain:
@@ -433,9 +432,9 @@ def export_certificate(cert_id):
                         result += b'\n'
                     result += ca_cert.public_bytes(serialization.Encoding.PEM)
                 if include_key:
-                    filename = f"{sanitize_filename(certificate.descr or certificate.refid)}_full_chain.pem"
+                    suffix = '_full_chain.pem'
                 else:
-                    filename = f"{sanitize_filename(certificate.descr or certificate.refid)}_chain.pem"
+                    suffix = '_chain.pem'
 
             if include_key and certificate.prv:
                 audit_key_export('certificate', certificate.id, certificate.descr or certificate.refid,
@@ -443,7 +442,7 @@ def export_certificate(cert_id):
             return Response(
                 result,
                 mimetype=content_type,
-                headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+                headers={'Content-Disposition': content_disposition(certificate.descr or certificate.refid, suffix, fallback=certificate.refid)}
             )
 
         elif export_format == 'der':
@@ -453,7 +452,7 @@ def export_certificate(cert_id):
             return Response(
                 der_bytes,
                 mimetype='application/x-x509-ca-cert',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.der"'}
+                headers={'Content-Disposition': content_disposition(certificate.descr or certificate.refid, '.der', fallback=certificate.refid)}
             )
 
         elif export_format == 'pkcs12':
@@ -486,7 +485,7 @@ def export_certificate(cert_id):
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.p12"'}
+                headers={'Content-Disposition': content_disposition(certificate.descr or certificate.refid, '.p12', fallback=certificate.refid)}
             )
 
         elif export_format == 'pkcs7' or export_format == 'p7b':
@@ -497,7 +496,7 @@ def export_certificate(cert_id):
             return Response(
                 p7b_from_pems(pems),
                 mimetype='application/x-pkcs7-certificates',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.p7b"'}
+                headers={'Content-Disposition': content_disposition(certificate.descr or certificate.refid, '.p7b', fallback=certificate.refid)}
             )
 
         elif export_format == 'pfx':
@@ -531,7 +530,7 @@ def export_certificate(cert_id):
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.pfx"'}
+                headers={'Content-Disposition': content_disposition(certificate.descr or certificate.refid, '.pfx', fallback=certificate.refid)}
             )
 
         elif export_format == 'jks':
@@ -580,7 +579,7 @@ def export_certificate(cert_id):
             return Response(
                 jks_bytes,
                 mimetype='application/x-java-keystore',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.jks"'}
+                headers={'Content-Disposition': content_disposition(certificate.descr or certificate.refid, '.jks', fallback=certificate.refid)}
             )
 
         else:
