@@ -41,8 +41,8 @@ describe('MscaConnectionForm: test connection', () => {
   })
 
   it("shows the server's refusal of a Kerberos test it may not run", async () => {
-    const message = 'Setting a Kerberos keytab or principal, or moving a connection or test that uses one, '
-      + 'requires the admin:system permission'
+    const message = 'A Kerberos connection signs in as an identity of this server: creating one, moving it, '
+      + 'changing its keytab or principal, or testing it against another target requires the admin:system permission'
     apiClient.post.mockRejectedValueOnce(Object.assign(new Error(message), { status: 403 }))
     notificationSpies.showError.mockClear()
     const connection = { ...CONNECTION, auth_method: 'kerberos', kerberos_principal: 'svc@CORP.EXAMPLE',
