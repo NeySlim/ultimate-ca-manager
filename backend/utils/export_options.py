@@ -72,14 +72,14 @@ def _json_object(request):
     if not raw:
         return None, None
     try:
-        text = raw.decode('utf-8')
+        text = raw.decode('utf-8-sig')      # a byte order mark is ignored (RFC 8259, 8.1)
     except UnicodeDecodeError:
         return None, 'The JSON body must be encoded in UTF-8'
     try:
         data = json.loads(text, object_pairs_hook=_unique_pairs)
     except _RepeatedName as exc:
         return None, f'{_shown(exc.name) or "An empty name"} is given more than once'
-    except ValueError:
+    except (ValueError, RecursionError):
         return None, 'The body is not valid JSON'
     return data, None
 

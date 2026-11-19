@@ -344,9 +344,24 @@ def test_a_repeated_name_inside_a_nested_object_is_refused(auth_client, route):
     (b'{"password": "\xff\xfe"}', 'UTF-8'),
 ])
 def test_a_body_that_is_not_utf8_json_is_refused(auth_client, route, raw, fragment):
-    """Guard: what get_json refused stays refused, now without a 500."""
+    """Guard: what get_json refused stays refused."""
     _kind, url = route
     _refused(auth_client.post(url, data=raw, content_type='application/json'), fragment)
+
+
+def test_a_byte_order_mark_is_ignored_and_the_body_still_checked(auth_client, route):
+    """RFC 8259 section 8.1 lets a parser ignore the mark: the body is read, so its repeated name is seen."""
+    _kind, url = route
+    body = b'\xef\xbb\xbf' + ('{"password": "%s", "password": null}' % PASSWORD).encode()
+    _refused(auth_client.post(url, data=body, content_type='application/json'),
+             'password is given more than once')
+
+
+def test_a_body_nested_past_the_parser_depth_is_a_400(auth_client, route):
+    _kind, url = route
+    depth = 100000
+    body = '{"x": ' + '[' * depth + ']' * depth + '}'
+    _refused(auth_client.post(url, data=body, content_type='application/json'), 'not valid JSON')
 
 
 def test_the_body_size_limit_still_applies(app, auth_client, route, monkeypatch):
