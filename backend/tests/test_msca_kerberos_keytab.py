@@ -111,6 +111,7 @@ class _WinrmKerberosAuth(requests.auth.AuthBase):
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
+        self.force_preemptive = kwargs.get('force_preemptive', False)
         self.auth_done = False
         self.seen = []
         type(self).instances.append(self)
@@ -189,6 +190,54 @@ def test_the_winrm_channel_names_the_keytab_only_while_it_acquires(pywinrm, ssl)
     assert auth.seen == [('/kt/svc.keytab', ccache_name(1, '/kt/svc.keytab', 'svc@CORP'))]
     assert pywinrm.running == [('FILE:/previous.keytab', 'FILE:/previous.ccache')]
     assert (os.environ[ENV], os.environ[CCACHE]) == ('FILE:/previous.keytab', 'FILE:/previous.ccache')
+
+
+class _OtherAuth(requests.auth.AuthBase):
+    """A Kerberos auth of another shape: no generate_request_header to wrap."""
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, request):
+        return request
+
+
+_built_with = []
+
+
+def _other_auth_session(self):
+    if self.session is None:
+        _built_with.append(self.message_encryption)
+        self.session = requests.Session()
+        self.session.auth = _OtherAuth()
+    return self.session
+
+
+@pytest.mark.parametrize('shape', ['no-transport', 'missing-attribute', 'other-auth-class'])
+def test_an_unexpected_pywinrm_runs_the_whole_command_under_the_keytab(pywinrm, monkeypatch, shape):
+    """Never worse than before: a pywinrm the wrapper does not recognise keeps the keytab
+    named (lock held, bounded wait for others) for the whole command."""
+    import winrm
+    import winrm.transport
+    if shape == 'no-transport':
+        class Session:
+            def __init__(self, endpoint, auth, **kwargs):
+                pass
+
+            def run_ps(self, script):
+                pywinrm.running.append((os.environ.get(ENV), os.environ.get(CCACHE)))
+                return SimpleNamespace(status_code=0, std_out=b'ok', std_err=b'')
+        monkeypatch.setattr(winrm, 'Session', Session)
+    elif shape == 'missing-attribute':
+        monkeypatch.delattr(winrm.transport.Transport, 'setup_encryption')
+    else:
+        _built_with.clear()
+        monkeypatch.setattr(winrm.transport.Transport, 'build_session', _other_auth_session)
+    assert _run_ps(_channel_row()) == 'ok'
+    assert [keytab for keytab, _cache in pywinrm.running] == ['/kt/svc.keytab']
+    if shape == 'other-auth-class':
+        # The session built with its encryption held back is dropped: pywinrm builds its own
+        assert _built_with == ['never', 'auto']
+    assert os.environ[ENV] == 'FILE:/previous.keytab'
 
 
 def test_a_long_command_holds_no_kerberos_lock(pywinrm, kerberos):

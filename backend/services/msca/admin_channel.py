@@ -32,6 +32,8 @@ _CERTUTIL_REASON = {
 _CERTUTIL_UNREVOKE = -1
 
 _SERIAL_RE = re.compile(r'^[0-9a-fA-F]+$')
+# What the keytab wrapper needs of a pywinrm 0.5.0 Transport
+_PYWINRM_TRANSPORT = ('message_encryption', 'endpoint', 'build_session', 'setup_encryption')
 
 
 def kerberos_transport_available() -> bool:
@@ -227,31 +229,44 @@ class MicrosoftCAAdminChannelMixin:
         preemptively by the first request: the message encryption setup that build_session
         sends over HTTP, else open_shell. The session is built with that setup held back so
         the wrapper is in place, then the setup is sent as build_session would have.
+        False when pywinrm is not shaped as expected: the caller then holds the keytab throughout.
         """
-        keytab = msca.kerberos_keytab_path
-        principal = msca.winrm_effective_username or msca.kerberos_principal or None
-        owner = getattr(msca, 'id', None)
-        transport = session.protocol.transport
+        keytab, principal, owner = MicrosoftCAAdminChannelMixin._keytab_identity(msca)
+        transport = getattr(getattr(session, 'protocol', None), 'transport', None)
+        if transport is None or getattr(transport, 'session', True) is not None or not all(
+                hasattr(transport, name) for name in _PYWINRM_TRANSPORT):
+            return False
         wanted = transport.message_encryption
         transport.message_encryption = 'never'
         try:
             http = transport.build_session()
         finally:
             transport.message_encryption = wanted
-        acquire = http.auth.generate_request_header
+        auth = getattr(http, 'auth', None)
+        if not (callable(getattr(auth, 'generate_request_header', None))
+                and getattr(auth, 'force_preemptive', None) is not None):
+            transport.session = None  # rebuilt by pywinrm itself, under the caller's lock
+            return False
+        acquire = auth.generate_request_header
 
         def generate_request_header(*args, **kwargs):
             with client_keytab(keytab, principal=principal, owner=owner):
                 return acquire(*args, **kwargs)
 
-        http.auth.generate_request_header = generate_request_header
+        auth.generate_request_header = generate_request_header
         # The end of Transport.build_session, skipped above
-        available = bool(getattr(http.auth, 'winrm_encryption_available', False))
+        available = bool(getattr(auth, 'winrm_encryption_available', False))
         if wanted == 'always' and not available:
             raise MSCAAdminChannelError('WinRM message encryption is not available with this Kerberos library')
         if available and (wanted == 'always' or (
                 wanted == 'auto' and not transport.endpoint.lower().startswith('https'))):
             transport.setup_encryption(http)
+        return True
+
+    @staticmethod
+    def _keytab_identity(msca):
+        return (msca.kerberos_keytab_path, msca.winrm_effective_username or msca.kerberos_principal or None,
+                getattr(msca, 'id', None))
 
     @staticmethod
     def _run_ps(msca, script):
@@ -263,9 +278,13 @@ class MicrosoftCAAdminChannelMixin:
         session = MicrosoftCAAdminChannelMixin._build_session(msca)
         kerberos = (msca.winrm_transport or 'kerberos').lower() == 'kerberos'
         try:
-            if kerberos and msca.kerberos_keytab_path:
-                MicrosoftCAAdminChannelMixin._bind_client_keytab(session, msca)
-            result = session.run_ps(script)
+            if not (kerberos and msca.kerberos_keytab_path) \
+                    or MicrosoftCAAdminChannelMixin._bind_client_keytab(session, msca):
+                result = session.run_ps(script)
+            else:
+                keytab, principal, owner = MicrosoftCAAdminChannelMixin._keytab_identity(msca)
+                with client_keytab(keytab, principal=principal, owner=owner):
+                    result = session.run_ps(script)
         except Exception as e:
             raise MSCAAdminChannelError(f'WinRM execution failed: {e}')
 
