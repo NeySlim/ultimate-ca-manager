@@ -95,7 +95,7 @@ export function useCertificateColumns(t) {
       },
       {
         key: 'status',
-        header: t('common.state'),
+        header: t('certificates.state'),
         priority: 2,
         sortable: true, // Groups by status type, then alphabetically
         hideOnMobile: true, // Shown in the name's mobile card

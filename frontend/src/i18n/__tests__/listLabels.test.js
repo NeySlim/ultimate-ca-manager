@@ -36,6 +36,15 @@ describe('list template labels', () => {
     expect(t('certificates.bulkExported', { count: 2 })).toBe('2 certificats exportés')
   })
 
+  it('names the state of a certificate, not the State or Province of a subject', async () => {
+    // common.state is the subject field (ST): the list needs its own word
+    const de = (await import('../locales/de.json')).default
+    expect(de.common.state).toBe('Bundesland')
+    expect(de.certificates.state).toBe('Zustand')
+    expect(ru.certificates.state).not.toBe(ru.common.state)
+    expect(en.certificates.state).toBe('State')
+  })
+
   it('takes the Russian forms', async () => {
     const t = await say('ru', ru)
     expect([1, 2, 5, 21].map((count) => t('certificates.total', { count }))).toEqual([

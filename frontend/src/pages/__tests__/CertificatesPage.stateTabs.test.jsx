@@ -254,7 +254,7 @@ describe('CertificatesPage: state tabs in a link view', () => {
     renderAt('/certificates?status=expiring&live=true')
     await waitFor(() => expect(lastParams().status).toEqual(['expiring']))
     expect(screen.getByText('overview.filter.status:')).toBeTruthy()
-    expect(screen.queryByText('common.state:')).toBeNull()
+    expect(screen.queryByText('certificates.state:')).toBeNull()
   })
 })
 
@@ -322,15 +322,15 @@ describe('CertificatesPage: filter presets and the tabs', () => {
     await waitFor(() => expect(lastParams().status).toEqual(['expired', 'revoked']))
     expect(selectedTabs()).toEqual([])
     // One removable chip per status
-    const chips = (await screen.findAllByText('common.state:')).map((el) => el.parentElement)
-    expect(chips.map((el) => el.textContent)).toEqual(['common.state:common.expired', 'common.state:common.revoked'])
+    const chips = (await screen.findAllByText('certificates.state:')).map((el) => el.parentElement)
+    expect(chips.map((el) => el.textContent)).toEqual(['certificates.state:common.expired', 'certificates.state:common.revoked'])
     // Removing one leaves the other, which is then a tab again
     fireEvent.click(within(chips[0]).getByRole('button'))
     await waitFor(() => expect(lastParams().status).toHaveLength(1))
     expect(lastParams().status).toEqual(['revoked'])
     expect(selectedTabs()).toEqual(['revoked'])
     expect(where()).toBe('?view=revoked')
-    expect(screen.queryByText('common.state:')).toBeNull()
+    expect(screen.queryByText('certificates.state:')).toBeNull()
   })
 
   it('a preset applied from a link view leaves the link in one step', async () => {

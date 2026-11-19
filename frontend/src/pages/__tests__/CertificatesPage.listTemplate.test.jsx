@@ -130,7 +130,7 @@ describe('CertificatesPage: columns', () => {
   it('shows the default columns in order', async () => {
     await mount()
     expect(headers()).toEqual([
-      'common.commonName', 'common.description', 'common.state', 'common.issuer',
+      'common.commonName', 'common.description', 'certificates.state', 'common.issuer',
       'certificates.source', 'certificates.expiry', 'common.keyAlgorithm',
     ])
   })

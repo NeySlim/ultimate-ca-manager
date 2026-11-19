@@ -465,7 +465,7 @@ export default function CertificatesPage() {
     {
       // The state tabs are its control: it stays here for the presets, the chips and Clear filters
       key: 'status',
-      label: t('common.state'),
+      label: t('certificates.state'),
       type: 'multiSelect',
       hideControl: true,
       // One status is the tab on screen, the link's are in its own chip row
