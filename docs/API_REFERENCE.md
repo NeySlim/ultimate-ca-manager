@@ -2228,14 +2228,14 @@ GET /api/v2/discovery?limit=50&offset=0&profile_id=1&status=new&search=example
 GET /api/v2/discovery/{disc_id}
 DELETE /api/v2/discovery/{disc_id}
 DELETE /api/v2/discovery?profile_id=1
-GET /api/v2/discovery/export?format=csv&profile_id=1&status=new
+GET /api/v2/discovery/export?format=csv&profile_id=1&status=new&search=example
 GET /api/v2/discovery/stats?profile_id=1
 POST /api/v2/discovery/bulk-resolve-dns
 ```
 - The list returns `items` and `total`; `limit` defaults to 50 (200 at most), `status` may be repeated.
 - `GET /{disc_id}` adds the parsed `extensions`, key and signature details and the SHA-1 and SHA-256 fingerprints; `404` when unknown. `DELETE /{disc_id}` answers `204`.
 - `DELETE /api/v2/discovery` (`admin:system`) deletes every record, or those of `profile_id`, and returns `deleted`.
-- `export` returns CSV (default) or JSON (`format=json`) as a download.
+- `export` returns CSV (default) or JSON (`format=json`) as a download, for the same `profile_id`, `status` and `search` filters as the list (10 000 rows at most).
 - `bulk-resolve-dns` (`admin:system`) re-resolves reverse DNS for every record and returns the counts `updated` and `total`.
 
 ### Scan Profiles and Runs

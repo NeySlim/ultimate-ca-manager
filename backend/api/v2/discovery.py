@@ -403,9 +403,11 @@ def export_discovered():
     fmt = request.args.get('format', 'csv')
     profile_id = request.args.get('profile_id', type=int)
     status_list = request.args.getlist('status')
+    search = request.args.get('search', '').strip()
     svc = _get_service()
     items, total = svc.get_all(limit=10000, offset=0, profile_id=profile_id,
-                               status=status_list if status_list else None)
+                               status=status_list if status_list else None,
+                               search=search or None)
 
     if fmt == 'json':
         import json

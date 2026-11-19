@@ -274,7 +274,11 @@ export default function DiscoveryPage() {
 
   const handleExport = async (format = 'csv') => {
     try {
-      const blob = await discoveryService.export(format)
+      // The filters on screen: the file holds what the table holds
+      const params = { search: discoveredSearch || undefined }
+      if (statusFilter.length > 0) params.status = statusFilter
+      if (profileFilter) params.profile_id = profileFilter
+      const blob = await discoveryService.export(format, params)
       downloadBlob(blob, `discovered_certificates.${format}`)
       showSuccess(t('discovery.exportSuccess'))
     } catch (error) {
