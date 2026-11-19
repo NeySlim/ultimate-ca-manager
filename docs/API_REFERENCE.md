@@ -613,6 +613,10 @@ with `Content-Type: application/json`, and reads the password only from its `pas
 `null`). A body of another kind, a `password` of another type, a name given twice, or a name
 containing `password` or `passphrase` placed anywhere else (including the query string) answers 400.
 
+A PEM export that carries the private key returns it as an encrypted PKCS#8 block
+(`BEGIN ENCRYPTED PRIVATE KEY`) when a `password` is given, and in clear without one. `include_key`
+is a JSON boolean (`true` or `false` in the query string); any other value answers 400.
+
 ### Export All CAs
 ```http
 GET /api/v2/cas/export
