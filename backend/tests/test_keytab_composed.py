@@ -192,17 +192,31 @@ def test_the_acceptor_reads_the_composed_file_whatever_krb5_ktname_says(app, pro
 
 
 def test_a_kerberos_msca_connection_leaves_krb5_ktname_alone(monkeypatch):
+    """The acceptor's KRB5_KTNAME is the same before, during and after the client's acquisition."""
+    import os
     from services.msca.connection import MicrosoftCAConnectionMixin
+    seen = []
+
+    class HTTPKerberosAuth:
+        def __init__(self, **kwargs):
+            pass
+
+        def generate_request_header(self, response, host, is_preemptive=False):
+            seen.append((os.environ.get('KRB5_KTNAME'), os.environ.get('KRB5_CLIENT_KTNAME')))
+            return 'Negotiate x'
+
     monkeypatch.setitem(sys.modules, 'certsrv', types.SimpleNamespace(
         Certsrv=lambda **kw: types.SimpleNamespace(session=types.SimpleNamespace(auth=None, verify=True))))
     monkeypatch.setitem(sys.modules, 'requests_kerberos', types.SimpleNamespace(
-        HTTPKerberosAuth=lambda **kw: object(), OPTIONAL=1))
+        HTTPKerberosAuth=HTTPKerberosAuth, OPTIONAL=1))
     monkeypatch.setenv('KRB5_KTNAME', 'FILE:/acceptor.keytab')
-    msca = types.SimpleNamespace(server='ca.example.test', verify_ssl=True, ca_bundle=None,
+    msca = types.SimpleNamespace(id=1, server='ca.example.test', verify_ssl=True, ca_bundle=None,
                                  auth_method='kerberos', kerberos_keytab_path='/msca.keytab',
                                  kerberos_principal='svc@EXAMPLE.TEST')
-    MicrosoftCAConnectionMixin._get_client(msca)
-    import os
+    client = MicrosoftCAConnectionMixin._get_client(msca)
+    assert os.environ['KRB5_KTNAME'] == 'FILE:/acceptor.keytab'
+    client.session.auth.generate_request_header(None, 'ca.example.test')
+    assert seen == [('FILE:/acceptor.keytab', '/msca.keytab')]
     assert os.environ['KRB5_KTNAME'] == 'FILE:/acceptor.keytab'
 
 
