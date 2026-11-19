@@ -1,8 +1,8 @@
 """The client keytab of a Kerberos Microsoft CA connection.
 
-KRB5_CLIENT_KTNAME names the connection's keytab only while its Kerberos
-credential is acquired, whatever the principal, and on both channels; a
-connection without keytab takes no lock. A file
+KRB5_CLIENT_KTNAME names the connection's keytab, and KRB5CCNAME a ticket cache
+of its own, only while its Kerberos credential is acquired, whatever the
+principal, and on both channels; a connection without keytab takes no lock. A file
 UCM manages itself (its data folder, the acceptor keytab) is never a client keytab.
 requests-kerberos, gssapi and pywinrm are faked at their boundary.
 """
@@ -182,12 +182,13 @@ def _run_ps(row):
 @pytest.mark.parametrize('ssl', [True, False], ids=['https', 'http-encrypted'])
 def test_the_winrm_channel_names_the_keytab_only_while_it_acquires(pywinrm, ssl):
     """Over HTTPS the first request acquires; over HTTP the message encryption setup does."""
+    from services.msca.client_keytab import ccache_name
     assert _run_ps(_channel_row(winrm_use_ssl=ssl, winrm_port=5986 if ssl else 5985)) == 'ok'
     auth, = _WinrmKerberosAuth.instances
     assert auth.kwargs['principal'] == 'svc@CORP'
-    assert [keytab for keytab, _cache in auth.seen] == ['/kt/svc.keytab']
-    assert [keytab for keytab, _cache in pywinrm.running] == ['FILE:/previous.keytab']
-    assert os.environ[ENV] == 'FILE:/previous.keytab'
+    assert auth.seen == [('/kt/svc.keytab', ccache_name(1, '/kt/svc.keytab', 'svc@CORP'))]
+    assert pywinrm.running == [('FILE:/previous.keytab', 'FILE:/previous.ccache')]
+    assert (os.environ[ENV], os.environ[CCACHE]) == ('FILE:/previous.keytab', 'FILE:/previous.ccache')
 
 
 def test_a_long_command_holds_no_kerberos_lock(pywinrm, kerberos):
@@ -259,6 +260,35 @@ def test_the_wait_for_another_sign_in_is_bounded(monkeypatch):
         release.set()
         holder.join(5)
         worker.join(5)
+
+
+# --- Each connection signs in with its own ticket cache ---
+
+def test_each_identity_has_its_own_memory_cache(monkeypatch):
+    from services.msca.client_keytab import client_keytab
+    monkeypatch.setenv(CCACHE, 'FILE:/previous.ccache')
+    names = {}
+    for key, args in {'a': (1, '/kt/a', 'p@CORP'), 'a-again': (1, '/kt/a', 'p@CORP'),
+                      'other-connection': (2, '/kt/a', 'p@CORP'), 'other-keytab': (1, '/kt/b', 'p@CORP'),
+                      'other-principal': (1, '/kt/a', 'q@CORP'), 'no-principal': (1, '/kt/a', None)}.items():
+        owner, path, principal = args
+        with client_keytab(path, principal=principal, owner=owner):
+            names[key] = os.environ[CCACHE]
+        assert os.environ[CCACHE] == 'FILE:/previous.ccache'
+    assert all(name.startswith('MEMORY:') for name in names.values())
+    assert names['a'] == names['a-again']
+    assert len({names[k] for k in names if k != 'a-again'}) == 5
+    with client_keytab(None, principal='p@CORP', owner=1):
+        assert os.environ[CCACHE] == 'FILE:/previous.ccache'
+
+
+def test_the_certsrv_channel_uses_the_connection_cache(kerberos, monkeypatch):
+    from services.msca.client_keytab import ccache_name
+    seen = []
+    monkeypatch.setattr(kerberos, 'generate_request_header',
+                        lambda self, *a, **k: seen.append(os.environ.get(CCACHE)) or 'Negotiate x')
+    _client(_row(id=7, kerberos_principal='svc@CORP')).session.auth.generate_request_header(None, 'ca.example')
+    assert seen == [ccache_name(7, '/kt/svc.keytab', 'svc@CORP')]
 
 
 # --- A file UCM manages is never a client keytab ------------------------------
