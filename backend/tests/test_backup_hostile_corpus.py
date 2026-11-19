@@ -38,6 +38,7 @@ from services.backup import container, manifest
 from services.backup.restore import RestorePlan, RestoreValidationError
 
 from tests.backup_v3 import as_v3, v3_header
+from tests.test_restore_sso_one_per_type import target  # noqa: F401  (SQLite and PostgreSQL)
 from tests.fresh_app import fresh_app_fixtures
 
 app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
@@ -438,6 +439,18 @@ def _date_as_text(data):
     data[SECTION] = [dict(TARGET, created_at='yesterday')]
 
 
+# Never copied into a refusal: an archived value can be a secret
+MARKER = 'hostile-corpus-value-marker'
+
+
+def _list_as_text(data):
+    data[SECTION] = [dict(TARGET, host=['deploy.example.test', MARKER])]
+
+
+def _object_as_text(data):
+    data[SECTION] = [dict(TARGET, host={'name': MARKER})]
+
+
 def _count_as_text(data):
     data['metadata']['sections'][SECTION] = 'three'
 
@@ -450,7 +463,10 @@ SHAPES = {
     'a list where the settings object belongs': (_configuration_as_list,
                                                  'configuration'),
     'text where a date belongs': (_date_as_text, SECTION),
+    'a list where text belongs': (_list_as_text, f'{SECTION}.host'),
+    'an object where text belongs': (_object_as_text, f'{SECTION}.host'),
 }
+CONTAINERS = {'list': _list_as_text, 'object': _object_as_text}
 
 
 @contextmanager
@@ -509,6 +525,36 @@ class TestASectionOfTheWrongTypeIsRefusedByName:
             after = _census()
         _assert_refused_cleanly(response, before, after)
         assert response.status_code == 400, (label, response.data)
+
+    @pytest.mark.parametrize('shape', sorted(CONTAINERS))
+    def test_a_list_or_an_object_in_a_text_column_is_named_not_copied(
+            self, app, auth_client, shape):
+        with app.app_context():
+            blob = _forged([SECTION], mutate=CONTAINERS[shape])
+            before = _census()
+
+        response = _restore(auth_client, blob)
+
+        with app.app_context():
+            after = _census()
+        _assert_refused_cleanly(response, before, after)
+        assert response.status_code == 400, response.data
+        message = _message(response)
+        assert f'{SECTION}.host' in message and MARKER not in message, message
+
+    @pytest.mark.parametrize('mode', ['merge', 'replace'])
+    @pytest.mark.parametrize('shape', sorted(CONTAINERS))
+    def test_a_list_or_an_object_in_a_text_column_writes_nothing_on_either_engine(
+            self, target, shape, mode):
+        from models.deploy import DeployTarget
+        blob = _forged([SECTION], mutate=CONTAINERS[shape])
+        before = _census()
+        with pytest.raises(RestoreValidationError) as refusal:
+            _service().restore_backup(blob, PASSWORD, mode=mode)
+        db.session.rollback()
+        assert f'{SECTION}.host' in str(refusal.value) and MARKER not in str(refusal.value)
+        assert _census() == before
+        assert DeployTarget.query.filter_by(name=TARGET['name']).count() == 0
 
     def test_a_count_that_is_not_a_number_is_refused_by_name(
             self, app, auth_client):

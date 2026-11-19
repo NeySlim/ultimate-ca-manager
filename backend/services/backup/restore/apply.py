@@ -24,6 +24,7 @@ from sqlalchemy.types import (
     Date,
     DateTime,
     Integer,
+    JSON,
     LargeBinary,
     Numeric,
 )
@@ -420,6 +421,11 @@ def _coerce(value: Any, column, where: str) -> Any:
         return None
 
     kind = column.type
+    # Only a JSON column holds a list or an object; the value is not echoed (it may be a secret)
+    if isinstance(value, (list, dict)) and not isinstance(kind, JSON):
+        raise RestoreValidationError(
+            f"Invalid backup: {where} holds a {'list' if isinstance(value, list) else 'object'} "
+            "where this column takes a single value")
     try:
         if isinstance(kind, LargeBinary) and isinstance(value, str):
             return base64.b64decode(value)
