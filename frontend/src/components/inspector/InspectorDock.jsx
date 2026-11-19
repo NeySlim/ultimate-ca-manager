@@ -6,7 +6,7 @@
  */
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, ArrowsOutSimple, ArrowsInSimple, SidebarSimple, Rows } from '@phosphor-icons/react'
+import { X, ArrowsOutSimple, ArrowsInSimple, SidebarSimple, Rows, Signpost } from '@phosphor-icons/react'
 import { useInspector, SIZE_LIMITS } from '../../contexts/InspectorContext'
 import { useMobile } from '../../contexts/MobileContext'
 import { cn } from '../../lib/utils'
@@ -15,13 +15,15 @@ import { InspectorObject } from './InspectorObject'
 
 const STEP = 24
 const RIGHT_MIN_VIEWPORT = 1400
+// The status bar keeps the bottom of the window: the docked inspector ends where it starts
+const ABOVE_STATUS = 'bottom-[var(--shell-status-h,0px)]'
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
 
 export function InspectorDock() {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
   const ins = useInspector()
-  const { opened, activeKey, setActiveKey, closeEntity, closeAll, focusToken, position, height, width, setGeometry } = ins
+  const { opened, activeKey, setActiveKey, closeEntity, closeAll, focusToken, position, height, width, setGeometry, closeOnNav, toggleCloseOnNav } = ins
   const [titles, setTitles] = useState({})
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight })
   const dock = useRef(null)
@@ -38,7 +40,7 @@ export function InspectorDock() {
     requestAnimationFrame(() => dock.current?.querySelector('[data-testid="inspector-object-tabs"] [aria-selected="true"]')?.focus())
   }, [focusToken])
 
-  // The page makes room for the dock (padding on #root, see index.css) instead of sitting under it
+  // The page makes room for the dock (padding on .shell-stage, see shell.css) instead of sitting under it
   const shown = opened.length > 0 && !isMobile
   const rightDock = position === 'right' && viewport.w >= RIGHT_MIN_VIEWPORT
   const reserve = !shown ? null : rightDock
@@ -120,12 +122,21 @@ export function InspectorDock() {
         {...(isMobile ? { role: 'dialog', 'aria-modal': 'true' } : { role: 'region' })}
         onKeyDown={onKeyDown} style={style}
         className={cn('fixed z-40 flex bg-bg-secondary border-border shadow-xl',
-          isMobile ? 'inset-0 flex-col' : right ? 'top-0 right-0 bottom-0 flex-row border-l' : 'left-0 right-0 bottom-0 flex-col border-t')}>
+          isMobile ? 'inset-0 flex-col' : cn(ABOVE_STATUS, right ? 'top-0 right-0 flex-row border-l' : 'left-0 right-0 flex-col border-t'))}>
         {grip}
         <div className="flex-1 min-w-0 min-h-0 flex flex-col">
           <div className="shrink-0 flex items-stretch border-b border-border-op50">
             <ObjectTabs opened={opened} activeKey={entry.key} titles={titles} onSelect={setActiveKey} onClose={closeEntity} />
             <div className="shrink-0 flex items-center gap-0.5 px-1">
+              <span data-testid="inspector-count" title={t('inspector.openCount', { count: opened.length })}
+                className="px-1.5 rounded bg-bg-tertiary text-xs font-semibold text-text-secondary tabular-nums">
+                <span aria-hidden="true">{opened.length}</span>
+                <span className="sr-only">{t('inspector.openCount', { count: opened.length })}</span>
+              </span>
+              <button type="button" className={cn(tool, closeOnNav && 'text-accent-primary')} onClick={toggleCloseOnNav}
+                aria-pressed={closeOnNav} aria-label={t('inspector.closeOnNav')} title={t('inspector.closeOnNav')}>
+                <Signpost size={14} weight={closeOnNav ? 'fill' : 'regular'} />
+              </button>
               {!isMobile && viewport.w >= RIGHT_MIN_VIEWPORT && (
                 <button type="button" className={tool} onClick={() => setGeometry({ position: right ? 'bottom' : 'right' })}
                   aria-label={t(right ? 'inspector.dockBottom' : 'inspector.dockRight')} title={t(right ? 'inspector.dockBottom' : 'inspector.dockRight')}>

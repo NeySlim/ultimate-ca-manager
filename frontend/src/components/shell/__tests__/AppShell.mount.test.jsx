@@ -34,7 +34,6 @@ vi.mock('../../ui/FloatingHelpPanel', () => ({
 }))
 vi.mock('../../UpdatePopup', () => ({ UpdatePopup: () => <div data-testid="update-popup" /> }))
 vi.mock('../../KofiSupportCard', () => ({ KofiSupportCard: () => <div data-testid="kofi" /> }))
-vi.mock('../../ui/StatusFooter', () => ({ StatusFooter: () => <div data-testid="window-footer" /> }))
 
 import { AppShell } from '../../AppShell'
 
@@ -107,13 +106,23 @@ describe('AppShell', () => {
     expect(current.map(a => a.getAttribute('data-module'))).toEqual(['certificates'])
   })
 
-  it('shows the window-manager footer on a module page but not on the dashboard', () => {
+  it('keeps the status bar out of the area that makes room for the dock', () => {
     setup('/certificates')
-    expect(screen.getByTestId('window-footer')).toBeInTheDocument()
+    const bar = screen.getByRole('contentinfo')
+    const stage = document.querySelector('.shell-stage')
+    expect(stage).not.toBeNull()
+    expect(stage).toContainElement(screen.getByRole('banner'))
+    expect(stage).toContainElement(screen.getByText('page body'))
+    expect(stage).not.toContainElement(bar)
+    expect(bar.parentElement).toHaveClass('shell-root')
+    expect(bar.parentElement.lastElementChild === bar || bar.previousElementSibling === stage).toBe(true)
   })
 
-  it('hides the window-manager footer on the dashboard', () => {
-    setup('/')
-    expect(screen.queryByTestId('window-footer')).toBeNull()
+  it.each(['/certificates', '/'])('has one bottom bar on %s', (path) => {
+    setup(path)
+    const content = document.querySelector('.shell-content')
+    expect(content.children).toHaveLength(1)
+    expect(document.querySelectorAll('footer')).toHaveLength(1)
+    expect(screen.queryByText(/^windows\./)).toBeNull()
   })
 })
