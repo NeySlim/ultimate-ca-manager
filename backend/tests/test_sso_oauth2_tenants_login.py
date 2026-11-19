@@ -171,6 +171,19 @@ def test_compatibility_mode_with_tenants_refuses_the_sign_in(entra):
     assert identity is None and 'require ID token verification' in refusal.reason
 
 
+def test_compatibility_mode_with_tenants_refuses_even_without_an_id_token(entra):
+    """Without an ID token the identity would rest on UserInfo alone, which names no tenant."""
+    from api.v2.sso import login_routes
+    entra.configure(id_token_verify=False)
+    real_post = login_routes.safe_request_post
+    login_routes.safe_request_post = lambda *_a, **_k: _Response({'access_token': 'at'})
+    try:
+        identity, refusal = entra.sign_in(TENANT_A, 'sub-n', 'mt-hugo')
+    finally:
+        login_routes.safe_request_post = real_post
+    assert identity is None and 'require ID token verification' in refusal.reason
+
+
 def test_a_single_tenant_provider_keeps_the_bare_subject(entra):
     from api.v2.sso.helpers import OIDC_TENANT_KEY
     from api.v2.sso.ldap_routes import _extract_external_id

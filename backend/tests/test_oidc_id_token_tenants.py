@@ -148,6 +148,15 @@ def test_a_template_that_is_not_the_configured_authority_is_refused(monkeypatch,
     _refused(_claims(TENANT_A), 'not a {tenantid} template')
 
 
+def test_a_template_standing_for_more_than_one_path_segment_is_refused(monkeypatch):
+    _serve(monkeypatch)
+    nested = 'https://idp.example/organizations/extra/v2.0'
+    documents = {f'{nested}/.well-known/openid-configuration': {'issuer': TEMPLATE, 'jwks_uri': JWKS_URL}}
+    monkeypatch.setattr('services.oidc_id_token.safe_request_get',
+                        lambda url, **_k: _Response(documents[url]))
+    _refused(_claims(TENANT_A), 'not a {tenantid} template', _provider(oauth2_issuer=nested))
+
+
 def test_the_template_comes_from_discovery_even_with_a_configured_jwks_uri(monkeypatch):
     fetched = _serve(monkeypatch, jwks_url='https://idp.example/keys')
     provider = _provider(oauth2_jwks_uri='https://idp.example/keys')
