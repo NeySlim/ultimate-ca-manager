@@ -125,6 +125,16 @@ def test_the_reserved_set_is_the_contract():
     assert len(RESERVED_VALUES) == 35
 
 
+def test_the_interface_list_is_the_server_set():
+    import re
+    from pathlib import Path
+    from api.v2.settings.general import _ADMIN_ONLY_SETTINGS
+    src = Path(__file__).resolve().parents[2] / 'frontend/src/pages/settings/adminOnlySettings.js'
+    text = src.read_text()
+    body = text.split('ADMIN_ONLY_SETTINGS = [', 1)[1].split(']', 1)[0]
+    assert set(re.findall(r"'([a-z0-9_]+)'", body)) == set(_ADMIN_ONLY_SETTINGS)
+
+
 @pytest.mark.parametrize('key', sorted(RESERVED_VALUES))
 def test_an_operator_sending_only_a_reserved_key_is_refused(
         app, operator_client, config_snapshot, key):
