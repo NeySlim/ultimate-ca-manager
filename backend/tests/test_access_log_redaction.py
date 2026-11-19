@@ -30,6 +30,12 @@ from utils.access_log import RedactingLogger, redact_url
     ('/api/v2/csrs/4/export?password+=Pw1', '/api/v2/csrs/4/export?password+=[REDACTED]'),
     ('/reset-password?%74oken=abc', '/reset-password?%74oken=[REDACTED]'),
     ('/api/v2/x?pass%2Bword=keep', '/api/v2/x?pass%2Bword=keep'),
+    # A second "?" typed for "&": the secret parameter behind it is still one
+    ('/reset-password?lang=fr?token=abc', '/reset-password?lang=fr?token=[REDACTED]'),
+    ('/api/v2/certificates/4/export?format=key?password=S3cret',
+     '/api/v2/certificates/4/export?format=key?password=[REDACTED]'),
+    ('/cb?x=1?code=abc&state=s', '/cb?x=1?code=[REDACTED]&state=[REDACTED]'),
+    ('/reset-password?token=ab?cd=ef', '/reset-password?token=[REDACTED]'),
 ])
 def test_redact_url(url, expected):
     assert redact_url(url) == expected

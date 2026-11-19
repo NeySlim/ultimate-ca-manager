@@ -23,8 +23,10 @@ def redact_url(value):
     """``value`` with the secret query values replaced; anything else unchanged."""
     if not isinstance(value, str) or '=' not in value:
         return value
+    # A value is read again: "?a=1?token=x" hides a parameter behind a second "?"
     return _PARAM.sub(
-        lambda m: f'{m[1]}{m[2]}=[REDACTED]' if _secret_name(m[2]) else m[0], value)
+        lambda m: f'{m[1]}{m[2]}=[REDACTED]' if _secret_name(m[2]) else f'{m[1]}{m[2]}={redact_url(m[3])}',
+        value)
 
 
 class RedactingLogger(Logger):
