@@ -63,6 +63,17 @@ const NONE = []
 const humanizeSource = (s) =>
   String(s).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 
+// The row as the table shows it; the export uses the same one
+function normalizeCertificate(cert) {
+  const { name, subtitle } = certificateNames(cert)
+  return {
+    ...cert,
+    status: cert.revoked ? 'revoked' : cert.status,
+    cn: name || extractCN(cert.subject) || (cert.san_dns ? JSON.parse(cert.san_dns)[0] : null) || 'Certificate',
+    subtitle,
+  }
+}
+
 export default function CertificatesPage() {
   const { t } = useTranslation()
   const { id: urlCertId } = useParams()
@@ -176,7 +187,10 @@ export default function CertificatesPage() {
   // The filters and sort of the list on screen, for the table's export
   const listParams = useRef({})
   const exportLoader = useCallback(
-    (paging) => certificatesService.getAll({ ...listParams.current, ...paging }), [])
+    async (paging) => {
+      const res = await certificatesService.getAll({ ...listParams.current, ...paging })
+      return { ...res, data: (res.data || []).map(normalizeCertificate) }
+    }, [])
   const loadData = useCallback(async () => {
     // A reload started earlier must not overwrite a later one (filter changed
     // while an action's reload was in flight)
@@ -460,16 +474,10 @@ export default function CertificatesPage() {
   const filteredCerts = useMemo(() => {
     const caRefIds = new Set(cas.map(ca => ca.refid))
     
-    let result = certificates.map(cert => {
-      const { name, subtitle } = certificateNames(cert)
-      return {
-        ...cert,
-        status: cert.revoked ? 'revoked' : cert.status,
-        cn: name || extractCN(cert.subject) || (cert.san_dns ? JSON.parse(cert.san_dns)[0] : null) || 'Certificate',
-        subtitle,
-        isOrphan: cert.caref && !caRefIds.has(cert.caref)
-      }
-    })
+    let result = certificates.map(cert => ({
+      ...normalizeCertificate(cert),
+      isOrphan: cert.caref && !caRefIds.has(cert.caref)
+    }))
     
     // No second pass on the status here: the server already applied the
     // filter, over the whole set rather than the current page. Re-filtering
