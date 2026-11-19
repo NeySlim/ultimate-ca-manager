@@ -170,7 +170,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - **The converter's output password.** `output_password` (the older `pkcs12_password` still works) now encrypts a private key written as PEM, and a DER output that would carry a key refuses it with `400`.
 - **A non-string export password is refused.** `0`, `false`, `[]` or `{}` was read as no password, so a CSR or certificate private key came back unencrypted; the CSR, certificate and converter routes now answer `400`, and so does key recovery.
 - **A CA export refuses `include_key` for formats without a key.** `der`, `p7b` and `pkcs7` answer `400` instead of silently returning no key.
-- **A CA export reads `include_key` and `include_chain` strictly.** A string such as `"false"` was read as true; it now answers `400`, as the other exports do.
+- **A CA export reads `include_key` and `include_chain` strictly.** In a JSON body a string such as `"false"` or `"true"` was read as true, and in the query string `include_chain=1` was read as false; both now answer `400`, as the other exports do (see UPGRADE.md).
 - **SMTP "No authentication" after OAuth2.** Choosing it now resets the stored method, erases the saved OAuth2 client secret, client ID and refresh token, and the sender no longer authenticates, so mail and the test email stop failing with "OAuth2 requires smtp_user".
 - **An administrator's mTLS certificate for a user carries its name as CN.** The generated certificate had no common name; a subject field UCM does not know is now an error instead of being dropped.
 - **Rate limit settings survive a restart without HA.** `PUT /api/v2/system/security/rate-limit` is stored in the database on every deployment and read again at start; it was kept in memory outside HA.

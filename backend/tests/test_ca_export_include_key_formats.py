@@ -59,3 +59,12 @@ def test_the_boolean_is_checked_before_an_hsm_refusal(app, auth_client, create_c
             row = db.session.get(CA, ca['id'])
             row.hsm_key_id = saved
             db.session.commit()
+
+
+@pytest.mark.parametrize('value', ['1', 'yes', 'on'])
+def test_a_query_boolean_other_than_true_or_false_is_a_400(auth_client, create_ca, value):
+    """Guard of the documented change: 2.x read `include_chain=1` as false."""
+    ca = create_ca(cn=f'Strict query boolean {value}')
+    r = auth_client.get(f"/api/v2/cas/{ca['id']}/export?format=pem&include_chain={value}")
+    assert r.status_code == 400, r.data[:200]
+    assert 'include_chain' in r.get_json()['message']
