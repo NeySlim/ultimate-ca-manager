@@ -498,8 +498,8 @@ def _query_certificate(parsed):
     return cert, None
 
 
-TLS_RENEWAL_REFUSED = ('Certificate renewal over TLS is served only for a profile whose issuing CA is the '
-                       'mTLS trusted CA or under it; renew over the Kerberos binding')
+TLS_RENEWAL_REFUSED = ('Certificate renewal over TLS is served only for a certificate issued under the mTLS '
+                       'trusted CA, or by a former CA its profile lists; renew over the Kerberos binding')
 
 
 def _query_token_status_by_certificate(parsed, cert):

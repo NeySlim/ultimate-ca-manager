@@ -216,8 +216,10 @@ def test_tls_renewal_needs_the_profile_ca_under_the_mtls_anchor(app, client, dir
     floor = _top_audit(app)
     with mtls_anchor(app, world['cas']['S']['refid']):
         r = _renew_tls(client, old, key)
-        assert _fault(r)[0] == 400 and 'mTLS trusted CA' in _fault(r)[2]
-        assert 'Kerberos' in _fault(r)[2]
+        # The listener judges the certificate's issuer, not the profile's issuing CA
+        assert _fault(r)[0] == 400 and _fault(r)[2] == (
+            'Certificate renewal over TLS is served only for a certificate issued under the mTLS trusted '
+            'CA, or by a former CA its profile lists; renew over the Kerberos binding')
     (_user, details), = _refusals(app, floor)
     assert 'mTLS trusted CA' in details and 'profile c04-a' in details
     with mtls_anchor(app, world['cas']['A']['refid']):
