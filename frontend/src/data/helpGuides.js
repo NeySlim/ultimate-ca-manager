@@ -79,16 +79,16 @@ Any CA signed by an Intermediate CA, creating deeper hierarchy levels.
 
 ## Views
 
-The three buttons next to the search field switch between:
+The tabs under the title count the CAs (All, Roots, Intermediates, Expired, then Offline, Revoked and Awaiting certificate when there are some) and filter the page; the tab is part of the address. The search field filters on the name, the common name and the subject. The three buttons next to it switch between:
 
-### Organigramme View
-Draws the CA hierarchy as a chart, each CA under its parent.
+### Tree View
+The default view. Each root that heads a hierarchy is drawn with its sub-authorities on its right, folded beyond the first level; a node gives its state, the number of its certificates and of its sub-authorities, and a dotted line joins a CA to the one that cross-certified it. A root without a sub-authority takes a single line, and the roots that have no certificate either fold into one group once there are many. The arrow keys move through the tree, right and left unfold and fold, and Enter opens the CA in the detail panel.
 
 ### Columns View
 Browses the hierarchy level by level, one column per level: select a CA to see the CAs below it.
 
 ### List View
-Flat table with sortable columns.
+Flat table with sortable columns. A row carries one action (download the certificate) and a chevron that opens the detail, where the other actions are.
 
 ## Creating a CA
 
@@ -183,7 +183,7 @@ Private keys are stored in the UCM database, encrypted under the master key that
 
 ## Chain Repair
 
-If parent-child relationships are broken (e.g., after import), use **Chain Repair** to automatically rebuild the hierarchy based on Issuer/Subject matching.
+If parent-child relationships are broken (e.g., after import), use **Chain Repair** to automatically rebuild the hierarchy based on Issuer/Subject matching. Its strip shows by itself while a CA is orphaned, a record waits for its repair or a repair runs; otherwise the **Chain Repair** button of the page head opens it.
 
 ## Renewing a CA
 

@@ -7,9 +7,12 @@ export default {
       {
         title: 'Vues',
         items: [
-          { label: 'Vue organigramme', text: 'Hiérarchie dessinée sous forme de schéma, chaque AC sous sa parente' },
+          { label: 'Onglets', text: 'Toutes, Racines, Intermédiaires et Expirées, chacun avec son compteur, puis Hors ligne, Révoquées et En attente du certificat quand il y en a. L\'onglet fait partie de l\'adresse' },
+          { label: 'Vue arbre', text: 'La hiérarchie de confiance, ouverte par défaut : chaque racine avec ses sous-autorités à sa droite, repliée au-delà du premier niveau. Un nœud montre son état, ses certificats et ses sous-autorités ; un pointillé relie une AC à celle qui l\'a signée en croisé. Les racines sans sous-autorité tiennent sur une ligne, et celles qui n\'ont pas non plus de certificat se replient dans un seul groupe dès qu\'elles sont nombreuses' },
+          { label: 'Clavier', text: 'Dans l\'arbre, les flèches déplacent, droite et gauche déplient et replient, Entrée ouvre l\'AC dans le panneau de détail' },
+          { label: 'Recherche', text: 'Filtre les trois vues sur le nom, le nom commun et le sujet ; l\'arbre garde la branche qui mène à chaque résultat' },
           { label: 'Vue colonnes', text: 'Hiérarchie parcourue niveau par niveau, une colonne par niveau' },
-          { label: 'Vue liste', text: 'Vue tableau plate avec tri et filtrage' },
+          { label: 'Vue liste', text: 'Tableau plat triable : une action par ligne (télécharger le certificat) et un chevron qui ouvre le détail' },
         ]
       },
       {
@@ -19,7 +22,7 @@ export default {
           { label: 'Importer une AC', text: 'Importer un certificat d\'AC existant (avec ou sans clé privée)' },
           { label: 'Exporter', text: 'PEM, DER ou PKCS#12 (P12/PFX) avec protection par mot de passe' },
           { label: 'Révoquer', text: 'Révoquer une AC intermédiaire auprès de son AC parente : publiée dans la CRL et l\'OCSP du parent, et l\'AC ne peut plus signer (définitif)' },
-          { label: 'Réparation de chaîne', text: 'Corriger automatiquement les relations parent-enfant rompues' },
+          { label: 'Réparation de chaîne', text: 'Corriger automatiquement les relations parent-enfant rompues. Son bandeau s\'affiche de lui-même quand une AC est orpheline, qu\'un enregistrement attend sa réparation ou qu\'une réparation est en cours ; sinon le bouton Rapprochement de l\'en-tête l\'ouvre' },
           { label: 'Importer la clé privée', text: 'Rattacher la clé privée d\'une AC qui ne détient que son certificat, pour qu\'elle puisse signer' },
           { label: 'Clé et validité', text: 'RSA-3072 par défaut, locale ou HSM. Validité de 1, 2, 3, 5, 10, 15 ou 20 ans, ou Personnalisée (jours) jusqu\'à 50 ans. Une AC RSA-2048 qui dépasserait 2030 est signalée : l\'ANSSI accepte RSA-2048 jusqu\'à fin 2030, l\'ETSI TS 119 312 jusqu\'à fin 2026' },
           { label: 'Post-quantique (ML-DSA)', text: "ML-DSA-44, ML-DSA-65 ou ML-DSA-87 (FIPS 204, niveaux NIST 2, 3 et 5), générées en logiciel ou sur un fournisseur HSM qui prend en charge ML-DSA ; en mode FIPS, seule une clé logicielle, proposée quand le module FIPS approuve ML-DSA (l'image Docker -fips le fait). Une clé ML-DSA signe sans digest séparé : l'AC, ses CRL et ses réponses OCSP n'ont donc aucun digest à choisir. Une AC ML-DSA peut signer des certificats RSA ou EC, et une AC RSA ou EC peut signer une intermédiaire ML-DSA" },
@@ -131,16 +134,16 @@ Toute AC signée par une AC intermédiaire, créant des niveaux de hiérarchie p
 
 ## Vues
 
-Les trois boutons à côté du champ de recherche permettent de basculer entre :
+Les onglets sous le titre comptent les AC (Toutes, Racines, Intermédiaires, Expirées, puis Hors ligne, Révoquées et En attente du certificat quand il y en a) et filtrent la page ; l'onglet fait partie de l'adresse. Le champ de recherche filtre sur le nom, le nom commun et le sujet. Les trois boutons à côté de lui permettent de basculer entre :
 
-### Vue organigramme
-Dessine la hiérarchie des AC sous forme de schéma, chaque AC sous sa parente.
+### Vue arbre
+La vue par défaut. Chaque racine à la tête d'une hiérarchie est dessinée avec ses sous-autorités à sa droite, repliée au-delà du premier niveau ; un nœud donne son état, le nombre de ses certificats et de ses sous-autorités, et un pointillé relie une AC à celle qui l'a signée en croisé. Une racine sans sous-autorité tient sur une seule ligne, et les racines qui n'ont pas non plus de certificat se replient dans un seul groupe dès qu'elles sont nombreuses. Les flèches parcourent l'arbre, droite et gauche déplient et replient, et Entrée ouvre l'AC dans le panneau de détail.
 
 ### Vue colonnes
 Parcourt la hiérarchie niveau par niveau, une colonne par niveau : sélectionnez une AC pour voir celles qui sont en dessous.
 
 ### Vue liste
-Tableau plat avec colonnes triables.
+Tableau plat avec colonnes triables. Une ligne porte une action (télécharger le certificat) et un chevron qui ouvre le détail, où se trouvent les autres actions.
 
 ## Créer une AC
 
