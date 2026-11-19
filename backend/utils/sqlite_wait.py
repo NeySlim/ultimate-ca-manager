@@ -147,6 +147,10 @@ def locked_refusal(exc):
         pass
     from services import cluster_maintenance
     if window():
+        from auth.restore_hold import answer_without_database
+        answer = answer_without_database()
+        if answer is not None:
+            return answer
         return cluster_maintenance.refusal(message=cluster_maintenance.HELD_MESSAGE)
     from flask import jsonify
     from utils.response import PROBLEM_CONTENT_TYPE, build_problem

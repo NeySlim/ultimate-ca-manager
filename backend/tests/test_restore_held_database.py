@@ -337,6 +337,23 @@ def test_a_check_made_on_one_host_is_not_used_on_another(restore_held):
     assert elsewhere.status_code == 503, elsewhere.data
 
 
+def test_a_cancellation_on_a_locked_database_before_the_mark_is_taken(restore_held):
+    """The gate is up, the transaction not yet marked as holding, and the database locked
+    (the restore reading its archive writes): the flag file takes the cancellation."""
+    job_id, admin = restore_held.job_id, restore_held.admin
+    url = f'/api/v2/system/jobs/{job_id}'
+    assert admin.get(url).status_code == 200
+    restore_held.gate.set_view(phase=restore_job.READING)
+    with holding(restore_held.path):
+        seen, read_took = _timed(admin.get, url)
+        cancelled, took = _timed(admin.post, f'{url}/cancel')
+    assert seen.status_code == 200 and read_took < 2.0, seen.data
+    assert seen.get_json()['data']['phase'] == restore_job.READING
+    assert cancelled.status_code == 200, cancelled.data
+    assert took < 2.0
+    assert restore_job.cancel_flagged(job_id), 'the cancellation was not taken'
+
+
 def test_a_cancellation_at_the_commit_is_too_late(restore_held):
     job_id, admin = restore_held.job_id, restore_held.admin
     url = f'/api/v2/system/jobs/{job_id}'

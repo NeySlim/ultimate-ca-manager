@@ -145,6 +145,16 @@ def _serve_job(view):
     return routes.held_read(job_id, view)
 
 
+def answer_without_database():
+    """The restore job's read or cancellation when the database stayed locked before the
+    transaction was marked as holding it (the restore's own writes): as while it holds it."""
+    from flask import has_request_context
+    if not has_request_context() or request.endpoint not in HELD_ENDPOINTS:
+        return None
+    view = _current_view()
+    return None if view is None else _serve_job(view)
+
+
 def before_request():
     """While the restore's transaction holds the SQLite database: health and the restore job
     are answered without it, OCSP says tryLater (RFC 6960 §2.3), anything else 503 at once."""

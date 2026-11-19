@@ -3286,8 +3286,8 @@ the same `400`. Past 25 seconds it answers `202`. While a restore runs, on a sin
 HA, writes answer `503` with `Retry-After: 30`, code `maintenance` and the message `This UCM
 instance is restoring a backup: writes are refused until the restore ends. Retry later.`
 (single node); reads, OCSP, CRL, health and `GET /api/v2/system/jobs/<id>` are served. On a
-single node with SQLite, while the restore's transaction holds the database, only the health
-probes, `GET /api/v2/system/jobs/<id>` and `POST /api/v2/system/jobs/<id>/cancel` of the restore
+single node with SQLite, while the restore's transaction holds the database (or its writes keep
+it locked past a request's one-second wait), only the health probes, `GET /api/v2/system/jobs/<id>` and `POST /api/v2/system/jobs/<id>/cancel` of the restore
 are answered, from its local state and for a session or API key checked during this restore
 (same host; a session also sends its CSRF token): a credential not checked since the restore
 began answers `503`, a request with none `401`. Every other request answers `503` with

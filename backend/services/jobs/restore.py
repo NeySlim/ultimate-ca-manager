@@ -790,11 +790,12 @@ def local_view(job_id):
     return {k: v for k, v in (state.get('view') or {}).items() if k != 'held'}
 
 
-def cancel_locally(job_id):
-    """None, or the outcome of a cancellation answered from the local state."""
+def cancel_locally(job_id, held_only=True):
+    """None, or the outcome of a cancellation answered from the local state; ``held_only=False``
+    also before the transaction is marked, for a database another write keeps locked."""
     state = read_state()
     view = (state or {}).get('view') or {}
-    if state is None or state.get('job_id') != job_id or not view.get('held'):
+    if state is None or state.get('job_id') != job_id or (held_only and not view.get('held')):
         return None
     if view.get('phase') == COMMITTING:
         return 'too_late'
