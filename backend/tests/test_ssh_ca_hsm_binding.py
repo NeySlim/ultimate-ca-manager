@@ -17,6 +17,7 @@ from models.hsm import HsmKey, HsmProvider
 from models.ssh import SSHCertificateAuthority
 from services.hsm.base_provider import (HsmConfigError, HsmConnectionError, HsmKeyNotFoundError,
                                         HsmOperationError)
+from tests.ssh_cleanup import ssh_rows_stay_in_their_module  # noqa: F401
 
 SSH_CAS = '/api/v2/ssh/cas'
 OPENSC = '/usr/lib/x86_64-linux-gnu/opensc-pkcs11.so'

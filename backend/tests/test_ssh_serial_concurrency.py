@@ -11,6 +11,7 @@ from sqlalchemy import event, select
 from models import SSHCertificate, SSHCertificateAuthority, db
 from services.ssh_ca_service import SSHCAService
 from services.ssh_cert import SSHCertificateService
+from tests.ssh_cleanup import ssh_rows_stay_in_their_module  # noqa: F401
 
 _PG_URL = os.environ.get('UCM_TEST_PG_URL')
 WORKERS = 6

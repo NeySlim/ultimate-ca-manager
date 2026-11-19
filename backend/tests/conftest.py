@@ -445,6 +445,7 @@ _LEAK_TABLES = (
     'certificate_authorities', 'certificates', 'acme_orders', 'acme_domains',
     'users', 'certificate_templates', 'scep_profiles', 'certificate_policies',
     'windows_enrollment_profiles', 'hsm_providers', 'pro_sso_providers', 'user_sso_identities',
+    'ssh_cas', 'ssh_certificates',
 )
 # Tables whose rows are compared too: a default profile edited in place keeps the count.
 _LEAK_CONTENT = {'windows_enrollment_profiles': ('updated_at', 'updated_by')}

@@ -3,6 +3,7 @@
 import json
 
 from tests.conftest import get_json
+from tests.ssh_cleanup import ssh_rows_stay_in_their_module  # noqa: F401
 
 
 def _create_host_ca(auth_client):

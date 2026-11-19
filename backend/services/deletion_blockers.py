@@ -179,7 +179,9 @@ def _ca_setting_blockers(ca) -> Iterator[DeletionBlocker]:
     declared = [(r, True) for r in SETTING_REFERENCES]
     declared += [(r, False) for r in CA_REFID_SETTINGS]
     declared = [(r, by_number) for r, by_number in declared if r.value == 'certificate_authorities']
-    for row in SystemConfig.query.order_by(SystemConfig.key):
+    # The declared settings have fixed keys (a test holds it): read those rows, not the table
+    fixed = {re.sub(r'\\(.)', r'\1', reference.pattern) for reference, _ in declared}
+    for row in SystemConfig.query.filter(SystemConfig.key.in_(fixed)).order_by(SystemConfig.key):
         value = (row.value or '').strip()
         for reference, by_number in declared:
             if setting_names_ca(value, ca, by_number) and re.fullmatch(reference.pattern, row.key):

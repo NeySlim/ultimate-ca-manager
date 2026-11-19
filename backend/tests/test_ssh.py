@@ -26,6 +26,7 @@ import json
 import os
 import sys
 from tests.conftest import get_json, assert_success, assert_error, assert_refused
+from tests.ssh_cleanup import ssh_rows_stay_in_their_module  # noqa: F401
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

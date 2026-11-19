@@ -10,6 +10,7 @@ import pytest
 from sqlalchemy import create_engine, text
 
 from tests.test_ssh import _generate_test_ssh_key, post_json
+from tests.ssh_cleanup import ssh_rows_stay_in_their_module  # noqa: F401
 
 PG_URL = os.getenv('UCM_TEST_PG_URL')
 

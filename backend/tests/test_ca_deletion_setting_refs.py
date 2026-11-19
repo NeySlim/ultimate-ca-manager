@@ -248,3 +248,26 @@ def test_a_padded_number_sent_to_the_acme_settings_still_blocks(app, auth_client
         with app.app_context():
             _put_back('acme.issuing_ca_id', before)
     assert auth_client.delete(f"/api/v2/cas/{ca['id']}").status_code == 204
+
+
+def test_the_check_reads_only_the_declared_settings(app, create_ca):
+    """Deleting a CA does not load every setting row: the declared keys are looked up by name."""
+    from sqlalchemy import event
+    ca = create_ca(cn='Checked without a scan')
+    with app.app_context():
+        row = db.session.get(CA, ca['id'])
+        extra = [SystemConfig(key=f'unrelated.setting.{n}', value=str(n)) for n in range(40)]
+        db.session.add_all(extra)
+        db.session.commit()
+        db.session.expunge_all()
+        row = db.session.get(CA, ca['id'])
+        loaded = []
+        listener = lambda target, context: loaded.append(target.key)  # noqa: E731
+        event.listen(SystemConfig, 'load', listener)
+        try:
+            list(ca_deletion_blockers(row))
+        finally:
+            event.remove(SystemConfig, 'load', listener)
+            SystemConfig.query.filter(SystemConfig.key.like('unrelated.setting.%')).delete(synchronize_session=False)
+            db.session.commit()
+        assert not [key for key in loaded if key.startswith('unrelated.setting.')]

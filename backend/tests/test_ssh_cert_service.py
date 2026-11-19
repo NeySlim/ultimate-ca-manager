@@ -4,6 +4,7 @@ import pytest
 from models import db, SSHCertificate
 from services.ssh_ca_service import SSHCAService
 from services.ssh_cert import SSHCertificateService
+from tests.ssh_cleanup import ssh_rows_stay_in_their_module  # noqa: F401
 
 
 def _client_pubkey():

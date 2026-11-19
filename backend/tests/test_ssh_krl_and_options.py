@@ -17,6 +17,7 @@ from services.ssh_krl_service import SSHKRLService
 from utils.datetime_utils import utc_now
 from tests.test_ssh import _create_ssh_ca, _generate_test_ssh_key, post_json
 from tests.test_ssh_cert_service import _client_pubkey
+from tests.ssh_cleanup import ssh_rows_stay_in_their_module  # noqa: F401
 
 needs_ssh_keygen = pytest.mark.skipif(not shutil.which('ssh-keygen'),
                                       reason='ssh-keygen not available')
