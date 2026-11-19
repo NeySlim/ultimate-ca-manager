@@ -57,6 +57,9 @@ export default function CaAccountsManager({
     setShowForm(true)
   }
 
+  // The server keeps one default: it is moved by choosing another account, never unticked
+  const isEditingDefault = Boolean(editingId) && accounts.some(a => a.id === editingId && a.is_default)
+
   const openEdit = (acct) => {
     setEditingId(acct.id)
     setForm({
@@ -96,7 +99,6 @@ export default function CaAccountsManager({
         const payload = {
           label: form.label,
           email: form.email,
-          account_key_algorithm: form.account_key_algorithm,
           eab_kid: form.eab_kid,
           is_default: form.is_default,
           proxy_enabled: form.proxy_enabled,
@@ -277,7 +279,8 @@ export default function CaAccountsManager({
                 { value: 'ES384', label: 'ECDSA P-384 (ES384)' },
                 { value: 'RS256', label: 'RSA 2048 (RS256)' },
               ]}
-              disabled={!editingId && !!form.account_key_pem.trim()}
+              disabled={editingId ? true : !!form.account_key_pem.trim()}
+              helperText={editingId ? t('acme.accountKeyFixed') : undefined}
             />
 
             {!editingId && (
@@ -372,9 +375,13 @@ export default function CaAccountsManager({
               <input
                 type="checkbox"
                 checked={form.is_default}
+                disabled={isEditingDefault}
                 onChange={(e) => setForm(p => ({ ...p, is_default: e.target.checked }))}
               />
               {t('acme.useAsDefault')}
+              {isEditingDefault && (
+                <span className="text-xs text-text-tertiary">{t('acme.defaultChooseAnother')}</span>
+              )}
             </label>
 
             <div className="flex justify-end gap-2 pt-2 border-t border-border">

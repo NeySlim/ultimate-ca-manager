@@ -27,10 +27,9 @@ from services.acme.acme_client_service import (
     ORDER_GONE,
     AcmeClientService,
     AUTHZ_INVALID_USER_MSG,
-    CERT_KEY_TYPES,
+    cert_key_type_refusal,
     csr_identifiers_match_order,
     fips_csr_refusal,
-    fips_key_type_refusal,
     fips_private_key_refusal,
 )
 from services.audit_service import AuditService
@@ -270,11 +269,9 @@ def request_certificate():
 
     # Key type for certificate (ignored when key_source=csr)
     key_type = data.get('key_type')
-    if key_type and key_type not in CERT_KEY_TYPES:
-        return error_response(
-            f'Invalid key type: must be one of {", ".join(CERT_KEY_TYPES)}', 400)
-    if key_type and fips_key_type_refusal(key_type):
-        return error_response(fips_key_type_refusal(key_type), 400)
+    refusal = cert_key_type_refusal(key_type)
+    if refusal:
+        return error_response(refusal, 400)
 
     key_source = (data.get('key_source') or 'generate').lower()
     if key_source not in ('generate', 'reuse', 'csr'):
@@ -1071,6 +1068,10 @@ def preflight_certificate():
             return error_response('dns_provider_id must be an integer', 400)
     else:
         dns_provider_id = None
+
+    refusal = cert_key_type_refusal(data.get('key_type'))
+    if refusal:
+        return error_response(refusal, 400)
 
     key_source = (data.get('key_source') or 'generate').lower()
     csr_pem = data.get('csr_pem') or data.get('csr')

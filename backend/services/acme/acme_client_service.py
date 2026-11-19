@@ -95,6 +95,15 @@ def fips_key_type_refusal(label):
     return None
 
 
+def cert_key_type_refusal(key_type):
+    """Why the certificate key type *key_type* is refused (unknown, or not allowed in FIPS mode), or None."""
+    if not key_type:
+        return None
+    if key_type not in CERT_KEY_TYPES:
+        return f'Invalid key type: must be one of {", ".join(CERT_KEY_TYPES)}'
+    return fips_key_type_refusal(key_type)
+
+
 def fips_private_key_refusal(private_key):
     """Why FIPS mode refuses signing with *private_key* (a reused key), or None.
     RSA is judged by its size alone, so a size outside the registry is still judged."""

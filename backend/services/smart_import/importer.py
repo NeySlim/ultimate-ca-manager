@@ -172,13 +172,14 @@ class SmartImporter:
         key_algorithms.refuse_unapproved_mldsa((o.key_algorithm for o in objects), 'the imported file')
         return objects
 
-    def analyze(self, content: str | bytes, password=None) -> AnalysisResult:
+    def analyze(self, content: str | bytes, password=None, include_pem: bool = False) -> AnalysisResult:
         """
         Analyze content without importing.
         
         Args:
             content: PEM/DER/PKCS12 content
             password: Optional password for encrypted content, or a list tried in turn
+            include_pem: add `pem` to each certificate and private key (what the caller gave, opened)
             
         Returns:
             AnalysisResult with detected objects and validation info
@@ -188,6 +189,13 @@ class SmartImporter:
         # Parse content
         objects = self._parse_fresh(content, password)
         result.objects = [o.to_dict() for o in objects]
+        if include_pem:
+            for obj, entry in zip(objects, result.objects):
+                # A key still sealed (no password, or a wrong one) has no usable PEM to hand back
+                if obj.type == ObjectType.CERTIFICATE or (
+                        obj.type == ObjectType.PRIVATE_KEY and not obj.error
+                        and 'ENCRYPTED' not in obj.raw_pem):
+                    entry['pem'] = obj.raw_pem
         
         # Build chains
         chains = self.chain_builder.build_chains(objects)

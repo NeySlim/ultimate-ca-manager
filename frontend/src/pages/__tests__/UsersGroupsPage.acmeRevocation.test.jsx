@@ -30,6 +30,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('../../contexts', () => ({
   useNotification: () => stable.notify,
+  useAuth: () => ({ user: { id: 999 } }),
   useMobile: () => ({
     isMobile: false, isTablet: false, isDesktop: true, isLargeScreen: true, isTouch: false,
     screenWidth: 1600, sidebarOpen: true, setSidebarOpen: vi.fn(),

@@ -344,6 +344,79 @@ class TestSAMLMetadata:
         assert len(calls) == 1
         assert calls[0][0] == 'https://93.184.216.34/metadata'
 
+    @pytest.fixture
+    def saml_row(self, app):
+        """A saved SAML provider with TLS verification on and no saved CA bundle."""
+        from models import SSOProvider, db
+        with app.app_context():
+            SSOProvider.query.filter_by(provider_type='saml').delete()
+            row = SSOProvider(name='rep24b-saml', provider_type='saml', saml_verify_ssl=True)
+            db.session.add(row)
+            db.session.commit()
+            pid = row.id
+        yield pid
+        with app.app_context():
+            SSOProvider.query.filter_by(id=pid).delete()
+            db.session.commit()
+
+    def _verify_sent(self, auth_client, monkeypatch, body):
+        seen = []
+
+        class _Resp:
+            text = '<x/>'
+
+            def raise_for_status(self):
+                return None
+
+        def fake_get(url, **kwargs):
+            v = kwargs['verify']
+            if isinstance(v, str):
+                with open(v) as fh:
+                    v = ('bundle', fh.read())
+            seen.append(v)
+            return _Resp()
+
+        monkeypatch.setattr('api.v2.sso.sessions.safe_request_get', fake_get)
+        monkeypatch.setattr('api.v2.sso.sessions._parse_saml_metadata', lambda _t: {})
+        r = _post(auth_client, '/api/v2/sso/saml/metadata/fetch',
+                  {'metadata_url': 'https://93.184.216.34/metadata', **body})
+        assert r.status_code == 200, r.data
+        return seen[0]
+
+    def test_typed_skip_verify_beats_the_saved_setting(self, auth_client, monkeypatch, saml_row):
+        assert self._verify_sent(auth_client, monkeypatch,
+                                 {'provider_id': saml_row, 'verify_ssl': False}) is False
+
+    def test_typed_ca_bundle_beats_the_saved_setting(self, auth_client, monkeypatch, saml_row):
+        got = self._verify_sent(auth_client, monkeypatch,
+                                {'provider_id': saml_row, 'verify_ssl': True, 'ca_bundle': 'PEM-TEXT'})
+        assert got == ('bundle', 'PEM-TEXT')
+
+    def test_saved_setting_applies_when_nothing_is_typed(self, auth_client, monkeypatch, saml_row, app):
+        from models import SSOProvider, db
+        assert self._verify_sent(auth_client, monkeypatch, {'provider_id': saml_row}) is True
+        with app.app_context():
+            SSOProvider.query.filter_by(id=saml_row).update({'saml_verify_ssl': False})
+            db.session.commit()
+        assert self._verify_sent(auth_client, monkeypatch, {'provider_id': saml_row}) is False
+
+    def test_unknown_provider_id_uses_the_typed_values(self, auth_client, monkeypatch):
+        assert self._verify_sent(auth_client, monkeypatch,
+                                 {'provider_id': 987654, 'verify_ssl': False}) is False
+
+    def test_ssl_error_message_names_the_setting_without_telling_to_tick_a_box(self, auth_client, monkeypatch):
+        import requests
+
+        def bad(url, **kwargs):
+            raise requests.exceptions.SSLError('bad cert')
+
+        monkeypatch.setattr('api.v2.sso.sessions.safe_request_get', bad)
+        r = _post(auth_client, '/api/v2/sso/saml/metadata/fetch',
+                  {'metadata_url': 'https://93.184.216.34/metadata'})
+        assert r.status_code == 400
+        assert "Enable 'Skip SSL Verification'" not in get_json(r)['message']
+        assert 'turn SSL verification off' in get_json(r)['message']
+
     def test_saml_certificates_list(self, auth_client):
         r = auth_client.get('/api/v2/sso/saml/certificates')
         assert r.status_code == 200

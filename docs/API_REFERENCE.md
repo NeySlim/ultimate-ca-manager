@@ -2250,6 +2250,7 @@ GET /api/v2/discovery/runs?profile_id=1
 GET /api/v2/discovery/runs/{run_id}
 ```
 - `POST /profiles` (`201`): `name` (required, unique: `409`), `targets` (required, a non-empty list of at most 1000 hostnames, IP addresses or CIDR ranges), `ports` (a non-empty list of at most 100 integers from 1 to 65535), and optionally `description`, `schedule_enabled`, `schedule_interval_minutes` (1440 by default), `notify_on_new`, `notify_on_change`, `notify_on_expiry` (all true by default), `notify_email` (one valid address), `timeout` (1 to 30, default 5), `max_workers` (1 to 50, default 20) and `resolve_dns`. `PUT` updates the same fields; `DELETE` answers `204`.
+- `PUT /profiles/{profile_id}`: a new `schedule_interval_minutes` on a scheduled profile, or `schedule_enabled` turned on again, sets `next_scan_at` to now plus the interval, as creation does; any other update leaves it.
 - `POST /profiles/{profile_id}/scan` starts a scan with the profile's settings and returns `scan_run_id`.
 - `POST /scan` scans without a saved profile: `targets` (at most 500) or `subnet` (at most 1024 addresses), one of the two being required, plus `ports` (default `[443]`), `timeout` (1 to 30, default 5), `max_workers` (1 to 50, default 20) and `resolve_dns`. It returns `scan_run_id`.
 - `runs` lists scan runs (`items`, `total`); `runs/{run_id}` reads one, `404` when unknown.
@@ -2834,6 +2835,8 @@ GET /api/v2/audit/actions
 GET /api/v2/audit/export?format=json&limit=10000
 GET /api/v2/audit/export?format=csv&date_from=2026-01-01
 ```
+
+The export takes the filters of the list (`username`, `action` and `resource_type`, repeatable, `category`, `success`, `search`, `date_from`, `date_to`) and holds only the rows they select.
 
 ### Cleanup Old Logs
 ```http
@@ -3986,6 +3989,8 @@ Content-Type: application/json
 }
 ```
 
+`password` opens the input (a PKCS#12/PFX file or an encrypted PEM) and the separate `private_key`, and is never logged; `pkcs12_password` protects a PKCS#12 or JKS output. The web interface shows the password field as soon as a separate key, an encrypted PEM or a PKCS#12 file is given.
+
 ---
 
 ## Global Search
@@ -4109,6 +4114,8 @@ Content-Type: application/json
 }
 ```
 
+With `"include_pem": true` each `certificate` object of `data.objects` also carries its `pem`, and each `private_key` object its unencrypted PKCS#8 `pem` once the password opened it (a key still sealed has none). Without it no object has a `pem`. The request key is `content`, never `files`.
+
 ### Execute Import
 ```http
 POST /api/v2/import/execute
@@ -4163,6 +4170,8 @@ Content-Type: application/json
   "enabled": true
 }
 ```
+
+Cloudflare takes `api_token`, or `api_key` together with `email` (400 otherwise, on creation and on update). Alwaysdata takes `api_key`; `account` is optional and, when given, is sent with the token as `<token> account=<name>`.
 
 ### Get DNS Provider
 ```http
@@ -4402,7 +4411,7 @@ POST /api/v2/acme/client/accounts/{account_id}/deactivate
 POST /api/v2/acme/client/accounts/{account_id}/default
 POST /api/v2/acme/client/accounts/{account_id}/register
 ```
-`PATCH` (`write:acme`) updates `label`, `email`, `account_key_algorithm`, `eab_kid`, `eab_hmac_key` and `is_default`. `DELETE` (`delete:acme`) answers `409` while issued orders still renew through the account. `deactivate` (`delete:acme`) deactivates the account at the CA (RFC 8555 section 7.3.6), then removes it; `502` when the CA refuses. `default` (`write:acme`) makes it the account used when a request names none. `register` (`write:acme`) registers or re-registers it with its CA; optional `email`, `400` without a valid contact.
+`PATCH` (`write:acme`) updates `label`, `email`, `account_key_algorithm`, `eab_kid`, `eab_hmac_key` and `is_default`. `is_default: true` makes the account the default; `is_default: false` on the default account answers `400` (make another account the default instead). `account_key_algorithm` answers `400` when it differs from the algorithm of the key the account already holds, and is applied only while the account has no key. `DELETE` (`delete:acme`) answers `409` while issued orders still renew through the account. `deactivate` (`delete:acme`) deactivates the account at the CA (RFC 8555 section 7.3.6), then removes it; `502` when the CA refuses. `default` (`write:acme`) makes it the account used when a request names none. `register` (`write:acme`) registers or re-registers it with its CA; optional `email`, `400` without a valid contact.
 
 ### ACME Client Preflight
 ```http
@@ -4411,7 +4420,7 @@ Content-Type: application/json
 
 { "domains": ["www.example.com"], "challenge_type": "dns-01", "mode": "full" }
 ```
-Permission `write:acme`. Dry-run of a certificate request; returns a report with `ok` and per-step results. `domains` is required; `challenge_type` defaults to `dns-01`; `mode` is `full` (default) or `validate_only`; optional `email`, `acme_account_id`, `dns_provider_id` (integers), `key_source` (default `generate`), `csr_pem` and `verify_dns`.
+Permission `write:acme`. Dry-run of a certificate request; returns a report with `ok` and per-step results. `domains` is required; `challenge_type` defaults to `dns-01`; `mode` is `full` (default) or `validate_only`; optional `email`, `acme_account_id`, `dns_provider_id` (integers), `key_source` (default `generate`), `csr_pem` and `verify_dns`. `key_type` is checked as the certificate request checks it: an unknown type, or one FIPS mode refuses, answers `400` before any step runs.
 
 ---
 
@@ -4622,7 +4631,7 @@ POST /api/v2/sso/providers/{provider_id}/test-mapping
 - `sp-info` (`read:sso`) returns the service provider URLs as UCM computes them, its `metadata_url` and `origin_configured` (whether they rest on a configured origin).
 - `certificates` (`read:sso`) lists the valid certificates usable for the SP metadata, the HTTPS certificate included.
 - `metadata` is public and returns the SAML 2.0 SP metadata XML to give the IdP.
-- `metadata/fetch` (`write:sso`) fetches and parses IdP metadata from `{"metadata_url": "https://..."}` (required; http or https with a hostname, not loopback or a cloud metadata address: `400`); optional `provider_id`, `verify_ssl` (default true) and `ca_bundle`.
+- `metadata/fetch` (`write:sso`) fetches and parses IdP metadata from `{"metadata_url": "https://..."}` (required; http or https with a hostname, not loopback or a cloud metadata address: `400`); optional `provider_id`, `verify_ssl` (default true) and `ca_bundle` (PEM). Values sent win over the saved provider's `saml_verify_ssl` and `saml_ca_bundle`, which apply for each value left out.
 - `test-mapping` (`write:sso`) is a dry run of an LDAP login past the password for `{"username": "..."}` (required), without creating a session: the same entry, groups and verdict as the login. `found: false` when the user filter finds no entry; otherwise `user_dn`, `username`, `email`, `groups`, `groups_readable`, `groups_error` (why the groups could not be read, else `null`), `access_allowed`, `refusal` (`null`, `account_disabled`, `groups_unreadable`, `group_denied`, `unmapped` or `no_default_role`), `resolved_role` and `resolved_custom_role` (`null` when refused), `group_source` (where the groups were read: the group search base, the `memberOf` attribute of the user entry, or not read), `diagnosis` (for `unmapped` and `no_default_role` only, else `null`: the groups read, bounded to 20 values of 64 characters, their source and the remedy, the same text as the audit entry of the login), `role_mapping`, `default_role`, `required_groups`, and `account_checked: false` with a `note`: the password and the UCM account the sign-in would open are not checked. `400` for a provider that is not LDAP, without `username` ("Username is required") or for a failed user lookup; `404` for an unknown provider.
 
 ---
