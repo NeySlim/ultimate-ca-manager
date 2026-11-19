@@ -13,7 +13,7 @@ from fips_mode import FipsRestricted
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.pagination import parse_request_pagination
 from services.ssh_cert_service import SSHCertificateService
-from services.ssh_cert.signing import SSHSerialConflict
+from services.ssh_cert.signing import MAX_VALIDITY_SECONDS, SSHSerialConflict
 from services.ssh_ca_service import normalize_key_type
 from services.audit_service import AuditService
 from sqlalchemy import or_, and_
@@ -35,9 +35,25 @@ _MAX_PRINCIPAL_LEN = 256
 _MAX_KEY_ID_LEN = 256
 _MAX_EXT_OR_OPTS = 32
 _MAX_OPT_VALUE_LEN = 1024
-_MAX_VALIDITY_SECONDS = 10 * 365 * 24 * 3600  # 10 years
+_MAX_VALIDITY_SECONDS = MAX_VALIDITY_SECONDS
 _VALID_CERT_TYPES = ('user', 'host')
 _VALID_KEY_TYPES = ('ed25519', 'rsa', 'ecdsa-p256', 'ecdsa-p384', 'ecdsa-p521')
+
+
+def _parse_instant(data, name):
+    """(epoch seconds or None, error): an ISO 8601 instant, UTC when it names no offset."""
+    value = data.get(name)
+    if value is None or value == '':
+        return None, None
+    if not isinstance(value, str):
+        return None, error_response(f'{name} must be an ISO 8601 date and time', 400)
+    try:
+        moment = datetime.fromisoformat(value.strip().replace('Z', '+00:00'))
+    except ValueError:
+        return None, error_response(f'{name} must be an ISO 8601 date and time', 400)
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return int(moment.timestamp()), None
 
 
 def _validate_ssh_sign_payload(data, *, require_pubkey):
@@ -86,6 +102,20 @@ def _validate_ssh_sign_payload(data, *, require_pubkey):
             return None, error_response(
                 f'validity_seconds must be between 60 and {_MAX_VALIDITY_SECONDS}', 400)
 
+    valid_from, err = _parse_instant(data, 'valid_from')
+    if err:
+        return None, err
+    valid_to, err = _parse_instant(data, 'valid_to')
+    if err:
+        return None, err
+    if valid_from is not None and valid_to is None:
+        return None, error_response('valid_to is required with valid_from', 400)
+    if valid_to is not None and validity_seconds is not None:
+        return None, error_response(
+            'validity_seconds cannot be combined with valid_from or valid_to', 400)
+    if valid_from is not None and valid_to is not None and valid_to <= valid_from:
+        return None, error_response('valid_to must be after valid_from', 400)
+
     key_id = data.get('key_id')
     if key_id is not None:
         if not isinstance(key_id, str):
@@ -130,6 +160,8 @@ def _validate_ssh_sign_payload(data, *, require_pubkey):
         'cert_type': cert_type,
         'principals': principals,
         'validity_seconds': validity_seconds,
+        'valid_from': valid_from,
+        'valid_to': valid_to,
         'key_id': key_id,
         'extensions': extensions,
         'critical_options': critical_options,
@@ -305,6 +337,8 @@ def sign_ssh_certificate():
             cert_type=validated['cert_type'],
             principals=validated['principals'],
             validity_seconds=validated['validity_seconds'],
+            valid_from=validated['valid_from'],
+            valid_to=validated['valid_to'],
             key_id=validated['key_id'],
             extensions=validated['extensions'],
             critical_options=validated['critical_options'],
@@ -372,6 +406,8 @@ def generate_ssh_certificate():
             principals=validated['principals'],
             key_type=key_type,
             validity_seconds=validated['validity_seconds'],
+            valid_from=validated['valid_from'],
+            valid_to=validated['valid_to'],
             key_id=validated['key_id'],
             extensions=validated['extensions'],
             critical_options=validated['critical_options'],

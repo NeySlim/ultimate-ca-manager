@@ -903,8 +903,9 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
       }
 
       if (validityPreset === 'custom') {
-        if (customFrom) data.valid_from = customFrom
-        if (customTo) data.valid_to = customTo
+        // The inputs hold local time without an offset: the server reads UTC
+        if (customFrom) data.valid_from = new Date(customFrom).toISOString()
+        if (customTo) data.valid_to = new Date(customTo).toISOString()
       }
 
       const criticalOptions = {}
@@ -1098,6 +1099,7 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
             </label>
             <Input
               type="datetime-local"
+              required
               value={customTo}
               onChange={(e) => setCustomTo(e.target.value)}
             />

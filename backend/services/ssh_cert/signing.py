@@ -19,6 +19,7 @@ from .utils import SSHCertificateUtilsMixin
 logger = logging.getLogger(__name__)
 
 BACKDATE_SECONDS = 300
+MAX_VALIDITY_SECONDS = 10 * 365 * 24 * 3600  # 10 years
 # PROTOCOL.certkeys: the critical options OpenSSH defines, all for user certificates
 USER_CRITICAL_OPTIONS = ('force-command', 'source-address', 'verify-required')
 
@@ -71,7 +72,7 @@ class SSHCertificateSigningMixin:
                          validity_seconds=None, key_id=None,
                          extensions=None, critical_options=None,
                          descr=None, source='web', username=None,
-                         owner_group_id=None):
+                         owner_group_id=None, valid_from=None, valid_to=None):
         ca = db.session.get(SSHCertificateAuthority, ca_id)
         if not ca:
             raise ValueError(f"SSH CA not found: {ca_id}")
@@ -124,20 +125,33 @@ class SSHCertificateSigningMixin:
         subject_key_type = SSHCertificateUtilsMixin._detect_key_type(public_key)
         subject_fingerprint = SSHCertificateUtilsMixin._compute_fingerprint(public_key)
 
-        if validity_seconds is None:
-            validity_seconds = int(ca.default_ttl) if ca.default_ttl else 86400
-
-        if ca.max_ttl:
-            max_ttl = int(ca.max_ttl)
-            if max_ttl > 0 and validity_seconds > max_ttl:
-                validity_seconds = max_ttl
-
-        critical_options = _checked_critical_options(cert_type, critical_options)
-
         # Backdated so a server whose clock lags behind still accepts it at once
         now_ts = int(time.time())
-        valid_after = now_ts - BACKDATE_SECONDS
-        valid_before = now_ts + validity_seconds
+        max_ttl = int(ca.max_ttl) if ca.max_ttl else 0
+        if valid_to is not None:
+            # A typed range is applied as given, or refused: never truncated
+            if valid_from is not None and valid_from < now_ts - BACKDATE_SECONDS:
+                raise ValueError('valid_from is in the past')
+            if valid_to <= now_ts:
+                raise ValueError('valid_to is in the past')
+            start = valid_from if valid_from is not None else now_ts
+            span = valid_to - start
+            if span < 60 or span > MAX_VALIDITY_SECONDS:
+                raise ValueError(
+                    f'The range from valid_from to valid_to must last between 60 and {MAX_VALIDITY_SECONDS} seconds')
+            if max_ttl > 0 and span > max_ttl:
+                raise ValueError(f"The range exceeds this CA's max_ttl ({max_ttl} seconds)")
+            valid_after = valid_from if valid_from is not None else now_ts - BACKDATE_SECONDS
+            valid_before = valid_to
+        else:
+            if validity_seconds is None:
+                validity_seconds = int(ca.default_ttl) if ca.default_ttl else 86400
+            if max_ttl > 0 and validity_seconds > max_ttl:
+                validity_seconds = max_ttl
+            valid_after = now_ts - BACKDATE_SECONDS
+            valid_before = now_ts + validity_seconds
+
+        critical_options = _checked_critical_options(cert_type, critical_options)
 
         ca_private_key = SSHCAService.get_private_key_object(ca_id)
 
@@ -288,7 +302,7 @@ class SSHCertificateSigningMixin:
                           validity_seconds=None, key_id=None,
                           extensions=None, critical_options=None,
                           descr=None, source='web', username=None,
-                          owner_group_id=None):
+                          owner_group_id=None, valid_from=None, valid_to=None):
         from cryptography.hazmat.primitives.serialization import (
             Encoding, NoEncryption, PrivateFormat,
         )
@@ -303,6 +317,8 @@ class SSHCertificateSigningMixin:
             cert_type=cert_type,
             principals=principals,
             validity_seconds=validity_seconds,
+            valid_from=valid_from,
+            valid_to=valid_to,
             key_id=key_id,
             extensions=extensions,
             critical_options=critical_options,
