@@ -130,6 +130,10 @@ def _serve_job(view):
     from auth.twofa_enforcement import ENROLL_SESSION_KEY
     from services import cluster_maintenance
     from utils.response import AUTHENTICATION_REQUIRED_PROBLEM, error_response
+    from middleware.public_host_middleware import untrusted_forwarded_host_refusal
+    refused = untrusted_forwarded_host_refusal()
+    if refused is not None:
+        return refused
     entry = _checked(view)
     if entry is None:
         return error_response('Authentication required', 401,

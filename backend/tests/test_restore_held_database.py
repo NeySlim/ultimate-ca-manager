@@ -680,3 +680,23 @@ def test_no_hsts_header_while_its_setting_cannot_be_read(restore_held, monkeypat
         other.execute("DELETE FROM system_config WHERE key = 'hsts_enabled'")
         other.commit()
         other.close()
+
+
+def test_an_untrusted_forwarded_host_is_refused_while_held(restore_held, monkeypatch):
+    """The direct client's X-Forwarded-Host gets the same 403 as when the database answers."""
+    monkeypatch.delenv('UCM_TRUSTED_PROXIES', raising=False)
+    app, job_id, admin = restore_held.app, restore_held.job_id, restore_held.admin
+    url = f'/api/v2/system/jobs/{job_id}'
+    assert admin.get(url).status_code == 200
+    monkeypatch.setitem(app.config, 'TRUSTED_PROXY_HOPS', 1)
+    spoofed = {'headers': {'X-Forwarded-Host': 'localhost'},
+               'environ_overrides': {'REMOTE_ADDR': '203.0.113.1'}}
+    assert admin.get(url, **spoofed).status_code == 403
+    with restore_held.hold():
+        seen = admin.get(url, **spoofed)
+        cancel = admin.post(f'{url}/cancel', **spoofed)
+        plain = admin.get(url)
+    assert seen.status_code == 403, seen.data
+    assert cancel.status_code == 403, cancel.data
+    assert plain.status_code == 200, plain.data
+    assert not restore_job.cancel_flagged(job_id)
