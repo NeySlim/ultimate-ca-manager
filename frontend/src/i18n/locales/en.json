@@ -1944,6 +1944,8 @@
     "directoryUrlImmutable": "The directory URL cannot be changed after creation.",
     "eabHmacKeyKeepPlaceholder": "Leave blank to keep the current key",
     "useAsDefault": "Use as default CA",
+    "accountKeyFixed": "The account key already exists: its algorithm cannot change",
+    "defaultChooseAnother": "This is the default account: choose another account as default to change it",
     "caTimingSettings": "Validation timing",
     "caOrderPollTimeout": "Order poll timeout (seconds)",
     "caOrderPollTimeoutHelper": "How long to wait for the CA to validate the order (30–600). Use 180+ for slow CAs.",

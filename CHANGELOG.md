@@ -130,6 +130,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **A CA account no longer accepts what it cannot apply.** Unticking *default* on the default ACME CA account, or changing the key algorithm of an account that already has a key, answered success and changed nothing; both now answer 400, and the edit form disables them.
 - **DNS providers: Alwaysdata and Cloudflare forms match the server.** Alwaysdata no longer demands an account name it never used (it is sent with the token when given), and Cloudflare creation accepts the legacy key with its email, as the form and an update already did.
 - **Downloads named after an object with non-ASCII characters no longer fail.** An export of a certificate, CA, CSR, template or SSH CA named in Japanese, Cyrillic or any other script answered 500 on the real server; the response now carries an ASCII `filename` plus an RFC 6266 `filename*` holding the original name, and any file saved from the web interface keeps those characters instead of underscores (#448).
 - **Two revocations of one SSH certificate at once.** The later one rewrote the date and reason of the earlier; it is now refused as for a certificate already revoked.

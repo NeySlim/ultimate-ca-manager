@@ -4393,7 +4393,7 @@ POST /api/v2/acme/client/accounts/{account_id}/deactivate
 POST /api/v2/acme/client/accounts/{account_id}/default
 POST /api/v2/acme/client/accounts/{account_id}/register
 ```
-`PATCH` (`write:acme`) updates `label`, `email`, `account_key_algorithm`, `eab_kid`, `eab_hmac_key` and `is_default`. `DELETE` (`delete:acme`) answers `409` while issued orders still renew through the account. `deactivate` (`delete:acme`) deactivates the account at the CA (RFC 8555 section 7.3.6), then removes it; `502` when the CA refuses. `default` (`write:acme`) makes it the account used when a request names none. `register` (`write:acme`) registers or re-registers it with its CA; optional `email`, `400` without a valid contact.
+`PATCH` (`write:acme`) updates `label`, `email`, `account_key_algorithm`, `eab_kid`, `eab_hmac_key` and `is_default`. `is_default: true` makes the account the default; `is_default: false` on the default account answers `400` (make another account the default instead). `account_key_algorithm` answers `400` when it differs from the algorithm of the key the account already holds, and is applied only while the account has no key. `DELETE` (`delete:acme`) answers `409` while issued orders still renew through the account. `deactivate` (`delete:acme`) deactivates the account at the CA (RFC 8555 section 7.3.6), then removes it; `502` when the CA refuses. `default` (`write:acme`) makes it the account used when a request names none. `register` (`write:acme`) registers or re-registers it with its CA; optional `email`, `400` without a valid contact.
 
 ### ACME Client Preflight
 ```http

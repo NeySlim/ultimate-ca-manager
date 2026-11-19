@@ -301,6 +301,24 @@ def _label_taken(label, except_id=None):
     return db.session.query(query.exists()).scalar()
 
 
+def _existing_key_algorithm(acct):
+    """Algorithm of the account key already held, None while there is no key."""
+    if not acct.account_key:
+        return None
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec, rsa
+    from security.encryption import decrypt_text
+    try:
+        key = serialization.load_pem_private_key(decrypt_text(acct.account_key).encode(), password=None)
+    except Exception:
+        return acct.account_key_algorithm
+    if isinstance(key, rsa.RSAPrivateKey):
+        return 'RS256'
+    if isinstance(key, ec.EllipticCurvePrivateKey) and isinstance(key.curve, ec.SECP384R1):
+        return 'ES384'
+    return 'ES256'
+
+
 @bp.route('/api/v2/acme/client/accounts/<int:account_id>', methods=['PATCH'])
 @require_auth(['write:acme'])
 def update_ca_account(account_id):
@@ -333,6 +351,10 @@ def update_ca_account(account_id):
         algorithm = data.get('account_key_algorithm') or 'ES256'
         if algorithm not in ACCOUNT_KEY_TYPES:
             return error_response('Invalid account_key_algorithm', 400)
+        held = _existing_key_algorithm(acct)
+        if held and algorithm != held:
+            return error_response(
+                f'account_key_algorithm cannot change: the account key is already {held}', 400)
         acct.account_key_algorithm = algorithm
     if 'eab_kid' in data:
         acct.eab_kid = (data.get('eab_kid') or '').strip() or None
@@ -343,6 +365,9 @@ def update_ca_account(account_id):
     if data.get('is_default') is True:
         _clear_other_defaults(except_id=acct.id)
         acct.is_default = True
+    elif data.get('is_default') is False and acct.is_default:
+        return error_response(
+            'is_default cannot be unset: make another account the default instead', 400)
 
     try:
         _apply_timing_fields(acct, data)
