@@ -122,7 +122,7 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
         winrm_transport: formData.winrm_transport,
         winrm_username: formData.winrm_username,
         ca_config: formData.ca_config,
-        // A Kerberos channel signs in with these: the server keeps the saved ones on the saved channel
+        // A Kerberos channel signs in with these; the route needs admin:system and shows the server's refusal
         kerberos_principal: formData.kerberos_principal,
         kerberos_keytab_path: formData.kerberos_keytab_path,
       }

@@ -1,9 +1,9 @@
-"""A saved credential of the WinRM admin channel only goes to the saved channel.
+"""A saved credential of the WinRM admin channel and who may move it.
 
-The channel test and the save both take a target from the request. With a
-Kerberos transport the credential is the saved keytab and principal, not a
-WinRM password: typing a password that Kerberos never uses must not carry
-the saved keytab to another host, port, TLS setting, transport or account.
+The saved NTLM password only goes to the saved channel unless it is retyped.
+A Kerberos keytab path and principal are read back in clear, so retyping them
+proves nothing: moving them is the admin:system permission (the channel test
+route requires it; saves are covered in test_msca_kerberos_permission).
 """
 import json
 import uuid
@@ -69,6 +69,7 @@ def _refused(r, field):
 
 
 class TestKerberosChannelTest:
+    """The channel test is admin:system: its Kerberos keytab and principal may go where it points."""
 
     def _test(self, client, msca_id, body):
         return _post(client, f'{BASE}/{msca_id}/admin-channel/test', body)
@@ -80,32 +81,13 @@ class TestKerberosChannelTest:
         assert r.status_code == 200, r.data
         assert seen[-1][:4] == ('adcs.corp.local', 'kerberos', PRINCIPAL, KEYTAB)
 
-    @pytest.mark.parametrize('over, field', [
-        ({'winrm_host': 'attacker.example'}, 'winrm_host'),
-        ({'winrm_port': 5985}, 'winrm_port'),
-        ({'winrm_use_ssl': False}, 'winrm_use_ssl'),
-        ({'winrm_verify_ssl': False}, 'winrm_verify_ssl'),
-        ({'winrm_username': 'other@CORP.LOCAL'}, 'winrm_username'),
-    ], ids=['host', 'port', 'plaintext', 'no-verify', 'account'])
-    def test_a_typed_password_does_not_carry_the_saved_keytab(self, auth_client, kerberos_id, seen,
-                                                               over, field):
-        r = self._test(auth_client, kerberos_id, {**over, 'winrm_password': 'typed-but-unused'})
-        _refused(r, field)
-        assert not seen, 'the saved keytab and principal went to a channel from the request'
-
-    def test_clearing_the_winrm_host_falls_back_to_the_server(self, app, auth_client, seen):
-        msca_id = _row(app, winrm_host='winrm.corp.local')
-        _refused(self._test(auth_client, msca_id, {'winrm_host': '', 'winrm_password': 'typed'}),
-                 'winrm_host')
-        assert not seen
-
-    @pytest.mark.parametrize('typed', [{'kerberos_keytab_path': '/srv/keytabs/other.keytab'},
-                                       {'kerberos_principal': 'other@CORP.LOCAL'}],
-                             ids=['keytab-only', 'principal-only'])
-    def test_half_retyped_is_still_refused(self, auth_client, kerberos_id, seen, typed):
-        _refused(self._test(auth_client, kerberos_id, {'winrm_host': 'attacker.example', **typed}),
-                 'winrm_host')
-        assert not seen
+    @pytest.mark.parametrize('over, expected', [
+        ({'winrm_host': 'other.example'}, ('other.example', PRINCIPAL)),
+        ({'winrm_username': 'other@CORP.LOCAL'}, ('adcs.corp.local', 'other@CORP.LOCAL')),
+    ], ids=['host', 'account'])
+    def test_an_administrator_moves_the_saved_keytab(self, auth_client, kerberos_id, seen, over, expected):
+        assert self._test(auth_client, kerberos_id, over).status_code == 200
+        assert (seen[-1][0], seen[-1][2], seen[-1][3]) == (*expected, KEYTAB)
 
     def test_retyped_keytab_and_principal_may_go_anywhere(self, auth_client, kerberos_id, seen):
         r = self._test(auth_client, kerberos_id, {'winrm_host': 'other.example',
@@ -114,23 +96,13 @@ class TestKerberosChannelTest:
         assert r.status_code == 200, r.data
         assert seen[-1][:4] == ('other.example', 'kerberos', 'other@CORP.LOCAL', '/srv/keytabs/other.keytab')
 
-    def test_a_typed_account_and_keytab_may_go_anywhere(self, auth_client, kerberos_id, seen):
-        r = self._test(auth_client, kerberos_id, {'winrm_host': 'other.example',
-                                                  'winrm_username': 'admin@CORP.LOCAL',
-                                                  'kerberos_keytab_path': '/srv/keytabs/other.keytab'})
-        assert r.status_code == 200, r.data
-        assert seen[-1][2:4] == ('admin@CORP.LOCAL', '/srv/keytabs/other.keytab')
-
-    def test_a_saved_principal_alone_stays_with_the_saved_channel(self, app, auth_client, seen):
-        msca_id = _row(app, kerberos_keytab_path=None)
-        _refused(self._test(auth_client, msca_id, {'winrm_host': 'attacker.example', 'winrm_password': 'x'}),
-                 'winrm_host')
-        assert not seen
-
-    def test_switching_to_kerberos_does_not_carry_the_saved_keytab(self, app, auth_client, seen):
-        msca_id = _row(app, winrm_transport='ntlm', winrm_username='officer')
-        _refused(self._test(auth_client, msca_id, {'winrm_transport': 'kerberos',
-                                                   'winrm_password': 'typed'}), 'winrm_transport')
+    def test_an_operator_cannot_test_the_channel(self, app, create_user, kerberos_id, seen):
+        create_user(username='op_msca_channel', role='operator')
+        client = app.test_client()
+        assert _post(client, '/api/v2/auth/login', {'username': 'op_msca_channel',
+                                                    'password': 'TestPass123!'}).status_code == 200
+        r = self._test(client, kerberos_id, {})
+        assert r.status_code == 403, r.data
         assert not seen
 
     def test_a_keytab_inside_the_data_folder_is_refused(self, auth_client, kerberos_id, seen):
@@ -155,16 +127,11 @@ class TestNtlmChannelAccount:
 
 class TestKerberosChannelSave:
 
-    def test_a_moved_channel_needs_the_keytab_retyped(self, app, auth_client, kerberos_id):
+    def test_an_administrator_moves_the_channel_of_a_saved_keytab(self, app, auth_client, kerberos_id):
         from models.msca import MicrosoftCA
-        url = f'{BASE}/{kerberos_id}'
-        _refused(_put(auth_client, url, {'winrm_host': 'attacker.example'}), 'winrm_host')
-        _refused(_put(auth_client, url, {'winrm_host': 'attacker.example', 'winrm_password': 'x'}),
-                 'winrm_host')
-        _refused(_put(auth_client, url, {'winrm_host': 'attacker.example', 'kerberos_principal': PRINCIPAL}),
-                 'winrm_host')
+        assert _put(auth_client, f'{BASE}/{kerberos_id}', {'winrm_host': 'winrm.corp.local'}).status_code == 200
         with app.app_context():
-            assert db.session.get(MicrosoftCA, kerberos_id).winrm_host is None
+            assert db.session.get(MicrosoftCA, kerberos_id).winrm_host == 'winrm.corp.local'
 
     def test_the_form_sent_back_saves(self, app, auth_client, kerberos_id):
         from models.msca import MicrosoftCA

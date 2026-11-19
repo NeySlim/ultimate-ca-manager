@@ -141,7 +141,7 @@ def test_a_new_auth_method_brings_no_saved_password(app, auth_client, certsrv):
             db.session.commit()
 
 
-def test_the_saved_kerberos_principal_does_not_follow_another_server(app, auth_client, certsrv, monkeypatch):
+def test_an_administrator_tests_the_saved_principal_on_another_server(app, auth_client, certsrv, monkeypatch):
     principals = []
 
     class HTTPKerberosAuth:
@@ -158,14 +158,8 @@ def test_the_saved_kerberos_principal_does_not_follow_another_server(app, auth_c
         db.session.commit()
         row_id = row.id
     try:
-        r = _test(auth_client, row_id, {'server': 'evil.example'})
-        assert r.status_code == 400, r.data
-        assert r.get_json()['details']['fields'] == ['server']
-        assert certsrv == [] and principals == []
-        # Retyped with the new server, the principal is the caller's own
-        body = {'server': 'typed.example', 'kerberos_principal': 'svc@CORP',
-                'kerberos_keytab_path': '/saved/svc.keytab'}
-        assert _test(auth_client, row_id, body).status_code == 200
+        # An administrator's test takes the saved principal to the typed server (operators: 403)
+        assert _test(auth_client, row_id, {'server': 'typed.example'}).status_code == 200
         assert certsrv[0]['server'] == 'typed.example' and principals == ['svc@CORP']
     finally:
         with app.app_context():

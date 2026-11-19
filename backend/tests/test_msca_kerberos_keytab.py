@@ -1,7 +1,8 @@
 """The client keytab of a Kerberos Microsoft CA connection.
 
-KRB5_CLIENT_KTNAME names the connection's keytab only while its Kerberos
-credential is acquired, whatever the principal, and on both channels. A file
+KRB5_CLIENT_KTNAME names the connection's keytab, and KRB5CCNAME a ticket cache
+of its own, only while its Kerberos credential is acquired, whatever the
+principal, and on both channels; a connection without keytab takes no lock. A file
 UCM manages itself (its data folder, the acceptor keytab) is never a client keytab.
 requests-kerberos, gssapi and pywinrm are faked at their boundary.
 """
@@ -13,6 +14,7 @@ import uuid
 from types import SimpleNamespace
 
 import pytest
+import requests.auth
 
 from models import db
 from models.msca import MicrosoftCA
@@ -96,26 +98,257 @@ def test_two_connections_never_share_the_variable(kerberos):
     assert os.environ[ENV] == 'FILE:/previous.keytab'
 
 
-def test_the_winrm_channel_uses_the_same_principal_and_keytab(monkeypatch):
-    seen = {}
+# --- pywinrm 0.5.0 (the real Session, Protocol and Transport), its Kerberos auth faked ---
 
-    class Session:
-        def __init__(self, endpoint, auth, transport, server_cert_validation):
-            seen['auth'] = auth
+CCACHE = 'KRB5CCNAME'
 
-        def run_ps(self, script):
-            seen['env'] = os.environ.get(ENV)
-            return SimpleNamespace(status_code=0, std_out=b'ok', std_err=b'')
 
-    monkeypatch.setitem(sys.modules, 'winrm', SimpleNamespace(Session=Session))
+class _WinrmKerberosAuth(requests.auth.AuthBase):
+    """winrm.vendor.requests_kerberos.HTTPKerberosAuth: with force_preemptive its __call__
+    acquires the credential (generate_request_header) on the first request."""
+    winrm_encryption_available = True
+    instances = []
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+        self.force_preemptive = kwargs.get('force_preemptive', False)
+        self.auth_done = False
+        self.seen = []
+        type(self).instances.append(self)
+
+    def generate_request_header(self, response, host, is_preemptive=False):
+        self.seen.append((os.environ.get(ENV), os.environ.get(CCACHE)))
+        return 'Negotiate x'
+
+    def __call__(self, request):
+        if not self.auth_done:
+            request.headers['Authorization'] = self.generate_request_header(None, 'ca.example', True)
+            self.auth_done = True
+        return request
+
+    def wrap_winrm(self, host, message):
+        return message, b''
+
+    def unwrap_winrm(self, host, message, header):
+        return message
+
+
+@pytest.fixture
+def pywinrm(monkeypatch):
+    import winrm.protocol
+    import winrm.transport
+    _WinrmKerberosAuth.instances = []
+    state = SimpleNamespace(running=[], hold=None, started=threading.Event())
+    monkeypatch.setattr(winrm.transport, 'HAVE_KERBEROS', True)
+    monkeypatch.setattr(winrm.transport, 'REQUIRED', 1, raising=False)
+    monkeypatch.setattr(winrm.transport, 'HTTPKerberosAuth', _WinrmKerberosAuth, raising=False)
+    monkeypatch.setattr(winrm.transport.Transport, '_send_message_request',
+                        lambda self, session, prepared: SimpleNamespace(content=b''))
+
+    def open_shell(self, *args, **kwargs):
+        if not self.transport.endpoint.startswith('http:'):
+            self.transport.send_message('<open/>')
+        return 'shell'
+
+    def get_command_output(self, shell_id, command_id):
+        state.running.append((os.environ.get(ENV), os.environ.get(CCACHE)))
+        state.started.set()
+        if state.hold is not None:
+            state.hold.wait(5)
+        return b'ok', b'', 0
+
+    monkeypatch.setattr(winrm.protocol.Protocol, 'open_shell', open_shell)
+    monkeypatch.setattr(winrm.protocol.Protocol, 'run_command', lambda self, *a, **k: 'command')
+    monkeypatch.setattr(winrm.protocol.Protocol, 'get_command_output', get_command_output)
+    monkeypatch.setattr(winrm.protocol.Protocol, 'cleanup_command', lambda self, *a: None)
+    monkeypatch.setattr(winrm.protocol.Protocol, 'close_shell', lambda self, *a: None)
     monkeypatch.setenv(ENV, 'FILE:/previous.keytab')
+    monkeypatch.setenv(CCACHE, 'FILE:/previous.ccache')
+    return state
+
+
+def _channel_row(**extra):
+    values = dict(kerberos_principal='svc@CORP', winrm_effective_host='ca.example', winrm_use_ssl=True,
+                  winrm_port=5986, winrm_transport='kerberos', winrm_verify_ssl=True,
+                  winrm_effective_username=None)
+    values.update(extra)
+    return _row(**values)
+
+
+def _run_ps(row):
     from services.msca.admin_channel import MicrosoftCAAdminChannelMixin
-    row = _row(kerberos_principal='svc@CORP', winrm_effective_host='ca.example', winrm_use_ssl=True,
-               winrm_port=5986, winrm_transport='kerberos', winrm_verify_ssl=True,
-               winrm_effective_username=None)
-    assert MicrosoftCAAdminChannelMixin._run_ps(row, 'x') == 'ok'
-    assert seen == {'auth': ('svc@CORP', ''), 'env': '/kt/svc.keytab'}
+    return MicrosoftCAAdminChannelMixin._run_ps(row, 'x')
+
+
+@pytest.mark.parametrize('ssl', [True, False], ids=['https', 'http-encrypted'])
+def test_the_winrm_channel_names_the_keytab_only_while_it_acquires(pywinrm, ssl):
+    """Over HTTPS the first request acquires; over HTTP the message encryption setup does."""
+    from services.msca.client_keytab import ccache_name
+    assert _run_ps(_channel_row(winrm_use_ssl=ssl, winrm_port=5986 if ssl else 5985)) == 'ok'
+    auth, = _WinrmKerberosAuth.instances
+    assert auth.kwargs['principal'] == 'svc@CORP'
+    assert auth.seen == [('/kt/svc.keytab', ccache_name(1, '/kt/svc.keytab', 'svc@CORP'))]
+    assert pywinrm.running == [('FILE:/previous.keytab', 'FILE:/previous.ccache')]
+    assert (os.environ[ENV], os.environ[CCACHE]) == ('FILE:/previous.keytab', 'FILE:/previous.ccache')
+
+
+class _OtherAuth(requests.auth.AuthBase):
+    """A Kerberos auth of another shape: no generate_request_header to wrap."""
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, request):
+        return request
+
+
+_built_with = []
+
+
+def _other_auth_session(self):
+    if self.session is None:
+        _built_with.append(self.message_encryption)
+        self.session = requests.Session()
+        self.session.auth = _OtherAuth()
+    return self.session
+
+
+@pytest.mark.parametrize('shape', ['no-transport', 'missing-attribute', 'other-auth-class'])
+def test_an_unexpected_pywinrm_runs_the_whole_command_under_the_keytab(pywinrm, monkeypatch, shape):
+    """Never worse than before: a pywinrm the wrapper does not recognise keeps the keytab
+    named (lock held, bounded wait for others) for the whole command."""
+    import winrm
+    import winrm.transport
+    if shape == 'no-transport':
+        class Session:
+            def __init__(self, endpoint, auth, **kwargs):
+                pass
+
+            def run_ps(self, script):
+                pywinrm.running.append((os.environ.get(ENV), os.environ.get(CCACHE)))
+                return SimpleNamespace(status_code=0, std_out=b'ok', std_err=b'')
+        monkeypatch.setattr(winrm, 'Session', Session)
+    elif shape == 'missing-attribute':
+        monkeypatch.delattr(winrm.transport.Transport, 'setup_encryption')
+    else:
+        _built_with.clear()
+        monkeypatch.setattr(winrm.transport.Transport, 'build_session', _other_auth_session)
+    assert _run_ps(_channel_row()) == 'ok'
+    assert [keytab for keytab, _cache in pywinrm.running] == ['/kt/svc.keytab']
+    if shape == 'other-auth-class':
+        # The session built with its encryption held back is dropped: pywinrm builds its own
+        assert _built_with == ['never', 'auto']
     assert os.environ[ENV] == 'FILE:/previous.keytab'
+
+
+def test_a_long_command_holds_no_kerberos_lock(pywinrm, kerberos):
+    """Another connection signs in while a WinRM command of the first one is still running."""
+    pywinrm.hold = threading.Event()
+    channel = threading.Thread(target=_run_ps, args=(_channel_row(),))
+    channel.start()
+    try:
+        assert pywinrm.started.wait(5)
+        other = _client(_row(id=2, kerberos_keytab_path='/kt/other')).session.auth
+        signer = threading.Thread(target=other.generate_request_header, args=(None, 'b'))
+        signer.start()
+        signer.join(2)
+        assert [k for _p, k in kerberos.seen] == ['/kt/other'], 'the running command held the lock'
+    finally:
+        pywinrm.hold.set()
+        channel.join(5)
+
+
+def _hold_the_lock():
+    from services.msca import client_keytab as module
+    taken, release = threading.Event(), threading.Event()
+
+    def holder():
+        with module._LOCK:
+            taken.set()
+            release.wait(5)
+
+    thread = threading.Thread(target=holder)
+    thread.start()
+    assert taken.wait(5)
+    return thread, release
+
+
+def test_no_keytab_never_waits_for_the_lock():
+    from services.msca.client_keytab import client_keytab
+    holder, release = _hold_the_lock()
+    done = []
+    try:
+        worker = threading.Thread(target=lambda: done.extend(client_keytab(None).__enter__() or [1]))
+        worker.start()
+        worker.join(2)
+        assert done, 'a connection without keytab waited for another one'
+    finally:
+        release.set()
+        holder.join(5)
+
+
+def test_the_wait_for_another_sign_in_is_bounded(monkeypatch):
+    from services.msca import client_keytab as module
+    monkeypatch.setattr(module, 'LOCK_WAIT_SECONDS', 0.2, raising=False)
+    holder, release = _hold_the_lock()
+    outcome = []
+
+    def attempt():
+        try:
+            with module.client_keytab('/kt/svc.keytab'):
+                outcome.append('entered')
+        except Exception as e:  # noqa: BLE001
+            outcome.append(e)
+
+    try:
+        worker = threading.Thread(target=attempt)
+        worker.start()
+        worker.join(3)
+        assert outcome, 'the wait for the Kerberos lock has no end'
+        assert isinstance(outcome[0], RuntimeError) and 'Kerberos' in str(outcome[0])
+    finally:
+        release.set()
+        holder.join(5)
+        worker.join(5)
+
+
+# --- Each connection signs in with its own ticket cache ---
+
+def test_each_identity_has_its_own_memory_cache(monkeypatch):
+    from services.msca.client_keytab import client_keytab
+    monkeypatch.setenv(CCACHE, 'FILE:/previous.ccache')
+    names = {}
+    for key, args in {'a': (1, '/kt/a', 'p@CORP'), 'a-again': (1, '/kt/a', 'p@CORP'),
+                      'other-connection': (2, '/kt/a', 'p@CORP'), 'other-keytab': (1, '/kt/b', 'p@CORP'),
+                      'other-principal': (1, '/kt/a', 'q@CORP'), 'no-principal': (1, '/kt/a', None)}.items():
+        owner, path, principal = args
+        with client_keytab(path, principal=principal, owner=owner):
+            names[key] = os.environ[CCACHE]
+        assert os.environ[CCACHE] == 'FILE:/previous.ccache'
+    assert all(name.startswith('MEMORY:') for name in names.values())
+    assert names['a'] == names['a-again']
+    assert len({names[k] for k in names if k != 'a-again'}) == 5
+    with client_keytab(None, principal='p@CORP', owner=1):
+        assert os.environ[CCACHE] == 'FILE:/previous.ccache'
+
+
+def test_the_certsrv_channel_uses_the_connection_cache(kerberos, monkeypatch):
+    from services.msca.client_keytab import ccache_name
+    seen = []
+    monkeypatch.setattr(kerberos, 'generate_request_header',
+                        lambda self, *a, **k: seen.append(os.environ.get(CCACHE)) or 'Negotiate x')
+    _client(_row(id=7, kerberos_principal='svc@CORP')).session.auth.generate_request_header(None, 'ca.example')
+    assert seen == [ccache_name(7, '/kt/svc.keytab', 'svc@CORP')]
+
+
+# --- The keytab alone makes the Kerberos admin channel usable ---
+
+def test_a_keytab_without_principal_or_account_is_a_usable_channel():
+    from services.msca.admin_channel import MicrosoftCAAdminChannelMixin
+    row = SimpleNamespace(winrm_enabled=True, winrm_transport='kerberos', kerberos_principal=None,
+                          winrm_username=None, kerberos_keytab_path='/kt/svc.keytab')
+    assert MicrosoftCAAdminChannelMixin.admin_channel_available(row)
+    row.kerberos_keytab_path = None
+    assert not MicrosoftCAAdminChannelMixin.admin_channel_available(row)
 
 
 # --- A file UCM manages is never a client keytab ------------------------------
