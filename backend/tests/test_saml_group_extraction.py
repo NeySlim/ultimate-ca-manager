@@ -79,7 +79,7 @@ def test_entra_group_overage_is_reported(extract, caplog):
 
 def test_extracted_groups_resolve_a_role(app, extract):
     from api.v2.sso.helpers import _resolve_role_from_mapping
-    provider = SimpleNamespace(role_mapping=json.dumps({'AMT-SG-PKI-Admins': 'admin'}))
+    provider = SimpleNamespace(provider_type='saml', role_mapping=json.dumps({'AMT-SG-PKI-Admins': 'admin'}))
     external = {'name_id': 'x', 'groups': extract({'groups': ['AMT-SG-PKI-Admins']})}
     with app.app_context():
         assert _resolve_role_from_mapping(provider, external) == 'admin'
