@@ -40,3 +40,21 @@ describe('MscaConnectionForm: test connection', () => {
     expect(posted()).toHaveLength(0)
   })
 })
+
+describe('MscaConnectionForm: test the admin channel', () => {
+  beforeEach(() => {
+    apiClient.post.mockClear()
+    apiClient.post.mockResolvedValue({ data: { templates: [] } })
+  })
+
+  it('sends the Kerberos keytab and principal of the form: the saved ones stay with the saved channel', async () => {
+    const connection = { ...CONNECTION, auth_method: 'kerberos', kerberos_principal: 'svc@CORP.EXAMPLE',
+      kerberos_keytab_path: '/srv/keytabs/ucm.keytab', winrm_enabled: true }
+    render(<MscaConnectionForm connection={connection} onSave={() => {}} onCancel={() => {}} />)
+    fireEvent.click(screen.getByText('msca.testAdminChannel'))
+    const channel = () => apiClient.post.mock.calls.filter(([url]) => url === '/microsoft-cas/4/admin-channel/test')
+    await waitFor(() => expect(channel()).toHaveLength(1))
+    expect(channel()[0][1]).toMatchObject({ kerberos_principal: 'svc@CORP.EXAMPLE',
+      kerberos_keytab_path: '/srv/keytabs/ucm.keytab' })
+  })
+})

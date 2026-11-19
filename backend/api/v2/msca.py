@@ -129,9 +129,37 @@ _WINRM_OVERRIDE_FIELDS = ('winrm_enabled', 'winrm_host', 'winrm_port', 'winrm_us
                           'winrm_password', 'ca_config')
 
 
-def _winrm_target(cfg):
-    return ((cfg.winrm_host or cfg.server or '').strip().lower(), cfg.winrm_port,
-            bool(cfg.winrm_use_ssl), bool(cfg.winrm_verify_ssl), cfg.winrm_transport or 'kerberos')
+# Kerberos credentials a channel test may retype: the keytab and the principal it signs in as
+_WINRM_KERBEROS_FIELDS = ('kerberos_principal', 'kerberos_keytab_path')
+
+
+def _winrm_channel(cfg):
+    """Where and as whom the channel signs in, as _build_session derives it."""
+    use_ssl = bool(cfg.winrm_use_ssl)
+    transport = (cfg.winrm_transport or 'kerberos').lower()
+    account = cfg.winrm_username or (cfg.username if cfg.auth_method == 'basic' else None)
+    if transport == 'kerberos':
+        account = account or cfg.kerberos_principal
+    return {'winrm_host': (cfg.winrm_host or cfg.server or '').strip().lower(),
+            'winrm_port': cfg.winrm_port or (5986 if use_ssl else 5985),
+            'winrm_use_ssl': use_ssl, 'winrm_verify_ssl': bool(cfg.winrm_verify_ssl),
+            'winrm_transport': transport, 'winrm_username': (account or '').strip() or None}
+
+
+def _kept_kerberos_credentials(msca, data):
+    """Saved keytab and principal a Kerberos channel built from ``msca`` and ``data``
+    would use without ``data`` naming them. A blank value is none, never the saved one."""
+    kept = []
+    if keeps_saved_secret(data, 'kerberos_keytab_path', msca.kerberos_keytab_path, blank_clears=True):
+        kept.append('kerberos_keytab_path')
+    # A channel account (or the basic user) is a target; the enrollment principal a credential
+    account = data.get('winrm_username', msca.winrm_username)
+    if data.get('auth_method', msca.auth_method) == 'basic' and not str(account or '').strip():
+        account = data.get('username', msca.username)
+    if not str(account or '').strip() and keeps_saved_secret(
+            data, 'kerberos_principal', msca.kerberos_principal, blank_clears=True):
+        kept.append('kerberos_principal')
+    return kept
 
 
 def _transient_winrm_config(msca, overrides):
@@ -161,18 +189,35 @@ def _transient_winrm_config(msca, overrides):
         ca_config=msca.ca_config,
     )
 
-    data = {k: v for k, v in (overrides or {}).items() if k in _WINRM_OVERRIDE_FIELDS}
+    if not isinstance(overrides, dict):
+        return None, error_response("Request body must be a JSON object", 400)
+    data = {k: v for k, v in overrides.items() if k in _WINRM_OVERRIDE_FIELDS + _WINRM_KERBEROS_FIELDS}
     # Empty or masked password means "use the saved one".
     if not data.get('winrm_password') or str(data['winrm_password']).strip() in MASKS:
         data.pop('winrm_password', None)
-    saved_target = _winrm_target(cfg)
+    for field in _WINRM_KERBEROS_FIELDS:
+        if field in data and data[field] is not None and not isinstance(data[field], str):
+            return None, error_response(f"{field} must be a string", 400)
+    err = _check_size('kerberos_keytab_path', data.get('kerberos_keytab_path'), MAX_KEYTAB_PATH_LEN) \
+        or _keytab_error(data)
+    if err:
+        return None, err
+    saved_channel = _winrm_channel(cfg)
     err = _apply_winrm_fields(cfg, data)
     if err:
         return None, err
-    # A saved password only goes to the saved target, trusted the saved way
-    if 'winrm_password' not in data and _winrm_target(cfg) != saved_target:
-        return None, error_response(
-            "Enter the WinRM password to test a host, port or transport other than the saved one", 400)
+    for field in _WINRM_KERBEROS_FIELDS:
+        if field in data:
+            setattr(cfg, field, (data[field] or '').strip() or None)
+    # No saved credential of the transport used follows a moved channel: it is retyped
+    changed = sorted(k for k, v in _winrm_channel(cfg).items() if saved_channel[k] != v)
+    if cfg.winrm_transport == 'kerberos':
+        kept = _kept_kerberos_credentials(msca, data)
+    else:
+        kept = [] if 'winrm_password' in data else ['winrm_password']
+    if changed and kept:
+        return None, error_response(SECRET_TARGET_MESSAGE, 400,
+                                    details={'code': 'secret_required_for_target', 'fields': changed})
 
     # Mirror MicrosoftCA.winrm_effective_* on the transient object.
     cfg.winrm_effective_host = cfg.winrm_host or cfg.server
@@ -367,6 +412,12 @@ def _msca_retarget_error(msca, data):
         data, 'winrm_password', msca._winrm_password, blank_clears=True))
     if winrm_err:
         return winrm_err
+    # A Kerberos channel's saved keytab and principal stay with the saved channel too
+    transport = str(data.get('winrm_transport', msca.winrm_transport) or 'kerberos').strip().lower()
+    if transport == 'kerberos' and _kept_kerberos_credentials(msca, data):
+        winrm_err = retarget_error(current, data, True)
+        if winrm_err:
+            return winrm_err
     if msca.auth_method != 'basic' or data.get('auth_method', 'basic') != 'basic':
         return None
     if not keeps_saved_secret(data, 'password', msca._password, blank_clears=True):
