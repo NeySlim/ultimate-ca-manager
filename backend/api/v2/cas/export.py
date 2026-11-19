@@ -25,6 +25,7 @@ from fips_mode import FipsRestricted
 from utils.key_codec import load_pem_bytes
 
 from utils.export_password import validate_export_password
+from utils.export_options import json_boolean, query_boolean
 from services.key_export_audit import audit_key_export, encrypt_key_pem
 
 logger = logging.getLogger(__name__)
@@ -172,15 +173,21 @@ def export_ca(ca_id):
     if request.method == 'POST' and request.is_json:
         data = request.get_json()
         export_format = data.get('format', 'pem').lower()
-        include_key = bool(data.get('include_key', False))
-        include_chain = bool(data.get('include_chain', False))
+        try:
+            include_key = json_boolean(data, 'include_key', False)
+            include_chain = json_boolean(data, 'include_chain', False)
+        except ValueError as exc:
+            return error_response(str(exc), 400)
         password = data.get('password')
         legacy = legacy_flag(data.get('legacy'))  # 3DES/SHA-1 profile (#331)
         variant, variant_err = _requested_variant(data, ca)
     else:
         export_format = request.args.get('format', 'pem').lower()
-        include_key = request.args.get('include_key', 'false').lower() == 'true'
-        include_chain = request.args.get('include_chain', 'false').lower() == 'true'
+        try:
+            include_key = query_boolean(request.args, 'include_key', False)
+            include_chain = query_boolean(request.args, 'include_chain', False)
+        except ValueError as exc:
+            return error_response(str(exc), 400)
         password = request.args.get('password')
         legacy = False
         variant, variant_err = _requested_variant(request.args, ca)

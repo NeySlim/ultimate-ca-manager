@@ -167,6 +167,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - **A CSR key export follows the export password rule.** `format=key` with a password under 8 or over 256 characters is refused, as on the other key exports.
 - **The converter's output password.** `output_password` (the older `pkcs12_password` still works) now encrypts a private key written as PEM, and a DER output that would carry a key refuses it with `400`; a `password` or `legacy` sent to an export that carries no key, or to JKS for `legacy`, stays ignored and is documented in the API reference.
 - **A CA export refuses `include_key` for formats without a key.** `der`, `p7b` and `pkcs7` answer `400` instead of silently returning no key.
+- **A CA export reads `include_key` and `include_chain` strictly.** A string such as `"false"` was read as true; it now answers `400`, as the other exports do.
 - **SMTP "No authentication" after OAuth2.** Choosing it now resets the stored method, erases the saved OAuth2 client secret, client ID and refresh token, and the sender no longer authenticates, so mail and the test email stop failing with "OAuth2 requires smtp_user".
 - **An administrator's mTLS certificate for a user carries its name as CN.** The generated certificate had no common name; a subject field UCM does not know is now an error instead of being dropped.
 - **Rate limit settings survive a restart without HA.** `PUT /api/v2/system/security/rate-limit` is stored in the database on every deployment and read again at start; it was kept in memory outside HA.
