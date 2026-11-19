@@ -278,6 +278,7 @@ IN_CHAIN = '1.2.840.113556.1.4.1941'  # LDAP_MATCHING_RULE_TRANSITIVE_EVAL
 # A DC answers sizeLimitExceeded past its MaxPageSize (1000 by default) without paging.
 NESTED_GROUPS_LIMIT = 1000
 NESTED_GROUPS_SECONDS = 10
+LIMIT_RESULTS = (3, 4, 11)  # timeLimitExceeded, sizeLimitExceeded, adminLimitExceeded (RFC 4511)
 
 
 def _is_active_directory(server):
@@ -311,6 +312,15 @@ def _primary_group_sid(conn, user_dn):
     return sid[:-4] + rid.to_bytes(4, 'little')
 
 
+def _dn_under(dn, base):
+    """Whether ``dn`` is ``base`` or lies below it, compared as the server compares names."""
+    try:
+        target, key = _dn_key(dn), _dn_key(base)
+    except ValueError:
+        return False
+    return bool(key) and len(key) <= len(target) and target[len(target) - len(key):] == key
+
+
 def _with_nested_groups(provider, server, user_dn, direct, report):
     """``direct`` plus the primary group and every group above them; never a partial answer."""
     if not _is_active_directory(server):
@@ -323,28 +333,37 @@ def _with_nested_groups(provider, server, user_dn, direct, report):
     try:
         conn = _service_connection(provider, server, receive_timeout=NESTED_GROUPS_SECONDS)
         try:
-            sid_filter = f'(objectSid={escape_bytes(_primary_group_sid(conn, user_dn))})'
+            # MS-ADTS 3.1.1.3.1.2.4: <SID=hex> names the object wherever it lies, on every DC.
+            sid = _primary_group_sid(conn, user_dn)
+            conn.search(f'<SID={sid.hex()}>', '(objectClass=*)', search_scope=ldap3.BASE,
+                        attributes=['cn'], time_limit=NESTED_GROUPS_SECONDS)
+            _search_succeeded(conn, 'primary group read by its SID')
+            if len(conn.entries) != 1:
+                raise LdapGroupsUnreadable('primary group read: no entry has its SID')
+            primary_dn = conn.entries[0].entry_dn
             failures = []
             for base in _ldap_group_search_bases(provider, server):
                 try:
-                    conn.search(base, sid_filter, search_scope=ldap3.SUBTREE, attributes=['cn'],
-                                size_limit=2, time_limit=NESTED_GROUPS_SECONDS)
-                    _search_succeeded(conn, f'primary group search under {base}')
+                    conn.search(base, _nested_filter(gf, user_dn, primary_dn),
+                                search_scope=ldap3.SUBTREE, attributes=['cn'],
+                                size_limit=NESTED_GROUPS_LIMIT, time_limit=NESTED_GROUPS_SECONDS)
+                    _search_succeeded(conn, f'nested group search under {base}')
                 except (LdapGroupsUnreadable, ldap3.core.exceptions.LDAPOperationResult) as e:
+                    # A limit is an answer cut short: another base would give fewer groups.
+                    if (conn.result or {}).get('result') in LIMIT_RESULTS:
+                        raise
                     failures.append(str(e) or type(e).__name__)
                     continue
                 break
             else:
                 raise LdapGroupsUnreadable('; '.join(failures))
-            primary = [e for e in conn.entries if hasattr(e, 'cn')]
-            if len(primary) != 1:
-                raise LdapGroupsUnreadable(f'the primary group was not found under {base}')
-            primary_dn, names = primary[0].entry_dn, [str(primary[0].cn)]
-            conn.search(base, _nested_filter(gf, user_dn, primary_dn), search_scope=ldap3.SUBTREE,
-                        attributes=['cn'], size_limit=NESTED_GROUPS_LIMIT,
-                        time_limit=NESTED_GROUPS_SECONDS)
-            _search_succeeded(conn, f'nested group search under {base}')
-            names += [str(e.cn) for e in conn.entries if hasattr(e, 'cn')]
+            names = [str(e.cn) for e in conn.entries if hasattr(e, 'cn')]
+            # Its name counts as any group's would: under the base and matching the filter.
+            if _dn_under(primary_dn, base):
+                conn.search(primary_dn, gf, search_scope=ldap3.BASE, attributes=['cn'],
+                            time_limit=NESTED_GROUPS_SECONDS)
+                _search_succeeded(conn, 'primary group filter check')
+                names = [str(e.cn) for e in conn.entries if hasattr(e, 'cn')] + names
         finally:
             conn.unbind()
     except LdapGroupsUnreadable:
