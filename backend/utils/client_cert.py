@@ -4,33 +4,76 @@ from cryptography.hazmat.primitives.serialization import Encoding
 from flask import request
 
 
-# Written by gunicorn_config at start: the former CAs of Windows profiles its listener trusts
-from boot_config import MTLS_FORMER_CAS_FILE as FORMER_CAS_FILE  # noqa: E402
 # A native client certificate the listener let through on a former CA alone: WSTEP renewal reads it
 FORMER_PEERCERT = 'ucm.former_ca_peercert'
-_former_cache = {}
+# Explanatory text before the PEM blocks of the trust bundle (ignored by OpenSSL): its former CAs
+FORMER_CAS_HEADER = 'UCM-Former-CAs: '
+# What this worker's TLS context loaded, pinned once when it is built: never a later rewrite
+_listener = {'armed': False, 'refids': frozenset()}
+
+
+def former_cas_header(refids):
+    """The bundle's first line naming the former CAs it trusts beside the anchor."""
+    import json
+    return FORMER_CAS_HEADER + json.dumps(sorted(refids)) + '\n'
+
+
+def _bundle_trust(bundle):
+    """``(armed, refids)`` of one bundle read: armed when it trusts more than its anchor, or is unreadable."""
+    import json
+    if bundle is None:
+        return True, frozenset()
+    text = bundle.decode('ascii', 'replace') if isinstance(bundle, (bytes, bytearray)) else bundle
+    refids = set()
+    for line in text.splitlines():
+        if line.startswith(FORMER_CAS_HEADER):
+            try:
+                value = json.loads(line[len(FORMER_CAS_HEADER):])
+            except ValueError:
+                return True, frozenset()
+            if isinstance(value, list):
+                refids.update(r for r in value if isinstance(r, str))
+    return bool(refids) or text.count('-----BEGIN CERTIFICATE-----') > 1, frozenset(refids)
+
+
+def pin_listener_trust(bundles, settled=True):
+    """Pin the former CAs of the bundle(s) this worker's TLS context loaded. Several reads, or an
+    unsettled one (rewritten while loading): their union, guard armed."""
+    armed, refids = not settled, set()
+    for bundle in bundles:
+        bundle_armed, bundle_refids = _bundle_trust(bundle)
+        armed, refids = armed or bundle_armed, refids | bundle_refids
+    _listener.update(armed=armed, refids=frozenset(refids))
+
+
+def pin_listener_trust_file(path, build, attempts=3):
+    """Build the TLS context with *build* (it loads *path*) and pin what it loaded: the bundle read
+    before and after must match, otherwise both count and the guard is armed."""
+    def read():
+        try:
+            with open(path, 'rb') as handle:
+                return handle.read()
+        except OSError:
+            return None
+    for _ in range(attempts):
+        before = read()
+        ctx = build()
+        after = read()
+        if before is not None and before == after:
+            pin_listener_trust([before])
+            return ctx
+    pin_listener_trust([before, after], settled=False)
+    return ctx
 
 
 def listener_former_refids():
-    """The refids of the former CAs the running listener trusts beside its mTLS anchor (empty when
-    it trusts none, or the file is missing or unreadable), as read at its start."""
-    import json
-    import os
-    from config.settings import DATA_DIR
-    path = os.path.join(str(DATA_DIR), FORMER_CAS_FILE)
-    try:
-        stamp = os.stat(path).st_mtime_ns
-    except OSError:
-        return frozenset()
-    if _former_cache.get('key') != (path, stamp):
-        try:
-            with open(path) as handle:
-                value = json.load(handle)
-            refids = frozenset(r for r in value if isinstance(r, str)) if isinstance(value, list) else frozenset()
-        except (OSError, ValueError):
-            refids = frozenset()
-        _former_cache.update(key=(path, stamp), refids=refids)
-    return _former_cache['refids']
+    """The refids of the former CAs this worker's listener trusts beside its mTLS anchor."""
+    return _listener['refids']
+
+
+def listener_guard_armed():
+    """Whether this worker's listener trusts anything beyond its mTLS anchor (or may, in doubt)."""
+    return _listener['armed']
 
 
 def set_aside_former_ca_peercert():
@@ -39,7 +82,7 @@ def set_aside_former_ca_peercert():
     (a former CA's, or an issuer UCM does not hold) moves to ``FORMER_PEERCERT``, out of reach of
     every route but WSTEP renewal: TLS trust of a former CA grants nothing else."""
     peercert = request.environ.get('peercert')
-    if not peercert or not listener_former_refids():
+    if not peercert or not listener_guard_armed():
         return None
     try:
         if isinstance(peercert, (bytes, bytearray)) and not bytes(peercert).lstrip().startswith(b'-----'):

@@ -420,6 +420,19 @@ describe('former CAs that still renew', () => {
     await waitFor(() => expect(mocks.notify.showInfo).toHaveBeenCalledWith('restarting'))
   })
 
+  // Guard: the server's refusal reaches the operator as it is (no change to the editor)
+  it('shows the refusal of a removal that needs admin:system, and keeps the editor open', async () => {
+    const refusal = 'This change alters the CAs the TLS listener trusts for Windows renewal and restarts the service: permission required: admin:system'
+    const onSaved = vi.fn()
+    mocks.get.mockResolvedValue({ data: MOVED })
+    mocks.update.mockRejectedValue(Object.assign(new Error(refusal), { status: 403 }))
+    renderEditor(undefined, { onSaved })
+    fireEvent.click((await screen.findAllByText('xcepWstep.renewalCaRemove'))[0])
+    fireEvent.click(screen.getByText('common.save'))
+    await waitFor(() => expect(mocks.notify.showError).toHaveBeenCalledWith(refusal))
+    expect(onSaved).not.toHaveBeenCalled()
+  })
+
   it('says none are listed for a profile whose CA never changed', async () => {
     renderEditor()
     expect(await screen.findByText('xcepWstep.renewalCasNone')).toBeInTheDocument()

@@ -324,9 +324,11 @@ def _apply(profile, data):
 
 def _apply_renewal_cas(profile, data, outgoing):
     """The former CAs whose certificates renew: the outgoing CA is listed when the issuing CA
-    changes; the operator may only remove one, never list a CA that was not the profile's."""
+    changes, after the list sent is applied; the operator may only remove one, never list a CA that
+    was not the profile's."""
     current = windows_profiles.renewal_ca_refids(profile)
     moved = outgoing if outgoing and outgoing != profile.issuing_ca_refid else None
+    wanted = current
     if 'renewal_ca_refids' in data:
         value = data['renewal_ca_refids']
         if not isinstance(value, list) or any(not isinstance(r, str) or not r for r in value):
@@ -337,8 +339,8 @@ def _apply_renewal_cas(profile, data, outgoing):
             return (f'renewal_ca_refids may only remove CAs from the list: {", ".join(unknown)} is not a '
                     'former issuing CA of this profile (one is listed when the issuing CA changes)'), 400
         wanted = list(dict.fromkeys(value))
-    else:
-        wanted = current + ([moved] if moved and moved not in current else [])
+    # The outgoing CA is listed whatever the list sent: its removal is a later save
+    wanted = wanted + ([moved] if moved and moved not in wanted else [])
     # The issuing CA is never a former one: moving back to it takes it off the list
     wanted = [r for r in wanted if r != profile.issuing_ca_refid]
     profile._renewal_change = (sorted(set(wanted) - set(current)), sorted(set(current) - set(wanted)))
@@ -370,6 +372,21 @@ def _queue_listener_restart(trusted_before):
         emit(RESTART)
         return True
     return False
+
+
+# The same scope as the mTLS settings, whose save restarts the listener as well
+LISTENER_TRUST_PERMISSION = 'admin:system'
+
+
+def _listener_trust_refused(trusted_before):
+    """A 403 when this change moves the CAs the TLS listener trusts (a service restart) and the
+    account lacks the scope of the mTLS settings; None otherwise. The change is rolled back."""
+    if (windows_profiles.listener_former_refids() == trusted_before
+            or has_permission(LISTENER_TRUST_PERMISSION, getattr(g, 'permissions', None) or [])):
+        return None
+    db.session.rollback()
+    return error_response('This change alters the CAs the TLS listener trusts for Windows renewal and '
+                          f'restarts the service: permission required: {LISTENER_TRUST_PERMISSION}', 403)
 
 
 def _listener_restart(rolling):
@@ -568,6 +585,9 @@ def update_windows_profile(profile_id):
         return taken
     profile.updated_by = _actor()
     _store_templates(profile)
+    refused = _listener_trust_refused(trusted_before)
+    if refused is not None:
+        return refused
     rolling = _queue_listener_restart(trusted_before)
     ok, err = safe_commit(logger, 'Failed to update the Windows enrollment profile')
     if not ok:
@@ -603,6 +623,9 @@ def delete_windows_profile(profile_id):
         problem = _recompose_keytab()
         if problem:
             return error_response(problem[0], problem[1])
+    refused = _listener_trust_refused(trusted_before)
+    if refused is not None:
+        return refused
     rolling = _queue_listener_restart(trusted_before)
     ok, err = safe_commit(logger, 'Failed to delete the Windows enrollment profile')
     if not ok:

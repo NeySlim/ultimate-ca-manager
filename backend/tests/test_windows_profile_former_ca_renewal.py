@@ -61,19 +61,13 @@ def mtls_on_a2(app):
 
 @pytest.fixture
 def listener(app):
-    """Writes what gunicorn_config records at start: the former CAs its listener trusts."""
-    from config.settings import DATA_DIR
-    from utils.client_cert import FORMER_CAS_FILE
-    path = os.path.join(str(DATA_DIR), FORMER_CAS_FILE)
+    """Pins what this worker's TLS context would have loaded: the former CAs its bundle trusts."""
+    from utils.client_cert import former_cas_header, pin_listener_trust
 
     def trusts(*refids):
-        with open(path, 'w') as handle:
-            json.dump(sorted(refids), handle)
+        pin_listener_trust([former_cas_header(refids) + '-----BEGIN CERTIFICATE-----\n' * (1 + len(refids))])
     yield trusts
-    try:
-        os.unlink(path)
-    except FileNotFoundError:
-        pass
+    pin_listener_trust(())
 
 
 @pytest.fixture
@@ -153,6 +147,30 @@ def test_moving_back_to_the_former_ca_takes_it_off_the_list(app, auth_client, wo
     _data, a2, profile_id = moved_by_api
     r = auth_client.put(f'{URL}/{profile_id}', json={'issuing_ca_refid': world['cas']['A']['refid']})
     assert r.get_json()['data']['renewal_cas'] == [{'refid': a2['refid'], 'name': 'C20 A2 CA'}]
+
+
+def test_a_list_sent_with_a_change_of_ca_still_lists_the_outgoing_ca(app, auth_client, world, create_ca,
+                                                                     moved_by_api):
+    """The list sent is applied first, then the outgoing CA is added and audited: dropping A while
+    moving from A2 to A3 leaves A2, never an empty list."""
+    _data, a2, profile_id = moved_by_api
+    a3 = create_ca(cn='C20 A3 CA')
+    with app.app_context():
+        for pin in CATemplatePin.query.filter_by(ca_id=world['cas']['A']['id']).all():
+            db.session.add(CATemplatePin(ca_id=a3['id'], template_id=pin.template_id))
+        db.session.commit()
+    floor = _top_audit(app)
+    try:
+        r = auth_client.put(f'{URL}/{profile_id}', json={'issuing_ca_refid': a3['refid'], 'renewal_ca_refids': []})
+        assert r.status_code == 200, r.get_json()
+        assert r.get_json()['data']['renewal_cas'] == [{'refid': a2['refid'], 'name': 'C20 A2 CA'}]
+        (entry,) = [a for a in _audits(app, floor) if a[0] == 'windows_profile_update']
+        assert 'former CA listed for renewal: C20 A2 CA' in entry[3]
+        assert 'former CA removed from renewal: C04 A CA' in entry[3]
+    finally:
+        with app.app_context():
+            CATemplatePin.query.filter_by(ca_id=a3['id']).delete()
+            db.session.commit()
 
 
 def test_in_ha_the_rolling_restart_is_committed_with_the_list(app, auth_client, moved_by_api, restarts,
@@ -428,3 +446,108 @@ def test_a_profile_that_never_moved_lists_nothing_and_renews_as_before(
     r = _kerberos_renewal(client, world, realm_a, old, key, True)
     assert r.status_code == 200 and _archived(app, old) == [True]
     assert _count(app) > 0
+
+
+# --- The guard follows the trust this worker loaded, not a list rewritten since ----------------------
+
+@pytest.fixture
+def started_worker(app):
+    """A worker whose TLS context loaded the bundle in the data directory (anchor, former CAs); the
+    bundle is rewritten afterwards, as another node's start does in a shared directory."""
+    from config.settings import DATA_DIR
+    from utils import client_cert
+    bundle = os.path.join(str(DATA_DIR), 'mtls_ca.pem')
+
+    def write(*refids):
+        with app.app_context():
+            pems = [CA.query.filter_by(refid=r).one().crt for r in refids]
+        header = client_cert.former_cas_header(refids[1:])
+        with open(bundle, 'w') as handle:
+            handle.write(header + ''.join(_pem_text(p) for p in pems))
+
+    def start(*refids):
+        write(*refids)
+        client_cert.pin_listener_trust_file(bundle, lambda: None)
+    yield start, write
+    client_cert.pin_listener_trust(())
+    try:
+        os.unlink(bundle)
+    except FileNotFoundError:
+        pass
+
+
+def _pem_text(crt):
+    import base64
+    text = crt if crt.lstrip().startswith('-----') else base64.b64decode(crt).decode()
+    return text if text.endswith('\n') else text + '\n'
+
+
+def test_a_worker_that_loaded_a_former_ca_keeps_its_certificates_aside_after_a_rewrite(
+        app, client, world, realm_a, directory, request, started_worker, monkeypatch):
+    """The former CA is delisted and another node rewrites the bundle: this worker still
+    trusts it in TLS, so its certificates stay out of EST and of the login."""
+    from services.mtls_auth_service import MTLSAuthService
+    seen = []
+    monkeypatch.setattr(MTLSAuthService, 'authenticate_certificate',
+                        staticmethod(lambda info: seen.append(info) or (None, None, 'Certificate not enrolled')))
+    old, _k = _old(app, client, world, realm_a, True)
+    _data, a2, _profile_id = request.getfixturevalue('moved_by_api')
+    start, rewrite = started_worker
+    start(a2['refid'], world['cas']['A']['refid'])
+    rewrite(a2['refid'])
+    assert _peer_hook(app, old)[:3] == (False, True, False)
+    client.post('/api/v2/auth/login/mtls',
+                environ_base={'peercert': old.public_bytes(serialization.Encoding.DER)})
+    assert seen == []
+
+
+# --- A save that changes the listener's trust restarts the service: admin:system ---------------------
+
+def _scoped(auth_client, permissions):
+    r = auth_client.post('/api/v2/account/apikeys', json={'name': 'c20-scope', 'permissions': permissions})
+    assert r.status_code == 201, r.data
+    data = r.get_json()['data']
+    return data['id'], {'X-API-Key': data['key']}
+
+
+def test_a_save_that_changes_the_listener_trust_needs_admin_system(
+        app, auth_client, world, create_ca, restarts, mtls_on_a2):
+    """write:xcep alone edits a profile, never the CAs the TLS listener trusts (that restarts it)."""
+    a2 = create_ca(cn='C20 A2b CA')
+    mtls_on_a2(a2['refid'])
+    with app.app_context():
+        profile_id = _profile('c04-a').id
+    key_id, headers = _scoped(auth_client, ['read:xcep', 'write:xcep'])
+    try:
+        r = app.test_client().put(f'{URL}/{profile_id}', headers=headers, json={'issuing_ca_refid': a2['refid']})
+        assert r.status_code == 403, r.get_json()
+        assert 'admin:system' in r.get_json()['message']
+        assert restarts == []
+        with app.app_context():
+            profile = _profile('c04-a')
+            assert (profile.issuing_ca_refid, profile.renewal_ca_refids or '[]') == (world['cas']['A']['refid'], '[]')
+        # A save that leaves the listener's trust as it is stays open to write:xcep
+        r = app.test_client().put(f'{URL}/{profile_id}', headers=headers, json={'allowed_ad_group': None})
+        assert r.status_code == 200, r.get_json()
+    finally:
+        auth_client.delete(f'/api/v2/account/apikeys/{key_id}')
+        with app.app_context():
+            profile = _profile('c04-a')
+            profile.issuing_ca_refid, profile.renewal_ca_refids = world['cas']['A']['refid'], '[]'
+            db.session.commit()
+
+
+def test_a_removal_from_the_list_by_write_xcep_alone_is_refused(app, auth_client, world, moved_by_api, restarts):
+    _data, _a2, profile_id = moved_by_api
+    restarts.clear()
+    key_id, headers = _scoped(auth_client, ['read:xcep', 'write:xcep'])
+    try:
+        r = app.test_client().put(f'{URL}/{profile_id}', headers=headers, json={'renewal_ca_refids': []})
+        assert r.status_code == 403 and 'admin:system' in r.get_json()['message']
+        r = app.test_client().delete(f'{URL}/{profile_id}', headers=headers)
+        assert r.status_code == 403 and 'admin:system' in r.get_json()['message']
+        assert restarts == []
+        with app.app_context():
+            assert json.loads(_profile('c04-a').renewal_ca_refids) == [world['cas']['A']['refid']]
+    finally:
+        auth_client.delete(f'/api/v2/account/apikeys/{key_id}')

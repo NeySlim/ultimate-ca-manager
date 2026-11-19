@@ -87,7 +87,13 @@ def ssl_context(conf, default_ssl_context_factory):
     sync with the setting rather than only taking effect on the next
     unrelated restart.
     """
-    ctx = default_ssl_context_factory()
+    from utils.client_cert import pin_listener_trust, pin_listener_trust_file
+    if conf.ca_certs:
+        # The guard of the application follows the bundle this context loaded, read once here
+        ctx = pin_listener_trust_file(conf.ca_certs, default_ssl_context_factory)
+    else:
+        ctx = default_ssl_context_factory()
+        pin_listener_trust(())
     if WSTEP_TLS12_CAP_NEEDED:
         ctx.maximum_version = ssl.TLSVersion.TLSv1_2
     if conf.ca_certs:
@@ -161,13 +167,6 @@ def _write_private(name, content):
     return path
 
 
-def _remember_former_cas(refids):
-    """The former CAs this listener trusts, for the application (utils.client_cert.FORMER_CAS_FILE)."""
-    import json
-    from boot_config import MTLS_FORMER_CAS_FILE
-    _write_private(MTLS_FORMER_CAS_FILE, json.dumps(sorted(refids)))
-
-
 def _reuse_last_known_mtls():
     """Keep the previous start's client-certificate setting.
 
@@ -210,16 +209,15 @@ def _load_mtls_config():
                 _reuse_last_known_mtls()
             return
         if not found:
-            _remember_former_cas([])
             _remember_mtls_mode('off')
             return
         ca_pem, ca_name, required = found
         # The former CAs a Windows profile lists renew over TLS: anchors beside the mTLS CA, whose
         # certificates the application keeps from every route but WSTEP renewal
         former = mtls_former_cas(data_path)
-        # The list first: a bundle trusting a CA the application does not set aside is never written
-        _remember_former_cas(refid for refid, _pem, _name in former)
-        ca_file_path = _write_private('mtls_ca.pem', ''.join(
+        # The bundle names its own former CAs: each worker arms its guard from the bundle it loads
+        from utils.client_cert import former_cas_header
+        ca_file_path = _write_private('mtls_ca.pem', former_cas_header(f[0] for f in former) + ''.join(
             pem if pem.endswith('\n') else pem + '\n' for pem in [ca_pem, *(f[1] for f in former)]))
 
         ca_certs = ca_file_path

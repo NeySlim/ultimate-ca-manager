@@ -199,10 +199,6 @@ def _chain_refids(database, refid):
     return seen, revoked
 
 
-# The former CAs the listener trusts, written at start, read by utils.client_cert
-MTLS_FORMER_CAS_FILE = 'mtls_former_cas.json'
-
-
 def mtls_former_cas(data_path: str):
     """``[(refid, pem, name)]`` of the former CAs the listener trusts beside the mTLS anchor so that
     their certificates renew over TLS: listed by a Windows enrollment profile, held here, not revoked

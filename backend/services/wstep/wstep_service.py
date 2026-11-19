@@ -1623,6 +1623,20 @@ def _renewal_refusal(ca, cert, *, profile):
                  EXPIRED: RENEWED_EXPIRED}.get(status, RENEWED_NOT_VALID)
 
 
+def renewed_certificate_revoked(ca, cert, *, profile):
+    """Whether the certificate an approved renewal replaces is revoked at delivery, read under the CA
+    that issued it whatever the profile lists by then (a delisting does not hide a revocation)."""
+    from services.cert.issued_lookup import REVOKED, find_issued_rows, issued_certificate_status
+    from services.windows_profiles import former_ca_refusal
+    from utils.cert_issuer import signing_ca_for
+    issuer = _issuing_ca(ca, cert, profile=profile)
+    if issuer.id == ca.id and not find_issued_rows(ca, cert):
+        issuer = signing_ca_for(cert) or ca
+    if issuer.id != ca.id and former_ca_refusal(issuer):
+        return True
+    return issued_certificate_status(issuer, cert)[1] == REVOKED
+
+
 def _requester_holds(cert, principal, sam_account_name, connector, requester_sid, *, profile):
     """Whether *cert* names the requester: its SID extension when it carries one, else the
     dNSHostName (computer) or the subject (user) the directory gives the account;

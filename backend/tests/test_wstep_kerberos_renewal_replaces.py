@@ -291,6 +291,24 @@ def test_after_a_ca_change_a_held_renewal_of_the_former_ca_s_certificate_replace
         assert reason == 'Renewed certificate revoked' and invalid == 'true'
 
 
+def test_a_held_renewal_revoked_then_delisted_before_delivery_is_not_delivered(
+        app, client, auth_client, world, realm_a, create_ca, request):
+    """The status at delivery is read under the CA that issued the renewed certificate, whatever the
+    profile's list says by then: revoked, then its CA taken off the list, it is still refused."""
+    from tests.test_protocol_approval_wstep import _fault as _held_fault
+    old, key = _old(app, client, world, realm_a, False)
+    a2 = request.getfixturevalue('moved')
+    with approval_policy(app, a2['id'], 'c19-held-delisted') as pid:
+        request_id, approval_id = _held_renewal(app, client, world, realm_a, pid, old, key, with_template=False)
+        approve(auth_client, approval_id)
+        with app.app_context():
+            Certificate.query.filter_by(serial_number=str(old.serial_number)).one().revoked = True
+            _profile('c04-a').renewal_ca_refids = '[]'
+            db.session.commit()
+        reason, invalid, _echo = _held_fault(_query(client, world, request_id))
+        assert reason == 'Renewed certificate revoked' and invalid == 'true'
+
+
 # --- A request for another template signed by a certificate of the first ---------------------------
 
 @pytest.fixture
