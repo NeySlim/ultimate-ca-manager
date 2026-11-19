@@ -481,13 +481,21 @@ def _holds_nul(value: Any) -> bool:
     return False
 
 
-def _without_nul(value: Any) -> Any:
+def _without_nul(value: Any, clashes: Optional[List[bool]] = None) -> Any:
+    """``value`` through escape_nul; a key rewritten onto another key of its object appends
+    to ``clashes`` (one of the two values is lost)."""
     if isinstance(value, str):
         return escape_nul(value)
     if isinstance(value, dict):
-        return {_without_nul(k): _without_nul(v) for k, v in value.items()}
+        rewritten = {}
+        for key, item in value.items():
+            new_key = _without_nul(key)
+            if new_key in rewritten and clashes is not None:
+                clashes.append(True)
+            rewritten[new_key] = _without_nul(item, clashes)
+        return rewritten
     if isinstance(value, list):
-        return [_without_nul(item) for item in value]
+        return [_without_nul(item, clashes) for item in value]
     return value
 
 
@@ -517,17 +525,32 @@ def _merged_identities(section_name: str, rows) -> List[str]:
     section = SECTIONS.get(section_name)
     if section is None or not section.identity:
         return []
-    seen: Dict[tuple, bool] = {}
+    seen: Dict[tuple, set] = {}
     merged = []
     for row in rows:
         if not isinstance(row, dict):
             continue
         before = tuple(row.get(field) for field in section.identity)
         after = tuple(_without_nul(value) for value in before)
-        if after in seen and (seen[after] or before != after):
-            merged.append('.'.join(section.identity))
-        seen[after] = seen.get(after, False) or before != after
+        try:
+            # Rows already alike before the rewrite are not the NUL's doing
+            if after in seen and before not in seen[after]:
+                merged.append('.'.join(section.identity))
+            seen.setdefault(after, set()).add(before)
+        except TypeError:
+            continue    # a list or an object as identity: refused by refuse_containers_in_columns
     return sorted(set(merged))
+
+
+def _fields_taken(section_name: str):
+    """Field names a restorer of the section reads: columns, handled and secret fields and
+    references; None when the section has no manifest entry (nothing is said ignored)."""
+    section = SECTIONS.get(section_name)
+    if section is None:
+        return None
+    columns, _attribute_of = _mapping_of(load_model(section))
+    taken = set(columns) | set(section.handled.values()) | set(section.secrets)
+    return taken | {f'{name}{REFERENCE_SUFFIX}' for name in section.references}
 
 
 # Fields named one by one in the report; past this many, a count
@@ -552,20 +575,30 @@ def escape_nul_in_archive(backup_data, sections) -> List[str]:
             mapping = backup_data[section_name]
             hit = _mapping_fields_with_nul(mapping)
             if hit:
-                backup_data[section_name] = _without_nul(mapping)
+                rewritten = {}
+                for key, value in mapping.items():
+                    clashes: List[bool] = []
+                    new_key = escape_nul(key) if isinstance(key, str) else key
+                    if new_key in rewritten:
+                        merged.append(section_name)
+                    rewritten[new_key] = _without_nul(value, clashes)
+                    if clashes:
+                        merged.append(f"{section_name}.{_shown(str(new_key))}")
+                backup_data[section_name] = rewritten
                 fields.extend((f"{section_name}.{name}", False) for name in hit)
             continue
         if kind != 'list':
             continue
         rows = (backup_data.iter_rows(section_name) if isinstance(backup_data, SectionStore)
                 else backup_data[section_name])
+        taken = _fields_taken(section_name)
         hit = {}
         for row in rows:
             if isinstance(row, dict):
                 for name, value in row.items():
                     if _holds_nul(name) or _holds_nul(value):
-                        # No column name holds a NUL: such a field is never written
-                        hit.setdefault(_shown(escape_nul(name)), _holds_nul(name))
+                        hit.setdefault(_shown(escape_nul(name)),
+                                       taken is not None and name not in taken)
             elif _holds_nul(row):
                 hit.setdefault('(row)', False)
         if hit:
@@ -573,10 +606,21 @@ def escape_nul_in_archive(backup_data, sections) -> List[str]:
             loaded = backup_data[section_name]
             merged.extend(f"{section_name}.{field}"
                           for field in _merged_identities(section_name, loaded))
+            for row in loaded:
+                names = set()
+                for name, value in (row.items() if isinstance(row, dict) else ()):
+                    clashes = []
+                    _without_nul(value, clashes)
+                    if clashes:
+                        merged.append(f"{section_name}.{_shown(escape_nul(name))}")
+                    if escape_nul(name) in names:
+                        merged.append(section_name)
+                    names.add(escape_nul(name))
             backup_data[section_name] = _without_nul(loaded)
             fields.extend((f"{section_name}.{name}", ignored) for name, ignored in hit.items())
+    merged = list(dict.fromkeys(merged))
     warnings = [
-        f"{field}: a field no column takes, ignored, its name holding a NUL character" if ignored
+        f"{field}: a field no column takes, ignored, holding a NUL character" if ignored
         else f"{field}: a NUL character, which PostgreSQL cannot store in text, was restored as "
              "the two characters \\0"
         for field, ignored in fields[:NUL_WARNING_FIELDS]]
@@ -584,8 +628,8 @@ def escape_nul_in_archive(backup_data, sections) -> List[str]:
         warnings.append(f"{len(fields) - NUL_WARNING_FIELDS} more fields held a NUL character, "
                         "restored the same way")
     warnings.extend(
-        f"{field}: two archived rows hold the same value once their NUL characters are "
-        "rewritten as \\0, and are restored as one row" for field in merged)
+        f"{field}: two archived rows or keys hold the same value once their NUL characters "
+        "are rewritten as \\0, and are restored as one" for field in merged)
     return warnings
 
 

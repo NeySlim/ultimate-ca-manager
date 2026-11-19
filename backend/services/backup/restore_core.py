@@ -352,11 +352,12 @@ class RestoreCoreMixin:
         # holding fewer rows than the archive says it holds, must not be
         # discovered halfway through a restore.
         self._check_payload_schema(backup_data)
+        # Shapes first: it compares no text, and the rewrite reads identities as values
+        refuse_containers_in_columns(backup_data)
         # PostgreSQL stores no NUL; SQLite keeps what it stored, identities included. Before
-        # every check, plan and rename: they compare the rewritten text alone
+        # every other check, plan and rename: they compare the rewritten text alone
         nul_warnings = (escape_nul_in_archive(backup_data, set(SECTIONS) | RESTORED_SECTIONS)
                         if db.session.get_bind().dialect.name == 'postgresql' else [])
-        refuse_containers_in_columns(backup_data)
         self._check_serial_duplicates(backup_data)
         upgrade_archived_permissions(backup_data)
         windows_warnings: List[str] = []
