@@ -257,6 +257,17 @@ class TestCreateCSR:
         r = _create_csr(auth_client, cn='bad-field.example.com', **{field: 'a;b'})
         assert r.status_code == 400
 
+    # RFC 2985 5.2.1: emailAddress is an IA5String, so an address that is not ASCII is refused
+    @pytest.mark.parametrize('email', [123, ['ops@example.com'], 'opé@example.com', 'not-an-address'])
+    def test_create_csr_refuses_an_email_that_is_not_an_address(self, auth_client, email):
+        r = _create_csr(auth_client, cn='bad-email.example.com', email=email)
+        assert r.status_code == 400, r.data
+
+    def test_create_csr_trims_the_email(self, auth_client):
+        r = _create_csr(auth_client, cn='trim-email.example.com', email='  ops@example.com ')
+        assert r.status_code in (200, 201), r.data
+        assert self._stored_subject(auth_client, r)[-1] == ('1.2.840.113549.1.9.1', 'ops@example.com')
+
     def test_create_csr_missing_cn(self, auth_client):
         r = auth_client.post('/api/v2/csrs',
                              data=json.dumps({'organization': 'Test'}),

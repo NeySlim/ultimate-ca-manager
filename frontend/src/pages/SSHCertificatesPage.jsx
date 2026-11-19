@@ -398,6 +398,8 @@ export default function SSHCertificatesPage() {
       key: 'principals',
       header: t('sshCertificates.principals'),
       priority: 3,
+      // Not in the server's sort list: a click would change nothing
+      sortable: false,
       hideOnMobile: true,
       render: (val) => {
         const principals = Array.isArray(val) ? val : (val ? String(val).split(',') : [])
@@ -451,6 +453,7 @@ export default function SSHCertificatesPage() {
       key: 'ca_name',
       header: t('sshCertificates.caName'),
       priority: 5,
+      sortable: false,
       hideOnMobile: true,
       render: (val) => (
         <span className="text-xs text-text-secondary truncate">

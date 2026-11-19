@@ -12,7 +12,8 @@ from sqlalchemy.exc import IntegrityError
 
 from models import db
 from models.ssh import SSHCertificateAuthority, SSHCertificate
-from services.ssh_ca_service import SSHCAService, normalize_key_type
+from services.ssh_ca_service import (DEFAULT_HOST_TTL, DEFAULT_USER_TTL, SSHCAService,
+                                     normalize_key_type)
 from utils import ssh_serials as SSHSerials
 from .utils import SSHCertificateUtilsMixin
 
@@ -134,6 +135,8 @@ class SSHCertificateSigningMixin:
                 raise ValueError('valid_from is in the past')
             if valid_to <= now_ts:
                 raise ValueError('valid_to is in the past')
+            if valid_to > now_ts + MAX_VALIDITY_SECONDS:
+                raise ValueError(f'valid_to is more than {MAX_VALIDITY_SECONDS} seconds from now')
             start = valid_from if valid_from is not None else now_ts
             span = valid_to - start
             if span < 60 or span > MAX_VALIDITY_SECONDS:
@@ -145,7 +148,9 @@ class SSHCertificateSigningMixin:
             valid_before = valid_to
         else:
             if validity_seconds is None:
-                validity_seconds = int(ca.default_ttl) if ca.default_ttl else 86400
+                # An emptied default is the creation default of the CA type
+                validity_seconds = int(ca.default_ttl) if ca.default_ttl else (
+                    DEFAULT_USER_TTL if ca.ca_type == 'user' else DEFAULT_HOST_TTL)
             if max_ttl > 0 and validity_seconds > max_ttl:
                 validity_seconds = max_ttl
             valid_after = now_ts - BACKDATE_SECONDS

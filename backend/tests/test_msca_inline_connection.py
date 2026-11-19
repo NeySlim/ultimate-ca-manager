@@ -94,9 +94,9 @@ def test_kerberos_principal_picks_the_identity(app, certsrv, monkeypatch):
     # requests-kerberos is faked at the library boundary: no KDC is contacted
     seen = {}
 
-    def fake_auth(**kwargs):
-        seen.update(kwargs)
-        return object()
+    class fake_auth:  # subclassed by the connection, as the real handler
+        def __init__(self, **kwargs):
+            seen.update(kwargs)
 
     monkeypatch.setitem(sys.modules, 'requests_kerberos',
                         SimpleNamespace(HTTPKerberosAuth=fake_auth, OPTIONAL=2))
@@ -113,9 +113,9 @@ def test_kerberos_principal_picks_the_identity(app, certsrv, monkeypatch):
 def test_kerberos_without_a_principal_uses_the_ambient_identity(app, certsrv, monkeypatch):
     seen = {}
 
-    def fake_auth(**kwargs):
-        seen.update(kwargs)
-        return object()
+    class fake_auth:  # subclassed by the connection, as the real handler
+        def __init__(self, **kwargs):
+            seen.update(kwargs)
 
     monkeypatch.setitem(sys.modules, 'requests_kerberos',
                         SimpleNamespace(HTTPKerberosAuth=fake_auth, OPTIONAL=2))

@@ -99,3 +99,82 @@ def test_the_test_saves_nothing(app, auth_client, connection, certsrv):
 def test_an_invalid_value_is_refused(auth_client, connection, certsrv, body, status):
     assert _test(auth_client, connection, body).status_code == status
     assert certsrv == []
+
+
+# The test never hands a saved secret to a target the body changed: a blank
+# password is no password, and a new auth method brings no saved secret along.
+@pytest.mark.parametrize('body', [
+    {'server': 'evil.example', 'password': ''},
+    {'server': 'evil.example', 'verify_ssl': False, 'username': 'x', 'password': '   '},
+])
+def test_a_blank_password_is_no_password_on_another_target(auth_client, connection, certsrv, body):
+    r = _test(auth_client, connection, body)
+    assert all(call['password'] != 'saved-password' for call in certsrv)
+    if r.status_code == 200:
+        assert certsrv[0]['password'] == ''
+
+
+def test_a_new_auth_method_brings_no_saved_password(app, auth_client, certsrv):
+    with app.app_context():
+        row = MicrosoftCA(name=f'form-cert-{uuid.uuid4().hex[:8]}', server='saved.example',
+                          auth_method='certificate', client_cert_pem='CERT', enabled=True)
+        row.password = 'saved-password'
+        row.client_key_pem = 'saved-key'
+        db.session.add(row)
+        db.session.commit()
+        row_id = row.id
+    try:
+        r = _test(auth_client, row_id, {'auth_method': 'basic', 'server': 'evil.example'})
+        assert r.status_code == 400, r.data
+        assert 'auth_method' in r.get_json()['details']['fields']
+        assert certsrv == []
+        # Same target: the saved key serves the connection it was saved for
+        assert _test(auth_client, row_id, {'ca_name': 'Typed', 'client_key_pem': '***'}).status_code == 200
+        assert len(certsrv) == 1
+        # Another server with the saved key: refused, nothing built
+        r = _test(auth_client, row_id, {'server': 'evil.example'})
+        assert r.status_code == 400 and r.get_json()['details']['fields'] == ['server']
+        assert len(certsrv) == 1
+    finally:
+        with app.app_context():
+            MicrosoftCA.query.filter_by(id=row_id).delete()
+            db.session.commit()
+
+
+def test_the_saved_kerberos_principal_does_not_follow_another_server(app, auth_client, certsrv, monkeypatch):
+    principals = []
+
+    class HTTPKerberosAuth:
+        def __init__(self, **kw):
+            principals.append(kw.get('principal'))
+
+    monkeypatch.setitem(sys.modules, 'requests_kerberos', SimpleNamespace(
+        OPTIONAL=1, HTTPKerberosAuth=HTTPKerberosAuth))
+    with app.app_context():
+        row = MicrosoftCA(name=f'form-krb-{uuid.uuid4().hex[:8]}', server='saved.example',
+                          auth_method='kerberos', kerberos_principal='svc@CORP',
+                          kerberos_keytab_path='/saved/svc.keytab', enabled=True)
+        db.session.add(row)
+        db.session.commit()
+        row_id = row.id
+    try:
+        r = _test(auth_client, row_id, {'server': 'evil.example'})
+        assert r.status_code == 400, r.data
+        assert r.get_json()['details']['fields'] == ['server']
+        assert certsrv == [] and principals == []
+        # Retyped with the new server, the principal is the caller's own
+        body = {'server': 'typed.example', 'kerberos_principal': 'svc@CORP',
+                'kerberos_keytab_path': '/saved/svc.keytab'}
+        assert _test(auth_client, row_id, body).status_code == 200
+        assert certsrv[0]['server'] == 'typed.example' and principals == ['svc@CORP']
+    finally:
+        with app.app_context():
+            MicrosoftCA.query.filter_by(id=row_id).delete()
+            db.session.commit()
+
+
+def test_the_service_itself_keeps_the_saved_password_home(app, connection, certsrv):
+    from services.msca_service import MicrosoftCAService
+    with app.app_context():
+        result = MicrosoftCAService.test_connection(connection, {'server': 'evil.example'})
+    assert result['success'] is False and certsrv == []

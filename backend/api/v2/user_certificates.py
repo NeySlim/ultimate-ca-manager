@@ -292,7 +292,7 @@ def get_user_certificate(cert_id):
 @bp.route('/<int:cert_id>/export', methods=['GET', 'POST'])
 @require_auth(['read:user_certificates'])
 def export_user_certificate(cert_id):
-    """Export user certificate (PEM or PKCS12). Auditors cannot export."""
+    """Export a user certificate as PEM, DER, P7B, the key alone, PKCS#12 or JKS. Auditors cannot export."""
     user = g.current_user
 
     if _is_auditor(user):

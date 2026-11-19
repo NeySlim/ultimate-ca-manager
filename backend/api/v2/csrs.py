@@ -18,6 +18,7 @@ from utils import notices as notices_mod
 from utils.export_password import validate_export_password
 from utils.pagination import parse_request_pagination
 from utils.dn_validation import validate_dn_field
+from utils.san_parse import is_valid_san_email
 from utils.request_names import RequestRejected
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from utils.sanitize import content_disposition
@@ -379,9 +380,19 @@ def create_csr():
             dn['O'] = data['organization']
         if country:
             dn['C'] = country
-        for key, field in (('state', 'ST'), ('locality', 'L'), ('email', 'email')):
+        for key, field in (('state', 'ST'), ('locality', 'L')):
             if data.get(key):
                 dn[field] = data[key]
+        # emailAddress is an IA5String (RFC 2985 5.2.1): an ASCII address or nothing
+        email = data.get('email')
+        if email not in (None, ''):
+            if not isinstance(email, str):
+                return error_response('email must be a string', 400)
+            email = email.strip()
+            if email and not is_valid_san_email(email):
+                return error_response(f'Invalid email address: {email}', 400)
+            if email:
+                dn['email'] = email
         
         # Validate DN fields
         for field, value in dn.items():
