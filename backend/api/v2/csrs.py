@@ -378,6 +378,9 @@ def create_csr():
             dn['O'] = data['organization']
         if country:
             dn['C'] = country
+        for key, field in (('state', 'ST'), ('locality', 'L'), ('email', 'email')):
+            if data.get(key):
+                dn[field] = data[key]
         
         # Validate DN fields
         for field, value in dn.items():

@@ -125,6 +125,7 @@ export default function CSRsPage() {
   const [genOU, setGenOU] = useState('')
   const [genCountry, setGenCountry] = useState('')
   const [genState, setGenState] = useState('')
+  const [genEmail, setGenEmail] = useState('')
   const [genLocality, setGenLocality] = useState('')
   // The user's pick, else the key the server issues when none is named, else the form default
   const [genKeyChoice, setGenKeyChoice] = useState(null)
@@ -518,6 +519,7 @@ export default function CSRsPage() {
         country: genCountry.trim() || undefined,
         state: genState.trim() || undefined,
         locality: genLocality.trim() || undefined,
+        email: genEmail.trim() || undefined,
         key_type: genKeyType,
         sans
       })
@@ -535,7 +537,7 @@ export default function CSRsPage() {
 
   const resetGenerateForm = () => {
     setGenCN(''); setGenOrg(''); setGenOU(''); setGenCountry('')
-    setGenState(''); setGenLocality(''); setGenKeyChoice(null)
+    setGenState(''); setGenLocality(''); setGenEmail(''); setGenKeyChoice(null)
     setGenSans([{ type: 'DNS', value: '' }])
   }
 
@@ -642,6 +644,7 @@ export default function CSRsPage() {
     setGenCountry(csr.country || '')
     setGenState(csr.state || '')
     setGenLocality(csr.locality || '')
+    setGenEmail(csr.email || '')
     // An unknown CSR key is no user choice: the server default applies
     setGenKeyChoice(csrKeyRow(csr)?.csr ?? null)
     setGenSans(parseSansFromCSR(csr))
@@ -1349,6 +1352,13 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
                 value={genLocality}
                 onChange={(e) => setGenLocality(e.target.value)}
                 placeholder={t('certificates.localityPlaceholder')}
+              />
+              <Input
+                label={t('common.email')}
+                type="email"
+                value={genEmail}
+                onChange={(e) => setGenEmail(e.target.value)}
+                placeholder={t('certificates.emailPlaceholder')}
               />
               <Input
                 label={t('common.organization')}
