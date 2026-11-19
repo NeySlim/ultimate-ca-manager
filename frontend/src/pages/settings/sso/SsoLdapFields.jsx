@@ -216,6 +216,16 @@ export default function SsoLdapFields({
               { value: 'uniqueMember', label: t('sso.ldapGroupAttrs.uniqueMember') },
             ]}
           />
+          <ToggleSwitch
+            checked={formData.ldap_nested_groups === true}
+            onChange={(val) => handleChange('ldap_nested_groups', val)}
+            label={t('sso.ldapNestedGroups')}
+            description={t('sso.ldapNestedGroupsHelp')}
+            size="sm"
+          />
+          {formData.ldap_nested_groups === true && (
+            <p className="text-xs text-status-warning">{t('sso.ldapNestedGroupsWarning')}</p>
+          )}
           {(formData.ldap_group_member_attr || 'member') !== 'memberOf' && (
             <Input
               label={t('sso.groupBaseDn')}
