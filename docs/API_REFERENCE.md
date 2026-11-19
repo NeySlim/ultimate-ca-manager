@@ -1361,12 +1361,14 @@ Content-Type: application/json
   "cn": "server.example.com",
   "organization": "My Company",
   "country": "US",
+  "state": "California",
+  "locality": "San Francisco",
   "key_type": "EC P-256",
   "sans": ["DNS:server.example.com", "IP:192.168.1.10"]
 }
 ```
 
-UCM generates the key pair and keeps the private key. `key_type` is `RSA 2048`, `RSA 3072`,
+UCM generates the key pair and keeps the private key. The subject takes `cn` (required), `organization`, `department` (OU), `country`, `state`, `locality` and `email`; each is validated and a refused value answers `400`. `key_type` is `RSA 2048`, `RSA 3072`,
 `RSA 4096`, an EC curve (`EC P-256`, `EC P-384`, `EC P-521`, Brainpool), or `ML-DSA-44`,
 `ML-DSA-65` or `ML-DSA-87`; an unknown value answers `400`. To submit an existing CSR, use
 `POST /api/v2/csrs/upload` below.

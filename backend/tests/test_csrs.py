@@ -222,6 +222,41 @@ class TestCreateCSR:
         data = _json(r)
         assert 'data' in data
 
+    @staticmethod
+    def _stored_subject(auth_client, created):
+        from cryptography import x509
+        csr_id = _json(created)['data']['id']
+        pem = _json(auth_client.get(f'/api/v2/csrs/{csr_id}'))['data']['csr_pem']
+        csr = x509.load_pem_x509_csr(pem.encode())
+        return [(a.oid.dotted_string, a.value) for a in csr.subject]
+
+    def test_create_csr_writes_every_subject_field(self, auth_client):
+        r = _create_csr(auth_client, cn='full-subject.example.com',
+                        department='Ops', state='Ile-de-France',
+                        locality='Paris', email='ops@example.com')
+        assert r.status_code in (200, 201), r.data
+        assert self._stored_subject(auth_client, r) == [
+            ('2.5.4.6', 'US'), ('2.5.4.8', 'Ile-de-France'),
+            ('2.5.4.7', 'Paris'), ('2.5.4.10', 'Test Org'),
+            ('2.5.4.11', 'Ops'), ('2.5.4.3', 'full-subject.example.com'),
+            ('1.2.840.113549.1.9.1', 'ops@example.com'),
+        ]
+        shown = _json(auth_client.get(f"/api/v2/csrs/{_json(r)['data']['id']}"))['data']
+        assert shown['state'] == 'Ile-de-France' and shown['locality'] == 'Paris'
+        assert shown['email'] == 'ops@example.com'
+
+    def test_create_csr_without_state_locality_email_keeps_subject(self, auth_client):
+        r = _create_csr(auth_client, cn='plain-subject.example.com')
+        assert self._stored_subject(auth_client, r) == [
+            ('2.5.4.6', 'US'), ('2.5.4.10', 'Test Org'),
+            ('2.5.4.3', 'plain-subject.example.com'),
+        ]
+
+    @pytest.mark.parametrize('field', ['state', 'locality', 'email'])
+    def test_create_csr_refuses_invalid_subject_field(self, auth_client, field):
+        r = _create_csr(auth_client, cn='bad-field.example.com', **{field: 'a;b'})
+        assert r.status_code == 400
+
     def test_create_csr_missing_cn(self, auth_client):
         r = auth_client.post('/api/v2/csrs',
                              data=json.dumps({'organization': 'Test'}),
