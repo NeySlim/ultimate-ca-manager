@@ -104,6 +104,28 @@ class TestInjection:
         assert content_disposition(name, '.crt') == 'attachment; filename="download.crt"'
 
 
+class TestSpoofing:
+    @pytest.mark.parametrize('mark', ['\u202e', '\u0085', '\u2028', '\u2029', '\u200e'],
+                             ids=['bidi-override', 'c1-next-line', 'line-sep', 'para-sep', 'lrm'])
+    def test_format_and_separator_characters_are_dropped(self, mark):
+        assert content_disposition(f'n{mark}b', '.crt', fallback='r1') == 'attachment; filename="nb.crt"'
+        _, plain, star = parse(content_disposition(f'テ{mark}b', '.crt', fallback='r1'))
+        assert (plain, star) == ('b.crt', 'テb.crt')
+
+
+class TestFallbackShape:
+    def test_no_leading_dot_in_the_plain_form(self):
+        _, plain, star = parse(content_disposition('テスト.CA', '.p12', fallback='r1'))
+        assert (plain, star) == ('CA.p12', 'テスト.CA.p12')
+
+    def test_no_percent_escape_in_the_plain_form(self):
+        _, plain, star = parse(content_disposition('テスト%41', '.p12', fallback='r1'))
+        assert (plain, star) == ('r1.p12', 'テスト%41.p12')
+
+    def test_a_lone_percent_stays(self):
+        assert parse(content_disposition('テ 100%', '.p12', fallback='r1'))[1] == '100%.p12'
+
+
 class TestLength:
     def test_long_name_is_bounded_as_before(self):
         assert content_disposition('a' * 300, '.crt') == f'attachment; filename="{"a" * 200}.crt"'
