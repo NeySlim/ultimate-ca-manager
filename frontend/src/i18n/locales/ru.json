@@ -2650,7 +2650,7 @@
     "caChainPlaceholder": "Промежуточные и корневые сертификаты...",
     "additionalCerts": "Дополнительные сертификаты для включения...",
     "inputPassword": "Пароль входных данных",
-    "keyPasswordPlaceholder": "Пароль зашифрованного ключа или файла (пусто, если его нет)",
+    "keyOrFilePasswordPlaceholder": "Пароль зашифрованного ключа или файла (пусто, если его нет)",
     "forEncryptedFiles": "Для зашифрованных файлов",
     "outputPkcs12Password": "Пароль выходного PKCS12",
     "passwordForP12": "Пароль для .p12",

@@ -564,7 +564,7 @@ export default function CertificateToolsPage() {
             type="password"
             noAutofill
             required={mustGivePassword}
-            placeholder={needsInputPassword ? t('tools.pkcs12PasswordPlaceholder') : t('tools.keyPasswordPlaceholder')}
+            placeholder={needsInputPassword ? t('tools.pkcs12PasswordPlaceholder') : t('tools.keyOrFilePasswordPlaceholder')}
             value={convertPassword}
             onChange={(e) => setConvertPassword(e.target.value)}
           />

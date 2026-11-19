@@ -2610,7 +2610,7 @@
     "caChainPlaceholder": "中間証明書およびルート証明書...",
     "additionalCerts": "含める追加の証明書...",
     "inputPassword": "パスワード入力",
-    "keyPasswordPlaceholder": "Password of the encrypted key or file (leave empty if none)",
+    "keyOrFilePasswordPlaceholder": "Password of the encrypted key or file (leave empty if none)",
     "forEncryptedFiles": "暗号化されたファイル用",
     "outputPkcs12Password": "出力PKCS12パスワード",
     "passwordForP12": ".p12用パスワード",
