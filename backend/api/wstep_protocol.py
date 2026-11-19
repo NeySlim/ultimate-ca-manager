@@ -233,10 +233,8 @@ def _renewed_certificate_standing(ca, approval):
     renewal_of = data.get('renewal_of')
     if not renewal_of:
         return True
-    # Looked up under the CA that issued it, a former one the profile still lists included
-    _row, refusal = wstep_service._renewal_refusal(ca, x509.load_pem_x509_certificate(renewal_of.encode()),
-                                                   profile=_held_profile(data))
-    return refusal != protocol_approval.RENEWED_REVOKED
+    return not wstep_service.renewed_certificate_revoked(
+        ca, x509.load_pem_x509_certificate(renewal_of.encode()), profile=_held_profile(data))
 
 
 def _answer_held(ca, parsed, approval):
