@@ -53,7 +53,7 @@ import { CertificateLintModal } from './CertificateLintModal'
 import { CompactSection, CompactGrid, CompactField } from './DetailCard'
 import { CertificateExtensions, SubjectAltNames } from './CertificateExtensions'
 import { CertDeploySection } from './deploy/CertDeploySection'
-import { cn } from '../lib/utils'
+import { cn, isOnHold } from '../lib/utils'
 import { useClipboard } from '../hooks/useClipboard'
 import { signatureShortName } from '../lib/signatureName'
 import { keyAlgorithmLabel } from '../lib/keyAlgorithms'
@@ -291,7 +291,7 @@ export function CertificateDetails({
               <ArrowsClockwise size={14} />
             </Button>
           )}
-          {onRevoke && canWrite && !cert.revoked && (
+          {onRevoke && canWrite && (!cert.revoked || isOnHold(cert)) && (
             <Button type="button" size="xs" variant="warning-soft" onClick={onRevoke} title={t('certificates.revokeCertificate')} aria-label={t('certificates.revokeCertificate')}>
               <X size={14} />
             </Button>

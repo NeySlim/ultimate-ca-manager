@@ -8,14 +8,14 @@ export default {
         title: 'Tabs',
         items: [
           { label: 'Einstellungen', text: 'TSA aktivieren, signierende CA auswählen und TSA-Richtlinien-OID konfigurieren' },
-          { label: 'Information', text: 'TSA-Endpunkt-URL, Verwendungsbeispiele mit OpenSSL und Anfragestatistiken' },
+          { label: 'TSA-Endpunkt', text: 'TSA-Endpunkt-URL, Verwendungsbeispiele mit OpenSSL und Anfragestatistiken' },
         ]
       },
       {
         title: 'Konfiguration',
         items: [
-          { label: 'Signierende CA', text: 'Die CA, deren privater Schlüssel Zeitstempel-Token signiert, muss eine gültige, nicht abgelaufene CA sein' },
-          { label: 'Richtlinien-OID', text: 'Object Identifier für die TSA-Richtlinie (z.B. 1.2.3.4.1): in jeder Zeitstempel-Antwort enthalten' },
+          { label: 'Signierende CA', text: 'Die CA, deren eigenes Zertifikat Zeitstempel-Token signiert, wenn kein dediziertes Signaturzertifikat gesetzt ist. Eine CA außerhalb ihrer Gültigkeit signiert nicht: /tsa antwortet mit 503. Strenge Prüfprogramme (openssl ts -verify, jarsigner) lehnen von einem CA-Zertifikat signierte Token ab, und die Seite warnt, solange die CA signiert' },
+          { label: 'Richtlinien-OID', text: 'Object Identifier für die TSA-Richtlinie, in jeder Zeitstempel-Antwort enthalten. Der Standard 1.2.3.4.1 ist die Beispiel-OID von OpenSSL, ein Platzhalter, vor dem die Seite warnt: Verwenden Sie eine OID aus dem Arc Ihrer Organisation' },
           { label: 'Aktivieren/Deaktivieren', text: 'Den TSA-Endpunkt ein- oder ausschalten, ohne die Konfiguration zu verlieren' },
           { label: 'Dediziertes Zertifikat erforderlich', text: 'Opt-in: Zeitstempel nicht mit dem CA-Zertifikat selbst signieren, erfordert ein dediziertes End-Entity-Signaturzertifikat mit kritischer timeStamping-EKU (RFC 3161)' },
                   { label: 'Signaturzertifikat (v2.217)', text: 'Signieren Sie Token mit einem dedizierten End-Entity-Zertifikat aus den ausgestellten Zertifikaten (timeStamping-EKU, RSA-, ECDSA- oder ML-DSA-Schlüssel bei UCM; Ed25519- und Ed448-Zertifikate werden nicht angeboten, ML-DSA im FIPS-Modus ebenfalls). Erneuerungen werden automatisch übernommen; ein abgelaufener oder widerrufener Signierer lässt Anfragen mit 503 fehlschlagen und fällt nie auf das CA-Zertifikat zurück' },
@@ -25,20 +25,23 @@ export default {
       {
         title: 'Verwendung',
         items: [
-          { label: 'Anfrage erstellen', text: 'openssl ts -query -data datei.txt -sha256 -no_nonce -out request.tsq' },
+          { label: 'Anfrage erstellen', text: 'openssl ts -query -data datei.txt -sha256 -cert -out request.tsq (-cert fordert das Signierer-Zertifikat in der Antwort an, das openssl ts -verify braucht)' },
           { label: 'An TSA senden', text: 'curl -H "Content-Type: application/timestamp-query" --data-binary @request.tsq https://ihr-server/tsa -o response.tsr' },
-          { label: 'Verifizieren', text: 'openssl ts -verify -data datei.txt -in response.tsr -CAfile ca-chain.pem (RSA- und ECDSA-Signierer). Ein ML-DSA-Token besteht openssl ts -verify nicht: die Signatur mit openssl cms -verify (OpenSSL 3.5 oder neuer) prüfen und dann den Message Imprint mit dem Hash der Datei vergleichen' },
+          { label: 'Verifizieren', text: 'openssl ts -verify -data datei.txt -in response.tsr -CAfile ca-chain.pem (dedizierter RSA- oder ECDSA-Signierer; ein vom CA-Zertifikat signiertes Token scheitert mit „unsuitable certificate purpose“). Ein ML-DSA-Token besteht openssl ts -verify nicht: die Signatur mit openssl cms -verify (OpenSSL 3.5 oder neuer) prüfen und dann den Message Imprint mit dem Hash der Datei vergleichen' },
         ]
       },
     ],
     tips: [
       'TSA-Zeitstempel werden bei der Code-Signierung verwendet, um sicherzustellen, dass Signaturen nach Zertifikatsablauf gültig bleiben',
-      'Der TSA-Endpunkt akzeptiert HTTP POST mit Content-Type: application/timestamp-query',
+      'Der TSA-Endpunkt akzeptiert HTTP POST mit Content-Type: application/timestamp-query (oder application/octet-stream)',
+      'Eine Anfrage mit einer beliebigen Extension wird mit unacceptedExtension abgelehnt, eine fehlerhafte mit badDataFormat (RFC 3161 §2.4.1)',
+      'Token tragen genTime in ganzen Sekunden mit einer erklärten Genauigkeit von 1 Sekunde, und den Message Imprint der Anfrage unverändert',
       'Verwenden Sie SHA-256 oder stärkere Hash-Algorithmen beim Erstellen von Zeitstempel-Anfragen',
       'Keine Authentifizierung erforderlich: der TSA-Endpunkt ist öffentlich zugänglich wie CRL/OCSP',
     ],
     warnings: [
       'Eine gültige signierende CA muss konfiguriert sein, bevor TSA aktiviert wird',
+      'openssl ts -verify und jarsigner lehnen von einem CA-Zertifikat signierte Token ab: RFC 3161 verlangt einen dedizierten Signierer mit kritischer, exklusiver timeStamping-EKU. Erzeugen Sie einen im Tab Einstellungen',
       'Der TSA-Endpunkt ist ein öffentlicher Protokoll-Endpunkt: fügen Sie keine sensiblen Daten in Zeitstempel-Anfragen ein',
     ],
   },
@@ -53,7 +56,7 @@ Der Zeitstempeldienst (TSA) implementiert **RFC 3161** zur Bereitstellung vertra
 
 1. **Client erstellt eine Zeitstempel-Anfrage**: hasht eine Datei mit SHA-256/SHA-512 und erstellt ein \`TimeStampReq\` (ASN.1 DER-kodiert)
 2. **Client sendet Anfrage an TSA**: HTTP POST an den \`/tsa\`-Endpunkt mit \`Content-Type: application/timestamp-query\`
-3. **UCM signiert den Zeitstempel**: die konfigurierte CA signiert den Hash + aktuelle Uhrzeit in ein \`TimeStampResp\`
+3. **UCM signiert den Zeitstempel**: das dedizierte Signaturzertifikat, oder das eigene Zertifikat der konfigurierten CA, wenn keines gesetzt ist, signiert den Hash + aktuelle Uhrzeit in ein \`TimeStampResp\`
 4. **Client empfängt und speichert die Antwort**: die \`.tsr\`-Datei kann später beweisen, dass das Dokument zu diesem Zeitpunkt existierte
 
 ## Konfiguration
@@ -62,39 +65,40 @@ Der Zeitstempeldienst (TSA) implementiert **RFC 3161** zur Bereitstellung vertra
 
 1. **TSA aktivieren**: Den TSA-Server ein- oder ausschalten
 2. **Signierende CA**: Auswählen, welche Zertifizierungsstelle Zeitstempel-Token signiert
-3. **Richtlinien-OID**: Object Identifier für die TSA-Richtlinie (z.B. \`1.2.3.4.1\`), in jeder Zeitstempel-Antwort enthalten
+3. **Richtlinien-OID**: Object Identifier für die TSA-Richtlinie, in jeder Zeitstempel-Antwort enthalten
+4. **Dediziertes TSA-Zertifikat erforderlich**: Opt-in: Zeitstempel nicht mit dem CA-Zertifikat selbst signieren. Ist es aktiv, ist ein dediziertes End-Entity-Signaturzertifikat mit einer **kritischen timeStamping-EKU** (RFC 3161) erforderlich
 
 ### Signierende CA auswählen
 
 Der private Schlüssel der signierenden CA wird zum Signieren jedes Zeitstempel-Tokens verwendet. Best Practices:
 
 - Verwenden Sie eine **dedizierte Sub-CA** für Zeitstempel anstelle Ihrer Root-CA
-- Das CA-Zertifikat sollte die **id-kp-timeStamping** Extended Key Usage (OID 1.3.6.1.5.5.7.3.8) enthalten
-- Stellen Sie sicher, dass das CA-Zertifikat eine **ausreichende Gültigkeit** hat: Zeitstempel müssen über Jahre hinweg verifizierbar bleiben
+- RFC 3161 §2.3 verlangt einen Signierer, dessen einzige, kritische EKU **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8) ist, was ein CA-Zertifikat nicht tragen kann, ohne seine anderen Verwendungen zu verlieren. Von dem CA-Zertifikat signierte Token lehnen strenge Prüfprogramme ab: \`openssl ts -verify\` scheitert mit „unsuitable certificate purpose“ und jarsigner mit „Certificate is not valid for timestamping“. Der Tab Einstellungen warnt, solange das CA-Zertifikat signiert: **Erzeugen Sie dort ein dediziertes Signaturzertifikat** für diese Clients
+- Stellen Sie sicher, dass das CA-Zertifikat eine **ausreichende Gültigkeit** hat: Zeitstempel müssen über Jahre hinweg verifizierbar bleiben. Eine CA außerhalb ihrer Gültigkeit signiert nicht: \`/tsa\` antwortet mit 503 und das Dashboard zeigt die TSA als offline
 - Aktivieren Sie **Dediziertes Zeitstempelzertifikat erforderlich**, um dies beim Signieren zu erzwingen, statt sich auf Konvention zu verlassen
 
 ### Richtlinien-OID
 
 Die Richtlinien-OID identifiziert die TSA-Richtlinie, unter der Zeitstempel ausgestellt werden. Sie wird in jedes \`TimeStampResp\` eingebettet.
 
-- Standard: \`1.2.3.4.1\` (Platzhalter)
+- Standard: \`1.2.3.4.1\` (Platzhalter: die Beispiel-OID von OpenSSL, niemandem zugewiesen; der Tab Einstellungen warnt, solange sie verwendet wird)
 - Für die Produktion registrieren Sie eine OID unter dem Arc Ihrer Organisation oder verwenden Sie eine aus Ihrem CP/CPS
 
-## Informations-Tab
+## Tab TSA-Endpunkt
 
-Der Informations-Tab zeigt:
+Der Tab TSA-Endpunkt zeigt:
 
 - **TSA-Endpunkt-URL**: Zum Kopieren bereite URL für die Client-Konfiguration
 - **Verwendungsbeispiele**: OpenSSL-Befehle zum Erstellen von Anfragen, Senden und Verifizieren von Antworten
-- **Statistiken**: Gesamte verarbeitete Zeitstempel-Anfragen (erfolgreich und fehlgeschlagen)
+- **Statistiken**: Gesamte verarbeitete Zeitstempel-Anfragen (erfolgreich und fehlgeschlagen); jede abgelehnte Anfrage wird als \`tsa.timestamp_rejected\` mit ihrem Fehlercode im Audit protokolliert
 
 ## Verwendungsbeispiele
 
 ### Zeitstempel-Anfrage erstellen
 
 \`\`\`bash
-# Datei hashen und Zeitstempel-Anfrage erstellen
-openssl ts -query -data datei.txt -sha256 -no_nonce -out request.tsq
+# Datei hashen und Zeitstempel-Anfrage erstellen (-cert: Signierer-Zertifikat einbetten)
+openssl ts -query -data datei.txt -sha256 -cert -out request.tsq
 \`\`\`
 
 ### Anfrage an TSA senden
@@ -114,11 +118,11 @@ openssl ts -verify -data datei.txt -in response.tsr \\
   -CAfile ca-chain.pem
 \`\`\`
 
-\`openssl ts -verify\` prüft nur RSA- und ECDSA-Token. Ein ML-DSA-Token wird mit \`openssl cms -verify\` (OpenSSL 3.5 oder neuer) verifiziert; anschließend den Message Imprint mit dem Hash der Datei vergleichen.
+\`openssl ts -verify\` braucht ein dediziertes Signaturzertifikat (ein vom CA-Zertifikat signiertes Token scheitert) und prüft nur RSA- und ECDSA-Token. Ein ML-DSA-Token wird mit \`openssl cms -verify\` (OpenSSL 3.5 oder neuer) verifiziert; anschließend den Message Imprint mit dem Hash der Datei vergleichen.
 
 ### Code-Signierung mit Zeitstempeln
 
-Beim Signieren von Code fügen Sie die TSA-URL hinzu, um sicherzustellen, dass Signaturen nach Zertifikatsablauf gültig bleiben:
+Beim Signieren von Code fügen Sie die TSA-URL hinzu, um sicherzustellen, dass Signaturen nach Zertifikatsablauf gültig bleiben. Konfigurieren Sie zuerst ein dediziertes Signaturzertifikat: jarsigner lehnt ein vom CA-Zertifikat signiertes Token ab („Certificate is not valid for timestamping“).
 
 \`\`\`bash
 # Mit Zeitstempel signieren (osslsigncode)
@@ -151,15 +155,19 @@ curl -s -H "Content-Type: application/timestamp-query" \\
 | Endpunkt | \`/tsa\` (POST) |
 | Content-Type | \`application/timestamp-query\` |
 | Antworttyp | \`application/timestamp-reply\` |
-| Hash-Algorithmen | SHA-256, SHA-384, SHA-512, SHA-1 (Legacy) |
+| Hash-Algorithmen | SHA-256, SHA-384, SHA-512 (SHA-1 und MD5 werden mit badAlg abgelehnt) |
+| Request-Extensions | Keine akzeptiert: jede Extension, kritisch oder nicht, wird mit unacceptedExtension abgelehnt |
+| Fehlerhafte Anfrage | badDataFormat (auch bei angehängten Bytes) |
+| genTime / Genauigkeit | Ganze Sekunden, Genauigkeit 1 Sekunde |
+| Message Imprint | Unverändert aus der Anfrage übernommen |
 | Authentifizierung | Keine (öffentlicher Endpunkt) |
 | Transport | HTTP oder HTTPS |
 
 ## Sicherheitshinweise
 
 - Der TSA-Endpunkt ist **öffentlich**: keine Authentifizierung erforderlich (wie CRL/OCSP)
-- Jede Zeitstempel-Antwort wird mit dem CA-Schlüssel **signiert**: Clients verifizieren die Signatur, um die Authentizität sicherzustellen
-- Verwenden Sie **SHA-256 oder stärkere** Hash-Algorithmen beim Erstellen von Anfragen (SHA-1 wird akzeptiert, aber nicht empfohlen)
+- Jede Zeitstempel-Antwort wird vom dedizierten Signierer oder dem CA-Schlüssel **signiert**: Clients verifizieren die Signatur, um die Authentizität sicherzustellen
+- Verwenden Sie **SHA-256 oder stärkere** Hash-Algorithmen beim Erstellen von Anfragen (SHA-1 wird abgelehnt)
 - Die TSA sieht **nicht** das Originaldokument: nur der Hash wird übertragen
 - Erwägen Sie eine **Ratenbegrenzung**, wenn der TSA-Endpunkt dem Internet ausgesetzt ist
 

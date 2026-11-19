@@ -40,7 +40,7 @@ class FakeHetzner:
                 return _Response(409, {'error': {'message': 'rrset already exists'}})
             self.rrsets[json['name']] = {'ttl': json['ttl'], 'records': list(json['records'])}
             return _Response(201, {'rrset': self.rrsets[json['name']]})
-        m = re.fullmatch(r'/zones/7/rrsets/([^/]+)/TXT(/actions/add_records)?', path)
+        m = re.fullmatch(r'/zones/7/rrsets/([^/]+)/TXT(/actions/(?:add|remove)_records)?', path)
         if not m:
             return _Response(404, {'error': {'message': 'not found'}})
         name, action = m.groups()
@@ -50,6 +50,19 @@ class FakeHetzner:
             if name not in self.rrsets:
                 return _Response(404, {'error': {'message': 'rrset not found'}})
             return _Response(200, {'rrset': self.rrsets[name]})
+        if method == 'POST' and action == '/actions/remove_records':
+            # Values must match exactly; an emptied RRset is deleted
+            rrset = self.rrsets.get(name)
+            if not rrset:
+                return _Response(404, {'error': {'message': 'rrset not found'}})
+            values = [r['value'] for r in rrset['records']]
+            if any(r['value'] not in values for r in json['records']):
+                return _Response(422, {'error': {'message': 'record not found in rrset'}})
+            gone = [r['value'] for r in json['records']]
+            rrset['records'] = [r for r in rrset['records'] if r['value'] not in gone]
+            if not rrset['records']:
+                del self.rrsets[name]
+            return _Response(201, {'action': {'status': self.action_status, 'error': {'message': 'zone locked'}}})
         if method == 'POST' and action:
             rrset = self.rrsets.setdefault(name, {'ttl': json.get('ttl'), 'records': []})
             if 'ttl' in json and rrset['ttl'] != json['ttl']:
@@ -121,3 +134,29 @@ def test_failed_action_is_reported(api):
     api.action_status = 'error'
     ok, msg = _provider().create_txt_record('example.com', '_acme-challenge.example.com', 'tok1')
     assert not ok and 'zone locked' in msg
+
+
+def test_cleanup_removes_only_its_value(api):
+    api.rrsets['_acme-challenge'] = {'ttl': 60, 'records': [{'value': '"apex"'}, {'value': '"wild"'}]}
+    ok, msg = _provider().delete_txt_record('example.com', '_acme-challenge.example.com', 'apex')
+    assert ok, msg
+    assert _values(api) == ['"wild"']
+    assert ('POST', '/zones/7/rrsets/_acme-challenge/TXT/actions/remove_records',
+            {'records': [{'value': '"apex"'}]}) in api.calls
+    assert not [c for c in api.calls if c[0] == 'DELETE']
+
+
+def test_cleanup_of_the_last_value_drops_the_rrset_and_succeeds_twice(api):
+    api.rrsets['_acme-challenge'] = {'ttl': 60, 'records': [{'value': '"apex"'}]}
+    for _ in range(2):
+        ok, msg = _provider().delete_txt_record('example.com', '_acme-challenge.example.com', 'apex')
+        assert ok, msg
+    assert api.rrsets == {}
+
+
+def test_cleanup_of_an_unreadable_rrset_writes_nothing(api):
+    api.rrsets['_acme-challenge'] = {'ttl': 60, 'records': [{'value': '"apex"'}]}
+    api.get_status = 429
+    ok, msg = _provider().delete_txt_record('example.com', '_acme-challenge.example.com', 'apex')
+    assert not ok and 'rate limited' in msg
+    assert not [c for c in api.calls if c[0] in ('POST', 'DELETE')]

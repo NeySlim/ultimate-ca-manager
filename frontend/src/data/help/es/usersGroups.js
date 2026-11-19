@@ -56,7 +56,7 @@ Administre cuentas de usuario, grupos y asignaciones de roles. Los usuarios se a
 Alterne el estado de un usuario sin eliminar su cuenta.
 
 ### Restablecer contraseña
-Los administradores pueden restablecer la contraseña de cualquier usuario. Se le pedirá al usuario que la cambie en el próximo inicio de sesión.
+Los administradores pueden restablecer la contraseña de cualquier usuario. No se le pide al usuario que la cambie en el próximo inicio de sesión: entréguele la nueva contraseña y pídale que la cambie en Mi cuenta. **¿Olvidó su contraseña?** en la página de inicio de sesión no envía ningún enlace a una cuenta vinculada a un proveedor SSO que no tiene contraseña local: solo su proveedor la abre.
 
 ### Llaves de seguridad
 En la ficha de un usuario, los administradores ven sus llaves de seguridad y pueden desactivar o eliminar una, normalmente una llave perdida, que de lo contrario aún permite iniciar sesión sin contraseña. Eliminar el último segundo factor de una cuenta que exige uno pide una segunda confirmación; el usuario registra entonces de nuevo un factor en el próximo inicio de sesión.
@@ -80,13 +80,14 @@ Cada usuario puede tener múltiples claves API para acceso programático. Las cl
 ### Permisos de grupo
 Los permisos efectivos de un usuario son la **unión** de:
 - Los permisos de su rol asignado directamente
+- Los permisos de su rol personalizado, si tiene alguno
 - Los permisos otorgados por cada grupo al que pertenece
 
 ## Roles
 
 ### Roles del sistema
 - **Admin**: Acceso completo a todas las funciones
-- **Operator**: Puede gestionar certificados, CAs, CSRs pero no la configuración del sistema
+- **Operator**: Puede gestionar certificados, CAs, CSRs, ACME, SSH y la configuración del sistema; plantillas y grupos de solo lectura, sin acceso a usuarios ni RBAC
 - **Auditor**: Acceso de solo lectura a todos los datos operativos para cumplimiento y auditoría
 - **Viewer**: Acceso de solo lectura a certificados, CAs y plantillas
 
@@ -102,6 +103,8 @@ La columna **Origen** indica de dónde proviene cada usuario:
 - **LDAP / OAuth2 / SAML**: provisionado automáticamente en el primer inicio de sesión SSO; el nombre del proveedor de origen aparece en la insignia (p. ej. \`LDAP · Corporate AD\`).
 
 Desde v2.133, los roles modificados manualmente en UCM para usuarios SSO se **conservan** entre inicios de sesión, salvo que **«Sincronizar rol en cada inicio de sesión»** esté activado en el proveedor (ver **Configuración → SSO**).
+
+**Vincular a SSO** asocia una cuenta a un proveedor; en una cuenta ya vinculada, **Cambiar proveedor o restablecer identidad SSO** la traslada a otro proveedor o borra su identidad SSO, tras una confirmación. El siguiente inicio de sesión mediante ese proveedor con el nombre de usuario o correo de la cuenta vincula la nueva identidad; la contraseña que tenga la cuenta se conserva salvo que se marque la casilla que la elimina, tras lo cual ningún inicio de sesión con contraseña abre la cuenta, y a una cuenta sin contraseña no se le pide establecer una. **Desvincular SSO** convierte de nuevo la cuenta en local.
 `
   }
 }

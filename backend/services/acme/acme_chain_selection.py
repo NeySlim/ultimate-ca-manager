@@ -2,18 +2,15 @@
 from __future__ import annotations
 
 import logging
-import re
 from typing import Callable, List, Optional, Tuple
 
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
+from services.acme.link_header import link_values
+
 logger = logging.getLogger(__name__)
 
-_ALTERNATE_LINK_RE = re.compile(
-    r'<([^>]+)>\s*;\s*rel="alternate"',
-    re.IGNORECASE,
-)
 
 
 def collect_link_header_values(headers) -> List[str]:
@@ -38,8 +35,10 @@ def parse_link_rel_alternate(link_header: str | None) -> List[str]:
         return []
     urls: List[str] = []
     seen = set()
-    for match in _ALTERNATE_LINK_RE.finditer(link_header):
-        url = match.group(1).strip()
+    for url, params in link_values(link_header):
+        # RFC 8288 §3.3: rel is a space-separated list, quoted or not
+        if 'alternate' not in (params.get('rel') or '').lower().split():
+            continue
         if url and url not in seen:
             seen.add(url)
             urls.append(url)

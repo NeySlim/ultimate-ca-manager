@@ -94,6 +94,14 @@ def _audit(action, req, *, success=True, extra=None):
         details=details, user_id=_user_id(), success=success)
 
 
+def _requested_certificate(req):
+    """The certificate a request names, or None once its number belongs to another one."""
+    cert = db.session.get(Certificate, req.cert_id)
+    if cert is None or cert.refid != req.cert_refid:
+        return None
+    return cert
+
+
 @bp.route('/api/v2/certificates/<int:cert_id>/key-recovery', methods=['POST'])
 @require_auth(['write:key_recovery'])
 def request_key_recovery(cert_id):
@@ -156,6 +164,9 @@ def approve_key_recovery(rid):
                 extra={'reason': 'dual_control'})
         return error_response('Dual control: the approver must be different from the requester', 403)
 
+    if _requested_certificate(req) is None:
+        return error_response('The certificate this request was opened on no longer exists', 410)
+
     data = request.get_json(silent=True) or {}
     req.status = STATUS_APPROVED
     req.decided_by = _username()
@@ -208,7 +219,7 @@ def recover_key(rid):
         return error_response(pw_err, 400)
     legacy = legacy_flag(data.get('legacy'))  # 3DES/SHA-1 profile (#331)
 
-    cert = db.session.get(Certificate, req.cert_id)
+    cert = _requested_certificate(req)
     if not cert or not cert.prv:
         return error_response('The certificate or its archived key no longer exists', 410)
 

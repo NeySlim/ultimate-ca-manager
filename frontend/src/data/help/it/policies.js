@@ -19,7 +19,7 @@ export default {
           { label: 'Validità massima', text: 'Durata massima del certificato in giorni' },
           { label: 'Tipi di chiave consentiti', text: 'Limita gli algoritmi e le dimensioni delle chiavi utilizzabili, inclusi ML-DSA-44, ML-DSA-65 e ML-DSA-87; la modalità FIPS rimuove ML-DSA' },
           { label: 'Schemi di firma consentiti', text: 'PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA o SLH-DSA, confrontati con la chiave della CA firmataria. Gli hash di firma consentiti non vincolano una CA ML-DSA, che firma senza un digest separato' },
-          { label: 'Restrizioni SAN', text: 'Limita il numero di SAN e imponi pattern di nomi DNS' },
+          { label: 'Restrizioni SAN', text: 'Limita il numero di nomi DNS (gli altri tipi di SAN non sono conteggiati); un pattern DNS per policy (*.company.com, o company.com per includere anche il dominio stesso) limita la policy ai nomi corrispondenti' },
           { label: 'Hash di firma consentiti', text: 'SHA-256, SHA-384 o SHA-512; se nessuno è selezionato, tutti sono consentiti. Quando nessuno ha scelto l\'hash, si applica quello predefinito se consentito, altrimenti il più debole tra quelli consentiti. Il modulo di emissione propone solo i tipi di chiave consentiti, Crea CA solo i tipi di chiave e gli hash consentiti' },
         ]
       },
@@ -33,7 +33,7 @@ export default {
       },
     ],
     tips: [
-      'Numero di priorità più basso = precedenza più alta. Usa 1–10 per le politiche critiche.',
+      'Numero di priorità più basso = precedenza più alta per l\'approvazione. Le regole di ogni policy nell\'ambito si applicano insieme, prevale la più rigida.',
       'Limita le politiche a CA specifiche per un controllo granulare.',
       'Abilita le notifiche per individuare presto le violazioni delle politiche.',
     ],
@@ -84,7 +84,7 @@ Limita gli algoritmi e le dimensioni delle chiavi utilizzabili:
 **Hash di firma consentiti** limita l'hash di firma allo stesso modo (SHA-256, SHA-384, SHA-512); se nessuno è selezionato, tutti sono consentiti. Quando nessuno ha scelto l'hash, si applica quello predefinito se consentito, altrimenti il più debole tra quelli consentiti. Il modulo di emissione propone solo i tipi di chiave consentiti, Crea CA solo i tipi di chiave e gli hash consentiti.
 
 ### Restrizioni SAN
-- **Massimo nomi DNS**: Limita il numero di Subject Alternative Names
+- **Massimo nomi DNS**: Limita il numero di nomi DNS nel SAN; le voci IP, e-mail e URI non sono conteggiate
 - **Pattern DNS**: Limita a pattern di dominio specifici (es. \`*.company.com\`)
 
 ## Flussi di approvazione
@@ -105,7 +105,7 @@ Le politiche vengono valutate in ordine di priorità. Numeri più bassi hanno pr
 - **10–20**: Conformità standard (TLS pubblico, PKI interna)
 - **20+**: Impostazioni predefinite permissive
 
-Quando più politiche corrispondono a una richiesta di certificato, la politica con la priorità più alta (numero più basso) prevale.
+Quando più politiche corrispondono a una richiesta di certificato, la politica con la priorità più alta (numero più basso) decide l'approvazione; le regole di ogni politica corrispondente si applicano insieme (la validità massima più piccola, l'intersezione dei tipi di chiave consentiti, e così via).
 
 ## Ambito
 
@@ -117,14 +117,7 @@ La politica si applica solo ai certificati emessi dalla CA selezionata. Usa per 
 
 ## Politiche predefinite
 
-UCM include 5 politiche predefinite che riflettono le best practice PKI del mondo reale:
-- **Firma del codice** (priorità 5): Chiavi robuste, approvazione richiesta
-- **Certificati wildcard** (priorità 8): Approvazione richiesta, max 10 SAN
-- **TLS server web** (priorità 10): Conforme al CA/B Forum, max 397 giorni
-- **Automazione a breve durata** (priorità 15): Stile ACME 90 giorni
-- **PKI interna** (priorità 20): 730 giorni, regole flessibili
-
-> 💡 Personalizza o disabilita le politiche predefinite per adattarle ai requisiti della tua organizzazione.
+Una nuova installazione non ha alcuna politica: crea quelle di cui la tua organizzazione ha bisogno. Un'installazione aggiornata da una release precedente può elencare cinque politiche di esempio (Firma del codice, Certificati wildcard, TLS server web, Automazione a breve durata, PKI interna), tutte disabilitate.
 `
   }
 }

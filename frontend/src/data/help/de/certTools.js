@@ -7,9 +7,9 @@ export default {
       {
         title: 'Verfügbare Werkzeuge',
         items: [
-          { label: 'SSL-Checker', text: 'Verbindung zu einem Remote-Host herstellen und dessen SSL/TLS-Zertifikatskette prüfen' },
+          { label: 'SSL-Checker', text: 'Verbindung zu einem Remote-Host herstellen und das Zertifikat prüfen, das er präsentiert (nur das Endzertifikat, nicht die Kette)' },
           { label: 'CSR-Decoder', text: 'Einen CSR im PEM-Format einfügen, um Betreff, SANs und Schlüsselinformationen anzuzeigen' },
-          { label: 'Zertifikats-Decoder', text: 'Ein Zertifikat im PEM-Format einfügen, um alle Felder zu prüfen' },
+          { label: 'Zertifikats-Decoder', text: 'Ein Zertifikat im PEM-Format einfügen, um Betreff, Aussteller, Gültigkeit, Schlüssel, SANs, Key Usages und Fingerabdrücke zu prüfen; CDP, AIA und Richtlinien werden nicht angezeigt' },
           { label: 'Schlüsselabgleich', text: 'Überprüfen, ob Zertifikat, CSR und privater Schlüssel zusammengehören' },
           { label: 'Konverter', text: 'Zwischen PEM, DER, PKCS#12 und PKCS#7 konvertieren' },
         ]
@@ -45,15 +45,16 @@ SSL/TLS-Zertifikat eines Remote-Servers prüfen:
 
 1. Geben Sie den **Hostnamen** ein (z.B. \`google.com\`)
 2. Ändern Sie optional den **Port** (Standard: 443)
-3. Klicken Sie auf **Prüfen**
+3. Klicken Sie auf **SSL prüfen**
 
 Die Ergebnisse umfassen:
 - Zertifikatsbetreff und Aussteller
 - Gültigkeitsdaten
 - SANs (Subject Alternative Names)
 - Schlüsseltyp und -größe
-- Vollständige Zertifikatskette
 - TLS-Protokollversion
+
+Gelesen wird nur das Zertifikat, das der Server präsentiert, nicht der Rest seiner Kette.
 
 ## CSR-Decoder
 
@@ -80,7 +81,7 @@ Zeigt: Betreff, Aussteller, SANs, Gültigkeit, Seriennummer, Key Usage, Erweiter
 1. Fügen Sie das **Zertifikat**-PEM ein
 2. Fügen Sie den **privaten Schlüssel**-PEM ein (optional verschlüsselt. Passwort angeben)
 3. Fügen Sie optional einen **CSR**-PEM ein
-4. Klicken Sie auf **Abgleichen**
+4. Klicken Sie auf **Schlüssel abgleichen**
 
 UCM vergleicht die öffentlichen Schlüssel (RSA, EC, EdDSA, ML-DSA). Eine Übereinstimmung bestätigt ein gültiges Paar. Ein privater ML-DSA-Schlüssel muss seinen Seed enthalten: Eine Schlüsseldatei mit nur der expandierten Form wird abgelehnt.
 

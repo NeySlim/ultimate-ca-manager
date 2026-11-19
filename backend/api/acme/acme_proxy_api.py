@@ -10,7 +10,6 @@ from flask import Blueprint, request, jsonify, make_response
 import base64
 import json
 import logging
-from datetime import datetime
 
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
@@ -20,14 +19,18 @@ from models import db, AcmeClientOrder, Certificate
 from services.acme.acme_client_service import AcmeClientService
 from services.acme.acme_proxy_service import (
     AcmeProxyService,
+    ProxyBadCsrError,
     ProxyChallengeIdentifierError,
     ProxyDns01OnlyError,
+    ProxyInvalidProfileError,
+    ProxySingleTxtValueError,
     ProxyOrderNotReadyError,
     ProxyResourceNotFoundError,
 )
 from services.cert_service import CertificateService
 from services.acme.acme_proxy_account import (
     ProxyEndpointNotConfiguredError,
+    normalize_proxy_slug,
     resolve_proxy_by_slug,
 )
 from services.acme import AcmeService, ari
@@ -43,6 +46,8 @@ from services.acme import domain_match
 from services.acme.jws_problems import jws_problem
 from services.acme.identifiers import validate_acme_identifier
 from services.acme.jwk_thumbprint import jwk_thumbprint_or_none
+from services.acme.requested_validity import parse_order_time
+from services.acme.upstream_problem import UpstreamProblem
 from utils.acme_csr import decode_csr_b64
 from utils.acme_public_url import get_acme_public_origin, get_acme_proxy_public_base
 
@@ -69,6 +74,27 @@ def _require_jose_content_type():
             415,
         )
     return None
+
+
+_DIRECTORY_ENDPOINTS = frozenset({'acme_proxy.proxy_directory', 'acme_proxy.proxy_directory_slug'})
+
+
+@acme_proxy_bp.after_request
+def _link_directory(response):
+    """RFC 8555 §7.1: every resource but the directory links it with rel="index",
+    problems included; links the view set (up, alternate) are kept."""
+    if request.endpoint in _DIRECTORY_ENDPOINTS:
+        return response
+    if any('rel="index"' in value for value in response.headers.getlist('Link')):
+        return response
+    slug = (request.view_args or {}).get('slug')
+    if slug is not None:
+        try:
+            slug = normalize_proxy_slug(slug)
+        except ValueError:
+            return response  # no directory to link, and the raw path never reaches a header
+    response.headers.add('Link', f'<{_proxy_base_url(slug)}/directory>;rel="index"')
+    return response
 
 
 # ==================== Helpers ====================
@@ -111,6 +137,26 @@ def proxy_error(error_type, detail, status_code=400):
     resp = make_response(jsonify(error_data), status_code)
     resp.headers['Content-Type'] = 'application/problem+json'
     resp.headers['Replay-Nonce'] = _get_nonce()
+    return resp
+
+
+def upstream_problem_error(exc):
+    """The upstream CA's problem, status and Retry-After as the client sees them."""
+    logger.warning("ACME proxy upstream refusal: %s", exc)
+    body, status = exc.client_problem()
+    resp = make_response(jsonify(body), status)
+    resp.headers['Content-Type'] = 'application/problem+json'
+    resp.headers['Replay-Nonce'] = _get_nonce()
+    if exc.retry_after:
+        resp.headers['Retry-After'] = exc.retry_after
+    return resp
+
+
+def _relay_retry_after(resp, svc):
+    """Copy the upstream Retry-After of the last order or authz read (RFC 8555 §7.1.3)."""
+    value = getattr(svc, 'retry_after', None)
+    if isinstance(value, str) and value:
+        resp.headers['Retry-After'] = value
     return resp
 
 
@@ -335,8 +381,8 @@ def new_nonce(slug=None):
     except RuntimeError as e:
         logger.error(f"ACME proxy new-nonce error: {e}")
         return proxy_error("serverInternal", "Failed to issue nonce", 500)
-    resp = make_response('', 200)
-    resp.status_code = 204 if request.method == 'HEAD' else 200
+    # RFC 8555 §7.2: HEAD answers 200, GET 204
+    resp = make_response('', 200 if request.method == 'HEAD' else 204)
     resp.headers['Replay-Nonce'] = nonce
     resp.headers['Cache-Control'] = 'no-store'
     return resp
@@ -360,15 +406,19 @@ def _unknown_slug_error(slug):
     return None
 
 
-def _account_response(account, slug, status_code):
-    """Account object (RFC 8555 §7.1.2) with its URL in Location."""
+def _account_response(account, slug, status_code, eab_data=None):
+    """Account object (RFC 8555 §7.1.2) with its URL in Location; a new account
+    echoes the binding it was created with (§7.3.4)."""
     acct_url = f"{_proxy_base_url(slug)}/acct/{account.account_id}"
-    resp = proxy_response({
+    data = {
         "status": account.status,
         "contact": account.contact_list,
         "termsOfServiceAgreed": account.terms_of_service_agreed,
         "orders": f"{acct_url}/orders"
-    }, status_code)
+    }
+    if eab_data:
+        data["externalAccountBinding"] = eab_data
+    resp = proxy_response(data, status_code)
     resp.headers['Location'] = acct_url
     return resp
 
@@ -450,7 +500,8 @@ def new_account(slug=None):
 
         if not is_new:
             require_valid_account(account)
-        return _account_response(account, slug, 201 if is_new else 200)
+        return _account_response(account, slug, 201 if is_new else 200,
+                                 eab_data if is_new else None)
     except AccountRequestError as e:
         return _problem(e)
     except Exception as e:
@@ -620,9 +671,8 @@ def new_order(slug=None):
             )
 
     try:  # malformed dates and upstream failures are mapped below
-        not_before = payload.get('notBefore')
-        if not_before:
-            not_before = datetime.fromisoformat(not_before.replace('Z', '+00:00'))
+        not_before, not_after = (parse_order_time(payload.get(field), field)
+                                 for field in ('notBefore', 'notAfter'))
 
         replaces = payload.get('replaces')
         if replaces is not None and (
@@ -636,9 +686,11 @@ def new_order(slug=None):
         svc = get_proxy_service(slug)
         order_data, order_id = svc.new_order(
             identifiers,
-            not_before,
+            not_before=not_before,
+            not_after=not_after,
             client_thumbprint=client_thumbprint,
             replaces=replaces,
+            profile=payload.get('profile'),
         )
 
         order_url = f"{_proxy_base_url(slug)}/order/{order_id}"
@@ -648,10 +700,16 @@ def new_order(slug=None):
 
     except ProxyDns01OnlyError as e:
         return proxy_error('unsupportedIdentifier', str(e), 400)
+    except ProxySingleTxtValueError as e:
+        return proxy_error('rejectedIdentifier', str(e), 400)
+    except ProxyInvalidProfileError as e:
+        return proxy_error('invalidProfile', str(e), 400)
     except ValueError as e:
         return proxy_error("malformed", str(e))
     except ProxyEndpointNotConfiguredError as e:
         return proxy_error("malformed", str(e), 404)
+    except UpstreamProblem as e:
+        return upstream_problem_error(e)
     except RuntimeError as e:
         logger.warning(f"ACME proxy new-order: {e}")
         return proxy_error("serverInternal", "Failed to create order", 500)
@@ -687,7 +745,9 @@ def authz(authz_id, slug=None):
             return proxy_error("malformed", "Authorization not found", 404)
 
         data, _ = result
-        return proxy_response(data)
+        return _relay_retry_after(proxy_response(data), svc)
+    except UpstreamProblem as e:
+        return upstream_problem_error(e)
     except PermissionError as e:
         return proxy_error("unauthorized", str(e), 403)
     except ProxyResourceNotFoundError as e:
@@ -722,7 +782,9 @@ def challenge(chall_id, slug=None):
         resp = proxy_response(data)
         if link_header:
             resp.headers['Link'] = link_header
-        return resp
+        return _relay_retry_after(resp, svc)
+    except UpstreamProblem as e:
+        return upstream_problem_error(e)
     except PermissionError as e:
         return proxy_error("unauthorized", str(e), 403)
     except ProxyResourceNotFoundError as e:
@@ -764,7 +826,9 @@ def get_order(order_id, slug=None):
         order_url = f"{_proxy_base_url(slug)}/order/{order_id}"
         resp = proxy_response(data)
         resp.headers['Location'] = order_url
-        return resp
+        return _relay_retry_after(resp, svc)
+    except UpstreamProblem as e:
+        return upstream_problem_error(e)
     except PermissionError as e:
         return proxy_error("unauthorized", str(e), 403)
     except ProxyResourceNotFoundError as e:
@@ -816,13 +880,17 @@ def finalize(order_id, slug=None):
         order_url = f"{_proxy_base_url(slug)}/order/{order_id}"
         resp = proxy_response(data)
         resp.headers['Location'] = order_url
-        return resp
+        return _relay_retry_after(resp, svc)
+    except UpstreamProblem as e:
+        return upstream_problem_error(e)
     except PermissionError as e:
         return proxy_error("unauthorized", str(e), 403)
     except ProxyResourceNotFoundError as e:
         return proxy_error("malformed", str(e), 404)
     except ProxyOrderNotReadyError as e:
         return proxy_error("orderNotReady", str(e), 403)
+    except ProxyBadCsrError as e:
+        return proxy_error("badCSR", str(e), 400)
     except ValueError as e:
         return proxy_error("malformed", str(e), 400)
     except Exception as e:
@@ -855,6 +923,8 @@ def cert(cert_id, slug=None):
         if link_header:
             resp.headers['Link'] = link_header
         return resp
+    except UpstreamProblem as e:
+        return upstream_problem_error(e)
     except PermissionError as e:
         return proxy_error("unauthorized", str(e), 403)
     except ProxyResourceNotFoundError as e:
@@ -872,10 +942,10 @@ def cert(cert_id, slug=None):
 def renewal_info(certid, slug=None):
     """ACME Renewal Information (ARI) — RFC 9773 §4.2.
 
-    Unauthenticated GET. Serves the suggested renewal window for a
-    certificate issued through this proxy. The certificate is looked up
-    locally in the UCM database (proxy-issued certs are stored on import),
-    so there is no upstream round-trip and no upstream host leak.
+    Unauthenticated GET. A certificate issued through the proxy gets the
+    window of the upstream CA that issued it, with its Retry-After; the
+    local window is served when that CA announces no renewalInfo, gives no
+    usable answer, or the certificate is revoked here.
     """
     from models import SystemConfig
 
@@ -884,22 +954,47 @@ def renewal_info(certid, slug=None):
         return proxy_error('malformed', 'Malformed certificate identifier', 400)
 
     aki_hex, serial_int = parsed
-    cert = ari.find_certificate(aki_hex, serial_int)
-    if cert is None:
+    rows = ari.find_certificates(aki_hex, serial_int)
+    if not rows:
         return proxy_error('malformed', 'Unknown certificate', 404)
+    # Each proxy download stores the certificate again: a revocation may be on any row
+    cert = ari.renewal_row(rows)
 
-    days_cfg = SystemConfig.query.filter_by(key='auto_renewal_days').first()
-    try:
-        renew_before_days = int(days_cfg.value) if days_cfg and days_cfg.value else None
-    except (TypeError, ValueError):
-        renew_before_days = None
-
-    data = ari.build_renewal_info(cert, renew_before_days)
+    relayed = None if cert.revoked else _upstream_renewal_info(rows, slug)
+    if relayed:
+        data, retry_after = relayed
+    else:
+        days_cfg = SystemConfig.query.filter_by(key='auto_renewal_days').first()
+        try:
+            renew_before_days = int(days_cfg.value) if days_cfg and days_cfg.value else None
+        except (TypeError, ValueError):
+            renew_before_days = None
+        data, retry_after = ari.build_renewal_info(cert, renew_before_days), ari.RETRY_AFTER_SECONDS
     resp = make_response(jsonify(data), 200)
     resp.headers['Content-Type'] = 'application/json'
-    resp.headers['Retry-After'] = str(ari.RETRY_AFTER_SECONDS)
-    resp.headers['Cache-Control'] = f'public, max-age={ari.RETRY_AFTER_SECONDS}'
+    resp.headers['Retry-After'] = str(retry_after)
+    resp.headers['Cache-Control'] = f'public, max-age={retry_after}'
     return resp
+
+
+def _upstream_renewal_info(rows, slug):
+    """RenewalInfo of the upstream CA account that issued the certificate stored as ``rows``
+    through the proxy, else None; asked with the certID of the stored certificate, DER serial
+    bytes included (RFC 9773 §4.1)."""
+    order = (AcmeClientOrder.query
+             .filter(AcmeClientOrder.is_proxy_order.is_(True),
+                     AcmeClientOrder.certificate_id.in_([row.id for row in rows]))
+             .order_by(AcmeClientOrder.id.desc()).first())
+    if order is None or not order.acme_client_account_id:
+        return None
+    cert = next(row for row in rows if row.id == order.certificate_id)
+    try:
+        certid = AcmeClientService.certificate_identifier(cert)
+        svc = AcmeProxyService(_proxy_base_url(slug), account_id=order.acme_client_account_id)
+        return svc.upstream_renewal_info(certid)
+    except Exception as exc:  # the local window still answers
+        logger.warning("ACME proxy renewalInfo relay skipped for certificate %s: %s", cert.id, exc)
+        return None
 
 
 @_dual_route('/revoke-cert', methods=['POST'], endpoint='proxy_revoke_cert')
@@ -912,9 +1007,11 @@ def revoke_cert(slug=None):
         return proxy_error("malformed", "Missing 'certificate' in payload")
 
     try:
-        reason = AcmeClientService.validate_revocation_reason(
-            payload.get('reason', 0)
-        )
+        reason = AcmeClientService.validate_revocation_reason(payload.get('reason', 0))
+    except ValueError:
+        return proxy_error("badRevocationReason",
+                           "Revocation reason must be an integer from 0 to 10, excluding 7 and 8", 400)
+    try:
         cert_der = _decode_b64url(payload['certificate'])
         cert_obj = x509.load_der_x509_certificate(cert_der)
     except ValueError as exc:
@@ -953,32 +1050,15 @@ def revoke_cert(slug=None):
         upstream_response = svc.revoke_certificate(cert_obj, reason)
         status_code = upstream_response.status_code
         if not 200 <= status_code < 300:
-            logger.warning(
-                "ACME proxy upstream revocation failed with HTTP %s",
-                status_code,
-            )
-            return proxy_error(
-                "serverInternal",
-                "Upstream certificate revocation failed",
-                status_code,
-            )
+            return upstream_problem_error(UpstreamProblem.from_response(upstream_response))
 
-        if not cert.revoked:
+        from utils.revocation_reasons import REASON_BY_CODE, revocable
+        local_reason = REASON_BY_CODE[reason]
+        if revocable(cert, local_reason):  # a hold may be made final
             try:
                 CertificateService.revoke_certificate(
                     cert_id=cert.id,
-                    reason={
-                        0: 'unspecified',
-                        1: 'keyCompromise',
-                        2: 'cACompromise',
-                        3: 'affiliationChanged',
-                        4: 'superseded',
-                        5: 'cessationOfOperation',
-                        6: 'certificateHold',
-                        8: 'removeFromCRL',
-                        9: 'privilegeWithdrawn',
-                        10: 'aACompromise',
-                    }[reason],
+                    reason=local_reason,
                     username='acme_proxy',
                 )
             except Exception as exc:
@@ -989,9 +1069,9 @@ def revoke_cert(slug=None):
                 )
 
         response = make_response('', status_code)
+        del response.headers['Content-Type']  # RFC 8555 §7.6: no body, no media type
         response.headers['Replay-Nonce'] = _get_nonce()
         response.headers['Cache-Control'] = 'no-store'
-        response.headers['Link'] = f'<{_proxy_base_url(slug)}/directory>;rel="index"'
         return response
     except ProxyEndpointNotConfiguredError as exc:
         return proxy_error("malformed", str(exc), 404)

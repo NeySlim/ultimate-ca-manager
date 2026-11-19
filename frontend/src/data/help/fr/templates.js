@@ -23,10 +23,12 @@ export default {
           { label: 'Dupliquer', text: 'Cloner un modèle existant et le modifier' },
           { label: 'Afficher système', text: 'Masquer les modèles intégrés pour ne travailler qu\'avec les vôtres. Mémorisé par navigateur' },
           { label: 'Désactiver', text: 'Un modèle désactivé, intégré ou non, n\'est plus proposé par le formulaire Émettre un certificat ni à l\'auto-inscription Windows, et affiche un badge Inactif. Activer le remet en service. Un modèle intégré peut être désactivé, pas modifié : dupliquez-le pour le changer' },
-          { label: 'Importer/Exporter', text: 'Partager des modèles sous forme de fichiers JSON entre instances UCM, un modèle ou plusieurs dans un fichier' },
+          { label: 'Importer/Exporter', text: 'Partager des modèles sous forme de fichiers JSON entre instances UCM : la page exporte un modèle à la fois, et un fichier d\'import peut en contenir un ou plusieurs' },
           { label: 'Type de clé', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 ou EC-P521, avec un condensat SHA-256, SHA-384 ou SHA-512, ou ML-DSA-44, ML-DSA-65 ou ML-DSA-87. Le condensat est le hachage de signature de la CA émettrice, pas celui de la clé finale : il s\'applique toujours à une clé finale ML-DSA sous une CA RSA ou EC, et une CA ML-DSA l\'ignore' },
+          { label: "Préférence de condensat (v2.251)", text: "Tout chemin qui émet depuis le template (formulaire d'émission, Sign CSR, ACME, SCEP, WSTEP, signataire TSA ; EST n'utilise aucun modèle) signe avec son condensat, relevé à celui qui correspond à la clé de l'AC : SHA-384 pour P-384, SHA-512 pour P-521. Quand une politique l'interdit, le condensat plus fort le plus proche autorisé signe à la place, et le résultat indique « Signature digest X replaced by Y by policy »" },
           { label: 'qcStatements', text: 'Déclarations ETSI EN 319 412-5 facultatives ajoutées à chaque certificat émis depuis le modèle : QcCompliance, QcType (signature, cachet ou site web), QcSSCD, QcPDS (URL HTTPS et langue à deux lettres), QcRetentionPeriod, QcLimitValue, QcCClegislation (pour un certificat qualifié selon un cadre juridique hors UE) et l\'identifiant de sémantique. Non appliquées à l\'émission EST, WSTEP ou mTLS, et une extension qcStatements présente dans une CSR est ignorée. QcIdentMethod, QcQSCDlegislation et les déclarations PSD2 ne sont pas prises en charge' },
           { label: 'OID de politique', text: 'OID de politique de certificat supplémentaires (par exemple les politiques ETSI QCP-n, QCP-l, QCP-n-qscd, QCP-l-qscd et QCP-w), ajoutés après la politique propre à la CA' },
+          { label: 'Extensions personnalisées', text: 'Extensions qu\'UCM ne modélise pas, chacune un OID, un indicateur critique et la valeur DER en hexadécimal, ajoutées telles quelles à chaque certificat émis depuis le modèle (formulaire d\'émission, signature de CSR, ACME, SCEP, WSTEP, approbations ; les renouvellements les gardent). Le formulaire d\'émission peut en ajouter ou remplacer celle de même OID. Les extensions qu\'UCM pose lui-même sont refusées : passez par leurs propres réglages. Un client qui ne reconnaît pas une extension critique rejette le certificat' },
           { label: 'Brainpool', text: 'EC-BP256, EC-BP384 et EC-BP512 (RFC 5639, regroupés sous Brainpool dans les listes de types de clé, masqués en mode FIPS). OpenSSL et Windows lisent leurs chaînes et signatures, mais Chrome, Firefox, Go, rustls, GnuTLS et Java sans Bouncy Castle les refusent pour TLS, et Windows Schannel ne les active pas par défaut. Sur un HSM, seuls les fournisseurs PKCS#11 les conservent' },
         ]
       },
@@ -75,7 +77,7 @@ Les autorités de certification ne se créent pas à partir de modèles : créez
 4. Configurez les **valeurs par défaut du sujet** (O, OU, C, ST, L, CN, Email). Sur les certificats Email (S/MIME) et Serveur + Client (Combiné), l'Email devient aussi un SAN
 5. Sélectionnez les indicateurs d'**utilisation de la clé**
 6. Sélectionnez les valeurs d'**utilisation étendue de la clé** parmi les usages connus du serveur (Smartcard Logon, Time Stamping, Microsoft RDP et autres)
-7. Définissez le **type de clé** (RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384, EC-P521 ou ML-DSA-44/65/87), le condensat et la **période de validité par défaut** en jours. Le condensat est le hachage de signature de la CA émettrice : il s'applique donc toujours à une clé ML-DSA sous une CA RSA ou EC ; une CA ML-DSA l'ignore
+7. Définissez le **type de clé** (RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384, EC-P521, Brainpool EC-BP256/384/512 ou ML-DSA-44/65/87), le condensat et la **période de validité par défaut** en jours. Le condensat est le hachage de signature de la CA émettrice : il s'applique donc toujours à une clé ML-DSA sous une CA RSA ou EC ; une CA ML-DSA l'ignore
 8. Cliquez sur **Créer**
 
 ## Utiliser les modèles
@@ -104,6 +106,17 @@ Un modèle peut **épingler** les champs organisationnels du sujet : **C, ST, L,
 - Les modèles avec champs épinglés affichent un badge **Épinglé**, et les valeurs épinglées apparaissent dans le panneau de détails du modèle
 
 Utilisez cette fonction pour garantir une identité organisationnelle uniforme (p. ex. un \`O\` et un \`C\` fixes) sur un parc autoenrôlé, indépendamment de ce que chaque client Windows soumet.
+
+## Extensions personnalisées
+
+Un modèle peut ajouter des extensions pour lesquelles UCM n'a aucun réglage. Chacune est un **OID**, un indicateur **Critique** et la **valeur** : l'encodage DER de la valeur de l'extension, en hexadécimal. UCM copie les octets tels quels et ne les analyse jamais : vérifiez d'abord l'encodage avec vos propres outils.
+
+- Tout certificat émis depuis le modèle les porte : formulaire d'émission, Sign CSR, profils ACME liés au modèle, profils SCEP, WSTEP et approbations. Les renouvellements les conservent
+- Le formulaire d'émission peut en ajouter d'autres pour un seul certificat ; une entrée ayant l'OID de l'une de celles du modèle la remplace
+- Les extensions qu'UCM pose lui-même (usage de la clé, EKU, noms, identifiants de clé, pointeurs CRL et OCSP, politiques, contraintes de noms, qcStatements...) sont refusées : utilisez leurs propres réglages
+- Un client qui ne reconnaît pas une extension **critique** doit rejeter le certificat (RFC 5280, section 4.2). Laissez-la non critique sauf si toutes les parties utilisatrices la comprennent
+
+Les panneaux de détails des certificats et des CA listent ces extensions sous **Autres extensions**, avec leur OID, leur nom s'il est connu, leur criticité et leur valeur.
 
 ## Dupliquer des modèles
 

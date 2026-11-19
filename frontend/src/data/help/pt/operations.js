@@ -27,7 +27,7 @@ export default {
       'Use os chips de recurso para alternar rapidamente entre tipos de recursos',
       'A pesquisa inline e os filtros (Status, CA) permitem refinar itens sem sair da barra de ferramentas',
       'Alterne entre os modos de visualização Tabela e Cesta (painel de transferência) no desktop',
-      'Visualize as alterações antes de confirmar operações em massa',
+      'Revogar, renovar, assinar e excluir pedem confirmação antes de executar; uma exportação começa de imediato',
     ],
     warnings: [
       'A exclusão em massa é irreversível: sempre crie um backup primeiro',
@@ -41,13 +41,13 @@ export default {
 
 Operações em massa e gerenciamento de dados. Realize ações em lote em múltiplos recursos simultaneamente.
 
-## Aba Importar/Exportar
+## Aba Importar
 
-Igual à página de Importação/Exportação: assistente de Importação Inteligente e funcionalidade de exportação em massa.
+Igual à página de Importação/Exportação: o assistente de Importação Inteligente e a integração OPNsense (conectar, navegar e importar do OPNsense).
 
-## Aba OPNsense
+## Aba Exportar
 
-Igual à integração OPNsense de Importação/Exportação: conecte, navegue e importe do OPNsense.
+Exportação em massa de certificados e CAs.
 
 ## Ações em Massa
 
@@ -55,10 +55,9 @@ Realize operações em lote em múltiplos recursos de uma vez.
 
 ### Como Funciona
 1. Selecione o **tipo de recurso** (Certificados, CAs, CSRs, Modelos, Usuários)
-2. Navegue pelos itens disponíveis no **painel esquerdo**
-3. Mova itens para o **painel direito** (selecionados) usando as setas de transferência
-4. Escolha a **ação** a ser realizada
-5. Confirme e execute
+2. Marque os itens na tabela (a vista opcional Cesta os move entre dois painéis)
+3. Escolha a **ação** a ser realizada
+4. Confirme e execute
 
 ### Ações Disponíveis por Recurso
 
@@ -77,16 +76,14 @@ Realize operações em lote em múltiplos recursos de uma vez.
 - **Excluir em Massa**: Remover CSRs selecionados
 
 #### Modelos
-- **Exportar em Massa**: Exportar como JSON
 - **Excluir em Massa**: Remover modelos selecionados
 
 #### Usuários
-- **Desativar em Massa**: Desativar contas de usuário selecionadas
 - **Excluir em Massa**: Remover permanentemente usuários selecionados
 
 > ⚠ Operações em massa são irreversíveis. Sempre crie um backup antes de realizar exclusões ou revogações em massa.
 
-> 💡 Use a pesquisa e filtro no painel esquerdo para encontrar rapidamente itens específicos.
+> 💡 Use a pesquisa e os filtros acima da tabela para encontrar rapidamente itens específicos.
 `
   }
 }

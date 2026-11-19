@@ -2,13 +2,13 @@ export default {
   helpContent: {
     title: '导入与导出',
     subtitle: '数据迁移与备份',
-    overview: '从外部来源导入证书并导出 PKI 数据。智能导入可自动检测文件类型。OPNsense 集成允许直接与防火墙同步。',
+    overview: '从外部来源导入证书并导出 PKI 数据。智能导入可自动检测文件类型。OPNsense 集成可按需导入防火墙的证书和 CA。',
     sections: [
       {
         title: '导入',
         items: [
           { label: '智能导入', text: '上传任意证书文件,, UCM 自动检测格式（PEM、DER、P12、P7B）' },
-          { label: 'OPNsense 同步', text: '连接到 OPNsense 防火墙并导入其证书和 CA' },
+          { label: 'OPNsense 导入', text: '连接到 OPNsense 防火墙并导入其证书和 CA，每次运行一次（不持续同步）' },
         ]
       },
       {
@@ -21,7 +21,7 @@ export default {
       {
         title: 'OPNsense 集成',
         items: [
-          { label: '连接', text: '提供 OPNsense URL、API 密钥和 API 密钥' },
+          { label: '连接', text: '提供 OPNsense 主机和端口、API 密钥和 API 密钥' },
           { label: '测试连接', text: '导入前验证连通性' },
           { label: '选择项目', text: '选择要导入的证书和 CA' },
         ]
@@ -64,26 +64,24 @@ export default {
 
 ## OPNsense 集成
 
-从 OPNsense 防火墙同步证书和 CA：
+按需从 OPNsense 防火墙导入证书和 CA（UCM 不会保持同步）：
 
 ### 设置
 1. 在 OPNsense 中创建 API 密钥（系统 → 访问 → 用户 → API 密钥）
-2. 在 UCM 中输入 OPNsense URL、API 密钥和 API 密钥
-3. 点击**测试连接**进行验证
+2. 在 UCM 中输入 OPNsense 主机和端口、API 密钥和 API 密钥
+3. 点击**测试连接**：它会验证连接并列出可用的证书和 CA
 
 ### 导入
-1. 点击**连接**以获取可用的证书和 CA
-2. 选择要导入的项目
-3. 点击**导入所选**
+1. 选择要导入的项目
+2. 点击**导入所选**
 
 UCM 导入证书及其私钥（如可用）并保留 CA 层次结构。
 
 ## 导出证书
 
 批量导出所有证书：
-- **PEM**: 单独的 PEM 文件
+- **PEM**: 所有证书在单个 PEM 捆绑包中
 - **P7B 捆绑包**: 所有证书在单个 PKCS#7 文件中
-- **ZIP**: 所有证书作为单独的 PEM 文件存放在 ZIP 归档中
 
 ## 导出 CA
 

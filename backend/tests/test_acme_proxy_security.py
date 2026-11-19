@@ -5,6 +5,7 @@ import json
 import pytest
 
 from models import db, SystemConfig, AcmeClientAccount, AcmeClientOrder
+from tests.seeded_rows import delete_client_accounts, ensure_acme_account
 from services.acme.acme_proxy_account import PROXY_ACCOUNT_ID_KEY
 from services.acme.jws_problems import UNKNOWN_ACCOUNT
 
@@ -125,9 +126,9 @@ def proxy_protocol_upstream_stub(app, monkeypatch):
 
     with app.app_context():
         SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
-        AcmeClientAccount.query.filter_by(
+        delete_client_accounts(AcmeClientAccount.query.filter_by(
             directory_url=_STUB_DIRECTORY_URL
-        ).delete()
+        ))
         db.session.commit()
         acct = AcmeClientAccount(
             directory_url=_STUB_DIRECTORY_URL,
@@ -145,9 +146,9 @@ def proxy_protocol_upstream_stub(app, monkeypatch):
     yield
     with app.app_context():
         SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
-        AcmeClientAccount.query.filter_by(
+        delete_client_accounts(AcmeClientAccount.query.filter_by(
             directory_url=_STUB_DIRECTORY_URL
-        ).delete()
+        ))
         db.session.commit()
 
 
@@ -496,6 +497,7 @@ class TestFinalizeFailClosed:
                 client_jwk_thumbprint='thumb-owner-1',
             )
             kwargs.update(overrides)
+            ensure_acme_account(kwargs['account_id'])
             order = AcmeClientOrder(**kwargs)
             db.session.add(order)
             db.session.commit()
@@ -545,3 +547,58 @@ class TestFinalizeFailClosed:
                 pytest.fail('matching identity must not raise PermissionError')
             except Exception:
                 pass  # CSR/upstream handling is out of scope for this test
+
+
+class TestProxyRfc8555Paths:
+    """The proxy's own newNonce, newAccount and newOrder against RFC 8555."""
+
+    def test_new_nonce_status_and_index_link(self, client):
+        head = client.head('/acme/proxy/new-nonce')
+        get = client.get('/acme/proxy/new-nonce')
+        assert head.status_code == 200
+        assert get.status_code == 204
+        for r in (head, get):
+            assert r.headers['Replay-Nonce']
+            assert r.headers['Link'] == '<http://localhost/acme/proxy/directory>;rel="index"'
+
+    def test_new_account_echoes_external_account_binding(self, app, client):
+        import hashlib
+        import hmac
+        from tests.test_acme_security_paths import _add_eab_credential
+
+        def b64u(raw):
+            return base64.urlsafe_b64encode(raw).rstrip(b'=').decode()
+
+        _set_eab_required(app, False)
+        kid, secret = 'proxy-conformance-eab', b'proxy-conformance-eab-secret'
+        with app.app_context():
+            _add_eab_credential(kid, b64u(secret))
+        private_key, jwk = _generate_rsa_key_and_jwk()
+        url = 'http://localhost/acme/proxy/new-account'
+        protected = b64u(json.dumps({'alg': 'HS256', 'kid': kid, 'url': url}).encode())
+        payload = b64u(json.dumps(jwk).encode())
+        eab = {'protected': protected, 'payload': payload,
+               'signature': b64u(hmac.new(secret, f'{protected}.{payload}'.encode(), hashlib.sha256).digest())}
+        jws = _build_jws(url, {'termsOfServiceAgreed': True, 'externalAccountBinding': eab},
+                         jwk, private_key, nonce=_get_nonce(client))
+        r = client.post('/acme/proxy/new-account', data=json.dumps(jws),
+                        content_type='application/jose+json')
+        assert r.status_code == 201, r.get_json()
+        assert r.get_json()['externalAccountBinding'] == eab
+
+    @pytest.mark.parametrize('not_before', [200, 'garbage'])
+    def test_unreadable_not_before_is_malformed(self, app, client, proxy_protocol_upstream_stub, not_before):
+        _set_eab_required(app, False)
+        private_key, jwk = _generate_rsa_key_and_jwk()
+        jws_acct = _build_jws('http://localhost/acme/proxy/new-account', {'termsOfServiceAgreed': True},
+                              jwk, private_key, nonce=_get_nonce(client))
+        r_acct = client.post('/acme/proxy/new-account', data=json.dumps(jws_acct),
+                             content_type='application/jose+json')
+        assert r_acct.status_code == 201
+        jws = _build_jws('http://localhost/acme/proxy/new-order',
+                         {'identifiers': [{'type': 'dns', 'value': 'test.example.com'}],
+                          'notBefore': not_before},
+                         jwk, private_key, nonce=_get_nonce(client), use_kid=r_acct.headers['Location'])
+        r = client.post('/acme/proxy/new-order', data=json.dumps(jws), content_type='application/jose+json')
+        assert r.status_code == 400, r.get_json()
+        assert r.get_json()['type'] == 'urn:ietf:params:acme:error:malformed'

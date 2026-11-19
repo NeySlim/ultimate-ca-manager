@@ -2,25 +2,24 @@ export default {
   helpContent: {
     title: 'Armazenamento de Confiança',
     subtitle: 'Gerenciar certificados confiáveis',
-    overview: 'Importe e gerencie certificados de CA raiz e intermediários confiáveis. O armazenamento de confiança é usado para validação de cadeia e pode ser sincronizado com o armazenamento de confiança do sistema operacional.',
+    overview: 'Mantenha certificados de CA raiz e intermediários confiáveis. A vista de cadeia de um certificado e as suas exportações completam a cadeia com um certificado do armazenamento de confiança cujo sujeito corresponde ao nome do emissor. O armazenamento pode ser preenchido a partir do armazenamento de confiança do sistema operacional ou das CAs gerenciadas pelo UCM.',
     sections: [
       {
         title: 'Tipos de Certificado',
         definitions: [
           { term: 'CA Raiz', description: 'Âncora de confiança autoassinada de nível superior' },
           { term: 'Intermediário', description: 'Certificado de CA assinado por uma raiz ou outro intermediário' },
-          { term: 'Autenticação de Cliente', description: 'Certificado usado para autenticação de cliente (mTLS)' },
+          { term: 'Sistema', description: 'Importado do armazenamento de confiança do sistema operacional' },
           { term: 'Assinatura de Código', description: 'Certificado usado para verificação de assinatura de código' },
+          { term: 'E-mail', description: 'Certificado usado para S/MIME' },
           { term: 'Personalizado', description: 'Certificado confiável categorizado manualmente' },
         ]
       },
       {
         title: 'Ações',
         items: [
-          { label: 'Importar Arquivo', text: 'Enviar arquivos de certificado PEM, DER ou PKCS#7' },
-          { label: 'Importar URL', text: 'Buscar um certificado de uma URL remota' },
-          { label: 'Adicionar PEM', text: 'Colar texto de certificado codificado em PEM diretamente' },
-          { label: 'Sincronizar do Sistema', text: 'Importar CAs confiáveis do SO para o UCM' },
+          { label: 'Adicionar', text: 'Adicionar certificados das CAs gerenciadas pelo UCM. Um certificado externo é adicionado pela API (POST /api/v2/truststore com PEM, ou /api/v2/truststore/import com um arquivo PEM ou DER)' },
+          { label: 'Sincronizar do Sistema', text: 'Importar CAs confiáveis do SO para o UCM, até a quantidade escolhida (500 por padrão, 1000 no máximo)' },
           { label: 'Exportar', text: 'Baixar certificados confiáveis individualmente' },
           { label: 'Eliminar seleção', text: 'Selecione vários certificados e remova-os em conjunto, por exemplo as CAs do sistema filtradas como expiradas; só são removidas as linhas que os filtros atuais mostram' },
         ]
@@ -36,32 +35,27 @@ export default {
     content: `
 ## Visão Geral
 
-O Armazenamento de Confiança gerencia certificados de CA confiáveis usados para validação de cadeia. Importe CAs raiz e intermediárias de fontes externas ou sincronize com o armazenamento de confiança do sistema operacional.
+O Armazenamento de Confiança mantém certificados de CA confiáveis. Preencha-o a partir das CAs gerenciadas pelo UCM ou do armazenamento de confiança do sistema operacional.
 
 ## Categorias de Certificados
 
 - **CA Raiz**: Âncoras de confiança autoassinadas
 - **Intermediário**: CAs assinadas por raiz ou outros intermediários
-- **Autenticação de Cliente**: Certificados para autenticação de cliente mTLS
+- **Sistema**: Importado do armazenamento de confiança do sistema operacional
 - **Assinatura de Código**: Certificados para verificação de assinatura de código
+- **E-mail**: Certificados para S/MIME
 - **Personalizado**: Certificados categorizados manualmente
 
-## Importando Certificados
+## Adicionando Certificados
 
-### De Arquivo
-Envie arquivos de certificado nestes formatos:
-- **PEM**: Codificado em Base64 (único ou em pacote)
-- **DER**: Formato binário
-- **PKCS#7 (P7B)**: Cadeia de certificados
+### De CAs gerenciadas
+**Adicionar** lista as CAs gerenciadas pelo UCM: selecione as que deseja tornar confiáveis.
 
-### De URL
-Busque um certificado de um endpoint HTTPS remoto. O UCM baixa e importa a cadeia de certificados do servidor.
-
-### Colar PEM
-Cole texto de certificado codificado em PEM diretamente na área de texto.
+### Certificados externos
+A página não tem formulário de envio para um certificado de fora do UCM. Adicione-o pela API: \`POST /api/v2/truststore\` com o seu PEM, ou \`POST /api/v2/truststore/import\` com um arquivo PEM ou DER.
 
 ### Sincronizar do Sistema
-Importe todas as CAs confiáveis do armazenamento de confiança do sistema operacional. Isso popula o UCM com as mesmas CAs raiz confiáveis pelo SO (ex.: pacote CA do Mozilla no Linux).
+Importe as CAs confiáveis do armazenamento de confiança do sistema operacional (ex.: pacote CA do Mozilla no Linux), até a quantidade escolhida: 500 por padrão, 1000 no máximo.
 
 > 💡 Sincronizar do Sistema é uma importação única. Alterações no armazenamento de confiança do SO não são refletidas automaticamente.
 
@@ -75,14 +69,10 @@ Importe todas as CAs confiáveis do armazenamento de confiança do sistema opera
 
 ## Casos de Uso
 
-### Validação de Cadeia
-Ao verificar uma cadeia de certificados, o UCM verifica o armazenamento de confiança para CAs raiz reconhecidas.
+### Cadeias
+A vista de cadeia de um certificado, e as suas exportações com a cadeia, usam um certificado do armazenamento de confiança cujo sujeito corresponde ao nome do emissor para completar a cadeia. Nenhuma assinatura é verificada contra o armazenamento de confiança.
 
-### mTLS
-Certificados de cliente apresentados durante autenticação TLS mútua são validados contra o armazenamento de confiança.
-
-### ACME
-Quando o UCM atua como cliente ACME (Let's Encrypt), o armazenamento de confiança é usado para verificar o certificado da CA ACME.
+O armazenamento de confiança não participa da autenticação de cliente mTLS (que usa a CA confiável escolhida em Configurações › Segurança) nem da conexão do cliente ACME com a sua CA.
 `
   }
 }

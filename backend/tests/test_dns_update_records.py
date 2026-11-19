@@ -10,6 +10,7 @@ import secrets
 import uuid
 from datetime import timedelta
 from types import SimpleNamespace
+from tests.seeded_rows import delete_client_accounts, ensure_acme_account, placeholder_certificate_id
 
 import pytest
 from sqlalchemy import event
@@ -100,11 +101,12 @@ def env(app):
             synchronize_session=False)
         AcmeDomain.query.filter_by(domain='example.com').delete()
         DnsProvider.query.filter_by(id=provider.id).delete()
-        AcmeClientAccount.query.filter_by(id=account.id).delete()
+        delete_client_accounts(AcmeClientAccount.query.filter_by(id=account.id))
         db.session.commit()
 
 
 def _seed_order(env, account_id, thumb, status='pending', **kw):
+    ensure_acme_account(account_id)
     order = AcmeClientOrder(
         domains=json.dumps([IDENT]), environment='staging',
         challenge_type='dns-01', status=status, is_proxy_order=True,
@@ -326,7 +328,7 @@ def _run_get_certificate(monkeypatch, acct='acct-a', thumb='thumb-a'):
         headers={'Content-Type': 'application/pem-certificate-chain'})
     monkeypatch.setattr(svc, '_post_with_account', lambda *_a, **_k: resp)
     monkeypatch.setattr(CertificateService, 'import_certificate',
-                        staticmethod(lambda **_kw: SimpleNamespace(id=4243)))
+                        staticmethod(lambda **_kw: SimpleNamespace(id=placeholder_certificate_id())))
     svc.get_certificate(_b64(CERT_URL), requester_account_id=acct,
                         requester_thumbprint=thumb)
 
@@ -415,10 +417,8 @@ def test_R4_respond_challenge_closes_only_failed_rows(app, env, monkeypatch,
         _seed_rows(a, b)
         svc = proxy_mod.AcmeProxyService('https://ucm.example/acme/proxy')
         svc.upstream_directory_url = f'{UPSTREAM}/directory'
-        chall = {'type': 'dns-01', 'url': CHALL_URL, 'status': chall_status,
-                 'token': TOKEN}
-        resp = _FakeResp(chall)
-        resp.headers = {'Link': f'<{AUTHZ_URL}>;rel="up"'}
+        status = chall_status if chall_status != 'processing' else 'pending'
+        resp = _FakeResp(_authz(status=status, chall_status=chall_status))
         monkeypatch.setattr(svc, '_post_with_account', lambda *_a, **_k: resp)
         svc.respond_challenge(_b64(CHALL_URL), requester_account_id='acct-a',
                               requester_thumbprint='thumb-a')

@@ -18,11 +18,33 @@ from auth.twofa_enforcement import (
     enforcement_active_for, has_security_key, lock_for_factor_change, lock_user,
 )
 import pyotp
+from auth.totp import consume_totp
 import qrcode
 
 from . import bp
 
 logger = logging.getLogger(__name__)
+
+
+def _code_checks_locked(user_id):
+    """The 429 to answer while the account's second factor is locked, or None.
+
+    Same counter as the login's second step: the secret guessed is the same, so a
+    stolen session gets no tries beyond what the login allows."""
+    from api.v2.auth_methods import _2fa_failed_attempts, _check_2fa_lockout
+    if _check_2fa_lockout(str(user_id), _2fa_failed_attempts):
+        return error_response('Too many failed attempts. Try again later.', 429)
+    return None
+
+
+def _code_check_failed(user_id):
+    from api.v2.auth_methods import _2fa_failed_attempts, _record_2fa_failure
+    _record_2fa_failure(str(user_id), _2fa_failed_attempts)
+
+
+def _code_check_passed(user_id):
+    from api.v2.auth_methods import _2fa_failed_attempts, _clear_2fa_failures
+    _clear_2fa_failures(str(user_id), _2fa_failed_attempts)
 
 
 # ============================================================================
@@ -48,6 +70,7 @@ def enable_2fa():
 
     # Store secret temporarily (will be confirmed with code)
     user.totp_secret = secret  # Store unconfirmed
+    user.totp_last_step = None  # steps of the old secret say nothing about this one
     ok, _err = safe_commit(logger, "Failed to initialize 2FA")
     if not ok:
         return _err
@@ -84,10 +107,12 @@ def confirm_2fa():
     user = db.session.get(User, g.current_user.id)
     if not user or not user.totp_secret:
         return error_response('2FA setup not initiated', 400)
+    # A confirmed secret is the login's factor: no code of it is checked here
+    if user.totp_confirmed:
+        return error_response('2FA is already enabled; disable it first', 409)
 
-    # Verify code
-    totp = pyotp.TOTP(user.totp_secret)
-    if not totp.verify(code):
+    # Verify code, once only
+    if not consume_totp(user, code):
         return error_response('Invalid verification code', 400)
 
     # Generate backup codes
@@ -145,17 +170,26 @@ def disable_2fa():
     if refused:
         return error_response(
             'Your account requires a second factor: register a security key before disabling TOTP', 403)
+    # Refused whatever the code, so checked before the lockout: no attempt is used up
+    if not user.totp_secret:
+        return error_response('2FA not enabled', 400)
+    # A secret not confirmed yet is no factor of the login: its codes are not counted
+    counted = bool(user.totp_confirmed)
+    locked = _code_checks_locked(user.id) if counted else None
+    if locked:
+        return locked
 
     # Verify with TOTP code
     if code:
-        if not user.totp_secret:
-            return error_response('2FA not enabled', 400)
-        totp = pyotp.TOTP(user.totp_secret)
-        if not totp.verify(code):
+        if not consume_totp(user, code):
+            if counted:
+                _code_check_failed(user.id)
             return error_response('Invalid verification code', 400)
     # Or verify with backup code
     elif backup_code:
         if not backup_verify(user.backup_codes, backup_code):
+            if counted:
+                _code_check_failed(user.id)
             return error_response('Invalid backup code', 400)
 
     # Disable 2FA. Under enforcement the remaining key becomes the user's own
@@ -168,6 +202,8 @@ def disable_2fa():
     ok, _err = safe_commit(logger, "Failed to disable 2FA")
     if not ok:
         return _err
+    if counted:
+        _code_check_passed(user.id)
 
     AuditService.log_action(
         action='mfa_disable',
@@ -252,10 +288,13 @@ def regenerate_recovery_codes():
     user = db.session.get(User, g.current_user.id)
     if not user or not user.totp_confirmed:
         return error_response('2FA not enabled', 400)
+    locked = _code_checks_locked(user.id)
+    if locked:
+        return locked
 
-    # Verify code
-    totp = pyotp.TOTP(user.totp_secret)
-    if not totp.verify(code):
+    # Verify code, once only
+    if not consume_totp(user, code):
+        _code_check_failed(user.id)
         return error_response('Invalid verification code', 400)
 
     # Generate new backup codes
@@ -265,6 +304,7 @@ def regenerate_recovery_codes():
     ok, _err = safe_commit(logger, "Failed to regenerate backup codes")
     if not ok:
         return _err
+    _code_check_passed(user.id)
 
     return success_response(
         data={'backup_codes': new_codes},

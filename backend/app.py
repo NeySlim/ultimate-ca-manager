@@ -27,6 +27,7 @@ from models import db, User, SystemConfig
 from websocket import socketio, init_websocket
 from utils.datetime_utils import utc_now
 from utils.key_codec import private_key_to_pem
+from utils.db_url import log_normalised_scheme
 
 # Initialize cache globally
 cache = Cache()
@@ -69,6 +70,26 @@ def _rate_limit_lan_exempt():
         return _is_lan_ip(get_remote_address())
     except Exception:
         return False
+
+
+def run_startup_housekeeping(app):
+    """Files missing on disk rewritten from the database, interrupted ACME orders reset."""
+    try:
+        with app.app_context():
+            from services.file_regen_service import regenerate_all_files
+            stats = regenerate_all_files()
+            if sum(stats.values()) > 0:
+                app.logger.info(f"✓ File regeneration completed: {stats}")
+    except Exception as e:
+        app.logger.warning(f"File regeneration failed (non-fatal): {e}")
+
+    # No auto-poll thread survives a restart: its orders go back to pending
+    try:
+        with app.app_context():
+            from services.acme.order_housekeeping import recover_interrupted_orders
+            recover_interrupted_orders()
+    except Exception as e:
+        app.logger.warning(f"Interrupted ACME orders not recovered (non-fatal): {e}")
 
 
 def create_app(config_name=None):
@@ -131,6 +152,8 @@ def create_app(config_name=None):
 
     app.logger.setLevel(_log_level)
     # ─────────────────────────────────────────────────────────────
+    # Here, not where settings read the URL: logging did not exist yet
+    log_normalised_scheme(os.getenv('DATABASE_URL', ''), _logging.getLogger('utils.db_url'))
     
     # Reverse proxy support (handles X-Forwarded-* headers).
     #
@@ -234,16 +257,18 @@ def create_app(config_name=None):
     @sa_event.listens_for(_Certificate, 'after_insert')
     def _on_cert_insert(mapper, connection, target):
         try:
-            from services.file_regen_service import write_cert_files
-            write_cert_files(target)
+            from services.file_regen_service import insert_file_writes_enabled, write_cert_files
+            if insert_file_writes_enabled():
+                write_cert_files(target)
         except Exception as e:
             app.logger.warning(f"Could not write files for cert {target.refid}: {e}")
 
     @sa_event.listens_for(_CA, 'after_insert')
     def _on_ca_insert(mapper, connection, target):
         try:
-            from services.file_regen_service import write_ca_files
-            write_ca_files(target)
+            from services.file_regen_service import insert_file_writes_enabled, write_ca_files
+            if insert_file_writes_enabled():
+                write_ca_files(target)
         except Exception as e:
             app.logger.warning(f"Could not write files for CA {target.refid}: {e}")
 
@@ -304,6 +329,11 @@ def create_app(config_name=None):
                 app.logger.info("Tightened sensitive dir perms to 0700: %s", sensitive_dir)
         except OSError as e:
             app.logger.warning("Could not tighten perms on %s: %s", sensitive_dir, e)
+
+    # Uploads spool under DATA_DIR/tmp: the system temp dir may be a small tmpfs
+    from utils.upload_spool import SpoolingRequest, prepare_spool_dir
+    app.config['UPLOAD_SPOOL_DIR'] = prepare_spool_dir(config.DATA_DIR)
+    app.request_class = SpoolingRequest
 
     # Initialize cache
     cache.init_app(app, config={
@@ -546,16 +576,12 @@ def create_app(config_name=None):
     app.logger.info("✓ DATABASE INITIALIZATION COMPLETE - Safe to proceed")
     app.logger.info("=" * 60)
     
-    # Regenerate certificate/key files from database if missing
-    try:
-        with app.app_context():
-            from services.file_regen_service import regenerate_all_files
-            stats = regenerate_all_files()
-            if sum(stats.values()) > 0:
-                app.logger.info(f"✓ File regeneration completed: {stats}")
-    except Exception as e:
-        app.logger.warning(f"File regeneration failed (non-fatal): {e}")
-    
+    # Under gunicorn the scheduler process does this before its loop: the master
+    # leaves the database alone once the workers are forked
+    from services.scheduler_service import supervised
+    if not supervised():
+        run_startup_housekeeping(app)
+
     # Initialize general task scheduler (CRL auto-regen, etc) - AFTER database is ready
     try:
         from services.scheduler_service import init_scheduler
@@ -580,7 +606,20 @@ def create_app(config_name=None):
                 name="acme_order_purge",
                 func=scheduled_purge,
                 interval=21600,
-                description="Purge expired local ACME orders, authorizations and challenges"
+                description="Purge expired local ACME orders, authorizations, challenges and spent nonces"
+            )
+        except ImportError:
+            pass
+
+        # An order a restart cut short resumes once idle, whichever instance restarted
+        try:
+            from services.acme.order_housekeeping import scheduled_order_recovery
+            scheduler.register_task(
+                name="acme_order_recovery",
+                func=scheduled_order_recovery,
+                interval=900,
+                description="Set ACME orders interrupted by a restart back to pending, "
+                            "release proxy TXT records whose deletion a restart lost"
             )
         except ImportError:
             pass
@@ -640,11 +679,11 @@ def create_app(config_name=None):
         
         # Register ACME auto-renewal task (runs every 6 hours)
         try:
-            from services.acme_renewal_service import scheduled_acme_renewal
+            from services.acme_renewal_service import RENEWAL_PASS_SECONDS, scheduled_acme_renewal
             scheduler.register_task(
                 name="acme_auto_renewal",
                 func=scheduled_acme_renewal,
-                interval=21600,  # 6 hours
+                interval=RENEWAL_PASS_SECONDS,  # 6 hours
                 description="Auto-renew Let's Encrypt certificates"
             )
             app.logger.info("Registered ACME auto-renewal task (every 6 hours)")
@@ -873,11 +912,13 @@ def create_app(config_name=None):
         # a request commits raises "cannot commit transaction - SQL statements
         # in progress" intermittently. Tasks stay registered (the admin view
         # and run-now execute them synchronously).
-        if not app.config.get('TESTING'):
-            scheduler.start(app=app)
+        from services.scheduler_service import start_scheduler
+        if start_scheduler(app):
             app.logger.info("Scheduler service started with all tasks")
-        else:
+        elif app.config.get('TESTING'):
             app.logger.info("Scheduler tasks registered (background thread disabled under TESTING)")
+        else:
+            app.logger.info("Scheduler tasks registered: the loop runs in the scheduler process")
         
         # Register scheduler in app context for graceful shutdown
         app.scheduler = scheduler
@@ -887,23 +928,13 @@ def create_app(config_name=None):
     # Register blueprints
     register_blueprints(app)
     
-    # ===== SAFE MODE DETECTION =====
-    # If DB has encrypted keys but no master key, enter safe mode
+    # ===== MASTER KEY AND SAFE MODE =====
+    # A new installation gets its master key here; encrypted keys without one
+    # put the API in safe mode
     try:
         with app.app_context():
-            from security.encryption import key_encryption, has_encrypted_keys_in_db
-            key_encryption.reload()
-            enabled = key_encryption.is_enabled
-            has_enc = has_encrypted_keys_in_db()
-            app.logger.info(f"🔐 Encryption check: enabled={enabled}, has_encrypted_keys={has_enc}, key_source={key_encryption.key_source}")
-            if not enabled and has_enc:
-                app.config['SAFE_MODE'] = True
-                app.logger.error(
-                    "🔒 SAFE MODE: Encrypted private keys found but no encryption key available. "
-                    "Place your master.key file at /etc/ucm/master.key and restart UCM."
-                )
-            else:
-                app.config['SAFE_MODE'] = False
+            from security.master_key_bootstrap import check_master_key_at_start
+            check_master_key_at_start(app)
     except Exception as e:
         app.config['SAFE_MODE'] = False
         app.logger.warning(f"Safe mode check skipped: {e}")
@@ -1085,6 +1116,9 @@ def create_app(config_name=None):
         return (admin_allowlist.REFUSAL_MESSAGE, 403,
                 {'Content-Type': 'text/plain; charset=utf-8'})
 
+    # Ahead of every hook that may sign in (mTLS), and of every identity check
+    from auth.session_epoch import remember_request_epoch
+    app.before_request_funcs.setdefault(None, []).insert(0, remember_request_epoch)
     app.before_request_funcs.setdefault(None, []).insert(0, enforce_admin_allowlist)
 
     # ── Global error handlers ─────────────────────────────────
@@ -1098,6 +1132,8 @@ def create_app(config_name=None):
         response.mimetype = PROBLEM_CONTENT_TYPE
         return response, code
     
+    from api.acme.routing_problems import is_acme_path, routing_problem
+
     @app.errorhandler(400)
     def handle_400(e):
         if request.path.startswith('/api/'):
@@ -1108,17 +1144,26 @@ def create_app(config_name=None):
     def handle_404(e):
         if request.path.startswith('/api/'):
             return _json_error(404, 'Not found')
+        if is_acme_path(request.path):
+            return routing_problem(e)
         return e
     
     @app.errorhandler(405)
     def handle_405(e):
         if request.path.startswith('/api/'):
             return _json_error(405, 'Method not allowed')
+        if is_acme_path(request.path):
+            return routing_problem(e)
         return e
     
     @app.errorhandler(413)
     def handle_413(e):
         if request.path.startswith('/api/'):
+            from services.backup.storage import RESTORE_FORM_MARGIN, restore_upload_limit
+            if request.max_content_length == restore_upload_limit() + RESTORE_FORM_MARGIN:
+                return _json_error(413, 'Backup archive too large: a restore accepts up to '
+                                        f'{restore_upload_limit() // (1024 * 1024)} MB '
+                                        '(BACKUP_MAX_UPLOAD_MB)')
             return _json_error(413, 'Request too large')
         return e
     
@@ -1875,6 +1920,8 @@ def main():
                     
                     try:
                         ssl_context.load_verify_locations(ca_cert_path)
+                        from boot_config import anchor_client_verification
+                        anchor_client_verification(ssl_context)
                         print(f"  mTLS CA: {ca.descr}")
                         print(f"  mTLS CA file: {ca_cert_path}")
                     except Exception as e:

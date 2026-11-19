@@ -107,13 +107,14 @@ class TestEnforceAtStartup:
         seen = {}
 
         def capture(log, database_url=''):
-            seen['url'] = database_url
+            from config.settings import TestingConfig
+            seen['url'], seen['configured'] = database_url, TestingConfig.SQLALCHEMY_DATABASE_URI
             raise _Stopped
         monkeypatch.setattr(fips_mode, 'enforce_at_startup', capture)
         from app import create_app
         with pytest.raises(_Stopped):
             create_app('testing')
-        assert seen['url'].startswith('sqlite:')
+        assert seen['url'] == seen['configured']
 
     def test_without_ucm_fips_nothing_is_checked(self, monkeypatch, providers):
         monkeypatch.delenv('UCM_FIPS', raising=False)

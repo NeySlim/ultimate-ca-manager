@@ -15,6 +15,10 @@ from models import db
 from services.backup import manifest
 from services.backup.export_generic import IdentityIndex, export_section
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 PASSWORD = 'Correct-Horse-Battery-9'
 
 
@@ -108,18 +112,38 @@ class TestFieldsNoArchiveUsedToCarry:
 class TestRelationsTravelByIdentity:
     """A numeric id means nothing on the target; the identity beside it does."""
 
-    def test_every_declared_reference_is_exported_with_its_identity(self, app):
+    def test_every_declared_reference_is_exported_with_its_identity(
+            self, app, auth_client, create_ca, create_cert):
+        from tests.test_backup_contract_matrix import _remove, _seed_all
+        # The factory hangs its rows off a CA and certificates; a revoked one fills
+        # the revocation sections. SSH material is the one thing nothing can invent.
+        ca = create_ca(cn='Manifest Reference CA')
+        create_cert(cn='manifest-issued.example.com', ca_id=ca['id'])
+        revoked = create_cert(cn='manifest-revoked.example.com', ca_id=ca['id'])
+        r = auth_client.post(f"/api/v2/certificates/{revoked['id']}/revoke", json={'reason': 'superseded'})
+        assert r.status_code == 200, r.get_json()
+        exempt = {'ssh_cas', 'ssh_certificates'}
         with app.app_context():
-            index = IdentityIndex()
-            for name, section in manifest.SECTIONS.items():
-                if not section.references or section.optional:
-                    continue
-                rows = export_section(name, index)
-                if not rows:
-                    continue
-                for column in section.references:
-                    assert f'{column}_ref' in rows[0], \
-                        f"{name}.{column} travels as a number only"
+            # A row in every section the factory can build, so none is skipped as empty.
+            _seeded, _failures, order, _secrets = _seed_all()
+            try:
+                index = IdentityIndex()
+                checked = set()
+                for name, section in manifest.SECTIONS.items():
+                    if not section.references or section.optional:
+                        continue
+                    rows = export_section(name, index)
+                    if not rows:
+                        continue
+                    checked.add(name)
+                    for column in section.references:
+                        assert f'{column}_ref' in rows[0], \
+                            f"{name}.{column} travels as a number only"
+                wanted = {n for n, s in manifest.SECTIONS.items()
+                          if s.references and not s.optional} - exempt
+                assert checked == wanted, sorted(wanted - checked)
+            finally:
+                _remove(order)
 
     def test_the_identity_is_the_target_row_not_its_primary_key(self, app, create_user):
         create_user(username='manifest_identity_user', role='operator')

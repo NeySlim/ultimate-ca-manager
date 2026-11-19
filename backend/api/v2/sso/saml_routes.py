@@ -198,15 +198,11 @@ def _parse_saml_metadata(xml_text):
                 result['sso_url'] = sso.get('Location')
                 break
 
-        # SLO URL
-        for binding in ['urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
-                        'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST']:
-            slo = idp.find(f'md:SingleLogoutService[@Binding="{binding}"]', NS)
-            if slo is None:
-                slo = idp.find(f'{{urn:oasis:names:tc:SAML:2.0:metadata}}SingleLogoutService[@Binding="{binding}"]')
-            if slo is not None:
-                result['slo_url'] = slo.get('Location')
-                break
+        # SLO URL: UCM only sends its LogoutResponse there, by HTTP-Redirect, so
+        # ResponseLocation, else Location, of that binding (SAML Metadata §2.2.2).
+        slo = idp.find('md:SingleLogoutService[@Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"]', NS)
+        if slo is not None:
+            result['slo_url'] = slo.get('ResponseLocation') or slo.get('Location')
 
         # Certificate (first X509Certificate found)
         cert = idp.find('.//ds:X509Certificate', NS)

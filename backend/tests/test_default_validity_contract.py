@@ -23,8 +23,15 @@ import json
 
 import pytest
 
+from tests.fixtures.templates import templates_created_here_removed
 from utils.validity import (DEFAULT_CERTIFICATE_VALIDITY_DAYS,
                             DEFAULT_TEMPLATE_VALIDITY_DAYS)
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _templates_stay_in_this_module(app):
+    with templates_created_here_removed(app):
+        yield
 
 
 def _validity_of(result):
@@ -66,7 +73,7 @@ class TestOneDefaultPerResource:
         assert not (imported.get_json() or {}).get('data', {}).get('skipped'), (
             imported.data)
 
-        listing = (auth_client.get('/api/v2/templates?per_page=100')
+        listing = (auth_client.get('/api/v2/templates?search=validity-contract-imported')
                    .get_json() or {}).get('data') or []
         rows = listing if isinstance(listing, list) else listing.get('items', [])
         by_name = {row['name']: row for row in rows}

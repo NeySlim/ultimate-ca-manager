@@ -59,7 +59,7 @@ class NamecomDnsProvider(BaseDnsProvider):
             return False, f"Failed to create record: {result}"
         return True, "Record created successfully"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         dom = self._find_domain(domain)
         if not dom:
             return False, f"Could not find domain {domain}"
@@ -68,7 +68,8 @@ class NamecomDnsProvider(BaseDnsProvider):
             return False, f"Failed to list records: {result}"
         host = self.get_relative_record_name(record_name, dom)
         for rec in result.get('records', []):
-            if rec.get('type') == 'TXT' and rec.get('host') == host:
+            if (rec.get('type') == 'TXT' and rec.get('host') == host
+                    and self.txt_matches(rec.get('answer'), record_value)):
                 self._request('DELETE', f'/domains/{dom}/records/{rec["id"]}')
         return True, "Record deleted successfully"
     

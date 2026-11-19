@@ -12,6 +12,7 @@ from fips_mode import FipsRestricted
 from utils.response import success_response, error_response
 from utils.export_password import validate_export_password
 from utils.algorithm_refusal import refuse_unexportable_key
+from utils.key_codec import refuse_eddsa_key
 from cryptography.hazmat.primitives.serialization import pkcs7
 
 from . import tools_bp, logger
@@ -49,6 +50,13 @@ def convert_certificate():
             raw_input = base64.b64decode(input_data[7:])
         else:
             raw_input = input_data
+        # Before any parsing, as the imports: the FIPS provider cannot load an EdDSA key
+        refuse_eddsa_key(raw_input, 'the converted file')
+        if key_pem:
+            refuse_eddsa_key(base64.b64decode(key_pem[7:]) if key_pem.startswith('BASE64:') else key_pem,
+                             'the converted key')
+        if chain_pem:
+            refuse_eddsa_key(chain_pem, 'the converted chain')
 
         # Guard rail: binary files (PKCS12/PFX) require a password
         if is_binary and not password:

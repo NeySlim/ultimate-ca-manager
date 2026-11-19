@@ -12,6 +12,33 @@ from one page or the other, said different things about itself.
 from typing import Any, Dict
 
 
+# What a renamed row is, in the restore message.
+_RENAMED_KIND = {'dns_providers': 'DNS provider', 'acme_client_accounts': 'ACME account',
+                 'webhook_endpoints': 'webhook'}
+
+
+def _listing(entries, shown=5) -> str:
+    listing = '; '.join(str(entry) for entry in entries[:shown])
+    if len(entries) > shown:
+        listing += f' and {len(entries) - shown} more'
+    return listing
+
+
+def restore_audit_details(filename: str, results: Dict[str, Any]) -> str:
+    """The `system_restore` audit line, with what a replacing restore removed or cancelled."""
+    results = results or {}
+    if not results.get('sections_carried'):
+        return f'Backup carried no data section, nothing was restored: {filename}'
+    details = f'Restored from backup: {filename}'
+    for key, label in (('removed', 'removed'), ('cleared_dependents', 'deleted with them'),
+                       ('unlinked_dependents', 'unlinked'), ('closed_dependents', 'cancelled')):
+        counts = results.get(key) or {}
+        if counts:
+            details += f'; {label}: ' + ', '.join(
+                f'{name} ({count})' for name, count in sorted(counts.items()))
+    return details
+
+
 def with_restore_warnings(message: str, results: Dict[str, Any]) -> str:
     """`message`, followed by what the archive had to warn about.
 
@@ -73,6 +100,47 @@ def with_restore_warnings(message: str, results: Dict[str, Any]) -> str:
         message += _clause(
             f'{len(fallbacks)} deploy {bindings} pinned to a cross-certificate '
             f'absent from this installation {were} reset to the automatic chain')
+
+    renamed = (results or {}).get('renamed') or []
+    if renamed:
+        shown = [f"{_RENAMED_KIND.get(entry['section'], entry['section'])} "
+                 f"{entry['from']} as {entry['to']}" for entry in renamed[:5]]
+        listing = ', '.join(shown)
+        if len(renamed) > len(shown):
+            listing += f' and {len(renamed) - len(shown)} more'
+        rows, were = ('row', 'was') if len(renamed) == 1 else ('rows', 'were')
+        message += _clause(f'{len(renamed)} {rows} {were} restored under another '
+                           f'name: {listing}')
+
+    cleared = (results or {}).get('cleared_dependents') or {}
+    if cleared:
+        message += _clause('Rows that depended on a removed row were deleted: '
+                           + _listing([f'{name} ({count})' for name, count in sorted(cleared.items())]))
+
+    closed = (results or {}).get('closed_dependents') or {}
+    if closed:
+        message += _clause('Open requests on a removed row were cancelled: '
+                           + _listing([f'{name} ({count})' for name, count in sorted(closed.items())]))
+
+    unlinked = (results or {}).get('unlinked_dependents') or {}
+    if unlinked:
+        message += _clause('Rows the archive does not carry lost their link to a removed row: '
+                           + _listing([f'{name} ({count})' for name, count in sorted(unlinked.items())]))
+
+    warnings = (results or {}).get('warnings') or []
+    if warnings:
+        message += _clause('The archive also warned: ' + _listing(warnings))
+
+    left_out = (results or {}).get('left_out') or []
+    if left_out:
+        rows, were = ('row', 'was') if len(left_out) == 1 else ('rows', 'were')
+        message += _clause(f'{len(left_out)} {rows} of an older archive {were} left out: '
+                           + _listing(left_out))
+
+    dropped = (results or {}).get('dropped_secrets') or []
+    if dropped:
+        message += _clause('Secrets encrypted under another installation\'s key were '
+                           'left out, enter them again: ' + _listing(dropped))
 
     if (results or {}).get('admin_allowlist_cleared'):
         message += _clause('The admin access allowlist from the archive would '

@@ -38,6 +38,14 @@ const HTTP_ERROR_MESSAGES = {
   504: 'The server took too long to respond. Please try again.',
 }
 
+// Retry-After in seconds (RFC 9110 §10.2.3: delay or HTTP date), undefined when absent
+export function parseRetryAfter(value) {
+  if (!value) return undefined
+  if (/^\d+$/.test(value.trim())) return Number(value.trim())
+  const date = Date.parse(value)
+  return Number.isNaN(date) ? undefined : Math.max(0, Math.ceil((date - Date.now()) / 1000))
+}
+
 /**
  * Build a user-friendly error message from an HTTP response.
  * Priority: backend message > status-code message > generic fallback.
@@ -50,6 +58,21 @@ function buildErrorMessage(status, data, fallback = 'Request failed') {
     ? (data.message || data.detail || (typeof data.error === 'string' ? data.error : null))
     : null
   return backendMsg || HTTP_ERROR_MESSAGES[status] || fallback
+}
+
+// One redirect for a burst of 401s: each navigation to /login can log in again with
+// a client certificate, and calls sent while it loads would carry no cookie.
+let loginRedirectPending = false
+
+export function resetLoginRedirect() {
+  loginRedirectPending = false
+}
+
+// A page restored from the back-forward cache keeps its module state: it sends again
+if (typeof window !== 'undefined') {
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) resetLoginRedirect()
+  })
 }
 
 class APIClient {
@@ -83,6 +106,11 @@ class APIClient {
   async request(endpoint, options = {}) {
     if (import.meta.env.DEV && options.params) {
       console.warn(`⚠️ apiClient does not support 'params'. Use buildQueryString() to append query params to the URL. Called on: ${endpoint}`)
+    }
+    if (loginRedirectPending) {
+      const error = new Error(HTTP_ERROR_MESSAGES[401])
+      error.status = 401
+      throw error
     }
     const url = `${this.baseURL}${endpoint}`
     
@@ -136,6 +164,7 @@ class APIClient {
         const error = new Error(msg)
         error.status = response.status
         error.data = data
+        error.retryAfter = parseRetryAfter(response.headers.get('retry-after'))
         if (import.meta.env.DEV) {
           console.error(`❌ API error ${response.status}:`, error.message)
         }
@@ -144,8 +173,9 @@ class APIClient {
         const isLoginPage = window.location.pathname.includes('/login')
         const isAuthEndpoint = endpoint.includes('/auth/login') || endpoint.includes('/auth/verify')
         
-        if (response.status === 401 && !isLoginPage && !isAuthEndpoint) {
+        if (response.status === 401 && !isLoginPage && !isAuthEndpoint && !loginRedirectPending) {
           console.warn('🚪 401 Unauthorized - redirecting to login')
+          loginRedirectPending = true
           window.location.href = '/login'
         }
         

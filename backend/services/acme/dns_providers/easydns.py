@@ -56,7 +56,7 @@ class EasyDnsDnsProvider(BaseDnsProvider):
             return False, f"Failed: {result}"
         return True, "Record created"
     
-    def delete_txt_record(self, domain, record_name):
+    def delete_txt_record(self, domain, record_name, record_value):
         zone = self._find_zone(domain)
         if not zone:
             return False, f"Zone not found for {domain}"
@@ -66,8 +66,11 @@ class EasyDnsDnsProvider(BaseDnsProvider):
         if not success:
             return False, f"Failed: {result}"
         for rec in result.get('data', []):
-            if rec.get('type') == 'TXT' and rec.get('host') == relative:
-                self._request('DELETE', f'/zones/records/{zone}/{rec["id"]}')
+            if (rec.get('type') == 'TXT' and rec.get('host') == relative
+                    and self.txt_matches(rec.get('rdata'), record_value)):
+                success, result = self._request('DELETE', f'/zones/records/{zone}/{rec["id"]}')
+                if not success:
+                    return False, f"Failed: {result}"
         return True, "Record deleted"
     
     def test_connection(self):

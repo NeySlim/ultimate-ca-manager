@@ -29,7 +29,9 @@ class DynuDnsProvider(BaseDnsProvider):
     def _request(self, method, path, data=None):
         try:
             resp = requests.request(method, f"{self.BASE_URL}{path}",
-                headers=self._get_headers(), json=data, timeout=30)
+                headers=self._get_headers(), json=data, timeout=30,
+                # requests keeps the API-Key header on a redirect to another host
+                allow_redirects=False)
             if resp.status_code >= 400:
                 return False, self._error(resp)
             return True, resp.json() if resp.text else None
@@ -64,7 +66,7 @@ class DynuDnsProvider(BaseDnsProvider):
             return False, f"Failed: {result}"
         return True, "Record created"
     
-    def delete_txt_record(self, domain, record_name):
+    def delete_txt_record(self, domain, record_name, record_value):
         info = self._get_domain_id(domain)
         if not info:
             return False, f"Zone not found for {domain}"
@@ -75,10 +77,16 @@ class DynuDnsProvider(BaseDnsProvider):
         if not success:
             return False, f"Failed to list records: {result}"
         
+        deleted = 0
         for rec in result.get('dnsRecords', []):
-            if rec.get('recordType') == 'TXT' and rec.get('nodeName') == node:
-                self._request('DELETE', f'/dns/{domain_id}/record/{rec["id"]}')
-                return True, "Record deleted"
+            if (rec.get('recordType') == 'TXT' and rec.get('nodeName') == node
+                    and self.txt_matches(rec.get('textData'), record_value)):
+                success, result = self._request('DELETE', f'/dns/{domain_id}/record/{rec["id"]}')
+                if not success:
+                    return False, f"Failed: {result}"
+                deleted += 1
+        if deleted:
+            return True, "Record deleted"
         return True, "Record not found (already deleted?)"
     
     def test_connection(self):

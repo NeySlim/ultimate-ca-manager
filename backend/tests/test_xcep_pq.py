@@ -7,6 +7,7 @@ from lxml import etree
 
 from models import CA, CATemplatePin, CertificateTemplate, db
 from models.system_config import SystemConfig
+from tests.fixtures.templates import delete_templates
 from services.xcep import policy_builder
 from tests.test_xcep_policy import (
     XCEP_NS, XCEP_PASSWORD, XCEP_URL, XCEP_USER, _basic_auth, _set_config,
@@ -63,8 +64,7 @@ def xcep_pq_policies(app, client, create_ca):
         yield etree.fromstring(r.data)
     finally:
         with app.app_context():
-            CATemplatePin.query.filter(CATemplatePin.template_id.in_(ids)).delete()
-            CertificateTemplate.query.filter(CertificateTemplate.id.in_(ids)).delete()
+            delete_templates(ids)
             db.session.commit()
             for k, v in previous.items():
                 if v is None:

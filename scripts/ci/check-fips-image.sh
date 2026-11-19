@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Boots IMAGE with UCM_FIPS=1 and fails unless OpenSSL runs the FIPS provider
 # and /api/v2/health reports fips_active: true. FIPS_CHECK_KEEP=1 leaves a
-# passing container running for later steps.
+# passing container running for later steps. A copy of fips.so with one byte
+# appended must stop the start (check-fips-module-tamper.sh).
 set -euo pipefail
 
 image=${1:?usage: check-fips-image.sh IMAGE [CONTAINER_NAME] [HOST_PORT]}
@@ -63,6 +64,10 @@ tls() { timeout 10 openssl s_client -connect "127.0.0.1:$port" "$@" </dev/null 2
 tls -groups X25519:X448 | grep -q 'Cipher is (NONE)' || fail "TLS accepts X25519 or X448"
 tls -groups P-256 | grep -Eq 'Temp Key: ECDH, prime256v1' || fail "TLS refuses P-256"
 tls | grep -E 'Temp Key' | grep -q X25519 && fail "TLS negotiates X25519 by default"
+
+# The entrypoint compares the module to the build's: one appended byte stops the start
+"$(dirname "$0")/check-fips-module-tamper.sh" "$image" "$name-tamper" \
+    || fail "the entrypoint did not refuse a modified FIPS module"
 
 passed=1
 echo "FIPS check passed for $image"

@@ -11,7 +11,6 @@ from flask import request, g
 import base64
 import logging
 
-from cryptography.hazmat.primitives.asymmetric import ed25519, ed448
 from cryptography import x509
 
 from auth.unified import require_auth
@@ -19,7 +18,7 @@ from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response
 from utils.cert_issuer import private_key_matches
 from services.import_service import KeyPasswordError, load_import_private_key
-from utils.key_codec import MalformedKey, private_key_to_pem
+from utils.key_codec import MalformedKey, private_key_to_pem, refuse_eddsa_key
 from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
 from services.audit_service import AuditService
 from models import CA, db
@@ -34,8 +33,7 @@ def import_ca_private_key(ca_id):
     """Attach a private key to a CA that holds only its certificate.
 
     Body (JSON): ``{key: PEM or base64 PEM, passphrase: optional}``.
-    The key must be the certificate's own; Ed25519/Ed448 keys are refused,
-    a CA could sign neither certificates nor CRLs with them.
+    The key must be the certificate's own.
     """
     ca = db.session.get(CA, ca_id)
     if not ca:
@@ -65,6 +63,8 @@ def import_ca_private_key(ca_id):
             return error_response('Invalid key format - must be PEM or base64-encoded PEM', 400)
     if 'PRIVATE KEY' not in key_data:
         return error_response('Invalid private key format', 400)
+    # FIPS mode: an EdDSA key is refused by name before the provider fails to load it
+    refuse_eddsa_key(key_data.encode('utf-8'), f"CA '{ca.descr}'")
     try:
         private_key = load_import_private_key(key_data.encode('utf-8'), passphrase)
     except UnsupportedForKeyAlgorithm:
@@ -74,9 +74,6 @@ def import_ca_private_key(ca_id):
     except Exception as e:
         logger.warning(f"CA {ca_id} key import: invalid key: {e}")
         return error_response('Invalid private key format', 400)
-    if isinstance(private_key, (ed25519.Ed25519PrivateKey, ed448.Ed448PrivateKey)):
-        return error_response('Ed25519 and Ed448 CA keys are not supported: '
-                              'such a CA could sign neither certificates nor CRLs', 400)
     try:
         cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
     except Exception:

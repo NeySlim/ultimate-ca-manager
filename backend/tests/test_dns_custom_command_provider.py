@@ -60,7 +60,7 @@ class TestCustomCommandProvider:
     def test_delete_optional_noop_when_missing(self, script):
         helper, _ = script
         p = create_provider('custom_command', _creds(helper, delete=False))
-        ok, msg = p.delete_txt_record('example.com', '_acme-challenge.example.com')
+        ok, msg = p.delete_txt_record('example.com', '_acme-challenge.example.com', 'v')
         assert ok and 'No command' in msg
 
     def test_relative_binary_refused(self, tmp_path):

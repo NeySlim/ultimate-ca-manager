@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Only the latest stable release receives security fixes. UCM has no patch releases: a fix ships in the next build (for example 2.245 after 2.244), so upgrade to stay covered. Release candidates and the `dev` branch are for testing and are not supported.
+Only the latest stable release receives security fixes. 2.254 is the last version of the 2.x line, which now receives security fixes only, numbered 2.254.1, 2.254.2 and so on: upgrade to the latest of them to stay covered. Release candidates and the `dev` branch are for testing and are not supported.
 
 ## Reporting a vulnerability
 

@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 
+from auth.session_start import ACCOUNT_KEY, account_proof
 from models import User, db
 from models.api_key import APIKey
 from models.user import UserSession
@@ -119,7 +120,12 @@ def _socket(app, user_id):
     client = app.test_client()
     with client.session_transaction() as sess:
         now = utc_now().isoformat()
-        sess.update(user_id=user_id, login_time=now, last_activity=now)
+        # A real login also records the username and the account proof.
+        with app.app_context():
+            user = db.session.get(User, user_id)
+            sess.update(user_id=user_id, username=user.username,
+                        **{ACCOUNT_KEY: account_proof(user)})
+        sess.update(login_time=now, last_activity=now)
     ws = socketio.test_client(app, flask_test_client=client)
     try:
         yield ws

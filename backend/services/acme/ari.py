@@ -72,8 +72,9 @@ def _aki_matches(stored_aki: Optional[str], wanted_hex: str) -> bool:
     return stored_aki.replace(':', '').lower() == wanted_hex
 
 
-def find_certificate(aki_hex: str, serial_int: int) -> Optional[Certificate]:
-    """Locate an issued certificate by AKI + serial.
+def find_certificates(aki_hex: str, serial_int: int) -> list:
+    """Every stored row of the certificate with this AKI + serial, oldest first: an
+    imported certificate may be stored again, by each proxy download for instance.
 
     Serial numbers are stored inconsistently (decimal or hex) across the
     DB's history, so we match on the integer value and confirm the AKI to
@@ -83,14 +84,24 @@ def find_certificate(aki_hex: str, serial_int: int) -> Optional[Certificate]:
     rows = (Certificate.query
             .filter(Certificate.crt.isnot(None))
             .filter(Certificate.serial_number.in_(candidates))
+            .order_by(Certificate.id.asc())
             .all())
-    for cert in rows:
-        # Against the stored certificate, not the column: an all-digit column
-        # reads as decimal but may have been written as hex, and confirming
-        # the candidate that way rejected the certificate that was asked for.
-        if resolve_record_serial(cert) == serial_int and _aki_matches(cert.aki, aki_hex):
-            return cert
-    return None
+    # Against the stored certificate, not the column: an all-digit column
+    # reads as decimal but may have been written as hex, and confirming
+    # the candidate that way rejected the certificate that was asked for.
+    return [cert for cert in rows
+            if resolve_record_serial(cert) == serial_int and _aki_matches(cert.aki, aki_hex)]
+
+
+def renewal_row(rows: list) -> Certificate:
+    """The row whose window is served: a revocation recorded on any row of the certificate wins."""
+    return next((row for row in rows if row.revoked), rows[0])
+
+
+def find_certificate(aki_hex: str, serial_int: int) -> Optional[Certificate]:
+    """Locate an issued certificate by AKI + serial (its oldest row)."""
+    rows = find_certificates(aki_hex, serial_int)
+    return rows[0] if rows else None
 
 
 def has_valid_replacement(certid: str) -> bool:

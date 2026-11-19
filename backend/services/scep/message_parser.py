@@ -25,6 +25,10 @@ from utils import key_algorithms
 logger = logging.getLogger(__name__)
 
 
+class UnsupportedScepAlgorithm(ValueError):
+    """An envelope algorithm UCM does not take: answered with badAlg (RFC 8894 §3.2.1.4)."""
+
+
 # Mapping for SignerInfo.digest_algorithm (cms native names) → cryptography hash
 _DIGEST_MAP = {
     "sha1": hashes.SHA1,
@@ -34,10 +38,8 @@ _DIGEST_MAP = {
     "sha512": hashes.SHA512,
 }
 
-# Hash algorithms we are *willing to verify* on incoming CMS signatures.
-# MD5 and SHA-1 are intentionally accepted on inbound messages because some
-# legacy SCEP clients still sign with them, but we never *advertise* them in
-# GetCACaps and never sign outbound responses with them.
+# Hash algorithms accepted on incoming CMS signatures: SHA-1 for legacy clients
+# (RFC 8894 §2.9 MAY), never advertised nor used outbound; MD5 is refused (MUST NOT).
 _INBOUND_DIGEST_ALLOWED = {"sha1", "sha224", "sha256", "sha384", "sha512"}
 _TDES_CBC = "1.2.840.113549.3.7"
 
@@ -259,7 +261,9 @@ def verify_cms_signature(signed_data, signer_cert, signer_info=None) -> None:
             bytes(signature), signed_bytes, padding.PKCS1v15(), hash_cls()
         )
     elif isinstance(public_key, ec.EllipticCurvePublicKey):
-        if sig_alg != f"{digest_name}_ecdsa":
+        # Windows CertEnroll puts the key type (id-ecPublicKey) there instead of
+        # RFC 5753's ecdsa-with-SHA*; the digest then comes from digestAlgorithm
+        if sig_alg not in (f"{digest_name}_ecdsa", "1.2.840.10045.2.1"):
             raise ValueError(f"Unsupported ECDSA CMS signature algorithm: {sig_alg}")
         public_key.verify(bytes(signature), signed_bytes, ec.ECDSA(hash_cls()))
     elif isinstance(public_key, dsa.DSAPublicKey):
@@ -415,7 +419,7 @@ def decrypt_scep_envelope(
         # Windows (Intune's SCEP client) wraps the content key with OAEP
         key_padding = oaep_padding(key_algorithm["parameters"])
     else:
-        raise ValueError("Unsupported SCEP key transport algorithm")
+        raise UnsupportedScepAlgorithm("Unsupported SCEP key transport algorithm")
     if fips_mode.enabled():
         # Refused before the CA key is used: the module has no 3DES and lets v1.5 through
         if key_algorithm_name == "rsaes_pkcs1v15":
@@ -441,7 +445,7 @@ def decrypt_scep_envelope(
 
     if alg_oid == "1.3.14.3.2.7":
         logger.warning("SCEP client using DES encryption: rejected (insecure)")
-        raise ValueError("DES encryption is not supported: use AES or 3DES")
+        raise UnsupportedScepAlgorithm("DES encryption is not supported: use AES or 3DES")
 
     if alg_oid == _TDES_CBC:
         if len(iv) != 8:
@@ -470,4 +474,4 @@ def decrypt_scep_envelope(
         )
         return _remove_pkcs7_padding(plaintext, 16)
 
-    raise ValueError(f"Unsupported encryption algorithm: {alg_oid}")
+    raise UnsupportedScepAlgorithm(f"Unsupported encryption algorithm: {alg_oid}")

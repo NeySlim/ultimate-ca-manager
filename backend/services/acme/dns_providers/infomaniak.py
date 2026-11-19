@@ -125,7 +125,7 @@ class InfomaniakDnsProvider(BaseDnsProvider):
         logger.info(f"Infomaniak: Created TXT record {record_name} (ID: {record_id})")
         return True, f"Record created successfully (ID: {record_id})"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         """Delete TXT record via Infomaniak API"""
         domain_info = self._get_domain_info(domain)
         if not domain_info:
@@ -144,7 +144,8 @@ class InfomaniakDnsProvider(BaseDnsProvider):
         deleted = 0
         record_list = records if isinstance(records, list) else []
         for record in record_list:
-            if record.get('type') == 'TXT' and record.get('source') == relative_name:
+            if (record.get('type') == 'TXT' and record.get('source') == relative_name
+                    and self.txt_matches(record.get('target'), record_value)):
                 success, _ = self._request('DELETE', f'/1/domain/{domain_id}/dns/record/{record["id"]}')
                 if success:
                     deleted += 1

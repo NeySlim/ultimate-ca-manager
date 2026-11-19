@@ -22,6 +22,7 @@ from models import (
 from services.deploy import DeployService
 from fips_mode import FipsRestricted
 from services.deploy.ssh import DeploySSHError, HostKeyMismatch
+from services.deploy.http import DeployHTTPError
 from services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
@@ -76,7 +77,9 @@ def create_target():
     AuditService.log_action(
         action='deploy_target_create', resource_type='deploy_target',
         resource_id=str(target.id), resource_name=target.name,
-        details=f"Created deploy target {target.name} ({target.username}@{target.host}:{target.port})",
+        details=(f"Created deploy target {target.name} ("
+                 + (f"{target.http_method} {target.url}" if target.is_http
+                    else f"{target.username}@{target.host}:{target.port}") + ')'),
         success=True)
     return created_response(data=result, message='Deploy target created')
 
@@ -175,7 +178,7 @@ def test_target(target_id):
     except FipsRestricted:
         db.session.rollback()
         raise  # the app handler answers 400 with the FIPS problem type
-    except DeploySSHError as e:
+    except (DeploySSHError, DeployHTTPError) as e:
         db.session.rollback()
         return error_response(str(e), 502)
     except Exception as e:
@@ -193,7 +196,9 @@ def test_target(target_id):
         action='deploy_target_test', resource_type='deploy_target',
         resource_id=str(target.id), resource_name=target.name,
         details=f"Connection test succeeded for {target.name}", success=True)
-    return success_response(data=result, message='Connection and SFTP OK')
+    message = (f"API reachable (HTTP {result.get('status_code')})" if target.is_http
+               else 'Connection and SFTP OK')
+    return success_response(data=result, message=message)
 
 
 # ================================================================= bindings
@@ -239,15 +244,19 @@ def create_binding():
     try:
         fields = DeployService.validate_binding_paths(data)
         DeployService.check_chain_variant(certificate, fields.get('chain_variant', 'auto'))
-        DeployService.ensure_distinct_paths(
-            fields.get('cert_path'), fields.get('key_path'), fields.get('fullchain_path'))
+        if target.is_http:
+            DeployService.validate_http_binding(target, certificate, fields)
+        else:
+            DeployService.ensure_distinct_paths(
+                fields.get('cert_path'), fields.get('key_path'), fields.get('fullchain_path'))
     except ValueError as e:
         return error_response(str(e), 400)
-    if not any(fields.get(f) for f in ('cert_path', 'key_path', 'fullchain_path')):
-        return error_response('At least one destination path is required', 400)
-    if fields.get('key_path') and not certificate.prv:
-        return error_response(
-            'This certificate has no private key in UCM: remove the key path', 400)
+    if not target.is_http:
+        if not any(fields.get(f) for f in ('cert_path', 'key_path', 'fullchain_path')):
+            return error_response('At least one destination path is required', 400)
+        if fields.get('key_path') and not certificate.prv:
+            return error_response(
+                'This certificate has no private key in UCM: remove the key path', 400)
 
     if DeployBinding.query.filter_by(
             target_id=target.id, certificate_id=certificate.id).first():
@@ -305,31 +314,35 @@ def update_binding(binding_id):
     if not binding:
         return error_response('Deploy binding not found', 404)
     data = request.get_json() or {}
+    http_target = bool(binding.target and binding.target.is_http)
     try:
         fields = DeployService.validate_binding_paths(data, partial=True)
         if 'chain_variant' in fields:
             DeployService.check_chain_variant(binding.certificate, fields['chain_variant'])
+        if http_target:
+            DeployService.validate_http_binding(binding.target, binding.certificate, fields)
     except ValueError as e:
         return error_response(str(e), 400)
     changed_fields = [key for key, value in fields.items()
                       if getattr(binding, key) != value]
     for key, value in fields.items():
         setattr(binding, key, value)
-    if not any((binding.cert_path, binding.key_path, binding.fullchain_path)):
-        db.session.rollback()
-        return error_response('At least one destination path is required', 400)
-    try:
-        # Collision check on the FINAL state (a partial PATCH can collide
-        # with a path that was already stored)
-        DeployService.ensure_distinct_paths(
-            binding.cert_path, binding.key_path, binding.fullchain_path)
-    except ValueError as e:
-        db.session.rollback()
-        return error_response(str(e), 400)
-    if binding.key_path and binding.certificate and not binding.certificate.prv:
-        db.session.rollback()
-        return error_response(
-            'This certificate has no private key in UCM: remove the key path', 400)
+    if not http_target:
+        if not any((binding.cert_path, binding.key_path, binding.fullchain_path)):
+            db.session.rollback()
+            return error_response('At least one destination path is required', 400)
+        try:
+            # Collision check on the FINAL state (a partial PATCH can collide
+            # with a path that was already stored)
+            DeployService.ensure_distinct_paths(
+                binding.cert_path, binding.key_path, binding.fullchain_path)
+        except ValueError as e:
+            db.session.rollback()
+            return error_response(str(e), 400)
+        if binding.key_path and binding.certificate and not binding.certificate.prv:
+            db.session.rollback()
+            return error_response(
+                'This certificate has no private key in UCM: remove the key path', 400)
 
     delivery = DeployService.deploy_binding_update_now(
         binding, DeployDelivery.BINDING_CERTIFICATE, actor=_actor())
@@ -442,6 +455,8 @@ def create_crl_binding():
     target = db.session.get(DeployTarget, data.get('target_id') or 0)
     if not target:
         return error_response('Deploy target not found', 404)
+    if target.is_http:
+        return error_response('CRL deployment requires an SSH target', 400)
     ca = db.session.get(CA, data.get('ca_id') or 0)
     if not ca:
         return error_response('CA not found', 404)

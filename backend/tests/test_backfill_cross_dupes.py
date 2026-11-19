@@ -16,6 +16,14 @@ from cryptography.x509.oid import NameOID
 from models import db, CA
 from services.ski_aki_backfill import backfill_ski_aki
 from utils.key_codec import store_pem_bytes
+import pytest
+from tests.fixtures.templates import templates_created_here_removed
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _templates_stay_in_this_module(app):
+    with templates_created_here_removed(app):
+        yield
 
 
 def _cert(subject_key, cn, issuer_key=None, issuer_cn=None):
@@ -338,3 +346,26 @@ def test_merge_repoints_settings_naming_the_duplicate(app):
                 else:
                     row.value = v
             db.session.commit()
+
+
+def test_merge_with_crl_numbers_on_both_sides_keeps_the_highest(app):
+    """Both records published CRL 1 and 2: the merge still happens and number 3 stays used."""
+    from models import CRLMetadata
+    key = ec.generate_private_key(ec.SECP256R1())
+    cert = _cert(key, 'Crl Number Clash Root')
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    with app.app_context():
+        keeper_id = _row(cert, key)
+        dupe_id = _row(cert)
+        for ca_id, numbers in ((keeper_id, (1, 2)), (dupe_id, (1, 2, 3))):
+            for number in numbers:
+                db.session.add(CRLMetadata(ca_id=ca_id, crl_number=number, this_update=now,
+                                           next_update=now + timedelta(days=1),
+                                           crl_pem='x', crl_der=b'x'))
+        db.session.commit()
+
+        backfill_ski_aki()
+
+        db.session.expire_all()
+        assert db.session.get(CA, dupe_id) is None
+        assert sorted(m.crl_number for m in CRLMetadata.query.filter_by(ca_id=keeper_id)) == [1, 2, 3]

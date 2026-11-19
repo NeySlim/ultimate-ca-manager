@@ -22,6 +22,10 @@ export default {
           { label: 'Schlüssel generieren', text: 'Ein neues Schlüsselpaar direkt auf dem HSM erstellen' },
           { label: 'Status', text: 'Verbindungszustand des Anbieters überwachen' },
           { label: 'Zertifizierung', text: 'Die Zertifizierung des HSM angeben: Common Criteria EAL 4+, EUCC high, FIPS 140-3 Level 3, FIPS 140-2 Level 3 oder andere. Bleibt das Feld leer, ist sie nicht angegeben. Das Compliance-Profil eu-acm akzeptiert für eine HSM-gestützte CA nur Common Criteria EAL 4+, EUCC high und FIPS 140-3 Level 3 (bis 31. Dezember 2030)' },
+          { label: 'Name bereits vergeben (v2.249)', text: 'Einen Schlüssel unter einem Namen zu erzeugen, den OpenBao oder Azure Key Vault bereits hält, wird abgelehnt (409): Bringen Sie einen vorhandenen Schlüssel mit einer Schlüsselsynchronisierung ein (POST /api/v2/hsm/providers/<id>/sync)' },
+          { label: 'Eine Erzeugung gleichzeitig (v2.249)', text: 'Schlüsselerzeugungen kommen je Anbieter nacheinander an die Reihe, und eine, die nach 60 Sekunden noch wartet, erhält 409. Ein Schlüssel, dessen Eintrag nicht gespeichert werden konnte, wird aus dem HSM entfernt' },
+          { label: 'PIN in Backups (v2.249)', text: 'Ein Backup enthält die PIN oder das Token des Anbieters im Klartext im Archiv, durch dessen Passwort geschützt, sodass es auf einer anderen Installation wiederhergestellt wird. Ein Wert, den nur der Schlüssel einer anderen Installation öffnet, wird bei der Wiederherstellung verworfen, mit einem Log-Eintrag, der zur erneuten Eingabe auffordert' },
+          { label: 'SoftHSM im FIPS-Modus (v2.247)', text: 'Der FIPS-Modus lehnt einen neuen SoftHSM-Anbieter ab, da SoftHSM kein validiertes Modul ist; UCM_FIPS_ALLOW_SOFTHSM=1 erlaubt einen für Tests' },
         ]
       },
       {
@@ -79,7 +83,8 @@ Die Industriestandard-HSM-Schnittstelle. Unterstützte Geräte:
 
 Konfiguration:
 - **Bibliothekspfad**: Pfad zur PKCS#11-Shared-Library (.so/.dll)
-- **Slot**: HSM-Slotnummer
+- **Token-Label**: Label des zu verwendenden Tokens (erforderlich)
+- **Slot**: HSM-Slotnummer (optional)
 - **PIN**: Benutzer-PIN zur Authentifizierung
 
 ### AWS CloudHSM
@@ -122,11 +127,11 @@ Unterstützte Schlüsseltypen:
 ## Anbieter verwalten
 
 ### Anbieter hinzufügen
-1. Klicken Sie auf **Anbieter hinzufügen**
+1. Klicken Sie auf **Neuer Anbieter**
 2. Wählen Sie den **Anbietertyp**
 3. Geben Sie die Verbindungsdetails ein
-4. Klicken Sie auf **Verbindung testen** zur Überprüfung
-5. Klicken Sie auf **Speichern**
+4. Klicken Sie auf **Erstellen**
+5. Klicken Sie beim neuen Anbieter auf **Testen**, um die Verbindung zu prüfen
 
 ### Verbindung testen
 Testen Sie die Verbindung immer nach dem Erstellen oder Ändern eines Anbieters. UCM überprüft, ob es mit dem HSM kommunizieren und sich authentifizieren kann. Bei einem PKCS#11-Modul erfasst der Test zusätzlich die Angaben des Moduls (Bibliothek, Hersteller, Bibliotheks- und Firmware-Version), die auf der Seite des Anbieters angezeigt werden.

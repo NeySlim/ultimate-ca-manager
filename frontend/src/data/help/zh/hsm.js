@@ -22,6 +22,10 @@ export default {
           { label: '生成密钥', text: '直接在 HSM 上创建新的密钥对' },
           { label: '状态', text: '监控提供商连接健康状况' },
           { label: '认证', text: '声明 HSM 的认证：Common Criteria EAL 4+、EUCC high、FIPS 140-3 级别 3、FIPS 140-2 级别 3 或其他。留空表示未声明。对于由 HSM 支持的 CA，eu-acm 合规配置仅接受 Common Criteria EAL 4+、EUCC high 以及 FIPS 140-3 级别 3（至 2030 年 12 月 31 日）' },
+          { label: '名称已存在 (v2.249)', text: '在 OpenBao 或 Azure Key Vault 已存在的名称下生成密钥会被拒绝 (409)：请通过密钥同步 (POST /api/v2/hsm/providers/<id>/sync) 引入现有密钥' },
+          { label: '一次一个生成 (v2.249)', text: '每个提供商上的密钥生成依次进行，等待超过 60 秒的会得到 409。记录无法保存的密钥会从 HSM 中移除' },
+          { label: '备份中的 PIN (v2.249)', text: '备份在归档内以明文保存提供商的 PIN 或令牌，并由其密码保护，因此可在另一个安装上恢复。仅另一个安装的密钥才能打开的值会在恢复时丢弃，并在日志中提示重新输入' },
+          { label: 'FIPS 模式下的 SoftHSM (v2.247)', text: 'FIPS 模式拒绝新的 SoftHSM 提供商，因为 SoftHSM 不是经过验证的模块；设置 UCM_FIPS_ALLOW_SOFTHSM=1 可在测试时允许创建' },
         ]
       },
       {
@@ -78,7 +82,8 @@ export default {
 
 配置：
 - **库路径**: PKCS#11 共享库路径（.so/.dll）
-- **插槽**: HSM 插槽号
+- **令牌标签**: 要使用的令牌标签（必填）
+- **插槽**: HSM 插槽号（可选）
 - **PIN**: 用户 PIN 用于认证
 
 ### AWS CloudHSM
@@ -121,11 +126,11 @@ OpenBao 或 HashiCorp Vault Transit Secrets Engine。密钥通过 Transit API �
 ## 管理提供商
 
 ### 添加提供商
-1. 点击**添加提供商**
+1. 点击**新提供商**
 2. 选择**提供商类型**
 3. 输入连接详情
-4. 点击**测试连接**进行验证
-5. 点击**保存**
+4. 点击**创建**
+5. 在新建的提供商上点击**测试**以验证连接
 
 ### 测试连接
 创建或修改提供商后始终测试连接。UCM 验证能否与 HSM 通信和认证。对于 PKCS#11 模块，测试还会记录模块上报的信息（库、制造商、库版本和固件版本），显示在提供商页面上。

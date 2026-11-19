@@ -246,9 +246,18 @@ def get_custom_role_permissions(user) -> list:
         from models import db
         from models.rbac import CustomRole
         return custom_role_permissions(db.session.get(CustomRole, role_id))
-    except Exception as e:  # noqa: BLE001: authorisation must not 500 on this
+    except Exception as e:  # noqa: BLE001  # authorisation must not 500 on this
         logger.warning(f"Could not resolve custom role permissions for user {getattr(user, 'id', '?')}: {e}")
         return []
+
+
+def builtin_role_shown_permissions(role: str) -> list:
+    """What Access Control shows for a built-in role: what it is granted here.
+
+    The `*` of the administrator is shown as every scope the page lists.
+    """
+    perms = ROLE_PERMISSIONS.get(role, [])
+    return list(CUSTOM_ROLE_GRANTABLE_PERMISSIONS) if '*' in perms else list(perms)
 
 
 def get_role_permissions(role: str) -> list:

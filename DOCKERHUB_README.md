@@ -120,16 +120,17 @@ volumes:
 | `UCM_SECRET_KEY` | generated | Session secret |
 | `DATABASE_URL` | unset | PostgreSQL DSN; SQLite is used when unset |
 | `KEY_ENCRYPTION_KEY` | unset | Encrypts private keys at rest, in place of the `master.key` file |
+| `UCM_AUTO_MASTER_KEY` | `true` | Creates `master.key` at first start, only when `/etc/ucm` is a named volume or a host directory; `false` leaves private keys unencrypted until encryption is enabled |
 
 ---
 
 ## Tags
 
 - `latest` -- Latest stable release
-- Version tags (e.g. `2.248`)
+- Version tags (e.g. `2.254`, `2.254.1`)
 - `latest-fips` and `<version>-fips` -- FIPS variant on the OpenSSL FIPS Provider, run with `UCM_FIPS=1`
 
-Release candidates are published under their own `X.Y-rcN` (and `X.Y-rcN-fips`) tag and never move `latest` or `latest-fips`.
+Release candidates are published under their own `X.Y-rcN` or `X.Y.Z-rcN` (and `-fips`) tag and never move `latest` or `latest-fips`. A stable tag takes `latest` and `latest-fips` only while it is the highest stable version published.
 
 ## Image Details
 

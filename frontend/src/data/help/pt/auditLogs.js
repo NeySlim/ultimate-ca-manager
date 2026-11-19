@@ -53,12 +53,8 @@ Cada entrada de log registra:
 
 ## Filtragem
 
-### Por Tipo de Ação
-Filtrar por categoria de operação:
-- Operações de certificado (emitir, revogar, renovar, exportar)
-- Operações de CA (criar, importar, excluir)
-- Operações de usuário (login, logout, criar, atualizar)
-- Operações do sistema (alteração de configurações, backup, restauração)
+### Por Ação
+Selecione um ou mais nomes de ação, por exemplo \`certificate_issued\` ou \`login_success\`.
 
 ### Por Usuário
 Mostrar apenas ações realizadas por um usuário específico.
@@ -71,7 +67,7 @@ Mostrar apenas ações realizadas por um usuário específico.
 Defina datas **De** e **Até** para limitar a janela de tempo.
 
 ### Pesquisa de Texto
-Pesquisa de texto livre em todos os campos de log.
+Pesquisa de texto livre no nome de usuário, ação, detalhes, tipo de recurso e endereço IP; o nome e o id do recurso não são pesquisados.
 
 ## Exportação
 
@@ -79,7 +75,7 @@ Exporte logs filtrados em:
 - **JSON**: Legível por máquina, inclui todos os campos
 - **CSV**: Compatível com planilhas, inclui campos principais
 
-As exportações incluem apenas os resultados filtrados atualmente.
+As exportações aplicam apenas o intervalo de datas, até 10.000 entradas: os outros filtros não são aplicados.
 
 ## Limpeza
 
@@ -92,7 +88,7 @@ Purgar logs antigos com base no período de retenção:
 
 ## Verificação de Integridade
 
-Clique em **Verificar Integridade** para verificar a cadeia de logs de auditoria. O UCM usa encadeamento de hash para detectar se alguma entrada de log foi adulterada ou excluída.
+Clique em **Verificar Integridade** para verificar a cadeia de logs de auditoria. O UCM usa encadeamento de hash para detectar uma entrada modificada ou removida dentro da cadeia; remover as últimas entradas não deixa rastro na própria cadeia, e é por isso que o encaminhamento syslog mantém uma cópia noutro lugar.
 
 ## Encaminhamento Syslog
 

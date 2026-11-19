@@ -10,6 +10,9 @@ from models import db
 
 class AcmeClientAccount(db.Model):
     __tablename__ = 'acme_client_accounts'
+    # Unique since migration 124: several accounts may share a directory URL,
+    # the label is what tells them apart.
+    __table_args__ = (db.Index('uq_acme_client_accounts_label', 'label', unique=True),)
 
     # Defaults for per-CA timing (slow authorities need longer polls).
     DEFAULT_ORDER_POLL_TIMEOUT_SEC = 180

@@ -26,6 +26,8 @@ class RevokedSerial(db.Model):
                            server_default=db.text('CURRENT_TIMESTAMP'))
     # Application link only: no FK, the row must survive the certificate
     certificate_id = db.Column(db.Integer, index=True)
+    # SHA-256 of the revoked key's SubjectPublicKeyInfo: a compromise outlives the certificate row
+    public_key_sha256 = db.Column(db.String(64), index=True)
 
     def to_dict(self):
         return {
@@ -37,6 +39,7 @@ class RevokedSerial(db.Model):
             'invalidity_at': utc_isoformat(self.invalidity_at),
             'valid_to': utc_isoformat(self.valid_to),
             'certificate_id': self.certificate_id,
+            'public_key_sha256': self.public_key_sha256,
             'created_at': utc_isoformat(self.created_at),
         }
 

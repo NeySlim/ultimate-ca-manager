@@ -102,3 +102,36 @@ REASON_CODES = {
     x509.ReasonFlags.privilege_withdrawn: 9,
     x509.ReasonFlags.aa_compromise: 10,
 }
+
+
+def reason_code(value) -> int:
+    """The CRLReason code of a stored reason; 0 (unspecified) when it is not a known one."""
+    return REASON_CODES.get(REASON_FLAGS.get(normalize_revocation_reason(value) or 'unspecified'), 0)
+
+
+# The CRLReason code an ACME client sends (RFC 8555 §7.6), as UCM stores it
+REASON_BY_CODE = {
+    0: 'unspecified', 1: 'keyCompromise', 2: 'cACompromise',
+    3: 'affiliationChanged', 4: 'superseded', 5: 'cessationOfOperation',
+    6: 'certificateHold', 8: 'removeFromCRL', 9: 'privilegeWithdrawn',
+    10: 'aACompromise',
+}
+
+HOLD_REASONS = ('certificateHold', 'certificate_hold')
+
+
+def revocable(cert, reason: Optional[str]) -> bool:
+    """Whether *cert* may be revoked with *reason*: not revoked yet, or on hold and
+    revoked for good (RFC 5280 §5.2.4 counts the reason change as a status change).
+    removeFromCRL ends nothing: it is a delta CRL entry only (§5.3.1). A stored certificate
+    is revoked by its row or by its CA's record of its serial, the graver of the two."""
+    from models import Certificate
+    if isinstance(cert, Certificate):
+        from services.cert.issued_lookup import effective_revocation
+        holder = effective_revocation(cert)
+    else:
+        holder = cert if getattr(cert, 'revoked', False) else None
+    if holder is None:
+        return True
+    return (holder.revoke_reason in HOLD_REASONS
+            and reason not in HOLD_REASONS and reason != 'removeFromCRL')

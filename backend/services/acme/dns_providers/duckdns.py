@@ -28,12 +28,21 @@ class DuckDnsDnsProvider(BaseDnsProvider):
     PROVIDER_NAME = "DuckDNS"
     PROVIDER_DESCRIPTION = "DuckDNS (Free Dynamic DNS)"
     REQUIRED_CREDENTIALS = ["token"]
+    SINGLE_TXT_VALUE = True
     
     BASE_URL = "https://www.duckdns.org/update"
     
     def __init__(self, credentials: Dict[str, Any]):
         super().__init__(credentials)
     
+    @classmethod
+    def single_value_key(cls, record_name: str) -> str:
+        """DuckDNS keeps one TXT value per account sub-name (foo), whatever is under it."""
+        name = super().single_value_key(record_name)
+        if name.endswith('.duckdns.org'):
+            return name[:-len('.duckdns.org')].rsplit('.', 1)[-1]
+        return name
+
     def _extract_subdomain(self, domain: str) -> str:
         """Extract subdomain from full domain name"""
         # DuckDNS domains are like: subdomain.duckdns.org
@@ -87,7 +96,7 @@ class DuckDnsDnsProvider(BaseDnsProvider):
             logger.error(f"DuckDNS API request failed: {msg}")
             return False, msg
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         """Delete TXT record via DuckDNS API (set to empty)"""
         # Remove _acme-challenge. prefix if present
         clean_name = record_name
@@ -95,6 +104,8 @@ class DuckDnsDnsProvider(BaseDnsProvider):
             clean_name = clean_name[16:]
         
         subdomain = self._extract_subdomain(clean_name)
+        # DuckDNS holds one TXT value per domain and cannot read it back: clearing is all or nothing
+        logger.warning(f"DuckDNS: cleanup of {subdomain} clears its TXT value, whichever challenge set it")
         
         # DuckDNS clears TXT by setting it to empty string
         params = {

@@ -8,7 +8,7 @@ export default {
         title: 'Schede',
         items: [
           { label: 'Impostazioni', text: 'Abilita TSA, seleziona la CA firmataria e configura l\'OID della policy TSA' },
-          { label: 'Informazioni', text: 'URL dell\'endpoint TSA, esempi di utilizzo con OpenSSL e statistiche delle richieste' },
+          { label: 'Endpoint TSA', text: 'URL dell\'endpoint TSA, esempi di utilizzo con OpenSSL e statistiche delle richieste' },
         ]
       },
       {
@@ -33,12 +33,15 @@ export default {
     ],
     tips: [
       'Le marche temporali TSA vengono usate nella firma del codice per garantire che le firme rimangano valide dopo la scadenza del certificato',
-      'L\'endpoint TSA accetta HTTP POST con Content-Type: application/timestamp-query',
+      'L\'endpoint TSA accetta HTTP POST con Content-Type: application/timestamp-query (o application/octet-stream)',
+      'Una richiesta con qualsiasi estensione viene rifiutata con unacceptedExtension, e una malformata con badDataFormat (RFC 3161 §2.4.1)',
+      'I token riportano genTime in secondi interi con un\'accuratezza dichiarata di 1 secondo, e il message imprint della richiesta copiato così come inviato',
       'Usa algoritmi di hash SHA-256 o superiori quando crei richieste di marca temporale',
       'Non è richiesta autenticazione: l\'endpoint TSA è pubblicamente accessibile come CRL/OCSP',
     ],
     warnings: [
       'Una CA firmataria valida deve essere configurata prima di abilitare TSA',
+      'openssl ts -verify e jarsigner rifiutano i token firmati dal certificato della CA: la RFC 3161 richiede un firmatario dedicato con un EKU timeStamping critico ed esclusivo. Generane uno nella scheda Impostazioni',
       'L\'endpoint TSA è un endpoint di protocollo pubblico: non inserire dati sensibili nelle richieste di marca temporale',
     ],
   },
@@ -80,9 +83,9 @@ Il Policy OID identifica la policy TSA secondo la quale vengono emesse le marche
 - Predefinito: \`1.2.3.4.1\` (segnaposto)
 - Per la produzione, registra un OID sotto l'arco della tua organizzazione o usane uno dal tuo CP/CPS
 
-## Scheda Informazioni
+## Scheda Endpoint TSA
 
-La scheda Informazioni mostra:
+La scheda Endpoint TSA mostra:
 
 - **URL dell'endpoint TSA**: URL pronto da copiare per la configurazione del client
 - **Esempi di utilizzo**: Comandi OpenSSL per creare richieste, inviarle e verificare le risposte

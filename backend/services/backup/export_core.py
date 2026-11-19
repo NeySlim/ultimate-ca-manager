@@ -23,6 +23,7 @@ from models.policy import CertificatePolicy
 from config.settings import Config
 from utils.datetime_utils import utc_now, utc_isoformat
 
+from . import installation
 from .key_material import (
     as_pem, decrypt_stored_key, decrypt_stored_secret, key_matches_certificate,
 )
@@ -44,6 +45,7 @@ class ExportCoreMixin:
             'created_at': utc_now().isoformat() + 'Z',
             'hostname': os.environ.get('FQDN', 'unknown'),
             'backup_type': backup_type,
+            installation.METADATA_KEY: installation.installation_id(create=True),
         }
 
     def _export_configuration(self, include: bool) -> Dict[str, Any]:
@@ -57,6 +59,8 @@ class ExportCoreMixin:
         # Get all system config entries
         system_configs = SystemConfig.query.all()
         for sc in system_configs:
+            if sc.key in installation.LOCAL_SETTINGS:
+                continue    # the installation's own; its id is carried in the metadata
             val = sc.value
             # A setting is secret either because the row says so or because
             # its value is ciphertext (the scheduled-backup password is stored
@@ -84,7 +88,10 @@ class ExportCoreMixin:
 
             config[sc.key] = val
 
+        from .restore.setting_refs import export_references
         return {
+            # The row each numbered setting names, by identity (restore/setting_refs.py)
+            'settings_refs': export_references(config),
             'system': {
                 'fqdn': os.environ.get('FQDN', ''),
                 'https_port': int(os.environ.get('HTTPS_PORT', 8443)),
@@ -186,8 +193,9 @@ class ExportCoreMixin:
                 'invalidity_at': rs.invalidity_at.isoformat() if rs.invalidity_at else None,
                 'valid_to': rs.valid_to.isoformat() if rs.valid_to else None,
                 'certificate_id': rs.certificate_id,
+                'public_key_sha256': rs.public_key_sha256,
             }
-            for rs in RevokedSerial.query.all()
+            for rs in RevokedSerial.query.order_by(RevokedSerial.id).all()
         ]
 
     def _export_certificates(self, include: bool) -> List[Dict[str, Any]]:

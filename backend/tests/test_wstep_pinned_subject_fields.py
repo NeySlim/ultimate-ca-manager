@@ -20,6 +20,7 @@ from cryptography.x509.oid import NameOID
 
 from models import CA, ADConnectorConfig, CATemplatePin, db
 from models.certificate_template import CertificateTemplate
+from tests.fixtures.templates import delete_templates, template_ids_named
 from services.ad_connector import lookup as ad_lookup
 from services.wstep import wstep_service
 
@@ -55,12 +56,7 @@ def _clear_pinned_templates(app):
         names = [
             'Test Pinned Template', 'Test Pinned Template A', 'Test Pinned Template B',
         ]
-        CATemplatePin.query.filter(
-            CATemplatePin.template_id.in_(
-                db.session.query(CertificateTemplate.id).filter(CertificateTemplate.name.in_(names))
-            )
-        ).delete(synchronize_session=False)
-        CertificateTemplate.query.filter(CertificateTemplate.name.in_(names)).delete(synchronize_session=False)
+        delete_templates(template_ids_named(*names))
         db.session.commit()
 
 

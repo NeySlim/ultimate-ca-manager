@@ -2,25 +2,24 @@ export default {
   helpContent: {
     title: 'Vertrauensspeicher',
     subtitle: 'Vertrauenswürdige Zertifikate verwalten',
-    overview: 'Importieren und verwalten Sie vertrauenswürdige Root- und Intermediate-CA-Zertifikate. Der Vertrauensspeicher wird für die Kettenvalidierung verwendet und kann mit dem Betriebssystem-Vertrauensspeicher synchronisiert werden.',
+    overview: 'Hält vertrauenswürdige Root- und Intermediate-CA-Zertifikate. Die Kettenansicht eines Zertifikats und seine Exporte vervollständigen die Kette mit einem Zertifikat des Vertrauensspeichers, dessen Subject dem Ausstellernamen entspricht. Der Speicher kann aus dem Betriebssystem-Vertrauensspeicher oder aus den von UCM verwalteten CAs gefüllt werden.',
     sections: [
       {
         title: 'Zertifikatstypen',
         definitions: [
           { term: 'Root-CA', description: 'Selbstsignierter Vertrauensanker der obersten Ebene' },
           { term: 'Intermediate', description: 'CA-Zertifikat, signiert von einer Root- oder einer anderen Intermediate-CA' },
-          { term: 'Client-Auth', description: 'Zertifikat für Client-Authentifizierung (mTLS)' },
+          { term: 'System', description: 'Aus dem Vertrauensspeicher des Betriebssystems importiert' },
           { term: 'Code-Signierung', description: 'Zertifikat zur Verifizierung von Code-Signaturen' },
+          { term: 'E-Mail', description: 'Zertifikat für S/MIME' },
           { term: 'Benutzerdefiniert', description: 'Manuell kategorisiertes vertrauenswürdiges Zertifikat' },
         ]
       },
       {
         title: 'Aktionen',
         items: [
-          { label: 'Datei importieren', text: 'PEM-, DER- oder PKCS#7-Zertifikatsdateien hochladen' },
-          { label: 'URL importieren', text: 'Ein Zertifikat von einer Remote-URL abrufen' },
-          { label: 'PEM hinzufügen', text: 'PEM-kodierten Zertifikatstext direkt einfügen' },
-          { label: 'Vom System synchronisieren', text: 'Vertrauenswürdige CAs des Betriebssystems in UCM importieren' },
+          { label: 'Hinzufügen', text: 'Zertifikate der von UCM verwalteten CAs hinzufügen. Ein externes Zertifikat wird über die API hinzugefügt (POST /api/v2/truststore mit PEM, oder /api/v2/truststore/import mit einer PEM- oder DER-Datei)' },
+          { label: 'Vom System synchronisieren', text: 'Vertrauenswürdige CAs des Betriebssystems in UCM importieren, bis zur gewählten Anzahl (standardmäßig 500, höchstens 1000)' },
           { label: 'Exportieren', text: 'Vertrauenswürdige Zertifikate einzeln herunterladen' },
           { label: 'Auswahl löschen', text: 'Mehrere Zertifikate auswählen und gemeinsam entfernen, zum Beispiel die als abgelaufen gefilterten System-CAs; nur die Zeilen, die die aktuellen Filter anzeigen, werden entfernt' },
         ]
@@ -36,32 +35,27 @@ export default {
     content: `
 ## Übersicht
 
-Der Vertrauensspeicher verwaltet vertrauenswürdige CA-Zertifikate, die für die Kettenvalidierung verwendet werden. Importieren Sie Root- und Intermediate-CAs aus externen Quellen oder synchronisieren Sie mit dem Vertrauensspeicher des Betriebssystems.
+Der Vertrauensspeicher hält vertrauenswürdige CA-Zertifikate. Füllen Sie ihn aus den von UCM verwalteten CAs oder aus dem Vertrauensspeicher des Betriebssystems.
 
 ## Zertifikatskategorien
 
 - **Root-CA**: Selbstsignierte Vertrauensanker
 - **Intermediate**: CAs, signiert von Root- oder anderen Intermediate-CAs
-- **Client-Auth**: Zertifikate für mTLS-Client-Authentifizierung
+- **System**: Aus dem Vertrauensspeicher des Betriebssystems importiert
 - **Code-Signierung**: Zertifikate zur Verifizierung von Code-Signaturen
+- **E-Mail**: Zertifikate für S/MIME
 - **Benutzerdefiniert**: Manuell kategorisierte Zertifikate
 
-## Zertifikate importieren
+## Zertifikate hinzufügen
 
-### Aus Datei
-Zertifikatsdateien in folgenden Formaten hochladen:
-- **PEM**: Base64-kodiert (einzeln oder gebündelt)
-- **DER**: Binärformat
-- **PKCS#7 (P7B)**: Zertifikatskette
+### Aus verwalteten CAs
+**Hinzufügen** listet die von UCM verwalteten CAs auf: Wählen Sie die aus, denen vertraut werden soll.
 
-### Von URL
-Ein Zertifikat von einem Remote-HTTPS-Endpunkt abrufen. UCM lädt die Zertifikatskette des Servers herunter und importiert sie.
-
-### PEM einfügen
-PEM-kodierten Zertifikatstext direkt in den Textbereich einfügen.
+### Externe Zertifikate
+Die Seite hat kein Upload-Formular für ein Zertifikat von außerhalb von UCM. Fügen Sie es über die API hinzu: \`POST /api/v2/truststore\` mit seinem PEM, oder \`POST /api/v2/truststore/import\` mit einer PEM- oder DER-Datei.
 
 ### Vom System synchronisieren
-Alle vertrauenswürdigen CAs aus dem Vertrauensspeicher des Betriebssystems importieren. Dies füllt UCM mit denselben Root-CAs, die das OS vertraut (z.B. Mozillas CA-Bundle unter Linux).
+Die vertrauenswürdigen CAs aus dem Vertrauensspeicher des Betriebssystems importieren (z.B. Mozillas CA-Bundle unter Linux), bis zur gewählten Anzahl: standardmäßig 500, höchstens 1000.
 
 > 💡 Die Synchronisierung vom System ist ein einmaliger Import. Änderungen am OS-Vertrauensspeicher werden nicht automatisch übernommen.
 
@@ -75,14 +69,10 @@ Alle vertrauenswürdigen CAs aus dem Vertrauensspeicher des Betriebssystems impo
 
 ## Anwendungsfälle
 
-### Kettenvalidierung
-Bei der Überprüfung einer Zertifikatskette prüft UCM den Vertrauensspeicher auf erkannte Root-CAs.
+### Ketten
+Die Kettenansicht eines Zertifikats und seine Exporte mit Kette nehmen ein Zertifikat des Vertrauensspeichers, dessen Subject dem Ausstellernamen entspricht, um die Kette zu vervollständigen. Gegen den Vertrauensspeicher wird keine Signatur geprüft.
 
-### mTLS
-Client-Zertifikate, die bei der gegenseitigen TLS-Authentifizierung präsentiert werden, werden gegen den Vertrauensspeicher validiert.
-
-### ACME
-Wenn UCM als ACME-Client fungiert (Let's Encrypt), wird der Vertrauensspeicher verwendet, um das Zertifikat der ACME-CA zu verifizieren.
+Der Vertrauensspeicher spielt weder bei der mTLS-Client-Authentifizierung (die die unter Einstellungen › Sicherheit gewählte vertrauenswürdige CA verwendet) noch bei der Verbindung des ACME-Clients zu seiner CA eine Rolle.
 `
   }
 }

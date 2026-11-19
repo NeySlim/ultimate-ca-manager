@@ -35,7 +35,7 @@ from utils.response import error_response, no_content_response, success_response
 from utils.db_transaction import safe_commit
 from utils.sanitize import sanitize_filename
 from utils.datetime_utils import utc_now, utc_isoformat
-from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message
+from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message, revocable
 from utils.export_options import json_boolean, query_boolean
 
 logger = logging.getLogger(__name__)
@@ -81,6 +81,7 @@ def _build_cert_response(auth_cert, certificate, owner_user=None):
         result['valid_to'] = utc_isoformat(certificate.valid_to)
         result['cert_type'] = certificate.cert_type
         result['revoked'] = certificate.revoked or False
+        result['revoke_reason'] = certificate.revoke_reason if certificate.revoked else None
         result['has_private_key'] = bool(certificate.prv)
         result['caref'] = certificate.caref
         # Extract CN from subject for CertificateDetails compatibility
@@ -519,20 +520,20 @@ def revoke_user_certificate(cert_id):
     if not cert:
         return error_response('Certificate data not found', 404)
 
-    if cert.revoked:
-        return error_response('Certificate already revoked', 400)
-
     data = request.json or {}
     reason = normalize_revocation_reason(data.get('reason', 'unspecified'))
     if reason is None:
         return error_response(invalid_reason_message(data.get('reason')), 400)
+
+    if not revocable(cert, reason):
+        return error_response('Certificate already revoked', 400)
 
     partner = mutual_partner(cert)
     try:
         policy, approval = queue_revocation(user, cert, reason=reason,
                                             comment=data.get('approval_comment'),
                                             auth_certificate_id=auth_cert.id,
-                                            partner=partner if partner is not None and not partner.revoked else None)
+                                            partner=partner if partner is not None and revocable(partner, reason) else None)
     except PairApprovalConflict as e:
         return error_response(str(e), 409)
     except Exception as e:

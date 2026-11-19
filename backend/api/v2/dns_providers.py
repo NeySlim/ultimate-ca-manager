@@ -81,6 +81,8 @@ def create_dns_provider():
         return error_response('Provider type is required', 400)
     if not is_valid_provider_type(provider_type):
         return error_response(f'Invalid provider type: {provider_type}', 400)
+    if _name_taken(name):
+        return error_response(f'A DNS provider named {name!r} already exists', 409)
     
     # Validate credentials against provider schema
     try:
@@ -143,6 +145,14 @@ def get_provider(provider_id):
     return success_response(data=_provider_dict(provider))
 
 
+def _name_taken(name, except_id=None):
+    """Names are unique (migration 124): a restore tells providers apart by name."""
+    query = DnsProvider.query.filter(DnsProvider.name == name)
+    if except_id is not None:
+        query = query.filter(DnsProvider.id != except_id)
+    return db.session.query(query.exists()).scalar()
+
+
 def _given(value):
     """A blank field keeps the saved value; False and 0 are values."""
     return value is not None and value != ''
@@ -183,6 +193,8 @@ def update_provider(provider_id):
     data = request.json
     if not data:
         return error_response('Request body required', 400)
+    if 'name' in data and _name_taken(data['name'], provider_id):
+        return error_response(f"A DNS provider named {data['name']!r} already exists", 409)
     # Merged and checked before anything changes: a refused algorithm or a
     # moved target leaves the provider as it was
     credentials = data.get('credentials')

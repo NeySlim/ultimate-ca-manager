@@ -248,7 +248,7 @@ def _load_pkcs12(data: bytes, password, attempts: _Attempts):
                  for alg in pkcs12_layers.shrouded_algorithms(contents)]
     except pkcs12_layers.LayerUnsupported as e:
         raise PasswordNotTried(str(e)) from e
-    except Exception as e:  # noqa: BLE001: bags that cannot be inspected are not handed on
+    except Exception as e:  # noqa: BLE001  # bags that cannot be inspected are not handed on
         raise ValueError('Unreadable PKCS#12 bags') from e
     failure = None
     for pwd in _candidates(password):
@@ -269,7 +269,7 @@ def _load_pkcs12(data: bytes, password, attempts: _Attempts):
             return load_key_and_certificates(data, pwd)
         except FipsRestricted:
             raise
-        except Exception as e:  # noqa: BLE001: the next password may open it
+        except Exception as e:  # noqa: BLE001  # the next password may open it
             failure = e
     raise failure
 

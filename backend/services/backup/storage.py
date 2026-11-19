@@ -321,6 +321,60 @@ def new_archive_filename() -> str:
             f"_{uuid4().hex[:12]}.ucmbkp")
 
 
+# Room for the multipart envelope around the archive: the password, the mode
+# and the boundaries.
+RESTORE_FORM_MARGIN = 1024 * 1024
+
+
+def restore_upload_limit() -> int:
+    """Bytes of archive a restore route accepts (`BACKUP_MAX_UPLOAD_MB`)."""
+    return int(Config.BACKUP_MAX_UPLOAD_MB) * 1024 * 1024
+
+
+def restore_limit_warning(size: int, payload_size: int = 0, containers: int = 0):
+    """What to tell whoever created an archive no restore reads, or None.
+
+    Checked against both ceilings: the archive itself, and its decompressed payload.
+    """
+    from . import container
+
+    limit = restore_upload_limit()
+    if size > limit:
+        return (f"This archive is {size / (1024 * 1024):.1f} MB, more than the "
+                f"{limit // (1024 * 1024)} MB a restore accepts: raise BACKUP_MAX_UPLOAD_MB "
+                "on the server that will restore it.")
+    ceiling = container.max_plaintext_bytes()
+    if payload_size > ceiling:
+        return (f"This archive decompresses to {payload_size / (1024 * 1024):.1f} MB, more "
+                f"than the {ceiling // (1024 * 1024)} MB a restore reads "
+                f"({container.PLAINTEXT_PER_ARCHIVE_BYTE} times BACKUP_MAX_UPLOAD_MB): raise "
+                "BACKUP_MAX_UPLOAD_MB on the server that will restore it.")
+    objects = container.max_json_containers()
+    if containers > objects:
+        return (f"This archive holds {containers} JSON objects, more than the {objects} a "
+                "restore reads: raise BACKUP_MAX_UPLOAD_MB on the server that will restore it.")
+    return None
+
+
+# Seconds a manual backup waits for the backup lock before it is refused.
+EXPORT_LOCK_WAIT = 30
+
+
+def export_archive(service, password: str, *, kdf=None, timeout=None) -> tuple:
+    """Export and publish one archive under the backup lock. Returns ``(bytes, path, filename)``.
+
+    The export runs inside the lock too: a restore holds it until it commits, so
+    an archive never reads half of a restore.
+    """
+    from .locking import backup_operation_lock
+
+    wait = EXPORT_LOCK_WAIT if timeout is None else timeout
+    with backup_operation_lock(timeout=wait, purpose='creating a backup'):
+        data = service.create_backup(password, kdf=kdf)
+        path, filename = _create_archive(data)
+    return data, path, filename
+
+
 def create_archive(data: bytes, backup_dir=None) -> tuple:
     """Publish archive bytes under a new name, validated.
 

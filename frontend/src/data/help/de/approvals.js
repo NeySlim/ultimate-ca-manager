@@ -40,7 +40,7 @@ export default {
     tips: [
       'Jede einzelne Ablehnung stoppt die Genehmigung sofort: dies ist aus Sicherheitsgründen beabsichtigt.',
       'Während eine Erneuerung auf Genehmigung wartet, überlässt der Planer das Zertifikat dieser Entscheidung, solange sie vor dem Ablauf des Zertifikats fallen kann; unter einer Erneuerungsrichtlinie erneuert er nie ohne eine solche.',
-      'Genehmigungskommentare werden im Audit-Trail für die Compliance protokolliert.',
+      'Jede Entscheidung und ihr Kommentar werden in der Genehmigungs-Timeline der Anfrage festgehalten; das Audit-Protokoll erfasst Genehmigungen, nicht den Kommentar, eine eingereihte Anfrage oder eine Ablehnung.',
     ],
   },
   helpGuides: {
@@ -83,7 +83,7 @@ Administratoren umgehen die Warteschlange auf jedem Pfad.
 - Das Genehmigen einer Anfrage, deren gespeicherte Anfrage, Zertifikat oder CA **nicht mehr existiert**, schließt sie als abgelehnt
 - Ein eingereihter Widerruf, dessen Zertifikat **direkt widerrufen** wurde, wird als genehmigt geschlossen (als abgebrochen, wenn der Antragsteller es widerrufen hat); einer, dessen Zertifikat seither **erneuert** wurde, wird bei der Genehmigung als abgelehnt geschlossen; während einer Zertifikatssperre wartet er, bis die Sperre aufgehoben wird
 
-Webhooks werden über diese Schließungen wie über eine Ablehnung informiert.
+Eine Schließung als abgelehnt benachrichtigt die Webhooks wie eine Ablehnung; eine Schließung als genehmigt sendet keinen Webhook.
 
 ## Frist
 Eine Anfrage wartet **sieben Tage** auf eine Entscheidung. Danach wird sie als abgelaufen geschlossen, nie als ausstehend gezählt, und der Erneuerungsplaner nimmt die Arbeit für ihr Zertifikat wieder auf. Während eine Erneuerung auf Genehmigung wartet, überlässt der Planer das Zertifikat dieser Entscheidung, solange sie vor dem Ablauf des Zertifikats fallen kann; unter einer Erneuerungsrichtlinie erneuert er nie ohne eine solche.
@@ -99,7 +99,7 @@ Eine Anfrage wartet **sieben Tage** auf eine Entscheidung. Danach wird sie als a
 
 1. Klicken Sie auf eine ausstehende Anfrage, um ihre Details anzuzeigen
 2. Klicken Sie auf **Ablehnen**
-3. Geben Sie einen **Ablehnungsgrund** ein (erforderlich): dieser wird für die Audit-Compliance protokolliert
+3. Geben Sie einen **Ablehnungsgrund** ein (erforderlich): er wird in der Timeline der Anfrage festgehalten; eine Ablehnung schreibt keinen Audit-Protokolleintrag
 4. Die Anfrage wird sofort gestoppt
 
 > ⚠ Jede einzelne Ablehnung stoppt die gesamte Anfrage. Dies ist beabsichtigt: wenn ein Prüfer ein Problem feststellt, sollte die Ausstellung nicht fortgesetzt werden.
@@ -111,7 +111,7 @@ Jede Anfrage enthält eine vollständige Genehmigungszeitleiste mit:
 - Wann die Aktion durchgeführt wurde (Zeitstempel)
 - Bereitgestellter Kommentar (falls vorhanden)
 
-Dieser Verlauf ist unveränderlich und Teil des Audit-Trails.
+Dieser Verlauf wird mit der Anfrage gespeichert, nicht im Audit-Protokoll.
 
 ## Filterung
 

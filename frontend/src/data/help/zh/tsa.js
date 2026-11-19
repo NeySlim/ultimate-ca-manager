@@ -8,13 +8,13 @@ export default {
         title: '选项卡',
         items: [
           { label: '设置', text: '启用 TSA、选择签名 CA 并配置 TSA 策略 OID' },
-          { label: '信息', text: 'TSA 端点 URL、OpenSSL 使用示例和请求统计' },
+          { label: 'TSA 端点', text: 'TSA 端点 URL、OpenSSL 使用示例和请求统计' },
         ]
       },
       {
         title: '配置',
         items: [
-          { label: '签名 CA', text: '用于签署时间戳令牌的 CA 私钥,, 必须是有效且未过期的 CA' },
+          { label: '签名 CA', text: '未设置专用签名证书时，由其自身证书签署时间戳令牌的 CA。有效期之外的 CA 不会签名：/tsa 应答 503。严格校验器（openssl ts -verify、jarsigner）会拒绝由 CA 证书签署的令牌，CA 签名时页面会给出警告' },
           { label: '策略 OID', text: 'TSA 策略的对象标识符（例如 1.2.3.4.1）,, 包含在每个时间戳响应中' },
           { label: '启用/禁用', text: '在不丢失配置的情况下开关 TSA 端点' },
           { label: '要求专用证书', text: '可选启用：拒绝使用 CA 证书本身签署时间戳,, 需要一个带有关键 timeStamping EKU 的专用终端实体签名证书（RFC 3161）' },
@@ -25,7 +25,7 @@ export default {
       {
         title: '使用方法',
         items: [
-          { label: '创建请求', text: 'openssl ts -query -data file.txt -sha256 -no_nonce -out request.tsq' },
+          { label: '创建请求', text: 'openssl ts -query -data file.txt -sha256 -cert -out request.tsq（-cert 要求在响应中包含签名者证书，openssl ts -verify 需要它）' },
           { label: '发送到 TSA', text: 'curl -H "Content-Type: application/timestamp-query" --data-binary @request.tsq https://your-server/tsa -o response.tsr' },
           { label: '验证', text: 'openssl ts -verify -data file.txt -in response.tsr -CAfile ca-chain.pem（适用于 RSA 和 ECDSA 签名者）。ML-DSA 令牌无法通过 openssl ts -verify：请用 openssl cms -verify（OpenSSL 3.5 或更高版本）校验其签名，再将消息摘要与文件的哈希比对' },
         ]
@@ -33,13 +33,16 @@ export default {
     ],
     tips: [
       'TSA 时间戳用于代码签名，确保签名在证书过期后仍然有效',
-      'TSA 端点接受 HTTP POST，Content-Type 为 application/timestamp-query',
+      'TSA 端点接受 HTTP POST，Content-Type 为 application/timestamp-query（或 application/octet-stream）',
+      '携带任何扩展的请求会以 unacceptedExtension 拒绝，格式错误的请求以 badDataFormat 拒绝（RFC 3161 §2.4.1）',
+      '令牌的 genTime 精确到整秒，声明精度为 1 秒，请求中的消息摘要按原样复制',
       '创建时间戳请求时使用 SHA-256 或更强的哈希算法',
       '无需认证:, TSA 端点像 CRL/OCSP 一样是公开可访问的',
     ],
     warnings: [
       '启用 TSA 之前必须配置有效的签名 CA',
-      'TSA 端点是公共协议端点:, 不要在时间戳请求中放入敏感数据',
+      'openssl ts -verify 和 jarsigner 会拒绝由 CA 证书签署的令牌：RFC 3161 要求使用带有关键且独占的 timeStamping EKU 的专用签名者。请在设置选项卡中生成一个',
+      'TSA 端点是公共协议端点：不要在时间戳请求中放入敏感数据',
     ],
   },
   helpGuides: {
@@ -80,9 +83,9 @@ export default {
 - 默认值：\`1.2.3.4.1\`（占位符）
 - 生产环境中，请在您组织的 OID 弧下注册一个 OID，或使用 CP/CPS 中的 OID
 
-## 信息选项卡
+## TSA 端点选项卡
 
-信息选项卡显示：
+TSA 端点选项卡显示：
 
 - **TSA 端点 URL**: 可直接复制的客户端配置 URL
 - **使用示例**: 用于创建请求、发送请求和验证响应的 OpenSSL 命令

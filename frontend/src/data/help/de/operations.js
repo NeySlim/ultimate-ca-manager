@@ -27,7 +27,7 @@ export default {
       'Verwenden Sie die Ressourcen-Chips, um schnell zwischen Ressourcentypen zu wechseln',
       'Die Inline-Suche und Filter (Status, CA) ermöglichen es, Elemente einzugrenzen, ohne die Symbolleiste zu verlassen',
       'Wechseln Sie zwischen Tabellen- und Korb-Ansicht (Transferpanel) auf dem Desktop',
-      'Überprüfen Sie Änderungen vor der Bestätigung von Massenoperationen',
+      'Widerrufen, Erneuern, Signieren und Löschen verlangen eine Bestätigung, bevor sie ausgeführt werden; ein Export startet sofort',
     ],
     warnings: [
       'Massenlöschung ist unwiderruflich: erstellen Sie vorher immer eine Sicherung',
@@ -41,13 +41,13 @@ export default {
 
 Massenoperationen und Datenverwaltung. Führen Sie Stapelaktionen über mehrere Ressourcen gleichzeitig durch.
 
-## Import/Export-Tab
+## Import-Tab
 
-Identisch mit der Import/Export-Seite. Smart-Import-Assistent und Massenexport-Funktionalität.
+Identisch mit der Import/Export-Seite: der Smart-Import-Assistent und die OPNsense-Integration (verbinden, durchsuchen und von OPNsense importieren).
 
-## OPNsense-Tab
+## Export-Tab
 
-Identisch mit der Import/Export OPNsense-Integration: verbinden, durchsuchen und von OPNsense importieren.
+Massenexport von Zertifikaten und CAs.
 
 ## Massenaktionen
 
@@ -55,10 +55,9 @@ Führen Sie Stapeloperationen auf mehreren Ressourcen gleichzeitig durch.
 
 ### Funktionsweise
 1. Wählen Sie den **Ressourcentyp** (Zertifikate, CAs, CSRs, Templates, Benutzer)
-2. Durchsuchen Sie verfügbare Elemente im **linken Panel**
-3. Verschieben Sie Elemente mit den Transferpfeilen in das **rechte Panel** (ausgewählt)
-4. Wählen Sie die auszuführende **Aktion**
-5. Bestätigen und ausführen
+2. Haken Sie die Elemente in der Tabelle an (die optionale Korb-Ansicht verschiebt sie stattdessen zwischen zwei Panels)
+3. Wählen Sie die auszuführende **Aktion**
+4. Bestätigen und ausführen
 
 ### Verfügbare Aktionen nach Ressource
 
@@ -77,16 +76,14 @@ Führen Sie Stapeloperationen auf mehreren Ressourcen gleichzeitig durch.
 - **Massenlöschung**: Ausgewählte CSRs entfernen
 
 #### Templates
-- **Massenexport**: Als JSON exportieren
 - **Massenlöschung**: Ausgewählte Templates entfernen
 
 #### Benutzer
-- **Massendeaktivierung**: Ausgewählte Benutzerkonten deaktivieren
 - **Massenlöschung**: Ausgewählte Benutzer dauerhaft entfernen
 
 > ⚠ Massenoperationen sind unwiderruflich. Erstellen Sie immer eine Sicherung, bevor Sie Massenlöschungen oder -widerrufe durchführen.
 
-> 💡 Verwenden Sie die Suche und den Filter im linken Panel, um bestimmte Elemente schnell zu finden.
+> 💡 Verwenden Sie die Suche und die Filter oberhalb der Tabelle, um bestimmte Elemente schnell zu finden.
 `
   }
 }

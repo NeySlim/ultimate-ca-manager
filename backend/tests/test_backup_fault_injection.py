@@ -43,6 +43,10 @@ from config.settings import Config
 from models import db, SystemConfig
 from services.backup import manifest
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 PASSWORD = 'Correct-Horse-Battery-9'
 GROUP_NAME = 'fault-injection-group'
 

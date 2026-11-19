@@ -150,6 +150,6 @@ def test_a_non_string_password_is_refused_not_an_error(app):
             {'username': name, 'password': 'Current-pw-123'})).status_code == 200
         r = c.post('/api/v2/account/password', content_type=CONTENT_JSON, data=json.dumps(
             {'current_password': 12345678, 'new_password': 'Brand-New-pw-456!'}))
-        assert r.status_code == 401, r.data
+        assert r.status_code == 403, r.data
     finally:
         _drop(app, uid)

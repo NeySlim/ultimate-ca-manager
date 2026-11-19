@@ -100,6 +100,7 @@ class TestCheckForUpdatesChecksumUrl:
         monkeypatch.setitem(updates._releases_cache, 'ts', _time.time())
         monkeypatch.setattr(updates.os.path, 'exists',
                             lambda p: p == '/usr/bin/dpkg')
+        monkeypatch.setattr(updates, 'get_current_version', lambda: '99.0-dev')
         result = updates.check_for_updates()
         assert result['update_available'] is True
         assert result['package_name'] == 'ucm_99.0_all.deb'
@@ -125,6 +126,8 @@ class TestChannelFilter:
         monkeypatch.setitem(updates._releases_cache, 'ts', _time.time())
         monkeypatch.setattr(updates.os.path, 'exists',
                             lambda p: p == '/usr/bin/dpkg')
+        # updates stay within the installed major version
+        monkeypatch.setattr(updates, 'get_current_version', lambda: '99.0-dev')
 
     def test_stable_channel_ignores_all_prereleases(self, monkeypatch):
         self._seed(monkeypatch, [
@@ -344,7 +347,7 @@ class TestScheduledTask:
     def _base_result(self, **over):
         result = {
             'update_available': True, 'current_version': '2.0',
-            'latest_version': '99.0', 'download_url': 'http://x/p.deb',
+            'latest_version': '2.999', 'download_url': 'http://x/p.deb',
             'package_name': 'p.deb', 'checksum_url': 'http://x/p.deb.sha256',
             'html_url': 'http://x/rel', 'prerelease': False,
         }
@@ -363,7 +366,7 @@ class TestScheduledTask:
             updates._cfg_set(updates._LAST_CHECK_TS_KEY, '0')  # force re-check
             updates.scheduled_update_check()
         assert len(events) == 1
-        assert events[0]['latest_version'] == '99.0'
+        assert events[0]['latest_version'] == '2.999'
 
     def test_no_install_when_opt_out(self, app, clean_update_config, monkeypatch):
         installed = []
@@ -427,7 +430,7 @@ class TestScheduledTask:
         # trigger + manifest both written
         assert (tmp_path / '.update_pending').read_text() == '/tmp/p.deb'
         manifest = json.loads((tmp_path / '.update_manifest.json').read_text())
-        assert manifest['to_version'] == '99.0'
+        assert manifest['to_version'] == '2.999'
         assert manifest['op_id']
 
     def test_trigger_failure_emits_no_installed_event(
@@ -689,6 +692,7 @@ class TestRpmAssetPerDistribution:
         monkeypatch.setitem(updates._releases_cache, 'ts', _time.time())
         monkeypatch.setattr(updates.os.path, 'exists', lambda p: p == '/usr/bin/rpm')
         monkeypatch.setattr(updates, '_el_release', lambda: el)
+        monkeypatch.setattr(updates, 'get_current_version', lambda: '99.0-dev')
         return updates.check_for_updates()
 
     @pytest.mark.parametrize('order', [1, -1])

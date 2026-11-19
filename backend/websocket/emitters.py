@@ -36,7 +36,7 @@ def emit_ws_event(event_type, data: Dict[str, Any], room: Optional[str] = None):
     try:
         from .events import emit_event  # circular: events imports the room names above
         emit_event(event_type, data, room=room)
-    except Exception as e:  # noqa: BLE001: emission is best effort for business code
+    except Exception as e:  # noqa: BLE001  # emission is best effort for business code
         logger.warning("Failed to emit WebSocket event %s: %s",
                        getattr(event_type, 'value', event_type), e)
 

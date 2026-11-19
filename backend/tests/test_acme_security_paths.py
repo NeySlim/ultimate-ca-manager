@@ -805,7 +805,8 @@ class TestRfc8555ErrorTypes:
         assert response.status_code == 400
         assert response.get_json()['type'].endswith(':badPublicKey')
 
-    @pytest.mark.parametrize('reason', [-1, 7, 11, '1', None, True])
+    # 8 (removeFromCRL) belongs to delta CRLs only (RFC 5280 §5.3.1)
+    @pytest.mark.parametrize('reason', [-1, 7, 8, 11, '1', None, True])
     def test_invalid_revocation_reason(self, client, acme_account, reason):
         path = '/acme/revoke-cert'
         jws = _build_jws(
@@ -884,7 +885,7 @@ class TestRfc8555StateMachine:
                     {'type': 'dns', 'value': 'second-failure.example.com'},
                 ],
             )
-            authorizations = order.authorizations.all()
+            authorizations = order.authorizations.order_by(AcmeAuthorization.id).all()
             first_challenge = authorizations[0].challenges.first()
             second_challenge = authorizations[1].challenges.first()
 
@@ -1359,6 +1360,24 @@ class TestSiblingChallengeDeprovisioning:
         assert [c['type'] for c in payload['challenges']] == ['dns-01']
 
 
+@pytest.fixture(scope='module')
+def dedicated_ca(app, create_ca):
+    """The refid of a CA only one class issues under, created once and deleted after the module."""
+    made = {}
+
+    def _get(cn):
+        if cn not in made:
+            made[cn] = create_ca(cn=cn)['refid']
+        return made[cn]
+    yield _get
+    from models import CA
+    from tests.seeded_rows import delete_cas
+    with app.app_context():
+        db.session.rollback()
+        delete_cas(CA.query.filter(CA.refid.in_(list(made.values()))))
+        db.session.commit()
+
+
 class TestARefusedRevocationRevokesNothing:
     """A revocation the server refuses leaves the certificate alone.
 
@@ -1376,21 +1395,22 @@ class TestARefusedRevocationRevokesNothing:
     """
 
     @pytest.fixture(autouse=True)
-    def _cleaned_up(self, app):
+    def _cleaned_up(self, app, dedicated_ca):
         """The row is removed afterwards.
 
         The suite shares one database per worker and does not roll back
-        between tests, and this row deliberately names an authority that does
-        not exist. Left behind, it reached the migration round-trip in
-        `test_database_admin.py` and failed it there.
+        between tests: left behind, the row reached the migration round-trip
+        in `test_database_admin.py` and failed it there. It is issued under a
+        CA of its own, which PostgreSQL requires to exist.
         """
+        self.caref = dedicated_ca('Revoke refusal CA')
         yield
         from models import Certificate, RevokedSerial
         with app.app_context():
             RevokedSerial.query.filter_by(
-                caref='revoke-refusal-ca').delete(synchronize_session=False)
+                caref=self.caref).delete(synchronize_session=False)
             Certificate.query.filter_by(
-                caref='revoke-refusal-ca').delete(synchronize_session=False)
+                caref=self.caref).delete(synchronize_session=False)
             db.session.commit()
 
     def _a_certificate_and_its_key(self, app):
@@ -1419,7 +1439,7 @@ class TestARefusedRevocationRevokesNothing:
             row = Certificate(
                 refid=uuid.uuid4().hex[:13],
                 descr='revoke-refusal.example',
-                caref='revoke-refusal-ca',
+                caref=self.caref,
                 serial_number=format(cert.serial_number, 'x'),
                 crt=b64.b64encode(pem.encode()).decode(),
                 valid_from=now.replace(tzinfo=None) - timedelta(days=1),
@@ -1475,10 +1495,9 @@ class TestARefusedRevocationRevokesNothing:
 class TestRevocationByAForgedCertificate:
     """revoke-cert acts on the stored certificate only when the one sent is it, byte for byte."""
 
-    CAREF = 'revoke-forge-ca'
-
     @pytest.fixture(autouse=True)
-    def _cleaned_up(self, app):
+    def _cleaned_up(self, app, dedicated_ca):
+        self.CAREF = dedicated_ca('Revoke forge CA')
         yield
         from models import Certificate, RevokedSerial
         with app.app_context():
@@ -1509,14 +1528,14 @@ class TestRevocationByAForgedCertificate:
             db.session.commit()
             return row.id, key, cert
 
-    def _revoke_with(self, client, key, cert):
+    def _revoke_with(self, client, key, cert, reason=1):
         pub = key.public_key().public_numbers()
         jwk = {'kty': 'RSA', 'n': _int_to_b64(pub.n), 'e': _int_to_b64(pub.e)}
         der = cert.public_bytes(serialization.Encoding.DER)
         path = '/acme/revoke-cert'
         return _post_jws(client, path, _build_jws(
             f'http://localhost{path}',
-            {'certificate': b64.urlsafe_b64encode(der).rstrip(b'=').decode(), 'reason': 1},
+            {'certificate': b64.urlsafe_b64encode(der).rstrip(b'=').decode(), 'reason': reason},
             key, jwk=jwk, nonce=_nonce(client)))
 
     def test_a_forged_certificate_with_the_same_serial_revokes_nothing(self, app, client):
@@ -1528,6 +1547,31 @@ class TestRevocationByAForgedCertificate:
         assert r.status_code == 404, r.get_json()
         with app.app_context():
             assert not db.session.get(Certificate, cert_id).revoked
+
+    def test_a_hold_is_made_final_once(self, app, client):
+        # RFC 5280 §5.2.4: certificateHold to a final reason is a status change
+        from models import Certificate
+        cert_id, key, cert = self._victim(app)
+        assert self._revoke_with(client, key, cert, reason=6).status_code == 200
+        r = self._revoke_with(client, key, cert, reason=6)
+        assert r.status_code == 400 and 'alreadyRevoked' in r.get_json()['type']
+        r = self._revoke_with(client, key, cert, reason=1)
+        assert r.status_code == 200, r.get_json()
+        with app.app_context():
+            assert db.session.get(Certificate, cert_id).revoke_reason == 'keyCompromise'
+        r = self._revoke_with(client, key, cert, reason=4)
+        assert r.status_code == 400 and 'alreadyRevoked' in r.get_json()['type']
+
+    def test_remove_from_crl_never_ends_a_hold(self, app, client):
+        # RFC 5280 §5.3.1: removeFromCRL is a delta CRL entry, not a final reason
+        from models import Certificate
+        cert_id, key, cert = self._victim(app)
+        assert self._revoke_with(client, key, cert, reason=6).status_code == 200
+        # Refused as a reason before the certificate is looked at (RFC 8555 §7.6)
+        r = self._revoke_with(client, key, cert, reason=8)
+        assert r.status_code == 400 and 'badRevocationReason' in r.get_json()['type']
+        with app.app_context():
+            assert db.session.get(Certificate, cert_id).revoke_reason == 'certificateHold'
 
     def test_the_key_of_the_stored_certificate_still_revokes_it(self, app, client):
         from models import Certificate

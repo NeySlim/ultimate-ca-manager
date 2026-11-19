@@ -605,16 +605,11 @@ class OCSPService:
         ).all()
 
     @staticmethod
-    def _persisted_revocation(ca: CA, variants):
-        """``(revoked_at, reason)`` from the earliest persistent revocation
-        record of *ca* for one of *variants*, else None; ``valid_to`` is not
-        consulted."""
-        from models.revoked_serial import RevokedSerial
-        from utils.cert_issuer import same_key_refids
-        row = RevokedSerial.query.filter(
-            RevokedSerial.caref.in_(same_key_refids(ca)),
-            RevokedSerial.serial_number.in_(list(variants)),
-        ).order_by(RevokedSerial.revoked_at, RevokedSerial.id).first()
+    def _persisted_revocation(ca: CA, cert_serial: int):
+        """``(revoked_at, reason)`` from the record that says *cert_serial* is revoked
+        under *ca* (``persisted_revocation``), else None; ``valid_to`` is not consulted."""
+        from services.cert.issued_lookup import persisted_revocation
+        row = persisted_revocation(ca, cert_serial)
         if row is None:
             return None
         reason = _REASON_MAP.get(row.revoke_reason, x509.ReasonFlags.unspecified)
@@ -629,12 +624,15 @@ class OCSPService:
                 certificate = row
                 break
         if certificate and certificate.revoked:
+            from services.cert.issued_lookup import answered_revocation
+            # A held row under a final record of its serial answers the graver reason, as the CRL
+            holder = answered_revocation(certificate, ca)
             return (
                 certificate,
                 'revoked',
-                certificate.revoked_at or utc_now(),
+                holder.revoked_at or utc_now(),
                 _REASON_MAP.get(
-                    certificate.revoke_reason, x509.ReasonFlags.unspecified
+                    holder.revoke_reason, x509.ReasonFlags.unspecified
                 ),
             )
         if not certificate:
@@ -665,14 +663,13 @@ class OCSPService:
                         _REASON_MAP.get(cross.revoke_reason, x509.ReasonFlags.unspecified),
                     )
                 certificate = cross
-        if certificate is None or not isinstance(certificate, Certificate):
-            # Persistent revocation table: deleted certificates, and a CA
-            # deleted after its revocation and imported again (its row is
-            # new, the parent's record is not)
-            persisted = OCSPService._persisted_revocation(ca, variants)
-            if persisted:
-                revoked_at, reason = persisted
-                return certificate, 'revoked', revoked_at, reason
+        # Persistent revocation table: deleted certificates, a CA deleted after
+        # its revocation and imported again, and a non-revoked row holding a
+        # serial this CA revoked (reimported, or left by an earlier release)
+        persisted = OCSPService._persisted_revocation(ca, cert_serial)
+        if persisted:
+            revoked_at, reason = persisted
+            return certificate, 'revoked', revoked_at, reason
         # Externally-signed CRL uploaded for a key-less/offline CA (#302):
         # revocations decided next to the offline key exist only on that CRL,
         # so it overrides a 'good'/absent local record for this issuer.

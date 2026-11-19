@@ -19,7 +19,7 @@ export default {
           { label: 'Validade Máxima', text: 'Tempo máximo de vida do certificado em dias' },
           { label: 'Tipos de Chave Permitidos', text: 'Restringir quais algoritmos e tamanhos de chave podem ser usados, incluindo ML-DSA-44, ML-DSA-65 e ML-DSA-87; o modo FIPS remove o ML-DSA' },
           { label: 'Esquemas de Assinatura Permitidos', text: 'PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA ou SLH-DSA, comparados com a chave da CA de assinatura. Os Hashes de Assinatura Permitidos não vinculam uma CA ML-DSA, que assina sem um digest separado' },
-          { label: 'Restrições de SAN', text: 'Limitar o número de SANs e aplicar padrões de nomes DNS' },
+          { label: 'Restrições de SAN', text: 'Limitar o número de nomes DNS (os outros tipos de SAN não são contados); um padrão DNS por política (*.company.com, ou company.com para incluir o próprio domínio) limita a política aos nomes correspondentes' },
           { label: 'Hashes de Assinatura Permitidos', text: 'SHA-256, SHA-384 ou SHA-512; nenhum selecionado permite qualquer um. Quando ninguém escolheu o hash, aplica-se o padrão se permitido, senão o mais fraco permitido. O formulário de emissão oferece apenas os tipos de chave permitidos, e Criar CA apenas os tipos de chave e hashes permitidos' },
         ]
       },
@@ -33,7 +33,7 @@ export default {
       },
     ],
     tips: [
-      'Número de prioridade menor = maior precedência. Use 1–10 para políticas críticas.',
+      'Número de prioridade menor = maior precedência para a aprovação. As regras de todas as políticas no escopo se aplicam em conjunto, prevalecendo a mais estrita.',
       'Atribua políticas a CAs específicas para controle granular.',
       'Ative notificações para detectar violações de políticas rapidamente.',
     ],
@@ -84,7 +84,7 @@ Restringir quais algoritmos e tamanhos de chave podem ser usados:
 **Hashes de Assinatura Permitidos** restringe o hash da assinatura da mesma forma (SHA-256, SHA-384, SHA-512); nenhum selecionado permite qualquer um. Quando ninguém escolheu o hash, aplica-se o padrão se permitido, senão o mais fraco permitido. O formulário de emissão oferece apenas os tipos de chave permitidos, e Criar CA apenas os tipos de chave e hashes permitidos.
 
 ### Restrições de SAN
-- **Máx. Nomes DNS**: Limitar o número de Nomes Alternativos do Sujeito
+- **Máx. Nomes DNS**: Limitar o número de nomes DNS no SAN; entradas de IP, e-mail e URI não são contadas
 - **Padrão DNS**: Restringir a padrões de domínio específicos (ex.: \`*.empresa.com\`)
 
 ## Fluxos de Aprovação
@@ -105,7 +105,7 @@ As políticas são avaliadas em ordem de prioridade. Números menores têm maior
 - **10–20**: Conformidade padrão (TLS público, PKI interna)
 - **20+**: Padrões permissivos
 
-Quando múltiplas políticas correspondem a uma solicitação de certificado, a política de maior prioridade (menor número) prevalece.
+Quando múltiplas políticas correspondem a uma solicitação de certificado, a política de maior prioridade (menor número) decide a aprovação; as regras de todas as políticas correspondentes se aplicam em conjunto (a menor validade máxima, a interseção dos tipos de chave permitidos, e assim por diante).
 
 ## Escopo
 
@@ -117,14 +117,7 @@ A política se aplica apenas a certificados emitidos pela CA selecionada. Use pa
 
 ## Políticas Padrão
 
-O UCM vem com 5 políticas integradas que refletem as melhores práticas PKI do mundo real:
-- **Assinatura de Código** (prioridade 5): Chaves fortes, aprovação necessária
-- **Certificados Curinga** (prioridade 8): Aprovação necessária, máx. 10 SANs
-- **TLS para Servidor Web** (prioridade 10): Conforme CA/B Forum, máx. 397 dias
-- **Automação de Curta Duração** (prioridade 15): 90 dias estilo ACME
-- **PKI Interna** (prioridade 20): 730 dias, regras relaxadas
-
-> 💡 Personalize ou desative políticas padrão para corresponder aos requisitos da sua organização.
+Uma instalação nova não tem nenhuma política: crie as que a sua organização precisa. Uma instalação atualizada de uma versão anterior pode listar cinco políticas de exemplo (Assinatura de Código, Certificados Curinga, TLS para Servidor Web, Automação de Curta Duração, PKI Interna), todas desativadas.
 `
   }
 }

@@ -157,7 +157,7 @@ cmd_check_build_tools() {
     rust=$(find_rust) || missing="$missing cargo/rustc>=$RUST_MIN"
     if [ -n "$missing" ]; then
         {
-            echo "ERROR: UCM_FIPS_BUILD=1 compiles cryptography, psycopg2, lxml and xmlsec against the system OpenSSL,"
+            echo "ERROR: UCM_FIPS_BUILD=1 compiles cryptography, psycopg, lxml and xmlsec against the system OpenSSL,"
             echo "and this host lacks:$missing"
             echo "Install the build tools first:"
             install_hint "$distro"
@@ -195,10 +195,10 @@ cmd_env() {
     return 0
 }
 
-# requirements.txt with psycopg2 instead of psycopg2-binary (and xmlsec pinned on EL9), into $2.
+# requirements.txt with psycopg[c] instead of psycopg[binary] (and xmlsec pinned on EL9), into $2.
 fips_requirements() {
-    [ "$(grep -c '^psycopg2-binary' "$1")" = 1 ] || die "$1: psycopg2-binary not found once"
-    sed 's/^psycopg2-binary/psycopg2/' "$1" > "$2"
+    [ "$(grep -c '^psycopg\[binary\]' "$1")" = 1 ] || die "$1: psycopg[binary] not found once"
+    sed 's/^psycopg\[binary\]/psycopg[c]/' "$1" > "$2"
     if [ "$(fips_distro)" = el9 ]; then
         # python-xmlsec 1.3.14 and later do not build against xmlsec1 1.2.29
         [ "$(grep -c '^xmlsec[<>=]' "$2")" = 1 ] || die "$1: xmlsec not found once"
@@ -211,7 +211,7 @@ build_fips_venv() {
     local python=$1 venv=$2 reqs=$3 prompt=$4
     "$python" -m venv "$venv" --prompt "$prompt" &&
     "$venv/bin/pip" install --upgrade pip &&
-    "$venv/bin/pip" install --no-binary cryptography,psycopg2,lxml,xmlsec -r "$reqs" &&
+    "$venv/bin/pip" install --no-binary cryptography,psycopg-c,lxml,xmlsec -r "$reqs" &&
     "$venv/bin/pip" install --no-deps pyjks==20.0.0
 }
 
@@ -253,14 +253,14 @@ problems = []
 if backend.openssl_version_text() != ssl.OPENSSL_VERSION:
     problems.append(f'cryptography uses {backend.openssl_version_text()}, not the system {ssl.OPENSSL_VERSION}')
 try:
-    md.distribution('psycopg2-binary')
-    problems.append('psycopg2-binary is installed')
+    md.distribution('psycopg-binary')
+    problems.append('psycopg-binary is installed')
 except md.PackageNotFoundError:
     pass
 site = sysconfig.get_paths()['platlib']
 modules = {
     'cryptography': glob.glob(f'{site}/cryptography/hazmat/bindings/_rust*.so'),
-    'psycopg2': glob.glob(f'{site}/psycopg2/_psycopg*.so'),
+    'psycopg': glob.glob(f'{site}/psycopg_c/pq*.so'),
     'hashlib': [getattr(_hashlib, '__file__', None) or sys.executable],
 }
 for name, files in modules.items():
@@ -277,11 +277,13 @@ for name, files in modules.items():
                 problems.append(f'{name}: {" ".join(l)}')
 for root, _dirs, names in os.walk(venv):
     problems += [f'bundled {os.path.join(root, n)}' for n in names if n.startswith(('libssl', 'libcrypto'))]
-import lxml.etree, psycopg2, xmlsec  # noqa: E401,F401
+import lxml.etree, psycopg, xmlsec  # noqa: E401,F401
+if psycopg.pq.__impl__ != 'c':
+    problems.append(f'psycopg uses its {psycopg.pq.__impl__} implementation, not the one built here')
 if problems:
     print('\n'.join(problems), file=sys.stderr)
     sys.exit(1)
-print(f'cryptography, hashlib and psycopg2 use the system {ssl.OPENSSL_VERSION}')
+print(f'cryptography, hashlib and psycopg use the system {ssl.OPENSSL_VERSION}')
 PY
 }
 
@@ -366,7 +368,7 @@ cmd_venv() {
         echo "build tools missing" > "$BUILD_FAILED"
         rust=$(cmd_check_build_tools "$python" "$format")
         export PATH="$rust:$PATH" RUSTC="$rust/rustc" CARGO="$rust/cargo"
-        say "UCM_FIPS_BUILD=1: building cryptography, psycopg2, lxml and xmlsec against the system OpenSSL"
+        say "UCM_FIPS_BUILD=1: building cryptography, psycopg, lxml and xmlsec against the system OpenSSL"
         say "(about 5 minutes the first time, then from pip's wheel cache; log: $BUILD_LOG)..."
         reqs=$(mktemp)
         guard_venv "$venv" "$reqs"

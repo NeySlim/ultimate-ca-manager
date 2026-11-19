@@ -200,7 +200,7 @@ class AzureDnsProvider(BaseDnsProvider):
         logger.info(f"Azure: Created TXT record {record_name}")
         return True, "Record created successfully"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         """Delete TXT record via Azure DNS API"""
         zone = self._get_zone(domain)
         if not zone:
@@ -214,14 +214,33 @@ class AzureDnsProvider(BaseDnsProvider):
             f"?api-version={self.API_VERSION}"
         )
         
-        success, result = self._request("DELETE", path)
+        # The set holds every value of the name: write back the others, delete it only when empty.
+        success, current = self._request("GET", path)
+        if not success:
+            if self._last_status == 404:
+                return True, "Record not found (already deleted?)"
+            return False, f"Failed to read existing record: {current}"
+        props = (current or {}).get("properties", {})
+        records = list(props.get("TXTRecords", []))
+        remaining = [r for r in records
+                     if not self.txt_matches("".join(r.get("value") or []), record_value)]
+        if len(remaining) == len(records):
+            return True, "Record not found (already deleted?)"
+        
+        if remaining:
+            properties = {"TTL": props.get("TTL", 300), "TXTRecords": remaining}
+            if props.get("metadata"):
+                properties["metadata"] = props["metadata"]
+            success, result = self._request("PUT", path, {"properties": properties})
+        else:
+            success, result = self._request("DELETE", path)
         
         if not success:
             if "not found" in str(result).lower():
                 return True, "Record not found (already deleted?)"
             return False, f"Failed to delete record: {result}"
         
-        logger.info(f"Azure: Deleted TXT record {record_name}")
+        logger.info(f"Azure: Deleted TXT value from {record_name}")
         return True, "Record deleted successfully"
     
     def test_connection(self) -> Tuple[bool, str]:

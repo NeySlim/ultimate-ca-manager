@@ -33,7 +33,9 @@ def get_expiring_certificates(days: int = 30, include_revoked: bool = False) -> 
     
     query = Certificate.query.filter(
         Certificate.valid_to <= cutoff,
-        Certificate.valid_to > now
+        Certificate.valid_to > now,
+        # EST key generators renew by themselves; a replaced one stays archived until it expires
+        Certificate.source.is_distinct_from('est_key_generator'),
     )
     
     if not include_revoked:

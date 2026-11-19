@@ -32,7 +32,7 @@ export default function UsersGroupsPage() {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
+  const { showSuccess, showError, showWarning, showConfirm, showPrompt } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const { muteToasts } = useWebSocket()
   
@@ -104,6 +104,7 @@ export default function UsersGroupsPage() {
   const [linkProviders, setLinkProviders] = useState([])
   const [linkProviderId, setLinkProviderId] = useState('')
   const [linkSaving, setLinkSaving] = useState(false)
+  const [linkRemovePassword, setLinkRemovePassword] = useState(false)
 
   // Pagination
   const [page, setPage] = useState(1)
@@ -161,8 +162,10 @@ export default function UsersGroupsPage() {
     if (!confirmed) return
     try {
       muteToasts()
-      await usersService.delete(user.id)
-      showSuccess(t('messages.success.delete.user'))
+      const result = await usersService.delete(user.id)
+      // The user is gone but some mTLS certificates could not be revoked: say so
+      if (result?.data?.unrevoked_certificates?.length) showWarning(result.message)
+      else showSuccess(t('messages.success.delete.user'))
       if (selectedUser?.id === user.id) setSelectedUser(null)
       loadData()
     } catch (error) {
@@ -249,6 +252,7 @@ export default function UsersGroupsPage() {
   const handleOpenLinkModal = async (user) => {
     setLinkTarget(user)
     setLinkProviderId('')
+    setLinkRemovePassword(false)
     setShowLinkModal(true)
     try {
       const res = await ssoService.getProviders()
@@ -261,10 +265,20 @@ export default function UsersGroupsPage() {
 
   const handleSubmitLink = async () => {
     if (!linkTarget || !linkProviderId) return
+    // An account already linked is moved, or its SSO identity reset: confirmed first.
+    if (isLinked(linkTarget)) {
+      const chosen = linkProviders.find(p => String(p.id) === String(linkProviderId))
+      const confirmed = await showConfirm(`${t('users.sso.confirmRelink', {
+        name: linkTarget.username, provider: chosen?.display_name || chosen?.name || '',
+      })} ${t(linkRemovePassword ? 'users.sso.relinkKeepsNoPassword' : 'users.sso.relinkKeeps')}`,
+        { title: t('users.sso.relink'), confirmText: t('users.sso.relink') })
+      if (!confirmed) return
+    }
     setLinkSaving(true)
     try {
       await usersService.linkSso(linkTarget.id, {
         provider_id: Number(linkProviderId),
+        remove_password: linkRemovePassword,
       })
       showSuccess(t('users.sso.linkSuccess', { name: linkTarget.username }))
       setShowLinkModal(false)
@@ -781,9 +795,12 @@ export default function UsersGroupsPage() {
     { label: row.active ? t('common.deactivate') : t('users.activate'), icon: row.active ? XCircle : CheckCircle, onClick: () => handleToggleUser(row) },
     { label: t('users.resetPassword'), icon: Key, onClick: () => handleResetPassword(row) },
     ...(canWrite('users') ? [
-      isLinked(row)
-        ? { label: t('users.sso.unlink'), icon: LinkBreak, onClick: () => handleUnlinkSso(row) }
-        : { label: t('users.sso.link'), icon: LinkSimple, onClick: () => handleOpenLinkModal(row) }
+      ...(isLinked(row)
+        ? [
+          { label: t('users.sso.relink'), icon: LinkSimple, onClick: () => handleOpenLinkModal(row) },
+          { label: t('users.sso.unlink'), icon: LinkBreak, onClick: () => handleUnlinkSso(row) },
+        ]
+        : [{ label: t('users.sso.link'), icon: LinkSimple, onClick: () => handleOpenLinkModal(row) }])
     ] : []),
     ...(canDelete('users') ? [
       { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDeleteUser(row) }
@@ -838,9 +855,14 @@ export default function UsersGroupsPage() {
               <ShieldCheck size={14} /> {selectedUser.totp_exempt ? t('users.require2fa') : t('users.exempt2fa')}
             </Button>
             {isLinked(selectedUser) ? (
-              <Button type="button" size="sm" variant="secondary" onClick={() => handleUnlinkSso(selectedUser)}>
-                <LinkBreak size={14} /> {t('users.sso.unlink')}
-              </Button>
+              <>
+                <Button type="button" size="sm" variant="secondary" onClick={() => handleOpenLinkModal(selectedUser)}>
+                  <LinkSimple size={14} /> {t('users.sso.relink')}
+                </Button>
+                <Button type="button" size="sm" variant="secondary" onClick={() => handleUnlinkSso(selectedUser)}>
+                  <LinkBreak size={14} /> {t('users.sso.unlink')}
+                </Button>
+              </>
             ) : (
               <Button type="button" size="sm" variant="secondary" onClick={() => handleOpenLinkModal(selectedUser)}>
                 <LinkSimple size={14} /> {t('users.sso.link')}
@@ -1189,11 +1211,11 @@ export default function UsersGroupsPage() {
       <Modal
         open={showLinkModal}
         onOpenChange={(open) => { setShowLinkModal(open); if (!open) setLinkTarget(null) }}
-        title={t('users.sso.linkTitle', { name: linkTarget?.username || '' })}
+        title={t(isLinked(linkTarget) ? 'users.sso.relinkTitle' : 'users.sso.linkTitle', { name: linkTarget?.username || '' })}
         size="md"
       >
         <div className="p-4 space-y-4">
-          <p className="text-sm text-text-secondary">{t('users.sso.linkHelp')}</p>
+          <p className="text-sm text-text-secondary">{t(isLinked(linkTarget) ? 'users.sso.relinkHelp' : 'users.sso.linkHelp')}</p>
           <Select
             label={t('users.sso.provider')}
             value={linkProviderId}
@@ -1204,12 +1226,21 @@ export default function UsersGroupsPage() {
               label: `${p.display_name || p.name} (${(p.provider_type || '').toUpperCase()})`,
             }))}
           />
+          <label className="flex items-start gap-2 text-sm text-text-secondary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={linkRemovePassword}
+              onChange={(e) => setLinkRemovePassword(e.target.checked)}
+              className="mt-0.5 rounded border-border"
+            />
+            <span>{t('users.sso.removePassword')}</span>
+          </label>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => { setShowLinkModal(false); setLinkTarget(null) }}>
               {t('common.cancel')}
             </Button>
             <Button type="button" onClick={handleSubmitLink} disabled={!linkProviderId || linkSaving} loading={linkSaving}>
-              <LinkSimple size={16} /> {t('users.sso.link')}
+              <LinkSimple size={16} /> {t(isLinked(linkTarget) ? 'users.sso.relink' : 'users.sso.link')}
             </Button>
           </div>
         </div>

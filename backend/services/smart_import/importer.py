@@ -20,6 +20,7 @@ from cryptography.hazmat.backends import default_backend
 
 from flask import has_request_context, request
 from fips_mode import FipsRestricted
+from utils.key_codec import refuse_eddsa_key
 from utils.trusted_proxy import client_ip
 from models import db, Certificate, CA, AuditLog
 from .parser import ParsedObject, ObjectType, SmartParser
@@ -33,6 +34,7 @@ def _encrypt_prv(raw_pem: str) -> str:
     return encrypt_private_key(base64.b64encode(raw_pem.encode()).decode())
 from .matcher import KeyMatcher
 from utils.foreign_algorithms import spki_der
+from utils.cert_issuer import signing_ca_for
 from .validator import ImportValidator, ValidationResult
 from utils.datetime_utils import utc_now
 from utils.key_type import unsignable_csr_key
@@ -153,10 +155,15 @@ class SmartImporter:
         if self._parsed is not None and self._parsed[0] is content and self._parsed[1] == password:
             objects = self._parsed[2]
         else:
-            objects = self.parser.parse(content, password)
+            objects = self._parse_fresh(content, password)
         self._parsed = None
         return objects
     
+    def _parse_fresh(self, content, password) -> List[ParsedObject]:
+        # Before any parsing, as the other imports: the FIPS provider cannot load an EdDSA key
+        refuse_eddsa_key(content, 'the imported file')
+        return self.parser.parse(content, password)
+
     def analyze(self, content: str | bytes, password=None) -> AnalysisResult:
         """
         Analyze content without importing.
@@ -171,7 +178,7 @@ class SmartImporter:
         result = AnalysisResult()
         
         # Parse content
-        objects = self.parser.parse(content, password)
+        objects = self._parse_fresh(content, password)
         result.objects = [o.to_dict() for o in objects]
         
         # Build chains
@@ -214,7 +221,7 @@ class SmartImporter:
         options = options or {}
         if not options.get("import_cas", True):
             return False
-        objects = self.parser.parse(content, password)
+        objects = self._parse_fresh(content, password)
         self._parsed = (content, password, objects)
         objects = _selected(objects, options) or []
         return any(o.type == ObjectType.CERTIFICATE and _is_ca_import_target(o) for o in objects)
@@ -348,6 +355,8 @@ class SmartImporter:
         subject_to_refid: Dict[str, str] = {}
         ski_to_refid: Dict[str, str] = {}
         bundle_roots = [o for o in ca_objects if o.is_self_signed and o.ski]
+        unverified_ids = []
+        from services.import_service import relink_parent_caref  # imported late: import_service imports this package
 
         for ca_obj in ca_objects:
             counterpart = self._cross_counterpart(ca_obj, bundle_roots)
@@ -391,9 +400,11 @@ class SmartImporter:
                         ski_to_refid[existing.ski] = existing.refid
                     continue
 
-            # Find parent CA: AKI→SKI first, then issuer DN fallback
-            caref = None
-            if not ca_obj.is_self_signed:
+            # The parent is the stored CA whose key signed this certificate (flushed batch CAs included);
+            # failing that, the former AKI then issuer DN guess, kept for parents whose signature cannot be checked
+            caref = relink_parent_caref(x509.load_pem_x509_certificate(ca_obj.raw_pem.encode()), None)
+            verified = caref is not None
+            if not caref and not ca_obj.is_self_signed:
                 if ca_obj.aki:
                     caref = ski_to_refid.get(ca_obj.aki)
                     if not caref:
@@ -445,9 +456,17 @@ class SmartImporter:
                 ski_to_refid[ca_obj.ski] = refid
             result.cas_imported += 1
             result.imported_ids["cas"].append(ca.id)
+            if not verified:
+                unverified_ids.append(ca.id)
             
             # Audit log
             self._log_audit("import_ca", ca.id, ca.descr, username)
+
+        # A child listed before its parent found no signer at creation: relink once the whole batch is stored
+        for ca in CA.query.filter(CA.id.in_(unverified_ids)).all() if unverified_ids else []:
+            ca.caref = relink_parent_caref(x509.load_pem_x509_certificate(base64.b64decode(ca.crt)), ca.caref,
+                                           exclude_ca_id=ca.id)
+        db.session.flush()
     
     @staticmethod
     def _is_self_signed_record(ca) -> bool:
@@ -516,16 +535,13 @@ class SmartImporter:
                     result.warnings.append(f"Skipped duplicate certificate: {self._get_cn(cert_obj.subject)}")
                     continue
             
-            # Find issuing CA: AKI→SKI first, then issuer DN fallback
+            # The issuing CA is the stored one whose key signed it, found by AKI then DN
             caref = None
-            if cert_obj.aki:
-                ca = find_ca_by_ski(cert_obj.aki)
-                if ca:
-                    caref = ca.refid
-            if not caref:
-                ca = CA.query.filter(CA.subject == cert_obj.issuer).first()
-                if ca:
-                    caref = ca.refid
+            try:
+                ca = signing_ca_for(x509.load_pem_x509_certificate(cert_obj.raw_pem.encode()))
+                caref = ca.refid if ca else None
+            except ValueError:
+                pass
             
             # Find matching private key
             prv = None
@@ -585,6 +601,8 @@ class SmartImporter:
                 imported_from="smart_import",
                 created_by=username
             )
+            from services.cert.issued_lookup import apply_persisted_revocation
+            apply_persisted_revocation(cert)
             
             db.session.add(cert)
             db.session.flush()

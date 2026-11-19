@@ -25,9 +25,9 @@ export default {
         title: 'Permessi',
         items: [
           { label: 'Viewer', text: 'Possono vedere solo i propri certificati' },
-          { label: 'Operatori', text: 'Possono visualizzare, esportare e revocare tutti i certificati utente' },
-          { label: 'Amministratori', text: 'Accesso completo, eliminazione inclusa' },
-          { label: 'Auditor', text: 'Possono visualizzare i certificati ma non esportarli' },
+          { label: 'Operatori', text: 'Possono visualizzare, esportare, revocare ed eliminare tutti i certificati utente; esportare la chiave privata del certificato di un altro utente richiede read:private_keys, che il ruolo non ha' },
+          { label: 'Amministratori', text: 'Accesso completo, chiavi private incluse' },
+          { label: 'Auditor', text: 'Possono visualizzare ed esportare i certificati, senza la loro chiave privata' },
         ]
       },
     ],
@@ -101,8 +101,8 @@ L'eliminazione rimuove sia il certificato sia l'associazione utente-certificato.
 | Ruolo | Visualizza | Esporta | Revoca | Elimina |
 |------|------|--------|--------|--------|
 | Amministratore | Tutti | Tutti | Tutti | Tutti |
-| Operatore | Tutti | Tutti | Tutti | Tutti |
-| Auditor | Tutti | ✗ | ✗ | ✗ |
+| Operatore | Tutti | Tutti (la chiave privata di un altro utente richiede read:private_keys) | Tutti | Tutti |
+| Auditor | Tutti | Solo il certificato, senza chiave privata | ✗ | ✗ |
 | Viewer | Solo i propri | Solo i propri | ✗ | ✗ |
 
 ### Permessi richiesti

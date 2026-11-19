@@ -35,11 +35,14 @@ export default {
       },
       {
         title: "Vista del planificador",
-        content: "Ajustes › Sistema enumera las tareas en segundo plano con su estado y última ejecución.",
+        content: "Ajustes › Planificador enumera las tareas en segundo plano con su estado y última ejecución.",
         items: [
           { label: "Tareas", text: "Comprobaciones de expiración, actualización de CRL, entrega de webhooks, copias programadas, autorrenovación, etc." },
           { label: "Ejecutar ahora", text: "Desencadenar cualquier tarea bajo demanda" },
           { label: "Visibilidad", text: "Última ejecución, última duración y número de fallos por tarea" },
+          { label: 'Proceso del planificador (v2.251)', text: 'Las tareas se ejecutan en un proceso propio del planificador, que arranca con el servicio y se reinicia en pocos segundos tras un fallo o una recarga, de modo que una tarea larga no retrasa ni las solicitudes ni los workers. Ocupa unos 150 MB de memoria' },
+          { label: 'Estado obsoleto (v2.251)', text: 'Cuando el proceso del planificador lleva un tiempo sin informar, la pestaña avisa de que el estado mostrado puede estar desactualizado' },
+          { label: 'Tareas largas (v2.251)', text: 'Ejecutar ahora espera hasta 30 segundos el resultado. Una tarea que sigue en curso se notifica como iniciada y en ejecución, y su resultado aparece en una actualización posterior' },
         ]
       },
       {
@@ -47,9 +50,20 @@ export default {
         content: "Copias de seguridad automáticas y cifradas de la base de datos, con cadencia configurable y retención.",
         items: [
           { label: "Cadencia", text: "Diaria / semanal / mensual" },
-          { label: "Retención", text: "Conservar las N copias más recientes; las más antiguas se eliminan" },
+          { label: "Retención", text: "Las copias más antiguas que el número de días fijado (30 por defecto) se eliminan" },
           { label: "Cifrado", text: "Las copias se cifran con la contraseña de copia de seguridad configurada" },
           { label: "Derivación de clave", text: "Automática (Argon2id si está disponible, PBKDF2 en modo FIPS), PBKDF2-HMAC-SHA256 o Argon2id. Los archivos escritos con Argon2id no se pueden restaurar en una instancia en modo FIPS" },
+        ]
+      },
+      {
+        title: 'Restauración (v2.251)',
+        items: [
+          { label: 'Reemplazar o fusionar', text: 'Restaurar desde copia reemplaza los datos de aquí por los del archivo y elimina lo que el archivo no contiene; la entrada de auditoría enumera lo eliminado. La API también acepta mode=merge, que añade el archivo a los datos de aquí' },
+          { label: 'Bloqueo compartido', text: 'Las copias y las restauraciones comparten un único bloqueo: se rechaza una restauración (409) mientras se ejecuta una copia, y una copia manual espera a que termine una restauración en curso' },
+          { label: 'Límite de subida', text: 'Una restauración acepta un archivo de hasta BACKUP_MAX_UPLOAD_MB (512 MB por defecto), definido en el entorno del servidor, y el rechazo nombra esa variable. Un reverse proxy delante de UCM mantiene su propio límite de cuerpo' },
+          { label: 'Qué contiene un archivo', text: 'Los archivos incluyen los pedidos del cliente ACME, las solicitudes de aprobación y las solicitudes de recuperación de claves. Restaurar un archivo escrito antes de esta versión deja esas filas de aquí como están' },
+          { label: 'Mismos nombres', text: 'Un proveedor DNS, una cuenta de CA ACME o un webhook cuyo nombre ya tiene otra fila aquí se restaura como «nombre (2)», y el resultado de la restauración que devuelve la API lo enumera' },
+          { label: 'Ajustes que nombran una fila', text: 'Las CA emisoras de SCEP y ACME, los respondedores OCSP y ajustes similares siguen las filas archivadas. Al restaurar un archivo antiguo en otra instalación, quedan vacíos y hay que elegirlos de nuevo' },
         ]
       },
       {
@@ -57,7 +71,9 @@ export default {
         content: 'Ajustes › Actualizaciones: una comprobación diaria en segundo plano de nuevas versiones y una instalación desatendida opcional.',
         items: [
           { label: "Canal", text: "Stable sigue solo las versiones finales; Release candidates acepta además únicamente versiones rcN, nunca alfa/beta" },
-          { label: 'Notificación', text: 'Una versión recién disponible dispara el evento webhook/correo system.update_available, una vez por versión' },
+          { label: 'Notificación', text: 'Una versión recién disponible dispara el evento webhook system.update_available, una vez por versión' },
+          { label: "Versiones principales", text: "Las actualizaciones se mantienen dentro de la versión principal instalada. Una versión principal posterior publicada como versión final se ofrece aparte como actualización recomendada, instalada solo a petición explícita y confirmada; las actualizaciones automáticas nunca la instalan, y system.update_available se emite una vez por versión principal, con major_upgrade activado" },
+          { label: "Mantenimiento de seguridad", text: "Esta línea de versiones está en mantenimiento de seguridad: seguirán llegando correcciones de seguridad, pero no nuevas funciones. La página Actualizaciones muestra este aviso en todo momento" },
           { label: 'Instalación automática', text: 'Desactivada por defecto. Cuando está activada, UCM descarga, verifica e instala la actualización a la hora elegida y luego se reinicia, solo instalaciones DEB/RPM' },
           { label: 'Suma de comprobación', text: 'Una instalación desatendida requiere el SHA256 publicado de la versión para la verificación; una instalación manual también verifica siempre que se publique una suma de comprobación' },
           { label: 'Docker', text: 'Los contenedores no pueden actualizarse a sí mismos, la comprobación y la notificación siguen funcionando; descargue la nueva imagen para actualizar' },
@@ -80,15 +96,17 @@ export default {
           { label: 'General', text: 'Nombre de host de syslog (enviado como HOSTNAME en los mensajes syslog reenviados), URL base y valores predeterminados del sistema' },
           { label: 'Apariencia', text: 'Selección de tema (claro/oscuro/sistema), color de acento, modo escritorio' },
           { label: 'Correo electrónico (SMTP)', text: 'Servidor SMTP, credenciales, editor de plantillas de correo y notificaciones de alerta de expiración' },
-          { label: 'Seguridad', text: 'Políticas de contraseña, tiempo de espera de sesión, limitación de velocidad, lista de acceso de administración' },
+          { label: 'Seguridad', text: 'Política de contraseñas, duración de sesión, lista de acceso de administración, mTLS, cifrado de claves privadas; el tiempo de inactividad y el bloqueo de cuenta están en General' },
           { label: 'SSO', text: 'Integración de inicio de sesión único con SAML 2.0, OAuth2/OIDC y LDAP' },
           { label: 'Respaldo', text: 'Copias de seguridad manuales y programadas de la base de datos' },
           { label: 'Auditoría', text: 'Retención de registros, reenvío a syslog, verificación de integridad' },
           { label: 'Base de datos', text: 'Backend activo (SQLite o PostgreSQL), tamaño, número de tablas, probar/cambiar/migrar entre backends' },
+          { label: 'Esquema de PostgreSQL (v2.251)', text: 'Se admite una URL de PostgreSQL cuyo search_path nombra un esquema distinto de public: la verificación de integridad cuenta las tablas de ese esquema y una migración hacia él realinea sus secuencias' },
           { label: 'HTTPS', text: 'Certificado TLS para la interfaz web de UCM. El certificado aplicado se recuerda y se vuelve a aplicar cuando se renueva (v2.217); el certificado vinculado se muestra con un botón para desvincularlo y dejar de seguir las renovaciones (v2.218)' },
           { label: 'Actualizaciones', text: 'Buscar nuevas versiones, ver registro de cambios, comprobación diaria programada con instalación desatendida opcional (DEB/RPM)' },
           { label: 'Webhooks', text: 'Webhooks HTTP para eventos de certificados (emisión, revocación, expiración). Autenticación saliente opcional: Bearer, Basic, API key o encabezado personalizado' },
-          { label: 'Despliegue', text: 'Los destinos de despliegue son conexiones SSH/SFTP reutilizables; cada despliegue de certificado o de CRL define sus propias rutas y su comando de recarga opcional (solo administradores, v2.215)' },
+          { label: 'Nombres de webhook únicos (v2.251)', text: 'Se rechaza (409) un nombre de webhook ya en uso, al crear y al renombrar. La actualización renombró los duplicados anteriores como «nombre (2)», «nombre (3)», empezando por el más antiguo' },
+          { label: 'Despliegue', text: 'Los destinos de despliegue son conexiones SSH/SFTP reutilizables, o una solicitud a una API HTTP (v2.252); cada despliegue de certificado o de CRL define sus propias rutas y su comando de recarga opcional (solo administradores, v2.215)' },
           { label: 'Active Directory', text: 'Conexión propia de UCM a AD/LDAP para búsquedas relacionadas con certificados (resolución de entidades de seguridad Kerberos, sujetos derivados de AD)' },
           { label: 'Autoinscripción de Windows', text: 'Inscripción nativa de Windows MS-XCEP/MS-WSTEP: descubrimiento de directivas, emisión de certificados y vinculación Kerberos/SPNEGO' },
           { label: 'Acerca de', text: 'Información del sistema, Enlaces y recursos y Apoyar UCM enlazan a Ko-fi (los administradores ven además una tarjeta de Ko-fi descartable una vez por versión de UCM). Con admin:system, Comprobar la preparación para FIPS enumera lo que el modo FIPS rechazaría en esta instancia, con un remedio para cada caso, y no modifica nada' },
@@ -97,9 +115,10 @@ export default {
       },
       {
         title: 'Hooks de despliegue (v2.215)',
-        content: 'Ajustes › Despliegue (solo administradores): conexiones SSH/SFTP reutilizables para los despliegues de certificados y de CRL. Las rutas y el comando de recarga opcional se configuran en cada despliegue.',
+        content: 'Ajustes › Despliegue (solo administradores): conexiones SSH/SFTP reutilizables, o solicitudes a una API HTTP, para los despliegues de certificados y de CRL. Las rutas y el comando de recarga opcional se configuran en cada despliegue SSH.',
         items: [
           { label: 'Destino', text: 'Host, puerto, usuario SSH. UCM genera una clave ed25519 (instale la clave pública mostrada en el destino) o acepta una clave privada importada, almacenada cifrada' },
+          { label: 'Destino de API HTTP (v2.252)', text: "URL, método (POST, PUT, PATCH), cabeceras de la solicitud almacenadas cifradas y que no se vuelven a mostrar, y una plantilla de cuerpo con {{cert_pem}}, {{fullchain_pem}}, {{cn}}, {{serial}}... más los filtros |json, |jsonstr, |b64 y |urlencode. Un cuerpo JSON se valida al guardar. La clave privada ({{key_pem}}) solo sale con la aceptación explícita del destino y una URL https; el certificado TLS siempre se verifica, contra un ancla de confianza pegada si el equipo es autofirmado. Se rechazan las redirecciones y se bloquean las direcciones de metadatos de la nube y de loopback. Solo certificados: las CRL permanecen en destinos SSH" },
           { label: 'Host key', text: 'Se fija en la primera conexión exitosa (trust-on-first-use); cualquier cambio posterior falla en cerrado. Cambiar el host vuelve a fijarla' },
           { label: 'Comando de recarga', text: 'Un comando opcional, configurado en cada vinculación de certificado o de CRL y ejecutado tras un envío exitoso (por ej. systemctl reload nginx): exit 0 = éxito, sin plantillas' },
           { label: 'Vinculaciones', text: 'Los certificados se asocian desde la vista de detalle del certificado; las CRL, desde CRL & OCSP. Cada vinculación tiene sus propias rutas, opciones de archivo y comando de recarga' },
@@ -138,6 +157,10 @@ export default {
           { label: 'Lista de verificación de configuración', text: 'La pestaña muestra una lista de verificación en vivo de lo configurado frente a lo que falta, tanto para la inscripción manual como la desatendida' },
           { label: 'Sujetos derivados de AD', text: 'Las plantillas pueden optar por derivar su sujeto/SAN de Active Directory (mediante el conector de AD) para la inscripción desatendida' },
           { label: 'Plantillas ML-DSA (v2.248)', text: 'Se anuncian por el OID de su algoritmo de clave con el Microsoft Software Key Storage Provider, aún no probadas con un cliente Windows real, y ocultas en modo FIPS. La renovación con certificado no puede usar un certificado ML-DSA (XML-DSig no tiene firma ML-DSA): inscriba uno nuevo' },
+          { label: 'Plantillas ECDSA (v2.251)', text: 'Se anuncian en el esquema de directiva 3 con su curva (ECDSA_P256, ECDSA_P384, ECDSA_P521) como clave de firma y un hash de solicitud, el más fuerte entre el resumen de la plantilla y el que corresponde a la curva. Las plantillas RSA fuera del modo FIPS siguen en el esquema 2' },
+          { label: 'Plantilla y clave (v2.251)', text: 'La clave de la solicitud debe ajustarse a la plantilla con la que se emite: la misma curva o el mismo conjunto ML-DSA, o una clave RSA al menos igual de larga, de modo que una solicitud P-384 ya no se emite con una plantilla P-256 que comparta su EKU. Se acepta el sobre de solicitud que Windows firma con una clave ECDSA' },
+          { label: 'Renovación desde Windows (v2.248)', text: 'certreq ... Renew se autentica con el certificado que se renueva como certificado de cliente TLS: requiere mTLS activado y la CA de WSTEP, o una de sus ancestras, de confianza. Una renovación conserva la plantilla y los EKU del certificado que renueva' },
+          { label: 'Kerberos en Docker (v2.251)', text: 'Las imágenes Docker incluyen el backend Kerberos de pyspnego, por lo que la vinculación Kerberos funciona en un contenedor igual que en las instalaciones DEB y RPM' },
         ]
       },
       {
@@ -148,6 +171,7 @@ export default {
           { label: 'Renovado entretanto', text: 'Un certificado que un operador renovó durante el lote no se renueva una segunda vez; uno eliminado durante el lote se omite' },
           { label: 'Certificados de corta duración', text: 'La renovación nunca empieza antes del último tercio de la vigencia de un certificado: uno de 27 días se renueva cuando le quedan 9, no desde su emisión' },
           { label: 'Ejecutar ahora', text: 'Ejecuta una pasada de renovación de inmediato e informa de los certificados por expirar que dejó sin tocar, contados por motivo: aún no en el último tercio de su vigencia, clave privada no en poder del servidor, fuente no seleccionada' },
+          { label: 'Resumen de firma (v2.251)', text: 'Una renovación conserva el resumen del certificado original mientras sea al menos el que corresponde a la clave de la CA y las políticas lo permitan; si no, sigue la regla de emisión: bajo una CA P-384 o P-521, un original SHA-256 se renueva con SHA-384 o SHA-512' },
         ]
       },
 
@@ -184,7 +208,6 @@ Configuración de todo el sistema organizada en pestañas. Los cambios surten ef
 - **Tema**: Claro, Oscuro o Sistema (sigue la preferencia del SO)
 - **Color de acento**: Color principal usado para botones, enlaces y resaltados
 - **Forzar modo escritorio**: Desactivar el diseño responsivo para móviles
-- **Comportamiento de la barra lateral**: Colapsada o expandida por defecto
 
 ## Correo electrónico (SMTP)
 
@@ -218,18 +241,14 @@ Cuando SMTP está configurado, active alertas automáticas de expiración de cer
 ## Seguridad
 
 ### Política de contraseñas
-- Longitud mínima (8-32 caracteres)
-- Requerir mayúsculas, minúsculas, números, caracteres especiales
-- Expiración de contraseña (días)
-- Historial de contraseñas (prevenir reutilización)
+- Longitud mínima (6-32 caracteres)
+- Requerir mayúsculas, números, caracteres especiales
 
 ### Gestión de sesiones
-- Tiempo de espera de sesión (minutos de inactividad)
-- Máximo de sesiones concurrentes por usuario
+- Duración de sesión (horas, sea cual sea la actividad); el tiempo de inactividad está en General
 
-### Limitación de velocidad
-- Límite de intentos de inicio de sesión por IP
-- Duración del bloqueo después de exceder el límite
+### Bloqueo de cuenta
+- Máximo de intentos de inicio de sesión y duración del bloqueo, en General: bloquean la cuenta, no la dirección IP
 
 ### Lista de acceso de administración
 Limita la interfaz web y la API de gestión a las direcciones IP y redes CIDR indicadas; los protocolos PKI siguen siendo accesibles desde cualquier lugar. Consulte la guía de Configuración de seguridad.
@@ -269,16 +288,22 @@ Cifre todas las claves privadas almacenadas en la base de datos con AES-256, pro
 ## Respaldo
 
 ### Respaldo manual
-Haga clic en **Crear respaldo** para generar una instantánea de la base de datos. Los respaldos incluyen todos los certificados, CAs, claves, configuración y registros de auditoría.
+Haga clic en **Crear respaldo** para generar una instantánea de la base de datos. Los respaldos incluyen los certificados, CAs, claves y configuración; el registro de auditoría y otras tablas de historial no se incluyen.
 
 ### Respaldo programado
 Configure copias de seguridad automáticas:
 - Frecuencia (diaria, semanal, mensual)
-- Cantidad de retención (número de respaldos a conservar)
+- Retención en días: los respaldos más antiguos se eliminan (30 por defecto)
 - **Derivación de clave**: Automática (Argon2id si está disponible, PBKDF2 en modo FIPS), PBKDF2-HMAC-SHA256 o Argon2id. Los archivos escritos con Argon2id no se pueden restaurar en una instancia en modo FIPS
 
 ### Restaurar
 Suba un archivo de respaldo para restaurar UCM a un estado anterior.
+
+- Las copias y las restauraciones comparten un único bloqueo: se rechaza una restauración (409) mientras se ejecuta una copia, y una copia manual espera a que termine una restauración en curso
+- Se acepta una subida de hasta \`BACKUP_MAX_UPLOAD_MB\` (512 MB por defecto, definido en el entorno del servidor); un reverse proxy delante de UCM mantiene su propio límite de cuerpo
+- Los archivos incluyen los pedidos del cliente ACME, las solicitudes de aprobación y las solicitudes de recuperación de claves (v2.251)
+- Un proveedor DNS, una cuenta de CA ACME o un webhook cuyo nombre ya tiene otra fila aquí se restaura como \`nombre (2)\`
+- La API también acepta \`mode=merge\`, que añade el archivo a los datos de aquí en lugar de reemplazarlos
 
 > ⚠ Restaurar un respaldo reemplaza TODOS los datos actuales.
 
@@ -286,7 +311,7 @@ Suba un archivo de respaldo para restaurar UCM a un estado anterior.
 
 - **Retención de registros**: Limpieza automática de registros antiguos después de N días
 - **Reenvío a syslog**: Enviar eventos a un servidor syslog remoto (UDP/TCP/TLS)
-- **Verificación de integridad**: Activar encadenamiento de hash para detección de manipulación
+- **Verificación de integridad**: Comprueba la cadena de hashes que enlaza cada entrada de auditoría; la cadena siempre está activa, no hay nada que activar
 
 ## Base de datos
 
@@ -295,18 +320,17 @@ UCM admite dos backends de base de datos:
 - **SQLite** (predeterminado): basado en archivo, sin configuración, ideal para nodo único
 - **PostgreSQL 13+**: recomendado para alta disponibilidad, multi-instancia o si ya opera un clúster PG gestionado
 
-El backend activo se selecciona mediante la variable de entorno \`DATABASE_URL\`. Si no se establece, UCM usa SQLite en \`UCM_DATA_DIR/ucm.db\`.
+El backend activo se selecciona mediante la variable de entorno \`DATABASE_URL\`. Si no se establece, UCM usa SQLite en \`DATA_DIR/ucm.db\`.
 
 ### Panel de estado
-- Backend activo (sqlite / postgresql) y controlador
+- Backend activo (sqlite / postgresql) y la versión de su motor
 - Tamaño de la base de datos y número de tablas
-- Versión de migración
 
 ### Probar la conexión
 Valide una \`DATABASE_URL\` (p. ej. \`postgresql://user:pass@host:5432/ucm\`) antes de cambiar. La prueba abre una conexión real e informa cualquier error. Los servidores PostgreSQL anteriores a la versión 13 son rechazados, UCM requiere PostgreSQL 13 o más reciente.
 
 ### Cambiar de backend
-Persiste \`DATABASE_URL\` en \`/etc/ucm/ucm.env\` (DEB/RPM) y reinicia UCM. **No se copia ningún dato**: use **Migrar** primero si desea conservar sus datos existentes.
+Persiste \`DATABASE_URL\` en \`/etc/ucm/ucm.env\` (DEB/RPM) y reinicia UCM. Solo se copian al nuevo backend las tablas de cuentas, roles, SSO y MFA, para que pueda seguir iniciando sesión; use **Migrar** primero si desea conservar sus demás datos.
 
 ### Migrar datos
 Copia todas las filas del backend actual al backend destino. Funciona en ambas direcciones (SQLite ↔ PostgreSQL):
@@ -314,13 +338,14 @@ Copia todas las filas del backend actual al backend destino. Funciona en ambas d
 1. La base de datos de origen se respalda en \`/opt/ucm/data/backups/db_migration/\`
 2. El esquema se crea en el destino mediante SQLAlchemy
 3. Las restricciones FK se desactivan durante la carga masiva
-4. Las columnas origen/destino se intersectan (las columnas heredadas se omiten con una advertencia)
+4. Las columnas se emparejan por nombre; solo se descartan las columnas heredadas conocidas, y cualquier otra columna que falte en el destino rechaza la migración
 5. Las secuencias de PostgreSQL se restablecen después de la carga
 6. El servicio se reinicia automáticamente (DEB/RPM): en Docker, establezca \`DATABASE_URL\` en su archivo compose y reinicie el contenedor manualmente
 
 **Comprobaciones de seguridad (fallo rápido, origen intacto):**
-- El destino debe estar vacío. Si \`users\`, \`cas\` o \`certificates\` ya contienen filas, la migración se rechaza con HTTP 409 y una sugerencia de limpieza:
+- El destino debe estar vacío. Si alguna de sus tablas ya contiene filas, la migración se rechaza con HTTP 409 y una sugerencia de limpieza:
   - PostgreSQL: \`psql ... -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'\`
+  - PostgreSQL en un esquema distinto de \`public\` (un \`search_path\` en la URL): la sugerencia nombra ese esquema, cuyas secuencias realinea la migración (v2.251)
   - SQLite: elimine el archivo \`.db\` de destino
 - Si la migración falla a mitad de camino, el origen permanece intacto y el mensaje de error apunta a la copia de seguridad del origen. Restablezca el destino antes de reintentar.
 
@@ -340,18 +365,22 @@ Administre el certificado TLS usado por la interfaz web de UCM:
 - Buscar nuevas versiones de UCM desde las publicaciones de GitHub
 - Ver el registro de cambios de las actualizaciones disponibles
 - Versión actual e información de compilación
-- **Actualización automática**: en instalaciones compatibles (DEB/RPM), haga clic en **Actualizar ahora** para descargar e instalar la última versión automáticamente
-- **Incluir prelanzamientos**: active para verificar también los candidatos de lanzamiento (rc)
+- **Actualización automática**: en instalaciones compatibles (DEB/RPM), haga clic en **Instalar actualización** para descargar e instalar la última versión automáticamente
+- **Canal de actualización**: estable, prelanzamiento (candidatos de lanzamiento) o dev
 
 ## Webhooks
 
 Configure webhooks HTTP para notificar a sistemas externos sobre eventos:
 
 ### Eventos soportados
-- Certificado emitido, revocado, expirado, renovado
-- CA creada, eliminada
-- Inicio de sesión del usuario, cierre de sesión
-- Respaldo creado
+- Certificado emitido, revocado, renovado, por expirar, expirado, importado, eliminado
+- CA creada, actualizada, eliminada
+- CSR enviado, aprobado, rechazado
+- Plantilla creada, actualizada
+- Preflight ACME, fallo de renovación, fallo de revocación
+- Actualización disponible, iniciada, instalada, fallida
+
+Las importaciones de certificados y los cambios de plantilla hechos desde la interfaz web no emiten su evento.
 
 ### Autenticación
 
@@ -367,7 +396,7 @@ Los tokens se almacenan cifrados y nunca se devuelven en la UI.
 
 ### Crear un webhook
 1. Haga clic en **Agregar webhook**
-2. Ingrese la **URL** (debe ser HTTPS)
+2. Ingrese la **URL** (se recomienda HTTPS; se acepta http://)
 3. Seleccione los **eventos** a los que suscribirse
 4. Elija el **tipo de autenticación** y proporcione las credenciales (opcional)
 5. Opcionalmente establezca un **secreto** para verificación de firma HMAC
@@ -393,11 +422,12 @@ Abra el historial (icono de reloj) en un webhook para ver sus entregas.
 
 ## Vista del planificador
 
-Ajustes › Sistema muestra las tareas en segundo plano.
+Ajustes › Planificador muestra las tareas en segundo plano.
 
 - Lista de tareas con **estado**, **última ejecución**, **duración** y **fallos**
-- **Ejecutar ahora** en cualquier tarea
+- **Ejecutar ahora** en cualquier tarea: espera hasta 30 segundos, y una tarea que sigue en curso se notifica como iniciada, con su resultado en una actualización posterior
 - Cubre expiración, CRL, entrega de webhooks, copias, autorrenovación…
+- **Proceso del planificador** (v2.251): las tareas se ejecutan en un proceso propio, que arranca con el servicio y se reinicia en pocos segundos tras un fallo o una recarga, de modo que una tarea larga no retrasa ni las solicitudes ni los workers. Se muestra una advertencia cuando lleva un tiempo sin informar
 
 ## Autorrenovación
 Los ajustes de autorrenovación gobiernan el planificador de renovaciones.
@@ -412,7 +442,7 @@ Los ajustes de autorrenovación gobiernan el planificador de renovaciones.
 Ajustes › Copia de seguridad permite copias automáticas.
 
 - Cadencia **diaria / semanal / mensual**
-- **Retención**: conservar las N más recientes, eliminar las antiguas
+- **Retención**: los respaldos más antiguos que el número de días fijado se eliminan
 - Copias **cifradas** con la contraseña de copia
 
 
@@ -448,6 +478,8 @@ La pestaña realiza un seguimiento de lo que está configurado frente a lo que a
 
 Una plantilla con tipo de clave **ML-DSA** se anuncia por el OID de su algoritmo de clave, con el Microsoft Software Key Storage Provider y una especificación de clave solo de firma. Se oculta en modo FIPS y la inscripción desde un cliente Windows real aún no se ha probado.
 
+Una plantilla **ECDSA** se anuncia en el esquema de directiva 3 con su curva (\`ECDSA_P256\`, \`ECDSA_P384\`, \`ECDSA_P521\`) como clave de firma y un hash de solicitud, el más fuerte entre el resumen de la plantilla y el que corresponde a la curva; las plantillas RSA fuera del modo FIPS siguen en el esquema 2. La clave de la solicitud debe ajustarse a la plantilla con la que se emite: la misma curva o el mismo conjunto ML-DSA, o una clave RSA al menos igual de larga (v2.251).
+
 ### Kerberos / SPNEGO
 
 Vincula los puntos de conexión XCEP/WSTEP autenticados por Kerberos usados para la autoinscripción GPO silenciosa, de modo que las máquinas y los usuarios se autentiquen mediante su ticket Kerberos en lugar de una solicitud de credenciales:
@@ -455,6 +487,8 @@ Vincula los puntos de conexión XCEP/WSTEP autenticados por Kerberos usados para
 - **Keytab**: Generado con \`ktpass\` o \`ktutil\` en el controlador de dominio para el SPN anterior
 
 > ⚠ Kerberos requiere el **backend \`gssapi\`** del lado del servidor (la biblioteca Python \`gssapi\` más las bibliotecas Kerberos del sistema): el paquete SPNEGO base por sí solo no es suficiente. Sin él, la autenticación Kerberos no funcionará aunque esté habilitada aquí, y la vinculación Kerberos no se anuncia; se muestra una advertencia en la pestaña.
+
+Las imágenes Docker incluyen este backend desde la v2.251.
 
 ### URL de directiva de inscripción
 
@@ -467,9 +501,11 @@ Además de Usuario/Contraseña y Kerberos, WSTEP admite la **renovación con cer
 
 XML-DSig no tiene método de firma ML-DSA, por lo que un certificado **ML-DSA** no puede renovarse así: UCM nombra la clave en su rechazo y el cliente inscribe un certificado nuevo.
 
+Windows también puede renovar con \`certreq ... Renew\`, autenticado por el certificado que se renueva como certificado de cliente TLS: active mTLS con la CA de WSTEP, o una de sus ancestras, de confianza. Una renovación conserva la plantilla y los EKU del certificado que renueva (v2.248).
+
 ### Extensión de seguridad SID (KB5014754)
 
-En la **emisión autenticada por Kerberos**, UCM incrusta el SID de AD del solicitante en la extensión de seguridad SID de Microsoft (\`szOID_NTDS_CA_SECURITY_EXT\`) del certificado emitido. Los controladores de dominio la usan para el **mapeo fuerte de certificados** (KB5014754): requerido desde que AD exige el mapeo fuerte para la autenticación basada en certificados (inicio de sesión con tarjeta inteligente, PKINIT).
+En la **emisión autenticada por Kerberos**, UCM incrusta el SID de AD del solicitante en la extensión de seguridad SID de Microsoft (\`szOID_NTDS_CA_SECURITY_EXT\`) del certificado emitido. Los controladores de dominio la usan para el **mapeo fuerte de certificados** (KB5014754): requerido desde que AD exige el mapeo fuerte para la autenticación basada en certificados (inicio de sesión con tarjeta inteligente, PKINIT). Una renovación WSTEP, EST o SCEP conserva la extensión SID del certificado que renueva, nunca una procedente de la CSR; con el conector de AD activado, ese SID debe seguir designando una cuenta del directorio.
 
 ### Sujetos derivados de AD
 

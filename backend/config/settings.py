@@ -9,7 +9,7 @@ from typing import Optional
 from datetime import timedelta
 from dotenv import load_dotenv
 
-from utils.db_url import is_postgres_url, sqlalchemy_url
+from utils.db_url import is_postgres_url, postgres_connect_args, sqlalchemy_url
 
 # Load environment variables FIRST (before using them)
 # Try multiple locations for .env files
@@ -94,6 +94,18 @@ def get_system_fqdn():
     return None
 
 
+def backup_max_upload_mb() -> int:
+    """`BACKUP_MAX_UPLOAD_MB`, at least 1; a value that is not a number falls back to 512."""
+    raw = os.getenv("BACKUP_MAX_UPLOAD_MB", "512")
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        import logging
+        logging.getLogger(__name__).warning(
+            "BACKUP_MAX_UPLOAD_MB=%r is not a whole number of MB: using 512", raw)
+        return 512
+
+
 class Config:
     """Base configuration - values can be overridden by database settings"""
     
@@ -140,9 +152,13 @@ class Config:
     HTTPS_CERT_PATH = Path(os.getenv("HTTPS_CERT_PATH", _https_cert_default))
     HTTPS_KEY_PATH = Path(os.getenv("HTTPS_KEY_PATH", _https_key_default))
     HTTPS_AUTO_GENERATE = os.getenv("HTTPS_AUTO_GENERATE", "true").lower() == "true"
+    # Create the master key at first start (security.master_key_bootstrap)
+    AUTO_MASTER_KEY = os.getenv("UCM_AUTO_MASTER_KEY", "true").strip().lower() not in ("0", "false", "no", "off")
     
     # File Upload Limits (security)
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB max (base64 inflates ~33%)
+    # The restore routes alone accept an archive up to this size, in MiB
+    BACKUP_MAX_UPLOAD_MB = backup_max_upload_mb()
     
     # Database
     # Supports SQLite (default) or PostgreSQL for high availability
@@ -171,8 +187,11 @@ class Config:
         "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "1800")),
     } if _db_url else {}
     # SQLAlchemy would otherwise quote bound values in its errors, private keys included.
-    # PostgreSQL's DETAIL line stays: a duplicate key in full, or a refused row's columns up to 64 bytes
+    # PostgreSQL's DETAIL stays for a duplicate or missing key; a refused row or input is dropped (utils/db_errors)
     SQLALCHEMY_ENGINE_OPTIONS["hide_parameters"] = True
+    # UCM_PG_PREPARE_THRESHOLD, for a transaction-mode pooler without prepared statements
+    if _db_url and postgres_connect_args(_db_url):
+        SQLALCHEMY_ENGINE_OPTIONS["connect_args"] = postgres_connect_args(_db_url)
     
     
     @classmethod
@@ -285,6 +304,8 @@ class TestingConfig(Config):
     # Inherit Config.SQLALCHEMY_ENGINE_OPTIONS when DATABASE_URL is set in the
     # environment (PG CI job) but force in-memory SQLite — pool_* args are invalid.
     SQLALCHEMY_ENGINE_OPTIONS = {"hide_parameters": True}
+    # The suite starts unencrypted; the tests of the first-start key turn it on
+    AUTO_MASTER_KEY = False
 
 
 # Configuration dictionary

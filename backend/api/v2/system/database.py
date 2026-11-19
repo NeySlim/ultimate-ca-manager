@@ -115,10 +115,11 @@ def check_integrity():
     try:
         db_uri = current_app.config.get('SQLALCHEMY_DATABASE_URI', '')
         if db_uri.startswith('postgresql'):
-            # PRAGMA is SQLite-only. On PG, verify connectivity + count public tables.
+            # PRAGMA is SQLite-only. On PG, verify connectivity + count the tables
+            # of the schema UCM runs in, which the URL's search_path may move.
             tables = db.session.execute(db.text(
                 "SELECT COUNT(*) FROM information_schema.tables "
-                "WHERE table_schema = 'public'"
+                "WHERE table_schema = current_schema()"
             )).scalar()
             db.session.execute(db.text('SELECT 1')).scalar()
             passed, errors_payload = True, 0
@@ -190,7 +191,9 @@ def reset_db():
         actor = getattr(g, 'current_user', None)
         actor_name = getattr(actor, 'username', None) or 'unknown'
 
-        # Drop all tables and recreate
+        # The request's own transaction holds locks on these tables: on
+        # PostgreSQL, drop_all on another connection would wait for it forever.
+        db.session.close()
         db.drop_all()
         db.create_all()
 

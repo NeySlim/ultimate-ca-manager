@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key) => key }),
+  useTranslation: () => ({ t: (key, vars) => (vars?.total !== undefined ? `${key} ${JSON.stringify(vars)}` : key) }),
 }))
 
 vi.mock('../../../components', () => ({
   Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-  Badge: ({ children }) => <span>{children}</span>,
+  Badge: ({ children, title }) => <span title={title}>{children}</span>,
   FilterSelect: ({ value, onChange, allLabel, options }) => (
     <select aria-label="status-filter" value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="">{allLabel}</option>
@@ -68,10 +68,74 @@ describe('LetsEncryptOrdersTab', () => {
     expect(screen.queryAllByText('acme.renew')).toHaveLength(count)
   })
 
+  it('shows failed renewals with the last error in the tooltip', () => {
+    const order = {
+      id: 1, primary_domain: 'a.example.com', status: 'issued', environment: 'production',
+      renewal_failures: 2, error_message: 'CA unreachable', last_error_at: '2026-11-05T10:00:00Z',
+    }
+    renderTab({ clientOrders: [order] })
+    const badge = screen.getByText('acme.renewalFailures')
+    expect(badge.getAttribute('title')).toContain('CA unreachable')
+    expect(badge.getAttribute('title')).toContain('acme.renewalLastFailure')
+    expect(screen.queryByText('acme.renewalRetryDaily')).not.toBeInTheDocument()
+  })
+
+  it('says when renewal is down to once a day', () => {
+    const order = {
+      id: 1, primary_domain: 'a.example.com', status: 'issued', environment: 'production',
+      renewal_failures: 5, renewal_retry_daily: true,
+    }
+    renderTab({ clientOrders: [order] })
+    expect(screen.getByText('acme.renewalRetryDaily')).toBeInTheDocument()
+  })
+
+  it('shows no failure badge on an order that has not failed', () => {
+    renderTab()
+    expect(screen.queryByText('acme.renewalFailures')).not.toBeInTheDocument()
+  })
+
+  it('turns an order\'s automatic renewal off', () => {
+    const onToggleRenewal = vi.fn()
+    const order = { id: 1, primary_domain: 'a.example.com', status: 'issued', environment: 'production', renewal_enabled: true }
+    renderTab({ clientOrders: [order], selectedClientOrder: order, onToggleRenewal, canWrite: true })
+    const toggle = screen.getByRole('switch')
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(toggle)
+    expect(onToggleRenewal).toHaveBeenCalledWith(order, false)
+    expect(noop).not.toHaveBeenCalled()  // the card stays selected
+  })
+
+  it('keeps the switch read-only without write permission', () => {
+    const order = { id: 1, primary_domain: 'a.example.com', status: 'issued', environment: 'production', renewal_enabled: false }
+    renderTab({ clientOrders: [order], selectedClientOrder: order, onToggleRenewal: vi.fn() })
+    expect(screen.getByRole('switch')).toBeDisabled()
+    expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it.each([
+    [{ opened_by_renewal: true }],
+    [{ is_proxy_order: true }],
+  ])('offers no switch on %j', (fields) => {
+    const order = { id: 1, primary_domain: 'a.example.com', status: 'issued', environment: 'production', ...fields }
+    renderTab({ clientOrders: [order], selectedClientOrder: order, onToggleRenewal: vi.fn(), canWrite: true })
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+  })
+
   it('refreshes from the dedicated view', () => {
     const onRefresh = vi.fn()
     renderTab({ onRefresh })
     fireEvent.click(screen.getByRole('button', { name: 'common.refresh' }))
     expect(onRefresh).toHaveBeenCalledOnce()
+  })
+
+  it('says when the list is partial', () => {
+    renderTab({ partial: { loaded: 2, total: 300 } })
+    expect(screen.getByRole('status')).toHaveTextContent('acme.ordersListPartial {"loaded":2,"total":300}')
+    expect(screen.getByText('a.example.com')).toBeInTheDocument()
+  })
+
+  it('shows no notice for a complete list', () => {
+    renderTab()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 })

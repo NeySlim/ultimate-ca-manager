@@ -8,14 +8,14 @@ export default {
         title: 'タブ',
         items: [
           { label: '設定', text: 'TSAの有効化、署名CAの選択、TSAポリシーOIDの設定' },
-          { label: '情報', text: 'TSAエンドポイントURL、OpenSSLの使用例、リクエスト統計' },
+          { label: 'TSAエンドポイント', text: 'TSAエンドポイントURL、OpenSSLの使用例、リクエスト統計' },
         ]
       },
       {
         title: '設定',
         items: [
-          { label: '署名CA', text: 'タイムスタンプトークンに署名する秘密鍵を持つCA, 有効で期限切れでないCAである必要があります' },
-          { label: 'ポリシーOID', text: 'TSAポリシーのオブジェクト識別子（例：1.2.3.4.1）, すべてのタイムスタンプレスポンスに含まれます' },
+          { label: '署名CA', text: '専用の署名証明書が設定されていない場合に、自身の証明書でタイムスタンプトークンに署名するCA。有効期間外のCAは署名せず、/tsa は 503 を返します。厳格な検証側（openssl ts -verify、jarsigner）はCA証明書で署名されたトークンを拒否し、CAが署名している間、ページは警告を表示します' },
+          { label: 'ポリシーOID', text: 'TSAポリシーのオブジェクト識別子で、すべてのタイムスタンプレスポンスに含まれます。既定の 1.2.3.4.1 は OpenSSL のサンプル OID で、ページが警告するプレースホルダーです。組織のアークの OID を使用してください' },
           { label: '有効化/無効化', text: '設定を失うことなくTSAエンドポイントのオン/オフを切り替え' },
           { label: '専用証明書を必須にする', text: 'オプトイン：CA証明書自体でのタイムスタンプ署名を拒否します, クリティカルな timeStamping EKU（RFC 3161）を持つ専用のエンドエンティティ署名証明書が必要です' },
                   { label: '署名証明書 (v2.217)', text: '発行済み証明書から選んだ専用のエンドエンティティ証明書（timeStamping EKU、UCM が保持する RSA、ECDSA または ML-DSA 鍵。Ed25519 と Ed448 の証明書は選択肢に表示されず、FIPS モードでは ML-DSA も表示されません）でトークンに署名します。更新は自動的に追従されます。期限切れまたは失効した署名者は 503 で失敗し、CA 証明書へのフォールバックは行われません' },
@@ -25,7 +25,7 @@ export default {
       {
         title: '使用方法',
         items: [
-          { label: 'リクエスト作成', text: 'openssl ts -query -data file.txt -sha256 -no_nonce -out request.tsq' },
+          { label: 'リクエスト作成', text: 'openssl ts -query -data file.txt -sha256 -cert -out request.tsq（-cert はレスポンスに署名者証明書を要求し、openssl ts -verify に必要です）' },
           { label: 'TSAに送信', text: 'curl -H "Content-Type: application/timestamp-query" --data-binary @request.tsq https://your-server/tsa -o response.tsr' },
           { label: '検証', text: 'openssl ts -verify -data file.txt -in response.tsr -CAfile ca-chain.pem（RSA と ECDSA の署名者向け）。ML-DSA のトークンは openssl ts -verify で失敗します。openssl cms -verify（OpenSSL 3.5 以降）で署名を検証し、続けてメッセージインプリントをファイルのハッシュと比較してください' },
         ]
@@ -33,12 +33,15 @@ export default {
     ],
     tips: [
       'TSAタイムスタンプは、証明書の有効期限後も署名が有効であることを保証するためにコード署名で使用されます',
-      'TSAエンドポイントはContent-Type: application/timestamp-queryのHTTP POSTを受け付けます',
+      'TSAエンドポイントはContent-Type: application/timestamp-query（または application/octet-stream）のHTTP POSTを受け付けます',
+      '拡張を含むリクエストは unacceptedExtension で、不正な形式のものは badDataFormat で拒否されます（RFC 3161 §2.4.1）',
+      'トークンの genTime は整数秒で、宣言された精度は 1 秒です。リクエストのメッセージインプリントは送信されたままコピーされます',
       'タイムスタンプリクエスト作成時にはSHA-256以上のハッシュアルゴリズムを使用してください',
       '認証は不要です: TSAエンドポイントはCRL/OCSPと同様にパブリックにアクセス可能です',
     ],
     warnings: [
       'TSAを有効にする前に有効な署名CAを設定する必要があります',
+      'openssl ts -verify と jarsigner は、CA証明書で署名されたトークンを拒否します：RFC 3161 は、クリティカルで排他的な timeStamping EKU を持つ専用の署名者を要求します。設定タブで生成してください',
       'TSAエンドポイントはパブリックプロトコルエンドポイントです: タイムスタンプリクエストに機密データを含めないでください',
     ],
   },
@@ -80,9 +83,9 @@ export default {
 - デフォルト：\`1.2.3.4.1\`（プレースホルダー）
 - プロダクション環境では、組織のアーク下でOIDを登録するか、CP/CPSからのものを使用
 
-## 情報タブ
+## TSAエンドポイントタブ
 
-情報タブには以下が表示されます：
+TSAエンドポイントタブには以下が表示されます：
 
 - **TSAエンドポイントURL**: クライアント設定用のコピー＆ペースト対応URL
 - **使用例**: リクエストの作成、送信、レスポンスの検証のためのOpenSSLコマンド

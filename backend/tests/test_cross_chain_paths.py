@@ -300,7 +300,7 @@ def test_scep_chain_and_ca_certificate_are_unchanged_by_a_served_cross_certifica
 
 
 def test_mtls_boot_trust_is_unchanged_by_a_served_cross_certificate(app, auth_client, world):
-    from boot_config import client_ca_chain
+    from boot_config import client_ca_anchor
     from sqlalchemy import text
 
     class Database:
@@ -309,5 +309,5 @@ def test_mtls_boot_trust_is_unchanged_by_a_served_cross_certificate(app, auth_cl
 
     set_served(auth_client, world, True)
     with app.app_context():
-        chain, _ = client_ca_chain(Database(), world.int_refid)
-        assert [_der(c) for c in _loads(chain.encode())] == [_der(world.pki.int_b), _der(world.pki.root_b)]
+        pem, _ = client_ca_anchor(Database(), world.int_refid)
+        assert [_der(c) for c in _loads(pem.encode())] == [_der(world.pki.int_b)]

@@ -63,8 +63,8 @@ AUTH_USERNAME_PASSWORD = 4
 AUTH_CLIENT_CERTIFICATE = 8
 
 # oIDs/oID/group -- real MS-XCEP enum values (see module docstring).
-# algorithmOIDReference stays nil for RSA and ECDSA (real-ADCS trace); only an
-# ML-DSA template names its key algorithm, by its RFC 9881 OID.
+# algorithmOIDReference stays nil for RSA (real-ADCS trace); an ECDSA or ML-DSA
+# template names its key algorithm, else CertEnroll generates its default RSA key.
 _GROUP_PUBLIC_KEY = 3  # "Public key identifier"
 _GROUP_POLICY = 9  # "Enrollment object identifier" (the template's own OID)
 _GROUP_EXTENSION = 6  # "Certificate extension or attribute identifier"
@@ -124,6 +124,12 @@ _KSP_CRYPTO_PROVIDERS = ('Microsoft Software Key Storage Provider',)
 # Windows then creates the key with the signing usage alone; left nil, it allows all usages.
 _SIGNATURE_KEY_SPEC = '2'
 _MLDSA_OIDS = {a.label: a.oid for a in key_algorithms.algorithms('ML-DSA')}
+# CNG names its ECDSA algorithms by the curve OID (certutil -oid: ECDSA_P256...)
+_ECDSA_CURVE_OIDS = {
+    'ECDSA_P256': '1.2.840.10045.3.1.7',
+    'ECDSA_P384': '1.3.132.0.34',
+    'ECDSA_P521': '1.3.132.0.35',
+}
 
 # subjectNameFlags: client supplies Subject (0x1) + SubjectAltName (0x10000).
 # Matches how EST/SCEP already accept a client-supplied CSR subject/SAN
@@ -144,10 +150,9 @@ _SUBJECT_NAME_FLAGS = 0x00000001 | 0x00010000
 # autoenrollment engine has no way to satisfy -- confirmed against the lab
 # that autoenrollment silently declines every other eligible machine template
 # with zero errors logged, while a manually-supplied-subject enrollment of the
-# same template type succeeds. These auto-derive bits tell Windows to build
-# CN/SAN from the computer's own DNS name itself, with no prompt needed --
-# unlike the user-template rationale above, this doesn't require UCM to
-# derive anything server-side; the machine already knows its own identity.
+# same template type succeeds. These bits make Windows send the request with
+# no prompt and no subject of its own; on the Kerberos binding WSTEP builds CN
+# and DNS SAN from the computer's AD dNSHostName, whatever the CSR names.
 _MACHINE_SUBJECT_NAME_FLAGS = 0x10000000 | 0x08000000
 
 # Per-template opt-in (CertificateTemplate.ad_derived_subject) gets its own
@@ -180,6 +185,24 @@ _ENROLLMENT_FLAGS = 0
 # common GPO computer-autoenrollment pattern this targets.
 _GENERAL_MACHINE_TYPE = 0x00000040
 _MACHINE_TEMPLATE_TYPES = {'web_server', 'vpn_server', 'vpn_client', 'ocsp_signing'}
+
+CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT = 0x00000001
+
+
+def is_machine_template(template):
+    return template.template_type in _MACHINE_TEMPLATE_TYPES
+
+
+def subject_name_flags(template, ad_identity=True):
+    """The subjectNameFlags announced for ``template``, which WSTEP issuance follows.
+    Without an AD identity (UsernamePassword binding) the client supplies every subject."""
+    if not ad_identity:
+        return _SUBJECT_NAME_FLAGS
+    if is_machine_template(template):
+        return _MACHINE_SUBJECT_NAME_FLAGS
+    if getattr(template, 'ad_derived_subject', False):
+        return _USER_AD_DERIVED_SUBJECT_NAME_FLAGS
+    return _SUBJECT_NAME_FLAGS
 
 # Stable namespace for deriving per-CA policy OIDs and policyIDs via uuid5,
 # which keeps derived values stable across requests -- matters both for a
@@ -249,15 +272,23 @@ def _key_type_info(key_type):
     return ('RSA' if alg.family == 'RSA' else f'ECDSA_{alg.param}'), alg.key_size
 
 
-def _request_hash(template):
-    """The digest a client must sign its request with: the template's own
-    digest when it is one XCEP can announce, else SHA-256. Never SHA-1."""
+def _request_hash(template, key_label=None):
+    """The digest a client must sign its request with: the template's own, raised to
+    the one matching its key (SHA-384 for P-384), SHA-512 for ML-DSA. Never SHA-1."""
+    from services.policy_service import POLICY_DIGESTS
+    from utils.issuance_defaults import digest_for_label
+    if key_label in _MLDSA_OIDS:
+        # RFC 9882 §3.3: an ML-DSA CMS signer digests with SHA-512, the one hash it must support
+        return _HASH_ALGORITHM_OIDS['sha512']
     digest = (getattr(template, 'digest', None) or _DEFAULT_HASH).strip().lower().replace('-', '')
     if digest not in _HASH_ALGORITHM_OIDS:
         if digest == 'sha1':
             logger.warning("XCEP: template %r digest SHA-1 not announced, using %s",
                            getattr(template, 'name', '?'), _DEFAULT_HASH)
         digest = _DEFAULT_HASH
+    floor = digest_for_label(key_label) if key_label else None
+    if floor in POLICY_DIGESTS and POLICY_DIGESTS.index(floor) > POLICY_DIGESTS.index(digest):
+        digest = floor
     return _HASH_ALGORITHM_OIDS[digest]
 
 
@@ -297,10 +328,10 @@ def _policy_id_for_ca(ca):
     return str(derived)
 
 
-def _build_extensions_element(attributes, extensions, oids):
+def _build_extensions_element(attributes, extensions, oids, template_extension):
     """attributes/extensions -- real X.509 extensions (KeyUsage,
-    ExtendedKeyUsage) DER-encoded and referenced by OID, per the MS-XCEP
-    schema."""
+    ExtendedKeyUsage, the template's own) DER-encoded and referenced by OID,
+    per the MS-XCEP schema."""
     entries = []  # list of (oid, critical, der_bytes)
 
     eku_list = extensions.get('extended_key_usage')
@@ -333,9 +364,9 @@ def _build_extensions_element(attributes, extensions, oids):
         der = asn1_x509.KeyUsage(ku_bits).dump()
         entries.append((_EXT_KEY_USAGE_OID, True, der))
 
-    if not entries:
-        _nil_element(attributes, 'extensions')
-        return
+    # CertEnroll copies it into the request, which then names its template (MS-WCCE
+    # 2.2.2.7.7.2, schema 2 and later); WSTEP otherwise tells templates apart by EKU only
+    entries.append((template_extension.oid.dotted_string, False, template_extension.value))
 
     extensions_el = etree.SubElement(attributes, '{%s}extensions' % XCEP_NS)
     for oid, critical, der in entries:
@@ -350,7 +381,7 @@ def _build_extensions_element(attributes, extensions, oids):
         )
 
 
-def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=None):
+def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=None, ad_identity=True):
     """Build an MS-XCEP ``GetPoliciesResponse`` SOAP envelope.
 
     Args:
@@ -365,10 +396,15 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
             ``a:RelatesTo`` in the response header (see
             ``ACTION_GET_POLICIES_RESPONSE``'s comment for why this
             matters to a real client).
+        ad_identity: False on the UsernamePassword binding, whose requests
+            carry no AD identity to build a subject from (``subject_name_flags``).
 
     Returns:
         bytes: UTF-8 encoded, well-formed SOAP XML.
     """
+    from services.trust_store.csr_operations_mixin import (
+        MS_TEMPLATE_MAJOR_VERSION, MS_TEMPLATE_MINOR_VERSION, _certificate_template_extension)
+
     oids = _OidTable()
     resolved_templates = _resolve_templates_for_ca(ca, templates)
 
@@ -394,7 +430,13 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
     # FIPS mode: announce schema 3 + a KSP + the request hash so no client signs with SHA-1.
     pin_request_hash = fips_mode.enabled()
 
+    from services.wstep.wstep_service import issues_only_capped_ekus
     for template in resolved_templates:
+        if issues_only_capped_ekus(template):
+            # WSTEP refuses it (OCSP Signing): announcing it would have the client enroll in vain
+            logger.info("XCEP: template %r left out, its EKUs are never issued to an enrollee",
+                        template.name)
+            continue
         key_info = _key_type_info(template.key_type)
         if key_info is None:
             # Announcing a default would have the client generate the wrong key.
@@ -419,13 +461,15 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         cas_el = etree.SubElement(policy, '{%s}cAs' % XCEP_NS)
         etree.SubElement(cas_el, '{%s}cAReference' % XCEP_NS).text = str(ca_ref_id)
 
-        # algorithmOIDReference and a KSP, which an ML-DSA template needs, are v3 attributes
+        # algorithmOIDReference and a KSP, which an ML-DSA template needs, are v3 attributes;
+        # MS-XCEP 3.1.4.1.3.1 announces the request hash of a schema 3 policy only, so
+        # every KSP template (ECDSA, ML-DSA, FIPS mode) is schema 3 and names its hash
         mldsa_oid = _MLDSA_OIDS.get(algo_name)
+        key_oid = mldsa_oid or _ECDSA_CURVE_OIDS.get(algo_name)
+        schema3 = pin_request_hash or key_oid is not None
         attributes = etree.SubElement(policy, '{%s}attributes' % XCEP_NS)
         etree.SubElement(attributes, '{%s}commonName' % XCEP_NS).text = template.name
-        etree.SubElement(attributes, '{%s}policySchema' % XCEP_NS).text = (
-            '3' if pin_request_hash or mldsa_oid is not None else '2'
-        )
+        etree.SubElement(attributes, '{%s}policySchema' % XCEP_NS).text = '3' if schema3 else '2'
 
         validity = etree.SubElement(attributes, '{%s}certificateValidity' % XCEP_NS)
         validity_seconds = int(template.validity_days or 397) * 86400
@@ -456,12 +500,12 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         # are required-but-nillable (see _nil_element's docstring), so they
         # must appear even when nil. Outside FIPS mode keySpec and cryptoProviders
         # are populated per the real-ADCS trace referenced in the module
-        # docstring; algorithmOIDReference stays nil (same trace) except for ML-DSA.
-        is_ecdsa = algo_name.startswith('ECDSA')
-        use_ksp = is_ecdsa or mldsa_oid is not None or pin_request_hash
+        # docstring; algorithmOIDReference stays nil (same trace) except for ECDSA and ML-DSA,
+        # signature-only CNG keys (AT_SIGNATURE).
+        use_ksp = schema3
         pk_attrs = etree.SubElement(attributes, '{%s}privateKeyAttributes' % XCEP_NS)
         etree.SubElement(pk_attrs, '{%s}minimalKeyLength' % XCEP_NS).text = str(min_key_length)
-        if mldsa_oid is not None:
+        if key_oid is not None:
             etree.SubElement(pk_attrs, '{%s}keySpec' % XCEP_NS).text = _SIGNATURE_KEY_SPEC
         elif use_ksp:
             _nil_element(pk_attrs, 'keySpec')
@@ -469,9 +513,9 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
             etree.SubElement(pk_attrs, '{%s}keySpec' % XCEP_NS).text = _RSA_KEY_SPEC
         _nil_element(pk_attrs, 'keyUsageProperty')
         _nil_element(pk_attrs, 'permissions')
-        if mldsa_oid is not None:
+        if key_oid is not None:
             # Without it the client would generate the default (RSA) key
-            algo_ref = oids.ref(mldsa_oid, group=_GROUP_PUBLIC_KEY, default_name=algo_name)
+            algo_ref = oids.ref(key_oid, group=_GROUP_PUBLIC_KEY, default_name=algo_name)
             etree.SubElement(pk_attrs, '{%s}algorithmOIDReference' % XCEP_NS).text = str(algo_ref)
         else:
             _nil_element(pk_attrs, 'algorithmOIDReference')
@@ -486,29 +530,22 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         # hashAlgorithmOIDReference, rARequirements, keyArchivalAttributes,
         # extensions -- order matters (xs:sequence) and the nillable-but-
         # required tail elements must all be present, real value or nil.
+        # MS-XCEP 3.1.4.1.3.24: the versions the template extension and the issued certificate carry
         revision = etree.SubElement(attributes, '{%s}revision' % XCEP_NS)
-        etree.SubElement(revision, '{%s}majorRevision' % XCEP_NS).text = '1'
-        etree.SubElement(revision, '{%s}minorRevision' % XCEP_NS).text = '0'
+        etree.SubElement(revision, '{%s}majorRevision' % XCEP_NS).text = str(MS_TEMPLATE_MAJOR_VERSION)
+        etree.SubElement(revision, '{%s}minorRevision' % XCEP_NS).text = str(MS_TEMPLATE_MINOR_VERSION)
 
         _nil_element(attributes, 'supersededPolicies')
         _nil_element(attributes, 'privateKeyFlags')
-        is_machine_template = template.template_type in _MACHINE_TEMPLATE_TYPES
-        if is_machine_template:
-            subject_name_flags = _MACHINE_SUBJECT_NAME_FLAGS
-        elif getattr(template, 'ad_derived_subject', False):
-            subject_name_flags = _USER_AD_DERIVED_SUBJECT_NAME_FLAGS
-        else:
-            subject_name_flags = _SUBJECT_NAME_FLAGS
-        etree.SubElement(attributes, '{%s}subjectNameFlags' % XCEP_NS).text = str(subject_name_flags)
+        etree.SubElement(attributes, '{%s}subjectNameFlags' % XCEP_NS).text = str(
+            subject_name_flags(template, ad_identity))
         etree.SubElement(attributes, '{%s}enrollmentFlags' % XCEP_NS).text = str(_ENROLLMENT_FLAGS)
-        if is_machine_template:
+        if is_machine_template(template):
             etree.SubElement(attributes, '{%s}generalFlags' % XCEP_NS).text = str(_GENERAL_MACHINE_TYPE)
         else:
             _nil_element(attributes, 'generalFlags')
-        if mldsa_oid is not None or pin_request_hash:
-            # RFC 9882 §3.3: an ML-DSA CMS signer digests with SHA-512, the one hash it must support
-            hash_oid, hash_name = (_HASH_ALGORITHM_OIDS['sha512'] if mldsa_oid is not None
-                                   else _request_hash(template))
+        if schema3:
+            hash_oid, hash_name = _request_hash(template, key_algorithms.normalize_label(template.key_type))
             hash_ref = oids.ref(hash_oid, group=_GROUP_HASH_ALGORITHM, default_name=hash_name)
             etree.SubElement(attributes, '{%s}hashAlgorithmOIDReference' % XCEP_NS).text = str(hash_ref)
         else:
@@ -516,7 +553,8 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         _nil_element(attributes, 'rARequirements')
         _nil_element(attributes, 'keyArchivalAttributes')
 
-        _build_extensions_element(attributes, extensions, oids)
+        _build_extensions_element(attributes, extensions, oids,
+                                  _certificate_template_extension(policy_oid))
 
     # PolicyCollection needs one policy: Windows refuses it empty (WS_E_INVALID_FORMAT), accepts nil.
     if len(policies) == 0:

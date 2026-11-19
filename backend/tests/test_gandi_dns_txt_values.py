@@ -106,10 +106,27 @@ def test_cleanup_called_once_per_challenge_succeeds_twice(api):
     provider = _provider()
     for token in ('a', 'b'):
         provider.create_txt_record('example.com', NAME, token)
-    for _ in range(2):
-        ok, msg = provider.delete_txt_record('example.com', NAME)
+    for token in ('a', 'b', 'b'):
+        ok, msg = provider.delete_txt_record('example.com', NAME, token)
         assert ok, msg
     assert api.rrsets == {}
+
+
+def test_cleanup_keeps_the_other_challenge_value(api):
+    api.rrsets['_acme-challenge'] = {'rrset_values': ['"apex"', 'wild'], 'rrset_ttl': 900}
+    ok, msg = _provider().delete_txt_record('example.com', NAME, 'apex')
+    assert ok, msg
+    assert api.rrsets['_acme-challenge'] == {'rrset_values': ['wild'], 'rrset_ttl': 900}
+    assert not [c for c in api.calls if c[0] == 'DELETE']
+
+
+def test_cleanup_of_an_unreadable_rrset_writes_nothing(api):
+    api.rrsets['_acme-challenge'] = {'rrset_values': ['apex', 'wild'], 'rrset_ttl': 300}
+    api.get_status = 500
+    ok, msg = _provider().delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and 'internal error' in msg
+    assert not [c for c in api.calls if c[0] in ('PUT', 'DELETE')]
+    assert api.rrsets['_acme-challenge']['rrset_values'] == ['apex', 'wild']
 
 
 def test_subdomain_and_its_wildcard_on_one_provider(api):
@@ -135,6 +152,7 @@ def test_delete_of_a_missing_record_is_a_success(api, monkeypatch):
             return _Response(404, {'cause': 'Not Found', 'message': 'The resource could not be found.'})
         return real(method, url, **kwargs)
 
+    api.rrsets['_acme-challenge'] = {'rrset_values': ['tok1'], 'rrset_ttl': 300}
     monkeypatch.setattr(requests, 'request', gone)
-    ok, msg = _provider().delete_txt_record('example.com', NAME)
+    ok, msg = _provider().delete_txt_record('example.com', NAME, 'tok1')
     assert ok, msg

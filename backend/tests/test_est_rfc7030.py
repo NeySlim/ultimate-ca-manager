@@ -1,6 +1,5 @@
 """RFC 7030 interoperability tests for the EST protocol endpoints."""
 import base64
-import builtins
 from datetime import datetime, timedelta, timezone
 from email import policy
 from email.parser import BytesParser
@@ -38,7 +37,9 @@ def _set_config(key, value):
 
 @pytest.fixture(scope='module')
 def est_config(app, create_ca):
-    ca_data = create_ca(cn='EST RFC 7030 CA')
+    # digitalSignature: the CA signs the encrypted serverkeygen key package (RFC 5280 §4.2.1.3)
+    ca_data = create_ca(cn='EST RFC 7030 CA',
+                        keyUsage=['digitalSignature', 'keyCertSign', 'cRLSign'])
     keys = ('est_enabled', 'est_ca_refid', 'est_username', 'est_password', 'est_validity_days')
     with app.app_context():
         previous = {
@@ -167,7 +168,7 @@ def _unpad_aes_cbc(ciphertext, key, iv):
 class TestSimpleEnroll:
     def test_reenroll_san_match_ignores_order_and_allows_missing(self):
         # RFC 7030 identity match must not depend on GeneralName order or
-        # extension criticality; a CSR without SAN is issued as-is (pre-2.200)
+        # extension criticality; a CSR without SAN renews the certificate's own
         from cryptography import x509
         from api.est_protocol import _reenroll_san_matches
 
@@ -295,19 +296,7 @@ class TestSimpleReenroll:
 
 
 class TestCsrAttrs:
-    @pytest.mark.parametrize('without_pyasn1', [False, True])
-    def test_is_public_and_returns_valid_csrattrs(self, client, est_config, monkeypatch,
-                                                  without_pyasn1):
-        if without_pyasn1:
-            original_import = builtins.__import__
-
-            def import_without_pyasn1(name, *args, **kwargs):
-                if name == 'pyasn1' or name.startswith('pyasn1.'):
-                    raise ImportError('pyasn1 deliberately unavailable')
-                return original_import(name, *args, **kwargs)
-
-            monkeypatch.setattr(builtins, '__import__', import_without_pyasn1)
-
+    def test_is_public_and_returns_valid_csrattrs(self, client, est_config):
         response = client.get(f'{EST_BASE}/csrattrs')
         assert response.status_code == 200
         assert response.headers['Content-Type'].startswith('application/csrattrs')
@@ -315,12 +304,9 @@ class TestCsrAttrs:
         der = base64.b64decode(response.data)
         attrs, trailing = der_decoder.decode(der)
         assert trailing == b''
-        # challengePassword is not asked for: UCM does not verify one (#405)
-        assert len(attrs) == 1
-        assert str(attrs[0][0]) == '1.2.840.113549.1.9.14'
-        assert {str(oid) for oid in attrs[0][1]} == {
-            '2.5.29.15', '2.5.29.17', '2.5.29.37'
-        }
+        # challengePassword is not asked for: tls-unique linking is optional (#405);
+        # the extensions are bare OIDs (RFC 9908 §5.2)
+        assert [str(oid) for oid in attrs] == ['2.5.29.15', '2.5.29.17', '2.5.29.37']
 
 
 class TestCaCerts:
@@ -367,7 +353,7 @@ class TestBase64LineLength:
 
 
 class TestServerKeygen:
-    def test_basic_returns_encrypted_pkcs8_and_single_certificate(self, client, est_config):
+    def test_basic_returns_clear_pkcs8_and_single_certificate(self, client, est_config):
         csr, _ = _make_csr(san_names=('basic.example.test',))
         response = _post_csr(
             client, 'serverkeygen', csr, headers=_basic_auth(),
@@ -380,8 +366,9 @@ class TestServerKeygen:
         assert parts[0].get_param('smime-type') == 'certs-only'
         certs = pkcs7.load_der_pkcs7_certificates(parts[0].get_payload(decode=True))
         assert len(certs) == 1
+        # RFC 7030 §4.4.2: no additional encryption requested, PrivateKeyInfo in clear
         generated_key = serialization.load_der_private_key(
-            parts[1].get_payload(decode=True), password=EST_PASSWORD.encode()
+            parts[1].get_payload(decode=True), password=None
         )
         assert generated_key.public_key().public_numbers() == certs[0].public_key().public_numbers()
 
@@ -455,17 +442,19 @@ class TestServerKeygen:
         iv = encrypted_info['content_encryption_algorithm']['parameters'].native
         signed_der = _unpad_aes_cbc(encrypted_info['encrypted_content'].native, cek, iv)
         signed_data = cms.SignedData.load(signed_der)
-        assert signed_data['encap_content_info']['content_type'].native == 'data'
-        assert len(signed_data['signer_infos']) == 1
-        private_key_der = signed_data['encap_content_info']['content'].native
-        signer_info = signed_data['signer_infos'][0]
-        certs[0].public_key().verify(
-            signer_info['signature'].native,
-            private_key_der,
-            asym_padding.PKCS1v15(),
-            hashes.SHA256(),
-        )
+        assert signed_data['encap_content_info']['content_type'].dotted == '2.16.840.1.101.2.1.2.78.5'
+        (package_key,) = der_decoder.decode(
+            signed_data['encap_content_info']['content'].contents)[0]
+        from pyasn1.codec.der import encoder as der_encoder
         generated_key = serialization.load_der_private_key(
-            private_key_der, password=None
+            der_encoder.encode(package_key), password=None
         )
         assert generated_key.public_key().public_numbers() == certs[0].public_key().public_numbers()
+        # Signed by the CA's EST key generator, never by the generated key
+        from tests.test_est_serverkeygen_cms import expected_key_package_signer
+        with client.application.app_context():
+            ca_cert = x509.load_pem_x509_certificate(
+                base64.b64decode(db.session.get(CA, est_config['id']).crt))
+        sid = signed_data['signer_infos'][0]['sid'].chosen
+        assert sid['serial_number'].native == expected_key_package_signer(
+            client.application, ca_cert).serial_number

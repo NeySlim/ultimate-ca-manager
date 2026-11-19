@@ -30,6 +30,8 @@ of a worker and there is no rollback between them.
 import base64
 from datetime import date, datetime
 
+import json
+
 import pytest
 from sqlalchemy import inspect as sa_inspect, text as sa_text
 from sqlalchemy.types import (
@@ -46,6 +48,10 @@ from sqlalchemy.types import (
 from models import db, User
 from services.backup import manifest
 from services.backup.export_generic import IdentityIndex, export_section, load_model
+
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
 
 PASSWORD = 'Correct-Horse-Battery-9'
 MARK = 'restore-secrets'
@@ -84,7 +90,7 @@ EMPTIED_BEFORE_RESTORE = {
 
 # The secrets whose model exposes a property that encrypts: these are the ones
 # a restore must not be able to leave in the clear. `hsm_providers.config` is
-# a plain column with no such property and is deliberately not here.
+# encrypted field by field, without such a property: not here.
 SECRETS_WITH_A_PROPERTY = (
     ('sso_providers', 'oauth2_client_secret'),
     ('sso_providers', 'ldap_bind_password'),
@@ -187,8 +193,9 @@ def _seed():
     rows['hsm_providers'] = HsmProvider(
         name=f'{MARK}-hsm', type='openbao', config='{}', status='connected')
 
+    # A list, as the product writes it: JSON text is the shape migration 104 repairs
     rows['groups'] = Group(name=f'{MARK}-group', description='seeded',
-                           permissions='["read:certificates"]')
+                           permissions=['read:certificates'])
 
     rows['custom_roles'] = CustomRole(
         name=f'{MARK}-role', description='seeded',
@@ -212,7 +219,7 @@ def _seed():
     rows['auth_certificates'] = AuthCertificate(
         user_id=owner.id, cert_pem=_CERTIFICATE_PEM.encode(),
         cert_serial=f'{MARK}-cert-serial', cert_subject='CN=Restore Secrets',
-        cert_issuer='CN=Restore Secrets',
+        cert_issuer=f'{MARK}-issuer',   # the identity, marked as this file's
         cert_fingerprint=f'{MARK}-cert-fingerprint',
         name=f'{MARK}-auth-cert', enabled=True)
 
@@ -367,7 +374,8 @@ def restored(app):
             measured[(section_name, column)] = {
                 'raw': _raw_secret(instance, column),
                 'column': getattr(instance, _stored_attribute(type(instance), column)),
-                'readable': getattr(instance, column),
+                'readable': (json.dumps(instance.get_config()) if section_name == 'hsm_providers'
+                             else getattr(instance, column)),
                 'before': before[(section_name, column)],
             }
 

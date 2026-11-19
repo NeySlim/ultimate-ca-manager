@@ -13,6 +13,7 @@ from auth.unified import AuthManager, require_auth, require_permission
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.trusted_proxy import client_ip
+from utils.public_endpoints import get_admin_canonical_origin
 from models import User, db
 from security.password_policy import validate_password
 
@@ -188,16 +189,27 @@ def forgot_password():
     if not _is_email_configured():
         return error_response('Password reset unavailable - email not configured', 503)
     
+    # The link goes to the operator's public origin (Base URL, else FQDN), never to
+    # the Host of this unauthenticated request, which the caller chooses.
+    origin = get_admin_canonical_origin()
+    if not origin:
+        logger.warning("Password reset refused: no Base URL nor server FQDN to build the link from")
+        return error_response(
+            'Password reset unavailable - set the Base URL in Settings so the link can reach UCM', 503)
+
     data = request.get_json() or {}
     email = data.get('email', '').strip().lower()
     
     if not email:
         return error_response('Email is required', 400)
     
-    # Always return success to prevent email enumeration
-    user = User.query.filter(db.func.lower(User.email) == email).first()
-    
-    if user and user.active:
+    # Always return success to prevent email enumeration. An account its SSO provider
+    # alone opens gets no link: another account sharing the address may still get one.
+    from api.v2.sso.account_state import sso_only
+    holders = User.query.filter(db.func.lower(User.email) == email).order_by(User.id).all()
+    user = next((u for u in holders if u.active and not sso_only(u)), None)
+
+    if user:
         # Generate secure token
         token = secrets.token_urlsafe(48)
         user.password_reset_token = hashlib.sha256(token.encode()).hexdigest()
@@ -209,7 +221,7 @@ def forgot_password():
         # Send email
         try:
             from services.notification_service import NotificationService
-            reset_url = f"{current_app.config.get('BASE_URL', 'https://localhost:8443')}/reset-password?token={token}"
+            reset_url = f"{origin.rstrip('/')}/reset-password?token={token}"
             
             NotificationService.send_email(
                 to=user.email,
@@ -260,8 +272,9 @@ def reset_password():
     if not user:
         return error_response('Invalid or expired reset token', 400)
     
-    # Check if user is active
-    if not user.active:
+    # An inactive account, or one its SSO provider alone opens, takes no password this way
+    from api.v2.sso.account_state import sso_only
+    if not user.active or sso_only(user):
         return error_response('Invalid or expired reset token', 400)
     
     if user.password_reset_expires < utc_now():
@@ -302,5 +315,5 @@ def reset_password():
 
 @bp.route('/api/v2/auth/email-configured', methods=['GET'])
 def check_email_configured():
-    """Check if email is configured (for showing forgot password link)"""
-    return success_response(data={'configured': _is_email_configured()})
+    """Whether a reset e-mail can go out with a link that reaches UCM (shows Forgot password)."""
+    return success_response(data={'configured': bool(_is_email_configured() and get_admin_canonical_origin())})

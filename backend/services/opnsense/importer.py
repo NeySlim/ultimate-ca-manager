@@ -72,10 +72,14 @@ class ImportMixin:
                 )
 
                 if not ca_data.get('is_root', False):
-                    issuer = ca_data.get('issuer', '')
-                    parent_ca = CA.query.filter_by(subject=issuer).first()
-                    if parent_ca:
-                        ca.caref = parent_ca.refid
+                    # Chained under the stored CA whose key signed it, never a namesake
+                    from cryptography import x509
+                    from services.import_service import relink_parent_caref
+                    try:
+                        ca.caref = relink_parent_caref(
+                            x509.load_pem_x509_certificate(base64.b64decode(ca_data.get('crt') or '')), None)
+                    except ValueError:
+                        ca.caref = None
 
                 db.session.add(ca)
                 db.session.flush()
@@ -157,6 +161,14 @@ class ImportMixin:
                         stats['failed'] += 1
                         stats['errors'].append(f"Cert {refid}: CA {caref} not found")
                         continue
+                    # The entry's caref is only a claim: linked to the CA whose key signed it
+                    try:
+                        from utils.cert_issuer import ca_signed, signing_ca_for
+                        leaf = x509.load_pem_x509_certificate(base64.b64decode(cert_data.get('crt') or ''))
+                        signer = ca if ca_signed(ca, leaf) else signing_ca_for(leaf)
+                        caref = signer.refid if signer else None
+                    except Exception:
+                        caref = None
 
                 san_dns_list = []
                 san_ip_list = []
@@ -205,6 +217,8 @@ class ImportMixin:
                     imported_from='opnsense',
                     created_by='import'
                 )
+                from services.cert.issued_lookup import apply_persisted_revocation
+                apply_persisted_revocation(cert)
 
                 db.session.add(cert)
                 db.session.flush()

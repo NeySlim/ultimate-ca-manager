@@ -71,27 +71,29 @@ def postgres_install(tmp_path, monkeypatch):
     """A PostgreSQL install: DATABASE_URL set, no SQLite file anywhere."""
     if not PG_URL:
         pytest.skip('UCM_TEST_PG_URL not set')
-    import psycopg2
+    import psycopg
     monkeypatch.setenv('DATABASE_URL', PG_URL)
-    connection = psycopg2.connect(PG_URL)
-    connection.autocommit = True
-    cursor = connection.cursor()
-    cursor.execute("DROP TABLE IF EXISTS system_config")
-    cursor.execute("DROP TABLE IF EXISTS certificate_authorities")
-    _seed(lambda sql, params=(): cursor.execute(sql, params), '%s')
-    yield str(tmp_path)
-    cursor.execute("DROP TABLE IF EXISTS system_config")
-    cursor.execute("DROP TABLE IF EXISTS certificate_authorities")
-    connection.close()
+    from tests.conftest import pg_bench_exclusive
+    # Tables in the shared bench's public schema, which other files reset
+    with pg_bench_exclusive():
+        connection = psycopg.connect(PG_URL, autocommit=True)
+        cursor = connection.cursor()
+        cursor.execute("DROP TABLE IF EXISTS system_config")
+        cursor.execute("DROP TABLE IF EXISTS certificate_authorities")
+        _seed(lambda sql, params=(): cursor.execute(sql, params), '%s')
+        yield str(tmp_path)
+        cursor.execute("DROP TABLE IF EXISTS system_config")
+        cursor.execute("DROP TABLE IF EXISTS certificate_authorities")
+        connection.close()
 
 
 class TestSqliteInstall:
     def test_url_falls_back_to_the_data_directory(self, sqlite_install):
         assert database_url(sqlite_install).endswith('/ucm.db')
 
-    def test_chain_is_leaf_then_root(self, sqlite_install):
-        chain, name, required = mtls_client_ca(sqlite_install)
-        assert chain == _pem('LEAF') + _pem('ROOT')
+    def test_only_the_trusted_ca_is_read(self, sqlite_install):
+        pem, name, required = mtls_client_ca(sqlite_install)
+        assert pem == _pem('LEAF')
         assert name == 'Issuing CA'
         assert required is True
 
@@ -132,25 +134,28 @@ class TestSqliteInstall:
         assert wstep_enabled(str(tmp_path)) is False
 
 
+@pytest.mark.postgres
 @pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
 class TestPostgresInstall:
-    def test_chain_is_read(self, postgres_install):
-        chain, name, required = mtls_client_ca(postgres_install)
-        assert chain == _pem('LEAF') + _pem('ROOT')
+    def test_only_the_trusted_ca_is_read(self, postgres_install):
+        pem, name, required = mtls_client_ca(postgres_install)
+        assert pem == _pem('LEAF')
         assert name == 'Issuing CA'
         assert required is True
 
     def test_wstep_is_read(self, postgres_install):
         assert wstep_enabled(postgres_install) is True
 
-    def test_sqlalchemy_driver_suffix_is_accepted(self, postgres_install, monkeypatch):
+    # +psycopg2 is read with psycopg 3, the one driver UCM ships
+    @pytest.mark.parametrize('driver', ['psycopg', 'psycopg2'])
+    def test_sqlalchemy_driver_suffix_is_accepted(self, postgres_install, monkeypatch, driver):
         scheme, _, rest = PG_URL.partition('://')
-        monkeypatch.setenv('DATABASE_URL', f'{scheme}+psycopg2://{rest}')
+        monkeypatch.setenv('DATABASE_URL', f'{scheme}+{driver}://{rest}')
         assert mtls_client_ca(postgres_install)[1] == 'Issuing CA'
 
 
-class TestChainWalk:
-    def test_a_cycle_does_not_hang(self, tmp_path, monkeypatch):
+class TestAnchor:
+    def test_a_parent_cycle_is_never_walked(self, tmp_path, monkeypatch):
         import sqlite3
         monkeypatch.delenv('DATABASE_URL', raising=False)
         monkeypatch.delenv('DATABASE_PATH', raising=False)
@@ -168,5 +173,5 @@ class TestChainWalk:
         connection.commit()
         connection.close()
 
-        chain, _name, _required = mtls_client_ca(str(tmp_path))
-        assert chain == _pem('LEAF') + _pem('ROOT')
+        pem, _name, _required = mtls_client_ca(str(tmp_path))
+        assert pem == _pem('LEAF')

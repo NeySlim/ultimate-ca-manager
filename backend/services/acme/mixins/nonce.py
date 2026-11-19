@@ -64,23 +64,21 @@ class NonceMixin:
         return result > 0
     
     def cleanup_expired_nonces(self) -> int:
-        """Remove expired nonces from database
-        
-        Returns:
-            Number of nonces deleted
-        """
-        expired = AcmeNonce.query.filter(
-            AcmeNonce.expires_at < utc_now()
-        ).all()
-        
-        count = len(expired)
-        for nonce in expired:
-            db.session.delete(nonce)
-        
-        try:
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"DB commit failed: {e}")
-            raise
-        return count
+        """Delete expired and consumed nonces; returns how many."""
+        return purge_nonces()
+
+
+def purge_nonces() -> int:
+    """Delete expired and consumed nonces in one statement: a consumed or
+    unknown nonce is refused the same way (RFC 8555 §6.5)."""
+    from sqlalchemy import or_
+    count = AcmeNonce.query.filter(
+        or_(AcmeNonce.expires_at < utc_now(), AcmeNonce.used.is_(True))
+    ).delete(synchronize_session=False)
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"DB commit failed: {e}")
+        raise
+    return count

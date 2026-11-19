@@ -102,13 +102,37 @@ def test_read_failure_does_not_overwrite(api):
     assert fake.values() == ['"tok1"']
 
 
-def test_cleanup_removes_the_set_and_second_call_succeeds(api):
+def test_cleanup_removes_only_its_value_then_the_set(api):
+    provider, fake = api
+    provider.create_txt_record('example.com', NAME.rstrip('.'), 'tok1', 120)
+    provider.create_txt_record('example.com', NAME.rstrip('.'), 'tok2')
+    assert provider.delete_txt_record('example.com', NAME.rstrip('.'), 'tok1')[0]
+    assert fake.values() == ['"tok2"']
+    assert fake.sets[(NAME, 'TXT')]['TTL'] == 120
+    assert provider.delete_txt_record('example.com', NAME.rstrip('.'), 'tok2')[0]
+    assert (NAME, 'TXT') not in fake.sets
+    assert provider.delete_txt_record('example.com', NAME.rstrip('.'), 'tok2')[0]
+
+
+def test_cleanup_of_an_absent_value_changes_nothing(api):
+    provider, fake = api
+    provider.create_txt_record('example.com', NAME.rstrip('.'), 'tok2')
+    fake.calls.clear()
+    ok, msg = provider.delete_txt_record('example.com', NAME.rstrip('.'), 'tok1')
+    assert ok and 'not found' in msg.lower()
+    assert 'change' not in fake.calls
+    assert fake.values() == ['"tok2"']
+
+
+def test_cleanup_read_failure_changes_nothing(api):
     provider, fake = api
     provider.create_txt_record('example.com', NAME.rstrip('.'), 'tok1')
-    provider.create_txt_record('example.com', NAME.rstrip('.'), 'tok2')
-    assert provider.delete_txt_record('example.com', NAME.rstrip('.'))[0]
-    assert (NAME, 'TXT') not in fake.sets
-    assert provider.delete_txt_record('example.com', NAME.rstrip('.'))[0]
+    fake.list_error = _ClientError('Throttling')
+    fake.calls.clear()
+    ok, _ = provider.delete_txt_record('example.com', NAME.rstrip('.'), 'tok1')
+    assert not ok
+    assert 'change' not in fake.calls
+    assert fake.values() == ['"tok1"']
 
 
 def test_key_without_list_permission_still_writes_its_value(api):
@@ -150,7 +174,7 @@ def test_alias_or_routing_policy_set_is_not_overwritten(api, extra):
 def test_cleanup_finds_the_set_whatever_the_case_of_the_name(api):
     provider, fake = api
     fake.sets[(NAME, 'TXT')] = {'Name': NAME, 'Type': 'TXT', 'TTL': 300, 'ResourceRecords': [{'Value': '"x"'}]}
-    ok, msg = provider.delete_txt_record('example.com', '_acme-challenge.Example.com')
+    ok, msg = provider.delete_txt_record('example.com', '_acme-challenge.Example.com', 'x')
     assert ok, msg
     assert (NAME, 'TXT') not in fake.sets
 
@@ -160,6 +184,6 @@ def test_cleanup_leaves_a_routing_policy_set_alone(api):
     rs = {'Name': NAME, 'Type': 'TXT', 'SetIdentifier': 'eu', 'Weight': 10, 'TTL': 60,
           'ResourceRecords': [{'Value': '"x"'}]}
     fake.sets[(NAME, 'TXT')] = rs
-    ok, msg = provider.delete_txt_record('example.com', NAME.rstrip('.'))
+    ok, msg = provider.delete_txt_record('example.com', NAME.rstrip('.'), 'x')
     assert not ok and 'routing-policy' in msg
     assert fake.sets[(NAME, 'TXT')] == rs

@@ -8,6 +8,7 @@ docker run -d --restart=unless-stopped \
   -p 8443:8443 \
   -p 8080:8080 \
   -v ucm-data:/opt/ucm/data \
+  -v ucm-config:/etc/ucm \
   neyslim/ultimate-ca-manager:latest
 ```
 
@@ -71,8 +72,8 @@ Mount this directory as a Docker volume to persist data across container restart
 
 ```bash
 docker stop ucm
-docker run --rm -v ucm-data:/data -v $(pwd):/backup \
-  alpine tar czf /backup/ucm-backup.tar.gz -C /data .
+docker run --rm -v ucm-data:/data -v ucm-config:/config -v $(pwd):/backup \
+  alpine tar czf /backup/ucm-backup.tar.gz -C / data config
 docker start ucm
 ```
 
@@ -86,8 +87,11 @@ docker run -d --restart=unless-stopped \
   -p 8443:8443 \
   -p 8080:8080 \
   -v ucm-data:/opt/ucm/data \
+  -v ucm-config:/etc/ucm \
   neyslim/ultimate-ca-manager:latest
 ```
+
+`/etc/ucm` holds `master.key`. If the old container ran without a volume there, copy the key out before `docker rm` (`docker cp ucm:/etc/ucm/master.key ./master.key`) and into the new container afterwards.
 
 ## Documentation
 

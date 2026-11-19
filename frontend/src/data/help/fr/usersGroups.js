@@ -56,7 +56,7 @@ Gérez les comptes utilisateurs, les groupes et les attributions de rôles. Les 
 Basculez le statut d'un utilisateur sans supprimer son compte.
 
 ### Réinitialisation du mot de passe
-Les administrateurs peuvent réinitialiser le mot de passe de tout utilisateur. L'utilisateur sera invité à le changer lors de sa prochaine connexion.
+Les administrateurs peuvent réinitialiser le mot de passe de tout utilisateur. L'utilisateur n'est pas invité à le changer à la prochaine connexion : donnez-lui le nouveau mot de passe et demandez-lui de le changer sous Mon compte. **Mot de passe oublié** sur la page de connexion n'envoie aucun lien à un compte lié à un fournisseur SSO et sans mot de passe local : seul son fournisseur l'ouvre.
 
 ### Clés de sécurité
 Dans la fiche d'un utilisateur, les administrateurs voient ses clés de sécurité et peuvent en désactiver ou en retirer une, typiquement une clé perdue, qui sinon permet toujours de se connecter sans mot de passe. Retirer le dernier second facteur d'un compte qui en exige un demande une seconde confirmation ; l'utilisateur enrôle alors à nouveau un facteur à la prochaine connexion.
@@ -80,13 +80,14 @@ Chaque utilisateur peut avoir plusieurs clés API pour l'accès programmatique. 
 ### Permissions de groupe
 Les permissions effectives d'un utilisateur sont l'**union** de :
 - Les permissions de leur rôle directement attribué
+- Les permissions de leur rôle personnalisé, le cas échéant
 - Les permissions accordées par chaque groupe auquel ils appartiennent
 
 ## Rôles
 
 ### Rôles système
 - **Admin** : Accès complet à toutes les fonctionnalités
-- **Opérateur** : Peut gérer les certificats, CA, CSR mais pas les paramètres système
+- **Opérateur** : Peut gérer les certificats, CA, CSR, ACME, SSH et les paramètres système ; modèles et groupes en lecture seule, aucun accès aux utilisateurs ni au RBAC
 - **Auditeur** : Accès en lecture seule à toutes les données opérationnelles pour la conformité et l'audit
 - **Lecteur** : Accès en lecture seule aux certificats, CA et modèles
 
@@ -102,6 +103,8 @@ La colonne **Source** indique d'où provient chaque utilisateur :
 - **LDAP / OAuth2 / SAML** : provisionné automatiquement lors d'une connexion SSO ; le nom du fournisseur d'origine apparaît sur le badge (ex. \`LDAP · Corporate AD\`).
 
 Depuis la v2.133, les rôles modifiés manuellement dans UCM sur des utilisateurs SSO sont **conservés** entre deux connexions, sauf si **« Synchroniser le rôle à chaque connexion »** est activé sur le fournisseur (voir page **Paramètres → SSO**).
+
+**Lier au SSO** rattache un compte à un fournisseur ; sur un compte déjà lié, **Changer de fournisseur ou réinitialiser l'identité SSO** le déplace vers un autre fournisseur ou efface son identité SSO, après confirmation. La prochaine connexion via ce fournisseur avec le nom d'utilisateur ou l'e-mail du compte lie la nouvelle identité ; le mot de passe du compte, s'il en a un, est conservé sauf si la case qui le supprime est cochée, après quoi aucune connexion par mot de passe n'ouvre le compte, et un compte qui n'en a pas n'est pas invité à en définir un. **Délier du SSO** reconvertit le compte en compte local.
 `
   }
 }

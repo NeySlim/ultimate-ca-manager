@@ -46,8 +46,7 @@ class DecryptMixin:
         header to check — but the payload bounds apply exactly as they do to a
         current archive.
         """
-        if len(backup_bytes) > container.MAX_CONTAINER_BYTES:
-            raise ContainerError("Backup file is too large to read")
+        container.refuse_oversized(backup_bytes)
         if len(backup_bytes) < self.SALT_SIZE + self.NONCE_SIZE + container.GCM_TAG_SIZE:
             raise ValueError("Invalid backup file: too small")
 

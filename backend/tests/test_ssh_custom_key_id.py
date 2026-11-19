@@ -9,7 +9,10 @@ import sqlite3
 import pytest
 from sqlalchemy import create_engine, text
 
+from tests.fresh_app import fresh_app_fixtures
 from tests.test_ssh import _generate_test_ssh_key, post_json
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
 
 PG_URL = os.getenv('UCM_TEST_PG_URL')
 

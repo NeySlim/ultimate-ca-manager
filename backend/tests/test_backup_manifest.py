@@ -118,8 +118,6 @@ READ_IN_THE_CLEAR = {
         "handed straight to pyotp, which cannot verify a ciphertext",
     ('users', 'backup_codes'):
         "Argon2id hashes, not encryption: they are already one-way",
-    ('hsm_providers', 'config'):
-        "JSON the provider reads with json.loads at every connection",
 }
 
 
@@ -152,7 +150,7 @@ class TestEverySecretSaysHowItGoesBack:
             for column, layer in section.stored.items():
                 assert column in section.secrets, (
                     f'{name}.{column} says how it is stored but is not a secret')
-                assert layer in ('master', 'database'), (
+                assert layer in ('master', 'database', 'fields'), (
                     f'{name}.{column} names the layer {layer!r}, which is not '
                     'one this version writes')
 
@@ -241,3 +239,39 @@ class TestEveryForeignKeyIsDecidedAbout:
                             f'{target!r} and its foreign key names {named!r}')
             assert not wrong, wrong
 
+
+
+def test_an_acme_order_carries_its_pending_key_and_link_not_its_lease(app):
+    import uuid
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from models.acme_models import AcmeClientOrder
+    from services.backup.export_generic import IdentityIndex, export_section
+    from utils.datetime_utils import utc_now
+
+    pem = ec.generate_private_key(ec.SECP256R1()).private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption()).decode()
+    url = f'https://ca.example/order/{uuid.uuid4().hex}'
+    with app.app_context():
+        parent = AcmeClientOrder(domains='["m.example"]', status='issued',
+                                 order_url=f'{url}-parent')
+        db.session.add(parent)
+        db.session.flush()
+        child = AcmeClientOrder(domains='["m.example"]', status='valid', order_url=url,
+                                renewal_claimed_at=utc_now(), renewal_of_order_id=parent.id)
+        child.pending_key = pem
+        db.session.add(child)
+        db.session.commit()
+        try:
+            row = next(r for r in export_section('acme_client_orders', IdentityIndex())
+                       if r['order_url'] == url)
+            assert 'renewal_claimed_at' not in row and '_pending_key' not in row
+            assert row['pending_key'] == pem
+            assert row['renewal_of_order_id_ref'] == {
+                'environment': parent.environment, 'domains': '["m.example"]',
+                'created_at': parent.created_at.isoformat()}
+        finally:
+            db.session.delete(child)
+            db.session.delete(parent)
+            db.session.commit()

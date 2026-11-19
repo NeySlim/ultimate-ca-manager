@@ -40,7 +40,7 @@ export default {
     tips: [
       'Cualquier rechazo individual detiene inmediatamente la aprobación: esto es intencional por seguridad.',
       'Mientras una renovación espera aprobación, el planificador deja el certificado a esa decisión, siempre que pueda llegar antes de que expire el certificado; bajo una política de renovación nunca renueva sin una.',
-      'Los comentarios de aprobación se registran en la pista de auditoría para cumplimiento normativo.',
+      'Cada decisión y su comentario se conservan en la cronología de aprobación de la solicitud; el registro de auditoría anota las aprobaciones, no el comentario, una solicitud puesta en cola ni un rechazo.',
     ],
   },
   helpGuides: {
@@ -83,7 +83,7 @@ Los administradores omiten la cola en todas las rutas.
 - Aprobar una solicitud cuya solicitud almacenada, certificado o CA **ya no existe** la cierra como rechazada
 - Una revocación en cola cuyo certificado fue **revocado directamente** se cierra como aprobada (cancelada cuando su solicitante lo revocó); si el certificado fue **renovado** desde entonces, se cierra como rechazada al aprobarla; durante una suspensión de certificado espera a que se levante
 
-Los webhooks reciben aviso de estos cierres igual que de un rechazo.
+Un cierre como rechazada avisa a los webhooks como un rechazo; un cierre como aprobada no envía ningún webhook.
 
 ## Fecha límite
 Una solicitud espera **siete días** una decisión. Pasado ese plazo se cierra como expirada, nunca se cuenta como pendiente y el planificador de renovaciones se reanuda para su certificado. Mientras una renovación espera aprobación, el planificador deja el certificado a esa decisión, siempre que pueda llegar antes de que expire el certificado; bajo una política de renovación nunca renueva sin una.
@@ -99,7 +99,7 @@ Una solicitud espera **siete días** una decisión. Pasado ese plazo se cierra c
 
 1. Haz clic en una solicitud pendiente para ver sus detalles
 2. Haz clic en **Rechazar**
-3. Introduce un **motivo de rechazo** (obligatorio): esto se registra para cumplimiento de auditoría
+3. Introduce un **motivo de rechazo** (obligatorio): se conserva en la cronología de la solicitud; un rechazo no escribe ninguna entrada en el registro de auditoría
 4. La solicitud se detiene inmediatamente
 
 > ⚠ Cualquier rechazo individual detiene toda la solicitud. Esto es intencional: si algún revisor identifica un problema, la emisión no debe proceder.
@@ -111,7 +111,7 @@ Cada solicitud mantiene una línea de tiempo completa de aprobaciones que muestr
 - Cuándo se realizó la acción (marca de tiempo)
 - Comentario proporcionado (si lo hay)
 
-Este historial es inmutable y forma parte de la pista de auditoría.
+Este historial se almacena con la solicitud, no en el registro de auditoría.
 
 ## Filtrado
 

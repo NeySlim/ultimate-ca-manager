@@ -87,7 +87,7 @@ def test_a_provider_held_mldsa_key_takes_no_digest():
 
 @pytest.mark.parametrize('key,expected', [
     (rsa.generate_private_key(public_exponent=65537, key_size=2048), 'sha256'),
-    (ec.generate_private_key(ec.SECP384R1()), 'sha256'),
+    (ec.generate_private_key(ec.SECP384R1()), 'sha384'),
     (ec.generate_private_key(ec.BrainpoolP384R1()), 'sha384'),
 ])
 def test_keys_that_take_a_digest_keep_the_registry_default(key, expected):

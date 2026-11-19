@@ -8,7 +8,11 @@ construction, certificate signing, and CA persistence with hsm_key_id.
 
 import os
 import sys
+import uuid
+
 import pytest
+
+from tests.seeded_rows import delete_cas
 from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -72,7 +76,8 @@ def hsm_provider_and_key(app, request):
     with app.app_context():
         from models import db, CA
         from models.hsm import HsmProvider, HsmKey
-        CA.query.filter_by(hsm_key_id=hsm_key_id).delete()
+        db.session.rollback()
+        delete_cas(CA.query.filter_by(hsm_key_id=hsm_key_id))
         HsmKey.query.filter_by(id=hsm_key_id).delete()
         HsmProvider.query.filter_by(id=provider_id).delete()
         db.session.commit()
@@ -315,7 +320,7 @@ class TestHsmCaReimport:
         with app.app_context():
             from models import db, CA
             cert = self._selfsigned(cn, fx['real_key'])
-            ca = CA(refid=f'hsm-reimport-{cn}', descr=cn, serial=0,
+            ca = CA(refid=f'hsm-re-{uuid.uuid4().hex[:24]}', descr=cn, serial=0,
                     crt=base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode(),
                     prv=None, hsm_key_id=fx['hsm_key_id'],
                     subject=cert.subject.rfc4514_string(), issuer=cert.issuer.rfc4514_string())

@@ -7,6 +7,7 @@ from services.audit_service import AuditService
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from auth.unified import require_auth
+from auth.session_start import keep_current_session
 from security.password_policy import validate_password
 
 from . import bp
@@ -49,28 +50,20 @@ def change_password():
         return error_response(first.get('message', 'Invalid password'), 400,
                               details={'i18n_key': first.get('key'), 'i18n_values': first.get('values', {})})
 
-    # Skip current-password verification only when the SERVER says so
+    # Skip current-password verification only when the SERVER says so.
+    # 403, not 401: the session is valid, and the UI logs out on any 401.
     if not skip_current_check:
         if not current_password or not user.check_password(current_password):
-            return error_response('Current password is incorrect', 401)
+            return error_response('Current password is incorrect', 403)
 
-    # Update password
+    # Update password: set_password() closes every session of the account,
+    # then this one is kept under a new identifier.
     user.set_password(new_password)
     user.force_password_change = False
     ok, _err = safe_commit(logger, "Failed to update password")
     if not ok:
         return _err
-
-    # SECURITY: Invalidate all active sessions after password change
-    # This forces re-authentication across all devices/browsers
-    from models.user import UserSession
-    sessions_deleted = UserSession.query.filter_by(user_id=user.id).delete()
-    if sessions_deleted > 0:
-        ok, _err = safe_commit(logger, "Failed to invalidate user sessions after password change")
-        if not ok:
-            logger.warning(f"Failed to delete {sessions_deleted} sessions for user {user.username}")
-        else:
-            logger.info(f"Invalidated {sessions_deleted} sessions for user {user.username} after password change")
+    keep_current_session(user)
 
     # Audit log
     AuditService.log_action(
@@ -78,7 +71,7 @@ def change_password():
         resource_type='user',
         resource_id=str(user.id),
         resource_name=user.username,
-        details=f'Password changed by user: {user.username} ({sessions_deleted} sessions invalidated)',
+        details=f'Password changed by user: {user.username} (other sessions closed)',
         success=True
     )
 

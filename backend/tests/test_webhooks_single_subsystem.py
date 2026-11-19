@@ -133,6 +133,7 @@ class TestMigration087Parsing:
         assert len(rows[0]['url']) == 500
 
 
+@pytest.mark.sqlite_only(reason='runs the migration on the raw sqlite3 connection of the session')
 class TestMigration087:
     """The blob an upgrading install still holds is carried over."""
 

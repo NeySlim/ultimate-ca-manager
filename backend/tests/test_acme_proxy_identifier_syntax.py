@@ -38,6 +38,7 @@ MALFORMED = [
     '.'.join(['a' * 60] * 4) + '.example.com',
     '-leading-hyphen.example.com',
     'a..example.com',
+    '_acme-challenge.example.com',
 ]
 
 # Every one of these is accepted by the ACME server's own new-order
@@ -51,7 +52,6 @@ LEGITIMATE = [
     'host-1.internal.lan',
     'EXAMPLE.com',
     'example.com.',
-    '_acme-challenge.example.com',
     'localhost',
     'ucm.lan',
 ]

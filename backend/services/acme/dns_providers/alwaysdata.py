@@ -52,11 +52,13 @@ class AlwaysdataDnsProvider(BaseDnsProvider):
             return False, f"Failed: {result}"
         return True, "Record created"
     
-    def delete_txt_record(self, domain, record_name):
+    def delete_txt_record(self, domain, record_name, record_value):
         success, result = self._request('GET', f'/record/?name={record_name}.&type=TXT')
         if not success:
             return False, f"Failed: {result}"
         for rec in result or []:
+            if not self.txt_matches(rec.get('value'), record_value):
+                continue
             self._request('DELETE', f'/record/{rec["id"]}/')
         return True, "Record deleted"
     

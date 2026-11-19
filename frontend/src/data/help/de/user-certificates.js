@@ -25,9 +25,9 @@ export default {
         title: 'Berechtigungen',
         items: [
           { label: 'Viewer', text: 'Sehen nur ihre eigenen Zertifikate' },
-          { label: 'Operatoren', text: 'Können alle Benutzerzertifikate anzeigen, exportieren und widerrufen' },
-          { label: 'Admins', text: 'Vollzugriff einschließlich Löschen' },
-          { label: 'Auditoren', text: 'Können Zertifikate anzeigen, aber nicht exportieren' },
+          { label: 'Operatoren', text: 'Können alle Benutzerzertifikate anzeigen, exportieren, widerrufen und löschen; der Export des privaten Schlüssels eines fremden Zertifikats erfordert read:private_keys, das der Rolle fehlt' },
+          { label: 'Admins', text: 'Vollzugriff, private Schlüssel eingeschlossen' },
+          { label: 'Auditoren', text: 'Können Zertifikate anzeigen und exportieren, ohne ihren privaten Schlüssel' },
         ]
       },
     ],
@@ -101,8 +101,8 @@ Das Löschen entfernt sowohl das Zertifikat als auch die Benutzer-Zertifikat-Zuo
 | Rolle | Anzeigen | Exportieren | Widerrufen | Löschen |
 |-------|----------|-------------|------------|---------|
 | Admin | Alle | Alle | Alle | Alle |
-| Operator | Alle | Alle | Alle | Alle |
-| Auditor | Alle | ✗ | ✗ | ✗ |
+| Operator | Alle | Alle (der private Schlüssel eines anderen Benutzers erfordert read:private_keys) | Alle | Alle |
+| Auditor | Alle | Nur Zertifikat, ohne privaten Schlüssel | ✗ | ✗ |
 | Viewer | Nur eigene | Nur eigene | ✗ | ✗ |
 
 ### Erforderliche Berechtigungen

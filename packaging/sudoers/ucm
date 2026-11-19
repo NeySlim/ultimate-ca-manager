@@ -1,4 +1,0 @@
-# UCM service management - allows ucm user to restart service without password
-# Restricted to (root) and only restart/reload for minimal privilege
-ucm ALL=(root) NOPASSWD: /usr/bin/systemctl restart ucm
-ucm ALL=(root) NOPASSWD: /usr/bin/systemctl reload ucm

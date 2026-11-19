@@ -13,6 +13,7 @@ from models import db, CA, Certificate
 from services.file_regen_service import mirror_private_key
 from services.trust_store import TrustStoreService
 from utils.dn_parse import subject_common_name
+from utils.request_names import RequestRejected
 from utils.file_naming import cert_cert_path, cert_key_path, cert_csr_path, ca_cert_path, ca_key_path
 
 logger = logging.getLogger(__name__)
@@ -191,7 +192,7 @@ class CSRMixin:
         caref: str,
         cert_type: str = 'server_cert',
         validity_days: int = 397,
-        digest: str = 'sha256',
+        digest: str = None,
         username: str = 'system',
         extra_ekus: list = None,
         allow_sensitive_ekus: bool = False,
@@ -200,6 +201,9 @@ class CSRMixin:
         digest_explicit: bool = False,
         policy_template_id: int = None,
         notices: list = None,
+        custom_extensions: list = None,
+        not_before=None,
+        not_after=None,
     ) -> Certificate:
         """
         Sign a CSR with a CA
@@ -209,7 +213,7 @@ class CSRMixin:
             caref: CA refid to sign with
             cert_type: Certificate type
             validity_days: Validity in days
-            digest: Hash algorithm
+            digest: Hash algorithm; None: the policy template's, else the CA key's
             username: User signing
             extra_ekus: Additional EKU OIDs
             template_id: Certificate template bound to the issuance context
@@ -221,6 +225,10 @@ class CSRMixin:
             policy_template_id: template that scopes the policies when it is
                 not bound to the issuance (Sign CSR form), else *template_id*
             notices: list that receives what was granted otherwise than asked
+            custom_extensions: the request's own extensions (#437), which win
+                over the template's for the same OID; the template's apply to leaves only
+            not_before, not_after: dates the requester asked for (naive UTC), issued
+                exactly or refused (ACME notBefore/notAfter)
 
         Returns:
             Updated Certificate with signed cert (or new CA record for intermediate_ca)
@@ -275,9 +283,9 @@ class CSRMixin:
             from utils.key_type import unsignable_csr_key
             unsignable = unsignable_csr_key(csr_obj)
             if unsignable:
-                raise ValueError(f"CSR public key rejected: {unsignable}")
+                raise RequestRejected(f"CSR public key rejected: {unsignable}")
             if not csr_obj.is_signature_valid:
-                raise ValueError("CSR signature is invalid (proof-of-possession failed)")
+                raise RequestRejected("CSR signature is invalid (proof-of-possession failed)")
         except ValueError:
             raise
         except Exception as e:
@@ -315,6 +323,13 @@ class CSRMixin:
         if san_template is None and policy_template_id:
             from models.certificate_template import CertificateTemplate
             san_template = db.session.get(CertificateTemplate, policy_template_id)
+        if digest is None and template is None:
+            # The Sign CSR form's template (issuance_defaults.template_digest)
+            from utils.issuance_defaults import template_digest
+            digest = template_digest(san_template, ca_private_key)
+        from utils.custom_extensions import issuance_custom_extensions
+        custom_ext = issuance_custom_extensions(
+            san_template if cert_type != 'intermediate_ca' else None, custom_extensions)
 
         cert_pem = TrustStoreService.sign_csr(
             csr_pem=csr_pem,
@@ -334,6 +349,7 @@ class CSRMixin:
             template_ext=template_ext,
             san_template=san_template,
             qualification_template=san_template,
+            custom_extensions=custom_ext,
             extra_san=extra_san,
             policy_scope={
                 'ca_id': ca.id,
@@ -341,6 +357,8 @@ class CSRMixin:
                 'digest_explicit': digest_explicit,
             },
             notices=notices,
+            not_before=not_before,
+            not_after=not_after,
         )
 
         # Parse signed certificate
@@ -587,6 +605,8 @@ class CSRMixin:
             raise ValueError('CSR was signed by another request')
         certificate.crt = base64.b64encode(cert_pem).decode('utf-8')
         certificate.caref = caref
+        from services.cert.issued_lookup import apply_persisted_revocation
+        apply_persisted_revocation(certificate)
         certificate.descr = descr or settle_csr_descr(certificate.descr, cn_value)
         certificate.subject = cert.subject.rfc4514_string() or None
         certificate.subject_cn = cn_value or certificate.descr

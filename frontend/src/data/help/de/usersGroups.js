@@ -56,7 +56,7 @@ Verwalten Sie Benutzerkonten, Gruppen und Rollenzuweisungen. Benutzer authentifi
 Schalten Sie den Status eines Benutzers um, ohne sein Konto zu löschen.
 
 ### Passwort zurücksetzen
-Administratoren können das Passwort jedes Benutzers zurücksetzen. Der Benutzer wird bei der nächsten Anmeldung zur Änderung aufgefordert.
+Administratoren können das Passwort jedes Benutzers zurücksetzen. Der Benutzer wird bei der nächsten Anmeldung nicht zur Änderung aufgefordert: Geben Sie ihm das neue Passwort und bitten Sie ihn, es unter Mein Konto zu ändern. **Passwort vergessen** auf der Anmeldeseite sendet keinen Link an ein Konto, das mit einem SSO-Provider verknüpft ist und kein lokales Passwort hat: Nur sein Provider öffnet es.
 
 ### Sicherheitsschlüssel
 In den Details eines Benutzers sehen Administratoren dessen Sicherheitsschlüssel und können einen deaktivieren oder entfernen, typischerweise einen verlorenen Schlüssel, der sonst weiterhin die Anmeldung ohne Passwort erlaubt. Das Entfernen des letzten zweiten Faktors eines Kontos, das einen verlangt, erfordert eine zweite Bestätigung; der Benutzer richtet dann bei der nächsten Anmeldung erneut einen Faktor ein.
@@ -80,13 +80,14 @@ Jeder Benutzer kann mehrere API-Schlüssel für programmatischen Zugriff haben. 
 ### Gruppenberechtigungen
 Die effektiven Berechtigungen eines Benutzers sind die **Vereinigung** von:
 - Den Berechtigungen seiner direkt zugewiesenen Rolle
+- Den Berechtigungen seiner benutzerdefinierten Rolle, falls vorhanden
 - Den Berechtigungen, die von jeder Gruppe gewährt werden, der er angehört
 
 ## Rollen
 
 ### Systemrollen
 - **Admin**: Vollständiger Zugriff auf alle Funktionen
-- **Operator**: Kann Zertifikate, CAs, CSRs verwalten, aber keine Systemeinstellungen
+- **Operator**: Kann Zertifikate, CAs, CSRs, ACME, SSH und Systemeinstellungen verwalten; Templates und Gruppen nur lesend, kein Zugriff auf Benutzer oder RBAC
 - **Auditor**: Nur-Lese-Zugriff auf alle Betriebsdaten für Compliance und Audit
 - **Viewer**: Nur-Lese-Zugriff auf Zertifikate, CAs und Templates
 
@@ -102,6 +103,8 @@ Die Spalte **Quelle** zeigt die Herkunft jedes Benutzers:
 - **LDAP / OAuth2 / SAML**: automatisch beim ersten SSO-Login bereitgestellt; der Name des ursprünglichen Anbieters erscheint auf dem Badge (z. B. \`LDAP · Corporate AD\`).
 
 Seit v2.133 bleiben manuell in UCM geänderte Rollen für SSO-Benutzer zwischen den Logins **erhalten**, sofern nicht **„Rolle bei jedem Login synchronisieren"** auf dem Anbieter aktiviert ist (siehe **Einstellungen → SSO**).
+
+**Mit SSO verknüpfen** ordnet ein Konto einem Provider zu; bei einem bereits verknüpften Konto verschiebt **Anbieter wechseln oder SSO-Identität zurücksetzen** es nach einer Bestätigung zu einem anderen Provider oder löscht seine SSO-Identität. Die nächste Anmeldung über diesen Provider mit dem Benutzernamen oder der E-Mail des Kontos bindet die neue Identität; ein vorhandenes Passwort des Kontos bleibt erhalten, sofern nicht das Kontrollkästchen zum Entfernen aktiviert wird, wonach keine Passwort-Anmeldung das Konto mehr öffnet; für ein Konto ohne Passwort wird keines verlangt. **SSO-Verknüpfung lösen** macht das Konto wieder zu einem lokalen.
 `
   }
 }

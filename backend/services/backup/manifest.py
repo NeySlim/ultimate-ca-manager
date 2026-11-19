@@ -18,7 +18,7 @@ a new table or a new column fails the suite until it is either exported or
 excluded here, on purpose and in writing.
 """
 from dataclasses import dataclass, field
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -57,11 +57,12 @@ class Section:
     application writes it with is named here:
 
     * `master` for `security.encryption.encrypt_text`, the key-encryption key;
-    * `database` for `utils.encryption.encrypt_if_needed`, the database key.
+    * `database` for `utils.encryption.encrypt_if_needed`, the database key;
+    * `fields` for a JSON object whose sensitive values are each under the database key.
 
     A plain column absent from this mapping is one the application reads
     directly, in the clear: the MFA secret `pyotp` is handed, the Argon2
-    hashes of the backup codes, the JSON configuration of an HSM provider.
+    hashes of the backup codes.
     Encrypting those would hand the application a ciphertext it never
     decrypts. `tests/test_backup_manifest.py` refuses a secret that is
     neither a property, nor named here, nor named there as read in the
@@ -89,6 +90,8 @@ SECTIONS: Dict[str, Section] = {
             'last_login': 'usage statistic',
             'password_reset_token': 'short-lived, and a restore must not carry a usable reset',
             'password_reset_expires': 'goes with the reset token',
+            'totp_last_step': 'live replay guard of the TOTP codes',
+            'session_version': 'live session state: an older value would reopen sessions closed since the backup',
         },
         secrets=('totp_secret', 'backup_codes'),
         references={'custom_role_id': 'custom_roles', 'sso_provider_id': 'sso_providers'},
@@ -106,7 +109,8 @@ SECTIONS: Dict[str, Section] = {
         model='models:Certificate',
         identity=('refid',),
         exclude={**_SURROGATE},
-        references={'template_id': 'certificate_templates', 'owner_group_id': 'groups'},
+        references={'template_id': 'certificate_templates', 'owner_group_id': 'groups',
+                    'related_certificate_id': 'certificates'},
         custom=True,
         handled={'crt': 'certificate_pem', 'prv': 'private_key_pem_encrypted',
                  'csr': 'csr_pem'},
@@ -117,6 +121,17 @@ SECTIONS: Dict[str, Section] = {
         exclude={**_SURROGATE, 'created_at': 'bookkeeping, revoked_at is the fact'},
         references={'certificate_id': 'certificates'},
         custom=True,
+    ),
+    'compromised_keys': Section(
+        model='models.compromised_key:CompromisedKeyRecord',
+        identity=('public_key_sha256',),
+        exclude={**_SURROGATE},
+    ),
+    # The CRL number reached by each issuer: a restore continues from it
+    'crl_number_counters': Section(
+        model='models.crl:CRLNumberCounter',
+        identity=('issuer_key',),
+        exclude={**_SURROGATE, 'updated_at': 'bookkeeping, last_number is the fact'},
     ),
     'groups': Section(
         model='models.group:Group',
@@ -175,6 +190,7 @@ SECTIONS: Dict[str, Section] = {
             'error_message': 'live connection state',
         },
         secrets=('config',),
+        stored={'config': 'fields'},
         references={'created_by': 'users'},
     ),
     'hsm_keys': Section(
@@ -193,7 +209,8 @@ SECTIONS: Dict[str, Section] = {
     ),
     'auth_certificates': Section(
         model='models.auth_certificate:AuthCertificate',
-        identity=('cert_fingerprint',),
+        # Unique since migration 130; the restorer looks for the fingerprint first
+        identity=('cert_issuer', 'cert_serial'),
         exclude={**_SURROGATE, 'last_used_at': 'usage statistic'},
         references={'user_id': 'users'},
     ),
@@ -228,7 +245,6 @@ SECTIONS: Dict[str, Section] = {
         exclude={**_SURROGATE},
         references={'certificate_id': 'certificates', 'policy_id': 'certificate_policies',
                     'requester_id': 'users'},
-        optional=True,
     ),
     'dns_providers': Section(
         model='models.acme_models:DnsProvider',
@@ -268,37 +284,34 @@ SECTIONS: Dict[str, Section] = {
     ),
     'acme_client_accounts': Section(
         model='models.acme_client_account:AcmeClientAccount',
-        # The label is part of the identity because the pair
-        # (directory_url, email) is not one: migration 077 dropped the
-        # uniqueness of `directory_url` on purpose (#276), so an
-        # administrator may hold several accounts at the same authority,
-        # under the same shared mailbox, told apart only by what they called
-        # them. Identified by the pair alone, the two collapsed into one
-        # index entry: the second archived account overwrote the first, and
-        # an order restored beside them was attached to whichever of the two
-        # the index had kept.
-        identity=('directory_url', 'email', 'label'),
+        # Several accounts may share a directory URL and a mailbox (#276):
+        # the label tells them apart, unique since migration 124. Before the
+        # plan, restore/names.py matches an archived account by
+        # (directory_url, account_url) and renames it when its label clashes.
+        identity=('label',),
         exclude={**_SURROGATE},
         secrets=('account_key', 'eab_hmac_key'),
         stored={'account_key': 'master'},
     ),
     'acme_client_orders': Section(
         model='models.acme_models:AcmeClientOrder',
-        identity=('order_url',),
-        exclude={**_SURROGATE},
+        # What never changes on an order: a renewal hands the parent its
+        # child's `order_url`, and two rows left by the renewal doubling share one.
+        identity=('environment', 'domains', 'created_at'),
+        exclude={
+            **_SURROGATE,
+            'renewal_claimed_at': 'lease of a renewal running on the source, meaningless elsewhere',
+        },
+        # Property `pending_key`: exported as a PEM, the setter re-encrypts it on restore.
+        secrets=('pending_key',),
         # `account_id` names the local ACME account by its account id, the
         # string the protocol itself uses, and is deliberately not a
         # reference: see the note above `references`.
-        #
-        # `acme_client_account_id` is a number, and names the account at the
-        # external CA the order was placed with. Exported as it stood, the
-        # source's number landed here on whichever account happened to hold
-        # it: a renewal placed against a different CA, or against nothing.
         references={'dns_provider_id': 'dns_providers',
                     'acme_client_account_id': 'acme_client_accounts',
                     'certificate_id': 'certificates',
-                    'source_certificate_id': 'certificates'},
-        optional=True,
+                    'source_certificate_id': 'certificates',
+                    'renewal_of_order_id': 'acme_client_orders'},
     ),
     'acme_dns_update_keys': Section(
         model='models.acme_dns_update:AcmeDnsUpdateKey',
@@ -401,6 +414,7 @@ SECTIONS: Dict[str, Section] = {
             'last_success': 'delivery statistic',
             'last_failure': 'delivery statistic',
             'failure_count': 'delivery statistic',
+            '_auth_token': "under this installation's key; the token travels in the clear as auth_token",
         },
         secrets=('secret', 'auth_token'),
         stored={'secret': 'database'},
@@ -414,8 +428,8 @@ SECTIONS: Dict[str, Section] = {
             'last_failure_at': 'delivery statistic',
             'failure_count': 'delivery statistic',
         },
-        secrets=('private_key',),
-        stored={'private_key': 'master'},
+        secrets=('private_key', 'http_headers'),
+        stored={'private_key': 'master', 'http_headers': 'master'},
     ),
     'deploy_bindings': Section(
         model='models.deploy:DeployBinding',
@@ -446,7 +460,8 @@ SECTIONS: Dict[str, Section] = {
     ),
     'discovered_certificates': Section(
         model='models.discovered_certificate:DiscoveredCertificate',
-        identity=('fingerprint_sha256', 'target', 'port'),
+        # The endpoint, as the table's unique constraint has it: its certificate changes
+        identity=('target', 'port', 'sni_hostname'),
         exclude={**_SURROGATE},
         references={'scan_profile_id': 'scan_profiles',
                     'ucm_certificate_id': 'certificates'},
@@ -454,16 +469,18 @@ SECTIONS: Dict[str, Section] = {
     ),
     'scep_requests': Section(
         model='models.scep:SCEPRequest',
-        identity=('transaction_id',),
+        # Unique per CA only (RFC 8894 §3.2.1.1), as the table's constraint says
+        identity=('transaction_id', 'ca_refid'),
         exclude={**_SURROGATE},
+        references={'profile_id': 'scep_profiles'},
         optional=True,
     ),
     'key_recovery_requests': Section(
         model='models.key_recovery:KeyRecoveryRequest',
         identity=('cert_refid', 'requested_at'),
         exclude={**_SURROGATE},
-        references={'cert_id': 'certificates'},
-        optional=True,
+        # `cert_id` is no reference: the restorer points it at the certificate
+        # of `cert_refid` here, and cancels an open request whose certificate is not.
     ),
     'audit_logs': Section(
         model='models.audit_log:AuditLog',
@@ -501,8 +518,9 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'acme_proxy_dns_challenges': ('expected TXT values of in-flight proxy orders, valid for at most 24 hours; '
                                   'rebuilt when the client fetches the authorization'),
     'crls': 'regenerated from the CAs and their revocation records',
-    'crl_metadata': 'regenerated with the CRLs',
+    'crl_metadata': 'regenerated with the CRLs; their numbering travels in crl_number_counters',
     'ocsp_responses': 'a response cache, rebuilt on demand',
+    'est_signer_certs': 'which certificate signs EST key packages; a new one is issued on first use',
     'notification_log': 'delivery history, not configuration',
     'webhook_deliveries': 'delivery queue and history; endpoints are exported',
     'deploy_deliveries': 'delivery queue and history; targets and bindings are exported',
@@ -514,3 +532,31 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'schema_migrations': 'migration bookkeeping of the target, never of the source',
     'alembic_version': 'migration bookkeeping of the target',
 }
+
+
+@dataclass(frozen=True)
+class SettingReference:
+    """A setting that names a row by its number, in its key, its value, or both."""
+
+    pattern: str                    # regular expression matching the whole key
+    value: Optional[str] = None     # section the value names (a number, or a refid)
+    key: Optional[str] = None       # section the number in the key (group 1) names
+
+
+# Settings holding a row number: carried with the identity of that row
+# (`settings_refs` in the configuration section) and renumbered on restore.
+# A refid reads the same everywhere and is not one of them: est_ca_refid,
+# tsa_ca_refid, tsa_signer_cert_refid, wstep_ca_refid, xcep_ca_refid,
+# mtls_trusted_ca_id, https_bound_certificate_refid, est_labels. The number in
+# `ca_url_alias_<n>` is the one published URLs carry, and stays the source's.
+SETTING_REFERENCES: Tuple[SettingReference, ...] = (
+    SettingReference(r'scep_ca_id', value='certificate_authorities'),
+    SettingReference(r'acme\.issuing_ca_id', value='certificate_authorities'),
+    SettingReference(r'acme_public_tls_cert_id', value='certificates'),
+    SettingReference(r'acme\.proxy\.acme_account_id', value='acme_client_accounts'),
+    SettingReference(r'ocsp_responder_cert_(\d+)', key='certificate_authorities',
+                     value='certificates'),
+    SettingReference(r'scep_challenge_(\d+)(?:_generated_at)?', key='certificate_authorities'),
+    SettingReference(r'cert_scts_(\d+)', key='certificates'),
+    SettingReference(r'ca_url_cross_.+', value='ca_cross_certificates'),
+)

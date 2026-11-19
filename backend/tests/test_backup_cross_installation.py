@@ -38,6 +38,7 @@ the archive holds nothing but the rows these tests write and the shared
 database is never touched -- which matters, because every other file of this
 worker reads it.
 """
+import json
 import base64
 import os
 from contextlib import contextmanager
@@ -263,6 +264,10 @@ SECRET_VALUES = {
     ('webhook_endpoints', 'secret'): 'xinst-webhook-secret',
     ('webhook_endpoints', 'auth_token'): 'xinst-webhook-auth-token',
     ('deploy_targets', 'private_key'): 'xinst-deploy-private-key',
+    ('deploy_targets', 'http_headers'): '{"Authorization": "Bearer xinst-deploy-http"}',
+    ('acme_client_orders', 'pending_key'): (
+        '-----BEGIN PRIVATE KEY-----\nxinst-pending-key\n'
+        '-----END PRIVATE KEY-----\n'),
 }
 
 # The row each section's secrets were written on, as this installation names
@@ -282,7 +287,14 @@ SECRET_ROW = {
     'ad_connector': {},
     'webhook_endpoints': {'name': 'xinst-webhook'},
     'deploy_targets': {'name': 'xinst-deploy-b'},
+    'acme_client_orders': {'order_url': 'https://acme-b.example.test/order/1'},
 }
+# A secret held on another row of its section: an HTTP target has no SSH key.
+SECRET_ROW_OF = {('deploy_targets', 'http_headers'): {'name': 'xinst-deploy-http'}}
+
+
+def _secret_row(section_name, column):
+    return SECRET_ROW_OF.get((section_name, column), SECRET_ROW[section_name])
 
 
 def _secret_attribute(model, column):
@@ -310,6 +322,7 @@ def _has_encrypting_property(model, column):
 WRAPPED_WITH_THE_MASTER_KEY = {
     ('acme_client_accounts', 'account_key'),
     ('acme_client_accounts', 'eab_hmac_key'),
+    ('deploy_targets', 'http_headers'),
 }
 
 
@@ -328,6 +341,8 @@ def _write_secret(row, section_name, column, value):
     model = type(row)
     if _has_encrypting_property(model, column):
         setattr(row, column, value)          # the property encrypts, its way
+    elif (section_name, column) == ('hsm_providers', 'config'):
+        row.set_config(json.loads(value))    # each sensitive value on its own
     elif (section_name, column) in WRAPPED_WITH_THE_MASTER_KEY:
         setattr(row, _secret_attribute(model, column), encrypt_text(value))
     else:
@@ -359,6 +374,8 @@ def _readable_secret(row, column, section_name=None):
              if section_name else None)
     if layer == 'master':
         return decrypt_text(stored) if stored else stored
+    if layer == 'fields':
+        return json.dumps(row.get_config())
     return decrypt_if_needed(stored)
 
 
@@ -464,6 +481,7 @@ def _seed_source():
         keys[refid], issued[refid] = key, certificate
     leaves[1].template_id = templates[1].id
     leaves[1].owner_group_id = groups[1].id
+    leaves[0].related_certificate_id = leaves[1].id     # a hybrid pair
     db.session.flush()
 
     # -- the rows that point at them ---------------------------------------
@@ -482,6 +500,8 @@ def _seed_source():
     add('revoked_serials', caref='xinst-ca-b', serial_number='xinst-revoked-serial',
         certificate_id=leaves[1].id, valid_to=now + timedelta(days=30),
         revoked_at=now)
+    add('compromised_keys', public_key_sha256='c0' * 32, revoked_at=now, source='acme_client',
+        cert_refid='xinst-gone-cert', subject='CN=xinst-gone.example.test')
 
     policies = [add('certificate_policies', name=f'xinst-policy-{suffix}')
                 for suffix in 'ab']
@@ -554,13 +574,20 @@ def _seed_source():
     secret(tsig, 'acme_dns_update_keys', 'secret')
     db.session.flush()
 
-    add('acme_client_orders', order_url='https://acme-b.example.test/order/1',
+    renewed = [add('acme_client_orders', order_url=f'https://acme-b.example.test/order/0{suffix}',
+                   domains='["xinst-order.example.test"]', environment='production',
+                   status='issued', created_at=now - timedelta(days=index + 1))
+               for index, suffix in enumerate('ab')]
+    db.session.flush()
+    order = add('acme_client_orders', order_url='https://acme-b.example.test/order/1',
+        renewal_of_order_id=renewed[1].id,
         domains='["xinst-order.example.test"]', challenge_type='http-01',
         environment='production', key_source='generate', status='valid',
         account_id=acme_accounts[1].account_id,
         acme_client_account_id=client_accounts[1].id,
         dns_provider_id=dns_providers[1].id,
         certificate_id=leaves[1].id, source_certificate_id=leaves[0].id)
+    secret(order, 'acme_client_orders', 'pending_key')
 
     ssh_authorities = [
         add('ssh_cas', refid=f'xinst-sshca-{suffix}',
@@ -597,11 +624,17 @@ def _seed_source():
                ca_refid='xinst-ca-b', template_id=templates[1].id,
                intune_enabled=True, intune_app_id=intune.id)
     secret(scep, 'scep_profiles', 'challenge_password')
+    add('scep_requests', transaction_id='xinst-scep-tx', ca_refid='xinst-ca-b', csr='x',
+        profile_id=scep.id)
 
     deploy_targets = [add('deploy_targets', name=f'xinst-deploy-{suffix}',
                           host=f'deploy-{suffix}.example.test', username='ucm',
                           private_key='x') for suffix in 'ab']
     secret(deploy_targets[1], 'deploy_targets', 'private_key')
+    http_target = add('deploy_targets', name='xinst-deploy-http', kind='http',
+                      host='api.example.test', port=443, url='https://api.example.test/certs',
+                      body_template='{"cert": {{cert_pem|json}}}', username='', private_key='')
+    secret(http_target, 'deploy_targets', 'http_headers')
     db.session.flush()
 
     add('deploy_bindings', target_id=deploy_targets[1].id,
@@ -646,7 +679,7 @@ def _seed_source():
     # target can be shown to hold something else.
     stored = {}
     for (section_name, column) in SECRET_VALUES:
-        row = _model(section_name).query.filter_by(**SECRET_ROW[section_name]).one()
+        row = _model(section_name).query.filter_by(**_secret_row(section_name, column)).one()
         stored[(section_name, column)] = _stored_secret(row, column)
 
     return {
@@ -709,13 +742,13 @@ RESTORABLE_SECTIONS = tuple(
     name for name in (
         'users', 'groups', 'custom_roles', 'sso_providers',
         'certificate_templates', 'certificate_authorities', 'certificates',
-        'revoked_serials', 'hsm_providers', 'hsm_keys', 'api_keys',
+        'revoked_serials', 'compromised_keys', 'hsm_providers', 'hsm_keys', 'api_keys',
         'auth_certificates', 'certificate_policies', 'approval_requests',
         'dns_providers', 'acme_accounts', 'acme_eab_credentials',
         'acme_domains', 'acme_local_domains', 'acme_client_accounts',
         'acme_client_orders', 'acme_dns_update_keys',
         'ssh_cas', 'ssh_certificates', 'microsoft_cas', 'msca_requests',
-        'scep_profiles', 'deploy_targets', 'scan_profiles', 'scan_runs',
+        'scep_profiles', 'scep_requests', 'deploy_targets', 'scan_profiles', 'scan_runs',
         'intune_apps',
         'discovered_certificates', 'smtp_config', 'ad_connector',
         'webhook_endpoints',
@@ -1034,6 +1067,20 @@ class TestEveryReferenceLandsOnTheRowTheArchiveNames:
         with restored_on_postgresql.open(app):
             _assert_every_reference_landed(restored_on_postgresql)
 
+    def test_a_hybrid_partner_is_the_certificate_the_archive_paired(self, app, restored_on_sqlite):
+        """Checked by name: an undeclared link is not one the loop above looks at."""
+        from models import Certificate
+        with restored_on_sqlite.open(app):
+            restored = Certificate.query.filter_by(refid='xinst-cert-a').one()
+            partner = db.session.get(Certificate, restored.related_certificate_id)
+            assert partner is not None and partner.refid == 'xinst-cert-b'
+
+    def test_a_scep_request_names_the_profile_the_archive_names(self, app, restored_on_sqlite):
+        from models.scep import ScepProfile, SCEPRequest
+        with restored_on_sqlite.open(app):
+            request = SCEPRequest.query.filter_by(transaction_id='xinst-scep-tx').one()
+            assert db.session.get(ScepProfile, request.profile_id).name == 'xinst-scep'
+
     def test_a_binding_pinned_to_a_cross_certificate_follows_it_on_sqlite(
             self, app, restored_on_sqlite):
         _assert_binding_follows_its_cross_certificate(app, restored_on_sqlite)
@@ -1224,7 +1271,7 @@ class TestWhatARestoreUsedToDropWithoutSayingSo:
 
     @pytest.mark.parametrize('section_name',
                              ['msca_requests', 'scan_runs',
-                              'discovered_certificates'])
+                              'discovered_certificates', 'compromised_keys'])
     def test_the_section_is_restored_and_not_merely_announced(
             self, app, restored_on_sqlite, section_name):
         assert len(restored_on_sqlite.archived(section_name)) == 1, \
@@ -1315,13 +1362,11 @@ AT_REST_AFTER_A_RESTORE = {
     ('smtp_config', 'smtp_oauth_refresh_token'): 'database key',
 
     # Readable in the column, which is where the application reads them: the
-    # MFA secret is handed straight to pyotp, the HSM configuration straight
-    # to json.loads. The restore puts back what the source held.
+    # MFA secret is handed straight to pyotp. The restore puts back what the source held.
     ('users', 'backup_codes'): 'the clear',
     ('users', 'totp_secret'): 'the clear',
 
-    # Readable in the column, which is where the application reads it: the
-    # HSM configuration goes straight to json.loads.
+    # A JSON object in the clear, its sensitive values each under the database key.
     ('hsm_providers', 'config'): 'the clear',
 
     # Plain columns, so no property re-encrypted them, and the restore wrote
@@ -1332,17 +1377,13 @@ AT_REST_AFTER_A_RESTORE = {
     # the layer each column is kept under and the restore puts them back
     # under it.
     ('deploy_targets', 'private_key'): 'key-encryption key',
+    ('deploy_targets', 'http_headers'): 'key-encryption key',
     ('scep_profiles', 'challenge_password'): 'key-encryption key',
     ('intune_apps', 'client_secret'): 'database key',
     ('webhook_endpoints', 'secret'): 'database key',
-
-    # Never written by the restore at all:
-    #  - _restore_microsoft_cas writes a hand-picked list of columns;
-    #  - webhook_endpoints.auth_token is applied by the manifest-driven path,
-    #    which drops it before it reaches the branch that writes secrets:
-    #    the column is named `_auth_token`, so `columns.get('auth_token')` is
-    #    None and the row is skipped as "a column this version does not have".
-    ('webhook_endpoints', 'auth_token'): 'nothing',
+    # A property over `_auth_token`: dropped as "a column this version does not
+    # have" until the restore wrote secrets through their property
+    ('webhook_endpoints', 'auth_token'): 'database key',
 
     # Both arrived as the source's own ciphertext until the export learned to
     # read the key-encryption layer as well: the product writes them through
@@ -1353,6 +1394,8 @@ AT_REST_AFTER_A_RESTORE = {
     # product writes it with.
     ('acme_client_accounts', 'account_key'): 'key-encryption key',
     ('acme_client_accounts', 'eab_hmac_key'): 'key-encryption key',
+    # Key material like a certificate's: under the target's master key
+    ('acme_client_orders', 'pending_key'): 'key-encryption key',
 }
 
 # Secrets the archive carried as the source's own ciphertext: the export
@@ -1398,7 +1441,7 @@ def secrets_on_the_target(app, restored_on_sqlite):
     with restored_on_sqlite.open(app):
         for section_name, column in _secrets_under_test():
             row = _model(section_name).query.filter_by(
-                **SECRET_ROW[section_name]).one()
+                **_secret_row(section_name, column)).one()
             stored = _stored_secret(row, column)
             measured[(section_name, column)] = {
                 'stored': stored,
@@ -1421,7 +1464,7 @@ class TestEverySecretSurvivesAChangeOfDatabaseKey:
         carried_as_ciphertext = []
         for section_name, column in _secrets_under_test():
             row = restored_on_sqlite.archived_row(
-                section_name, **SECRET_ROW[section_name])
+                section_name, **_secret_row(section_name, column))
             if row.get(column) != SECRET_VALUES[(section_name, column)]:
                 carried_as_ciphertext.append((section_name, column))
         assert set(carried_as_ciphertext) == CARRIED_AS_SOURCE_CIPHERTEXT, (

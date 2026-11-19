@@ -19,7 +19,7 @@ export default {
           { label: 'Validité maximale', text: 'Durée de vie maximale du certificat en jours' },
           { label: 'Types de clés autorisés', text: 'Restreindre les algorithmes et tailles de clés pouvant être utilisés, ML-DSA-44, ML-DSA-65 et ML-DSA-87 compris ; le mode FIPS retire ML-DSA' },
           { label: 'Schémas de signature autorisés', text: 'PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA ou SLH-DSA, comparés à la clé de la CA signataire. Les algorithmes de hachage de signature autorisés ne contraignent pas une CA ML-DSA, qui signe sans digest séparé' },
-          { label: 'Restrictions SAN', text: 'Limiter le nombre de SAN et imposer des motifs de noms DNS' },
+          { label: 'Restrictions SAN', text: 'Limiter le nombre de noms DNS (les autres types de SAN ne sont pas comptés) et imposer des motifs de noms DNS' },
           { label: 'Algorithmes de hachage de signature autorisés', text: 'SHA-256, SHA-384 ou SHA-512 ; aucun sélectionné autorise tout. Quand personne n\'a choisi le hachage, celui par défaut s\'applique s\'il est autorisé, sinon le plus faible autorisé. Le formulaire d\'émission ne propose que les types de clé autorisés, Créer une CA que les types de clé et hachages autorisés' },
         ]
       },
@@ -33,7 +33,7 @@ export default {
       },
     ],
     tips: [
-      'Nombre de priorité plus bas = précédence plus élevée. Utilisez 1–10 pour les politiques critiques.',
+      'Nombre de priorité plus bas = précédence plus élevée pour l\'approbation. Les règles de toutes les politiques concernées s\'appliquent ensemble, la plus stricte l\'emportant.',
       'Scopez les politiques à des CA spécifiques pour un contrôle granulaire.',
       'Activez les notifications pour détecter tôt les violations de politique.',
     ],
@@ -84,7 +84,7 @@ Restreindre les algorithmes et tailles de clés pouvant être utilisés :
 **Algorithmes de hachage de signature autorisés** restreint le hachage de signature de la même façon (SHA-256, SHA-384, SHA-512) ; aucun sélectionné autorise tout. Quand personne n'a choisi le hachage, celui par défaut s'applique s'il est autorisé, sinon le plus faible autorisé. Le formulaire d'émission ne propose que les types de clé autorisés, Créer une CA que les types de clé et hachages autorisés.
 
 ### Restrictions SAN
-- **Noms DNS max** : Limiter le nombre de noms alternatifs du sujet
+- **Noms DNS max** : Limiter le nombre de noms DNS du SAN ; les entrées IP, e-mail et URI ne sont pas comptées
 - **Motif DNS** : Restreindre à des motifs de domaine spécifiques (par ex. \`*.entreprise.com\`)
 
 ## Flux d'approbation
@@ -105,7 +105,7 @@ Les politiques sont évaluées par ordre de priorité. Les nombres plus bas ont 
 - **10-20** : Conformité standard (TLS public, PKI interne)
 - **20+** : Valeurs par défaut permissives
 
-Lorsque plusieurs politiques correspondent à une demande de certificat, la politique de priorité la plus élevée (nombre le plus bas) l'emporte.
+Lorsque plusieurs politiques correspondent à une demande de certificat, la politique de priorité la plus élevée (nombre le plus bas) décide de l'approbation ; les règles de toutes les politiques correspondantes s'appliquent ensemble (la validité maximale la plus petite, l'intersection des types de clé autorisés, etc.).
 
 ## Portée
 
@@ -117,14 +117,7 @@ La politique s'applique uniquement aux certificats émis par la CA sélectionné
 
 ## Politiques par défaut
 
-UCM est livré avec 5 politiques intégrées reflétant les meilleures pratiques PKI du monde réel :
-- **Signature de code** (priorité 5) : Clés fortes, approbation requise
-- **Certificats génériques** (priorité 8) : Approbation requise, max 10 SAN
-- **TLS serveur web** (priorité 10) : Conforme CA/B Forum, max 397 jours
-- **Automatisation courte durée** (priorité 15) : 90 jours style ACME
-- **PKI interne** (priorité 20) : 730 jours, règles assouplies
-
-> 💡 Personnalisez ou désactivez les politiques par défaut pour correspondre aux exigences de votre organisation.
+Une nouvelle installation n'a aucune politique : créez celles dont votre organisation a besoin. Une installation mise à niveau depuis une version plus ancienne peut lister cinq politiques d'exemple (Signature de code, Certificats génériques, TLS serveur web, Automatisation courte durée, PKI interne), toutes désactivées.
 `
   }
 }

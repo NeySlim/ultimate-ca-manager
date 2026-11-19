@@ -12,6 +12,10 @@ from cryptography.x509.oid import NameOID
 from models import db, CA
 from models.revoked_serial import RevokedSerial
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 
 def _revoke(auth_client, ca_id, reason='keyCompromise'):
     return auth_client.post(f'/api/v2/cas/{ca_id}/revoke', data=json.dumps({'reason': reason}),
@@ -213,13 +217,13 @@ class TestReviewOfTheReviewFixes:
         with app.app_context():
             row = db.session.get(CA, sub['id'])
             RevokedSerial.query.filter_by(serial_number=row.serial_number).delete()
-            # The revocation regenerated the base CRL: a delta carries what came
-            # after it, so the row's revocation is dated after that base
-            from models.crl import CRLMetadata
-            base = CRLMetadata.query.filter_by(ca_id=root['id'], is_delta=False).order_by(CRLMetadata.crl_number.desc()).first()
-            row.revoked_at = base.this_update + timedelta(seconds=5)
+            # A base without the sub CA: the delta carries what the base lacks
+            row.revoked = False
             db.session.commit()
             from services.crl_service import CRLService
+            CRLService.generate_crl(root['id'])
+            row.revoked = True
+            db.session.commit()
             delta = CRLService.generate_delta_crl(root['id'])
             crl = x509.load_pem_x509_crl(delta.crl_pem.encode())
             assert any(rc.serial_number == int(row.serial_number) for rc in crl)

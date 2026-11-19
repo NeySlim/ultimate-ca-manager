@@ -18,6 +18,14 @@ from models.policy import ApprovalRequest, CertificatePolicy
 from services.policy_service import PolicyEvaluationService, PolicyViolation
 from tests.conftest import get_json
 from utils import key_algorithms
+from tests.fixtures.templates import delete_templates, templates_created_here_removed
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _templates_stay_in_this_module(app):
+    with templates_created_here_removed(app):
+        yield
+
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
@@ -39,10 +47,14 @@ def _policy(auth_client, name, rules, ca_id=None):
 
 def _drop(app, model, *ids):
     with app.app_context():
-        for row_id in ids:
-            row = db.session.get(model, row_id)
-            if row is not None:
-                db.session.delete(row)
+        if model is CertificateTemplate:
+            # What points to a template lets go first: SQLite hands the id to the next one
+            delete_templates(ids)
+        else:
+            for row_id in ids:
+                row = db.session.get(model, row_id)
+                if row is not None:
+                    db.session.delete(row)
         db.session.commit()
 
 
@@ -242,7 +254,7 @@ def test_ca_creation_follows_an_ml_dsa_only_policy(app, auth_client):
 # --------------------------------------------------- digests and signature schemes
 
 def test_allowed_digests_do_not_bind_a_signer_without_digest(app, auth_client, create_ca):
-    """A template digest outside allowed_digests refuses an RSA CA, not an ML-DSA one."""
+    """allowed_digests moves an RSA CA off the template's digest (a preference, #397), and an ML-DSA CA signs without one."""
     pq_ca, rsa_ca = _mldsa_ca(create_ca, 'PQ digest'), create_ca(cn=f'PQ digest RSA {uuid.uuid4().hex[:6]}')
     with app.app_context():
         tpl = CertificateTemplate(name=f'pq-digest-{uuid.uuid4().hex[:6]}', template_type='custom',
@@ -255,7 +267,8 @@ def test_allowed_digests_do_not_bind_a_signer_without_digest(app, auth_client, c
             for c in (pq_ca, rsa_ca)]
     try:
         r = _issue(auth_client, rsa_ca['id'], 'ml-dsa', 65, 'pq-digest-rsa.example.test', template_id=tid)
-        assert r.status_code == 400 and b'SHA256' in r.data, r.data
+        assert r.status_code == 201, r.get_json()
+        assert _row_cert(app, Certificate, get_json(r)['data']['id']).signature_hash_algorithm.name == 'sha512'
         r = _issue(auth_client, pq_ca['id'], 'ml-dsa', 65, 'pq-digest-65.example.test', template_id=tid)
         assert r.status_code == 201, r.get_json()
         assert _row_cert(app, Certificate, get_json(r)['data']['id']).signature_hash_algorithm is None

@@ -14,12 +14,19 @@ from lxml import etree
 from models import CA, db
 from models.certificate_template import CertificateTemplate
 from models.system_config import SystemConfig
+from tests.fixtures.templates import delete_templates, template_ids_named, templates_created_here_removed
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WSSE_NS, WST_NS
 
 
 ISSUE_URL = '/ADCertificateService_CES_UsernamePassword/service.svc'
 WSTEP_USER = 'wstep-test'
 WSTEP_PASSWORD = 'wstep-password'
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _templates_stay_in_this_module(app):
+    with templates_created_here_removed(app):
+        yield
 
 
 def _set_config(key, value):
@@ -134,6 +141,7 @@ def _build_rst_with_username_token(csr, username, password, message_id='urn:uuid
     etree.SubElement(token, '{%s}Password' % WSSE_NS).text = password
     body = etree.SubElement(envelope, '{%s}Body' % SOAP_NS)
     rst = etree.SubElement(body, '{%s}RequestSecurityToken' % WST_NS)
+    etree.SubElement(rst, '{%s}RequestType' % WST_NS).text = 'http://docs.oasis-open.org/ws-sx/ws-trust/200512/Issue'
     bst = etree.SubElement(
         rst, '{%s}BinarySecurityToken' % WSSE_NS,
         ValueType='http://schemas.microsoft.com/windows/pki/2009/01/enrollment#PKCS10',
@@ -145,7 +153,7 @@ def _build_rst_with_username_token(csr, username, password, message_id='urn:uuid
 
 def _issued_cert_from_rstr(response_bytes):
     root = etree.fromstring(response_bytes)
-    bst_el = root.find(f'.//{{{WSSE_NS}}}BinarySecurityToken')
+    bst_el = root.find(f'.//{{{WST_NS}}}RequestedSecurityToken/{{{WSSE_NS}}}BinarySecurityToken')
     assert bst_el is not None and bst_el.text
     return x509.load_der_x509_certificate(base64.b64decode(bst_el.text))
 
@@ -277,7 +285,7 @@ def test_issue_ignores_enroll_acl_on_username_password_path(client, app, wstep_c
     membership for. A template restricted to a group must still issue
     normally here, matching pre-feature behavior exactly."""
     with app.app_context():
-        CertificateTemplate.query.filter_by(name='Test UsernamePassword ACL Template').delete()
+        delete_templates(template_ids_named('Test UsernamePassword ACL Template'))
         template = CertificateTemplate(
             name='Test UsernamePassword ACL Template', template_type='client_auth',
             extensions_template='{}', is_active=True, allowed_ad_group='VPN-Enroll',
@@ -293,5 +301,251 @@ def test_issue_ignores_enroll_acl_on_username_password_path(client, app, wstep_c
         assert cert.subject.rfc4514_string() == 'CN=wstep-acl-unaffected.example.test'
     finally:
         with app.app_context():
-            CertificateTemplate.query.filter_by(name='Test UsernamePassword ACL Template').delete()
+            delete_templates(template_ids_named('Test UsernamePassword ACL Template'))
             db.session.commit()
+
+
+def test_issue_refusal_gives_its_reason(client, wstep_config):
+    """A request the trunk refuses for its names tells the client why."""
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    csr = x509.CertificateSigningRequestBuilder().subject_name(
+        x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'reason.example.test')])
+    ).add_extension(x509.SubjectAlternativeName([x509.DNSName('bad name.example')]),
+                    critical=False).sign(key, hashes.SHA256())
+    r = client.post(ISSUE_URL, data=_build_rst(csr), headers=_basic_auth())
+    assert r.status_code == 400
+    assert b'bad name.example' in r.data
+
+
+@pytest.mark.parametrize('eku,cn,dns', [
+    (x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH, 'jdoe', []),
+    (x509.oid.ExtendedKeyUsageOID.SERVER_AUTH, 'intranet', ['intranet']),
+])
+def test_issue_cert_type_follows_the_template_eku(client, app, wstep_config, eku, cn, dns):
+    """A user template's CN names a person, so CN=jdoe gives no DNS:jdoe; a machine's keeps it."""
+    name = f'Test WSTEP profile {eku.dotted_string}'
+    with app.app_context():
+        delete_templates(template_ids_named(name))
+        db.session.add(CertificateTemplate(
+            name=name, template_type='custom', key_type='RSA-2048', is_active=True,
+            extensions_template='{"extended_key_usage": ["%s"]}' % eku.dotted_string))
+        db.session.commit()
+    try:
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        csr = (x509.CertificateSigningRequestBuilder()
+               .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)]))
+               .add_extension(x509.ExtendedKeyUsage([eku]), critical=False)
+               .sign(key, hashes.SHA256()))
+        r = client.post(ISSUE_URL, data=_build_rst(csr), headers=_basic_auth())
+        assert r.status_code == 200, r.data
+        cert = _issued_cert_from_rstr(r.data)
+        try:
+            names = cert.extensions.get_extension_for_class(
+                x509.SubjectAlternativeName).value.get_values_for_type(x509.DNSName)
+        except x509.ExtensionNotFound:
+            names = []
+        assert names == dns
+    finally:
+        with app.app_context():
+            delete_templates(template_ids_named(name))
+            db.session.commit()
+
+
+def _naming(name):
+    """szOID_ENROLL_CERTTYPE: the request names its template, as CertEnroll does from XCEP."""
+    from asn1crypto import core as asn1_core
+    return x509.UnrecognizedExtension(x509.ObjectIdentifier('1.3.6.1.4.1.311.20.2'),
+                                      asn1_core.BMPString(name).dump())
+
+
+_EFS = '1.3.6.1.4.1.311.10.3.4'
+_SMARTCARD_LOGON = '1.3.6.1.4.1.311.20.2.2'
+
+
+@pytest.mark.parametrize('ekus,ku', [
+    # AD CS User, Smartcard Logon and Basic EFS: keyEncipherment for S/MIME, EFS and PKINIT
+    (['1.3.6.1.5.5.7.3.2', '1.3.6.1.5.5.7.3.4', _EFS], {'key_encipherment', 'content_commitment'}),
+    (['1.3.6.1.5.5.7.3.2', _SMARTCARD_LOGON], {'key_encipherment'}),
+    ([_EFS], {'key_encipherment', 'content_commitment'}),
+    (['1.3.6.1.5.5.7.3.4'], {'key_encipherment', 'content_commitment'}),
+    (['1.3.6.1.5.5.7.3.2'], set()),
+])
+def test_user_template_key_usage_and_names(client, app, wstep_config, ekus, ku):
+    """A request without Key Usage gets its template's profile; a person's CN gives no DNS name."""
+    import json
+    name = f'Test WSTEP user profile {"-".join(ekus)}'
+    with app.app_context():
+        delete_templates(template_ids_named(name))
+        db.session.add(CertificateTemplate(
+            name=name, template_type='custom', key_type='RSA-2048', is_active=True,
+            extensions_template=json.dumps({'extended_key_usage': ekus})))
+        db.session.commit()
+    try:
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        csr = (x509.CertificateSigningRequestBuilder()
+               .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'jdoe')]))
+               .add_extension(x509.ExtendedKeyUsage([x509.ObjectIdentifier(o) for o in ekus]),
+                              critical=False)
+               .add_extension(_naming(name), critical=False)
+               .sign(key, hashes.SHA256()))
+        r = client.post(ISSUE_URL, data=_build_rst(csr), headers=_basic_auth())
+        assert r.status_code == 200, r.data
+        cert = _issued_cert_from_rstr(r.data)
+        usage = cert.extensions.get_extension_for_class(x509.KeyUsage).value
+        granted = {bit for bit in ('key_encipherment', 'content_commitment', 'key_agreement',
+                                   'data_encipherment') if getattr(usage, bit)}
+        assert usage.digital_signature and granted == ku, granted
+        try:
+            san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+            assert san.get_values_for_type(x509.DNSName) == []
+        except x509.ExtensionNotFound:
+            pass
+    finally:
+        with app.app_context():
+            delete_templates(template_ids_named(name))
+            db.session.commit()
+
+
+@pytest.mark.parametrize('ekus,configured,ku,dns', [
+    # Built-in Client Authentication, Email Certificate (S/MIME) and VPN Client
+    (['clientAuth'], ['digitalSignature', 'keyEncipherment'], {'key_encipherment'}, []),
+    (['emailProtection'], ['digitalSignature', 'keyEncipherment', 'dataEncipherment'],
+     {'key_encipherment', 'data_encipherment'}, []),
+    (['clientAuth', 'ipsecUser'], ['digitalSignature', 'keyEncipherment'], {'key_encipherment'}, []),
+    # No serverAuth: a user's VPN template is a client one, its CN names no host
+    (['clientAuth', 'ipsecUser'], None, set(), []),
+])
+def test_a_request_without_key_usage_gets_the_template_s(client, app, wstep_config, ekus, configured, ku, dns):
+    import json
+    from utils.eku_validation import normalize_extra_ekus
+    name = f'Test WSTEP configured KU {"-".join(ekus)} {bool(configured)}'
+    ext = {'extended_key_usage': ekus, **({'key_usage': configured} if configured else {})}
+    with app.app_context():
+        delete_templates(template_ids_named(name))
+        db.session.add(CertificateTemplate(name=name, template_type='custom', key_type='RSA-2048',
+                                           is_active=True, extensions_template=json.dumps(ext)))
+        db.session.commit()
+    try:
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        csr = (x509.CertificateSigningRequestBuilder()
+               .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'jdoe')]))
+               .add_extension(x509.ExtendedKeyUsage(
+                   [x509.ObjectIdentifier(o) for o in normalize_extra_ekus(ekus)[0]]), critical=False)
+               .add_extension(_naming(name), critical=False)
+               .sign(key, hashes.SHA256()))
+        r = client.post(ISSUE_URL, data=_build_rst(csr), headers=_basic_auth())
+        assert r.status_code == 200, r.data
+        cert = _issued_cert_from_rstr(r.data)
+        usage = cert.extensions.get_extension_for_class(x509.KeyUsage).value
+        granted = {bit for bit in ('key_encipherment', 'content_commitment', 'key_agreement',
+                                   'data_encipherment') if getattr(usage, bit)}
+        assert usage.digital_signature and granted == ku, granted
+        try:
+            names = cert.extensions.get_extension_for_class(
+                x509.SubjectAlternativeName).value.get_values_for_type(x509.DNSName)
+        except x509.ExtensionNotFound:
+            names = []
+        assert names == dns
+    finally:
+        with app.app_context():
+            delete_templates(template_ids_named(name))
+            db.session.commit()
+
+
+def test_the_request_s_key_usage_wins_over_the_template_s(client, app, wstep_config):
+    """CertEnroll copies the Key Usage XCEP announced: the request's own is kept."""
+    import json
+    name = 'Test WSTEP configured KU, request KU'
+    with app.app_context():
+        delete_templates(template_ids_named(name))
+        db.session.add(CertificateTemplate(
+            name=name, template_type='custom', key_type='RSA-2048', is_active=True,
+            extensions_template=json.dumps({'extended_key_usage': ['clientAuth'],
+                                            'key_usage': ['digitalSignature', 'keyEncipherment']})))
+        db.session.commit()
+    try:
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        asked = x509.KeyUsage(digital_signature=True, content_commitment=False, key_encipherment=False,
+                              data_encipherment=False, key_agreement=False, key_cert_sign=False,
+                              crl_sign=False, encipher_only=False, decipher_only=False)
+        csr = (x509.CertificateSigningRequestBuilder()
+               .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'jdoe')]))
+               .add_extension(x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH]),
+                              critical=False)
+               .add_extension(asked, critical=True)
+               .add_extension(_naming(name), critical=False)
+               .sign(key, hashes.SHA256()))
+        r = client.post(ISSUE_URL, data=_build_rst(csr), headers=_basic_auth())
+        assert r.status_code == 200, r.data
+        assert _issued_cert_from_rstr(r.data).extensions.get_extension_for_class(x509.KeyUsage).value == asked
+    finally:
+        with app.app_context():
+            delete_templates(template_ids_named(name))
+            db.session.commit()
+
+
+def test_a_bare_csr_is_not_issued_under_a_template_of_capped_ekus_only(client, app, wstep_config):
+    """`openssl req -new` with a CN alone: OCSP Signing, whose only EKU is never issued,
+    scores as a perfect match but is no template for it; the server pair is kept."""
+    from models import CA
+    from services.xcep.policy_builder import _policy_oid_for_template
+    with app.app_context():
+        ca = db.session.get(CA, wstep_config['id'])
+        ocsp = CertificateTemplate.query.filter_by(name='OCSP Signing').first()
+        assert ocsp is not None and ocsp.is_active
+        ocsp_oid = _policy_oid_for_template(ca, ocsp)
+    csr, _key = _make_csr(common_name='bare.example.test')
+    r = client.post(ISSUE_URL, data=_build_rst(csr), headers=_basic_auth())
+    assert r.status_code == 200, r.data
+    cert = _issued_cert_from_rstr(r.data)
+    usage = cert.extensions.get_extension_for_class(x509.KeyUsage).value
+    assert usage.digital_signature and usage.key_encipherment
+    ekus = {o.dotted_string for o in cert.extensions.get_extension_for_class(x509.ExtendedKeyUsage).value}
+    assert ekus == {'1.3.6.1.5.5.7.3.1'}, ekus
+    try:
+        stamped = cert.extensions.get_extension_for_class(
+            x509.MSCertificateTemplate).value.template_id.dotted_string
+    except x509.ExtensionNotFound:
+        stamped = None
+    assert stamped != ocsp_oid
+
+
+@pytest.fixture
+def _ca_offers_only_ocsp_signing(app, wstep_config):
+    """The CA offers OCSP Signing alone, whatever templates the database holds."""
+    from models import CATemplatePin
+    with app.app_context():
+        ocsp = CertificateTemplate.query.filter_by(name='OCSP Signing').first()
+        assert ocsp is not None and ocsp.is_active
+        pin = CATemplatePin(ca_id=wstep_config['id'], template_id=ocsp.id)
+        db.session.add(pin)
+        db.session.commit()
+        pin_id = pin.id
+    yield
+    with app.app_context():
+        CATemplatePin.query.filter_by(id=pin_id).delete()
+        db.session.commit()
+
+
+@pytest.mark.parametrize('named', [False, True])
+def test_a_template_of_capped_ekus_only_is_refused(client, app, wstep_config, _ca_offers_only_ocsp_signing, named):
+    """OCSP Signing would be signed under the server profile, its only EKU dropped: the
+    request asking for it, or naming it, is refused as the client's fault."""
+    from models import CA
+    from services.xcep.policy_builder import _policy_oid_for_template
+    from tests.test_wstep_protocol_conformance import _fault, _fault_code
+    with app.app_context():
+        ca = db.session.get(CA, wstep_config['id'])
+        ocsp_oid = _policy_oid_for_template(ca, CertificateTemplate.query.filter_by(name='OCSP Signing').first())
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    builder = (x509.CertificateSigningRequestBuilder()
+               .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'ocsp.example.test')]))
+               .add_extension(x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.OCSP_SIGNING]), critical=False))
+    if named:
+        builder = builder.add_extension(
+            x509.MSCertificateTemplate(x509.ObjectIdentifier(ocsp_oid), 100, 0), critical=False)
+    r = client.post(ISSUE_URL, data=_build_rst(builder.sign(key, hashes.SHA256())), headers=_basic_auth())
+    assert r.status_code == 400, r.data
+    assert _fault(r.data)[0] == ("Template 'OCSP Signing' configures only Extended Key Usages "
+                                 'this service does not issue')
+    assert _fault_code(r.data) == 's:Sender'

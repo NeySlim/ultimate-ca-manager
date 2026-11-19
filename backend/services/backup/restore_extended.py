@@ -34,7 +34,7 @@ from .errors import BackupSchemaError
 from .export_generic import REFERENCE_SUFFIX, load_model
 from .manifest import SECTIONS
 from .restore.apply import apply_columns
-from .restore.plan import RestorePlan, RestoreValidationError
+from .restore.plan import RestorePlan, RestoreValidationError, _normalise, missing_identity_value
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +121,7 @@ def _timestamp(where: str, column: str, value: Any,
 
 
 def _reference(where: str, section_name: str, row: Dict[str, Any], column: str,
-               plan: RestorePlan) -> Optional[Any]:
+               plan: RestorePlan, *, optional: bool = False) -> Optional[Any]:
     """The id this installation holds for the row a reference points at.
 
     The archive carries the source's numeric id and, beside it, the identity
@@ -142,6 +142,8 @@ def _reference(where: str, section_name: str, row: Dict[str, Any], column: str,
         resolved = _target_id(section_name, row, column)
     if resolved is None:
         identity = row.get(f'{column}{REFERENCE_SUFFIX}')
+        if optional and f'{column}{REFERENCE_SUFFIX}' in row and identity is None:
+            return None                  # gone before the export: left empty, plan.resolve warned
         raise RestoreValidationError(
             f"Invalid backup: {where} points at a "
             f"{SECTIONS[section_name].references[column]} row this "
@@ -179,7 +181,8 @@ def _target_id(section_name: str, row: Dict[str, Any], column: str) -> Optional[
     return getattr(found, primary[0].key)
 
 
-def _existing_row(section_name: str, identity: Dict[str, Any]):
+def _existing_row(section_name: str, identity: Dict[str, Any], plan: Optional[RestorePlan] = None,
+                  archived: Optional[Dict[str, Any]] = None):
     """The row here that an archived row is, by the identity the manifest declares.
 
     Looked up on the session rather than in the plan's index: for an approval
@@ -190,7 +193,8 @@ def _existing_row(section_name: str, identity: Dict[str, Any]):
 
     A row whose identity is empty is no row in particular: it is created
     rather than matched against every other row that has none either. The
-    plan has already said so, as a warning, when it read the archive.
+    plan has already said so, as a warning, when it read the archive. Rows
+    sharing an identity are taken by rank, as `RestorePlan.rank` does.
     """
     section = SECTIONS[section_name]
     if tuple(identity) != section.identity:
@@ -198,9 +202,15 @@ def _existing_row(section_name: str, identity: Dict[str, Any]):
             f"Section '{section_name}' is identified by "
             f"{', '.join(section.identity)}, not by "
             f"{', '.join(identity)}")
-    if all(value in (None, '') for value in identity.values()):
+    if all(missing_identity_value(section_name, field, value) for field, value in identity.items()):
         return None
-    return load_model(section).query.filter_by(**identity).first()
+    model = load_model(section)
+    rows = model.query.filter_by(**identity).order_by(*sa_inspect(model).primary_key).all()
+    if plan is None or archived is None:
+        return rows[0] if rows else None
+    key = tuple(_normalise(value) for value in identity.values())
+    taken = plan.rank(section_name, key, archived, [sa_inspect(row).identity[0] for row in rows])
+    return next((row for row in rows if sa_inspect(row).identity[0] == taken), None)
 
 
 class RestoreExtendedMixin:
@@ -329,7 +339,7 @@ class RestoreExtendedMixin:
             # the source used.
             sc = _existing_row('ssh_certificates',
                                {'serial': sc_data.get('serial'),
-                                'ssh_ca_id': authority_id})
+                                'ssh_ca_id': authority_id}, plan, sc_data)
             if sc is None:
                 # refid, ssh_ca_id, cert_type, key_id, public_key,
                 # certificate, principals, serial, valid_from, valid_to,
@@ -360,8 +370,8 @@ class RestoreExtendedMixin:
                 )
                 db.session.add(sc)
 
-            apply_columns(sc, 'ssh_certificates', sc_data, plan)
-            results['ssh_certificates'] += 1
+            if apply_columns(sc, 'ssh_certificates', sc_data, plan):
+                results['ssh_certificates'] += 1
 
         db.session.flush()
 
@@ -508,8 +518,8 @@ class RestoreExtendedMixin:
                 )
                 db.session.add(hk)
 
-            apply_columns(hk, 'hsm_keys', k_data, plan)
-            results['hsm_keys'] += 1
+            if apply_columns(hk, 'hsm_keys', k_data, plan):
+                results['hsm_keys'] += 1
 
         db.session.flush()
 
@@ -547,15 +557,15 @@ class RestoreExtendedMixin:
             created_at = _timestamp(where, 'created_at', ar_data.get('created_at'),
                                     required=True)
             certificate_id = _reference(where, 'approval_requests', ar_data,
-                                        'certificate_id', plan)
-            # None only when the archive names none (a request the renewal
-            # scheduler queued); a requester this installation lacks stops it
+                                        'certificate_id', plan, optional=True)
+            # None when the archive names none (a request the renewal scheduler
+            # queued) or one gone before the export; one this installation lacks stops it
             requester_id = _reference(where, 'approval_requests', ar_data,
-                                      'requester_id', plan)
+                                      'requester_id', plan, optional=True)
 
             request = _existing_row('approval_requests',
                                     {'certificate_id': certificate_id,
-                                     'created_at': created_at})
+                                     'created_at': created_at}, plan, ar_data)
             if request is None:
                 # request_type is NOT NULL; apply_columns overwrites it and requester_id
                 request = ApprovalRequest(
@@ -563,9 +573,9 @@ class RestoreExtendedMixin:
                     requester_id=requester_id)
                 db.session.add(request)
 
-            apply_columns(request, 'approval_requests',
-                          dict(ar_data, created_at=created_at), plan)
-            results['approval_requests'] += 1
+            if apply_columns(request, 'approval_requests',
+                             dict(ar_data, created_at=created_at), plan, archived=ar_data):
+                results['approval_requests'] += 1
 
         db.session.flush()
 
@@ -573,14 +583,10 @@ class RestoreExtendedMixin:
                                     plan: Optional[RestorePlan] = None) -> None:
         """Restore the orders UCM placed with an external ACME CA, once.
 
-        An order is the one the CA knows under that URL, so restoring an
-        archive twice updates the order it already put back rather than
-        placing a second row for the same upstream order.
-
-        Every column comes from the manifest now: the hand-written list was
-        missing the CSR the order was placed with, the certificate it renews,
-        its expiry and its renewal history, so a restored order was one the
-        renewal could not carry on from.
+        An order is found again by what never changes on it (environment, names,
+        creation instant). Rows go in by creation, a renewal's parent before it;
+        `relink_references` points a child at a parent written after it.
+        Which side wins over an order this installation moved on with: restore/orders.py.
         """
         from models.acme_models import AcmeClientOrder
 
@@ -592,21 +598,77 @@ class RestoreExtendedMixin:
         plan = plan if plan is not None else RestorePlan.build(backup_data)
         reindex_reference_targets('acme_client_orders', plan)
 
-        for o_data in rows:
+        dated, written = [], []
+        for position, o_data in enumerate(rows):
+            where = f"ACME order {position} ({o_data.get('domains')})"
+            dated.append((_timestamp(where, 'created_at', o_data.get('created_at'),
+                                     required=True), position, o_data))
+        for created_at, _position, o_data in sorted(dated, key=lambda item: item[:2]):
             order = _existing_row('acme_client_orders',
-                                  {'order_url': o_data.get('order_url')})
+                                  {'environment': o_data.get('environment'),
+                                   'domains': o_data.get('domains'),
+                                   'created_at': created_at}, plan, o_data)
             if order is None:
                 # domains, challenge_type, environment, key_source and status
                 # are NOT NULL; all of them are overwritten by apply_columns.
                 order = AcmeClientOrder(domains=o_data.get('domains') or '[]')
                 db.session.add(order)
 
-            # `certificate_id` is a column like any other here: the manifest
-            # carries no identity for the issued certificate, so there is
-            # nothing to resolve it against and the archive's own number is
-            # written, exactly as this restore has always written it.
-            apply_columns(order, 'acme_client_orders', o_data, plan)
-            results['acme_client_orders'] += 1
+            if apply_columns(order, 'acme_client_orders',
+                             dict(o_data, created_at=created_at), plan, archived=o_data):
+                results['acme_client_orders'] += 1
+                written.append(order)
+
+        db.session.flush()
+        plan.written.setdefault('acme_client_orders', set()).update(order.id for order in written)
+
+    def _restore_key_recovery_requests(self, backup_data: Dict, results: Dict,
+                                       plan: Optional[RestorePlan] = None) -> None:
+        """Key recovery requests, on the certificate of their refid here.
+
+        The archived `cert_id` is the source's number. A request whose certificate
+        is not here gets `cert_id` 0, which names no row; an open one is also
+        cancelled, as a replacing restore cancels one whose certificate it removes.
+        """
+        from models import Certificate
+        from models.key_recovery import (
+            KeyRecoveryRequest, STATUS_APPROVED, STATUS_CANCELLED, STATUS_PENDING,
+        )
+        from utils.datetime_utils import utc_now
+
+        results.setdefault('key_recovery_requests', 0)
+        rows = backup_data.get('key_recovery_requests', [])
+        if not rows:
+            return
+        plan = plan if plan is not None else RestorePlan.build(backup_data)
+        db.session.flush()
+
+        for position, kr_data in enumerate(rows):
+            where = f"key recovery request {position}"
+            requested_at = _timestamp(where, 'requested_at', kr_data.get('requested_at'),
+                                      required=True)
+            refid = kr_data.get('cert_refid') or (kr_data.get(f'cert_id{REFERENCE_SUFFIX}') or {}).get('refid')
+            with db.session.no_autoflush:
+                certificate = Certificate.query.filter_by(refid=refid).first() if refid else None
+            row = dict(kr_data, requested_at=requested_at, cert_refid=refid,
+                       cert_id=certificate.id if certificate is not None else 0)
+            row.pop(f'cert_id{REFERENCE_SUFFIX}', None)
+            if certificate is None and row.get('status') in (STATUS_PENDING, STATUS_APPROVED):
+                row.update(status=STATUS_CANCELLED, decided_by='restore',
+                           decided_at=utc_now().isoformat(),
+                           decision_note='Cancelled by a restore: the certificate is not on this installation')
+                plan.warnings.append(
+                    f"key recovery request for certificate {refid or '(no refid)'} was cancelled: "
+                    "the certificate is not on this installation")
+
+            request = _existing_row('key_recovery_requests',
+                                    {'cert_refid': refid, 'requested_at': requested_at}, plan, kr_data)
+            if request is None:
+                request = KeyRecoveryRequest(cert_id=row['cert_id'], reason=row.get('reason') or '',
+                                             requested_by=row.get('requested_by') or '')
+                db.session.add(request)
+            if apply_columns(request, 'key_recovery_requests', row, plan, archived=kr_data):
+                results['key_recovery_requests'] += 1
 
         db.session.flush()
 

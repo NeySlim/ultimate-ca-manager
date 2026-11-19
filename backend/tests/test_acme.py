@@ -15,6 +15,7 @@ import os
 import sys
 from tests.conftest import get_json, assert_success, assert_error
 from services.acme.jws_problems import UNKNOWN_ACCOUNT
+from tests.seeded_rows import delete_client_accounts
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -425,10 +426,20 @@ class TestAcmeClientSettings:
     def _clear_proxy_account_link(self, app):
         from models import db, SystemConfig
         from services.acme.acme_proxy_account import PROXY_ACCOUNT_ID_KEY
+        settings = SystemConfig.key.like('acme.client.%') | SystemConfig.key.like('acme.proxy.%')
         with app.app_context():
             SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
             db.session.commit()
+            saved = {row.key: (row.value, row.encrypted, row.description)
+                     for row in SystemConfig.query.filter(settings)}
         yield
+        # The PATCHed settings outlive the test otherwise (proxy_verify_ssl=False above all)
+        with app.app_context():
+            SystemConfig.query.filter(settings).delete(synchronize_session=False)
+            for key, (value, encrypted, description) in saved.items():
+                db.session.add(SystemConfig(key=key, value=value, encrypted=encrypted,
+                                            description=description))
+            db.session.commit()
 
     def test_get_client_settings(self, auth_client):
         r = auth_client.get('/api/v2/acme/client/settings')
@@ -591,7 +602,7 @@ class TestAcmeClientSettings:
         yield acct_id
         with app.app_context():
             SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
-            AcmeClientAccount.query.filter_by(id=acct_id).delete()
+            delete_client_accounts(AcmeClientAccount.query.filter_by(id=acct_id))
             db.session.commit()
 
     def test_patch_proxy_eab_kid(self, auth_client, linked_proxy_account):
@@ -659,7 +670,7 @@ class TestAcmeClientProxy:
         custom_dir = 'https://proxy-reg-test.example/directory'
         with app.app_context():
             SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
-            AcmeClientAccount.query.filter_by(directory_url=custom_dir).delete()
+            delete_client_accounts(AcmeClientAccount.query.filter_by(directory_url=custom_dir))
             db.session.commit()
             acct = AcmeClientAccount(
                 directory_url=custom_dir,
@@ -721,7 +732,7 @@ class TestAcmeClientProxy:
         custom_dir = 'https://proxy-unreg-test.example/directory'
         with app.app_context():
             SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
-            AcmeClientAccount.query.filter_by(directory_url=custom_dir).delete()
+            delete_client_accounts(AcmeClientAccount.query.filter_by(directory_url=custom_dir))
             db.session.commit()
             acct = AcmeClientAccount(
                 directory_url=custom_dir,
@@ -1431,9 +1442,9 @@ class TestAcmeProxyProtocol:
 
         with app.app_context():
             SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
-            AcmeClientAccount.query.filter_by(
+            delete_client_accounts(AcmeClientAccount.query.filter_by(
                 directory_url=self._STUB_DIRECTORY_URL
-            ).delete()
+            ))
             db.session.commit()
             acct = AcmeClientAccount(
                 directory_url=self._STUB_DIRECTORY_URL,
@@ -1451,9 +1462,9 @@ class TestAcmeProxyProtocol:
         yield
         with app.app_context():
             SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
-            AcmeClientAccount.query.filter_by(
+            delete_client_accounts(AcmeClientAccount.query.filter_by(
                 directory_url=self._STUB_DIRECTORY_URL
-            ).delete()
+            ))
             db.session.commit()
 
     @staticmethod
@@ -1520,7 +1531,7 @@ class TestAcmeProxyProtocol:
     def test_new_nonce(self, client):
         """GET /acme/proxy/new-nonce returns nonce header."""
         r = client.get('/acme/proxy/new-nonce')
-        assert r.status_code == 200
+        assert r.status_code == 204  # RFC 8555 §7.2: GET 204, HEAD 200
         assert 'Replay-Nonce' in r.headers
 
     def test_new_account_creates_persistent_account(self, client):
@@ -1674,14 +1685,14 @@ class TestAcmeProxyFreshInstall:
                     SystemConfig.key.in_([PROXY_ACCOUNT_ID_KEY, 'acme.proxy.upstream_url'])
                 ).all()
             ]
-            AcmeClientAccount.query.delete()
+            delete_client_accounts(AcmeClientAccount.query)
             SystemConfig.query.filter(
                 SystemConfig.key.in_([PROXY_ACCOUNT_ID_KEY, 'acme.proxy.upstream_url'])
             ).delete(synchronize_session=False)
             db.session.commit()
         yield
         with app.app_context():
-            AcmeClientAccount.query.delete()
+            delete_client_accounts(AcmeClientAccount.query)
             for row in keep:
                 db.session.add(AcmeClientAccount(**row))
             for row in keep_cfg:
@@ -1700,7 +1711,7 @@ class TestAcmeProxyFreshInstall:
     def test_new_nonce_without_account(self, client):
         """GET /acme/proxy/new-nonce returns a nonce when no CA account exists."""
         r = client.get('/acme/proxy/new-nonce')
-        assert r.status_code == 200
+        assert r.status_code == 204  # RFC 8555 §7.2: GET 204, HEAD 200
         assert 'Replay-Nonce' in r.headers
 
 

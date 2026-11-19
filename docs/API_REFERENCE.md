@@ -217,6 +217,8 @@ Content-Type: application/json
 }
 ```
 
+`forgot-password` answers the same `200` whether or not a link was sent. No link is sent to an SSO account (linked to a provider or left without one) that has no local password, and `reset-password` answers `400` (`Invalid or expired reset token`) for a link such an account holds.
+
 ### Check Email Configuration
 ```http
 GET /api/v2/auth/email-configured
@@ -288,6 +290,8 @@ GET /api/v2/account/2fa/recovery-codes
 # Regenerate recovery codes
 POST /api/v2/account/2fa/recovery-codes/regenerate
 ```
+
+A code checked by `2fa/disable` or `2fa/recovery-codes/regenerate` against an enabled TOTP counts against the same `max_login_attempts` as the second step of a login for that account; past it, both answer 429 until `lockout_duration` has passed, and a code accepted resets the count. `2fa/confirm` answers 409 once TOTP is enabled.
 
 ### API Keys
 
@@ -464,11 +468,11 @@ GET /api/v2/cas?page=1&per_page=20
 ```
 
 **Key fields** (CAs, certificates and CSRs): `key_type` (`"RSA 4096"`, `"EC secp384r1"`,
-`"ML-DSA-65"`), `key_algorithm` (`"RSA"`, `"EC"`, `"ML-DSA-65"`), `key_size` (bits of an RSA key; `0`
-for EC and `null` for a post-quantum key), `security_level` (NIST level `2`, `3` or `5` for ML-DSA-44/65/87,
-`null` otherwise), `post_quantum` (boolean) and `verifiable` (`false` for an SLH-DSA
-signature, which UCM reads but cannot check). An ML-DSA CA reports `signature_algorithm`
-as its parameter set, e.g. `"ML-DSA-65"`. A certificate in a hybrid pair (RFC 9763) also
+`"ML-DSA-65"`), `key_algorithm` (`"RSA"`, `"EC"`, `"ML-DSA-65"`), `key_size` (bits of an RSA key, `256`
+or `448` for Ed25519 or Ed448; `0` for EC and `null` for a post-quantum key), `security_level` (NIST level
+`2`, `3` or `5` for ML-DSA-44/65/87, `null` otherwise), `post_quantum` (boolean) and `verifiable` (`false`
+for an SLH-DSA signature, which UCM reads but cannot check). An ML-DSA CA reports `signature_algorithm`
+as its parameter set, e.g. `"ML-DSA-65"`, an EdDSA CA as `"Ed25519"` or `"Ed448"`. A certificate in a hybrid pair (RFC 9763) also
 reports `related_certificate_id` (the other member) and `hybrid_role` (`"classical"` or `"pq"`);
 both are `null` otherwise.
 
@@ -523,11 +527,17 @@ are sent. An intermediate CA never outlives its parent. A CA of type
 `external` takes neither: its signer decides.
 
 `keyAlgo` is `RSA` (`keySize` 2048, 3072 or 4096), `ECDSA` or `EC` (`keySize` a curve:
-`prime256v1`, `secp384r1`, `secp521r1`, or a Brainpool curve) or `ML-DSA` (`keySize` 44, 65
-or 87, required). A full label such as `RSA-3072`, `EC-P384` or `ML-DSA-65` is also accepted,
+`prime256v1`, `secp384r1`, `secp521r1`, or a Brainpool curve), `EdDSA` (`keySize` `Ed25519` or
+`Ed448`) or `ML-DSA` (`keySize` 44, 65 or 87, required). A full label such as `RSA-3072`, `EC-P384`,
+`Ed25519` or `ML-DSA-65` is also accepted,
 and `keyType` is an alias of `keyAlgo`. An unknown `keyAlgo`, or a `keySize` that does not
-belong to it, answers `400`. Without `keySize`, `RSA` gives RSA-2048 and `ECDSA` P-256; a request
-without any key field gets RSA-2048. ML-DSA needs
+belong to it, answers `400`. Without `keySize`, `RSA` gives RSA-2048, `ECDSA` P-256 and `EdDSA`
+Ed25519; a request without any key field gets RSA-2048. An EdDSA CA key is generated in software
+only (no HSM provider holds one), is refused in FIPS mode and signs without a separate digest,
+like ML-DSA below. Web browsers (Chrome, Firefox, Safari), Windows (CryptoAPI/CNG) and SCEP clients
+do not verify an Ed25519 or Ed448 signature on a certificate, so they reject anything such a CA issues,
+whatever the leaf key: keep it for clients that do (OpenSSL, Go, Java 15 and later). SCEP and XCEP
+refuse an EdDSA CA, and an EdDSA CA cannot sign timestamps itself (it can issue the TSA signer). ML-DSA needs
 OpenSSL 3.5 or later and is refused in FIPS mode; `keyAlgo` generates it in software, and
 an HSM-held ML-DSA key is chosen with `hsm_key_algorithm` on a provider that has it (see [HSM](#hsm)).
 An ML-DSA key signs without a separate digest: a `digest` sent for it is ignored and named
@@ -763,6 +773,8 @@ are ignored; a `classical` member that is post-quantum, a `pq` member that is no
 key type answers `400`, and so does a policy that requires approval. The response is
 `201` with `data.certificate` (A) and `data.related` (B).
 
+**Custom extensions.** `custom_extensions` takes the list described under [Templates](#templates). They join the template's; an entry with the OID of one of the template's replaces it. An invalid list answers `400` before anything is issued or queued for approval. A renewal keeps the extensions of the certificate it renews, the template's current entries replacing those of the same OID and joining the others; one the template no longer lists stays, since UCM cannot tell it from one the request added.
+
 **Response:**
 ```json
 {
@@ -783,6 +795,8 @@ key type answers `400`, and so does a policy that requires approval. The respons
 ```http
 GET /api/v2/certificates/{cert_id}
 ```
+
+`extensions.other_extensions` lists the extensions without a section of their own, custom ones included: `[{oid, name, critical, value_hex}]`, `name` being null for an OID UCM cannot name. `GET /api/v2/cas/{ca_id}` returns the same under `extensions`, and `GET /api/v2/csrs/{csr_id}` lists under `other_extensions` the extensions of the request outside basic constraints, key usage, extended key usage, names, key identifiers, CRL distribution points, authority information access, certificate policies, name constraints and SCT.
 
 ### Export Certificate
 ```http
@@ -1155,6 +1169,8 @@ Content-Type: application/json
 }
 ```
 
+`custom_extensions` adds extensions to the template's, as on `POST /api/v2/certificates`; the template's apply to end-entity certificates only. Extensions the CSR itself asks for outside the usual ones are not copied.
+
 A CSR carrying a relatedCertRequest (RFC 9763), here or through ACME, EST or WSTEP, issues a
 certificate linked to the A it names. A must be held here, valid, unrevoked and an end-entity
 certificate issued by a CA of this instance whose chain passes RFC 5280 path checks now (validity,
@@ -1309,6 +1325,20 @@ ML-DSA key under an RSA or EC CA, and an ML-DSA CA ignores it.
 - `certificate_policies`: up to 20 dotted OIDs, added after the CA's CPS policy.
 - `qc_statements`: `compliance` is QcCompliance and `cc_legislation` (ISO 3166 country codes, QcCClegislation) names the non-EU legal framework of a qualified certificate, left out for an EU one; `type` is `esign`, `eseal` or `web`; `pds` entries need an `https` URL and a two-letter language, at most one per language, and an EU qualified certificate (QcCompliance without QcCClegislation) needs one in English; `semantics` is `natural`, `legal`, `eidas-natural` or `eidas-legal` (RFC 3739 semantics identifier). Unknown keys are refused.
 - Certificates issued from the UI, Sign CSR (single and bulk), ACME, SCEP and approvals carry both; renewals keep them. EST, WSTEP and mTLS enrollment do not add them. `GET /api/v2/certificates/{id}` decodes the extension under `extensions.qc_statements`, and `GET /api/v2/certificates/{id}/lint?profile=etsi` runs the ETSI EN 319 412 checks.
+
+**Custom extensions (#437).** `custom_extensions` adds extensions UCM does not model, each given by its OID and the DER bytes of its value:
+
+```json
+"custom_extensions": [
+  {"oid": "1.3.6.1.4.1.99999.1", "critical": false, "value": "0c0568656c6c6f"}
+]
+```
+
+- `value` is the DER encoding of the extension value (the content of `extnValue`) in hex; colons and spaces are ignored. `value_base64` may be given instead. It must be a single DER element (tag, minimal definite length, content of that length); UCM checks nothing more and copies the bytes as they are. Stored and returned as lowercase hex in `value`.
+- `critical` defaults to `false`. A client that does not recognise a critical extension must reject the certificate (RFC 5280, section 4.2): mark one critical only when every relying party understands it.
+- `400` for an OID that is not dotted (`1.2.840...`), an empty value, a value above 4096 bytes, more than 20 entries, the same OID twice, or an extension UCM sets itself or parses (basic constraints, key usage, extended key usage, names, key identifiers, CRL distribution points, authority and subject information access, certificate policies, name constraints, TLS feature, OCSP no-check, SCT, qcStatements, relatedCertificate, the Microsoft template and SID extensions...): those keep their dedicated settings. The rule is "set by UCM or parsed by the X.509 library": any other OID is accepted, an unparsed `2.5.29.x` included.
+- `[]` clears the list. Duplicate, export, import and backups carry it. A stored list that no longer validates (a restored or hand-edited row) is reported in `custom_extensions_error`, and issuance from the template is refused until it is fixed: `400` with the reason for an operator, `serverInternal` without the template's name for an ACME client, `badRequest` for SCEP (RFC 8894 has no server-side failInfo).
+- Certificates issued from the template carry the list: issue form, Sign CSR (single and bulk, end-entity certificates only), ACME profiles bound to the template, SCEP profiles, WSTEP (the matched template) and approvals. EST and mTLS enrollment use no template and add none.
 
 ### Get Template
 ```http
@@ -1793,6 +1823,21 @@ Content-Type: application/json
 }
 ```
 
+### Link or Unlink SSO
+```http
+POST /api/v2/users/{user_id}/link-sso
+Content-Type: application/json
+
+{
+  "provider_id": 1,
+  "remove_password": false
+}
+
+POST /api/v2/users/{user_id}/unlink-sso
+```
+
+`link-sso` (admin, `write:users`) attaches any account to that SSO provider: a local account, one of another provider (moved), one without provider, or one already linked to it (its stable identity is reset). The stored identity is cleared, so the next sign-in through the provider with the account's username or email binds one. A password the account has is kept unless `remove_password` is `true` (a boolean, `400` otherwise), which removes it and any pending reset link so no password login opens the account (`400` on the caller's own account); an account without password is not asked to set one. When the account's provider or identity changes, or its password is removed, its sessions are closed (the caller's own session stays); API keys, security keys and mTLS certificates are kept. The `user_link_sso` audit entry says where the account came from. `400` without `provider_id`, `404` for an unknown user or provider. `unlink-sso` turns an SSO-linked account back into a local one (`400` when it is not linked).
+
 ### Delete User
 ```http
 DELETE /api/v2/users/{user_id}
@@ -2188,7 +2233,7 @@ GET /api/v2/settings/backup/history
 # Download backup
 GET /api/v2/settings/backup/{backup_id}/download
 
-# Restore backup
+# Restore backup (signs out every session begun before it, the caller's included)
 POST /api/v2/settings/backup/restore
 Content-Type: multipart/form-data
 
@@ -2258,7 +2303,7 @@ POST /api/v2/system/backup/create
 # Download backup
 GET /api/v2/system/backup/{filename}/download
 
-# Restore backup
+# Restore backup (signs out every session begun before it, the caller's included)
 POST /api/v2/system/backup/restore
 ```
 
@@ -2462,11 +2507,17 @@ POST /api/v2/system/alerts/expiry/check
 
 ### Updates
 ```http
-# Check for updates
+# Check for updates (within the installed major version; a later
+# major version's final release is reported apart in major_upgrade,
+# null when there is none; security_maintenance is a boolean)
 GET /api/v2/system/updates/check
 
-# Install update
+# Install update (within the installed major version)
 POST /api/v2/system/updates/install
+
+# Upgrade to the later major version reported by the check
+POST /api/v2/system/updates/install
+{"major_upgrade": true, "version": "<major_upgrade.version>"}
 
 # Get current version
 GET /api/v2/system/updates/version
@@ -2658,7 +2709,7 @@ Content-Type: multipart/form-data
 file: <certificate file>          # Required: .pem, .crt, .cer, .der, .p12, .pfx
 name: "My Certificate"            # Optional: display name
 password: "pkcs12password"        # Optional: for PKCS12 files
-ca_id: 1                          # Optional: link to specific CA (auto-detected if omitted)
+ca_id: 1                          # Optional: link to this CA, which must have signed it (400 otherwise)
 import_key: true                  # Optional: import private key (default: true)
 cross_mode: auto                  # Optional: auto | attach | replace | refuse (default: auto)
 
@@ -2681,6 +2732,8 @@ cross_mode: auto                  # Optional: auto | attach | replace | refuse (
   "message": "CA certificate \"My CA\" imported successfully (detected as CA)"
 }
 ```
+
+Without `ca_id`, the certificate is linked to the stored CA whose key verifies its signature (AKI, then issuer name, are only used to find candidates); with none it is stored as a third-party certificate.
 
 **Features:**
 - Auto-detects format: PEM, DER, PKCS12, PKCS7
@@ -3045,6 +3098,10 @@ Content-Type: application/json
 }
 ```
 
+`renewal_days` (1 to 60) applies when the CA suggests no renewal window (ARI). When it is more
+than two thirds of a certificate's lifetime, that certificate is renewed in the last third of
+its lifetime instead.
+
 Fields of the DNS UPDATE (RFC 2136) listener of the ACME proxy:
 
 | Field | Method | Description |
@@ -3065,12 +3122,37 @@ Content-Type: application/json
 ```http
 GET /api/v2/acme/client/orders
 GET /api/v2/acme/client/orders?status=pending&environment=production
+GET /api/v2/acme/client/orders?page=2&per_page=100
 ```
+
+Newest first, 100 per page at most (`per_page`, default 100); `meta` gives `total`, `page`
+and `total_pages`. Orders left `pending` for more than 7 days, whose order at the CA has expired
+or whose expiry is unknown, are removed by the renewal task.
+
+Each order carries `renewal_failures`, `renewal_retry_daily`, `last_error_at` and
+`error_message`, and `upstream_revocations_owed`: the replaced certificates whose revocation the
+CA has not confirmed yet (with `acme.revoke_on_renewal`). The renewal task sends them again
+until the certificate expires, and each failure emits the `acme_order.revocation_failed`
+webhook event (`order`, `serial_number`, `error`, `attempts`). Deleting the order abandons them;
+its audit entry says how many.
 
 ### Get Order Details
 ```http
 GET /api/v2/acme/client/orders/{order_id}
 ```
+
+### Turn Automatic Renewal On or Off
+```http
+PATCH /api/v2/acme/client/orders/{order_id}
+Content-Type: application/json
+
+{
+  "renewal_enabled": false
+}
+```
+
+Takes a JSON boolean only (`400` otherwise). Refused with `409` on a proxy order and on an
+order a renewal opened.
 
 ### Request Certificate
 ```http
@@ -3085,6 +3167,9 @@ Content-Type: application/json
   "dns_provider_id": 1
 }
 ```
+
+A CSR (`key_source: "csr"`) whose key was revoked as compromised is refused with `409` before
+any order is opened at the CA.
 
 `key_type` sets the certificate key UCM generates: `RSA-2048`, `RSA-4096`, `EC-P256`,
 `EC-P384`, `EC-BP256`, `EC-BP384`, or `ML-DSA-44`, `ML-DSA-65`, `ML-DSA-87` when this build
@@ -3122,6 +3207,11 @@ DELETE /api/v2/acme/client/orders/{order_id}
 ```http
 POST /api/v2/acme/client/orders/{order_id}/renew
 ```
+
+A failure answers `409` when the renewal is blocked before the CA (account gone, key revoked
+as compromised, DNS provider disabled) and `422` otherwise, with the reason; both are counted
+on the order and emit `acme_order.renewal_failed`. `409` also answers while another renewal or
+finalization of the order runs, and that one is not counted.
 
 ### Register ACME Account
 ```http
@@ -3273,7 +3363,7 @@ Additional fields depend on `provider_type` (ldap, oauth2, saml).
 
 Custom roles are referenced by name. Among the groups a user belongs to, the base role is the most privileged one given; the custom role is the first one, in mapping order, that names one. A custom role never grants the permissions reserved to administrators.
 
-The mapping is checked when the provider is created or updated: an unknown base role, an unknown custom role or a malformed entry returns `400` and nothing is saved. At login, a value that has become invalid is not trusted: an invalid base role counts as `viewer` and an unknown custom role is ignored.
+The mapping is checked when the provider is created or updated: an unknown base role, an unknown custom role or a malformed entry returns `400` and nothing is saved. A key is saved without its edge spaces. For an LDAP provider, keys and group names compare ignoring case, edge spaces and the length of inner space runs (caseIgnoreMatch), and two keys equal in that sense return `400`; OIDC and SAML groups compare exactly. At login, a value that has become invalid is not trusted: an invalid base role counts as `viewer` and an unknown custom role is ignored.
 
 With `sync_role_on_login` on, each login also updates the custom role, and removes it when no matching group names one, but only if it came from the mapping (`custom_role_source` is `"sso"`). A custom role assigned by hand is never replaced nor removed. System roles cannot be used as the custom role of a mapping. Changes are recorded in the audit log as `role_change`.
 
@@ -3299,6 +3389,16 @@ POST /api/v2/sso/providers/{provider_id}/toggle
 ```http
 POST /api/v2/sso/providers/{provider_id}/test
 ```
+
+### Test LDAP Role Mapping (admin)
+```http
+POST /api/v2/sso/providers/{provider_id}/test-mapping
+Content-Type: application/json
+
+{ "username": "alice" }
+```
+
+A dry run of an LDAP login past the password, without creating a session: the same entry, groups and verdict as the login. `found: false` when the user filter finds no entry; otherwise `user_dn`, `username`, `email`, `groups`, `groups_readable`, `access_allowed`, `refusal` (`null`, `account_disabled`, `groups_unreadable`, `group_denied`, `unmapped` or `no_default_role`), `resolved_role` and `resolved_custom_role` (`null` when refused), `role_mapping`, `default_role`, `required_groups`, and `account_checked: false` with a `note`: the password and the UCM account the sign-in would open are not checked. `400` for a provider that is not LDAP, without `username` ("Username is required") or for a failed user lookup; `404` for an unknown provider.
 
 ### List SSO Sessions (admin)
 ```http

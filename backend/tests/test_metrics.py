@@ -21,6 +21,7 @@ class TestRenderer:
             assert 'ucm_build_info' in out
             assert '# TYPE ucm_certificates gauge' in out
             assert 'ucm_scheduler_task_runs_total' in out
+            assert 'ucm_scheduler_state_stale 0' in out  # no scheduler process to wait for here
             assert 'ucm_webhook_deliveries' in out
             # every non-comment line is "name value" or 'name{...} value'
             for line in out.splitlines():

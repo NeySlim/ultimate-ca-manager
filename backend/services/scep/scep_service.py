@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 
 import asn1crypto.cms
+import asn1crypto.csr
 import asn1crypto.x509
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
@@ -39,6 +40,7 @@ from services.scep.crypto_helpers import (
     select_response_key_transport,
 )
 from services.scep.message_parser import (
+    UnsupportedScepAlgorithm,
     decrypt_scep_envelope,
     extract_scep_attributes,
     extract_signer_certificate,
@@ -75,6 +77,28 @@ def _scep_allow_no_challenge() -> bool:
     another way (isolated network, mTLS front).
     """
     return os.environ.get('UCM_SCEP_ALLOW_NO_CHALLENGE', '').lower() in ('1', 'true', 'yes')
+
+
+def _csr_challenge_password(csr_der: bytes):
+    """The CSR's challengePassword, decoded by its DirectoryString type
+    (RFC 2985 §5.4.1: every string type MUST be processed), or None."""
+    try:
+        info = asn1crypto.csr.CertificationRequest.load(csr_der)['certification_request_info']
+        for attr in info['attributes']:
+            if attr['type'].dotted == '1.2.840.113549.1.9.7' and len(attr['values']):
+                return attr['values'][0].native
+    except Exception as e:
+        logger.debug(f"SCEP: Could not extract challenge from CSR: {e}")
+    return None
+
+
+def _csr_san_names(csr):
+    """The CSR's SAN entries as sent, or None without the extension."""
+    try:
+        return list(csr_extensions(csr).get_extension_for_oid(
+            ExtensionOID.SUBJECT_ALTERNATIVE_NAME).value)
+    except x509.ExtensionNotFound:
+        return None
 
 
 class SCEPService:
@@ -369,7 +393,7 @@ class SCEPService:
                 message_data = decrypt_scep_envelope(
                     encrypted_bytes, self.ca_key, self.ca_cert
                 )
-            except FipsRestricted as e:
+            except (FipsRestricted, UnsupportedScepAlgorithm) as e:
                 return self._create_error_response(
                     self.FAIL_BAD_ALG, str(e),
                     transaction_id=transaction_id, recipient_nonce=sender_nonce,
@@ -456,30 +480,9 @@ class SCEPService:
 
             logger.debug(f"SCEP: CSR parsed, subject={csr.subject.rfc4514_string()}")
 
-            # Issuance policies (key type, signature hash), before anything is stored
-            _, policy_violations = self._policy_signing_hash(csr)
-            if policy_violations:
-                logger.warning("SCEP: request refused by policy: %s", '; '.join(policy_violations))
-                return self._create_error_response(
-                    self.FAIL_BAD_REQUEST, 'Policy violation: ' + '; '.join(policy_violations),
-                    transaction_id=transaction_id, recipient_nonce=sender_nonce,
-                ), 200
-
             # ---- 6. Also check challengePassword in CSR attributes (scepclient) ----
             if not self._has_usable_challenge_password(challenge_pwd):
-                try:
-                    from cryptography.x509.oid import AttributeOID
-                    for attr in csr.attributes:
-                        if attr.oid == AttributeOID.CHALLENGE_PASSWORD:
-                            challenge_pwd = attr.value
-                            if isinstance(challenge_pwd, bytes):
-                                try:
-                                    challenge_pwd = challenge_pwd.decode("utf-8")
-                                except UnicodeDecodeError:
-                                    pass
-                            break
-                except Exception as e:
-                    logger.debug(f"SCEP: Could not extract challenge from CSR: {e}")
+                challenge_pwd = _csr_challenge_password(csr_data)
 
             if self._recipient_requires_password(
                 signer_cert
@@ -521,7 +524,12 @@ class SCEPService:
                     transaction_id=transaction_id, recipient_nonce=sender_nonce,
                 ), 200
 
-            if self.intune_client is None and self.challenge_password:
+            # RFC 8894 §2.4: a RenewalReq signed by a certificate this endpoint
+            # issued is authenticated by it (step 8), so its challenge is not
+            # compared; any other signer still needs this endpoint's secret.
+            if (self.intune_client is None and self.challenge_password
+                    and not (message_type == self.MSG_TYPE_RENEWAL_REQ
+                             and self._issued_through_this_endpoint(signer_cert))):
                 if not self._has_usable_challenge_password(
                     challenge_pwd
                 ) or not hmac.compare_digest(
@@ -575,6 +583,18 @@ class SCEPService:
                         err[0], err[1],
                         transaction_id=transaction_id, recipient_nonce=sender_nonce,
                     ), 200
+
+            # ---- 8b. Policies, subject bounds and names, once the requester is authenticated ----
+            # Before anything is stored: a manual approval must not queue what issuing refuses
+            refusal = self._content_refusal(
+                csr, signer_cert if message_type == self.MSG_TYPE_RENEWAL_REQ else None)
+            if refusal:
+                logger.warning("SCEP: request refused: %s", refusal)
+                self._notify_intune_failure(transaction_id, csr_data, refusal)
+                return self._create_error_response(
+                    self.FAIL_BAD_REQUEST, refusal,
+                    transaction_id=transaction_id, recipient_nonce=sender_nonce,
+                ), 200
 
             # ---- 9. Idempotency (scoped to this CA) ----
             existing = SCEPRequest.query.filter_by(
@@ -633,20 +653,13 @@ class SCEPService:
                     # Intune expects to hear about a subsequent failure too,
                     # not just silence. Best-effort: a failed notify here
                     # must not mask the real error back to the device.
-                    if self.intune_client is not None:
-                        try:
-                            self.intune_client.send_failure_notification(
-                                transaction_id, csr_data,
-                                hresult=0x80004005,  # E_FAIL — no finer-grained mapping available
-                                description=str(e)[:255],
-                            )
-                        except Exception as notify_err:
-                            logger.error(
-                                "SCEP: Intune failure notification also failed: %s",
-                                notify_err,
-                            )
+                    self._notify_intune_failure(
+                        transaction_id, csr_data, getattr(e, 'public_message', str(e)))
+                    # A refusal for the request's content is the device's to read (RFC 8894 §3.2.1.4)
+                    from utils.request_names import RequestRejected
                     return self._create_error_response(
-                        self.FAIL_BAD_REQUEST, "Server error issuing certificate",
+                        self.FAIL_BAD_REQUEST,
+                        str(e) if isinstance(e, RequestRejected) else "Server error issuing certificate",
                         transaction_id=transaction_id, recipient_nonce=sender_nonce,
                     ), 200
 
@@ -997,6 +1010,47 @@ class SCEPService:
             and len(challenge_password) > 0
         )
 
+    def _issued_through_this_endpoint(self, signer_cert: x509.Certificate) -> bool:
+        """True when a SCEP request of this profile (NULL: the global endpoint)
+        produced the signer certificate."""
+        from services.cert.issued_lookup import find_issued_rows
+        try:
+            refids = [r.refid for r in find_issued_rows(self.ca, signer_cert)]
+        except Exception as e:
+            logger.warning(f"SCEP renewal: signer lookup failed: {e}")
+            return False
+        if not refids:
+            return False
+        query = SCEPRequest.query.filter(SCEPRequest.cert_refid.in_(refids))
+        query = query.filter(SCEPRequest.profile_id.is_(None) if self.profile_id is None
+                             else SCEPRequest.profile_id == self.profile_id)
+        return query.first() is not None
+
+    def _content_refusal(self, csr, renewal_of):
+        """Why issuance would refuse the request's key, hash, subject or names, else None."""
+        _, policy_violations = self._policy_signing_hash(csr)
+        if policy_violations:
+            return 'Policy violation: ' + '; '.join(policy_violations)
+        from utils.request_names import RequestRejected, refuse_malformed_request
+        try:
+            refuse_malformed_request(csr.subject, _csr_san_names(csr), renewal_of)
+        except RequestRejected as e:
+            return str(e)
+        return None
+
+    def _notify_intune_failure(self, transaction_id, csr_data, description):
+        """Tell Intune a request it validated was refused; best effort, the device still gets the reason."""
+        if self.intune_client is None:
+            return
+        try:
+            self.intune_client.send_failure_notification(
+                transaction_id, csr_data,
+                hresult=0x80004005,  # E_FAIL: no finer-grained mapping available
+                description=description[:255],
+            )
+        except Exception as notify_err:
+            logger.error("SCEP: Intune failure notification also failed: %s", notify_err)
+
     def _validate_renewal(self, signer_cert: x509.Certificate, csr) \
             -> Optional[Tuple[int, str]]:
         """Validate signer certificate for RenewalReq (messageType 17).
@@ -1081,8 +1135,8 @@ class SCEPService:
                         SUPERSEDED: "Renewal: signer certificate has been superseded by a newer one",
                     }.get(status, "Renewal: signer certificate is not recognized"),
                 )
-            # RFC 8894 §2.5: a renewal keeps the identity -- the SAN set
-            # as well as the subject (EST and WSTEP already compared both)
+            # UCM policy, not an RFC 8894 rule: a renewal keeps the identity,
+            # SAN set as well as subject, as EST and WSTEP require
             if not san_identity_matches(signer_cert, csr):
                 logger.warning(
                     f"SCEP renewal: SAN mismatch (serial={signer_cert.serial_number})"
@@ -1193,8 +1247,10 @@ class SCEPService:
         cn_attrs = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
         context = {'operation': 'issuance', 'ca_id': self.ca.id,
                    'subject': cn_attrs[0].value if cn_attrs else None}
+        from utils.issuance_defaults import template_digest
+        digest = template_digest(self.template, self.ca_key)
         sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
-            policies, self.ca_key, explicit=False,
+            policies, self.ca_key, digest, explicit=False,
             key_type=key_label_for_public_key(csr.public_key()), context=context)
         limit_violations, _, _ = PolicyEvaluationService.enforce_rules(
             policies, dns_name_count=len(dns), context=context)
@@ -1248,6 +1304,9 @@ class SCEPService:
             from services.cert.issued_lookup import REVOKED, issued_certificate_status
             if issued_certificate_status(self.ca, renewal_of)[1] == REVOKED:
                 raise ValueError('Signing certificate has been revoked')
+        # A RenewalReq keeps the renewed certificate's SID extension, resolved at signing
+        from services.ad_connector.renewal_identity import renewal_requester_sid
+        requester_sid = renewal_requester_sid(renewal_of, self.ca_cert, 'SCEP') if renewal_of is not None else None
 
         # Re-checked here: a manual approval may come after the policies changed
         from services.policy_service import PolicyViolation
@@ -1258,24 +1317,10 @@ class SCEPService:
         cert_refid = str(uuid.uuid4())
         public_key = csr.public_key()
 
-        # Enforce the CA chain's NameConstraints on the CSR's subject + SANs
-        # (RFC 5280 §4.2.1.10). SCEP is unauthenticated beyond the challenge,
-        # so a constrained CA must not be tricked into issuing out-of-scope
-        # names here just as on the web/ACME/EST paths.
-        try:
-            _scep_sans = list(
-                csr_extensions(csr).get_extension_for_oid(
-                    ExtensionOID.SUBJECT_ALTERNATIVE_NAME
-                ).value
-            )
-        except x509.ExtensionNotFound:
-            _scep_sans = None
-        from services.trust_store.constraints_mixin import validate_name_constraints
-        # renewal_of (the cert authenticating a RenewalReq) grants renewal at
-        # par: an enrolled fleet must stay renewable even if the CA's
-        # constraints tightened after enrollment.
-        validate_name_constraints(self.ca_cert, csr.subject, _scep_sans,
-                                  renewal_of=renewal_of)
+        _scep_sans = _csr_san_names(csr)
+        # The bounds and name syntax every issuance path applies
+        from utils.request_names import refuse_malformed_request
+        refuse_malformed_request(csr.subject, _scep_sans, renewal_of)
 
         # Profile template (issue #228): its validity and KU/EKU govern
         # issuance for this endpoint — the operator bound this policy to the
@@ -1502,6 +1547,17 @@ class SCEPService:
                 ]),
                 critical=False,
             )
+        # The CA chain's NameConstraints (RFC 5280 §4.2.1.10), once the EKUs are
+        # settled: they decide whether a dotted CN names a host, so a policy or
+        # template EKU refusal comes first. renewal_of grants renewal at par.
+        issued_ekus = next(e.value for e in builder._extensions
+                           if e.oid == ExtensionOID.EXTENDED_KEY_USAGE)
+        from services.trust_store.constraints_mixin import validate_name_constraints
+        from utils.request_names import cert_type_for_ekus, cn_may_name_host
+        cert_type = cert_type_for_ekus(issued_ekus)
+        validate_name_constraints(self.ca_cert, csr.subject, _scep_sans, renewal_of=renewal_of,
+                                  cn_may_name_host=cn_may_name_host(cert_type, list(issued_ekus)))
+
         # Whether the KeyUsage came from the template or the CSR, bits the
         # enrollee's key type cannot honour (keyEncipherment on an EC key)
         # are cleared here, as on every other leaf path (#327).
@@ -1570,6 +1626,11 @@ class SCEPService:
             builder, self.ca.cps_uri if self.ca.cps_enabled else None, self.ca.cps_oid,
             template_policy_oids(tpl_ext))
         builder = add_qc_statements(builder, tpl_ext)
+        from utils.custom_extensions import add_custom_extensions, template_custom_extensions
+        builder = add_custom_extensions(builder, template_custom_extensions(self.template))
+        if requester_sid:
+            from services.trust_store.csr_operations_mixin import _ad_security_extension
+            builder = builder.add_extension(_ad_security_extension(requester_sid), critical=False)
 
         cert = builder.sign(self.ca_key, sign_hash, default_backend(),
                             rsa_padding=rsa_padding_for(self.ca_key, sign_hash))
@@ -1608,7 +1669,7 @@ class SCEPService:
             descr=f"SCEP: {csr.subject.rfc4514_string()}",
             crt=base64.b64encode(cert_pem).decode('utf-8'),
             prv=None,
-            cert_type="server_cert",
+            cert_type=cert_type,
             subject=csr.subject.rfc4514_string(),
             subject_cn=cn_value,
             issuer=cert.issuer.rfc4514_string(),

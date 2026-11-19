@@ -116,9 +116,9 @@ def lock_for_factor_change(user_id, *, dropping_totp=False, dropping_key=None):
 def must_enroll_2fa(user, *, auth_method='password', provider=None):
     """Whether this login gets a restricted session until a second factor is enrolled.
 
-    Enrolled means confirmed TOTP or an enabled security key. Only password logins
-    are later challenged for that factor; SSO and LDAP logins get this enrolment
-    gate alone. False for exempt users and for mTLS/WebAuthn logins.
+    Enrolled means confirmed TOTP or an enabled security key. Password and LDAP
+    logins are later challenged for that factor; OIDC and SAML logins get this
+    enrolment gate alone. False for exempt users and for mTLS/WebAuthn logins.
     """
     if getattr(user, 'totp_confirmed', False) or has_security_key(user):
         return False

@@ -32,11 +32,13 @@ def test_valid_certificate_refused(app, auth_client):
     assert _exists(app, cid)
 
 
-def test_revoked_certificate_deleted(app, auth_client):
+def test_revoked_certificate_kept_until_it_expires(app, auth_client):
     cid = _issue(auth_client)
     post_json(auth_client, f'/api/v2/ssh/certificates/{cid}/revoke', {'reason': 'unspecified'})
-    assert auth_client.delete(f'/api/v2/ssh/certificates/{cid}').status_code == 204
-    assert not _exists(app, cid)
+    r = auth_client.delete(f'/api/v2/ssh/certificates/{cid}')
+    assert r.status_code == 409
+    assert 'stays in the KRL until it expires' in r.get_json()['message']
+    assert _exists(app, cid)
 
 
 def test_expired_certificate_deleted(app, auth_client):

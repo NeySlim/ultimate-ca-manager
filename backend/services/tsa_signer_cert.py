@@ -185,21 +185,18 @@ def issue_tsa_signer_certificate(*, ca, cn=None, validity_days=None,
     )
     builder = _copy_ca_pointer_extensions(builder, ca)
 
-    # SHA-256 by default, matching cert_create.py's non-template path. Follow the
-    # CA certificate's own signature hash when it is stronger, so a SHA-384/512
-    # CA does not get a weaker-signed child.
-    sign_hash = hashes.SHA256()
+    # The CA certificate's own hash when it is SHA-384/512, else the CA key's (#397)
+    preferred = None
     try:
         ca_sig_hash = ca_cert.signature_hash_algorithm
         if isinstance(ca_sig_hash, (hashes.SHA384, hashes.SHA512)):
-            sign_hash = ca_sig_hash
+            preferred = ca_sig_hash.name
     except Exception:
         pass
-    # Issuance policies (#397): that default yields to the digests they allow
     from services.policy_service import PolicyEvaluationService, key_label_for_public_key
     sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
         PolicyEvaluationService.applicable_policies(ca.id, None, cn),
-        ca_key, sign_hash.name, explicit=False,
+        ca_key, preferred, explicit=False,
         key_type=key_label_for_public_key(new_key.public_key()),
         not_after=not_after.date(), tsa_signer=True,
         context={'operation': 'issuance', 'subject': cn, 'ca_id': ca.id})

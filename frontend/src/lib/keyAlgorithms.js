@@ -46,13 +46,17 @@ const brainpool = (bits) => ({
   curveParam: `brainpoolP${bits}r1`, i18nKey: null, sizeKey: null, csrKey: null, exportExcluded: [],
 })
 
-// EdDSA keys only arrive through CSRs and enrollment protocols (generate: false)
-const eddsa = (label, i18nKey) => ({
-  label, bits: null, family: 'EDDSA', group: GROUP_EDDSA, display: label === 'ED25519' ? 'Ed25519' : 'Ed448',
-  securityLevel: null, digest: null, fips: false, generate: false, providers: null,
-  issue: null, ca: null, csr: null, curveParam: null, i18nKey, sizeKey: null, csrKey: null,
-  exportExcluded: [],
-})
+// EdDSA: generated for a CA only (ca), never on an HSM; leaf keys arrive through CSRs
+// and enrollment protocols (generate: false)
+const eddsa = (label, i18nKey) => {
+  const display = label === 'ED25519' ? 'Ed25519' : 'Ed448'
+  return {
+    label, bits: null, family: 'EDDSA', group: GROUP_EDDSA, display,
+    securityLevel: null, digest: null, fips: false, generate: false, providers: [],
+    issue: null, ca: ['EdDSA', display], csr: null, curveParam: null, i18nKey, sizeKey: null, csrKey: null,
+    exportExcluded: [],
+  }
+}
 
 // ML-DSA (FIPS 204): software and the HSM types whose provider signs it (not Azure Key
 // Vault), no digest; named by algorithmName ('ML-DSA-65 (level 3)'), no i18n keys of its own
@@ -86,7 +90,7 @@ export const TSA_LABELS = ['RSA-3072', 'RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P3
   'ML-DSA-65', 'ML-DSA-87']
 
 // Key each family starts on, per form; the first entry is the form's default key
-export const CA_DEFAULT_LABELS = ['RSA-3072', 'EC-P256', 'ML-DSA-65']
+export const CA_DEFAULT_LABELS = ['RSA-3072', 'EC-P256', 'ED25519', 'ML-DSA-65']
 export const ISSUE_DEFAULT_LABELS = ['RSA-2048', 'EC-P256', 'ML-DSA-65']
 
 export function findAlgorithm(label) {
@@ -97,7 +101,7 @@ export function findAlgorithm(label) {
 export function keyFamilyOptions(field) {
   const families = new Map()
   for (const a of KEY_ALGORITHMS) {
-    if (a.generate && a[field] && !families.has(a[field][0])) {
+    if (a[field] && !families.has(a[field][0])) {
       families.set(a[field][0], { value: a[field][0], label: a.ca?.[0] ?? a.family })
     }
   }

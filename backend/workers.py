@@ -59,7 +59,21 @@ class MTLSWebSocketHandler(WebSocketHandler, PyWSGIHandler):
                     env['peercert'] = peercert_der
             except (ssl.SSLError, OSError, ValueError):
                 pass
+        binding = _tls_unique(sock)
+        if binding:
+            env['ucm.tls_unique'] = binding
         return env
+
+
+def _tls_unique(sock):
+    """The RFC 5929 tls-unique binding of a native TLS 1.2 or older connection,
+    else None: RFC 9266 leaves it undefined in TLS 1.3."""
+    try:
+        if sock.version() not in ('TLSv1', 'TLSv1.1', 'TLSv1.2'):
+            return None
+        return sock.get_channel_binding('tls-unique')
+    except (AttributeError, ssl.SSLError, OSError, ValueError):
+        return None
 
 
 class MTLSGeventWebSocketWorker(GeventWebSocketWorker):

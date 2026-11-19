@@ -123,7 +123,7 @@ def test_existing_hmac_md5_provider_sends_nothing_in_fips_mode(fips_on, monkeypa
     provider = Rfc2136DnsProvider(_rfc2136('hmac-md5', 'x')['credentials'])
     monkeypatch.setattr(provider, '_find_zone', lambda domain: 'example.test')
     assert provider.create_txt_record('example.test', '_acme-challenge.example.test', 'v') == (False, TSIG_REFUSAL)
-    assert provider.delete_txt_record('example.test', '_acme-challenge.example.test') == (False, TSIG_REFUSAL)
+    assert provider.delete_txt_record('example.test', '_acme-challenge.example.test', 'v') == (False, TSIG_REFUSAL)
     ok, message = provider.test_connection()
     assert not ok and TSIG_REFUSAL in message
     assert sent == []

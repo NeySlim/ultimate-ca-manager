@@ -176,8 +176,8 @@ export const acmeService = {
   },
 
   // Client Orders (certificates from Let's Encrypt)
-  async getClientOrders(status, environment) {
-    return apiClient.get(`/acme/client/orders${buildQueryString({ status, environment })}`)
+  async getClientOrders(status, environment, page = {}) {
+    return apiClient.get(`/acme/client/orders${buildQueryString({ status, environment, ...page })}`)
   },
 
   async getClientOrder(orderId) {
@@ -213,6 +213,10 @@ export const acmeService = {
 
   async deleteOrder(orderId) {
     return apiClient.delete(`/acme/client/orders/${orderId}`)
+  },
+
+  async updateOrder(orderId, data) {
+    return apiClient.patch(`/acme/client/orders/${orderId}`, data)
   },
 
   async renewOrder(orderId) {

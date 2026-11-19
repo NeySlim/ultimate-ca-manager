@@ -6,7 +6,7 @@ from auth.unified import require_auth
 from utils.datetime_utils import to_naive_utc, utc_now
 from utils.response import success_response, error_response, no_content_response
 from models import Certificate, CA, db
-from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message
+from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message, revocable
 from services.cert_service import CertificateService
 from services.approval_gate import (PairApprovalConflict, approval_payload, queue_revocation,
                                     revocation_policy_for)
@@ -83,7 +83,7 @@ def revoke_certificate(cert_id):
     if not cert:
         return error_response('Certificate not found', 404)
 
-    if cert.revoked:
+    if not revocable(cert, reason):
         return error_response('Certificate already revoked', 400)
 
     # The other member of a related pair falls with it unless the request says otherwise
@@ -92,7 +92,7 @@ def revoke_certificate(cert_id):
     except ValueError as e:
         return error_response(str(e), 400)
     partner = mutual_partner(cert)
-    partner_id = partner.id if partner is not None and not partner.revoked else None
+    partner_id = partner.id if partner is not None and revocable(partner, reason) else None
     refusal = _related_choice_refusal(cert, partner_id, revoke_related)
     if refusal:
         return error_response(*refusal)
@@ -136,7 +136,7 @@ def revoke_certificate(cert_id):
         cert_dict = cert.to_dict()
         partner = db.session.get(Certificate, partner_id) if revoke_related and partner_id else None
         message = 'Certificate revoked successfully'
-        if partner is not None and partner.revoked:
+        if partner is not None and not revocable(partner, reason):
             cert_dict['related_revoked'] = partner_id
         elif partner is not None:
             # This one stays revoked; the other member's failure is said, not hidden
@@ -214,6 +214,62 @@ def _revoke_msca_on_ca(cert, reason):
     )
 
 
+LIFTABLE_ROW_REASONS = ('certificateHold', 'certificate_hold', 'removeFromCRL')
+
+
+def _interrupted_lift(cert):
+    """A row in removeFromCRL is an unhold stopped between its two commits unless a record
+    of its serial says otherwise: a hold record or none is a lift to finish, a final one is not."""
+    from services.cert.issued_lookup import revocation_records
+    from services.cert.serial_resolution import resolve_record_serial
+    from utils.revocation_reasons import HOLD_REASONS
+    ca = CA.query.filter_by(refid=cert.caref).first() if cert.caref else None
+    serial = resolve_record_serial(cert)
+    records = revocation_records(ca, serial) if ca is not None and serial is not None else []
+    return all(r.revoke_reason in HOLD_REASONS for r in records)
+
+
+def _liftable_row(cert_id):
+    """The row of ``cert_id`` while an unhold may write it: unrevoked, held or mid-lift."""
+    from sqlalchemy import or_
+    return Certificate.query.filter(
+        Certificate.id == cert_id,
+        or_(Certificate.revoked.is_(False), Certificate.revoked.is_(None),
+            Certificate.revoke_reason.in_(LIFTABLE_ROW_REASONS)))
+
+
+def _lift_hold(cert, ca, serial):
+    """Clear ``cert``'s hold and delete its hold records, or the 409 to answer (no commit).
+    Records are locked before the row, as the hourly pass and a revocation take them; the row
+    is written only if still held or unrevoked, and a final record found under lock refuses."""
+    from services.cert.issued_lookup import lock_serial_records
+    from models import RevokedSerial
+    from utils.revocation_reasons import HOLD_REASONS
+    if ca is not None and serial is not None:
+        lock_serial_records(ca, serial)
+    cleared = _liftable_row(cert.id).update(
+        {'revoked': False, 'revoked_at': None, 'revoke_reason': None, 'invalidity_at': None},
+        synchronize_session='fetch')
+    if not cleared:
+        db.session.rollback()
+        return _revoked_for_good(cert, db.session.get(Certificate, cert.id).revoke_reason)
+    # Read again under the row's write lock: SQLite takes it only at the UPDATE above
+    records = lock_serial_records(ca, serial) if ca is not None and serial is not None else []
+    final = [r for r in records if r.revoke_reason not in HOLD_REASONS]
+    if final:
+        return _revoked_for_good(cert, final[0].revoke_reason)
+    if records:
+        RevokedSerial.query.filter(RevokedSerial.id.in_([r.id for r in records])) \
+            .delete(synchronize_session=False)
+    return None
+
+
+def _revoked_for_good(cert, reason):
+    return error_response(
+        f'Certificate "{cert.descr or cert.refid}" is revoked for good '
+        f'({reason or "unspecified"}): its hold cannot be lifted', 409)
+
+
 @bp.route('/api/v2/certificates/<int:cert_id>/unhold', methods=['POST'])
 @require_auth(['write:certificates'])
 def unhold_certificate(cert_id):
@@ -223,15 +279,20 @@ def unhold_certificate(cert_id):
     if not cert:
         return error_response('Certificate not found', 404)
 
-    if not cert.revoked:
+    # A hold its record alone carries (row not yet aligned) lifts too, as OCSP and the CRL say it
+    from services.cert.issued_lookup import effective_revocation
+    if not cert.revoked and effective_revocation(cert) is None:
         return error_response('Certificate is not revoked', 400)
 
-    # Only certificateHold can be unheld
+    # Only a suspension lifts: a final reason, on the row or on a record, is one 409 refusal
     hold_reasons = ('certificate_hold', 'certificateHold')
-    if cert.revoke_reason not in hold_reasons:
-        return error_response(
-            'Only certificates with reason "certificateHold" can be unheld', 400
-        )
+    if cert.revoked and cert.revoke_reason == 'removeFromCRL':
+        if not _interrupted_lift(cert):
+            return error_response(
+                f'Certificate "{cert.descr or cert.refid}" is revoked as removeFromCRL, '
+                'not on hold: there is no hold to lift', 409)
+    elif cert.revoked and cert.revoke_reason not in hold_reasons:
+        return _revoked_for_good(cert, cert.revoke_reason)
 
     try:
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
@@ -239,19 +300,33 @@ def unhold_certificate(cert_id):
         ca = None
         if cert.caref:
             ca = CA.query.filter_by(refid=cert.caref).first()
+        # Only a suspension lifts: a final revocation recorded for the serial stays
+        from services.cert.issued_lookup import persisted_revocation
+        from services.cert.serial_resolution import resolve_record_serial
+        serial_int = resolve_record_serial(cert)
+        record = persisted_revocation(ca, serial_int) if ca is not None and serial_int is not None else None
+        if record is not None and record.revoke_reason not in hold_reasons:
+            return _revoked_for_good(cert, record.revoke_reason)
 
         # The hold as it stands, before the removeFromCRL staging below
         held = {field: getattr(cert, field)
                 for field in ('revoked', 'revoked_at', 'revoke_reason', 'invalidity_at')}
-        serial, caref = cert.serial_number, cert.caref
 
         # RFC 5280 §5.3.1 — when delta CRLs are enabled, emit removeFromCRL on
         # a delta before clearing the hold so relying parties drop the entry.
+        staged_cas = []
         if ca and ca.delta_crl_enabled and ca.cdp_enabled:
-            cert.revoke_reason = 'removeFromCRL'
-            cert.revoked_at = utc_now()
+            # A hold its record alone carries is listed from the row while the delta says removeFromCRL
             try:
+                # Staged only over a hold: a final revocation committed since this read stays
+                staged = _liftable_row(cert.id).update(
+                    {'revoked': True, 'revoke_reason': 'removeFromCRL', 'revoked_at': utc_now()},
+                    synchronize_session='fetch')
+                if not staged:
+                    db.session.rollback()
+                    return _revoked_for_good(cert, db.session.get(Certificate, cert.id).revoke_reason)
                 db.session.commit()
+                staged_cas.append(ca)
             except Exception as e:
                 db.session.rollback()
                 logger.error(f"Failed to stage removeFromCRL before unhold: {e}")
@@ -265,22 +340,20 @@ def unhold_certificate(cert_id):
                 logger.warning(f"Failed to emit removeFromCRL delta before unhold: {e}")
                 cert = db.session.get(Certificate, cert_id)
 
-        cert.revoked = False
-        cert.revoked_at = None
-        cert.revoke_reason = None
-        cert.invalidity_at = None
-
-        # The lifted hold and its revocation record go together or not at all
+        # The lifted hold and its revocation records go together or not at all
         try:
-            if caref and serial:
-                from models import RevokedSerial
-                RevokedSerial.query.filter_by(caref=caref, serial_number=serial).delete(
-                    synchronize_session='fetch')
+            refused = _lift_hold(cert, ca, serial_int)
+            if refused is not None:
+                db.session.rollback()
+                _restore_hold(cert_id, held)
+                _regenerate_crls(staged_cas, username, 'a refused unhold')
+                return refused
             db.session.commit()
         except Exception as e:
             db.session.rollback()
             logger.error(f"Failed to remove hold on certificate {cert_id}: {e}", exc_info=True)
             _restore_hold(cert_id, held)
+            _regenerate_crls(staged_cas, username, 'a failed unhold')
             return error_response('Failed to remove certificate hold', 500)
 
         # Audit log
@@ -293,14 +366,7 @@ def unhold_certificate(cert_id):
             success=True
         )
 
-        # Regenerate CRL for the issuing CA
-        try:
-            if ca:
-                from services.crl_service import CRLService
-                CRLService.generate_crl(ca.id, username=username)
-                logger.info(f"Regenerated CRL for CA {ca.id} after unhold")
-        except Exception as e:
-            logger.warning(f"Failed to regenerate CRL after unhold: {e}")
+        _regenerate_crls([ca] if ca else [], username, 'unhold')
 
         # Invalidate all per-algorithm OCSP cache entries (RFC 6960 §2.2).
         if cert.serial_number:
@@ -353,15 +419,26 @@ def unhold_certificate(cert_id):
         return error_response('Failed to remove certificate hold', 500)
 
 
+def _regenerate_crls(cas, username, after):
+    """A fresh CRL (and delta) for each of ``cas``: after a refused or failed unhold, one that
+    lists again the hold whose removeFromCRL delta was already published."""
+    from services.crl_service import CRLService
+    for member_ca in cas:
+        try:
+            CRLService.generate_crl(member_ca.id, username=username)
+            logger.info(f"Regenerated CRL for CA {member_ca.id} after {after}")
+        except Exception as e:
+            logger.warning(f"Failed to regenerate CRL of CA {member_ca.id} after {after}: {e}")
+
+
 def _restore_hold(cert_id, held):
     """Put the hold back as it was before a failed unhold (the delta staging
     may have committed removeFromCRL)."""
     try:
-        cert = db.session.get(Certificate, cert_id)
-        if cert is None:
-            return
-        for field, value in held.items():
-            setattr(cert, field, value)
+        # Only over this unhold's own staging: a revocation made since stays
+        Certificate.query.filter(Certificate.id == cert_id,
+                                 Certificate.revoke_reason == 'removeFromCRL').update(
+            held, synchronize_session=False)
         db.session.commit()
     except Exception as e:
         db.session.rollback()

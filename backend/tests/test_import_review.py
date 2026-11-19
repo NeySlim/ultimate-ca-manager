@@ -312,7 +312,7 @@ class TestRevocationFollowsTheCertificate:
 
 class TestEdKeys:
     @pytest.mark.parametrize('path', [CA_IMPORT, f'{BASE}/import'])
-    def test_ed25519_ca_key_is_refused_with_the_reason(self, app, auth_client, path):
+    def test_ed25519_ca_key_is_imported(self, app, auth_client, path):
         key = ed25519.Ed25519PrivateKey.generate()
         now = datetime.now(timezone.utc)
         cert = (x509.CertificateBuilder().subject_name(_name('Ed CA')).issuer_name(_name('Ed CA'))
@@ -321,8 +321,8 @@ class TestEdKeys:
                 .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
                 .sign(key, None))
         r = _import(auth_client, path, cert, key)
-        assert r.status_code == 400, r.data
-        assert 'Ed25519' in json.loads(r.data)['message']
+        assert r.status_code in (200, 201), r.data
+        assert json.loads(r.data)['data']['has_private_key'] is True
 
     def test_ed25519_leaf_renewal_keeps_the_key_type(self, app, auth_client, create_ca):
         from models import Certificate

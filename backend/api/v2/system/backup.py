@@ -5,7 +5,7 @@ System Backup Operations
 from services.backup import storage
 from services.backup.locking import BackupBusyError, backup_operation_lock
 from services.backup.restore.plan import RestoreValidationError
-from services.backup.restore_report import with_restore_warnings
+from services.backup.restore_report import restore_audit_details, with_restore_warnings
 from services.database_admin.lock import (
     MigrationBusyError,
     database_migration_lock,
@@ -47,8 +47,8 @@ from services.backup.restore_completion import (
     request_restart as _request_restart_after_restore,
     restore_message,
 )
-# Upload ceiling for a restore, and the bounds of a listing or a bulk request.
-MAX_RESTORE_UPLOAD_BYTES = 100 * 1024 * 1024
+# Bounds of a listing or a bulk request; a restore's upload ceiling is
+# `storage.restore_upload_limit()`.
 LIST_DEFAULT_PER_PAGE = 20
 LIST_MAX_PER_PAGE = 100
 MAX_BULK_DELETE = 1000
@@ -148,10 +148,13 @@ def create_backup():
         return error_response(str(e), 400)
 
     try:
-        backup_bytes = BackupService().create_backup(password, kdf=kdf)
-        _filepath, filename = storage.create_archive(backup_bytes)
+        service = BackupService()
+        backup_bytes, _filepath, filename = storage.export_archive(service, password, kdf=kdf)
     except FipsRestricted:
         raise  # the application maps it to its problem type
+    except BackupBusyError as busy:
+        logger.info('Backup refused: %s', busy)
+        return error_response(str(busy), 409)
     except BackupPasswordError as e:
         return error_response(str(e), 400)
     except BackupExportError as e:
@@ -176,15 +179,22 @@ def create_backup():
     )
 
     size = len(backup_bytes)
-    return success_response(
-        data={
-            'filename': filename,
-            'size': _format_size(size),
-            'size_bytes': size,
-            'download_url': f'/api/v2/system/backup/{filename}/download',
-        },
-        message='Backup created successfully',
-    )
+    data = {
+        'filename': filename,
+        'size': _format_size(size),
+        'size_bytes': size,
+        'download_url': f'/api/v2/system/backup/{filename}/download',
+    }
+    message = 'Backup created successfully'
+    warning = storage.restore_limit_warning(size, service.last_payload_size,
+                                            service.last_payload_containers)
+    if warning:
+        data['restore_limit_warning'] = warning
+        message = f'{message}. {warning}'
+    if service.last_export_warnings:
+        data['export_warnings'] = list(service.last_export_warnings)
+        message = f"{message}. {'; '.join(service.last_export_warnings)}"
+    return success_response(data=data, message=message)
 
 
 @bp.route('/api/v2/system/backups', methods=['GET'])
@@ -391,6 +401,9 @@ def restore_backup():
     Only restore archives you produced yourself: a replacing restore puts back
     users, private keys and secrets exactly as the archive holds them.
     """
+    limit = storage.restore_upload_limit()
+    # Before anything reads the body: this route's ceiling, not the global one
+    request.max_content_length = limit + storage.RESTORE_FORM_MARGIN
     if 'file' not in request.files:
         return error_response('No backup file provided', 400)
     file = request.files['file']
@@ -408,7 +421,7 @@ def restore_backup():
     try:
         try:
             backup_bytes, _ = validate_upload(
-                file, BACKUP_EXTENSIONS, max_size=MAX_RESTORE_UPLOAD_BYTES)
+                file, BACKUP_EXTENSIONS, max_size=limit)
         except ValueError as exc:
             logger.warning('Backup upload refused: %s', exc)
             return error_response('Invalid backup file', 400)
@@ -419,22 +432,24 @@ def restore_backup():
             return error_response(pending, 409)
 
         try:
-            with database_migration_lock(purpose='the restore'):
+            # The backup lock too: an archive written meanwhile would read half of the restore
+            with database_migration_lock(purpose='the restore'), \
+                    backup_operation_lock(purpose='the restore'):
                 results = BackupService().restore_backup(
                     backup_bytes, password, mode=mode)
         except MigrationBusyError as busy:
             return error_response(
                 f'{busy} A backend migration or another restore is still '
                 'running.', 409)
+        except BackupBusyError as busy:
+            return error_response(f'{busy} Retry once it has finished.', 409)
 
         carried = bool((results or {}).get('sections_carried'))
         _safe_audit_log(
             action='system_restore',
             resource_type='system',
             resource_name=file.filename,
-            details=(f'Restored from backup: {file.filename}' if carried else
-                     f'Backup carried no data section, nothing was restored: '
-                     f'{file.filename}'),
+            details=restore_audit_details(file.filename, results),
             success=True,
         )
 

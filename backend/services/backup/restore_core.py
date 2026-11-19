@@ -6,27 +6,69 @@ import hashlib
 import base64
 import logging
 from datetime import datetime
+from types import SimpleNamespace
 from typing import Any, Dict, List
 
+from sqlalchemy.exc import DataError, IntegrityError
 from models import db, CA, Certificate
-from utils.datetime_utils import utc_now
+from utils.datetime_utils import to_naive_utc, utc_now
 from compliance_profiles import is_valid as is_valid_profile
 from utils.port_zero import strip_port_zero_from_stored
 from utils.signing_hash import SIGNATURE_SCHEMES
 from models.acme_models import AcmeAccount
 from config.settings import Config
-from services.file_regen_service import mirror_private_key
+from utils.serial_format import serial_named_by, unambiguous_serial_spellings
+from services.file_regen_service import insert_file_writes_suspended
 
+from . import installation
 from .errors import BackupSchemaError
 from .restore import RestorePlan, single_transaction
 from .restore.files import StagedFiles
 from .manifest import SECTIONS
 from .restore.apply import apply_columns, apply_section, relink_references
-from .restore.replace import replace_sections
+from .restore.names import rename_clashing_rows
+from .restore.orders import keep_newer_orders
+from .restore.repairs import replay_repairs
+from .restore.conflict import conflict_from_integrity_error, is_value_too_long
+from .restore.replace import plan_replacement, remove_after_writes, remove_before_writes
+from .restore.setting_refs import deferred_keys, prune_doomed_settings, restore_setting_references
 from .restore.settings import restore_encrypted_settings
-from .restore_rbac import upgrade_archived_permissions
+from .restore_rbac import restore_nested_webauthn, upgrade_archived_permissions
 
 logger = logging.getLogger(__name__)
+
+
+def _revocation_key(holder):
+    """``revocation_order`` of a row or record: the gravest reason, then the earliest date."""
+    from services.cert.issued_lookup import reason_rank
+    return reason_rank(holder.revoke_reason), holder.revoked_at or datetime.max
+
+
+def _kept_final(service, here):
+    """In a merge, the final revocation a certificate or CA row holds here, which the
+    archive's hold or validity never replaces; None otherwise."""
+    from utils.revocation_reasons import HOLD_REASONS
+    if (not getattr(service, '_merging', False) or here is None or not here.revoked
+            or here.revoke_reason in HOLD_REASONS + ('removeFromCRL',)):
+        return None
+    return SimpleNamespace(revoked=True, revoked_at=here.revoked_at,
+                           revoke_reason=here.revoke_reason, invalidity_at=here.invalidity_at)
+
+
+def _readable_record_serial(archived: Any) -> str:
+    """A record's serial in a spelling the revocation readers accept: kept when it already is one
+    (decimal, bare hex with a letter), else decimal when it reads as hex without doubt (``0x``,
+    colons, leading zeros before a letter); an all-digit string is kept."""
+    text = str(archived).strip()
+    bare = text.replace(':', '')
+    hexa = bare[2:] if bare.lower().startswith('0x') else bare
+    if not (hexa != bare or ':' in text or any(c in 'abcdefABCDEF' for c in hexa)):
+        return text
+    try:
+        value = int(hexa, 16)
+    except ValueError:
+        return text
+    return text if text in unambiguous_serial_spellings(value) else str(value)
 
 
 def _archived_datetime(where: str, column: str, value: Any):
@@ -57,6 +99,39 @@ def _archived_datetime(where: str, column: str, value: Any):
         ) from exc
 
 
+def _row_file_paths() -> set:
+    """The certificate, CSR and key files the authority and certificate rows name."""
+    from types import SimpleNamespace
+    from utils.file_naming import ca_cert_path, ca_key_path, cert_cert_path, cert_csr_path, cert_key_path
+
+    paths = set()
+    with db.session.no_autoflush:
+        for refid, subject, descr in db.session.query(CA.refid, CA.subject, CA.descr):
+            row = SimpleNamespace(refid=refid, subject=subject, descr=descr)
+            paths.update((ca_cert_path(row), ca_key_path(row)))
+        for refid, subject, descr in db.session.query(
+                Certificate.refid, Certificate.subject, Certificate.descr):
+            row = SimpleNamespace(refid=refid, subject=subject, descr=descr)
+            paths.update((cert_cert_path(row), cert_csr_path(row), cert_key_path(row)))
+    return paths
+
+
+def _stage_key_mirror(staged, path, key_pem: bytes) -> None:
+    """A plaintext key mirror, only while database encryption is off (as mirror_private_key)."""
+    from security.encryption import key_encryption
+    if key_encryption.is_enabled:
+        staged.stage_removal(path)
+    else:
+        staged.stage(path, key_pem, mode=0o600)
+
+
+def _archived_timestamps(row, where: str, data: Dict[str, Any]) -> None:
+    """`created_at` and `updated_at` as the archive has them, for a hand-written restorer."""
+    for column in ('created_at', 'updated_at'):
+        if data.get(column) and hasattr(row, column):
+            setattr(row, column, to_naive_utc(_archived_datetime(where, column, data[column])))
+
+
 # Sections this restore path knows how to apply. The export carries more
 # than this (the manifest is ahead of the restore), so what is not applied is
 # reported rather than passed over: an archive holding webhook endpoints and
@@ -65,6 +140,7 @@ def _archived_datetime(where: str, column: str, value: Any):
 # section comes after everything it points at: a membership needs its user and
 # its group, a binding needs its target and its certificate.
 GENERIC_SECTIONS = (
+    'compromised_keys',
     'role_permissions',
     'group_members',
     'webauthn_credentials',
@@ -81,7 +157,6 @@ GENERIC_SECTIONS = (
     # After its proxy account, EAB credential and creator (users and
     # acme_eab_credentials have their own restorers, run before these).
     'acme_dns_update_keys',
-    'key_recovery_requests',
     # The history an archive carries only when it is asked for. They were
     # listed as restored and no code path ever wrote them: the export
     # collected them, the restore counted them as applied, and they went
@@ -96,14 +171,15 @@ GENERIC_SECTIONS = (
 
 RESTORED_SECTIONS = set(GENERIC_SECTIONS) | {
     'users', 'certificate_authorities', 'certificates', 'revoked_serials',
-    'acme_accounts', 'acme_eab_credentials', 'configuration', 'groups',
+    'crl_number_counters', 'acme_accounts', 'acme_eab_credentials', 'configuration', 'groups',
     'custom_roles', 'certificate_templates', 'trusted_certificates',
     'sso_providers', 'hsm_providers', 'hsm_keys', 'api_keys', 'smtp_config',
     'notification_config', 'certificate_policies', 'auth_certificates',
     'dns_providers', 'acme_domains', 'acme_local_domains', 'ssh_cas',
     'ssh_certificates', 'microsoft_cas', 'msca_requests', 'scan_profiles',
     'scan_runs', 'discovered_certificates', 'approval_requests',
-    'scep_requests', 'acme_client_orders', 'audit_logs', 'https_server',
+    'scep_requests', 'acme_client_orders', 'key_recovery_requests', 'audit_logs',
+    'https_server',
 }
 
 
@@ -241,6 +317,17 @@ class RestoreCoreMixin:
         # discovered halfway through a restore.
         self._check_payload_schema(backup_data)
         upgrade_archived_permissions(backup_data)
+        if mode not in ('replace', 'merge'):
+            raise BackupSchemaError(
+                f"Unknown restore mode {mode!r}: use 'replace' (the archive "
+                "becomes the instance) or 'merge' (the archive is added to it)")
+        pruned = (self._sections_the_archive_replaces(backup_data)
+                  if mode == 'replace' else set())
+        # Before the plan, which finds these rows again by name.
+        ambiguous_references: List[str] = []
+        displaced: Dict[str, set] = {}
+        renamed = rename_clashing_rows(backup_data, ambiguous_references,
+                                       replacing=frozenset(pruned), displaced=displaced)
 
         # An archive of metadata alone restores nothing. Announcing it as a
         # success made the caller revoke every session and ask for a restart
@@ -287,8 +374,11 @@ class RestoreCoreMixin:
             'acme_local_domains': 0,
             'https_server': 0,
             'revoked_serials': 0,
+            'crl_number_counters': 0,
             'sections_not_restored': not_restored,
             'sections_carried': carried,
+            'renamed': renamed,
+            'ambiguous_references': ambiguous_references,
         }
 
         # A key that is not its certificate's was recorded when the archive
@@ -305,22 +395,37 @@ class RestoreCoreMixin:
         # Nothing has been written yet, and nothing will be until the plan
         # is built: it decides which row here each archived row is, and what
         # each reference resolves to on this installation.
-        plan = RestorePlan.build(backup_data)
+        # Orders this installation moved on with: kept in a merge, named in a replacement
+        order_warnings = keep_newer_orders(backup_data, mode)
+        plan = RestorePlan.build(backup_data, pruned=pruned)
+        plan.warnings.extend(order_warnings)
         for warning in plan.warnings:
             logger.warning("Restore: %s", warning)
+        built_with = len(plan.warnings)
 
-        # Files are written to a staging directory during the transaction and
-        # published once it has committed, so the database and the files on
-        # disk can never disagree about whether the restore happened.
-        if mode not in ('replace', 'merge'):
-            raise BackupSchemaError(
-                f"Unknown restore mode {mode!r}: use 'replace' (the archive "
-                "becomes the instance) or 'merge' (the archive is added to it)")
+        # Files are staged during the transaction and published just before the
+        # commit; a commit that fails puts them back (`unpublish()`).
         results['mode'] = mode
+        # A merge never lowers a final revocation made here, of a certificate or a CA (_kept_final)
+        self._merging = mode == 'merge'
+        self._kept_finals = []
 
         staged = StagedFiles()
+        # What the rows had on disk before: a file no row names afterwards goes with the commit
+        files_before = _row_file_paths()
+        aligned = []
         try:
-            with single_transaction():
+            with single_transaction(), insert_file_writes_suspended():
+                replacement = None
+                if mode == 'replace':
+                    # Removed before the writes, so what they free is free
+                    replacement = plan_replacement(backup_data, plan, pruned, displaced=displaced)
+                    prune_doomed_settings(replacement, plan, deferred_keys(
+                        backup_data.get('configuration') if isinstance(
+                            backup_data.get('configuration'), dict) else {}))
+                    replacement = remove_before_writes(replacement)
+                    plan.refresh()
+
                 self._apply_all(backup_data, results, master_key, plan, staged)
 
                 # Sections are applied in an order that cannot satisfy every
@@ -328,16 +433,40 @@ class RestoreCoreMixin:
                 # row exists: this is where an authority finds the HSM key the
                 # same restore has just created.
                 results['relinked'] = relink_references(backup_data, plan)
+                results['repairs'] = replay_repairs(backup_data, plan)
+                # The rows written take the revocation their CA records, as the hourly pass does
+                aligned = self._align_restored_revocations(plan) + self._align_kept_finals()
+                results['revoked_from_records'] = len(aligned)
+                if plan.written.get('acme_client_orders'):
+                    results['acme_client_orders_repaired'] = results['repairs'].get(
+                        '121_acme_renewal_order_duplicates', {'reissued': 0, 'dropped': 0})
+                results['settings'] += restore_setting_references(
+                    backup_data.get('configuration'), plan)
                 results['chain_variant_fallbacks'] = list(plan.chain_variant_fallbacks)
 
-                if mode == 'replace':
-                    results['removed'] = self._remove_what_the_archive_omits(
-                        backup_data, plan)
+                if replacement is not None:
+                    results.update(remove_after_writes(replacement).report())
+                results['left_out'] = list(plan.left_out)
+                # What applying the rows had to warn about reaches the log and the result
+                for warning in dict.fromkeys(plan.warnings[built_with:]):
+                    logger.warning("Restore: %s", warning)
+                results['warnings'] = list(dict.fromkeys(plan.warnings))
+                results['dropped_secrets'] = list(plan.dropped_fields)
 
+                for path in sorted(files_before - _row_file_paths()):
+                    staged.stage_removal(path)
                 # Published inside the transaction, so a file that cannot be
                 # placed rolls the database back with it. The window that
                 # remains is the commit itself, and it is compensated below.
                 staged.publish()
+        except (IntegrityError, DataError) as exc:
+            staged.unpublish()
+            staged.discard()
+            if isinstance(exc, DataError) and not is_value_too_long(exc):
+                raise
+            conflict = conflict_from_integrity_error(exc)
+            logger.warning("Restore refused by the database: %s", conflict)
+            raise conflict from exc
         except Exception:
             # The commit is the last thing the block does: if it is what
             # failed, the files are already in place and describe a restore
@@ -347,6 +476,11 @@ class RestoreCoreMixin:
             raise
         finally:
             staged.discard()
+
+        if aligned:
+            from services.audit_service import AuditService
+            for entry in aligned:
+                AuditService.log_action(username='system', **entry)
 
         from utils import admin_allowlist
         admin_allowlist.invalidate_cache()
@@ -366,6 +500,31 @@ class RestoreCoreMixin:
         # restores data, and an API route is where revoking every session and
         # asking for a restart belongs (see invalidate_after_restore).
         return results
+
+    @staticmethod
+    def _align_restored_revocations(plan) -> List[Dict[str, Any]]:
+        """Mark the certificate rows the restore wrote from their CA's records (the hourly
+        pass's function, limited to them); returns their audit entries, logged after the commit."""
+        from services.cert.issued_lookup import apply_persisted_revocations
+        from services.ski_aki_backfill import _marked_entry
+        ids = plan.written.get('certificates')
+        if not ids:
+            return []
+        return [_marked_entry(row, record) for row, record in apply_persisted_revocations(ids)]
+
+    def _align_kept_finals(self) -> List[Dict[str, Any]]:
+        """A final revocation a merge kept here takes its serial's gravest record when that one
+        is graver (``persisted_revocation``): the CRL and OCSP answer a final row with itself."""
+        from services.cert.issued_lookup import row_persisted_revocation
+        from services.ski_aki_backfill import _marked_entry
+        entries = []
+        for row in self.__dict__.get('_kept_finals', ()):
+            record = row_persisted_revocation(row)
+            if record is not None and _revocation_key(record) < _revocation_key(row):
+                row.revoked_at, row.revoke_reason = record.revoked_at, record.revoke_reason
+                row.invalidity_at = record.invalidity_at or row.invalidity_at
+                entries.append(_marked_entry(row, record))
+        return entries
 
     @staticmethod
     def _archived_key_mismatches(backup_data: Dict[str, Any]) -> List[str]:
@@ -388,7 +547,7 @@ class RestoreCoreMixin:
         return found
 
     @staticmethod
-    def _remove_what_the_archive_omits(backup_data, plan):
+    def _sections_the_archive_replaces(backup_data):
         """Make the restore a replacement, as the documentation says it is.
 
         Only the sections the archive claims to describe are pruned. An
@@ -414,7 +573,7 @@ class RestoreCoreMixin:
                 "Nothing has been changed."
             )
 
-        return replace_sections(backup_data, plan, sections)
+        return sections
 
     def _apply_all(self, backup_data, results, master_key, plan, staged):
         """Every write of a restore, inside the one transaction."""
@@ -423,6 +582,7 @@ class RestoreCoreMixin:
         self._restore_cas(backup_data, results, master_key, plan)
         self._restore_certificates(backup_data, results, master_key, plan)
         self._restore_revoked_serials(backup_data, results, plan)
+        self._restore_crl_number_counters(backup_data, results)
         self._restore_acme_accounts(backup_data, results)
         self._restore_acme_eab_credentials(backup_data, results)
         self._restore_settings(backup_data, results)
@@ -435,7 +595,7 @@ class RestoreCoreMixin:
         self._regenerate_files(staged)
 
         # RBAC restores
-        self._restore_groups(backup_data, results)
+        self._restore_groups(backup_data, results, plan)
         self._restore_custom_roles(backup_data, results, plan)
         self._restore_templates(backup_data, results)
         # Settings came back before the templates: point the ACME profile
@@ -470,6 +630,7 @@ class RestoreCoreMixin:
         self._restore_hsm_keys(backup_data, results, plan)
         self._restore_approval_requests(backup_data, results, plan)
         self._restore_acme_client_orders(backup_data, results, plan)
+        self._restore_key_recovery_requests(backup_data, results, plan)
         self._restore_https_files(backup_data, results, staged)
 
         # Sections the manifest carries and the hand-written restorers never
@@ -518,10 +679,16 @@ class RestoreCoreMixin:
                 existing.password_hash = previous_hash
             results['users'] += 1
 
+        db.session.flush()
+        nested = restore_nested_webauthn(backup_data, plan)
+        if nested:
+            results['webauthn_credentials'] = nested
+
     @staticmethod
-    def _apply_ca_revocation(ca, ca_data: Dict) -> None:
+    def _apply_ca_revocation(ca, ca_data: Dict, here_final=None) -> None:
         """Carry the CA's revocation state back (#343): a restore that drops
-        it brings a revoked CA back as active and able to sign again."""
+        it brings a revoked CA back as active and able to sign again. A merge
+        keeps ``here_final`` (``_kept_final``) over a lighter or no revocation."""
         where = f"certificate authority {ca_data.get('refid') or ca_data.get('descr')}"
 
         def _dt_or_none(column, val):
@@ -536,6 +703,9 @@ class RestoreCoreMixin:
         ca.revoked_at = _dt_or_none('revoked_at', ca_data.get('revoked_at'))
         ca.revoke_reason = ca_data.get('revoke_reason')
         ca.invalidity_at = _dt_or_none('invalidity_at', ca_data.get('invalidity_at'))
+        if here_final is not None and (not ca.revoked or _revocation_key(ca) > _revocation_key(here_final)):
+            for field, value in vars(here_final).items():
+                setattr(ca, field, value)
 
     @staticmethod
     def _apply_ca_fields(ca, ca_data: Dict) -> None:
@@ -594,11 +764,20 @@ class RestoreCoreMixin:
 
         results.setdefault('revoked_serials', 0)
         results.setdefault('revoked_serials_skipped', 0)
+        # The archive's own leftovers of a lifted hold are not suspensions; nothing here is touched
+        from .restore.repairs import archived_lifted_holds
+        lifted = archived_lifted_holds(backup_data)
+        results['lifted_holds_skipped'] = len(lifted)
+        if lifted:
+            logger.info("Restore: %d hold record(s) an older release left behind a lifted hold "
+                        "not restored", len(lifted))
         # A record whose CA is neither in the database nor in the backup
         # would fail the foreign key on PostgreSQL and abort the whole restore
         known = {ca.refid for ca in CA.query.with_entities(CA.refid).all()}
         known.update(c.get('refid') for c in backup_data.get('certificate_authorities', []) if c.get('refid'))
         for position, rs_data in enumerate(backup_data.get('revoked_serials', [])):
+            if position in lifted:
+                continue
             caref = rs_data.get('caref')
             serial = rs_data.get('serial_number')
             if not caref or not serial:
@@ -619,10 +798,20 @@ class RestoreCoreMixin:
                 logger.warning(f"Revoked serial {serial} skipped: CA {caref} is unknown")
                 results['revoked_serials_skipped'] += 1
                 continue
-            where = f"revoked serial {serial} of CA {caref}"
-            existing = RevokedSerial.query.filter_by(
-                caref=caref, serial_number=serial
-            ).first()
+            archived_serial = serial
+            where = f"revoked serial {archived_serial} of CA {caref}"
+            serial = _readable_record_serial(serial)
+            # One serial, one identity: every spelling of it here, ranked under its decimal form
+            value = serial_named_by(serial)
+            spellings = {str(archived_serial), serial} | (
+                unambiguous_serial_spellings(value) if value is not None else set())
+            here = RevokedSerial.query.filter(
+                RevokedSerial.caref == caref,
+                RevokedSerial.serial_number.in_(spellings),
+            ).order_by(RevokedSerial.id).all()
+            taken = plan.rank('revoked_serials', (caref, str(value) if value is not None else serial),
+                              rs_data, [r.id for r in here])
+            existing = next((r for r in here if r.id == taken), None)
             valid_to = _archived_datetime(
                 where, 'valid_to', rs_data.get('valid_to')) or utc_now()
             revoked_at = _archived_datetime(
@@ -632,13 +821,23 @@ class RestoreCoreMixin:
             certificate_id = plan.resolve('revoked_serials', rs_data,
                                           'certificate_id')
             if existing:
-                existing.revoked_at = revoked_at or existing.revoked_at
-                existing.revoke_reason = rs_data.get('revoke_reason')
-                existing.invalidity_at = invalidity_at
+                existing.serial_number = serial
+                archived = SimpleNamespace(revoke_reason=rs_data.get('revoke_reason'),
+                                           revoked_at=revoked_at or existing.revoked_at,
+                                           invalidity_at=invalidity_at)
+                # A merge keeps the graver of the two, between equals the earlier
+                if not (getattr(self, '_merging', False)
+                        and _revocation_key(existing) <= _revocation_key(archived)):
+                    existing.revoked_at = archived.revoked_at
+                    existing.revoke_reason = archived.revoke_reason
+                    existing.invalidity_at = archived.invalidity_at
                 existing.valid_to = valid_to
                 existing.certificate_id = certificate_id
+                # An archive older than the column says nothing of the key
+                existing.public_key_sha256 = rs_data.get('public_key_sha256') or existing.public_key_sha256
+                plan.place('revoked_serials', rs_data, existing)
             else:
-                db.session.add(RevokedSerial(
+                existing = RevokedSerial(
                     caref=caref,
                     serial_number=serial,
                     revoked_at=revoked_at or utc_now(),
@@ -646,8 +845,28 @@ class RestoreCoreMixin:
                     invalidity_at=invalidity_at,
                     valid_to=valid_to,
                     certificate_id=certificate_id,
-                ))
+                    public_key_sha256=rs_data.get('public_key_sha256'),
+                )
+                db.session.add(existing)
+                plan.place('revoked_serials', rs_data, existing)
             results['revoked_serials'] += 1
+
+    def _restore_crl_number_counters(self, backup_data: Dict, results: Dict) -> None:
+        """Each issuer's CRL number, never lowered: the higher of here and the archive."""
+        from models.crl import CRLNumberCounter
+        for position, row in enumerate(backup_data.get('crl_number_counters') or []):
+            issuer_key, number = row.get('issuer_key'), row.get('last_number')
+            if (not isinstance(issuer_key, str) or not isinstance(number, int)
+                    or isinstance(number, bool)):
+                raise BackupSchemaError(
+                    f"Invalid backup: CRL number counter {position} is malformed. "
+                    "Nothing has been changed.")
+            counter = CRLNumberCounter.query.filter_by(issuer_key=issuer_key).first()
+            if counter is None:
+                db.session.add(CRLNumberCounter(issuer_key=issuer_key, last_number=number))
+            elif number > (counter.last_number or 0):
+                counter.last_number = number
+            results['crl_number_counters'] += 1
 
     def _restore_cas(self, backup_data: Dict, results: Dict, master_key: bytes,
                      plan=None) -> None:
@@ -680,6 +899,8 @@ class RestoreCoreMixin:
                 from security.encryption import encrypt_private_key
                 prv_b64 = encrypt_private_key(prv_b64)
 
+            # Read before apply_columns writes the archive's revocation columns
+            here_final = _kept_final(self, ca)
             if ca is None:
                 # descr and crt are NOT NULL; both are overwritten below
                 ca = CA(refid=ca_data['refid'], descr=ca_data.get('descr'), crt='')
@@ -703,7 +924,7 @@ class RestoreCoreMixin:
             ca.serial_number = ca_data.get('serial_number') or ca.serial_number
             ca.ski = ca_data.get('ski') or ca.ski
             self._apply_ca_fields(ca, ca_data)
-            self._apply_ca_revocation(ca, ca_data)
+            self._apply_ca_revocation(ca, ca_data, here_final)
             results['cas'] += 1
 
     def _restore_certificates(self, backup_data: Dict, results: Dict, master_key: bytes,
@@ -717,6 +938,8 @@ class RestoreCoreMixin:
         """
         plan = plan if plan is not None else RestorePlan.build(backup_data)
 
+        written = []
+        kept_finals = self.__dict__.setdefault('_kept_finals', [])
         for cert_data in backup_data.get('certificates', []):
             cert = Certificate.query.filter_by(refid=cert_data['refid']).first()
 
@@ -734,6 +957,9 @@ class RestoreCoreMixin:
                 from security.encryption import encrypt_private_key
                 prv_b64 = encrypt_private_key(prv_b64)
 
+            here_state = None if cert is None else SimpleNamespace(
+                revoked=cert.revoked, revoked_at=cert.revoked_at,
+                revoke_reason=cert.revoke_reason, invalidity_at=cert.invalidity_at)
             if cert is None:
                 # descr is NOT NULL; overwritten by apply_columns below
                 cert = Certificate(refid=cert_data['refid'],
@@ -742,7 +968,8 @@ class RestoreCoreMixin:
 
             # Every column of the section, references resolved through the
             # plan; the PEMs and the key are `handled` and set right after.
-            apply_columns(cert, 'certificates', cert_data, plan)
+            if not apply_columns(cert, 'certificates', cert_data, plan):
+                continue    # left out, and listed: nothing more is written for it
 
             cert.crt = (
                 base64.b64encode(cert_data['certificate_pem'].encode()).decode()
@@ -758,6 +985,7 @@ class RestoreCoreMixin:
             if prv_b64:
                 cert.prv = prv_b64
             where = f"certificate {cert_data.get('refid')}"
+            here_final = _kept_final(self, here_state)
             cert.revoked = bool(cert_data.get('revoked', False))
             cert.revoked_at = _archived_datetime(where, 'revoked_at',
                                                  cert_data.get('revoked_at'))
@@ -765,8 +993,15 @@ class RestoreCoreMixin:
             if 'invalidity_at' in cert_data:
                 cert.invalidity_at = _archived_datetime(
                     where, 'invalidity_at', cert_data.get('invalidity_at'))
+            if here_final is not None and (not cert.revoked or _revocation_key(cert) > _revocation_key(here_final)):
+                for field, value in vars(here_final).items():
+                    setattr(cert, field, value)
+                kept_finals.append(cert)
             cert.archived = bool(cert_data.get('archived', False))
+            written.append(cert)
             results['certificates'] += 1
+        db.session.flush()
+        plan.written.setdefault('certificates', set()).update(cert.id for cert in written)
 
     def _restore_acme_accounts(self, backup_data: Dict, results: Dict) -> None:
         """Restore ACME accounts from backup data (RFC 8555)"""
@@ -776,6 +1011,7 @@ class RestoreCoreMixin:
             if not account_id or not jwk_thumbprint or not acme_data.get('jwk'):
                 continue
             existing = AcmeAccount.query.filter_by(account_id=account_id).first()
+            target = existing
             if existing:
                 existing.jwk = acme_data['jwk']
                 existing.jwk_thumbprint = jwk_thumbprint
@@ -794,6 +1030,8 @@ class RestoreCoreMixin:
                     external_account_binding=acme_data.get('external_account_binding'),
                 )
                 db.session.add(new_acme)
+                target = new_acme
+            _archived_timestamps(target, f"ACME account {account_id}", acme_data)
             results['acme_accounts'] += 1
 
     def _restore_acme_eab_credentials(self, backup_data: Dict, results: Dict) -> None:
@@ -851,6 +1089,7 @@ class RestoreCoreMixin:
                 if limits is not None and not isinstance(limits, str):
                     raise BackupSchemaError(f"{where}: allowed_domains is not JSON text")
                 target._allowed_domains = limits
+            _archived_timestamps(target, where, eab)
             results['acme_eab_credentials'] += 1
 
     def _restore_settings(self, backup_data: Dict, results: Dict) -> None:
@@ -863,7 +1102,11 @@ class RestoreCoreMixin:
         else:
             config_data = configuration.get('settings', {})
         from utils import admin_allowlist
+        # Settings naming a row by number wait for that row: see restore/setting_refs.py
+        deferred = deferred_keys(configuration if isinstance(configuration, dict) else {})
         for key, value in config_data.items():
+            if key in installation.LOCAL_SETTINGS or key in deferred:
+                continue    # this database's own, never the source's
             if key == admin_allowlist.CONFIG_KEY and admin_allowlist.restored_value_locks_out(value):
                 if admin_allowlist.disabled_by_env():
                     logger.warning(
@@ -887,7 +1130,7 @@ class RestoreCoreMixin:
         # encrypted: written back encrypted with this installation's key.
         results['encrypted_settings'] = restore_encrypted_settings(
             configuration if isinstance(configuration, dict) else {},
-            (configuration or {}).get('encrypted_settings') or [])
+            (configuration or {}).get('encrypted_settings') or [], skip=deferred)
 
     def _regenerate_files(self, staged) -> None:
         """Write the files that materialise the restored rows on disk.
@@ -901,14 +1144,12 @@ class RestoreCoreMixin:
         and the instance stays as it was, which is the only outcome that
         matches what the caller is told.
 
-        The certificate and CSR files are staged rather than written in
-        place, and published with the rest once the transaction has
-        committed: written directly, a restore that failed afterwards left
+        The certificate, CSR and key files are staged rather than written in
+        place, published with the rest just before the commit and put back by
+        `unpublish()` if the commit fails: written directly, a restore that failed afterwards left
         every certificate file holding the archive's content while the rows
-        had gone back to what they were. The key mirrors are the exception
-        and stay a direct write, because mirroring is also a *removal* when
-        database encryption is on, which staging does not express; each one
-        is atomic on its own (see ``mirror_private_key``).
+        had gone back to what they were. With database encryption on, a key
+        mirror is staged as a removal.
 
         Material that cannot be decoded is a warning naming the row, and the
         restore goes on. This walks every authority and certificate in the
@@ -941,9 +1182,7 @@ class RestoreCoreMixin:
                         "Restore: the stored key of CA %s could not be read "
                         "(%s); it was not mirrored on disk", ca.id, exc)
                 else:
-                    mirror_private_key(
-                        ca_key_path(ca), prv_pem, context=f"restored CA {ca.id}"
-                    )
+                    _stage_key_mirror(staged, ca_key_path(ca), prv_pem)
 
         for cert in Certificate.query.all():
             if cert.crt:
@@ -980,8 +1219,4 @@ class RestoreCoreMixin:
                         "be read (%s); it was not mirrored on disk",
                         cert.id, exc)
                 else:
-                    mirror_private_key(
-                        cert_key_path(cert),
-                        prv_pem_bytes,
-                        context=f"restored certificate {cert.id}",
-                    )
+                    _stage_key_mirror(staged, cert_key_path(cert), prv_pem_bytes)

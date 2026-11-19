@@ -2,7 +2,7 @@
 UI Routes - Serve React SPA
 Single Page Application - all routes serve index.html
 """
-from flask import Blueprint, send_from_directory, current_app, make_response
+from flask import Blueprint, abort, send_from_directory, current_app, make_response
 from pathlib import Path
 import os
 
@@ -55,6 +55,8 @@ def spa(path):
     # what keeps 'scep/' (the protocol endpoint) apart from 'scep-config' and
     # 'tsa' apart from 'tsa-config' — both React routes that must be served.
     from utils.public_endpoints import is_public_protocol_path
+    if path.startswith('acme/'):
+        abort(404)  # answered as an ACME problem, 405 where another method is served
     if path.startswith('api/') or is_public_protocol_path('/' + path):
         from utils.response import error_response
         return error_response('Not found', 404)

@@ -15,10 +15,16 @@ archive, removes the row, restores it, and asks two questions of the column:
 what the application reads out of it, and whether the cleartext is sitting
 there.
 """
+import json
+
 import pytest
 
 from models import db
 from services.backup.manifest import SECTIONS
+
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
 
 PASSWORD = 'secret-storage-password-0123456789'
 MARK = 'secstore'
@@ -65,9 +71,11 @@ def _acme_client_account(secret):
 
 
 def _scep_challenge(secret):
+    from models import CA
     from models.scep import ScepProfile
+    ca = CA.query.order_by(CA.id).first()  # a real one: PostgreSQL enforces ca_refid
     row = ScepProfile(name=f'{MARK}-challenge', url_slug=f'{MARK}-challenge',
-                      ca_refid=f'{MARK}-ca', challenge_password=_master(secret))
+                      ca_refid=ca.refid if ca else None, challenge_password=_master(secret))
     return ScepProfile, row, ScepProfile.name == f'{MARK}-challenge'
 
 
@@ -94,14 +102,48 @@ def _deploy_target(secret):
     return DeployTarget, row, DeployTarget.name == f'{MARK}-target'
 
 
+def _http_target(secret):
+    from models.deploy import DeployTarget
+    row = DeployTarget(name=f'{MARK}-http-target', kind='http', host=f'{MARK}.example.test',
+                       port=443, url=f'https://{MARK}.example.test/api',
+                       body_template='{{cert_pem}}', username='', private_key='',
+                       http_headers=_master(json.dumps({'Authorization': secret})))
+    return DeployTarget, row, DeployTarget.name == f'{MARK}-http-target'
+
+
+def _read_master_headers(stored):
+    return json.loads(_read_master(stored))['Authorization']
+
+
 # (section, column, how the row is made, how the application reads the column)
+def _hsm_provider(cleartext):
+    from models.hsm import HsmProvider
+    row = HsmProvider(name=f'{MARK}-hsm', type='openbao')
+    row.set_config({'token': cleartext})
+    return HsmProvider, row, HsmProvider.name == f'{MARK}-hsm'
+
+
+def _read_hsm_token(stored):
+    from utils.encryption import decrypt_value, is_encrypted
+    token = json.loads(stored)['token']
+    assert is_encrypted(token)
+    return decrypt_value(token)
+
+
 CASES = [
     ('acme_client_accounts', 'account_key', _acme_client_account, _read_master),
     ('scep_profiles', 'challenge_password', _scep_challenge, _read_master),
     ('intune_apps', 'client_secret', _intune_app, _read_database),
     ('webhook_endpoints', 'secret', _webhook, _read_database),
     ('deploy_targets', 'private_key', _deploy_target, _read_master),
+    ('deploy_targets', 'http_headers', _http_target, _read_master_headers),
+    ('hsm_providers', 'config', _hsm_provider, _read_hsm_token),
 ]
+
+
+@pytest.fixture(scope='module', autouse=True)
+def _a_ca_for_the_scep_profile(create_ca):
+    create_ca(cn=f'{MARK} scep CA')
 
 
 class TestASecretGoesBackTheWayTheColumnHoldsIt:

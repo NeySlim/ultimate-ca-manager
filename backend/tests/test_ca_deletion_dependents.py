@@ -85,3 +85,20 @@ def test_files_survive_a_refused_commit(app, auth_client, create_ca, monkeypatch
     r = auth_client.delete(f"/api/v2/cas/{ca['id']}")
     assert r.status_code == 204, r.data
     assert not any(p.exists() for p in files)
+
+
+def test_settings_numbered_after_the_ca_go_with_it(app, auth_client, create_ca):
+    """A SCEP challenge or a responder binding kept under the number would
+    belong to the next CA SQLite gives that number to."""
+    from models import SystemConfig
+    ca = create_ca(cn='Numbered settings CA')
+    keys = (f"scep_challenge_{ca['id']}", f"scep_challenge_{ca['id']}_generated_at",
+            f"ocsp_responder_cert_{ca['id']}")
+    with app.app_context():
+        for key in keys:
+            db.session.add(SystemConfig(key=key, value='kept-by-mistake'))
+        db.session.commit()
+    r = auth_client.delete(f"/api/v2/cas/{ca['id']}")
+    assert r.status_code == 204, r.data
+    with app.app_context():
+        assert SystemConfig.query.filter(SystemConfig.key.in_(keys)).count() == 0

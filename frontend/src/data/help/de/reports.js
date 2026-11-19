@@ -10,8 +10,8 @@ export default {
           { label: 'Zertifikatsinventar', text: 'Vollständige Liste aller Zertifikate mit Status' },
           { label: 'Ablaufende Zertifikate', text: 'Zertifikate, die innerhalb eines bestimmten Zeitfensters ablaufen' },
           { label: 'CA-Hierarchie', text: 'Struktur der Zertifizierungsstellen und Statistiken' },
-          { label: 'Audit-Zusammenfassung', text: 'Sicherheitsereignisse und Benutzeraktivitätsübersicht' },
-          { label: 'Compliance-Status', text: 'Richtlinien-Compliance und Verstöße' },
+          { label: 'Audit-Zusammenfassung', text: 'Die häufigsten Aktionen und die aktivsten Benutzer im Zeitraum' },
+          { label: 'Compliance-Status', text: 'Drei Prüfungen: aktive Zertifikate, abgelaufene CAs und Zertifikate, die innerhalb von 30 Tagen ablaufen; Zertifikatsrichtlinien werden nicht gelesen' },
           { label: 'Widerrufene Zertifikate', text: 'Im Zeitraum widerrufene Zertifikate mit Datum und Grund' },
         ]
       },
@@ -53,13 +53,13 @@ Vollständige Liste aller von UCM verwalteten Zertifikate. Enthält Betreff, Aus
 Zertifikate, die innerhalb eines bestimmten Zeitfensters ablaufen (Standard: 30 Tage). Kritisch zur Vermeidung von Ausfällen, überprüfen Sie diesen Bericht regelmäßig oder planen Sie ihn für die tägliche Zustellung.
 
 ### CA-Hierarchie
-Struktur der Zertifizierungsstellen mit Eltern-Kind-Beziehungen, Zertifikatsanzahl pro CA und CA-Status. Nützlich zum Verständnis Ihrer PKI-Topologie.
+Struktur der Zertifizierungsstellen mit Eltern-Kind-Beziehungen, Zertifikatsanzahl pro CA. Nützlich zum Verständnis Ihrer PKI-Topologie.
 
 ### Audit-Zusammenfassung
-Sicherheitsereignisse und Benutzeraktivitätsübersicht. Enthält Anmeldeversuche, Zertifikatsvorgänge, Richtlinienverstöße und Konfigurationsänderungen. Unverzichtbar für Sicherheitsaudits.
+Die zehn häufigsten Aktionen und die zehn aktivsten Benutzer im Zeitraum.
 
 ### Compliance-Status
-Richtlinien-Compliance und Verstöße. Zeigt, welche Zertifikate Ihren Richtlinien entsprechen und welche dagegen verstoßen. Erforderlich für die regulatorische Compliance.
+Drei Prüfungen mit Anzahl und Schweregrad: aktive Zertifikate, abgelaufene CAs und Zertifikate, die innerhalb von 30 Tagen ablaufen. Die Zertifikatsrichtlinien werden nicht gelesen.
 
 ### Widerrufene Zertifikate
 Im gewählten Zeitraum (Standard: 30 Tage) widerrufene Zertifikate mit Widerrufsdatum und Grund. Nutzen Sie ihn, um Widerrufe und ihre Ursachen zu verfolgen.
@@ -124,7 +124,7 @@ Bevor Sie Zeitpläne aktivieren, verwenden Sie den ✈️-Button in jeder Berich
 
 ## Berechtigungen
 
-- **read:reports**: Berichte erstellen und herunterladen
+- **read:audit**: Berichte erstellen und ansehen; das Herunterladen braucht zusätzlich **export:audit**
 - **read:audit + export:audit**: PDF-Managementbericht herunterladen
 - **write:settings**: Berichtzeitpläne konfigurieren
 

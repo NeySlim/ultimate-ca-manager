@@ -103,10 +103,19 @@ class HsmService:
         library = getattr(provider_class, 'ML_DSA_LIBRARY', None)
         return mldsa_refusal(f"provider type '{provider_type}'", algorithm, supported, library)
 
+    @staticmethod
+    def eddsa_refusal(algorithm: Optional[str]) -> Optional[str]:
+        """Why an EdDSA *algorithm* key is not used on any HSM, or None: no provider wrapper signs with one."""
+        alg = key_algorithms.get(algorithm) if algorithm else None
+        if alg is not None and alg.family in ('ED25519', 'ED448'):
+            return f'{alg.display} keys are not supported on an HSM: an EdDSA CA key is a software key'
+        return None
+
     @classmethod
     def algorithm_refusal(cls, provider_type: str, algorithm: Optional[str]) -> Optional[str]:
-        """Why this provider type cannot hold an *algorithm* key (Brainpool, ML-DSA), or None."""
-        return cls.brainpool_refusal(provider_type, algorithm) or cls.mldsa_refusal(provider_type, algorithm)
+        """Why this provider type cannot hold an *algorithm* key (EdDSA, Brainpool, ML-DSA), or None."""
+        return (cls.eddsa_refusal(algorithm) or cls.brainpool_refusal(provider_type, algorithm)
+                or cls.mldsa_refusal(provider_type, algorithm))
 
     @classmethod
     def get_available_providers(cls) -> List[str]:

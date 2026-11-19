@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
 from models import AcmeClientAccount, Certificate, db
+from tests.seeded_rows import ensure_acme_account
 from models.acme_models import AcmeClientOrder
 
 
@@ -64,6 +65,7 @@ def proxy_revocation_rows(app):
         )
         db.session.add_all([account, cert])
         db.session.flush()
+        ensure_acme_account('internal-acme-account')
         order = AcmeClientOrder(
             domains='["proxy-revoke.example"]',
             challenge_type='dns-01',
@@ -171,6 +173,10 @@ def test_proxy_revoke_relays_upstream_status_and_revokes_local(
     )
 
     assert response.status_code == 200
+    # RFC 8555 §7.6: 200 without a body, so no HTML media type
+    assert response.data == b'' and response.headers['Content-Length'] == '0'
+    assert 'Content-Type' not in response.headers
+    assert response.headers['Link'] == '<http://localhost/acme/proxy/directory>;rel="index"'
     service.revoke_certificate.assert_called_once()
     forwarded_cert, forwarded_reason = service.revoke_certificate.call_args.args
     assert forwarded_cert.public_bytes(serialization.Encoding.DER) == proxy_revocation_rows['certificate_der']
@@ -182,12 +188,52 @@ def test_proxy_revoke_relays_upstream_status_and_revokes_local(
     )
 
 
-def test_proxy_revoke_rejects_invalid_reason(app, client, proxy_revocation_rows, monkeypatch):
+@pytest.mark.parametrize('held_as, code, local', [
+    ('certificateHold', 1, 'keyCompromise'),
+    ('certificateHold', 6, None),
+    ('superseded', 1, None),
+])
+def test_proxy_revoke_makes_a_local_hold_final_only(
+    app, client, proxy_revocation_rows, monkeypatch, held_as, code, local,
+):
+    from api.acme import acme_proxy_api
+
+    with app.app_context():
+        row = db.session.get(Certificate, proxy_revocation_rows['certificate_id'])
+        row.revoked, row.revoke_reason, row.revoked_at = True, held_as, datetime.utcnow()
+        db.session.commit()
+    payload = {'certificate': _b64url(proxy_revocation_rows['certificate_der']), 'reason': code}
+    service = MagicMock()
+    service.account.id = proxy_revocation_rows['account_id']
+    service.revoke_certificate.return_value.status_code = 200
+    local_revoke = MagicMock()
+    monkeypatch.setattr(acme_proxy_api, 'verify_proxy_jws', lambda: (True, payload, None, None))
+    monkeypatch.setattr(
+        acme_proxy_api, '_request_protected_header',
+        lambda: {'kid': 'https://ucm.example/acme/proxy/acct/internal-acme-account'})
+    monkeypatch.setattr(acme_proxy_api, 'get_proxy_service', lambda slug=None: service)
+    monkeypatch.setattr('services.cert_service.CertificateService.revoke_certificate', local_revoke)
+
+    response = client.post(
+        '/acme/proxy/revoke-cert',
+        data=json.dumps({'protected': 'stub', 'payload': 'stub', 'signature': 'stub'}),
+        content_type='application/jose+json')
+
+    assert response.status_code == 200
+    if local:
+        local_revoke.assert_called_once_with(
+            cert_id=proxy_revocation_rows['certificate_id'], reason=local, username='acme_proxy')
+    else:
+        local_revoke.assert_not_called()
+
+
+@pytest.mark.parametrize('reason', [7, 8, 11, '1'])
+def test_proxy_revoke_rejects_invalid_reason(app, client, proxy_revocation_rows, monkeypatch, reason):
     from api.acme import acme_proxy_api
 
     payload = {
         'certificate': _b64url(proxy_revocation_rows['certificate_der']),
-        'reason': 7,
+        'reason': reason,
     }
     monkeypatch.setattr(
         acme_proxy_api,
@@ -201,8 +247,15 @@ def test_proxy_revoke_rejects_invalid_reason(app, client, proxy_revocation_rows,
         content_type='application/jose+json',
     )
 
+    # RFC 8555 §7.6: an unsupported reason is badRevocationReason, not malformed
     assert response.status_code == 400
-    assert response.get_json()['type'].endswith(':malformed')
+    assert response.get_json()['type'].endswith(':badRevocationReason')
+
+
+def test_the_client_never_sends_remove_from_crl():
+    from services.acme.acme_client_service import AcmeClientService
+    with pytest.raises(ValueError):
+        AcmeClientService.validate_revocation_reason(8)
 
 
 def test_proxy_revoke_relays_upstream_failure_status(
@@ -237,4 +290,49 @@ def test_proxy_revoke_relays_upstream_failure_status(
     )
 
     assert response.status_code == 403
-    assert response.get_json()['detail'] == 'Upstream certificate revocation failed'
+    problem = response.get_json()
+    assert problem['type'] == 'urn:ietf:params:acme:error:serverInternal'
+    assert 'HTTP 403' in problem['detail']
+
+
+def test_proxy_revoke_leaves_a_certificate_its_ca_recorded_as_revoked(
+    app, client, create_ca, proxy_revocation_rows, monkeypatch,
+):
+    """Revoked for good by its CA's record: already revoked, no local revocation is tried."""
+    from api.acme import acme_proxy_api
+    from models import CA, RevokedSerial
+
+    ca = create_ca(cn=f'Proxy record CA {uuid4().hex[:6]}')
+    with app.app_context():
+        refid = db.session.get(CA, ca['id']).refid
+        row = db.session.get(Certificate, proxy_revocation_rows['certificate_id'])
+        row.caref = refid
+        db.session.add(RevokedSerial(caref=refid, serial_number=str(0xCAFE1234), revoke_reason='keyCompromise',
+                                     revoked_at=datetime(2026, 1, 2), valid_to=datetime(2099, 1, 1)))
+        db.session.commit()
+    payload = {'certificate': _b64url(proxy_revocation_rows['certificate_der']), 'reason': 4}
+    service = MagicMock()
+    service.account.id = proxy_revocation_rows['account_id']
+    service.revoke_certificate.return_value.status_code = 200
+    local_revoke = MagicMock()
+    monkeypatch.setattr(acme_proxy_api, 'verify_proxy_jws', lambda: (True, payload, None, None))
+    monkeypatch.setattr(
+        acme_proxy_api, '_request_protected_header',
+        lambda: {'kid': 'https://ucm.example/acme/proxy/acct/internal-acme-account'})
+    monkeypatch.setattr(acme_proxy_api, 'get_proxy_service', lambda slug=None: service)
+    monkeypatch.setattr('services.cert_service.CertificateService.revoke_certificate', local_revoke)
+    try:
+        response = client.post(
+            '/acme/proxy/revoke-cert',
+            data=json.dumps({'protected': 'stub', 'payload': 'stub', 'signature': 'stub'}),
+            content_type='application/jose+json')
+        assert response.status_code == 200
+        local_revoke.assert_not_called()
+    finally:
+        with app.app_context():
+            RevokedSerial.query.filter_by(caref=refid).delete()
+            row = db.session.get(Certificate, proxy_revocation_rows['certificate_id'])
+            row.caref = None
+            db.session.commit()
+            from services.ca_service import CAService
+            CAService.delete_ca(ca['id'])

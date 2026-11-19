@@ -22,6 +22,10 @@ export default {
           { label: 'Generar clave', text: 'Crear un nuevo par de claves directamente en el HSM' },
           { label: 'Estado', text: 'Monitorear el estado de conexión del proveedor' },
           { label: 'Certificación', text: 'Declarar la certificación del HSM: Common Criteria EAL 4+, EUCC high, FIPS 140-3 nivel 3, FIPS 140-2 nivel 3 u otra. Si se deja vacía, no se declara. El perfil de cumplimiento eu-acm solo acepta Common Criteria EAL 4+, EUCC high y FIPS 140-3 nivel 3 (hasta el 31 de diciembre de 2030) para una CA respaldada por HSM' },
+          { label: 'Nombre ya en uso (v2.249)', text: 'Se rechaza (409) generar una clave con un nombre que OpenBao o Azure Key Vault ya tienen: traiga una clave existente con una sincronización de claves (POST /api/v2/hsm/providers/<id>/sync)' },
+          { label: 'Una generación a la vez (v2.249)', text: 'Las generaciones de claves se turnan en cada proveedor, y una que sigue esperando tras 60 segundos recibe un 409. Una clave cuyo registro no pudo guardarse se elimina del HSM' },
+          { label: 'PIN en las copias (v2.249)', text: 'Una copia contiene el PIN o el token del proveedor en claro dentro del archivo, protegido por su contraseña, de modo que se restaura en otra instalación. Un valor que solo abre la clave de otra instalación se descarta al restaurar, con una entrada de registro que pide introducirlo de nuevo' },
+          { label: 'SoftHSM en modo FIPS (v2.247)', text: 'El modo FIPS rechaza un nuevo proveedor SoftHSM, al no ser SoftHSM un módulo validado; UCM_FIPS_ALLOW_SOFTHSM=1 permite uno para pruebas' },
         ]
       },
       {
@@ -79,7 +83,8 @@ La interfaz HSM estándar de la industria. Dispositivos compatibles:
 
 Configuración:
 - **Ruta de biblioteca**: Ruta a la biblioteca compartida PKCS#11 (.so/.dll)
-- **Slot**: Número de slot del HSM
+- **Etiqueta del token**: Etiqueta del token a usar (obligatoria)
+- **Slot**: Número de slot del HSM (opcional)
 - **PIN**: PIN de usuario para autenticación
 
 ### AWS CloudHSM
@@ -122,11 +127,11 @@ Tipos de claves soportados:
 ## Gestión de proveedores
 
 ### Agregar un proveedor
-1. Haga clic en **Agregar proveedor**
+1. Haga clic en **Nuevo proveedor**
 2. Seleccione el **tipo de proveedor**
 3. Ingrese los detalles de conexión
-4. Haga clic en **Probar conexión** para verificar
-5. Haga clic en **Guardar**
+4. Haga clic en **Crear**
+5. Haga clic en **Probar** en el nuevo proveedor para verificar la conexión
 
 ### Probar conexión
 Siempre pruebe la conexión después de crear o modificar un proveedor. UCM verifica que puede comunicarse con el HSM y autenticarse. Para un módulo PKCS#11, la prueba registra también lo que el módulo declara (biblioteca, fabricante, versiones de la biblioteca y del firmware), visible en la página del proveedor.

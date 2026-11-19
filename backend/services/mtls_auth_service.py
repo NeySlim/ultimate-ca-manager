@@ -39,20 +39,9 @@ class MTLSAuthService:
         if not serial:
             return None, None, "Certificate serial number not found"
         
-        # Try to find certificate by serial number (hex or decimal)
-        auth_cert = AuthCertificate.query.filter_by(cert_serial=serial).first()
-        
-        # Serial may be stored in decimal but presented in hex (or vice-versa)
-        if not auth_cert:
-            try:
-                if all(c in '0123456789ABCDEFabcdef' for c in serial):
-                    decimal_serial = str(int(serial, 16))
-                    auth_cert = AuthCertificate.query.filter_by(cert_serial=decimal_serial).first()
-                if not auth_cert:
-                    hex_serial = format(int(serial), 'X')
-                    auth_cert = AuthCertificate.query.filter_by(cert_serial=hex_serial).first()
-            except (ValueError, OverflowError):
-                pass
+        # By (issuer, serial) in any stored form, the fingerprint telling same-serial ones apart
+        from services.mtls_enrollment import presented_enrolment
+        auth_cert = presented_enrolment(cert_info)
         
         # If not found by serial, try fingerprint
         if not auth_cert and fingerprint:
@@ -109,19 +98,24 @@ class MTLSAuthService:
                     from utils.cert_issuer import self_signed_first
                     issuer = next(iter(self_signed_first(
                         _CA.query.filter(_CA.subject == auth_cert.cert_issuer).order_by(_CA.id).all())), None)
+                if issuer is not None and issuer.revoked_in_chain:  # RFC 5280 §6.1.3(a)(3): the whole path
+                    logger.warning(f"Certificate issuer revoked: serial={serial}, user_id={auth_cert.user_id}")
+                    return None, None, "Certificate issuer has been revoked"
                 if issuer is not None and enrolled is not None:
                     # The row may be gone (certificate deleted after its
                     # revocation): the persistent revocation record remains
                     revoked = issued_certificate_status(issuer, enrolled)[1] == REVOKED
                 elif issuer is not None:
                     from models import RevokedSerial as _RevokedSerial
-                    from utils.serial_format import serial_variants
-                    # No PEM to tell the records of one name apart: any of them closes it
+                    from utils.serial_format import unambiguous_serial_spellings
+                    # No PEM to tell the records of one name apart: any of them closes it. The text
+                    # is read both ways (writers differ), each reading in its own unambiguous spellings
+                    # Not covered: a record of a legacy row in all-digit hex, which reads as another serial
                     refids = [r for (r,) in _CA.query.filter(_CA.subject == issuer.subject).with_entities(_CA.refid)]
                     variants = set()
                     for base in (10, 16):
                         try:
-                            variants |= serial_variants(int(str(auth_cert.cert_serial), base))
+                            variants |= unambiguous_serial_spellings(int(str(auth_cert.cert_serial), base))
                         except ValueError:
                             continue
                     revoked = bool(variants) and _RevokedSerial.query.filter(
@@ -196,8 +190,8 @@ class MTLSAuthService:
         cert_info = CertificateParser.extract_certificate_info(cert)
         
         # Check if certificate already enrolled
-        existing = AuthCertificate.query.filter_by(cert_serial=cert_info['serial']).first()
-        if existing:
+        from services.mtls_enrollment import enrolments_of
+        if enrolments_of(cert.serial_number, cert.issuer):
             return False, "Certificate already enrolled", None
         
         # Check validity

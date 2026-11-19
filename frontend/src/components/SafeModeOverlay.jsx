@@ -1,5 +1,5 @@
 /**
- * SafeModeOverlay - Shown when UCM is in safe mode (encryption key missing)
+ * SafeModeOverlay - Shown when UCM is in safe mode (encryption key missing or wrong)
  * Polls /api/health to detect when safe mode is resolved.
  */
 import { useState, useEffect, useRef } from 'react'
@@ -12,6 +12,7 @@ const POLL_INTERVAL = 5000
 export function SafeModeOverlay() {
   const { t } = useTranslation()
   const [safeMode, setSafeMode] = useState(false)
+  const [mismatch, setMismatch] = useState(false)
   const [checking, setChecking] = useState(true)
   const timerRef = useRef(null)
 
@@ -27,6 +28,7 @@ export function SafeModeOverlay() {
         const data = await resp.json()
         if (data.safe_mode) {
           setSafeMode(true)
+          setMismatch(data.safe_mode_reason === 'encryption_key_mismatch')
           timerRef.current = setTimeout(checkHealth, POLL_INTERVAL)
         } else {
           if (safeMode) {
@@ -56,14 +58,14 @@ export function SafeModeOverlay() {
         </h2>
         
         <p className="text-sm text-text-secondary mb-4">
-          {t('safeMode.description')}
+          {t(mismatch ? 'safeMode.mismatchDescription' : 'safeMode.description')}
         </p>
 
         <div className="bg-bg-tertiary rounded-lg p-4 text-left mb-4 space-y-3">
           <div className="flex items-start gap-2">
             <Key size={18} className="text-accent-primary flex-shrink-0 mt-0.5" />
             <div className="text-sm text-text-primary">
-              <p className="font-medium mb-1">{t('safeMode.step1Title')}</p>
+              <p className="font-medium mb-1">{t(mismatch ? 'safeMode.mismatchStep1Title' : 'safeMode.step1Title')}</p>
               <code className="text-xs bg-bg-secondary px-2 py-1 rounded block">
                 /etc/ucm/master.key
               </code>

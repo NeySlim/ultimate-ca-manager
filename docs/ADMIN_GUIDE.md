@@ -35,6 +35,7 @@ Native installs (DEB/RPM) read `/etc/ucm/ucm.env`; the Docker image reads the `U
 | `DATABASE_URL` | `DATABASE_URL` | (unset → SQLite) | SQLAlchemy URL. Set to `postgresql://user:pass@host:5432/dbname` to use PostgreSQL. When unset, UCM uses SQLite at `DATA_DIR/ucm.db`. |
 | `UCM_ADMIN_ALLOWED_NETWORKS` | `UCM_ADMIN_ALLOWED_NETWORKS` | (unset) | Comma-separated IP addresses or CIDR networks allowed to reach the web interface and the management API. When set, it wins over the setting in Settings > Security, which becomes read-only. See [Admin access allowlist](#admin-access-allowlist) |
 | `UCM_ADMIN_ALLOWLIST_DISABLE` | `UCM_ADMIN_ALLOWLIST_DISABLE` | (unset) | `1` turns the admin access allowlist off (recovery after a lock-out); a warning is logged at startup |
+| `BACKUP_MAX_UPLOAD_MB` | `BACKUP_MAX_UPLOAD_MB` | `512` | Largest archive a restore accepts and reads, in MB; its decompressed content may be four times that. Every other request keeps the 50 MB limit. Creating a larger archive succeeds with a warning |
 
 ### Systemd Service
 
@@ -198,10 +199,21 @@ Configure SSO under **Settings → SSO**. UCM supports three SSO providers:
 - Group-to-role mapping (map AD groups to UCM roles)
 - Test connection before saving
 
+*Where groups are read.* With `memberOf`, from the user's own entry (a base search on its DN); the group filter is not used. With `member` or `uniqueMember`, by a search for the entries whose membership attribute holds the user's DN and that match the group filter (`(objectClass=*)` when empty), under the parent of the base DN when that parent lies in a naming context the server publishes (the root DSE's `namingContexts`, or when it publishes none), else under the base DN; a search under the parent that does not succeed (for example a service account allowed to search one subtree only) is tried once more under the base DN. Groups in a branch beside the users (`ou=people` and `ou=groups`) are therefore found; on a large directory, index the membership attribute for equality (OpenLDAP `index member eq`; Active Directory indexes `member`). The groups are read whenever the provider has role mapping rules or required groups.
+
+*Direct membership only.* A group counts when it names the user itself: nested groups are not followed, and the Active Directory primary group (`primaryGroupID`, usually Domain Users) never appears in `memberOf`. Map the groups users are direct members of.
+
+*Matching.* LDAP group names compare with rule keys and required groups as `cn` does (caseIgnoreMatch, RFC 4519 and RFC 4518): case and edge spaces are ignored and a run of inner spaces counts as one space; OIDC and SAML groups are compared exactly. A rule key is saved without its edge spaces, and two LDAP rule keys that compare equal are refused at save; a provider saved earlier with two such keys keeps working, both rules apply and the highest-privilege role wins.
+
+*A failed read.* When the directory does not answer the group read with success (service account rights, timeout, referral, missing base) and the admission depends on the groups, the login is refused with "your groups could not be read from the directory", and the log and the audit say the same.
+
+*Test Mapping* (Groups and role mapping section of a saved provider) finds the user, reads the groups and decides as the login does, without a password: it shows the access verdict with its reason, and a role only for an admitted user. It does not check the password nor the UCM account the sign-in would open (an account of the same name that this identity may not open, an account disabled in UCM, automatic creation turned off, an email that belongs to an account of another provider or left without one).
+
 **OAuth2 (Azure AD, Google, GitHub):**
 - Client ID, Client Secret, Authorization/Token/UserInfo URLs
 - Callback URL: `https://your-server:8443/api/v2/auth/sso/oauth2/callback`
 - Role claim mapping from token attributes
+- Role mapping rules compare their keys with the `roles` and `groups` claims, read from the ID token of the login (same `sub` as UserInfo) and from the UserInfo response together. Microsoft Entra ID sends them only in the ID token: add the groups claim under *Token configuration* of the application registration (values are group object IDs, so the mapping keys are these IDs), or define app roles and map their values. Above about 200 groups Entra ID leaves the groups claim out: UCM logs a warning and only app roles can match, so emit only the groups assigned to the application, or app roles. With *Verify ID token signature* off, the groups of the ID token count only when the Token URL is HTTPS with TLS verification on, and the issuer and client ID are set and match the token.
 
 **SAML 2.0:**
 - IdP Metadata URL or manual XML upload
@@ -212,7 +224,13 @@ Configure SSO under **Settings → SSO**. UCM supports three SSO providers:
 - *Sign authentication requests* signs each AuthnRequest with the key of the SP certificate (the HTTPS certificate or one held by UCM, RSA only); register that certificate at the IdP from the SP metadata first.
 - *NameID format* is asked of the IdP in each request and published in the metadata; *persistent* gives UCM a stable identifier, a transient NameID is never used to recognise the account.
 
-**Role mapping resolution:** when a user belongs to several groups that each match a mapping entry, the highest-privilege role wins (`admin` > `operator` > `auditor` > `viewer`); the order of the entries does not matter. This lets you map a broad access group to a low role and grant higher privileges through narrower groups. Users with no matching entry get the provider's default role at account creation; on later logins their stored role is kept unless *Sync role on each login* is enabled.
+**Role mapping resolution:** when a user belongs to several groups that each match a mapping entry, the highest-privilege role wins (`admin` > `operator` > `auditor` > `viewer`); the order of the entries does not matter. This lets you map a broad access group to a low role and grant higher privileges through narrower groups. With at least one entry, a user no entry matches is refused at sign-in; without entries, new accounts get the provider's default role. On later logins the stored role is kept unless *Sync role on each login* is enabled.
+
+**Which account a sign-in opens:** an account belongs to one provider and to one stable identity of its IdP (OIDC `sub`, SAML persistent NameID, LDAP `entryUUID` or `objectGUID`, else the DN). A sign-in opens the account bound to its identity; a name or email matches only an account of the same provider that is not bound yet. A sign-in is refused, with an audit entry naming the account, its state and the remedy, when its name belongs to an account it may not open (local, linked to another provider, bound to another identity, or without provider), and when no account matches but its email belongs to an account of another provider or left without provider by another or an unknown IdP (after a restore, for instance) or, with `email_verified` false, to one linked to this provider and not bound yet. An email shared with a local account still gives the SSO identity an account of its own.
+
+**Moving an account:** **Users → Link to SSO** (on a linked account, **Change provider or reset SSO identity**) attaches any account to the chosen provider after a confirmation: a local account, one of another provider (moved, after which its former provider no longer opens it), one without provider, or one of the same provider whose identity changed at the IdP (reset). Its identity is cleared and the next sign-in through that provider with its username or email binds one. An account with a password keeps it unless **Also remove its local password** is ticked, which leaves it signing in through the provider only (**Forgot password** then sends it no link, and an administrator cannot tick it for their own account); an account without one is not asked to set one. For a second person who shares an email with an existing account, create an account under the name their provider sends and link it with that box ticked, so the password chosen at creation does not stay outside the IdP. Linking closes the account's sessions whenever its provider or identity changes or its password is removed; its password (unless removed), API keys, security keys and mTLS certificates stay, so revoke them yourself when the account now belongs to another person.
+
+**Deleted providers:** the users of a deleted provider keep their identity and are taken back at sign-in by a provider created again for the same IdP: same OIDC issuer (or, when neither provider has one, the same UserInfo URL), same SAML entity ID, or same LDAP server and base DN. Otherwise, use Link to SSO on each account.
 
 **Important:** After configuring SSO, test with a non-admin account first. Keep at least one local admin account as fallback.
 
@@ -264,12 +282,15 @@ When SMTP is configured, enable automatic certificate expiry alerts:
 3. Enter encryption password
 4. Download `.ucmbkp` file
 
-**Via command line:**
+Backups, retention and restores take the same lock, so an archive never holds half of a restore: a manual backup started meanwhile waits up to 30 seconds, then answers 409; the scheduled one runs at the next minute.
+
+**Via command line (SQLite):**
 ```bash
 sudo systemctl stop ucm
 sudo cp /opt/ucm/data/ucm.db ~/ucm-backup-$(date +%Y%m%d).db
 sudo systemctl start ucm
 ```
+On PostgreSQL, use `pg_dump` instead. A copy of the database is not a `.ucmbkp` archive: the private keys stay under this installation's key-encryption key.
 
 ### Restoring Backups
 
@@ -279,13 +300,30 @@ sudo systemctl start ucm
 3. Upload `.ucmbkp` file
 4. Enter encryption password
 
+A restore **replaces** the instance with the archive: for every section the archive carries, the rows it does not hold are removed. Sections the archive left out are not touched, and an archive whose user list is empty is refused. `POST /api/v2/system/restore` also takes `mode=merge`, which adds and updates the archived rows and removes nothing.
+
+- The restore is one transaction: on any error nothing is changed, the answer names the row the database refused, and no file on disk is touched. The certificate, CSR and key files are published once the rows are in, and those of the removed rows are deleted with them.
+- A row of a table the archive does not carry that points at a removed row loses the link where it is optional, and goes with it in a regenerable table (CRL metadata, OCSP cache, sessions, in-flight ACME server orders); any other refuses the restore, named.
+- Rows are matched by identity (name, refid, fingerprint), never by number. Each archive carries the identifier of the database it was taken from, and row numbers are trusted only when restoring onto that same database.
+- An archive written by an older version is repaired as the migrations repaired the source: legacy EAB keys, dead and `ldap_*` settings, SAML providers, group permissions, duplicated ACME renewal orders.
+- ACME client orders: a merge keeps the order here when it is further along, was renewed or is being finalized since the archive was taken; a replacement restores the archived one and names the certificate it gives up.
+- Revocations: a merge never lowers a final revocation made here, of a certificate or a CA; a suspension is reversible, so one carried by the certificate alone (no revocation record) is lifted by an archive in which the certificate is valid.
+- Every session is revoked and a restart is requested: no session begun before the restore is accepted after it, the restoring operator's included, whatever the session store (files or Redis). A restore is refused (409) while a backend migration, another restore or a backup is running.
+
+The upload accepts archives up to `BACKUP_MAX_UPLOAD_MB` (512 MB by default), their decompressed content up to four times that, and one JSON object per 100 bytes of it; a reverse proxy in front of UCM applies its own body limit. A restore holds the whole archive in memory: plan for a peak of several times its size. Creating a backup larger than the limit warns that it cannot be restored as is.
+
 ### Backup Contents
 
 - All certificates and private keys
-- CA hierarchy
-- Users and settings
-- Audit logs
-- Templates
+- CA hierarchy, cross-certificates and revocation records
+- Users, groups, roles, API keys, client certificates and settings
+- Templates, policies, SSO, HSM, SMTP, notification, deployment, webhook and ACME configuration
+- SSH CAs and certificates, Microsoft CA connections, SCEP profiles and Intune apps, DNS providers, discovery profiles
+- ACME client orders, with the key of a finalization in progress, approval requests and key recovery requests
+- The HTTPS certificate and key the server presents
+- Settings that name a CA, a certificate or an ACME account carry that row's identity, and are renumbered on restore. One whose row is not on the target is emptied, or left out when the number is in its name (`scep_challenge_<n>`, `ocsp_responder_cert_<n>`, `cert_scts_<n>`), with a warning
+
+Secrets travel decrypted inside the encrypted archive and are encrypted again with the target's keys. Histories (audit log, discovery scans and results, SCEP and Microsoft CA request logs) are not in the archives UCM writes, and a restore leaves them as they are. Live state is not carried either: lockout counters, sessions, CRL and OCSP caches, delivery queues.
 
 ---
 
@@ -384,7 +422,7 @@ pg_dump -U ucm -h db.example.com ucm > ucm-pg-backup.sql
 psql -U ucm -h db.example.com ucm < ucm-pg-backup.sql
 ```
 
-> ℹ The `psycopg2-binary` driver is bundled with the DEB/RPM packages and the Docker image. No extra install step is needed.
+> ℹ The psycopg 3 driver is bundled with the DEB/RPM packages and the Docker image. No extra install step is needed.
 
 ### Database Tables
 
@@ -730,6 +768,8 @@ Once installed, `gssapi`/`spnego` are importable and the warning clears without 
 3. Click **Reset Password**
 4. Set temporary password
 5. User must change on next login
+
+**Forgot password** on the login page sends no reset link to an account linked to an SSO provider that has no local password: its provider alone opens it, and a link sent before the account was linked no longer works. An SSO account that kept a local password keeps the reset.
 
 ### Role Management
 

@@ -275,15 +275,20 @@ def get_activity_log():
         'renew': 'Renewed',
     }
     
+    # The whole trail needs read:audit, as /audit/logs does; anyone else sees
+    # their own events only (never the names typed at someone's failed login).
+    from auth.unified import has_permission
+    own_only = not has_permission('read:audit', g.permissions or [])
     try:
         results = db.session.execute(
-            text("""
+            text(f"""
                 SELECT action, resource_type, resource_id, username, timestamp, details
-                FROM audit_logs 
-                ORDER BY timestamp DESC 
+                FROM audit_logs
+                {'WHERE username = :username' if own_only else ''}
+                ORDER BY timestamp DESC
                 LIMIT :limit
             """),
-            {'limit': limit}
+            {'limit': limit, 'username': g.current_user.username}
         ).fetchall()
         
         activity = []
@@ -629,6 +634,16 @@ def get_system_status():
         # A resolver bug is exactly when the dashboard must not claim health.
         logger.debug('TSA status check failed', exc_info=True)
         status['tsa'] = {'status': 'warning', 'message': 'Status unavailable'}
+
+    # Without a loaded master key, private keys are written to the database
+    # unencrypted; only those who can enable encryption are told
+    from security.encryption import key_encryption
+    from auth.unified import has_permission
+    if has_permission('admin:system', g.permissions):
+        if key_encryption.is_enabled:
+            status['key_encryption'] = {'status': 'online', 'message': 'Private keys encrypted'}
+        else:
+            status['key_encryption'] = {'status': 'warning', 'message': 'No master key loaded'}
 
     # Core is online if we can respond
     status['core'] = {'status': 'online', 'message': 'Operational'}

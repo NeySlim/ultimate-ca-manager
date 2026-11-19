@@ -73,7 +73,7 @@ class NetlifyDnsProvider(BaseDnsProvider):
         logger.info("Netlify: Created TXT record %s", record_name)
         return True, "Record created successfully"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         zone_id = self._get_zone_id(domain)
         if not zone_id:
             return False, f"Could not find zone for domain {domain}"
@@ -81,7 +81,8 @@ class NetlifyDnsProvider(BaseDnsProvider):
         if not success:
             return False, f"Failed to list records: {records}"
         for rec in records:
-            if rec.get('type') == 'TXT' and rec.get('hostname') == record_name:
+            if (rec.get('type') == 'TXT' and rec.get('hostname') == record_name
+                    and self.txt_matches(rec.get('value'), record_value)):
                 ok, res = self._request('DELETE', f'/dns_zones/{zone_id}/dns_records/{rec["id"]}')
                 if not ok:
                     return False, f"Failed to delete record: {res}"

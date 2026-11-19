@@ -23,6 +23,7 @@ from sqlalchemy.orm.attributes import set_committed_value
 
 from models import CA, AuditLog, CATemplatePin, Certificate, db
 from models.certificate_template import CertificateTemplate
+from tests.fixtures.templates import delete_templates
 from services.ca.ca_signing import AlreadySuperseded
 from services.ca_service import CAService
 from services.cert_service import CertificateService
@@ -452,7 +453,9 @@ def _archive_behind_the_session(row_id):
                        .execution_options(synchronize_session=False))
 
 
-@pytest.mark.parametrize('backend', ['sqlite', pytest.param('postgresql', marks=pytest.mark.postgres)])
+@pytest.mark.parametrize('backend', [
+    pytest.param('sqlite', marks=pytest.mark.sqlite_only(reason='the SQLite half runs on the session database')),
+    pytest.param('postgresql', marks=pytest.mark.postgres)])
 def test_supersede_is_a_compare_and_set(app, backend):
     """Of two signings superseding one row, only the first stores a certificate."""
     from tests.test_crl_persistent_revocations import _PG_URL, _make_ca, _on_postgresql
@@ -560,8 +563,7 @@ def templated_ca(app, create_ca):
         return ca_data['id']
     yield _make
     with app.app_context():
-        CATemplatePin.query.filter(CATemplatePin.template_id.in_(made)).delete(synchronize_session=False)
-        CertificateTemplate.query.filter(CertificateTemplate.id.in_(made)).delete(synchronize_session=False)
+        delete_templates(made)
         db.session.commit()
 
 
@@ -769,6 +771,7 @@ def test_legacy_certificate_is_refused_when_the_ca_offers_no_template(app, templ
         db.session.commit()
         _template, _extra, _issued, err = wstep_service._renewal_template(db.session.get(CA, ca_id), renewed, csr)
     assert err == 'This CA offers no certificate template'
+    assert isinstance(err, wstep_service.ServerError)
 
 
 def test_renewal_may_ask_for_what_xcep_advertised(app, templated_ca):
@@ -797,7 +800,7 @@ def test_template_without_ekus_keeps_the_renewal_within_the_old_ones(app, templa
 @pytest.mark.parametrize('twin', ['same', 'hex_serial', 'crlf_pem'])
 def test_two_live_duplicates_are_claimed_together(client, app, wstep_renew_config, twin):
     """A certificate held twice renews once, however the twin stores its serial or PEM."""
-    old_cert, old_key = _issue(app, wstep_renew_config['id'], f'tls-renew-two-live-{twin}.example.test')
+    old_cert, old_key = _issue(app, wstep_renew_config['id'], f"tls-renew-two-live-{twin.replace('_', '-')}.example.test")
     with app.app_context():
         original = Certificate.query.filter_by(serial_number=str(old_cert.serial_number)).one()
         columns = {c.name: getattr(original, c.name) for c in Certificate.__table__.columns
@@ -844,3 +847,24 @@ def test_a_twin_claimed_by_another_renewal_loses_the_claim(app, wstep_renew_conf
         assert _claim_superseded(original) is False
         monkeypatch.undo()
         db.session.rollback()
+
+
+@pytest.mark.parametrize('ekus', [['clientAuth', 'emailProtection', '1.3.6.1.4.1.311.10.3.4'],
+                                  ['clientAuth'], ['clientAuth', 'smartcardLogon']])
+def test_renewal_keeps_the_key_usage_of_its_template(app, templated_ca, ekus):
+    """A renewal is signed under the profile of its template, as the issuance was."""
+    ca_id = templated_ca(f'WSTEP renew user KU CA {len(ekus)}', {'User': (ekus, None)})
+    with app.app_context():
+        oids = [x509.ObjectIdentifier(o) for o in wstep_service._template_configured_ekus(
+            CertificateTemplate.query.filter_by(name=f'WSTEP renew user KU CA {len(ekus)} User').one())]
+    key = _key()
+    csr = _eku_csr('jdoe', key, *oids)
+    with app.app_context():
+        pem, err = wstep_service.issue(db.session.get(CA, ca_id),
+                                       csr.public_bytes(serialization.Encoding.DER), 30)
+    assert err is None, err
+    old_cert = x509.load_pem_x509_certificate(pem.encode())
+    cert, err = _renew(app, ca_id, 'tls', old_cert, key, _eku_csr(old_cert, key, *oids))
+    assert err is None, err
+    assert (cert.extensions.get_extension_for_class(x509.KeyUsage).value
+            == old_cert.extensions.get_extension_for_class(x509.KeyUsage).value)

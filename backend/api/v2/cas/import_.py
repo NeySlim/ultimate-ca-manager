@@ -6,7 +6,6 @@ from . import bp
 from flask import request, g
 import base64
 import logging
-from cryptography.hazmat.primitives.asymmetric import ed25519, ed448
 import traceback
 import uuid
 
@@ -20,6 +19,7 @@ from utils.cert_issuer import private_key_matches
 from services.import_service import (
     KeyPasswordError, parse_certificate_file, extract_cert_info, find_existing_ca_for_import, cross_mode_from, finish_cross_attach, AmbiguousImportTarget, CrossCertificateImport, ImportConflict, update_ca_from_import,
     install_on_pending_ca, find_pending_csr_for_certificate,
+    relink_parent_caref,
     serialize_cert_to_pem, serialize_key_to_pem
 )
 from security.encryption import encrypt_private_key
@@ -83,11 +83,6 @@ def import_ca():
         # it would sign nothing anyone can verify (#347 review)
         if private_key is not None and not private_key_matches(private_key, cert):
             return error_response('Private key does not match the certificate', 400)
-        if isinstance(private_key, (ed25519.Ed25519PrivateKey, ed448.Ed448PrivateKey)):
-            # The CA's signing paths (certificates, CRLs) hand these keys a
-            # digest they refuse: refused here with the reason, not later with 500
-            return error_response('Ed25519 and Ed448 CA keys are not supported: '
-                                  'such a CA could sign neither certificates nor CRLs', 400)
 
         # Extract certificate info
         cert_info = extract_cert_info(cert)
@@ -190,6 +185,7 @@ def import_ca():
             serial_number=str(cert.serial_number),
             valid_from=cert_info['valid_from'],
             valid_to=cert_info['valid_to'],
+            caref=relink_parent_caref(cert, None),
             imported_from='manual'
         )
         # Deleted after its revocation and imported again: still revoked (#343)

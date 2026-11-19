@@ -18,15 +18,16 @@ SECRET = 'zz-intune-client-secret'
 
 
 @pytest.fixture
-def bound(app):
+def bound(app, create_ca):
     """An app registration and a profile bound to it, removed afterwards."""
+    ca_refid = create_ca(cn='Intune readback CA')['refid']  # PostgreSQL enforces ca_refid
     with app.app_context():
         registration = IntuneApp(name='zz-intune-readback', tenant_id='zz-tenant',
                                  client_id='zz-client', client_secret='x')
         db.session.add(registration)
         db.session.flush()
         row = ScepProfile(name='zz-intune-readback', url_slug='zz-intune-readback',
-                          ca_refid='zz-intune-ca', intune_app_id=registration.id)
+                          ca_refid=ca_refid, intune_app_id=registration.id)
         db.session.add(row)
         db.session.commit()
         ids = (registration.id, row.id)

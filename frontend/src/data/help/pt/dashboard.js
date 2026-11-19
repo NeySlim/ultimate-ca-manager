@@ -7,23 +7,24 @@ export default {
       {
         title: 'Widgets',
         items: [
-          { label: 'Estatísticas', text: 'Total de CAs, certificados ativos, CSRs pendentes e contagens de certificados expirando em breve' },
-          { label: 'Tendência de Certificados', text: 'Gráfico do histórico de emissão ao longo do tempo' },
+          { label: 'Estatísticas', text: 'Total de certificados (expirados e revogados incluídos), CAs, CSRs pendentes e contas ACME, mais os certificados SSH quando existe uma CA SSH' },
+          { label: 'Atividade de Certificados', text: 'Certificados emitidos, revogados e expirados por dia no período escolhido' },
           { label: 'Distribuição de Status', text: 'Gráfico de pizza: válidos / expirando / expirados / revogados' },
-          { label: 'Próxima Expiração', text: 'Certificados expirando nos próximos 30 dias; o assinante TSA dedicado configurado é assinalado com uma etiqueta "TSA signer" (v2.218)' },
+          { label: 'Próxima Expiração', text: 'Os seis certificados válidos que expiram primeiro, qualquer que seja a data; o assinante TSA dedicado configurado é assinalado com uma etiqueta "TSA signer" (v2.218)' },
           { label: 'Status do Sistema', text: 'Saúde dos serviços: ACME, SCEP, EST, OCSP, CRL/CDP, TSA (v2.218), renovação automática, SMTP e webhooks. Os emblemas mostram um estado de aviso âmbar distinto (assinante TSA perto de expirar, SMTP configurado mas desativado) e sua mensagem de status ao passar o mouse' },
-          { label: 'Atividade Recente', text: 'Últimas operações realizadas no sistema' },
+          { label: 'Atividade Recente', text: 'Últimas operações realizadas no sistema, com read:audit; sem essa permissão, apenas os seus próprios eventos' },
           { label: 'Certificados Recentes', text: 'Certificados emitidos ou importados recentemente' },
-          { label: 'Autoridades Certificadoras', text: 'Lista de CAs com informações da cadeia' },
+          { label: 'Autoridades Certificadoras', text: 'Últimas CAs, cada uma marcada como Root ou Sub' },
           { label: 'Contas ACME', text: 'Contas de clientes ACME registradas' },
+          { label: 'Expiração do Trust Store', text: 'Certificados confiáveis que expiram primeiro' },
         ]
       },
     ],
     tips: [
-      'Arraste os widgets para reorganizar o layout do seu painel',
-      'Clique no ícone de olho no cabeçalho para mostrar/ocultar widgets específicos',
+      'Clique em Editar layout no cabeçalho e arraste os widgets para reorganizá-los',
+      'Clique no botão Personalizar painel (ícone de controles deslizantes) no cabeçalho e, em seguida, no olho ao lado de um widget para mostrá-lo ou ocultá-lo',
       'O painel é atualizado em tempo real via WebSocket: não é necessário atualizar manualmente',
-      'O layout é salvo por usuário e persiste entre sessões',
+      'O layout é salvo neste navegador, para todas as contas que entram a partir dele',
     ],
   },
   helpGuides: {
@@ -36,14 +37,15 @@ O Painel é o seu centro de monitoramento. Ele exibe métricas em tempo real, gr
 ## Widgets
 
 ### Cartão de Estatísticas
-Exibe quatro contadores principais:
-- **Total de CAs**: Autoridades Certificadoras Raiz e Intermediárias
-- **Certificados Ativos**: Certificados válidos e não revogados
-- **CSRs Pendentes**: Requisições de Assinatura de Certificado aguardando aprovação
-- **Expirando em Breve**: Certificados expirando nos próximos 30 dias
+Exibe estes contadores:
+- **Certificados**: todos os certificados, expirados e revogados incluídos
+- **CAs**: Autoridades Certificadoras Raiz e Intermediárias
+- **CSRs**: Requisições de Assinatura de Certificado aguardando assinatura
+- **ACME**: contas ACME registradas
+- **Certificados SSH**: exibido quando existe uma CA SSH
 
-### Tendência de Certificados
-Um gráfico de linha mostrando a emissão de certificados ao longo do tempo. Passe o mouse sobre os pontos para ver contagens exatas.
+### Atividade de Certificados
+Um gráfico de área dos certificados emitidos, revogados e expirados por dia no período escolhido. Passe o mouse sobre os pontos para ver contagens exatas.
 
 ### Distribuição de Status
 Gráfico de pizza mostrando a distribuição dos estados dos certificados:
@@ -53,7 +55,7 @@ Gráfico de pizza mostrando a distribuição dos estados dos certificados:
 - **Revogado**: Explicitamente revogado
 
 ### Próxima Expiração
-Lista os certificados que expiram mais cedo. Clique em qualquer certificado para navegar até seus detalhes. Configure o limite em **Configurações → Geral**.
+Lista os seis certificados válidos que expiram primeiro, qualquer que seja a data. Clique em qualquer certificado para navegar até seus detalhes.
 
 ### Status do Sistema
 Mostra a saúde dos serviços do UCM:
@@ -62,14 +64,19 @@ Mostra a saúde dos serviços do UCM:
 - Protocolo EST (ativado/desativado, CA atribuída)
 - Regeneração automática de CRL com contagem de CDP
 - Respondedor OCSP
+- TSA, SMTP e webhooks
 - Status de renovação automática
-- Tempo de atividade do serviço
+
+O painel Saúde do Sistema mostra também a conexão WebSocket, o banco de dados, a API e a hora da última atualização.
 
 ### Atividade Recente
-Um feed ao vivo das últimas operações: emissão de certificados, revogações, importações, logins de usuários. Atualiza em tempo real via WebSocket.
+Um feed ao vivo das últimas operações: emissão de certificados, revogações, importações, logins de usuários. Atualiza em tempo real via WebSocket. O feed completo exige **read:audit**, como a página Logs de Auditoria; sem essa permissão, você vê apenas os seus próprios eventos.
 
 ### Autoridades Certificadoras
-Visualização rápida de todas as CAs com seu tipo (Raiz/Intermediária) e contagem de certificados.
+Visualização rápida das últimas CAs, cada uma marcada como Root ou Sub.
+
+### Expiração do Trust Store
+Certificados confiáveis que expiram primeiro.
 
 ### Contas ACME
 Lista as contas de clientes ACME registradas e suas contagens de pedidos.
@@ -77,18 +84,18 @@ Lista as contas de clientes ACME registradas e suas contagens de pedidos.
 ## Personalização
 
 ### Reorganizando Widgets
-Arraste qualquer widget pelo seu cabeçalho para reposicioná-lo. O layout usa uma grade responsiva que se adapta ao tamanho da sua tela.
+Clique em **Editar layout** no cabeçalho da página e arraste qualquer widget pelo seu cabeçalho para reposicioná-lo. O layout usa uma grade responsiva que se adapta ao tamanho da sua tela.
 
 ### Mostrando/Ocultando Widgets
-Clique no **ícone de olho** no cabeçalho da página para alternar a visibilidade de widgets individuais. Widgets ocultos são lembrados entre sessões.
+Clique em **Personalizar painel** (ícone de controles deslizantes) no cabeçalho da página e, em seguida, no olho ao lado de um widget para alternar a sua visibilidade. Widgets ocultos são lembrados entre sessões.
 
 ### Persistência do Layout
-Sua configuração de layout é salva por usuário no navegador. Ela persiste entre sessões e dispositivos que compartilham o mesmo perfil de navegador.
+Seu layout é salvo no navegador, não na sua conta: todas as contas que entram a partir do mesmo perfil de navegador o compartilham, e outro navegador começa com o layout padrão.
 
 ## Atualizações em Tempo Real
 O painel recebe atualizações ao vivo via WebSocket. Não é necessário atualizar manualmente: novos certificados, mudanças de status e entradas de atividade aparecem automaticamente.
 
-> 💡 Se o WebSocket estiver desconectado, um indicador amarelo aparece na barra lateral. Os dados serão atualizados na reconexão.
+> 💡 O ponto verde na barra lateral indica uma conexão WebSocket ativa e desaparece quando ela cai. Os dados serão atualizados na reconexão.
 `
   }
 }

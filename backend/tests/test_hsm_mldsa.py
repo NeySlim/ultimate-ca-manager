@@ -10,6 +10,8 @@ from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
+
+from tests.seeded_rows import delete_cas
 from cryptography import x509
 from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives import hashes, serialization
@@ -80,17 +82,11 @@ def _hsm_mldsa_key(app, label='ML-DSA-65', provider_type='pkcs11'):
             yield key_id, key, fake
     finally:
         with app.app_context():
-            from models import CA, Certificate, db
-            from models.crl import CRLMetadata
+            from models import CA, db
             from models.hsm import HsmProvider
-            from models.ocsp import OCSPResponse
             from services.hsm import HsmService
             db.session.rollback()
-            for ca in CA.query.filter_by(hsm_key_id=key_id).all():
-                CRLMetadata.query.filter_by(ca_id=ca.id).delete()
-                OCSPResponse.query.filter_by(ca_id=ca.id).delete()
-                Certificate.query.filter_by(caref=ca.refid).delete()
-                db.session.delete(ca)
+            delete_cas(CA.query.filter_by(hsm_key_id=key_id))
             db.session.query(HsmKey).filter_by(id=key_id).delete()
             db.session.query(HsmProvider).filter_by(id=provider_id).delete()
             db.session.commit()

@@ -44,17 +44,20 @@ class DreamhostDnsProvider(BaseDnsProvider):
             return False, f"Failed: {result}"
         return True, "Record created"
     
-    def delete_txt_record(self, domain, record_name):
-        # First list to find the value
+    def delete_txt_record(self, domain, record_name, record_value):
+        # dns-remove_record needs the value exactly as stored: take it from the listing
         success, result = self._request('dns-list_records')
         if not success:
             return False, f"Failed: {result}"
         
         for rec in result.get('data', []):
-            if rec.get('record') == record_name and rec.get('type') == 'TXT':
-                self._request('dns-remove_record', {
+            if (rec.get('record') == record_name and rec.get('type') == 'TXT'
+                    and self.txt_matches(rec.get('value'), record_value)):
+                success, result = self._request('dns-remove_record', {
                     'record': record_name, 'type': 'TXT', 'value': rec['value']
                 })
+                if not success:
+                    return False, f"Failed: {result}"
                 return True, "Record deleted"
         return True, "Record not found (already deleted?)"
     

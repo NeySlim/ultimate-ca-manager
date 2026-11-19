@@ -73,7 +73,9 @@ UCM uses a 3-panel layout:
 4. Configure:
    - **Common Name** - CA identifier
    - **Organization** - Your organization name
-   - **Key Type** - RSA 4096 or ECDSA P-384 recommended
+   - **Key Type** - RSA 4096 or ECDSA P-384 recommended. EdDSA (Ed25519, Ed448) suits only
+     clients that verify it (OpenSSL, Go, Java 15 and later): web browsers, Windows
+     (CryptoAPI/CNG) and SCEP clients reject what such a CA issues
    - **Validity** - 10-20 years typical for Root
 5. Click **Create**
 

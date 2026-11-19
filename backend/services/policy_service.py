@@ -334,7 +334,8 @@ class PolicyEvaluationService:
     def enforce_rules(policies: list, *, key_type=None, dns_name_count=None,
                       validity_days=None, digest=None, context=None, notify=True,
                       ca_id=None, signer=None, signer_scheme=None, signer_storage=None,
-                      signer_certification=None, not_after=None, tsa_signer=False, pq_hybrid=False, notices=None):
+                      signer_certification=None, not_after=None, not_before=None, tsa_signer=False,
+                      pq_hybrid=False, notices=None):
         """Apply the Rules of *policies* to a request (#335).
 
         Returns ``(violations, validity_days, capped_by)``: the
@@ -355,7 +356,8 @@ class PolicyEvaluationService:
         and key storage the rules read; *signer_scheme* and *signer_storage*
         say them when no signer exists yet (*signer_certification*: the
         certification declared for its HSM). The end of the certificate is
-        *not_after* (a date), else today plus the capped validity. *tsa_signer*
+        *not_after* (a date), else *not_before* (a datetime, default now) plus the
+        capped validity. *tsa_signer*
         marks a TSA signing certificate. The ``advisories`` of each policy are
         appended to *notices* (a list) and never refuse anything.
 
@@ -387,7 +389,7 @@ class PolicyEvaluationService:
         today = utc_now().date()
         end = not_after
         if end is None and effective_validity is not None:
-            end = (utc_now() + timedelta(days=effective_validity)).date()
+            end = ((not_before or utc_now()) + timedelta(days=effective_validity)).date()
         req = {'key_type': key_type, 'digest': digest, 'signer_scheme': signer_scheme,
                'signer_storage': signer_storage, 'signer_certification': signer_certification,
                'not_after': end, 'today': today,
@@ -436,33 +438,39 @@ class PolicyEvaluationService:
     @staticmethod
     def choose_digest(policies: list, default='sha256'):
         """The digest for a path whose hash nobody chose: *default* when the
-        policies accept it, else the weakest one they all accept. An explicit
-        choice (template, ACME profile, CA form) is checked, never replaced."""
+        policies accept it, else the weakest they all accept that is at least as
+        strong, else the strongest they accept. An explicit choice (template,
+        ACME profile, CA form) is checked, never replaced."""
         default = normalize_digest(default) or 'sha256'
         allowed = PolicyEvaluationService.allowed_digests(policies)
         if not allowed or default in allowed:
             return default
-        return allowed[0]
+        floor = POLICY_DIGESTS.index(default)
+        stronger = [d for d in allowed if POLICY_DIGESTS.index(d) > floor]
+        return stronger[0] if stronger else allowed[-1]
 
     @staticmethod
     def checked_signing_hash(policies: list, ca_key, digest=None, *, explicit=True,
                              key_type=None, context=None, validity_days=None, not_after=None,
                              tsa_signer=False, notices=None, ca_id=None, pq_hybrid=False):
-        """``(hash for builder.sign(), violations)``. An implicit *digest* yields
-        to the weakest one the policies allow; the hash the key really signs
-        with (HSM-bound, None for Ed25519, Ed448 and ML-DSA) is then checked with *key_type*,
-        and *ca_key* (its scheme and storage) against the signature rules."""
+        """``(hash for builder.sign(), violations)``. Without *digest*, the one
+        matching the CA key; an implicit *digest* is a preference kept while the
+        policies allow it, else the CA key's yields to them. The hash the key really
+        signs with (HSM-bound, None for Ed25519, Ed448 and ML-DSA) is then checked
+        with *key_type*, and *ca_key* (its scheme and storage) against the signature rules."""
         from cryptography.hazmat.primitives import hashes
         from services.trust_store.constants import hash_algorithm
+        from utils.issuance_defaults import digest_for_key
         from utils.signing_hash import signing_hash_for
-        key_default = key_algorithms.default_digest_for_key(ca_key)  # None: the key takes no digest
+        key_default = digest_for_key(ca_key)  # None: the key takes no digest
         requested = None
         if digest or key_default:
             name = str(digest or key_default).strip().lower()
             if not explicit:
-                # SHA-256 is the callers' placeholder default: the key's registry digest stands in
-                name = PolicyEvaluationService.choose_digest(
-                    policies, (key_default or name) if name == 'sha256' else name)
+                preferred = normalize_digest(digest)
+                allowed = PolicyEvaluationService.allowed_digests(policies)
+                name = (preferred if preferred and (not allowed or preferred in allowed)
+                        else PolicyEvaluationService.choose_digest(policies, key_default))
             try:
                 requested = hash_algorithm(name)
             except ValueError as e:
@@ -591,17 +599,23 @@ class PolicyEvaluationService:
         if not names:
             return False
         
-        # Check if any name matches the pattern
-        for name in names:
-            name = str(name)
-            if dns_pattern == '*.':
-                # Wildcard policy: matches if name starts with *.
-                if name.startswith('*.'):
-                    return True
-            elif name.startswith(dns_pattern) or name.endswith(dns_pattern):
-                return True
-        
-        return False
+        return any(PolicyEvaluationService._dns_pattern_covers(dns_pattern, str(name)) for name in names)
+
+    @staticmethod
+    def _dns_pattern_covers(pattern: str, name: str) -> bool:
+        """Label match, case and root dot ignored (RFC 4343): ``*.x`` and ``.x`` cover
+        the names under x, ``x`` covers x too; ``*.`` covers wildcard names only."""
+        if pattern.strip() in ('*.', '*'):
+            return name.strip().startswith('*.')
+        name = name.strip().lower().rstrip('.')
+        if name.startswith('dns:'):
+            name = name[4:].strip()
+        base = pattern.strip().lower().rstrip('.')
+        subdomains_only = base.startswith(('*.', '.'))
+        base = base[2:] if base.startswith('*.') else base.lstrip('.')
+        if not base:
+            return True
+        return name.endswith('.' + base) or (not subdomains_only and name == base)
 
     @staticmethod
     def create_approval_request(

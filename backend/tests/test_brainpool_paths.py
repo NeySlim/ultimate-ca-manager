@@ -386,6 +386,7 @@ def _signed_renewal_rst(signing_cert, signing_key, csr):
     etree.SubElement(rst, '{%s}BinarySecurityToken' % WSSE_NS, EncodingType='base64', ValueType=(
         'http://schemas.microsoft.com/windows/pki/2009/01/enrollment#PKCS10')
     ).text = base64.b64encode(csr.public_bytes(serialization.Encoding.DER)).decode()
+    etree.SubElement(rst, '{%s}RequestType' % WST_NS).text = 'http://docs.oasis-open.org/ws-sx/ws-trust/200512/Issue'
     sig = xmlsec.template.create(security, xmlsec.constants.TransformExclC14N,
                                  xmlsec.constants.TransformEcdsaSha256)
     security.append(sig)

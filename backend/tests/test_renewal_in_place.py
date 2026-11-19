@@ -221,6 +221,17 @@ class TestInPlace:
         assert result['new_serial'] == after['serial'] and result['rekeyed'] is True
         assert result['ca_id'] == ca['id'] and result['notices'] == []
 
+    def test_the_superseded_serial_keeps_the_old_key_digest(self, app, leaf):
+        from utils.spki_digest import certificate_key_sha256
+        cid = leaf()
+        before = _state(app, cid)
+        _renew(app, cid)
+        after = _state(app, cid)
+        with app.app_context():
+            record = RevokedSerial.query.filter_by(certificate_id=cid).one()
+            assert record.public_key_sha256 == certificate_key_sha256(before['crt'])
+            assert record.public_key_sha256 != certificate_key_sha256(after['crt'])
+
     def test_second_renewal_records_the_intermediate_serial(self, app, leaf):
         cid = leaf()
         first = _state(app, cid)['serial']
@@ -234,20 +245,26 @@ class TestInPlace:
         assert recorded == sorted([first, middle]) and first != middle
 
     def test_an_existing_record_for_the_serial_is_updated_not_duplicated(self, app, ca, leaf):
+        """Non-regression, passes with and without the fix: on the record alone, as a renewal
+        never meets a record of its own serial (it is refused)."""
+        from services.cert.renewal import _record_superseded
         cid = leaf()
         before = _state(app, cid)
         with app.app_context():
             refid = db.session.get(CA, ca['id']).refid
             db.session.add(RevokedSerial(caref=refid, serial_number=before['serial'],
-                                         revoke_reason='unspecified', certificate_id=None,
+                                         revoke_reason='certificateHold', certificate_id=None,
                                          valid_to=datetime(2001, 1, 1)))
             db.session.commit()
-        _renew(app, cid)
-        with app.app_context():
+            _record_superseded(cid, db.session.get(CA, ca['id']), before['serial'], before['valid_to'],
+                               datetime(2026, 1, 1))
+            db.session.commit()
             records = RevokedSerial.query.filter_by(caref=refid, serial_number=before['serial']).all()
             assert len(records) == 1
             assert records[0].revoke_reason == 'superseded' and records[0].certificate_id == cid
             assert records[0].valid_to == before['valid_to']
+            db.session.delete(records[0])
+            db.session.commit()
 
     def test_columns_follow_the_new_certificate(self, app, ca, leaf):
         from utils.upn_san import build_upn_other_name

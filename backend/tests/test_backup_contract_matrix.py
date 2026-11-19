@@ -33,6 +33,10 @@ from models import db
 from services.backup import manifest
 from services.backup.export_generic import load_model
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 PASSWORD = 'Correct-Horse-Battery-9'
 
 # Rows this file creates are recognisable, so the teardown removes exactly
@@ -41,9 +45,9 @@ MARK = 'zzcontract'
 
 # {section: reason} — sections that hang off one the factory does not build,
 # because its exporter reads real cryptographic material nothing can invent.
-# Whether they seed depends on what the rest of the suite left in the shared
-# database, so they are allowed to be absent, never to be absent silently:
-# an entry is a decision, with a reason someone can check.
+# On the fresh database of this module they never seed, so they are allowed
+# to be absent, never to be absent silently: an entry is a decision, with a
+# reason someone can check.
 NEEDS_REAL_MATERIAL: dict = {
     'ssh_certificates': (
         'it hangs off an SSH authority, whose exporter reads a real key, and '
@@ -74,13 +78,28 @@ def _value_for(column, index):
         return b'contract'
     if 'JSON' in declared:
         return {}
-    return f'{MARK}-{index}'
+    length = getattr(column.type, 'length', None)  # PostgreSQL enforces it
+    return f'{MARK}-{index}'[:length] if length else f'{MARK}-{index}'
 
 
 def _is_ours(row) -> bool:
     """Whether this archived row is one this file seeded."""
     return any(isinstance(value, str) and value.startswith(MARK)
                for value in row.values())
+
+
+# Secrets the export reads as key material: only a PEM leaves the installation
+_PEM_SECRETS = {('acme_client_orders', 'pending_key')}
+
+
+def _secret_value(name, column):
+    value = f'{MARK}-secret-{name}-{column}'
+    if (name, column) in _PEM_SECRETS:
+        return f'-----BEGIN PRIVATE KEY-----\n{value}\n-----END PRIVATE KEY-----\n'
+    # PostgreSQL enforces the declared length (users.totp_secret is 32)
+    table_column = load_model(manifest.SECTIONS[name]).__table__.c.get(column)
+    length = getattr(getattr(table_column, 'type', None), 'length', None)
+    return value[:length] if length else value
 
 
 def _fill_secrets(name, row):
@@ -97,7 +116,7 @@ def _fill_secrets(name, row):
     for column in section.secrets:
         try:
             with db.session.begin_nested():
-                setattr(row, column, f'{MARK}-secret-{name}-{column}')
+                setattr(row, column, _secret_value(name, column))
                 db.session.flush()
         except Exception:
             # A column this version stores differently, or a setter that
@@ -366,7 +385,7 @@ class TestEverySecretTravelsReadable:
                     value = row.get(column)
                     if not isinstance(value, str) or not value:
                         continue
-                    expected = f'{MARK}-secret-{name}-{column}'
+                    expected = _secret_value(name, column)
                     if value == expected:
                         readable.add((name, column))
                     elif (key_encryption.is_string_encrypted(value)

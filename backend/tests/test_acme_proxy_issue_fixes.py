@@ -15,8 +15,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from models import db
+from models import Certificate, db
+from tests.seeded_rows import ensure_acme_account
 from models.acme_models import AcmeClientOrder
+from services.acme.upstream_problem import UpstreamProblem
 
 UPSTREAM = 'https://acme-stub.example'
 
@@ -53,6 +55,7 @@ def _make_service(app):
 
 
 def _seed_proxy_order(**kwargs):
+    ensure_acme_account(kwargs.get('account_id'))
     order = AcmeClientOrder(
         domains=json.dumps(['proxy-fix.test']),
         status=kwargs.pop('status', 'pending'),
@@ -69,6 +72,7 @@ def _clean_orders(app):
     with app.app_context():
         yield
         AcmeClientOrder.query.filter_by(domains=json.dumps(['proxy-fix.test'])).delete()
+        Certificate.query.filter_by(refid='proxy-fix-imported').delete()
         db.session.commit()
 
 
@@ -110,10 +114,14 @@ class TestChallengeUpLinkFallback:
         )
         resp = SimpleNamespace(
             status_code=200, headers=upstream_headers, text='',
-            json=lambda: {'type': 'dns-01', 'url': self.CHALL,
-                          'status': status, 'token': 't'},
+            json=lambda: {'status': 'pending' if status == 'pending' else 'valid',
+                          'identifier': {'type': 'dns', 'value': 'proxy-fix.test'},
+                          'challenges': [{'type': 'dns-01', 'url': self.CHALL,
+                                          'status': status, 'token': 't'}]},
         )
-        monkeypatch.setattr(svc, '_post_with_account', lambda *_a, **_k: resp)
+        self.calls = []
+        monkeypatch.setattr(svc, '_post_with_account',
+                            lambda url, *_a, **_k: self.calls.append(url) or resp)
         return svc.respond_challenge(
             _b64(self.CHALL), requester_account_id='acct-up',
             requester_thumbprint='thumb-up')
@@ -124,12 +132,14 @@ class TestChallengeUpLinkFallback:
             _data, link = self._respond(app, monkeypatch, {}, status=status)
         assert link == f'<https://ucm.example/acme/proxy/authz/{_b64(self.AUTHZ)}>;rel="up"'
 
-    def test_upstream_link_wins_over_known_authz(self, app, monkeypatch):
-        other = f'{UPSTREAM}/authZ/other'
+    @pytest.mark.parametrize('status', ['valid', 'pending'])
+    def test_challenge_is_read_on_its_authorization_only(self, app, monkeypatch, status):
+        """A POST-as-GET on a pending challenge starts its validation on some
+        servers (RFC 8555 erratum 5729): the proxy never sends one upstream."""
         with app.app_context():
-            _data, link = self._respond(
-                app, monkeypatch, {'Link': f'<{other}>;rel="up"'})
-        assert link == f'<https://ucm.example/acme/proxy/authz/{_b64(other)}>;rel="up"'
+            _data, link = self._respond(app, monkeypatch, {}, status=status)
+        assert self.calls == [self.AUTHZ]
+        assert link == f'<https://ucm.example/acme/proxy/authz/{_b64(self.AUTHZ)}>;rel="up"'
 
 
 class TestCertificateUrlPersistence:
@@ -139,7 +149,7 @@ class TestCertificateUrlPersistence:
         with app.app_context():
             svc = _make_service(app)
             order = _seed_proxy_order(upstream_order_url=f'{UPSTREAM}/order/1')
-            svc._persist_certificate_url(f'{UPSTREAM}/order/1', f'{UPSTREAM}/cert/abc')
+            svc._persist_certificate_url(order, f'{UPSTREAM}/cert/abc')
             assert db.session.get(AcmeClientOrder, order.id).certificate_url == f'{UPSTREAM}/cert/abc'
 
     def test_find_order_fast_path_no_upstream_calls(self, app, monkeypatch):
@@ -200,9 +210,16 @@ class TestGetCertificateResponsePath:
         )
         svc = _make_service(app)
         monkeypatch.setattr(svc, '_post_with_account', lambda *_a, **_k: upstream_resp)
+        # A real row: the order's certificate_id is a foreign key on PostgreSQL
+        imported = Certificate.query.filter_by(refid='proxy-fix-imported').first()
+        if imported is None:
+            imported = Certificate(refid='proxy-fix-imported', descr='proxy-fix')
+            db.session.add(imported)
+            db.session.commit()
+        self.imported_id = imported.id
         monkeypatch.setattr(
             CertificateService, 'import_certificate',
-            staticmethod(lambda **_kw: SimpleNamespace(id=4242)),
+            staticmethod(lambda **_kw: SimpleNamespace(id=imported.id)),
         )
 
         spawned = []
@@ -234,11 +251,12 @@ class TestGetCertificateResponsePath:
             target, args = spawned[0]
             assert target.__name__ == '_bg_cleanup_dns_records'
             assert args[1] == records
+            assert args[2] == order.id  # its own cleanup is never left to itself
 
             refreshed = db.session.get(AcmeClientOrder, order.id)
             assert refreshed.status == 'valid'
             assert refreshed.dns_records_created is None
-            assert refreshed.certificate_id == 4242
+            assert refreshed.certificate_id == self.imported_id
 
     def test_upstream_link_header_not_forwarded(self, app, monkeypatch):
         with app.app_context():
@@ -261,8 +279,10 @@ class TestGetCertificateResponsePath:
                 headers={'Link': f'<{UPSTREAM}/x>;rel="alternate"', 'Content-Type': 'application/problem+json'},
             )
             monkeypatch.setattr(svc, '_post_with_account', lambda *_a, **_k: err_resp)
-            _body, _ct, link_header = svc.get_certificate(_b64(f'{UPSTREAM}/cert/err'))
-            assert link_header is None
+            # Relayed as a problem document: neither the body nor the Link header is served
+            with pytest.raises(UpstreamProblem) as exc:
+                svc.get_certificate(_b64(f'{UPSTREAM}/cert/err'))
+            assert exc.value.status == 404
 
 
 class TestBgCleanupDnsRecords:

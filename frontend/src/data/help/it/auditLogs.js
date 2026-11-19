@@ -53,12 +53,8 @@ Ogni voce del log registra:
 
 ## Filtri
 
-### Per tipo di azione
-Filtra per categoria di operazione:
-- Operazioni certificato (emissione, revoca, rinnovo, esportazione)
-- Operazioni CA (creazione, importazione, eliminazione)
-- Operazioni utente (accesso, uscita, creazione, aggiornamento)
-- Operazioni di sistema (modifica impostazioni, backup, ripristino)
+### Per azione
+Seleziona uno o più nomi di azione, ad esempio \`certificate_issued\` o \`login_success\`.
 
 ### Per utente
 Mostra solo le azioni eseguite da un utente specifico.
@@ -71,7 +67,7 @@ Mostra solo le azioni eseguite da un utente specifico.
 Imposta le date **Da** e **A** per restringere la finestra temporale.
 
 ### Ricerca testuale
-Ricerca libera su tutti i campi del log.
+Ricerca libera in nome utente, azione, dettagli, tipo di risorsa e indirizzo IP; il nome e l'id della risorsa non sono cercati.
 
 ## Esportazione
 
@@ -79,7 +75,7 @@ Esporta i log filtrati in:
 - **JSON**: Leggibile dalle macchine, include tutti i campi
 - **CSV**: Compatibile con i fogli di calcolo, include i campi principali
 
-Le esportazioni includono solo i risultati attualmente filtrati.
+Le esportazioni applicano solo l'intervallo di date, fino a 10.000 voci: gli altri filtri non vengono applicati.
 
 ## Pulizia
 
@@ -92,7 +88,7 @@ Elimina i vecchi log in base al periodo di conservazione:
 
 ## Verifica dell'integrità
 
-Clicca **Verifica integrità** per controllare la catena dei log di audit. UCM utilizza il concatenamento di hash per rilevare se delle voci del log sono state manomesse o eliminate.
+Clicca **Verifica integrità** per controllare la catena dei log di audit. UCM utilizza il concatenamento di hash per rilevare una voce modificata o rimossa all'interno della catena; la rimozione delle ultime voci non lascia traccia nella catena stessa, ed è per questo che l'inoltro syslog ne conserva una copia altrove.
 
 ## Inoltro syslog
 

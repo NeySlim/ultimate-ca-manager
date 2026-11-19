@@ -15,6 +15,7 @@ WK-3 tests — webhook auth validation, PUT semantics, and audit events.
 """
 
 import json
+import uuid
 
 import pytest
 from tests.conftest import assert_error, assert_success
@@ -33,7 +34,7 @@ def _put(client, wh_id, payload):
 
 
 def _base_payload(**kwargs):
-    p = {'name': 'Test Hook', 'url': 'https://example.com/hook'}
+    p = {'name': f'Test Hook {uuid.uuid4().hex[:8]}', 'url': 'https://example.com/hook'}
     p.update(kwargs)
     return p
 

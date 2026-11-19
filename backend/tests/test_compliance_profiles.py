@@ -17,6 +17,10 @@ from models import CA, SystemConfig, db
 from models.audit_log import AuditLog
 from services.policy_service import PolicyEvaluationService, SystemPolicy, with_system_policies
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 PG_URL = os.getenv('UCM_TEST_PG_URL')
 JSON = 'application/json'
 

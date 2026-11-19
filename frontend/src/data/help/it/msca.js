@@ -18,7 +18,7 @@ export default {
           { label: 'Selezione template', text: 'Scegli tra i template di certificato disponibili sulla MS CA' },
           { label: 'Approvazione automatica', text: 'I template con autoenroll restituiscono il certificato immediatamente' },
           { label: 'Approvazione del responsabile', text: 'Alcuni template richiedono l\'approvazione del responsabile, UCM traccia la richiesta in sospeso' },
-          { label: 'Polling dello stato', text: 'Controlla lo stato della richiesta in sospeso dal pannello dei dettagli del CSR' },
+          { label: 'Richieste in sospeso', text: 'Una richiesta che la CA trattiene per il suo responsabile resta In sospeso in UCM, e la pagina non offre alcun controllo dello stato: una volta emessa sulla CA, importa il certificato, oppure lascia che la Sincronizzazione inventario sul canale di amministrazione WinRM importi i certificati che UCM non conosce ancora' },
         ]
       },
       {
@@ -44,7 +44,7 @@ export default {
           { label: 'Scopo', text: 'Esegue operazioni di gestione sulla CA Windows (revoca, annullamento revoca, pubblicazione CRL, inventario, approvazione/rifiuto) tramite PowerShell remoting + certutil, operazioni che l\'iscrizione web di AD CS non può fare.' },
           { label: 'Trasporto', text: 'NTLM o Kerberos su HTTP/HTTPS. Consigliato Kerberos + HTTPS; Kerberos riutilizza il keytab della connessione.' },
           { label: 'Credenziali', text: 'Riutilizza per impostazione predefinita quelle della connessione. Le connessioni mTLS devono impostare un account WinRM dedicato (ufficiale «Rilascia e gestisci certificati» con privilegi minimi).' },
-          { label: 'Requisito', text: 'WinRM abilitato sulla CA e il pacchetto opzionale pywinrm installato. Le operazioni di gestione richiedono admin:system.' },
+          { label: 'Requisito', text: 'WinRM abilitato sulla CA e il pacchetto opzionale pywinrm installato. Le operazioni di gestione richiedono admin:system; la propagazione alla CA di una revoca o del rilascio di una sospensione segue il permesso write:certificates del certificato.' },
         ]
       },
       {
@@ -58,7 +58,7 @@ export default {
       {
         title: 'Inventario CA e pannello di controllo',
         items: [
-          { label: 'Sincronizzazione inventario', text: 'Importa i certificati emessi direttamente sulla CA che UCM non conosce ancora (incrementale per id richiesta, con riconciliazione).' },
+          { label: 'Sincronizzazione inventario', text: 'Importa i certificati emessi direttamente sulla CA che UCM non conosce ancora (incrementale per id richiesta); la riconciliazione è disponibile tramite l\'API.' },
           { label: 'Richieste in sospeso', text: 'Elenca, approva (reinvio + importazione automatica) o rifiuta le richieste in attesa di approvazione del responsabile della CA.' },
           { label: 'Salute della CA', text: 'Stato del servizio CA, scadenza del certificato CA, prossimo aggiornamento della CRL e numero di richieste in sospeso a colpo d\'occhio.' },
         ]
@@ -88,7 +88,7 @@ UCM si integra con i servizi certificati di Microsoft Active Directory (AD CS) p
 1. Vai su **Impostazioni → Microsoft CA**
 2. Clicca **Aggiungi connessione**
 3. Inserisci il **nome della connessione** e l'**hostname del server CA**
-4. Facoltativamente inserisci il **nome comune della CA** (rilevato automaticamente se vuoto)
+4. Facoltativamente inserisci il **nome comune della CA** (se vuoto si usa l'hostname del server)
 5. Seleziona il **metodo di autenticazione**
 6. Inserisci le credenziali per il metodo scelto
 7. Clicca **Testa connessione** per verificare
@@ -124,7 +124,7 @@ UCM si integra con i servizi certificati di Microsoft Active Directory (AD CS) p
 Il certificato viene restituito immediatamente e importato in UCM.
 
 ### Template con approvazione del responsabile
-UCM salva la richiesta come **In sospeso** e traccia l'ID della richiesta MS CA. Una volta approvata sulla CA Windows, controlla lo stato dal pannello dei dettagli del CSR per importare il certificato.
+UCM salva la richiesta come **In sospeso** e traccia l'ID della richiesta MS CA. La pagina non offre un controllo dello stato per essa: una volta emessa sulla CA Windows, importa il certificato, oppure lascia che la **Sincronizzazione inventario** sul canale di amministrazione WinRM importi i certificati che UCM non conosce ancora.
 
 ## Iscrizione per conto di (EOBO)
 

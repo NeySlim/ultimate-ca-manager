@@ -40,7 +40,7 @@ export default {
     tips: [
       'Tout rejet unique arrête immédiatement l\'approbation : c\'est intentionnel pour la sécurité.',
       'Tant qu\'un renouvellement attend une approbation, le planificateur laisse le certificat à cette décision, tant qu\'elle peut intervenir avant l\'expiration du certificat ; sous une politique de renouvellement, il ne renouvelle jamais sans elle.',
-      'Les commentaires d\'approbation sont enregistrés dans la piste d\'audit pour la conformité.',
+      'Chaque décision et son commentaire sont conservés dans la chronologie d\'approbation de la demande ; le journal d\'audit enregistre les approbations, pas le commentaire, une demande mise en file ni un rejet.',
     ],
   },
   helpGuides: {
@@ -85,7 +85,7 @@ Les administrateurs contournent la file sur tous les chemins.
 - Approuver une demande dont la requête stockée, le certificat ou la CA **n'existe plus** la clôture comme rejetée
 - Une révocation en file dont le certificat a été **révoqué directement** est clôturée comme approuvée (annulée si son demandeur l'a révoqué) ; si le certificat a été **renouvelé** depuis, elle est clôturée comme rejetée à l'approbation ; pendant une suspension du certificat, elle attend la levée de la suspension
 
-Les webhooks sont notifiés de ces clôtures comme pour un rejet.
+Une clôture comme rejetée notifie les webhooks comme le fait un rejet ; une clôture comme approuvée n'envoie aucun webhook.
 
 ## Échéance
 
@@ -102,7 +102,7 @@ Une demande attend **sept jours** une décision. Passé ce délai, elle est clô
 
 1. Cliquez sur une demande en attente pour voir ses détails
 2. Cliquez sur **Rejeter**
-3. Entrez un **motif de rejet** (requis) : cela est enregistré pour la conformité d'audit
+3. Entrez un **motif de rejet** (requis) : il est conservé dans la chronologie de la demande ; un rejet n'écrit aucune entrée dans le journal d'audit
 4. La demande est immédiatement arrêtée
 
 > ⚠ Tout rejet unique arrête la demande entière. C'est intentionnel : si un examinateur identifie un problème, l'émission ne doit pas se poursuivre.
@@ -114,7 +114,7 @@ Chaque demande maintient un historique d'approbation complet montrant :
 - Quand l'action a été effectuée (horodatage)
 - Commentaire fourni (le cas échéant)
 
-Cet historique est immuable et fait partie de la piste d'audit.
+Cet historique est stocké avec la demande, pas dans le journal d'audit.
 
 ## Filtrage
 

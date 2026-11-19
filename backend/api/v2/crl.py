@@ -454,17 +454,17 @@ def get_ocsp_status():
 @bp.route('/api/v2/ocsp/stats', methods=['GET'])
 @require_auth(['read:certificates'])
 def get_ocsp_stats():
-    """Get OCSP statistics from cached responses"""
+    """OCSP requests answered since the service started, and how many came from the cache"""
+    from api.ocsp_routes import request_stats
     from models.ocsp import OCSPResponse
+    stats = request_stats()
     try:
-        total = OCSPResponse.query.count()
-        return success_response(data={
-            'total_requests': total,
-            'cache_hits': total,
-        })
+        cached = OCSPResponse.query.count()
     except Exception as e:
         logger.error(f"OCSP stats query failed: {e}")
-        return success_response(data={
-            'total_requests': 0,
-            'cache_hits': 0,
-        })
+        cached = 0
+    return success_response(data={
+        'total_requests': stats['requests'],
+        'cache_hits': stats['cache_hits'],
+        'cached_responses': cached,
+    })

@@ -8,9 +8,12 @@ import re
 from cryptography import x509
 from cryptography.x509.oid import NameOID, ExtensionOID
 
+from utils.request_names import RequestRejected
+
 from .validation_helpers import _name_value, _name_matches_subtree
 
 logger = logging.getLogger(__name__)
+
 
 # Hostname-shaped CN: optional wildcard label then dotted DNS labels. A CN
 # like "John Doe" or "Fileserver Backup Key" is a display name, not a DNS
@@ -76,7 +79,7 @@ def _validate_against_cert(ca_cert, names_to_check):
             + ", ".join(outside_permitted_names)
         )
     if errors:
-        raise ValueError("; ".join(errors))
+        raise RequestRejected("; ".join(errors))
 
 
 def _chain_certs_above(ca_cert):
@@ -158,7 +161,8 @@ def _cert_name_values(cert):
     return values
 
 
-def validate_name_constraints(ca_cert, subject, san_names=None, renewal_of=None):
+def validate_name_constraints(ca_cert, subject, san_names=None, renewal_of=None,
+                              cn_may_name_host=True):
     """Validate subject and SANs against the NameConstraints of the whole CA
     chain (RFC 5280 §4.2.1.10) — the direct issuer AND every CA above it, so a
     constraint set on a root is enforced even when an intermediate carries none.
@@ -169,6 +173,9 @@ def validate_name_constraints(ca_cert, subject, san_names=None, renewal_of=None)
     before the CA's constraints were tightened) must stay renewable — blocking
     them strands entire fleets at expiry. Violations on carried-over names are
     logged; only names NEW to this request are enforced.
+
+    ``cn_may_name_host``: False for an S/MIME certificate that cannot authenticate a
+    server (utils.request_names.cn_may_name_host): its dotted CN (john.doe) names a person.
     """
     names_to_check = []
     try:
@@ -178,7 +185,7 @@ def validate_name_constraints(ca_cert, subject, san_names=None, renewal_of=None)
             cn_value = attr.value
             if '@' in cn_value:
                 names_to_check.append(x509.RFC822Name(cn_value))
-            elif _DNS_LIKE_CN.match(cn_value or ''):
+            elif cn_may_name_host and _DNS_LIKE_CN.match(cn_value or ''):
                 names_to_check.append(x509.DNSName(cn_value))
             # Non-hostname CNs ("John Doe") carry no DNS/email identity —
             # RFC 5280 name constraints do not apply to them.

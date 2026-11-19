@@ -32,6 +32,8 @@ from security.encryption import encrypt_private_key
 from utils.db_transaction import safe_commit
 from . import bp
 from utils.qc_statements import add_certificate_policies, add_qc_statements, template_policy_oids
+from utils.custom_extensions import (TemplateConfigError, add_custom_extensions, merge_custom_extensions,
+                                     template_custom_extensions, validate_custom_extensions)
 from utils import key_algorithms
 from utils.key_codec import private_key_to_pem
 from utils.x509_aki import authority_key_identifier_from_issuer
@@ -82,7 +84,7 @@ def create_certificate():
         if not is_valid:
             return error_response(error, 400)
 
-    from utils.san_parse import parse_cert_san_payload
+    from utils.san_parse import cn_dns_name_error, parse_cert_san_payload
 
     san_buckets, san_err = parse_cert_san_payload(data)
     if san_err:
@@ -120,6 +122,20 @@ def create_certificate():
         san_refusal = bucket_san_refusal(template, data)
         if san_refusal:
             return error_response(san_refusal, 400)
+    cn_err = cn_dns_name_error(data.get('cn'), data.get('cert_type', 'server'), san_buckets, template)
+    if cn_err:
+        return error_response(cn_err, 400)
+
+    # The request's own extensions win over the template's for the same OID;
+    # the approval workflow stores the request's alone
+    requested_ext, ext_err = validate_custom_extensions(data.get('custom_extensions'))
+    if ext_err:
+        return error_response(ext_err, 400)
+    data['custom_extensions'] = requested_ext
+    try:
+        custom_ext = merge_custom_extensions(template_custom_extensions(template), requested_ext)
+    except TemplateConfigError as e:
+        return error_response(str(e), 400)
 
     if not ca.has_private_key:
         return error_response('CA private key not available', 400)
@@ -298,10 +314,11 @@ def create_certificate():
             )
             violations = list(dict.fromkeys(list(violations) + list(pq_violations)))
             capped_by = pq_capped_by or capped_by
-        # The template's digest is a choice, checked; without one the default yields
-        template_digest = template.digest if template and template.digest else None
+        # The template's digest, floored at the CA key's, yields to the policies
+        from utils.issuance_defaults import digest_replaced_notice, template_digest
+        preferred_digest = template_digest(template, ca_key)
         sign_hash, digest_violations = PolicyEvaluationService.checked_signing_hash(
-            policies, ca_key, template_digest, explicit=template_digest is not None,
+            policies, ca_key, preferred_digest, explicit=False,
             context=rule_context, notices=advisories)
         violations += digest_violations
         if violations:
@@ -311,12 +328,13 @@ def create_certificate():
             notices.append(notices_mod.validity_shortened(
                 requested_validity, validity_days,
                 notices_mod.policy_validity_reason(capped_by, validity_days)))
+        notices += notices_mod.collect(digest_replaced_notice(policies, preferred_digest, sign_hash))
         notices += advisories
 
         # Record which inherited values the request explicitly diverged from
         # (#258): the template link is kept and the divergence flagged. The
-        # digest is not compared here — this path always signs with the
-        # template's digest (or SHA-256 by default), it cannot be overridden.
+        # digest is not compared here: the request cannot choose one (the
+        # template's or the CA key's, as the policies allow).
         template_overrides = compute_template_overrides(
             template,
             key_type=normalized_key,
@@ -492,7 +510,9 @@ def create_certificate():
         final_san_upn = extract_upns_from_san_list(san_list)
 
         try:
-            validate_name_constraints(ca_cert, subject, san_list or None)
+            from utils.request_names import cn_may_name_host
+            validate_name_constraints(ca_cert, subject, san_list or None,
+                                      cn_may_name_host=cn_may_name_host(cert_type, eku_oids))
         except ValueError as exc:
             logger.info(f"Certificate rejected by CA NameConstraints: {exc}")
             return error_response(str(exc), 400)
@@ -562,6 +582,7 @@ def create_certificate():
             builder, ca.cps_uri if ca.cps_enabled else None, ca.cps_oid,
             template_policy_oids(tpl_ext))
         builder = add_qc_statements(builder, tpl_ext)
+        builder = add_custom_extensions(builder, custom_ext)
 
         # OCSP Must-Staple / TLS Feature (RFC 6066)
         if data.get('ocsp_must_staple'):

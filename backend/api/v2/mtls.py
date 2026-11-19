@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
 from utils.pkcs12_export import legacy_flag, pkcs12_encryption
 from utils.algorithm_refusal import refuse_unexportable_key
+from utils.issuance_defaults import browser_key_type
 
 from auth.unified import require_auth, has_permission
 from config.settings import is_docker, restart_ucm_service
@@ -29,8 +30,8 @@ from utils import trusted_proxy
 from utils.key_codec import load_pem_bytes
 from utils.validity import MAX_VALIDITY_DAYS, MIN_VALIDITY_DAYS
 from services.mtls_enrollment import (
-    certificate_row_for, issuing_ca_for, normalized_fingerprint, parse_validity_days,
-    remove_enrolment,
+    certificate_row_for, enrolments_of, issuing_ca_for, made_for_account, normalized_fingerprint,
+    parse_validity_days, remove_enrolment,
 )
 from utils.response import success_response, error_response, created_response
 from utils.export_password import validate_export_password
@@ -41,19 +42,6 @@ from utils.export_options import json_boolean, query_boolean
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('mtls', __name__, url_prefix='/api/v2/mtls')
-
-
-def _serial_forms(raw) -> set:
-    """Every stored form of a serial (decimal, hex): one certificate is one
-    enrolment whatever route recorded it."""
-    from utils.serial_format import serial_variants
-    forms = {str(raw)}
-    for base in (10, 16):
-        try:
-            forms |= serial_variants(int(str(raw), base))
-        except (TypeError, ValueError):
-            continue
-    return forms
 
 
 def _get_mtls_config(key, default=None):
@@ -256,7 +244,7 @@ def create_mtls_certificate():
                 'OU': 'mTLS Clients',
             },
             cert_type='usr_cert',
-            key_type='2048',
+            key_type=browser_key_type(ca, f'{user.username}@mtls'),
             validity_days=validity_days,
             username=user.username,
         )
@@ -528,11 +516,30 @@ def enroll_presented_certificate():
         if hasattr(valid_from, 'timestamp') and valid_from > datetime.now(timezone.utc):
             return error_response('Cannot enroll certificate that is not yet valid', 400)
 
+    # A revoked certificate is refused here as by /enroll-import: it could never log in
+    if cert_info.get('cert_pem'):
+        from services.cert.issued_lookup import REVOKED, issued_certificate_status
+        from services.mtls_enrollment import issuing_ca_for
+        presented = cx509.load_pem_x509_certificate(cert_info['cert_pem'].encode())
+        issuer = issuing_ca_for(presented)
+        if issuer is not None and issuer.revoked_in_chain:  # RFC 5280 §6.1.3: the whole path
+            return error_response('This certificate issuer has been revoked', 400)
+        if issuer is not None and issued_certificate_status(issuer, presented)[1] == REVOKED:
+            return error_response('This certificate has been revoked', 400)
+
     # Check if already enrolled
-    existing = AuthCertificate.query.filter(
-        AuthCertificate.cert_serial.in_(_serial_forms(cert_info['serial']))
-    ).first()
-    if existing:
+    from services.mtls_enrollment import dn_attributes, presented_identity
+    presented_serial, presented_issuer = presented_identity(cert_info)
+    if presented_serial is None:
+        return error_response('The client certificate serial number cannot be read', 400)
+    # A serial is unique per issuer only (RFC 5280 §4.1.2.2): an enrolment needs both
+    if not str(presented_issuer or '').strip():
+        return error_response('The client certificate issuer is missing: the proxy must '
+                              'forward X-SSL-Client-I-DN or X-SSL-Client-Cert', 400)
+    if dn_attributes(presented_issuer) is None:
+        return error_response('The client certificate issuer cannot be read: forward '
+                              'X-SSL-Client-I-DN in RFC 4514 or legacy form, or forward X-SSL-Client-Cert', 400)
+    if enrolments_of(presented_serial, presented_issuer):
         return error_response('This certificate is already enrolled', 409)
 
     data = request.get_json() or {}
@@ -597,6 +604,8 @@ def enroll_import_certificate():
             'Certificate was not issued by a CA of this server and cannot be enrolled',
             400,
         )
+    if issuing_ca.revoked_in_chain:  # RFC 5280 §6.1.3(a)(3): the whole path, as /enroll
+        return error_response('This certificate issuer has been revoked', 400)
 
     serial = str(cert_obj.serial_number)
     subject_dn = cert_obj.subject.rfc4514_string()
@@ -618,10 +627,7 @@ def enroll_import_certificate():
     )
     # The serial may be stored decimal (this route, assign) or hexadecimal
     # (/enroll from a proxy): the same certificate is one enrolment
-    from utils.serial_format import serial_variants
-    existing_auth = AuthCertificate.query.filter(
-        AuthCertificate.cert_serial.in_(serial_variants(cert_obj.serial_number))
-    ).first()
+    existing_auth = next(iter(enrolments_of(cert_obj.serial_number, cert_obj.issuer)), None)
     if existing_auth:
         if existing_auth.user_id == user.id:
             return error_response('This certificate is already enrolled to your account', 409)
@@ -645,7 +651,7 @@ def enroll_import_certificate():
                 'This certificate is not recorded on this server; ask an administrator to enroll it',
                 403,
             )
-        if existing_cert.created_by != user.username or existing_cert.cert_type != 'usr_cert':
+        if not made_for_account(existing_cert, user) or existing_cert.cert_type != 'usr_cert':
             return error_response(
                 'This certificate belongs to another record; ask an administrator to assign it',
                 403,
@@ -729,22 +735,24 @@ def list_available_certificates():
 
     user = g.current_user
 
-    # Get all enrolled serials
-    enrolled_serials = {s[0] for s in db.session.query(AuthCertificate.cert_serial).all()}
-
-    # Query unassigned usr_cert
+    # Unassigned usr_cert: no enrolment may be of that (issuer, serial), by the rule of the other routes
+    from utils.serial_format import serial_to_int
+    pool = {}
+    for enrolment in AuthCertificate.query.all():
+        pool.setdefault(enrolment.cert_serial, []).append(enrolment)
     query = Certificate.query.filter(
         Certificate.cert_type == 'usr_cert',
         Certificate.revoked == False,
     )
-    if enrolled_serials:
-        query = query.filter(~Certificate.serial_number.in_(enrolled_serials))
 
     # Non-admin: only own certs (the rule `assign` enforces)
     if user.role != 'admin':
         query = query.filter(Certificate.created_by == user.username)
 
-    certs = query.order_by(Certificate.id.desc()).all()
+    certs = [c for c in query.order_by(Certificate.id.desc()).all()
+             if (user.role == 'admin' or made_for_account(c, user))
+             and (serial_to_int(c.serial_number) is None
+                  or not enrolments_of(serial_to_int(c.serial_number), c.issuer, pool=pool))]
 
     results = []
     for c in certs:
@@ -784,7 +792,8 @@ def assign_certificate():
 
     if certificate.cert_type != 'usr_cert':
         return error_response('Only user certificates can be assigned for mTLS', 400)
-    if certificate.revoked:
+    from services.cert.issued_lookup import row_revoked
+    if row_revoked(certificate):  # by its row or by the record of its serial
         return error_response('This certificate has been revoked', 400)
 
     # Security: non-admin can only assign their own certs
@@ -797,14 +806,18 @@ def assign_certificate():
         enroll_user_id = target.id
         enroll_username = target.username
     elif user.role != 'admin':
-        if certificate.created_by != user.username:
+        if not made_for_account(certificate, user):
             return error_response('Not authorized to assign this certificate', 403)
 
     # Check duplicate enrollment
     serial = certificate.serial_number
-    existing = AuthCertificate.query.filter(
-        AuthCertificate.cert_serial.in_(_serial_forms(serial))
-    ).first()
+    from utils.serial_format import serial_to_int
+    try:
+        held = cx509.load_pem_x509_certificate(base64.b64decode(certificate.crt), default_backend())
+        number, issuer = held.serial_number, held.issuer
+    except Exception:
+        number, issuer = serial_to_int(serial), certificate.issuer
+    existing = next(iter(enrolments_of(number, issuer)), None) if number is not None else None
     if existing:
         if existing.user_id == enroll_user_id:
             return error_response('This certificate is already assigned to this account', 409)

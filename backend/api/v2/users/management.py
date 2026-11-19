@@ -9,6 +9,7 @@ import io
 import logging
 
 from auth.unified import refuse_api_key_on_own_account, require_auth
+from auth.session_start import keep_own_session
 from utils.response import success_response, error_response
 from auth.permissions import BUILTIN_ROLES
 from utils.db_transaction import safe_commit
@@ -69,11 +70,12 @@ def reset_user_password(user_id):
     if not is_valid:
         return error_response(error_msg, 400)
 
-    # Update password
+    # Update password; the user's sessions end with the old one
     user.set_password(data['new_password'])
 
     try:
         db.session.commit()
+        keep_own_session(user)
 
         AuditService.log_action(
             action='password_change',
@@ -129,9 +131,11 @@ def reset_user_2fa(user_id):
     user.totp_secret = None
     user.backup_codes = None
     user.webauthn_2fa = False
+    user.end_sessions()
     ok, _err = safe_commit(logger, "Failed to reset user 2FA")
     if not ok:
         return _err
+    keep_own_session(user)
 
     AuditService.log_action(
         action='mfa_reset',
@@ -193,22 +197,17 @@ def toggle_user_status(user_id):
         return error_response('Failed to toggle user status', 500)
 
 
-SSO_NO_PASSWORD = '!SSO_NO_PASSWORD!'
-
-
 @bp.route('/api/v2/users/<int:user_id>/link-sso', methods=['POST'])
 @require_auth(['write:users'])
 def link_user_sso(user_id):
-    """Link an existing local account to an SSO provider (admin only).
-
-    The recommended way to resolve an email collision between a local user and
-    an SSO identity (#136): instead of creating a duplicate or silently merging
-    on email, an admin deliberately links the two. After linking, the matching
-    SSO login adopts this account **by email** — the local username is kept
-    unchanged (renaming it locked admins out of their account, see #138).
+    """Attach any account to an SSO provider (admin only): a local account, one of
+    another provider (moved), one with no provider, or one of this provider whose
+    stable identity changed (reset). Its stable identity is cleared: the next
+    sign-in through this provider with its name, or its e-mail (#136), binds one.
+    The username is kept (renaming it locked admins out of their account, #138).
 
     POST /api/v2/users/{user_id}/link-sso
-    Body: {"provider_id": int}
+    Body: {"provider_id": int, "remove_password": bool (optional, default false)}
     """
     refused = refuse_api_key_on_own_account(user_id)
     if refused:
@@ -217,34 +216,61 @@ def link_user_sso(user_id):
         return error_response('Insufficient permissions', 403)
 
     from models.sso import SSOProvider
+    from api.v2.sso.account_state import SSO_NO_PASSWORD, describe_origin
 
     user = db.session.get(User, user_id)
     if not user:
         return error_response('User not found', 404)
-    if (user.auth_source or 'local') != 'local' or user.sso_provider_id:
-        return error_response('User is already linked to single sign-on', 400)
 
     data = request.get_json(silent=True) or {}
     provider_id = data.get('provider_id')
     if not provider_id:
         return error_response('provider_id is required', 400)
+    remove_password = data.get('remove_password', False)
+    if not isinstance(remove_password, bool):
+        return error_response('remove_password must be true or false', 400)
     provider = db.session.get(SSOProvider, provider_id)
     if not provider:
         return error_response('SSO provider not found', 404)
+    # Changing one's own password asks for the current one: removing it is another admin's act
+    if remove_password and g.current_user.id == user_id:
+        return error_response('You cannot remove the local password of your own account', 400)
 
-    # Keep the username; the SSO login is matched to this account by email.
+    # The account's sessions end when its owner may change (another provider, a local
+    # account, a reset identity) or its local password goes: they were opened before.
+    moved = user.sso_provider_id != provider.id or user.sso_external_id is not None
+    drop_password = remove_password and user.password_hash != SSO_NO_PASSWORD
+    origin = describe_origin(user, provider)
     user.auth_source = provider.provider_type
     user.sso_provider_id = provider.id
+    user.sso_external_id = None
+    user.sso_orphan_of = None
+    if drop_password:
+        # Same state as an account the provider created: no password door opens it.
+        user.password_hash = SSO_NO_PASSWORD
+        user.password_reset_token = None
+        user.password_reset_expires = None
+    # An account without a password signs in through the provider only: the change
+    # Unlink SSO asked of it would confine its SSO session. One with a password keeps both.
+    if user.password_hash == SSO_NO_PASSWORD:
+        user.force_password_change = False
+    closing = moved or drop_password
+    if closing:
+        user.end_sessions()
 
     ok, err = safe_commit(logger, f"Failed to link user {user_id} to SSO")
     if not ok:
         return err
+    if closing:
+        keep_own_session(user)
+    note = ', local password removed' if drop_password else ''
+    note += ', its sessions closed' if closing else ''
     AuditService.log_action(
         action='user_link_sso',
         resource_type='user',
         resource_id=str(user.id),
         resource_name=user.username,
-        details=f'Linked account {user.username!r} to SSO provider {provider.name!r}',
+        details=f'Linked account {user.username!r} to SSO provider {provider.name!r} ({origin}{note})',
         success=True,
     )
     return success_response(
@@ -274,6 +300,8 @@ def unlink_user_sso(user_id):
     user.auth_source = 'local'
     user.sso_provider_id = None
     user.sso_external_id = None
+    user.sso_orphan_of = None
+    from api.v2.sso.account_state import SSO_NO_PASSWORD
     # An account that never had a local password must set one before it can log in.
     needs_password = user.password_hash == SSO_NO_PASSWORD
     if needs_password:

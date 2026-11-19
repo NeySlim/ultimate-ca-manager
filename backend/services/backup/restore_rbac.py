@@ -54,6 +54,59 @@ def upgrade_archived_permissions(backup_data: Dict[str, Any]) -> int:
     return widened
 
 
+def _restore_nested_member(group, member: Any, plan) -> None:
+    """A membership an older archive nests in its group names its user by number alone: listed, not placed."""
+    member = member if isinstance(member, dict) else {}
+    plan.left_out.append(
+        f"groups {group.name}: the member user number {member.get('user_id')!r} was left out, "
+        "an archive older than 2.230 names it by a number from another database")
+    logger.warning("Restore: %s", plan.left_out[-1])
+
+
+def restore_nested_webauthn(backup_data: Dict[str, Any], plan) -> int:
+    """WebAuthn keys an older archive nests in their user. Returns the number applied."""
+    import base64
+    import binascii
+
+    from models import User
+    from models.webauthn import WebAuthnCredential
+
+    if 'webauthn_credentials' in backup_data:
+        return 0    # the flat section is the one to apply
+    applied = 0
+    for user_data in backup_data.get('users') or []:
+        nested = user_data.get('webauthn_credentials') if isinstance(user_data, dict) else None
+        if not nested:
+            continue
+        user = User.query.filter_by(username=user_data.get('username')).first()
+        for position, credential in enumerate(nested):
+            where = f"users {user_data.get('username')}: WebAuthn key {position}"
+            try:
+                credential_id = base64.b64decode(credential.get('credential_id') or '', validate=True)
+                public_key = base64.b64decode(credential.get('public_key') or '', validate=True)
+            except (AttributeError, binascii.Error, ValueError):
+                credential_id = public_key = b''
+            if user is None or not credential_id or not public_key:
+                plan.left_out.append(f"{where} was left out: it cannot be read")
+                logger.warning("Restore: %s", plan.left_out[-1])
+                continue
+            row = WebAuthnCredential.query.filter_by(credential_id=credential_id).first()
+            if row is not None and row.user_id != user.id:
+                plan.left_out.append(f"{where} was left out: another account holds it here")
+                logger.warning("Restore: %s", plan.left_out[-1])
+                continue
+            if row is None:
+                row = WebAuthnCredential(user_id=user.id, credential_id=credential_id,
+                                         public_key=public_key)
+                db.session.add(row)
+            row.public_key = public_key
+            row.sign_count = int(credential.get('sign_count') or 0)
+            row.name = credential.get('name')
+            row.aaguid = credential.get('aaguid')
+            applied += 1
+    return applied
+
+
 class RestoreRbacMixin:
     def _restore_groups(self, backup_data: Dict, results: Dict,
                         plan: Optional[RestorePlan] = None) -> None:
@@ -64,9 +117,14 @@ class RestoreRbacMixin:
         written before it existed. They stay hand-written here so such an
         archive still restores its memberships; a current archive carries the
         flat section and the manifest-driven pass applies it.
+
+        A member is found by its username. One named by the source's user
+        number alone is left out with a warning: that number is another
+        account's here.
         """
-        from models.group import Group, GroupMember
+        from models.group import Group
         plan = plan if plan is not None else RestorePlan()
+        nested = 'group_members' not in backup_data
         for grp_data in backup_data.get('groups', []):
             group = Group.query.filter_by(name=grp_data['name']).first()
             created = group is None
@@ -77,16 +135,9 @@ class RestoreRbacMixin:
             if created:
                 db.session.flush()   # the members below need the group's id
 
-            # Restore members
-            for m_data in grp_data.get('members', []):
-                existing_m = GroupMember.query.filter_by(
-                    group_id=group.id, user_id=m_data['user_id']
-                ).first()
-                if not existing_m:
-                    db.session.add(GroupMember(
-                        group_id=group.id,
-                        user_id=m_data['user_id'],
-                    ))
+            if nested:
+                for m_data in grp_data.get('members') or []:
+                    _restore_nested_member(group, m_data, plan)
             results['groups'] += 1
 
     def _restore_custom_roles(self, backup_data: Dict, results: Dict,

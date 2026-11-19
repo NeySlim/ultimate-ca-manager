@@ -27,7 +27,7 @@ export default {
     ],
     tips: [
       'CSRs bewahren den privaten Schlüssel des Antragstellers: er verlässt nie dessen System',
-      'Sie können nach dem Signieren einen privaten Schlüssel zu einem CSR hinzufügen, wenn er für den PKCS#12-Export benötigt wird',
+      'Schlüssel hochladen hängt einen privaten Schlüssel an einen ausstehenden CSR an, sodass das signierte Zertifikat als PKCS#12 exportiert werden kann',
       'Ein für einen in UCM generierten CSR importiertes Zertifikat vervollständigt diesen CSR: Der Eintrag behält seinen privaten Schlüssel, sodass das Zertifikat zusammen mit ihm exportiert wird',
       'Verwenden Sie den Microsoft CA-Modus, um CSRs über AD CS zu signieren, wenn eine Verbindung zu einer Windows-PKI besteht',
       'Ein Zertifikat für einen ML-DSA-Schlüssel behält nur Signaturbits: Vom Template angeforderte keyEncipherment, dataEncipherment und keyAgreement werden entfernt, und das Ergebnis weist darauf hin',
@@ -74,7 +74,7 @@ Ein für einen **ML-DSA**-Schlüssel signiertes Zertifikat behält nur Signaturb
 ## CSR hochladen
 
 1. Klicken Sie auf **CSR hochladen**
-2. Fügen Sie entweder PEM-Text ein oder laden Sie eine PEM/DER-Datei hoch
+2. Fügen Sie entweder PEM-Text ein oder laden Sie eine PEM-Datei hoch
 3. UCM validiert die CSR-Signatur und zeigt die Details an
 4. Der CSR erscheint im Tab „Ausstehend"
 
@@ -95,9 +95,10 @@ Klicken Sie auf einen CSR, um zu sehen:
 3. Wählen Sie die **signierende CA** (muss einen privaten Schlüssel haben)
 4. Wählen Sie den **Zertifikatstyp** (Server, Client, Code-Signierung, E-Mail)
 5. Legen Sie die **Gültigkeitsdauer** in Tagen fest
-6. Wenden Sie optional ein Template für Key Usage und Erweiterungen an
-7. Fügen Sie optional **Namen hinzufügen** (E-Mail, DNS, IP, URI) zu denen der Anfrage hinzu
-8. Klicken Sie auf **Signieren**
+6. Fügen Sie optional **Namen hinzufügen** (E-Mail, DNS, IP, URI) zu denen der Anfrage hinzu
+7. Klicken Sie auf **Signieren**
+
+Im Microsoft-CA-Modus wird statt des Zertifikatstyps das AD-CS-Template gewählt.
 
 Das resultierende Zertifikat erscheint auf der Zertifikatsseite.
 
@@ -146,13 +147,13 @@ Ein Gerät, das seinen Schlüssel behält, etwa eine Smartcard, kann dieselbe An
 
 ## Privaten Schlüssel hinzufügen
 
-Nach dem Signieren können Sie dem Zertifikat einen privaten Schlüssel für den PKCS#12-Export hinzufügen. Klicken Sie auf **Schlüssel hinzufügen** am signierten Zertifikat.
+Vor dem Signieren hängt **Schlüssel hochladen** den privaten Schlüssel an einen ausstehenden CSR an, sodass das signierte Zertifikat als PKCS#12 exportiert werden kann. Einer signierten Anfrage wird diese Aktion nicht mehr angeboten.
 
 > 💡 Dies ist nützlich, wenn der Antragsteller sowohl den CSR als auch den Schlüssel sicher sendet.
 
 ## CSRs löschen
 
-Löschen entfernt den CSR aus UCM. Wenn der CSR bereits signiert wurde, ist das resultierende Zertifikat nicht betroffen.
+Löschen entfernt einen ausstehenden CSR aus UCM. Eine signierte Anfrage ist ihr Zertifikat: Es wird auf der Zertifikatsseite gelöscht, nicht hier.
 `
   }
 }

@@ -87,6 +87,8 @@ class CASigningMixin:
         supersedes=None,
         policy_template_id: int = None,
         template_ekus: list = None,
+        template_id: int = None,
+        template_key_usage: list = None,
     ) -> Tuple[str, str]:
         """
         Sign a CSR (x509 object) using a CA.
@@ -109,20 +111,27 @@ class CASigningMixin:
             override_san: forwarded to TrustStoreService.sign_csr — see its
                 docstring. Only WSTEP's Kerberos binding passes this.
             requester_sid: forwarded to TrustStoreService.sign_csr — see its
-                docstring. Only WSTEP's Kerberos binding passes this.
+                docstring. WSTEP passes it at Kerberos issuance, WSTEP and EST
+                at renewal.
             cert_type: Signing profile for TrustStoreService.sign_csr —
                 decides the EKU ceiling. EST passes 'device_cert'; WSTEP
                 overrides this too for its own matched-template flow; the
-                default keeps every other caller on the TLS profile.
+                default keeps every other caller on the TLS profile. Recorded on
+                the certificate's row.
             extra_ekus: forwarded to TrustStoreService.sign_csr — see its
                 docstring. Only WSTEP passes this, for a matched template's
                 own configured EKUs (e.g. Smartcard Logon) that a CSR-EKU
                 cap keyed off cert_type could otherwise never let through.
             policy_template_id: template scoping the issuance policies (the
                 WSTEP matched template), none for EST; its SAN types bind
-                the request's names.
+                the request's names and its digest is the preferred one
+                (``issuance_defaults.template_digest``).
             template_ekus: EKUs that replace the CSR's, as a bound template's
                 do (WSTEP renewal); protocol-forbidden ones still dropped.
+            template_id: template the certificate is issued under, recorded on
+                its row (WSTEP: the one whose OID it carries).
+            template_key_usage: Key Usage names that replace the CSR's, as a
+                bound template's do (WSTEP, for a request that carries none).
 
         Returns:
             Tuple of (cert_pem_string, serial_number_string)
@@ -149,13 +158,20 @@ class CASigningMixin:
         cps_uri = ca.cps_uri if ca.cps_enabled and ca.cps_uri else None
         cps_oid = ca.cps_oid if cps_uri else None
 
+        # The matched template (WSTEP) adds its custom extensions (#437)
+        policy_template = (db.session.get(CertificateTemplate, policy_template_id)
+                           if policy_template_id else None)
+        from utils.custom_extensions import template_custom_extensions
+        from utils.issuance_defaults import template_digest as _template_digest
+        template_digest = _template_digest(policy_template, ca_private_key)
+
         # Sign via TrustStoreService
         cert_pem_bytes = TrustStoreService.sign_csr(
             csr_pem=csr_pem,
             ca_cert=ca_cert,
             ca_private_key=ca_private_key,
             validity_days=validity_days,
-            digest='sha256',
+            digest=template_digest,
             cert_type=cert_type,
             cdp_urls=cdp_urls,
             ocsp_urls=ocsp_urls,
@@ -169,11 +185,12 @@ class CASigningMixin:
             override_san=override_san,
             requester_sid=requester_sid,
             extra_ekus=extra_ekus,
-            template_ext={'extended_key_usage': list(template_ekus)} if template_ekus else None,
+            template_ext={k: list(v) for k, v in (('extended_key_usage', template_ekus),
+                                                  ('key_usage', template_key_usage)) if v} or None,
             policy_scope={'ca_id': ca.id, 'template_id': policy_template_id,
                           'digest_explicit': False},
-            san_template=(db.session.get(CertificateTemplate, policy_template_id)
-                          if policy_template_id else None),
+            san_template=policy_template,
+            custom_extensions=template_custom_extensions(policy_template),
         )
 
         # Extract serial number
@@ -225,7 +242,7 @@ class CASigningMixin:
             caref=ca.refid,
             crt=base64.b64encode(cert_pem_raw).decode(),
             csr=base64.b64encode(csr_pem).decode(),
-            cert_type='server',
+            cert_type=cert_type,
             subject=cert_obj.subject.rfc4514_string(),
             subject_cn=cn,
             issuer=cert_obj.issuer.rfc4514_string(),
@@ -238,6 +255,7 @@ class CASigningMixin:
             san_email=json.dumps(san_email) if san_email else None,
             san_upn=json.dumps(san_upn) if san_upn else None,
             source=source,
+            template_id=template_id,
         )
         db.session.add(new_cert)
 

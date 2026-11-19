@@ -41,6 +41,7 @@ def snapshots_dir(tmp_path, monkeypatch):
     return directory
 
 
+@pytest.mark.sqlite_only(reason='snapshots the SQLite session database as a file')
 class TestASnapshotIsTakenAndRead:
     def test_the_source_is_snapshotted_and_verified(self, app, snapshots_dir):
         with app.app_context():
@@ -134,6 +135,7 @@ class TestASnapshotIsTakenAndRead:
         assert discarded == [], 'the claim of another migration was removed'
 
 
+@pytest.mark.sqlite_only(reason='snapshots the SQLite session database as a file')
 class TestTheSnapshotIsReadTheWayARollbackWould:
     def test_a_snapshot_with_torn_pages_is_refused(
             self, app, snapshots_dir, monkeypatch):
@@ -235,6 +237,7 @@ class TestAFailedSnapshotStopsTheMigration:
 
         assert not torn.exists()
 
+    @pytest.mark.sqlite_only(reason='snapshots the SQLite session database as a file')
     def test_a_snapshot_missing_a_table_is_a_refusal(
             self, app, snapshots_dir, monkeypatch):
         partial = snapshots_dir / 'ucm-sqlite-partial.db'

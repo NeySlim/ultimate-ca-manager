@@ -3,8 +3,10 @@ OCSP Responder Routes (RFC 6960)
 Handles OCSP requests via GET and POST methods.
 """
 import base64
+import hashlib
 import logging
-from datetime import timedelta
+import threading
+from datetime import datetime, timezone
 from urllib.parse import unquote
 
 from flask import Blueprint, request, Response
@@ -14,7 +16,6 @@ from cryptography.hazmat.primitives import hashes, serialization
 
 from models import CA
 from services.ocsp_service import OCSPService, _subject_public_key_bits
-from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,22 @@ ocsp_service = OCSPService()
 
 OCSP_CONTENT_TYPE = 'application/ocsp-response'
 OCSP_REQUEST_TYPE = 'application/ocsp-request'
+
+# Requests answered and answered from the cache, since this process started (UCM
+# runs one worker, which also serves the HTTP protocol port)
+_STATS_LOCK = threading.Lock()
+_STATS = {'requests': 0, 'cache_hits': 0}
+
+
+def _count(name):
+    with _STATS_LOCK:
+        _STATS[name] += 1
+
+
+def request_stats():
+    with _STATS_LOCK:
+        return dict(_STATS)
+
 
 # RFC 6960 OCSP requests are very small (typically <1KB even with extensions).
 # Cap to 16KB to prevent DoS via huge unauthenticated POSTs.
@@ -37,12 +54,12 @@ def ocsp_responder():
     GET:  /ocsp?{base64-encoded-request} (query string)
     POST: body = DER-encoded OCSP request
     """
+    _count('requests')
     try:
         # Extract DER-encoded request
         if request.method == 'POST':
-            # RFC 6960 §4.2.2: validate Content-Type
-            content_type = request.content_type or ''
-            if not content_type.startswith(OCSP_REQUEST_TYPE):
+            # RFC 6960 A.1 Content-Type; RFC 9110 §8.3.1: type and subtype ignore case
+            if (request.mimetype or '').lower() != OCSP_REQUEST_TYPE:
                 return _error_response(ocsp.OCSPResponseStatus.MALFORMED_REQUEST)
             # Cap body size — public unauthenticated endpoint
             cl = request.content_length
@@ -75,6 +92,7 @@ def ocsp_responder():
 @ocsp_bp.route('/ocsp/<path:encoded_request>', methods=['GET'])
 def ocsp_responder_get(encoded_request):
     """Handle GET requests with base64-encoded OCSP request in URL path (RFC 6960 §A.1)"""
+    _count('requests')
     if len(encoded_request) > MAX_OCSP_REQUEST_BYTES * 2:
         return _error_response(ocsp.OCSPResponseStatus.MALFORMED_REQUEST)
     try:
@@ -132,7 +150,7 @@ def _process_ocsp_request(request_der: bytes) -> Response:
             ','.join(statuses),
         )
         resp = Response(response_der, status=200, content_type=OCSP_CONTENT_TYPE)
-        _add_cache_headers(resp, request_nonce)
+        _add_cache_headers(resp, request_nonce, response_der)
         return resp
 
     item = parsed_request.requests[0]
@@ -143,8 +161,9 @@ def _process_ocsp_request(request_der: bytes) -> Response:
     cached = None if request_nonce is not None else ocsp_service.get_cached_response(
         ca.id, cert_serial_hex, item.hash_algorithm)
     if cached:
+        _count('cache_hits')
         resp = Response(cached, status=200, content_type=OCSP_CONTENT_TYPE)
-        _add_cache_headers(resp, request_nonce)
+        _add_cache_headers(resp, request_nonce, cached)
         return resp
 
     response_der, status_str = ocsp_service.generate_response(
@@ -160,20 +179,33 @@ def _process_ocsp_request(request_der: bytes) -> Response:
 
     logger.info(f"OCSP response for serial {cert_serial_hex}: {status_str}")
     resp = Response(response_der, status=200, content_type=OCSP_CONTENT_TYPE)
-    _add_cache_headers(resp, request_nonce)
+    _add_cache_headers(resp, request_nonce, response_der)
     return resp
 
 
-def _add_cache_headers(resp: Response, request_nonce):
-    """Add RFC 6960 recommended Cache-Control and Expires headers"""
+def _http_date(moment) -> str:
+    return moment.astimezone(timezone.utc).strftime('%a, %d %b %Y %H:%M:%S GMT')
+
+
+def _add_cache_headers(resp: Response, request_nonce, response_der: bytes):
+    """RFC 5019 §6.2: cacheable until nextUpdate, never no-cache or no-store."""
     if request_nonce is not None:
-        # Nonce present — response is unique, don't cache
-        resp.headers['Cache-Control'] = 'no-cache, no-store'
-    else:
-        # No nonce — response can be cached (24h matches nextUpdate)
-        resp.headers['Cache-Control'] = 'max-age=3600, public'
-        expires = utc_now() + timedelta(hours=1)
-        resp.headers['Expires'] = expires.strftime('%a, %d %b %Y %H:%M:%S GMT')
+        # A nonce makes the answer unique to its request: nothing to reuse
+        resp.headers['Cache-Control'] = 'max-age=0, must-revalidate'
+        return
+    try:
+        singles = list(ocsp.load_der_ocsp_response(response_der).responses)
+        this_update = max(single.this_update_utc for single in singles)
+        next_update = min(single.next_update_utc for single in singles)
+    except Exception:  # unsuccessful, or a response without nextUpdate
+        return
+    # Never past nextUpdate; at most an hour, so a revocation reaches proxy caches quickly
+    remaining = int((next_update - datetime.now(timezone.utc)).total_seconds())
+    resp.headers['Cache-Control'] = f'max-age={max(0, min(3600, remaining))}, public, no-transform, must-revalidate'
+    resp.headers['Expires'] = _http_date(next_update)
+    resp.headers['Last-Modified'] = _http_date(this_update)
+    # The profile RECOMMENDS the hex SHA-1 of the OCSPResponse: an identifier, not a signature
+    resp.headers['ETag'] = f'"{hashlib.sha1(response_der, usedforsecurity=False).hexdigest()}"'
 
 
 def _find_ca_by_issuer_hash(issuer_name_hash, issuer_key_hash, hash_algorithm):

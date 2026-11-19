@@ -2,6 +2,7 @@
 import json
 import uuid
 from datetime import timedelta
+from tests.seeded_rows import delete_client_accounts
 
 import pytest
 from sqlalchemy import text
@@ -33,8 +34,7 @@ def _cleanup(app):
             synchronize_session=False)
         AcmeEabCredential.query.filter(AcmeEabCredential.id > eab_floor).delete(
             synchronize_session=False)
-        AcmeClientAccount.query.filter(AcmeClientAccount.id > acct_floor).delete(
-            synchronize_session=False)
+        delete_client_accounts(AcmeClientAccount.query.filter(AcmeClientAccount.id > acct_floor), synchronize_session=False)
         db.session.commit()
 
 

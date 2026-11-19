@@ -3,6 +3,8 @@ Authentication Certificate Model
 Store client certificates for mTLS authentication
 """
 from datetime import datetime
+from sqlalchemy.orm import validates
+
 from models import db
 from utils.datetime_utils import utc_now, utc_isoformat
 
@@ -10,7 +12,11 @@ from utils.datetime_utils import utc_now, utc_isoformat
 class AuthCertificate(db.Model):
     """Client certificate for mTLS authentication"""
     __tablename__ = 'auth_certificates'
-    
+    # X.509 makes a serial unique per issuer only (RFC 5280 §4.1.2.2)
+    __table_args__ = (
+        db.Index('uq_auth_certificates_issuer_serial', 'cert_issuer', 'cert_serial', unique=True),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     
@@ -18,9 +24,10 @@ class AuthCertificate(db.Model):
     cert_pem = db.Column(db.LargeBinary)  # Store certificate PEM for re-download
     
     # Certificate identification
-    cert_serial = db.Column(db.String(128), unique=True, nullable=False, index=True)
+    cert_serial = db.Column(db.String(128), nullable=False, index=True)
     cert_subject = db.Column(db.Text, nullable=False)  # Full DN
-    cert_issuer = db.Column(db.Text)
+    # '' rather than NULL when unknown, so the unique index still holds such rows
+    cert_issuer = db.Column(db.Text, default='')
     cert_fingerprint = db.Column(db.String(128), index=True)  # SHA256
     
     # Certificate metadata
@@ -38,6 +45,10 @@ class AuthCertificate(db.Model):
     # Relationship
     user = db.relationship('User', backref=db.backref('auth_certificates', lazy='dynamic'))
     
+    @validates('cert_issuer')
+    def _issuer_never_null(self, _key, value):
+        return value or ''
+
     @property
     def key_facts(self) -> dict:
         """Key facts of the enrolled certificate, from its stored PEM, else from its certificate row."""

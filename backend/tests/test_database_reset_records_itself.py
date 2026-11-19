@@ -16,6 +16,17 @@ import pytest
 from models import db, AuditLog, User
 
 
+@pytest.fixture(autouse=True, scope='module')
+def _startup_data_back_after_the_resets(app):
+    """The resets drop what the application seeds at startup (system templates,
+    roles): seeding again leaves later files the database they would start with."""
+    yield
+    from app import init_database
+    with app.app_context():
+        db.session.rollback()
+        init_database(app)
+
+
 class TestTheResetIsRecorded:
     def test_an_administrator_who_is_not_the_bootstrap_one_is_named(
             self, app, auth_client):

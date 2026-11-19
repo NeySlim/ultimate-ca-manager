@@ -14,6 +14,10 @@ import pytest
 from models import db
 from services.backup import manifest
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 
 PASSWORD = 'Correct-Horse-Battery-9'
 
@@ -50,6 +54,13 @@ class TestHsmLinkSurvivesNewIds:
             ca.hsm_key_id = key.id
             db.session.commit()
             key_id_before = key.id
+            # Archived too, so the replacement keeps it and the key cannot
+            # take its old id back
+            filler = HsmKey(provider_id=provider.id, key_identifier='relink-filler',
+                            label='filler', algorithm='rsa', key_type='rsa',
+                            purpose='sign')
+            db.session.add(filler)
+            db.session.commit()
 
             blob = _service().create_backup(
                 PASSWORD,
@@ -60,11 +71,6 @@ class TestHsmLinkSurvivesNewIds:
             ca.hsm_key_id = None
             db.session.commit()
             db.session.delete(key)
-            db.session.commit()
-            filler = HsmKey(provider_id=provider.id, key_identifier='relink-filler',
-                            label='filler', algorithm='rsa', key_type='rsa',
-                            purpose='sign')
-            db.session.add(filler)
             db.session.commit()
 
             try:
@@ -83,7 +89,7 @@ class TestHsmLinkSurvivesNewIds:
 
                 provider_back = HsmProvider.query.filter_by(
                     name='relink-provider').first()
-                assert 'relink-token' in (provider_back.config or ''), \
+                assert provider_back.get_config().get('token') == 'relink-token', \
                     'the provider credentials did not survive the restore'
             finally:
                 ca = CA.query.filter_by(refid=authority['refid']).first()

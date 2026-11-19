@@ -18,7 +18,7 @@ export default {
           { label: '模板选择', text: '从 MS CA 上可用的证书模板中选择' },
           { label: '自动审批', text: '启用自动注册的模板将立即返回证书' },
           { label: '管理者审批', text: '某些模板需要管理者审批,, UCM 跟踪待处理请求' },
-          { label: '状态轮询', text: '从 CSR 详情面板检查待处理请求状态' },
+          { label: '待处理请求', text: 'CA 为其管理员保留的请求在 UCM 中保持“待处理”，页面不提供状态检查：在 CA 上签发后，请导入证书，或让通过 WinRM 管理通道进行的清单同步导入 UCM 尚不知道的证书' },
         ]
       },
       {
@@ -44,7 +44,7 @@ export default {
           { label: '用途', text: '通过 PowerShell 远程 + certutil 在 Windows CA 上执行管理操作（吊销、撤销吊销、发布 CRL、清单、审批/拒绝）,, 这些是 AD CS Web 注册无法完成的。' },
           { label: '传输', text: '基于 HTTP/HTTPS 的 NTLM 或 Kerberos。推荐 Kerberos + HTTPS；Kerberos 复用连接的 keytab。' },
           { label: '凭据', text: '默认复用连接自身的凭据。mTLS 注册的连接必须设置专用的 WinRM 账户（最小权限的"颁发和管理证书"专员）。' },
-          { label: '要求', text: 'CA 上已启用 WinRM 并已安装可选的 pywinrm 包。管理操作需要 admin:system 权限。' },
+          { label: '要求', text: 'CA 上已启用 WinRM 并已安装可选的 pywinrm 包。管理操作需要 admin:system 权限；将吊销或解除挂起传播到 CA 则遵循证书的 write:certificates。' },
         ]
       },
       {
@@ -58,7 +58,7 @@ export default {
       {
         title: 'CA 清单与控制面板',
         items: [
-          { label: '清单同步', text: '导入直接在 CA 上签发但 UCM 尚不知晓的证书（按请求 ID 增量处理，支持对账）。' },
+          { label: '清单同步', text: '导入直接在 CA 上签发但 UCM 尚不知晓的证书（按请求 ID 增量处理）；对账可通过 API 使用。' },
           { label: '待处理请求', text: '列出、审批（重新提交 + 自动导入）或拒绝等待 CA 管理者审批的请求。' },
           { label: 'CA 健康状况', text: '一目了然地查看 CA 服务状态、CA 证书到期时间、CRL 下次更新时间和待处理请求数量。' },
         ]
@@ -88,7 +88,7 @@ UCM 与 Microsoft Active Directory 证书服务（AD CS）集成，使用现有�
 1. 进入**设置 → Microsoft CA**
 2. 点击**添加连接**
 3. 输入**连接名称**和 **CA 服务器主机名**
-4. 可选输入 **CA 通用名称**（留空则自动检测）
+4. 可选输入 **CA 通用名称**（留空则使用服务器主机名）
 5. 选择**认证方式**
 6. 输入所选方式的凭据
 7. 点击**测试连接**进行验证
@@ -124,7 +124,7 @@ UCM 与 Microsoft Active Directory 证书服务（AD CS）集成，使用现有�
 证书立即返回并导入到 UCM。
 
 ### 管理者审批模板
-UCM 将请求保存为**待处理**状态并跟踪 MS CA 请求 ID。在 Windows CA 上批准后，从 CSR 详情面板检查状态以导入证书。
+UCM 将请求保存为**待处理**状态并跟踪 MS CA 请求 ID。页面不提供状态检查：在 Windows CA 上签发后，请导入证书，或让通过 WinRM 管理通道进行的**清单同步**导入 UCM 尚不知道的证书。
 
 ## 代理注册（EOBO）
 

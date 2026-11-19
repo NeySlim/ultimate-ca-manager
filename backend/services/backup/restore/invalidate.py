@@ -67,6 +67,26 @@ def _revoke_database_sessions() -> Dict[str, int]:
     return revoked
 
 
+def _advance_session_epoch() -> None:
+    """Refuse every session begun before now, whatever the store, or raise.
+
+    Removing the stored sessions is not enough: Redis entries stay, and a request in
+    flight may write its session back; that session holds the old epoch. The caller's
+    own session is emptied too, so this response never writes it back.
+    """
+    from flask import has_request_context, session
+    from auth.session_epoch import advance_epoch
+    try:
+        epoch = advance_epoch()
+    except Exception:
+        logger.error("Restore: the session epoch could not be advanced; access granted "
+                     "before the restore may still be usable")
+        raise
+    if has_request_context():
+        session.clear()
+    logger.info("Restore: session epoch %s, every session begun before it is refused", epoch)
+
+
 def _session_directory() -> Optional[Path]:
     """The server-side session store, when it is a directory on this host."""
     try:
@@ -80,12 +100,9 @@ def _session_directory() -> Optional[Path]:
     configured = config.get('SESSION_FILE_DIR')
     if not configured:
         if str(config.get('SESSION_TYPE') or '').lower() == 'redis':
-            # The rows are gone and the restart follows, but the Redis
-            # entries themselves are not ours to delete here.
-            logger.warning(
-                "Restore: sessions are stored in Redis; their entries are not "
-                "removed by the restore"
-            )
+            # Left to expire: the session epoch already refuses each of them
+            logger.info("Restore: sessions are stored in Redis; their entries expire "
+                        "on their own and are refused meanwhile")
         return None
 
     path = Path(configured)
@@ -306,6 +323,7 @@ def invalidate_after_restore(*, request_restart: bool = False) -> Dict[str, Any]
          'caches_failed': [str],        # caches that refused to drop
          'restart_requested': bool}     # the mechanism accepted the request
     """
+    _advance_session_epoch()
     revoked = _revoke_database_sessions()
 
     summary: Dict[str, Any] = {

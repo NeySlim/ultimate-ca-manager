@@ -1,8 +1,10 @@
 import { useTranslation } from 'react-i18next'
 import { Plugs, MagnifyingGlass, UsersThree, UserPlus, Play, ShieldWarning } from '@phosphor-icons/react'
-import { Button, Input, Select, Badge, LoadingSpinner, CompactSection } from '../../../components'
+import { Button, Input, Select, LoadingSpinner, CompactSection } from '../../../components'
 import { ToggleSwitch } from '../../../components/ui/ToggleSwitch'
 import RoleMappingEditor from '../RoleMappingEditor'
+import ProvisioningNotice, { hasRoleRules } from './ProvisioningNotice'
+import MappingTestResult from './MappingTestResult'
 
 export default function SsoLdapFields({
   formData,
@@ -17,6 +19,7 @@ export default function SsoLdapFields({
   handleTestConnection,
   handleTestMapping,
   roleOptions,
+  defaultRoleOptions,
   customRoles,
   setFormData,
   secretProps,
@@ -96,7 +99,19 @@ export default function SsoLdapFields({
             label={t('sso.ldapUseSsl')}
             size="sm"
           />
-          {formData.ldap_use_ssl && (
+          {!formData.ldap_use_ssl && (
+            <ToggleSwitch
+              checked={formData.ldap_start_tls}
+              onChange={(val) => handleChange('ldap_start_tls', val)}
+              label={t('sso.ldapStartTls')}
+              description={t('sso.ldapStartTlsHelp')}
+              size="sm"
+            />
+          )}
+          {!formData.ldap_use_ssl && !formData.ldap_start_tls && (
+            <p className="text-xs text-amber-500">{t('sso.ldapPlainWarning')}</p>
+          )}
+          {(formData.ldap_use_ssl || formData.ldap_start_tls) && (
             <>
               <ToggleSwitch
                 checked={formData.ldap_verify_ssl}
@@ -205,7 +220,7 @@ export default function SsoLdapFields({
             label={t('sso.defaultRole')}
             value={formData.default_role}
             onChange={value => handleChange('default_role', value)}
-            options={roleOptions}
+            options={defaultRoleOptions}
           />
           <div className="pt-1">
             <p className="text-xs font-medium text-text-secondary mb-2">{t('sso.roleMapping')}</p>
@@ -244,34 +259,7 @@ export default function SsoLdapFields({
               </div>
               {testMappingResult && (
                 <div className="mt-2 p-2.5 rounded-lg border border-border bg-bg-secondary text-xs space-y-1">
-                  {testMappingResult.found === false ? (
-                    <p className="text-status-error">{t('sso.testMappingNotFound')}</p>
-                  ) : (
-                    <>
-                      <p><span className="text-text-secondary font-medium">DN:</span> <span className="text-text-tertiary font-mono">{testMappingResult.user_dn}</span></p>
-                      <p>
-                        <span className="text-text-secondary font-medium">{t('sso.testMappingGroups')}:</span>{' '}
-                        {testMappingResult.groups?.length > 0
-                          ? testMappingResult.groups.map(g => <Badge key={g} variant="secondary" size="sm" className="mr-1">{g}</Badge>)
-                          : <span className="text-text-tertiary italic">{t('sso.testMappingNoGroups')}</span>
-                        }
-                      </p>
-                      <p>
-                        <span className="text-text-secondary font-medium">{t('sso.testMappingResolvedRole')}:</span>{' '}
-                        <Badge variant={testMappingResult.resolved_role === 'admin' ? 'danger' : testMappingResult.resolved_role === 'operator' ? 'warning' : 'info'} size="sm">
-                          {testMappingResult.resolved_role}
-                        </Badge>
-                      </p>
-                      {testMappingResult.required_groups?.length > 0 && (
-                        <p>
-                          <span className="text-text-secondary font-medium">{t('sso.testMappingAccess')}:</span>{' '}
-                          <Badge variant={testMappingResult.access_allowed ? 'success' : 'danger'} size="sm">
-                            {testMappingResult.access_allowed ? t('sso.testMappingAccessAllowed') : t('sso.testMappingAccessDenied')}
-                          </Badge>
-                        </p>
-                      )}
-                    </>
-                  )}
+                  <MappingTestResult result={testMappingResult} />
                 </div>
               )}
             </div>
@@ -280,8 +268,9 @@ export default function SsoLdapFields({
       </CompactSection>
 
       {/* Provisioning */}
-      <CompactSection title={t('sso.provisioningSection')} icon={UserPlus} collapsible defaultOpen={false}>
+      <CompactSection title={t('sso.provisioningSection')} icon={UserPlus} collapsible defaultOpen={!hasRoleRules(formData.role_mapping)}>
         <div className="space-y-2">
+          <ProvisioningNotice formData={formData} />
           <ToggleSwitch checked={formData.auto_create_users} onChange={(val) => handleChange('auto_create_users', val)} label={t('sso.autoCreateUsers')} />
           <ToggleSwitch checked={formData.auto_update_users} onChange={(val) => handleChange('auto_update_users', val)} label={t('sso.autoUpdateUsers')} />
           <ToggleSwitch checked={formData.sync_role_on_login} onChange={(val) => handleChange('sync_role_on_login', val)} label={t('sso.syncRoleOnLogin')} description={t('sso.syncRoleOnLoginHelp')} />

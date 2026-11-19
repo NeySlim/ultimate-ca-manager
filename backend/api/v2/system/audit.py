@@ -12,6 +12,7 @@ from services.audit_service import AuditService
 from services.retention_service import (
     RetentionPolicy, RetentionSettingError, cleanup_audit_logs as do_cleanup)
 from services.syslog_service import syslog_forwarder
+from services.audit.staging import forward_to_syslog, syslog_copy
 from api.v2.settings import set_config
 import logging
 
@@ -98,7 +99,8 @@ def update_syslog_config():
             'octet' if protocol == 'tcp' and tls else 'line'
         )
         framing = framing.lower() if isinstance(framing, str) else ''
-        categories = data.get('categories', list(syslog_forwarder.ALL_CATEGORIES))
+        # No box checked forwards everything: save and show it as every box
+        categories = data.get('categories') or list(syslog_forwarder.ALL_CATEGORIES)
 
         if protocol not in ('udp', 'tcp'):
             return error_response("Protocol must be 'udp' or 'tcp'", 400)
@@ -117,22 +119,35 @@ def update_syslog_config():
         set_config('syslog_tls', str(tls).lower())
         set_config('syslog_tls_verify', str(tls_verify).lower())
         set_config('syslog_framing', framing)
-        set_config('syslog_categories', ','.join(categories) if categories else '')
+        set_config('syslog_categories', ','.join(categories))
         ok, err = safe_commit(logger, "Failed to update syslog config")
         if not ok:
             return err
 
-        # Reconfigure forwarder
+        # Logged as settings (never filtered) and before reconfiguring, so the
+        # collector that is being narrowed or turned off still hears of it
+        old = syslog_forwarder.config
+        entry = AuditService.log_action(
+            action='syslog_config_updated',
+            resource_type='settings',
+            resource_name='syslog',
+            details=(f"Syslog {'enabled' if enabled else 'disabled'}: "
+                     f"{protocol.upper()}://{host}:{port}, categories {','.join(categories)} "
+                     f"(was {'enabled' if old['enabled'] else 'disabled'}: "
+                     f"{old['protocol'].upper()}://{old['host']}:{old['port']}, "
+                     f"categories {','.join(old['categories'])})"),
+        )
+
         syslog_forwarder.configure(
             enabled=enabled, host=host, port=port,
             protocol=protocol, tls=tls, tls_verify=tls_verify,
             framing=framing, categories=categories
         )
-
-        AuditService.log_system(
-            'syslog_config_updated',
-            f"Syslog {'enabled' if enabled else 'disabled'}: {protocol.upper()}://{host}:{port}"
-        )
+        # A collector that was not the one being told also receives its own setup
+        new = syslog_forwarder.config
+        if entry is not None and enabled and any(
+                old[k] != new[k] for k in ('enabled', 'host', 'port', 'protocol', 'tls')):
+            forward_to_syslog(syslog_copy(entry))
 
         return success_response(
             message='Syslog configuration updated',

@@ -3,6 +3,7 @@ Remote Syslog Forwarder for Audit Logs
 Forwards audit events to a remote syslog server via UDP, TCP, or TCP+TLS.
 """
 
+import os
 import re
 import socket
 import ssl
@@ -58,8 +59,45 @@ class SyslogForwarder:
             cls._instance._initialized = False
         return cls._instance
 
-    # All available event categories (resource_type values)
+    # The categories an operator can deselect; a resource type in none of them is always sent
     ALL_CATEGORIES = ['certificate', 'ca', 'csr', 'user', 'acme', 'scep', 'system']
+    _PREFIXES = (('acme_', 'acme'), ('scep_', 'scep'))
+    _ALIASES = {'sso': 'user', 'user_certificate': 'certificate',
+                'ssh_certificate': 'certificate', 'ssh_ca': 'ca'}
+
+    # Under Users only sign-in activity can be muted: account changes (role, password, MFA) always leave
+    _USER_ACTIVITY = ('login', 'logout')
+    # Under System, key, encryption, restore, database and settings changes always leave too
+    _SYSTEM_ALWAYS = frozenset({
+        'master_key_downloaded', 'encryption_enabled', 'encryption_disabled', 'system_encrypt',
+        'system_restore', 'database_reset', 'database.switch', 'settings_update',
+        'private_key_files_purged', 'backup_delete', 'log_bundle_downloaded'})
+
+    @classmethod
+    def category_of(cls, resource_type, action=None):
+        """The deselectable category an event belongs to, or None."""
+        category = cls._category_of_type(resource_type)
+        if category == 'user' and not str(action or '').startswith(cls._USER_ACTIVITY):
+            return None
+        if category == 'system' and action in cls._SYSTEM_ALWAYS:
+            return None
+        return category
+
+    @classmethod
+    def _category_of_type(cls, resource_type):
+        if not resource_type:
+            return None
+        if resource_type in cls.ALL_CATEGORIES:
+            return resource_type
+        for prefix, category in cls._PREFIXES:
+            if resource_type.startswith(prefix):
+                return category
+        return cls._ALIASES.get(resource_type)
+
+    def _wanted(self, resource_type, action=None) -> bool:
+        # No box checked is read back from the database as all of them: same here
+        category = self.category_of(resource_type, action)
+        return not self._categories or category is None or category in self._categories
 
     def _initialize(self):
         self._enabled = False
@@ -71,6 +109,7 @@ class SyslogForwarder:
         self._framing = 'line'
         self._categories = list(self.ALL_CATEGORIES)  # all enabled by default
         self._socket = None
+        self._socket_pid = None
         self._hostname = ''
         self._hostname_resolved_at = 0.0
         self._initialized = True
@@ -85,14 +124,18 @@ class SyslogForwarder:
             return self._hostname
 
         name = ''
+        read = True
         try:
             from models import SystemConfig
             cfg = SystemConfig.query.filter_by(key='system_name').first()
             name = _sanitize_hostname(cfg.value if cfg else '')
         except Exception:
-            pass
+            read = False
         if not name:
             name = _sanitize_hostname(safe_call(socket.gethostname))
+        if not read:
+            # A fallback taken because SQL was refused must not hide system_name for minutes
+            return name or '-'
 
         self._hostname = name or '-'
         self._hostname_resolved_at = now
@@ -116,7 +159,7 @@ class SyslogForwarder:
         self._framing = framing.lower() if framing else default_framing
         if self._framing not in ('octet', 'line'):
             raise ValueError("Syslog framing must be 'octet' or 'line'")
-        self._categories = categories if categories is not None else list(self.ALL_CATEGORIES)
+        self._categories = list(categories) if categories else list(self.ALL_CATEGORIES)
         # Force re-resolution of the HOSTNAME field on next send
         self._hostname = ''
         self._hostname_resolved_at = 0.0
@@ -129,12 +172,29 @@ class SyslogForwarder:
 
     def _close(self):
         """Close existing socket."""
+        self.forget_inherited_socket()
         if self._socket:
             safe_call(self._socket.close)
             self._socket = None
 
+    def forget_inherited_socket(self):
+        """Drop a connection opened by the process this one was forked from.
+
+        Frames from both would interleave on it. Only this copy of the descriptor
+        is closed: no FIN, no TLS close_notify, the parent's stream is untouched.
+        """
+        sock = getattr(self, '_socket', None)
+        if sock is None or self._socket_pid == os.getpid():
+            return
+        self._socket = None
+        try:
+            os.close(sock.detach())
+        except OSError:
+            pass
+
     def _get_socket(self):
         """Get or create socket connection."""
+        self.forget_inherited_socket()
         if self._socket:
             return self._socket
 
@@ -154,6 +214,7 @@ class SyslogForwarder:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 sock.settimeout(5)
                 self._socket = sock
+            self._socket_pid = os.getpid()
             return self._socket
         except Exception as e:
             logger.error(f"Syslog connection failed: {e}")
@@ -176,7 +237,10 @@ class SyslogForwarder:
         pri = (facility_code * 8) + severity_code
 
         timestamp = audit_log.timestamp.strftime('%Y-%m-%dT%H:%M:%S.%fZ') if audit_log.timestamp else utc_now().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
-        hostname = self._resolve_hostname()
+        # A staged entry carries the name resolved while SQL was still allowed
+        hostname = getattr(audit_log, 'syslog_hostname', None)
+        if not isinstance(hostname, str) or not hostname:
+            hostname = self._resolve_hostname()
 
         # Structured data
         sd_parts = []
@@ -208,9 +272,8 @@ class SyslogForwarder:
         if not self._enabled or not self._host:
             return False
 
-        # Filter by event category
-        resource_type = getattr(audit_log, 'resource_type', None) or ''
-        if self._categories and resource_type and resource_type not in self._categories:
+        if not self._wanted(getattr(audit_log, 'resource_type', None),
+                            getattr(audit_log, 'action', None)):
             return False
 
         try:

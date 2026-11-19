@@ -96,7 +96,7 @@ def get_installed_at():
 def parse_version(version_str):
     """Parse version string to tuple for comparison.
     
-    Supports both Major.Build (2.48) and legacy semver (2.1.6) formats.
+    Supports Major.Build (2.48), maintenance (2.254.1) and legacy semver (2.1.6) formats.
     Pre-release suffixes (-dev, -beta, -rc) are ranked lower than release.
     """
     version_str = version_str.lstrip('v')
@@ -135,6 +135,17 @@ def parse_version(version_str):
     return numbers + (prerelease_order,)
 
 
+def major_of(version_str):
+    """Major version number of a version string ('2.254.2' -> 2, 'v10.1-rc1' -> 10)."""
+    return parse_version(version_str)[0]
+
+
+def _is_final(release):
+    """A published final release: not a draft, not flagged prerelease, no -suffix in its tag."""
+    tag = release.get('tag_name', '').lstrip('v')
+    return not release.get('draft') and not release.get('prerelease') and '-' not in tag
+
+
 def compare_versions(v1, v2):
     """Compare two version strings. Returns: -1 if v1<v2, 0 if equal, 1 if v1>v2"""
     t1 = parse_version(v1)
@@ -153,6 +164,71 @@ def invalidate_update_cache():
     _releases_cache['ts'] = 0
 
 
+# This version line is in security maintenance: security fixes, no new features.
+SECURITY_MAINTENANCE = True
+
+
+def docker_image(version):
+    """Image tag of `version` for this deployment: the -fips variant when FIPS mode is asked for."""
+    import fips_mode
+    return f"ghcr.io/neyslim/ultimate-ca-manager:{version}{'-fips' if fips_mode.requested() else ''}"
+
+
+def _pick_asset(release, version):
+    """(download_url, package_name, checksum_url) of `release` for this platform."""
+    download_url = package_name = checksum_url = None
+    # Detect package type (deb takes priority over rpm if both exist)
+    is_docker = os.getenv('UCM_DOCKER') == '1'
+    is_deb = os.path.exists('/usr/bin/dpkg')
+    is_rpm = os.path.exists('/usr/bin/rpm') and not is_deb
+
+    deb_asset = None
+    checksum_assets = {}
+    for asset in release.get('assets', []):
+        name = asset['name']
+        if is_docker:
+            download_url = docker_image(version)
+            package_name = name
+            break
+        elif name.endswith('.sha256'):
+            checksum_assets[name[:-len('.sha256')]] = asset
+        elif name.endswith('.deb') and not deb_asset:
+            deb_asset = asset
+
+    if not is_docker:
+        rpm_asset = _pick_rpm(release.get('assets', []), _el_release()) if is_rpm else None
+        chosen = deb_asset if is_deb and deb_asset else (rpm_asset if is_rpm and rpm_asset else None)
+        if chosen:
+            download_url = chosen['browser_download_url']
+            package_name = chosen['name']
+            checksum_asset = checksum_assets.get(package_name)
+            if checksum_asset:
+                checksum_url = checksum_asset['browser_download_url']
+    return download_url, package_name, checksum_url
+
+
+def _major_upgrade(releases, current):
+    """The highest final release of a later major version, never an RC, or None."""
+    if major_of(current) == 0:
+        return None  # installed version unreadable: no major to compare with
+    later = [r for r in releases
+             if _is_final(r) and major_of(r.get('tag_name', '')) > major_of(current)]
+    if not later:
+        return None
+    best = max(later, key=lambda r: parse_version(r.get('tag_name', '')))
+    version = best['tag_name'].lstrip('v')
+    download_url, package_name, checksum_url = _pick_asset(best, version)
+    return {
+        'version': version,
+        'published_at': best.get('published_at'),
+        'release_notes': best.get('body', ''),
+        'html_url': best.get('html_url'),
+        'download_url': download_url,
+        'package_name': package_name,
+        'checksum_url': checksum_url,
+    }
+
+
 def check_for_updates(include_prereleases=False, include_dev=False, force=False,
                       channel=None):
     """
@@ -167,6 +243,10 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False,
             final releases only, 'rc' accepts final releases plus rcN
             prereleases — alpha/beta/dev tags never qualify for either.
 
+    The update (update_available, latest_version, package) is only ever a
+    release of the installed major version; the highest final release of a
+    later major version, if any, is reported apart in major_upgrade.
+
     Returns dict with:
         - update_available: bool
         - current_version: str
@@ -174,12 +254,15 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False,
         - release_notes: str
         - download_url: str
         - published_at: str
+        - major_upgrade: dict or None
+        - security_maintenance: bool
     """
     if include_dev:
         include_prereleases = True
     repo = get_github_repo()
     current = get_current_version()
-    
+    base = {'major_upgrade': None, 'security_maintenance': SECURITY_MAINTENANCE}
+
     try:
         # Get releases from GitHub API (with cache to avoid rate limits)
         now = time.time()
@@ -192,28 +275,35 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False,
             github_token = os.environ.get('GITHUB_TOKEN') or os.environ.get('UCM_GITHUB_TOKEN')
             if github_token:
                 headers['Authorization'] = f'token {github_token}'
-            
-            try:
-                response = requests.get(url, headers=headers, timeout=10, verify=_ca_bundle or True)
-                response.raise_for_status()
-                releases = response.json()
-                _releases_cache['data'] = releases
-                _releases_cache['ts'] = now
-            except requests.exceptions.HTTPError as e:
-                raise
-        
+
+            # One page of 100 (the API maximum, 30 by default), newest first:
+            # RCs and another major line must not push this line's fixes off it.
+            response = requests.get(url, headers=headers, params={'per_page': 100},
+                                    timeout=10, verify=_ca_bundle or True)
+            response.raise_for_status()
+            releases = response.json()
+            _releases_cache['data'] = releases
+            _releases_cache['ts'] = now
+
         if not releases:
             return {
+                **base,
                 'update_available': False,
                 'current_version': current,
                 'latest_version': current,
                 'message': 'No releases found'
             }
-        
-        # Find latest applicable release by version (don't trust API order)
+
+        base['major_upgrade'] = _major_upgrade(releases, current)
+
+        # Find latest applicable release by version (don't trust API order),
+        # within the installed major version only
+        installed_major = major_of(current)
         candidates = []
         for release in releases:
             if release.get('draft'):
+                continue
+            if major_of(release.get('tag_name', '')) != installed_major:
                 continue
             if release.get('prerelease'):
                 tag = release.get('tag_name', '').lstrip('v')
@@ -229,11 +319,11 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False,
                     if suffix.startswith('dev') and not include_dev:
                         continue
             candidates.append(release)
-        
+
         # Sort by parsed version, highest first
         candidates.sort(key=lambda r: parse_version(r.get('tag_name', '')), reverse=True)
         latest_release = candidates[0] if candidates else None
-        
+
         # Find release matching current version for its notes
         current_release_notes = ''
         current_published_at = ''
@@ -243,9 +333,10 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False,
                 current_release_notes = release.get('body', '')
                 current_published_at = release.get('published_at', '')
                 break
-        
+
         if not latest_release:
             return {
+                **base,
                 'update_available': False,
                 'current_version': current,
                 'latest_version': current,
@@ -253,47 +344,13 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False,
                 'current_published_at': current_published_at,
                 'message': 'No applicable releases found'
             }
-        
+
         latest_version = latest_release['tag_name'].lstrip('v')
-        
-        # Find appropriate download asset
-        download_url = None
-        package_name = None
-        
-        # Detect package type (deb takes priority over rpm if both exist)
-        is_docker = os.getenv('UCM_DOCKER') == '1'
-        is_deb = os.path.exists('/usr/bin/dpkg')
-        is_rpm = os.path.exists('/usr/bin/rpm') and not is_deb
-        
-        # Collect all matching assets, then pick the best one
-        deb_asset = None
-        checksum_assets = {}
-        checksum_url = None
-
-        for asset in latest_release.get('assets', []):
-            name = asset['name']
-            if is_docker:
-                download_url = f"ghcr.io/neyslim/ultimate-ca-manager:{latest_version}"
-                package_name = name
-                break
-            elif name.endswith('.sha256'):
-                checksum_assets[name[:-len('.sha256')]] = asset
-            elif name.endswith('.deb') and not deb_asset:
-                deb_asset = asset
-
-        if not is_docker:
-            rpm_asset = _pick_rpm(latest_release.get('assets', []), _el_release()) if is_rpm else None
-            chosen = deb_asset if is_deb and deb_asset else (rpm_asset if is_rpm and rpm_asset else None)
-            if chosen:
-                download_url = chosen['browser_download_url']
-                package_name = chosen['name']
-                checksum_asset = checksum_assets.get(package_name)
-                if checksum_asset:
-                    checksum_url = checksum_asset['browser_download_url']
-        
+        download_url, package_name, checksum_url = _pick_asset(latest_release, latest_version)
         update_available = compare_versions(latest_version, current) > 0
-        
+
         return {
+            **base,
             'update_available': update_available,
             'current_version': current,
             'latest_version': latest_version,
@@ -308,9 +365,10 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False,
             'prerelease': latest_release.get('prerelease', False),
             'repo': repo
         }
-        
+
     except requests.RequestException as e:
         return {
+            **base,
             'update_available': False,
             'current_version': current,
             'error': f'Failed to check for updates: {str(e)}'
@@ -457,7 +515,7 @@ def install_update(package_path, *, to_version=None, initiated_by='admin'):
         trigger_tmp.write_text(package_path)
         os.replace(trigger_tmp, trigger_file)
 
-        logger.info(f"Auto-update: trigger written, ucm-watcher.path will handle install + restart")
+        logger.info("Auto-update: trigger written, ucm-watcher.path will handle install + restart")
         return True
     except Exception as e:
         raise Exception(f"Install trigger failed: {str(e)}")
@@ -602,6 +660,8 @@ UPDATE_POPUP_BASELINE_KEY = 'update_popup_baseline_version'  # version running w
 _LAST_CHECK_TS_KEY = 'update_last_check_ts'
 _NOTIFIED_VERSION_KEY = 'update_notified_version'
 _ATTEMPTED_VERSION_KEY = 'auto_update_attempted_version'
+# Major version of the last later-major release notified (once per major)
+_NOTIFIED_MAJOR_KEY = 'update_notified_major'
 # op_id of the last processed watcher result — replay guard for the
 # claim/process/delete consumption (review S-02)
 _RESULT_OP_KEY = 'update_result_last_op'
@@ -677,6 +737,7 @@ def _notify_update_available(result):
         'latest_version': latest,
         'html_url': result.get('html_url'),
         'prerelease': result.get('prerelease', False),
+        'major_upgrade': False,
     })
     if not _cfg_set(_NOTIFIED_VERSION_KEY, latest):
         logger.warning(
@@ -690,6 +751,34 @@ def _notify_update_available(result):
     return True
 
 
+def _notify_major_upgrade(result):
+    """Emit the bus event once per later major version: a later build of an
+    already notified major stays silent. Returns True when nothing is left to do."""
+    upgrade = result.get('major_upgrade')
+    if not upgrade:
+        return True
+    major = str(major_of(upgrade['version']))
+    if _cfg_get(_NOTIFIED_MAJOR_KEY) == major:
+        return True
+    from services.webhook_service import emit_update_available
+    emit_update_available({
+        'current_version': result['current_version'],
+        'latest_version': upgrade['version'],
+        'html_url': upgrade.get('html_url'),
+        'prerelease': False,
+        'major_upgrade': True,
+        'security_maintenance': SECURITY_MAINTENANCE,
+    })
+    if not _cfg_set(_NOTIFIED_MAJOR_KEY, major):
+        logger.warning(
+            "Major version notification emitted but its marker could not be "
+            "persisted, the next check may notify again"
+        )
+        return False
+    logger.info(f"Later major version available: {upgrade['version']}")
+    return True
+
+
 def _auto_install(result):
     """Unattended install — checksum verification is mandatory here."""
     from datetime import datetime
@@ -698,8 +787,6 @@ def _auto_install(result):
     latest = result['latest_version']
     if os.getenv('UCM_DOCKER') == '1' or not result.get('download_url'):
         return
-    if _cfg_get(_ATTEMPTED_VERSION_KEY) == latest:
-        return  # one attempt per version — no overnight crash loops
 
     def refuse(reason):
         logger.warning(f"Auto-update to {latest} refused: {reason}")
@@ -709,6 +796,12 @@ def _auto_install(result):
             details=f"Unattended update to {latest} refused: {reason}",
             success=False,
         )
+
+    # Unattended installs never leave the installed major version.
+    if major_of(latest) != major_of(get_current_version()):
+        return refuse('another major version is only installed on explicit request')
+    if _cfg_get(_ATTEMPTED_VERSION_KEY) == latest:
+        return  # one attempt per version — no overnight crash loops
 
     # Mark before acting so a crash mid-install is not retried nightly.
     # If the marker cannot be persisted, do NOT install: an unattended
@@ -796,6 +889,7 @@ def scheduled_update_check():
         if result.get('error'):
             logger.warning(f"Update check failed: {result['error']}")
             return
+        _notify_major_upgrade(result)
         if not result.get('update_available'):
             return
 

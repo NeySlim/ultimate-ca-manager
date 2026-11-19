@@ -327,6 +327,14 @@ class AutoRenewalService:
             if cert.archived:
                 stats['skipped'] += 1
                 continue
+            # Revoked by its CA's record: marked so once, not refused on every pass
+            from services.cert.issued_lookup import apply_persisted_revocation
+            from utils.db_transaction import commit_or_rollback
+            if apply_persisted_revocation(cert):
+                if commit_or_rollback(logger, f"Auto-renewal: revocation of cert {cert_id} not marked"):
+                    logger.info(f"Auto-renewal skipped cert {cert_id}: revoked by its CA's record")
+                stats['skipped'] += 1
+                continue
             common_name = cert.common_name
             try:
                 partner = renewal_partner(cert)

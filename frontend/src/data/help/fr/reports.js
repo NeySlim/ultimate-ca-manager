@@ -10,8 +10,8 @@ export default {
           { label: 'Inventaire des certificats', text: 'Liste complète de tous les certificats avec leur statut' },
           { label: 'Certificats expirants', text: 'Certificats expirant dans une fenêtre temporelle spécifiée' },
           { label: 'Hiérarchie des CA', text: 'Structure et statistiques des autorités de certification' },
-          { label: 'Résumé d\'audit', text: 'Événements de sécurité et résumé de l\'activité des utilisateurs' },
-          { label: 'Statut de conformité', text: 'Résumé de la conformité et des violations de politique' },
+          { label: 'Résumé d\'audit', text: 'Les actions les plus fréquentes et les utilisateurs les plus actifs sur la période' },
+          { label: 'Statut de conformité', text: 'Trois contrôles : certificats actifs, CA expirées et certificats expirant dans les 30 jours ; les politiques de certificat ne sont pas lues' },
           { label: 'Certificats révoqués', text: 'Certificats révoqués sur la période, avec date et raison' },
         ]
       },
@@ -53,13 +53,13 @@ Liste complète de tous les certificats gérés par UCM. Inclut le sujet, l'éme
 Certificats expirant dans une fenêtre temporelle spécifiée (par défaut : 30 jours). Critique pour éviter les pannes, consultez ce rapport régulièrement ou programmez-le pour une livraison quotidienne.
 
 ### Hiérarchie des CA
-Structure de l'autorité de certification montrant les relations parent-enfant, les comptages de certificats par CA et le statut des CA. Utile pour comprendre votre topologie PKI.
+Structure de l'autorité de certification montrant les relations parent-enfant, les comptages de certificats par CA. Utile pour comprendre votre topologie PKI.
 
 ### Résumé d'audit
-Résumé des événements de sécurité et de l'activité des utilisateurs. Inclut les tentatives de connexion, les opérations de certificat, les violations de politique et les changements de configuration. Essentiel pour les audits de sécurité.
+Les dix actions les plus fréquentes et les dix utilisateurs les plus actifs sur la période.
 
 ### Statut de conformité
-Résumé de la conformité et des violations de politique. Montre quels certificats sont conformes à vos politiques et lesquels les violent. Requis pour la conformité réglementaire.
+Trois contrôles avec un nombre et une gravité : certificats actifs, CA expirées et certificats expirant dans les 30 jours. Il ne lit pas les politiques de certificat.
 
 ### Certificats révoqués
 Certificats révoqués sur la période choisie (30 jours par défaut), avec la date et la raison de révocation. Consultez-le pour suivre les révocations et leurs causes.
@@ -124,7 +124,7 @@ Avant d'activer les programmations, utilisez le bouton ✈️ sur n'importe quel
 
 ## Permissions
 
-- **read:reports** : Générer et télécharger des rapports
+- **read:audit** : Générer et consulter des rapports ; le téléchargement exige aussi **export:audit**
 - **read:audit + export:audit** : Télécharger le rapport PDF exécutif
 - **write:settings** : Configurer les programmations de rapports
 

@@ -19,6 +19,7 @@ from lxml import etree
 from models import CA, ADConnectorConfig, AuditLog, Certificate, db
 from models.certificate_template import CertificateTemplate
 from models.system_config import SystemConfig
+from tests.fixtures.templates import delete_templates, template_ids_named, templates_created_here_removed
 from services.ad_connector import lookup as ad_lookup
 from services.kerberos import negotiate_auth
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WST_NS, WSSE_NS
@@ -26,6 +27,12 @@ from utils.upn_san import extract_upns_from_san_list
 
 ISSUE_URL = '/ADCertificateService_CES_Kerberos/service.svc'
 KERBEROS_PRINCIPAL = 'HOST$@HAGLAND.DOMAIN'
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _templates_stay_in_this_module(app):
+    with templates_created_here_removed(app):
+        yield
 
 
 def _set_config(key, value):
@@ -68,9 +75,12 @@ def wstep_kerberos_config(app, create_ca):
 
 
 def _make_csr(common_name='machine.hagland.domain'):
+    """A manual request asking for clientAuth, the EKU of the Enroll ACL template."""
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     csr = x509.CertificateSigningRequestBuilder().subject_name(
         x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name)])
+    ).add_extension(
+        x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH]), critical=False,
     ).sign(key, hashes.SHA256())
     return csr, key
 
@@ -109,7 +119,7 @@ def _build_rst(csr, message_id='urn:uuid:test-krb-rst-1'):
 
 def _issued_cert_from_rstr(response_bytes):
     root = etree.fromstring(response_bytes)
-    bst_el = root.find(f'.//{{{WSSE_NS}}}BinarySecurityToken')
+    bst_el = root.find(f'.//{{{WST_NS}}}RequestedSecurityToken/{{{WSSE_NS}}}BinarySecurityToken')
     assert bst_el is not None and bst_el.text
     return x509.load_der_x509_certificate(base64.b64decode(bst_el.text))
 
@@ -162,11 +172,16 @@ def test_issue_succeeds_with_authenticated_negotiation(client, app, wstep_kerber
     # earlier test in this file, so mock defensively regardless.
     monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
 
-    csr, key = _make_csr()
-    r = client.post(
-        ISSUE_URL, data=_build_rst(csr),
-        headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
-    )
+    # A template whose subject the client supplies: a machine template's comes from AD
+    _configure_acl_template(app, None, wstep_kerberos_config['id'])
+    try:
+        csr, key = _make_csr()
+        r = client.post(
+            ISSUE_URL, data=_build_rst(csr),
+            headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
+        )
+    finally:
+        _clear_acl_template(app)
     assert r.status_code == 200
     assert r.headers.get('WWW-Authenticate') == 'Negotiate bXV0dWFsLXRva2Vu'
 
@@ -199,26 +214,56 @@ def _clear_ad_derived_templates(app):
     derivation is rejected when nothing has opted in could false-pass/fail
     depending on test execution order."""
     with app.app_context():
-        CertificateTemplate.query.filter_by(name='Test AD User Template').delete()
+        delete_templates(template_ids_named('Test AD User Template'))
         db.session.commit()
 
 
-def _configure_ad_derived_user_template(app):
+def _configure_ad_derived_user_template(app, ca_id):
     """An active template with ad_derived_subject=True -- the per-template
     opt-in wstep_service._user_ad_derivation_enabled gates user-branch
-    derivation on. Unpinned: _resolve_templates_for_ca falls back to every
-    active template when a CA has nothing pinned, so this alone is enough
-    to make the CA eligible."""
+    derivation on -- pinned to ``ca_id`` beside the class's anchor."""
+    from models import CATemplatePin
+
     with app.app_context():
-        CertificateTemplate.query.filter_by(name='Test AD User Template').delete()
+        delete_templates(template_ids_named('Test AD User Template'))
         template = CertificateTemplate(
             name='Test AD User Template', template_type='client_auth',
             extensions_template='{}', is_active=True, ad_derived_subject=True,
         )
         db.session.add(template)
+        db.session.flush()
+        db.session.add(CATemplatePin(ca_id=ca_id, template_id=template.id))
         db.session.commit()
 
 
+_NAKED_ANCHOR = 'Test Naked CSR Anchor'
+
+
+@pytest.fixture(scope='class')
+def _ca_offers_only_its_templates(app, wstep_kerberos_config):
+    """Pins a clientAuth template, which a naked CSR does not match, to the CA:
+    the CA then offers only what the class pins, not every active template of the database."""
+    import json
+
+    from models import CATemplatePin
+
+    with app.app_context():
+        delete_templates(template_ids_named(_NAKED_ANCHOR))
+        anchor = CertificateTemplate(
+            name=_NAKED_ANCHOR, template_type='client_auth', is_active=True,
+            extensions_template=json.dumps({'extended_key_usage': ['clientAuth']}),
+        )
+        db.session.add(anchor)
+        db.session.flush()
+        db.session.add(CATemplatePin(ca_id=wstep_kerberos_config['id'], template_id=anchor.id))
+        db.session.commit()
+    yield
+    with app.app_context():
+        delete_templates(template_ids_named(_NAKED_ANCHOR, 'Test AD User Template'))
+        db.session.commit()
+
+
+@pytest.mark.usefixtures('_ca_offers_only_its_templates')
 class TestNakedCsrSubjectDerivation:
     """Real Windows GPO machine autoenrollment submits a CSR with no CN and
     no SAN for machine templates, trusting the CA to derive the subject
@@ -261,6 +306,7 @@ class TestNakedCsrSubjectDerivation:
         self, client, app, wstep_kerberos_config, monkeypatch
     ):
         _configure_ad_connector(app)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
         monkeypatch.setattr(
@@ -325,7 +371,7 @@ class TestNakedCsrSubjectDerivation:
         gets a subject and SAN derived from AD, matching real ADCS's own
         User-template enrollment shape."""
         _configure_ad_connector(app)
-        _configure_ad_derived_user_template(app)
+        _configure_ad_derived_user_template(app, wstep_kerberos_config['id'])
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
         monkeypatch.setattr(
@@ -377,7 +423,7 @@ class TestNakedCsrSubjectDerivation:
         a hard requirement (unlike real ADCS's CT_FLAG_SUBJECT_REQUIRE_EMAIL,
         which would decline enrollment outright for any user without one)."""
         _configure_ad_connector(app)
-        _configure_ad_derived_user_template(app)
+        _configure_ad_derived_user_template(app, wstep_kerberos_config['id'])
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
         monkeypatch.setattr(
@@ -430,7 +476,8 @@ class TestNakedCsrSubjectDerivation:
         ...) means the naked CSR falls through to the pre-existing
         rejection, never a crash or a bypass."""
         _configure_ad_connector(app)
-        _configure_ad_derived_user_template(app)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+        _configure_ad_derived_user_template(app, wstep_kerberos_config['id'])
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
         monkeypatch.setattr(
@@ -455,6 +502,7 @@ class TestNakedCsrSubjectDerivation:
         + a successful lookup -- without any ad_derived_subject template,
         derivation must not fire even if AD would have resolved the user."""
         _configure_ad_connector(app)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
         _clear_ad_derived_templates(app)
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
@@ -478,20 +526,16 @@ class TestNakedCsrSubjectDerivation:
             headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
         )
         assert r.status_code == 400
+        assert b'CSR subject must include a non-empty CN or a SubjectAltName' in r.data, r.data
 
 
 def _clear_acl_template(app):
-    from models import CATemplatePin
-
     with app.app_context():
-        existing = CertificateTemplate.query.filter_by(name='Test Enroll ACL Template').first()
-        if existing:
-            CATemplatePin.query.filter_by(template_id=existing.id).delete()
-            db.session.delete(existing)
-            db.session.commit()
+        delete_templates(template_ids_named('Test Enroll ACL Template'))
+        db.session.commit()
 
 
-def _configure_acl_template(app, allowed_ad_group, ca_id, extended_key_usage=None):
+def _configure_acl_template(app, allowed_ad_group, ca_id, extended_key_usage=('clientAuth',)):
     """An active template with an Enroll ACL group set, PINNED to ``ca_id``.
 
     Pinning matters here specifically: ``_resolve_templates_for_ca`` falls
@@ -505,13 +549,11 @@ def _configure_acl_template(app, allowed_ad_group, ca_id, extended_key_usage=Non
     lower id would silently win the tie-break instead of this one --
     exactly the failure mode this pin closes off.
 
-    ``extended_key_usage=None`` (empty EKU) matches a plain populated CSR
-    with score 0 -- see _match_template -- exercising the confident-match
-    branch of the ACL gate. A non-empty ``extended_key_usage`` (e.g.
-    ``['clientAuth']``) instead makes this template score negative against
-    both a populated no-EKU CSR and a naked CSR, so _match_template returns
-    None for either -- exercising the CA-wide fallback branch instead (see
-    _required_enroll_acl_groups).
+    The clientAuth template matches ``_make_csr``'s clientAuth request (the
+    confident-match branch of the ACL gate) and scores negative against a
+    naked CSR, which then takes the CA-wide fallback branch (see
+    _required_enroll_acl_groups). A template whose subject the request names
+    must configure its EKUs, or issuance is refused.
 
     Also clears 'Test AD User Template' (used by the derivation tests
     above), since an empty-EKU variant of it would otherwise tie-break
@@ -523,7 +565,7 @@ def _configure_acl_template(app, allowed_ad_group, ca_id, extended_key_usage=Non
     _clear_ad_derived_templates(app)
     _clear_acl_template(app)
     with app.app_context():
-        extensions = {'extended_key_usage': extended_key_usage} if extended_key_usage else {}
+        extensions = {'extended_key_usage': list(extended_key_usage)}
         template = CertificateTemplate(
             name='Test Enroll ACL Template', template_type='client_auth',
             extensions_template=json.dumps(extensions), is_active=True,
@@ -615,8 +657,8 @@ class TestEnrollAcl:
                 ISSUE_URL, data=_build_rst(csr),
                 headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
             )
-            assert r.status_code == 400
-            assert b'This CA offers no certificate template' in r.data, r.data
+            assert r.status_code == 500
+            assert _fault_text_and_code(r.data) == ('This CA offers no certificate template', 's:Receiver')
         finally:
             _clear_acl_template(app)
 
@@ -626,6 +668,7 @@ class TestEnrollAcl:
         propagates that as a denial, not a silent bypass, when the
         connector/DC is unreachable."""
         _configure_ad_connector(app)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
         _configure_acl_template(app, 'VPN-Enroll', wstep_kerberos_config['id'])
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
@@ -641,7 +684,11 @@ class TestEnrollAcl:
                 ISSUE_URL, data=_build_rst(csr),
                 headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
             )
-            assert r.status_code == 400
+            # Denied all the same, but as the server's failure (SOAP env:Receiver), not the requester's
+            assert r.status_code == 500
+            assert _fault_text_and_code(r.data) == (
+                'The directory could not be reached to check enrollment rights', 's:Receiver')
+            assert b'DC unreachable' not in r.data
         finally:
             _clear_acl_template(app)
 
@@ -689,6 +736,7 @@ class TestEnrollAcl:
         never be checked at all -- silently defeating the ACL for exactly
         the unattended-autoenrollment case it exists to restrict."""
         _configure_ad_connector(app)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
         _configure_acl_template(app, 'VPN-Enroll', wstep_kerberos_config['id'], extended_key_usage=['clientAuth'])
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
@@ -747,3 +795,132 @@ class TestEnrollAcl:
             assert cert.public_key().public_numbers() == key.public_key().public_numbers()
         finally:
             _clear_acl_template(app)
+
+
+def test_an_unreachable_directory_is_a_receiver_fault(client, app, wstep_kerberos_config, monkeypatch):
+    """The SID lookup failing is the server's fault (SOAP env:Receiver, HTTP 500), not the client's."""
+    _configure_ad_connector(app)
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
+                        lambda auth_header, connection_key: _authenticated_result())
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: ad_lookup.UNREACHABLE)
+    csr, _key = _make_csr()
+    r = client.post(ISSUE_URL, data=_build_rst(csr),
+                    headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    assert r.status_code == 500
+    fault = etree.fromstring(r.data).find(f'.//{{{SOAP_NS}}}Fault')
+    assert fault.find(f'.//{{{SOAP_NS}}}Text').text == (
+        'Could not resolve requester identity for strong certificate mapping')
+    assert fault.find(f'{{{SOAP_NS}}}Code/{{{SOAP_NS}}}Value').text == 's:Receiver'
+
+
+def test_a_requester_missing_from_the_directory_is_a_sender_fault(
+        client, app, wstep_kerberos_config, monkeypatch):
+    """The directory answered that the account does not exist: the request is refused (400)."""
+    _configure_ad_connector(app)
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
+                        lambda auth_header, connection_key: _authenticated_result())
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: None)
+    csr, _key = _make_csr()
+    r = client.post(ISSUE_URL, data=_build_rst(csr),
+                    headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    assert r.status_code == 400
+    assert _fault_text_and_code(r.data) == ('The requester was not found in the directory', 's:Sender')
+
+
+def test_an_enabled_connector_without_a_server_is_a_receiver_fault(
+        client, app, wstep_kerberos_config, monkeypatch):
+    """The API accepts an enabled connector with no server: a configuration fault (500), not 400."""
+    with app.app_context():
+        ADConnectorConfig.query.delete()
+        config = ADConnectorConfig(server=None, base_dn='DC=hagland,DC=domain', bind_dn='svc-ucm', enabled=True)
+        config.bind_password = 'irrelevant'
+        db.session.add(config)
+        db.session.commit()
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
+                        lambda auth_header, connection_key: _authenticated_result())
+    csr, _key = _make_csr()
+    r = client.post(ISSUE_URL, data=_build_rst(csr),
+                    headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    assert r.status_code == 500
+    assert _fault_text_and_code(r.data) == (
+        'Could not resolve requester identity for strong certificate mapping', 's:Receiver')
+
+
+def test_a_requester_without_a_usable_sid_is_told_apart_from_a_missing_one(
+        client, app, wstep_kerberos_config, monkeypatch):
+    _configure_ad_connector(app)
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
+                        lambda auth_header, connection_key: _authenticated_result())
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: ad_lookup.UNUSABLE_SID)
+    csr, _key = _make_csr()
+    r = client.post(ISSUE_URL, data=_build_rst(csr),
+                    headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    assert r.status_code == 400
+    assert _fault_text_and_code(r.data) == ('The requester has no usable directory identity', 's:Sender')
+
+
+def _fault_text_and_code(data):
+    fault = etree.fromstring(data).find(f'.//{{{SOAP_NS}}}Fault')
+    return (fault.find(f'.//{{{SOAP_NS}}}Text').text,
+            fault.find(f'{{{SOAP_NS}}}Code/{{{SOAP_NS}}}Value').text)
+
+
+def test_a_naked_request_the_directory_cannot_answer_is_a_receiver_fault(
+        client, app, wstep_kerberos_config, monkeypatch):
+    """GPO autoenrollment with no DC bound: the CA, not the computer, failed to build the subject."""
+    _configure_ad_connector(app)
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
+                        lambda auth_header, connection_key: _authenticated_result())
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+    monkeypatch.setattr(ad_lookup, '_connect', lambda config: (_ for _ in ()).throw(RuntimeError('DC unreachable')))
+    csr, _key = _make_naked_csr()
+    r = client.post(ISSUE_URL, data=_build_rst(csr),
+                    headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    assert r.status_code == 500
+    assert _fault_text_and_code(r.data) == (
+        'The directory that builds the certificate subject could not be reached', 's:Receiver')
+    assert b'DC unreachable' not in r.data
+
+
+@pytest.mark.parametrize('principal, base_dn, status, text, code', [
+    ('HOST$@OTHER.DOMAIN', 'DC=hagland,DC=domain', 400,
+     "The requester's realm is not served by the directory connector", 's:Sender'),
+    (KERBEROS_PRINCIPAL, None, 500,
+     'Could not resolve requester identity for strong certificate mapping', 's:Receiver'),
+])
+def test_an_enabled_connector_that_cannot_resolve_the_requester_faults(
+        client, app, wstep_kerberos_config, monkeypatch, principal, base_dn, status, text, code):
+    """Never issued without the SID extension: a foreign realm is the requester's fault, no base DN the CA's."""
+    with app.app_context():
+        ADConnectorConfig.query.delete()
+        config = ADConnectorConfig(server='dc1.hagland.domain', base_dn=base_dn,
+                                   bind_dn='svc-ucm', enabled=True)
+        config.bind_password = 'irrelevant'
+        db.session.add(config)
+        db.session.commit()
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
+                        lambda auth_header, connection_key: negotiate_auth.NegotiateResult(
+                            status='authenticated', client_principal=principal))
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+    csr, _key = _make_csr()
+    try:
+        r = client.post(ISSUE_URL, data=_build_rst(csr),
+                        headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    finally:
+        with app.app_context():
+            ADConnectorConfig.query.delete()
+            db.session.commit()
+    assert r.status_code == status
+    assert _fault_text_and_code(r.data) == (text, code)

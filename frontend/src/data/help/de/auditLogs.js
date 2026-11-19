@@ -53,12 +53,8 @@ Jeder Protokolleintrag erfasst:
 
 ## Filterung
 
-### Nach Aktionstyp
-Nach Vorgangskategorie filtern:
-- Zertifikatsvorgänge (Ausstellen, Widerrufen, Erneuern, Exportieren)
-- CA-Vorgänge (Erstellen, Importieren, Löschen)
-- Benutzervorgänge (Anmelden, Abmelden, Erstellen, Aktualisieren)
-- Systemvorgänge (Einstellungsänderung, Sicherung, Wiederherstellung)
+### Nach Aktion
+Eine oder mehrere Aktionsnamen auswählen, zum Beispiel \`certificate_issued\` oder \`login_success\`.
 
 ### Nach Benutzer
 Nur Aktionen eines bestimmten Benutzers anzeigen.
@@ -71,7 +67,7 @@ Nur Aktionen eines bestimmten Benutzers anzeigen.
 Legen Sie **Von**- und **Bis**-Daten fest, um den Zeitraum einzugrenzen.
 
 ### Textsuche
-Freitextsuche über alle Protokollfelder.
+Freitextsuche in Benutzername, Aktion, Details, Ressourcentyp und IP-Adresse; Ressourcenname und ID werden nicht durchsucht.
 
 ## Export
 
@@ -79,7 +75,7 @@ Gefilterte Protokolle exportieren in:
 - **JSON**: Maschinenlesbar, enthält alle Felder
 - **CSV**: Tabellenkalkulationskompatibel, enthält die wichtigsten Felder
 
-Exporte enthalten nur die aktuell gefilterten Ergebnisse.
+Exporte wenden nur den Datumsbereich an, bis zu 10.000 Einträge: Die übrigen Filter werden nicht angewendet.
 
 ## Bereinigung
 
@@ -92,7 +88,7 @@ Alte Protokolle basierend auf der Aufbewahrungsfrist löschen:
 
 ## Integritätsüberprüfung
 
-Klicken Sie auf **Integrität prüfen**, um die Audit-Protokollkette zu überprüfen. UCM verwendet Hash-Verkettung, um zu erkennen, ob Protokolleinträge manipuliert oder gelöscht wurden.
+Klicken Sie auf **Integrität prüfen**, um die Audit-Protokollkette zu überprüfen. UCM verwendet Hash-Verkettung, um einen innerhalb der Kette geänderten oder entfernten Eintrag zu erkennen; das Entfernen der letzten Einträge hinterlässt in der Kette selbst keine Spur, weshalb die Syslog-Weiterleitung eine Kopie andernorts aufbewahrt.
 
 ## Syslog-Weiterleitung
 

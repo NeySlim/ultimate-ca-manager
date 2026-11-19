@@ -572,6 +572,15 @@ export default function SCEPPage() {
               <p className="text-xs text-text-tertiary">{t('scep.getCaCertChainHelp')}</p>
 
               <ToggleSwitch
+                checked={config.plain_http || false}
+                onChange={(val) => setConfig({ ...config, plain_http: val })}
+                label={t('scep.plainHttp')}
+                size="sm"
+                disabled={!config.enabled}
+              />
+              <p className="text-xs text-text-tertiary">{t('scep.plainHttpHelp')}</p>
+
+              <ToggleSwitch
                 checked={config.enforce_signing_time || false}
                 onChange={(val) => setConfig({ ...config, enforce_signing_time: val })}
                 label={t('scep.enforceSigningTime')}

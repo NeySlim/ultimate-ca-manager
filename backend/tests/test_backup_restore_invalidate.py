@@ -59,18 +59,27 @@ class TestSessionsAreRevoked:
             provider = db.session.execute(
                 db.text("SELECT id FROM pro_sso_providers LIMIT 1")
             ).first()
+            from models.sso import SSOProvider
+            created = None
             if provider is None:
-                db.session.add(SSOSession(user_id=user_id, provider_id=1,
-                                          session_id='restore-invalidate-sso'))
-            else:
-                db.session.add(SSOSession(user_id=user_id, provider_id=provider[0],
-                                          session_id='restore-invalidate-sso'))
+                created = SSOProvider(name='restore-invalidate-sso', provider_type='ldap')
+                db.session.add(created)
+                db.session.flush()
+                provider = (created.id,)
+            db.session.add(SSOSession(user_id=user_id, provider_id=provider[0],
+                                      session_id='restore-invalidate-sso'))
             db.session.commit()
+            try:
+                result = invalidate_after_restore()
 
-            result = invalidate_after_restore()
-
-            assert result['sso_sessions_revoked'] >= 1
-            assert SSOSession.query.count() == 0
+                assert result['sso_sessions_revoked'] >= 1
+                assert SSOSession.query.count() == 0
+            finally:
+                db.session.rollback()
+                if created is not None:
+                    SSOSession.query.filter_by(provider_id=provider[0]).delete()
+                    SSOProvider.query.filter_by(id=provider[0]).delete()
+                    db.session.commit()
 
     def test_a_failed_revocation_raises_and_stops_everything(
             self, app, user_id, monkeypatch):

@@ -61,10 +61,12 @@ def challenge_txt_name(domain: str, challenge: dict) -> str:
     return challenge.get('dns_txt_name') or f"_acme-challenge.{strip_wildcard(domain)}"
 
 
-def wait_for_challenges(challenges: dict, timeout: int, delay: Optional[int] = None) -> dict:
+def wait_for_challenges(challenges: dict, timeout: int, delay: Optional[int] = None,
+                        on_tick=None) -> dict:
     """
     Poll DNS until every dns-01 TXT record is visible, or timeout, then wait
     *delay* seconds (default: the configured propagation delay) when they all are.
+    *on_tick* is called after each wait, to show the order is still being worked on.
 
     Returns {'ok': bool, 'missing': [domains], 'waited': seconds}.
     """
@@ -96,6 +98,8 @@ def wait_for_challenges(challenges: dict, timeout: int, delay: Optional[int] = N
             break
         time.sleep(DNS_SELFCHECK_INTERVAL)
         waited += DNS_SELFCHECK_INTERVAL
+        if on_tick:
+            on_tick()
         if pending:
             acme_log(
                 logger,

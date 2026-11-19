@@ -10,6 +10,10 @@ import os
 import ssl
 import sys
 
+# Before the preloaded app: the master and its workers only register the scheduled
+# tasks, which run in the scheduler process started below (when_ready)
+os.environ['UCM_SCHEDULER_SUPERVISED'] = '1'
+
 # Detect environment
 base_path = os.getenv('UCM_BASE_PATH', '/opt/ucm')
 data_path = os.getenv('DATA_DIR', f'{base_path}/data')
@@ -80,6 +84,7 @@ def ssl_context(conf, default_ssl_context_factory):
     if WSTEP_TLS12_CAP_NEEDED:
         ctx.maximum_version = ssl.TLSVersion.TLSv1_2
     if conf.ca_certs:
+        anchor_client_verification(ctx)
         try:
             import ctypes
             libssl = ctypes.CDLL('libssl.so.3')
@@ -110,7 +115,7 @@ def ssl_context(conf, default_ssl_context_factory):
     return ctx
 
 
-from boot_config import mtls_client_ca, wstep_enabled
+from boot_config import anchor_client_verification, mtls_client_ca, wstep_enabled
 
 # Drives the TLS 1.2 cap in ssl_context().
 WSTEP_TLS12_CAP_NEEDED = wstep_enabled(data_path)
@@ -164,7 +169,7 @@ def _load_mtls_config():
         if not found:
             _remember_mtls_mode(False)
             return
-        full_chain, ca_name, required = found
+        ca_pem, ca_name, required = found
 
         # Write CA cert atomically (temp file + rename) with restricted permissions
         import tempfile
@@ -173,7 +178,7 @@ def _load_mtls_config():
         fd, temp_path = tempfile.mkstemp(dir=data_path, prefix='.mtls_ca_', suffix='.tmp')
         try:
             with os.fdopen(fd, 'w') as f:
-                f.write(full_chain)
+                f.write(ca_pem)
             os.chmod(temp_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP)
             os.rename(temp_path, ca_file_path)
         except Exception as e:
@@ -206,6 +211,9 @@ else:
     errorlog = os.getenv('ERROR_LOG', '/var/log/ucm/error.log')
 loglevel = os.getenv('LOG_LEVEL', 'info')
 access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
+# Reset tokens and OAuth codes travel in URLs: kept out of the access log.
+from utils.access_log import RedactingLogger  # noqa: E402
+logger_class = RedactingLogger
 
 # Process naming
 proc_name = 'ucm'
@@ -232,8 +240,19 @@ tmp_upload_dir = None
 def on_starting(server):
     server.log.info("Starting UCM with Gunicorn")
 
+def when_ready(server):
+    from scheduler_supervisor import supervisor
+    supervisor.start(server)
+
 def on_reload(server):
     server.log.info("Reloading UCM")
+    # The scheduler process takes the new code and configuration too
+    from scheduler_supervisor import supervisor
+    supervisor.restart()
+
+def on_exit(server):
+    from scheduler_supervisor import supervisor
+    supervisor.stop()
 
 def worker_int(worker):
     worker.log.info("Worker received INT or QUIT signal")
@@ -243,7 +262,7 @@ def worker_abort(worker):
 
 def post_worker_init(worker):
     """Post-worker initialization:
-    0. Drop the database connections inherited from the master
+    0. Drop the database and syslog connections inherited from the master
     1. Suppress noisy SSL/connection tracebacks from gevent
     2. Start HTTP protocol server for CDP/OCSP (if configured)
     3. Start the DNS UPDATE listener (if configured)
@@ -256,7 +275,9 @@ def post_worker_init(worker):
     from utils.db_fork import forget_inherited_connections
     from wsgi import app as flask_app
     with flask_app.app_context():
-        forget_inherited_connections(db.engine)
+        forget_inherited_connections(db.engines.values())
+    from services.syslog_service import syslog_forwarder
+    syslog_forwarder.forget_inherited_socket()
 
     hub = gevent.get_hub()
     _original_handle_error = hub.handle_error

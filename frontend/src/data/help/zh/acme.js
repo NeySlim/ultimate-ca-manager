@@ -28,6 +28,27 @@ export default {
           { label: '自定义命令', text: '运行管理员配置的本地命令来创建/删除 TXT 记录的 DNS 提供商类型,, 记录详情通过 DOMAIN、RECORD_NAME、RECORD_VALUE、TTL、ACTION 环境变量传递。要求二进制文件绝对路径，不经过 shell，超时可配置' },
           { label: '域名', text: '将域名映射到 DNS 提供商以进行自动验证' },
           { label: 'HTTP-01', text: 'UCM 在 HTTP 协议端口（默认 8080）的 /.well-known/acme-challenge/ 下提供其待处理订单的 challenge 文件：请将域名 80 端口上的该路径转发到 UCM。验证会先检查该文件，HTTP-01 订单会自动续期' },
+          { label: '原地续期 (v2.251)', text: '续期保留证书的 id 和 refid，因此 HTTPS 绑定、部署绑定和 Webhook 会随之更新。先前续期中作为新行导入的证书仍保留在清单中：请手动归档或删除' },
+          { label: '中断的订单 (v2.251)', text: '因重启而停在处理中的订单会在约 15 分钟内带着提示信息回到待处理状态，可执行 Verify Challenge。重启或导入失败之前 CA 已签发的证书，可通过 Check Status、完成订单或下一次续期取回' },
+          { label: '过期的待处理订单 (v2.251)', text: '续期任务会移除待处理超过 7 天、且其在 CA 的订单已过期或过期时间未知的订单，连同其 TXT 记录，并为每次移除记录审计。验证失败的订单的 TXT 记录在其变为无效后移除' },
+          { label: '订单列表 (v2.251)', text: 'Let\'s Encrypt orders 标签页加载全部订单（最多 5000 个），每次四页，并在 Retry-After 之后重试被 429 拒绝的页。仍缺失的页会保留已获取的订单，并提示列表不完整' },
+          { label: '续期失败 (v2.251)', text: '订单会显示其续期失败次数、最后一次错误及其日期。计划续期失败 5 次后，每天重试一次；每次失败（包括手动续期）都会触发 acme_order.renewal_failed 事件' },
+          { label: '按订单自动续期 (v2.251)', text: '选中订单后会显示“自动续期”开关，用于停止或恢复其续期。吊销后删除证书会关闭其订单的续期，并给出提示' },
+          { label: '一次一个续期 (v2.251)', text: '续期或完成订单会锁定该订单：此时再启动第二个会得到 409，调度器也会跳过该订单' },
+          { label: '缺少账户或提供商 (v2.251)', text: '其 CA 账户已被删除、DNS 提供商已被禁用，或重用了已删除证书的密钥的订单，会在到达 CA 之前停止，并给出应执行操作的提示。已签发订单仍通过某个 CA 账户续期时，删除或停用该账户会被拒绝 (409)' },
+          { label: '已泄露的密钥 (v2.251)', text: '无论由哪个 CA 签发其证书，因泄露而吊销的密钥都会在请求时以及续期创建订单之前被拒绝 (409)，即使该证书已被删除。设置为重用此类密钥的续期会改为生成新密钥' },
+          { label: '续期时吊销 (v2.251)', text: '启用“续期后吊销旧证书”（本地 ACME › 续期策略）后，当本地原因为 keyCompromise、affiliationChanged、superseded 或 cessationOfOperation 时，CA 会收到该原因，否则不带原因。吊销失败时，续期任务会重试直到证书过期，并触发 acme_order.revocation_failed' },
+          { label: '续期阈值 (v2.249)', text: '“到期前天数”在 CA 未建议续期窗口 (ARI) 时生效。有效期短于该阈值 1.5 倍的证书改为在其最后三分之一时段内续期' },
+          { label: '长名称 (v2.249)', text: '超过 64 个字符的首个名称仅放入主题备用名称并标记为关键，而不会导致完成订单失败' },
+          { label: '域名与通配符 (v2.252)', text: '同时包含域名及其通配符的订单，在共用名称下每个授权获得一个 TXT 值，DNS 提供商会将每个值添加在其他值旁边。DuckDNS、Hurricane Electric 和 FreeDNS 每个名称只保留一个值，因此这类订单会在询问 CA 之前被拒绝，在同一子域名下包含两个主机的 DuckDNS 订单也是如此：请分开提交，一个接一个' },
+          { label: 'TXT 清理 (v2.252)', text: '清理只移除其订单的 TXT 值，因此其他订单，或共用该名称的通配符和根域名，会保留各自的值。DuckDNS、Hurricane Electric 和 FreeDNS 每个名称只保留一个值：仅当没有其他进行中的订单使用该名称时才会清除' },
+          { label: '名称唯一 (v2.251)', text: '创建和重命名时，已被使用的 DNS 提供商或外部 CA 账户名称会被拒绝 (409)。升级时，先前重复的名称按创建先后依次重命名为“名称 (2)”、“名称 (3)”' },
+          { label: 'Vercel 团队 (v2.251)', text: 'Vercel 提供商可为团队所拥有的域名填写可选的 Team ID' },
+          { label: 'RFC 2136 提供商 (v2.252)', text: 'DNS 服务器可以是主机名。已填写的区域用于其内部的名称；对于其他名称，或区域为空时，区域从所配置服务器返回的 SOA 读取，再从系统解析器读取' },
+          { label: 'ARI 续期时间 (v2.252)', text: 'CA 建议续期窗口时，每张证书在窗口内一次性随机抽取的时刻之前的最后一次 6 小时轮询中续期。窗口会在 CA 的 Retry-After 之后再次检查，间隔限制在一分钟到一天之间，证书过期后不再检查（RFC 9773）' },
+          { label: 'CA 错误 (v2.252)', text: '不是 ACME 问题的 CA 错误页面（例如 HTML 503）会连同其 HTTP 状态和 Retry-After 一并报告' },
+          { label: 'RcodeZero 令牌 (v2.251)', text: 'RcodeZero 需要具有区域读写权限的 API 令牌，而不是仅限 ACME 权限的令牌' },
+          { label: 'Checkdomain (v2.251)', text: 'Checkdomain 按其 API 文档，在读取所有页之后，通过重写不含该值的区域记录来移除值。SOA、根域名 NS 和生成的 www 副本不在重写范围内' },
         ]
       },
       {
@@ -42,6 +63,11 @@ export default {
                   { label: '配置文件与模板 (v2.221)', text: '证书配置文件（draft-ietf-acme-profiles）在目录中公布，由客户端在每个订单中选择。每个配置文件设定有效期和摘要，并可绑定证书模板，绑定后模板的密钥用法和扩展密钥用法将决定签发的证书' },
                   { label: '默认配置文件', text: '大多数客户端不请求任何配置文件。在配置文件下方选择的默认配置文件会应用于这些订单；未设置时，它们获得 90 天有效期和默认摘要' },
                   { label: '吊销 (v2.248)', text: '客户端发送用于吊销的证书必须与存储的证书逐字节一致。只有 RSA 或 EC P-256、P-384、P-521 证书密钥可以自行签署请求：ML-DSA、EdDSA 或 Brainpool 证书请使用下单的账户吊销' },
+          { label: '按授权吊销 (v2.252)', text: '持有此 ACME 服务器所签发证书的每个名称和 IP 地址的有效且未过期授权的账户，即使该证书由其他账户下单，也可以吊销它（RFC 8555 §7.6）。由自动批准授予的授权不计入' },
+          { label: '请求的日期 (v2.252)', text: '订单可以请求 notBefore 和 notAfter（cert-manager 的 duration、lego 的 --not-after）：证书恰好带有这些日期。长于配置文件有效期、超出签发 CA 有效期、被策略禁止或已过去的窗口会被拒绝，而不是以其他日期签发' },
+          { label: '到期 (v2.252)', text: '超过到期时间的订单，或其有效授权已过期的订单，无法再完成：它会变为 invalid，客户端需要重新下单。已过期的有效授权显示为 expired' },
+          { label: '挑战 (v2.252)', text: '以空负载读取挑战绝不会启动其验证：客户端为此提交 {}。tls-alpn-01 证书必须恰好以被验证的名称或 IP 地址作为其主题备用名称' },
+          { label: 'CAA 标识 (v2.252)', text: '目录将已配置的 CAA 标识符作为 caaIdentities 公布，否则使用公开的 ACME 主机，完成订单时用同一列表检查 CAA 记录' },
         ]
       },
       {
@@ -53,8 +79,13 @@ export default {
           { label: '重置账户', text: '清除所选 CA 账户的上游注册以强制重新注册' },
           { label: 'EAB凭据', text: '需要EAB的CA的External Account Binding凭据（如ZeroSSL、Google Trust），在“外部 CA 账户”中的 CA 账户上输入' },
           { label: 'DNS挑战', text: 'UCM使用配置的DNS提供商代表客户端处理DNS-01挑战' },
-          { label: '清理被替换的证书', text: '可选开关：当代理订单 finalize 时，删除之前由代理订单为完全相同域名集合导入的证书。已吊销证书始终保留；非代理证书绝不受影响。默认关闭' },
-                  { label: '客户端预检 (v2.217)', text: '代理还会发布用每个客户端账户密钥计算的 dns-01 TXT 值：lego/Traefik/Caddy 的传播预检无需禁用即可通过；重试的 new-order 会返回该账户仍在等待的订单' },
+          { label: '清除被替换的证书', text: '可选开关：当代理订单 finalize 时，删除之前由代理订单为完全相同域名集合导入的证书。已吊销证书始终保留；非代理证书绝不受影响。默认关闭' },
+                  { label: '客户端预检 (v2.217)', text: '代理还会发布用每个客户端账户密钥计算的 dns-01 TXT 值：lego/Traefik/Caddy 的传播预检无需禁用即可通过，但 DuckDNS、Hurricane Electric 和 FreeDNS 例外，它们只保留一个值：请在这些提供商上禁用客户端预检；重试的 new-order 会返回该账户仍在等待的订单' },
+                  { label: '客户端兼容性 (v2.246)', text: '要求 EAB 时，onlyReturnExisting 查询以及使用已注册密钥的 new-account 会返回现有账户 (cert-manager)。账户 URL 可响应读取、联系信息更新和停用，并接受授权停用 (lego)，challenge 响应带有 Link rel="up"' },
+          { label: '上游错误 (v2.252)', text: '上游 CA 的错误会连同其类型（rateLimited、badCSR、rejectedIdentifier、alreadyRevoked 等）、状态、子问题和 Retry-After 一并传给客户端。与代理自身上游账户有关的错误仍为 serverInternal' },
+          { label: '配置文件与有效期 (v2.252)', text: '目录列出上游 CA 的配置文件。客户端请求的配置文件、notBefore 和 notAfter 会传给上游；重试的 new-order 仅在携带它们时才重用待处理订单；上游 CA 不提供的配置文件会以 invalidProfile 拒绝' },
+          { label: 'TXT 记录被拒绝 (v2.252)', text: 'DNS 提供商拒绝 TXT 记录时，挑战不会提交到上游：订单、其授权和挑战都会变为 invalid，其其他挑战均不提交，提供商的消息会被记录并保存在订单上。无效或已停用订单的 TXT 记录会被移除' },
+          { label: '挑战读取 (v2.252)', text: '代理通过其授权读取挑战，绝不对挑战使用 POST-as-GET，因为在某些 CA 上这会在 TXT 记录存在之前就启动验证。代理目录不提供密钥轮换' },
         ]
       },
       {
@@ -76,7 +107,7 @@ export default {
           { label: '签发', text: '从 ACME → EAB Credentials 生成新的 kid + HMAC 密钥对' },
           { label: '分发', text: '将 kid + HMAC 交给客户端(cert-manager、certbot、acme.sh)' },
           { label: '绑定', text: '客户端在 newAccount 上对 MAC 密钥签名 JWS 以绑定其 ACME 账户' },
-          { label: '轮换 / 撤销', text: '随时撤销 kid, 现有账户继续工作,新绑定被拒绝' },
+          { label: '撤销', text: '随时撤销 kid，现有账户继续工作，新绑定被拒绝。如需轮换，请创建新的 kid 并撤销旧的' },
           { label: '审计', text: '签发、轮换和撤销在执行操作员名下进行审计' },
           { label: '域名限制', text: '将凭据限制为其可申请的域名：*（任意）、*.example.com（所有子域名）或显式列表,, 空列表将完全阻止签发。在 new-order/new-authz 上强制执行，服务器和代理均适用；仅在要求 EAB 时有意义' },
         ]
@@ -125,7 +156,7 @@ export default {
         content: '本地 ACME 服务器可通过绑定到 ACME 账户的持久 TXT 记录验证域名 (draft-ietf-acme-dns-persist):, 续期时无需写入 DNS。可选启用，默认关闭。',
         items: [
           { label: '记录', text: '创建 _validation-persist.<域名> TXT "<签发者域名>; accounturi=<账户 URL>",, challenge 对象会公布这两个期望值' },
-          { label: '启用', text: 'ACME → 配置 → 持久 DNS 验证 (dns-persist-01)' },
+          { label: '启用', text: 'ACME → 本地 ACME → 持久 DNS 验证 (dns-persist-01)' },
           { label: '通配符 / 子域名', text: '追加 policy=wildcard 可同时授权通配符证书及已验证名称的子域名' },
           { label: 'persistUntil', text: '可选的 persistUntil=<unix 时间戳> 会在该时间之后阻止新的验证' },
           { label: '安全', text: '只要记录存在，账户密钥即拥有签发能力,, 删除 TXT 记录即可撤销' },
@@ -169,6 +200,10 @@ UCM 支持两种 ACME（自动化证书管理环境）模式：
 - **自动续期**: 在证书到期前自动续期
 - **证书密钥类型**: RSA-2048、RSA-4096、ECDSA P-256、ECDSA P-384、Brainpool P-256 或 P-384、ML-DSA-44、ML-DSA-65 或 ML-DSA-87。FIPS 模式下或不含 ML-DSA 的构建中不提供 ML-DSA。已配置但本实例无法生成的类型会使订单失败，而不是回退到 RSA-2048
 - **账户密钥算法**: ES256、ES384 或 RS256 用于 ACME 账户签名
+- **原地续期** (v2.251)：续期保留证书的 id 和 refid，因此其 HTTPS 绑定、部署绑定和 Webhook 会随之更新
+- **续期失败** (v2.251)：订单列表显示失败次数和最后一次错误；计划续期失败 5 次后，订单每天重试一次。选中订单的**自动续期**开关可停止或恢复其续期
+- **订单列表** (v2.251)：加载全部订单，每次四页；重试后仍缺失的页会提示列表不完整
+- **已泄露的密钥** (v2.251)：因泄露而吊销的密钥会在请求时以及任何续期创建订单之前被拒绝 (409)
 
 ### 自定义 ACME 服务器
 使用任何符合 RFC 8555 的 CA，不仅限于 Let's Encrypt：
@@ -243,6 +278,8 @@ ECDSA 密钥推荐用于现代部署:, 更小、更快且同样安全。
 - 等等
 
 每个提供商需要特定于该 DNS 服务的 API 凭据。
+
+清理只移除其订单的 TXT 值，因此其他订单，或共用该名称的通配符和根域名，会保留各自的值；DuckDNS、Hurricane Electric 和 FreeDNS 每个名称只保留一个值，因此仅当没有其他进行中的订单使用该名称时才会清除，并拒绝同时包含域名及其通配符的订单 (v2.252)。Vercel 可为团队所拥有的域名填写可选的 **Team ID**，RcodeZero 需要具有区域读写权限的令牌。已被使用的提供商名称会被拒绝 (v2.251)。
 
 #### 自定义命令提供商
 对于没有原生驱动的 DNS 服务，**自定义命令**提供商运行管理员配置的本地命令来创建/删除 TXT 记录。记录详情通过环境变量传递：
@@ -397,7 +434,7 @@ acme.sh --issue --dns dns_nsupdate --server https://ucm.example.com/acme/proxy/<
 ### 配置
 - **启用/禁用**: 切换内置 ACME 服务器
 - **默认 CA**: 选择默认签署证书的 CA
-- **服务条款**: 客户端可选的服务条款 URL
+- **服务条款**: 可选的标题和 Markdown 文本，由 UCM 提供并从目录中链接
 
 ### ACME 目录 URL
 \`\`\`
@@ -440,14 +477,18 @@ certbot、acme.sh 或 Caddy 等客户端使用此 URL 来发现 ACME 端点。
 - 订单数量
 
 ### 历史
-浏览所有证书签发订单：
-- 订单状态（pending、valid、invalid、ready）
-- 请求的域名
-- 使用的签名 CA
-- 签发时间戳
+浏览通过 ACME 签发的证书：
+- 通用名称
+- 状态
+- 签发者
+- 到期日期
+- 来源
+
+### 请求的日期
+订单可以携带 \`notBefore\` 和 \`notAfter\`（带 \`duration\` 的 cert-manager、lego 的 \`--not-after\`）。证书恰好以这些日期签发，否则请求会以 \`malformed\` 被拒绝：窗口长于配置文件的有效期（时钟偏差 15 分钟除外）、超出签发 CA 的有效期，或已经过去。被策略禁止的窗口（长于其最大有效期或超过密钥类型期限）会在完成订单时以 \`badCSR\` 拒绝。未指定时使用配置文件的有效期。
 
 ### 吊销
-客户端使用其账户密钥或证书自身的密钥吊销，且发送的证书必须与存储的证书逐字节一致：仅凭序列号永远不够。只有 RSA 或 EC P-256、P-384、P-521 密钥可以签署 ACME 请求，因此 ML-DSA、EdDSA 或 Brainpool 证书需使用下单的账户吊销；UCM 会在拒绝信息中说明这一点。
+客户端使用其账户密钥或证书自身的密钥吊销，且发送的证书必须与存储的证书逐字节一致：仅凭序列号永远不够。持有此 ACME 服务器所签发证书的每个名称和 IP 地址的有效且未过期授权的账户，无论由谁下单，也可以吊销它；由自动批准授予的授权不计入。只有 RSA 或 EC P-256、P-384、P-521 密钥可以签署 ACME 请求，因此 ML-DSA、EdDSA 或 Brainpool 证书需使用下单的账户吊销；UCM 会在拒绝信息中说明这一点。
 
 ## IP 地址证书 (RFC 8738)
 
@@ -480,7 +521,7 @@ certbot、acme.sh 或 Caddy 等客户端使用此 URL 来发现 ACME 端点。
 本地 ACME 服务器支持 **dns-persist-01** (draft-ietf-acme-dns-persist)：通过绑定到 ACME 账户的**持久** TXT 记录进行验证:, 续期时无需写入 DNS。
 
 ### 设置
-1. 在 **ACME → 配置 → 持久 DNS 验证** 中启用（默认关闭）。
+1. 在 **ACME → 本地 ACME → 持久 DNS 验证** 中启用（默认关闭）。
 2. 只需创建一次记录：
 \`\`\`
 _validation-persist.app.example.com. IN TXT "ca.example.com; accounturi=https://ca.example.com/acme/acct/<id>"
@@ -532,7 +573,7 @@ acme.sh --issue \\
 
 > ⚠ 对于内部 ACME，客户端必须信任 UCM CA。在客户端的信任存储中安装根 CA 证书。
 
-## Renewal Information (ARI, RFC 9773)
+## 续期信息（ARI，RFC 9773）
 
 本地 ACME 服务器在其 directory 中公布 \`renewalInfo\`，并为每个证书提供**建议续期窗口**。
 

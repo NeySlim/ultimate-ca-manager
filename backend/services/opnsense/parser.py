@@ -6,7 +6,7 @@ import logging
 from typing import Dict, List, Optional
 
 import defusedxml.ElementTree as ET
-from xml.etree.ElementTree import Element  # noqa: type-only, defusedxml has no Element class
+from xml.etree.ElementTree import Element  # noqa: F401  # type-only, defusedxml has no Element class
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 

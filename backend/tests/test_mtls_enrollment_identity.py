@@ -123,10 +123,12 @@ class TestSerialInterpretation:
             .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=30))
             .sign(ca_key, hashes.SHA256())
         )
-        statements = []
+        import threading
+        statements, mine = [], threading.get_ident()
 
         def hook(conn, cursor, statement, *args):
-            if 'FROM certificates' in statement:
+            # Another thread's queries on the engine are not this lookup's cost
+            if 'FROM certificates' in statement and threading.get_ident() == mine:
                 statements.append(statement)
 
         with app.app_context():

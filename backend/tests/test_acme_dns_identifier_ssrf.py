@@ -232,6 +232,9 @@ def test_guard_returns_every_validated_address(dns_two_public):
     'x' * 250 + '.example.com',
     '-leading-hyphen.example.com',
     'a..example.com',
+    'under_score.example.com',   # no underscore in a dNSName (RFC 5280 §4.2.1.6)
+    '_acme-challenge.example.com',
+    'a\n.example.com',
     None,
 ])
 def test_malformed_dns_identifier_is_rejected(value):
@@ -250,7 +253,6 @@ def test_malformed_dns_identifier_is_rejected(value):
     'host-1.internal.lan',
     'EXAMPLE.com',
     'example.com.',            # single trailing root dot
-    '_acme-challenge.example.com',
     'localhost',
 ])
 def test_legitimate_dns_identifier_is_accepted(value):

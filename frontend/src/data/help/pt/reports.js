@@ -10,8 +10,8 @@ export default {
           { label: 'Inventário de Certificados', text: 'Lista completa de todos os certificados com status' },
           { label: 'Certificados Expirando', text: 'Certificados expirando dentro de uma janela de tempo especificada' },
           { label: 'Hierarquia de CA', text: 'Estrutura da Autoridade Certificadora e estatísticas' },
-          { label: 'Resumo de Auditoria', text: 'Eventos de segurança e resumo de atividades dos usuários' },
-          { label: 'Status de Conformidade', text: 'Conformidade com políticas e resumo de violações' },
+          { label: 'Resumo de Auditoria', text: 'As ações mais frequentes e os usuários mais ativos no período' },
+          { label: 'Status de Conformidade', text: 'Três verificações: certificados ativos, CAs expiradas e certificados que expiram em 30 dias; as políticas de certificado não são lidas' },
           { label: 'Certificados revogados', text: 'Certificados revogados no período, com data e motivo' },
         ]
       },
@@ -53,13 +53,13 @@ Lista completa de todos os certificados gerenciados pelo UCM. Inclui sujeito, em
 Certificados expirando dentro de uma janela de tempo especificada (padrão: 30 dias). Crítico para evitar interrupções, revise este relatório regularmente ou agende-o para entrega diária.
 
 ### Hierarquia de CA
-Estrutura da Autoridade Certificadora mostrando relações pai-filho, contagens de certificados por CA e status da CA. Útil para entender sua topologia PKI.
+Estrutura da Autoridade Certificadora mostrando relações pai-filho e contagens de certificados por CA. Útil para entender sua topologia PKI.
 
 ### Resumo de Auditoria
-Eventos de segurança e resumo de atividades dos usuários. Inclui tentativas de login, operações de certificado, violações de políticas e alterações de configuração. Essencial para auditorias de segurança.
+As dez ações mais frequentes e os dez usuários mais ativos no período.
 
 ### Status de Conformidade
-Conformidade com políticas e resumo de violações. Mostra quais certificados estão em conformidade com suas políticas e quais as violam. Necessário para conformidade regulatória.
+Três verificações com uma contagem e uma gravidade: certificados ativos, CAs expiradas e certificados que expiram em 30 dias. Não lê as políticas de certificado.
 
 ### Certificados revogados
 Certificados revogados no período escolhido (padrão: 30 dias), com data e motivo da revogação. Consulte-o para acompanhar as revogações e suas causas.
@@ -124,7 +124,7 @@ Antes de ativar agendamentos, use o botão ✈️ em qualquer linha de relatóri
 
 ## Permissões
 
-- **read:reports**: Gerar e baixar relatórios
+- **read:audit**: Gerar e ver relatórios; baixar exige também **export:audit**
 - **read:audit + export:audit**: Baixar relatório PDF executivo
 - **write:settings**: Configurar agendamentos de relatórios
 

@@ -6,7 +6,7 @@ import uuid
 import pytest
 
 from models import CA
-from tests.fixtures.cross_pki import build_cross_pki, pem
+from tests.fixtures.cross_pki import build_cross_pki, make_cert, new_key, pem
 from tests.test_opnsense_import import _Session
 
 
@@ -58,8 +58,10 @@ def test_certificates_naming_an_attached_entry_link_to_its_counterpart_and_its_k
     pki = build_cross_pki()
     cross_row = _row(pki.cross_b, 'B cross')
     cross_row['prv'] = base64.b64encode(_key_pem(pki.key_b)).decode()
+    # Signed by B's key: the entry it names is only linked once that key verifies it
+    signed_by_b = make_cert(f'leaf-b-{pki.tag}.example', new_key(), pki.name_b, pki.key_b, ca=False)
     leaf = {'uuid': str(uuid.uuid4()), 'refid': uuid.uuid4().hex[:13], 'descr': f'leaf {pki.tag}',
-            'crt': base64.b64encode(pem(pki.leaf).encode()).decode(), 'caref': cross_row['refid']}
+            'crt': base64.b64encode(pem(signed_by_b).encode()).decode(), 'caref': cross_row['refid']}
     monkeypatch.setattr(import_opnsense, 'create_session', lambda verify_ssl=True: _Session(
         [_row(pki.root_a, pki.name_a), _row(pki.root_b, pki.name_b), cross_row], [leaf]))
     r = auth_client.post('/api/v2/import/opnsense/import', json={

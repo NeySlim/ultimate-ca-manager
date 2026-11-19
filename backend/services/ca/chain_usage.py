@@ -147,17 +147,32 @@ def _orphans(hits, orphan_cond, now):
     return issued, via
 
 
+def _sends_chain(target) -> bool:
+    """An HTTP target (#428) pushes the chain when its template names it."""
+    from services.deploy import http as deploy_http
+    try:
+        names = {n for source in (target.url, target.body_template)
+                 for n, _ in deploy_http.template_variables(source or '')}
+    except ValueError:
+        return False
+    return bool(names & {'chain_pem', 'fullchain_pem'})
+
+
 def _binding_items(hits, concerned, orphan_cond, now, with_targets):
     from services.deploy.service import DeployService
     pins = [f'cross:{i}' for i in hits.hot_cross_ids]
+    # An SSH binding sends the chain through its fullchain path, an HTTP one through its template
+    with_chain = or_(and_(DeployBinding.fullchain_path.isnot(None), DeployBinding.fullchain_path != ''),
+                     DeployTarget.kind == DeployTarget.KIND_HTTP)
     q = (db.session.query(DeployBinding, DeployTarget, Certificate)
          .join(DeployTarget, DeployBinding.target_id == DeployTarget.id)
          .join(Certificate, DeployBinding.certificate_id == Certificate.id)
-         .filter(DeployBinding.enabled.is_(True), DeployTarget.enabled.is_(True),
-                 DeployBinding.fullchain_path.isnot(None), DeployBinding.fullchain_path != '', *_active(now),
+         .filter(DeployBinding.enabled.is_(True), DeployTarget.enabled.is_(True), with_chain, *_active(now),
                  or_(concerned, orphan_cond, DeployBinding.chain_variant.in_(pins))))
     memo, found = {}, []
     for binding, target, cert in q.all():
+        if target.is_http and not _sends_chain(target):
+            continue
         variant, include_root = binding.chain_variant or AUTO, bool(binding.include_root)
         inline = base64.b64decode(cert.crt).count(b'BEGIN CERTIFICATE') > 1
         # A pinned variant also depends on the caref, so an inline chain with a known one keeps it in the key

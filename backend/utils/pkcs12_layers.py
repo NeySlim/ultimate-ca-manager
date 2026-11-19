@@ -166,7 +166,7 @@ def _open(scheme: _Scheme, secrets: list, spend) -> bytes:
             return plain
         except LayerUnsupported:
             raise
-        except Exception:  # noqa: BLE001: padding or structure, both the password's
+        except Exception:  # noqa: BLE001  # padding or structure, both the password's
             continue
     raise WrongPassword('Invalid password or PKCS12 data')
 
@@ -199,7 +199,7 @@ def _scheme(layer: cms.EncryptedContentInfo) -> _Scheme:
             return _pbes1(algorithm, ciphertext)
     except LayerUnsupported:
         raise
-    except Exception as e:  # noqa: BLE001: parameters asn1crypto cannot read
+    except Exception as e:  # noqa: BLE001  # parameters asn1crypto cannot read
         raise LayerUnsupported(f'PKCS#12 encryption {name} has parameters that cannot be read') from e
     if name.startswith('pbes1_md2'):
         raise LayerUnsupported(f'PKCS#12 encryption {name} is not supported: MD2 is not available')

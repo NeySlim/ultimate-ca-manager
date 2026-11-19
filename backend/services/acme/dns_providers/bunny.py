@@ -29,7 +29,9 @@ class BunnyDnsProvider(BaseDnsProvider):
     def _request(self, method, path, data=None):
         try:
             resp = requests.request(method, f"{self.BASE_URL}{path}",
-                headers=self._get_headers(), json=data, timeout=30)
+                headers=self._get_headers(), json=data, timeout=30,
+                # requests keeps the AccessKey header on a redirect to another host
+                allow_redirects=False)
             if resp.status_code >= 400:
                 return False, self._error(resp)
             return True, resp.json() if resp.text and resp.status_code != 204 else None
@@ -57,7 +59,7 @@ class BunnyDnsProvider(BaseDnsProvider):
             return False, f"Failed: {result}"
         return True, "Record created"
     
-    def delete_txt_record(self, domain, record_name):
+    def delete_txt_record(self, domain, record_name, record_value):
         info = self._find_zone(domain)
         if not info:
             return False, f"Zone not found for {domain}"
@@ -68,7 +70,8 @@ class BunnyDnsProvider(BaseDnsProvider):
         if not success:
             return False, f"Failed: {result}"
         for rec in result.get('Records', []):
-            if rec.get('Type') == 5 and rec.get('Name') == relative:
+            if (rec.get('Type') == 5 and rec.get('Name') == relative
+                    and self.txt_matches(rec.get('Value'), record_value)):
                 self._request('DELETE', f'/dnszone/{zone_id}/records/{rec["Id"]}')
         return True, "Record deleted"
     

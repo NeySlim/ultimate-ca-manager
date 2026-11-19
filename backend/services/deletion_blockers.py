@@ -220,6 +220,19 @@ def intune_app_deletion_blockers(app) -> Iterator[DeletionBlocker]:
         )
 
 
+def numbered_ca_settings(ca_id) -> list:
+    """The stored settings keyed by this CA's number, as the backup manifest declares them."""
+    from models import SystemConfig
+    from services.backup.restore.setting_refs import reference_of
+
+    keys = []
+    for (key,) in SystemConfig.query.with_entities(SystemConfig.key):
+        found = reference_of(key)
+        if found and found[0].key == 'certificate_authorities' and found[1].group(1) == str(ca_id):
+            keys.append(key)
+    return keys
+
+
 def purge_ca_dependents(ca) -> str:
     """Stage the rows that must not outlive a CA, and say what was staged.
 
@@ -238,14 +251,53 @@ def purge_ca_dependents(ca) -> str:
 
     from models.ca_cross_certificate import CACrossCertificate
 
+    from models.est_signer_cert import EstSignerCert
     CACrossCertificate.query.filter_by(ca_id=ca.id).delete()
+    EstSignerCert.query.filter_by(ca_id=ca.id).delete()
     crl_count = CRLMetadata.query.filter_by(ca_id=ca.id).delete()
     ocsp_count = OCSPResponse.query.filter_by(ca_id=ca.id).delete()
     rs_count = RevokedSerial.query.filter_by(caref=ca.refid).delete()
     # The enrolment history of the authority: same foreign key, same fate.
     scep_count = SCEPRequest.query.filter_by(ca_refid=ca.refid).delete()
+    # Settings named after its number would pass to the next CA given that number
+    from models import SystemConfig
+    SystemConfig.query.filter(SystemConfig.key.in_(numbered_ca_settings(ca.id))).delete(
+        synchronize_session=False)
 
     if crl_count or ocsp_count or rs_count or scep_count:
         return (f"Deleted {crl_count} CRL(s), {ocsp_count} OCSP response(s), "
                 f"{rs_count} revoked serial(s) and {scep_count} SCEP request(s)")
     return ''
+
+
+def acme_account_deletion_blockers(acct, deactivate=False) -> Iterator[DeletionBlocker]:
+    """Why this ACME CA account may not be deleted, or deactivated: issued orders it renews.
+
+    Deactivation acts at the CA on ``account_url``, so it also counts the orders that
+    renew through another row holding the same account."""
+    from sqlalchemy import false, or_
+    from models.acme_client_account import AcmeClientAccount
+    from models.acme_models import AcmeClientOrder
+    from services.acme.acme_client_service import AcmeClientService
+
+    same_account = {acct.id}
+    if deactivate and acct.account_url:
+        same_account |= {row.id for row in AcmeClientAccount.query.filter_by(account_url=acct.account_url)}
+    names = AcmeClientOrder.account_url == acct.account_url if acct.account_url else false()
+    candidates = AcmeClientOrder.query.filter(
+        AcmeClientOrder.status == 'issued',
+        AcmeClientOrder.renewal_enabled == True,  # noqa: E712
+        or_(AcmeClientOrder.acme_client_account_id.in_(same_account), names),
+    ).order_by(AcmeClientOrder.id).all()
+    # The account each order renews under, resolved as the renewal resolves it
+    domains = [o.primary_domain or f'order {o.id}' for o in candidates
+               if getattr(AcmeClientService.order_account(o), 'id', None) in same_account]
+    if domains:
+        verb = 'deactivate' if deactivate else 'delete'
+        shown = ', '.join(domains[:5]) + (f' and {len(domains) - 5} more' if len(domains) > 5 else '')
+        yield DeletionBlocker(
+            409,
+            f'Cannot {verb} the ACME account: {len(domains)} issued order(s) renew through it '
+            f'({shown}). Turn off their automatic renewal in the order list, or delete them, first.',
+            f'{len(domains)} issued order(s) renew through it',
+        )

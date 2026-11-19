@@ -116,6 +116,38 @@ class TestEddsaKeyName:
                 .valid_principals([b'u']).valid_after(now).valid_before(now + 60).sign(ca_key))
         assert eddsa_key_name(cert.public_bytes()) == 'Ed25519'
 
+    @pytest.mark.parametrize('make, name', [
+        (ed25519.Ed25519PrivateKey.generate, 'Ed25519'),
+        (ed448.Ed448PrivateKey.generate, 'Ed448'),
+        (lambda: ec.generate_private_key(ec.SECP256R1()), None),
+    ])
+    def test_x509_certificate_names_its_key(self, make, name):
+        key = make()
+        now = datetime.now(timezone.utc)
+        subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'cert')])
+        cert = (x509.CertificateBuilder().subject_name(subject).issuer_name(subject)
+                .public_key(key.public_key()).serial_number(1)
+                .not_valid_before(now).not_valid_after(now + timedelta(days=1))
+                .sign(key, None if name else hashes.SHA256()))
+        assert eddsa_key_name(cert.public_bytes(serialization.Encoding.PEM)) == name
+        assert eddsa_key_name(cert.public_bytes(serialization.Encoding.DER)) == name
+
+    def test_a_malformed_certificate_does_not_hide_the_key_after_it(self):
+        key = ed25519.Ed25519PrivateKey.generate()
+        truncated = b'-----BEGIN CERTIFICATE-----\n' + base64.b64encode(b'\x30\x82\x05\x00\x30\x80') + \
+            b'\n-----END CERTIFICATE-----\n'
+        assert eddsa_key_name(truncated + _pkcs8(key)) == 'Ed25519'
+        assert eddsa_key_name(b'\x30\x82\x05\x00\x30\x80') is None
+
+    def test_encrypted_pkcs8_is_told_only_by_an_explicit_label(self):
+        key = ed25519.Ed25519PrivateKey.generate()
+        encrypted = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                      serialization.BestAvailableEncryption(b'secret'))
+        assert eddsa_key_name(encrypted) is None  # its algorithm is inside the ciphertext
+        body = encrypted.split(b'\n', 1)[1].rsplit(b'-----END', 1)[0]
+        labelled = b'-----BEGIN ED25519 PRIVATE KEY-----\n' + body + b'-----END ED25519 PRIVATE KEY-----\n'
+        assert eddsa_key_name(labelled) == 'Ed25519'
+
     @pytest.mark.parametrize('key', [
         rsa.generate_private_key(65537, 2048), ec.generate_private_key(ec.SECP256R1())])
     def test_rsa_and_ec_are_not_eddsa(self, key):
@@ -502,3 +534,48 @@ class TestImports:
         r = auth_client.post(url, data={'pem_content': pem, 'name': 'ed import'})
         _assert_fips_problem(r)
         assert 'the imported file' in r.get_json()['detail']
+
+    @pytest.mark.parametrize('url', ['/api/v2/import/analyze', '/api/v2/import/execute'])
+    @pytest.mark.parametrize('ca', [True, False])
+    def test_smart_import_answers_the_fips_problem(self, app, auth_client, fips_on, url, ca):
+        cn = f'Smart Ed25519 {uuid.uuid4().hex[:6]}'
+        r = _post(auth_client, url, {'content': _ed_pem_bundle(cn, ca=ca)})
+        _assert_fips_problem(r)
+        assert 'the imported file' in r.get_json()['detail']
+        with app.app_context():
+            assert CA.query.filter(CA.subject.contains(cn)).count() == 0
+            assert Certificate.query.filter(Certificate.subject.contains(cn)).count() == 0
+
+    def test_smart_import_keeps_eddsa_outside_fips_mode(self, auth_client, fips_off):
+        r = _post(auth_client, '/api/v2/import/analyze', {'content': _ed_pem_bundle('Smart Ed off')})
+        assert r.status_code == 200, r.get_json()
+
+    @pytest.mark.parametrize('field', ['pem', 'private_key', 'chain'])
+    def test_the_converter_answers_the_fips_problem(self, auth_client, fips_on, field):
+        bundle = _ed_pem_bundle('Converted Ed25519', ca=False)
+        cert, key = bundle.split('-----BEGIN PRIVATE KEY-----')
+        key = '-----BEGIN PRIVATE KEY-----' + key
+        payload = {'pem': {'pem': bundle}, 'private_key': {'pem': _rsa_cert_pem(), 'private_key': key},
+                   'chain': {'pem': _rsa_cert_pem(), 'chain': cert}}[field]
+        _assert_fips_problem(_post(auth_client, '/api/v2/tools/convert', {**payload, 'output_format': 'pem'}))
+
+def _rsa_cert_pem():
+    key = rsa.generate_private_key(65537, 2048)
+    now = datetime.now(timezone.utc)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'rsa')])
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+            .serial_number(1).not_valid_before(now).not_valid_after(now + timedelta(days=1))
+            .sign(key, hashes.SHA256()))
+    return cert.public_bytes(serialization.Encoding.PEM).decode()
+
+
+class TestCertificateOnlyImports:
+    def test_an_ed25519_certificate_without_its_key_is_refused(self, auth_client, fips_on):
+        cert = _ed_pem_bundle(f'Ed25519 alone {uuid.uuid4().hex[:6]}', ca=False).split('-----BEGIN PRIVATE KEY-----')[0]
+        r = auth_client.post('/api/v2/certificates/import', data={'pem_content': cert, 'name': 'ed alone'})
+        _assert_fips_problem(r)
+
+    def test_an_rsa_certificate_alone_is_imported(self, auth_client, fips_on):
+        r = auth_client.post('/api/v2/certificates/import',
+                             data={'pem_content': _rsa_cert_pem(), 'name': f'rsa alone {uuid.uuid4().hex[:6]}'})
+        assert r.status_code in (200, 201), r.get_json()

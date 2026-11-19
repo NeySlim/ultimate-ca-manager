@@ -40,7 +40,7 @@ export default {
     tips: [
       'Un singolo rifiuto blocca immediatamente l\'approvazione: questo è intenzionale per la sicurezza.',
       'Mentre un rinnovo attende l\'approvazione, lo scheduler lascia il certificato a quella decisione, purché possa arrivare prima della scadenza del certificato; con una politica di rinnovo non rinnova mai senza di essa.',
-      'I commenti di approvazione vengono registrati nella traccia di audit per la conformità.',
+      'Ogni decisione e il suo commento sono conservati nella cronologia delle approvazioni della richiesta; il log di audit registra le approvazioni, non il commento, una richiesta in coda o un rifiuto.',
     ],
   },
   helpGuides: {
@@ -83,7 +83,7 @@ Gli amministratori saltano la coda su ogni percorso.
 - Approvare una richiesta la cui richiesta memorizzata, certificato o CA **non esiste più** la chiude come rifiutata
 - Una revoca in coda il cui certificato è stato **revocato direttamente** viene chiusa come approvata (annullata se a revocarlo è stato il richiedente); se il certificato è stato **rinnovato** nel frattempo, viene chiusa come rifiutata all'approvazione; durante una sospensione del certificato attende la rimozione della sospensione
 
-I webhook vengono informati di queste chiusure come per un rifiuto.
+Una chiusura come rifiutata notifica i webhook come un rifiuto; una chiusura come approvata non invia alcun webhook.
 
 ## Termine ultimo
 Una richiesta attende **sette giorni** una decisione. Oltre quel termine viene chiusa come scaduta, non viene mai conteggiata tra quelle in attesa e lo scheduler dei rinnovi riprende per il suo certificato. Mentre un rinnovo attende l'approvazione, lo scheduler lascia il certificato a quella decisione, purché possa arrivare prima della scadenza del certificato; con una politica di rinnovo non rinnova mai senza di essa.
@@ -99,7 +99,7 @@ Una richiesta attende **sette giorni** una decisione. Oltre quel termine viene c
 
 1. Clicca su una richiesta in attesa per visualizzarne i dettagli
 2. Clicca **Rifiuta**
-3. Inserisci un **motivo del rifiuto** (obbligatorio): viene registrato per la conformità audit
+3. Inserisci un **motivo del rifiuto** (obbligatorio): viene conservato nella cronologia della richiesta; un rifiuto non scrive alcuna voce nel log di audit
 4. La richiesta viene immediatamente bloccata
 
 > ⚠ Un singolo rifiuto blocca l'intera richiesta. Questo è intenzionale: se un revisore identifica un problema, l'emissione non deve procedere.
@@ -111,7 +111,7 @@ Ogni richiesta mantiene una cronologia completa delle approvazioni che mostra:
 - Quando l'azione è stata eseguita (timestamp)
 - Commento fornito (se presente)
 
-Questa cronologia è immutabile e fa parte della traccia di audit.
+Questa cronologia è conservata con la richiesta, non nel log di audit.
 
 ## Filtri
 

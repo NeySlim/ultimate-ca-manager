@@ -33,9 +33,10 @@ COPY backend/requirements.txt /tmp/requirements.txt
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r /tmp/requirements.txt && \
+    pip install --no-cache-dir "pyspnego[kerberos]==$(pip show pyspnego | sed -n 's/^Version: //p')" && \
     pip install --no-cache-dir --no-deps pyjks==20.0.0
 
-# FIPS variant builder: same requirements, psycopg2-binary swapped for psycopg2,
+# FIPS variant builder: same requirements, psycopg[binary] swapped for psycopg[c],
 # and every library that links OpenSSL or libxml2 compiled from source.
 FROM python:3.13-slim-trixie AS builder-1
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -56,27 +57,31 @@ RUN python -m venv /opt/ucm/venv
 ENV PATH="/opt/ucm/venv/bin:$PATH"
 COPY backend/requirements.txt /tmp/requirements.txt
 RUN set -eu; \
-    test "$(grep -c '^psycopg2-binary' /tmp/requirements.txt)" = 1; \
-    sed 's/^psycopg2-binary/psycopg2/' /tmp/requirements.txt > /tmp/requirements-fips.txt; \
-    ! grep -q 'psycopg2-binary' /tmp/requirements-fips.txt; \
+    test "$(grep -c '^psycopg\[binary\]' /tmp/requirements.txt)" = 1; \
+    sed 's/^psycopg\[binary\]/psycopg[c]/' /tmp/requirements.txt > /tmp/requirements-fips.txt; \
+    ! grep -q '^psycopg\[binary\]' /tmp/requirements-fips.txt; \
     test "$(diff /tmp/requirements.txt /tmp/requirements-fips.txt | grep -c '^[<>]')" = 2
 RUN --mount=type=cache,target=/root/.cargo/registry \
     pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir --no-binary cryptography,psycopg2,lxml,xmlsec \
+    pip install --no-cache-dir --no-binary cryptography,psycopg-c,lxml,xmlsec \
         -r /tmp/requirements-fips.txt && \
+    pip install --no-cache-dir --no-binary gssapi \
+        "pyspnego[kerberos]==$(pip show pyspnego | sed -n 's/^Version: //p')" && \
     pip install --no-cache-dir --no-deps pyjks==20.0.0
 # Fails the build if any of them still carries its own OpenSSL or libxml2
 RUN set -eu; \
     pip check | grep -v '^pyjks [0-9.]* requires twofish, which is not installed\.$' | { ! grep .; }; \
-    ! pip show psycopg2-binary >/dev/null 2>&1; \
+    ! pip show psycopg-binary >/dev/null 2>&1; \
+    python -c "import psycopg; assert psycopg.pq.__impl__ == 'c', psycopg.pq.__impl__"; \
     python -c "import ssl; from cryptography.hazmat.backends.openssl.backend import backend as b; \
 assert b.openssl_version_text() == ssl.OPENSSL_VERSION, (b.openssl_version_text(), ssl.OPENSSL_VERSION)"; \
     site=$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])'); \
     ldd "$site"/cryptography/hazmat/bindings/_rust.abi3.so | grep -q 'libcrypto\.so\.3 => /lib/'; \
-    ldd "$site"/psycopg2/_psycopg*.so | grep -q 'libpq\.so\.5 => /lib/'; \
+    ldd "$site"/psycopg_c/pq*.so | grep -q 'libpq\.so\.5 => /lib/'; \
     ldd "$site"/xmlsec*.so | grep -q 'libxmlsec1-openssl\.so\.1 => /lib/'; \
     ldd "$site"/lxml/etree*.so | grep -q 'libxml2\.so\.2 => /lib/'; \
-    test -z "$(find /opt/ucm/venv \( -name 'libssl*' -o -name 'libcrypto*' -o -name 'libxml2*' -o -name 'libpq*' \) -print)"
+    test -z "$(find /opt/ucm/venv \( -name 'libssl*.so*' -o -name 'libcrypto*.so*' -o -name 'libxml2*.so*' \
+        -o -name 'libpq*.so*' \) -print)"
 
 FROM builder-${UCM_FIPS_BUILD} AS builder
 
@@ -121,6 +126,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-client \
     softhsm2 \
     libkrb5-3 \
+    libgssapi-krb5-2 \
     postgresql-client \
     $([ "$UCM_FIPS_BUILD" = 1 ] && echo libpq5 libxml2 libxslt1.1 libxmlsec1t64-openssl) \
     && rm -rf /var/lib/apt/lists/*
@@ -129,8 +135,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN useradd -r -u 1000 -s /bin/false -d /opt/ucm ucm && \
     usermod -aG softhsm ucm
 
-# FIPS variant: fips.so in the module directory of this platform's libcrypto,
-# and /run/ucm where the entrypoint writes the module configuration at start
+# FIPS variant: fips.so in the module directory of this platform's libcrypto, its
+# module-mac (root, read-only) that the entrypoint compares at each start, and
+# /run/ucm where the entrypoint writes the module configuration at start
+COPY docker/fips-module.sh /fips-module.sh
 RUN --mount=type=bind,from=fips-provider,target=/tmp/fips-provider \
     if [ "$UCM_FIPS_BUILD" = 1 ]; then \
         set -eu; \
@@ -140,7 +148,15 @@ RUN --mount=type=bind,from=fips-provider,target=/tmp/fips-provider \
         moddir="$(openssl version -m | sed -E 's/^MODULESDIR: "(.*)"$/\1/')"; \
         test "$moddir" = "/usr/lib/$triplet/ossl-modules"; \
         install -m 0644 /tmp/fips-provider/out/fips.so "$moddir/fips.so"; \
-        openssl fipsinstall -module "$moddir/fips.so" -provider_name fips -out /dev/null; \
+        tmp="$(mktemp -d)"; \
+        openssl fipsinstall -pedantic -module "$moddir/fips.so" -provider_name fips \
+            -out "$tmp/fipsmodule.cnf" >/dev/null; \
+        install -d -m 0755 /usr/share/ucm; \
+        . /fips-module.sh; fips_module_mac "$tmp/fipsmodule.cnf" > /usr/share/ucm/fips-module.mac; \
+        grep -Eq '^([0-9A-F]{2}:){31}[0-9A-F]{2}$' /usr/share/ucm/fips-module.mac; \
+        chmod 0444 /usr/share/ucm/fips-module.mac; \
+        cat /usr/share/ucm/fips-module.mac; \
+        rm -rf "$tmp"; \
         install -d -o ucm -g ucm -m 0700 /run/ucm; \
     fi
 
@@ -198,7 +214,8 @@ EXPOSE 8053/tcp
 # key in the database. If the container is recreated without this volume
 # bind-mounted, master.key is destroyed and ALL encrypted CAs / certs / ACME
 # / SSH-CA private keys in the DB become unrecoverable. ALWAYS bind-mount
-# /etc/ucm to a host path or named volume before enabling encryption.
+# /etc/ucm to a host path or named volume: UCM creates master.key at first
+# start only then, never in this anonymous volume.
 # /opt/ucm/data holds the SQLite DB, CA files, sessions, backups.
 VOLUME ["/etc/ucm", "/opt/ucm/data"]
 

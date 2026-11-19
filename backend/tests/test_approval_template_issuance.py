@@ -19,6 +19,14 @@ from models.certificate_template import CertificateTemplate
 from models.policy import ApprovalRequest, CertificatePolicy
 from services.policy_service import PolicyEvaluationService
 from api.v2.policies import _issue_approved_certificate
+from tests.fixtures.templates import templates_created_here_removed
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _templates_stay_in_this_module(app):
+    with templates_created_here_removed(app):
+        yield
+
 
 _SEQ = itertools.count(1)
 

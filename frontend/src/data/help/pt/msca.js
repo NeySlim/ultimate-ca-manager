@@ -18,7 +18,7 @@ export default {
           { label: 'Seleção de Modelo', text: 'Escolha entre modelos de certificado disponíveis na MS CA' },
           { label: 'Auto-Aprovado', text: 'Modelos com autoenroll retornam o certificado imediatamente' },
           { label: 'Aprovação do Gerente', text: 'Alguns modelos requerem aprovação do gerente, o UCM rastreia a solicitação pendente' },
-          { label: 'Consulta de Status', text: 'Verificar o status da solicitação pendente no painel de detalhes do CSR' },
+          { label: 'Solicitações pendentes', text: 'Uma solicitação que a CA mantém para o seu gerente continua Pendente no UCM, e a página não oferece verificação de status: depois de emitida na CA, importe o certificado, ou deixe a Sincronização de inventário pelo canal de administração WinRM importar os certificados que o UCM ainda não conhece' },
         ]
       },
       {
@@ -44,7 +44,7 @@ export default {
           { label: 'Propósito', text: 'Executa operações de gerenciamento na CA Windows (revogar, desfazer revogação, publicar CRL, inventário, aprovar/negar) via PowerShell remoting + certutil, coisas que a inscrição web do AD CS não pode fazer.' },
           { label: 'Transporte', text: 'NTLM ou Kerberos sobre HTTP/HTTPS. Recomenda-se Kerberos + HTTPS; Kerberos reutiliza o keytab da conexão.' },
           { label: 'Credenciais', text: 'Reutiliza por padrão as da própria conexão. Conexões mTLS devem definir uma conta WinRM dedicada (oficial "Emitir e Gerenciar Certificados" com privilégios mínimos).' },
-          { label: 'Requisito', text: 'WinRM habilitado na CA e o pacote opcional pywinrm instalado. Operações de gerenciamento exigem admin:system.' },
+          { label: 'Requisito', text: 'WinRM habilitado na CA e o pacote opcional pywinrm instalado. Operações de gerenciamento exigem admin:system; propagar uma revogação ou a retirada de uma suspensão para a CA segue o write:certificates do certificado.' },
         ]
       },
       {
@@ -58,7 +58,7 @@ export default {
       {
         title: 'Inventário da CA e Painel de Controle',
         items: [
-          { label: 'Sincronização de inventário', text: 'Importa certificados emitidos diretamente na CA que o UCM ainda não conhece (incremental por id de solicitação, com reconciliação).' },
+          { label: 'Sincronização de inventário', text: 'Importa certificados emitidos diretamente na CA que o UCM ainda não conhece (incremental por id de solicitação); a reconciliação está disponível pela API.' },
           { label: 'Solicitações pendentes', text: 'Listar, aprovar (reenvio + importação automática) ou negar solicitações aguardando aprovação do gerente da CA.' },
           { label: 'Saúde da CA', text: 'Status do serviço da CA, expiração do certificado da CA, próxima atualização da CRL e contagem de solicitações pendentes em um relance.' },
         ]
@@ -88,7 +88,7 @@ O UCM integra com o Microsoft Active Directory Certificate Services (AD CS) para
 1. Vá para **Configurações → Microsoft CA**
 2. Clique em **Adicionar Conexão**
 3. Insira o **Nome da Conexão** e o **Hostname do Servidor CA**
-4. Opcionalmente insira o **Nome Comum da CA** (detectado automaticamente se vazio)
+4. Opcionalmente insira o **Nome Comum da CA** (o hostname do servidor é usado se vazio)
 5. Selecione o **Método de Autenticação**
 6. Insira as credenciais para o método escolhido
 7. Clique em **Testar Conexão** para verificar
@@ -124,7 +124,7 @@ O UCM integra com o Microsoft Active Directory Certificate Services (AD CS) para
 O certificado é retornado imediatamente e importado no UCM.
 
 ### Modelos com Aprovação do Gerente
-O UCM salva a solicitação como **Pendente** e rastreia o ID da solicitação da MS CA. Uma vez aprovada na CA Windows, verifique o status no painel de detalhes do CSR para importar o certificado.
+O UCM salva a solicitação como **Pendente** e rastreia o ID da solicitação da MS CA. A página não oferece verificação de status para ela: depois de emitida na CA Windows, importe o certificado, ou deixe a **Sincronização de inventário** pelo canal de administração WinRM importar os certificados que o UCM ainda não conhece.
 
 ## Inscrição em Nome de Outro (EOBO)
 

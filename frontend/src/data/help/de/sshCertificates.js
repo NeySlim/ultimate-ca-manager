@@ -85,7 +85,7 @@ UCM generiert sowohl das Schlüsselpaar als auch das Zertifikat. Verwenden Sie d
 **Vorgehensweise:**
 1. Wählen Sie eine CA und füllen Sie die Zertifikatsdetails aus
 2. Wählen Sie den Modus „Generieren"
-3. Klicken Sie auf **Ausstellen**
+3. Klicken Sie auf **Zertifikat ausstellen**
 4. Laden Sie alle drei Dateien herunter:
    - Privater Schlüssel (\`keyid\`): **Sicher aufbewahren!**
    - Zertifikat (\`keyid-cert.pub\`)
@@ -106,7 +106,7 @@ Principals definieren, **wer** (Benutzerzertifikate) oder **was** (Host-Zertifik
 - **Benutzerzertifikate**: Liste der Benutzernamen, unter denen sich der Inhaber anmelden darf (z. B. \`deploy\`, \`admin\`)
 - **Host-Zertifikate**: Liste der Hostnamen/IPs, unter denen der Server bekannt ist (z. B. \`web01.example.com\`, \`10.0.1.5\`)
 
-> 💡 Werden keine Principals angegeben, gilt das Zertifikat für jeden Principal: was in der Regel zu freizügig ist.
+> 💡 Mindestens ein Principal ist erforderlich: Listen Sie die Benutzer- oder Hostnamen auf, für die das Zertifikat gilt.
 
 ### Gültigkeit
 

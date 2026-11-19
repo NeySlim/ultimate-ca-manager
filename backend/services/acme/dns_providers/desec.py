@@ -159,7 +159,7 @@ class DesecDnsProvider(BaseDnsProvider):
         logger.info(f"deSEC: Created TXT record {record_name}")
         return True, "Record created successfully"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         """Delete TXT record via deSEC API"""
         domain_name = self._get_domain_name(domain)
         if not domain_name:
@@ -175,17 +175,31 @@ class DesecDnsProvider(BaseDnsProvider):
         
         subname = subname.rstrip('.')
         
-        success, result = self._request(
-            'DELETE',
-            f'/domains/{domain_name}/rrsets/{subname or "@"}/TXT/'
-        )
+        # The RRset holds every value of the name: write back the others, delete it only when empty.
+        rrset_path = f'/domains/{domain_name}/rrsets/{subname or "@"}/TXT/'
+        success, current = self._request('GET', rrset_path)
+        if not success:
+            if self._last_status == 404:
+                return True, "Record not found (already deleted?)"
+            return False, f"Failed to read existing record: {current}"
+        records = list((current or {}).get('records') or [])
+        remaining = [r for r in records if not self.txt_matches(r, record_value)]
+        if len(remaining) == len(records):
+            return True, "Record not found (already deleted?)"
+        
+        if remaining:
+            success, result = self._request(
+                'PATCH', rrset_path, {'records': remaining, 'ttl': current.get('ttl')}
+            )
+        else:
+            success, result = self._request('DELETE', rrset_path)
         
         if not success:
             if self._last_status == 404 or 'not found' in str(result).lower():
                 return True, "Record not found (already deleted?)"
             return False, f"Failed to delete record: {result}"
         
-        logger.info(f"deSEC: Deleted TXT record {record_name}")
+        logger.info(f"deSEC: Deleted TXT value from {record_name}")
         return True, "Record deleted successfully"
     
     def test_connection(self) -> Tuple[bool, str]:

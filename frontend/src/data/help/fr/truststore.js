@@ -2,25 +2,24 @@ export default {
   helpContent: {
     title: 'Magasin de confiance',
     subtitle: 'Gérer les certificats de confiance',
-    overview: 'Importez et gérez les certificats CA racines et intermédiaires de confiance. Le magasin de confiance est utilisé pour la validation de chaîne et peut être synchronisé avec le magasin de confiance du système d\'exploitation.',
+    overview: 'Conservez les certificats CA racines et intermédiaires de confiance. La vue de chaîne d\'un certificat et ses exports complètent la chaîne avec un certificat du magasin de confiance dont le sujet correspond au nom de l\'émetteur. Le magasin peut être rempli depuis le magasin de confiance du système d\'exploitation ou depuis les CA que UCM gère.',
     sections: [
       {
         title: 'Types de certificats',
         definitions: [
           { term: 'CA racine', description: 'Ancre de confiance auto-signée de niveau supérieur' },
           { term: 'Intermédiaire', description: 'Certificat CA signé par une racine ou un autre intermédiaire' },
-          { term: 'Authentification client', description: 'Certificat utilisé pour l\'authentification client (mTLS)' },
+          { term: 'Système', description: 'Importé depuis le magasin de confiance du système d\'exploitation' },
           { term: 'Signature de code', description: 'Certificat utilisé pour la vérification de signature de code' },
+          { term: 'E-mail', description: 'Certificat utilisé pour S/MIME' },
           { term: 'Personnalisé', description: 'Certificat de confiance catégorisé manuellement' },
         ]
       },
       {
         title: 'Actions',
         items: [
-          { label: 'Importer un fichier', text: 'Téléverser des fichiers de certificat PEM, DER ou PKCS#7' },
-          { label: 'Importer depuis une URL', text: 'Récupérer un certificat depuis une URL distante' },
-          { label: 'Ajouter un PEM', text: 'Coller directement du texte de certificat encodé en PEM' },
-          { label: 'Synchroniser depuis le système', text: 'Importer les CA de confiance du système d\'exploitation dans UCM' },
+          { label: 'Ajouter', text: 'Ajouter les certificats des CA que UCM gère. Un certificat externe s\'ajoute via l\'API (POST /api/v2/truststore avec le PEM, ou /api/v2/truststore/import avec un fichier PEM ou DER)' },
+          { label: 'Synchroniser depuis le système', text: 'Importer les CA de confiance du système d\'exploitation dans UCM, jusqu\'au nombre choisi (500 par défaut, 1000 au maximum)' },
           { label: 'Exporter', text: 'Télécharger les certificats de confiance individuellement' },
           { label: 'Supprimer la sélection', text: 'Sélectionnez plusieurs certificats et supprimez-les ensemble, par exemple les CA système filtrées comme expirées ; seules les lignes affichées par les filtres actuels sont supprimées' },
         ]
@@ -36,32 +35,27 @@ export default {
     content: `
 ## Vue d'ensemble
 
-Le magasin de confiance gère les certificats CA de confiance utilisés pour la validation de chaîne. Importez des CA racines et intermédiaires depuis des sources externes ou synchronisez avec le magasin de confiance du système d'exploitation.
+Le magasin de confiance conserve les certificats CA de confiance. Remplissez-le depuis les CA que UCM gère ou depuis le magasin de confiance du système d'exploitation.
 
 ## Catégories de certificats
 
 - **CA racine** : Ancres de confiance auto-signées
 - **Intermédiaire** : CA signées par une racine ou d'autres intermédiaires
-- **Authentification client** : Certificats pour l'authentification client mTLS
+- **Système** : Importés depuis le magasin de confiance du système d'exploitation
 - **Signature de code** : Certificats pour la vérification de signature de code
+- **E-mail** : Certificats pour S/MIME
 - **Personnalisé** : Certificats catégorisés manuellement
 
-## Importer des certificats
+## Ajouter des certificats
 
-### Depuis un fichier
-Téléversez des fichiers de certificat dans ces formats :
-- **PEM** : Encodé en Base64 (simple ou groupé)
-- **DER** : Format binaire
-- **PKCS#7 (P7B)** : Chaîne de certificats
+### Depuis les CA gérées
+**Ajouter** liste les CA que UCM gère : sélectionnez celles à approuver.
 
-### Depuis une URL
-Récupérez un certificat depuis un point de terminaison HTTPS distant. UCM télécharge et importe la chaîne de certificats du serveur.
-
-### Coller du PEM
-Collez du texte de certificat encodé en PEM directement dans la zone de texte.
+### Certificats externes
+La page n'a pas de formulaire de téléversement pour un certificat extérieur à UCM. Ajoutez-le via l'API : \`POST /api/v2/truststore\` avec son PEM, ou \`POST /api/v2/truststore/import\` avec un fichier PEM ou DER.
 
 ### Synchroniser depuis le système
-Importez toutes les CA de confiance du magasin de confiance du système d'exploitation. Cela remplit UCM avec les mêmes CA racines approuvées par le système d'exploitation (par ex. le bundle CA de Mozilla sous Linux).
+Importez les CA de confiance du magasin de confiance du système d'exploitation (par ex. le bundle CA de Mozilla sous Linux), jusqu'au nombre choisi : 500 par défaut, 1000 au maximum.
 
 > 💡 La synchronisation depuis le système est un import ponctuel. Les modifications du magasin de confiance du système d'exploitation ne sont pas automatiquement reflétées.
 
@@ -75,14 +69,10 @@ Importez toutes les CA de confiance du magasin de confiance du système d'exploi
 
 ## Cas d'utilisation
 
-### Validation de chaîne
-Lors de la vérification d'une chaîne de certificats, UCM consulte le magasin de confiance pour les CA racines reconnues.
+### Chaînes
+La vue de chaîne d'un certificat, et ses exports avec la chaîne, prennent un certificat du magasin de confiance dont le sujet correspond au nom de l'émetteur pour compléter la chaîne. Aucune signature n'est vérifiée contre le magasin de confiance.
 
-### mTLS
-Les certificats client présentés lors de l'authentification TLS mutuel sont validés contre le magasin de confiance.
-
-### ACME
-Lorsque UCM agit comme client ACME (Let's Encrypt), le magasin de confiance est utilisé pour vérifier le certificat du CA ACME.
+Le magasin de confiance ne joue aucun rôle dans l'authentification client mTLS (qui utilise la CA de confiance choisie sous Paramètres › Sécurité) ni dans la connexion du client ACME à sa CA.
 `
   }
 }

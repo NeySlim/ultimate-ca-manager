@@ -112,12 +112,30 @@ def test_unreadable_name_is_not_overwritten(api):
     assert api.records['_acme-challenge'] == [{'data': 'other', 'ttl': 600}]
 
 
-def test_cleanup_deletes_the_name_and_succeeds_twice(api):
+def test_cleanup_deletes_the_name_with_its_last_value_and_succeeds_twice(api):
     provider = _provider()
     for token in ('a', 'b'):
         provider.create_txt_record('example.com', NAME, token)
-    for _ in range(2):
-        ok, msg = provider.delete_txt_record('example.com', NAME)
+    for token in ('a', 'b', 'b'):
+        ok, msg = provider.delete_txt_record('example.com', NAME, token)
         assert ok, msg
     assert api.records == {}
     assert ('DELETE', '/domains/example.com/records/TXT/_acme-challenge', None) in api.calls
+
+
+def test_cleanup_keeps_the_other_challenge_value(api):
+    api.records['_acme-challenge'] = [{'data': 'apex', 'ttl': 3600}, {'data': 'wild', 'ttl': 3600}]
+    ok, msg = _provider().delete_txt_record('example.com', NAME, 'apex')
+    assert ok, msg
+    assert api.records['_acme-challenge'] == [{'data': 'wild', 'ttl': 3600}]
+    assert ('PUT', '/domains/example.com/records/TXT/_acme-challenge', [{'data': 'wild', 'ttl': 3600}]) in api.calls
+    assert not [c for c in api.calls if c[0] == 'DELETE']
+
+
+def test_cleanup_of_an_unreadable_name_writes_nothing(api):
+    api.records['_acme-challenge'] = [{'data': 'apex', 'ttl': 600}, {'data': 'wild', 'ttl': 600}]
+    api.get_status = 500
+    ok, msg = _provider().delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and 'Internal error' in msg
+    assert not [c for c in api.calls if c[0] in ('PUT', 'DELETE')]
+    assert len(api.records['_acme-challenge']) == 2

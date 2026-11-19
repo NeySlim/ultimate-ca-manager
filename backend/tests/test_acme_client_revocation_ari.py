@@ -124,7 +124,8 @@ class TestAcmeClientAri:
         )
 
         info = service.get_renewal_info(cert)
-        cert_id = f'{_b64url(aki)}.{_b64url(serial.to_bytes(3, "big"))}'
+        # 0xA1 starts with a 1 bit: DER puts a zero byte before it (RFC 9773 §4.1)
+        cert_id = f'{_b64url(aki)}.{_b64url(serial.to_bytes(4, "big"))}'
 
         assert captured['url'] == f'https://ca.example/acme/renewal-info/{cert_id}'
         assert info['cert_id'] == cert_id
@@ -218,7 +219,7 @@ def test_scheduler_uses_ari_window_and_retry_after(app, renewal_ari_rows, monkey
     monkeypatch.setattr(
         renewal_service,
         'renew_certificate',
-        lambda order: renewed.append(order.id) or (True, 'ok'),
+        lambda order, **_kw: renewed.append(order.id) or (True, 'ok'),
     )
 
     with app.app_context():
@@ -257,8 +258,10 @@ def test_upstream_revoke_failure_does_not_undo_local_revoke(
         client = MagicMock()
         client.revoke_certificate.side_effect = RuntimeError('upstream unavailable')
         certificate = db.session.get(Certificate, renewal_ari_rows[1])
+        replaced = renewal_service._replaced_snapshot(certificate)
 
-        renewal_service._revoke_replaced_certificate(client, certificate)
+        # Renewed into a row of its own: the replaced row is revoked here
+        renewal_service._revoke_replaced_certificate(client, replaced, in_place=False)
 
         local_revoke.assert_called_once_with(
             cert_id=certificate.id,
@@ -266,7 +269,7 @@ def test_upstream_revoke_failure_does_not_undo_local_revoke(
             username='system',
             revoke_related=False,
         )
-        client.revoke_certificate.assert_called_once_with(certificate, reason=4)
+        client.revoke_certificate.assert_called_once_with(replaced.pem, reason=4)
 
         if previous is None:
             db.session.delete(setting)

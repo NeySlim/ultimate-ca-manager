@@ -13,6 +13,8 @@ POST   /api/v2/acme/client/orders/<id>/renew
 
 import logging
 import threading
+
+import requests
 import time
 from flask import request, current_app
 
@@ -22,6 +24,8 @@ from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from models import db, DnsProvider, AcmeClientOrder, SystemConfig
 from services.acme.acme_client_service import (
+    ACCOUNT_GONE,
+    ORDER_GONE,
     AcmeClientService,
     AUTHZ_INVALID_USER_MSG,
     CERT_KEY_TYPES,
@@ -31,7 +35,9 @@ from services.acme.acme_client_service import (
     fips_private_key_refusal,
 )
 from services.audit_service import AuditService
+from services.acme.compromised_keys import CompromisedKey, refuse_compromised_csr
 from services.acme.http01 import wait_for_http01
+from services.acme.order_lease import BUSY, OrderLease
 from services.acme.dns_selfcheck import (
     dns_propagation_delay,
     dns_propagation_timeout as _shared_dns_propagation_timeout,
@@ -40,8 +46,11 @@ from services.acme.dns_selfcheck import (
 from utils.acme_debug import acme_log
 from utils.acme_ip import normalize_ip_for_identifier
 from utils.dns_txt_lookup import txt_record_present
+from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
+
+RENEWAL_CA_UNREACHABLE = 'Renewal failed: the CA could not be reached'
 
 # DNS-01 propagation: poll for the expected TXT record before telling the CA to
 # validate, instead of a fixed sleep (#140). Timeout is configurable (up to
@@ -66,7 +75,7 @@ def _txt_present(name: str, expected: str) -> bool:
     return txt_record_present(name, expected)
 
 
-def _dns_selfcheck(challenges: dict, timeout: int, delay=None) -> dict:
+def _dns_selfcheck(challenges: dict, timeout: int, delay=None, on_tick=None) -> dict:
     """Poll DNS until every dns-01 TXT record is visible, or until timeout.
 
     Each poll follows ``acme.dns01_resolver_mode`` (see utils.dns_txt_lookup):
@@ -84,7 +93,7 @@ def _dns_selfcheck(challenges: dict, timeout: int, delay=None) -> dict:
     challenges (no dns_txt_value) are ignored.
     """
     # Keep local wrapper for backwards-compatible tests/imports.
-    return _shared_wait_for_challenges(challenges, timeout, delay)
+    return _shared_wait_for_challenges(challenges, timeout, delay, on_tick=on_tick)
 
 
 @bp.route('/api/v2/acme/client/orders', methods=['GET'])
@@ -101,9 +110,10 @@ def list_orders():
     if environment:
         query = query.filter_by(environment=environment)
 
-    orders = query.order_by(AcmeClientOrder.created_at.desc()).limit(100).all()
-
-    return success_response(data=[o.to_dict() for o in orders])
+    from utils.pagination import paginate, parse_request_pagination
+    page, per_page = parse_request_pagination(default_per_page=100, max_per_page=100)
+    result = paginate(query.order_by(AcmeClientOrder.created_at.desc(), AcmeClientOrder.id.desc()), page, per_page)
+    return success_response(data=[o.to_dict() for o in result['items']], meta=result['meta'])
 
 
 @bp.route('/api/v2/acme/client/orders/<int:order_id>', methods=['GET'])
@@ -114,6 +124,39 @@ def get_order(order_id):
     if not order:
         return error_response('Order not found', 404)
 
+    return success_response(data=order.to_dict())
+
+
+@bp.route('/api/v2/acme/client/orders/<int:order_id>', methods=['PATCH'])
+@require_auth(['write:acme'])
+def update_order(order_id):
+    """Turn an order's automatic renewal on or off: ``{"renewal_enabled": bool}``."""
+    order = db.session.get(AcmeClientOrder, order_id)
+    if not order:
+        return error_response('Order not found', 404)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or set(data) != {'renewal_enabled'} \
+            or not isinstance(data['renewal_enabled'], bool):
+        return error_response('Expected {"renewal_enabled": true|false}', 400)
+    if order.is_proxy_order:
+        return error_response('A proxy order is renewed by the ACME client that placed it', 409)
+    if order.renewal_of_order_id is not None:
+        return error_response(
+            f'This order belongs to a renewal of order {order.renewal_of_order_id}: change that order', 409)
+
+    enabled = data['renewal_enabled']
+    order.renewal_enabled = enabled
+    ok, err = safe_commit(logger, 'Failed to update ACME order')
+    if not ok:
+        return err
+    AuditService.log_action(
+        action='acme_order_update',
+        resource_type='acme_order',
+        resource_id=str(order_id),
+        resource_name=order.primary_domain,
+        details=f"Automatic renewal turned {'on' if enabled else 'off'} for ACME order {order_id}",
+        success=True,
+    )
     return success_response(data=order.to_dict())
 
 
@@ -221,6 +264,10 @@ def request_certificate():
     has_wildcard = any(d.startswith('*.') for d in domains)
     if has_wildcard and challenge_type != 'dns-01':
         return error_response('Wildcard domains require DNS-01 challenge', 400)
+    if provider is not None:
+        refusal = AcmeClientService.single_txt_value_refusal(domains, provider.id)
+        if refusal:
+            return error_response(refusal, 400)
 
     # Key type for certificate (ignored when key_source=csr)
     key_type = data.get('key_type')
@@ -252,6 +299,10 @@ def request_certificate():
         match_ok, match_msg = csr_identifiers_match_order(csr, domains)
         if not match_ok:
             return error_response(match_msg, 400)
+        try:
+            refuse_compromised_csr(csr)
+        except CompromisedKey as exc:
+            return error_response(str(exc), 409)
     elif csr_pem:
         return error_response('csr_pem is only valid when key_source is csr', 400)
 
@@ -411,7 +462,9 @@ def verify_challenges(order_id):
     force = bool(data.get('force'))
 
     try:
-        client = AcmeClientService.for_order(order)
+        client = AcmeClientService.for_existing_order(order)
+        if client is None:
+            return error_response(ACCOUNT_GONE, 409)
 
         results = {}
         challenges = order.challenges_dict
@@ -473,7 +526,10 @@ def verify_challenges(order_id):
             # Check if LE has already validated (poll order status)
             try:
                 le_status, _ = client.check_order_status(order)
-                new_status = le_status if le_status in ['ready', 'valid'] else 'validating'
+                if le_status == 'gone':
+                    new_status = 'invalid'  # the check recorded why
+                else:
+                    new_status = le_status if le_status in ['ready', 'valid'] else 'validating'
             except Exception:
                 new_status = 'validating'
             AcmeClientService.write_order_status(order, new_status)
@@ -517,8 +573,14 @@ def check_order_status(order_id):
         return error_response('Order not found', 404)
 
     try:
-        client = AcmeClientService.for_order(order)
+        client = AcmeClientService.for_existing_order(order)
+        if client is None:
+            return error_response(ACCOUNT_GONE, 409)
         status, data = client.check_order_status(order)
+        if status == 'gone':
+            status = order.status  # invalid with the reason, or issued as it was
+        if status == 'valid' and data and _resumable_here(client, order):
+            status = _resume_finalization(client, order) or status
 
         return success_response(data={
             'status': status,
@@ -546,9 +608,22 @@ def finalize_order(order_id):
     if order.status == 'issued':
         return error_response('Order already issued', 400)
 
+    parent = _renewal_parent(order)
+    if parent is not None:
+        return error_response(f'This order belongs to a renewal of order {parent.id}: renew that order', 409)
+
     try:
-        client = AcmeClientService.for_order(order)
-        success, message, cert_id = client.finalize_order(order)
+        lease = OrderLease.take(order_id)
+    except Exception as e:
+        logger.error(f'ACME order finalization failed: {e}')
+        return error_response('Finalization failed', 500)
+    if lease is None:
+        return error_response(BUSY, 409)
+    try:
+        client = AcmeClientService.for_existing_order(order)
+        if client is None:
+            return error_response(ACCOUNT_GONE, 409)
+        success, message, cert_id = client.finalize_order(order, lease=lease)
 
         if success:
             # Clean up DNS records
@@ -576,6 +651,8 @@ def finalize_order(order_id):
     except Exception as e:
         logger.error(f'ACME order finalization failed: {e}')
         return error_response('Finalization failed', 500)
+    finally:
+        lease.release()
 
 
 @bp.route('/api/v2/acme/client/orders/<int:order_id>', methods=['DELETE'])
@@ -586,16 +663,9 @@ def cancel_order(order_id):
     if not order:
         return error_response('Order not found', 404)
 
-    # Clean up DNS if needed
-    if order.challenge_type == 'dns-01' and order.dns_provider_id:
-        try:
-            client = AcmeClientService.for_order(order)
-            client.cleanup_dns_challenge(order)
-        except Exception:
-            pass  # Best effort cleanup
-
     order_domains = ', '.join([d.get('value', '') for d in (order.identifiers_list if hasattr(order, 'identifiers_list') else [])]) or f'Order {order_id}'
-    db.session.delete(order)
+    from services.acme.order_housekeeping import delete_order
+    notes = delete_order(order)
     ok, _err = safe_commit(logger, "Failed to cancel ACME order")
     if not ok:
         return _err
@@ -605,7 +675,7 @@ def cancel_order(order_id):
         resource_type='acme_order',
         resource_id=str(order_id),
         resource_name=order_domains,
-        details=f'Cancelled/deleted ACME order {order_id}',
+        details='; '.join([f'Cancelled/deleted ACME order {order_id}'] + notes),
         success=True
     )
 
@@ -627,7 +697,8 @@ def renew_order(order_id):
     if order.status not in ('valid', 'issued'):
         return error_response('Only valid/issued orders can be renewed', 400)
 
-    from services.acme_renewal_service import RenewalBlocked, renew_certificate
+    from services.acme_renewal_service import (
+        RenewalBlocked, RenewalInProgress, record_renewal_failure, renew_certificate)
 
     try:
         success, message = renew_certificate(order)
@@ -648,11 +719,55 @@ def renew_order(order_id):
         else:
             return error_response(message, 400)
 
-    except RenewalBlocked as e:
+    except RenewalInProgress as e:
         return error_response(str(e), 409)
+    except (RenewalBlocked, CompromisedKey) as e:
+        return error_response(record_renewal_failure(order, e, manual=True), 409)
     except Exception as e:
         logger.error(f'ACME certificate renewal failed: {e}')
-        return error_response('Renewal failed', 500)
+        message = record_renewal_failure(order, e, manual=True)
+        if isinstance(e, (requests.RequestException, OSError)):
+            message = RENEWAL_CA_UNREACHABLE  # its text names hosts and URLs
+        return error_response(message, 422)
+
+
+def _renewal_parent(order):
+    from services.acme_renewal_service import renewal_parent
+    return renewal_parent(order)
+
+
+def _resumable_here(client, order) -> bool:
+    """A finalization the CA completed and UCM never imported, which this order can finish."""
+    # An order naming a certificate imported it already: its own import is not cut short
+    if (order.status == 'issued' or order.is_proxy_order or order.certificate_id is not None
+            or _renewal_parent(order) is not None):
+        return False
+    _key, key_error = client.held_finalize_key(order)
+    return key_error is None
+
+
+def _resume_finalization(client, order):
+    """Import the certificate of a finalization a restart cut short; 'issued' on success."""
+    lease = OrderLease.take(order.id)
+    if lease is None:
+        return None  # the finalization is still running elsewhere
+    try:
+        ok, message, cert_id = client.finalize_order(order, lease=lease)
+    finally:
+        lease.release()
+    if not ok:
+        logger.warning(f'Resumed finalization of order {order.id} failed: {message}')
+        return None
+    try:
+        client.cleanup_dns_challenge(order)
+    except Exception as cleanup_err:
+        logger.warning(f'DNS cleanup after resumed finalization: {cleanup_err}')
+    AuditService.log_action(
+        action='acme_finalize', resource_type='acme_order', resource_id=str(order.id),
+        resource_name=f'Order {order.id}',
+        details=f'Resumed the finalization of ACME order {order.id}, certificate ID: {cert_id}',
+        success=True)
+    return 'issued'
 
 
 def _auto_poll_and_finalize(client, order) -> dict:
@@ -676,6 +791,19 @@ def _auto_poll_and_finalize(client, order) -> dict:
             db.session.rollback()
             logger.error(f'Failed to persist status={status} for order {order.id}: {e}')
 
+    def _touch():
+        """Refresh updated_at: a restart elsewhere resumes only idle processing orders."""
+        try:
+            AcmeClientOrder.query.filter(
+                AcmeClientOrder.id == order.id, AcmeClientOrder.status == 'processing',
+            ).update({'updated_at': utc_now()}, synchronize_session=False)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.warning(f'Failed to refresh order {order.id} during the DNS wait: {e}')
+
+    # Set once the TXT records can serve no more: a pending order keeps them for Verify
+    drop_txt = False
     result = {
         'dns_propagation_wait': False,
         'challenge_submitted': False,
@@ -710,7 +838,7 @@ def _auto_poll_and_finalize(client, order) -> dict:
             logger.info('DNS propagation pre-check skipped (timeout=0)')
             check = {'ok': True, 'missing': [], 'waited': 0}
         else:
-            check = _dns_selfcheck(challenges, timeout)
+            check = _dns_selfcheck(challenges, timeout, on_tick=_touch)
         if check['ok']:
             logger.info(f'DNS propagation confirmed after {check["waited"]}s')
         else:
@@ -751,15 +879,28 @@ def _auto_poll_and_finalize(client, order) -> dict:
                     result['error'] = msg
                     logger.warning(f'Authorization invalid for {domain} on order {order.id}: {msg}')
                     _set_status('invalid', msg)
+                    drop_txt = True
                     break
 
             le_status, le_data = client.check_order_status(order)
             result['polling_status'] = le_status
             logger.info(f'ACME order {order.id} status after {elapsed}s: {le_status}')
 
+            if le_status == 'gone':  # recorded as invalid by the status check
+                result['error'] = ORDER_GONE
+                drop_txt = True
+                break
+
             if le_status in ('ready', 'valid'):
                 # 4. Auto-finalize (finalize_order sets status='issued' on success)
-                fin_success, fin_msg, cert_id = client.finalize_order(order)
+                lease = OrderLease.take(order.id)
+                if lease is None:  # a manual finalization runs: it owns the outcome
+                    result['error'] = BUSY
+                    break
+                try:
+                    fin_success, fin_msg, cert_id = client.finalize_order(order, lease=lease)
+                finally:
+                    lease.release()
                 if fin_success:
                     result['finalized'] = True
                     result['certificate_id'] = cert_id
@@ -774,6 +915,7 @@ def _auto_poll_and_finalize(client, order) -> dict:
                     logger.warning(f'Auto-finalize failed: {fin_msg}')
                     # What the CA last said stays: only a valid order can be renewed
                     _set_status(order.status if order.status in ('valid', 'invalid') else 'pending', fin_msg)
+                    drop_txt = True  # the authorizations were valid already
                 break
 
             if le_status == 'invalid':
@@ -789,6 +931,7 @@ def _auto_poll_and_finalize(client, order) -> dict:
                 else:
                     result['error'] = f'Order became invalid: {order_detail or "Unknown"}'
                 _set_status('invalid', result['error'])
+                drop_txt = True
                 break
 
             if elapsed >= max_wait:
@@ -797,6 +940,7 @@ def _auto_poll_and_finalize(client, order) -> dict:
                     _, msg = invalid
                     result['error'] = msg
                     _set_status('invalid', msg)
+                    drop_txt = True
                 else:
                     result['error'] = f'Timeout after {max_wait}s (status: {le_status})'
                     _set_status('pending', result['error'])
@@ -807,6 +951,12 @@ def _auto_poll_and_finalize(client, order) -> dict:
         logger.error(f'Auto-poll error for order {order.id}: {e}', exc_info=True)
         # Reset to 'pending' so the manual Verify/Finalize path can recover.
         _set_status('pending', result['error'])
+
+    if drop_txt:
+        try:
+            AcmeClientService.cleanup_dns_challenge(order)
+        except Exception as cleanup_err:
+            logger.warning(f'DNS cleanup after the failed auto-poll of order {order.id}: {cleanup_err}')
 
     logger.info(f'Auto-poll result for order {order.id}: status={result.get("polling_status")}, finalized={result["finalized"]}, error={result["error"]}')
 
@@ -841,7 +991,12 @@ def _run_auto_poll_background(order_id: int, environment: str) -> None:
                 if order.status in ('issued', 'invalid', 'expired'):
                     logger.info(f'Auto-poll background: order {order_id} already {order.status}, skipping')
                     return
-                client = AcmeClientService.for_order(order)
+                client = AcmeClientService.for_existing_order(order)
+                if client is None:
+                    order.status = 'pending'
+                    order.error_message = ACCOUNT_GONE
+                    db.session.commit()
+                    return
                 _auto_poll_and_finalize(client, order)
             except Exception as e:
                 logger.error(f'Auto-poll background failed for order {order_id}: {e}', exc_info=True)

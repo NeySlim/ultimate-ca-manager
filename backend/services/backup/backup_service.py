@@ -134,6 +134,9 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
 
     def __init__(self):
         self.app_version = Config.APP_VERSION
+        self.last_payload_size = 0    # decompressed bytes of the last archive created
+        self.last_payload_containers = 0
+        self.last_export_warnings = []  # what the last export left out, to say in its result
     def create_backup(
         self,
         password: str,
@@ -189,6 +192,7 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
                 ) from exc
 
         index = IdentityIndex()
+        self.last_export_warnings = []
         custom_exporters = {
             'configuration': self._export_configuration,
             'certificate_authorities': self._export_cas,
@@ -210,7 +214,7 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
                     rows = _section(
                         name, self._merge_with_manifest, name, rows, index)
             else:
-                rows = _section(name, export_section, name, index)
+                rows = _section(name, export_section, name, index, self.last_export_warnings)
             backup_data[name] = rows
 
         # Files, not a table: the HTTPS certificate and key the server serves
@@ -262,6 +266,8 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
 
         # Serialize final payload
         final_json = json.dumps(backup_data, indent=2, sort_keys=True).encode()
+        self.last_payload_size = len(final_json)
+        self.last_payload_containers = container.count_containers(backup_data)
 
         # Compress (gzip level 6 — good ratio, fast)
         flags = self.FLAG_GZIP

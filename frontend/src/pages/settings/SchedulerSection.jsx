@@ -57,9 +57,9 @@ function fmtDuration(ms) {
 
 export default function SchedulerSection({ hasPermission }) {
   const { t } = useTranslation()
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showInfo, showError } = useNotification()
   const [tasks, setTasks] = useState([])
-  const [meta, setMeta] = useState({ total: 0, warnings: 0 })
+  const [meta, setMeta] = useState({ total: 0, warnings: 0, stale: false })
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState({})
   const pollRef = useRef(null)
@@ -71,7 +71,7 @@ export default function SchedulerSection({ hasPermission }) {
       const res = await systemService.getSchedulerTasks()
       const data = res.data || res
       setTasks(data.tasks || [])
-      setMeta({ total: data.total || 0, warnings: data.warnings || 0 })
+      setMeta({ total: data.total || 0, warnings: data.warnings || 0, stale: !!data.stale })
     } catch (e) {
       if (!silent) showError(e.message || t('scheduler.loadFailed'))
     } finally {
@@ -88,8 +88,10 @@ export default function SchedulerSection({ hasPermission }) {
   const handleRun = async (name) => {
     setRunning((r) => ({ ...r, [name]: true }))
     try {
-      await systemService.runSchedulerTask(name)
-      showSuccess(t('scheduler.taskRan', { name }))
+      const res = await systemService.runSchedulerTask(name)
+      // Still running in the scheduler process after the API's wait
+      if ((res?.data || res)?.queued) showInfo(t('scheduler.taskQueued', { name }))
+      else showSuccess(t('scheduler.taskRan', { name }))
       await load(true)
     } catch (e) {
       showError(e.message || t('scheduler.runFailed'))
@@ -115,6 +117,13 @@ export default function SchedulerSection({ hasPermission }) {
         ]}
       />
 
+      {meta.stale && (
+        <p className="mb-3 flex items-center gap-1.5 text-xs text-status-warning">
+          <WarningCircle size={14} className="shrink-0" />
+          {t('scheduler.stateStale')}
+        </p>
+      )}
+
       <DetailSection title={t('scheduler.tasksTitle')} icon={Timer} iconClass="icon-bg-blue">
         {loading ? (
           <div className="p-6 text-center text-sm text-text-secondary">{t('common.loading')}</div>
@@ -139,7 +148,7 @@ export default function SchedulerSection({ hasPermission }) {
                   <tr key={task.name} className="border-b border-white/5 last:border-0">
                     <td className="py-2.5 pr-3">
                       <div className="flex items-center gap-2">
-                        {task.last_error ? (
+                        {task.last_error || task.last_status === 'warning' ? (
                           <WarningCircle size={16} className="text-amber-500 shrink-0" weight="fill" />
                         ) : task.last_status === 'skipped' ? (
                           <MinusCircle size={16} className="text-text-tertiary shrink-0" weight="fill" />
@@ -150,6 +159,9 @@ export default function SchedulerSection({ hasPermission }) {
                           <p className="font-medium text-text-primary">{task.label}</p>
                           {task.last_error && (
                             <p className="text-xs text-amber-500/90 mt-0.5 font-mono">{task.last_error}</p>
+                          )}
+                          {!task.last_error && task.last_status === 'warning' && task.last_reason && (
+                            <p className="text-xs text-amber-500/90 mt-0.5">{task.last_reason}</p>
                           )}
                           {!task.last_error && task.last_status === 'skipped' && (
                             <p className="text-xs text-text-tertiary mt-0.5">

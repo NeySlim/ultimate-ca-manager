@@ -97,6 +97,15 @@ if 'DATA_DIR' not in os.environ or _xdist_worker:
 # itself runs in memory. Pinned before settings.py loads one, like DATA_DIR above.
 if 'DATABASE_PATH' not in os.environ or _xdist_worker:
     os.environ['DATABASE_PATH'] = os.path.join(os.environ['DATA_DIR'], 'ucm.db')
+# Only for the raw create_engine(PG_URL) of tests: they get psycopg 3 like the application.
+# Product code never relies on this and always goes through utils.db_url.sqlalchemy_url.
+from sqlalchemy.dialects import registry as _sa_registry  # noqa: E402
+_sa_registry.register('postgresql', 'sqlalchemy.dialects.postgresql.psycopg', 'dialect')
+from tests import pg_app_harness as _pg_app  # noqa: E402
+
+if _pg_app.ENABLED:
+    os.environ['DATABASE_URL'] = _pg_app.app_url()
+    _pg_app.create_schema()
 os.environ.setdefault('DATABASE_URL', '')
 
 # The backend-switch routes rewrite /etc/ucm/ucm.env, the file the installed
@@ -138,6 +147,28 @@ from services.database_admin import persistence as _db_persistence  # noqa: E402
 
 _db_helpers.UCM_ENV_PATH = UCM_TEST_ENV_FILE
 _db_persistence.UCM_ENV_PATH = UCM_TEST_ENV_FILE
+
+if _pg_app.ENABLED:
+    # TestingConfig pins in-memory SQLite; in PostgreSQL mode it takes the URL Config read.
+    from config import settings as _settings  # noqa: E402
+
+    assert _settings.Config.DATABASE_TYPE == 'postgresql', _settings.Config.SQLALCHEMY_DATABASE_URI
+    _settings.TestingConfig.SQLALCHEMY_DATABASE_URI = _settings.Config.SQLALCHEMY_DATABASE_URI
+    _settings.TestingConfig.SQLALCHEMY_ENGINE_OPTIONS = dict(_settings.Config.SQLALCHEMY_ENGINE_OPTIONS)
+    import app as _app_module  # noqa: E402
+
+    _app_module.create_app = _pg_app.isolating(_app_module.create_app, _settings.TestingConfig)
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip the tests marked sqlite_only when the session app runs on PostgreSQL."""
+    if not _pg_app.ENABLED:
+        return
+    for item in items:
+        marker = item.get_closest_marker('sqlite_only')
+        if marker is not None:
+            reason = marker.kwargs.get('reason') or (marker.args[0] if marker.args else '')
+            item.add_marker(pytest.mark.skip(reason=f'SQLite only: {reason}'))
 
 # The host's master key, when the machine runs UCM, must not reach the tests:
 # rows encrypted with it outlive the test that wrote them and break any later
@@ -310,6 +341,163 @@ def _admin_api_keys_stay_in_their_module():
         db.session.commit()
 
 
+# Session-app clients that sign in again when a file puts the epoch back
+_RELOGGING_CLIENTS = []
+
+
+def _epoch_row():
+    """The stored session epoch: its value, None when absent (a fresh database)."""
+    if not _SESSION_APP:
+        return None
+    from auth.session_epoch import EPOCH_KEY
+    from models import SystemConfig, db
+    with _SESSION_APP[0].app_context():
+        value = db.session.query(SystemConfig.value).filter_by(key=EPOCH_KEY).scalar()
+        db.session.rollback()
+        return value
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _session_epoch_stays_in_its_module():
+    """A restore a file plays advances the epoch; put back the one found before the
+    file, or every session a later file opens otherwise reads as begun before it."""
+    before = _epoch_row()
+    yield
+    if not _SESSION_APP or _epoch_row() == before:
+        return
+    from auth.session_epoch import EPOCH_KEY
+    from models import SystemConfig, db
+    with _SESSION_APP[0].app_context():
+        row = SystemConfig.query.filter_by(key=EPOCH_KEY).first()
+        if before is None:
+            db.session.delete(row)
+        elif row is None:
+            db.session.add(SystemConfig(key=EPOCH_KEY, value=before))
+        else:
+            row.value = before
+        db.session.commit()
+        db.session.remove()
+    # A client that signed back in during the file holds the epoch just undone
+    for client in _RELOGGING_CLIENTS:
+        client._login(client._client)
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _seeded_rows_stay_in_their_module():
+    """Rows `tests.seeded_rows` wrote for a module are deleted after it."""
+    yield
+    from tests.seeded_rows import _SEEDED, remove_seeded
+    if _SEEDED:
+        remove_seeded()
+
+
+# Tables a file must leave as it found them: the sequential suite shares one
+# database, so a leftover row is visible to every later file.
+_LEAK_TABLES = (
+    'certificate_authorities', 'certificates', 'acme_orders', 'acme_domains',
+    'users', 'certificate_templates', 'scep_profiles', 'certificate_policies',
+)
+# Files allowed to change the shared tables: they reset or migrate the database.
+_LEAK_EXEMPT = {
+    'test_api_routes.py', 'test_admin_seed_kwargs.py', 'test_system.py',
+    'test_database_reset_records_itself.py',
+}
+
+
+def _leak_counts():
+    if not _SESSION_APP:
+        return None
+    from sqlalchemy import text as _text
+    from models import db
+    counts = {}
+    with _SESSION_APP[0].app_context():
+        present = set(db.inspect(db.engine).get_table_names())
+        for table in _LEAK_TABLES:
+            if table in present:
+                counts[table] = db.session.execute(_text(f'SELECT COUNT(*) FROM "{table}"')).scalar()
+        db.session.rollback()
+    return counts
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _shared_tables_stay_in_their_module(request):
+    """Row counts of the shared tables before and after each file. UCM_TEST_LEAK_MODE
+    is `warn` (default) or `fail`; a file in _LEAK_EXEMPT is never checked."""
+    name = os.path.basename(str(request.fspath))
+    before = _leak_counts()
+    yield
+    if name in _LEAK_EXEMPT or before is None:
+        return
+    after = _leak_counts() or {}
+    deltas = {t: after[t] - before[t] for t in before if t in after and after[t] != before[t]}
+    if not deltas:
+        return
+    message = f'{name} left the shared tables changed: ' + ', '.join(
+        f'{t} {d:+d}' for t, d in sorted(deltas.items()))
+    if os.environ.get('UCM_TEST_LEAK_MODE', 'warn') == 'fail':
+        pytest.fail(message)
+    import warnings
+    warnings.warn(message, stacklevel=1)
+
+
+@pytest.fixture(scope='module')
+def drop_new_cas_and_certificates(app):
+    """Deletes the certificates then the CAs a module created, with their dependent rows."""
+    from models import db, CA, Certificate
+    from services.ca_service import CAService
+    from services.cert_service import CertificateService
+
+    def _top(model):
+        with app.app_context():
+            return db.session.query(db.func.max(model.id)).scalar() or 0
+    floors = {Certificate: _top(Certificate), CA: _top(CA)}
+    yield
+    for model, delete in ((Certificate, CertificateService.delete_certificate),
+                          (CA, CAService.delete_ca)):
+        with app.app_context():
+            for row_id in [row.id for row in model.query.filter(model.id > floors[model])]:
+                delete(row_id)
+
+
+def sandbox_paths(application, replaced=None):
+    """Point the file paths at a temp tree; returns it and the Config values replaced.
+    `replaced` may be the caller's dict, filled as it goes, for a partial undo.
+
+    The restore writes the HTTPS certificate and key where the configuration
+    points and the backup routes write archives to the configured directory:
+    left at /etc/ucm and /opt/ucm, a run would replace the installed service's files.
+    """
+    from config.settings import Config as _Config
+    sandbox = Path(tempfile.mkdtemp(prefix='ucm-test-paths-'))
+    if replaced is None:
+        replaced = {}
+    for name, relative in (
+        ('HTTPS_CERT_PATH', 'etc/https_cert.pem'),
+        ('HTTPS_KEY_PATH', 'etc/https_key.pem'),
+        ('DATA_DIR', 'data'),
+        ('BACKUP_DIR', 'data/backups'),
+        ('CA_DIR', 'data/ca'),
+        ('CRL_DIR', 'data/crl'),
+        ('CERT_DIR', 'data/certs'),
+        ('PRIVATE_DIR', 'data/private'),
+    ):
+        if not hasattr(_Config, name):
+            continue
+        target = sandbox / relative
+        (target.parent if target.suffix else target).mkdir(parents=True, exist_ok=True)
+        replaced[name] = getattr(_Config, name)
+        setattr(_Config, name, target)
+        application.config[name] = target
+    return sandbox, replaced
+
+
+def configure_test_app(application):
+    application.config['TESTING'] = True
+    application.config['WTF_CSRF_ENABLED'] = False
+    # Deterministic FQDN: the CA OCSP/CDP/AIA auto-URLs must not depend on `hostname -f`.
+    application.config['FQDN'] = 'ucm.test'
+
+
 @pytest.fixture(scope='session')
 def app():
     """Create Flask app with test configuration (shared across all tests)."""
@@ -325,45 +513,25 @@ def app():
         temp_db = f.name
 
     from app import create_app
-    application = create_app('testing')
+    if _pg_app.ENABLED:
+        application = _pg_app.session_app(create_app, 'testing')
+    else:
+        application = create_app('testing')
 
-    # Keep the suite off the machine's real files. The restore writes the
-    # HTTPS certificate and key where the configuration points, and the
-    # backup routes write archives to the configured directory: pointed at
-    # /etc/ucm and /opt/ucm as they are by default, a test run would replace
-    # the files the installed service is using.
-    from config.settings import Config as _Config
-    _sandbox = Path(tempfile.mkdtemp(prefix='ucm-test-paths-'))
-    for _name, _relative in (
-        ('HTTPS_CERT_PATH', 'etc/https_cert.pem'),
-        ('HTTPS_KEY_PATH', 'etc/https_key.pem'),
-        ('DATA_DIR', 'data'),
-        ('BACKUP_DIR', 'data/backups'),
-        ('CA_DIR', 'data/ca'),
-        ('CRL_DIR', 'data/crl'),
-        ('CERT_DIR', 'data/certs'),
-        ('PRIVATE_DIR', 'data/private'),
-    ):
-        if not hasattr(_Config, _name):
-            continue
-        _target = _sandbox / _relative
-        (_target.parent if _target.suffix else _target).mkdir(parents=True, exist_ok=True)
-        setattr(_Config, _name, _target)
-        application.config[_name] = _target
-
-    application.config['TESTING'] = True
-    application.config['WTF_CSRF_ENABLED'] = False
-    # Deterministic FQDN so CA OCSP/CDP/AIA auto-URL generation does not depend
-    # on the CI runner's `hostname -f` (which can lack a domain part and thus
-    # resolve to None, flaking tests that patch `ocsp_enabled=True` without a
-    # configured protocol_base_url).
-    application.config['FQDN'] = 'ucm.test'
+    _sandbox, _ = sandbox_paths(application)
+    configure_test_app(application)
 
     # Module fixtures are built before the per-test autouse that clears the flag.
     clear_admin_password_flag(application)
     _SESSION_APP.append(application)
     yield application
     _SESSION_APP.clear()
+    if _pg_app.ENABLED:
+        from models import db as _db
+        with application.app_context():
+            _db.session.remove()
+            _db.engine.dispose()
+        _pg_app.drop_schema()
 
     if os.path.exists(temp_db):
         os.unlink(temp_db)
@@ -395,11 +563,28 @@ class _ReloggingClient:
         self._client = client
         self._login = login
 
+    @staticmethod
+    def _uploads(kwargs):
+        """The form's (stream, name) uploads as (bytes, name), to replay them afresh."""
+        data = kwargs.get('data')
+        if not isinstance(data, dict):
+            return {}
+        kept = {}
+        for field, value in data.items():
+            if isinstance(value, tuple) and value and hasattr(value[0], 'getvalue'):
+                kept[field] = (value[0].getvalue(),) + value[1:]
+        return kept
+
     def _call(self, method, *args, **kwargs):
+        uploads = self._uploads(kwargs)
         response = getattr(self._client, method)(*args, **kwargs)
         if response.status_code != 401:
             return response
         self._login(self._client)
+        if uploads:
+            import io
+            kwargs['data'] = dict(kwargs['data'], **{
+                field: (io.BytesIO(value[0]),) + value[1:] for field, value in uploads.items()})
         try:
             return getattr(self._client, method)(*args, **kwargs)
         except ValueError:
@@ -420,6 +605,12 @@ class _ReloggingClient:
 @pytest.fixture(scope='session')
 def auth_client(app):
     """Authenticated Flask test client (admin role)."""
+    client = admin_client(app)
+    _RELOGGING_CLIENTS.append(client)
+    return client
+
+
+def admin_client(app):
     def login(client):
         r = client.post('/api/v2/auth/login',
                         data=json.dumps({'username': 'admin',
@@ -470,6 +661,10 @@ def viewer_client(app):
 @pytest.fixture(scope='session')
 def create_ca(auth_client):
     """Factory fixture to create a root CA. Returns CA dict."""
+    return ca_factory(auth_client)
+
+
+def ca_factory(auth_client):
     _counter = [0]
 
     def _create(cn=None, **kwargs):
@@ -508,6 +703,10 @@ def create_cert(auth_client, create_ca):
     the cached id to the next CA created, possibly one that cannot sign, so the
     cache is checked by refid and rebuilt when the row is gone or is another CA.
     """
+    return cert_factory(auth_client, create_ca)
+
+
+def cert_factory(auth_client, create_ca):
     _ca_cache = {}
     _counter = [0]
 
@@ -548,6 +747,10 @@ def create_cert(auth_client, create_ca):
 @pytest.fixture(scope='session')
 def create_user(auth_client):
     """Factory fixture to create a user. Returns user dict."""
+    return user_factory(auth_client)
+
+
+def user_factory(auth_client):
     _counter = [0]
 
     def _create(username=None, role='operator', **kwargs):
@@ -664,6 +867,7 @@ def clean_dangling_rows(app):
     _force_register_all_models()
     removed = 0
     with app.app_context():
+        row_key = 'ctid' if _db.engine.dialect.name == 'postgresql' else 'rowid'
         present = set(_db.inspect(_db.engine).get_table_names())
         for table in reversed(_db.metadata.sorted_tables):
             if table.name not in present:
@@ -679,8 +883,8 @@ def clean_dangling_rows(app):
                     f'c."{a}" = p."{b}"' for a, b in zip(child, parent))
                 not_null = ' AND '.join(f'c."{a}" IS NOT NULL' for a in child)
                 result = _db.session.execute(_text(
-                    f'DELETE FROM "{table.name}" WHERE rowid IN ('
-                    f'  SELECT c.rowid FROM "{table.name}" c '
+                    f'DELETE FROM "{table.name}" WHERE {row_key} IN ('
+                    f'  SELECT c.{row_key} FROM "{table.name}" c '
                     f'  LEFT JOIN "{parent_table}" p ON {on} '
                     f'  WHERE {not_null} AND p."{parent[0]}" IS NULL)'))
                 removed += result.rowcount or 0
@@ -710,13 +914,16 @@ def clean_unreadable_secrets(app):
         from services.database_admin.verify import encrypted_columns
         from services.backup.key_material import decrypt_stored_secret
 
+        is_pg = _db.engine.dialect.name == 'postgresql'
+        row_key = 'ctid' if is_pg else 'rowid'
+        match = 'ctid = CAST(:rowid AS tid)' if is_pg else 'rowid = :rowid'
         present = set(_db.inspect(_db.engine).get_table_names())
         for table, column in encrypted_columns():
             if table not in present:
                 continue
             try:
                 rows = _db.session.execute(_text(
-                    f'SELECT rowid, "{column}" FROM "{table}" '
+                    f'SELECT {row_key}, "{column}" FROM "{table}" '
                     f'WHERE "{column}" IS NOT NULL')).fetchall()
             except Exception:
                 _db.session.rollback()
@@ -731,7 +938,7 @@ def clean_unreadable_secrets(app):
                     doomed.append(rowid)
             for rowid in doomed:
                 _db.session.execute(_text(
-                    f'DELETE FROM "{table}" WHERE rowid = :rowid'),
+                    f'DELETE FROM "{table}" WHERE {match}'),
                     {'rowid': rowid})
                 removed += 1
         if removed:

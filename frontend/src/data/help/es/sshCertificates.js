@@ -85,7 +85,7 @@ UCM genera tanto el par de claves como el certificado. Úselo cuando necesite pr
 **Procedimiento:**
 1. Seleccione una CA y complete los datos del certificado
 2. Elija el modo «Generar»
-3. Haga clic en **Emitir**
+3. Haga clic en **Emitir certificado**
 4. Descargue los tres archivos:
    - Clave privada (\`keyid\`): **¡Guárdela de forma segura!**
    - Certificado (\`keyid-cert.pub\`)
@@ -106,7 +106,7 @@ Los principals definen **quién** (certificados de usuario) o **qué** (certific
 - **Certificados de usuario**: lista de nombres de usuario con los que el titular puede iniciar sesión (ej.: \`deploy\`, \`admin\`)
 - **Certificados de host**: lista de nombres de host o IPs por los que el servidor es conocido (ej.: \`web01.example.com\`, \`10.0.1.5\`)
 
-> 💡 Si no se especifican principals, el certificado funciona para cualquier principal: lo cual suele ser demasiado permisivo.
+> 💡 Se requiere al menos un principal: indique los nombres de usuario o de host para los que el certificado es válido.
 
 ### Validez
 

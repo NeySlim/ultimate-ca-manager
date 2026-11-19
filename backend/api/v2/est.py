@@ -4,7 +4,7 @@ EST Management Routes v2.0
 """
 
 from utils.signing_ca import signing_ca_problem
-from api.est_protocol import _est_label_map
+from api.est_protocol import EST_OPERATIONS, _est_label_map
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
@@ -52,20 +52,15 @@ def get_est_config():
             ca_id = ca.id
             ca_name = ca.descr
 
-    # RFC 7030 §3.2.2 CA labels: {label: ca_refid}. Enriched with the CA name
-    # so the UI can show which authority each label serves.
+    # RFC 7030 §3.2.2 CA labels, with each CA's name; only those enrolment serves,
+    # since one it ignores would be listed here and then refused on save.
     labels = {}
-    try:
-        raw_labels = json.loads(get_config('est_labels', '') or '{}')
-        if isinstance(raw_labels, dict):
-            for label, refid in raw_labels.items():
-                ca_row = CA.query.filter_by(refid=refid).first()
-                labels[label] = {
-                    'ca_refid': refid,
-                    'ca_name': ca_row.descr if ca_row else None,
-                }
-    except (TypeError, ValueError):
-        logger.warning('Invalid est_labels configuration; reporting none')
+    for label, refid in _est_label_map().items():
+        ca_row = CA.query.filter_by(refid=refid).first()
+        labels[label] = {
+            'ca_refid': refid,
+            'ca_name': ca_row.descr if ca_row else None,
+        }
 
     return success_response(data={
         'enabled': get_config('est_enabled', 'false') == 'true',
@@ -76,6 +71,9 @@ def get_est_config():
         'password_set': bool(get_config('est_password', '')),
         'validity_days': int(get_config('est_validity_days', '365') or 365),
         'response_include_chain': get_config('est_response_include_chain', 'false') == 'true',
+        'csrattrs_legacy_encoding': get_config('est_csrattrs_legacy_encoding', 'false') == 'true',
+        'allow_empty_username': get_config('est_allow_empty_username', 'false') == 'true',
+        'ignore_challenge_password': get_config('est_ignore_challenge_password', 'false') == 'true',
         'labels': labels,
     })
 
@@ -85,6 +83,10 @@ def get_est_config():
 def update_est_config():
     """Update EST configuration in database"""
     data = request.json or {}
+    # These turn a check off: a JSON "false" is truthy, so only a boolean is taken
+    for field in ('csrattrs_legacy_encoding', 'allow_empty_username', 'ignore_challenge_password'):
+        if field in data and not isinstance(data[field], bool):
+            return error_response(f'{field} must be a boolean', 400)
 
     if 'enabled' in data:
         set_config('est_enabled', 'true' if data['enabled'] else 'false')
@@ -130,9 +132,10 @@ def update_est_config():
                 f'validity_days must be between {MIN_VALIDITY_DAYS} and {MAX_VALIDITY_DAYS}',
                 400)
         set_config('est_validity_days', str(vd))
-    if 'response_include_chain' in data:
-        set_config('est_response_include_chain',
-                   'true' if data['response_include_chain'] else 'false')
+    for field in ('response_include_chain', 'csrattrs_legacy_encoding', 'allow_empty_username',
+                  'ignore_challenge_password'):
+        if field in data:
+            set_config(f'est_{field}', 'true' if data[field] else 'false')
 
     if 'labels' in data:
         # RFC 7030 §3.2.2 CA labels. Accepts {label: ca_refid} or the enriched
@@ -152,6 +155,10 @@ def update_est_config():
                 return error_response(
                     f"Invalid EST label '{str(label)[:20]}': use letters, digits, "
                     "dot, dash or underscore (max 64 characters)", 400)
+            if label.lower() in EST_OPERATIONS:
+                return error_response(
+                    f"Invalid EST label '{label}': an operation name cannot be a label "
+                    "(RFC 7030 §3.2.2)", 400)
             refid = value.get('ca_refid') if isinstance(value, dict) else value
             if not isinstance(refid, str) or not refid:
                 return error_response(f"Label '{label}' has no CA", 400)

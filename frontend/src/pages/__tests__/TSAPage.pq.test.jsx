@@ -74,7 +74,7 @@ vi.mock('../../services/tsa.service', () => ({
   tsaService: {
     getConfig: vi.fn(),
     updateConfig: vi.fn().mockResolvedValue({ data: {} }),
-    getStats: vi.fn().mockResolvedValue({ data: { total_requests: 0 } }),
+    getStats: vi.fn().mockResolvedValue({ data: { total: 0 } }),
     getSignerCandidates: vi.fn().mockResolvedValue({ data: [] }),
     issueSignerCertificate: vi.fn(),
   },
@@ -105,7 +105,7 @@ describe('TSAPage signer key, from the registry', () => {
     tsaService.getConfig.mockResolvedValue({
       data: { enabled: true, ca_refid: 'ca-tsa', signer_cert_refid: '', signer: { configured: false } },
     })
-    tsaService.getStats.mockResolvedValue({ data: { total_requests: 0 } })
+    tsaService.getStats.mockResolvedValue({ data: { total: 0 } })
     tsaService.getSignerCandidates.mockResolvedValue({ data: [] })
     tsaService.issueSignerCertificate.mockResolvedValue({ data: { selected: true } })
   })

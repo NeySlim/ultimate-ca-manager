@@ -362,3 +362,97 @@ class TestBindCredentialIsRequired:
             data=json.dumps({'servers': ['dc1.corp.local'],
                              'bind_password': 'svc-password'}))
         assert no_dn.status_code == 400
+
+
+class TestBaseDnValidation:
+    @staticmethod
+    def _put(auth_client, payload):
+        return auth_client.put('/api/v2/ad-connector', data=json.dumps(payload),
+                               content_type='application/json')
+
+    @pytest.mark.parametrize('base_dn', ['OU=Users,O=Corp', 'not a dn', 'CN=Users'])
+    def test_a_base_dn_without_a_domain_component_is_refused(self, app, auth_client, base_dn):
+        response = self._put(auth_client, {'base_dn': base_dn})
+        assert response.status_code == 400
+        assert 'DC=' in response.get_json()['message']
+
+    def test_a_spaced_domain_dn_is_accepted(self, app, auth_client):
+        assert self._put(auth_client, {'base_dn': 'DC=corp, DC=example'}).status_code == 200
+
+
+class TestGlobalCatalogPortRefused:
+    @pytest.fixture(autouse=True)
+    def _disabled_connector(self, app):
+        with app.app_context():
+            ADConnectorConfig.query.delete()
+            db.session.add(ADConnectorConfig(server='dc1.corp.local', base_dn='DC=corp,DC=local', enabled=False))
+            db.session.commit()
+        yield
+        with app.app_context():
+            ADConnectorConfig.query.delete()
+            db.session.commit()
+
+    @staticmethod
+    def _put(auth_client, payload):
+        return auth_client.put('/api/v2/ad-connector', data=json.dumps(payload),
+                               content_type='application/json')
+
+    @pytest.mark.parametrize('port', [3268, 3269, '3268'])
+    def test_a_global_catalog_port_is_refused(self, app, auth_client, port):
+        response = self._put(auth_client, {'port': port})
+        assert response.status_code == 400
+        assert response.get_json()['message'] == (
+            'the connector must reach a domain controller, not a global catalog')
+
+    @pytest.mark.parametrize('port', [389, 636])
+    def test_a_domain_controller_port_is_accepted(self, app, auth_client, port):
+        assert self._put(auth_client, {'port': port}).status_code == 200
+
+
+_HOST_PORT_MESSAGE = 'servers are host names; set the port in the port field'
+_GC_MESSAGE = 'the connector must reach a domain controller, not a global catalog'
+
+
+class TestServersCarryNoPort:
+    """ldap3 takes a port or a scheme written in the host over the port field, so the
+    Global Catalog refusal would not see ``dc1:3268``."""
+
+    @pytest.fixture(autouse=True)
+    def _disabled_connector(self, app):
+        with app.app_context():
+            ADConnectorConfig.query.delete()
+            db.session.add(ADConnectorConfig(server='dc1.corp.local', base_dn='DC=corp,DC=local', enabled=False))
+            db.session.commit()
+        yield
+        with app.app_context():
+            ADConnectorConfig.query.delete()
+            db.session.commit()
+
+    @pytest.mark.parametrize('server', ['dc1.corp.local:3268', 'ldap://dc1.corp.local',
+                                        'ldaps://dc1.corp.local:3269', '[2001:db8::1]:389'])
+    def test_a_server_with_a_port_or_scheme_is_refused(self, auth_client, server):
+        response = auth_client.put('/api/v2/ad-connector', content_type='application/json',
+                                   data=json.dumps({'servers': ['dc2.corp.local', server]}))
+        assert response.status_code == 400
+        assert response.get_json()['message'] == _HOST_PORT_MESSAGE
+
+    def test_a_bare_ipv6_address_is_still_a_host(self, auth_client):
+        response = auth_client.put('/api/v2/ad-connector', content_type='application/json',
+                                   data=json.dumps({'servers': ['2001:db8::1']}))
+        assert response.status_code == 200
+
+    @pytest.mark.parametrize('payload, message', [
+        ({'servers': ['dc1.corp.local'], 'port': 3268}, _GC_MESSAGE),
+        ({'servers': ['dc1.corp.local'], 'port': '3269'}, _GC_MESSAGE),
+        ({'servers': ['dc1.corp.local:3268']}, _HOST_PORT_MESSAGE),
+        ({'servers': ['ldaps://dc1.corp.local']}, _HOST_PORT_MESSAGE),
+    ])
+    def test_the_inline_test_refuses_what_the_save_refuses(self, auth_client, monkeypatch, payload, message):
+        from services.ad_connector import lookup as ad_lookup
+        monkeypatch.setattr(ad_lookup, 'test_connection',
+                            lambda cfg: (_ for _ in ()).throw(AssertionError('must not connect')))
+        payload = dict(payload, bind_dn='CN=svc-ucm,DC=corp,DC=local', bind_password='svc-password')
+        response = auth_client.post('/api/v2/ad-connector/test', content_type='application/json',
+                                    data=json.dumps(payload))
+        assert response.status_code == 400
+        assert response.get_json()['message'] == message

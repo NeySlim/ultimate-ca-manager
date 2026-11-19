@@ -41,6 +41,27 @@ def serial_to_int(serial: str | int | None) -> int | None:
         return None
 
 
+def unambiguous_serial_spellings(serial: int) -> set[str]:
+    """The forms of ``serial`` no other serial is written as: decimal, and its hex forms that
+    hold a letter. A string without one reads as decimal: ``format(16, 'x')`` is serial 10,
+    ``format(-16, 'x')`` serial -10."""
+    return {str(serial)} | {v for v in (format(serial, 'x'), format(serial, 'X'))
+                            if any(c in 'abcdefABCDEF' for c in v)}
+
+
+def serial_named_by(column: str | None) -> int | None:
+    """The serial ``column`` is an unambiguous spelling of (``unambiguous_serial_spellings``),
+    or None: the inverse of that function, for records read in bulk."""
+    if not column:
+        return None
+    text = str(column)
+    try:
+        serial = int(text, 10) if text.lstrip('-').isdigit() else int(text, 16)
+    except ValueError:
+        return None
+    return serial if text in unambiguous_serial_spellings(serial) else None
+
+
 def serial_variants(serial: int) -> set[str]:
     """DB string forms a given integer serial might be stored under.
 

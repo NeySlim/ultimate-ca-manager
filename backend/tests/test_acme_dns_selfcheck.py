@@ -189,7 +189,7 @@ def test_auto_poll_fetches_authorization_error_when_order_is_invalid(app, monkey
     monkeypatch.setattr(
         orders_mod,
         '_dns_selfcheck',
-        lambda challenges, timeout: {'ok': True, 'missing': [], 'waited': 1},
+        lambda challenges, timeout, **_kw: {'ok': True, 'missing': [], 'waited': 1},
     )
     monkeypatch.setattr(orders_mod.time, 'sleep', lambda seconds: None)
 
@@ -394,3 +394,13 @@ def test_challenge_txt_name_fallback():
     assert challenge_txt_name(
         'example.com', {'dns_txt_name': '_acme-challenge.custom.example.com'}
     ) == '_acme-challenge.custom.example.com'
+
+
+def test_wait_for_challenges_reports_each_tick(monkeypatch):
+    from services.acme import dns_selfcheck
+    monkeypatch.setattr(dns_selfcheck.time, 'sleep', lambda _s: None)
+    monkeypatch.setattr(dns_selfcheck, 'txt_record_present', lambda _n, _v: False)
+    ticks = []
+    dns_selfcheck.wait_for_challenges({'a.example.com': {'dns_txt_name': 'n', 'dns_txt_value': 'v'}},
+                                      10, on_tick=lambda: ticks.append(1))
+    assert len(ticks) == 2

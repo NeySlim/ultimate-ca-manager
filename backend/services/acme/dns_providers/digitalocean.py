@@ -127,7 +127,7 @@ class DigitalOceanDnsProvider(BaseDnsProvider):
         logger.info(f"DigitalOcean: Created TXT record {record_name} (ID: {record_id})")
         return True, f"Record created successfully (ID: {record_id})"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         """Delete TXT record via DigitalOcean API"""
         do_domain = self._get_domain(domain)
         if not do_domain:
@@ -144,10 +144,10 @@ class DigitalOceanDnsProvider(BaseDnsProvider):
         
         records = result.get('domain_records', [])
         
-        # Find and delete matching TXT records
         deleted = 0
         for record in records:
-            if record['type'] == 'TXT' and record['name'] == relative_name:
+            if (record['type'] == 'TXT' and record['name'] == relative_name
+                    and self.txt_matches(record.get('data'), record_value)):
                 success, _ = self._request('DELETE', f'/domains/{do_domain}/records/{record["id"]}')
                 if success:
                     deleted += 1

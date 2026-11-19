@@ -3,18 +3,37 @@ name: Tests & Quality Checks
 on:
   push:
     branches: [main, master, develop, dev, test, 'v*', '*-dev', 'feature/**']
+    # Prose-only commits do not need the suite (no required checks on any
+    # branch), except the two files tests read.
+    paths:
+      - '**'
+      - '!**.md'
+      - '!docs/**'
+      - 'README.md'
+      - 'docs/LOG_ROTATION.md'
   pull_request:
     branches: [main, master, develop, dev]
   workflow_dispatch:
+  schedule:
+    # Nightly sequential run of dev (the default branch is main, see the job)
+    - cron: '0 3 * * *'
 
 permissions:
   contents: read
   security-events: write
 
+# A new push to a branch replaces the run of its previous commit, except on
+# test and main where every run is a release record: one group per commit
+# there, so nothing is cancelled or queued away
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.event_name }}-${{ (github.ref_name == 'test' || github.ref_name == 'main') && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref_name != 'test' && github.ref_name != 'main' }}
+
 jobs:
   lint:
     name: Code Linting
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
     
     steps:
       - name: Checkout code
@@ -26,28 +45,18 @@ jobs:
           python-version: '3.13'
           cache: 'pip'
       
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install flake8 black isort pylint
-      
-      - name: Run Flake8
-        run: |
-          flake8 backend/ --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 backend/ --count --max-complexity=10 --max-line-length=127 --statistics
-        continue-on-error: true
-      
-      - name: Check code formatting with Black
-        run: black --check backend/
-        continue-on-error: true
-      
-      - name: Check import sorting with isort
-        run: isort --check-only backend/
-        continue-on-error: true
+      - name: Install ruff
+        run: pip install ruff==0.17.4
+
+      # Blocking: undefined names, bad star imports, syntax errors. The four
+      # ignored codes are style debt tracked in backend/pyproject.toml.
+      - name: Pyflakes gate (ruff)
+        run: ruff check backend/ --select F --ignore F401,F541,F811,F841
   
   security:
     name: Security Scanning
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
     
     steps:
       - name: Checkout code
@@ -83,9 +92,15 @@ jobs:
           sarif_file: 'trivy-results.sarif'
         continue-on-error: true
   
+  # Two halves of the file list (scripts/ci/shard-tests.sh), four workers each.
   test-backend:
-    name: Backend Tests
+    name: Backend Tests (${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     
     steps:
       - name: Checkout code
@@ -98,7 +113,7 @@ jobs:
           cache: 'pip'
       
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libkrb5-dev
+        run: scripts/ci/apt-install.sh libkrb5-dev
       
       - name: Install dependencies
         run: |
@@ -117,11 +132,92 @@ jobs:
           UCM_DEV_MODE: 'true'
         run: |
           cd backend
-          pytest -v --tb=short
+          files=$(../scripts/ci/shard-tests.sh ${{ matrix.shard }} 2)
+          [ -n "$files" ]
+          pytest -v --tb=short -n 4 --dist loadfile $files
+
+  # One database for the whole suite, as a user runs it: the integration judge.
+  # Release branches, the nightly run of dev, and on demand. Not on dev pushes.
+  test-backend-sequential:
+    name: Backend Tests (sequential)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'test' || github.ref_name == 'main'))
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'dev' || github.ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: scripts/ci/apt-install.sh libkrb5-dev
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+          # As the packages do: pyjks without its twofish dependency
+          pip install --no-deps pyjks==20.0.0
+
+      - name: Run tests
+        id: deterministic
+        env:
+          SECRET_KEY: test-secret-key-for-ci
+          UCM_ENV: test
+          HTTP_REDIRECT: 'false'
+          INITIAL_ADMIN_PASSWORD: changeme123
+          CSRF_DISABLED: 'true'
+          UCM_DEV_MODE: 'true'
+        run: |
+          cd backend
+          pytest -v --tb=short --durations=30
+
+      # The same suite in random order on the nightly run: a report, not a gate.
+      # The job summary gives the seed that replays the order locally.
+      - name: Run tests in random order (report only)
+        if: ${{ !cancelled() && github.event_name == 'schedule' && steps.deterministic.outcome != 'skipped' }}
+        continue-on-error: true
+        timeout-minutes: 45
+        env:
+          SECRET_KEY: test-secret-key-for-ci
+          UCM_ENV: test
+          HTTP_REDIRECT: 'false'
+          INITIAL_ADMIN_PASSWORD: changeme123
+          CSRF_DISABLED: 'true'
+          UCM_DEV_MODE: 'true'
+        run: |
+          pip install pytest-randomly==5.0.0
+          sha=$(git rev-parse HEAD)
+          cd backend
+          seed=$(od -An -N4 -tu4 /dev/urandom | tr -d ' ')
+          set +e
+          # Inside the step timeout, so a slow run still writes its summary (exit 124).
+          timeout 40m pytest -p randomly --randomly-seed="$seed" -q --tb=line -rfE > random-order.log 2>&1
+          status=$?
+          set -e
+          tail -n 60 random-order.log
+          {
+            echo "### Random order: seed $seed, commit $sha, pytest exit $status"
+            echo
+            echo "Replay: \`git checkout $sha && pip install pytest-randomly==5.0.0 && cd backend && pytest -p randomly --randomly-seed=$seed\`"
+            echo
+            echo "Files with failures or errors:"
+            echo
+            grep -E '^(FAILED|ERROR) ' random-order.log | sed -E 's/^(FAILED|ERROR) ([^: ]+).*/\2/' | sort | uniq -c | sort -rn | sed 's/^/    /' || true
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
 
   test-backend-postgres:
     name: Backend Tests (PostgreSQL)
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
 
     services:
       postgres:
@@ -149,14 +245,13 @@ jobs:
           cache: 'pip'
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libkrb5-dev libpq-dev postgresql-client
+        run: scripts/ci/apt-install.sh libkrb5-dev libpq-dev postgresql-client
 
       - name: Install dependencies
         run: |
           pip install --upgrade pip
           pip install -r backend/requirements-dev.txt
           pip install --no-deps pyjks==20.0.0
-          pip install psycopg2-binary
 
       - name: Wait for PostgreSQL
         run: |
@@ -187,11 +282,10 @@ jobs:
           INITIAL_ADMIN_PASSWORD: changeme123
           CSRF_DISABLED: 'true'
           UCM_DEV_MODE: 'true'
-          # No DATABASE_URL here on purpose: the application reads it and would
-          # run the whole test app against PostgreSQL, where the harness never
-          # created the schema, so every fixture died on the migration ledger.
-          # These tests keep their own SQLite instance and reach PostgreSQL
-          # through the two variables below, each building its own engine.
+          # No DATABASE_URL here on purpose: these tests keep their own SQLite
+          # instance and reach PostgreSQL through the two variables below, each
+          # building its own engine. The application on PostgreSQL is the next
+          # job, through UCM_TEST_APP_PG_URL.
           UCM_TEST_POSTGRES_URL: postgresql://ucm:ucm_ci_password@localhost:5432/ucm_test
           UCM_TEST_PG_URL: postgresql://ucm_migtest:ucm_migtest_ci@localhost:5432/ucm_migtest
         run: |
@@ -214,9 +308,97 @@ jobs:
             tests/test_migration_036.py \
             tests/test_migration_runner_pg.py
   
+  # The application suite on PostgreSQL, in three shards of scripts/ci/pg-app-tests.txt,
+  # each with a PostgreSQL service of its own.
+  test-backend-postgres-app:
+    name: Backend Tests (PostgreSQL app ${{ matrix.shard }}/3)
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ucm
+          POSTGRES_PASSWORD: ucm_ci_password
+          POSTGRES_DB: ucm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: scripts/ci/apt-install.sh libkrb5-dev libpq-dev postgresql-client
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+          pip install --no-deps pyjks==20.0.0
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in $(seq 1 30); do
+            pg_isready -h localhost -p 5432 -U ucm && break
+            sleep 1
+          done
+
+      # The role the service creates is a superuser, and a superuser can
+      # disable foreign keys during a migration. Every installation that runs
+      # a managed PostgreSQL cannot, and the fallback that handles it went
+      # unexercised for thirty releases. These tests get a role that is
+      # deliberately ordinary, with a database of its own to reset.
+      - name: Create the unprivileged role the migration tests need
+        env:
+          PGPASSWORD: ucm_ci_password
+        run: |
+          psql -h localhost -U ucm -d ucm_test -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE ucm_migtest LOGIN PASSWORD 'ucm_migtest_ci' NOSUPERUSER;
+          CREATE DATABASE ucm_migtest OWNER ucm_migtest;
+          SQL
+
+      # The application itself on PostgreSQL: the session `app` fixture builds
+      # it in a schema of its own (docs/testing/postgres-harness.md), so the
+      # routes and services run on this backend and not only the migrations.
+      # The unprivileged role, as on a managed PostgreSQL; its `public` schema
+      # is never touched here.
+      - name: Run the application tests on PostgreSQL
+        timeout-minutes: 30
+        env:
+          SECRET_KEY: test-secret-key-for-ci
+          UCM_ENV: test
+          HTTP_REDIRECT: 'false'
+          INITIAL_ADMIN_PASSWORD: changeme123
+          CSRF_DISABLED: 'true'
+          UCM_DEV_MODE: 'true'
+          UCM_TEST_APP_PG_URL: postgresql://ucm_migtest:ucm_migtest_ci@localhost:5432/ucm_migtest
+        run: |
+          cd backend
+          files=$(../scripts/ci/shard-tests.sh ${{ matrix.shard }} 3 ../scripts/ci/pg-app-tests.txt)
+          [ -n "$files" ]
+          pytest --tb=short $files
+  
   test-frontend:
     name: Frontend Tests
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
     
     steps:
       - name: Checkout code
@@ -242,7 +424,8 @@ jobs:
   build-test:
     name: Docker Build Test
     runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend]
+    if: github.event_name != 'schedule'
+    needs: [test-frontend]
     
     steps:
       - name: Checkout code
@@ -298,7 +481,7 @@ jobs:
   build-test-fips:
     name: Docker Build Test (FIPS)
     runs-on: ubuntu-24.04
-    needs: [test-backend, test-frontend]
+    needs: [test-frontend]
     if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
     timeout-minutes: 60
 

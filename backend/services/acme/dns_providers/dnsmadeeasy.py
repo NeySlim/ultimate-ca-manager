@@ -36,7 +36,9 @@ class DnsMadeEasyDnsProvider(BaseDnsProvider):
     def _request(self, method, path, data=None):
         try:
             resp = requests.request(method, f"{self.BASE_URL}{path}",
-                headers=self._get_headers(), json=data, timeout=30)
+                headers=self._get_headers(), json=data, timeout=30,
+                # requests keeps the x-dnsme-* headers on a redirect to another host
+                allow_redirects=False)
             if resp.status_code >= 400:
                 return False, self._error(resp)
             return True, resp.json() if resp.text else None
@@ -64,7 +66,7 @@ class DnsMadeEasyDnsProvider(BaseDnsProvider):
             return False, f"Failed: {result}"
         return True, "Record created"
     
-    def delete_txt_record(self, domain, record_name):
+    def delete_txt_record(self, domain, record_name, record_value):
         info = self._find_domain(domain)
         if not info:
             return False, f"Domain not found for {domain}"
@@ -75,6 +77,8 @@ class DnsMadeEasyDnsProvider(BaseDnsProvider):
         if not success:
             return False, f"Failed: {result}"
         for rec in result.get('data', []):
+            if not self.txt_matches(rec.get('value'), record_value):
+                continue
             self._request('DELETE', f'/dns/managed/{domain_id}/records/{rec["id"]}')
         return True, "Record deleted"
     

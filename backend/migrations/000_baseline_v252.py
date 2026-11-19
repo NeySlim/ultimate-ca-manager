@@ -433,6 +433,9 @@ CREATE TABLE IF NOT EXISTS crl_metadata (
 );
 CREATE INDEX IF NOT EXISTS ix_crl_metadata_ca_id ON crl_metadata(ca_id);
 CREATE INDEX IF NOT EXISTS ix_crl_metadata_created_at ON crl_metadata(created_at);
+-- RFC 5280 §5.2.3: one CRL per (CA, number); an older table may hold duplicates
+DELETE FROM crl_metadata WHERE id NOT IN (SELECT MAX(id) FROM crl_metadata GROUP BY ca_id, crl_number);
+CREATE UNIQUE INDEX IF NOT EXISTS uix_crl_ca_number ON crl_metadata(ca_id, crl_number);
 
 CREATE TABLE IF NOT EXISTS ocsp_responses (
     id INTEGER PRIMARY KEY NOT NULL,

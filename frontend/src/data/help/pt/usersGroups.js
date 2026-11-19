@@ -56,7 +56,7 @@ Gerencie contas de usuário, grupos e atribuições de funções. Os usuários s
 Alterne o status de um usuário sem excluir sua conta.
 
 ### Redefinir Senha
-Administradores podem redefinir a senha de qualquer usuário. O usuário será solicitado a alterá-la no próximo login.
+Administradores podem redefinir a senha de qualquer usuário. O usuário não é solicitado a alterá-la no próximo login: forneça a nova senha e peça que a altere em Minha Conta. **Esqueceu a palavra-passe?**, na página de login, não envia link a uma conta vinculada a um provedor SSO que não tem senha local: só o seu provedor a abre.
 
 ### Chaves de segurança
 Nos detalhes de um usuário, os administradores veem as chaves de segurança dele e podem desativar ou remover uma, normalmente uma chave perdida, que caso contrário ainda permite entrar sem senha. Remover o último segundo fator de uma conta que exige um pede uma segunda confirmação; o usuário registra então novamente um fator no próximo login.
@@ -80,13 +80,14 @@ Cada usuário pode ter múltiplas chaves de API para acesso programático. As ch
 ### Permissões de Grupo
 As permissões efetivas de um usuário são a **união** de:
 - As permissões de sua função atribuída diretamente
+- As permissões de sua função personalizada, se houver
 - As permissões concedidas por cada grupo ao qual pertence
 
 ## Funções
 
 ### Funções do Sistema
 - **Admin**: Acesso total a todos os recursos
-- **Operador**: Pode gerenciar certificados, CAs, CSRs, mas não configurações do sistema
+- **Operador**: Pode gerenciar certificados, CAs, CSRs, ACME, SSH e configurações do sistema; modelos e grupos somente leitura, sem acesso a usuários nem a RBAC
 - **Auditor**: Acesso somente leitura a todos os dados operacionais para conformidade e auditoria
 - **Visualizador**: Acesso somente leitura a certificados, CAs e modelos
 
@@ -102,6 +103,8 @@ A coluna **Origem** indica a proveniência de cada utilizador:
 - **LDAP / OAuth2 / SAML**: provisionado automaticamente no primeiro início de sessão SSO; o nome do fornecedor de origem aparece no selo (ex.: \`LDAP · Corporate AD\`).
 
 Desde a v2.133, os papéis alterados manualmente no UCM para utilizadores SSO são **preservados** entre sessões, exceto se **«Sincronizar papel em cada início de sessão»** estiver ativo no fornecedor (ver **Definições → SSO**).
+
+**Vincular ao SSO** associa uma conta a um fornecedor; numa conta já vinculada, **Alterar fornecedor ou repor identidade SSO** move-a para outro fornecedor ou apaga a sua identidade SSO, após uma confirmação. O próximo início de sessão por esse fornecedor com o nome de utilizador ou o e-mail da conta vincula a nova identidade; uma palavra-passe que a conta tenha é mantida, a menos que a caixa que a remove esteja marcada, caso em que nenhum início de sessão com palavra-passe abre a conta, e uma conta sem palavra-passe não é solicitada a definir uma. **Desvincular SSO** volta a tornar a conta local.
 `
   }
 }

@@ -19,6 +19,14 @@ from lxml import etree
 from models import CA, CATemplatePin, Certificate, CertificateTemplate, db
 from models.system_config import SystemConfig
 from tests.conftest import get_json
+from tests.fixtures.templates import templates_created_here_removed
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _templates_stay_in_this_module(app):
+    with templates_created_here_removed(app):
+        yield
+
 
 CONTENT_JSON = 'application/json'
 XCEP_URL = '/ADPolicyProvider_CEP_UsernamePassword/service.svc'
@@ -193,7 +201,8 @@ def _policies(client):
 def _assert_ecdsa_p384(policy):
     attrs = policy.find(f'.//{{{XCEP_NS}}}privateKeyAttributes')
     assert attrs.find(f'{{{XCEP_NS}}}minimalKeyLength').text == '384'
-    assert attrs.find(f'{{{XCEP_NS}}}keySpec').get(XSI_NIL) == 'true'
+    assert attrs.find(f'{{{XCEP_NS}}}keySpec').text == '2'  # AT_SIGNATURE, the key is named too
+    assert attrs.find(f'{{{XCEP_NS}}}algorithmOIDReference').get(XSI_NIL) is None
     providers = [p.text for p in attrs.findall(f'.//{{{XCEP_NS}}}provider')]
     assert providers == ['Microsoft Software Key Storage Provider']
 

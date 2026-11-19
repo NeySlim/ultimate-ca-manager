@@ -5,10 +5,13 @@ Automatic Certificate Management Environment
 from datetime import datetime, timedelta
 from . import db
 import ipaddress
+import logging
 import re
 import secrets
 import json
 from utils.datetime_utils import utc_now, utc_isoformat
+
+logger = logging.getLogger(__name__)
 
 
 class AcmeAccount(db.Model):
@@ -277,6 +280,8 @@ class AcmeNonce(db.Model):
 class DnsProvider(db.Model):
     """DNS Provider for automated DNS-01 challenge validation"""
     __tablename__ = 'dns_providers'
+    # Unique since migration 124: a restore tells providers apart by name.
+    __table_args__ = (db.Index('uq_dns_providers_name', 'name', unique=True),)
     
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -343,6 +348,9 @@ class DnsProvider(db.Model):
 class AcmeClientOrder(db.Model):
     """ACME Client Order - Orders initiated BY UCM to external ACME (Let's Encrypt)"""
     __tablename__ = 'acme_client_orders'
+
+    # From this many failed scheduled renewals on, one attempt a day
+    RENEWAL_FAILURES_BEFORE_DAILY = 5
     
     id = db.Column(db.Integer, primary_key=True)
     
@@ -394,6 +402,16 @@ class AcmeClientOrder(db.Model):
     # Error tracking
     error_message = db.Column(db.Text)
     last_error_at = db.Column(db.DateTime)
+
+    # Key sent in a finalize request, kept until its certificate is imported (``pending_key``)
+    _pending_key = db.Column('pending_key', db.Text)
+    # Lease of the renewal or finalization running on this order (services/acme/order_lease.py)
+    renewal_claimed_at = db.Column(db.DateTime)
+    # JSON list of replaced certificates whose revocation the CA has not confirmed yet
+    upstream_revocations = db.Column(db.Text)
+    # On the order a renewal opens: the order it renews
+    renewal_of_order_id = db.Column(
+        db.Integer, db.ForeignKey('acme_client_orders.id', ondelete='SET NULL'), nullable=True, index=True)
     
     # Proxy order fields
     is_proxy_order = db.Column(db.Boolean, default=False)
@@ -421,6 +439,39 @@ class AcmeClientOrder(db.Model):
         'AcmeClientAccount', foreign_keys=[acme_client_account_id]
     )
     
+    @property
+    def pending_key(self):
+        """PEM private key awaiting its certificate; None when there is none.
+        Stored like ``Certificate.prv``, under the master key when it is enabled."""
+        if not self._pending_key:
+            return None
+        from utils.key_codec import load_pem_bytes
+        try:
+            return load_pem_bytes(self._pending_key, context=f'ACME order {self.id}').decode()
+        except ValueError as exc:  # under another master key, or damaged: no usable key
+            logger.warning("Pending key of ACME order %s not readable: %s", self.id, exc)
+            return None
+
+    @pending_key.setter
+    def pending_key(self, value):
+        if value:
+            from utils.key_codec import store_pem_bytes
+            self._pending_key = store_pem_bytes(value.encode())
+        else:
+            self._pending_key = None
+
+    @property
+    def upstream_revocations_list(self):
+        try:
+            entries = json.loads(self.upstream_revocations) if self.upstream_revocations else []
+        except ValueError:
+            return []
+        return entries if isinstance(entries, list) else []
+
+    @upstream_revocations_list.setter
+    def upstream_revocations_list(self, entries):
+        self.upstream_revocations = json.dumps(entries) if entries else None
+
     @property
     def domains_list(self):
         """Parse domains JSON to list"""
@@ -463,6 +514,11 @@ class AcmeClientOrder(db.Model):
         if authz_url not in urls:
             self.deactivated_authz_urls = json.dumps(urls + [authz_url])
     
+    @property
+    def renewal_retry_daily(self):
+        """True once failed scheduled renewals have slowed to one attempt a day."""
+        return (self.renewal_failures or 0) >= self.RENEWAL_FAILURES_BEFORE_DAILY
+
     @property
     def primary_domain(self):
         """Get the primary (first) domain"""
@@ -516,6 +572,12 @@ class AcmeClientOrder(db.Model):
             'dns_provider_name': self.dns_provider.name if self.dns_provider else None,
             'certificate_id': self.certificate_id,
             'renewal_enabled': self.renewal_enabled,
+            'opened_by_renewal': self.renewal_of_order_id is not None,
+            'renewal_failures': self.renewal_failures or 0,
+            'renewal_retry_daily': self.renewal_retry_daily,
+            'upstream_revocations_owed': len(self.upstream_revocations_list),
+            'last_renewal_at': utc_isoformat(self.last_renewal_at),
+            'last_error_at': utc_isoformat(self.last_error_at),
             'error_message': self.error_message,
             'is_proxy_order': bool(self.is_proxy_order),
             'acme_client_account_id': self.acme_client_account_id,

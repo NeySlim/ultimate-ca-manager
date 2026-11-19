@@ -47,7 +47,9 @@ class NetcupDnsProvider(BaseDnsProvider):
                 self.BASE_URL,
                 json=payload,
                 timeout=30,
-                headers={'Content-Type': 'application/json'}
+                headers={'Content-Type': 'application/json'},
+                # A 307/308 to another host would resend the API password in the body
+                allow_redirects=False,
             )
             
             if response.status_code >= 400:
@@ -185,7 +187,7 @@ class NetcupDnsProvider(BaseDnsProvider):
         finally:
             self._logout()
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         """Delete TXT record via Netcup API using individual internal IDs"""
         success, msg = self._login()
         if not success:
@@ -205,11 +207,12 @@ class NetcupDnsProvider(BaseDnsProvider):
             
             dns_records = info_result.get('responsedata', {}).get('dnsrecords', [])
             
-            # 2. Find the matching entry and set the deletion flag
+            # 2. Flag only this value: other values of the name belong to other challenges
             record_found = False
             for record in dns_records:
                 if (record.get('hostname') == hostname and 
-                    record.get('type') == 'TXT'):
+                    record.get('type') == 'TXT' and
+                    self.txt_matches(record.get('destination'), record_value)):
                     record['deleterecord'] = True
                     record_found = True
             

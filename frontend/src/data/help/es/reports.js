@@ -10,8 +10,8 @@ export default {
           { label: 'Inventario de certificados', text: 'Lista completa de todos los certificados con su estado' },
           { label: 'Certificados por expirar', text: 'Certificados que expiran dentro de un período de tiempo especificado' },
           { label: 'Jerarquía de CA', text: 'Estructura y estadísticas de las autoridades de certificación' },
-          { label: 'Resumen de auditoría', text: 'Resumen de eventos de seguridad y actividad de usuarios' },
-          { label: 'Estado de cumplimiento', text: 'Resumen de cumplimiento de políticas e infracciones' },
+          { label: 'Resumen de auditoría', text: 'Las acciones más frecuentes y los usuarios más activos durante el período' },
+          { label: 'Estado de cumplimiento', text: 'Tres comprobaciones: certificados activos, CA expiradas y certificados que expiran en 30 días; las políticas de certificados no se leen' },
           { label: 'Certificados revocados', text: 'Certificados revocados durante el período, con fecha y motivo' },
         ]
       },
@@ -53,13 +53,13 @@ Lista completa de todos los certificados gestionados por UCM. Incluye asunto, em
 Certificados que expiran dentro de un período de tiempo especificado (por defecto: 30 días). Crítico para evitar interrupciones, revise este informe regularmente o prográmelo para entrega diaria.
 
 ### Jerarquía de CA
-Estructura de las autoridades de certificación que muestra las relaciones padre-hijo, el recuento de certificados por CA y el estado de la CA. Útil para comprender la topología de su PKI.
+Estructura de las autoridades de certificación que muestra las relaciones padre-hijo, y el recuento de certificados por CA. Útil para comprender la topología de su PKI.
 
 ### Resumen de auditoría
-Resumen de eventos de seguridad y actividad de usuarios. Incluye intentos de inicio de sesión, operaciones con certificados, infracciones de políticas y cambios de configuración. Esencial para auditorías de seguridad.
+Las diez acciones más frecuentes y los diez usuarios más activos durante el período.
 
 ### Estado de cumplimiento
-Resumen de cumplimiento de políticas e infracciones. Muestra qué certificados cumplen con sus políticas y cuáles las infringen. Necesario para el cumplimiento normativo.
+Tres comprobaciones con un recuento y una gravedad: certificados activos, CA expiradas y certificados que expiran en 30 días. No lee las políticas de certificados.
 
 ### Certificados revocados
 Certificados revocados durante el período elegido (por defecto: 30 días), con fecha y motivo de revocación. Revíselo para seguir las revocaciones y sus causas.
@@ -124,7 +124,7 @@ Antes de activar los programas, use el botón ✈️ en cualquier fila de inform
 
 ## Permisos
 
-- **read:reports**: Generar y descargar informes
+- **read:audit**: Generar y ver informes; la descarga requiere además **export:audit**
 - **read:audit + export:audit**: Descargar informe ejecutivo PDF
 - **write:settings**: Configurar programas de informes
 

@@ -17,13 +17,18 @@ from models import db
 
 
 @pytest.fixture
-def commit_always_fails(monkeypatch):
+def commit_always_fails(request, monkeypatch):
     """Make the next db.session.commit() fail the way a busy database does.
 
     `safe_commit` catches it, rolls back and answers (False, response). The
     session stays usable afterwards, which is the point of the rollback.
     """
     import utils.db_transaction as transaction
+
+    # The shared client signs back in on a 401 (a restore revoked its session):
+    # let it do so now, a sign-in under failing commits is refused.
+    if 'auth_client' in request.fixturenames:
+        request.getfixturevalue('auth_client').get('/api/v2/certificates?per_page=1')
 
     real_commit = transaction.db.session.commit
     calls = {'n': 0}
@@ -129,3 +134,16 @@ class TestARouteDoesNotAnnounceWhatItDidNotWrite:
         assert response.status_code == 500, (
             f'the route answered {response.status_code} for a setting the '
             'database never took')
+
+
+class TestTheContractHoldsAfterTheSharedSessionWasRevoked(
+        TestARouteDoesNotAnnounceWhatItDidNotWrite):
+    """A restore earlier in the same worker leaves the shared client signed out."""
+
+    @pytest.fixture(autouse=True)
+    def signed_out(self, auth_client):
+        jar = auth_client._client
+        for cookie in list(getattr(jar, '_cookies', {}).values()):
+            jar.delete_cookie(cookie.key, domain=cookie.domain, path=cookie.path)
+        assert jar.get('/api/v2/certificates?per_page=1').status_code == 401
+

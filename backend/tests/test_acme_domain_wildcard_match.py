@@ -17,8 +17,34 @@ from api.v2.acme_domains import find_provider_for_domain
 from services.acme import domain_match
 
 
+@pytest.fixture(scope='module')
+def _mapping_ids(app, create_ca):
+    """Real CAs and a DNS provider for the rows to point at, keyed by the
+    numbers the tests use: PostgreSQL enforces both foreign keys."""
+    from models.acme_models import DnsProvider
+
+    from models import CA
+    from tests.seeded_rows import delete_cas
+
+    ids = {n: create_ca(cn=f'Wildcard match CA {n}')['id'] for n in (2, 3, 7, 8, 9)}
+    with app.app_context():
+        provider = DnsProvider.query.filter_by(name='wildcard-match-provider').first()
+        if provider is None:
+            provider = DnsProvider(name='wildcard-match-provider', provider_type='cloudflare')
+            db.session.add(provider)
+            db.session.commit()
+        ids['provider'] = provider.id
+    yield ids
+    with app.app_context():
+        db.session.rollback()
+        AcmeDomain.query.filter_by(dns_provider_id=ids['provider']).delete()
+        DnsProvider.query.filter_by(id=ids['provider']).delete()
+        delete_cas(CA.query.filter(CA.id.in_([ids[n] for n in (2, 3, 7, 8, 9)])))
+        db.session.commit()
+
+
 @pytest.fixture
-def clean_domains(app):
+def clean_domains(app, _mapping_ids):
     """These tests read both mapping tables as a whole."""
     def wipe():
         with app.app_context():
@@ -27,7 +53,7 @@ def clean_domains(app):
             db.session.commit()
 
     wipe()
-    yield
+    yield _mapping_ids
     wipe()
 
 
@@ -36,35 +62,35 @@ class TestTheWildcardSpellingIsFoundAgain:
     def test_an_entry_stored_as_a_wildcard_resolves(
             self, app, clean_domains, asked):
         with app.app_context():
-            db.session.add(AcmeLocalDomain(domain='*.custom', issuing_ca_id=7))
+            db.session.add(AcmeLocalDomain(domain='*.custom', issuing_ca_id=clean_domains[7]))
             db.session.commit()
 
-            assert find_local_domain_ca(asked) == 7
+            assert find_local_domain_ca(asked) == clean_domains[7]
 
     @pytest.mark.parametrize('asked', ['host.custom', '*.custom', 'custom'])
     def test_the_bare_spelling_still_resolves(self, app, clean_domains, asked):
         with app.app_context():
-            db.session.add(AcmeLocalDomain(domain='custom', issuing_ca_id=7))
+            db.session.add(AcmeLocalDomain(domain='custom', issuing_ca_id=clean_domains[7]))
             db.session.commit()
 
-            assert find_local_domain_ca(asked) == 7
+            assert find_local_domain_ca(asked) == clean_domains[7]
 
     def test_the_dns_table_answers_the_same_way(self, app, clean_domains):
         with app.app_context():
             db.session.add(AcmeDomain(domain='*.example.test',
-                                      dns_provider_id=1, issuing_ca_id=9))
+                                      dns_provider_id=clean_domains['provider'], issuing_ca_id=clean_domains[9]))
             db.session.commit()
 
             result = find_provider_for_domain('api.example.test')
 
         assert result is not None, 'the wildcard entry was not found'
-        assert result['issuing_ca_id'] == 9
+        assert result['issuing_ca_id'] == clean_domains[9]
         assert result['matched_domain'] == '*.example.test'
 
     def test_an_unrelated_domain_still_matches_nothing(
             self, app, clean_domains):
         with app.app_context():
-            db.session.add(AcmeLocalDomain(domain='*.custom', issuing_ca_id=7))
+            db.session.add(AcmeLocalDomain(domain='*.custom', issuing_ca_id=clean_domains[7]))
             db.session.commit()
 
             assert find_local_domain_ca('elsewhere.test') is None
@@ -74,7 +100,7 @@ class TestTheWildcardSpellingIsFoundAgain:
         """`*.custom` covers what is under `custom`, not a name that merely
         ends with those letters."""
         with app.app_context():
-            db.session.add(AcmeLocalDomain(domain='*.custom', issuing_ca_id=7))
+            db.session.add(AcmeLocalDomain(domain='*.custom', issuing_ca_id=clean_domains[7]))
             db.session.commit()
 
             assert find_local_domain_ca('mycustom') is None
@@ -83,24 +109,24 @@ class TestTheWildcardSpellingIsFoundAgain:
 class TestTheMostSpecificEntryDecides:
     def test_a_subdomain_entry_wins_over_its_parent(self, app, clean_domains):
         with app.app_context():
-            db.session.add(AcmeLocalDomain(domain='plain.test', issuing_ca_id=2))
+            db.session.add(AcmeLocalDomain(domain='plain.test', issuing_ca_id=clean_domains[2]))
             db.session.add(
-                AcmeLocalDomain(domain='deep.plain.test', issuing_ca_id=3))
+                AcmeLocalDomain(domain='deep.plain.test', issuing_ca_id=clean_domains[3]))
             db.session.commit()
 
-            assert find_local_domain_ca('host.deep.plain.test') == 3
-            assert find_local_domain_ca('host.plain.test') == 2
+            assert find_local_domain_ca('host.deep.plain.test') == clean_domains[3]
+            assert find_local_domain_ca('host.plain.test') == clean_domains[2]
 
     def test_the_bare_spelling_wins_over_the_wildcard_at_the_same_level(
             self, app, clean_domains):
         """Registering both is refused, but a database that already holds the
         two must still give one stable answer."""
         with app.app_context():
-            db.session.add(AcmeLocalDomain(domain='*.custom', issuing_ca_id=7))
-            db.session.add(AcmeLocalDomain(domain='custom', issuing_ca_id=8))
+            db.session.add(AcmeLocalDomain(domain='*.custom', issuing_ca_id=clean_domains[7]))
+            db.session.add(AcmeLocalDomain(domain='custom', issuing_ca_id=clean_domains[8]))
             db.session.commit()
 
-            assert find_local_domain_ca('host.custom') == 8
+            assert find_local_domain_ca('host.custom') == clean_domains[8]
 
 
 class TestTheTwoSpellingsAreOneEntry:
@@ -197,7 +223,7 @@ class TestAutoApproveHonoursTheWildcardEntry:
 
         with app.app_context():
             db.session.add(AcmeLocalDomain(
-                domain='*.custom', issuing_ca_id=7, auto_approve=True))
+                domain='*.custom', issuing_ca_id=clean_domains[7], auto_approve=True))
             db.session.commit()
 
             assert AcmeService._is_domain_auto_approved('host.custom') is True
@@ -211,9 +237,9 @@ class TestAutoApproveHonoursTheWildcardEntry:
 
         with app.app_context():
             db.session.add(AcmeLocalDomain(
-                domain='custom', issuing_ca_id=7, auto_approve=True))
+                domain='custom', issuing_ca_id=clean_domains[7], auto_approve=True))
             db.session.add(AcmeLocalDomain(
-                domain='strict.custom', issuing_ca_id=7, auto_approve=False))
+                domain='strict.custom', issuing_ca_id=clean_domains[7], auto_approve=False))
             db.session.commit()
 
             assert AcmeService._is_domain_auto_approved('strict.custom') is False

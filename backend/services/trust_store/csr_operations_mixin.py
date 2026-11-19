@@ -2,19 +2,23 @@
 CSR operations mixin for TrustStoreService
 """
 import ipaddress
+import math
+import re
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
 from cryptography import x509
 from utils.csr_extensions import csr_extensions
-from utils.san_parse import cn_looks_like_hostname
+from utils.request_names import (RequestRejected, cn_implied_names, cn_may_name_host,
+                                 cn_without_name_notice, refuse_malformed_request,
+                                 subject_email_names)
 from utils.eku_validation import add_ocsp_nocheck_if_responder
 from cryptography.x509.oid import NameOID, ExtensionOID
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
-from utils.datetime_utils import utc_now, cert_not_before
+from utils.datetime_utils import CERT_NOT_BEFORE_SKEW, utc_now, cert_not_before
 from utils.ca_signing_window import check_issuer_window, clamp_not_after
 from utils.x509_aki import authority_key_identifier_from_issuer
 from utils.leaf_key_usage import builder_key_usage, constrain_builder_key_usage, key_usage_notice
@@ -27,20 +31,31 @@ logger = logging.getLogger(__name__)
 
 _MS_CERTIFICATE_TEMPLATE_OID = x509.ObjectIdentifier('1.3.6.1.4.1.311.21.7')
 
+# Trunk certificate types whose default Key Usage is the issue form's profile
+_PROFILE_FOR_CERT_TYPE = {
+    'usr_cert': 'client', 'client_cert': 'client', 'user': 'client',
+    'code_signing': 'code_signing', 'email_cert': 'email',
+    'combined_cert': 'combined', 'combined_server_client': 'combined',
+}
+
 
 from utils.signing_hash import signing_hash_for, rsa_padding_for
 from utils.qc_statements import add_certificate_policies, add_qc_statements, template_policy_oids
+from utils.custom_extensions import add_custom_extensions
 
 
-def _certificate_template_extension(template_oid, major=100, minor=0):
-    """Build the Microsoft CertificateTemplateOID extension (MS-CRTD):
+# Revision of every template, as XCEP announces it (100 is AD CS's first v2 revision)
+MS_TEMPLATE_MAJOR_VERSION = 100
+MS_TEMPLATE_MINOR_VERSION = 0
+
+
+def _certificate_template_extension(template_oid, major=MS_TEMPLATE_MAJOR_VERSION,
+                                    minor=MS_TEMPLATE_MINOR_VERSION):
+    """Build the Microsoft CertificateTemplateOID extension (MS-WCCE 2.2.2.7.7.2):
     ``SEQUENCE { templateID OBJECT IDENTIFIER, major INTEGER, minor
     INTEGER }``. ``cryptography`` has no native type for it, so it's
-    hand-built with asn1crypto and wrapped as UnrecognizedExtension —
-    same approach already used for CMC parsing in
-    services/wstep/rst_parser.py. major/minor are arbitrary (Windows
-    doesn't validate them against anything server-side); 100/0 mirrors
-    a typical real ADCS template's default major version."""
+    hand-built with asn1crypto and wrapped as UnrecognizedExtension.
+    XCEP announces the same value, which CertEnroll copies into its request."""
     from asn1crypto import core as asn1_core
 
     class _TemplateVersion(asn1_core.Integer):
@@ -78,6 +93,17 @@ def _ad_security_extension(sid_string):
     ``_certificate_template_extension`` above. Byte-for-byte verified
     against a real ADCS-issued certificate's own extension for the same
     SID (see test_ad_security_extension.py)."""
+    spec = _security_ext_spec()
+    entry = spec._child_spec({
+        'type': _NTDS_OBJECT_SID_OID,
+        'value': sid_string.encode('ascii'),
+    })
+    der = spec([entry]).dump()
+    return x509.UnrecognizedExtension(_SID_SECURITY_EXT_OID, der)
+
+
+def _security_ext_spec():
+    """asn1crypto spec of the SID security extension: SEQUENCE OF [0] {OID, [0] EXPLICIT OCTET STRING}."""
     from asn1crypto import core as asn1_core
 
     class _SidValue(asn1_core.OctetString):
@@ -94,12 +120,23 @@ def _ad_security_extension(sid_string):
     class _SecurityExt(asn1_core.SequenceOf):
         _child_spec = _SecurityExtEntry
 
-    entry = _SecurityExtEntry({
-        'type': _NTDS_OBJECT_SID_OID,
-        'value': sid_string.encode('ascii'),
-    })
-    der = _SecurityExt([entry]).dump()
-    return x509.UnrecognizedExtension(_SID_SECURITY_EXT_OID, der)
+    return _SecurityExt
+
+
+_SID_STRING = re.compile(r'S-1-[0-9]{1,15}(-[0-9]{1,10}){1,15}')
+
+
+def ad_security_extension_sid(cert):
+    """The SID ``cert``'s SID security extension carries, or None when it is absent or not
+    exactly what ``_ad_security_extension`` writes for one SID: a renewal re-encodes it byte for byte."""
+    try:
+        raw = cert.extensions.get_extension_for_oid(_SID_SECURITY_EXT_OID).value.value
+        sid = _security_ext_spec().load(raw)[0]['value'].native.decode('ascii')
+    except Exception:
+        return None
+    if not _SID_STRING.fullmatch(sid) or _ad_security_extension(sid).value != raw:
+        return None
+    return sid
 
 
 # CA-only constraints a leaf never carries; the allow-list below is what
@@ -113,7 +150,7 @@ _LEAF_CA_ONLY_EXTENSION_OIDS = frozenset({
 # The only extensions a leaf CSR may contribute to the issued certificate.
 # Everything else on a leaf is the issuer's to set: CRL Distribution Points,
 # AIA and Certificate Policies come from the CA configuration below, the
-# Microsoft template and SID security extensions only from the WSTEP kwargs,
+# Microsoft template and SID security extensions only from the caller's kwargs,
 # SKI/AKI from the keys. Copying unknown extensions verbatim let an enrollee
 # that reached this trunk through ACME, EST or WSTEP choose the revocation
 # endpoints of its own certificate, or carry a szOID_NTDS_CA_SECURITY_EXT of
@@ -370,7 +407,7 @@ def _filter_csr_ekus(eku_oids, cert_type, allow_sensitive_ekus, renewal_of=None)
         # MORE than a CSR requesting nothing. Fall back to the type's profile.
         kept = _default_ekus_for_cert_type(cert_type)
         if not kept:
-            raise ValueError(
+            raise RequestRejected(
                 "CSR requests only Extended Key Usages that are not permitted "
                 f"for certificate type {cert_type!r}"
             )
@@ -401,7 +438,7 @@ def _capped_basic_constraints(csr_constraints, ca_cert):
         return csr_constraints
 
     if parent_limit <= 0:
-        raise ValueError(
+        raise RequestRejected(
             "Issuing CA has pathLenConstraint 0 and may not issue a subordinate CA"
         )
 
@@ -445,32 +482,10 @@ def _key_usage_with_ca_signing(usage, enabled):
     )
 
 
-def _synthesize_san_from_subject(subject):
-    """SAN entries implied by a subject's CN/email attributes -- same
-    derivation ``sign_csr`` already applied when a CSR carries no SAN
-    extension of its own. Factored out so this can be computed once and
-    reused both for NameConstraints validation and for actually building the
-    certificate's SAN extension, so the two can't drift apart (see
-    ``sign_csr``'s ``override_subject`` handling)."""
-    san_names = []
-    for attr in subject:
-        if attr.oid == NameOID.COMMON_NAME:
-            cn_val = attr.value
-            try:
-                ip = ipaddress.ip_address(cn_val)
-                san_names.append(x509.IPAddress(ip))
-            except ValueError:
-                if '@' in cn_val:
-                    san_names.append(x509.RFC822Name(cn_val))
-                else:
-                    san_names.append(x509.DNSName(cn_val))
-            break
-    for attr in subject:
-        if attr.oid == NameOID.EMAIL_ADDRESS:
-            email_val = attr.value
-            if not any(isinstance(n, x509.RFC822Name) and n.value == email_val for n in san_names):
-                san_names.append(x509.RFC822Name(email_val))
-    return san_names
+def _synthesize_san_from_subject(subject, cert_type='server_cert'):
+    """SAN entries a request without its own SAN gets from its subject, for
+    every CSR path (utils.request_names.cn_implied_names)."""
+    return cn_implied_names(subject, cert_type)
 
 
 def _verified_related_certificate(csr, cert_type):
@@ -603,7 +618,7 @@ class CSROperationsMixin:
         ca_cert: x509.Certificate,
         ca_private_key,
         validity_days: int = 397,
-        digest: str = 'sha256',
+        digest: Optional[str] = None,
         cert_type: str = 'server_cert',
         cdp_url: str = None,
         cdp_urls: Optional[List[str]] = None,
@@ -628,9 +643,13 @@ class CSROperationsMixin:
         san_template=None,
         qualification_template=None,
         notices: Optional[list] = None,
+        custom_extensions: Optional[list] = None,
+        not_before: Optional[datetime] = None,
+        not_after: Optional[datetime] = None,
     ) -> bytes:
         """Sign a CSR with a CA. ``renewal_of``: existing certificate this
-        signing renews — its names are graced by NameConstraints validation.
+        signing renews — its names are graced by NameConstraints validation,
+        and stand for the SAN of a CSR that carries none.
         ``allow_sensitive_ekus``: keep OCSPSigning/timeStamping from the CSR —
         reserved for the admin Sign-CSR path (an operator explicitly signing a
         delegated responder/TSA CSR); protocol enrollees never get them.
@@ -652,8 +671,8 @@ class CSROperationsMixin:
         CSR's own (empty) one — applying it later would let a CA's
         NameConstraints be silently bypassed by whatever subject was
         derived server-side.
-        ``override_san``: replaces the auto-synthesized SAN outright when
-        given, instead of deriving it from ``override_subject``'s CN via
+        ``override_san``: replaces the CSR's SAN or the auto-synthesized one
+        outright when given, instead of deriving it from ``override_subject``'s CN via
         ``_synthesize_san_from_subject``. Needed for AD-derived user
         subjects: a user's directory-path CN (e.g. "Roy Hagland") isn't a
         DNS name or email address, so synthesis would build a nonsensical
@@ -662,10 +681,10 @@ class CSROperationsMixin:
         passes here directly.
         ``requester_sid``: the authenticated requester's AD SID (
         ``"S-1-5-21-..."`` string form), embedded as the SID security
-        extension (KB5014754 strong certificate mapping) — only WSTEP's
-        Kerberos binding passes this, independent of ``override_subject``
-        (applies to naked and normal CSRs alike, since it identifies who
-        authenticated, not what subject was requested).
+        extension (KB5014754 strong certificate mapping). WSTEP passes it at
+        Kerberos issuance, WSTEP and EST at renewal (the renewed certificate's
+        own SID, never the CSR's), independent of ``override_subject``: it
+        identifies who authenticated, not what subject was requested.
         ``extra_san``: names the operator adds to the request's own (admin
         Sign CSR only); with a request that names none, they join those its
         CN implies, a CN that is not a hostname giving no DNS name.
@@ -676,7 +695,9 @@ class CSROperationsMixin:
         names implied by the subject alone are dropped instead of refused.
         ``qualification_template``: template whose qcStatements and policy OIDs
         land on a leaf (EST, WSTEP and mTLS pass none).
-        ``notices``: list that receives what was granted otherwise than asked."""
+        ``notices``: list that receives what was granted otherwise than asked.
+        ``custom_extensions``: validated ``{oid, critical, value}`` entries
+        (utils.custom_extensions) added verbatim."""
         from utils.eku_validation import normalize_extra_ekus, to_object_identifiers, merge_eku_lists
 
         # Load CSR
@@ -690,9 +711,9 @@ class CSROperationsMixin:
         from utils.key_type import validate_enrollment_csr
         key_err = validate_enrollment_csr(csr)
         if key_err:
-            raise ValueError(f"CSR public key rejected: {key_err}")
+            raise RequestRejected(f"CSR public key rejected: {key_err}")
         if require_pop and not csr.is_signature_valid:
-            raise ValueError("CSR has invalid signature")
+            raise RequestRejected("CSR has invalid signature")
         related_a = _verified_related_certificate(csr, cert_type)
 
         # Effective subject: an override (if any) wins outright; otherwise
@@ -703,11 +724,11 @@ class CSROperationsMixin:
             try:
                 san_ext = csr_exts.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
                 for name in san_ext.value:
-                    if isinstance(name, x509.DNSName):
-                        subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, name.value)])
-                        break
-                    elif isinstance(name, x509.IPAddress):
-                        subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, str(name.value))])
+                    value = (name.value if isinstance(name, x509.DNSName)
+                             else str(name.value) if isinstance(name, x509.IPAddress) else None)
+                    # ub-common-name is 64: a longer name stays in the SAN only
+                    if value and len(value) <= 64:
+                        subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, value)])
                         break
             except x509.ExtensionNotFound:
                 pass
@@ -725,33 +746,48 @@ class CSROperationsMixin:
             csr_sans = None
             has_csr_san = False
 
+        if override_san is None and not has_csr_san and renewal_of is not None:
+            # A renewal keeps its identity: the renewed certificate's names, or none,
+            # never a name built from the CN (RFC 7030 §4.2.2)
+            try:
+                override_san = list(renewal_of.extensions.get_extension_for_class(
+                    x509.SubjectAlternativeName).value)
+            except x509.ExtensionNotFound:
+                override_san = []
+        san_rebuilt = bool(extra_san)
         if override_san is not None:
             effective_sans = override_san
         elif has_csr_san:
             effective_sans = csr_sans
-        elif extra_san:
-            # The names the CN implies stay, but not a "DNS name" made of a
-            # person's name, which is what an S/MIME request's CN holds (#389)
-            effective_sans = [
-                n for n in _synthesize_san_from_subject(subject)
-                if not isinstance(n, x509.DNSName) or cn_looks_like_hostname(n.value)]
+            if cert_type != 'intermediate_ca':
+                # RFC 5280 §4.1.2.6: the subject's emailAddress is also an rfc822Name
+                missing = [n for n in subject_email_names(subject) if n not in csr_sans]
+                if san_template is not None and missing:
+                    from services.template_service import allowed_san_types, san_type_of
+                    allowed = allowed_san_types(san_template)
+                    missing = [n for n in missing if allowed is None or san_type_of(n) in allowed]
+                if missing:
+                    effective_sans = list(csr_sans) + missing
+                    san_rebuilt = True
         else:
-            effective_sans = _synthesize_san_from_subject(subject)
+            effective_sans = _synthesize_san_from_subject(subject, cert_type)
+            cn_notice = cn_without_name_notice(subject, cert_type)
+            if cn_notice and notices is not None:
+                notices.append(cn_notice)
         if extra_san:
             effective_sans = list(effective_sans) + [
                 n for n in extra_san if n not in effective_sans]
         if san_template is not None:
             from services.template_service import allowed_san_types, check_san_types, san_type_of
-            # The names that land: the CSR's own SAN when it has one, else the override
-            requested = list(csr_sans or []) if has_csr_san or override_san is None else override_san
+            # The names that land: the override when given, else the CSR's own SAN
+            requested = override_san if override_san is not None else list(csr_sans or [])
             check_san_types(san_template, list(requested) + list(extra_san or []))
             allowed = allowed_san_types(san_template)
             if allowed is not None and override_san is None and not has_csr_san:
                 effective_sans = [n for n in effective_sans if san_type_of(n) in allowed]
-
-        ConstraintsMixin._validate_name_constraints(
-            ca_cert, subject, effective_sans if effective_sans else None, renewal_of=renewal_of
-        )
+        # Subject bounds and the syntax of the names that land; an override subject is the caller's
+        refuse_malformed_request(subject if override_subject is None else None,
+                                 effective_sans, renewal_of)
 
         # The CA can only vouch inside its own validity window, and the leaf
         # never outlives it (RFC 5280 §6.1) -- checked here for every caller
@@ -776,15 +812,26 @@ class CSROperationsMixin:
             explicit=bool((policy_scope or {}).get('digest_explicit', policy_scope is None)),
             key_type=key_label_for_public_key(csr.public_key()), context=policy_context,
             pq_hybrid=related_a is not None)
+        if not_after is not None:
+            # A requested notAfter is issued as asked: the days are what the policies judge,
+            # with the skew UCM's own certificates carry beyond their days
+            validity_days = max(1, math.ceil(
+                (not_after - (not_before or utc_now()) - CERT_NOT_BEFORE_SKEW).total_seconds() / 86400))
         if policy_scope is not None:
             # Name count, validity ceiling and key horizons, for the protocols as for the form
             dns_count = sum(isinstance(n, x509.DNSName) for n in (effective_sans or []))
             limit_violations, capped, capped_by = PolicyEvaluationService.enforce_rules(
                 policies, key_type=key_label_for_public_key(csr.public_key()),
                 dns_name_count=dns_count, validity_days=validity_days,
+                # Key horizons judge the notAfter actually issued, requested dates included
+                not_after=not_after.date() if not_after is not None else None,
+                not_before=not_before,
                 context=policy_context, pq_hybrid=related_a is not None)
             violations = list(dict.fromkeys(list(violations) + limit_violations))
-            if capped_by:
+            if capped_by and not_after is not None:
+                violations.append(f"The requested validity exceeds the {capped} days "
+                                  f"allowed by policy '{capped_by}'")
+            elif capped_by:
                 logger.info(f"Validity capped to {capped} days by policy '{capped_by}'")
                 validity_days = capped
         if violations:
@@ -796,10 +843,12 @@ class CSROperationsMixin:
         builder = builder.issuer_name(ca_cert.subject)
         builder = builder.public_key(csr.public_key())
         builder = builder.serial_number(x509.random_serial_number())
-        builder = builder.not_valid_before(cert_not_before())
-        builder = builder.not_valid_after(
-            clamp_not_after(utc_now() + timedelta(days=validity_days), ca_cert)
-        )
+        start = not_before or cert_not_before()
+        if not_after is not None and clamp_not_after(not_after, ca_cert) != not_after:
+            raise ValueError('The requested notAfter is later than the issuing CA certificate expires')
+        builder = builder.not_valid_before(start)
+        builder = builder.not_valid_after(not_after if not_after is not None else clamp_not_after(
+            (not_before or utc_now()) + timedelta(days=validity_days), ca_cert))
 
         # Copy only extensions appropriate for the requested certificate role.
         # CA-only constraints from an enrollee CSR must never reach a leaf.
@@ -816,7 +865,7 @@ class CSROperationsMixin:
             and csr_basic_constraints is not None
             and not csr_basic_constraints.value.ca
         ):
-            raise ValueError(
+            raise RequestRejected(
                 "Intermediate CA CSR BasicConstraints must set ca=True"
             )
 
@@ -832,6 +881,8 @@ class CSROperationsMixin:
             ExtensionOID.SUBJECT_KEY_IDENTIFIER,
             ExtensionOID.AUTHORITY_KEY_IDENTIFIER,
         }
+        # The operator's custom extensions win over the CSR's (sub-CA copy)
+        skip_from_csr |= {x509.ObjectIdentifier(e['oid']) for e in custom_extensions or ()}
         for extension in csr_exts:
             if extension.oid in skip_from_csr:
                 continue
@@ -899,10 +950,12 @@ class CSROperationsMixin:
                 builder = builder.add_extension(x509.TLSFeature(features), critical=False)
                 continue
             if extension.oid == ExtensionOID.SUBJECT_ALTERNATIVE_NAME:
+                if override_san is not None:
+                    continue  # replaced by the override, added below
                 # RFC 5280 §4.2.1.6: SAN MUST be critical when the subject
                 # is empty -- the CSR's flag cannot override that.
                 san_value = (x509.SubjectAlternativeName(effective_sans)
-                             if extra_san else extension.value)
+                             if san_rebuilt else extension.value)
                 builder = builder.add_extension(
                     san_value, extension.critical or len(subject) == 0
                 )
@@ -913,7 +966,7 @@ class CSROperationsMixin:
         # effective_sans, already computed above for NameConstraints, so
         # what got constraint-checked and what actually lands on the
         # certificate can't drift apart.
-        if not has_csr_san and effective_sans:
+        if (not has_csr_san or override_san is not None) and effective_sans:
             builder = builder.add_extension(
                 x509.SubjectAlternativeName(effective_sans),
                 critical=len(subject) == 0,
@@ -980,6 +1033,14 @@ class CSROperationsMixin:
                     ),
                     critical=True,
                 )
+            elif cert_type in _PROFILE_FOR_CERT_TYPE:
+                # A client, code-signing or S/MIME leaf gets its type's usage too,
+                # as from the issue form; the key's algorithm trims it below
+                from utils.cert_profiles import profile_for
+                builder = builder.add_extension(
+                    x509.KeyUsage(**profile_for(_PROFILE_FOR_CERT_TYPE[cert_type])['ku']),
+                    critical=True,
+                )
 
         # Add Extended Key Usage if not in CSR
         extra_oid_strs, extra_err = normalize_extra_ekus(extra_ekus)
@@ -1000,14 +1061,16 @@ class CSROperationsMixin:
             # on top, as on the issue form. Renewal at par does not apply:
             # the template is the policy, prior EKUs outside it are not
             # resurrected. A template whose every EKU was refused imposes
-            # the cert_type default profile, never the CSR's request.
-            if not tpl_ekus:
+            # the cert_type default profile, never the CSR's request, unless
+            # extra_ekus already give the leaf its purposes.
+            if not tpl_ekus and not extra_oids:
                 logger.warning(
                     "sign_csr: every template EKU was refused for certificate "
                     "type %r; issuing its default profile instead", cert_type,
                 )
             merged = merge_eku_lists(
-                tpl_ekus or _default_ekus_for_cert_type(cert_type), extra_oids
+                tpl_ekus or ([] if extra_oids else _default_ekus_for_cert_type(cert_type)),
+                extra_oids,
             )
             if merged:
                 builder = builder.add_extension(
@@ -1066,6 +1129,14 @@ class CSROperationsMixin:
             )
             new_builder = add_ocsp_nocheck_if_responder(new_builder, merged)
             builder = new_builder
+
+        # Checked once the EKUs are settled: they decide whether the CN may name a host
+        issued_ekus = next((e.value for e in builder._extensions
+                            if e.oid == ExtensionOID.EXTENDED_KEY_USAGE), None)
+        ConstraintsMixin._validate_name_constraints(
+            ca_cert, subject, effective_sans if effective_sans else None, renewal_of=renewal_of,
+            cn_may_name_host=cn_may_name_host(cert_type, list(issued_ekus or ())),
+        )
 
         # RFC 5480 §3, RFC 9881 §5: a non-RSA key cannot honour keyEncipherment /
         # dataEncipherment, on a leaf or a sub-CA (#327). Applied once the EKU is
@@ -1142,6 +1213,7 @@ class CSROperationsMixin:
                 builder = add_certificate_policies(
                     builder, cps_uri, cps_oid, template_policy_oids(qc_tpl_ext))
         builder = add_qc_statements(builder, qc_tpl_ext)
+        builder = add_custom_extensions(builder, custom_extensions)
 
         # SubjectKeyIdentifier — always from the CSR subject public key
         builder = builder.add_extension(
@@ -1186,8 +1258,8 @@ class CSROperationsMixin:
 
         # Microsoft SID security extension (szOID_NTDS_CA_SECURITY_EXT,
         # 1.3.6.1.4.1.311.25.2) for KB5014754 strong certificate mapping —
-        # only WSTEP's Kerberos binding passes this, with the requester's
-        # own AD SID once resolved via the AD Connector. Non-critical,
+        # WSTEP passes it at Kerberos issuance (SID resolved by the AD Connector),
+        # WSTEP and EST at renewal (the renewed certificate's SID). Non-critical,
         # matching real ADCS's own issuance (confirmed against a captured
         # real cert — see _ad_security_extension's docstring).
         if requester_sid:

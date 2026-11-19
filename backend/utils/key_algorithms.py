@@ -112,6 +112,12 @@ class KeyAlgorithm:
     aliases: tuple[str, ...] = ()       # extra spellings accepted by normalize_label
     security_level: int | None = None   # NIST post-quantum security category, None for classical keys
     oid: str | None = None              # OID of a post-quantum key and of its signatures (one names both)
+    ca_only_key_type: str | None = None  # KEY_TYPES id of a key generated for CAs only (EdDSA: no leaf one)
+
+    @property
+    def ca_key_type(self) -> str | None:
+        """KEY_TYPES id a CA key of this algorithm is generated under; None when UCM generates none."""
+        return self.trust_store_id or self.ca_only_key_type
 
     def generate(self):
         return self.generator()
@@ -143,7 +149,8 @@ def _ec(bits: int, curve: type, names: tuple[str, ...], trust_store_id: str) -> 
         label=f'EC-P{bits}', family='EC', param=f'P{bits}',
         private_class=ec.EllipticCurvePrivateKey, public_class=ec.EllipticCurvePublicKey,
         generator=lambda: generate_ec(curve()),
-        needs_digest=True, default_digest='sha256',
+        # A hash of the curve's strength (CA/Browser Forum BR 7.1.3.2.2)
+        needs_digest=True, default_digest={256: 'sha256', 384: 'sha384', 521: 'sha512'}[bits],
         display=f'EC P-{bits}', legacy_key_algo=f'EC {curve.name}', trust_store_id=trust_store_id,
         fips_approved=True, key_size=bits, curve_names=names,
         aliases=(f'P-{bits}', f'NIST P-{bits}', f'ECDSA-P{bits}'),
@@ -171,7 +178,7 @@ def _edwards(name: str, private_class: type, public_class: type, bits: int) -> K
         generator=_non_fips_generator(name, private_class),
         needs_digest=False, default_digest=None,
         display=name, legacy_key_algo=name, trust_store_id=None,
-        fips_approved=False, key_size=bits,
+        fips_approved=False, key_size=bits, ca_only_key_type=name.lower(),
     )
 
 
@@ -234,7 +241,7 @@ class _Registry:
                 raise ValueError(f'duplicate key algorithm label {alg.label!r}')
             self.by_label[alg.label] = alg
             spellings = (alg.label, alg.display, alg.legacy_key_algo, alg.trust_store_id,
-                         *alg.curve_names, *alg.aliases)
+                         alg.ca_only_key_type, *alg.curve_names, *alg.aliases)
             for spelling in spellings:
                 if not spelling:
                     continue
@@ -312,8 +319,8 @@ def label_for_public_key(public_key) -> str | None:
 
 
 def default_digest_for_key(key) -> str | None:
-    """Digest name UCM signs with when none is requested, for a public or private key;
-    None when its scheme takes no digest (Ed25519, Ed448, ML-DSA), sha256 if unregistered."""
+    """Digest name UCM signs with when none is requested, for a public or private key: the
+    curve's for EC, None when its scheme takes none (Ed25519, Ed448, ML-DSA), sha256 if unregistered."""
     for alg in _REGISTRY.algorithms:
         if alg.matches_key(key):
             return alg.default_digest

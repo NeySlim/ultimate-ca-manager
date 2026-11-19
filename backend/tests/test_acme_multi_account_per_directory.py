@@ -6,6 +6,7 @@ resolution preference (default account wins when several share a URL).
 """
 import importlib
 import sqlite3
+from tests.seeded_rows import delete_client_accounts
 
 import pytest
 
@@ -18,7 +19,7 @@ DUP_DIR = 'https://acme-multi.example/directory'
 @pytest.fixture
 def fresh_account_table(app):
     with app.app_context():
-        AcmeClientAccount.query.delete()
+        delete_client_accounts(AcmeClientAccount.query)
         db.session.commit()
         yield
 

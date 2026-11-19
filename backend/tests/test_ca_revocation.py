@@ -15,6 +15,10 @@ from models import db, CA, RevokedSerial  # noqa: E402
 from services.ocsp_service import OCSPService  # noqa: E402
 from services.crl_service import CRLService  # noqa: E402
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 CAS = '/api/v2/cas'
 
 
@@ -417,7 +421,7 @@ class TestIssuerResolution:
 
             db.session.expire_all()
             new_ca = db.session.get(CA, imported['id'])
-            assert new_ca.caref is None  # an import carries no parent link
+            assert new_ca.caref == real['refid']  # linked to the CA whose key signed it
             assert new_ca.issuing_ca().id == real['id']
             assert new_ca.revoked_in_chain is True
 

@@ -28,6 +28,7 @@ import hashlib
 import io
 import json
 import struct
+from contextlib import contextmanager
 
 import pytest
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -35,6 +36,10 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from models import db
 from services.backup import container, manifest
 from services.backup.restore import RestorePlan, RestoreValidationError
+
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
 
 PASSWORD = 'Correct-Horse-Battery-9'
 
@@ -58,7 +63,7 @@ TARGET = {
 
 # What must never come back to the caller, whatever it is refusing.
 LEAKED_INTERNALS = ('Traceback', 'File "', 'sqlite3', 'sqlalchemy',
-                    'psycopg2', '/root/', 'site-packages')
+                    'psycopg', '/root/', 'site-packages')
 
 
 def _service():
@@ -197,6 +202,15 @@ def archive(app):
 
 
 @pytest.fixture(autouse=True)
+def installation_identified(app):
+    """The first archive gives the installation its identifier: written before any census."""
+    from services.backup.installation import installation_id
+    with app.app_context():
+        installation_id(create=True)
+        db.session.commit()
+
+
+@pytest.fixture(autouse=True)
 def no_forged_rows_left(app):
     """Whatever a case wrote, the next file must not find it."""
     yield
@@ -332,6 +346,20 @@ SHAPES = {
 }
 
 
+@contextmanager
+def _target_for(app, tmp_path, mode):
+    """A replacing restore prunes: it runs on an installation no other test wrote to."""
+    if mode != 'replace':
+        with app.app_context():
+            yield
+        return
+    from tests.test_backup_cross_installation import Keys, _installation
+    with _installation(app, f"sqlite:///{tmp_path / 'hostile.db'}", Keys(tmp_path, 'hostile')), \
+            app.app_context():
+        yield
+        db.session.rollback()
+
+
 class TestASectionOfTheWrongTypeIsRefusedByName:
     """A payload is JSON a caller chose: every section is checked, not trusted.
 
@@ -342,15 +370,16 @@ class TestASectionOfTheWrongTypeIsRefusedByName:
     first write, and the refusal names the section it is about.
     """
 
+    @pytest.mark.parametrize('mode', ['merge', 'replace'])
     @pytest.mark.parametrize('label', sorted(SHAPES))
-    def test_the_service_names_the_section(self, app, label):
+    def test_the_service_names_the_section(self, app, tmp_path, label, mode):
         mutate, named = SHAPES[label]
-        with app.app_context():
+        with _target_for(app, tmp_path, mode):
             blob = _forged([SECTION], mutate=mutate)
             before = _census()
 
             with pytest.raises(RestoreValidationError) as refusal:
-                _service().restore_backup(blob, PASSWORD)
+                _service().restore_backup(blob, PASSWORD, mode=mode)
             db.session.rollback()
 
             assert named in str(refusal.value), (

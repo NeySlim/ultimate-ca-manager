@@ -307,3 +307,7 @@ export function formatRelativeTime(date, t) {
 
   return formatDate(date)
 }
+
+// On hold: still revocable for good, never held again (RFC 5280 §5.2.4)
+export const isOnHold = (cert) => !!cert?.revoked
+  && (cert.revoke_reason === 'certificateHold' || cert.revoke_reason === 'certificate_hold')

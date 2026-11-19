@@ -30,7 +30,7 @@ def custom_ca_account(app):
     with app.app_context():
         acct = AcmeClientAccount(
             directory_url=f'https://acme-{suffix}.example/directory',
-            label='Test CA',
+            label=f'Test CA {suffix}',
             email='ops@example.com',
         )
         db.session.add(acct)

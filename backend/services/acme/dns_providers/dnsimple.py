@@ -57,7 +57,7 @@ class DnsimpleDnsProvider(BaseDnsProvider):
             return False, f"Failed: {result}"
         return True, "Record created"
     
-    def delete_txt_record(self, domain, record_name):
+    def delete_txt_record(self, domain, record_name, record_value):
         zone = self._find_zone(domain)
         if not zone:
             return False, f"Zone not found for {domain}"
@@ -67,6 +67,8 @@ class DnsimpleDnsProvider(BaseDnsProvider):
         if not success:
             return False, f"Failed: {result}"
         for rec in result.get('data', []):
+            if not self.txt_matches(rec.get('content'), record_value):
+                continue
             self._request('DELETE', f'/zones/{zone}/records/{rec["id"]}')
         return True, "Record deleted"
     

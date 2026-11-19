@@ -171,3 +171,17 @@ class TestAFailedDeleteIsNotSilent:
             'failed')
         assert entry.success is False, (
             'the ledger reports a success for a deletion that did not happen')
+
+
+def test_the_scts_kept_under_its_number_go_with_it(app, create_ca, create_cert):
+    """SQLite gives the number to the next certificate, which would inherit them."""
+    from models import SystemConfig
+    from services.cert_service import CertificateService
+    ca = create_ca(cn='SCT setting CA')
+    cert = create_cert(cn='sct-setting.example.test', ca_id=ca['id'])
+    key = f"cert_scts_{cert['id']}"
+    with app.app_context():
+        db.session.add(SystemConfig(key=key, value='[]'))
+        db.session.commit()
+        assert CertificateService.delete_certificate(cert['id'])
+        assert SystemConfig.query.filter_by(key=key).first() is None

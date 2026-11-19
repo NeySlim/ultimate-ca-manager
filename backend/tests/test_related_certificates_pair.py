@@ -196,6 +196,42 @@ def test_revoking_either_member_revokes_the_pair(app, auth_client, create_ca, me
         assert db.session.get(Certificate, other['id']).revoke_reason == 'keyCompromise'
 
 
+@pytest.mark.parametrize('route', ['single', 'bulk'])
+def test_a_hold_made_final_is_made_final_on_the_pair(app, auth_client, create_ca, route):
+    a, b = _pair(auth_client, create_ca, f'pair-hold-final-{route}.example.com')
+    r = auth_client.post(f"/api/v2/certificates/{a['id']}/revoke", json={'reason': 'certificateHold'})
+    assert r.status_code == 200, r.data
+    if route == 'single':
+        r = auth_client.post(f"/api/v2/certificates/{a['id']}/revoke", json={'reason': 'keyCompromise'})
+        assert r.status_code == 200, r.data
+        assert json.loads(r.data)['data']['related_revoked'] == b['id']
+    else:
+        r = auth_client.post('/api/v2/certificates/bulk/revoke',
+                             json={'ids': [a['id']], 'reason': 'keyCompromise'})
+        assert r.status_code == 200, r.data
+        assert 'related_not_revoked' not in json.loads(r.data)['data'], r.data
+    with app.app_context():
+        assert [db.session.get(Certificate, i).revoke_reason for i in (a['id'], b['id'])] \
+            == ['keyCompromise', 'keyCompromise']
+
+
+@pytest.mark.parametrize('route', ['single', 'bulk'])
+def test_a_partner_left_on_hold_is_said(app, auth_client, create_ca, monkeypatch, route):
+    a, b = _pair(auth_client, create_ca, f'pair-hold-left-{route}.example.com')
+    r = auth_client.post(f"/api/v2/certificates/{a['id']}/revoke", json={'reason': 'certificateHold'})
+    assert r.status_code == 200, r.data
+    _partner_revocation_fails(monkeypatch, b['id'])
+    if route == 'single':
+        r = auth_client.post(f"/api/v2/certificates/{a['id']}/revoke", json={'reason': 'keyCompromise'})
+        assert json.loads(r.data)['data']['related_not_revoked'] == b['id'], r.data
+    else:
+        r = auth_client.post('/api/v2/certificates/bulk/revoke',
+                             json={'ids': [a['id']], 'reason': 'keyCompromise'})
+        assert json.loads(r.data)['data']['related_not_revoked'] == [b['id']], r.data
+    with app.app_context():
+        assert db.session.get(Certificate, b['id']).revoke_reason == 'certificateHold'
+
+
 def test_revoke_related_false_keeps_the_other_member(app, auth_client, create_ca):
     a, b = _pair(auth_client, create_ca, 'pair-keep.example.com')
     r = auth_client.post(f"/api/v2/certificates/{b['id']}/revoke",
@@ -524,14 +560,16 @@ def test_acme_supersede_leaves_the_new_partner_valid(app, auth_client, create_ca
 
 def test_acme_client_renewal_revokes_the_replaced_member_only(app, auth_client, create_ca):
     from unittest import mock
-    from services.acme_renewal_service import _revoke_replaced_certificate
+    from services.acme_renewal_service import _replaced_snapshot, _revoke_replaced_certificate
     a, b = _pair(auth_client, create_ca, 'pair-client-renew.example.com')
     previous = _set_config(app, 'acme.revoke_on_renewal', 'true')
     try:
         client = mock.Mock()
         client.revoke_certificate.return_value = mock.Mock(status_code=200)
         with app.app_context():
-            _revoke_replaced_certificate(client, db.session.get(Certificate, a['id']))
+            # A replaced row of its own (renewed into a new row): revoked alone
+            _revoke_replaced_certificate(client, _replaced_snapshot(db.session.get(Certificate, a['id'])),
+                                         in_place=False)
         assert _revoked(app, a['id'], b['id']) == [True, False]
     finally:
         _restore_config(app, 'acme.revoke_on_renewal', previous)
@@ -613,6 +651,44 @@ def test_the_partner_policy_holds_a_user_certificate_revocation(
         assert r.status_code == 200, r.data
         assert json.loads(r.data)['data']['approval_required'], r.data
         assert _revoked(app, a['id'], b['id']) == [False, False]
+    finally:
+        _drop_policy(app, pid)
+        with app.app_context():
+            AuthCertificate.query.filter_by(cert_serial=str(_x509(a).serial_number)).delete()
+            db.session.commit()
+
+
+@pytest.mark.parametrize('route', ['single', 'bulk', 'user'])
+def test_the_partner_policy_holds_a_hold_made_final(app, auth_client, create_ca, create_user, route):
+    from models import AuthCertificate
+    a, b = _pair(auth_client, create_ca, f'pair-held-policy-{route}.example.com')
+    r = auth_client.post(f"/api/v2/certificates/{a['id']}/revoke", json={'reason': 'certificateHold'})
+    assert r.status_code == 200, r.data
+    pid = _approval_policy(app, _move_to_new_ca(app, create_ca, b['id'], f'Pair CA2 held {route}'),
+                           ['revocation'])
+    try:
+        operator = _login(app, create_user)
+        if route == 'user':
+            user = create_user()
+            with app.app_context():
+                cert = _x509(a)
+                enrolment = AuthCertificate(user_id=user['id'], cert_pem=a['pem'].encode(),
+                                            cert_serial=str(cert.serial_number),
+                                            cert_subject=cert.subject.rfc4514_string())
+                db.session.add(enrolment)
+                db.session.commit()
+                url, body = f'/api/v2/user-certificates/{enrolment.id}/revoke', {}
+        elif route == 'bulk':
+            url, body = '/api/v2/certificates/bulk/revoke', {'ids': [a['id']]}
+        else:
+            url, body = f"/api/v2/certificates/{a['id']}/revoke", {}
+        r = operator.post(url, json=dict(body, reason='keyCompromise'))
+        assert r.status_code == 200, r.data
+        data = json.loads(r.data)['data']
+        assert (data['pending_approval'] if route == 'bulk' else data['approval_required']), r.data
+        with app.app_context():
+            assert [db.session.get(Certificate, i).revoke_reason for i in (a['id'], b['id'])] \
+                == ['certificateHold', 'certificateHold']
     finally:
         _drop_policy(app, pid)
         with app.app_context():

@@ -19,6 +19,7 @@ import json
 import pytest
 
 from models import db, SystemConfig, AcmeAccount, AcmeClientAccount, AcmeClientOrder
+from tests.seeded_rows import delete_client_accounts, ensure_acme_account
 from services.acme.acme_proxy_account import PROXY_ACCOUNT_ID_KEY
 from services.acme.acme_proxy_service import (
     AcmeProxyService,
@@ -53,6 +54,7 @@ def _seed_order(**overrides):
         client_jwk_thumbprint='thumb-owner-1',
     )
     kwargs.update(overrides)
+    ensure_acme_account(kwargs['account_id'])
     order = AcmeClientOrder(**kwargs)
     db.session.add(order)
     db.session.commit()
@@ -309,23 +311,22 @@ class TestSharedUpstreamAuthz:
 
 
 class TestChallengeOwnership:
-    """The owning order is resolved through the authz URL upstream returns in
-    Link rel="up" — challenge and authz URLs live in disjoint namespaces, so
-    the URL itself can never be matched against the stored authz URLs."""
+    """The owning order is resolved by reading the authorizations recorded on
+    the requester's own orders: challenge and authz URLs live in disjoint
+    namespaces, and the challenge itself is never read upstream."""
 
     def _upstream_challenge(self, status='valid'):
-        return _FakeResp(
-            {'type': 'dns-01', 'url': CHALL_URL, 'status': status, 'token': 't'},
-            headers={'Link': f'<{AUTHZ_URL}>;rel="up"'},
-        )
+        return _FakeResp({
+            'status': status, 'identifier': {'type': 'dns', 'value': 'owned.example.com'},
+            'challenges': [{'type': 'dns-01', 'url': CHALL_URL, 'status': status,
+                            'token': 't'}]})
 
     def test_cross_account_denied(self, app, monkeypatch):
+        """Another account's orders are not read: the challenge is unknown to it."""
         with app.app_context():
             _seed_order()
-            svc = _make_svc(
-                app, monkeypatch, upstream_response=self._upstream_challenge(),
-            )
-            with pytest.raises(PermissionError):
+            svc = _make_svc(app, monkeypatch)
+            with pytest.raises(ProxyResourceNotFoundError):
                 svc.respond_challenge(
                     _b64(CHALL_URL),
                     requester_account_id='acct-intruder',
@@ -482,9 +483,9 @@ def proxy_upstream_stub(app, monkeypatch):
 
     with app.app_context():
         SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
-        AcmeClientAccount.query.filter_by(
+        delete_client_accounts(AcmeClientAccount.query.filter_by(
             directory_url=_STUB_DIRECTORY_URL
-        ).delete()
+        ))
         db.session.commit()
         acct = AcmeClientAccount(
             directory_url=_STUB_DIRECTORY_URL,
@@ -502,9 +503,9 @@ def proxy_upstream_stub(app, monkeypatch):
     yield
     with app.app_context():
         SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
-        AcmeClientAccount.query.filter_by(
+        delete_client_accounts(AcmeClientAccount.query.filter_by(
             directory_url=_STUB_DIRECTORY_URL
-        ).delete()
+        ))
         db.session.commit()
 
 
@@ -554,7 +555,7 @@ class TestEndpointOwnership:
         assert r_alice.status_code == 200
         assert r_alice.get_json()['status'] == 'valid'
 
-    def test_challenge_cross_account_403_owner_200(
+    def test_challenge_cross_account_404_owner_200(
         self, app, client, monkeypatch, proxy_upstream_stub,
     ):
         alice_key, alice_jwk = _generate_rsa_key_and_jwk()
@@ -563,10 +564,7 @@ class TestEndpointOwnership:
         bob_kid = _register_account(client, bob_key, bob_jwk)
         self._seed_alice_order(app, alice_kid)
 
-        upstream = _FakeResp(
-            {'type': 'dns-01', 'url': CHALL_URL, 'status': 'valid', 'token': 't'},
-            headers={'Link': f'<{AUTHZ_URL}>;rel="up"'},
-        )
+        upstream = TestChallengeOwnership()._upstream_challenge()
         monkeypatch.setattr(
             AcmeProxyService, '_post_with_account',
             lambda self, *_a, **_k: upstream,
@@ -574,8 +572,8 @@ class TestEndpointOwnership:
 
         path = f'/acme/proxy/challenge/{_b64(CHALL_URL)}'
         r_bob = self._post_as_get(client, path, bob_key, bob_kid)
-        assert r_bob.status_code == 403
-        assert 'unauthorized' in r_bob.get_json()['type']
+        assert r_bob.status_code == 404
+        assert r_bob.get_json()['status'] == 404
 
         r_alice = self._post_as_get(client, path, alice_key, alice_kid)
         assert r_alice.status_code == 200
@@ -674,6 +672,42 @@ class TestSameAccountPendingOrderReuse:
             }))
             assert svc._find_reusable_pending_order(
                 ['reuse.example.com'], 'thumb-reuse') is None
+
+    @pytest.mark.parametrize('upstream_dates, wanted, reused', [
+        ({}, {'not_after': '2026-12-01T00:00:00Z'}, False),
+        ({'notAfter': '2026-12-02T00:00:00Z'}, {'not_after': '2026-12-01T00:00:00Z'}, False),
+        ({'notAfter': '2026-12-01T00:00:00.000Z'}, {'not_after': '2026-12-01T00:00:00Z'}, True),
+        ({'notBefore': '2026-11-10T00:00:00Z'}, {'not_before': '2026-11-10T01:00:00+01:00'}, True),
+        ({'notBefore': '2026-11-10T00:00:00Z'}, {}, True),
+        ({}, {'not_before': '2026-11-10T00:00:00Z'}, False),
+    ])
+    def test_reuse_honours_the_requested_dates(self, app, monkeypatch, upstream_dates,
+                                               wanted, reused):
+        from datetime import datetime as _dt
+        with app.app_context():
+            self._seed(upstream='https://ca.example/acme/order/reuse-3')
+            svc = _make_svc(app, monkeypatch, upstream_response=_FakeResp({
+                'status': 'pending', **upstream_dates,
+                'authorizations': ['https://ca.example/acme/authz-v3/r3'],
+                'finalize': 'https://ca.example/acme/order/reuse-3/finalize',
+            }))
+            dates = {k: _dt.fromisoformat(v.replace('Z', '+00:00')) for k, v in wanted.items()}
+            result = svc._find_reusable_pending_order(
+                ['reuse.example.com'], 'thumb-reuse', **dates)
+            assert (result is not None) is reused
+
+    def test_reuse_honours_the_replaced_certificate(self, app, monkeypatch):
+        with app.app_context():
+            self._seed(upstream='https://ca.example/acme/order/reuse-4')
+            svc = _make_svc(app, monkeypatch, upstream_response=_FakeResp({
+                'status': 'pending', 'replaces': 'aYhba4dGQEHhs3uEe6CuLN4ByNQ.AIdlQyE',
+                'authorizations': [], 'finalize': 'https://ca.example/f'}))
+            svc.directory = {**(svc.directory or {}), 'renewalInfo': 'https://ca.example/ari'}
+            assert svc._find_reusable_pending_order(
+                ['reuse.example.com'], 'thumb-reuse', replaces='other.cert') is None
+            assert svc._find_reusable_pending_order(
+                ['reuse.example.com'], 'thumb-reuse',
+                replaces='aYhba4dGQEHhs3uEe6CuLN4ByNQ.AIdlQyE') is not None
 
 
 class TestClientTxtValues:

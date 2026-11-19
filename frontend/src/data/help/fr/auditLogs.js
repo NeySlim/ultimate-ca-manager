@@ -53,12 +53,8 @@ Chaque entrée de journal enregistre :
 
 ## Filtrage
 
-### Par type d'action
-Filtrer par catégorie d'opération :
-- Opérations de certificat (émettre, révoquer, renouveler, exporter)
-- Opérations de CA (créer, importer, supprimer)
-- Opérations utilisateur (connexion, déconnexion, créer, mettre à jour)
-- Opérations système (modification de paramètres, sauvegarde, restauration)
+### Par action
+Sélectionnez un ou plusieurs noms d'action, par exemple \`certificate_issued\` ou \`login_success\`.
 
 ### Par utilisateur
 Afficher uniquement les actions effectuées par un utilisateur spécifique.
@@ -71,7 +67,7 @@ Afficher uniquement les actions effectuées par un utilisateur spécifique.
 Définissez des dates **De** et **À** pour restreindre la fenêtre temporelle.
 
 ### Recherche textuelle
-Recherche textuelle libre dans tous les champs du journal.
+Recherche textuelle libre dans le nom d'utilisateur, l'action, les détails, le type de ressource et l'adresse IP ; le nom et l'id de la ressource ne sont pas recherchés.
 
 ## Exportation
 
@@ -79,7 +75,7 @@ Exportez les journaux filtrés en :
 - **JSON** : Lisible par machine, inclut tous les champs
 - **CSV** : Compatible avec les tableurs, inclut les champs clés
 
-Les exportations incluent uniquement les résultats actuellement filtrés.
+Les exportations n'appliquent que la plage de dates, jusqu'à 10 000 entrées : les autres filtres ne sont pas appliqués.
 
 ## Nettoyage
 
@@ -92,7 +88,7 @@ Purgez les anciens journaux selon la période de rétention :
 
 ## Vérification d'intégrité
 
-Cliquez sur **Vérifier l'intégrité** pour contrôler la chaîne de journaux d'audit. UCM utilise le chaînage de hachages pour détecter si des entrées de journal ont été altérées ou supprimées.
+Cliquez sur **Vérifier l'intégrité** pour contrôler la chaîne de journaux d'audit. UCM utilise le chaînage de hachages pour détecter une entrée modifiée ou supprimée à l'intérieur de la chaîne ; la suppression des dernières entrées ne laisse aucune trace dans la chaîne elle-même, c'est pourquoi le transfert syslog en garde une copie ailleurs.
 
 ## Transfert Syslog
 

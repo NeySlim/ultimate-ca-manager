@@ -23,7 +23,7 @@ This guide covers all installation methods for Ultimate Certificate Manager.
 
 ### Optional: Kerberos/SPNEGO support
 
-Windows Autoenrollment's Kerberos binding (silent GPO autoenrollment via MS-XCEP/MS-WSTEP) needs an extra dependency that none of the methods above install by default, since it requires a C compiler and the system's Kerberos headers to build:
+Windows Autoenrollment's Kerberos binding (silent GPO autoenrollment via MS-XCEP/MS-WSTEP) needs an extra dependency. The Docker images ship it; the DEB, RPM and source installs do not install it by default, since it requires a C compiler and the system's Kerberos headers to build:
 
 ```bash
 # Debian/Ubuntu
@@ -53,6 +53,7 @@ docker run -d \
   -p 8443:8443 \
   -p 8080:8080 \
   -v ucm-data:/opt/ucm/data \
+  -v ucm-config:/etc/ucm \
   neyslim/ultimate-ca-manager:latest
 ```
 
@@ -108,7 +109,7 @@ sudo systemctl status ucm
 
 ### FIPS hosts: DEB and RPM built against the system OpenSSL
 
-The packages install pre-built Python wheels, and the `cryptography` and `psycopg2-binary` wheels carry their own OpenSSL, which ignores the FIPS mode of the host. On RHEL 9 (or AlmaLinux and Rocky Linux 9) and on Ubuntu 24.04 (Ubuntu Pro for the FIPS module), `UCM_FIPS_BUILD=1` makes the package compile `cryptography`, `psycopg2`, `lxml` and `xmlsec` against the system OpenSSL instead. Other distributions refuse the option.
+The packages install pre-built Python wheels, and the `cryptography` and `psycopg-binary` wheels carry their own OpenSSL, which ignores the FIPS mode of the host. On RHEL 9 (or AlmaLinux and Rocky Linux 9) and on Ubuntu 24.04 (Ubuntu Pro for the FIPS module), `UCM_FIPS_BUILD=1` makes the package compile `cryptography`, `psycopg`, `lxml` and `xmlsec` against the system OpenSSL instead. Other distributions refuse the option.
 
 1. Install the build tools.
 

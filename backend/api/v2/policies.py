@@ -18,6 +18,7 @@ import uuid
 import fips_mode
 from utils.datetime_utils import cert_not_before, utc_now
 from utils.leaf_key_usage import key_usage_for_key, key_usage_notice
+from utils.revocation_reasons import revocable
 from services.audit_service import AuditService
 from services.policy_notifications import validated_emails
 from security.encryption import encrypt_private_key
@@ -238,6 +239,7 @@ def _issue_approved_csr(approval, data):
         extra_san=general_names_from_buckets(data['extra_san']) if data.get('extra_san') else None,
         policy_template_id=data.get('template_id'),
         notices=sign_notices,
+        custom_extensions=data.get('custom_extensions'),
     )
     if isinstance(signed, CA):
         # An intermediate CA request: the result lives in the CA table, the
@@ -304,9 +306,6 @@ def _requester_name(approval, data):
     return data.get('requested_by') or 'system'
 
 
-_HOLD_REASONS = ('certificateHold', 'certificate_hold')
-
-
 def _approved_revocation_params(data):
     """``(reason, invalidity_at)`` stored with a revocation request, checked again."""
     from utils.revocation_reasons import normalize_revocation_reason
@@ -330,14 +329,13 @@ def _revoke_approved_certificate(approval, data):
         raise ValueError('The certificate to revoke no longer exists')
     if cert.serial_number != data.get('serial_number'):
         raise ValueError('The certificate was renewed since the request; request its revocation again')
-    if cert.revoked:
-        if cert.revoke_reason in _HOLD_REASONS and data.get('reason') not in _HOLD_REASONS:
-            raise ValueError('The certificate is on hold: approve its revocation once the hold is lifted')
+    reason, invalidity_at = _approved_revocation_params(data)
+    # On hold, a definitive reason makes the hold final (RFC 5280 §5.2.4)
+    if not revocable(cert, reason):
         # Revoked meanwhile: the approval is closed on the revoked certificate
         _link_approval(approval, cert.id)
         return {'id': cert.id, 'cn': data.get('cn'), 'serial_number': cert.serial_number,
                 'revoked': True, 'already_revoked': True}
-    reason, invalidity_at = _approved_revocation_params(data)
     duplicate_ids = _close_duplicate_requests(approval, 'certificate_id', cert.id)
     cert = CertificateService.revoke_certificate(
         cert_id=cert.id, reason=reason, username=_requester_name(approval, data),
@@ -541,9 +539,10 @@ def _issue_approved_certificate(approval):
         dns_name_count=len(set(_requested_dns) | set(_implicit_dns)),
         validity_days=validity_days, context=_rule_context, notices=_advisories,
     )
-    _template_digest = template.digest if template and template.digest else None
+    from utils.issuance_defaults import digest_replaced_notice, template_digest
+    _preferred_digest = template_digest(template, ca_key)
     _sign_hash, _digest_violations = PolicyEvaluationService.checked_signing_hash(
-        _policies, ca_key, _template_digest, explicit=_template_digest is not None,
+        _policies, ca_key, _preferred_digest, explicit=False,
         context=_rule_context, notices=_advisories)
     _violations += _digest_violations
     if _violations:
@@ -556,6 +555,7 @@ def _issue_approved_certificate(approval):
         _notices.append(notices_mod.validity_shortened(
             requested_validity, validity_days,
             notices_mod.policy_validity_reason(_capper, validity_days)))
+    _notices += notices_mod.collect(digest_replaced_notice(_policies, _preferred_digest, _sign_hash))
     _notices += _advisories
     new_key = key_algorithms.generate(normalized_key)
     
@@ -705,7 +705,9 @@ def _issue_approved_certificate(approval):
     # Enforce the CA chain's NameConstraints (RFC 5280 §4.2.1.10) on the
     # approved subject + SANs before signing.
     from services.trust_store.constraints_mixin import validate_name_constraints
-    validate_name_constraints(ca_cert, subject, san_list or None)
+    from utils.request_names import cn_may_name_host
+    validate_name_constraints(ca_cert, subject, san_list or None,
+                              cn_may_name_host=cn_may_name_host(cert_type, base_ekus))
 
     # SKI/AKI
     builder = builder.add_extension(x509.SubjectKeyIdentifier.from_public_key(new_key.public_key()), critical=False)
@@ -732,6 +734,9 @@ def _issue_approved_certificate(approval):
     builder = add_certificate_policies(
         builder, ca.cps_uri if ca.cps_enabled else None, ca.cps_oid, template_policy_oids(tpl_ext))
     builder = add_qc_statements(builder, tpl_ext)
+    from utils.custom_extensions import add_custom_extensions, issuance_custom_extensions
+    builder = add_custom_extensions(
+        builder, issuance_custom_extensions(template, data.get('custom_extensions')))
     
     # Sign with the digest resolved against the policies above
     new_cert = builder.sign(ca_key, _sign_hash, default_backend(),
@@ -925,6 +930,23 @@ def _validated_algorithm_rules(rules, *, fips_check=True):
     return _validated_certifications(rules, 'hsm_certifications')
 
 
+def _validated_dns_pattern(rules):
+    # One pattern per policy: a list would match no name and silently skip the policy
+    san = rules.get('san_restrictions')
+    if san is None:
+        return None
+    if not isinstance(san, dict):
+        return 'san_restrictions must be an object'
+    pattern = san.get('dns_pattern')
+    if pattern is None:
+        return None
+    if not isinstance(pattern, str):
+        return 'dns_pattern must be a string'
+    if ',' in pattern or any(c.isspace() for c in pattern.strip()):
+        return 'dns_pattern holds a single pattern: create one policy per domain'
+    return None
+
+
 def _validated_rules(rules):
     """``(rules, error)``: key-type, digest, scheme and date rules normalised,
     unknown values refused."""
@@ -932,7 +954,7 @@ def _validated_rules(rules):
     if not isinstance(rules, dict):
         return None, 'rules must be an object'
     rules = strip_dead_rules(rules)
-    error = _validated_algorithm_rules(rules)
+    error = _validated_algorithm_rules(rules) or _validated_dns_pattern(rules)
     for key in ('require_hsm_ca_key', 'pq_standalone'):
         if error is None and key in rules and not isinstance(rules[key], bool):
             error = f'{key} must be true or false'
@@ -1304,10 +1326,13 @@ def approve_request(request_id):
                          exc_info=True)
             from services.policy_service import PolicyViolation
             from services.cert.renewal import RenewalError
+            from utils.custom_extensions import TemplateConfigError
             if isinstance(e, PolicyViolation):
                 issue_error = f'Policy violation: {e}'
             elif isinstance(e, RenewalError):
                 issue_error = e.message
+            elif isinstance(e, TemplateConfigError):
+                issue_error = str(e)
             elif isinstance(e, RuntimeError) and 'already issued' in str(e):
                 issue_error = 'A certificate was already issued for this request by another approver; reload it'
             elif isinstance(e, ValueError) and not any(

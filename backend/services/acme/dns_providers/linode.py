@@ -144,7 +144,7 @@ class LinodeDnsProvider(BaseDnsProvider):
         logger.info(f"Linode: Created TXT record {record_name}")
         return True, "Record created successfully"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         """Delete TXT record via Linode API"""
         domain_info = self._get_domain(domain)
         if not domain_info:
@@ -167,21 +167,19 @@ class LinodeDnsProvider(BaseDnsProvider):
             return False, f"Failed to list records: {result}"
         
         records = result.get('data', [])
-        record_id = None
-        for r in records:
-            if r.get('type') == 'TXT' and r.get('name', '') == name:
-                record_id = r.get('id')
-                break
+        record_ids = [
+            r.get('id') for r in records
+            if r.get('type') == 'TXT' and r.get('name', '') == name
+            and self.txt_matches(r.get('target'), record_value) and r.get('id')
+        ]
         
-        if not record_id:
+        if not record_ids:
             return True, "Record not found (already deleted?)"
         
-        success, result = self._request('DELETE', f'/domains/{domain_id}/records/{record_id}')
-        
-        if not success:
-            if 'not found' in str(result).lower():
-                return True, "Record not found (already deleted?)"
-            return False, f"Failed to delete record: {result}"
+        for record_id in record_ids:
+            success, result = self._request('DELETE', f'/domains/{domain_id}/records/{record_id}')
+            if not success and 'not found' not in str(result).lower():
+                return False, f"Failed to delete record: {result}"
         
         logger.info(f"Linode: Deleted TXT record {record_name}")
         return True, "Record deleted successfully"

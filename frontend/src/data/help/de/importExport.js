@@ -2,13 +2,13 @@ export default {
   helpContent: {
     title: 'Import & Export',
     subtitle: 'Datenmigration und Sicherung',
-    overview: 'Importieren Sie Zertifikate aus externen Quellen und exportieren Sie Ihre PKI-Daten. Smart Import erkennt Dateitypen automatisch. Die OPNsense-Integration ermöglicht die direkte Synchronisation mit Ihrer Firewall.',
+    overview: 'Importieren Sie Zertifikate aus externen Quellen und exportieren Sie Ihre PKI-Daten. Smart Import erkennt Dateitypen automatisch. Die OPNsense-Integration importiert die Zertifikate und CAs einer Firewall auf Abruf.',
     sections: [
       {
         title: 'Import',
         items: [
           { label: 'Smart Import', text: 'Laden Sie eine beliebige Zertifikatsdatei hoch, UCM erkennt automatisch das Format (PEM, DER, P12, P7B)' },
-          { label: 'OPNsense-Sync', text: 'Verbinden Sie sich mit der OPNsense-Firewall und importieren Sie deren Zertifikate und CAs' },
+          { label: 'OPNsense-Import', text: 'Verbinden Sie sich mit einer OPNsense-Firewall und importieren Sie deren Zertifikate und CAs, einmal pro Durchlauf (keine laufende Synchronisation)' },
         ]
       },
       {
@@ -21,7 +21,7 @@ export default {
       {
         title: 'OPNsense-Integration',
         items: [
-          { label: 'Verbindung', text: 'OPNsense-URL, API-Schlüssel und API-Geheimnis angeben' },
+          { label: 'Verbindung', text: 'OPNsense-Host und Port, API-Schlüssel und API-Geheimnis angeben' },
           { label: 'Verbindung testen', text: 'Konnektivität vor dem Import überprüfen' },
           { label: 'Elemente auswählen', text: 'Auswählen, welche Zertifikate und CAs importiert werden sollen' },
         ]
@@ -64,26 +64,24 @@ Der Smart-Import-Assistent erkennt Dateitypen automatisch und verarbeitet sie:
 
 ## OPNsense-Integration
 
-Synchronisieren Sie Zertifikate und CAs von einer OPNsense-Firewall:
+Importieren Sie Zertifikate und CAs von einer OPNsense-Firewall, auf Abruf (UCM hält sie nicht synchron):
 
 ### Einrichtung
 1. Erstellen Sie in OPNsense einen API-Schlüssel (System → Zugang → Benutzer → API-Schlüssel)
-2. Geben Sie in UCM die OPNsense-URL, den API-Schlüssel und das API-Geheimnis ein
-3. Klicken Sie auf **Verbindung testen** zur Überprüfung
+2. Geben Sie in UCM den OPNsense-Host und -Port, den API-Schlüssel und das API-Geheimnis ein
+3. Klicken Sie auf **Verbindung testen**: Es prüft die Verbindung und listet die verfügbaren Zertifikate und CAs auf
 
 ### Import
-1. Klicken Sie auf **Verbinden**, um verfügbare Zertifikate und CAs abzurufen
-2. Wählen Sie die Elemente aus, die Sie importieren möchten
-3. Klicken Sie auf **Ausgewählte importieren**
+1. Wählen Sie die Elemente aus, die Sie importieren möchten
+2. Klicken Sie auf **Ausgewählte importieren**
 
 UCM importiert Zertifikate mit ihren privaten Schlüsseln (falls verfügbar) und bewahrt die CA-Hierarchie.
 
 ## Zertifikate exportieren
 
 Massenexport aller Zertifikate:
-- **PEM**: Einzelne PEM-Dateien
+- **PEM**: Alle Zertifikate in einem einzelnen PEM-Bündel
 - **P7B-Bündel**: Alle Zertifikate in einer einzelnen PKCS#7-Datei
-- **ZIP**: Alle Zertifikate als einzelne PEM-Dateien in einem ZIP-Archiv
 
 ## CAs exportieren
 

@@ -7,6 +7,7 @@ from lxml import etree
 
 from models import CA, CATemplatePin, CertificateTemplate, db
 from models.system_config import SystemConfig
+from tests.fixtures.templates import delete_templates
 from services.wstep.soap_envelope import SOAP_NS
 
 
@@ -61,17 +62,11 @@ def xcep_config(app, create_ca):
         db.session.add(pin)
         db.session.commit()
         template_id = template.id
-        pin_id = pin.id
 
     yield {'ca': ca_data, 'template_id': template_id}
 
     with app.app_context():
-        pin_row = db.session.get(CATemplatePin, pin_id)
-        if pin_row:
-            db.session.delete(pin_row)
-        tmpl = db.session.get(CertificateTemplate, template_id)
-        if tmpl:
-            db.session.delete(tmpl)
+        delete_templates([template_id])
         db.session.commit()
         for key, value in previous.items():
             row = SystemConfig.query.filter_by(key=key).first()
@@ -259,16 +254,12 @@ def test_get_policies_returns_pinned_template(client, xcep_config):
     assert ca_reference_id is not None
     assert ca_reference.text == ca_reference_id.text
 
-    # Machine templates (web_server here) get the auto-derive-from-DNS-name
-    # subjectNameFlags, not the enrollee-supplies-subject one -- confirmed
-    # against the lab's real ADCS "Computer" template's own msPKI-Certificate-
-    # Name-Flag AD attribute (0x18000000). Required for unattended GPO
-    # autoenrollment to work at all: with enrollee-supplies-subject, Windows'
-    # background autoenrollment engine has no interactive session to ask for
-    # a subject and silently declines the template (see policy_builder.py's
-    # _MACHINE_SUBJECT_NAME_FLAGS docstring).
+    # The UsernamePassword binding has no AD identity to build a subject from:
+    # every template, machine ones included, announces a client-supplied
+    # subject there (0x00010001). The Kerberos binding announces 0x18000000
+    # for machine templates (test_wstep_subject_source).
     subject_name_flags = policies[0].find(f'.//{{{XCEP_NS}}}subjectNameFlags')
-    assert int(subject_name_flags.text) == (0x10000000 | 0x08000000)
+    assert int(subject_name_flags.text) == (0x00000001 | 0x00010000)
 
     # generalFlags/GeneralMachineType (0x40) must be set for a web_server
     # template -- real-client regression: leaving this nil made Windows
@@ -350,9 +341,7 @@ def test_get_policies_falls_back_to_active_templates_when_unpinned(client, app, 
         assert 'XCEP Fallback Template' in names
     finally:
         with app.app_context():
-            tmpl = db.session.get(CertificateTemplate, template_id)
-            if tmpl:
-                db.session.delete(tmpl)
+            delete_templates([template_id])
             db.session.commit()
             if previous_value is None:
                 row = SystemConfig.query.filter_by(key='xcep_ca_refid').first()
@@ -410,10 +399,7 @@ def test_get_policies_autoenroll_reflects_per_template_flag(client, app, create_
         assert manual_permission.find(f'{{{XCEP_NS}}}autoEnroll').text == 'false'
     finally:
         with app.app_context():
-            for tid in (auto_id, manual_id):
-                tmpl = db.session.get(CertificateTemplate, tid)
-                if tmpl:
-                    db.session.delete(tmpl)
+            delete_templates([auto_id, manual_id])
             db.session.commit()
             if previous_value is None:
                 row = SystemConfig.query.filter_by(key='xcep_ca_refid').first()
@@ -488,10 +474,7 @@ def test_get_policies_template_oid_arcs_fit_uint32(client, app, create_ca):
                 pin_row = db.session.get(CATemplatePin, pid)
                 if pin_row:
                     db.session.delete(pin_row)
-            for tid in template_ids:
-                tmpl = db.session.get(CertificateTemplate, tid)
-                if tmpl:
-                    db.session.delete(tmpl)
+            delete_templates(template_ids)
             db.session.commit()
             if previous_value is None:
                 row = SystemConfig.query.filter_by(key='xcep_ca_refid').first()
@@ -500,3 +483,26 @@ def test_get_policies_template_oid_arcs_fit_uint32(client, app, create_ca):
                 db.session.commit()
             else:
                 _set_config('xcep_ca_refid', previous_value)
+
+
+def _fault_code(data):
+    return etree.fromstring(data).find(f'.//{{{SOAP_NS}}}Fault/{{{SOAP_NS}}}Code/{{{SOAP_NS}}}Value').text
+
+
+def test_client_faults_are_sender_faults(client, xcep_config):
+    """SOAP 1.2: a fault the request causes is env:Sender, which its HTTP binding sends as 400."""
+    for headers, body in (({}, b'<GetPolicies/>'), (_basic_auth(), b'<GetPolicies')):
+        r = client.post(XCEP_URL, data=body, headers=headers)
+        assert r.status_code == 400, body
+        assert _fault_code(r.data) == 's:Sender', body
+
+
+def test_a_server_failure_is_a_receiver_fault(client, xcep_config, monkeypatch):
+    from services.xcep import policy_builder
+
+    def _fail(*_args, **_kwargs):
+        raise RuntimeError('database unreachable')
+    monkeypatch.setattr(policy_builder, 'build_get_policies_response', _fail)
+    r = client.post(XCEP_URL, data=b'<GetPolicies/>', headers=_basic_auth())
+    assert r.status_code == 500
+    assert _fault_code(r.data) == 's:Receiver'

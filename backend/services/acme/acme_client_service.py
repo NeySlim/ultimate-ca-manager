@@ -42,6 +42,9 @@ from utils.ca_profile import default_digest_for_key_type
 from utils.signing_hash import HASH_BY_NAME, signing_hash_for
 from utils.san_parse import strip_wildcard
 from services.acme.dns_txt_lock import txt_record_lock
+from services.acme.single_txt_value import apex_and_wildcard_refusal, keep_for_another_order, txt_lock_name
+from services.acme.order_lease import LEASE_LOST
+from services.acme import compromised_keys
 
 if TYPE_CHECKING:
     from models.acme_client_account import AcmeClientAccount
@@ -58,6 +61,12 @@ ACCOUNT_KEY_TYPES = {
     'ES256': {'alg': 'ES256', 'generate': lambda: key_algorithms.generate('EC-P256')},
     'ES384': {'alg': 'ES384', 'generate': lambda: key_algorithms.generate('EC-P384')},
 }
+
+ORDER_GONE = 'The CA no longer has this order: it expired or was removed there, request a new certificate'
+
+ACCOUNT_GONE = ('The ACME CA account this order was issued under no longer exists, and another '
+                'account could be at another CA. Request a new certificate for these names '
+                'with the account to use, then delete this order.')
 
 CERT_KEY_TYPES = {
     'RSA-2048': lambda: key_algorithms.generate('RSA-2048'),
@@ -168,6 +177,8 @@ class AcmeClientService:
     LE_STAGING = "https://acme-staging-v02.api.letsencrypt.org/directory"
     LE_PRODUCTION = "https://acme-v02.api.letsencrypt.org/directory"
 
+    _order_retry_after = None
+
     def __init__(self, environment: str = None, directory_url: str = None,
                  account: 'AcmeClientAccount' = None,
                  tls_alpn_port: Optional[int] = None):
@@ -197,7 +208,7 @@ class AcmeClientService:
 
         self.verify_ssl = self._get_verify_ssl()
         self.session = create_session(verify_ssl=self.verify_ssl)
-        self.session.headers['User-Agent'] = 'UCM-ACME-Client/2.1'
+        self.session.headers['User-Agent'] = outbound.USER_AGENT
         if not self.verify_ssl:
             logger.warning(
                 "ACME client SSL verification disabled by settings "
@@ -266,9 +277,12 @@ class AcmeClientService:
         alg_cfg = SystemConfig.query.filter_by(key='acme.client.account_key_type').first()
         algorithm = (alg_cfg.value if alg_cfg and alg_cfg.value in ACCOUNT_KEY_TYPES else 'ES256')
 
+        # Labels are unique (migration 124): an operator's account may hold this one.
+        from utils.unique_names import first_free
+        taken = {label for (label,) in db.session.query(AcmeClientAccount.label)}
         new_account = AcmeClientAccount(
             directory_url=target_url,
-            label=target_label,
+            label=first_free(target_label, taken),
             email=email,
             account_key_algorithm=algorithm,
             is_default=(AcmeClientAccount.query.count() == 0),
@@ -283,7 +297,7 @@ class AcmeClientService:
             if existing:
                 return existing
             raise
-        logger.info(f"Created placeholder ACME account: {target_label} ({target_url})")
+        logger.info(f"Created placeholder ACME account: {new_account.label} ({target_url})")
         return new_account
 
     # ------------------------------------------------------------------
@@ -346,18 +360,33 @@ class AcmeClientService:
         keeps its CA even if ``acme.client.directory_url`` was changed/cleared
         after creation), then falls back to :meth:`for_issuance`.
         """
+        account = cls.order_account(order) if order else None
+        if account is not None:
+            return cls(account=account)
+        return cls.for_issuance(environment=order.environment if order else None)
+
+    @staticmethod
+    def order_account(order: 'AcmeClientOrder'):
+        """The CA account the order names, by id then by ``account_url``; None when neither resolves."""
         from models.acme_client_account import AcmeClientAccount
 
-        if order and order.acme_client_account_id:
+        if order.acme_client_account_id:
             acct = db.session.get(AcmeClientAccount, order.acme_client_account_id)
             if acct:
-                return cls(account=acct)
-        if order and order.account_url:
-            account = AcmeClientAccount.query.filter_by(
-                account_url=order.account_url).first()
-            if account:
-                return cls(account=account)
-        return cls.for_issuance(environment=order.environment if order else None)
+                return acct
+        if order.account_url:
+            return (AcmeClientAccount.query.filter_by(account_url=order.account_url)
+                    .order_by(AcmeClientAccount.id).first())
+        return None
+
+    @classmethod
+    def for_existing_order(cls, order: 'AcmeClientOrder') -> Optional['AcmeClientService']:
+        """:meth:`for_order`, or None when the order names a CA account that no longer exists:
+        another account, maybe at another CA, would answer in its place."""
+        named = order.acme_client_account_id or order.account_url
+        if named and cls.order_account(order) is None:
+            return None
+        return cls.for_order(order)
 
     def _sync_legacy_eab_to_account(self) -> bool:
         """Copy legacy EAB keys (``acme.client.eab_*``) onto the account row.
@@ -438,6 +467,38 @@ class AcmeClientService:
             'http_timeout_sec': AcmeClientAccount.DEFAULT_HTTP_TIMEOUT_SEC,
         }
 
+    def wait_for_order(self, order: AcmeClientOrder) -> Tuple[str, Dict]:
+        """Poll until the authorizations are settled: the order leaves `pending`, or the per-CA
+        poll timeout runs out. Returns the last status and body."""
+        deadline, interval = self._order_poll_limits()
+        while True:
+            status, data = self.check_order_status(order)
+            if status != 'pending' or not self._sleep_before_next_poll(deadline, interval):
+                return status, data
+
+    def _order_poll_limits(self) -> Tuple[float, int]:
+        poll = self.get_poll_settings()
+        return (time.monotonic() + max(1, int(poll['order_poll_timeout_sec'])),
+                max(1, int(poll['order_poll_interval_sec'])))
+
+    def _sleep_before_next_poll(self, deadline: float, interval: int) -> bool:
+        """Wait as long as the CA's last Retry-After asks (RFC 8555 §7.4), or the interval.
+        False when the deadline has passed: nothing more to poll."""
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        time.sleep(min(self._order_retry_after or interval, remaining))
+        return True
+
+    def _note_retry_after(self, response) -> None:
+        """Keep the seconds asked by this response; none or unreadable leaves the interval."""
+        try:
+            retry_at = self._parse_retry_after(response.headers.get('Retry-After'))
+        except (ValueError, OverflowError):
+            retry_at = None
+        wait = (retry_at - datetime.now(timezone.utc).replace(tzinfo=None)).total_seconds() if retry_at else 0
+        self._order_retry_after = wait if wait > 0 else None
+
     # =========================================================================
     # Directory & Nonce
     # =========================================================================
@@ -458,7 +519,7 @@ class AcmeClientService:
             allow_loopback=acme_allow_loopback_upstream(),
             timeout=self._http_timeout(),
             verify=self.verify_ssl,
-            headers={'User-Agent': self.session.headers.get('User-Agent', 'UCM-ACME-Client/2.1')},
+            headers={'User-Agent': self.session.headers.get('User-Agent', outbound.USER_AGENT)},
         )
         resp.raise_for_status()
         self.directory = resp.json()
@@ -591,7 +652,8 @@ class AcmeClientService:
             n_bytes = (numbers.n.bit_length() + 7) // 8
             return {
                 "kty": "RSA",
-                "e": b64url(numbers.e.to_bytes(3, byteorder='big')),
+                # RFC 7518 §6.3.1.2: minimum number of octets
+                "e": b64url(numbers.e.to_bytes((numbers.e.bit_length() + 7) // 8, byteorder='big')),
                 "n": b64url(numbers.n.to_bytes(n_bytes, byteorder='big')),
             }
         elif isinstance(key, ec.EllipticCurvePrivateKey):
@@ -689,21 +751,10 @@ class AcmeClientService:
         }
     
     def _post(self, url: str, payload: Any, use_jwk: bool = False) -> requests.Response:
-        """POST signed JWS to ACME endpoint, retrying once on badNonce.
-
-        RFC 8555 §6.5: on badNonce the server returns a fresh nonce and the
-        client retries with it. Without the retry a badNonce was terminal here,
-        while the proxy side recovered from the same answer.
-        """
+        """POST signed JWS to ACME endpoint, retrying on badNonce (RFC 8555 §6.5)."""
         self._validate_outbound_acme_url(url)
-        resp = self._sign_and_post(url, payload, use_jwk=use_jwk)
-
-        fresh_nonce = outbound.bad_nonce_retry_value(resp)
-        if fresh_nonce:
-            logger.warning(f"Upstream rejected nonce on {url}, retrying with fresh nonce")
-            resp = self._sign_and_post(url, payload, use_jwk=use_jwk,
-                                       nonce=fresh_nonce)
-        return resp
+        return outbound.post_with_bad_nonce_retries(
+            lambda nonce: self._sign_and_post(url, payload, use_jwk=use_jwk, nonce=nonce), url)
 
     def _sign_and_post(self, url: str, payload: Any, use_jwk: bool = False,
                        nonce: Optional[str] = None) -> requests.Response:
@@ -736,7 +787,8 @@ class AcmeClientService:
     @staticmethod
     def validate_revocation_reason(reason: int) -> int:
         """Validate an RFC 5280 CRLReason code accepted by ACME."""
-        valid_reasons = {0, 1, 2, 3, 4, 5, 6, 8, 9, 10}
+        # removeFromCRL (8) only appears on a delta CRL (RFC 5280 §5.3.1): no certificate is revoked so
+        valid_reasons = {0, 1, 2, 3, 4, 5, 6, 9, 10}
         if isinstance(reason, bool) or not isinstance(reason, int) or reason not in valid_reasons:
             raise ValueError("Invalid certificate revocation reason code")
         return reason
@@ -785,7 +837,8 @@ class AcmeClientService:
         if not aki:
             raise ValueError("Certificate has no Authority Key Identifier")
 
-        serial_length = max(1, (cert_obj.serial_number.bit_length() + 7) // 8)
+        # The value bytes of the DER INTEGER: a leading 1 bit takes a zero byte (RFC 9773 §4.1)
+        serial_length = cert_obj.serial_number.bit_length() // 8 + 1
         serial_bytes = cert_obj.serial_number.to_bytes(serial_length, 'big')
         return f"{cls._b64url(aki)}.{cls._b64url(serial_bytes)}"
 
@@ -800,6 +853,18 @@ class AcmeClientService:
         if parsed.tzinfo is not None:
             parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
         return parsed
+
+    @staticmethod
+    def _problem_detail(resp) -> str:
+        """Detail of an error response; a body that is no problem document is named by its status."""
+        try:
+            body = resp.json()
+        except Exception:
+            body = None
+        if isinstance(body, dict) and body.get('detail'):
+            return str(body['detail'])
+        retry = (getattr(resp, 'headers', None) or {}).get('Retry-After')
+        return f"HTTP {resp.status_code}" + (f" (Retry-After: {retry})" if retry else '')
 
     @staticmethod
     def _parse_retry_after(value: Optional[str]) -> Optional[datetime]:
@@ -821,13 +886,15 @@ class AcmeClientService:
             retry_at = retry_at.astimezone(timezone.utc)
         return retry_at.replace(tzinfo=None)
 
-    def revoke_certificate(self, certificate_pem_or_der, reason: int = 0) -> requests.Response:
+    def revoke_certificate(self, certificate_pem_or_der, reason: Optional[int] = 0) -> requests.Response:
         """Revoke a certificate upstream using the registered account KID.
 
         The certificate is encoded as base64url DER and the request is signed
         with the external ACME account key, as required by RFC 8555 §7.6.
+        ``reason`` None leaves the optional field out.
         """
-        reason = self.validate_revocation_reason(reason)
+        if reason is not None:
+            reason = self.validate_revocation_reason(reason)
         cert_obj = self._load_x509_certificate(certificate_pem_or_der)
         directory = self._fetch_directory()
         revoke_url = directory.get('revokeCert')
@@ -838,8 +905,9 @@ class AcmeClientService:
             'certificate': self._b64url(
                 cert_obj.public_bytes(serialization.Encoding.DER)
             ),
-            'reason': reason,
         }
+        if reason is not None:
+            payload['reason'] = reason
         return self._post(revoke_url, payload, use_jwk=False)
 
     def get_renewal_info(self, certificate) -> Optional[Dict[str, Any]]:
@@ -961,8 +1029,7 @@ class AcmeClientService:
                  logger.info(f"ACME account {status}: {account_url}")
                  return True, f"Account {status} successfully", account_url
             else:
-                error = resp.json()
-                return False, f"Account registration failed: {error.get('detail', 'Unknown error')}", None
+                return False, f"Account registration failed: {self._problem_detail(resp)}", None
                 
         except Exception as e:
             logger.error(f"Account registration error: {e}")
@@ -1057,6 +1124,13 @@ class AcmeClientService:
     # Order Management
     # =========================================================================
     
+    @staticmethod
+    def single_txt_value_refusal(domains, dns_provider_id) -> Optional[str]:
+        """Why the provider cannot validate these identifiers in one order, else None."""
+        model = db.session.get(DnsProvider, dns_provider_id)
+        provider_class = get_provider_class(model.provider_type) if model else None
+        return apex_and_wildcard_refusal(domains, provider_class) if provider_class else None
+
     def create_order(
         self,
         domains: List[str],
@@ -1094,6 +1168,10 @@ class AcmeClientService:
                 identifier['type'] == 'ip' for identifier in identifiers
             ):
                 return False, 'dns-01 cannot be used with IP identifiers', None
+            if challenge_type == 'dns-01' and dns_provider_id:
+                refusal = self.single_txt_value_refusal(normalized_domains, dns_provider_id)
+                if refusal:
+                    return False, refusal, None
 
             # Ensure account exists
             success, msg = self.ensure_account(email)
@@ -1120,7 +1198,11 @@ class AcmeClientService:
                 except Exception:
                     err_body = {}
                 err_text = f"{err_body.get('type', '')} {err_body.get('detail', '')}".lower()
-                if (resp.status_code == 409 or 'replace' in err_text):
+                # A CA may reject the field however it likes. A rate limit is not about it,
+                # whatever its status: RFC 8555 §6.7 names it by type, never by its detail.
+                rate_limited = (resp.status_code == 429
+                                or err_body.get('type') == 'urn:ietf:params:acme:error:rateLimited')
+                if not rate_limited and (400 <= resp.status_code < 500 or 'replace' in err_text):
                     logger.warning(
                         "newOrder with replaces rejected (%s); retrying without "
                         "replaces: %s", resp.status_code, err_body.get('detail'),
@@ -1129,8 +1211,7 @@ class AcmeClientService:
                     resp = self._post(directory['newOrder'], payload)
 
             if resp.status_code not in [200, 201]:
-                error = resp.json()
-                return False, f"Order creation failed: {error.get('detail', 'Unknown error')}", None
+                return False, f"Order creation failed: {self._problem_detail(resp)}", None
             
             order_data = resp.json()
             order_url = resp.headers.get('Location')
@@ -1244,7 +1325,7 @@ class AcmeClientService:
             record_name = challenge['dns_txt_name']
             record_value = challenge['dns_txt_value']
             
-            with txt_record_lock(record_name):
+            with txt_record_lock(txt_lock_name(provider, record_name)):
                 success, message = provider.create_txt_record(
                     domain=strip_wildcard(domain),
                     record_name=record_name,
@@ -1366,8 +1447,7 @@ class AcmeClientService:
                 
                 return True, f"Challenge submitted: {result.get('status')}"
             else:
-                error = resp.json()
-                detail = error.get('detail', 'Unknown error')
+                detail = self._problem_detail(resp)
                 if 'invalid' in detail.lower():
                     return False, f'{AUTHZ_INVALID_USER_MSG} ({detail})'
                 return False, f"Challenge submission failed: {detail}"
@@ -1409,11 +1489,7 @@ class AcmeClientService:
             listener.start()
             response = self._post(challenge['url'], {})
             if response.status_code != 200:
-                try:
-                    detail = response.json().get('detail', 'Unknown error')
-                except Exception:
-                    detail = 'Unknown error'
-                return False, f'Challenge submission failed: {detail}'
+                return False, f'Challenge submission failed: {self._problem_detail(response)}'
 
             result = response.json()
             challenge['status'] = result.get('status', 'processing')
@@ -1452,6 +1528,15 @@ class AcmeClientService:
         finally:
             listener.stop()
 
+    def fetch_order_state(self, order: AcmeClientOrder) -> str:
+        """The order's status at the CA, written nowhere; 'gone' when the CA no longer has it."""
+        resp = self._post(order.order_url, "")  # POST-as-GET
+        if resp.status_code in (404, 410):
+            return 'gone'
+        if resp.status_code != 200:
+            raise RuntimeError(f"Status of order {order.id} unavailable: HTTP {resp.status_code}")
+        return resp.json().get('status') or 'gone'
+
     @staticmethod
     def write_order_status(order, status: str) -> bool:
         """Write a status, unless the order is issued: that means imported here, which the CA
@@ -1472,6 +1557,10 @@ class AcmeClientService:
         """
         try:
             resp = self._post(order.order_url, "")  # POST-as-GET
+            self._note_retry_after(resp)
+            if resp.status_code in (404, 410):
+                self._record_order_gone(order)
+                return 'gone', {}
             if resp.status_code == 200:
                 data = resp.json()
                 self.write_order_status(order, data.get('status', order.status))
@@ -1487,149 +1576,213 @@ class AcmeClientService:
                 db.session.rollback()
             return order.status, {}
     
+    @staticmethod
+    def _record_order_gone(order) -> None:
+        """An order the CA answers 404 or 410 for cannot complete: invalid here too, with the
+        reason. An issued order keeps its status."""
+        AcmeClientOrder.query.filter(
+            AcmeClientOrder.id == order.id, AcmeClientOrder.status != 'issued',
+        ).update({'status': 'invalid', 'error_message': ORDER_GONE}, synchronize_session=False)
+        db.session.commit()
+
     # =========================================================================
     # Finalization
     # =========================================================================
     
-    def finalize_order(self, order: AcmeClientOrder) -> Tuple[bool, str, Optional[int]]:
-        """
-        Finalize order and download certificate.
-        Supports configurable key types (RSA-2048/4096, ECDSA P-256/P-384),
-        external CSR (key_source=csr), and private key reuse on renewal
-        (key_source=reuse).
+    @staticmethod
+    def _revoked_as_compromised(certificate) -> bool:
+        return compromised_keys.revoked_as_compromised(certificate)
 
-        Returns:
-            Tuple of (success, message, certificate_id)
+    @staticmethod
+    def _key_revoked_as_compromised(public_key) -> bool:
+        return compromised_keys.key_revoked_as_compromised(public_key)
+
+    def held_finalize_key(self, order: AcmeClientOrder) -> Tuple[Optional[str], Optional[str]]:
+        """The PEM key an order the CA already finalized was certified with: ``(pem, None)``,
+        ``(None, None)`` for an external CSR, ``(None, error)`` when the key is not held."""
+        pending = order.pending_key
+        if pending:
+            return pending, None
+        key_source = (order.key_source or 'generate').lower()
+        if key_source == 'csr':
+            return None, None
+        src_id = order.source_certificate_id or order.certificate_id
+        if key_source == 'reuse' and src_id:
+            # The key the request carried, even if revoked since: it is the certificate's
+            src_cert = db.session.get(Certificate, src_id)
+            if src_cert is None or not src_cert.prv:
+                return None, 'The certificate holding the key to reuse no longer exists'
+            from utils.key_codec import load_pem_bytes
+            return load_pem_bytes(src_cert.prv, context=f'certificate {src_id}').decode(), None
+        return None, ('The key this order was finalized with was not kept: '
+                      'the certificate cannot be imported, request a new one')
+
+    def _finalize_key(self, order, domains, primary_domain):
+        """``(key or None, CSR b64url, key to keep as pending, error)`` for a finalize request."""
+        key_source = (getattr(order, 'key_source', None) or 'generate').lower()
+        pending = order.pending_key
+        if pending:
+            # A request that may never have reached the CA: sent again with the same key
+            cert_key = serialization.load_pem_private_key(pending.encode(), password=None)
+            return cert_key, self._build_csr_b64(cert_key, domains, primary_domain), True, None
+
+        if key_source == 'csr':
+            if not order.csr_pem:
+                return None, None, False, 'External CSR not stored on order'
+            from utils.acme_csr import load_pem_csr, csr_to_b64url_der
+            try:
+                csr = load_pem_csr(order.csr_pem)
+            except ValueError as exc:
+                return None, None, False, str(exc)
+            match_ok, match_msg = csr_identifiers_match_order(csr, domains)
+            if not match_ok:
+                return None, None, False, match_msg
+            if self._key_revoked_as_compromised(csr.public_key()):
+                return None, None, False, compromised_keys.COMPROMISED_CSR
+            return None, csr_to_b64url_der(csr), False, None
+
+        cert_key = None
+        if key_source == 'reuse':
+            from utils.acme_csr import load_private_key_from_certificate
+            src_id = order.source_certificate_id or order.certificate_id
+            src_cert = db.session.get(Certificate, src_id) if src_id else None
+            if src_id and src_cert is None:
+                return None, None, False, 'The certificate holding the key to reuse no longer exists'
+            if src_cert is not None and not self._revoked_as_compromised(src_cert):
+                try:
+                    cert_key = load_private_key_from_certificate(src_cert)
+                except ValueError as exc:
+                    return None, None, False, str(exc)
+                refusal = fips_private_key_refusal(cert_key)
+                if refusal:
+                    return None, None, False, refusal
+                if self._key_revoked_as_compromised(cert_key.public_key()):
+                    cert_key = None
+            if src_cert is not None and cert_key is None:
+                logger.warning("Order %s does not reuse the key of certificate %s, revoked as "
+                               "compromised: a new key is generated", order.id, src_id)
+            if cert_key is not None:
+                return cert_key, self._build_csr_b64(cert_key, domains, primary_domain), False, None
+        # First issuance of a reuse order, or a key that must not be certified again
+        cert_key, key_error = self._generate_cert_key(order)
+        if key_error:
+            return None, None, False, key_error
+        return cert_key, self._build_csr_b64(cert_key, domains, primary_domain), True, None
+
+    @staticmethod
+    def _keep_before_request(lease) -> bool:
+        """Commit what the finalize request depends on; False when ``lease`` was lost."""
+        if lease is not None:
+            return lease.refresh()
+        db.session.commit()
+        return True
+
+    def finalize_order(self, order: AcmeClientOrder, *, renews: Optional[AcmeClientOrder] = None,
+                       lease=None) -> Tuple[bool, str, Optional[int]]:
+        """Finalize ``order``, download its certificate and import it: ``(success, message, certificate_id)``.
+
+        First issuance (``renews`` None): the certificate goes into a new row, which ``order``
+        then names. Renewal: ``order`` is the one the renewal opened and ``renews`` the order
+        it renews. The certificate is written into the row ``renews`` names, which keeps its
+        id and refid (a new row only when that one is gone or revoked); ``renews`` takes over
+        the order and certificate URLs and ``order`` is deleted, in one commit, then
+        certificate.renewed is emitted.
+
+        A key generated here is stored on the order and committed before the finalize
+        request, and removed with the import. An order the CA already took (processing or
+        valid) is resumed with that key, the external CSR (key_source csr) or the key of the
+        source certificate (reuse). ``lease`` is refreshed before the request and before the
+        import: once lost, this finalization stops and leaves the order to its new holder.
         """
         try:
-            # Check order is ready
             status, data = self.check_order_status(order)
-            if status != 'ready':
-                return False, f"Order not ready for finalization (status: {status})", None
-
             domains = order.domains_list
             primary_domain = domains[0]
-            key_source = (getattr(order, 'key_source', None) or 'generate').lower()
-            cert_key = None
-            csr_b64 = None
 
-            if key_source == 'csr':
-                if not order.csr_pem:
-                    return False, 'External CSR not stored on order', None
-                from utils.acme_csr import load_pem_csr, csr_to_b64url_der
-                try:
-                    csr = load_pem_csr(order.csr_pem)
-                except ValueError as exc:
-                    return False, str(exc), None
-                match_ok, match_msg = csr_identifiers_match_order(csr, domains)
-                if not match_ok:
-                    return False, match_msg, None
-                csr_b64 = csr_to_b64url_der(csr)
-            elif key_source == 'reuse':
-                from utils.acme_csr import load_private_key_from_certificate
-                from models import Certificate
-                src_id = order.source_certificate_id or order.certificate_id
-                if not src_id:
-                    # First issuance: generate a key; renewals reuse it via source_certificate_id.
-                    cert_key, key_error = self._generate_cert_key(order)
-                    if key_error:
-                        return False, key_error, None
-                    csr_b64 = self._build_csr_b64(cert_key, domains, primary_domain)
-                else:
-                    src_cert = db.session.get(Certificate, src_id)
-                    try:
-                        cert_key = load_private_key_from_certificate(src_cert)
-                    except ValueError as exc:
-                        return False, str(exc), None
-                    refusal = fips_private_key_refusal(cert_key)
-                    if refusal:
-                        return False, refusal, None
-                    csr_b64 = self._build_csr_b64(cert_key, domains, primary_domain)
-            else:
-                cert_key, key_error = self._generate_cert_key(order)
+            if status in ('processing', 'valid'):
+                if not data:
+                    return False, 'The CA did not answer about this order: try again later', None
+                key_pem, key_error = self.held_finalize_key(order)
                 if key_error:
                     return False, key_error, None
-                csr_b64 = self._build_csr_b64(cert_key, domains, primary_domain)
-
-            # Submit CSR to finalize URL
-            resp = self._post(order.finalize_url, {"csr": csr_b64})
-            
-            if resp.status_code not in [200, 201]:
-                error = resp.json()
-                return False, f"Finalization failed: {error.get('detail', 'Unknown error')}", None
-            
-            # Poll for certificate
-            order_data = resp.json()
-            self.write_order_status(order, order_data.get('status', 'processing'))
-            db.session.commit()
-            
-            # Wait for certificate (poll up to 30 seconds)
-            for _ in range(10):
-                if order_data.get('certificate'):
-                    break
-                time.sleep(3)
-                status, order_data = self.check_order_status(order)
-                if status == 'invalid':
-                    return False, "Order became invalid during finalization", None
-            
-            if not order_data.get('certificate'):
-                return False, "Certificate not ready after polling", None
-            
-            # Download certificate
-            cert_url = order_data['certificate']
-            cert_resp = self._post(cert_url, "")
-            
-            if cert_resp.status_code != 200:
-                message = "Failed to download certificate"
-                self._record_finalize_failure(order, message)
-                return False, message, None
-
-            cert_pem = self._select_certificate_chain(cert_resp)
-
-            # Store private key (not available for external CSR-only issuance)
-            key_pem = None
-            if cert_key is not None:
+                order_data = data
+            elif status == 'gone':
+                return False, ORDER_GONE, None
+            elif status != 'ready':
+                return False, f"Order not ready for finalization (status: {status})", None
+            else:
+                cert_key, csr_b64, keep, key_error = self._finalize_key(order, domains, primary_domain)
+                if key_error:
+                    return False, key_error, None
                 key_pem = cert_key.private_bytes(
                     encoding=Encoding.PEM,
                     format=serialization.PrivateFormat.PKCS8,
                     encryption_algorithm=serialization.NoEncryption()
-                ).decode()
+                ).decode() if cert_key is not None else None
+                if keep:
+                    order.pending_key = key_pem
+                if not self._keep_before_request(lease):
+                    return False, LEASE_LOST, None
 
-            # Import into UCM certificate store
+                resp = self._post(order.finalize_url, {"csr": csr_b64})
+                if resp.status_code not in [200, 201]:
+                    return False, f"Finalization failed: {self._problem_detail(resp)}", None
+                order_data = resp.json()
+                self.write_order_status(order, order_data.get('status', 'processing'))
+                db.session.commit()
+                if not order_data.get('certificate'):
+                    self._note_retry_after(resp)
+
+            if not order_data.get('certificate'):
+                deadline, interval = self._order_poll_limits()
+                while not order_data.get('certificate'):
+                    if not self._sleep_before_next_poll(deadline, interval):
+                        return False, "Certificate not ready after polling", None
+                    status, order_data = self.check_order_status(order)
+                    if status == 'invalid':
+                        return False, "Order became invalid during finalization", None
+                    if status == 'gone':
+                        return False, ORDER_GONE, None
+
+            if lease is not None and not lease.refresh():
+                return False, LEASE_LOST, None
+
+            cert_url = order_data['certificate']
+            cert_resp = self._post(cert_url, "")
+            if cert_resp.status_code != 200:
+                message = "Failed to download certificate"
+                self._record_finalize_failure(order, message)
+                return False, message, None
+            cert_pem = self._select_certificate_chain(cert_resp)
+
+            if renews is not None:
+                return self._complete_renewal(order, renews, cert_pem, key_pem, cert_url)
+
             cert_id = self._import_certificate(
                 cert_pem=cert_pem,
                 key_pem=key_pem,
                 domains=domains,
                 source='acme_client'
             )
-            
-            if cert_id:
-                order.certificate_id = cert_id
-                order.certificate_url = cert_url
-                order.status = 'issued'
-                order.error_message = None
-                # RFC 8555 §7.1.3: order.expires is the *order resource* expiry
-                # (~7 days for Let's Encrypt), NOT the certificate's notAfter.
-                # The renewal scheduler compares expires_at against `now + threshold`,
-                # so we must replace the order expiry with the cert's notAfter,
-                # otherwise the cert will be renewed on every scheduler tick (issue #74).
-                try:
-                    # cert_pem is a chain; the leaf certificate is the first PEM block.
-                    leaf_pem = cert_pem.split('-----END CERTIFICATE-----')[0] + '-----END CERTIFICATE-----\n'
-                    leaf = x509.load_pem_x509_certificate(leaf_pem.encode(), default_backend())
-                    not_after = leaf.not_valid_after_utc if hasattr(leaf, 'not_valid_after_utc') else leaf.not_valid_after
-                    # Strip tzinfo for SQLite-naive datetime column consistency
-                    order.expires_at = not_after.replace(tzinfo=None) if not_after.tzinfo else not_after
-                except Exception as parse_err:
-                    logger.warning(f"Could not parse cert notAfter for order {order.id}: {parse_err}")
-                db.session.commit()
-
-                logger.info(f"Certificate issued for {domains}, ID: {cert_id}, expires_at={order.expires_at}")
-                return True, "Certificate issued and imported successfully", cert_id
-            else:
+            if not cert_id:
                 message = "Certificate obtained but import failed"
                 self._record_finalize_failure(order, message)
                 return False, message, None
+
+            order.certificate_id = cert_id
+            order.certificate_url = cert_url
+            order.status = 'issued'
+            order.error_message = None
+            order.pending_key = None
+            # RFC 8555 §7.1.3: order.expires is the order resource's expiry, not the
+            # certificate's; the scheduler compares expires_at with its threshold (issue #74).
+            not_after = self._not_after(cert_pem, order)
+            if not_after is not None:
+                order.expires_at = not_after
+            db.session.commit()
+
+            logger.info(f"Certificate issued for {domains}, ID: {cert_id}, expires_at={order.expires_at}")
+            return True, "Certificate issued and imported successfully", cert_id
 
         except Exception as e:
             logger.error(f"Finalization error: {e}")
@@ -1637,6 +1790,74 @@ class AcmeClientService:
             message = 'Database error during finalization' if isinstance(e, SQLAlchemyError) else str(e)
             self._record_finalize_failure(order, message)
             return False, message, None
+
+    @staticmethod
+    def _not_after(cert_pem: str, order) -> Optional[datetime]:
+        """The leaf's notAfter, naive UTC; None when it cannot be read."""
+        try:
+            from services.acme.client_certificates import load_leaf
+            return load_leaf(cert_pem).not_valid_after_utc.replace(tzinfo=None)
+        except Exception as parse_err:
+            logger.warning(f"Could not parse cert notAfter for order {order.id}: {parse_err}")
+            return None
+
+    def _complete_renewal(self, order, renews, cert_pem, key_pem, cert_url):
+        """The renewal half of finalize_order: certificate written, ``renews`` updated and
+        ``order`` deleted in one commit."""
+        from services.acme import client_certificates
+
+        row = db.session.get(Certificate, renews.certificate_id) if renews.certificate_id else None
+        in_place = row is not None and bool(row.crt) and not row.revoked
+        old_serial = row.serial_number if in_place else None
+        from utils.datetime_utils import utc_now
+        now = utc_now()
+        try:
+            client_certificates.check_key(client_certificates.load_leaf(cert_pem), key_pem)
+        except ValueError as exc:
+            self._record_finalize_failure(order, str(exc))
+            return False, str(exc), None
+        if in_place:
+            try:
+                client_certificates.write_renewed(row, cert_pem, key_pem, now)
+            except ValueError as exc:
+                db.session.rollback()
+                self._record_finalize_failure(order, str(exc))
+                return False, str(exc), None
+            cert_id = row.id
+        else:
+            # Gone or revoked: a revoked row keeps its revocation, the certificate gets a new one
+            cert_id = self._import_certificate(cert_pem=cert_pem, key_pem=key_pem,
+                                               domains=order.domains_list, source='acme_client')
+            if not cert_id:
+                message = "Certificate obtained but import failed"
+                self._record_finalize_failure(order, message)
+                return False, message, None
+
+        renews.certificate_id = cert_id
+        renews.order_url = order.order_url
+        renews.certificate_url = cert_url
+        # Renewed from whatever status: the order that fetched the certificate has nothing
+        # of its own left and goes, or it would renew these names again
+        renews.status = 'issued'
+        renews.last_renewal_at = now
+        renews.renewal_failures = 0
+        renews.error_message = None
+        renews.last_error_at = None
+        not_after = self._not_after(cert_pem, order)
+        if not_after is not None:
+            renews.expires_at = not_after
+        db.session.delete(order)
+        try:
+            db.session.commit()
+        except SQLAlchemyError as exc:
+            logger.error(f"Renewed certificate not saved: {exc}")
+            self._record_finalize_failure(order, 'Database error during finalization')
+            return False, 'Database error during finalization', None
+
+        if in_place:
+            client_certificates.after_renewal_commit(row, cert_pem, key_pem, old_serial)
+        logger.info(f"Certificate renewed for {renews.domains_list}, ID: {cert_id}")
+        return True, "Certificate renewed and imported successfully", cert_id
 
     @staticmethod
     def _record_finalize_failure(order, message: str) -> None:
@@ -1665,52 +1886,43 @@ class AcmeClientService:
         domains: List[str],
         source: str = 'acme_client'
     ) -> Optional[int]:
-        """
-        Import certificate into UCM store using CertificateService.
-        
-        Let's Encrypt returns a full chain (end-entity + intermediates).
-        We split it and pass the chain separately for proper storage.
-        
-        Returns:
-            Certificate ID or None
+        """Import a certificate the CA issued into a new row; its id, None on failure.
+
+        The chain goes with the end-entity certificate. A row of the same ``source`` already
+        holding this certificate is returned as it is: a resumed finalization may follow an
+        import whose order update was never saved.
         """
         try:
             from services.cert_service import CertificateService
-            
-            # Split PEM chain: first cert = end-entity, rest = chain
-            pem_blocks = []
-            current_block = []
-            for line in cert_pem.strip().splitlines():
-                current_block.append(line)
-                if line.strip() == '-----END CERTIFICATE-----':
-                    pem_blocks.append('\n'.join(current_block))
-                    current_block = []
-            
-            if not pem_blocks:
+            from services.acme.client_certificates import check_key, load_leaf, split_chain
+
+            end_entity_pem, chain_pem = split_chain(cert_pem)
+            if end_entity_pem is None:
                 logger.error("No PEM certificates found in ACME response")
                 return None
-            
-            end_entity_pem = pem_blocks[0]
-            chain_pem = '\n'.join(pem_blocks[1:]) if len(pem_blocks) > 1 else None
-            
-            # Use domain as description (no "Let's Encrypt:" prefix)
-            primary_domain = domains[0]
-            
+            leaf = load_leaf(cert_pem)
+            check_key(leaf, key_pem)
+            existing = Certificate.query.filter_by(
+                serial_number=str(leaf.serial_number), issuer=leaf.issuer.rfc4514_string(),
+                source=source).first()
+            if existing is not None:
+                return existing.id
+
             cert_record = CertificateService.import_certificate(
-                descr=primary_domain,
+                descr=domains[0],
                 cert_pem=end_entity_pem,
                 key_pem=key_pem,
                 chain_pem=chain_pem,
                 username='system',
                 source=source
             )
-            
             return cert_record.id if cert_record else None
-            
+
         except Exception as e:
             logger.error(f"Certificate import error: {e}")
             return None
     
+
     # =========================================================================
     # Configuration Helpers
     # =========================================================================
@@ -1755,9 +1967,9 @@ class AcmeClientService:
             requested = HASH_BY_NAME[default_digest_for_key_type(cert_key.curve.name)]()
         hash_alg = signing_hash_for(cert_key, requested)
 
-        subject = x509.Name([
-            x509.NameAttribute(NameOID.COMMON_NAME, primary_domain),
-        ])
+        # A CN holds 64 characters (RFC 5280), a DNS name 253: the SAN carries the names anyway
+        has_cn = len(primary_domain) <= 64
+        subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, primary_domain)] if has_cn else [])
         san_list = []
         for identifier in domains:
             normalized_ip = normalize_ip_for_identifier(identifier)
@@ -1769,7 +1981,7 @@ class AcmeClientService:
             subject
         ).add_extension(
             x509.SubjectAlternativeName(san_list),
-            critical=False,
+            critical=not has_cn,
         ).sign(cert_key, hash_alg, default_backend())
 
         csr_der = csr.public_bytes(Encoding.DER)
@@ -1779,10 +1991,9 @@ class AcmeClientService:
     # Cleanup
     # =========================================================================
     
-    def cleanup_dns_challenge(self, order: AcmeClientOrder) -> Tuple[bool, str]:
-        """
-        Clean up DNS records after certificate issuance.
-        """
+    @staticmethod
+    def cleanup_dns_challenge(order: AcmeClientOrder) -> Tuple[bool, str]:
+        """Clean up DNS records after certificate issuance; needs no CA account."""
         if order.challenge_type != 'dns-01' or not order.dns_provider_id:
             return True, "No cleanup needed"
         
@@ -1796,11 +2007,21 @@ class AcmeClientService:
             
             challenges = order.challenges_dict
             for domain, challenge in challenges.items():
-                with txt_record_lock(challenge['dns_txt_name']):
-                    provider.delete_txt_record(
+                value = challenge.get('dns_txt_value')
+                if not value:
+                    # Deleting by name alone would take other orders' values with it
+                    logger.warning("DNS cleanup skipped for %s: no TXT value recorded", challenge['dns_txt_name'])
+                    continue
+                with txt_record_lock(txt_lock_name(provider, challenge['dns_txt_name'])):
+                    if keep_for_another_order(provider, challenge['dns_txt_name'], getattr(order, 'id', None)):
+                        continue
+                    result = provider.delete_txt_record(
                         domain=strip_wildcard(domain),
-                        record_name=challenge['dns_txt_name']
+                        record_name=challenge['dns_txt_name'],
+                        record_value=value,
                     )
+                if isinstance(result, tuple) and not result[0]:
+                    logger.warning("DNS cleanup of %s failed: %s", challenge['dns_txt_name'], result[1])
             
             return True, "DNS records cleaned up"
             

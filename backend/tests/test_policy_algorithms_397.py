@@ -22,6 +22,7 @@ from models.policy import CertificatePolicy
 from services.policy_service import (PolicyEvaluationService, PolicyViolation,
                                      key_label_for_public_key)
 from tests.conftest import get_json
+from tests.fixtures.templates import delete_templates
 
 CONTENT_JSON = 'application/json'
 
@@ -39,10 +40,14 @@ def _policy(app, name, ca_id=None, rules=None, template_id=None):
 
 def _drop(app, model, *ids):
     with app.app_context():
-        for row_id in ids:
-            row = db.session.get(model, row_id)
-            if row is not None:
-                db.session.delete(row)
+        if model is CertificateTemplate:
+            # What points to a template lets go first: SQLite hands the id to the next one
+            delete_templates(ids)
+        else:
+            for row_id in ids:
+                row = db.session.get(model, row_id)
+                if row is not None:
+                    db.session.delete(row)
         db.session.commit()
 
 
@@ -188,7 +193,7 @@ class TestPolicyApi:
 
 class TestOperatorPaths:
 
-    def test_issue_form_default_digest_yields_template_digest_is_refused(
+    def test_issue_form_default_and_template_digest_yield(
             self, app, auth_client, create_ca):
         ca = create_ca(cn='Algo issue CA')
         pid = _policy(app, 'algo-issue', ca['id'], {'allowed_digests': ['sha384']})
@@ -208,10 +213,15 @@ class TestOperatorPaths:
             cert = _signed(app, get_json(r)['data']['id'])
             assert isinstance(cert.signature_hash_algorithm, hashes.SHA384)
 
+            # The template's digest is a preference too (#397 follow-up)
             payload['template_id'] = tpl_id
             r = auth_client.post('/api/v2/certificates', data=json.dumps(payload),
                                  content_type=CONTENT_JSON)
-            assert r.status_code == 400 and b'SHA256' in r.data and b'algo-issue' in r.data
+            assert r.status_code in (200, 201), r.data
+            cert = _signed(app, get_json(r)['data']['id'])
+            assert isinstance(cert.signature_hash_algorithm, hashes.SHA384)
+            assert ('Signature digest SHA256 replaced by SHA384 by policy "algo-issue".'
+                    in r.get_json()['meta']['notices'])
         finally:
             _drop(app, CertificatePolicy, pid)
             _drop(app, CertificateTemplate, tpl_id)

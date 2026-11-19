@@ -71,10 +71,12 @@ def _revoke_superseded_certificates():
     if not superseded_ids:
         return 0
 
-    superseded = Certificate.query.filter(
+    from services.cert.issued_lookup import row_revoked
+    # Revoked by its row or by its CA's record of its serial: left as it is
+    superseded = [cert for cert in Certificate.query.filter(
         Certificate.id.in_(superseded_ids),
         Certificate.revoked == False
-    ).all()
+    ).all() if not row_revoked(cert)]
 
     revoked_count = 0
     for cert in superseded:

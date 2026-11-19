@@ -38,5 +38,6 @@ def test_approved_certificate_carries_every_requested_field(app, create_ca):
     cert.extensions.get_extension_for_oid(ExtensionOID.TLS_FEATURE)
     assert cert.not_valid_before_utc < datetime.now(timezone.utc)
     with app.app_context():
+        ApprovalRequest.query.filter_by(certificate_id=row_id).update({'certificate_id': None})
         db.session.delete(db.session.get(Certificate, row_id))
         db.session.commit()

@@ -16,6 +16,7 @@ from lxml import etree
 
 from models import CA, CATemplatePin, CertificateTemplate, db
 from models.system_config import SystemConfig
+from tests.fixtures.templates import delete_templates
 from services.kerberos import negotiate_auth
 from services.wstep.soap_envelope import SOAP_NS
 
@@ -70,17 +71,11 @@ def xcep_kerberos_config(app, create_ca):
         db.session.add(pin)
         db.session.commit()
         template_id = template.id
-        pin_id = pin.id
 
     yield {'ca': ca_data}
 
     with app.app_context():
-        pin_row = db.session.get(CATemplatePin, pin_id)
-        if pin_row:
-            db.session.delete(pin_row)
-        tmpl = db.session.get(CertificateTemplate, template_id)
-        if tmpl:
-            db.session.delete(tmpl)
+        delete_templates([template_id])
         db.session.commit()
         for key, value in previous.items():
             row = SystemConfig.query.filter_by(key=key).first()
@@ -156,6 +151,9 @@ def test_kerberos_get_policies_succeeds_and_echoes_mutual_auth_token(client, xce
     auth_values = _cauri_auth_values(r.data)
     assert '2' in auth_values  # AUTH_KERBEROS
     assert '4' in auth_values  # AUTH_USERNAME_PASSWORD, still advertised too
+    # The CA builds a machine template's subject from AD on this binding
+    flags = etree.fromstring(r.data).find(f'.//{{{XCEP_NS}}}subjectNameFlags')
+    assert int(flags.text) == 0x18000000
 
 
 def _basic_auth():
@@ -194,3 +192,15 @@ def test_kerberos_cauri_present_via_userpass_endpoint_when_configured(client, xc
     )
     assert r.status_code == 200
     assert '2' in _cauri_auth_values(r.data)  # AUTH_KERBEROS
+
+
+def test_kerberos_malformed_request_is_a_sender_fault(client, xcep_kerberos_config, monkeypatch):
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate', lambda auth_header, connection_key:
+                        negotiate_auth.NegotiateResult(status='authenticated', client_principal='HOST$@HAGLAND.DOMAIN'))
+    r = client.post(XCEP_KRB_URL, data=b'<s:Envelope', headers={
+        'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    assert r.status_code == 400
+    fault = etree.fromstring(r.data).find(f'.//{{{SOAP_NS}}}Fault')
+    assert fault.find(f'{{{SOAP_NS}}}Code/{{{SOAP_NS}}}Value').text == 's:Sender'

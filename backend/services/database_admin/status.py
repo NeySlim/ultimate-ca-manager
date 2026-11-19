@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from config.settings import Config, is_docker
-from utils.db_url import sqlalchemy_url
+from utils.db_url import postgres_connect_args, sqlalchemy_url
 from models import db
 
 from .helpers import _live_database_url, _redact_uri, _human_size, _short_err
@@ -85,13 +85,14 @@ def test_connection(database_url: str) -> Tuple[bool, str]:
         return False, "DATABASE_URL is required"
 
     parsed = urlparse(database_url)
-    if parsed.scheme not in ("postgresql", "postgresql+psycopg2", "sqlite"):
+    if parsed.scheme not in ("postgresql", "postgresql+psycopg", "postgresql+psycopg2", "sqlite"):
         return False, f"Unsupported scheme: {parsed.scheme}"
 
     try:
         engine = create_engine(
             sqlalchemy_url(database_url),
-            connect_args={"connect_timeout": 5} if parsed.scheme.startswith("postgresql") else {},
+            connect_args=({"connect_timeout": 5, **postgres_connect_args(database_url)}
+                          if parsed.scheme.startswith("postgresql") else {}),
             pool_pre_ping=True,
         )
         with engine.connect() as conn:

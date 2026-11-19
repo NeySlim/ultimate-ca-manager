@@ -288,10 +288,23 @@ class TestUnholdRemoveFromCrl:
             row.revoked_at = base.this_update + timedelta(minutes=1)
             db.session.commit()
 
+            held_base = base.crl_number
+
         r = auth_client.post(f'/api/v2/certificates/{cert["id"]}/unhold')
         assert r.status_code == 200, r.data
 
-        delta = _load_crl(_fetch_crl_pem(auth_client, ca['id'], delta=True))
+        # The delta on the base that listed the hold carries removeFromCRL; the
+        # complete CRL regenerated after it then gets a delta of its own
+        with app.app_context():
+            from models.crl import CRLMetadata
+            on_held_base = CRLMetadata.query.filter_by(
+                ca_id=ca['id'], is_delta=True, base_crl_number=held_base
+            ).order_by(CRLMetadata.crl_number.desc()).first()
+            delta = _load_crl(on_held_base.crl_pem)
+        served = _load_crl(_fetch_crl_pem(auth_client, ca['id'], delta=True))
+        served_base = served.extensions.get_extension_for_class(x509.DeltaCRLIndicator).value.crl_number
+        assert served_base == _load_crl(_fetch_crl_pem(auth_client, ca['id'])).extensions \
+            .get_extension_for_class(x509.CRLNumber).value.crl_number
         reasons = [
             e.value.reason
             for entry in delta
@@ -314,6 +327,41 @@ class TestUnholdRemoveFromCrl:
             serial_int = serial_to_int(row.serial_number)
         for entry in full:
             assert entry.serial_number != serial_int
+
+    def test_a_hold_its_record_alone_carries_emits_remove_from_crl(self, app, auth_client, create_ca):
+        """The row is not yet aligned with the record: the delta still says removeFromCRL."""
+        ca = create_ca(cn='Unhold Recorded Delta CA')
+        refid = _enable_delta(app, ca['id'])
+        assert auth_client.post(f'{CRL_BASE}/{ca["id"]}/regenerate').status_code == 200
+        cert = assert_success(_post_json(auth_client, '/api/v2/certificates', {
+            'cn': 'recorded-hold.example.com', 'ca_id': ca['id'], 'validity_days': 30}), status=201)
+        with app.app_context():
+            from models import Certificate, RevokedSerial, db
+            from models.crl import CRLMetadata
+            base = CRLMetadata.query.filter_by(ca_id=ca['id'], is_delta=False) \
+                .order_by(CRLMetadata.crl_number.desc()).first()
+            row = db.session.get(Certificate, cert['id'])
+            db.session.add(RevokedSerial(caref=refid, serial_number=row.serial_number, certificate_id=row.id,
+                                         revoke_reason='certificateHold', valid_to=row.valid_to,
+                                         revoked_at=base.this_update + timedelta(minutes=1)))
+            db.session.commit()
+            held_base = base.crl_number
+        r = auth_client.post(f'/api/v2/certificates/{cert["id"]}/unhold')
+        assert r.status_code == 200, r.data
+        with app.app_context():
+            from models.crl import CRLMetadata
+            on_held_base = CRLMetadata.query.filter_by(
+                ca_id=ca['id'], is_delta=True, base_crl_number=held_base
+            ).order_by(CRLMetadata.crl_number.desc()).first()
+            delta = _load_crl(on_held_base.crl_pem)
+        reasons = [e.value.reason for entry in delta
+                   if (e := _ext_or_none(entry, CRLEntryExtensionOID.CRL_REASON))]
+        assert reasons == [x509.ReasonFlags.remove_from_crl]
+        with app.app_context():
+            from models import Certificate, RevokedSerial, db
+            row = db.session.get(Certificate, cert['id'])
+            assert (row.revoked, row.revoke_reason) == (False, None)
+            assert RevokedSerial.query.filter_by(caref=refid).count() == 0
 
 
 class TestAuthGates:

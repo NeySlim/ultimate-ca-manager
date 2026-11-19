@@ -13,6 +13,10 @@ from models.group import Group, permission_list
 from models.rbac import CustomRole
 from tests.test_backup_export_manifest import PASSWORD, _only, _reseal
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 NAME = 'ssh-scope-restore'
 
 

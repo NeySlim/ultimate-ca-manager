@@ -28,6 +28,10 @@ from services.backup.settings_contract import (
     validate_retention_days,
 )
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 
 # The two download routes, the two delete routes, the two settings routes.
 DOWNLOAD_ROUTES = (

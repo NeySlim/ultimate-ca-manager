@@ -1,5 +1,6 @@
 """Tests for the webhook delivery history + retry endpoints."""
 import json
+import uuid
 import pytest
 
 from models import db, WebhookDelivery
@@ -13,7 +14,7 @@ def endpoint_with_deliveries(app):
         # Shared session-scoped DB with no per-test rollback: clear any dirty
         # transaction left by a prior test before creating the endpoint.
         db.session.rollback()
-        ep = WebhookEndpoint(name='hist', url='https://x.invalid/h',
+        ep = WebhookEndpoint(name=f'hist-{uuid.uuid4().hex[:8]}', url='https://x.invalid/h',
                              events=json.dumps(['*']), enabled=True)
         db.session.add(ep)
         db.session.commit()

@@ -137,8 +137,8 @@ class TestSSOProviderCRUD:
         assert provider['name'] == 'test-ldap'
         assert provider['default_role'] == 'operator'
 
-    def test_create_provider_invalid_role_defaults_to_viewer(self, auth_client):
-        """POST /sso/providers with invalid default_role → fallback to viewer"""
+    def test_create_provider_invalid_role_is_refused(self, auth_client):
+        """An unknown default_role is refused, not stored as viewer."""
         r = auth_client.post('/api/v2/sso/providers',
             data=json.dumps({
                 'name': 'test-bad-role',
@@ -151,15 +151,11 @@ class TestSSOProviderCRUD:
                 'oauth2_userinfo_url': 'https://auth.test.com/userinfo',
             }),
             content_type='application/json')
-        assert r.status_code in (200, 201)
-        data = json.loads(r.data)
-        provider = data.get('data', data)
-        assert provider['default_role'] == 'viewer', \
-            f'Invalid role should fallback to viewer, got {provider["default_role"]}'
+        assert r.status_code == 400
+        assert 'default_role' in json.loads(r.data)['message']
 
     def test_update_provider_invalid_role(self, auth_client):
-        """PUT /sso/providers/<id> with invalid role → fallback to viewer"""
-        # First, get providers to find the test one
+        """PUT /sso/providers/<id> with an unknown role → 400, role unchanged"""
         r = auth_client.get('/api/v2/sso/providers')
         providers = json.loads(r.data).get('data', [])
         test_provider = next((p for p in providers if p['name'] == 'test-ldap'), None)
@@ -169,10 +165,9 @@ class TestSSOProviderCRUD:
         r = auth_client.put(f'/api/v2/sso/providers/{test_provider["id"]}',
             data=json.dumps({'default_role': 'root'}),
             content_type='application/json')
-        assert r.status_code == 200
-        data = json.loads(r.data)
-        provider = data.get('data', data)
-        assert provider['default_role'] == 'viewer'
+        assert r.status_code == 400
+        r = auth_client.get(f'/api/v2/sso/providers/{test_provider["id"]}')
+        assert json.loads(r.data)['data']['default_role'] == test_provider['default_role']
 
     def test_available_providers_public(self, client):
         """GET /sso/available → public endpoint, no auth"""
@@ -379,6 +374,9 @@ class TestResolveRoleFromMapping:
 # ============================================================
 # SSO User Provisioning — _get_or_create_sso_user (#81)
 # ============================================================
+IDP_KEY = 'oauth2:https://idp.example.test'
+
+
 class TestSSOUserProvisioning:
     """Verify role/userinfo decoupling on SSO login (issue #81)."""
 
@@ -392,14 +390,18 @@ class TestSSOUserProvisioning:
         provider.sync_role_on_login = kwargs.get('sync_role_on_login', False)
         provider.default_role = kwargs.get('default_role', 'viewer')
         provider.role_mapping = kwargs.get('role_mapping', None)
+        provider.idp_key.return_value = kwargs.get('idp_key', IDP_KEY)
         return provider
 
     def _ensure_user(self, app, username='sso.alice', role='admin'):
         from models import db, User
+        # Not bound yet, orphaned by a deleted provider for this IdP: a kind a name matches.
         u = User.query.filter_by(username=username).first()
         if u:
             u.role = role
-            u.password_hash = '!sso-no-password!'
+            u.password_hash = '!SSO_NO_PASSWORD!'
+            u.auth_source, u.sso_provider_id, u.sso_external_id = 'oauth2', None, None
+            u.sso_orphan_of = IDP_KEY
             db.session.commit()
             return u
         u = User(
@@ -408,7 +410,9 @@ class TestSSOUserProvisioning:
             full_name='Alice',
             role=role,
             active=True,
-            password_hash='!sso-no-password!',
+            password_hash='!SSO_NO_PASSWORD!',
+            auth_source='oauth2',
+            sso_orphan_of=IDP_KEY,
         )
         db.session.add(u)
         db.session.commit()
@@ -447,16 +451,12 @@ class TestSSOUserProvisioning:
             assert user.role == 'admin'
 
     def test_existing_user_role_kept_when_no_mapping_match(self, app):
-        """sync_role_on_login=True but no mapping match → role unchanged
+        """sync_role_on_login=True without a mapping match → role unchanged
         (NEVER falls back to default_role for existing users — #81)."""
         with app.app_context():
             from api.v2.sso import _get_or_create_sso_user
             self._ensure_user(app, 'sso.carol', role='operator')
-            provider = self._make_provider(
-                default_role='viewer',
-                sync_role_on_login=True,
-                role_mapping=json.dumps({'admins': 'admin'}),
-            )
+            provider = self._make_provider(default_role='viewer', sync_role_on_login=True)
 
             user, err = _get_or_create_sso_user(
                 provider, 'sso.carol', 'carol@example.test', 'Carol',
@@ -464,6 +464,14 @@ class TestSSOUserProvisioning:
             )
             assert err is None
             assert user.role == 'operator', "default_role must NOT be applied to existing users"
+
+            # With rules, a user none of them matches is refused instead.
+            provider.role_mapping = json.dumps({'admins': 'admin'})
+            user, err = _get_or_create_sso_user(
+                provider, 'sso.carol', 'carol@example.test', 'Carol',
+                {'groups': ['users']}
+            )
+            assert user is None and err == 'sso_unmapped'
 
     def test_existing_user_userinfo_synced_without_role(self, app):
         """auto_update_users updates email/name without touching role."""
@@ -688,6 +696,7 @@ class TestSamlStableMatch:
         p.id = kw.get('id', 1); p.provider_type = 'saml'
         p.auto_create_users = True; p.auto_update_users = True
         p.sync_role_on_login = False; p.default_role = 'viewer'; p.role_mapping = None
+        p.idp_key.return_value = None
         return p
 
     def test_saml_match_by_nameid(self, app):

@@ -425,6 +425,13 @@ describe('acmeService', () => {
     expect(call[0]).toContain('/acme/client/orders')
   })
 
+  it('getClientOrders passes the page asked for', async () => {
+    await acmeService.getClientOrders(undefined, undefined, { page: 2, per_page: 100 })
+    const url = mockApiClient.get.mock.calls[0][0]
+    expect(url).toContain('page=2')
+    expect(url).toContain('per_page=100')
+  })
+
   it('getClientSettings → GET /acme/client/settings', async () => {
     await acmeService.getClientSettings()
     expect(mockApiClient.get).toHaveBeenCalledWith('/acme/client/settings')

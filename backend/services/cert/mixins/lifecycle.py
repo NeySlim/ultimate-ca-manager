@@ -12,6 +12,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
 from models import db, CA, CertificateTemplate, Certificate, SystemConfig
+from models.compromised_key import remember_if_compromised
 from utils.validity import DEFAULT_CERTIFICATE_VALIDITY_DAYS
 from utils.key_type import issue_key_type_from_template
 from services.file_regen_service import mirror_private_key
@@ -20,6 +21,10 @@ from services.trust_store import TrustStoreService
 from utils.ct_client import embed_scts_in_certificate
 from utils.file_naming import cert_cert_path, cert_key_path, cert_csr_path, cleanup_old_files
 from utils.datetime_utils import utc_now, to_naive_utc
+from utils.issuance_defaults import template_digest
+from utils.spki_digest import certificate_key_sha256
+from utils.revocation_reasons import revocable
+from services.cert.issued_lookup import effective_revocation, record_reason_replaceable
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +32,26 @@ from security.encryption import decrypt_private_key, encrypt_private_key
 
 _HOLD_REASONS = ('certificateHold', 'certificate_hold')
 _REVOCATION_FIELDS = ('revoked', 'revoked_at', 'revoke_reason', 'invalidity_at')
+
+
+class _AlreadyRevoked(ValueError):
+    """The refusal met under the lock: answered to the caller, not an error to log."""
+
+
+def _lock_own_record(certificate):
+    """Lock by id every record of ``certificate``'s serial under its CA, in the row's own spelling
+    and each unambiguous one (``record_serial_clause``); return the one in the row's spelling."""
+    from sqlalchemy import or_
+    from models import RevokedSerial
+    from services.cert.issued_lookup import record_serial_clause
+    from services.cert.serial_resolution import resolve_record_serial
+    serial = resolve_record_serial(certificate)
+    spelled = RevokedSerial.serial_number == certificate.serial_number
+    if serial is not None:
+        spelled = or_(spelled, record_serial_clause(serial))
+    records = RevokedSerial.query.filter(RevokedSerial.caref == certificate.caref, spelled) \
+        .order_by(RevokedSerial.id).with_for_update().all()
+    return next((r for r in records if r.serial_number == certificate.serial_number), None)
 
 
 def _request_user_id(username):
@@ -58,6 +83,10 @@ def _restore_revocation_state(cert_id, previous):
     except Exception as e:
         db.session.rollback()
         logger.error(f"Certificate {cert_id}: previous revocation state not restored: {e}")
+
+
+REVOKED_THEN_DELETED = ('Certificate {id} was revoked, then deleted: automatic renewal is off. '
+                        'Turn it back on to obtain a new certificate for these names.')
 
 
 class LifecycleMixin:
@@ -123,8 +152,6 @@ class LifecycleMixin:
                                 or key_type)
                 if validity_days is None:
                     validity_days = template.validity_days or validity_days
-                if digest is None:
-                    digest = template.digest or digest
                 from services.template_service import bucket_san_refusal
                 san_refusal = bucket_san_refusal(template, {
                     'san_dns': san_dns, 'san_ip': san_ip, 'san_uri': san_uri, 'san_email': san_email})
@@ -136,10 +163,10 @@ class LifecycleMixin:
             key_type = '2048'
         if validity_days is None:
             validity_days = DEFAULT_CERTIFICATE_VALIDITY_DAYS
-        # A digest asked for (or the template's) is checked; the default yields
+        # A digest asked for is checked; the template's (floored at the CA key's) and the default yield
         digest_explicit = digest is not None
         if digest is None:
-            digest = 'sha256'
+            digest = (template.digest if template is not None else None) or 'sha256'
 
         # Record divergences from the template on the final effective values
         # (#258) — inherited-as-default values compare equal and are not
@@ -192,7 +219,9 @@ class LifecycleMixin:
         sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
             PolicyEvaluationService.applicable_policies(
                 ca.id, template_id, (dn or {}).get('CN'), san_dns),
-            ca_private_key, digest, explicit=digest_explicit,
+            ca_private_key,
+            digest if digest_explicit else template_digest(template, ca_private_key),
+            explicit=digest_explicit,
             context={'operation': 'issuance', 'subject': (dn or {}).get('CN'), 'ca_id': ca.id},
             key_type=_normalize_key_type_label(key_type) or key_type, validity_days=validity_days)
         if violations:
@@ -389,35 +418,50 @@ class LifecycleMixin:
         certificate = db.session.get(Certificate, cert_id)
         if not certificate:
             raise ValueError("Certificate not found")
-        if certificate.revoked:
+        if not revocable(certificate, reason):
             raise ValueError("Certificate already revoked")
 
         ca = CA.query.filter_by(refid=certificate.caref).first() if certificate.caref else None
         is_hold = reason in _HOLD_REASONS
-        previous = {field: getattr(certificate, field) for field in _REVOCATION_FIELDS}
         now = utc_now()
         rejected_renewals = []
         try:
+            # The record is locked before the row is written, the order unholds and the hourly
+            # pass follow (PostgreSQL), so none of them deadlocks
+            record = _lock_own_record(certificate) if ca is not None else None
+            # The row as it stands under its own lock: an unhold or a revocation committed
+            # while this one waited is seen, and only changed columns are sent
+            db.session.refresh(certificate, with_for_update=True)
+            if not revocable(certificate, reason):
+                raise _AlreadyRevoked("Certificate already revoked")
+            # A hold made final: dated now, so the delta lists the change; invalid since the hold
+            # (the row's, or its record's when only the record holds it)
+            held = effective_revocation(certificate)
+            held_since = held.revoked_at if held is not None else None
+            previous = {field: getattr(certificate, field) for field in _REVOCATION_FIELDS}
             certificate.revoked = True
             certificate.revoked_at = now
             certificate.revoke_reason = reason
             if invalidity_at is not None:
                 certificate.invalidity_at = invalidity_at
+            elif held_since is not None and certificate.invalidity_at is None:
+                certificate.invalidity_at = held_since
 
             # A Microsoft certificate has no caref: nothing for a UCM CRL to publish
             if ca is not None:
                 valid_to = to_naive_utc(certificate.valid_to) or now + timedelta(days=365)
-                record = RevokedSerial.query.filter_by(
-                    caref=certificate.caref, serial_number=certificate.serial_number).first()
-                if record is None:
+                fresh = record is None
+                if fresh:
                     record = RevokedSerial(caref=certificate.caref,
                                            serial_number=certificate.serial_number)
                     db.session.add(record)
-                record.revoked_at = now
-                record.revoke_reason = reason
-                record.invalidity_at = certificate.invalidity_at
+                if fresh or record_reason_replaceable(record, reason):
+                    record.revoked_at = now
+                    record.revoke_reason = reason
+                    record.invalidity_at = certificate.invalidity_at
                 record.valid_to = valid_to
                 record.certificate_id = certificate.id
+                record.public_key_sha256 = certificate_key_sha256(certificate.crt)  # None, never raises
             elif certificate.caref:
                 logger.warning("Certificate %s: CA %s not found, no revocation record written",
                                cert_id, certificate.caref)
@@ -433,9 +477,11 @@ class LifecycleMixin:
                     username=username, user_id=_request_user_id(username),
                     certificate_id=certificate.id, reason='Revoked directly', commit=False)
             db.session.flush()
-        except Exception:
+            remember_if_compromised(certificate)
+        except Exception as e:
             db.session.rollback()
-            logger.error("Revocation of certificate %s not staged", cert_id, exc_info=True)
+            if not isinstance(e, _AlreadyRevoked):
+                logger.error("Revocation of certificate %s not staged", cert_id, exc_info=True)
             raise
         rejected_snapshots = request_snapshots(rejected_renewals)
 
@@ -486,7 +532,7 @@ class LifecycleMixin:
         if revoke_related:
             from services.cert.related_pair import mutual_partner
             partner = mutual_partner(db.session.get(Certificate, cert_id))
-            if partner is not None and not partner.revoked:
+            if partner is not None and revocable(partner, reason):
                 partner_id = partner.id
                 try:
                     LifecycleMixin.revoke_certificate(partner_id, reason=reason, username=username,
@@ -549,6 +595,9 @@ class LifecycleMixin:
             cert_snapshots = request_snapshots(closed_cert)
             ApprovalRequest.query.filter(ApprovalRequest.certificate_id == cert_id).delete(
                 synchronize_session='fetch')
+            # SQLite runs no ON DELETE CASCADE: the EST key generator pointer goes explicitly
+            from models.est_signer_cert import EstSignerCert
+            EstSignerCert.query.filter_by(certificate_id=cert_id).delete(synchronize_session='fetch')
 
             binding_ids = [row.id for row in DeployBinding.query.filter_by(certificate_id=cert_id)]
             if binding_ids:
@@ -566,6 +615,14 @@ class LifecycleMixin:
 
         # The revocation record outlives the certificate: unlinked, never cascaded
         try:
+            digest = certificate_key_sha256(certificate.crt)
+            remember_if_compromised(certificate, digest)  # revoked before the table existed
+            if digest:  # a record older than the column learns the key before the row goes
+                # Only the row's own serial: an earlier one, renewed in place, had another key
+                RevokedSerial.query.filter(RevokedSerial.certificate_id == cert_id,
+                                           RevokedSerial.serial_number == certificate.serial_number,
+                                           RevokedSerial.public_key_sha256.is_(None)).update(
+                    {RevokedSerial.public_key_sha256: digest}, synchronize_session='fetch')
             RevokedSerial.query.filter(RevokedSerial.certificate_id == cert_id).update(
                 {RevokedSerial.certificate_id: None}, synchronize_session='fetch')
         except Exception as e:
@@ -573,8 +630,12 @@ class LifecycleMixin:
 
         # PostgreSQL refuses the delete while an ACME order points at the row
         try:
+            unlinked = {AcmeClientOrder.certificate_id: None}
+            if certificate.revoked:  # revoked then deleted: never issued again unasked
+                unlinked.update({AcmeClientOrder.renewal_enabled: False,
+                                 AcmeClientOrder.error_message: REVOKED_THEN_DELETED.format(id=cert_id)})
             AcmeClientOrder.query.filter(AcmeClientOrder.certificate_id == cert_id).update(
-                {AcmeClientOrder.certificate_id: None}, synchronize_session='fetch')
+                unlinked, synchronize_session='fetch')
             AcmeClientOrder.query.filter(AcmeClientOrder.source_certificate_id == cert_id).update(
                 {AcmeClientOrder.source_certificate_id: None}, synchronize_session='fetch')
             AcmeOrder.query.filter(AcmeOrder.certificate_id == cert_id).update(
@@ -608,6 +669,8 @@ class LifecycleMixin:
             for responder_ca_id in responder_cas:
                 SystemConfig.query.filter_by(key=f'ocsp_responder_cert_{responder_ca_id}').delete(
                     synchronize_session='fetch')
+            # Kept under the number, the SCTs would belong to the next certificate given it
+            SystemConfig.query.filter_by(key=f'cert_scts_{cert_id}').delete(synchronize_session='fetch')
             db.session.delete(certificate)
             db.session.commit()
         except Exception as e:

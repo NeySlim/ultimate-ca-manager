@@ -27,7 +27,7 @@ export default {
     ],
     tips: [
       'CSRs preservam a chave privada do solicitante: ela nunca sai do sistema dele',
-      'Você pode adicionar uma chave privada a um CSR após a assinatura se necessário para exportação PKCS#12',
+      'Carregar Chave anexa uma chave privada a um CSR pendente, para que o certificado assinado possa ser exportado como PKCS#12',
       'Um certificado importado para um CSR gerado no UCM completa esse CSR: o registo mantém a sua chave privada, pelo que o certificado é exportado com ela',
       'Um certificado para uma chave ML-DSA mantém apenas bits de assinatura: keyEncipherment, dataEncipherment e keyAgreement pedidos pelo modelo são removidos, e o resultado di-lo',
       'Um CSR gerado com related_to (API, requer read:private_keys) designa um certificado A existente: assiná-lo emite um certificado ligado a A (RFC 9763), recusado se declarar um key usage ou EKU que A não tenha',
@@ -74,7 +74,7 @@ Pela API, \`related_to\` designa um certificado existente **A** cuja chave priva
 ## Enviando um CSR
 
 1. Clique em **Enviar CSR**
-2. Cole o texto PEM ou envie um arquivo PEM/DER
+2. Cole o texto PEM ou envie um arquivo PEM
 3. O UCM valida a assinatura do CSR e exibe os detalhes
 4. O CSR aparece na aba Pendentes
 
@@ -95,9 +95,10 @@ Clique em um CSR para visualizar:
 3. Escolha a **CA Assinante** (deve ter chave privada)
 4. Selecione o **Tipo de Certificado** (servidor, cliente, assinatura de código, e-mail)
 5. Defina o **período de validade** em dias
-6. Opcionalmente aplique um modelo para Key Usage e extensões
-7. Opcionalmente **Adicionar nomes** (email, DNS, IP, URI) aos do pedido
-8. Clique em **Assinar**
+6. Opcionalmente **Adicionar nomes** (email, DNS, IP, URI) aos do pedido
+7. Clique em **Assinar**
+
+No modo Microsoft CA, o modelo AD CS é escolhido no lugar do tipo de certificado.
 
 O certificado resultante aparece na página de Certificados.
 
@@ -146,13 +147,13 @@ Um dispositivo que guarda a sua chave, como um smartcard, muitas vezes não cons
 
 ## Adicionando uma Chave Privada
 
-Após a assinatura, você pode anexar uma chave privada ao certificado para exportação PKCS#12. Clique em **Adicionar Chave** no certificado assinado.
+Antes da assinatura, **Carregar Chave** anexa a chave privada a um CSR pendente, para que o certificado assinado possa ser exportado como PKCS#12. Um pedido já assinado não oferece mais essa ação.
 
 > 💡 Isso é útil quando o solicitante envia tanto o CSR quanto a chave de forma segura.
 
 ## Excluindo CSRs
 
-A exclusão remove o CSR do UCM. Se o CSR já foi assinado, o certificado resultante não é afetado.
+A exclusão remove um CSR pendente do UCM. Um pedido assinado é o seu certificado: ele é excluído na página Certificados, não aqui.
 `
   }
 }

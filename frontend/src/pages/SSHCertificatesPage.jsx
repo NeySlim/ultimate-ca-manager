@@ -886,8 +886,8 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
       }
 
       const criticalOptions = {}
-      if (forceCommand.trim()) criticalOptions['force-command'] = forceCommand.trim()
-      if (sourceAddress.trim()) criticalOptions['source-address'] = sourceAddress.trim()
+      if (certType === 'user' && forceCommand.trim()) criticalOptions['force-command'] = forceCommand.trim()
+      if (certType === 'user' && sourceAddress.trim()) criticalOptions['source-address'] = sourceAddress.trim()
       if (Object.keys(criticalOptions).length > 0) {
         data.critical_options = criticalOptions
       }
@@ -1105,7 +1105,8 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
         </div>
       )}
 
-      {/* Critical Options (collapsible) */}
+      {/* Critical Options (collapsible): OpenSSH defines none for host certificates */}
+      {certType === 'user' && (
       <div>
         <button
           type="button"
@@ -1140,6 +1141,7 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
           </div>
         )}
       </div>
+      )}
 
       {/* Submit */}
       <div className="flex justify-end gap-2 pt-4 border-t border-border">

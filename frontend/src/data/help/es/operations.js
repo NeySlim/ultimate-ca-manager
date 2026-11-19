@@ -27,7 +27,7 @@ export default {
       'Use las fichas de recursos para cambiar rápidamente entre tipos de recursos',
       'La búsqueda en línea y los filtros (Estado, CA) le permiten reducir los elementos sin salir de la barra de herramientas',
       'Cambie entre los modos de vista Tabla y Cesta (panel de transferencia) en escritorio',
-      'Previsualice los cambios antes de confirmar las operaciones masivas',
+      'Revocar, renovar, firmar y eliminar piden confirmación antes de ejecutarse; una exportación se inicia de inmediato',
     ],
     warnings: [
       'La eliminación masiva es irreversible: siempre cree una copia de seguridad primero',
@@ -41,13 +41,13 @@ export default {
 
 Operaciones masivas y gestión de datos. Realice acciones por lotes en múltiples recursos simultáneamente.
 
-## Pestaña Importar/Exportar
+## Pestaña Importar
 
-Igual que la página de Importar/Exportar: asistente de importación inteligente y funcionalidad de exportación masiva.
+Igual que la página de Importar/Exportar: el asistente de importación inteligente y la integración OPNsense (conectar, explorar e importar desde OPNsense).
 
-## Pestaña OPNsense
+## Pestaña Exportar
 
-Igual que la integración OPNsense de Importar/Exportar: conectar, explorar e importar desde OPNsense.
+Exportación masiva de certificados y CAs.
 
 ## Acciones masivas
 
@@ -55,10 +55,9 @@ Realice operaciones por lotes en múltiples recursos a la vez.
 
 ### Cómo funciona
 1. Seleccione el **tipo de recurso** (Certificados, CAs, CSRs, Plantillas, Usuarios)
-2. Explore los elementos disponibles en el **panel izquierdo**
-3. Mueva elementos al **panel derecho** (seleccionados) usando las flechas de transferencia
-4. Elija la **acción** a realizar
-5. Confirme y ejecute
+2. Marque los elementos en la tabla (la vista Cesta opcional los mueve entre dos paneles)
+3. Elija la **acción** a realizar
+4. Confirme y ejecute
 
 ### Acciones disponibles por recurso
 
@@ -77,16 +76,14 @@ Realice operaciones por lotes en múltiples recursos a la vez.
 - **Eliminación masiva**: Eliminar los CSRs seleccionados
 
 #### Plantillas
-- **Exportación masiva**: Exportar como JSON
 - **Eliminación masiva**: Eliminar las plantillas seleccionadas
 
 #### Usuarios
-- **Desactivación masiva**: Desactivar las cuentas de usuario seleccionadas
 - **Eliminación masiva**: Eliminar permanentemente los usuarios seleccionados
 
 > ⚠ Las operaciones masivas son irreversibles. Siempre cree una copia de seguridad antes de realizar eliminaciones o revocaciones masivas.
 
-> 💡 Use la búsqueda y los filtros en el panel izquierdo para encontrar rápidamente elementos específicos.
+> 💡 Use la búsqueda y los filtros sobre la tabla para encontrar rápidamente elementos específicos.
 `
   }
 }

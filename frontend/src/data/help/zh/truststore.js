@@ -2,25 +2,24 @@ export default {
   helpContent: {
     title: '信任库',
     subtitle: '管理受信任的证书',
-    overview: '导入和管理受信任的根 CA 和中间 CA 证书。信任库用于链验证，可以与操作系统信任库同步。',
+    overview: '保存受信任的根 CA 和中间 CA 证书。证书的链视图及其导出会用主题与签发者名称匹配的信任库证书来补全证书链。信任库可由操作系统信任库或 UCM 管理的 CA 填充。',
     sections: [
       {
         title: '证书类型',
         definitions: [
           { term: '根 CA', description: '自签名的顶级信任锚点' },
           { term: '中间', description: '由根 CA 或其他中间 CA 签署的 CA 证书' },
-          { term: '客户端认证', description: '用于客户端认证（mTLS）的证书' },
+          { term: '系统', description: '从操作系统信任库导入' },
           { term: '代码签名', description: '用于代码签名验证的证书' },
+          { term: '电子邮件', description: '用于 S/MIME 的证书' },
           { term: '自定义', description: '手动分类的受信任证书' },
         ]
       },
       {
         title: '操作',
         items: [
-          { label: '导入文件', text: '上传 PEM、DER 或 PKCS#7 证书文件' },
-          { label: '从 URL 导入', text: '从远程 URL 获取证书' },
-          { label: '添加 PEM', text: '直接粘贴 PEM 编码的证书文本' },
-          { label: '从系统同步', text: '将操作系统信任的 CA 导入到 UCM' },
+          { label: '添加', text: '添加 UCM 所管理 CA 的证书。外部证书通过 API 添加（POST /api/v2/truststore 携带 PEM，或 /api/v2/truststore/import 携带 PEM 或 DER 文件）' },
+          { label: '从系统同步', text: '将操作系统信任的 CA 导入到 UCM，数量不超过所选值（默认 500，最多 1000）' },
           { label: '导出', text: '单独下载受信任的证书' },
           { label: '删除所选', text: '选择多个证书并一并移除，例如筛选为已过期的系统 CA；仅移除当前筛选条件下显示的行' },
         ]
@@ -36,32 +35,27 @@ export default {
     content: `
 ## 概述
 
-信任库管理用于链验证的受信任 CA 证书。从外部来源导入根 CA 和中间 CA，或与操作系统的信任库同步。
+信任库保存受信任的 CA 证书。可由 UCM 管理的 CA 或操作系统的信任库填充。
 
 ## 证书类别
 
 - **根 CA**: 自签名的信任锚点
 - **中间**: 由根 CA 或其他中间 CA 签署的 CA
-- **客户端认证**: 用于 mTLS 客户端认证的证书
+- **系统**: 从操作系统信任库导入
 - **代码签名**: 用于代码签名验证的证书
+- **电子邮件**: 用于 S/MIME 的证书
 - **自定义**: 手动分类的证书
 
-## 导入证书
+## 添加证书
 
-### 从文件导入
-上传以下格式的证书文件：
-- **PEM**: Base64 编码（单个或捆绑）
-- **DER**: 二进制格式
-- **PKCS#7 (P7B)**: 证书链
+### 从受管 CA 添加
+**添加**会列出 UCM 管理的 CA：选择要信任的 CA。
 
-### 从 URL 导入
-从远程 HTTPS 端点获取证书。UCM 下载并导入服务器的证书链。
-
-### 粘贴 PEM
-直接将 PEM 编码的证书文本粘贴到文本区域。
+### 外部证书
+页面没有用于上传 UCM 之外证书的表单。请通过 API 添加：\`POST /api/v2/truststore\` 携带其 PEM，或 \`POST /api/v2/truststore/import\` 携带 PEM 或 DER 文件。
 
 ### 从系统同步
-从操作系统的信任库导入所有受信任的 CA。这将使 UCM 包含与操作系统信任的相同根 CA（例如 Linux 上的 Mozilla CA 捆绑包）。
+导入操作系统信任库中的受信任 CA（例如 Linux 上的 Mozilla CA 捆绑包），数量不超过所选值：默认 500，最多 1000。
 
 > 💡 从系统同步是一次性导入。操作系统信任库的更改不会自动反映。
 
@@ -75,14 +69,10 @@ export default {
 
 ## 使用场景
 
-### 链验证
-验证证书链时，UCM 检查信任库中是否有已识别的根 CA。
+### 证书链
+证书的链视图及其带链的导出，会用主题与签发者名称匹配的信任库证书来补全证书链。不会根据信任库验证任何签名。
 
-### mTLS
-在双向 TLS 认证中呈现的客户端证书将根据信任库进行验证。
-
-### ACME
-当 UCM 作为 ACME 客户端（Let's Encrypt）时，信任库用于验证 ACME CA 的证书。
+信任库不参与 mTLS 客户端认证（该认证使用在设置 › 安全中选择的受信任 CA），也不参与 ACME 客户端与其 CA 的连接。
 `
   }
 }

@@ -35,6 +35,10 @@ import { effectiveDnsUpdatePort, settingsAfterPortSave } from './acme/dnsUpdateP
 import DnsProviderForm from './acme/DnsProviderForm'
 import DomainForm from './acme/DomainForm'
 import LocalDomainForm from './acme/LocalDomainForm'
+import { fetchPages } from '../lib/fetchAllPages'
+
+// The order list pages by 100 rows; the tab shows and filters all of them
+const CLIENT_ORDERS_MAX = 5000
 
 export default function ACMEPage() {
   const { t } = useTranslation()
@@ -55,6 +59,7 @@ export default function ACMEPage() {
 
   // Data states - Let's Encrypt Client
   const [clientOrders, setClientOrders] = useState([])
+  const [clientOrdersPartial, setClientOrdersPartial] = useState(null)
   const [clientSettings, setClientSettings] = useState({})
   const [caAccounts, setCaAccounts] = useState([])
   const [dnsProviders, setDnsProviders] = useState([])
@@ -163,7 +168,9 @@ export default function ACMEPage() {
         acmeService.getSettings(),
         casService.getAll(),
         acmeService.getHistory(),
-        acmeService.getClientOrders().catch(() => ({ data: [] })),
+        fetchPages((page) => acmeService.getClientOrders(undefined, undefined, page), { max: CLIENT_ORDERS_MAX })
+          .then(({ rows, total, complete }) => ({ data: rows, partial: complete ? null : { loaded: rows.length, total } }))
+          .catch(() => ({ data: [] })),
         acmeService.getClientSettings().catch(() => ({ data: {} })),
         acmeService.getDnsProviders().catch(() => ({ data: [] })),
         acmeService.getDnsProviderTypes().catch(() => ({ data: [] })),
@@ -178,6 +185,7 @@ export default function ACMEPage() {
       setCas(casRes.data || casRes.cas || [])
       setHistory(historyRes.data || [])
       setClientOrders(clientOrdersRes.data || [])
+      setClientOrdersPartial(clientOrdersRes.partial || null)
       setClientSettings(clientSettingsRes.data || {})
       setCaAccounts(caAccountsRes.data || [])
       setEabHmacInput(null)
@@ -663,6 +671,16 @@ export default function ACMEPage() {
     window.location.href = `/certificates?id=${order.certificate_id}`
   }
   
+  const handleToggleOrderRenewal = async (order, enabled) => {
+    try {
+      await acmeService.updateOrder(order.id, { renewal_enabled: enabled })
+      showSuccess(t('acme.orderRenewalUpdated'))
+      loadData()
+    } catch (error) {
+      showError(error.message || t('messages.errors.updateFailed.generic'))
+    }
+  }
+
   // Manual renewal
   const handleRenewCertificate = async (order) => {
     try {
@@ -671,6 +689,7 @@ export default function ACMEPage() {
       loadData()
     } catch (error) {
       showError(error.message || t('acme.renewalFailed'))
+      loadData()  // the order now shows the failure
     }
   }
   
@@ -1222,6 +1241,7 @@ export default function ACMEPage() {
         {activeTab === 'letsencryptorders' && (
           <LetsEncryptOrdersTab
             clientOrders={clientOrders}
+            partial={clientOrdersPartial}
             selectedClientOrder={selectedClientOrder}
             onSelectOrder={setSelectedClientOrder}
             onRefresh={loadData}
@@ -1232,7 +1252,9 @@ export default function ACMEPage() {
             onDownloadCertificate={handleDownloadCertificate}
             onRenewCertificate={handleRenewCertificate}
             onDeleteOrder={handleDeleteClientOrder}
+            onToggleRenewal={handleToggleOrderRenewal}
             canDelete={canDelete('acme')}
+            canWrite={canWrite('acme')}
           />
         )}
         {activeTab === 'dns' && (
