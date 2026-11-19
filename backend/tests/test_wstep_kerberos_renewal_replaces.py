@@ -3,6 +3,7 @@ and after a change of the profile's CA the certificate of the former CA renews a
 PostgreSQL with UCM_TEST_APP_PG_URL). The renewed row is archived in the commit that stores its
 successor, and a second renewal of it is refused on either binding."""
 import base64
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -188,8 +189,8 @@ def test_a_held_kerberos_renewal_whose_certificate_the_other_binding_renewed_is_
 
 @pytest.fixture
 def moved(app, world, create_ca):
-    """Moves profile c04-a from CA A to a new CA A2 offering the same templates; the profile's
-    template identifiers do not change."""
+    """Moves profile c04-a from CA A to a new CA A2 offering the same templates, CA A listed for
+    renewal as the profiles API lists it; the profile's template identifiers do not change."""
     a2 = create_ca(cn='C19 A2 CA')
     with app.app_context():
         template_ids = [t.template_id for t in CATemplatePin.query.filter_by(ca_id=world['cas']['A']['id'])]
@@ -197,10 +198,12 @@ def moved(app, world, create_ca):
             db.session.add(CATemplatePin(ca_id=a2['id'], template_id=template_id))
         profile = _profile('c04-a')
         profile.issuing_ca_refid = a2['refid']
+        profile.renewal_ca_refids = json.dumps([world['cas']['A']['refid']])
         db.session.commit()
     yield a2
     with app.app_context():
         _profile('c04-a').issuing_ca_refid = world['cas']['A']['refid']
+        _profile('c04-a').renewal_ca_refids = '[]'
         CATemplatePin.query.filter_by(ca_id=a2['id']).delete()
         db.session.commit()
 

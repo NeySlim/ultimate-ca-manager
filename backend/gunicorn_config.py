@@ -123,7 +123,7 @@ def ssl_context(conf, default_ssl_context_factory):
 
 
 from boot_config import (MTLS_UNDECIDED, HttpsMaterialError, anchor_client_verification,
-                         materialize_https, mtls_client_ca, wstep_enabled)
+                         materialize_https, mtls_client_ca, mtls_former_cas, wstep_enabled)
 
 # Drives the TLS 1.2 cap in ssl_context().
 WSTEP_TLS12_CAP_NEEDED = wstep_enabled(data_path)
@@ -139,6 +139,33 @@ def _remember_mtls_mode(mode):
             handle.write(mode)
     except OSError as e:
         print(f"mTLS: could not record the mode: {e}", file=sys.stderr)
+
+
+def _write_private(name, content):
+    """Write *name* in the data directory atomically (temp file + rename), owner and group only."""
+    import tempfile
+    import stat
+    path = os.path.join(data_path, name)
+    fd, temp_path = tempfile.mkstemp(dir=data_path, prefix=f'.{name}_', suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w') as f:
+            f.write(content)
+        os.chmod(temp_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP)
+        os.rename(temp_path, path)
+    except Exception:
+        try:
+            os.unlink(temp_path)
+        except OSError:
+            pass
+        raise
+    return path
+
+
+def _remember_former_cas(refids):
+    """The former CAs this listener trusts, for the application (utils.client_cert.FORMER_CAS_FILE)."""
+    import json
+    from boot_config import MTLS_FORMER_CAS_FILE
+    _write_private(MTLS_FORMER_CAS_FILE, json.dumps(sorted(refids)))
 
 
 def _reuse_last_known_mtls():
@@ -183,26 +210,17 @@ def _load_mtls_config():
                 _reuse_last_known_mtls()
             return
         if not found:
+            _remember_former_cas([])
             _remember_mtls_mode('off')
             return
         ca_pem, ca_name, required = found
-
-        # Write CA cert atomically (temp file + rename) with restricted permissions
-        import tempfile
-        import stat
-        ca_file_path = os.path.join(data_path, 'mtls_ca.pem')
-        fd, temp_path = tempfile.mkstemp(dir=data_path, prefix='.mtls_ca_', suffix='.tmp')
-        try:
-            with os.fdopen(fd, 'w') as f:
-                f.write(ca_pem)
-            os.chmod(temp_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP)
-            os.rename(temp_path, ca_file_path)
-        except Exception as e:
-            try:
-                os.unlink(temp_path)
-            except OSError:
-                pass
-            raise e
+        # The former CAs a Windows profile lists renew over TLS: anchors beside the mTLS CA, whose
+        # certificates the application keeps from every route but WSTEP renewal
+        former = mtls_former_cas(data_path)
+        # The list first: a bundle trusting a CA the application does not set aside is never written
+        _remember_former_cas(refid for refid, _pem, _name in former)
+        ca_file_path = _write_private('mtls_ca.pem', ''.join(
+            pem if pem.endswith('\n') else pem + '\n' for pem in [ca_pem, *(f[1] for f in former)]))
 
         ca_certs = ca_file_path
         cert_reqs = 2 if required else 1
@@ -210,6 +228,9 @@ def _load_mtls_config():
 
         mode = "REQUIRED" if cert_reqs == 2 else "OPTIONAL"
         print(f"mTLS: {mode}, trusted CA: {ca_name}", file=sys.stderr)
+        if former:
+            print("mTLS: former CAs trusted for Windows renewal only: "
+                  + ', '.join(name for _refid, _pem, name in former), file=sys.stderr)
 
     except Exception as e:
         print(f"mTLS: config load failed: {e}", file=sys.stderr)

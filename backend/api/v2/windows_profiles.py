@@ -34,7 +34,7 @@ MAX_PER_PAGE = 200
 SERVICES = ('xcep', 'wstep')
 WRITABLE = ('name', 'realm', 'enabled', 'is_default', 'connector_id', 'issuing_ca_refid',
             'policy_ca_refid', 'validity_days', 'allowed_ad_group', 'pinned_subject_fields',
-            'template_ids',
+            'template_ids', 'renewal_ca_refids',
             *(f'{svc}_{part}' for svc in SERVICES for part in ('username', 'password')))
 
 
@@ -128,6 +128,9 @@ def _render(profile, ca_names, connectors=None, failing=None, templates=None, de
         'issuing_ca_name': ca_names.get(profile.issuing_ca_refid),
         'policy_ca_refid': profile.policy_ca_refid,
         'policy_ca_name': ca_names.get(profile.policy_ca_refid),
+        # Former issuing CAs whose certificates still renew; a name of None: the CA is deleted
+        'renewal_cas': [{'refid': r, 'name': ca_names.get(r)}
+                        for r in windows_profiles.renewal_ca_refids(profile)],
         # Read-only: fixed at creation, outside WRITABLE
         'policy_id': profile.policy_id,
         'policy_oid_root': profile.policy_oid_root,
@@ -169,7 +172,8 @@ def _render_page(profiles):
 
 
 def _ca_names(profiles):
-    refids = {r for p in profiles for r in (p.issuing_ca_refid, p.policy_ca_refid) if r}
+    refids = {r for p in profiles
+              for r in (p.issuing_ca_refid, p.policy_ca_refid, *windows_profiles.renewal_ca_refids(p)) if r}
     if not refids:
         return {}
     return {c.refid: (c.descr or c.common_name)
@@ -247,6 +251,7 @@ def _apply(profile, data):
     if 'enabled' in data:
         profile.enabled = data['enabled']
 
+    outgoing = profile.issuing_ca_refid if profile.id is not None else None
     for field, check in (('issuing_ca_refid', signing_ca_problem), ('policy_ca_refid', xcep_ca_problem)):
         if field not in data:
             continue
@@ -261,6 +266,9 @@ def _apply(profile, data):
             if refid != getattr(profile, field) and check(ca):
                 return check(ca), 400
         setattr(profile, field, refid)
+    problem = _apply_renewal_cas(profile, data, outgoing)
+    if problem:
+        return problem
 
     if 'validity_days' in data:
         days = coerce_validity_days(data['validity_days'])
@@ -312,6 +320,71 @@ def _apply(profile, data):
         profile.is_default = True
         profile._designated = True
     return problem
+
+
+def _apply_renewal_cas(profile, data, outgoing):
+    """The former CAs whose certificates renew: the outgoing CA is listed when the issuing CA
+    changes; the operator may only remove one, never list a CA that was not the profile's."""
+    current = windows_profiles.renewal_ca_refids(profile)
+    moved = outgoing if outgoing and outgoing != profile.issuing_ca_refid else None
+    if 'renewal_ca_refids' in data:
+        value = data['renewal_ca_refids']
+        if not isinstance(value, list) or any(not isinstance(r, str) or not r for r in value):
+            return 'renewal_ca_refids must be a list of CA refids', 400
+        allowed = set(current) | ({moved} if moved else set())
+        unknown = [r for r in value if r not in allowed]
+        if unknown:
+            return (f'renewal_ca_refids may only remove CAs from the list: {", ".join(unknown)} is not a '
+                    'former issuing CA of this profile (one is listed when the issuing CA changes)'), 400
+        wanted = list(dict.fromkeys(value))
+    else:
+        wanted = current + ([moved] if moved and moved not in current else [])
+    # The issuing CA is never a former one: moving back to it takes it off the list
+    wanted = [r for r in wanted if r != profile.issuing_ca_refid]
+    profile._renewal_change = (sorted(set(wanted) - set(current)), sorted(set(current) - set(wanted)))
+    profile.renewal_ca_refids = json.dumps(wanted)
+    return None
+
+
+def _renewal_change_details(profile):
+    """The audit's words for the former CAs listed and removed by this save, '' when none."""
+    added, removed = getattr(profile, '_renewal_change', ([], []))
+    names = ({c.refid: c.descr or c.common_name for c in CA.query.filter(CA.refid.in_(added + removed))}
+             if added or removed else {})
+    parts = []
+    if added:
+        parts.append('former CA listed for renewal: ' + ', '.join(names.get(r) or r for r in added))
+    if removed:
+        parts.append('former CA removed from renewal: ' + ', '.join(names.get(r) or r for r in removed))
+    return ''.join(f'; {p}' for p in parts)
+
+
+def _queue_listener_restart(trusted_before):
+    """None when the CAs the TLS listener trusts for renewal stay the same; else whether the restart
+    that reloads them is a rolling one, queued in HA in the same transaction as the change."""
+    if windows_profiles.listener_former_refids() == trusted_before:
+        return None
+    from utils.ha import ha_enabled
+    if ha_enabled():
+        from services.cluster_commands import RESTART, emit
+        emit(RESTART)
+        return True
+    return False
+
+
+def _listener_restart(rolling):
+    """``(needs_restart, message)`` once the change is committed, the local restart asked for."""
+    if rolling is None:
+        return False, None
+    if rolling:
+        from services.cluster_commands import ROLLING_RESTART_MESSAGE
+        return True, ROLLING_RESTART_MESSAGE
+    from config.settings import is_docker, restart_ucm_service
+    if is_docker():
+        return True, 'Restart the container so that the TLS listener trusts the former CAs as listed.'
+    success, msg = restart_ucm_service()
+    return True, ('Service restart initiated so that the TLS listener trusts the former CAs as listed.'
+                  if success else msg)
 
 
 def _template_id_list(value):
@@ -405,8 +478,8 @@ def _audit(action, profile, details):
 @bp.route('/api/v2/windows-profiles', methods=['GET'])
 @require_auth(['read:xcep'])
 def list_windows_profiles():
-    """Profiles, paginated; ``q`` matches the name or the realm, ``ca`` (a refid) the issuing or
-    policy CA, ``state`` one of complete, keytab_missing, connector_failing, disabled."""
+    """Profiles, paginated; ``q`` matches the name or the realm, ``ca`` (a refid) the issuing,
+    policy or a former renewal CA, ``state`` one of complete, keytab_missing, connector_failing, disabled."""
     page, per_page = parse_request_pagination(default_per_page=25, max_per_page=MAX_PER_PAGE)
     P = WindowsEnrollmentProfile
     query = P.query
@@ -416,7 +489,8 @@ def list_windows_profiles():
         query = query.filter(db.or_(P.name.ilike(like, escape='\\'), P.realm.ilike(like, escape='\\')))
     ca = (request.args.get('ca') or '').strip()
     if ca:
-        query = query.filter(db.or_(P.issuing_ca_refid == ca, P.policy_ca_refid == ca))
+        query = query.filter(db.or_(P.issuing_ca_refid == ca, P.policy_ca_refid == ca,
+                                    P.renewal_ca_refids.contains(json.dumps(ca), autoescape=True)))
     state = (request.args.get('state') or '').strip()
     if state:
         if state not in STATES:
@@ -484,6 +558,7 @@ def update_windows_profile(profile_id):
     if not isinstance(data, dict):
         return error_response('A JSON object is required', 400)
     changed = sorted(k for k in data if k in WRITABLE)
+    trusted_before = windows_profiles.listener_former_refids()
     problem = _apply(profile, {k: v for k, v in data.items() if k in WRITABLE})
     if problem:
         db.session.rollback()
@@ -493,12 +568,17 @@ def update_windows_profile(profile_id):
         return taken
     profile.updated_by = _actor()
     _store_templates(profile)
+    rolling = _queue_listener_restart(trusted_before)
     ok, err = safe_commit(logger, 'Failed to update the Windows enrollment profile')
     if not ok:
         return err
+    listener_restart = _listener_restart(rolling)
     _audit('windows_profile_update', profile,
-           f"Updated Windows enrollment profile {profile.name}; fields: {', '.join(changed) or 'none'}")
-    return success_response(data=_render_one(profile, detail=True), message='Profile updated')
+           f"Updated Windows enrollment profile {profile.name}; fields: {', '.join(changed) or 'none'}"
+           f"{_renewal_change_details(profile)}")
+    data = _render_one(profile, detail=True)
+    data['needs_restart'], data['restart_message'] = listener_restart
+    return success_response(data=data, message='Profile updated')
 
 
 @bp.route('/api/v2/windows-profiles/<int:profile_id>', methods=['DELETE'])
@@ -512,6 +592,7 @@ def delete_windows_profile(profile_id):
         return error_response(blocker.message, blocker.status)
     name = profile.name
     held_keytab = bool(profile.keytab)
+    trusted_before = windows_profiles.listener_former_refids()
     # SQLite enforces no key: the template links go with their profile explicitly
     WindowsProfileTemplate.query.filter_by(profile_id=profile.id).delete()
     # No key either: a dangling id would be inherited by a later profile reusing it
@@ -522,15 +603,18 @@ def delete_windows_profile(profile_id):
         problem = _recompose_keytab()
         if problem:
             return error_response(problem[0], problem[1])
+    rolling = _queue_listener_restart(trusted_before)
     ok, err = safe_commit(logger, 'Failed to delete the Windows enrollment profile')
     if not ok:
         return err
+    needs_restart, restart_message = _listener_restart(rolling)
     if held_keytab:
         _write_keytab_file()
     AuditService.log_action(action='windows_profile_delete', resource_type='windows_profile',
                             resource_id=str(profile_id), resource_name=name,
                             details=f'Deleted Windows enrollment profile {name}', success=True)
-    return success_response(message='Profile deleted')
+    return success_response(data={'needs_restart': needs_restart, 'restart_message': restart_message},
+                            message='Profile deleted')
 
 
 def _read_keytab_upload():

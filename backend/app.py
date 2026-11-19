@@ -1296,6 +1296,9 @@ def create_app(config_name=None):
                 {'Content-Type': 'text/plain; charset=utf-8'})
 
     app.before_request_funcs.setdefault(None, []).insert(0, enforce_admin_allowlist)
+    # First of all: a client certificate trusted on a former CA alone reaches WSTEP renewal only
+    from utils.client_cert import set_aside_former_ca_peercert
+    app.before_request_funcs[None].insert(0, set_aside_former_ca_peercert)
 
     # ── Global error handlers ─────────────────────────────────
     # Ensure ALL errors return JSON (not HTML) for API requests

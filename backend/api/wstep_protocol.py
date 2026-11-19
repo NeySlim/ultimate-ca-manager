@@ -228,11 +228,14 @@ def _renewed_certificate_standing(ca, approval):
     """An approved renewal is refused only when the certificate it renews
     was revoked; any other status (expired, no longer on record) delivers it."""
     from services import protocol_approval
-    renewal_of = protocol_approval.request_data(approval).get('renewal_of')
+    from services.wstep.approval import _held_profile
+    data = protocol_approval.request_data(approval)
+    renewal_of = data.get('renewal_of')
     if not renewal_of:
         return True
-    # Looked up under the CA that issued it, the profile's former one included
-    _row, refusal = wstep_service._renewal_refusal(ca, x509.load_pem_x509_certificate(renewal_of.encode()))
+    # Looked up under the CA that issued it, a former one the profile still lists included
+    _row, refusal = wstep_service._renewal_refusal(ca, x509.load_pem_x509_certificate(renewal_of.encode()),
+                                                   profile=_held_profile(data))
     return refusal != protocol_approval.RENEWED_REVOKED
 
 
@@ -476,7 +479,7 @@ def _presented_certificate(parsed):
     if _carries_xml_signature(parsed.security_header):
         cert, error = wstep_service.signed_request_certificate(parsed.security_header, parsed.csr_element)
         return cert, 'wstep-ws-security', error
-    cert, error = wstep_service.tls_client_certificate(trusted_client_cert(logger, 'WSTEP'))
+    cert, error = wstep_service.tls_client_certificate(trusted_client_cert(logger, 'WSTEP', former_ca=True))
     return cert, 'wstep-client-cert', error
 
 
@@ -491,7 +494,7 @@ def _query_certificate(parsed):
         except Exception as e:
             return None, _fault_response(f'Authentication failed: {e}', status=400,
                                          relates_to=parsed.message_id)
-    cert, error = wstep_service.tls_client_certificate(trusted_client_cert(logger, 'WSTEP'))
+    cert, error = wstep_service.tls_client_certificate(trusted_client_cert(logger, 'WSTEP', former_ca=True))
     if error:
         return None, _fault_response('Authentication failed', status=400, relates_to=parsed.message_id)
     return cert, None
@@ -552,17 +555,21 @@ def renew_certificate_bound():
         return _fault_response(error, status=400, relates_to=parsed.message_id)
 
     from services.windows_profiles import presented_certificate_profile
-    from utils.client_cert import native_tls_admits
+    from utils.client_cert import listener_former_refids, native_client_cert, native_tls_admits
     from services.windows_profiles import issuing_ca
     profile, error, served = presented_certificate_profile(cert)
-    ca, status = None, None
+    ca, status, issuer = None, None, None
     if error is None and profile is not None:
         ca = issuing_ca(profile)
+        if ca is not None:
+            issuer = wstep_service.certificate_issuer(ca, cert, profile=profile)
         if ca is None:
             # A refusal of a stored certificate like any other: audited below with its profile
             error, status = f'The Windows enrollment profile {profile.name} has no issuing CA', 503
-        # A5: the native listener anchors on the mTLS CA alone; a proxy terminating TLS answers for its own
-        elif username == 'wstep-client-cert' and request.environ.get('peercert') and not native_tls_admits(ca):
+        # A5: the native listener anchors on the mTLS CA, and on the former CAs a profile lists;
+        # a proxy terminating TLS answers for its own
+        elif username == 'wstep-client-cert' and native_client_cert() and not (
+                native_tls_admits(issuer) or (issuer.id != ca.id and issuer.refid in listener_former_refids())):
             error = TLS_RENEWAL_REFUSED
     elif error is None:
         error = 'Signing certificate is not recognized'
@@ -607,10 +614,11 @@ def renew_certificate_bound():
         logger.error("WSTEP: failed to build RSTR: %s", e)
         return _fault_response('Internal server error', status=500, relates_to=parsed.message_id)
 
+    former = f', old CA {issuer.descr}' if issuer is not None and issuer.id != ca.id else ''
     _audit_issuance(
         'certificate.renewed', new_cert.subject.rfc4514_string(), username,
         resource_id=str(request_id) if request_id else None,
         details=(f'WSTEP renewal from {client_ip()}: old serial {cert.serial_number}, '
-                 f'new serial {new_cert.serial_number} ({served})'),
+                 f'new serial {new_cert.serial_number} ({served}{former})'),
     )
     return Response(response_body, status=200, content_type=f'{SOAP_XML_MIME}; charset=utf-8')

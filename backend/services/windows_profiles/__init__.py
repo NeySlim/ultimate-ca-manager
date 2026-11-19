@@ -301,6 +301,48 @@ def policy_ca(profile):
     return _ca(profile.policy_refid) if profile is not None else None
 
 
+def renewal_ca_refids(profile):
+    """The refids of the former CAs whose certificates renew under *profile*, in list order."""
+    import json
+    try:
+        value = json.loads(profile.renewal_ca_refids or '[]') if profile is not None else []
+    except ValueError:
+        return []
+    return [r for r in value if isinstance(r, str) and r] if isinstance(value, list) else []
+
+
+def former_cas(profile):
+    """The CAs of UCM *profile* lists for renewal, deleted ones left out (a deleted CA renews nothing)."""
+    refids = renewal_ca_refids(profile)
+    if not refids:
+        return []
+    found = {c.refid: c for c in CA.query.filter(CA.refid.in_(refids)).all()}
+    return [found[r] for r in refids if r in found]
+
+
+def listener_former_refids():
+    """The refids the native TLS listener adds to its mTLS anchor so that former CAs renew over TLS:
+    listed by a profile, not revoked, not already under the anchor; empty while mTLS is off.
+    ``boot_config.mtls_former_cas`` reads the same rule from the database at start."""
+    from models import SystemConfig
+    from utils.client_cert import native_tls_admits
+    enabled = SystemConfig.query.filter_by(key='mtls_enabled').first()
+    if enabled is None or enabled.value != 'true':
+        return []
+    refids = set()
+    for profile in WindowsEnrollmentProfile.query.all():
+        refids.update(ca.refid for ca in former_cas(profile)
+                      if former_ca_refusal(ca) is None and not native_tls_admits(ca))
+    return sorted(refids)
+
+
+def former_ca_refusal(ca):
+    """Why a former CA of a profile renews nothing, None while it may: revoked, itself or up its chain."""
+    if ca.revoked_in_chain:
+        return f'The former CA {ca.descr or ca.refid} of this profile is revoked'
+    return None
+
+
 def _connector_values(connector):
     if connector is None:
         return None

@@ -64,7 +64,7 @@ def test_guide_says_what_the_windows_bench_showed():
     assert '`certreq -new` with `RenewalCert` in the INF, then `certreq -submit`' in text
     assert 'Windows keeps the policy it read for up to 8 hours' in text
     assert 'the old certificate is marked superseded by the new one, as on the Certificate binding' in text
-    assert 'a certificate of the former CA renews the same way' in text
+    assert 'a certificate of a former CA the profile lists renews the same way' in text
     upgrade = (GUIDE.parents[1] / 'UPGRADE.md').read_text()
     assert '`HashAlgorithm = sha256` in the `certreq` INF' in upgrade
     assert 'Windows enrollment, renewal over Kerberos:' in upgrade
@@ -88,3 +88,26 @@ def test_texts_say_a_kerberos_renewal_keeps_its_template():
     fr = (help_dir / 'help' / 'fr' / 'settings.js').read_text()
     assert 'le renouvelle quand elle nomme le modèle de ce certificat' in fr
     assert 'Une demande qui nomme un autre modèle est un enrôlement' in fr
+
+
+def test_texts_say_how_a_former_ca_renews_and_how_to_cut_it():
+    """Guide, API reference, UPGRADE, CHANGELOG and help (en, fr) say what a change of the issuing CA
+    lists, that the list only shrinks, that a cut or a revocation stops renewals at once, and that the
+    listener trusts a listed CA for WSTEP renewal only."""
+    root = GUIDE.parents[1]
+    text = GUIDE.read_text()
+    assert "the outgoing CA is added to the profile's **Former CAs that still renew**" in text
+    assert 'renews nothing from that moment' in text and 'The list only shrinks' in text
+    assert 'serves WSTEP renewal only: certificate login, EST and every other route do not see it' in text
+    assert 'a rolling restart of every node in HA' in text
+    api = (root / 'docs' / 'API_REFERENCE.md').read_text()
+    assert '`renewal_ca_refids` (a list of refids) may only remove entries' in api
+    assert 'Windows enrollment, change of the issuing CA: the upgrade lists' in (root / 'UPGRADE.md').read_text()
+    assert '**Windows renewal after a change of CA.**' in (root / 'CHANGELOG.md').read_text()
+    help_dir = root / 'frontend' / 'src' / 'data'
+    for path, phrase in ((help_dir / 'helpGuides.js', 'A former CA taken off the list, revoked or deleted renews nothing'),
+                         (help_dir / 'help' / 'fr' / 'settings.js',
+                          'Une ancienne AC retirée de la liste, révoquée ou supprimée ne renouvelle plus rien'),
+                         (help_dir / 'help' / 'ru' / 'settings.js', 'Former CAs that still renew'),
+                         (help_dir / 'help' / 'zh' / 'settings.js', 'Former CAs that still renew')):
+        assert phrase in path.read_text(), path

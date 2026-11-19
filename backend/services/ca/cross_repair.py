@@ -104,10 +104,15 @@ def _move_settings(record, root, cross=None):
     of *record* at *root*."""
     from models import SystemConfig, WindowsEnrollmentProfile
     from services.deletion_blockers import setting_names_ca
+    from services.windows_profiles import renewal_ca_refids
     for profile in WindowsEnrollmentProfile.query.all():
         for column in ('issuing_ca_refid', 'policy_ca_refid'):
             if getattr(profile, column) == record.refid:
                 setattr(profile, column, root.refid)
+        former = renewal_ca_refids(profile)
+        if record.refid in former:
+            moved = list(dict.fromkeys(root.refid if r == record.refid else r for r in former))
+            profile.renewal_ca_refids = json.dumps([r for r in moved if r != profile.issuing_ca_refid])
     for key in _SETTINGS:
         cfg = SystemConfig.query.filter_by(key=key).first()
         if cfg is None:

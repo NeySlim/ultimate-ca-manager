@@ -31,6 +31,9 @@ class WindowsEnrollmentProfile(db.Model):
     issuing_ca_refid = db.Column(db.String(36), index=True)
     # NULL: the issuing CA, whose templates XCEP announces
     policy_ca_refid = db.Column(db.String(36), index=True)
+    # JSON list of former issuing CA refids whose certificates still renew under this profile;
+    # the operator's list, fed by a change of issuing CA (never read by XCEP or for new issuance)
+    renewal_ca_refids = db.Column(db.Text, default='[]')
     # The policy's identity (MS-XCEP policyID, template OID root): fixed once, no route writes
     # it and no CA change moves it, so enrolled clients keep the policy server they registered
     policy_id = db.Column(db.String(36), nullable=False, default=random_policy_id)

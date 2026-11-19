@@ -1255,9 +1255,10 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     if isinstance(renewed, SupersededRenewal):
         return None, RENEWED_SUPERSEDED
     # The renewed row is replaced by the new certificate, under the CA that issued it
-    renewal_ca, superseded_row = (_issuing_ca(ca, renewed), None) if renewed is not None else (None, None)
+    renewal_ca, superseded_row = ((_issuing_ca(ca, renewed, profile=profile), None) if renewed is not None
+                                  else (None, None))
     if renewed is not None:
-        superseded_row, withdrawn = _renewal_refusal(ca, renewed)
+        superseded_row, withdrawn = _renewal_refusal(ca, renewed, profile=profile)
         # An approved request is processed as a new one (MS-CSRA ResubmitRequest, rule 3): the
         # arrival's check again, so an expiry, a revocation or a renewal since withdraws it
         if withdrawn:
@@ -1427,7 +1428,7 @@ def renew(ca, signing_cert, csr_der, validity_days, source='wstep', require_pop=
     wrapped too. The WS-Security signature proves the current key; a new key
     in a wrapped request proves itself through ``outer_signed_data``.
     """
-    db_cert, err = _renewable_certificate(ca, signing_cert)
+    db_cert, err = _profile_renewable_certificate(ca, signing_cert, profile=profile)
     if err:
         return None, err
 
@@ -1469,7 +1470,7 @@ def renew_with_client_certificate(ca, client_cert, csr_der, outer_signed_data, v
     """Renewal on the Certificate binding as Windows sends it: authenticated by the TLS
     client certificate (``tls_client_certificate``), which must also sign the CMS request
     (MS-WSTEP, RFC 5272). Returns (cert_pem, error)."""
-    db_cert, err = _renewable_certificate(ca, client_cert)
+    db_cert, err = _profile_renewable_certificate(ca, client_cert, profile=profile)
     if err:
         return None, err
 
@@ -1561,11 +1562,11 @@ def _requester_renewal(ca, outer_signed_data, principal, sam_account_name, conne
     from services.windows_profiles import certificate_profile
     unreachable, superseded = False, None
     for cert in _envelope_certificates(outer_signed_data):
-        row, refusal = _renewal_refusal(ca, cert)
+        row, refusal = _renewal_refusal(ca, cert, profile=profile)
         if (row is None or refusal not in (None, RENEWED_SUPERSEDED)
                 or _verify_renewal_signer(outer_signed_data, cert) is not None):
             continue
-        row = _windows_row(_issuing_ca(ca, cert), cert, row)
+        row = _windows_row(_issuing_ca(ca, cert, profile=profile), cert, row)
         recorded, _refusal = certificate_profile(row)
         if recorded is None or profile is None or recorded.id != profile.id:
             continue
@@ -1588,25 +1589,34 @@ class SupersededRenewal:
         self.cert = cert
 
 
-def _issuing_ca(ca, cert):
-    """The CA of UCM whose key signed *cert* and that stores it: *ca*, else the CA a stored row of
-    *cert* names (one the profile issued under before a change of CA); *ca* when none did."""
-    from models import CA
-    from services.cert.issued_lookup import find_issued_rows, find_stored_rows
+def _issuing_ca(ca, cert, *, profile):
+    """The CA of UCM whose key signed *cert* and that stores it: *ca*, else one of the former CAs
+    *profile* lists for renewal (an operator's list, no other CA); *ca* when none did."""
+    from services.cert.issued_lookup import find_issued_rows
+    from services.windows_profiles import former_cas
     if find_issued_rows(ca, cert):
         return ca
-    for row in find_stored_rows(cert):
-        other = CA.query.filter_by(refid=row.caref).first() if row.caref else None
-        if other is not None and other.id != ca.id and find_issued_rows(other, cert):
+    for other in former_cas(profile):
+        if other.id != ca.id and find_issued_rows(other, cert):
             return other
     return ca
 
 
-def _renewal_refusal(ca, cert):
+def certificate_issuer(ca, cert, *, profile):
+    """The CA a renewal of *cert* is judged under: *ca* or a former CA of *profile* (``_issuing_ca``)."""
+    return _issuing_ca(ca, cert, profile=profile)
+
+
+def _renewal_refusal(ca, cert, *, profile):
     """(row, refusal): *cert*'s stored row and why it cannot be renewed, None while valid; one
     check for a request on arrival and for a held one at its approval, under the CA that issued it."""
     from services.cert.issued_lookup import EXPIRED, OK, REVOKED, SUPERSEDED, issued_certificate_status
-    row, status = issued_certificate_status(_issuing_ca(ca, cert), cert)
+    from services.windows_profiles import former_ca_refusal
+    issuer = _issuing_ca(ca, cert, profile=profile)
+    row, status = issued_certificate_status(issuer, cert)
+    # A revoked former CA revokes, for its path, every certificate under it (RFC 5280 6.1.3)
+    if issuer.id != ca.id and former_ca_refusal(issuer):
+        return row, RENEWED_REVOKED
     if status == OK:
         return row, None
     return row, {REVOKED: RENEWED_REVOKED, SUPERSEDED: RENEWED_SUPERSEDED,
@@ -1639,6 +1649,16 @@ def _requester_holds(cert, principal, sam_account_name, connector, requester_sid
     if subject is lookup.UNREACHABLE:
         return lookup.UNREACHABLE
     return isinstance(subject, x509.Name) and same_name(cert.subject, subject)
+
+
+def _profile_renewable_certificate(ca, cert, *, profile):
+    """``_renewable_certificate`` under the CA that issued *cert*: *ca*, or a former CA *profile*
+    lists, which a revocation of its own or up its chain closes."""
+    from services.windows_profiles import former_ca_refusal
+    issuer = _issuing_ca(ca, cert, profile=profile)
+    if issuer.id != ca.id and former_ca_refusal(issuer):
+        return None, former_ca_refusal(issuer)
+    return _renewable_certificate(issuer, cert)
 
 
 def _renewable_certificate(ca, cert):
@@ -1727,8 +1747,9 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
     # A8: the SID alone is checked again, by the profile's connector only
     found = {}
     try:
+        issuer = _issuing_ca(ca, signing_cert, profile=profile)
         requester_sid = renewal_identity.renewal_requester_sid(
-            signing_cert, x509.load_pem_x509_certificate(base64.b64decode(ca.crt)), 'WSTEP',
+            signing_cert, x509.load_pem_x509_certificate(base64.b64decode(issuer.crt)), 'WSTEP',
             connectors_for=lambda sid: profile_sid_connectors(profile, sid), found=found)
     except renewal_identity.RenewalIdentityUnresolved as e:
         return None, ServerError(str(e))

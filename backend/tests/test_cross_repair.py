@@ -267,6 +267,29 @@ def test_convert_moves_the_ca_settings_to_the_root(app, auth_client):
         profile.restore(saved)
 
 
+def test_convert_moves_a_former_renewal_ca_of_a_windows_profile_to_the_root(app, auth_client):
+    """A profile listing the duplicate as a former CA lists the root in its place, once."""
+    import json
+    from models import WindowsEnrollmentProfile
+    pki, ids = _world(app)
+    with app.app_context():
+        x_ref, b_ref = db.session.get(CA, ids['x']).refid, db.session.get(CA, ids['b']).refid
+        a_ref = db.session.get(CA, ids['a']).refid
+        profile = WindowsEnrollmentProfile(name=f'c20-cross-{pki.tag}', issuing_ca_refid=a_ref,
+                                           renewal_ca_refids=json.dumps([x_ref, b_ref]))
+        db.session.add(profile)
+        db.session.commit()
+        profile_id = profile.id
+    try:
+        assert auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={}).status_code == 200
+        with app.app_context():
+            assert json.loads(db.session.get(WindowsEnrollmentProfile, profile_id).renewal_ca_refids) == [b_ref]
+    finally:
+        with app.app_context():
+            WindowsEnrollmentProfile.query.filter_by(id=profile_id).delete()
+            db.session.commit()
+
+
 def test_urls_embedded_by_the_removed_duplicate_still_resolve(app, auth_client, client):
     pki, ids = _world(app)
     with app.app_context():

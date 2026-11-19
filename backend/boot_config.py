@@ -184,6 +184,63 @@ def mtls_client_ca(data_path: str):
         return pem, name, config.get('mtls_required') == 'true'
 
 
+def _chain_refids(database, refid):
+    """*refid* and its ancestors by ``caref``, with whether one of them is revoked (a loop: revoked)."""
+    seen, revoked = [], False
+    while refid:
+        if refid in seen or len(seen) > 64:
+            return seen, True
+        row = database.one("SELECT caref, revoked FROM certificate_authorities WHERE refid = ?", (refid,))
+        if row is None:
+            break
+        seen.append(refid)
+        revoked = revoked or bool(row[1])
+        refid = row[0]
+    return seen, revoked
+
+
+# The former CAs the listener trusts, written at start, read by utils.client_cert
+MTLS_FORMER_CAS_FILE = 'mtls_former_cas.json'
+
+
+def mtls_former_cas(data_path: str):
+    """``[(refid, pem, name)]`` of the former CAs the listener trusts beside the mTLS anchor so that
+    their certificates renew over TLS: listed by a Windows enrollment profile, held here, not revoked
+    up their chain, not already under the anchor. Empty while mTLS is off or on any read failure;
+    ``services.windows_profiles.listener_former_refids`` applies the same rule in the application."""
+    import json
+    database = open_boot_database(data_path)
+    if database is None:
+        return []
+    with database:
+        try:
+            config = _settings(database, ('mtls_enabled', 'mtls_trusted_ca_id'), missing={})
+            anchor = config.get('mtls_trusted_ca_id')
+            if config.get('mtls_enabled') != 'true' or not anchor:
+                return []
+            refids = set()
+            for (value,) in database.rows("SELECT renewal_ca_refids FROM windows_enrollment_profiles"):
+                try:
+                    listed = json.loads(value or '[]')
+                except ValueError:
+                    continue
+                if isinstance(listed, list):
+                    refids.update(r for r in listed if isinstance(r, str))
+            found = []
+            for refid in sorted(refids):
+                chain, revoked = _chain_refids(database, refid)
+                if not chain or revoked or anchor in chain:
+                    continue
+                pem, name = client_ca_anchor(database, refid)
+                if pem is not None:
+                    found.append((refid, pem, name))
+            return found
+        except Exception as e:
+            print(f"mTLS: former CAs of the Windows profiles not read ({type(e).__name__}: {e})",
+                  file=sys.stderr)
+            return []
+
+
 # The bound HTTPS certificate (services/https_binding.py) and the chain last written with it
 HTTPS_BOUND_KEY = 'https_bound_certificate_refid'
 HTTPS_CHAIN_KEY = 'https_bound_certificate_chain'

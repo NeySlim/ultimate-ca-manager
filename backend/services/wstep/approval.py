@@ -119,7 +119,7 @@ def _issue(approval, data):
     require_pop = bool(data.get('require_pop', True))
     if data.get('operation') == 'renew':
         signing_cert = x509.load_pem_x509_certificate(data['renewal_of'].encode())
-        db_cert, err = wstep_service._renewable_certificate(ca, signing_cert)
+        db_cert, err = wstep_service._profile_renewable_certificate(ca, signing_cert, profile=profile)
         if not err:
             # The proof of possession was checked when the request came in
             cert_pem, err = wstep_service._sign_renewal(
