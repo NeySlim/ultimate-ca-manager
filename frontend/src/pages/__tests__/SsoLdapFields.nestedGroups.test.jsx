@@ -57,4 +57,17 @@ describe('SsoLdapFields nested groups', () => {
     expect(screen.getByText('sso.testMappingGroupsUnreadable')).toBeTruthy()
     expect(screen.getByText('nested group search under DC=x: sizeLimitExceeded')).toBeTruthy()
   })
+
+  it('shows the group search base whenever the option is on, memberOf included', () => {
+    show({ ldap_group_member_attr: 'memberOf', ldap_nested_groups: true,
+      ldap_group_base_dn: 'OU=Groups,DC=x' })
+    expect(screen.getByText('sso.groupBaseDn')).toBeTruthy()
+    expect(screen.getByDisplayValue('OU=Groups,DC=x')).toBeTruthy()
+  })
+
+  // Guard: today's behaviour, kept
+  it('hides the group search base with memberOf while the option is off', () => {
+    show({ ldap_group_member_attr: 'memberOf', ldap_nested_groups: false })
+    expect(screen.queryByText('sso.groupBaseDn')).toBeNull()
+  })
 })
