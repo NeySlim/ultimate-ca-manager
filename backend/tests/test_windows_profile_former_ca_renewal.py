@@ -149,6 +149,30 @@ def test_moving_back_to_the_former_ca_takes_it_off_the_list(app, auth_client, wo
     assert r.get_json()['data']['renewal_cas'] == [{'refid': a2['refid'], 'name': 'C20 A2 CA'}]
 
 
+def test_a_list_sent_with_a_change_of_ca_still_lists_the_outgoing_ca(app, auth_client, world, create_ca,
+                                                                     moved_by_api):
+    """The list sent is applied first, then the outgoing CA is added and audited: dropping A while
+    moving from A2 to A3 leaves A2, never an empty list."""
+    _data, a2, profile_id = moved_by_api
+    a3 = create_ca(cn='C20 A3 CA')
+    with app.app_context():
+        for pin in CATemplatePin.query.filter_by(ca_id=world['cas']['A']['id']).all():
+            db.session.add(CATemplatePin(ca_id=a3['id'], template_id=pin.template_id))
+        db.session.commit()
+    floor = _top_audit(app)
+    try:
+        r = auth_client.put(f'{URL}/{profile_id}', json={'issuing_ca_refid': a3['refid'], 'renewal_ca_refids': []})
+        assert r.status_code == 200, r.get_json()
+        assert r.get_json()['data']['renewal_cas'] == [{'refid': a2['refid'], 'name': 'C20 A2 CA'}]
+        (entry,) = [a for a in _audits(app, floor) if a[0] == 'windows_profile_update']
+        assert 'former CA listed for renewal: C20 A2 CA' in entry[3]
+        assert 'former CA removed from renewal: C04 A CA' in entry[3]
+    finally:
+        with app.app_context():
+            CATemplatePin.query.filter_by(ca_id=a3['id']).delete()
+            db.session.commit()
+
+
 def test_in_ha_the_rolling_restart_is_committed_with_the_list(app, auth_client, moved_by_api, restarts,
                                                               monkeypatch):
     _data, _a2, profile_id = moved_by_api

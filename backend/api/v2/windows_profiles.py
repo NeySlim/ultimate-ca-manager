@@ -324,9 +324,11 @@ def _apply(profile, data):
 
 def _apply_renewal_cas(profile, data, outgoing):
     """The former CAs whose certificates renew: the outgoing CA is listed when the issuing CA
-    changes; the operator may only remove one, never list a CA that was not the profile's."""
+    changes, after the list sent is applied; the operator may only remove one, never list a CA that
+    was not the profile's."""
     current = windows_profiles.renewal_ca_refids(profile)
     moved = outgoing if outgoing and outgoing != profile.issuing_ca_refid else None
+    wanted = current
     if 'renewal_ca_refids' in data:
         value = data['renewal_ca_refids']
         if not isinstance(value, list) or any(not isinstance(r, str) or not r for r in value):
@@ -337,8 +339,8 @@ def _apply_renewal_cas(profile, data, outgoing):
             return (f'renewal_ca_refids may only remove CAs from the list: {", ".join(unknown)} is not a '
                     'former issuing CA of this profile (one is listed when the issuing CA changes)'), 400
         wanted = list(dict.fromkeys(value))
-    else:
-        wanted = current + ([moved] if moved and moved not in current else [])
+    # The outgoing CA is listed whatever the list sent: its removal is a later save
+    wanted = wanted + ([moved] if moved and moved not in wanted else [])
     # The issuing CA is never a former one: moving back to it takes it off the list
     wanted = [r for r in wanted if r != profile.issuing_ca_refid]
     profile._renewal_change = (sorted(set(wanted) - set(current)), sorted(set(current) - set(wanted)))
