@@ -41,6 +41,16 @@ def test_redact_url(url, expected):
     assert redact_url(url) == expected
 
 
+def test_a_long_run_of_question_marks_is_still_read_to_its_end():
+    """The line is masked whatever its length: a URL cannot make the log drop its own request."""
+    url = '/x?x=1' + '?a=' * 1300 + '?token=abc&b=2'
+    assert redact_url(url) == '/x?x=1' + '?a=' * 1300 + '?token=[REDACTED]&b=2'
+
+
+def test_a_name_cut_by_a_question_mark_does_not_hide_the_parameter_behind_it():
+    assert redact_url('/x?a?token=abc') == '/x?a?token=[REDACTED]'
+
+
 def test_the_gunicorn_line_carries_no_token():
     cfg = Config()
     cfg.set('access_log_format', '%(h)s "%(r)s" %(q)s "%(f)s"')

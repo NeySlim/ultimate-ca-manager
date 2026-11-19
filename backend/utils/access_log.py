@@ -10,7 +10,9 @@ SECRET_PARAMS = ('token', 'code', 'state', 'access_token', 'id_token', 'refresh_
 # Any parameter whose name holds one of these: a password refused in a URL still reaches the log
 SECRET_NAME_PARTS = ('password', 'passphrase')
 
-_PARAM = re.compile(r'([?&;])([^=&;#\s"]*)=([^&;#\s"]*)')
+# A name stops at "?": "?a=1?token=x" and "?a?token=x" still show the parameter behind the second "?"
+_NAME = re.compile(r'[?&;]([^=&;#\s"?]*)=')
+_VALUE = re.compile(r'[^&;#\s"]*')
 
 
 def _secret_name(raw):
@@ -23,10 +25,19 @@ def redact_url(value):
     """``value`` with the secret query values replaced; anything else unchanged."""
     if not isinstance(value, str) or '=' not in value:
         return value
-    # A value is read again: "?a=1?token=x" hides a parameter behind a second "?"
-    return _PARAM.sub(
-        lambda m: f'{m[1]}{m[2]}=[REDACTED]' if _secret_name(m[2]) else f'{m[1]}{m[2]}={redact_url(m[3])}',
-        value)
+    out, pos = [], 0
+    # One pass, no recursion: a secret value is skipped whole, any other is scanned for more names
+    while True:
+        name = _NAME.search(value, pos)
+        if name is None:
+            break
+        out.append(value[pos:name.end()])
+        pos = name.end()
+        if _secret_name(name[1]):
+            out.append('[REDACTED]')
+            pos = _VALUE.match(value, pos).end()
+    out.append(value[pos:])
+    return ''.join(out)
 
 
 class RedactingLogger(Logger):
