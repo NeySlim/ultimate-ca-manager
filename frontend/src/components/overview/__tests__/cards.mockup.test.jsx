@@ -10,12 +10,14 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k, o) => (o?.defa
 const api = vi.hoisted(() => ({
   getQueue: vi.fn(), getHealth: vi.fn(), getCompliance: vi.fn(), getIssuance: vi.fn(),
   getStats: vi.fn(), getAll: vi.fn(), getNext: vi.fn(), getActivity: vi.fn(), can: vi.fn(),
+  getDashStats: vi.fn(), getTrend: vi.fn(),
 }))
 vi.mock('../../../services', () => ({
   overviewService: { getQueue: api.getQueue, getHealth: api.getHealth, getCompliance: api.getCompliance, getIssuance: api.getIssuance },
   certificatesService: { getStats: api.getStats },
   casService: { getAll: api.getAll },
-  dashboardService: { getNextExpirations: api.getNext, getActivityLog: api.getActivity },
+  dashboardService: { getNextExpirations: api.getNext, getActivityLog: api.getActivity,
+    getStats: api.getDashStats, getCertificateTrend: api.getTrend },
 }))
 vi.mock('../../../hooks/useWebSocket', () => ({
   useWebSocket: () => ({ connectionState: 'connected' }),
@@ -23,7 +25,7 @@ vi.mock('../../../hooks/useWebSocket', () => ({
 }))
 vi.mock('../../../hooks/usePermission', () => ({ usePermission: () => ({ hasPermission: api.can }) }))
 
-import { QueueCard, HierarchyCard, HorizonCard, ActivityCard, ComplianceCard, HealthCard } from '..'
+import { QueueCard, HierarchyCard, HorizonCard, ActivityCard, ComplianceCard, HealthCard, TrendCard, StatesCard } from '..'
 
 const show = (ui) => render(<MemoryRouter>{ui}</MemoryRouter>)
 const item = (i) => ({ kind: 'manual_renewal_due', tier: 'warning', id: i, label: `cert-${i}`, due_at: null, href_hint: `/certificates/${i}` })
@@ -44,7 +46,7 @@ describe('queue ceiling and folded total', () => {
     expect(screen.getAllByText(/^cert-\d$/)).toHaveLength(6)
     fireEvent.click(screen.getByText('overview.queue.unfold'))
     expect(screen.getAllByText(/^cert-\d$/)).toHaveLength(9)
-    fireEvent.click(screen.getByText('overview.queue.fold'))
+    fireEvent.click(screen.getByText('overview.queue.less'))
     expect(screen.getAllByText(/^cert-\d$/)).toHaveLength(6)
   })
 
@@ -53,7 +55,8 @@ describe('queue ceiling and folded total', () => {
     show(<QueueCard />)
     await screen.findByText('cert-1')
     expect(screen.getByTestId('queue-total').textContent).toBe('140')
-    expect(screen.getByLabelText('overview.queue.perKind').textContent).toContain('140')
+    expect(screen.getByText('overview.queue.group.renew').closest('button').textContent).toContain('140')
+    expect(screen.getByText('overview.queue.partial')).toBeTruthy()
   })
 
   it('the fold state starts from the stored preference', async () => {
@@ -78,9 +81,11 @@ describe('exact links', () => {
     expect(root.getAttribute('href')).toBe('/cas/1')
     expect(child.getAttribute('href')).toBe('/cas/2')
     expect(root.closest('li').querySelector('ul').contains(child)).toBe(true)
-    expect(screen.getByText('Orphan').closest('ul').parentElement.tagName).toBe('SECTION')
+    // A CA whose parent is not in the list heads its own tree
+    expect(screen.getByText('Orphan').closest('li').parentElement.closest('li')).toBeNull()
     expect(child.textContent).toContain('overview.hierarchy.issued7d 4')
-    expect(root.textContent).toContain('overview.hierarchy.issued7d 0')
+    // A zero is not a figure worth a line
+    expect(root.textContent).not.toContain('overview.hierarchy.issued7d')
   })
 
   it('horizon counters open the list of their own status, each soonest row its certificate', async () => {
@@ -113,6 +118,8 @@ describe('empty state is not the error state', () => {
     ['horizon', HorizonCard, api.getStats, { total: 0 }],
     ['compliance', ComplianceCard, api.getCompliance, { total: 0, counters: {}, by_key_algorithm: [] }],
     ['activity', ActivityCard, api.getActivity, { activity: [] }],
+    ['trend', TrendCard, api.getTrend, { trend: [] }],
+    ['states', StatesCard, api.getDashStats, { valid: 0, expiring_soon: 0, expired: 0, revoked: 0 }],
   ]
   it.each(cards)('%s says "nothing" for an empty answer and offers a retry for a failure, never both', async (id, Card, fetcher, empty) => {
     fetcher.mockResolvedValueOnce({ data: empty, meta: { total: 0 } })

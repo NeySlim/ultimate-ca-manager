@@ -3,20 +3,22 @@
  * a burst reloads it once, a reconnection and the tab coming back reload it, and the button reloads all.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, act, fireEvent } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k, o) => (o?.defaultValue ?? k) }) }))
 const api = vi.hoisted(() => ({
   getQueue: vi.fn(), getHealth: vi.fn(), getCompliance: vi.fn(), getIssuance: vi.fn(),
   getStats: vi.fn(), getAll: vi.fn(), getNext: vi.fn(), getActivity: vi.fn(),
+  getDashStats: vi.fn(), getTrend: vi.fn(),
 }))
 const ws = vi.hoisted(() => ({ state: 'connected' }))
 vi.mock('../../../services', () => ({
   overviewService: { getQueue: api.getQueue, getHealth: api.getHealth, getCompliance: api.getCompliance, getIssuance: api.getIssuance },
   certificatesService: { getStats: api.getStats },
   casService: { getAll: api.getAll },
-  dashboardService: { getNextExpirations: api.getNext, getActivityLog: api.getActivity },
+  dashboardService: { getNextExpirations: api.getNext, getActivityLog: api.getActivity,
+    getStats: api.getDashStats, getCertificateTrend: api.getTrend },
 }))
 vi.mock('../../../hooks/usePermission', () => ({ usePermission: () => ({ hasPermission: () => true }) }))
 vi.mock('../../../hooks/useWebSocket', () => ({
@@ -24,12 +26,13 @@ vi.mock('../../../hooks/useWebSocket', () => ({
   ConnectionState: { CONNECTED: 'connected', DISCONNECTED: 'disconnected', CONNECTING: 'connecting', ERROR: 'error' },
 }))
 
-import { QueueCard, ComplianceCard, HealthCard, HierarchyCard, HorizonCard, ActivityCard } from '..'
+import { QueueCard, ComplianceCard, HealthCard, HierarchyCard, HorizonCard, ActivityCard, TrendCard, StatesCard } from '..'
 import { REFRESH_EVENT } from '../../../lib/overviewRefresh'
 
 const CARDS = { queue: [QueueCard, api.getQueue], compliance: [ComplianceCard, api.getCompliance],
   health: [HealthCard, api.getHealth], hierarchy: [HierarchyCard, api.getAll],
-  horizon: [HorizonCard, api.getStats], activity: [ActivityCard, api.getActivity] }
+  horizon: [HorizonCard, api.getStats], activity: [ActivityCard, api.getActivity],
+  trend: [TrendCard, api.getTrend], states: [StatesCard, api.getDashStats] }
 
 const announce = (type) => act(() => { window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type } })) })
 const settle = async (ms = 0) => { await act(async () => { await vi.advanceTimersByTimeAsync(ms) }) }
@@ -52,6 +55,8 @@ beforeEach(() => {
   api.getNext.mockResolvedValue({ data: [] })
   api.getActivity.mockResolvedValue({ data: { activity: [] } })
   api.getIssuance.mockResolvedValue({ data: { by_ca: [] } })
+  api.getTrend.mockResolvedValue({ data: { trend: [] } })
+  api.getDashStats.mockResolvedValue({ data: { valid: 1, expiring_soon: 0, expired: 0, revoked: 0 } })
 })
 afterEach(() => { vi.useRealTimers() })
 

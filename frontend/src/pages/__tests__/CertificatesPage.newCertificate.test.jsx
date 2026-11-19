@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, renderHook, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
-import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
 
 // Stable across renders: t and showError are loader dependencies, a fresh one reloads in a loop
 const stable = vi.hoisted(() => ({
@@ -101,6 +101,21 @@ describe('CertificatesPage — finding a new certificate (#368)', () => {
     getAll.mockReset()
     getAll.mockResolvedValue({ data: [], meta: { total: 0 } })
     importResult = null
+  })
+
+  it('?action=create opens the issue form and leaves the address clean', async () => {
+    const Where = () => <p data-testid="where">{useLocation().pathname + useLocation().search}</p>
+    render(
+      <MemoryRouter initialEntries={['/certificates?action=create&status=valid']}><CertificatesPage /><Where /></MemoryRouter>
+    )
+    expect(await screen.findByText('submit-issue')).toBeTruthy()
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/certificates?status=valid'))
+  })
+
+  it('opens no form without the parameter', async () => {
+    renderPage()
+    await waitFor(() => expect(getAll).toHaveBeenCalled())
+    expect(screen.queryByText('submit-issue')).toBeNull()
   })
 
   it('offers a sortable creation date column', () => {

@@ -68,8 +68,14 @@ describe('AppShell', () => {
   })
 
   it('keeps the overlays mounted', () => {
-    setup()
+    setup('/certificates')
     for (const id of ['palette', 'help', 'update-popup', 'kofi']) expect(screen.getByTestId(id)).toBeInTheDocument()
+  })
+
+  it.each(['/', '/dashboard'])('leaves the support message to the overview on %s: nothing floats over its cards', (path) => {
+    setup(path)
+    for (const id of ['palette', 'help', 'update-popup']) expect(screen.getByTestId(id)).toBeInTheDocument()
+    expect(screen.queryByTestId('kofi')).toBeNull()
   })
 
   it('opens the palette from the search field of the bar', async () => {

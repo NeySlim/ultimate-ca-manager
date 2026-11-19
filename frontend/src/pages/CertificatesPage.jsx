@@ -267,6 +267,14 @@ export default function CertificatesPage() {
     return () => window.removeEventListener('ucm:data-changed', handler)
   }, [loadData])
 
+  // `?action=create` (the overview's Issue button) opens the form, then leaves the URL
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('action') !== 'create') return
+    if (canWrite('certificates')) setShowIssueModal(true)
+    navigate({ pathname: location.pathname, search: withoutFilter(location.search, 'action') }, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search])
+
   // Handle re-key prefill from CSRs page navigation
   useEffect(() => {
     if (location.state?.prefill && location.state?.source === 'rekey') {

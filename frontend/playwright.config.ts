@@ -7,7 +7,7 @@ const lab = process.env.UCM_LAB === '1'
 const managed = process.env.UCM_E2E_MANAGED === '1' && !lab
 const desktop = { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } }
 const RESTORE = /backup-restore\.spec\.ts/
-// The overview lists the five latest operations: its tests need to be the only ones acting
+// The overview lists the six latest operations: its tests need to be the only ones acting
 const OVERVIEW = /overview\.spec\.ts/
 const LAB = lab ? [] : ['lab/**']
 

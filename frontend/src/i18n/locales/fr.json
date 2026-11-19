@@ -6479,7 +6479,9 @@
       "label": "Préréglages de disposition",
       "operator": "Opérateur",
       "manager": "Responsable",
-      "all": "Toutes les cartes"
+      "all": "Toutes les cartes",
+      "short": "Préréglage",
+      "allHint": "Toutes les cartes, dans l'ordre initial"
     },
     "cards": {
       "queue": "À traiter",
@@ -6487,7 +6489,9 @@
       "hierarchy": "Hiérarchie",
       "horizon": "Horizon d'expiration",
       "compliance": "Conformité",
-      "activity": "Dernières opérations"
+      "activity": "Dernières opérations",
+      "trend": "Activité des certificats",
+      "states": "Répartition des états"
     },
     "state": {
       "loading": "Chargement...",
@@ -6499,9 +6503,43 @@
       "partialForbidden": "Vous n'avez pas accès à une partie de cette carte."
     },
     "queue": {
-      "fold": "Replier les totaux par type",
-      "unfold": "Afficher les totaux par type",
-      "perKind": "Totaux par type"
+      "sub": "Par urgence : les éléments critiques d'abord, puis par échéance ; ce qui reste à surveiller vient en dernier.",
+      "subFiltered": "{{shown}} sur {{total}}, filtre « {{name}} ».",
+      "toRenew_one": "{{count}} renouvellement manuel à faire",
+      "toRenew_other": "{{count}} renouvellements manuels à faire",
+      "filterLabel": "Filtrer la file par type",
+      "listLabel": "Interventions, de la plus urgente à la moins urgente",
+      "none": "Aucune intervention en attente.",
+      "emptyHint": "Rien à faire ni à surveiller.",
+      "unfold_one": "Afficher {{count}} autre",
+      "unfold_other": "Afficher les {{count}} autres",
+      "watch_one": "{{count}} à surveiller",
+      "watch_other": "{{count}} à surveiller",
+      "watchNote": "renouvellements par le client, autorités et ancres de confiance loin de l'expiration : rien à faire aujourd'hui",
+      "watchShow": "Afficher les lignes à surveiller",
+      "watchHide": "Masquer les lignes à surveiller",
+      "show": "Afficher",
+      "hide": "Masquer",
+      "partial": "{{shown}} sur {{total}} listés : la file montre ses éléments les plus urgents.",
+      "overdue": "en retard de {{span}}",
+      "critical": "Critique :",
+      "retry": "Relancer",
+      "retried": "Renouvellement relancé",
+      "publish": "Publier maintenant",
+      "review": "Examiner",
+      "viewCa": "Voir l'AC",
+      "open": "Ouvrir",
+      "actionFailed": "L'opération a échoué.",
+      "group": {
+        "all": "Tous",
+        "renew": "Renouvellements",
+        "acme": "Échecs ACME",
+        "request": "Demandes",
+        "crl": "CRL",
+        "ca": "Autorités",
+        "deploy": "Déploiements"
+      },
+      "less": "Réduire"
     },
     "kind": {
       "acme_order_failed": "Commande ACME échouée",
@@ -6527,7 +6565,8 @@
       "incomplete_chain": "Chaîne incomplète",
       "no_private_key": "Pas de clé privée",
       "byAlgorithm": "Algorithmes de clé",
-      "unknownAlgo": "Inconnu"
+      "unknownAlgo": "Inconnu",
+      "sub": "Sur les certificats actifs. Un chiffre qui a une liste l'ouvre, filtrée."
     },
     "health": {
       "acme": "ACME",
@@ -6577,7 +6616,22 @@
           "disabled": "Désactivé"
         },
         "unavailable": "État indisponible"
-      }
+      },
+      "sub_one": "Par jour UTC, sur {{count}} jour.",
+      "sub_other": "Par jour UTC, sur {{count}} jours.",
+      "subScheduler": "Planificateur : dernier passage {{when}}.",
+      "lastOperation": "Dernière opération {{when}}",
+      "noOperation": "Aucune opération enregistrée",
+      "today": "Aujourd'hui",
+      "successes_one": "{{count}} succès",
+      "successes_other": "{{count}} succès",
+      "failures_one": "{{count}} échec",
+      "failures_other": "{{count}} échecs",
+      "sparkAlt": "{{name}}, par jour, du plus ancien au plus récent. Succès : {{ok}}. Échecs : {{failed}}.",
+      "alerts_one": "{{count}} ligne signale un problème.",
+      "alerts_other": "{{count}} lignes signalent un problème.",
+      "seeQueue": "Voir dans À traiter",
+      "allFine": "Aucune ligne ne signale de problème."
     },
     "filter": {
       "status": "Statut",
@@ -6612,22 +6666,109 @@
       "ocspOff": "OCSP désactivé",
       "issued7d": "Émis, 7 jours :",
       "offline": "Hors ligne",
-      "crossSigned": "Signée croisée"
+      "crossSigned": "Signée croisée",
+      "sub": "Autorités : {{total}}, racines : {{roots}}. CRL, OCSP et certificats émis sur 7 jours.",
+      "explore": "Explorer",
+      "branch": "Branche {{name}}",
+      "bounded": "{{shown}} autorités affichées sur {{total}}, les arbres les plus actifs d'abord.",
+      "all": "Tout voir ({{total}})",
+      "below_one": "{{count}} de plus en dessous",
+      "below_other": "{{count}} de plus en dessous"
     },
     "horizon": {
       "expiring": "Expire bientôt",
       "expired": "Expirés",
       "soonest": "Prochains à expirer",
       "tsaSigner": "Signataire TSA",
-      "ocspResponder": "Répondeur OCSP"
+      "ocspResponder": "Répondeur OCSP",
+      "sub": "Les prochains certificats à expirer, le plus proche d'abord.",
+      "expiresIn_one": "Expire dans {{count}} jour",
+      "expiresIn_other": "Expire dans {{count}} jours",
+      "elapsed": "{{percent}} % de la validité écoulés"
     },
     "activity": {
-      "all": "Tout voir"
+      "all": "Tout voir",
+      "sub": "Les dernières entrées de la piste d'audit.",
+      "subOwn": "Vos propres dernières opérations."
     },
     "link": {
       "handled": "L'élément n°{{id}} n'attend plus d'action (état : {{status}}).",
       "gone": "L'élément n°{{id}} n'existe plus."
     },
-    "refresh": "Actualiser"
+    "refresh": "Actualiser",
+    "intent": "Ce qui demande votre intervention aujourd'hui, puis l'état de l'automatisation, de la hiérarchie et de la conformité.",
+    "actions": {
+      "issue": "Émettre",
+      "newCa": "Nouvelle AC",
+      "discovery": "Découverte réseau"
+    },
+    "days_one": "{{count}} jour",
+    "days_other": "{{count}} jours",
+    "layout": {
+      "cards": "Cartes",
+      "cardsLabel": "Cartes : afficher, masquer, réordonner",
+      "dialogTitle": "Cartes de la vue d'ensemble",
+      "dialogSub": "Afficher, masquer et réordonner.",
+      "saved": "L'ordre et les cartes masquées sont enregistrés avec votre compte.",
+      "up": "Monter {{name}}",
+      "down": "Descendre {{name}}",
+      "grip": "Déplacer la carte {{name}} : faites-la glisser ou utilisez les flèches du clavier",
+      "gripHint": "Glisser pour déplacer, ou flèches du clavier",
+      "menu": "Options de la carte {{name}}",
+      "menuTitle": "Options de la carte",
+      "earlier": "Placer avant",
+      "later": "Placer après",
+      "hide": "Masquer la carte",
+      "customize": "Personnaliser les cartes…",
+      "moved": "{{name}} est maintenant la carte {{position}} sur {{total}}.",
+      "hidden": "{{name}} est masquée. Le bouton Cartes la réaffiche."
+    },
+    "metrics": {
+      "label": "Chiffres clés",
+      "cas_one": "{{count}} autorité",
+      "cas_other": "{{count}} autorités",
+      "pending_one": "{{count}} demande en attente",
+      "pending_other": "{{count}} demandes en attente",
+      "ssh_one": "{{count}} certificat SSH",
+      "ssh_other": "{{count}} certificats SSH",
+      "queueSub": "À faire : {{act}}, à surveiller : {{watch}}",
+      "expiringSoon_one": "{{count}} expire bientôt",
+      "expiringSoon_other": "{{count}} expirent bientôt",
+      "failures": "Échecs du jour",
+      "failuresSub": "ACME, SCEP et EST, jour UTC"
+    },
+    "cause": {
+      "acme_order_failed": "Une commande ACME s'est terminée invalide dans les 7 derniers jours",
+      "acme_client_renewal_failed": "Le client ACME n'a pas pu renouveler ce certificat",
+      "approval_pending": "Une demande attend une décision",
+      "scep_request_pending": "Un enrôlement SCEP attend une approbation",
+      "key_recovery_pending": "Une demande de récupération de clé attend une approbation",
+      "crl_due": "La CRL en cours atteint sa prochaine mise à jour",
+      "crl_missing": "Le point de distribution est activé et aucune CRL n'existe",
+      "manual_renewal_due": "Aucune automatisation ne renouvelle ce certificat",
+      "client_renewal_overdue": "Son client aurait déjà dû le renouveler",
+      "auto_renewal_blocked": "Renouvellement automatique impossible : l'AC émettrice ne peut pas signer",
+      "renewal_declined": "Le renouvellement automatique a été refusé pour ce certificat",
+      "ca_expiring": "Les certificats qu'elle a émis sont à migrer avant son expiration",
+      "deploy_binding_left_behind": "Un déploiement sert encore l'ancien certificat",
+      "https_binding_left_behind": "L'écoute HTTPS sert encore l'ancien certificat",
+      "truststore_expiring": "Une ancre de confiance à remplacer dans le magasin de confiance"
+    },
+    "trend": {
+      "sub_one": "Certificats émis, révoqués et expirés par jour, sur le dernier jour ({{count}}).",
+      "sub_other": "Certificats émis, révoqués et expirés par jour, sur les {{count}} derniers jours.",
+      "period": "Période affichée",
+      "short": "{{count}} j",
+      "day": "Jour",
+      "quiet_one": "Aucun certificat émis, révoqué ou expiré sur le dernier jour ({{count}}).",
+      "quiet_other": "Aucun certificat émis, révoqué ou expiré sur les {{count}} derniers jours.",
+      "alt_one": "Activité des certificats sur {{count}} jour : {{issued}} émis, {{revoked}} révoqués, {{expired}} expirés.",
+      "alt_other": "Activité des certificats sur {{count}} jours : {{issued}} émis, {{revoked}} révoqués, {{expired}} expirés.",
+      "keys": "Graphique : les flèches gauche et droite le lisent jour par jour"
+    },
+    "states": {
+      "sub": "Les certificats par état. Chaque ligne ouvre sa liste.",
+      "alt": "{{total}} certificats : {{valid}} valides, {{expiring}} expirent bientôt, {{expired}} expirés, {{revoked}} révoqués."
+    }
   }
 }
