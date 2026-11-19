@@ -205,6 +205,10 @@ def export_ca(ca_id):
         if ca.uses_hsm:
             return error_response('Cannot export HSM-backed key', 409)
 
+    if include_key and export_format not in ('pem', 'pkcs12', 'p12', 'pfx', 'jks', 'key'):
+        return error_response(
+            f'include_key is not supported with format {export_format}: it carries no private key', 400)
+
     # Cap export password length (PKCS12/PFX/JKS or PEM-encrypted key)
     pw_err = _validate_export_password(password)
     if pw_err:
