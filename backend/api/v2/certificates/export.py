@@ -35,7 +35,7 @@ from utils.key_codec import load_pem_bytes
 from utils.cert_issuer import (
     authority_key_identifier_hex, certificate_signed_by, is_self_signed,
 )
-from utils.export_options import json_boolean, query_boolean
+from utils.export_options import export_body, json_boolean, query_boolean
 from services.key_export_audit import audit_key_export, encrypt_key_pem
 from services.cert.related_pair import row_certificate
 from utils import related_cert
@@ -351,9 +351,10 @@ def export_certificate(cert_id):
     if not certificate.crt:
         return error_response('Certificate data not available', 400)
 
-    # Support both GET (query params) and POST (body) for security
-    if request.method == 'POST' and request.is_json:
-        data = request.get_json()
+    data, refused = export_body('certificate')
+    if refused:
+        return refused
+    if data is not None:
         export_format = data.get('format', 'pem').lower()
         try:
             include_key = json_boolean(data, 'include_key', False)
@@ -378,18 +379,11 @@ def export_certificate(cert_id):
             include_root = query_boolean(request.args, 'include_root', False)
         except ValueError as exc:
             return error_response(str(exc), 400)
-        password = request.args.get('password')
+        password = None
         legacy = False
         variant, variant_err = requested_chain_variant(request.args, certificate)
-        # Outside a JSON body no password is read: a key never leaves in
-        # clear because the body carrying its password was not JSON.
-        if password or include_key or export_format in ('pkcs12', 'pfx', 'jks', 'key'):
-            if password:
-                logger.warning(
-                    "Rejected certificate export with password in query string "
-                    "(cert_id=%s): client must POST with JSON body",
-                    cert_id,
-                )
+        # Outside a JSON body no password is read, so no key is served
+        if include_key or export_format in ('pkcs12', 'pfx', 'jks', 'key'):
             return error_response(
                 'Password and private key exports must use POST with a JSON body, '
                 'not the query string', 400)

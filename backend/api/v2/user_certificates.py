@@ -39,7 +39,7 @@ from utils.db_transaction import safe_commit
 from utils.sanitize import content_disposition, sanitize_filename
 from utils.datetime_utils import utc_now, utc_isoformat
 from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message, revocable
-from utils.export_options import json_boolean, query_boolean
+from utils.export_options import export_body, json_boolean, query_boolean
 
 logger = logging.getLogger(__name__)
 
@@ -307,8 +307,10 @@ def export_user_certificate(cert_id):
     if not cert:
         return error_response('Certificate data not found', 404)
 
-    if request.method == 'POST' and request.is_json:
-        data = request.get_json()
+    data, refused = export_body('user-certificate')
+    if refused:
+        return refused
+    if data is not None:
         export_format = data.get('format', 'pem').lower()
         password = data.get('password', '')
         try:
@@ -321,7 +323,7 @@ def export_user_certificate(cert_id):
         legacy = legacy_flag(legacy_value)  # 3DES/SHA-1 profile (#331)
     else:
         export_format = request.args.get('format', 'pem').lower()
-        password = request.args.get('password', '')
+        password = ''
         legacy = False
         try:
             include_key = query_boolean(request.args, 'include_key', False)
@@ -331,13 +333,7 @@ def export_user_certificate(cert_id):
             return error_response(str(exc), 400)
         # Outside a JSON body no password is read, so no key is served: a GET
         # carries the certificate alone unless it asks for a key (400).
-        if password or include_key or export_format in ('pkcs12', 'p12', 'pfx', 'jks', 'key'):
-            if password:
-                logger.warning(
-                    "Rejected user-certificate export with password in query string "
-                    "(cert_id=%s): client must POST with JSON body",
-                    cert_id,
-                )
+        if include_key or export_format in ('pkcs12', 'p12', 'pfx', 'jks', 'key'):
             return error_response(
                 'Password and private key exports must use POST with a JSON body, '
                 'not the query string', 400)
@@ -349,7 +345,7 @@ def export_user_certificate(cert_id):
     if option_err:
         return error_response(option_err, 400)
     variant, variant_err = requested_chain_variant(
-        data if request.method == 'POST' and request.is_json else request.args, cert)
+        data if data is not None else request.args, cert)
     if variant_err:
         return variant_err
 

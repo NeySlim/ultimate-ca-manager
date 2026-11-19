@@ -38,7 +38,7 @@ from utils.response import success_response, error_response, created_response
 from utils.export_password import validate_export_password
 from utils.db_transaction import safe_commit
 from utils.sanitize import content_disposition
-from utils.export_options import json_boolean, query_boolean
+from utils.export_options import export_body, json_boolean, query_boolean
 
 logger = logging.getLogger(__name__)
 
@@ -361,8 +361,10 @@ def download_mtls_certificate(cert_id):
     """Download mTLS certificate as PEM or PKCS12"""
 
     user = g.current_user
-    if request.method == 'POST' and request.is_json:
-        data = request.get_json() or {}
+    data, refused = export_body('mTLS certificate')
+    if refused:
+        return refused
+    if data is not None:
         fmt = str(data.get('format', 'pem')).lower()
         password = data.get('password', '')
         try:
@@ -375,7 +377,7 @@ def download_mtls_certificate(cert_id):
         chain_sent = 'include_chain' in data or 'include_root' in data
     else:
         fmt = request.args.get('format', 'pem')
-        password = request.args.get('password', '')
+        password = ''
         legacy = False
         chain_sent = 'include_chain' in request.args or 'include_root' in request.args
         try:
@@ -383,13 +385,8 @@ def download_mtls_certificate(cert_id):
             include_root = query_boolean(request.args, 'include_root', False)
         except ValueError as exc:
             return error_response(str(exc), 400)
-        # SECURITY: never accept PKCS12 passwords via query string (proxy logs).
-        if password or fmt in ('p12', 'pkcs12'):
-            if password:
-                logger.warning(
-                    'Rejected mTLS PKCS12 download with password in query string (cert_id=%s)',
-                    cert_id,
-                )
+        # A PKCS#12 needs the password only a JSON body carries
+        if fmt in ('p12', 'pkcs12'):
             return error_response(
                 'PKCS12 export requires POST with JSON body (format, password)',
                 400,
