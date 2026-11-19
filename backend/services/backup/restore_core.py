@@ -1138,6 +1138,7 @@ class RestoreCoreMixin:
         """Each issuer's CRL number, never lowered: the higher of here and the archive."""
         from models.crl import CRLNumberCounter
         for position, row in enumerate(backup_data.get('crl_number_counters') or []):
+            tick(1)   # every row announced by expect_rows is counted, written or left out
             issuer_key, number = row.get('issuer_key'), row.get('last_number')
             if (not isinstance(issuer_key, str) or not isinstance(number, int)
                     or isinstance(number, bool)):
@@ -1295,6 +1296,7 @@ class RestoreCoreMixin:
     def _restore_acme_accounts(self, backup_data: Dict, results: Dict) -> None:
         """Restore ACME accounts from backup data (RFC 8555)"""
         for acme_data in backup_data.get('acme_accounts', []):
+            tick(1)   # every row announced by expect_rows is counted, written or left out
             account_id = acme_data.get('account_id')
             jwk_thumbprint = acme_data.get('jwk_thumbprint')
             if not account_id or not jwk_thumbprint or not acme_data.get('jwk'):
@@ -1336,6 +1338,7 @@ class RestoreCoreMixin:
 
         results.setdefault('acme_eab_credentials', 0)
         for eab in backup_data.get('acme_eab_credentials', []):
+            tick(1)   # every row announced by expect_rows is counted, written or left out
             kid = eab.get('kid')
             if not kid or not eab.get('hmac_key_b64'):
                 continue
