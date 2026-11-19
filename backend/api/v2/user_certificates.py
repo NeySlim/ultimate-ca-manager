@@ -176,9 +176,9 @@ def list_user_certificates():
         search_pattern = f'%{safe_search}%'
         query = query.filter(
             db.or_(
-                AuthCertificate.name.ilike(search_pattern),
-                AuthCertificate.cert_subject.ilike(search_pattern),
-                AuthCertificate.cert_serial.ilike(search_pattern),
+                AuthCertificate.name.ilike(search_pattern, escape='\\'),
+                AuthCertificate.cert_subject.ilike(search_pattern, escape='\\'),
+                AuthCertificate.cert_serial.ilike(search_pattern, escape='\\'),
             )
         )
 
@@ -190,14 +190,12 @@ def list_user_certificates():
         'last_used_at': AuthCertificate.last_used_at,
     }
     sort_col = sort_col_map.get(sort_by, AuthCertificate.created_at)
-    # Tie-break on the primary key: `name` is not unique and `last_used_at` is
-    # NULL for every certificate never used, so without it the page boundary
-    # falls wherever the plan puts it — and the two backends do not even order
-    # NULLs the same way.
+    # Absent values last in both directions, whichever engine; the primary key
+    # breaks ties so the page boundary does not depend on the plan.
     if sort_order == 'asc':
-        query = query.order_by(sort_col.asc(), AuthCertificate.id.asc())
+        query = query.order_by(sort_col.asc().nulls_last(), AuthCertificate.id.asc())
     else:
-        query = query.order_by(sort_col.desc(), AuthCertificate.id.desc())
+        query = query.order_by(sort_col.desc().nulls_last(), AuthCertificate.id.desc())
 
     if status_filters:
         # The status is computed from the bound certificate, so the filter

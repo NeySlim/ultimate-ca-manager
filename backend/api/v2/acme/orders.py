@@ -278,7 +278,7 @@ def get_acme_history():
         status: 'valid' or 'revoked' (repeatable)
         ca: issuer name as listed in meta.cas
         search: common name, serial number or issuer contains
-        sort_by: common_name, valid_to or created_at (default); sort_order: asc or desc (default)
+        sort_by: common_name, valid_to, source or created_at (default); sort_order: asc or desc (default)
     """
     # Bounded from both ends: `min(..., 100)` let a negative page size
     # through, and a negative LIMIT means no limit on SQLite and an error on
@@ -334,12 +334,13 @@ def get_acme_history():
             Certificate.issuer.ilike(pattern, escape='\\')))
 
     sort_columns = {'common_name': Certificate.subject_cn, 'valid_to': Certificate.valid_to,
-                    'created_at': Certificate.created_at}
+                    'created_at': Certificate.created_at, 'source': Certificate.source}
     sort_col = sort_columns.get(request.args.get('sort_by', 'created_at'), Certificate.created_at)
+    # Absent values last in both directions, the same on both engines
     if request.args.get('sort_order') == 'asc':
-        query = query.order_by(sort_col.asc(), Certificate.id.asc())
+        query = query.order_by(sort_col.asc().nulls_last(), Certificate.id.asc())
     else:
-        query = query.order_by(sort_col.desc(), Certificate.id.desc())
+        query = query.order_by(sort_col.desc().nulls_last(), Certificate.id.desc())
     total = query.count()
     certs = query.offset((page - 1) * per_page).limit(per_page).all()
 

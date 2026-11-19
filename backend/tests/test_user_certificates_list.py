@@ -1,4 +1,6 @@
 """The user certificate list filters and sorts in the query, so pages and total agree."""
+from datetime import datetime
+
 import pytest
 
 from models import Certificate, User, db
@@ -66,3 +68,40 @@ def test_the_sort_covers_the_whole_set(auth_client, enrolments):
     last = _get(auth_client, 'sort_by=name&sort_order=desc&per_page=2&page=1')
     assert [i['name'] for i in first['items']] == ['ucl-0', 'ucl-1']
     assert [i['name'] for i in last['items']] == ['ucl-4', 'ucl-3']
+
+
+@pytest.fixture
+def odd_rows(app):
+    """One enrolment named with an underscore, one with no name and no expiry."""
+    with app.app_context():
+        admin_id = User.query.filter_by(username='admin').first().id
+        rows = [
+            AuthCertificate(user_id=admin_id, cert_serial='9001', cert_subject='CN=odd-1',
+                            name='odd_name', valid_until=datetime(2030, 1, 1), enabled=True),
+            AuthCertificate(user_id=admin_id, cert_serial='9002', cert_subject='CN=odd-2',
+                            name=None, valid_until=None, enabled=True),
+            AuthCertificate(user_id=admin_id, cert_serial='9003', cert_subject='CN=odd-3',
+                            name='odd-z', valid_until=datetime(2031, 1, 1), enabled=True),
+        ]
+        db.session.add_all(rows)
+        db.session.commit()
+        ids = [r.id for r in rows]
+    yield ids
+    with app.app_context():
+        AuthCertificate.query.filter(AuthCertificate.id.in_(ids)).delete(synchronize_session=False)
+        db.session.commit()
+
+
+def test_an_underscore_in_the_search_is_literal(auth_client, odd_rows):
+    got = auth_client.get(f'{URL}?search=odd_name').get_json()['data']
+    assert [i['name'] for i in got['items']] == ['odd_name']
+    assert auth_client.get(f'{URL}?search=odd%25').get_json()['data']['total'] == 0
+
+
+@pytest.mark.parametrize('column', ['name', 'valid_until'])
+@pytest.mark.parametrize('order', ['asc', 'desc'])
+def test_absent_values_come_last_in_both_directions(auth_client, odd_rows, column, order):
+    got = auth_client.get(
+        f'{URL}?search=odd-&sort_by={column}&sort_order={order}').get_json()['data']
+    names = [i['name'] for i in got['items']]
+    assert len(names) == 3 and names[-1] is None, names

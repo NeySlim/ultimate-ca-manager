@@ -245,9 +245,9 @@ def list_trusted_certificates():
         search_pattern = f'%{safe_search}%'
         query = query.filter(
             db.or_(
-                TrustedCertificate.name.ilike(search_pattern),
-                TrustedCertificate.subject.ilike(search_pattern),
-                TrustedCertificate.fingerprint_sha256.ilike(search_pattern)
+                TrustedCertificate.name.ilike(search_pattern, escape='\\'),
+                TrustedCertificate.subject.ilike(search_pattern, escape='\\'),
+                TrustedCertificate.fingerprint_sha256.ilike(search_pattern, escape='\\')
             )
         )
     

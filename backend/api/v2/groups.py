@@ -52,8 +52,8 @@ def list_groups():
         search_pattern = f'%{safe_search}%'
         query = query.filter(
             db.or_(
-                Group.name.ilike(search_pattern),
-                Group.description.ilike(search_pattern)
+                Group.name.ilike(search_pattern, escape='\\'),
+                Group.description.ilike(search_pattern, escape='\\')
             )
         )
     
