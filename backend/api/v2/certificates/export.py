@@ -35,7 +35,7 @@ from utils.cert_issuer import (
     authority_key_identifier_hex, certificate_signed_by, is_self_signed,
 )
 from utils.export_options import json_boolean, query_boolean
-from services.key_export_audit import audit_key_export
+from services.key_export_audit import audit_key_export, encrypt_key_pem
 from services.cert.related_pair import row_certificate
 from utils import related_cert
 from . import bp
@@ -83,10 +83,7 @@ def _hybrid_bundle(certificate, include_key, password):
                             if stored else base64.b64decode(row.crt))
             if include_key:
                 key_pem = load_pem_bytes(row.prv, context=f"certificate {row.id}")
-                if password:
-                    key_pem = serialization.load_pem_private_key(key_pem, password=None).private_bytes(
-                        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
-                        serialization.BestAvailableEncryption(password.encode()))
+                key_pem = encrypt_key_pem(key_pem, password)
                 bundle.writestr(f'{name}.key', key_pem)
     if include_key:
         for row in members:
@@ -393,13 +390,7 @@ def export_certificate(cert_id):
             if not certificate.prv:
                 return error_response('Certificate has no private key', 400)
             key_pem = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
-            if password:
-                private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
-                key_pem = private_key.private_bytes(
-                    encoding=serialization.Encoding.PEM,
-                    format=serialization.PrivateFormat.PKCS8,
-                    encryption_algorithm=serialization.BestAvailableEncryption(password.encode())
-                )
+            key_pem = encrypt_key_pem(key_pem, password)
             audit_key_export('certificate', certificate.id, certificate.descr or certificate.refid,
                              export_format, password)
             return Response(
@@ -417,7 +408,8 @@ def export_certificate(cert_id):
 
             # Include private key if requested
             if include_key and certificate.prv:
-                key_pem = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
+                key_pem = encrypt_key_pem(
+                    load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}"), password)
                 if not result.endswith(b'\n'):
                     result += b'\n'
                 result += key_pem

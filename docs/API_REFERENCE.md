@@ -683,6 +683,8 @@ GET /api/v2/cas/{ca_id}/certificates
 GET /api/v2/cas/{ca_id}/certificates?status=active&page=1&per_page=50
 ```
 
+The `password` encrypts every private key the response carries: required for `pkcs12`, `pfx` and `jks`; optional for `key`, `hybrid-bundle` and `pem` with `include_key`, where the key is PKCS#8 encrypted when one is given and written in clear when not. A `password` with `der` or `pkcs7` is ignored, as those formats carry no key. The `private_key_exported` audit entry says `password-protected` or `unencrypted` accordingly.
+
 ### Export CA
 ```http
 GET /api/v2/cas/{ca_id}/export?format=pem
@@ -694,7 +696,7 @@ POST /api/v2/cas/{ca_id}/export
 GET /api/v2/cas/{ca_id}/export?format=pem&include_chain=true&chain_variant=cross:4
 ```
 
-`POST` takes `format`, `include_key`, `include_chain`, `password` (required for the PKCS12, PFX and JKS formats) and `legacy` in a JSON body. `chain_variant` is `auto` (default: the chain UCM serves), `primary` (the self-signed root)
+`POST` takes `format`, `include_key`, `include_chain`, `password` (required for the PKCS12, PFX and JKS formats; with `format=pem` and `include_key` or with `key`, it encrypts the key as PKCS#8) and `legacy` in a JSON body. `chain_variant` is `auto` (default: the chain UCM serves), `primary` (the self-signed root)
 or `cross:<id>`; any other value, or one that is not part of the chain of this CA, answers 400.
 
 ### Export All CAs
@@ -966,6 +968,10 @@ POST /api/v2/certificates/{cert_id}/export
 # earlier, Windows Server 2016 and earlier, Java before 8u301 / 11.0.1 (#331)
 POST /api/v2/certificates/{cert_id}/export
 {"format": "pkcs12", "password": "export-password", "legacy": true}
+
+# PEM with the private key encrypted (PKCS#8): POST only, 8 to 256 characters
+POST /api/v2/certificates/{cert_id}/export
+{"format": "pem", "include_key": true, "password": "export-password"}
 
 # DER format
 GET /api/v2/certificates/{cert_id}/export?format=der
@@ -1288,6 +1294,8 @@ GET /api/v2/user-certificates/{id}/export?format=pem&include_key=true&include_ch
 POST /api/v2/user-certificates/{id}/export
 {"format": "pkcs12", "password": "mypassword", "include_chain": true, "include_root": false}
 ```
+
+With `format=pem` and `include_key`, a `password` (POST) encrypts the key as PKCS#8; without one the key is written in clear.
 
 **Query Parameters**:
 | Param | Type | Description |

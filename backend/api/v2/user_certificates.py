@@ -21,6 +21,7 @@ from auth.unified import require_auth, has_permission
 from models import CA, AuthCertificate, Certificate, User, db
 from utils.key_codec import load_pem_bytes
 from services.audit_service import AuditService
+from services.key_export_audit import encrypt_key_pem
 from services.cert_service import CertificateService
 from services.approval_gate import PairApprovalConflict, approval_payload, queue_revocation
 from services.cert.related_pair import revocation_partner
@@ -468,7 +469,11 @@ def export_user_certificate(cert_id):
         suffix = '.crt'
 
         if include_key and cert.prv:
-            key_pem = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
+            pw_err = validate_export_password(password, allow_empty=True)
+            if pw_err:
+                return error_response(pw_err, 400)
+            key_pem = encrypt_key_pem(
+                load_pem_bytes(cert.prv, context=f"certificate {cert.id}"), password)
             if not result.endswith(b'\n'):
                 result += b'\n'
             result += key_pem
@@ -485,7 +490,7 @@ def export_user_certificate(cert_id):
             resource_type='user_certificate',
             resource_id=cert_id,
             resource_name=filename_base,
-            details=(f'Exported PEM with private key (unencrypted) for user cert: {filename_base}'
+            details=(f'Exported PEM with private key ({"password-protected" if password else "unencrypted"}) for user cert: {filename_base}'
                      if include_key and cert.prv else f'Exported PEM for user cert: {filename_base}'),
             success=True
         )
