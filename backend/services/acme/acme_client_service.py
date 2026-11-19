@@ -99,7 +99,7 @@ def cert_key_type_refusal(key_type):
     """Why the certificate key type *key_type* is refused (unknown, or not allowed in FIPS mode), or None."""
     if not key_type:
         return None
-    if key_type not in CERT_KEY_TYPES:
+    if not isinstance(key_type, str) or key_type not in CERT_KEY_TYPES:
         return f'Invalid key type: must be one of {", ".join(CERT_KEY_TYPES)}'
     return fips_key_type_refusal(key_type)
 

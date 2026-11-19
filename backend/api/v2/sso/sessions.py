@@ -35,6 +35,9 @@ def _typed_ssl_verify(verify, ca_bundle):
     fd, path = tempfile.mkstemp(suffix='.pem', prefix='ucm_sso_ca_')
     try:
         os.write(fd, ca_bundle.encode('utf-8') if isinstance(ca_bundle, str) else ca_bundle)
+    except BaseException:
+        os.unlink(path)
+        raise
     finally:
         os.close(fd)
     return path
@@ -64,6 +67,9 @@ def fetch_idp_metadata():
         validate_url_not_cloud_metadata(metadata_url)
     except ValueError:
         return error_response("metadata_url cannot target cloud metadata or loopback", 400)
+
+    if not isinstance(data.get('ca_bundle') or '', str):
+        return error_response("ca_bundle must be a string", 400)
 
     verify = True
     try:
