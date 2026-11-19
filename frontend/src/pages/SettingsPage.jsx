@@ -32,7 +32,7 @@ import { settingsService, systemService, casService, ssoService, mtlsService, ms
 import { holdSignOut } from '../services/apiClient'
 import { useAuth, useNotification, useMobile } from '../contexts'
 import { useServiceReconnect } from '../hooks'
-import { usePermission, useJob, isTransientError } from '../hooks'
+import { usePermission, useJob, isTransientError, jobPercent } from '../hooks'
 import { acceptedJob } from '../services/jobs.service'
 import { formatDate , downloadBlob} from '../lib/utils'
 import { useTheme } from '../contexts/ThemeContext'
@@ -1539,8 +1539,10 @@ export default function SettingsPage() {
     }
   }
 
-  const restoreJobProgress = restoreJob.job?.progress?.total
-    ? t('settings.restoreJobProgress', { done: restoreJob.job.progress.done || 0, total: restoreJob.job.progress.total })
+  // A restore counts its rows: a percentage, the total known once the archive is read
+  const restorePercent = jobPercent(restoreJob.job?.progress)
+  const restoreJobProgress = restorePercent !== null
+    ? t('settings.restoreJobPercent', { percent: restorePercent })
     : t('settings.restoreJobStarting')
 
   const handleOptimizeDb = async () => {

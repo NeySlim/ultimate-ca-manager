@@ -26,7 +26,7 @@ from . import container, installation
 from .errors import BackupSchemaError, RestoreFilesUnwritable
 from .export_generic import REFERENCE_SUFFIX
 from .restore import RestorePlan, single_transaction
-from .restore.transaction import checkpoint
+from .restore.transaction import checkpoint, expect_rows, tick, ticking
 from .manifest import SECTIONS
 from .section_store import SectionStore, section_kind, section_length
 from .restore.apply import apply_columns, apply_section, relink_references
@@ -137,6 +137,18 @@ GENERIC_SECTIONS = (
     'scan_runs',
     'scep_requests',
 )
+
+# Certificates written are flushed and their PEMs let go by this many: the plan holds every
+# row it placed until the commit, and a reader of a PEM loads it again from the transaction
+PEM_RELEASE_ROWS = 1000
+_PEM_COLUMNS = ('crt', 'csr', 'prv')
+
+
+def _release_pems(certificates) -> None:
+    db.session.flush()
+    for cert in certificates:
+        db.session.expire(cert, _PEM_COLUMNS)
+
 
 RESTORED_SECTIONS = set(GENERIC_SECTIONS) | {
     'users', 'certificate_authorities', 'certificates', 'revoked_serials',
@@ -427,6 +439,9 @@ class RestoreCoreMixin:
         # each reference resolves to on this installation.
         # Orders this installation moved on with: kept in a merge, named in a replacement
         order_warnings = keep_newer_orders(backup_data, mode)
+        # The progress counts the rows written from here on
+        expect_rows(sum(section_length(backup_data, name) for name in backup_data.keys()
+                        if name in RESTORED_SECTIONS and section_kind(backup_data, name) == 'list'))
         checkpoint('plan')
         plan = RestorePlan.build(backup_data, pruned=pruned)
         plan.warnings.extend(order_warnings + windows_warnings + sso_warnings)
@@ -635,7 +650,7 @@ class RestoreCoreMixin:
         # A v4 store is read row by row: the section is never loaded for this check
         rows = (backup_data.iter_rows('certificates') if isinstance(backup_data, SectionStore)
                 else backup_data['certificates'])
-        duplicates = duplicates_in_rows(r for r in rows if isinstance(r, dict))
+        duplicates = duplicates_in_rows(r for r in ticking(rows) if isinstance(r, dict))
         if duplicates:
             raise BackupSchemaError(
                 f"The archive holds {len(duplicates)} serial number(s) shared by certificates "
@@ -1048,6 +1063,7 @@ class RestoreCoreMixin:
         known = {ca.refid for ca in CA.query.with_entities(CA.refid).all()}
         known.update(c.get('refid') for c in backup_data.get('certificate_authorities', []) if c.get('refid'))
         for position, rs_data in enumerate(backup_data.get('revoked_serials', [])):
+            tick(1)
             if position in lifted:
                 continue
             caref = rs_data.get('caref')
@@ -1268,7 +1284,10 @@ class RestoreCoreMixin:
             cert.archived = bool(cert_data.get('archived', False))
             written.append(cert)
             results['certificates'] += 1
+            if len(written) % PEM_RELEASE_ROWS == 0:
+                _release_pems(written[-PEM_RELEASE_ROWS:])
         db.session.flush()
+        _release_pems(written[-(len(written) % PEM_RELEASE_ROWS or PEM_RELEASE_ROWS):])
         plan.written.setdefault('certificates', set()).update(cert.id for cert in written)
 
     def _restore_acme_accounts(self, backup_data: Dict, results: Dict) -> None:

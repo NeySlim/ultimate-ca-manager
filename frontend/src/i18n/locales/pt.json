@@ -3594,7 +3594,7 @@
       "haNote": "Modo HA: os nós são atualizados um de cada vez, o seguinte só quando o anterior voltar na nova versão."
     },
     "restoreJobStarting": "A restauração está iniciando",
-    "restoreJobProgress": "Restauração em andamento: etapa {{done}} de {{total}}",
+    "restoreJobPercent": "Restore in progress: {{percent}}%",
     "restoreRunsInBackground": "A restauração é executada em segundo plano. As gravações são recusadas até que ela termine, e todas as sessões são encerradas: você precisará fazer login novamente para ler o relatório.",
     "restoreCancel": "Cancelar a restauração",
     "restoreCancelled": "A restauração foi cancelada: nada foi restaurado",

@@ -11,6 +11,9 @@ export const JOB_POLL_MS = 1000
 // No answer (0) or a proxy's 502/503/504: polled again this many times in a row, then given up
 export const JOB_POLL_RETRIES = 5
 export const isTransientError = (error) => [0, 502, 503, 504].includes(error?.status)
+// A job's progress as a whole percentage, or null while its total is unknown
+export const jobPercent = (progress) => (progress?.total
+  ? Math.min(100, Math.floor(((progress.done || 0) * 100) / progress.total)) : null)
 
 const unwrap = (response) => response?.data || response
 

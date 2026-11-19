@@ -225,7 +225,12 @@ def get_job(job_id):
         return success_response(data=view)
     if row is None:
         return error_response('Job not found', 404)
-    return success_response(data=jobs.public_view(row))
+    view = jobs.public_view(row)
+    held = _held_view(job_id) if view['state'] == 'running' else None
+    if held is not None:
+        # The SQLite transaction keeps the run from writing its row: its local state is newer
+        view.update(phase=held.get('phase', view['phase']), progress=held.get('progress', view['progress']))
+    return success_response(data=view)
 
 
 @bp.route('/api/v2/system/jobs/<job_id>/cancel', methods=['POST'])

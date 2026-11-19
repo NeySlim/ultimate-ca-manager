@@ -3595,7 +3595,7 @@
       "haNote": "HA mode: the nodes update one at a time, the next one only once the previous one is back on the new version."
     },
     "restoreJobStarting": "The restore is starting",
-    "restoreJobProgress": "Restore in progress: step {{done}} of {{total}}",
+    "restoreJobPercent": "Restore in progress: {{percent}}%",
     "restoreRunsInBackground": "The restore runs in the background. Writes are refused until it ends, and it signs every session out: you will sign in again to read its report.",
     "restoreCancel": "Cancel the restore",
     "restoreCancelled": "The restore was cancelled: nothing was restored",

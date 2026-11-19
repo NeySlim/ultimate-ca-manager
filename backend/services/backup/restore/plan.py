@@ -19,6 +19,7 @@ from sqlalchemy import inspect as sa_inspect
 
 from ..export_generic import REFERENCE_SUFFIX, load_model
 from ..manifest import SECTIONS, Section
+from .transaction import ticking
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +107,7 @@ class RestorePlan:
                 raise RestoreValidationError(
                     f"Invalid backup: section '{name}' should be a list of rows")
 
-            for position, row in enumerate(value):
+            for position, row in enumerate(ticking(value)):
                 if not isinstance(row, dict):
                     raise RestoreValidationError(
                         f"Invalid backup: row {position} of section '{name}' is "
@@ -576,7 +577,7 @@ def _index_of(section_name: str, section: Section):
             rows.setdefault(sso_identity_key(*values), []).append(key_value)
         return ({key: ids[0] for key, ids in rows.items()},
                 {key: ids for key, ids in rows.items() if len(ids) > 1}, [])
-    for key_value, values in _identities_here(model, primary[0], section.identity):
+    for key_value, values in ticking(_identities_here(model, primary[0], section.identity)):
         if not singleton and any(missing_identity_value(section_name, field, value)
                                  for field, value in zip(section.identity, values)):
             incomplete.append(key_value)

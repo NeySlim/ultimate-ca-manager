@@ -3725,7 +3725,7 @@
       "haNote": "Mode HA : les nœuds se mettent à jour un par un, le suivant seulement une fois le précédent revenu sur la nouvelle version."
     },
     "restoreJobStarting": "La restauration démarre",
-    "restoreJobProgress": "Restauration en cours : étape {{done}} sur {{total}}",
+    "restoreJobPercent": "Restore in progress: {{percent}}%",
     "restoreRunsInBackground": "La restauration se déroule en arrière-plan. Les écritures sont refusées jusqu’à sa fin, et elle ferme toutes les sessions : vous vous reconnecterez pour lire son compte rendu.",
     "restoreCancel": "Annuler la restauration",
     "restoreCancelled": "La restauration a été annulée : rien n’a été restauré",
