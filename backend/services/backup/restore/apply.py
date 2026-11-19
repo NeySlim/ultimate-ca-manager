@@ -416,8 +416,9 @@ _INTEGER_LIMIT = 2 ** 63 - 1
 
 
 def _refuse_container(value: Any, column, where: str) -> None:
-    # Only a JSON column holds a list or an object; the value is not echoed (it may be a secret)
-    if isinstance(value, (list, dict)) and not isinstance(column.type, JSON):
+    # Only a JSON column holds a list or an object; the value is not echoed (it may be a secret).
+    # column None: a secret property over a private column, which takes text
+    if isinstance(value, (list, dict)) and (column is None or not isinstance(column.type, JSON)):
         raise RestoreValidationError(
             f"Invalid backup: {where} holds a {'list' if isinstance(value, list) else 'object'} "
             "where this column takes a single value")
@@ -440,6 +441,9 @@ def refuse_containers_in_columns(backup_data) -> None:
                 column = columns.get(name)
                 if column is not None and name not in section.handled:
                     _refuse_container(value, column, f"{section_name}.{name}")
+                elif (column is None and name in section.secrets
+                      and section.stored.get(name) != 'fields'):
+                    _refuse_container(value, None, f"{section_name}.{name}")
 
 
 def _coerce(value: Any, column, where: str) -> Any:

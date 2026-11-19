@@ -586,6 +586,23 @@ class TestASectionOfTheWrongTypeIsRefusedByName:
         assert SSOProvider.query.count() == 0 and APIKey.query.count() == 0
         assert User.query.count() == before['users']
 
+    @pytest.mark.parametrize('mode', ['merge', 'replace'])
+    @pytest.mark.parametrize('shape', ['list', 'object'])
+    def test_a_container_in_a_secret_property_writes_nothing(self, target, shape, mode):
+        # auth_token is a property over _auth_token: no column carries its archived name
+        from services.webhook_service import WebhookEndpoint
+        value = ['tok', MARKER] if shape == 'list' else {'v': MARKER}
+        payload = {'webhook_endpoints': [{'name': 'hc-hook', 'url': 'https://hook.corpus.test/x',
+                                          'auth_token': value}]}
+        before = _census()
+        with pytest.raises(RestoreValidationError) as refusal:
+            _service()._restore_payload(payload, b'\0' * 32, mode)
+        db.session.rollback()
+        message = str(refusal.value)
+        assert 'webhook_endpoints.auth_token' in message and MARKER not in message
+        assert _census() == before
+        assert WebhookEndpoint.query.filter_by(name='hc-hook').count() == 0
+
     def test_a_list_as_a_username_answers_400_naming_the_column(self, app, auth_client):
         def mutate(data):
             data['users'] = [dict(READ_BEFORE_THE_COLUMNS['users.username'][1],
