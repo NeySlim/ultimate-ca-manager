@@ -279,7 +279,7 @@ export default function TrustStorePage() {
     if (!cert?.certificate_pem) return
     
     const blob = new Blob([cert.certificate_pem], { type: 'application/x-pem-file' })
-    downloadBlob(blob, `${cert.name.replace(/\s+/g, '_')}.pem`)
+    downloadBlob(blob, `${cert.name}.pem`)
   }
 
   const handleExportBundle = async (format = 'pem') => {

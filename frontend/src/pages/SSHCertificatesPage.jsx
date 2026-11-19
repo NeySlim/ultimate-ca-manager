@@ -1207,7 +1207,6 @@ function GeneratedResultView({ result, onClose }) {
   }
 
   const keyId = result.key_id || 'ssh_cert'
-  const safeKeyId = keyId.replace(/[^a-zA-Z0-9_-]/g, '_')
 
   return (
     <div className="p-4 space-y-4">
@@ -1235,7 +1234,7 @@ function GeneratedResultView({ result, onClose }) {
                 {t('sshCertificates.generatedPrivateKey')}
               </label>
               <div className="flex items-center gap-1">
-                <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.private_key, safeKeyId)}>
+                <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.private_key, keyId)}>
                   <Download size={12} /> {t('common.download')}
                 </Button>
                 <Button type="button" size="sm" variant="ghost" onClick={() => handleCopy(result.private_key)}>
@@ -1258,7 +1257,7 @@ function GeneratedResultView({ result, onClose }) {
               {t('sshCertificates.generatedCertificate')}
             </label>
             <div className="flex items-center gap-1">
-              <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.certificate, `${safeKeyId}-cert.pub`)}>
+              <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.certificate, `${keyId}-cert.pub`)}>
                 <Download size={12} /> {t('common.download')}
               </Button>
               <Button type="button" size="sm" variant="ghost" onClick={() => handleCopy(result.certificate)}>
@@ -1280,7 +1279,7 @@ function GeneratedResultView({ result, onClose }) {
               {t('sshCertificates.publicKey')}
             </label>
             <div className="flex items-center gap-1">
-              <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.public_key, `${safeKeyId}.pub`)}>
+              <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.public_key, `${keyId}.pub`)}>
                 <Download size={12} /> {t('common.download')}
               </Button>
               <Button type="button" size="sm" variant="ghost" onClick={() => handleCopy(result.public_key)}>
