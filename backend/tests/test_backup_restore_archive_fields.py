@@ -142,3 +142,21 @@ def test_a_real_backup_and_the_form_of_2_254_pass_the_check(target):
     db.session.expire_all()
     assert results['cas'] == 1 and results['certificates'] == 1
     assert CA.query.filter_by(refid='af-real-ca').one().prv
+
+
+# --- A field the export never writes -------------------------------------------------------------
+
+PLAINTEXT_SHAPES = {'integer': 987654321, 'list': ['af-marker'],
+                    'text': '-----BEGIN OPENSSH PRIVATE KEY-----\naf-marker\n'}
+
+
+@pytest.mark.parametrize('mode', MODES)
+@pytest.mark.parametrize('shape', sorted(PLAINTEXT_SHAPES))
+def test_an_archived_plaintext_ssh_key_is_never_read(target, shape, mode):
+    from models.ssh import SSHCertificateAuthority
+    from security.encryption import decrypt_private_key
+    row = dict(ROWS['ssh_cas'], _private_key_plaintext=PLAINTEXT_SHAPES[shape])
+    _service()._restore_payload({'ssh_cas': [row]}, os.urandom(32), mode)
+    db.session.expire_all()
+    stored = SSHCertificateAuthority.query.filter_by(refid='af-ssh-ca').one().private_key
+    assert not stored or 'af-marker' not in decrypt_private_key(stored)

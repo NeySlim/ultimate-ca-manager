@@ -336,19 +336,13 @@ class RestoreExtendedMixin:
                 # An older archive: an empty list meant any principal then
                 sca.allow_any_principal = not sca.get_allowed_principals()
 
+            # The key comes from its encrypted field only: no export writes another in an archive
             encrypted = sca_data.get('private_key_pem_encrypted')
-            prv = sca_data.get('_private_key_plaintext')
+            prv = None
             if encrypted:
-                try:
-                    prv = self._decrypt_private_key(encrypted, master_key)
-                except Exception as exc:
-                    raise BackupSchemaError(
-                        f"Invalid backup: the private key of SSH CA "
-                        f"{refid or sca_data.get('descr') or '(unnamed)'} could "
-                        "not be decrypted. Restoring it would create an "
-                        "authority that can sign nothing; nothing has been "
-                        "changed."
-                    ) from exc
+                prv = self._decrypt_archived_key(
+                    encrypted, master_key,
+                    f"SSH CA {refid or sca_data.get('descr') or '(unnamed)'}")
             if prv:
                 sca.private_key = encrypt_private_key(prv)
             _refuse_a_taken_key(sca, taken)
