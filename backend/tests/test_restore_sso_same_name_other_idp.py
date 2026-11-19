@@ -324,14 +324,36 @@ def test_an_archived_provider_type_that_is_not_text_is_refused(target, value, mo
     assert _rows('kate') == [(corp, 'kate-sub', None)]
 
 
-@pytest.mark.parametrize('value', [None, ''])
-def test_an_archived_provider_type_left_empty_is_still_oauth2(target, value):
-    corp = _instance('oauth2')
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+def test_an_archived_provider_without_a_type_is_written_oauth2(target, mode):
     archive = _archive('3.0', 'oauth2', IDPS['oauth2'][0], 'kate-sub')
-    archive['sso_providers'][0]['provider_type'] = value
-    _restore(archive, 'merge')
+    del archive['sso_providers'][0]['provider_type']
+    _restore(archive, mode)
     db.session.expire_all()
-    assert db.session.get(SSOProvider, corp).provider_type == 'oauth2'
+    assert [(p.name, p.provider_type) for p in SSOProvider.query.all()] == [('corp', 'oauth2')]
+
+
+OUT_OF_LIST_TYPES = {'none': None, 'empty': '', 'spaces': '  ', 'unknown': 'x',
+                     'upper-case': 'OAUTH2', 'padded': ' oauth2', 'oidc': 'oidc'}
+
+
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+@pytest.mark.parametrize('value', sorted(OUT_OF_LIST_TYPES))
+def test_an_archived_provider_type_out_of_the_list_is_refused(target, value, mode):
+    from services.backup.errors import BackupSchemaError
+    here = SSOProvider(name='other', provider_type='oauth2', **IDPS['oauth2'][2])
+    db.session.add(here)
+    db.session.commit()
+    archive = _archive('3.0', 'oauth2', IDPS['oauth2'][0], 'kate-sub')
+    archive['sso_providers'][0]['provider_type'] = OUT_OF_LIST_TYPES[value]
+    with pytest.raises(BackupSchemaError) as refused:
+        _restore(archive, mode)
+    message = str(refused.value)
+    assert "'corp'" in message and repr(OUT_OF_LIST_TYPES[value]) in message
+    assert 'Nothing has been changed' in message
+    db.session.rollback()
+    assert [(p.name, p.provider_type) for p in SSOProvider.query.all()] == [('other', 'oauth2')]
+    assert User.query.count() == 0
 
 
 @pytest.mark.parametrize('kind, field', NOT_TEXT_FIELDS)

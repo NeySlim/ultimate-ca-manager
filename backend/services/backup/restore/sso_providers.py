@@ -35,16 +35,20 @@ def _archived(backup_data) -> List[Dict[str, Any]]:
 
 def refuse_archived_shared_types(backup_data) -> None:
     """BackupSchemaError, before any write, when the archive itself holds two providers of one type
-    or a provider whose type is not text."""
+    or a provider whose type is not one the product knows (an absent type is oauth2)."""
+    from models.sso import SSOProvider
     by_type: Dict[str, List[str]] = {}
     for row in _archived(backup_data):
-        kind = row.get('provider_type')
-        if kind is None or kind == '':
-            kind = 'oauth2'
-        elif not isinstance(kind, str):
+        kind = row.get('provider_type', 'oauth2')
+        if kind is not None and not isinstance(kind, str):
             raise BackupSchemaError(
                 f"Cannot restore: the type of the archive's SSO provider {row['name']!r} is not "
                 "text. Nothing has been changed.")
+        if kind not in SSOProvider.TYPES:
+            raise BackupSchemaError(
+                f"Cannot restore: the archive's SSO provider {row['name']!r} has the type "
+                f"{kind!r}, which is none of {', '.join(SSOProvider.TYPES)}. Nothing has been "
+                "changed.")
         by_type.setdefault(kind, []).append(row['name'])
     for kind, names in by_type.items():
         if len(names) > 1:
@@ -107,7 +111,7 @@ def settle_provider_types(backup_data, replacing: bool, warnings: List[str],
         by_type.setdefault(provider.provider_type, []).append(provider)
     left_out, removed = [], set()
     for row in rows:
-        kind = row.get('provider_type') or 'oauth2'
+        kind = row.get('provider_type', 'oauth2')  # in TYPES: refuse_archived_shared_types
         holder = by_name.get(row['name'])
         # The holder of the name is another provider when its type or its IdP differs
         elsewhere = holder is not None and holder.provider_type == kind and _another_idp(holder, row)
