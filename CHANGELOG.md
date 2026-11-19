@@ -93,7 +93,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - **The trust store export follows the expiry filter on screen.** `GET /api/v2/truststore/export` takes `expiry` (`expired`, `expiring`, `valid`), and the page sends the states it lists, so the bundle holds what the table shows.
 - **The bulk export says how many items it exported.** Both `POST .../bulk/export` routes return `X-Exported-Count` (CORS-exposed), and the Operations page announces that number instead of the number selected.
 - **SCEP request list refuses an unknown `status`.** `GET /api/v2/scep/requests?status=` answers 400 for a value other than `pending`, `approved` or `rejected`, as the user certificate list does, instead of an empty page.
-- **Searches match `_` and `%` literally on SQLite.** The user certificate, trusted certificate, group and global searches no longer return nothing for a term holding one; the ACME history puts absent names and expiry dates last in both directions.
+- **Searches match `_` and `%` literally.** The user certificate, trusted certificate, group, template, user and global searches no longer return nothing on SQLite for a term holding one, and the audit log search and user filter no longer take them as wildcards; the ACME history puts absent names and expiry dates last in both directions.
 - **A failed ACME finalize follows RFC 8555.** A failure on the server once the order is `processing` leaves it `invalid` with a generic `serverInternal` error instead of putting it back to `ready`, and a refused CSR answers `badCSR` with the order left `ready` for an amended CSR instead of `invalid` (see UPGRADE.md).
 - **SQLite planner statistics.** A scheduled task refreshes them every hour, and Optimize Database now reads a bounded sample of each index (`PRAGMA analysis_limit = 1000`) instead of every row.
 - **Manual backups run in the background.** Creating a backup no longer holds the web worker: the dialog shows its progress, can cancel it and offers the archive once it is ready, a reload picks it up again, and past 25 seconds the create routes answer `202` with a job to follow; a shorter one answers as before.
@@ -140,7 +140,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - **A generated CSR keeps the State, Locality and Email entered.** `POST /api/v2/csrs` dropped them without an error, so the request carried only C, O, OU and CN; the form now also has an Email field, and re-keying a CSR as a new CSR keeps its email (#449). The email is trimmed and must be an ASCII address, else `400` (RFC 2985 §5.2.1).
 - **A SQLite lock no longer answers 500.** A request that meets the database locked by another write, longer than it may wait, and would have answered 500 (a sign-in that cannot count its attempt included) answers 503 with `Retry-After` instead; a route that turns the error into another status keeps it.
-- **HSTS is not sent when its setting cannot be read.** A response served while the database could not answer (locked by a restore, unavailable) carried the default HSTS header even with HSTS switched off; it now carries none, unless `UCM_HSTS_ENABLED` decides.
+- **HSTS is not sent when its settings cannot be read.** A response served while the database could not answer (locked by a restore, unavailable) carried the default HSTS header even with HSTS switched off or a shorter duration saved; it now carries none, unless the `UCM_HSTS_*` environment variables set each setting the database could not give.
 - **The converter asks for the password of an encrypted key.** A separate private key or a pasted encrypted PEM had no password field (only `.p12` and `.pfx` files did), so the conversion could not open it; the field now shows as soon as one is given.
 - **Uploading a certificate file in the shared certificate field works.** The file upload of the Microsoft CA client certificate field always answered 400 and its password prompt never opened; the file is now analysed and its certificate and key fill the fields.
 - **A discovery profile's next scan follows its new schedule.** Changing the interval, or switching the schedule off and on again, kept the old date: the profile ran at once on a stale one or waited out the old interval; it now restarts the wait.
@@ -171,7 +171,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - **The converter's output password.** `output_password` (the older `pkcs12_password` still works) now encrypts a private key written as PEM, and a DER output that would carry a key refuses it with `400`.
 - **A non-string export password is refused.** `0`, `false`, `[]` or `{}` was read as no password, so a CSR or certificate private key came back unencrypted; the CSR, certificate and converter routes now answer `400`, and so does key recovery.
 - **A CA export refuses `include_key` for formats without a key.** `der`, `p7b` and `pkcs7` answer `400` instead of silently returning no key.
-- **A CA export reads `include_key` and `include_chain` strictly.** A string such as `"false"` was read as true; it now answers `400`, as the other exports do.
+- **A CA export reads `include_key` and `include_chain` strictly.** In a JSON body a string such as `"false"` or `"true"` was read as true, and in the query string `include_chain=1` was read as false; both now answer `400`, as the other exports do (see UPGRADE.md).
 - **SMTP "No authentication" after OAuth2.** Choosing it now resets the stored method, erases the saved OAuth2 client secret, client ID and refresh token, and the sender no longer authenticates, so mail and the test email stop failing with "OAuth2 requires smtp_user".
 - **An administrator's mTLS certificate for a user carries its name as CN.** The generated certificate had no common name; a subject field UCM does not know is now an error instead of being dropped.
 - **Rate limit settings survive a restart without HA.** `PUT /api/v2/system/security/rate-limit` is stored in the database on every deployment and read again at start; it was kept in memory outside HA.
@@ -312,6 +312,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Users: a CSV import refused a local account whose e-mail an SSO account used, which a single creation accepts, and answered `500` when another request took one of its e-mails or usernames first; it now accepts that e-mail and answers `409` naming the e-mail or username taken.
 - SSO: a second attribute mapping row with the same attribute name silently replaced the first one on save; the row is now marked and the provider is not saved until one of them is changed or removed.
 - SSH: the KRL of a CA failed to generate once a certificate of serial 0 (an imported one) was revoked; such a certificate is now listed as OpenSSH lists it, by its key ID under that CA, and the CA's other certificates with that key ID are revoked with it.
+- **An AD connector's CA bundle that is not text answers 400.** A `ca_bundle` sent as a number, list or object to the connector save or test answered 500; it is now refused with `400` naming the field.
 
 ### Security
 
@@ -339,9 +340,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Dashboard: `GET /api/v2/dashboard/system-status` returned the mail (with its host), webhook and auto-renewal status to any authenticated caller; these entries now need `read:settings`, like the same witnesses on `/dashboard/health`.
 - ACME client: revoking a certificate obtained from an ACME CA (single, bulk or approved request) only revoked it in UCM while the CA still answered "good"; the CA is now told (RFC 8555 §7.6) with reasons 1, 3, 4, 5 and 9 (privilegeWithdrawn included) and retried by the scheduler until it confirms, and the answer says when the revocation stayed local (`acme_local_only`), a hold included.
 - Dependencies: cbor2 6.1.2 → 6.3.0 (GHSA-6rgc-8hxm-rj7p, GHSA-55vx-2phh-7grr, GHSA-p6xp-9h6j-r278). A passkey sign-in response carrying crafted extension data crashed the worker before any signature was checked; it is now refused like any failed sign-in.
+- Export: a certificate or user certificate export whose body was not JSON (a form, `curl -d`) ignored the password it carried and returned the private key in clear. A private key now leaves these routes only for a POST with a JSON body; any other request asking for one answers `400`.
 
 ### Upgrade notes
 
+- Exports: a GET or form request for a certificate's or user certificate's private key answers `400`; send a POST with a JSON body. A GET of a user certificate no longer includes its key (see UPGRADE.md).
 - Microsoft CA: a Kerberos connection whose keytab path lies inside the UCM data folder stops authenticating; move that keytab elsewhere and save the new path (see UPGRADE.md).
 - FIPS image: the module becomes the OpenSSL FIPS Provider 3.5.9 (certificate #5586) without any step; TLS 1.2 peers without Extended Master Secret are refused in both directions (see UPGRADE.md).
 - CA import: a CA with an RSA key under 2048 bits is no longer accepted together with its private key; import it without the key (read-only, for chains) or replace it.

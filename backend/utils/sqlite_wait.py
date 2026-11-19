@@ -7,6 +7,7 @@ retries stop at once while the restore's transaction holds the database. Outside
 (the scheduler process, a job's thread) nothing changes; in the web worker, a request that met
 a lock and would answer 500 answers 503, gate or not.
 """
+import contextlib
 import logging
 import sqlite3
 import time
@@ -131,6 +132,22 @@ def _on_error(context):
     from flask import g, has_request_context, request
     if has_request_context():
         setattr(g, _LOCK_MET, request._get_current_object())
+
+
+@contextlib.contextmanager
+def lock_not_marked():
+    """A lock met inside and swallowed by the block does not mark the request: its 500, if
+    any, has another cause. A lock error that leaves the block still marks it."""
+    from flask import g, has_app_context
+    if not has_app_context():
+        yield
+        return
+    before = g.get(_LOCK_MET)
+    yield
+    if before is None:
+        g.pop(_LOCK_MET, None)
+    else:
+        setattr(g, _LOCK_MET, before)
 
 
 _installed = []

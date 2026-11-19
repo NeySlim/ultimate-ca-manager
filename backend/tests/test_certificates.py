@@ -518,7 +518,8 @@ class TestExportSingle:
     def test_export_pem_with_key(self, auth_client, create_cert):
         cert = create_cert(cn='export-key.example.com')
         cert_id = cert.get('id')
-        r = auth_client.get(f'{BASE}/{cert_id}/export?format=pem&include_key=true')
+        r = auth_client.post(f'{BASE}/{cert_id}/export',
+                             json={'format': 'pem', 'include_key': True})
         assert r.status_code == 200
         assert b'BEGIN CERTIFICATE' in r.data
 
@@ -535,7 +536,7 @@ class TestExportSingle:
                     content_type='application/json')
         assert r.status_code == 200
         # Private key export refused (include_key, and PKCS#12 which always bundles the key)
-        r = op.get(f'{BASE}/{cert_id}/export?format=pem&include_key=true')
+        r = op.post(f'{BASE}/{cert_id}/export', json={'format': 'pem', 'include_key': True})
         assert r.status_code == 403
         r = op.post(f'{BASE}/{cert_id}/export',
                     data=json.dumps({'format': 'pkcs12', 'password': 'ExportPass123!'}),
@@ -1407,7 +1408,7 @@ class TestEd25519KeyImport:
         data = json.loads(r.data)['data']
         assert data['has_private_key'] is True
         # and the stored key is usable: export it back
-        r = auth_client.get(f"{BASE}/{data['id']}/export?format=key")
+        r = auth_client.post(f"{BASE}/{data['id']}/export", json={'format': 'key'})
         assert r.status_code == 200, r.data
         loaded = serialization.load_pem_private_key(r.data, password=None)
         assert isinstance(loaded, ed25519.Ed25519PrivateKey)

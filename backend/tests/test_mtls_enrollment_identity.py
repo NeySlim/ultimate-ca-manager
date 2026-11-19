@@ -55,7 +55,8 @@ class TestUserCertificateRoutesShareTheRule:
             db.session.commit()
             legacy_id = legacy.id
         try:
-            r = auth_client.get(f'/api/v2/user-certificates/{legacy_id}/export?format=pem')
+            r = auth_client.post(f'/api/v2/user-certificates/{legacy_id}/export',
+                                 json={'format': 'pem'})
             assert r.status_code == 200, r.data[:200]
             assert b'PRIVATE KEY' in r.data
         finally:

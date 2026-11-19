@@ -2762,6 +2762,7 @@
     "auditTitle": "审计日志设置",
     "smtpAuthRequired": "需要认证",
     "smtpNoAuthHint": "无认证: 适用于本地中继服务器（Postfix、sendmail等）",
+    "smtpNoAuthClearsOauth": "Saving deletes the stored OAuth2 client ID, client secret and refresh token: going back to OAuth2 means entering them and authorizing again.",
     "smtpAuthMethod": "认证方式",
     "smtpAuthMethod_password": "密码",
     "smtpAuthMethod_oauth2": "OAuth2 (XOAUTH2)",

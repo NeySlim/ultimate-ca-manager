@@ -324,13 +324,14 @@ def export_user_certificate(cert_id):
         password = request.args.get('password', '')
         legacy = False
         try:
-            include_key = query_boolean(request.args, 'include_key', _key_by_default(export_format))
+            include_key = query_boolean(request.args, 'include_key', False)
             include_chain = query_boolean(request.args, 'include_chain', _chain_by_default(export_format))
             include_root = query_boolean(request.args, 'include_root', False)
         except ValueError as exc:
             return error_response(str(exc), 400)
-        # SECURITY: never accept passwords via query string (proxy access logs).
-        if password or export_format in ('pkcs12', 'p12', 'pfx', 'jks'):
+        # Outside a JSON body no password is read, so no key is served: a GET
+        # carries the certificate alone unless it asks for a key (400).
+        if password or include_key or export_format in ('pkcs12', 'p12', 'pfx', 'jks', 'key'):
             if password:
                 logger.warning(
                     "Rejected user-certificate export with password in query string "
@@ -338,9 +339,8 @@ def export_user_certificate(cert_id):
                     cert_id,
                 )
             return error_response(
-                'Password must be sent via POST body (JSON), not query string',
-                400,
-            )
+                'Password and private key exports must use POST with a JSON body, '
+                'not the query string', 400)
 
     if export_format not in _EXPORT_FORMATS:
         return error_response(f'Unsupported format: {export_format}', 400)

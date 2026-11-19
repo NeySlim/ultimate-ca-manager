@@ -557,17 +557,20 @@ def sync_trust_store():
 
 
 _EXPIRY_STATES = ('expired', 'expiring', 'valid')
+# The trust store page warns this many days ahead (frontend TrustStorePage).
+TRUST_EXPIRY_WINDOW_DAYS = 90
 
 
 def _expiry_condition(states):
-    """The page's own buckets: under a day left is expired, up to 90 days expiring."""
+    """The page's buckets on utils/days_remaining: expired at 0 days left or
+    less (the instant of expiry), expiring up to the window, else valid."""
     now = utc_now()
-    soon, later = now + timedelta(days=1), now + timedelta(days=91)
+    later = now + timedelta(days=TRUST_EXPIRY_WINDOW_DAYS)
     col = TrustedCertificate.not_after
     parts = {
-        'expired': col < soon,
-        'expiring': db.and_(col >= soon, col < later),
-        'valid': db.or_(col.is_(None), col >= later),
+        'expired': col <= now,
+        'expiring': db.and_(col > now, col <= later),
+        'valid': db.or_(col.is_(None), col > later),
     }
     return db.or_(*[parts[v] for v in states])
 

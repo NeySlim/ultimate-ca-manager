@@ -2763,6 +2763,7 @@
     "auditTitle": "Audit Log Settings",
     "smtpAuthRequired": "Authentication required",
     "smtpNoAuthHint": "No authentication: suitable for local relay servers (Postfix, sendmail, etc.)",
+    "smtpNoAuthClearsOauth": "Saving deletes the stored OAuth2 client ID, client secret and refresh token: going back to OAuth2 means entering them and authorizing again.",
     "smtpAuthMethod": "Authentication method",
     "smtpAuthMethod_password": "Password",
     "smtpAuthMethod_oauth2": "OAuth2 (XOAUTH2)",

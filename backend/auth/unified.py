@@ -114,11 +114,11 @@ class AuthManager:
         if not linked_user or not getattr(linked_user, 'active', False):
             return None
         
-        # Update last_used timestamp
+        # last_used is telemetry: a lock its write swallows is not the request's
+        from utils.sqlite_wait import lock_not_marked
         api_key.last_used_at = utc_now()
-        if not commit_or_rollback(logger, "Failed to update api_key.last_used_at"):
-            # Don't fail the auth — last_used is non-critical telemetry
-            pass
+        with lock_not_marked():
+            commit_or_rollback(logger, "Failed to update api_key.last_used_at")
         
         # Parse permissions from JSON
         try:

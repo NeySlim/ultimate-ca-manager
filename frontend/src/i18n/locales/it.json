@@ -2762,6 +2762,7 @@
     "auditTitle": "Impostazioni registro di audit",
     "smtpAuthRequired": "Autenticazione richiesta",
     "smtpNoAuthHint": "Senza autenticazione: adatto per server relay locali (Postfix, sendmail, ecc.)",
+    "smtpNoAuthClearsOauth": "Saving deletes the stored OAuth2 client ID, client secret and refresh token: going back to OAuth2 means entering them and authorizing again.",
     "smtpAuthMethod": "Metodo di autenticazione",
     "smtpAuthMethod_password": "Password",
     "smtpAuthMethod_oauth2": "OAuth2 (XOAUTH2)",

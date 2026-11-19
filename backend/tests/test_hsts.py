@@ -155,7 +155,62 @@ class TestHstsUnreadableSetting:
         with app.app_context():
             assert build_hsts_header() is None
 
-    def test_the_environment_still_decides_when_it_is_set(self, app, monkeypatch, unreadable):
+    def test_the_environment_still_decides_when_it_sets_all_three(self, app, monkeypatch, unreadable):
+        monkeypatch.setenv('UCM_HSTS_ENABLED', '1')
+        monkeypatch.setenv('UCM_HSTS_INCLUDE_SUBDOMAINS', '0')
+        monkeypatch.setenv('UCM_HSTS_MAX_AGE', '600')
+        with app.app_context():
+            assert build_hsts_header() == 'max-age=600'
+
+    def test_enabled_by_the_environment_is_not_enough(self, app, monkeypatch, unreadable):
+        """The duration and scope the database may hold are unknown: no header."""
         monkeypatch.setenv('UCM_HSTS_ENABLED', '1')
         with app.app_context():
-            assert build_hsts_header() == 'max-age=31536000; includeSubDomains'
+            assert build_hsts_header() is None
+
+
+class _OneKeyUnreadable:
+    """SystemConfig.query that cannot answer for one key only."""
+    def __init__(self, key):
+        self.key = key
+
+    def __get__(self, obj, owner):
+        real = db.session.query(owner)
+        key = self.key
+
+        class _Query:
+            def filter_by(self, **kw):
+                if kw.get('key') == key:
+                    raise RuntimeError('database is locked')
+                return real.filter_by(**kw)
+        return _Query()
+
+
+@pytest.fixture
+def unreadable_key():
+    def make(key):
+        SystemConfig.query = _OneKeyUnreadable(key)
+    try:
+        yield make
+    finally:
+        if isinstance(SystemConfig.__dict__.get('query'), _OneKeyUnreadable):
+            del SystemConfig.query
+
+
+@pytest.mark.parametrize('key', ['hsts_enabled', 'hsts_include_subdomains', 'hsts_max_age'])
+def test_any_unreadable_setting_emits_no_header(app, unreadable_key, key):
+    unreadable_key(key)
+    with app.app_context():
+        assert build_hsts_header() is None
+
+
+@pytest.mark.parametrize('key, env, value', [
+    ('hsts_include_subdomains', 'UCM_HSTS_INCLUDE_SUBDOMAINS', '1'),
+    ('hsts_max_age', 'UCM_HSTS_MAX_AGE', '31536000'),
+])
+def test_a_setting_the_environment_fixes_is_never_unreadable(app, monkeypatch, unreadable_key,
+                                                            key, env, value):
+    monkeypatch.setenv(env, value)
+    unreadable_key(key)
+    with app.app_context():
+        assert build_hsts_header() == 'max-age=31536000; includeSubDomains'

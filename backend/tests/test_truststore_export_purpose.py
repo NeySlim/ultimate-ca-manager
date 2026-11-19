@@ -97,3 +97,39 @@ def test_without_an_expiry_filter_everything_is_kept(auth_client, by_expiry):
 
 def test_an_unknown_expiry_value_is_refused(auth_client, by_expiry):
     assert auth_client.get('/api/v2/truststore/export?expiry=soon').status_code == 400
+
+
+@pytest.fixture
+def at_the_boundary(app):
+    """Twelve hours left, a second past, and the last instant of the window."""
+    from datetime import timedelta
+    from utils.datetime_utils import utc_now
+    tag = uuid.uuid4().hex[:8]
+    ids = []
+    now = utc_now()
+    with app.app_context():
+        for i, (label, until) in enumerate([
+                ('halfday', now + timedelta(hours=12)), ('justpast', now - timedelta(seconds=1)),
+                ('edge', now + timedelta(days=90, minutes=-5)),
+                ('beyond', now + timedelta(days=90, minutes=5))]):
+            row = TrustedCertificate(
+                name=f'te-{tag}-{label}', certificate_pem=_pem(f'tb-{tag}-{i}').decode(),
+                fingerprint_sha256=uuid.uuid4().hex * 2, purpose='custom', not_after=until)
+            db.session.add(row)
+            db.session.flush()
+            ids.append(row.id)
+        db.session.commit()
+    yield tag
+    with app.app_context():
+        TrustedCertificate.query.filter(TrustedCertificate.id.in_(ids)).delete(
+            synchronize_session=False)
+        db.session.commit()
+
+
+def test_the_expiry_filter_follows_days_remaining(auth_client, at_the_boundary):
+    """Half a day left is one day left, so expiring (contracts/days_remaining_contract.json)."""
+    base = '/api/v2/truststore/export?purpose=custom'
+    assert _expiry_names(auth_client.get(f'{base}&expiry=expired'), at_the_boundary) == ['justpast']
+    assert _expiry_names(auth_client.get(f'{base}&expiry=expiring'), at_the_boundary) == [
+        'edge', 'halfday']
+    assert _expiry_names(auth_client.get(f'{base}&expiry=valid'), at_the_boundary) == ['beyond']

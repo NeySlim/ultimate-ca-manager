@@ -12,6 +12,11 @@ TIMESTAMP_INDEX = 'ix_audit_logs_timestamp'
 logger = logging.getLogger(__name__)
 
 
+def _like_literal(term: str) -> str:
+    """A typed `_` or `%` matches itself under `escape='\\'`."""
+    return term.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+
+
 class AuditQueryMixin:
 
     @staticmethod
@@ -29,7 +34,7 @@ class AuditQueryMixin:
         query = AuditLog.query
 
         if username:
-            query = query.filter(AuditLog.username.ilike(f'%{username}%'))
+            query = query.filter(AuditLog.username.ilike(f'%{_like_literal(username)}%', escape='\\'))
 
         if action:
             if isinstance(action, list):
@@ -56,15 +61,11 @@ class AuditQueryMixin:
             query = query.filter(AuditLog.timestamp <= date_to)
 
         if search:
-            search_filter = f'%{search}%'
+            search_filter = f'%{_like_literal(search)}%'
             query = query.filter(
-                db.or_(
-                    AuditLog.username.ilike(search_filter),
-                    AuditLog.action.ilike(search_filter),
-                    AuditLog.details.ilike(search_filter),
-                    AuditLog.resource_type.ilike(search_filter),
-                    AuditLog.ip_address.ilike(search_filter)
-                )
+                db.or_(*(column.ilike(search_filter, escape='\\') for column in (
+                    AuditLog.username, AuditLog.action, AuditLog.details,
+                    AuditLog.resource_type, AuditLog.ip_address)))
             )
 
         return query

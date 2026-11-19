@@ -2762,6 +2762,7 @@
     "auditTitle": "Configuración del registro de auditoría",
     "smtpAuthRequired": "Autenticación requerida",
     "smtpNoAuthHint": "Sin autenticación: adecuado para servidores de retransmisión locales (Postfix, sendmail, etc.)",
+    "smtpNoAuthClearsOauth": "Saving deletes the stored OAuth2 client ID, client secret and refresh token: going back to OAuth2 means entering them and authorizing again.",
     "smtpAuthMethod": "Método de autenticación",
     "smtpAuthMethod_password": "Contraseña",
     "smtpAuthMethod_oauth2": "OAuth2 (XOAUTH2)",

@@ -258,8 +258,8 @@ def list_templates():
         search_pattern = f'%{safe_search}%'
         query = query.filter(
             db.or_(
-                CertificateTemplate.name.ilike(search_pattern),
-                CertificateTemplate.description.ilike(search_pattern)
+                CertificateTemplate.name.ilike(search_pattern, escape='\\'),
+                CertificateTemplate.description.ilike(search_pattern, escape='\\')
             )
         )
     

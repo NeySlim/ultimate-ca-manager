@@ -7,6 +7,7 @@ from urllib.parse import quote
 
 _UNSEEN = ('Cc', 'Cf', 'Zl', 'Zp')
 _MAX_BYTES = 200
+_PERCENT_ESCAPE = re.compile(r'%[0-9A-Fa-f]{2}')
 # Device names Windows refuses whatever follows the first dot (same list as the interface).
 _WINDOWS_DEVICE = re.compile(r'^(con|prn|aux|nul|com[0-9\u00b9\u00b2\u00b3]|lpt[0-9\u00b9\u00b2\u00b3])$', re.I)
 
@@ -31,8 +32,9 @@ def _clean_filename(name):
     name = re.sub(r'[/\\]', '_', name)
     name = _clip(name.replace('"', '').lstrip('.'))
     stem = name.split('.', 1)[0]
-    if _WINDOWS_DEVICE.match(stem):
-        name = f'{stem}_{name[len(stem):]}'
+    # Windows drops trailing spaces before matching a device name (`COM1 .pem` is COM1)
+    if _WINDOWS_DEVICE.match(stem.rstrip(' ')):
+        name = f"{stem.rstrip(' ')}_{name[len(stem):]}"
     return name
 
 
@@ -50,7 +52,7 @@ def _ascii_fallback(text):
     folded = _clean_filename(unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('ascii'))
     # No hidden file and no %XX a client could decode (RFC 6266 appendix D).
     folded = folded.strip(' .')
-    if re.search(r'%[0-9A-Fa-f]{2}', folded):
+    if _PERCENT_ESCAPE.search(folded):
         return ''
     return folded if any(c.isalnum() for c in folded) else ''
 
@@ -65,7 +67,8 @@ def content_disposition(name, ext='', fallback=None, disposition='attachment', p
     """
     stem = _clean_filename(name) or _clean_filename(fallback) or 'download'
     full = f'{prefix}{stem}{ext}'
-    if full.isascii():
+    # A %XX in `filename` may be decoded by a client (RFC 6266 appendix D): filename* then
+    if full.isascii() and not _PERCENT_ESCAPE.search(full):
         return f'{disposition}; filename="{full}"'
     simple = _ascii_fallback(stem) or _ascii_fallback(_clean_filename(fallback)) or 'download'
     encoded = quote(full, safe="!#$&+-.^_`|~", errors='replace')
