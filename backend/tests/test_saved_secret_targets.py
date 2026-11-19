@@ -112,12 +112,28 @@ class TestMicrosoftCAAdminChannelTest:
 
     @pytest.mark.parametrize('over', [
         {'winrm_host': 'attacker.example'}, {'winrm_port': 5985}, {'winrm_use_ssl': False},
-        {'winrm_verify_ssl': False}, {'winrm_transport': 'kerberos'},
-    ], ids=['host', 'port', 'plaintext', 'no-verify', 'transport'])
+        {'winrm_verify_ssl': False}, {'winrm_username': 'administrator'},
+    ], ids=['host', 'port', 'plaintext', 'no-verify', 'account'])
     def test_another_target_needs_the_secret_typed(self, auth_client, msca_id, seen, over):
         r = self._test(auth_client, msca_id, {**over, 'winrm_password': ''})
         assert r.status_code == 400, r.data
         assert not seen, 'a saved WinRM or basic password went to a target from the request'
+
+    def test_kerberos_sends_no_saved_password(self, auth_client, msca_id, monkeypatch):
+        import winrm
+        sessions = []
+
+        class FakeSession:
+            def __init__(self, endpoint, auth, **kwargs):
+                sessions.append((endpoint, auth, kwargs.get('transport')))
+
+            def run_ps(self, script):
+                return type('R', (), {'status_code': 0, 'std_out': b'UCM_CERTSVC=Running', 'std_err': b''})()
+
+        monkeypatch.setattr(winrm, 'Session', FakeSession)
+        r = self._test(auth_client, msca_id, {'winrm_transport': 'kerberos', 'winrm_host': 'other.example'})
+        assert r.status_code == 200, r.data
+        assert sessions == [('https://other.example:5986/wsman', ('u', ''), 'kerberos')]
 
     def test_a_masked_secret_is_not_a_typed_one(self, auth_client, msca_id, seen):
         r = self._test(auth_client, msca_id, {'winrm_host': 'attacker.example', 'winrm_password': '********'})

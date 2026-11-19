@@ -122,6 +122,9 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
         winrm_transport: formData.winrm_transport,
         winrm_username: formData.winrm_username,
         ca_config: formData.ca_config,
+        // A Kerberos channel signs in with these: the server keeps the saved ones on the saved channel
+        kerberos_principal: formData.kerberos_principal,
+        kerberos_keytab_path: formData.kerberos_keytab_path,
       }
       if (formData.winrm_password) overrides.winrm_password = formData.winrm_password
       const res = await mscaService.testAdminChannel(connection.id, overrides)
