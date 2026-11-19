@@ -97,7 +97,7 @@ export const systemService = {
 
   // Logs
   async getLogs(limit = 100) {
-    return apiClient.get(`/system/logs?limit=${limit}`)
+    return apiClient.get(`/system/logs?lines=${limit}`)
   },
 
   // Service Management
