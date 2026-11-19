@@ -3513,7 +3513,7 @@ POST /api/v2/system/security/rate-limit/reset
   "whitelist_remove": ["192.0.2.11"]
 }
 ```
-`burst` defaults to a third of `rpm`. The change is stored in the database, so it survives a restart, and read again when UCM starts; in HA mode it is also applied on every node. Only the process that answers applies it at once; any other worker process reads it when it starts. `stats` (`read:settings`) returns the counters. `reset` (`admin:system`) clears the buckets, of one address with `{"ip": "..."}` or all, and the statistics too with `{"reset_stats": true}`.
+`enabled` must be a boolean, `rpm` and `burst` integers of at least 1, and the whitelists lists of IP addresses (single addresses, not networks); anything else is a 400 that names the field and stores nothing. `burst` defaults to a third of `rpm`, at least 1. The change is stored in the database, so it survives a restart, and read again when UCM starts; in HA mode it is also applied on every node. Only the process that answers applies it at once; any other worker process reads it when it starts. `stats` (`read:settings`) returns the counters. `reset` (`admin:system`) clears the buckets, of one address with `{"ip": "..."}` or all, and the statistics too with `{"reset_stats": true}`.
 
 ### Audit Retention
 ```http

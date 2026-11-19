@@ -1140,20 +1140,8 @@ def create_app(config_name=None):
         app.logger.warning(f"CSRF middleware not loaded: {e}")
 
     # Enable rate-limiting middleware (auth brute-force protection, etc.)
-    try:
-        from security.rate_limiter import init_rate_limiter
-        if rate_limit_enabled():
-            init_rate_limiter(app)
-        else:
-            app.logger.info("Rate limiter disabled via RATE_LIMIT_ENABLED")
-    except Exception as e:
-        app.logger.warning(f"Rate limiter not loaded: {e}")
-    try:  # the settings stored by the API, by this node before a restart or by another node
-        with app.app_context():
-            from security.rate_limiter import RateLimitConfig
-            RateLimitConfig.compose(RateLimitConfig.read_stored())
-    except Exception as e:
-        app.logger.error(f"Stored rate limit settings not loaded: {e}")
+    from security.rate_limiter import start_rate_limiting
+    start_rate_limiting(app)
     
     # Security headers and cleanup
     @app.teardown_request

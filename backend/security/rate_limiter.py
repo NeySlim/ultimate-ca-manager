@@ -270,6 +270,41 @@ class RateLimitConfig:
         }
     
     @staticmethod
+    def validate_update(data: Any) -> Optional[str]:
+        """Error naming the first field of a settings request that cannot be stored, else None."""
+        if not isinstance(data, dict):
+            return 'request body must be an object'
+        if 'enabled' in data and not isinstance(data['enabled'], bool):
+            return 'enabled must be a boolean'
+        limits = data.get('custom_limits')
+        if limits is not None:
+            if not isinstance(limits, dict):
+                return 'custom_limits must be an object keyed by path'
+            for path, limit in limits.items():
+                if not isinstance(limit, dict):
+                    return f'custom_limits[{path}] must be an object with rpm and burst'
+                for name, required in (('rpm', True), ('burst', False)):
+                    value = limit.get(name)
+                    if value is None and not required:
+                        continue
+                    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+                        return f'custom_limits[{path}].{name} must be an integer of at least 1'
+        for name in ('whitelist_add', 'whitelist_remove'):
+            values = data.get(name)
+            if values is None:
+                continue
+            if not isinstance(values, list):
+                return f'{name} must be a list of IP addresses'
+            for value in values:
+                try:
+                    if not isinstance(value, str):
+                        raise ValueError(value)  # ip_address() would read an int as an address
+                    ipaddress.ip_address(value)
+                except ValueError:
+                    return f'{name} holds an invalid IP address: {str(value)[:64]}'
+        return None
+
+    @staticmethod
     def merge_stored(stored: Optional[Dict[str, Any]], data: Dict[str, Any]) -> Dict[str, Any]:
         """The settings stored in the database (HA) after a settings API request ``data``.
 
@@ -284,11 +319,13 @@ class RateLimitConfig:
             out['enabled'] = bool(data['enabled'])
         for path, limit in (data.get('custom_limits') or {}).items():
             rpm = int(limit['rpm'])
-            out['custom_limits'][path] = {'rpm': rpm, 'burst': int(limit.get('burst', rpm // 3))}
+            out['custom_limits'][path] = {'rpm': rpm, 'burst': int(limit.get('burst', max(1, rpm // 3)))}
         for ip in data.get('whitelist_add') or []:
+            ip = str(ipaddress.ip_address(ip))
             out['whitelist_add'].add(ip)
             out['whitelist_remove'].discard(ip)
         for ip in data.get('whitelist_remove') or []:
+            ip = str(ipaddress.ip_address(ip))
             out['whitelist_remove'].add(ip)
             out['whitelist_add'].discard(ip)
         out['whitelist_add'] = sorted(out['whitelist_add'])
@@ -588,3 +625,20 @@ def rate_limit(rpm: int = None, burst: int = None):
             return f(*args, **kwargs)
         return wrapper
     return decorator
+
+
+def start_rate_limiting(app):
+    """Start-up: register the limiter, then read again the settings the API stored."""
+    from config.settings import rate_limit_enabled
+    try:
+        if rate_limit_enabled():
+            init_rate_limiter(app)
+        else:
+            app.logger.info("Rate limiter disabled via RATE_LIMIT_ENABLED")
+    except Exception as e:
+        app.logger.warning(f"Rate limiter not loaded: {e}")
+    try:  # the settings stored by the API, by this node before a restart or by another node
+        with app.app_context():
+            RateLimitConfig.compose(RateLimitConfig.read_stored())
+    except Exception as e:
+        app.logger.error(f"Stored rate limit settings not loaded: {e}")

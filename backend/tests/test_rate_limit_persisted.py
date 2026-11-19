@@ -46,3 +46,42 @@ def test_the_answer_shows_the_new_state(auth_client, clean_limits):
                         content_type='application/json')
     assert r.status_code == 200, r.data
     assert '192.0.2.56' in r.get_json()['data']['whitelist']
+
+
+@pytest.mark.parametrize('body, field', [
+    ({'enabled': 'false', 'whitelist_add': ['10.9.8.7']}, 'enabled'),
+    ({'enabled': 0}, 'enabled'),
+    ({'whitelist_add': '10.9.8.7'}, 'whitelist_add'),
+    ({'whitelist_add': ['not-an-address']}, 'whitelist_add'),
+    ({'whitelist_remove': [7]}, 'whitelist_remove'),
+    ({'custom_limits': {'/api/v2/x': {'rpm': 0}}}, 'custom_limits'),
+    ({'custom_limits': {'/api/v2/x': {'rpm': True}}}, 'custom_limits'),
+    ({'custom_limits': {'/api/v2/x': {'rpm': 5, 'burst': 0}}}, 'custom_limits'),
+    ({'custom_limits': {'/api/v2/x': {}}}, 'custom_limits'),
+    ({'custom_limits': ['/api/v2/x']}, 'custom_limits'),
+])
+def test_a_bad_value_is_a_400_naming_the_field_and_stores_nothing(app, auth_client, clean_limits, body, field):
+    r = auth_client.put(URL, data=json.dumps(body), content_type='application/json')
+    assert r.status_code == 400, r.data
+    assert field in r.get_json()['message']
+    with app.app_context():
+        assert SystemConfig.query.filter_by(key=STORED_KEY).first() is None
+
+
+def test_a_valid_address_is_stored_in_its_canonical_form(auth_client, clean_limits):
+    r = auth_client.put(URL, data=json.dumps({'whitelist_add': ['2001:DB8:0:0:0:0:0:1']}),
+                        content_type='application/json')
+    assert r.status_code == 200, r.data
+    assert '2001:db8::1' in r.get_json()['data']['whitelist']
+
+
+def test_start_reads_the_stored_settings_again(app, auth_client, clean_limits, monkeypatch):
+    import security.rate_limiter as rl
+    monkeypatch.setattr(rl, 'init_rate_limiter', lambda _app=None: None)
+    r = auth_client.put(URL, data=json.dumps({'whitelist_add': ['192.0.2.57']}),
+                        content_type='application/json')
+    assert r.status_code == 200, r.data
+    rl.RateLimitConfig.compose(None)
+    assert '192.0.2.57' not in rl.RateLimitConfig.get_config()['whitelist']
+    rl.start_rate_limiting(app)
+    assert '192.0.2.57' in rl.RateLimitConfig.get_config()['whitelist']

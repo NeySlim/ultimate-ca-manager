@@ -617,6 +617,10 @@ def update_rate_limit_config():
     """Update rate limiting configuration"""
     try:
         data = request.get_json() or {}
+        from security.rate_limiter import RateLimitConfig
+        invalid = RateLimitConfig.validate_update(data)
+        if invalid:
+            return error_response(invalid, 400)
 
         # Stored in the database on every deployment, so a restart keeps it
         return _update_stored_rate_limits(data)
