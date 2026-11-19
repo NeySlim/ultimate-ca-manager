@@ -15,6 +15,7 @@ from auth.unified import has_permission, require_auth
 from services.cert.unique_subject import OVERRIDE_FIELD, SubjectTaken, override_requested, taken_response
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils import notices as notices_mod
+from utils.export_password import validate_export_password
 from utils.pagination import parse_request_pagination
 from utils.dn_validation import validate_dn_field
 from utils.request_names import RequestRejected
@@ -807,6 +808,10 @@ def export_csr(csr_id):
             return error_response(
                 'Private key export requires the read:private_keys permission', 403
             )
+        # An empty password means an unencrypted key; any other must follow the shared rule
+        pw_err = validate_export_password(password, allow_empty=True)
+        if pw_err:
+            return error_response(pw_err, 400)
         if not cert.prv:
             return error_response('CSR has no private key', 400)
         try:

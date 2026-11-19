@@ -864,14 +864,32 @@ class TestExportCSRKey:
         from cryptography.hazmat.primitives import serialization
         csr_id = _json(_create_csr(auth_client, cn='key-export-pw.example.com'))['data']['id']
         r = auth_client.post(f'/api/v2/csrs/{csr_id}/export',
-                             data=json.dumps({'format': 'key', 'password': 'S3cret!'}),
+                             data=json.dumps({'format': 'key', 'password': 'S3cret!Pw'}),
                              content_type='application/json')
         assert r.status_code == 200, r.data
         assert b'ENCRYPTED PRIVATE KEY' in r.data
-        key = serialization.load_pem_private_key(r.data, password=b'S3cret!')
+        key = serialization.load_pem_private_key(r.data, password=b'S3cret!Pw')
         assert key.public_key().public_bytes(
             serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
         ) == self._csr_public_key_der(auth_client, csr_id)
+
+    @pytest.mark.parametrize('password', ['short', 'x' * 257, 12345678])
+    def test_key_export_applies_the_export_password_rule(self, auth_client, password):
+        csr_id = _json(_create_csr(auth_client, cn='key-export-rule.example.com'))['data']['id']
+        r = auth_client.post(f'/api/v2/csrs/{csr_id}/export',
+                             data=json.dumps({'format': 'key', 'password': password}),
+                             content_type='application/json')
+        assert r.status_code == 400, r.data
+        assert b'PRIVATE KEY' not in r.data
+
+    def test_csr_export_ignores_a_password(self, auth_client):
+        # A CSR holds no secret: the password is accepted and has nothing to protect
+        csr_id = _json(_create_csr(auth_client, cn='csr-pw-ignored.example.com'))['data']['id']
+        r = auth_client.post(f'/api/v2/csrs/{csr_id}/export',
+                             data=json.dumps({'format': 'csr', 'password': 'whatever-long'}),
+                             content_type='application/json')
+        assert r.status_code == 200, r.data
+        assert b'CERTIFICATE REQUEST' in r.data
 
     def test_key_export_rejects_password_in_query_string(self, auth_client):
         csr_id = _json(_create_csr(auth_client, cn='key-export-qs.example.com'))['data']['id']
