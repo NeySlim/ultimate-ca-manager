@@ -165,6 +165,53 @@ class CSRFProtection:
         return False
 
 
+def check_request():
+    """The CSRF refusal for this request, or None (also called where the hook is skipped)."""
+    if not CSRFProtection.is_enabled():
+        return None
+    
+    # Only protect state-changing methods
+    if request.method not in CSRF_PROTECTED_METHODS:
+        return None
+    
+    # Check exempt paths
+    if CSRFProtection.is_exempt(request.path):
+        return None
+    
+    # Skip for API key auth (X-API-Key or Bearer): a browser never sends
+    # either on its own, and a presented key never falls back to the session.
+    if presented_api_key(request):
+        return None
+    
+    # Get user_id from session or g (set by auth middleware)
+    user_id = getattr(g, 'user_id', None) or session.get('user_id')
+    if not user_id:
+        # No user context, let auth middleware handle it
+        return None
+    
+    # Get token from header
+    token = request.headers.get('X-CSRF-Token')
+    
+    if not token:
+        # Also check for token in JSON body (fallback for forms)
+        try:
+            if request.is_json and request.content_length and request.content_length > 0:
+                body = request.get_json(silent=True)
+                if body:
+                    token = body.get('_csrf_token')
+        except Exception as e:
+            logger.warning(f"Failed to extract CSRF token from request body for {request.path}: {e}")
+    
+    is_valid, error = CSRFProtection.validate_token(token, user_id)
+    
+    if not is_valid:
+        logger.warning(f"CSRF validation failed for {request.path}: {error}")
+        from utils.response import error_response
+        return error_response(f"CSRF validation failed: {error}", 403)
+    
+    return None
+
+
 def init_csrf_middleware(app):
     """
     Initialize CSRF middleware for the application.
@@ -174,48 +221,6 @@ def init_csrf_middleware(app):
     @app.before_request
     def check_csrf():
         """Global CSRF check before each request"""
-        if not CSRFProtection.is_enabled():
-            return None
-        
-        # Only protect state-changing methods
-        if request.method not in CSRF_PROTECTED_METHODS:
-            return None
-        
-        # Check exempt paths
-        if CSRFProtection.is_exempt(request.path):
-            return None
-        
-        # Skip for API key auth (X-API-Key or Bearer): a browser never sends
-        # either on its own, and a presented key never falls back to the session.
-        if presented_api_key(request):
-            return None
-        
-        # Get user_id from session or g (set by auth middleware)
-        user_id = getattr(g, 'user_id', None) or session.get('user_id')
-        if not user_id:
-            # No user context, let auth middleware handle it
-            return None
-        
-        # Get token from header
-        token = request.headers.get('X-CSRF-Token')
-        
-        if not token:
-            # Also check for token in JSON body (fallback for forms)
-            try:
-                if request.is_json and request.content_length and request.content_length > 0:
-                    body = request.get_json(silent=True)
-                    if body:
-                        token = body.get('_csrf_token')
-            except Exception as e:
-                logger.warning(f"Failed to extract CSRF token from request body for {request.path}: {e}")
-        
-        is_valid, error = CSRFProtection.validate_token(token, user_id)
-        
-        if not is_valid:
-            logger.warning(f"CSRF validation failed for {request.path}: {error}")
-            from utils.response import error_response
-            return error_response(f"CSRF validation failed: {error}", 403)
-        
-        return None
-    
+        return check_request()
+
     logger.info("✅ CSRF protection middleware initialized")

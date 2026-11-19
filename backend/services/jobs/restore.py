@@ -294,6 +294,11 @@ class _Run:
             return  # the restore transaction holds the SQLite database: no other connection writes
         self.ctx.progress(done=self._done, total=len(STEPS), phase=phase)
 
+    def transaction_over(self):
+        """Committed or rolled back: the web worker may read the database again."""
+        if self.gate is not None and self.sqlite:
+            self.gate.set_view(held=False)
+
     def mark(self, session, report):
         """In the restore transaction, last before its commit: the job is ``committed``
         with the report known so far, unless a cancellation was asked first."""
@@ -401,7 +406,10 @@ def _restore(ctx, current, stream, password):
                             transaction.marking(current.mark), \
                             transaction.progressing(current.checkpoint):
                         try:
-                            results = service.restore_backup_from_stream(stream, password, mode=mode)
+                            try:
+                                results = service.restore_backup_from_stream(stream, password, mode=mode)
+                            finally:
+                                current.transaction_over()
                         except (JobCancelled, JobLost):
                             raise
                         except BaseException:
@@ -782,11 +790,12 @@ def local_view(job_id):
     return {k: v for k, v in (state.get('view') or {}).items() if k != 'held'}
 
 
-def cancel_locally(job_id):
-    """None, or the outcome of a cancellation answered from the local state."""
+def cancel_locally(job_id, held_only=True):
+    """None, or the outcome of a cancellation answered from the local state; ``held_only=False``
+    also before the transaction is marked, for a database another write keeps locked."""
     state = read_state()
     view = (state or {}).get('view') or {}
-    if state is None or state.get('job_id') != job_id or not view.get('held'):
+    if state is None or state.get('job_id') != job_id or (held_only and not view.get('held')):
         return None
     if view.get('phase') == COMMITTING:
         return 'too_late'

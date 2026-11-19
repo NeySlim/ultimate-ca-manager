@@ -326,6 +326,9 @@ def post_worker_init(worker):
     from wsgi import app as flask_app
     with flask_app.app_context():
         forget_inherited_connections(db.engines.values())
+    # A restore holding SQLite never stops this worker's greenlets in sqlite3's busy wait
+    from utils.sqlite_wait import serve_web_worker
+    serve_web_worker(flask_app)
     from services.syslog_service import syslog_forwarder
     syslog_forwarder.forget_inherited_socket()
 

@@ -176,6 +176,41 @@ def _held_view(job_id):
     return view
 
 
+def _held_job(job_id, view):
+    """(local view, None) for the held restore the caller may read; (None, answer) otherwise."""
+    from services import cluster_maintenance
+    from services.jobs import restore as restore_job
+    local = restore_job.local_view(job_id)
+    if local is None:
+        # Another job: its row is in the database the transaction holds
+        return None, cluster_maintenance.refusal(view, message=cluster_maintenance.HELD_MESSAGE)
+    if not _readable(local.get('kind')):
+        return None, error_response('Job not found', 404)
+    return local, None
+
+
+def held_read(job_id, view):
+    """GET of a job while the restore's SQLite transaction holds the database."""
+    local, answer = _held_job(job_id, view)
+    return answer if local is None else success_response(data=local)
+
+
+def held_cancel(job_id, view):
+    """Its cancellation then: a flag file the restore reads at its next checkpoint."""
+    from services import cluster_maintenance
+    from services.jobs import restore as restore_job
+    local, answer = _held_job(job_id, view)
+    if local is None:
+        return answer
+    outcome = restore_job.cancel_locally(job_id, held_only=False)
+    if outcome is None:
+        return cluster_maintenance.refusal(view, message=cluster_maintenance.HELD_MESSAGE)
+    if outcome == 'too_late':
+        return error_response(restore_job.TOO_LATE, 409)
+    return success_response(data={**local, 'cancel_requested': True},
+                            message='Cancellation requested')
+
+
 @bp.route('/api/v2/system/jobs/<job_id>', methods=['GET'])
 @require_auth()
 def get_job(job_id):
@@ -212,8 +247,16 @@ def cancel_job(job_id):
         db.session.rollback()
         raise  # the maintenance's 503: only the restore holding it is cancelled through it
     except Exception as e:
-        logger.error(f"Job {job_id} not cancelled: {type(e).__name__}")
-        return error_response('Job not cancelled', 500)
+        from utils.sqlite_wait import is_locked, locked_refusal
+        if not is_locked(e):
+            logger.error(f"Job {job_id} not cancelled: {type(e).__name__}")
+            return error_response('Job not cancelled', 500)
+        # The restore's own writes keep SQLite locked: its flag file stops it all the same
+        db.session.rollback()
+        from services.jobs.restore import cancel_locally
+        outcome = cancel_locally(job_id, held_only=False)
+        if outcome is None:
+            return locked_refusal(e)  # nothing was written: the caller retries
     if outcome == 'final':
         return error_response('The job has already ended', 409)
     if outcome == 'too_late':

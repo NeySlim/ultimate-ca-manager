@@ -22,6 +22,10 @@ RECOVER_SECONDS = 15
 PURGE_SECONDS = 3600
 WAIT_POLL_SECONDS = 0.5
 CONCLUDE_RETRY_SECONDS = 2
+# A job's own writes wait this long for another SQLite writer (a purge, a sweep), well inside
+# the lease: past it the write fails like any database error, never as a lost executor
+JOB_LOCK_WAIT_SECONDS = 60
+LOCK_RETRY_SECONDS = 0.5
 
 # Jobs run by a thread of this process: their end is awaited on the event, not the database
 _local_done = {}
@@ -65,6 +69,21 @@ def join_local(job_id, timeout=30):
     return True if done is None else done.wait(timeout)
 
 
+def _waiting_for_writers(write):
+    """``write()``, tried again while another connection holds the SQLite database."""
+    from models import db
+    from utils.sqlite_wait import is_locked
+    deadline = time.monotonic() + JOB_LOCK_WAIT_SECONDS
+    while True:
+        try:
+            return write()
+        except Exception as e:
+            if not is_locked(e) or time.monotonic() >= deadline:
+                raise
+            db.session.rollback()
+            time.sleep(LOCK_RETRY_SECONDS)
+
+
 class _Lease:
     def __init__(self, app, job_id, executor):
         self.app, self.job_id, self.executor = app, job_id, executor
@@ -79,16 +98,19 @@ class _Lease:
         self._stop.set()
 
     def _runner_loop(self):
-        from models import db
         from services.cluster_maintenance import exempt
         while not self._stop.wait(RENEW_SECONDS):
             with self.app.app_context(), exempt():
                 try:
-                    with db.engine.begin() as conn:
-                        if not store.renew_lease(conn, self.job_id, self.executor, jobs._now(conn)):
-                            return
+                    if not _waiting_for_writers(self._renew):
+                        return
                 except Exception as e:
                     logger.error(f"Background job lease not renewed: {type(e).__name__}")
+
+    def _renew(self):
+        from models import db
+        with db.engine.begin() as conn:
+            return store.renew_lease(conn, self.job_id, self.executor, jobs._now(conn))
 
 
 class JobContext:
@@ -119,8 +141,11 @@ class JobContext:
         """Record progress on a connection of its own; JobCancelled when one was asked."""
         from models import db
         from services.cluster_maintenance import exempt
-        with exempt(), db.engine.begin() as conn:
-            asked = store.write_progress(conn, self.job_id, self.executor, done, total, phase)
+
+        def write():
+            with exempt(), db.engine.begin() as conn:
+                return store.write_progress(conn, self.job_id, self.executor, done, total, phase)
+        asked = _waiting_for_writers(write)
         if asked:
             raise jobs.JobCancelled(self.job_id)
 
@@ -144,7 +169,7 @@ def _conclude_after_maintenance(app, conclude):
     from services.cluster_maintenance import MaintenanceActive, blocks_writes
     while True:
         try:
-            if conclude():
+            if _waiting_for_writers(conclude):
                 return True
             if not blocks_writes(app):
                 return False

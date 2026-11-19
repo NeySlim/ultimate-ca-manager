@@ -113,12 +113,15 @@ def test_post_worker_init_forgets_the_inherited_pool_first(app, monkeypatch, tmp
     monkeypatch.setattr('services.syslog_service.syslog_forwarder.forget_inherited_socket',
                         lambda: order.append(('syslog',)))
     monkeypatch.setattr('services.ws_relay.start_reader', lambda a: order.append(('relay', a)))
+    monkeypatch.setattr('utils.sqlite_wait.serve_web_worker', lambda a: order.append(('sqlite_wait', a)))
     module.post_worker_init(_worker())
 
     with app.app_context():
         assert order[0] == ('forget', list(db.engines.values()))
         assert bind in order[0][1] and db.engine in order[0][1]
     assert ('http', app) in order and ('relay', app) in order
+    # Before any thread of the worker can query: none waits in sqlite3's busy handler
+    assert order.index(('sqlite_wait', app)) < order.index(('http', app))
     assert order.index(('syslog',)) < order.index(('http', app))  # before anything can log
 
 
