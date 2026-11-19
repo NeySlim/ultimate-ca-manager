@@ -188,6 +188,10 @@ ingress:
     enabled: false
     host: pki.local
 
+## Backups and restores run in the scheduler process of this container, and their memory grows with the number of
+## certificates: 1Gi holds a restore of about 25 000 certificates (measured: scheduler 0.55 GB, web worker 0.25 GB,
+## master 0.22 GB). Above, raise limits.memory: about 4Gi for 255 000 certificates (docs/ADMIN_GUIDE.md, memory
+## of backups and restores).
 resources:
   requests:
     cpu: 100m

@@ -402,6 +402,17 @@ The HTTPS certificate and key of the archive are stored in the database and writ
 
 Archives are written as format v4: a sequence of chunks of at most 8 MB, each authenticated on its own, so a backup is created and read section by section without ever being held whole. The upload is spooled to `DATA_DIR/tmp` and each section is kept there, encrypted under a key held only in memory, until the restore needs it. When `DATA_DIR/tmp` is missing and cannot be created, or is not writable, the upload is spooled to the system temporary directory and the sections to a directory of the instance's own under it, named after a hash of `DATA_DIR`. At startup each worker removes stale stores from the directory its restores use, and only after taking the backup lock: when the lock cannot be taken, nothing is removed. The store of a restore run in the background carries its job's identifier and is removed when that job ends, however it ends: a restore whose process was killed loses its store when it is concluded (`executor_lost`), or at the next pass of the scheduler process of the node that holds the store (every 15 seconds), never while the job is still pending or running. Decryption and the checks made before the restore plan hold about one section at a time; the plan and the writes hold every section the archive carries. A v4 archive has no size limit unless `BACKUP_MAX_ARCHIVE_MB` sets one. Archives written before 3.0 (v1 to v3) are still restored, up to `BACKUP_MAX_UPLOAD_MB` (512 MB by default), their decompressed content up to four times that, and one JSON object per 100 bytes of it. A reverse proxy in front of UCM applies its own body limit.
 
+### Memory of backups and restores
+
+Backups and restores run in the scheduler process, and its memory grows with the number of certificates: the restore holds every row of the archive and every row it writes until its commit. Peaks measured (resident memory of the scheduler process, by the routes, on a base with 200 CAs and one million audit lines):
+
+| Certificates | Backup | Restore |
+|---|---|---|
+| 25 500 | 0.27 GB (SQLite), 0.28 GB (PostgreSQL) | 0.54 GB (SQLite), 0.55 GB (PostgreSQL) |
+| 255 000 | 2.9 GB (SQLite), 3.85 GB (PostgreSQL) | 3.7 GB (SQLite and PostgreSQL) |
+
+The web worker stays near 0.25 GB and the gunicorn master near 0.22 GB. Size the host or the container for the restore of the largest archive it may receive, plus these two. A scheduler process stopped for want of memory takes its job with it: a restore then fails and restores nothing, and its archive and sections are removed when the job is concluded.
+
 ### Backup Contents
 
 - All certificates and private keys
