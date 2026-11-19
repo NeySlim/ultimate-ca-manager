@@ -509,7 +509,8 @@ SECTIONS: Dict[str, Section] = {
     'audit_logs': Section(
         model='models.audit_log:AuditLog',
         identity=('entry_hash',),
-        exclude={**_SURROGATE},
+        # The id is carried: the entry's seal covers it (restore/audit_ids.py)
+        exclude={},
         optional=True,
     ),
     'configuration': Section(
