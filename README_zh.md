@@ -45,13 +45,13 @@
 - **AIA CA 签发者** -- 机构信息访问 CA 证书下载（RFC 5280 §4.2.2.1）。
 
 ### 集成
-- **Microsoft ADCS** -- Full lifecycle over AD CS: CSR signing, template discovery, EOBO (Enroll On Behalf Of), renew/revoke through the connector, and an optional WinRM admin channel for CRL revocation sync, CA inventory import, and pending-request approve/deny with a CA health panel
-- **Windows autoenrollment & Active Directory Connector** -- MS-XCEP/WSTEP policy and enrollment for domain-joined machines and users; a subject-less request from GPO autoenrollment is completed from Active Directory (the computer's DNS host name, or the user's DN and UPN), across several domain controllers with failover and a scheduled health check per DC, never with an anonymous bind
-- **Microsoft Intune** -- SCEP challenge validation for Intune-managed devices, Entra app registrations defined once under SCEP › Intune app registrations and picked per profile, with a step-by-step guide in `docs/integrations/intune-scep.md`
-- **HSM** -- SoftHSM included, PKCS#11, Azure Key Vault, Google Cloud KMS, OpenBao/Vault Transit; **HSM-backed CAs** with non-exportable signing keys, RSA-PSS and Brainpool on PKCS#11, and a declared device certification (Common Criteria, EUCC, FIPS 140-3) checked by the EU compliance profile; a connection test shows what a PKCS#11 module reports (library, manufacturer, firmware)
-- **Kubernetes / cert-manager** -- Reference manifests for ClusterIssuer (HTTP-01 + DNS-01 with EAB), sample Certificate, Secret template under `examples/kubernetes/cert-manager/`
-- **DNS Providers** -- Cloudflare, Route53, Azure DNS, Plesk and more for ACME DNS-01 challenges
-- **Webhooks** -- Event-driven notifications for certificate lifecycle events (15+ event types), **per-endpoint delivery history with manual retry**, durable async delivery queue with exponential backoff, and a retention window on the history so it does not grow without end
+- **Microsoft ADCS** -- 提供覆盖 AD CS 全生命周期的管理功能：CSR 签名、证书模板发现、EOBO（代他人申请证书，Enroll On Behalf Of）、通过连接器续订和吊销证书；此外，还提供可选的 WinRM 管理通道，用于同步 CRL 吊销信息、导入 CA 清单，以及批准或拒绝待处理的证书请求，并配备 CA 健康状态面板。
+- **Windows 自动注册与 Active Directory Connector** -- 为加入域的计算机和用户提供基于 MS-XCEP/WSTEP 协议的策略获取与证书注册功能。对于由 GPO 自动注册发起的、未包含主题字段的请求，系统会从 Active Directory 中补全相关信息（计算机的 DNS 主机名，或用户的 DN 和 UPN）。支持通过多个域控制器实现故障转移，并为每个域控制器安排定期健康检查，绝不会使用匿名绑定。
+- **Microsoft Intune** -- S验证由 Intune 管理的设备所使用的 SCEP 挑战值，Entra 应用注册只需在 SCEP › Intune app registrations 中定义一次，即可在各个配置文件中按需选择。详细配置步骤请参阅 `docs/integrations/intune-scep.md`
+- **HSM** -- 内置 SoftHSM，并支持 PKCS#11、Azure Key Vault、Google Cloud KMS 以及 OpenBao/Vault Transit。支持由 HSM 提供密钥保护的 CA（HSM-backed CAs），其签名密钥不可导出；在 PKCS#11 模式下支持 RSA-PSS 和 Brainpool 算法。还支持声明设备所取得的认证资质（Common Criteria、EUCC、FIPS 140-3），并由 EU 合规配置文件进行检查。连接测试会显示 PKCS#11 模块报告的信息，包括库、制造商和固件版本。
+- **Kubernetes / cert-manager** -- 提供 ClusterIssuer 参考配置清单（支持 HTTP-01，以及配合 EAB 的 DNS-01）、Certificate 示例和 Secret 模板，位于 `examples/kubernetes/cert-manager/`目录下。
+- **DNS 服务商** -- 支持 Cloudflare、Route53、Azure DNS、Plesk 等服务商，用于处理 ACME DNS-01 挑战。
+- **Webhooks** -- 针对证书生命周期事件提供事件驱动的通知机制，支持 15 种以上事件类型，提供**按端点查看的投递历史记录及手动重试功能**, 采用持久化的异步投递队列，并通过指数退避机制处理失败重试。同时，历史记录设有保留期限，避免数据无限累积。
 
 ### Security & Access
 - **Authentication** -- Password, WebAuthn/FIDO2 (also as the second factor, next to or instead of TOTP), TOTP 2FA, mTLS, API keys (`X-API-Key` or `Authorization: Bearer`)
