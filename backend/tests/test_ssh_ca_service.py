@@ -3,6 +3,7 @@ import pytest
 
 from models import db, SSHCertificateAuthority
 from services.ssh_ca_service import SSHCAService
+from tests.ssh_cleanup import ssh_rows_stay_in_their_module  # noqa: F401
 
 
 class TestCreateCA:
