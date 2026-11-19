@@ -7,6 +7,7 @@ revocation of the former CA closes its renewals at once, on both bindings. The T
 listed former CA, and a certificate trusted on it alone reaches no route but WSTEP renewal."""
 import json
 import os
+import uuid
 
 import pytest
 from cryptography import x509
@@ -306,7 +307,7 @@ def test_a_cut_closes_the_former_ca_s_renewals_at_once(
         with app.app_context():
             # A deleted CA: its record gone, its refid left on the list
             ca = db.session.get(CA, world['cas']['A']['id'])
-            ca.refid, keep = f"gone-{ca.refid}", ca.refid
+            ca.refid, keep = str(uuid.uuid4()), ca.refid
             db.session.commit()
     try:
         floor = _top_audit(app)
