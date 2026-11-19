@@ -87,6 +87,15 @@ def _ad_retarget_error(saved, data):
     return retarget_error(current, requested, True)
 
 
+def _ca_bundle(value):
+    """(PEM text or None, None), or (None, a 400) for a value that is not text."""
+    if value is None:
+        return None, None
+    if not isinstance(value, str):
+        return None, error_response('ca_bundle must be PEM text', 400)
+    return value.strip() or None, None
+
+
 def apply_fields(config, data):
     """Copy the submitted settings onto *config*; an error response, or None. The domain
     SID read for a base DN or a DC list is dropped when either changes."""
@@ -125,7 +134,10 @@ def apply_fields(config, data):
     if 'verify_ssl' in data:
         config.verify_ssl = bool(data['verify_ssl'])
     if 'ca_bundle' in data:
-        config.ca_bundle = (data['ca_bundle'] or '').strip() or None
+        bundle, err = _ca_bundle(data['ca_bundle'])
+        if err:
+            return err
+        config.ca_bundle = bundle
     if 'base_dn' in data:
         base_dn = (data['base_dn'] or '').strip()
         if len(base_dn) > MAX_DN_LEN:
@@ -196,7 +208,9 @@ def run_unsaved_test(data, saved_connector):
         return error_response(GLOBAL_CATALOG_REFUSAL, 400)
     use_ssl = bool(data.get('use_ssl'))
     verify_ssl = data.get('verify_ssl', True)
-    ca_bundle = data.get('ca_bundle') or None
+    ca_bundle, err = _ca_bundle(data.get('ca_bundle'))
+    if err:
+        return err
 
     bind_password = data.get('bind_password')
     if not bind_password:
