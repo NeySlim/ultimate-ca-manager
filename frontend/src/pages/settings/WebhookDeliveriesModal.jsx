@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowsClockwise, ArrowClockwise, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import { Modal, Button, Badge } from '../../components'
@@ -32,18 +32,22 @@ export default function WebhookDeliveriesModal({ webhook, onClose, canRetry }) {
   const [total, setTotal] = useState(0)
   const [retrying, setRetrying] = useState({})
 
+  const loadSeq = useRef(0)
   const load = useCallback(async () => {
     if (!webhook) return
+    // An answer older than the last request sent is dropped
+    const seq = ++loadSeq.current
     setLoading(true)
     try {
       const res = await settingsService.getWebhookDeliveries(webhook.id, { page, perPage: PER_PAGE, status: statusFilter || undefined })
+      if (seq !== loadSeq.current) return
       setItems((res.data || res) || [])
       setTotal(res.meta?.total ?? 0)
       setTotalPages(Math.max(1, res.meta?.total_pages ?? 1))
     } catch (e) {
-      showError(e.message || t('webhooks.deliveries.loadFailed'))
+      if (seq === loadSeq.current) showError(e.message || t('webhooks.deliveries.loadFailed'))
     } finally {
-      setLoading(false)
+      if (seq === loadSeq.current) setLoading(false)
     }
   }, [webhook, statusFilter, page, showError, t])
 

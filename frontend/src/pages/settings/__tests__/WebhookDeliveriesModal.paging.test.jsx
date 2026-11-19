@@ -61,4 +61,24 @@ describe('WebhookDeliveriesModal paging', () => {
     fireEvent.click(screen.getByText('webhooks.deliveries.status.failed'))
     await waitFor(() => expect(getWebhookDeliveries.mock.calls.at(-1)[1]).toMatchObject({ page: 1, status: 'failed' }))
   })
+
+  it('keeps the filter asked for last when an older answer arrives later', async () => {
+    const pending = {}
+    getWebhookDeliveries.mockReset().mockImplementation((_id, { status }) => (
+      status ? new Promise((resolve) => { pending[status] = resolve })
+        : Promise.resolve({ data: [delivery(1)], meta: { total: 1, total_pages: 1 } })))
+    render(<WebhookDeliveriesModal webhook={{ id: 7, name: 'hook' }} onClose={vi.fn()} />)
+    await screen.findByText('evt.1')
+    fireEvent.click(screen.getByText('webhooks.deliveries.status.failed'))
+    await waitFor(() => expect(pending.failed).toBeTruthy())
+    fireEvent.click(screen.getByText('webhooks.deliveries.status.delivered'))
+    await waitFor(() => expect(pending.delivered).toBeTruthy())
+    const answer = (id) => ({ data: [delivery(id)], meta: { total: 1, total_pages: 1 } })
+    pending.delivered(answer(51))
+    await screen.findByText('evt.51')
+    pending.failed(answer(26))
+    await new Promise((r) => setTimeout(r, 50))
+    expect(screen.queryByText('evt.26')).toBeNull()
+    expect(screen.getByText('evt.51')).toBeTruthy()
+  })
 })
