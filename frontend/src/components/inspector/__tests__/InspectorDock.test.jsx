@@ -168,6 +168,42 @@ describe('InspectorDock', () => {
     expect(root.getPropertyValue('--inspector-reserve-bottom')).toBe('')
   })
 
+  it('sits above the status bar on the desktop, docked at the bottom or on the right', async () => {
+    renderDock()
+    fireEvent.click(screen.getByText('open-1'))
+    const dock = await screen.findByTestId('inspector-dock')
+    expect(dock).toHaveClass('bottom-[var(--shell-status-h,0px)]')
+    expect(dock).not.toHaveClass('bottom-0')
+    fireEvent.click(screen.getByRole('button', { name: 'inspector.dockRight' }))
+    await waitFor(() => expect(screen.getByTestId('inspector-grip')).toHaveAttribute('aria-orientation', 'vertical'))
+    expect(dock).toHaveClass('bottom-[var(--shell-status-h,0px)]', 'top-0', 'right-0')
+    expect(dock).not.toHaveClass('bottom-0')
+  })
+
+  it('counts the open objects in its header', async () => {
+    renderDock()
+    fireEvent.click(screen.getByText('open-1'))
+    await screen.findByText('one.example.com:overview')
+    expect(screen.getByTestId('inspector-count').firstElementChild).toHaveTextContent(/^1$/)
+    fireEvent.click(screen.getByText('open-2'))
+    await screen.findByText('two.example.com:overview')
+    expect(screen.getByTestId('inspector-count').firstElementChild).toHaveTextContent(/^2$/)
+    expect(screen.getByTestId('inspector-count')).toHaveAttribute('title', 'inspector.openCount')
+  })
+
+  it('switches close on navigate from its header and remembers it', async () => {
+    renderDock()
+    fireEvent.click(screen.getByText('open-1'))
+    await screen.findByText('one.example.com:overview')
+    const toggle = screen.getByRole('button', { name: 'inspector.closeOnNav' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    expect(JSON.parse(localStorage.getItem('ucm-inspector-prefs')).closeOnNav).toBe(false)
+    // The dock stays open and the focus stays on the switch
+    expect(screen.getByTestId('inspector-dock')).toBeInTheDocument()
+  })
+
   it('closes an object from its own close button', async () => {
     renderDock()
     fireEvent.click(screen.getByText('open-1'))
@@ -209,6 +245,8 @@ describe('InspectorDock', () => {
     const dock = await screen.findByTestId('inspector-dock')
     expect(dock).toHaveAttribute('role', 'dialog')
     expect(dock).toHaveAttribute('aria-modal', 'true')
+    expect(dock).toHaveClass('inset-0')
+    expect(dock).not.toHaveClass('bottom-[var(--shell-status-h,0px)]')
     expect(screen.queryByTestId('inspector-grip')).toBeNull()
   })
 

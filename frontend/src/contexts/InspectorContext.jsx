@@ -109,7 +109,7 @@ export function InspectorProvider({ children }) {
     // that closes the inspector goes away with it and does not count
     const focused = document.activeElement
     const free = !focused || focused === document.body || !focused.isConnected
-      || !!focused.closest?.('[data-testid="inspector-dock"], [data-inspector-control]')
+      || !!focused.closest?.('[data-testid="inspector-dock"]')
     if (origin && free) queueMicrotask(() => origin.focus())
     openedRef.current = []
     setOpened([])

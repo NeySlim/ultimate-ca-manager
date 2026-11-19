@@ -48,7 +48,7 @@ describe('resolveActivePageId', () => {
     expect(resolveActivePageId('/cas/')).toBe('cas')
   })
 
-  it('keeps /dashboard on the first-segment fallback (StatusFooter relies on it)', () => {
+  it('keeps /dashboard on the first-segment fallback', () => {
     expect(resolveActivePageId('/dashboard')).toBe('dashboard')
   })
 

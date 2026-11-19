@@ -32,8 +32,9 @@ export function TopBar({ can, pins, onTogglePin, activeId, onOpenSearch, onOpenH
         {fixed.map(m => {
           const Icon = m.icon
           const active = current === m.id
+          const badged = m.id === 'certificates' && expiring > 0
           return (
-            <span key={m.id} className="shell-fixed">
+            <span key={m.id} className={`shell-fixed${badged ? ' has-badge' : ''}`}>
               <Link
                 to={m.path}
                 data-module={m.id}
@@ -43,7 +44,7 @@ export function TopBar({ can, pins, onTogglePin, activeId, onOpenSearch, onOpenH
                 <Icon size={16} weight={active ? 'fill' : 'regular'} aria-hidden="true" />
                 <span>{t(m.labelKey)}</span>
               </Link>
-              {m.id === 'certificates' && expiring > 0 && (
+              {badged && (
                 <button type="button" className="shell-badge" onClick={dismiss}
                   aria-label={t('shell.expiringBadge', { count: expiring })}
                   title={t('common.dismiss')}>

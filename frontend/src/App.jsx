@@ -5,7 +5,7 @@ import { WebSocketProvider } from './hooks/useWebSocket'
 import { MODULES, REDIRECTS } from './navigation/registry'
 import { loginUrl, safeNext } from './navigation/safeNext'
 import { pages, lazyWithRetry } from './navigation/pages'
-import { AppShell, ErrorBoundary, LoadingSpinner, SessionWarning, ForcePasswordChange, ForceEnroll2FA, SafeModeOverlay, InspectorDock } from './components'
+import { AppShell, ErrorBoundary, LoadingSpinner, SessionWarning, ForcePasswordChange, ForceEnroll2FA, SafeModeOverlay, InspectorDock, InspectorCloseOnNavigate } from './components'
 
 // Lazy load pages for code splitting (module pages are bound in navigation/pages.js)
 const LoginPage = lazyWithRetry(() => import('./pages/LoginPage'))
@@ -159,6 +159,7 @@ export default function App() {
                   <SafeModeOverlay />
                   <AppRoutes />
                   <InspectorDock />
+                  <InspectorCloseOnNavigate />
                 </InspectorProvider>
               </MobileProvider>
             </WebSocketProvider>

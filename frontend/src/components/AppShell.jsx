@@ -12,7 +12,6 @@ import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
 import { FloatingHelpPanel } from './ui/FloatingHelpPanel'
 import { UpdatePopup } from './UpdatePopup'
 import { KofiSupportCard } from './KofiSupportCard'
-import { StatusFooter } from './ui/StatusFooter'
 import { useNotification } from '../contexts/NotificationContext'
 import { usePermission } from '../hooks'
 import { certificatesService } from '../services'
@@ -27,7 +26,6 @@ export function AppShell() {
   const [helpModalOpen, setHelpModalOpen] = useState(false)
   // Help key requested by the shell itself (navigation help); cleared on close
   const [helpOverride, setHelpOverride] = useState(null)
-  const [isMobile, setIsMobile] = useState(false)
   const { showWarning } = useNotification()
 
   // Derive the active nav item from the URL (see resolveActivePageId)
@@ -61,14 +59,6 @@ export function AppShell() {
     'keyRecovery', 'policies', 'approvals', 'reports', 'discovery'
   ]
   const hasHelp = pagesWithHelp.includes(activePage) || activePage === ''
-
-  // Phone width: the window-manager footer is desktop only
-  useEffect(() => {
-    const checkViewport = () => setIsMobile(window.innerWidth < 768)
-    checkViewport()
-    window.addEventListener('resize', checkViewport)
-    return () => window.removeEventListener('resize', checkViewport)
-  }, [])
 
   // Check for expiring certificates on mount (once per session)
   useEffect(() => {
@@ -136,6 +126,8 @@ export function AppShell() {
 
   return (
     <div className="shell-root">
+      {/* The stage makes room for the inspector dock; the status bar stays under both */}
+      <div className="shell-stage">
       <TopBar
         can={can}
         pins={pins}
@@ -151,10 +143,8 @@ export function AppShell() {
           <div className="flex-1 flex min-h-0 min-w-0 overflow-auto">
             <Outlet />
           </div>
-
-          {/* Window-manager footer: desktop only, not on the dashboard */}
-          {!isMobile && activePage !== '' && activePage !== 'dashboard' && <StatusFooter />}
         </div>
+      </div>
       </div>
 
       <StatusBar />

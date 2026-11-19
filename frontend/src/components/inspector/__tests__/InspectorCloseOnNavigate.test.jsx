@@ -6,16 +6,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, act } from '@testing-library/react'
 import { MemoryRouter, useNavigate } from 'react-router-dom'
 
-const wm = vi.hoisted(() => ({ closeAll: vi.fn(), windowCount: 1 }))
+const wm = vi.hoisted(() => ({ closeAll: vi.fn(), windowCount: 1, closeOnNav: true }))
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key, fallback) => fallback ?? key }) }))
 vi.mock('../../../contexts/InspectorContext', () => ({
   useInspector: () => ({
-    openCount: wm.windowCount, closeAll: wm.closeAll, closeOnNav: true, toggleCloseOnNav: vi.fn(),
+    openCount: wm.windowCount, closeAll: wm.closeAll, closeOnNav: wm.closeOnNav, toggleCloseOnNav: vi.fn(),
   }),
 }))
 
-import { StatusFooter } from '../StatusFooter'
+import { InspectorCloseOnNavigate } from '../InspectorCloseOnNavigate'
 
 let navigate
 function Navigator() {
@@ -24,11 +24,11 @@ function Navigator() {
 }
 
 function renderAt(path) {
-  render(<MemoryRouter initialEntries={[path]}><Navigator /><StatusFooter /></MemoryRouter>)
+  render(<MemoryRouter initialEntries={[path]}><Navigator /><InspectorCloseOnNavigate /></MemoryRouter>)
 }
 
-describe('StatusFooter close on navigate', () => {
-  beforeEach(() => { wm.closeAll.mockReset(); wm.windowCount = 1 })
+describe('close on navigate', () => {
+  beforeEach(() => { wm.closeAll.mockReset(); wm.windowCount = 1; wm.closeOnNav = true })
 
   it('keeps the window a direct link opened when the URL settles on the list', () => {
     renderAt('/certificates/12')
@@ -49,4 +49,16 @@ describe('StatusFooter close on navigate', () => {
       act(() => navigate(to))
       expect(wm.closeAll).toHaveBeenCalledTimes(1)
     })
+
+  it('renders nothing', () => {
+    renderAt('/certificates')
+    expect(document.body.textContent).toBe('')
+  })
+
+  it('keeps the objects open across pages when the preference is off', () => {
+    wm.closeOnNav = false
+    renderAt('/certificates')
+    act(() => navigate('/cas'))
+    expect(wm.closeAll).not.toHaveBeenCalled()
+  })
 })

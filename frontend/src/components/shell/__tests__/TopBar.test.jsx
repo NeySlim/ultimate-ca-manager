@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { ROLES, canFor, tStub } from './shellTestUtils'
 
 const getStats = vi.hoisted(() => vi.fn())
@@ -130,6 +132,30 @@ describe('TopBar expiry badge', () => {
     await user.click(badge)
     expect(screen.queryByRole('button', { name: /shell\.expiringBadge/ })).toBeNull()
     expect(JSON.parse(localStorage.getItem('ucm_badge_dismissed')).count).toBe(5)
+  })
+
+  // jsdom has no layout: the cascade of the real stylesheet is what it can check
+  it('keeps the badge clear of its link and of the next one', async () => {
+    const sheet = document.createElement('style')
+    sheet.textContent = readFileSync(resolve(process.cwd(), 'src/components/shell/shell.css'), 'utf8')
+    document.head.appendChild(sheet)
+    try {
+      getStats.mockResolvedValue({ data: { expiring: 30, expired: 2 } })
+      setup({ activeId: 'certificates' })
+      const badge = await screen.findByRole('button', { name: /shell\.expiringBadge/ })
+      const link = badge.previousElementSibling
+      expect(link).toHaveAttribute('data-module', 'certificates')
+      expect(link).not.toContainElement(badge)
+      const style = getComputedStyle(badge)
+      expect(parseFloat(style.marginLeft)).toBeGreaterThanOrEqual(0)
+      expect(parseFloat(style.marginRight)).toBeGreaterThan(0)
+      // Neither the badge nor its link gives way when the bar is short of room
+      expect(style.flexShrink).toBe('0')
+      expect(style.whiteSpace).toBe('nowrap')
+      expect(getComputedStyle(badge.parentElement).flexShrink).toBe('0')
+    } finally {
+      sheet.remove()
+    }
   })
 
   it('has no badge when nothing expires', async () => {

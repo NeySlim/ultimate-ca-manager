@@ -138,6 +138,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Shell: the status bar stays at the bottom of the window, full width, with the inspector docked above it, and the expiry badge of the top bar no longer slips under its own link. The second bottom bar is gone: the count of open objects and the *Close on navigate* switch are in the inspector header, and the switch now applies on every page and on mobile.
 - **A restored audit log verifies.** A replacing restore wrote every archived entry under a new id, which its seal covers, so the restored history no longer verified; the archive now carries the ids, a replacement writes each entry back under its own, and the report counts the entries that cannot verify here (a merge, an older archive, another master key).
 - **A local ACME account is refused only for an e-mail another account already uses.** The check refused any address found inside another one (`b@example.com` when `ab@example.com` existed, `_` and `%` read as wildcards) and ignored case on SQLite only; it now compares whole addresses, ignoring case on both databases.
 - **A generated CSR keeps the State, Locality and Email entered.** `POST /api/v2/csrs` dropped them without an error, so the request carried only C, O, OU and CN; the form now also has an Email field, and re-keying a CSR as a new CSR keeps its email (#449). The email is trimmed and must be an ASCII address, else `400` (RFC 2985 §5.2.1).
