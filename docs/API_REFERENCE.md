@@ -1299,7 +1299,7 @@ POST /api/v2/user-certificates/{id}/export
 | password | string | PKCS12 password (required for pkcs12, min 8 chars) |
 | legacy | bool | PKCS12 compatibility profile, 3DES/SHA-1 instead of AES-256/SHA-256 (default: false) |
 
-**Response** `200`: Binary file download with `Content-Disposition` header.
+**Response** `200`: Binary file download with `Content-Disposition` header. A name that is not ASCII is sent as an ASCII `filename` fallback plus `filename*=UTF-8''<percent-encoded name>` (RFC 6266); every download route does the same.
 
 > **Note**: Auditors are explicitly blocked from exporting user certificates.
 
