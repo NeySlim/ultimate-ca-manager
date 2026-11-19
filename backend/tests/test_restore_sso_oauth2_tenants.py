@@ -79,12 +79,60 @@ def test_an_archive_without_the_column_restores_a_single_issuer_provider(target)
     assert provider.oauth2_tenants is None and provider.to_dict()['oauth2_tenants'] == []
 
 
-def test_an_archived_wildcard_is_restored_as_written_and_refuses_every_token(target):
-    """A restore writes the column as archived; the sign-in reads it and refuses, never "any tenant"."""
-    from services.oidc_id_token import OIDCValidationError, has_tenants, provider_tenants
-    _restore(_archive('["*"]'), 'replace')
+_UNREADABLE = {'wildcard': '["*"]', 'not_json': 'nope', 'object': '{"a": 1}', 'number': 42,
+               'braces': f'["{{{TENANT_A}}}"]'}
+
+
+def _refused(data, mode, *words):
+    from services.backup.errors import BackupSchemaError
+    with pytest.raises(BackupSchemaError) as refused:
+        _restore(data, mode)
+    db.session.rollback()
+    message = str(refused.value)
+    assert "'entra'" in message and 'Nothing has been changed' in message, message
+    assert all(word in message for word in words), message
+    assert SSOProvider.query.filter_by(name='entra').first() is None
+    assert User.query.filter_by(username='mt-alice').first() is None
+
+
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+@pytest.mark.parametrize('value', sorted(_UNREADABLE))
+def test_unreadable_archived_tenants_are_refused_before_any_write(target, mode, value):
+    _refused(_archive(_UNREADABLE[value]), mode, 'accepted tenants')
+
+
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+def test_archived_tenants_without_id_token_verification_are_refused(target, mode):
+    data = _archive(json.dumps([TENANT_A]))
+    data['sso_providers'][0]['id_token_verify'] = False
+    _refused(data, mode, 'ID token verification')
+
+
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+@pytest.mark.parametrize('value', ['["*"]', json.dumps(['9188040d-6c67-4c5b-b112-36a304b66dad'])],
+                         ids=['unreadable', 'not_accepted'])
+def test_archived_role_tenants_off_the_accepted_list_are_refused(target, mode, value):
+    data = _archive(json.dumps([TENANT_A, TENANT_B]))
+    data['sso_providers'][0]['oauth2_role_tenants'] = value
+    _refused(data, mode, 'role tenants')
+
+
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+def test_archived_role_tenants_and_expected_tenants_come_back(target, mode):
+    data = _archive(json.dumps([TENANT_A, TENANT_B]))
+    data['sso_providers'][0]['oauth2_role_tenants'] = json.dumps([TENANT_B])
+    data['user_sso_identities'][0].update(external_id=None, expected_tenant=TENANT_A)
+    _restore(data, mode)
     db.session.expire_all()
     provider = SSOProvider.query.filter_by(name='entra').one()
-    assert has_tenants(provider)
-    with pytest.raises(OIDCValidationError, match='accepted tenants'):
-        provider_tenants(provider)
+    assert provider.to_dict()['oauth2_role_tenants'] == [TENANT_B]
+    row = UserSSOIdentity.query.filter_by(provider_id=provider.id, external_id=None).one()
+    assert row.expected_tenant == TENANT_A
+
+
+def test_to_dict_shows_an_unreadable_stored_value_as_it_is(target):
+    """Never as an empty list, which would read as a provider of one issuer."""
+    provider = SSOProvider(name='raw', provider_type='oauth2', oauth2_tenants='["*"]',
+                           oauth2_role_tenants='nope')
+    assert provider.to_dict()['oauth2_tenants'] == ['*']
+    assert provider.to_dict()['oauth2_role_tenants'] == 'nope'
