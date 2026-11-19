@@ -42,7 +42,8 @@ const MAX_BASENAME = 128
  * @returns {string} a single path segment, never empty, never "." or ".."
  */
 export function sanitizeFilename(name, maxLength = MAX_BASENAME) {
-  let safe = String(name ?? '').replace(/[^A-Za-z0-9._-]+/g, '_')
+  // Letters, marks and digits of any script stay; separators, controls and bidi marks do not
+  let safe = String(name ?? '').normalize('NFC').replace(/[^\p{L}\p{M}\p{N}._-]+/gu, '_')
   // Leading dots would hide the file, and "." / ".." are not names at all.
   safe = safe.replace(/^\.+/, '')
   if (safe.length > maxLength) safe = safe.slice(0, maxLength)

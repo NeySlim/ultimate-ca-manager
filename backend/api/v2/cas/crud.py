@@ -1303,13 +1303,14 @@ def take_ca_offline(ca_id):
         )
 
         if mode == 'file_exported':
-            from utils.sanitize import sanitize_filename
-            fname = f"{sanitize_filename(ca.descr or ca.refid or f'ca-{ca_id}')}-offline.key"
+            from utils.sanitize import content_disposition
+            disposition = content_disposition(ca.descr or ca.refid or f'ca-{ca_id}', '-offline.key',
+                                              fallback=ca.refid or f'ca-{ca_id}')
             return Response(
                 encrypted_pem,
                 mimetype='application/x-pem-file',
                 headers={
-                    'Content-Disposition': f'attachment; filename="{fname}"',
+                    'Content-Disposition': disposition,
                     'X-UCM-Offline-Mode': 'file_exported',
                 }
             )

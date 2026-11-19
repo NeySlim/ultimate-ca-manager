@@ -19,7 +19,7 @@ from utils.pagination import parse_request_pagination
 from utils.dn_validation import validate_dn_field
 from utils.request_names import RequestRejected
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
-from utils.sanitize import sanitize_filename
+from utils.sanitize import content_disposition
 from models import db, Certificate, CA
 from services.cert_service import CertificateService
 from services.cert.mixins.csr import RelatedSignerError
@@ -830,7 +830,7 @@ def export_csr(csr_id):
         return Response(
             key_pem,
             mimetype='application/x-pem-file',
-            headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(cert.descr or cert.refid)}.key"'}
+            headers={'Content-Disposition': content_disposition(cert.descr or cert.refid, '.key', fallback=cert.refid)}
         )
     
     try:
@@ -838,7 +838,7 @@ def export_csr(csr_id):
         return Response(
             csr_pem,
             mimetype='application/x-pem-file',
-            headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(cert.descr or cert.refid)}.csr"'}
+            headers={'Content-Disposition': content_disposition(cert.descr or cert.refid, '.csr', fallback=cert.refid)}
         )
     except Exception as e:
         logger.error(f"CSR export failed: {e}")

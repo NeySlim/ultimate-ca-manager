@@ -1,33 +1,64 @@
 """Sanitization utilities for user-controlled input."""
 
 import re
+import unicodedata
+from urllib.parse import quote
+
+
+_UNSEEN = ('Cc', 'Cf', 'Zl', 'Zp')
+
+
+def _clean_filename(name):
+    """*name* without control, format (bidi), line-separator characters and quotes, separators
+    replaced by '_', at most 200 characters; '' if nothing is left."""
+    if not name:
+        return ''
+    name = ''.join(c for c in name if unicodedata.category(c) not in _UNSEEN)
+    name = re.sub(r'[/\\]', '_', name)
+    return name.replace('"', '')[:200]
 
 
 def sanitize_filename(name):
-    """Sanitize a string for safe use in Content-Disposition headers.
+    """*name* without the characters that inject a header or a path, 'download' if none is left.
 
-    Removes/replaces characters that could cause header injection or
-    filesystem issues.
+    It keeps non-ASCII: only content_disposition() makes a header value of it.
     """
-    if not name:
-        return 'download'
-    # Remove any control characters and CRLF
-    name = re.sub(r'[\x00-\x1f\x7f\r\n]', '', name)
-    # Remove path separators
-    name = re.sub(r'[/\\]', '_', name)
-    # Remove quotes
-    name = name.replace('"', '')
-    # Limit length
-    name = name[:200]
-    return name or 'download'
+    return _clean_filename(name) or 'download'
+
+
+def _ascii_fallback(text):
+    """The ASCII reading of *text* (accents folded), or '' when nothing readable is left."""
+    # NFKD turns compatibility forms (fullwidth quote, solidus) into ASCII: clean after folding.
+    folded = _clean_filename(unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('ascii'))
+    # No hidden file and no %XX a client could decode (RFC 6266 appendix D).
+    folded = folded.strip(' .')
+    if re.search(r'%[0-9A-Fa-f]{2}', folded):
+        return ''
+    return folded if any(c.isalnum() for c in folded) else ''
+
+
+def content_disposition(name, ext='', fallback=None, disposition='attachment', prefix=''):
+    """Complete Content-Disposition value for a download named *prefix* + *name* + *ext*.
+
+    An ASCII name gives ``attachment; filename="name.ext"``; any other gives that form with an
+    ASCII fallback plus ``filename*=UTF-8''...`` (RFC 6266 4.3, RFC 8187 3.2.1). The header is
+    always ASCII, since the server refuses one that is not Latin-1. *fallback* (e.g. a refid)
+    stands in when the name has no readable ASCII left; *prefix* is a constant ASCII lead-in.
+    """
+    stem = _clean_filename(name) or _clean_filename(fallback) or 'download'
+    full = f'{prefix}{stem}{ext}'
+    if full.isascii():
+        return f'{disposition}; filename="{full}"'
+    simple = _ascii_fallback(stem) or _ascii_fallback(_clean_filename(fallback)) or 'download'
+    encoded = quote(full, safe="!#$&+-.^_`|~", errors='replace')
+    return f'{disposition}; filename="{prefix}{simple}{ext}"; filename*=UTF-8\'\'{encoded}'
 
 
 def client_filename(name, limit=255):
     """A client-supplied file name as one audit line: its base name (either separator),
     without control, format (bidi marks) or line-separator characters, at most *limit* characters."""
-    import unicodedata
     base = re.split(r'[/\\]', name or '')[-1]
-    base = ''.join(c for c in base if unicodedata.category(c) not in ('Cc', 'Cf', 'Zl', 'Zp'))
+    base = ''.join(c for c in base if unicodedata.category(c) not in _UNSEEN)
     base = base[:limit].strip('. ')
     return base or 'upload'
 

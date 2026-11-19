@@ -35,7 +35,7 @@ from utils.cert_status import (USER_CERTIFICATE_STATUS_FILTERS,
                                unknown_status_message)
 from utils.response import error_response, no_content_response, success_response
 from utils.db_transaction import safe_commit
-from utils.sanitize import sanitize_filename
+from utils.sanitize import content_disposition, sanitize_filename
 from utils.datetime_utils import utc_now, utc_isoformat
 from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message, revocable
 from utils.export_options import json_boolean, query_boolean
@@ -354,7 +354,9 @@ def export_user_certificate(cert_id):
 
     try:
         cert_pem = base64.b64decode(cert.crt)
-        filename_base = sanitize_filename(auth_cert.name or cert.descr or cert.refid)
+        # The raw name goes to content_disposition(), which falls back to the refid.
+        raw_name = auth_cert.name or cert.descr or cert.refid
+        filename_base = sanitize_filename(raw_name)
 
         if export_format in ('pkcs12', 'p12', 'pfx'):
             pw_err = validate_export_password(password)
@@ -394,7 +396,7 @@ def export_user_certificate(cert_id):
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
-                headers={'Content-Disposition': f'attachment; filename="{filename_base}.p12"'}
+                headers={'Content-Disposition': content_disposition(raw_name, '.p12', fallback=cert.refid)}
             )
 
         elif export_format == 'jks':
@@ -453,7 +455,7 @@ def export_user_certificate(cert_id):
             return Response(
                 jks_bytes,
                 mimetype='application/x-java-keystore',
-                headers={'Content-Disposition': f'attachment; filename="{filename_base}.jks"'}
+                headers={'Content-Disposition': content_disposition(raw_name, '.jks', fallback=cert.refid)}
             )
 
         # PEM export (default)
@@ -463,14 +465,14 @@ def export_user_certificate(cert_id):
             stored_certs[0].public_bytes(serialization.Encoding.PEM)
             if stored_certs else cert_pem
         )
-        filename = f"{filename_base}.crt"
+        suffix = '.crt'
 
         if include_key and cert.prv:
             key_pem = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
             if not result.endswith(b'\n'):
                 result += b'\n'
             result += key_pem
-            filename = f"{filename_base}.pem"
+            suffix = '.pem'
 
         if include_chain:
             for ca_cert in _build_ca_chain(cert, cert_pem, include_root=include_root, variant=variant):
@@ -491,7 +493,7 @@ def export_user_certificate(cert_id):
         return Response(
             result,
             mimetype='application/x-pem-file',
-            headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+            headers={'Content-Disposition': content_disposition(raw_name, suffix, fallback=cert.refid)}
         )
 
     except FipsRestricted:

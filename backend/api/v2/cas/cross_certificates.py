@@ -13,7 +13,7 @@ from services.ca import cross_certs
 from services.ca.chain_usage import chain_usage
 from services.ca.cross_certs import CrossCertError
 from utils.response import created_response, error_response, no_content_response, success_response
-from utils.sanitize import sanitize_filename
+from utils.sanitize import content_disposition
 
 from . import bp
 
@@ -206,12 +206,13 @@ def export_cross_certificate(ca_id, xid):
         cert = cross_certs.certificate_of(row)
     except CrossCertError as e:
         return error_response(e.message, e.status)
-    name = f'{sanitize_filename(ca.descr or ca.refid)}-cross-{row.id}'
+    name = ca.descr or ca.refid
+    suffix = f'-cross-{row.id}'
     if fmt == 'der':
         return Response(cert.public_bytes(serialization.Encoding.DER), mimetype='application/pkix-cert',
-                        headers={'Content-Disposition': f'attachment; filename="{name}.cer"'})
+                        headers={'Content-Disposition': content_disposition(name, f'{suffix}.cer', fallback=ca.refid)})
     return Response(cert.public_bytes(serialization.Encoding.PEM), mimetype='application/x-pem-file',
-                    headers={'Content-Disposition': f'attachment; filename="{name}.pem"'})
+                    headers={'Content-Disposition': content_disposition(name, f'{suffix}.pem', fallback=ca.refid)})
 
 
 @bp.route('/api/v2/cas/<int:ca_id>/cross-sign', methods=['POST'])

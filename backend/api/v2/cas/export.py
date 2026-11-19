@@ -9,7 +9,7 @@ import logging
 
 from auth.unified import require_auth, has_permission
 from utils.response import success_response, error_response
-from utils.sanitize import sanitize_filename
+from utils.sanitize import content_disposition
 from utils.datetime_utils import utc_isoformat
 from models import CA, Certificate, db
 from cryptography import x509
@@ -230,13 +230,13 @@ def export_ca(ca_id):
             return Response(
                 key_pem,
                 mimetype='application/x-pem-file',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(ca.descr or ca.refid)}.key"'}
+                headers={'Content-Disposition': content_disposition(ca.descr or ca.refid, '.key', fallback=ca.refid)}
             )
 
         if export_format == 'pem':
             result = cert_pem
             content_type = 'application/x-pem-file'
-            filename = f"{sanitize_filename(ca.descr or ca.refid)}.crt"
+            suffix = '.crt'
 
             # Include private key if requested
             if include_key and ca.prv:
@@ -244,7 +244,7 @@ def export_ca(ca_id):
                 if not result.endswith(b'\n'):
                     result += b'\n'
                 result += key_pem
-                filename = f"{sanitize_filename(ca.descr or ca.refid)}_with_key.pem"
+                suffix = '_with_key.pem'
 
             # Include parent CA chain if requested
             if include_chain:
@@ -253,16 +253,16 @@ def export_ca(ca_id):
                         result += b'\n'
                     result += parent_cert
                 if include_key:
-                    filename = f"{sanitize_filename(ca.descr or ca.refid)}_full_chain.pem"
+                    suffix = '_full_chain.pem'
                 else:
-                    filename = f"{sanitize_filename(ca.descr or ca.refid)}_chain.pem"
+                    suffix = '_chain.pem'
 
             if include_key and ca.prv:
                 _audit_key_export(ca, export_format, password)
             return Response(
                 result,
                 mimetype=content_type,
-                headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+                headers={'Content-Disposition': content_disposition(ca.descr or ca.refid, suffix, fallback=ca.refid)}
             )
 
         elif export_format == 'der':
@@ -273,7 +273,7 @@ def export_ca(ca_id):
             return Response(
                 der_bytes,
                 mimetype='application/x-x509-ca-cert',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(ca.descr or ca.refid)}.der"'}
+                headers={'Content-Disposition': content_disposition(ca.descr or ca.refid, '.der', fallback=ca.refid)}
             )
 
         elif export_format == 'pkcs12':
@@ -303,7 +303,7 @@ def export_ca(ca_id):
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(ca.descr or ca.refid)}.p12"'}
+                headers={'Content-Disposition': content_disposition(ca.descr or ca.refid, '.p12', fallback=ca.refid)}
             )
 
         elif export_format == 'pkcs7' or export_format == 'p7b':
@@ -311,7 +311,7 @@ def export_ca(ca_id):
             return Response(
                 p7b_from_pems([cert_pem, *parent_pems]),
                 mimetype='application/x-pkcs7-certificates',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(ca.descr or ca.refid)}.p7b"'}
+                headers={'Content-Disposition': content_disposition(ca.descr or ca.refid, '.p7b', fallback=ca.refid)}
             )
 
         elif export_format == 'pfx':
@@ -342,7 +342,7 @@ def export_ca(ca_id):
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(ca.descr or ca.refid)}.pfx"'}
+                headers={'Content-Disposition': content_disposition(ca.descr or ca.refid, '.pfx', fallback=ca.refid)}
             )
 
         elif export_format == 'jks':
@@ -388,7 +388,7 @@ def export_ca(ca_id):
             return Response(
                 jks_bytes,
                 mimetype='application/x-java-keystore',
-                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(ca.descr or ca.refid)}.jks"'}
+                headers={'Content-Disposition': content_disposition(ca.descr or ca.refid, '.jks', fallback=ca.refid)}
             )
 
         else:

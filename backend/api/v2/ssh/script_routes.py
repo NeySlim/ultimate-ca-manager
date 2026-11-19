@@ -2,16 +2,15 @@
 SSH CA public-key and setup-script endpoints.
 """
 
-import re
-
 from flask import request, Response
 
 from auth.unified import require_auth
 from utils.response import error_response
+from utils.sanitize import content_disposition
 from services.ssh_ca_service import SSHCAService
 from models.ssh import SSHCertificateAuthority
 
-from .helpers import bp, logger
+from .helpers import bp, logger, ssh_download_stem
 from .setup_scripts import _generate_setup_script
 from .validation import validate_setup_hostname
 from models import db
@@ -32,7 +31,7 @@ def get_ssh_ca_public_key(ca_id):
             pub_key,
             mimetype='text/plain',
             headers={
-                'Content-Disposition': f'attachment; filename="ssh_ca_{re.sub(r"[^a-zA-Z0-9_.-]", "_", ca.descr)}.pub"'
+                'Content-Disposition': content_disposition(ssh_download_stem(ca.descr), '.pub', fallback=ca.refid, prefix='ssh_ca_')
             }
         )
     except ValueError as e:
@@ -69,20 +68,20 @@ def get_ssh_ca_setup_script(ca_id):
             return error_response('Invalid platform parameter. Must be "unix" or "windows"', 400)
 
         script = _generate_setup_script(ca, pub_key, ca_type, hostname, platform)
-        safe_name = re.sub(r'[^a-zA-Z0-9_.-]', '_', ca.descr)
+        safe_name = ssh_download_stem(ca.descr)
 
         if platform == 'windows':
             mimetype = 'text/x-powershell'
-            filename = f'ssh_ca_setup_{safe_name}.ps1'
+            ext = '.ps1'
         else:
             mimetype = 'text/x-shellscript'
-            filename = f'ssh_ca_setup_{safe_name}.sh'
+            ext = '.sh'
 
         return Response(
             script,
             mimetype=mimetype,
             headers={
-                'Content-Disposition': f'attachment; filename="{filename}"'
+                'Content-Disposition': content_disposition(safe_name, ext, fallback=ca.refid, prefix='ssh_ca_setup_')
             }
         )
     except ValueError as e:

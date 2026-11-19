@@ -18,7 +18,7 @@ from cryptography.hazmat.primitives import serialization
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
-from utils.sanitize import sanitize_filename
+from utils.sanitize import content_disposition
 from services.ca_service import CAService
 from services.ca.signature_scheme import ca_public_key
 from services.import_service import CrossCertificateImport, cross_mode_from
@@ -65,7 +65,7 @@ def download_ca_csr(ca_id):
         mimetype='application/x-pem-file',
         headers={
             'Content-Disposition':
-                f'attachment; filename="{sanitize_filename(ca.descr or ca.refid)}.csr"'
+                content_disposition(ca.descr or ca.refid, '.csr', fallback=ca.refid)
         },
     )
 
