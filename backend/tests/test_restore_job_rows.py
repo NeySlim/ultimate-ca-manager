@@ -112,19 +112,16 @@ class RowHold:
         monkeypatch.setattr(restore_job, 'CHECK_SECONDS', 0.05)
 
 
-def _reported(app, job_id):
-    """(done, total) as a reader sees it: the row, or the local state the SQLite run keeps."""
-    with app.app_context():
-        if db.engine.dialect.name == 'sqlite':
-            progress = (restore_job.read_state() or {}).get('view', {}).get('progress') or {}
-            return progress.get('done'), progress.get('total')
-        with db.engine.connect() as conn:
-            row = store.job_row(conn, job_id)
-        return row['progress_done'], row['progress_total']
+def _reported(client, job_id):
+    """(done, total) as the job's route answers while the run holds its transaction."""
+    answer = client.get(f'/api/v2/system/jobs/{job_id}')
+    assert answer.status_code == 200, answer.data
+    progress = answer.get_json()['data']['progress']
+    return progress['done'], progress['total']
 
 
-def test_a_cancellation_in_the_middle_of_a_loop_is_taken_before_it_ends(app, archive, created,
-                                                                      monkeypatch):
+def test_a_cancellation_in_the_middle_of_a_loop_is_taken_before_it_ends(app, auth_client, archive,
+                                                                      created, monkeypatch):
     hold = RowHold(monkeypatch)
     job_id, name = _start(app, archive, created)
     assert hold.reached.wait(60), 'the run never reached the middle of the groups'
@@ -135,7 +132,7 @@ def test_a_cancellation_in_the_middle_of_a_loop_is_taken_before_it_ends(app, arc
         # The sections being read carry the job's id: whoever concludes the job removes them
         owned = [n for n in os.listdir(directory) if n.startswith(f'.ucm_restore_{job_id}.')]
         assert len(owned) == 1, os.listdir(directory)
-        done, total = _reported(app, job_id)
+        done, total = _reported(auth_client, job_id)
         # The progress counts the rows written so far, not only the steps passed
         assert total is not None and total >= len(restore_job.STEPS) + GROUPS
         assert done is not None and done >= HOLD_AT // 2, (done, total)
