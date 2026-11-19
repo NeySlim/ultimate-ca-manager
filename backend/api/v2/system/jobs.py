@@ -145,9 +145,10 @@ def started_response(job_id, extra=None):
 
 
 def _wait_for_job(job_id, seconds):
-    """(row, None) as wait_for_job, or (None, the restore's local view) once its SQLite
-    transaction holds the database or keeps the row locked. Waits in slices: when a local
-    restore's gate goes up meanwhile, the caller is checked again against the database."""
+    """(row, None) as wait_for_job, or (None, the restore's local view) when the wait ends
+    while its SQLite transaction holds the database or keeps the row locked. Waits in slices:
+    when a local restore's gate goes up meanwhile, the caller is checked again against the
+    database."""
     import time as _time
     from services import cluster_maintenance
     from services.jobs import restore as restore_job
@@ -159,22 +160,27 @@ def _wait_for_job(job_id, seconds):
     while True:
         cluster_maintenance.current(refresh=True)
         rechecked = rechecked or restore_hold.recheck()
-        local = restore_job.local_view(job_id) if window() == 'held' else None
-        if local is not None:
-            return None, local
         left = max(0.0, deadline - _time.monotonic())
-        try:
-            row = jobs.wait_for_job(job_id, min(left, WAIT_POLL_SECONDS))
-        except Exception as e:  # noqa: BLE001 - only a lock is answered from the local state
-            if not is_locked(e):
-                raise
-            db.session.rollback()
-            local = restore_job.local_view(job_id)
-            if local is None:
-                raise
+        local = restore_job.local_view(job_id) if window() == 'held' else None
+        if local is None:
+            try:
+                row = jobs.wait_for_job(job_id, min(left, WAIT_POLL_SECONDS))
+            except Exception as e:  # noqa: BLE001 - only a lock is answered from the local state
+                if not is_locked(e):
+                    raise
+                db.session.rollback()
+                local = restore_job.local_view(job_id)
+                if local is None:
+                    raise
+            else:
+                if row is None or row['state'] in jobs.FINAL_STATES or _time.monotonic() >= deadline:
+                    return row, None
+                continue
+        # The held database is waited out on the local state, never read: a restore that
+        # ends within the wait answers its report (its caller's session is revoked after it)
+        if left <= 0:
             return None, local
-        if row is None or row['state'] in jobs.FINAL_STATES or _time.monotonic() >= deadline:
-            return row, None
+        _time.sleep(min(left, WAIT_POLL_SECONDS))
 
 
 def _readable(kind):
