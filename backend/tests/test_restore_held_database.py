@@ -373,7 +373,7 @@ def test_the_held_mark_drops_once_the_transaction_ends(app, archive, created, no
     else:
         assert True not in views
     # The end steps run with the database free: the worker serves it again from the commit
-    assert at_end_steps == [False if _on_sqlite(app) else None], at_end_steps
+    assert at_end_steps == [False], at_end_steps
 
 
 # -- a job's own writes wait for another writer -------------------------------------------
