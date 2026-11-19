@@ -282,6 +282,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Users: on SQLite, a new account took the id of a deleted account when it held the highest id, with the rows that still named it; ids are no longer reused, a backend switch included.
 - Dashboard: `GET /api/v2/dashboard/system-status` returned the mail (with its host), webhook and auto-renewal status to any authenticated caller; these entries now need `read:settings`, like the same witnesses on `/dashboard/health`.
 - ACME client: revoking a certificate obtained from an ACME CA (single, bulk or approved request) only revoked it in UCM while the CA still answered "good"; the CA is now told (RFC 8555 §7.6) with reasons 1, 3, 4, 5 and 9 (privilegeWithdrawn included) and retried by the scheduler until it confirms, and the answer says when the revocation stayed local (`acme_local_only`), a hold included.
+- Dependencies: cbor2 6.1.2 → 6.3.0 (GHSA-6rgc-8hxm-rj7p, GHSA-55vx-2phh-7grr, GHSA-p6xp-9h6j-r278). A passkey sign-in response carrying crafted extension data crashed the worker before any signature was checked; it is now refused like any failed sign-in.
 
 ### Upgrade notes
 
