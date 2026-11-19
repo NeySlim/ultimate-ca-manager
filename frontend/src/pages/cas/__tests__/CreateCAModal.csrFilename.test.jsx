@@ -1,6 +1,6 @@
 /** CreateCAModal: the CSR of a pending CA is saved under its label, non-ASCII kept. */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),

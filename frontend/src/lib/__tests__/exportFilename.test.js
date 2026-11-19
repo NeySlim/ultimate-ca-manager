@@ -59,6 +59,12 @@ describe('sanitizeFilename', () => {
     expect(sanitizeFilename('console')).toBe('console')
   })
 
+  it('nor a device name followed by dots, which Windows reserves as well', () => {
+    expect(sanitizeFilename('nul.example.com')).toBe('nul_.example.com')
+    expect(sanitizeFilename('nul_.example.com')).toBe('nul_.example.com')
+    expect(sanitizeFilename('null.example.com')).toBe('null.example.com')
+  })
+
   it('strips control characters, newlines included', () => {
     expect(sanitizeFilename('web\r\nContent-Type: evil')).toBe('web_Content-Type_evil')
     expect(sanitizeFilename('tab\there')).toBe('tab_here')

@@ -4,9 +4,9 @@
 // name + extension inside the 255-byte limit every common filesystem enforces.
 const MAX_BASENAME = 128
 const MAX_BASENAME_BYTES = 200
-// Letters and marks nobody sees: fillers, ZWNJ/ZWJ (dropped like the server's Cf strip), variation selectors
+// Characters nobody sees: fillers, variation selectors, and the ZWNJ/ZWJ format marks the server strips too
 const INVISIBLE = /[\u034f\u200c\u200d\u115f\u1160\u180b-\u180d\u3164\ufe00-\ufe0f\uffa0\u{e0100}-\u{e01ef}]/gu
-// Device names Windows refuses whatever the extension
+// Device names Windows refuses whatever follows the first dot
 const WINDOWS_DEVICE = /^(con|prn|aux|nul|com[0-9\u00b9\u00b2\u00b3]|lpt[0-9\u00b9\u00b2\u00b3])$/i
 
 /** The longest prefix of whole characters within both budgets. */
@@ -44,7 +44,8 @@ export function sanitizeFilename(name, maxLength = MAX_BASENAME) {
     .replace(/[^\p{L}\p{M}\p{N}._-]+/gu, '_')
   // Leading dots would hide the file, "." / ".." are not names, a leading mark has no base.
   safe = clip(safe.replace(/^[.\p{M}]+/u, ''), maxLength)
-  if (WINDOWS_DEVICE.test(safe)) safe += '_'
+  const stem = safe.split('.', 1)[0]
+  if (WINDOWS_DEVICE.test(stem)) safe = `${stem}_${safe.slice(stem.length)}`
   return safe || 'export'
 }
 

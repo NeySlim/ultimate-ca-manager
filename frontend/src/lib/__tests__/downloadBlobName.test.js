@@ -59,3 +59,11 @@ describe('sanitizeFilename joiners', () => {
     expect(sanitizeFilename('a‍b')).toBe('ab')
   })
 })
+
+describe('a device name before the extension', () => {
+  it('is suffixed whatever the extensions are', () => {
+    expect(sanitizeDownloadName('con.tar.gz')).toBe('con_.tar.gz')
+    expect(sanitizeDownloadName('aux.pem')).toBe('aux_.pem')
+    expect(sanitizeDownloadName('con_.tar.gz')).toBe('con_.tar.gz')
+  })
+})
