@@ -219,6 +219,7 @@ def create_provider():
         provider.ldap_user_filter = data.get('ldap_user_filter', '(uid={username})')
         provider.ldap_group_filter = data.get('ldap_group_filter')
         provider.ldap_group_member_attr = data.get('ldap_group_member_attr', 'member')
+        provider.ldap_nested_groups = data.get('ldap_nested_groups') is True
         try:
             provider.ldap_group_base_dn = _group_base_dn(data.get('ldap_group_base_dn'))
         except ValueError as e:
@@ -402,6 +403,8 @@ def update_provider(provider_id=None, provider_type_name=None):
                 setattr(provider, field, data[field])
         if 'ldap_start_tls' in data:
             provider.ldap_start_tls = bool(data['ldap_start_tls'])
+        if 'ldap_nested_groups' in data:
+            provider.ldap_nested_groups = data['ldap_nested_groups'] is True
         if 'ldap_group_base_dn' in data:
             try:
                 provider.ldap_group_base_dn = _group_base_dn(data['ldap_group_base_dn'])

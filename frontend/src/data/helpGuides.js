@@ -2856,7 +2856,8 @@ A sign-in refused because no rule matches, or because the provider has no rule a
 ### Groups
 - **memberOf**: read from the user's own entry (a base search on its DN); the group filter is not used
 - **member / uniqueMember**: searched under the Group Search Base alone when it is set; otherwise under the parent of the Base DN when the directory holds it, then under the Base DN if that search fails, with the group filter (\`(objectClass=*)\` when empty); groups beside the users (\`ou=groups\` next to \`ou=people\`) are found
-- **Direct membership only**: nested groups and the Active Directory primary group (Domain Users) are not seen
+- **Direct membership only** by default: nested groups and the Active Directory primary group (Domain Users) are not seen
+- **Nested groups and primary group** (Active Directory only, off by default): adds every group above the user's groups at any depth (matching rule 1.2.840.113556.1.4.1941) and the primary group, so parent groups give their roles; on another directory, or when the search fails, times out or passes 1000 groups, the sign-in is refused, never limited to the direct groups
 - **Matching**: group names compare with rules and required groups ignoring case and edge spaces, a run of inner spaces counting as one
 - **Unreadable groups**: with rules or required groups, a sign-in whose groups cannot be read is refused with "your groups could not be read from the directory"
 - **Test Mapping** reads the groups and decides as the sign-in does, without the password; it shows a role only for an admitted user

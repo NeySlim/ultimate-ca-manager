@@ -7,7 +7,7 @@ from .diagnostics import NAME_LENGTH, shown, shown_list
 from .helpers import ldap_auto_bind, ldap_bind, _get_ssl_verify, _cleanup_ssl_verify, _build_ldap_tls, _decrypt_ldap_password, _encrypt_ldap_password, _parse_json_field, _parse_group_list, _mapping_rules, group_match_key
 import ldap3
 from ldap3 import Server, Connection, ALL, Tls
-from ldap3.utils.conv import escape_filter_chars
+from ldap3.utils.conv import escape_bytes, escape_filter_chars
 import ssl
 import logging
 import requests as http_requests
@@ -141,7 +141,7 @@ def _admission_needs_groups(provider):
     return bool(_mapping_rules(provider)) or bool(_parse_group_list(provider.ldap_required_groups))
 
 
-def _service_connection(provider, server):
+def _service_connection(provider, server, **bounds):
     # check_names=False: attributes asked for may be missing from this server's schema
     # (objectGUID on OpenLDAP, entryUUID on AD); the server returns the ones it has.
     return ldap3.Connection(
@@ -150,6 +150,7 @@ def _service_connection(provider, server):
         password=_decrypt_ldap_password(provider),
         auto_bind=ldap_auto_bind(provider),
         check_names=False,
+        **bounds,
     )
 
 
@@ -203,10 +204,18 @@ def _search_succeeded(conn, what):
 
 
 def _ldap_read_groups(provider, server, user_dn, report=None):
-    """Names of the groups ``user_dn`` is a direct member of, the same for the login and
-    the mapping test. Raises LdapGroupsUnreadable rather than answer an empty list.
+    """Names of the groups of ``user_dn``, the same for the login and the mapping test:
+    the direct ones, plus the nested and primary groups when the provider asks for them.
+    Raises LdapGroupsUnreadable rather than answer an empty or a partial list.
     ``report['source']`` is set to where they were read, for a refusal diagnosis."""
     report = {} if report is None else report
+    groups = _ldap_direct_groups(provider, server, user_dn, report)
+    if not getattr(provider, 'ldap_nested_groups', False):
+        return groups
+    return _with_nested_groups(provider, server, user_dn, groups, report)
+
+
+def _ldap_direct_groups(provider, server, user_dn, report):
     member_attr = (provider.ldap_group_member_attr or 'member').strip().lower()
     try:
         conn = _service_connection(provider, server)
@@ -260,6 +269,96 @@ def _ldap_read_groups(provider, server, user_dn, report=None):
         raise
     except Exception as e:
         raise LdapGroupsUnreadable(str(e) or type(e).__name__) from e
+
+
+# LDAP_CAP_ACTIVE_DIRECTORY_OID in the root DSE supportedCapabilities (MS-ADTS 3.1.1.3.4.3):
+# a DC publishes no list of the matching rules it evaluates (MS-ADTS 3.1.1.3.4.4).
+AD_CAPABILITY = '1.2.840.113556.1.4.800'
+IN_CHAIN = '1.2.840.113556.1.4.1941'  # LDAP_MATCHING_RULE_TRANSITIVE_EVAL
+# A DC answers sizeLimitExceeded past its MaxPageSize (1000 by default) without paging.
+NESTED_GROUPS_LIMIT = 1000
+NESTED_GROUPS_SECONDS = 10
+
+
+def _is_active_directory(server):
+    features = getattr(getattr(server, 'info', None), 'supported_features', None) or []
+    return any((f[0] if isinstance(f, (tuple, list)) else str(f)) == AD_CAPABILITY
+               for f in features)
+
+
+def _nested_filter(group_filter, user_dn, primary_dn):
+    """Groups holding the user or the primary group at any depth, values escaped (RFC 4515 §3)."""
+    return (f'(&{group_filter}(|(member:{IN_CHAIN}:={escape_filter_chars(user_dn)})'
+            f'(member:{IN_CHAIN}:={escape_filter_chars(primary_dn)})))')
+
+
+def _primary_group_sid(conn, user_dn):
+    """The SID of the user's primary group: its domain SID with primaryGroupID as the last RID."""
+    conn.search(user_dn, '(objectClass=*)', search_scope=ldap3.BASE,
+                attributes=['objectSid', 'primaryGroupID'])
+    _search_succeeded(conn, 'primary group read')
+    if not conn.entries:
+        raise LdapGroupsUnreadable('primary group read: the user entry was not returned')
+    entry = conn.entries[0]
+    try:
+        sid = bytes(entry.objectSid.raw_values[0])
+        rid = int(str(entry.primaryGroupID.value))
+    except Exception:
+        raise LdapGroupsUnreadable('primary group read: objectSid or primaryGroupID is missing') from None
+    # MS-DTYP 2.4.2.2: revision, sub-authority count, 6-byte authority, 32-bit sub-authorities
+    if len(sid) < 12 or len(sid) != 8 + 4 * sid[1] or not 0 <= rid < 2 ** 32:
+        raise LdapGroupsUnreadable('primary group read: objectSid is not a SID')
+    return sid[:-4] + rid.to_bytes(4, 'little')
+
+
+def _with_nested_groups(provider, server, user_dn, direct, report):
+    """``direct`` plus the primary group and every group above them; never a partial answer."""
+    if not _is_active_directory(server):
+        raise LdapGroupsUnreadable(
+            'nested groups need Active Directory: the root DSE does not list the capability '
+            f'{AD_CAPABILITY}')
+    gf = (provider.ldap_group_filter or '').strip() or DEFAULT_GROUP_FILTER
+    if not gf.startswith('('):
+        gf = f'({gf})'
+    try:
+        conn = _service_connection(provider, server, receive_timeout=NESTED_GROUPS_SECONDS)
+        try:
+            sid_filter = f'(objectSid={escape_bytes(_primary_group_sid(conn, user_dn))})'
+            failures = []
+            for base in _ldap_group_search_bases(provider, server):
+                try:
+                    conn.search(base, sid_filter, search_scope=ldap3.SUBTREE, attributes=['cn'],
+                                size_limit=2, time_limit=NESTED_GROUPS_SECONDS)
+                    _search_succeeded(conn, f'primary group search under {base}')
+                except (LdapGroupsUnreadable, ldap3.core.exceptions.LDAPOperationResult) as e:
+                    failures.append(str(e) or type(e).__name__)
+                    continue
+                break
+            else:
+                raise LdapGroupsUnreadable('; '.join(failures))
+            primary = [e for e in conn.entries if hasattr(e, 'cn')]
+            if len(primary) != 1:
+                raise LdapGroupsUnreadable(f'the primary group was not found under {base}')
+            primary_dn, names = primary[0].entry_dn, [str(primary[0].cn)]
+            conn.search(base, _nested_filter(gf, user_dn, primary_dn), search_scope=ldap3.SUBTREE,
+                        attributes=['cn'], size_limit=NESTED_GROUPS_LIMIT,
+                        time_limit=NESTED_GROUPS_SECONDS)
+            _search_succeeded(conn, f'nested group search under {base}')
+            names += [str(e.cn) for e in conn.entries if hasattr(e, 'cn')]
+        finally:
+            conn.unbind()
+    except LdapGroupsUnreadable:
+        raise
+    except Exception as e:
+        raise LdapGroupsUnreadable(str(e) or type(e).__name__) from e
+    seen, groups = set(), []
+    for name in list(direct) + names:
+        if name.casefold() not in seen:
+            seen.add(name.casefold())
+            groups.append(name)
+    report['source'] = (f"{report.get('source')}, with the nested groups and the primary group "
+                        f"under {shown(base, NAME_LENGTH)}")
+    return groups
 
 
 NOT_READ = ('the directory, not asked: groups are read only for role mapping rules, '

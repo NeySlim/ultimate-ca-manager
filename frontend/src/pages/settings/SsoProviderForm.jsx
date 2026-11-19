@@ -102,6 +102,7 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     ldap_group_filter: provider?.ldap_group_filter || '',
     ldap_group_member_attr: provider?.ldap_group_member_attr || 'member',
     ldap_group_base_dn: provider?.ldap_group_base_dn || '',
+    ldap_nested_groups: provider?.ldap_nested_groups === true,
     ldap_username_attr: provider?.ldap_username_attr || 'uid',
     ldap_email_attr: provider?.ldap_email_attr || 'mail',
     ldap_fullname_attr: provider?.ldap_fullname_attr || 'cn',
