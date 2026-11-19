@@ -6666,6 +6666,8 @@
       "subScheduler": "Scheduler: last run {{when}}.",
       "lastOperation": "Last operation {{when}}",
       "noOperation": "No operation recorded",
+      "idle_one": "No operation over {{count}} day.",
+      "idle_other": "No operation over {{count}} days.",
       "today": "Today",
       "successes_one": "{{count}} success",
       "successes_other": "{{count}} successes",

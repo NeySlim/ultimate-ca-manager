@@ -235,8 +235,34 @@ describe('protocol rows', () => {
     const card = await show({ acme: busy, scep: idle })
     expect(within(row(card, 'acme')).getByTestId('health-spark').getAttribute('role')).toBe('img')
     expect(within(row(card, 'scep')).queryByTestId('health-spark')).toBeNull()
-    expect(row(card, 'scep').textContent).toContain('overview.health.noOperation')
     expect(row(card, 'scep').textContent).not.toContain('–')
+  })
+
+  it('a protocol idle over the period says so in one line, without columns of zeros', async () => {
+    const card = await show({ acme: busy, scep: idle, est: { ...idle, last_operation_at: '2026-08-19T10:00:00Z', last_status: 'ok' } })
+    for (const name of ['scep', 'est']) {
+      expect(row(card, name).querySelector('.ov-health-stats')).toBeNull()
+      expect(row(card, name).textContent).not.toMatch(/successes|failures|overview\.health\.today/)
+    }
+    expect(row(card, 'scep').querySelector('.ov-health-idle').textContent).toBe('overview.health.idle:7')
+    const est = row(card, 'est').querySelector('.ov-health-idle')
+    expect(est.textContent).toMatch(/^overview\.health\.idle:7 overview\.health\.lastOperation$/)
+    expect(est.querySelector('[title]')).not.toBeNull()
+    expect(row(card, 'est').querySelector('.ov-health-name .ov-pill.is-good')).not.toBeNull()
+    expect(row(card, 'acme').querySelector('.ov-health-stats')).not.toBeNull()
+    expect(row(card, 'acme').querySelector('.ov-health-idle')).toBeNull()
+  })
+
+  it('the idle line reads in French with the relative date of the last operation', async () => {
+    lang.fr = true
+    const card = await show({ est: { ...idle, last_operation_at: '2020-01-01T10:00:00Z' } })
+    expect(row(card, 'est').querySelector('.ov-health-idle').textContent).toMatch(/^Aucune opération sur 7 jours\. Dernière opération .+/)
+  })
+
+  it('a protocol without daily figures keeps its last operation, or says none is recorded', async () => {
+    const card = await show({ acme: { periods: null, last_operation_at: null, last_status: null } })
+    expect(row(card, 'acme').textContent).toContain('overview.health.noOperation')
+    expect(row(card, 'acme').querySelector('.ov-health-idle, .ov-health-stats')).toBeNull()
   })
 
   it('the curve reads as its figures, oldest day first', async () => {

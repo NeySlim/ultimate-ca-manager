@@ -24,7 +24,7 @@ export function ComplianceCard() {
       empty={state.status === 'ready' && data.total === 0} count={num(data.total)}
       sub={t('overview.compliance.sub')}>
       <div className="ov-body">
-        <div className="ov-tiles">
+        <div className={`ov-compliance${algos.length > 0 ? ' has-algo' : ''}`}>
           {algos.length > 0 && (
             <div className="ov-tile is-algo">
               <h3 className="ov-tile-label" id="overview-compliance-algos">{t('overview.compliance.byAlgorithm')}</h3>
@@ -43,21 +43,23 @@ export function ComplianceCard() {
               </ul>
             </div>
           )}
-          {COUNTERS.map((name) => {
-            const n = counters[name]?.count
-            const known = typeof n === 'number' && Number.isFinite(n)
-            const tone = !known || NEUTRAL.includes(name) ? '' : n > 0 ? 'is-warn' : 'is-good'
-            const Icon = NEUTRAL.includes(name) ? Key : n > 0 ? Warning : CheckCircle
-            return (
-              <MaybeLink key={name} to={link(counters[name])} className="ov-tile" data-testid={`compliance-${name}`}>
-                <span className={`ov-tile-value ${tone}`}>
-                  {known && <Icon size={16} aria-hidden="true" />}
-                  <strong>{num(n)}</strong>
-                </span>
-                <span className="ov-tile-label">{t(`overview.compliance.${name}`)}</span>
-              </MaybeLink>
-            )
-          })}
+          <div className="ov-tiles">
+            {COUNTERS.map((name) => {
+              const n = counters[name]?.count
+              const known = typeof n === 'number' && Number.isFinite(n)
+              const tone = !known || NEUTRAL.includes(name) ? '' : n > 0 ? 'is-warn' : 'is-good'
+              const Icon = NEUTRAL.includes(name) ? Key : n > 0 ? Warning : CheckCircle
+              return (
+                <MaybeLink key={name} to={link(counters[name])} className="ov-tile" data-testid={`compliance-${name}`}>
+                  <span className={`ov-tile-value ${tone}`}>
+                    {known && <Icon size={16} aria-hidden="true" />}
+                    <strong>{num(n)}</strong>
+                  </span>
+                  <span className="ov-tile-label">{t(`overview.compliance.${name}`)}</span>
+                </MaybeLink>
+              )
+            })}
+          </div>
         </div>
       </div>
     </CardFrame>

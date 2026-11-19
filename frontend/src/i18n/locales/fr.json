@@ -6666,6 +6666,8 @@
       "subScheduler": "Planificateur : dernier passage {{when}}.",
       "lastOperation": "Dernière opération {{when}}",
       "noOperation": "Aucune opération enregistrée",
+      "idle_one": "Aucune opération sur {{count}} jour.",
+      "idle_other": "Aucune opération sur {{count}} jours.",
       "today": "Aujourd'hui",
       "successes_one": "{{count}} succès",
       "successes_other": "{{count}} succès",

@@ -40,6 +40,12 @@ describe('overview grid', () => {
     grid.remove()
   })
 
+  it('once measured, the cards pack by column: dense flow, and the row gap is part of each span', () => {
+    const packed = rule(sheet.cssRules, '.ov-grid[data-masonry]').style
+    expect(packed.getPropertyValue('grid-auto-flow')).toBe('row dense')
+    expect(packed.getPropertyValue('row-gap')).toBe('0')
+  })
+
   it('the page takes the whole width it is given', () => {
     const page = rule(sheet.cssRules, '.ov-page').style
     expect(page.getPropertyValue('flex')).toMatch(/^1\b/)
@@ -51,6 +57,12 @@ describe('overview grid', () => {
     const [three] = media('(min-width: 1280px)')
     expect(rule(two.cssRules, '.ov-slot[data-span="full"]').style.getPropertyValue('grid-column').replace(/\s/g, '')).toBe('1/-1')
     expect(rule(three.cssRules, '.ov-slot[data-span="wide"]').style.getPropertyValue('grid-column')).toBe('span 2')
+  })
+
+  it('a compliance figure keeps its own height: its grid does not stretch to the algorithms beside it', () => {
+    expect(rule(sheet.cssRules, '.ov-tiles').style.getPropertyValue('align-content')).toBe('start')
+    expect(rule(sheet.cssRules, '.ov-compliance').style.getPropertyValue('align-items')).toBe('start')
+    expect(columns(rule(sheet.cssRules, '.ov-compliance.has-algo').style.getPropertyValue('grid-template-columns'))).toBe(2)
   })
 
   it('stops its animations when the user asks for reduced motion', () => {

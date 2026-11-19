@@ -136,6 +136,28 @@ describe('compliance card', () => {
     expect(screen.getAllByTestId('algo-bar').map((b) => b.style.width)).toEqual(['40%', '60%'])
   })
 
+  it('keeps the five figures in their own grid beside the algorithms: no figure shares a row with that tall tile', async () => {
+    api.getCompliance.mockResolvedValue({ data: {
+      total: 10, by_key_algorithm: [{ key_algo: 'RSA 2048', count: 4 }, { key_algo: 'EC P-256', count: 6 }],
+      counters: { rsa_below_3072: entry(4, null), weak_signature_hash: entry(0, null) },
+    } })
+    show(<ComplianceCard />)
+    const figures = (await screen.findByTestId('compliance-rsa_below_3072')).parentElement
+    expect(figures.querySelectorAll('[data-testid^="compliance-"]')).toHaveLength(5)
+    expect(figures.querySelector('.is-algo')).toBeNull()
+    const algos = screen.getByText('overview.compliance.byAlgorithm').closest('.is-algo')
+    expect([...figures.parentElement.children]).toEqual([algos, figures])
+    expect(figures.parentElement.className).toContain('has-algo')
+  })
+
+  it('without algorithms the figures take the whole card', async () => {
+    api.getCompliance.mockResolvedValue({ data: { total: 3, counters: { rsa_below_3072: entry(1, null) }, by_key_algorithm: [] } })
+    show(<ComplianceCard />)
+    const figures = (await screen.findByTestId('compliance-rsa_below_3072')).parentElement
+    expect([...figures.parentElement.children]).toEqual([figures])
+    expect(figures.parentElement.className).not.toContain('has-algo')
+  })
+
   it('shows a dash, not zero, for a figure the response lacks', async () => {
     api.getCompliance.mockResolvedValue({ data: { total: 3, counters: { rsa_below_3072: {} }, by_key_algorithm: [] } })
     show(<ComplianceCard />)

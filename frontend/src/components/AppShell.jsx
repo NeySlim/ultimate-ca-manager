@@ -1,7 +1,7 @@
 /**
  * AppShell Component - Atelier layout: top bar, page, status bar
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Outlet, useLocation } from 'react-router-dom'
 import { TopBar } from './shell/TopBar'
@@ -30,6 +30,9 @@ export function AppShell() {
 
   // Derive the active nav item from the URL (see resolveActivePageId)
   const activePage = resolveActivePageId(location.pathname)
+  const onOverview = activePage === '' || activePage === 'dashboard'
+  const onOverviewNow = useRef(onOverview)
+  onOverviewNow.current = onOverview
   
   // Map URL paths to helpContent keys
   // Use full path for nested routes (e.g. /ssh/cas → sshCas)
@@ -71,6 +74,11 @@ export function AppShell() {
       // Check if we already showed the alert this session
       const alreadyShown = sessionStorage.getItem('ucm-expiring-alert-shown')
       if (alreadyShown) return
+      // The overview's figures strip gives these counts: no toast over its cards, and none later in the session
+      if (onOverviewNow.current) {
+        sessionStorage.setItem('ucm-expiring-alert-shown', 'true')
+        return
+      }
 
       try {
         const stats = await certificatesService.getStats()
@@ -165,7 +173,7 @@ export function AppShell() {
       <UpdatePopup />
 
       {/* Ko-fi support card, once per version for admins; the overview shows it in its own flow */}
-      {activePage !== '' && activePage !== 'dashboard' && <KofiSupportCard />}
+      {!onOverview && <KofiSupportCard />}
     </div>
   )
 }

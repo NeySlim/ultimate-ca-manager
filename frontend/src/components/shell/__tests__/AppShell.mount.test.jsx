@@ -1,11 +1,12 @@
 /** The shell around the page: bar, status bar, search entries, help, and the overlays it keeps mounted. */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, within, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { ROLES, tStub } from './shellTestUtils'
 
 const perms = vi.hoisted(() => ({ list: ['*'] }))
+const probe = vi.hoisted(() => ({ showWarning: vi.fn(), getStats: vi.fn() }))
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: tStub, i18n: { language: 'en', changeLanguage: vi.fn() } }),
@@ -17,10 +18,10 @@ vi.mock('../../../contexts/AuthContext', () => ({
 vi.mock('../../../contexts/ThemeContext', () => ({
   useTheme: () => ({ themeFamily: 'atelier', setThemeFamily: vi.fn(), mode: 'dark', setMode: vi.fn(), themes: [] }),
 }))
-vi.mock('../../../contexts/NotificationContext', () => ({ useNotification: () => ({ showWarning: vi.fn() }) }))
+vi.mock('../../../contexts/NotificationContext', () => ({ useNotification: () => ({ showWarning: probe.showWarning }) }))
 vi.mock('../../WebSocketIndicator', () => ({ WebSocketIndicator: () => null }))
 vi.mock('../../../services', () => ({
-  certificatesService: { getStats: vi.fn().mockResolvedValue({ data: {} }) },
+  certificatesService: { getStats: probe.getStats },
 }))
 vi.mock('../../CommandPalette', async () => {
   const actual = await vi.importActual('../../CommandPalette')
@@ -53,6 +54,9 @@ function setup(path = '/') {
 
 beforeEach(() => {
   perms.list = ROLES.admin
+  probe.showWarning.mockClear()
+  probe.getStats.mockReset().mockResolvedValue({ data: {} })
+  sessionStorage.clear()
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'ok', version: '3.0.0' }) }))
 })
 
@@ -130,5 +134,34 @@ describe('AppShell', () => {
     expect(content.children).toHaveLength(1)
     expect(document.querySelectorAll('footer')).toHaveLength(1)
     expect(screen.queryByText(/^windows\./)).toBeNull()
+  })
+})
+
+describe('expiry notice on arrival', () => {
+  const arrive = async (path) => {
+    vi.useFakeTimers()
+    probe.getStats.mockResolvedValue({ data: { expired: 55, expiring: 11 } })
+    setup(path)
+    await act(async () => { await vi.advanceTimersByTimeAsync(2500) })
+  }
+  afterEach(() => { vi.useRealTimers() })
+
+  it('warns once per session on a page that does not show the figures', async () => {
+    await arrive('/certificates')
+    expect(probe.showWarning).toHaveBeenCalledTimes(1)
+    expect(probe.showWarning).toHaveBeenCalledWith('notifications.certificatesExpiredAndExpiring')
+    expect(sessionStorage.getItem('ucm-expiring-alert-shown')).toBe('true')
+  })
+
+  it.each([
+    ['/', { expired: 55, expiring: 11 }], ['/dashboard', { expired: 55, expiring: 11 }],
+    ['/', { expired: 3, expiring: 0 }], ['/', { expired: 0, expiring: 2 }],
+  ])('stays silent on the overview (%s, %o): its figures strip already says it', async (path, data) => {
+    vi.useFakeTimers()
+    probe.getStats.mockResolvedValue({ data })
+    setup(path)
+    await act(async () => { await vi.advanceTimersByTimeAsync(2500) })
+    expect(probe.showWarning).not.toHaveBeenCalled()
+    expect(sessionStorage.getItem('ucm-expiring-alert-shown')).toBe('true')
   })
 })
