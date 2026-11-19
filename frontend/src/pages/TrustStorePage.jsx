@@ -22,6 +22,7 @@ import { useMobile } from '../contexts/MobileContext'
 import { usePermission, useModals, usePersistedState } from '../hooks'
 import { formatDate, cn, downloadBlob, warnSkippedExport } from '../lib/utils'
 import { soleImported } from '../lib/importResult'
+import { trustStoreExpiryStatus } from '../lib/expiry'
 import { runInBatches } from '../lib/bulkChunks'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 import { TrustCertPanel } from '../components/detail/TrustCertPanel'
@@ -64,16 +65,11 @@ export default function TrustStorePage() {
         truststoreService.getStats()
       ])
       const rawCerts = certsRes.data || []
-      // Add computed expiry status for filtering
-      const now = new Date()
-      const enrichedCerts = rawCerts.map(c => {
-        const date = c.not_after ? new Date(c.not_after) : null
-        const daysLeft = date ? Math.floor((date - now) / (1000 * 60 * 60 * 24)) : null
-        return {
-          ...c,
-          _expiry_status: daysLeft === null ? 'valid' : daysLeft <= 0 ? 'expired' : daysLeft <= 90 ? 'expiring' : 'valid'
-        }
-      })
+      // Same buckets as the export's expiry filter (api/v2/truststore)
+      const enrichedCerts = rawCerts.map(c => ({
+        ...c,
+        _expiry_status: trustStoreExpiryStatus(c.not_after)
+      }))
       setCertificates(enrichedCerts)
       setCertStats(statsRes.data || { total: 0, root_ca: 0, intermediate_ca: 0, expired: 0, valid: 0 })
     } catch (error) {
