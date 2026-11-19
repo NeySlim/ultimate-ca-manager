@@ -26,6 +26,7 @@ BUSY_RETRY_AFTER_SECONDS = 5
 _BUSY_INFO = 'ucm_busy_timeout'
 _LOCK_MET = 'ucm_lock_met'
 _DEADLINE = 'ucm_lock_deadline'
+_BUILT = 'ucm_lock_response_built'
 BUSY_MESSAGE = 'The database is busy with another write: retry shortly.'
 
 
@@ -165,6 +166,29 @@ def install():
     event.listen(Engine, 'handle_error', _on_error)
 
 
+def watch_response():
+    """before_request: freeze, when the route's response is built, whether a 500 met a lock.
+    A lock met afterwards (headers, session store, audit) never turns that 500 into a 503."""
+    from flask import after_this_request
+
+    @after_this_request
+    def _built(response):
+        from flask import g, request
+        # Once: a failed response processing runs the hooks again on the error's answer
+        if _BUILT not in g and response.status_code == 500:
+            setattr(g, _BUILT, g.get(_LOCK_MET) is request._get_current_object())
+        return response
+
+
+def _met_lock():
+    """Whether the request met a lock: as frozen when its 500 was built, else as now."""
+    from flask import g, request
+    built = g.get(_BUILT)
+    if built is not None:
+        return built
+    return g.get(_LOCK_MET) is request._get_current_object()
+
+
 def locked_refusal(exc):
     """503 with Retry-After for a request that met a lock it may not wait for; else None."""
     if not is_locked(exc):
@@ -175,8 +199,7 @@ def locked_refusal(exc):
 def answer_locked_500(response):
     """after_request: a 500 from a request that met a SQLite lock, whatever route caught it,
     becomes the 503 with Retry-After of locked_refusal, rewritten in place (headers kept)."""
-    from flask import g, request
-    if response.status_code != 500 or g.get(_LOCK_MET) is not request._get_current_object():
+    if response.status_code != 500 or not _met_lock():
         return response
     refused = _refusal(serve_job=False)
     response.set_data(refused.get_data())
