@@ -22,4 +22,11 @@ class Latin1HeaderGuard:
 
 
 def guard_latin1_headers(application):
-    application.wsgi_app = Latin1HeaderGuard(application.wsgi_app)
+    # Under the peer normalizer, which must stay the outermost layer and passes
+    # start_response through untouched: the guard still sees every header the server would.
+    from listen_address import PeerAddressNormalizer
+    outer = application.wsgi_app
+    if isinstance(outer, PeerAddressNormalizer):
+        outer.app = Latin1HeaderGuard(outer.app)
+    else:
+        application.wsgi_app = Latin1HeaderGuard(outer)
