@@ -3,10 +3,13 @@
 ``ldap_group_base_dn``: empty keeps the derived base. The unique index
 ``uq_pro_sso_providers_provider_type`` holds the rule 2.254 enforced only at creation: two
 providers of one type refuse the upgrade before migration 300 writes anything (``refusal``).
-Idempotent, dual-backend (SQLite + PostgreSQL).
+A blank name, which 2.254 accepted on a rename, becomes the provider's type (numbered when another
+provider holds it). Idempotent, dual-backend (SQLite + PostgreSQL).
 """
 import logging
 import sqlite3
+
+from utils.unique_names import first_free
 
 logger = logging.getLogger(__name__)
 pg_compatible = True
@@ -51,6 +54,33 @@ def refusal(conn):
     return _refusal_text([tuple(r) for r in conn.execute(text(_SHARED))])
 
 
+def blank_names(rows):
+    """{id: new name} for the (id, name, provider_type) rows whose name is blank."""
+    taken = {name for _id, name, _type in rows if name and name.strip()}
+    renamed = {}
+    for provider_id, name, provider_type in sorted(rows, key=lambda row: row[0]):
+        if not (name and name.strip()):
+            renamed[provider_id] = first_free(provider_type, taken)
+            taken.add(renamed[provider_id])
+    return renamed
+
+
+def _name_blank_providers(conn):
+    select = f"SELECT id, name, provider_type FROM {TABLE}"
+    if isinstance(conn, sqlite3.Connection):
+        renamed = blank_names(conn.execute(select).fetchall())
+        conn.executemany(f"UPDATE {TABLE} SET name = ? WHERE id = ?",
+                         [(name, provider_id) for provider_id, name in renamed.items()])
+    else:
+        from sqlalchemy import text
+        renamed = blank_names([tuple(r) for r in conn.execute(text(select))])
+        for provider_id, name in renamed.items():
+            conn.execute(text(f"UPDATE {TABLE} SET name = :name WHERE id = :id"),
+                         {'name': name, 'id': provider_id})
+    for provider_id, name in renamed.items():
+        logger.info(f"[165] SSO provider #{provider_id} had a blank name, now {name!r}")
+
+
 def upgrade(conn):
     if not _has_table(conn):
         if isinstance(conn, sqlite3.Connection):
@@ -64,6 +94,7 @@ def upgrade(conn):
             conn.execute(DDL)
             logger.info("[165] LDAP group search base (SQLite)")
         conn.execute(INDEX)
+        _name_blank_providers(conn)
         conn.commit()
         return
     from sqlalchemy import inspect, text
@@ -71,6 +102,7 @@ def upgrade(conn):
         conn.execute(text(DDL))
         logger.info("[165] LDAP group search base (PostgreSQL)")
     conn.execute(text(INDEX))
+    _name_blank_providers(conn)
 
 
 def downgrade(conn):

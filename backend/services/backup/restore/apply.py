@@ -423,25 +423,31 @@ def _refuse_container(value: Any, column, where: str) -> None:
     # column None: a secret property over a private column, which takes text
     if isinstance(value, (list, dict)) and (column is None or not isinstance(column.type, JSON)):
         raise RestoreValidationError(
-            f"Invalid backup: {where} holds a {'list' if isinstance(value, list) else 'object'} "
+            f"Invalid backup: {where} holds {_a_kind_of(value)} "
             "where this column takes a single value")
 
 
-# The encrypted private key of an archive: an object of hex text (BackupService._encrypt_private_key)
+# The encrypted private key of an archive: an object of hex text (BackupService._encrypt_private_key).
+# Its salt and nonce have had these lengths in bytes in every release; the ciphertext is never empty.
 _KEY_BLOB = 'private_key_pem_encrypted'
-_KEY_BLOB_PARTS = ('salt', 'nonce', 'ciphertext')
+_KEY_BLOB_PARTS = {'salt': 32, 'nonce': 12, 'ciphertext': None}
 
 
 def _kind_of(value: Any) -> str:
     return {list: 'list', dict: 'object', bool: 'boolean', str: 'text'}.get(type(value), 'number')
 
 
-def _is_hex(value: Any) -> bool:
+def _a_kind_of(value: Any) -> str:
+    kind = _kind_of(value)
+    return f"{'an' if kind[0] in 'aeiou' else 'a'} {kind}"
+
+
+def _is_key_part(value: Any, length) -> bool:
     try:
-        bytes.fromhex(value)
+        size = len(bytes.fromhex(value))
     except (TypeError, ValueError):
         return False
-    return True
+    return size == length if length is not None else size > 0
 
 
 def _refuse_unreadable_handled(name: str, value: Any, where: str) -> None:
@@ -451,24 +457,49 @@ def _refuse_unreadable_handled(name: str, value: Any, where: str) -> None:
         return
     if name == _KEY_BLOB:
         if isinstance(value, dict) and (not value or all(
-                isinstance(value.get(part), str) and _is_hex(value[part])
-                for part in _KEY_BLOB_PARTS)):
+                _is_key_part(value.get(part), length) for part, length in _KEY_BLOB_PARTS.items())):
             return
         raise RestoreValidationError(
-            f"Invalid backup: {where} holds a {_kind_of(value)} that is not an encrypted key "
-            f"(an object of {', '.join(_KEY_BLOB_PARTS)} in hexadecimal)")
+            f"Invalid backup: {where} holds {_a_kind_of(value)} that is not an encrypted key "
+            f"(an object of {', '.join(_KEY_BLOB_PARTS)} in hexadecimal, the salt of 32 bytes, "
+            "the nonce of 12)")
     if not isinstance(value, str):
         raise RestoreValidationError(
-            f"Invalid backup: {where} holds a {_kind_of(value)} where this field takes text")
+            f"Invalid backup: {where} holds {_a_kind_of(value)} where this field takes text")
 
 
-def refuse_containers_in_columns(backup_data) -> None:
+def _holds_nul(value: Any) -> bool:
+    """Whether a text in ``value``, at any depth and keys included, holds U+0000."""
+    if isinstance(value, str):
+        return '\x00' in value
+    if isinstance(value, dict):
+        return any(_holds_nul(k) or _holds_nul(v) for k, v in value.items())
+    if isinstance(value, list):
+        return any(_holds_nul(item) for item in value)
+    return False
+
+
+def _refuse_nul(value: Any, where: str) -> None:
+    # PostgreSQL stores no U+0000 in text or JSON where SQLite does: refused on both alike
+    if _holds_nul(value):
+        raise RestoreValidationError(
+            f"Invalid backup: {where} holds a NUL character, which no text field can store")
+
+
+def refuse_containers_in_columns(backup_data, mappings=()) -> None:
     """RestoreValidationError, before any write, for a value no restorer of the row can take.
 
     A list or an object in a non JSON column, or in a secret property over a column of
     another name; a field the dedicated restorers read themselves (`Section.handled`) that is
-    neither absent nor of the shape they read: text for a PEM, an object for the encrypted key."""
+    neither absent nor of the shape they read: text for a PEM, an object for the encrypted key;
+    a NUL character in any text of a row, or of the sections named in ``mappings`` the archive
+    holds as an object."""
     from ..section_store import SectionStore, section_kind
+    for section_name in sorted(mappings):
+        if section_kind(backup_data, section_name) == 'mapping':
+            for key, value in backup_data[section_name].items():
+                _refuse_nul(key, section_name)
+                _refuse_nul(value, f"{section_name}.{key}")
     for section_name, section in SECTIONS.items():
         if section_kind(backup_data, section_name) != 'list':
             continue
@@ -480,6 +511,8 @@ def refuse_containers_in_columns(backup_data) -> None:
             if not isinstance(row, dict):
                 continue
             for name, value in row.items():
+                _refuse_nul(name, section_name)
+                _refuse_nul(value, f"{section_name}.{name}")
                 column = columns.get(name)
                 if name in handled:
                     _refuse_unreadable_handled(name, value, f"{section_name}.{name}")

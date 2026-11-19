@@ -33,7 +33,8 @@ from .restore.apply import (apply_columns, apply_section, refuse_containers_in_c
                             relink_references)
 from .restore.names import rename_clashing_rows
 from .restore.orders import keep_newer_orders
-from .restore.sso_providers import refuse_archived_shared_types, settle_provider_types
+from .restore.sso_providers import (name_blank_providers, refuse_archived_shared_types,
+                                    settle_provider_types)
 from .restore.repairs import replay_repairs
 from .restore.conflict import conflict_from_integrity_error, is_value_too_long
 from .restore.replace import plan_replacement, remove_after_writes, remove_before_writes
@@ -350,7 +351,7 @@ class RestoreCoreMixin:
         # holding fewer rows than the archive says it holds, must not be
         # discovered halfway through a restore.
         self._check_payload_schema(backup_data)
-        refuse_containers_in_columns(backup_data)
+        refuse_containers_in_columns(backup_data, mappings=RESTORED_SECTIONS)
         self._check_serial_duplicates(backup_data)
         upgrade_archived_permissions(backup_data)
         windows_warnings: List[str] = []
@@ -375,6 +376,7 @@ class RestoreCoreMixin:
         # One SSO provider per type at the end, whatever the mode (restore/sso_providers.py)
         refuse_archived_shared_types(backup_data)
         sso_warnings: List[str] = []
+        name_blank_providers(backup_data, sso_warnings)
         settle_provider_types(backup_data, 'sso_providers' in pruned, sso_warnings, displaced)
         renamed_here: Dict[str, dict] = {}
         renamed = rename_clashing_rows(backup_data, ambiguous_references,
@@ -1197,10 +1199,8 @@ class RestoreCoreMixin:
             # Decrypt private key if encrypted
             prv_pem = None
             if ca_data.get('private_key_pem_encrypted'):
-                prv_pem = self._decrypt_private_key(
-                    ca_data['private_key_pem_encrypted'],
-                    master_key
-                )
+                prv_pem = self._decrypt_archived_key(
+                    ca_data['private_key_pem_encrypted'], master_key, f"CA {ca_data['refid']}")
             prv_b64 = base64.b64encode(prv_pem.encode()).decode() if prv_pem else None
             if prv_b64:
                 from security.encryption import encrypt_private_key
@@ -1254,10 +1254,9 @@ class RestoreCoreMixin:
             # Decrypt private key if encrypted
             prv_pem = None
             if cert_data.get('private_key_pem_encrypted'):
-                prv_pem = self._decrypt_private_key(
-                    cert_data['private_key_pem_encrypted'],
-                    master_key
-                )
+                prv_pem = self._decrypt_archived_key(
+                    cert_data['private_key_pem_encrypted'], master_key,
+                    f"certificate {cert_data['refid']}")
 
             prv_b64 = None
             if prv_pem:

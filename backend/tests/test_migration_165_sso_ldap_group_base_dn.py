@@ -101,3 +101,45 @@ def test_postgres(with_table):
         conn.commit()
         conn.close()
         engine.dispose()
+
+
+# A blank name (2.254 let a provider be renamed so) becomes its type, or its type with a number
+# when another provider holds that name already
+BLANK_ROWS = [(2, '', 'ldap'), (3, '   ', 'saml'), (4, 'saml', 'oauth2')]
+NAMED = [(2, 'ldap'), (3, 'saml (2)'), (4, 'saml')]
+
+
+def test_sqlite_names_a_blank_provider_after_its_type_once():
+    conn = sqlite3.connect(':memory:')
+    conn.execute(CREATE.format(pk='INTEGER PRIMARY KEY'))
+    conn.executemany(f"INSERT INTO {TABLE} (id, name, provider_type) VALUES (?, ?, ?)", BLANK_ROWS)
+    conn.commit()
+    for _ in range(2):
+        _migration().upgrade(conn)
+        assert conn.execute(f"SELECT id, name FROM {TABLE} ORDER BY id").fetchall() == NAMED
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_postgres_names_a_blank_provider_after_its_type_once():
+    schema = f"migtest_165b_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
+    engine = create_engine(PG_URL)
+    conn = engine.connect()
+    try:
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+        conn.execute(text(f"CREATE SCHEMA {schema}"))
+        conn.execute(text(f"SET search_path TO {schema}"))
+        conn.execute(text(CREATE.format(pk='SERIAL PRIMARY KEY')))
+        for row in BLANK_ROWS:
+            conn.execute(text(f"INSERT INTO {TABLE} (id, name, provider_type) VALUES (:i, :n, :t)"),
+                         {'i': row[0], 'n': row[1], 't': row[2]})
+        for _ in range(2):
+            _migration().upgrade(conn)
+            assert [tuple(r) for r in conn.execute(
+                text(f"SELECT id, name FROM {TABLE} ORDER BY id"))] == NAMED
+    finally:
+        conn.rollback()
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+        conn.commit()
+        conn.close()
+        engine.dispose()

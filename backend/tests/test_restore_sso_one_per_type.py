@@ -132,11 +132,35 @@ def test_an_archive_holding_two_providers_of_a_type_is_refused(target, mode):
     assert User.query.filter_by(username='admin-keep').first() is None
 
 
+@pytest.mark.parametrize('fmt', FORMATS)
 @pytest.mark.parametrize('mode', ['merge', 'replace'])
-def test_a_provider_named_blank_by_an_older_instance_is_restored(target, mode):
-    results = _restore({'sso_providers': [_archived_provider('   ', 'ldap', 'ldap.example')]}, mode)
+@pytest.mark.parametrize('blank', ['', '   '])
+def test_a_provider_named_blank_by_an_older_instance_is_restored_under_its_type(target, blank,
+                                                                                mode, fmt):
+    """2.254 accepted a blank name on a rename: the provider comes back named as the upgrade
+    names it, with the accounts it opened, and the report says so."""
+    data = {'sso_providers': [_archived_provider(blank, 'ldap', 'ldap.example')],
+            **_archived_account(fmt, 'bob', blank, 'bob-at-ldap')}
+    results = _restore(data, mode)
     db.session.expire_all()
-    assert [(kind, named) for kind, named, _id in _providers()] == [('ldap', '   ')], results
+    ldap = SSOProvider.query.filter_by(name='ldap').one()
+    assert _providers() == [('ldap', 'ldap', ldap.id)], results
+    assert _rows('bob') == [(ldap.id, 'bob-at-ldap', None)]
+    assert any("blank name" in w and "'ldap'" in w for w in results['warnings']), results['warnings']
+
+
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+def test_a_blank_name_takes_a_free_name_when_another_provider_holds_its_type(target, mode):
+    """'ldap' is the name of the oauth2 provider, here and in the archive: the blank one is
+    numbered, and the oauth2 provider keeps its own."""
+    here = _here('ldap', 'oauth2', 'https://corp.example')
+    db.session.commit()
+    results = _restore({'sso_providers': [_archived_provider('ldap', 'oauth2', 'https://corp.example'),
+                                          _archived_provider(' ', 'ldap', 'ldap.example')]}, mode)
+    db.session.expire_all()
+    numbered = SSOProvider.query.filter_by(name='ldap (2)').one()
+    assert _providers() == sorted([('oauth2', 'ldap', here), ('ldap', 'ldap (2)', numbered.id)])
+    assert any("'ldap (2)'" in w for w in results['warnings']), results['warnings']
 
 
 @pytest.mark.parametrize('mode', ['merge', 'replace'])
