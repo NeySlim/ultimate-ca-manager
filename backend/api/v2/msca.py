@@ -49,6 +49,18 @@ def _check_size(name: str, value, limit: int):
     return None
 
 
+# Fields read as text: null or another JSON type is a 400 naming the field, not a 500
+_TEXT_FIELDS = ('name', 'server', 'ca_name', 'ca_bundle', 'default_template', 'username',
+                'client_cert_pem', 'client_key_pem', 'kerberos_principal', 'kerberos_keytab_path')
+
+
+def _text_field_error(data):
+    for field in _TEXT_FIELDS:
+        if field in data and not isinstance(data[field], str):
+            return error_response(f"{field} must be a string", 400)
+    return None
+
+
 def _clean_crl_url(raw):
     """Validate a user-supplied CRL URL. Returns (value_or_None, error_response_or_None)."""
     if not isinstance(raw, str):
@@ -311,6 +323,11 @@ def create_connection():
     data = request.get_json()
     if not data:
         return error_response("Request body required", 400)
+    if not isinstance(data, dict):
+        return error_response("Request body must be a JSON object", 400)
+    err = _text_field_error(data)
+    if err:
+        return err
 
     name = data.get('name', '').strip()
     server = data.get('server', '').strip()
@@ -478,6 +495,11 @@ def update_connection(msca_id):
     data = request.get_json()
     if not data:
         return error_response("Request body required", 400)
+    if not isinstance(data, dict):
+        return error_response("Request body must be a JSON object", 400)
+    err = _text_field_error(data)
+    if err:
+        return err
     # A transport refused outright is the answer, before any question of secrets
     err = _kerberos_save_forbidden(msca, data) \
         or (_winrm_transport_error(data) if 'winrm_transport' in data else None) \
