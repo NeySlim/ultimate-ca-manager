@@ -3,7 +3,7 @@
  * day count (lib/utils daysRemaining), so an entry 12 hours from its end is not green.
  */
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import en from '../../i18n/locales/en.json'
 
