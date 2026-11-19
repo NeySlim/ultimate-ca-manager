@@ -34,7 +34,14 @@ def convert_certificate():
     input_data = data.get('pem', '').strip()
     output_format = data.get('output_format', 'pem')
     password = data.get('password', '') or None
-    pkcs12_password = data.get('pkcs12_password', '')
+    # output_password is the neutral name of pkcs12_password: the password of the OUTPUT (PEM key, PKCS#12, JKS)
+    output_password = data.get('output_password') or ''
+    pkcs12_password = data.get('pkcs12_password') or ''
+    if not isinstance(output_password, str) or not isinstance(pkcs12_password, str):
+        return error_response('output_password must be a string', 400)
+    if output_password and pkcs12_password and output_password != pkcs12_password:
+        return error_response('Send the output password as output_password only', 400)
+    pkcs12_password = output_password or pkcs12_password
     chain_pem = data.get('chain', '').strip()
     key_pem = data.get('private_key', '').strip()
 
@@ -133,8 +140,13 @@ def convert_certificate():
             pem_parts = []
             for cert in certs:
                 pem_parts.append(cert.public_bytes(serialization.Encoding.PEM).decode())
+            if keys and pkcs12_password:
+                pw_err = validate_export_password(pkcs12_password)
+                if pw_err:
+                    return error_response(pw_err, 400)
             for key in keys:
-                enc = serialization.NoEncryption()
+                enc = (serialization.BestAvailableEncryption(pkcs12_password.encode())
+                       if pkcs12_password else serialization.NoEncryption())
                 pem_parts.append(key.private_bytes(
                     encoding=serialization.Encoding.PEM,
                     format=serialization.PrivateFormat.PKCS8,
@@ -161,6 +173,10 @@ def convert_certificate():
                 der_data = certs[0].public_bytes(serialization.Encoding.DER)
                 filename = 'certificate.der'
             elif keys:
+                if pkcs12_password:
+                    return error_response(
+                        'A DER private key cannot be encrypted: use output_format pem, pkcs12 or jks '
+                        'for an output_password, or send no output_password', 400)
                 der_data = keys[0].private_bytes(
                     encoding=serialization.Encoding.DER,
                     format=serialization.PrivateFormat.PKCS8,

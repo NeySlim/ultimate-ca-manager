@@ -233,7 +233,7 @@ export default function CertificateToolsPage() {
         private_key: keyContent,
         chain: convertChain.trim(),
         password: convertPassword,
-        pkcs12_password: pkcs12Password
+        output_password: (convertFormat === 'pkcs12' || convertFormat === 'jks') ? pkcs12Password : ''
       })
       setResult({ type: 'convert', data: response.data })
     } catch (error) {
