@@ -138,6 +138,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **A local ACME account is refused only for an e-mail already used.** Creating one whose address holds `_` or `%` answered `409` when another account's address matched it with those read as wildcards.
 - **A generated CSR keeps the State, Locality and Email entered.** `POST /api/v2/csrs` dropped them without an error, so the request carried only C, O, OU and CN; the form now also has an Email field, and re-keying a CSR as a new CSR keeps its email (#449). The email is trimmed and must be an ASCII address, else `400` (RFC 2985 §5.2.1).
 - **A SQLite lock no longer answers 500.** A request that meets the database locked by another write, longer than it may wait, and would have answered 500 (a sign-in that cannot count its attempt included) answers 503 with `Retry-After` instead; a route that turns the error into another status keeps it.
 - **HSTS is not sent when its settings cannot be read.** A response served while the database could not answer (locked by a restore, unavailable) carried the default HSTS header even with HSTS switched off or a shorter duration saved; it now carries none, unless the `UCM_HSTS_*` environment variables set each setting the database could not give.
