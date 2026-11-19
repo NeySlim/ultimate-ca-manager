@@ -13,6 +13,7 @@ from models import db
 from models.msca import MicrosoftCA, MSCARequest, basic_password_reaches
 from services.msca_service import MicrosoftCAService
 from services.msca.connection import saved_credential_retargets
+from services.msca.client_keytab import managed_keytab_error
 from services.msca.requests import (MSCASignedElsewhere, SIGNED_MEANWHILE_MESSAGE, SUPERSEDED,
                                     SUPERSEDED_MESSAGE, msca_may_write_clause, supersede)
 from services.audit import AuditService
@@ -247,6 +248,9 @@ def create_connection():
         return error_response(f"Server too long (max {MAX_SERVER_LEN})", 400)
     if auth_method not in ('certificate', 'kerberos', 'basic'):
         return error_response("Invalid auth method", 400)
+    err = _keytab_error(data)
+    if err:
+        return err
 
     # Cap PEM/keytab inputs early so we don't ingest megabytes into the DB.
     for field, limit in (
@@ -334,6 +338,13 @@ def get_connection(msca_id):
     return success_response(data=msca.to_dict())
 
 
+def _keytab_error(data):
+    """400 when the body names a file UCM manages as the client keytab."""
+    value = data.get('kerberos_keytab_path') if isinstance(data, dict) else None
+    reason = managed_keytab_error(value) if isinstance(value, str) else None
+    return error_response(reason, 400) if reason else None
+
+
 _WINRM_TARGET_FIELDS = ('winrm_host', 'winrm_port', 'winrm_use_ssl', 'winrm_verify_ssl',
                         'winrm_transport', 'winrm_username')
 
@@ -386,7 +397,7 @@ def update_connection(msca_id):
         return error_response("Request body required", 400)
     # A transport refused outright is the answer, before any question of secrets
     err = (_winrm_transport_error(data) if 'winrm_transport' in data else None) \
-        or _msca_retarget_error(msca, data)
+        or _keytab_error(data) or _msca_retarget_error(msca, data)
     if err:
         return err
 
@@ -538,6 +549,9 @@ def test_connection_inline():
     data = request.get_json()
     if not data or not data.get('server'):
         return error_response("Server hostname is required", 400)
+    err = _keytab_error(data)
+    if err:
+        return err
     result = MicrosoftCAService.test_connection_inline(data)
     if result.get('success'):
         return success_response(data=result, message="Connection successful")
@@ -560,6 +574,9 @@ def _test_overrides(msca, data):
             return None, error_response(f"{field} must be a boolean", 400)
     if 'server' in data and not data['server'].strip():
         return None, error_response("Server hostname is required", 400)
+    err = _keytab_error(data)
+    if err:
+        return None, err
     if data.get('auth_method', msca.auth_method) not in ('certificate', 'kerberos', 'basic'):
         return None, error_response("Invalid auth method", 400)
     for field, limit in (('client_cert_pem', MAX_PEM_FIELD_BYTES), ('client_key_pem', MAX_PEM_FIELD_BYTES),

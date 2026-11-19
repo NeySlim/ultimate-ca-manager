@@ -307,6 +307,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- Microsoft CA: a Kerberos connection could name a file of the UCM data folder, the keytab XCEP and WSTEP accept with among them, as its client keytab, and authenticate under its service principals toward any host. Such a path is now refused with `400`, on save, on test and at use.
 - Export: a PEM export with the private key and a password (certificate, CA or user certificate) validated the password then returned the key unencrypted. The key is now written as PKCS#8 encrypted with that password, a password too short is refused with `400`, and the audit entry says `password-protected` for the PEM and the hybrid bundle.
 - Trust store: a file imported with its private key (a `server.pem`) was stored whole, and the key came back to every account allowed to read the trust store, in the PEM bundle and in backups. An entry holding a private key is now refused, entries keep only their certificates, the upgrade and the restore remove a key already stored (audited, see UPGRADE.md), and no export hands out anything but certificate blocks.
 - Account: the password reset by e-mail set a local password on an account created by an SSO provider, which then opened without the provider. Such an account gets no reset link any more, and a reset token sets no password on it.
@@ -331,6 +332,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Upgrade notes
 
+- Microsoft CA: a Kerberos connection whose keytab path lies inside the UCM data folder stops authenticating; move that keytab elsewhere and save the new path (see UPGRADE.md).
 - FIPS image: the module becomes the OpenSSL FIPS Provider 3.5.9 (certificate #5586) without any step; TLS 1.2 peers without Extended Master Secret are refused in both directions (see UPGRADE.md).
 - CA import: a CA with an RSA key under 2048 bits is no longer accepted together with its private key; import it without the key (read-only, for chains) or replace it.
 - Kerberos: a keytab merged for several realms is refused on upload; upload each realm's keytab on its own profile.
