@@ -130,6 +130,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **CORS follows a changed Base URL without a restart.** The allowed origins were read once at start, so the interface served under a Base URL saved later was refused by browsers until the next restart; they are now read on each request, and an extra origin written as a wildcard or a pattern is ignored.
 - **Downloads named after an object with non-ASCII characters no longer fail.** An export of a certificate, CA, CSR, template or SSH CA named in Japanese, Cyrillic or any other script answered 500 on the real server; the response now carries an ASCII `filename` plus an RFC 6266 `filename*` holding the original name, and a certificate or CA export saved from the web interface keeps those characters instead of underscores (#448).
 - **Two revocations of one SSH certificate at once.** The later one rewrote the date and reason of the earlier; it is now refused as for a certificate already revoked.
 - **The scheduler no longer queues a renewal no approval could honour.** Under a renewal approval policy, a certificate revoked since the listing or holding a key FIPS mode refuses opened an approval request; the scheduled pass now records it as failed with the same reason as the renewal routes and goes on.

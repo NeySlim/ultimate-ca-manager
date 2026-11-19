@@ -8,7 +8,6 @@ from os import environ
 import sys
 from pathlib import Path
 from flask import Flask, jsonify as flask_jsonify, redirect, request
-from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_caching import Cache
 from flask_session import Session
@@ -404,40 +403,39 @@ def create_app(config_name=None):
             "UCM_ADMIN_ALLOWLIST_DISABLE is set: the admin source-address "
             "allowlist is not enforced")
     
-    # CORS - dynamic origins (admin base URL + localhost + env extras)
-    class _DynamicCorsOrigins:
-        """Iterable allowlist recomputed from SystemConfig on each CORS check."""
-        def __iter__(self):
-            from utils.public_endpoints import get_cors_origins
-            return iter(get_cors_origins())
-
-        def __contains__(self, origin):
-            from utils.public_endpoints import get_cors_origins
-            return origin in get_cors_origins()
-
-        def __len__(self):
-            from utils.public_endpoints import get_cors_origins
-            return len(get_cors_origins())
-
-    _cors_origins = _DynamicCorsOrigins()
-
-    CORS(app, resources={
-        r"/api/*": {
-            "origins": _cors_origins,
+    # CORS: Flask-CORS's headers, its options resolved per request so the allowlist (admin base
+    # URL + localhost + env extras) is the one stored now; CORS(app) would freeze it at start.
+    import re
+    from urllib.parse import unquote
+    from flask_cors.core import ACL_ORIGIN, get_cors_options, probably_regex, set_cors_headers
+    _cors_resources = [
+        (re.compile(r"/api/*"), {
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
             "allow_headers": ["Content-Type", "Authorization", "X-CSRF-Token"],
             "expose_headers": ["Content-Disposition", "X-Skipped-Certificates", "X-Skipped-Certificates-Count",
                                "X-Skipped-CAs", "X-Skipped-CAs-Count"],
             "supports_credentials": True
-        },
-        r"/socket.io/*": {
-            "origins": _cors_origins,
+        }),
+        (re.compile(r"/socket.io/*"), {
             "methods": ["GET", "POST", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"],
             "supports_credentials": True
-        }
-    })
-    
+        }),
+    ]
+
+    @app.after_request
+    def _cors_headers(resp):
+        if resp.headers.get(ACL_ORIGIN):
+            return resp
+        path = unquote(request.path)
+        for pattern, options in _cors_resources:
+            if pattern.match(path):
+                from utils.public_endpoints import get_cors_origins
+                # Literal origins only (no '*', no pattern): an Origin is echoed only when listed
+                origins = [o for o in get_cors_origins() if not probably_regex(o)]
+                return set_cors_headers(resp, get_cors_options(app, options, {'origins': origins}))
+        return resp
+
     # Swagger/OpenAPI Documentation
     swagger_config = {
         "headers": [],
