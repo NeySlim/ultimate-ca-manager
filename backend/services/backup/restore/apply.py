@@ -553,6 +553,24 @@ def _fields_taken(section_name: str):
     return taken | {f'{name}{REFERENCE_SUFFIX}' for name in section.references}
 
 
+# What the report says of a field holding a NUL, by who reads the field
+_NUL_TEXT = {
+    'column': "a NUL character, which PostgreSQL cannot store in text, was restored as the two "
+              "characters \\0",
+    # A restorer may read a field of an older archive that no column takes: not said ignored
+    'unknown': "a field no column takes held a NUL character; where the restore reads it, it is "
+               "restored as the two characters \\0",
+    'nobody': "a field no column takes, ignored, holding a NUL character",
+}
+
+
+def _reader_of(name, taken) -> str:
+    """Who reads a row's field: a column, nobody (no code spells a name holding a NUL), or unknown."""
+    if taken is None or name in taken:
+        return 'column'
+    return 'nobody' if _holds_nul(name) else 'unknown'
+
+
 # Fields named one by one in the report; past this many, a count
 NUL_WARNING_FIELDS = 20
 # Characters of an archive's field name a warning shows
@@ -585,7 +603,7 @@ def escape_nul_in_archive(backup_data, sections) -> List[str]:
                     if clashes:
                         merged.append(f"{section_name}.{_shown(str(new_key))}")
                 backup_data[section_name] = rewritten
-                fields.extend((f"{section_name}.{name}", False) for name in hit)
+                fields.extend((f"{section_name}.{name}", 'column') for name in hit)
             continue
         if kind != 'list':
             continue
@@ -597,10 +615,9 @@ def escape_nul_in_archive(backup_data, sections) -> List[str]:
             if isinstance(row, dict):
                 for name, value in row.items():
                     if _holds_nul(name) or _holds_nul(value):
-                        hit.setdefault(_shown(escape_nul(name)),
-                                       taken is not None and name not in taken)
+                        hit.setdefault(_shown(escape_nul(name)), _reader_of(name, taken))
             elif _holds_nul(row):
-                hit.setdefault('(row)', False)
+                hit.setdefault('(row)', 'column')
         if hit:
             # Loaded only when it holds one: written back through the store
             loaded = backup_data[section_name]
@@ -617,13 +634,9 @@ def escape_nul_in_archive(backup_data, sections) -> List[str]:
                         merged.append(section_name)
                     names.add(escape_nul(name))
             backup_data[section_name] = _without_nul(loaded)
-            fields.extend((f"{section_name}.{name}", ignored) for name, ignored in hit.items())
+            fields.extend((f"{section_name}.{name}", reader) for name, reader in hit.items())
     merged = list(dict.fromkeys(merged))
-    warnings = [
-        f"{field}: a field no column takes, ignored, holding a NUL character" if ignored
-        else f"{field}: a NUL character, which PostgreSQL cannot store in text, was restored as "
-             "the two characters \\0"
-        for field, ignored in fields[:NUL_WARNING_FIELDS]]
+    warnings = [f"{field}: {_NUL_TEXT[reader]}" for field, reader in fields[:NUL_WARNING_FIELDS]]
     if len(fields) > NUL_WARNING_FIELDS:
         warnings.append(f"{len(fields) - NUL_WARNING_FIELDS} more fields held a NUL character, "
                         "restored the same way")

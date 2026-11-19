@@ -409,10 +409,20 @@ def test_the_rewrite_does_not_blame_the_nul_for_rows_already_alike():
     assert not [w for w in _rewritten(payload) if 'restored as one' in w]
 
 
-def test_the_rewrite_names_a_field_no_column_takes_as_ignored_by_its_value():
+_NO_COLUMN = ('a field no column takes held a NUL character; where the restore reads it, it '
+              'is restored as the two characters \\0')
+
+
+def test_the_rewrite_does_not_say_where_a_value_no_column_takes_went():
+    """A readable name with no column: the restore may read it itself, or drop it."""
     warnings = _rewritten({'deploy_targets': [_target('n', no_column='x\x00')]})
-    assert warnings == ['deploy_targets.no_column: a field no column takes, ignored, holding a '
-                        'NUL character'], warnings
+    assert warnings == [f'deploy_targets.no_column: {_NO_COLUMN}'], warnings
+
+
+def test_a_field_an_older_archive_carries_is_not_said_ignored():
+    """An archive of the previous major names the SSO identity on the account itself."""
+    warnings = _rewritten({'users': [{'username': 'u', 'sso_external_id': 'a\x00b'}]})
+    assert warnings == [f'users.sso_external_id: {_NO_COLUMN}'], warnings
 
 
 @pytest.mark.parametrize('mode', MODES)
