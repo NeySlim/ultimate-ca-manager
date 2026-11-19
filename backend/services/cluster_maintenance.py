@@ -416,6 +416,7 @@ def init_app(app):
     sqlite_wait.install()
     # First of all (after the admin allowlist): the hooks below it read the database
     app.before_request_funcs.setdefault(None, []).insert(0, restore_hold.before_request)
+    app.before_request_funcs[None].insert(0, sqlite_wait.watch_response)
     app.before_request(gate)
     app.register_error_handler(MaintenanceActive, lambda e: refusal())
     app.after_request(sqlite_wait.answer_locked_500)

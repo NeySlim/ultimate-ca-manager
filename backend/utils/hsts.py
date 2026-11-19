@@ -55,16 +55,13 @@ _UNREADABLE = object()
 
 
 def _cfg_value(key: str, unreadable=None):
-    """Read a SystemConfig value, tolerating any DB error / missing table; a lock met
-    here does not mark the request (utils/sqlite_wait)."""
-    from utils.sqlite_wait import lock_not_marked
-    with lock_not_marked():
-        try:
-            from models import SystemConfig
-            row = SystemConfig.query.filter_by(key=key).first()
-            return row.value if row else None
-        except Exception:
-            return unreadable
+    """Read a SystemConfig value, tolerating any DB error / missing table."""
+    try:
+        from models import SystemConfig
+        row = SystemConfig.query.filter_by(key=key).first()
+        return row.value if row else None
+    except Exception:
+        return unreadable
 
 
 def _setting(key: str):
