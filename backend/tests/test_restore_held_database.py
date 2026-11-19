@@ -269,6 +269,31 @@ def test_a_session_without_the_right_reads_nothing(restore_held, viewer_client):
     assert not restore_job.cancel_flagged(job_id)
 
 
+def test_a_held_cancellation_still_needs_its_csrf_token(restore_held, monkeypatch):
+    job_id, admin = restore_held.job_id, restore_held.admin
+    url = f'/api/v2/system/jobs/{job_id}'
+    assert admin.get(url).status_code == 200
+    monkeypatch.setenv('CSRF_DISABLED', 'false')
+    with restore_held.hold():
+        forged = admin.post(f'{url}/cancel')
+    assert forged.status_code == 403, forged.data
+    assert not restore_job.cancel_flagged(job_id)
+
+
+def test_a_check_made_on_one_host_is_not_used_on_another(restore_held):
+    """The public-host rules ran for the host of the check, not for this one."""
+    job_id, admin = restore_held.job_id, restore_held.admin
+    url = f'/api/v2/system/jobs/{job_id}'
+    assert admin.get(url).status_code == 200
+    other = restore_held.app.test_client()
+    other.set_cookie('session', admin.get_cookie('session').value, domain='acme.elsewhere.test')
+    with restore_held.hold():
+        here = admin.get(url)
+        elsewhere = other.get(url, base_url='http://acme.elsewhere.test')
+    assert here.status_code == 200, here.data
+    assert elsewhere.status_code == 503, elsewhere.data
+
+
 def test_a_cancellation_at_the_commit_is_too_late(restore_held):
     job_id, admin = restore_held.job_id, restore_held.admin
     url = f'/api/v2/system/jobs/{job_id}'
