@@ -17,39 +17,45 @@ PASSWORD = 'Export-Passw0rd!'
 each_name = pytest.mark.parametrize('name', NAMES, ids=NAME_IDS)
 
 
-@each_name
-def test_user_certificate_exports(app, auth_client, create_user, create_cert, name):
+def _user_cert(app, create_user, create_cert, owner, name):
+    """An enrolment of *owner* named *name*, and the refid of its certificate."""
     from models.auth_certificate import AuthCertificate
     from tests.test_user_certificate_key_export_guard import _enrolment_for
-    owner = f'jp_user_cert_owner_{NAMES.index(name)}'
     create_user(username=owner, role='viewer')
-    row_id, _ = _enrolment_for(app, create_cert, owner, f'jp-user-cert-{NAMES.index(name)}')
+    row_id, _ = _enrolment_for(app, create_cert, owner, owner.replace('_', '-'))
     with app.app_context():
         row = db.session.get(AuthCertificate, row_id)
         row.name = name
-        refid = db.session.get(Certificate, row.certificate_id).refid if getattr(row, 'certificate_id', None) else None
+        refid = Certificate.query.filter_by(serial_number=row.cert_serial).one().refid
         db.session.commit()
+    return row_id, refid
+
+
+@each_name
+def test_user_certificate_exports(app, auth_client, create_user, create_cert, name):
+    row_id, refid = _user_cert(app, create_user, create_cert, f'jp_user_cert_owner_{NAMES.index(name)}', name)
     url = f'/api/v2/user-certificates/{row_id}/export'
+    plain = plain_stem(name, refid)
     r = auth_client.post(url, json={'format': 'pkcs12', 'password': PASSWORD})
-    assert_named(r, name, '.p12')
-    assert_named(auth_client.post(url, json={'format': 'pem', 'include_key': False}), name, '.crt')
-    assert_named(auth_client.post(url, json={'format': 'pem', 'include_key': True}), name, '.pem')
-    del refid
+    assert_named(r, name, '.p12', plain)
+    assert_named(auth_client.post(url, json={'format': 'pem', 'include_key': False}), name, '.crt', plain)
+    assert_named(auth_client.post(url, json={'format': 'pem', 'include_key': True}), name, '.pem', plain)
+
+
+def test_user_certificate_named_only_with_stripped_characters_falls_back_to_the_refid(
+        app, auth_client, create_user, create_cert):
+    row_id, refid = _user_cert(app, create_user, create_cert, 'jp_user_cert_stripped', '"\r\n"')
+    r = auth_client.post(f'/api/v2/user-certificates/{row_id}/export', json={'format': 'pem', 'include_key': False})
+    assert r.status_code == 200, r.data
+    assert r.headers['Content-Disposition'] == f'attachment; filename="{refid}.crt"'
 
 
 @each_name
 def test_user_certificate_jks_export(app, auth_client, create_user, create_cert, name):
     pytest.importorskip('jks')
-    from models.auth_certificate import AuthCertificate
-    from tests.test_user_certificate_key_export_guard import _enrolment_for
-    owner = f'jp_user_cert_owner2_{NAMES.index(name)}'
-    create_user(username=owner, role='viewer')
-    row_id, _ = _enrolment_for(app, create_cert, owner, f'jp-user-cert2-{NAMES.index(name)}')
-    with app.app_context():
-        db.session.get(AuthCertificate, row_id).name = name
-        db.session.commit()
+    row_id, refid = _user_cert(app, create_user, create_cert, f'jp_user_cert_owner2_{NAMES.index(name)}', name)
     r = auth_client.post(f'/api/v2/user-certificates/{row_id}/export', json={'format': 'jks', 'password': PASSWORD})
-    assert_named(r, name, '.jks')
+    assert_named(r, name, '.jks', plain_stem(name, refid))
 
 
 @each_name

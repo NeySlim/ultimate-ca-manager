@@ -354,7 +354,9 @@ def export_user_certificate(cert_id):
 
     try:
         cert_pem = base64.b64decode(cert.crt)
-        filename_base = sanitize_filename(auth_cert.name or cert.descr or cert.refid)
+        # The raw name goes to content_disposition(), which falls back to the refid.
+        raw_name = auth_cert.name or cert.descr or cert.refid
+        filename_base = sanitize_filename(raw_name)
 
         if export_format in ('pkcs12', 'p12', 'pfx'):
             pw_err = validate_export_password(password)
@@ -394,7 +396,7 @@ def export_user_certificate(cert_id):
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
-                headers={'Content-Disposition': content_disposition(filename_base, '.p12', fallback=cert.refid)}
+                headers={'Content-Disposition': content_disposition(raw_name, '.p12', fallback=cert.refid)}
             )
 
         elif export_format == 'jks':
@@ -453,7 +455,7 @@ def export_user_certificate(cert_id):
             return Response(
                 jks_bytes,
                 mimetype='application/x-java-keystore',
-                headers={'Content-Disposition': content_disposition(filename_base, '.jks', fallback=cert.refid)}
+                headers={'Content-Disposition': content_disposition(raw_name, '.jks', fallback=cert.refid)}
             )
 
         # PEM export (default)
@@ -491,7 +493,7 @@ def export_user_certificate(cert_id):
         return Response(
             result,
             mimetype='application/x-pem-file',
-            headers={'Content-Disposition': content_disposition(filename_base, suffix, fallback=cert.refid)}
+            headers={'Content-Disposition': content_disposition(raw_name, suffix, fallback=cert.refid)}
         )
 
     except FipsRestricted:
