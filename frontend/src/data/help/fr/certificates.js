@@ -18,11 +18,11 @@ export default {
         title: 'Statut des certificats',
         definitions: [
           { term: 'Valide', description: 'Dans la période de validité et non révoqué' },
-          { term: 'Expirant', description: 'Expirera dans les 30 jours' },
+          { term: 'À renouveler', description: 'Expirera dans les 30 jours' },
           { term: 'Expiré', description: 'Après la date « Not After »' },
           { term: 'Révoqué', description: 'Explicitement révoqué (publié dans la CRL)' },
           { term: 'Orphelin', description: 'L\'AC émettrice n\'existe plus dans le système' },
-          { term: 'Archivé', description: 'Remplacé par un renouvellement ou un ré-enrôlement qui a conservé l\'ancien enregistrement pour l\'historique (SCEP, EST, WSTEP, ACME, répondeur OCSP) ; listé avec le filtre de statut « Archivé »' },
+          { term: 'Archivé', description: 'Remplacé par un renouvellement ou un ré-enrôlement qui a conservé l\'ancien enregistrement pour l\'historique (SCEP, EST, WSTEP, ACME, répondeur OCSP) ; listé sous l\'onglet « Archivés »' },
         ]
       },
       {
@@ -38,7 +38,7 @@ export default {
           { label: 'Révocation auprès de l\'AC ACME', text: "Révoquer un certificat obtenu via ACME (par le client, ou par le proxy sous un compte amont détenu par UCM) le révoque aussi auprès de cette AC, qu'il soit révoqué seul, en masse, par une demande approuvée, comme certificat utilisateur, avec l'inscription ou l'utilisateur auquel il appartient, comme membre lié d'une paire, ou par sa clé auprès du serveur ACME propre à UCM. Si l'AC ne confirme pas, la révocation reste due et est renvoyée par la tâche de renouvellement ; une suspension reste dans UCM, ACME n'en ayant pas. Si aucun compte d'UCM ne peut parler pour lui, il reste local et un avertissement indique de le révoquer directement auprès de l'AC. Le motif est envoyé quand il vaut keyCompromise, affiliationChanged, superseded, cessationOfOperation ou privilegeWithdrawn" },
           { label: 'Exporter', text: 'Télécharger au format PEM, DER, PKCS#12 ou JKS' },
           { label: 'Mode compatibilité PKCS#12 (v2.222)', text: 'Les dialogues d\'export proposent un profil 3DES/SHA-1 pour les importeurs qui refusent l\'archive AES-256 par défaut comme un mot de passe incorrect : Android 15 et antérieur, macOS 14 et antérieur, Windows Server 2016 et antérieur, Java ancien. Désactivé par défaut, il protège moins bien le fichier' },
-          { label: 'Comparer', text: 'Comparaison côte à côte de deux certificats' },
+          { label: 'Comparer', text: 'Comparaison côte à côte de deux certificats : cochez une ou deux lignes, puis Comparer dans la barre de sélection' },
           { label: "Autres extensions (v2.251)", text: "Les détails des certificats et des AC listent sous Autres extensions celles pour lesquelles UCM n'a pas de section, avec leur OID, leur nom s'il est connu, leur criticité et leur valeur brute. Le formulaire d'émission peut ajouter des extensions personnalisées à celles du template" },
           { label: "Clés compromises (v2.251)", text: "Une clé révoquée pour keyCompromise reste connue après la suppression de son certificat, quelle que soit l'AC qui l'a émis, Let's Encrypt compris : le client ACME la refuse à la requête, au renouvellement et à la finalisation, et EST refuse une CSR qui la porte. Les autres chemins d'émission ne consultent pas cette liste" },
           { label: "Certificats du client ACME (v2.251)", text: "Un certificat obtenu par le client ACME est lui aussi renouvelé en place, avec son id et son refid conservés. Les copies que d'anciens renouvellements ont importées comme nouvelles lignes restent dans l'inventaire jusqu'à leur archivage ou suppression" },
@@ -61,7 +61,7 @@ export default {
         items: [
           { label: 'Émission', text: 'Cochez « Émettre une paire hybride » dans le formulaire d\'émission et choisissez la clé classique et le niveau ML-DSA ; les deux viennent de la même AC, avec le même sujet, les mêmes noms et la même validité, et B n\'affirme aucun key usage ni EKU absent de A. Proposé seulement quand les politiques de l\'AC autorisent les deux, jamais en mode FIPS. Sous les profils ANSSI, BSI et EU ACM, ML-DSA-65 et ML-DSA-87 ne sont proposés que dans la paire. Une politique qui exige une approbation refuse la paire pour l\'instant' },
           { label: 'Lien par requête', text: 'Une CSR portant une relatedCertRequest signée par la clé de A (Signer une CSR, ACME, EST, WSTEP) émet un B lié à A. A doit être détenu ici, valide, non révoqué et être un certificat d\'entité finale ; un B plus récent désignant le même A reprend la paire' },
-          { label: 'Lié', text: 'Chaque membre porte un badge Lié dans la liste et dans ses détails, avec un lien qui ouvre l\'autre membre' },
+          { label: 'Lié', text: 'Chaque membre porte une marque de lien après son nom dans la liste et un badge Lié dans ses détails, avec un lien qui ouvre l\'autre membre ; le bouton Colonnes ajoute une colonne Lié à la liste' },
           { label: 'Révocation', text: 'Révoquer un membre, seul ou en masse, révoque aussi l\'autre, sauf si vous décochez « Révoquer aussi le certificat lié », par ex. pour garder A quand seule la clé ML-DSA est compromise ; sous une politique qui exige une approbation, les deux partent ensemble. Un avertissement nomme l\'autre membre quand il n\'a pas pu être révoqué. La révocation ACME ne révoque que le certificat présenté' },
           { label: 'Renouvellement', text: 'Renouveler l\'un des membres renouvelle les deux, manuellement, en masse ou automatiquement, et le nouveau B désigne le nouveau A. Un membre renouvelé seul ne désigne que le certificat que désignait l\'original ; une fois celui-ci renouvelé entre-temps, révoqué, archivé ou expiré, il quitte la paire et le renouvellement dit pourquoi. Un membre illisible fait refuser le renouvellement' },
           { label: 'Export', text: 'Le format Lot hybride télécharge un ZIP des deux certificats, et des deux clés quand vous incluez la clé et pouvez exporter les clés' },
@@ -93,7 +93,8 @@ export default {
     ],
     tips: [
       'Ajoutez une étoile ⭐ aux certificats importants pour les ajouter à vos favoris',
-      'Utilisez les filtres pour trouver rapidement les certificats par statut, AC ou texte de recherche : votre sélection est conservée au rechargement',
+      'Les onglets au-dessus de la liste filtrent par état et comptent chacun ; l\'onglet fait partie de l\'adresse, un rechargement ou un lien partagé le conserve. Les filtres par AC, source et modèle sont conservés au rechargement',
+      'Une ligne garde une seule action, Exporter ; ouvrez le certificat (clic sur sa ligne) pour Renommer, Renouveler, Révoquer et Supprimer. Cochez des lignes pour comparer deux certificats ou en exporter plusieurs dans un seul fichier PEM',
       'Le renouvellement conserve le même enregistrement (id, refid, date de création). Renouveler depuis la page génère une nouvelle clé ; le renouvellement automatique conserve la clé. Un certificat dont UCM ne détient pas la clé (enrôlement SCEP, EST, WSTEP ou ACME, import sans la clé) est refusé (409) : renouvelez-le par son protocole ou signez une nouvelle demande',
       'Besoin d\'un EKU non-standard (Microsoft RDP, smartcard logon, document signing) ? Ajoutez-le via « EKU supplémentaires » plutôt que d\'éditer les modèles',
       'Quand une politique ou l\'expiration de l\'AC émettrice raccourcit la validité demandée, le résultat l\'indique : "Issued for N day(s) instead of the M requested", avec la raison',
@@ -116,7 +117,7 @@ Gestion centralisée de tous les certificats X.509. Émettez de nouveaux certifi
 ## Statut des certificats
 
 - **Valide** : Dans la période de validité et non révoqué
-- **Expirant** : Expirera dans les 30 jours
+- **À renouveler** : Expirera dans les 30 jours
 - **Expiré** : Après la date « Not After »
 - **Révoqué** : Explicitement révoqué, publié dans la CRL
 - **Orphelin** : L'AC émettrice n'existe plus dans UCM
@@ -213,16 +214,18 @@ Ajoutez une étoile ⭐ aux certificats importants pour les marquer. Les favoris
 
 ## Comparer des certificats
 
-Sélectionnez deux certificats et cliquez sur **Comparer** pour voir une comparaison côte à côte de leur sujet, SAN, utilisation de la clé, validité et extensions.
+Cochez deux certificats dans la liste et cliquez sur **Comparer** dans la barre de sélection pour voir une comparaison côte à côte de leur sujet, SAN, utilisation de la clé, validité et extensions. Avec un seul certificat coché, la fenêtre laisse choisir l'autre.
 
 ## Filtrage et recherche
 
-- **Filtre par statut** : Valide, Expirant, Expiré, Révoqué, Orphelin, Archivé
+- **Onglets d'état** : Tous, À renouveler, Valides, Expirés, Révoqués et Archivés, plus Orphelins quand il y en a ; chacun affiche son compteur, sauf Archivés. L'onglet fait partie de l'adresse : un rechargement ou un lien partagé le conserve
 - **Filtre par AC** : Afficher les certificats d'une AC spécifique
 - **Filtre par source** : Filtrer selon la manière dont le certificat est entré dans UCM (émis, importé, ACME, SCEP, etc.)
 - **Filtre par modèle** : Trouver les certificats **modifiés depuis le modèle** : émis depuis un modèle mais avec le type de clé ou la validité explicitement remplacés au moment de la demande. Les champs divergents sont listés sur le détail du certificat ; l'enregistrement est figé à l'émission
 - **Recherche textuelle** : Recherche par sujet, émetteur, nom d'affichage ou numéro de série (les SAN ne sont pas recherchés)
 - **Tri** : Par nom, date d'expiration, date de création, statut
+- **Colonnes** : nom commun, description, état, émetteur, source, expiration et algorithme de clé par défaut ; le bouton **Colonnes** ajoute la note de conformité, le lien hybride et la date de création
+- **Actions d'une ligne** : Exporter sur la ligne ; Renommer, Renouveler, Révoquer et Supprimer dans le détail qu'ouvre un clic sur la ligne
 ## Linting de conformité
 
 Le bouton **Linter** (détail d'un certificat) vérifie la conformité aux standards X.509. Informatif uniquement.

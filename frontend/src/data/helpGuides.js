@@ -282,7 +282,7 @@ Central management for all X.509 certificates. Issue new certificates, import ex
 ## Certificate Status
 
 - **Valid**: Within validity period and not revoked
-- **Expiring**: Will expire within 30 days
+- **To renew**: Will expire within 30 days
 - **Expired**: Past the "Not After" date
 - **Revoked**: Explicitly revoked, published in CRL
 - **Orphan**: Issuing CA no longer exists in UCM
@@ -381,16 +381,18 @@ Star ⭐ important certificates to bookmark them. Favorites are listed in the co
 
 ## Comparing Certificates
 
-Select two certificates and click **Compare** to see a side-by-side diff of their Subject, SANs, Key Usage, validity, and extensions.
+Tick two certificates in the list and click **Compare** in the selection bar to see a side-by-side diff of their Subject, SANs, Key Usage, validity, and extensions. With one certificate ticked, the dialog lets you choose the other.
 
 ## Filtering & Search
 
-- **Status filter**: Valid, Expiring, Expired, Revoked, Orphan, Archived
+- **State tabs**: All, To renew, Valid, Expired, Revoked and Archived, plus Orphans when there are some; each shows its count, except Archived. The tab is part of the address, so a reload or a shared link keeps it
 - **CA filter**: Show certificates from a specific CA
 - **Source filter**: Filter by how the certificate entered UCM (issued, imported, ACME, SCEP, etc.)
 - **Template filter**: Find certificates **modified from template**: issued from a template but with the key type or validity explicitly overridden at request time. The divergent fields are listed on the certificate detail; the record is frozen at issuance
 - **Text search**: Search by subject, issuer, display name or serial number (SANs are not searched)
 - **Sorting**: By name, expiry date, creation date, status
+- **Columns**: Common name, description, state, issuer, source, expiry and key algorithm by default; the **Columns** button adds the compliance grade, the hybrid link and the creation date
+- **Row actions**: Export on the row; Rename, Renew, Revoke and Delete in the detail a click on the row opens
 
 ## Conformance linting
 

@@ -244,11 +244,11 @@ export const helpContent = {
         icon: Certificate,
         definitions: [
           { term: 'Valid', description: 'Within validity period and not revoked' },
-          { term: 'Expiring', description: 'Will expire within 30 days' },
+          { term: 'To renew', description: 'Will expire within 30 days' },
           { term: 'Expired', description: 'Past the "Not After" date' },
           { term: 'Revoked', description: 'Explicitly revoked (published in CRL)' },
           { term: 'Orphan', description: 'Issuing CA no longer exists in the system' },
-          { term: 'Archived', description: 'Superseded by a renewal or re-enrolment that kept the old record for history (SCEP, EST, WSTEP, ACME, OCSP responder); listed with the "Archived" status filter' },
+          { term: 'Archived', description: 'Superseded by a renewal or re-enrolment that kept the old record for history (SCEP, EST, WSTEP, ACME, OCSP responder); listed under the "Archived" tab' },
         ]
       },
       {
@@ -265,7 +265,7 @@ export const helpContent = {
           { label: 'Revocation at the ACME CA', text: 'Revoking a certificate obtained over ACME (by the client, or by the proxy under an upstream account UCM holds) also revokes it at that CA, whether it is revoked alone, in bulk, by an approved request, as a user certificate, with the enrolment or user it belongs to, as the related member of a pair, or by its key at UCM\'s own ACME server. If the CA does not confirm, the revocation is kept owed and sent again by the renewal task; a hold stays in UCM, ACME having none. If no account of UCM can speak for it, it stays local and a warning says to revoke it with the CA directly. The reason is sent when it is keyCompromise, affiliationChanged, superseded, cessationOfOperation or privilegeWithdrawn' },
           { label: 'Export', text: 'Download in PEM, DER, PKCS#12, or JKS format' },
           { label: 'PKCS#12 compatibility mode (v2.222)', text: 'The export dialogs offer a 3DES/SHA-1 profile for importers that reject the default AES-256 archive as a wrong password: Android 15 and earlier, macOS 14 and earlier, Windows Server 2016 and earlier, old Java. Off by default, it protects the file less well' },
-          { label: 'Compare', text: 'Side-by-side comparison of two certificates' },
+          { label: 'Compare', text: 'Side-by-side comparison of two certificates: tick one or two rows, then Compare in the selection bar' },
           { label: 'Other extensions (v2.251)', text: 'The certificate and CA details list the extensions UCM has no section for under Other extensions, with their OID, name when known, criticality and raw value. The issue form can add custom extensions on top of the template\'s' },
           { label: 'Compromised keys (v2.251)', text: 'A key revoked as keyCompromise stays known after its certificate is deleted, whatever CA issued it, Let\'s Encrypt included: the ACME client refuses it at the request, the renewal and the finalization, and EST refuses a CSR carrying it. The other issuance paths do not consult this list' },
           { label: 'ACME client certificates (v2.251)', text: 'A certificate obtained by the ACME client is renewed in place too, keeping its id and refid. The copies earlier renewals imported as new rows stay in the inventory until archived or deleted' },
@@ -290,7 +290,7 @@ export const helpContent = {
         items: [
           { label: 'Issue', text: 'Tick "Issue a hybrid pair" in the Issue Certificate form and choose the classical key and the ML-DSA level; both come from the same CA, with the same subject, names and validity, and B asserts no key usage or EKU that A lacks. Offered only when the policies of the CA allow both, never in FIPS mode. Under the ANSSI, BSI and EU ACM profiles, ML-DSA-65 and ML-DSA-87 are offered in the pair only. A policy that requires approval refuses the pair for now' },
           { label: 'Linked by request', text: 'A CSR carrying a relatedCertRequest signed by A\'s key (Sign CSR, ACME, EST, WSTEP) issues a B linked to A. A must be held here, valid, unrevoked and an end-entity certificate; a newer B naming the same A takes over the pair' },
-          { label: 'Linked', text: 'Each member carries a Linked badge in the list and in its details, with a link that opens the other member' },
+          { label: 'Linked', text: 'Each member carries a link mark after its name in the list and a Linked badge in its details, with a link that opens the other member; the Columns button adds a Linked column to the list' },
           { label: 'Revoke', text: 'Revoking one member, alone or in a bulk operation, also revokes the other unless you untick "Also revoke the linked certificate", e.g. to keep A when only the ML-DSA key is compromised; under a policy that requires approval both go together. A warning names the other member when it could not be revoked. ACME revocation revokes only the certificate presented' },
           { label: 'Renew', text: 'Renewing either member renews both, manually, in bulk or automatically, and the new B names the new A. A member renewed alone names only the certificate its original named; once that one is renewed since, revoked, archived or expired, it leaves the pair and the renewal says why. A member that cannot be read refuses the renewal' },
           { label: 'Export', text: 'The Hybrid bundle format downloads a ZIP of both certificates, and of both keys when you include the key and may export keys' },
@@ -323,7 +323,8 @@ export const helpContent = {
     ],
     tips: [
       'Star ⭐ important certificates to add them to your favorites list',
-      'Use filters to quickly find certificates by status, CA, or search text: your selection is persisted across reloads',
+      'The tabs above the list filter by state and count each one; the tab is part of the address, so a reload or a shared link keeps it. The CA, source and template filters are remembered across reloads',
+      'A row keeps one action, Export; open the certificate (click its row) for Rename, Renew, Revoke and Delete. Tick rows to compare two certificates or to export several as one PEM file',
       'Renewing keeps the same record (id, refid, creation date). Renew from the page generates a new key; the automatic renewal keeps the key. A certificate whose key UCM does not hold (SCEP, EST, WSTEP or ACME enrolment, import without the key) is refused (409): renew it through its protocol or sign a new request',
       'Need a non-standard EKU (Microsoft RDP, smartcard logon, document signing)? Add it via "Extra EKUs" instead of editing templates',
       'When a policy or the issuing CA\'s expiry shortens the requested validity, the result says so: "Issued for N day(s) instead of the M requested", with the reason',
