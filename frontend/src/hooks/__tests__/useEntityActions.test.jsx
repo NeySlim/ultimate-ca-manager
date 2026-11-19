@@ -10,7 +10,7 @@ const notify = vi.hoisted(() => ({
   showConfirm: vi.fn(), showPrompt: vi.fn(),
 }))
 const svc = vi.hoisted(() => ({
-  certs: { delete: vi.fn(), revoke: vi.fn(), unhold: vi.fn(), export: vi.fn(), renew: vi.fn(), getById: vi.fn() },
+  certs: { delete: vi.fn(), revoke: vi.fn(), unhold: vi.fn(), export: vi.fn(), renew: vi.fn(), rename: vi.fn(), getById: vi.fn() },
   cas: { delete: vi.fn(), revoke: vi.fn(), export: vi.fn(), getById: vi.fn(), renewCsr: vi.fn(), downloadCsr: vi.fn() },
 }))
 
@@ -78,6 +78,58 @@ describe('certificate actions by permission', () => {
   it('offers delete on the resource of the type, not on certificates', () => {
     expect(visible(run('truststore', { id: 1, name: 'root' }, rights(['delete:certificates'])))).not.toContain('delete')
     expect(visible(run('truststore', { id: 1, name: 'root' }, rights(['delete:truststore'])))).toContain('delete')
+  })
+})
+
+// The certificate list keeps one action per row (export): the rest lives here
+describe('what a list row leaves to the detail', () => {
+  const ALL = rights(['write:certificates', 'delete:certificates'])
+  const OFFERED = ['export', 'rename', 'renew', 'revoke', 'delete']
+  const offered = (entity, permissions) => visible(run('certificate', entity, permissions)).filter((id) => OFFERED.includes(id))
+
+  it('offers export, rename, renew, revoke and delete to a writer who may delete', () => {
+    expect(offered(CERT, ALL)).toEqual(OFFERED)
+  })
+
+  it('offers a read-only principal the export alone', () => {
+    expect(offered(CERT, rights())).toEqual(['export'])
+  })
+
+  it('gates delete on delete:certificates alone', () => {
+    expect(offered(CERT, rights(['write:certificates']))).toEqual(['export', 'rename', 'renew', 'revoke'])
+    expect(offered(CERT, rights(['delete:certificates']))).toEqual(['export', 'delete'])
+  })
+
+  it('offers neither renew nor revoke on a revoked certificate, nor renew without its key', () => {
+    expect(offered({ ...CERT, revoked: true, status: 'revoked' }, ALL)).toEqual(['export', 'rename', 'delete'])
+    expect(offered({ ...CERT, has_private_key: false }, ALL)).toEqual(['export', 'rename', 'revoke', 'delete'])
+  })
+
+  it('renames through the service, with the description on hand as the default', async () => {
+    notify.showPrompt.mockResolvedValueOnce('  Back door  ')
+    svc.certs.rename.mockResolvedValue({ data: { ...CERT, descr: 'Back door' } })
+    const r = run('certificate', { ...CERT, descr: 'Front door' }, ALL)
+    await act(async () => { await r.actions.find(a => a.id === 'rename').onClick() })
+    expect(svc.certs.rename).toHaveBeenCalledWith(4, 'Back door')
+    expect(notify.showPrompt.mock.calls[0][1].defaultValue).toBe('Front door')
+    expect(notify.showSuccess).toHaveBeenCalledWith('certificates.renameSuccess')
+  })
+
+  it('renews through the shared renewal prompt', async () => {
+    notify.showPrompt.mockResolvedValueOnce('')
+    svc.certs.renew.mockResolvedValue({ data: { id: 4 } })
+    const r = run('certificate', CERT, ALL)
+    await act(async () => { await r.actions.find(a => a.id === 'renew').onClick() })
+    expect(svc.certs.renew).toHaveBeenCalledWith(4, {})
+    expect(notify.showPrompt.mock.calls[0][1].title).toBe('certificates.renewCertificate')
+  })
+
+  it('sends a still-valid certificate to the revocation dialog before deleting it', async () => {
+    notify.showConfirm.mockResolvedValueOnce(false)
+    const r = run('certificate', CERT, ALL)
+    await act(async () => { await r.actions.find(a => a.id === 'delete').onClick() })
+    expect(notify.showConfirm.mock.calls[0][0]).toBe('certificates.deleteNeedsRevoke')
+    expect(svc.certs.delete).not.toHaveBeenCalled()
   })
 })
 
