@@ -166,7 +166,7 @@ The routes that can return a private key (certificate, CA, CSR, user-certificate
 
 ### A password given with a PEM export encrypts the private key
 
-A PEM export that carries the private key (`format: pem` with `include_key`, and a user certificate's PEM, which includes its key by default) ignored a `password` and returned the key in clear; with a password it now returns the key as an encrypted PKCS#8 block (`BEGIN ENCRYPTED PRIVATE KEY`), and without one nothing changes. The CA export now reads `include_key` as a JSON boolean (`true` or `false`, or `true`/`false` in the query string): a string such as `"false"` answered with the CA key and now answers 400.
+A PEM export that carries the private key (`format: pem` with `include_key`, and a user certificate's PEM, which includes its key by default) ignored a `password` and returned the key in clear; with a password it now returns the key as an encrypted PKCS#8 block (`BEGIN ENCRYPTED PRIVATE KEY`), and without one nothing changes. The CA export now reads `include_key` as a JSON boolean (`true` or `false`, or `true`/`false` in the query string): a string such as `"false"` answered with the CA key and now answers 400. In the query string of a `GET`, any value other than `true` or `false` (`0`, `1`, `no`, an empty value) answers 400 as well. A user certificate's PEM export now applies the export password rule: a password outside 8 to 256 characters answers 400. The key of an offline CA kept under its offline password is exported as stored: a password given with its `pem` or `key` export answers 409 (the `key` export answered 500), so export it without one.
 
 ### ACME: a DNS name in the CN alone counts against a policy
 

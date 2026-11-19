@@ -617,6 +617,9 @@ A PEM export that carries the private key returns it as an encrypted PKCS#8 bloc
 (`BEGIN ENCRYPTED PRIVATE KEY`) when a `password` is given, and in clear without one. `include_key`
 is a JSON boolean (`true` or `false` in the query string); any other value answers 400.
 
+The key of an offline CA kept under its offline password is exported as stored, already encrypted
+under that password: a `password` given with its `pem` or `key` export answers 409.
+
 ### Export All CAs
 ```http
 GET /api/v2/cas/export
