@@ -102,9 +102,11 @@ def _checked(view):
     key = _credential()
     if key is None:
         return None
+    gate = _gate_key(view)
     with _lock:
-        entry = _entries_for(_gate_key(view)).get(key)
-    if entry is None or entry['host'] != request.host:
+        entry = _entries_for(gate).get(key)
+    # Only a check made during this very gate counts, the memory emptied or not
+    if entry is None or entry['gate'] != gate or entry['host'] != request.host:
         return False
     # A key that expired since its check is refused as the database would refuse it
     if entry['expires_at'] is not None:

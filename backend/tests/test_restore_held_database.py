@@ -397,6 +397,40 @@ def test_an_api_key_that_expires_during_the_restore_reads_nothing(held_app):
     assert not restore_job.cancel_flagged(job_id)
 
 
+def test_a_check_made_during_a_previous_restore_is_not_used(held_app):
+    """Two restores one after the other: a check from the first one's gate never serves the
+    second, whatever the memory kept between them."""
+    app, path = held_app
+    first, second = _restore_job(app), None
+    user = _admin_user(app)
+    client = _client(app, user['username'])
+    gate = _gate(app, first).raise_gate()
+    try:
+        assert client.get(f'/api/v2/system/jobs/{first}').status_code == 200
+    finally:
+        gate.lift()
+    with app.app_context():
+        db.session.execute(T.delete().where(T.c.id == first))
+        db.session.commit()
+        db.session.remove()
+    second = _restore_job(app)
+    url = f'/api/v2/system/jobs/{second}'
+    gate = _gate(app, second).raise_gate()
+    try:
+        gate.set_view(phase=restore_job.APPLYING, held=True)
+        with holding(path):
+            seen = client.get(url)
+            cancel = client.post(f'{url}/cancel')
+    finally:
+        gate.lift()
+        with app.app_context():
+            db.session.execute(T.delete().where(T.c.id == second))
+            db.session.commit()
+    assert seen.status_code == 503, seen.data
+    assert cancel.status_code == 503, cancel.data
+    assert not restore_job.cancel_flagged(second)
+
+
 def test_a_session_without_the_right_reads_nothing(restore_held, viewer_client):
     app, job_id = restore_held.app, restore_held.job_id
     url = f'/api/v2/system/jobs/{job_id}'
