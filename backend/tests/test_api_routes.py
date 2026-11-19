@@ -35,8 +35,8 @@ def app():
     
     from app import create_app
     app = create_app('testing')
-    app.config['TESTING'] = True
-    app.config['WTF_CSRF_ENABLED'] = False
+    from tests.conftest import configure_test_app
+    configure_test_app(app)
     
     from tests.conftest import clear_admin_password_flag
     clear_admin_password_flag(app)

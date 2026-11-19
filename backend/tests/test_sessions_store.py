@@ -12,6 +12,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.header_guard import guarded
+
 from config.settings import session_store
 
 BACKEND = Path(__file__).resolve().parent.parent
@@ -89,8 +91,8 @@ def two_nodes(monkeypatch):
     node_a = None
     try:
         from app import create_app
-        node_a = create_app('testing')
-        node_b = create_app('testing')
+        node_a = guarded(create_app('testing'))
+        node_b = guarded(create_app('testing'))
         yield node_a, node_b
     finally:
         pg_app_harness._creating_session_app.pop()
@@ -145,7 +147,7 @@ def sql_store_app(monkeypatch, tmp_path):
     monkeypatch.setattr(TestingConfig, 'SESSION_TYPE', 'sqlalchemy')
     monkeypatch.setattr(TestingConfig, 'SESSION_SQLALCHEMY_TABLE', 'flask_sessions', raising=False)
     from app import create_app
-    application = create_app('testing')
+    application = guarded(create_app('testing'))
     application.config['PROPAGATE_EXCEPTIONS'] = False
     yield application
     from models import db
@@ -194,7 +196,7 @@ def test_the_store_never_waits_on_the_request_pool(monkeypatch, tmp_path):
     monkeypatch.setattr(TestingConfig, 'SESSION_SQLALCHEMY_TABLE', 'flask_sessions', raising=False)
     from app import create_app
     from models import db
-    app = create_app('testing')
+    app = guarded(create_app('testing'))
     app.config['PROPAGATE_EXCEPTIONS'] = False
     try:
         clear_admin_password_flag(app)
@@ -268,7 +270,7 @@ def test_a_purge_the_database_refuses_never_fails_the_request_it_rides(monkeypat
     monkeypatch.setattr(TestingConfig, 'SESSION_SQLALCHEMY_TABLE', 'flask_sessions', raising=False)
     monkeypatch.setattr(TestingConfig, 'SESSION_CLEANUP_N_REQUESTS', 1, raising=False)
     from app import create_app
-    app = create_app('testing')
+    app = guarded(create_app('testing'))
     app.config['PROPAGATE_EXCEPTIONS'] = False
     interface, attempts, slept = app.session_interface, [], []
 
@@ -304,7 +306,7 @@ def purging_app(monkeypatch, tmp_path):
     monkeypatch.setattr(TestingConfig, 'SESSION_SQLALCHEMY_TABLE', 'flask_sessions', raising=False)
     monkeypatch.setattr(TestingConfig, 'SESSION_CLEANUP_N_REQUESTS', 1, raising=False)
     from app import create_app
-    application = create_app('testing')
+    application = guarded(create_app('testing'))
     application.config['PROPAGATE_EXCEPTIONS'] = False
     yield application
     from models import db

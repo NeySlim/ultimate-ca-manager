@@ -38,6 +38,7 @@ from services.backup import container, manifest
 from services.backup.restore import RestorePlan, RestoreValidationError
 
 from tests.backup_v3 import as_v3, v3_header
+from tests.test_restore_sso_one_per_type import target  # noqa: F401  (SQLite and PostgreSQL)
 from tests.fresh_app import fresh_app_fixtures
 
 app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
@@ -438,6 +439,18 @@ def _date_as_text(data):
     data[SECTION] = [dict(TARGET, created_at='yesterday')]
 
 
+# Never copied into a refusal: an archived value can be a secret
+MARKER = 'hostile-corpus-value-marker'
+
+
+def _list_as_text(data):
+    data[SECTION] = [dict(TARGET, host=['deploy.example.test', MARKER])]
+
+
+def _object_as_text(data):
+    data[SECTION] = [dict(TARGET, host={'name': MARKER})]
+
+
 def _count_as_text(data):
     data['metadata']['sections'][SECTION] = 'three'
 
@@ -450,6 +463,19 @@ SHAPES = {
     'a list where the settings object belongs': (_configuration_as_list,
                                                  'configuration'),
     'text where a date belongs': (_date_as_text, SECTION),
+    'a list where text belongs': (_list_as_text, f'{SECTION}.host'),
+    'an object where text belongs': (_object_as_text, f'{SECTION}.host'),
+}
+CONTAINERS = {'list': _list_as_text, 'object': _object_as_text}
+
+# Columns the users, SSO and API key restorers query by before the generic write
+READ_BEFORE_THE_COLUMNS = {
+    'users.username': ('users', {'username': 'hc-user', 'email': 'hc@corpus.test',
+                                 'role': 'viewer', 'active': True, 'password_hash': 'x'}),
+    'sso_providers.name': ('sso_providers', {'name': 'hc-sso', 'provider_type': 'oauth2',
+                                             'oauth2_issuer': 'https://idp.corpus.test'}),
+    'api_keys.key_hash': ('api_keys', {'key_hash': 'a' * 64, 'name': 'hc-key',
+                                       'user_id': None, 'user_id_ref': None}),
 }
 
 
@@ -509,6 +535,90 @@ class TestASectionOfTheWrongTypeIsRefusedByName:
             after = _census()
         _assert_refused_cleanly(response, before, after)
         assert response.status_code == 400, (label, response.data)
+
+    @pytest.mark.parametrize('shape', sorted(CONTAINERS))
+    def test_a_list_or_an_object_in_a_text_column_is_named_not_copied(
+            self, app, auth_client, shape):
+        with app.app_context():
+            blob = _forged([SECTION], mutate=CONTAINERS[shape])
+            before = _census()
+
+        response = _restore(auth_client, blob)
+
+        with app.app_context():
+            after = _census()
+        _assert_refused_cleanly(response, before, after)
+        assert response.status_code == 400, response.data
+        message = _message(response)
+        assert f'{SECTION}.host' in message and MARKER not in message, message
+
+    @pytest.mark.parametrize('mode', ['merge', 'replace'])
+    @pytest.mark.parametrize('shape', sorted(CONTAINERS))
+    def test_a_list_or_an_object_in_a_text_column_writes_nothing_on_either_engine(
+            self, target, shape, mode):
+        from models.deploy import DeployTarget
+        blob = _forged([SECTION], mutate=CONTAINERS[shape])
+        before = _census()
+        with pytest.raises(RestoreValidationError) as refusal:
+            _service().restore_backup(blob, PASSWORD, mode=mode)
+        db.session.rollback()
+        assert f'{SECTION}.host' in str(refusal.value) and MARKER not in str(refusal.value)
+        assert _census() == before
+        assert DeployTarget.query.filter_by(name=TARGET['name']).count() == 0
+
+    @pytest.mark.parametrize('mode', ['merge', 'replace'])
+    @pytest.mark.parametrize('column', sorted(READ_BEFORE_THE_COLUMNS))
+    @pytest.mark.parametrize('shape', ['list', 'object'])
+    def test_a_container_in_a_column_a_dedicated_restorer_reads_writes_nothing(
+            self, target, column, shape, mode):
+        from models import User
+        from models.api_key import APIKey
+        from models.sso import SSOProvider
+        section, row = READ_BEFORE_THE_COLUMNS[column]
+        value = [MARKER] if shape == 'list' else {'v': MARKER}
+        payload = {section: [dict(row, **{column.split('.')[1]: value})]}
+        before = _census()
+        with pytest.raises(RestoreValidationError) as refusal:
+            _service()._restore_payload(payload, b'\0' * 32, mode)
+        db.session.rollback()
+        assert column in str(refusal.value) and MARKER not in str(refusal.value)
+        assert _census() == before
+        assert SSOProvider.query.count() == 0 and APIKey.query.count() == 0
+        assert User.query.count() == before['users']
+
+    @pytest.mark.parametrize('mode', ['merge', 'replace'])
+    @pytest.mark.parametrize('shape', ['list', 'object'])
+    def test_a_container_in_a_secret_property_writes_nothing(self, target, shape, mode):
+        # auth_token is a property over _auth_token: no column carries its archived name
+        from services.webhook_service import WebhookEndpoint
+        value = ['tok', MARKER] if shape == 'list' else {'v': MARKER}
+        payload = {'webhook_endpoints': [{'name': 'hc-hook', 'url': 'https://hook.corpus.test/x',
+                                          'auth_token': value}]}
+        before = _census()
+        with pytest.raises(RestoreValidationError) as refusal:
+            _service()._restore_payload(payload, b'\0' * 32, mode)
+        db.session.rollback()
+        message = str(refusal.value)
+        assert 'webhook_endpoints.auth_token' in message and MARKER not in message
+        assert _census() == before
+        assert WebhookEndpoint.query.filter_by(name='hc-hook').count() == 0
+
+    def test_a_list_as_a_username_answers_400_naming_the_column(self, app, auth_client):
+        def mutate(data):
+            data['users'] = [dict(READ_BEFORE_THE_COLUMNS['users.username'][1],
+                                  username=[MARKER])]
+        with app.app_context():
+            blob = _forged([SECTION], mutate=mutate)
+            before = _census()
+
+        response = _restore(auth_client, blob)
+
+        with app.app_context():
+            after = _census()
+        _assert_refused_cleanly(response, before, after)
+        assert response.status_code == 400, response.data
+        message = _message(response)
+        assert 'users.username' in message and MARKER not in message, message
 
     def test_a_count_that_is_not_a_number_is_refused_by_name(
             self, app, auth_client):

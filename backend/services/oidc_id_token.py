@@ -38,9 +38,13 @@ _OKP_CURVES = {'Ed25519': ed25519.Ed25519PublicKey, 'Ed448': ed448.Ed448PublicKe
 _MIN_RSA_BITS = 2048
 _SHOWN_ALGORITHM = re.compile(r'[A-Za-z0-9+._-]{1,32}')
 _CACHE_TTL_SECONDS = 3600
+# A cached document is read again ahead of its TTL at most once per window: a burst of forged
+# tokens costs one outbound request, not one per attempt
+_REFRESH_INTERVAL_SECONDS = 60
 _CLOCK_SKEW_SECONDS = 60
 _MAX_DOCUMENT_BYTES = 1024 * 1024
 _cache = {}
+_refreshed = {}  # cache key -> time.monotonic() of its last early reading
 _cache_lock = threading.Lock()
 
 
@@ -52,6 +56,7 @@ def clear_oidc_cache():
     """Clear cached discovery documents and JWKS (used on config changes/tests)."""
     with _cache_lock:
         _cache.clear()
+        _refreshed.clear()
 
 
 def _b64url_decode(value):
@@ -106,6 +111,17 @@ def _cache_put(key, value):
         _cache[key] = (time.monotonic() + _CACHE_TTL_SECONDS, value)
 
 
+def _may_refresh(key):
+    """Whether ``key`` may be read again ahead of its TTL now; counts the reading."""
+    now = time.monotonic()
+    with _cache_lock:
+        last = _refreshed.get(key)
+        if last is not None and now - last < _REFRESH_INTERVAL_SECONDS:
+            return False
+        _refreshed[key] = now
+        return True
+
+
 def _cache_invalidate(key):
     with _cache_lock:
         _cache.pop(key, None)
@@ -141,11 +157,12 @@ def _provider_cache_key(provider, kind, url):
     return (getattr(provider, 'id', None), kind, url)
 
 
-def _get_discovery(provider, issuer, verify):
+def _get_discovery(provider, issuer, verify, force_refresh=False):
+    """The discovery document; ``force_refresh`` reads it again (kept cached until that succeeds)."""
     discovery_url = f"{issuer.rstrip('/')}/.well-known/openid-configuration"
     key = _provider_cache_key(provider, 'discovery', discovery_url)
     cached = _cache_get(key)
-    if cached is not None:
+    if cached is not None and not (force_refresh and _may_refresh(key)):
         return cached
 
     document = _fetch_json(discovery_url, verify, 'OIDC discovery')
@@ -168,7 +185,7 @@ def _get_jwks(provider, issuer, verify, force_refresh=False):
         jwks_uri = _get_discovery(provider, issuer, verify)['jwks_uri']
 
     key = _provider_cache_key(provider, 'jwks', jwks_uri)
-    if force_refresh:
+    if force_refresh and _may_refresh(key):
         _cache_invalidate(key)
     else:
         cached = _cache_get(key)
@@ -277,19 +294,23 @@ def _shown(algorithm):
 def _check_discovery_algorithm(provider, issuer, verify, algorithm):
     """OIDC Discovery: the header algorithm is one the provider says it signs ID tokens with.
 
-    Read only where the discovery document is loaded anyway (no JWKS URI configured)."""
+    Read only where the discovery document is loaded anyway (no JWKS URI configured). The
+    caller has already refused an algorithm outside the product's list, whatever this one says."""
     if getattr(provider, 'oauth2_jwks_uri', None):
         return
-    supported = _get_discovery(provider, issuer, verify).get(
-        'id_token_signing_alg_values_supported')
-    if supported is None:
-        return
-    if not isinstance(supported, list):
-        raise OIDCValidationError(
-            'OIDC discovery has an invalid id_token_signing_alg_values_supported')
-    if algorithm not in supported:
-        raise OIDCValidationError(f'ID token signing algorithm {algorithm} is not listed '
-                                  'in the provider discovery document')
+    # An algorithm the provider added since the cached reading: read once more (_may_refresh)
+    for force_refresh in (False, True):
+        supported = _get_discovery(provider, issuer, verify, force_refresh=force_refresh).get(
+            'id_token_signing_alg_values_supported')
+        if supported is None:
+            return
+        if not isinstance(supported, list):
+            raise OIDCValidationError(
+                'OIDC discovery has an invalid id_token_signing_alg_values_supported')
+        if algorithm in supported:
+            return
+    raise OIDCValidationError(f'ID token signing algorithm {algorithm} is not listed '
+                              'in the provider discovery document')
 
 
 def _numeric_date(claims, name, required=False):

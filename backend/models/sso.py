@@ -15,10 +15,12 @@ class SSOProvider(db.Model):
     __tablename__ = 'pro_sso_providers'
     # One provider per type: every sign-in, return and restore finds "the provider of the type"
     __table_args__ = (db.Index('uq_pro_sso_providers_provider_type', 'provider_type', unique=True),)
+    # The only types the product creates, signs in with and restores
+    TYPES = ('saml', 'oauth2', 'ldap')
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
-    provider_type = db.Column(db.String(50), nullable=False)  # saml, oauth2, ldap
+    provider_type = db.Column(db.String(50), nullable=False)  # one of TYPES
     enabled = db.Column(db.Boolean, default=False)
     is_default = db.Column(db.Boolean, default=False)
     

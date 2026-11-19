@@ -61,8 +61,15 @@ NEEDS_REAL_MATERIAL: dict = {
 _SEEDING_PASSES = 6
 
 
+# Columns a restore checks against the product's list: a value of that list
+_LISTED = {('pro_sso_providers', 'provider_type'): 'oauth2'}
+
+
 def _value_for(column, index):
     """A plausible value for a required column, from its declared type."""
+    listed = _LISTED.get((getattr(column.table, 'name', None), column.name))
+    if listed is not None:
+        return listed
     declared = str(column.type).upper()
     if 'BOOL' in declared:
         return False

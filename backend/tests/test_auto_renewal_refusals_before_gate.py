@@ -150,40 +150,46 @@ def test_a_certificate_overtaken_or_gone_before_the_gate_is_skipped(
 
 
 def test_a_pair_under_two_policies_fails_before_the_gate_and_the_pass_goes_on(
-        app, create_ca, monkeypatch):
-    import services.auto_renewal_service as scheduler
-    from services.approval_gate import PairApprovalConflict
-    from types import SimpleNamespace
-    svc = scheduler.AutoRenewalService
-    ca = create_ca(cn='pair-conflict CA')
-    bad_id = _cert_row(app, ca['id'], 'bad-pair.example.test')
-    next_id = _cert_row(app, ca['id'], 'next-pair.example.test')
+        app, auth_client, create_ca, monkeypatch):
+    """Two real renewal policies, one per member's CA: the gate itself refuses the pair, before
+    any approval request or certificate is written, and the next certificate is renewed."""
+    from services.auto_renewal_service import AutoRenewalService as svc
+    from tests.test_related_certificates_pair import (
+        _approval_policy, _ca_id_of, _move_to_new_ca, _pair, _pending)
+    a, b = _pair(auth_client, create_ca, 'bad-pair.example.test')
+    p1 = _approval_policy(app, _ca_id_of(app, a['id']), ['renewal'])
+    p2 = _approval_policy(app, _move_to_new_ca(app, create_ca, b['id'], 'pair-conflict CA2'), ['renewal'])
+    free = create_ca(cn='pair-conflict free CA')
+    next_id = _cert_row(app, free['id'], 'next-pair.example.test')
     reasons = []
     monkeypatch.setattr(svc, '_log_failure', staticmethod(
         lambda cert_id, cn, reason: reasons.append((cert_id, reason))))
     monkeypatch.setattr(svc, '_send_failure_notification', staticmethod(lambda stats: None))
     monkeypatch.setattr(svc, '_publish_crls', staticmethod(lambda carefs: None))
-    conflict = PairApprovalConflict(SimpleNamespace(name='one'), SimpleNamespace(name='other'))
-
-    def held(cert, already_queued=False):
-        if cert.id == bad_id:
-            raise conflict
-        return False
-
-    monkeypatch.setattr(svc, '_held_for_approval', staticmethod(held))
     try:
         with app.app_context():
+            certificates = db.session.query(db.func.count(Certificate.id)).scalar()
+            requests = ApprovalRequest.query.count()
             previous = dict(svc.get_renewal_config())
             monkeypatch.setattr(svc, 'get_certificates_for_renewal', staticmethod(
-                lambda: [db.session.get(Certificate, i) for i in (bad_id, next_id)]))
+                lambda: [db.session.get(Certificate, i) for i in (a['id'], next_id)]))
             svc.set_renewal_config({**previous, 'enabled': True})
             try:
                 stats = svc.run_auto_renewal()
             finally:
                 svc.set_renewal_config(previous)
-            assert (db.session.get(Certificate, next_id).renewed_times or 0) == 1
+            db.session.expire_all()
+            assert [db.session.get(Certificate, i).renewed_times or 0
+                    for i in (a['id'], b['id'], next_id)] == [0, 0, 1]
+            # A renewal rewrites its row in place: no certificate row is added
+            assert db.session.query(db.func.count(Certificate.id)).scalar() == certificates
+            assert ApprovalRequest.query.count() == requests
             db.session.remove()
-        assert (stats['renewed'], stats['failed'], stats['skipped']) == (1, 1, 0), stats
-        assert reasons == [(bad_id, str(conflict))]
+        assert (stats['renewed'], stats['failed'], stats['queued']) == (1, 1, 0), stats
+        assert (_pending(app, p1), _pending(app, p2)) == (0, 0)
+        [(failed_id, reason)] = reasons
+        assert failed_id == a['id'] and 'different policies' in reason, reasons
     finally:
-        _drop_rows(app, bad_id, next_id)
+        _drop_policy(app, p1)
+        _drop_policy(app, p2)
+        _drop_rows(app, next_id)

@@ -283,14 +283,12 @@ NOT_TEXT_FIELDS = [('oauth2', 'oauth2_issuer'), ('saml', 'saml_entity_id'),
 NOT_TEXT = {'number': 12345, 'list': ['https://a.example'], 'object': {'url': 'https://a.example'}}
 
 
-# A replacement writes the archived row: a list or an object then fails in the text column
-# (another defect), so only a number goes that far
-@pytest.mark.parametrize('value, mode', [(v, 'merge') for v in sorted(NOT_TEXT)]
-                         + [('number', 'replace')])
+# A list or an object is refused before the plan (test_a_container_in_an_archived_provider_…)
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
 @pytest.mark.parametrize('kind, field', NOT_TEXT_FIELDS)
-def test_an_archived_idp_field_that_is_not_text_names_no_idp(target, kind, field, value, mode):
+def test_an_archived_idp_field_that_is_not_text_names_no_idp(target, kind, field, mode):
     corp = _instance(kind)
-    archive = _archive('3.0', kind, {**IDPS[kind][0], field: NOT_TEXT[value]}, 'kate-sub-b')
+    archive = _archive('3.0', kind, {**IDPS[kind][0], field: NOT_TEXT['number']}, 'kate-sub-b')
     results = _restore(archive, mode)
     db.session.expire_all()
     # No IdP is never the IdP here: kate's account at A never follows the archived row
@@ -307,7 +305,7 @@ def test_an_archived_idp_field_that_is_not_text_names_no_idp(target, kind, field
         assert (None, 'kate-sub', a) in _rows('kate')
 
 
-NOT_TEXT_TYPES = {**NOT_TEXT, 'zero': 0, 'false': False, 'empty-list': [], 'empty-object': {}}
+NOT_TEXT_TYPES = {'number': 12345, 'zero': 0, 'false': False}
 
 
 @pytest.mark.parametrize('mode', ['merge', 'replace'])
@@ -324,14 +322,76 @@ def test_an_archived_provider_type_that_is_not_text_is_refused(target, value, mo
     assert _rows('kate') == [(corp, 'kate-sub', None)]
 
 
-@pytest.mark.parametrize('value', [None, ''])
-def test_an_archived_provider_type_left_empty_is_still_oauth2(target, value):
-    corp = _instance('oauth2')
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+def test_an_archived_provider_without_a_type_is_written_oauth2(target, mode):
     archive = _archive('3.0', 'oauth2', IDPS['oauth2'][0], 'kate-sub')
-    archive['sso_providers'][0]['provider_type'] = value
-    _restore(archive, 'merge')
+    del archive['sso_providers'][0]['provider_type']
+    _restore(archive, mode)
     db.session.expire_all()
-    assert db.session.get(SSOProvider, corp).provider_type == 'oauth2'
+    assert [(p.name, p.provider_type) for p in SSOProvider.query.all()] == [('corp', 'oauth2')]
+
+
+OUT_OF_LIST_TYPES = {'none': None, 'empty': '', 'spaces': '  ', 'unknown': 'x',
+                     'upper-case': 'OAUTH2', 'padded': ' oauth2', 'oidc': 'oidc'}
+
+
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+@pytest.mark.parametrize('value', sorted(OUT_OF_LIST_TYPES))
+def test_an_archived_provider_type_out_of_the_list_is_refused(target, value, mode):
+    from services.backup.errors import BackupSchemaError
+    here = SSOProvider(name='other', provider_type='oauth2', **IDPS['oauth2'][2])
+    db.session.add(here)
+    db.session.commit()
+    archive = _archive('3.0', 'oauth2', IDPS['oauth2'][0], 'kate-sub')
+    archive['sso_providers'][0]['provider_type'] = OUT_OF_LIST_TYPES[value]
+    with pytest.raises(BackupSchemaError) as refused:
+        _restore(archive, mode)
+    message = str(refused.value)
+    assert "'corp'" in message and repr(OUT_OF_LIST_TYPES[value]) in message
+    assert 'Nothing has been changed' in message
+    db.session.rollback()
+    assert [(p.name, p.provider_type) for p in SSOProvider.query.all()] == [('other', 'oauth2')]
+    assert User.query.count() == 0
+
+
+UNNAMED = {'number': 123, 'none': None, 'empty': '', 'spaces': '  ', 'false': False}
+
+
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+@pytest.mark.parametrize('name', sorted(UNNAMED))
+def test_an_archived_provider_without_a_text_name_is_refused(target, name, mode):
+    from services.backup.errors import BackupSchemaError
+    here = SSOProvider(name='other', provider_type='oauth2', **IDPS['oauth2'][2])
+    db.session.add(here)
+    db.session.commit()
+    archive = _archive('3.0', 'oauth2', IDPS['oauth2'][0], 'kate-sub')
+    archive['sso_providers'][0].update(name=UNNAMED[name], provider_type='x')
+    with pytest.raises(BackupSchemaError) as refused:
+        _restore(archive, mode)
+    assert 'name' in str(refused.value) and 'Nothing has been changed' in str(refused.value)
+    db.session.rollback()
+    assert [(p.name, p.provider_type) for p in SSOProvider.query.all()] == [('other', 'oauth2')]
+    assert User.query.count() == 0
+
+
+CONTAINER_COLUMNS = ['name', 'provider_type'] + [field for _kind, field in NOT_TEXT_FIELDS]
+
+
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+@pytest.mark.parametrize('shape', ['list', 'object', 'empty-list', 'empty-object'])
+@pytest.mark.parametrize('column', CONTAINER_COLUMNS)
+def test_a_container_in_an_archived_provider_column_is_refused(target, column, shape, mode):
+    from services.backup.restore import RestoreValidationError
+    corp = _instance('oauth2')
+    archive = _archive('3.0', 'oauth2', IDPS['oauth2'][1], 'kate-sub-b')
+    archive['sso_providers'][0][column] = {'list': ['corp'], 'object': {'v': 'corp'},
+                                           'empty-list': [], 'empty-object': {}}[shape]
+    with pytest.raises(RestoreValidationError) as refused:
+        _restore(archive, mode)
+    assert f'sso_providers.{column}' in str(refused.value)
+    db.session.rollback()
+    assert [p.id for p in SSOProvider.query.all()] == [corp]
+    assert _rows('kate') == [(corp, 'kate-sub', None)]
 
 
 @pytest.mark.parametrize('kind, field', NOT_TEXT_FIELDS)

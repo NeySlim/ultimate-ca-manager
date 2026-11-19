@@ -29,7 +29,8 @@ from .restore import RestorePlan, single_transaction
 from .restore.transaction import checkpoint, expect_rows, tick, ticking
 from .manifest import SECTIONS
 from .section_store import SectionStore, section_kind, section_length
-from .restore.apply import apply_columns, apply_section, relink_references
+from .restore.apply import (apply_columns, apply_section, refuse_containers_in_columns,
+                            relink_references)
 from .restore.names import rename_clashing_rows
 from .restore.orders import keep_newer_orders
 from .restore.sso_providers import refuse_archived_shared_types, settle_provider_types
@@ -349,6 +350,7 @@ class RestoreCoreMixin:
         # holding fewer rows than the archive says it holds, must not be
         # discovered halfway through a restore.
         self._check_payload_schema(backup_data)
+        refuse_containers_in_columns(backup_data)
         self._check_serial_duplicates(backup_data)
         upgrade_archived_permissions(backup_data)
         windows_warnings: List[str] = []

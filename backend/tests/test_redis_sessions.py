@@ -17,6 +17,8 @@ from pathlib import Path
 import pyotp
 import pytest
 
+from tests.header_guard import guarded
+
 from models import SystemConfig, User, db
 from tests.redis_support import RedisServer, guard_hits, needs_redis, sandbox_env
 
@@ -58,7 +60,7 @@ def redis_apps(monkeypatch, tmp_path, url, count=2):
     monkeypatch.setattr(events, '_message_queue', lambda _app: None)
     from app import create_app
     from tests.conftest import clear_admin_password_flag
-    nodes = [create_app('testing') for _ in range(count)]
+    nodes = [guarded(create_app('testing')) for _ in range(count)]
     for node in nodes:
         node.config['PROPAGATE_EXCEPTIONS'] = False
     clear_admin_password_flag(nodes[0])

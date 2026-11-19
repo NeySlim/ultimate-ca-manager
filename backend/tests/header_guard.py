@@ -30,3 +30,9 @@ def guard_latin1_headers(application):
         outer.app = Latin1HeaderGuard(outer.app)
     else:
         application.wsgi_app = Latin1HeaderGuard(outer)
+
+
+def guarded(application):
+    """``application`` with the guard, its configuration otherwise left as the test set it."""
+    guard_latin1_headers(application)
+    return application
