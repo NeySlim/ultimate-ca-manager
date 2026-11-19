@@ -115,6 +115,10 @@ export default function SsoOAuth2Fields({
               helperText={t('sso.oidcRoleTenantsHelp')}
             />
           )}
+          {/* With role rules, a tenant whose roles are not honoured is refused at sign-in */}
+          {hasTenants && hasRoleRules(formData.role_mapping) && !(formData.oauth2_role_tenants || '').trim() && (
+            <p className="text-xs text-status-warning">{t('sso.oidcRoleTenantsNoneWarning')}</p>
+          )}
           {hasTenants && !formData.id_token_verify && (
             <p className="text-xs text-status-warning">{t('sso.oidcTenantsNeedVerify')}</p>
           )}
