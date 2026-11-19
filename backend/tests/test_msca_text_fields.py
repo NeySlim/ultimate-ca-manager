@@ -61,3 +61,9 @@ def test_a_null_field_of_another_method_is_ignored_on_update(app, auth_client, k
     r = _send(auth_client, 'put', f'{BASE}/{kerberos_id}', {'username': None, 'client_cert_pem': None,
                                                             'name': f'krb-upd-{uuid.uuid4().hex[:8]}'})
     assert r.status_code == 200, r.data
+
+
+def test_the_fields_checked_are_those_of_the_method_the_update_sets(app, auth_client, kerberos_id):
+    r = _send(auth_client, 'put', f'{BASE}/{kerberos_id}', {'auth_method': 'certificate', 'client_cert_pem': None})
+    assert r.status_code == 400, r.data
+    assert 'client_cert_pem' in get_json(r)['message']
