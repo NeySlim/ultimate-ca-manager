@@ -17,6 +17,8 @@ import { fetchPages } from '../../../lib/fetchAllPages'
 import { FilterSelect } from '../Select'
 import { MultiSelectFilter } from '../MultiSelectFilter'
 import { FilterChips } from '../FilterChips'
+import { ListTable } from './ListTable'
+import '../../list/list.css'
 
 const EXPORT_MAX_ROWS = 10000
 const EXPORT_PAGE_SIZE = 100
@@ -95,11 +97,23 @@ export function ResponsiveDataTable({
   // Density toggle - when provided, enables density toggle button
   densityStorageKey, // localStorage key for density preference (e.g. 'ucm-certs-density')
   
+  // List template (all optional): variant="list" draws the flat toolbar, the content-sized
+  // table with one `grow` column, rows of one height, a checkbox per row beside a row click
+  // that still opens, the row actions and an opening chevron, and the worded footer.
+  // Column flags it reads: grow, maxWidth, muted, small, title(row); defaultHidden works in both.
+  variant = 'default',
+  rowLabel, // (row) => string: names the row in the labels of its checkbox and actions
+  rangeLabel, // ({ start, end, total }) => string: "1–25 of 276 certificates"
+  tableLabel, // accessible name of the table
+
   // Custom class
   className
 }) {
   const { isMobile, isDesktop, isTouch } = useMobile()
   const { t } = useTranslation()
+  const list = variant === 'list'
+  // The list template draws the desktop; phones keep the card list
+  const flat = list && !isMobile
   
   // Density state (persisted if key provided)
   const [density, setDensity] = useState(() => {
@@ -201,15 +215,17 @@ export function ResponsiveDataTable({
   const [showColumnMenu, setShowColumnMenu] = useState(false)
   const columnMenuRef = useRef(null)
   const [hiddenColumns, setHiddenColumns] = useState(() => {
+    // Until the user chooses, the columns flagged defaultHidden stay out
+    const initial = columns.filter(col => col.defaultHidden).map(col => col.key)
     if (columnStorageKey) {
       try {
         const saved = localStorage.getItem(columnStorageKey)
-        return saved ? JSON.parse(saved) : []
+        return saved ? JSON.parse(saved) : initial
       } catch {
-        return []
+        return initial
       }
     }
-    return []
+    return initial
   })
   
   // Save column preferences
@@ -619,10 +635,11 @@ export function ResponsiveDataTable({
   // Empty state - but ALWAYS show toolbar if there are filters to clear
   if (!loading && sortedData.length === 0) {
     return (
-      <div className={cn('flex flex-col h-full', className)}>
+      <div className={cn(flat ? 'lv-workspace' : 'flex flex-col h-full', className)}>
         {/* Always show toolbar when there are filters or actions */}
         {(searchable || toolbarFilters || toolbarActions || columnStorageKey || filterPresetsKey) && (
           <SearchBar
+            flat={flat}
             value={searchValue}
             onChange={setSearchValue}
             placeholder={searchPlaceholder}
@@ -656,7 +673,7 @@ export function ResponsiveDataTable({
         )}
         
         {/* Empty state content */}
-        <div className="flex-1 flex flex-col items-center justify-center py-16 px-4">
+        <div className={cn('flex-1 flex flex-col items-center justify-center py-16 px-4', flat && 'lv-table-box')}>
           {EmptyIcon && (
             <div className="w-16 h-16 rounded-2xl bg-bg-tertiary flex items-center justify-center mb-4">
               <EmptyIcon size={32} className="text-text-secondary" />
@@ -684,11 +701,16 @@ export function ResponsiveDataTable({
     )
   }
   
+  const rangeOf = ({ start, end, total }) => (
+    rangeLabel ? rangeLabel({ start, end, total }) : t('table.range', { start, end, total })
+  )
+
   return (
-    <div className={cn('flex flex-col h-full', className)}>
+    <div className={cn(flat ? 'lv-workspace' : 'flex flex-col h-full', className)}>
       {/* SEARCH BAR + TOOLBAR */}
       {(searchable || toolbarFilters || toolbarActions || columnStorageKey || filterPresetsKey) && (
         <SearchBar
+          flat={flat}
           value={searchValue}
           onChange={setSearchValue}
           placeholder={searchPlaceholder}
@@ -734,17 +756,28 @@ export function ResponsiveDataTable({
 
       {/* ACTIVE FILTER CHIPS */}
       {hasActiveFilters && filterChipsArray.length > 0 && (
-        <div className="px-1 pb-1">
+        <div className={flat ? undefined : 'px-1 pb-1'}>
           <FilterChips
             filters={filterChipsArray}
             onRemove={handleRemoveChip}
             onClearAll={handleClearAllChips}
+            className={flat ? 'lv-chips' : undefined}
           />
         </div>
       )}
       
       {/* BULK ACTION BAR */}
-      {multiSelect && selectionCount > 0 && bulkActions && (
+      {flat && multiSelect && selectionCount > 0 && bulkActions && (
+        <div className="lv-batch" role="group" aria-label={t('table.selection')}>
+          <strong>{t('table.selectedCount', { count: selectionCount })}</strong>
+          {bulkActions}
+          <span className="lv-spacer" />
+          <button type="button" className="lv-btn is-quiet" onClick={() => onSelectionChange(new Set())}>
+            {t('table.clearSelection')}
+          </button>
+        </div>
+      )}
+      {!flat && multiSelect && selectionCount > 0 && bulkActions && (
         <div className="flex items-center gap-3 px-4 py-2 bg-accent-primary-op10 border border-accent-primary-op20 rounded-lg mx-1 mb-1">
           <span className="text-sm font-medium text-accent-primary">
             {selectionCount} {t('table.selected')}
@@ -777,7 +810,39 @@ export function ResponsiveDataTable({
           selectedIds={selectedIds}
           onToggleRow={handleToggleRow}
           onToggleAll={() => handleToggleAll(paginatedData)}
+          rowClickOpens={list}
         />
+      ) : list ? (
+        <div className="lv-table-box">
+          <ListTable
+            data={paginatedData}
+            columns={visibleColumns}
+            selectedId={selectedId}
+            onRowClick={onRowClick}
+            rowActions={rowActions}
+            rowLabel={rowLabel}
+            label={tableLabel}
+            sort={sort}
+            onSort={handleSort}
+            sortable={sortable}
+            loading={loading}
+            density={density}
+            columnWidths={columnWidths}
+            setColumnWidth={setColumnWidth}
+            resetColumnWidth={resetColumnWidth}
+            multiSelect={multiSelect}
+            selectedIds={selectedIds}
+            onToggleRow={handleToggleRow}
+            onToggleAll={() => handleToggleAll(paginatedData)}
+          />
+          {paginationProps && sortedData.length > 0 ? (
+            <PaginationBar {...paginationProps} isMobile={false} flat range={rangeOf} />
+          ) : sortedData.length > 0 && (
+            <footer className="lv-footer">
+              <span>{rangeOf({ start: 1, end: sortedData.length, total: sortedData.length })}</span>
+            </footer>
+          )}
+        </div>
       ) : (
         <DesktopTable
           data={paginatedData}
@@ -804,10 +869,11 @@ export function ResponsiveDataTable({
       )}
       
       {/* PAGINATION */}
-      {paginationProps && sortedData.length > 0 && (
+      {!flat && paginationProps && sortedData.length > 0 && (
         <PaginationBar
           {...paginationProps}
           isMobile={isMobile}
+          range={rangeOf}
         />
       )}
     </div>
@@ -819,6 +885,7 @@ export function ResponsiveDataTable({
 // =============================================================================
 
 function SearchBar({ 
+  flat = false,
   value, 
   onChange, 
   placeholder, 
@@ -863,14 +930,42 @@ function SearchBar({
   cycleDensity
 }) {
   const { t } = useTranslation()
+  // Toolbar button: flat and labelled in the list template, the compact square elsewhere
+  const tool = (active) => (flat ? 'lv-btn' : cn(
+    'flex items-center gap-1.5 h-7 px-2 rounded-md border text-xs font-medium transition-colors',
+    active
+      ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary'
+      : 'border-border bg-bg-primary text-text-secondary hover:text-text-primary hover:border-border-hover'
+  ))
+  const shownFilters = (filters || []).filter(f => !f.hideControl)
   return (
-    <div className={cn(
+    <div className={flat ? 'shrink-0' : cn(
       'shrink-0 border-b border-border-op30',
       isMobile ? 'px-3 py-2 bg-secondary-op10' : 'px-4 py-2 bg-secondary-op30'
     )}>
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className={flat ? 'lv-toolbar' : 'flex items-center gap-2 flex-wrap'}>
+        {/* List template: a full-width field whose placeholder names what is searched */}
+        {searchable && flat && (
+          <label className="lv-search">
+            <MagnifyingGlass size={16} aria-hidden="true" />
+            <span className="sr-only">{t('common.search')}</span>
+            <input
+              type="search"
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={placeholder}
+              autoComplete="off"
+              spellCheck={false}
+            />
+            {value && (
+              <button type="button" className="lv-search-clear" aria-label={t('common.clear')} onClick={() => onChange('')}>
+                <X size={14} weight="bold" aria-hidden="true" />
+              </button>
+            )}
+          </label>
+        )}
         {/* Search input - premium styling on mobile */}
-        {searchable && (
+        {searchable && !flat && (
           <div className={cn(
             "relative group flex-1 min-w-0",
             isMobile && "search-bar-premium"
@@ -915,9 +1010,9 @@ function SearchBar({
         )}
         
         {/* Filters (desktop only) */}
-        {!isMobile && filters && filters.length > 0 && (
-          <div className="flex items-center gap-2 shrink-0">
-            {filters.map((filter) => {
+        {!isMobile && shownFilters.length > 0 && (
+          <div className={flat ? 'lv-tools' : 'flex items-center gap-2 shrink-0'}>
+            {shownFilters.map((filter) => {
               // Boolean toggle filter -- a checkbox-style pill for the
               // "show/hide this class of row" case, where a multiSelect with
               // one option would read as a filter the user must unset rather
@@ -995,6 +1090,7 @@ function SearchBar({
                     value={filter.value || []}
                     onChange={filter.onChange}
                     placeholder={filter.placeholder || t('common.all')}
+                    className={flat ? 'lv-filter' : undefined}
                   />
                 )
               }
@@ -1013,20 +1109,20 @@ function SearchBar({
           </div>
         )}
         
+        {flat && <span className="lv-divider" aria-hidden="true" />}
+
         {/* Column Selector (desktop only) */}
         {!isMobile && columns && columns.length > 0 && (
           <div className="relative shrink-0" ref={columnMenuRef}>
             <button
+              type="button"
               onClick={() => setShowColumnMenu?.(!showColumnMenu)}
-              className={cn(
-                'flex items-center gap-1.5 h-7 px-2 rounded-md border text-xs font-medium transition-colors',
-                showColumnMenu
-                  ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary'
-                  : 'border-border bg-bg-primary text-text-secondary hover:text-text-primary hover:border-border-hover'
-              )}
+              className={tool(showColumnMenu)}
               title={t('table.customizeColumns')}
+              aria-expanded={flat ? Boolean(showColumnMenu) : undefined}
             >
-              <Columns size={14} />
+              <Columns size={flat ? 16 : 14} aria-hidden={flat ? 'true' : undefined} />
+              {flat && <span>{t('table.columns')}</span>}
             </button>
             
             {/* Dropdown menu */}
@@ -1084,13 +1180,13 @@ function SearchBar({
             type="button"
             onClick={cycleDensity}
             aria-label={t('table.density')}
-            className={cn(
+            className={flat ? 'lv-btn is-icon' : cn(
               'flex items-center gap-1.5 h-7 px-2 rounded-md border text-xs font-medium transition-colors shrink-0',
               'border-border bg-bg-primary text-text-secondary hover:text-text-primary hover:border-border-hover'
             )}
             title={`${t('table.density')}: ${t(`table.${density}`)}`}
           >
-            <Rows size={14} weight={density === 'comfortable' ? 'fill' : density === 'default' ? 'duotone' : 'regular'} />
+            <Rows size={flat ? 16 : 14} weight={density === 'comfortable' ? 'fill' : density === 'default' ? 'duotone' : 'regular'} />
           </button>
         )}
         
@@ -1098,16 +1194,14 @@ function SearchBar({
         {!isMobile && filterPresetsKey && (
           <div className="relative shrink-0" ref={presetsMenuRef}>
             <button
+              type="button"
               onClick={() => setShowPresetsMenu?.(!showPresetsMenu)}
-              className={cn(
-                'flex items-center gap-1.5 h-7 px-2 rounded-md border text-xs font-medium transition-colors',
-                showPresetsMenu
-                  ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary'
-                  : 'border-border bg-bg-primary text-text-secondary hover:text-text-primary hover:border-border-hover'
-              )}
+              className={tool(showPresetsMenu)}
               title={t('table.filterPresets')}
+              aria-label={flat ? t('table.filterPresets') : undefined}
+              aria-expanded={flat ? Boolean(showPresetsMenu) : undefined}
             >
-              <BookmarkSimple size={14} />
+              <BookmarkSimple size={flat ? 16 : 14} />
               {filterPresets?.length > 0 && (
                 <span className="text-2xs bg-accent-primary-op20 text-accent-primary px-1 rounded">
                   {filterPresets.length}
@@ -1215,16 +1309,14 @@ function SearchBar({
         {!isMobile && exportEnabled && dataCount > 0 && (
           <div className="relative shrink-0" ref={exportMenuRef}>
             <button
+              type="button"
               onClick={() => setShowExportMenu?.(!showExportMenu)}
-              className={cn(
-                'flex items-center gap-1.5 h-7 px-2 rounded-md border text-xs font-medium transition-colors',
-                showExportMenu
-                  ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary'
-                  : 'border-border bg-bg-primary text-text-secondary hover:text-text-primary hover:border-border-hover'
-              )}
+              className={flat ? 'lv-btn is-icon' : tool(showExportMenu)}
               title={t('table.exportData')}
+              aria-label={flat ? t('table.exportData') : undefined}
+              aria-expanded={flat ? Boolean(showExportMenu) : undefined}
             >
-              <Export size={14} />
+              <Export size={flat ? 16 : 14} />
             </button>
             
             {/* Export dropdown */}
@@ -1624,8 +1716,12 @@ function MobileCardList({
   multiSelect,
   selectedIds,
   onToggleRow,
-  onToggleAll
+  onToggleAll,
+  // List template: the checkbox selects, a tap on the card still opens it
+  rowClickOpens = false
 }) {
+  const { t } = useTranslation()
+  const tapSelects = multiSelect && !rowClickOpens
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center py-12">
@@ -1648,7 +1744,7 @@ function MobileCardList({
             onChange={onToggleAll}
             className="w-4 h-4 rounded border-border text-accent-primary cursor-pointer"
           />
-          <span className="text-xs text-text-secondary">Select all</span>
+          <span className="text-xs text-text-secondary">{rowClickOpens ? t('table.selectPage') : 'Select all'}</span>
         </div>
       )}
       {/* Gradient dividers instead of flat lines */}
@@ -1672,8 +1768,8 @@ function MobileCardList({
                 primaryCol={primaryCol}
                 secondaryCol={secondaryCol}
                 tertiaryCol={tertiaryCol}
-                isSelected={multiSelect ? selectedIds?.has(row.id) : selectedId === row.id}
-                onClick={() => multiSelect ? onToggleRow(row.id) : onRowClick?.(row)}
+                isSelected={tapSelects ? selectedIds?.has(row.id) : selectedId === row.id}
+                onClick={() => tapSelects ? onToggleRow(row.id) : onRowClick?.(row)}
                 actions={rowActions?.(row)}
               />
             </div>
@@ -1801,11 +1897,42 @@ function MobileCardRow({
 // PAGINATION BAR
 // =============================================================================
 
-function PaginationBar({ page, total, perPage, onChange, onPerPageChange, isMobile }) {
+function PaginationBar({ page, total, perPage, onChange, onPerPageChange, isMobile, flat = false, range }) {
+  const { t } = useTranslation()
   const totalPages = Math.ceil(total / perPage)
   const start = (page - 1) * perPage + 1
   const end = Math.min(page * perPage, total)
-  
+  const perPageSelect = onPerPageChange && (
+    <FilterSelect
+      value={String(perPage)}
+      onChange={(val) => onPerPageChange(Number(val))}
+      options={[10, 25, 50, 100].map(n => ({ value: String(n), label: t('table.perPage', { size: n }) }))}
+      placeholder={t('table.perPage', { size: perPage })}
+      size="sm"
+    />
+  )
+
+  // List template: the range in words, the page size, the pages
+  if (flat) {
+    return (
+      <footer className="lv-footer">
+        <span>{range({ start, end, total })}</span>
+        <div className="lv-footer-controls">
+          {perPageSelect}
+          <button type="button" className="lv-btn is-small is-icon" aria-label={t('table.previousPage')}
+            onClick={() => onChange(page - 1)} disabled={page <= 1}>
+            <CaretLeft size={14} aria-hidden="true" />
+          </button>
+          <span>{page} / {totalPages}</span>
+          <button type="button" className="lv-btn is-small is-icon" aria-label={t('table.nextPage')}
+            onClick={() => onChange(page + 1)} disabled={page >= totalPages}>
+            <CaretRight size={14} aria-hidden="true" />
+          </button>
+        </div>
+      </footer>
+    )
+  }
+
   return (
     <div className={cn(
       'shrink-0 border-t border-border bg-secondary-op30',
@@ -1817,7 +1944,7 @@ function PaginationBar({ page, total, perPage, onChange, onPerPageChange, isMobi
         'text-text-secondary font-medium',
         isMobile ? 'text-sm' : 'text-xs'
       )}>
-        <span className="text-text-primary">{start}-{end}</span> of <span className="text-text-primary">{total}</span>
+        {range({ start, end, total })}
       </p>
       
       {/* Controls */}
@@ -1826,20 +1953,13 @@ function PaginationBar({ page, total, perPage, onChange, onPerPageChange, isMobi
         isMobile ? 'gap-2' : 'gap-1.5'
       )}>
         {/* Per page selector (desktop only) */}
-        {!isMobile && onPerPageChange && (
-          <FilterSelect
-            value={String(perPage)}
-            onChange={(val) => onPerPageChange(Number(val))}
-            options={[10, 25, 50, 100].map(n => ({ value: String(n), label: `${n}/page` }))}
-            placeholder={`${perPage}/page`}
-            size="sm"
-          />
-        )}
+        {!isMobile && perPageSelect}
         
         {/* Prev button */}
         <button
           onClick={() => onChange(page - 1)}
           disabled={page <= 1}
+          aria-label={t('table.previousPage')}
           className={cn(
             'rounded-lg flex items-center justify-center',
             'border border-border bg-bg-primary',
@@ -1867,6 +1987,7 @@ function PaginationBar({ page, total, perPage, onChange, onPerPageChange, isMobi
         <button
           onClick={() => onChange(page + 1)}
           disabled={page >= totalPages}
+          aria-label={t('table.nextPage')}
           className={cn(
             'rounded-lg flex items-center justify-center',
             'border border-border bg-bg-primary',

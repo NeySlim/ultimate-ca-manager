@@ -18,7 +18,7 @@
  * DESKTOP: Dense, hover states, keyboard shortcuts, inline panels
  * MOBILE: Touch targets 44px+, swipe gestures, full-screen panels
  */
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useId } from 'react'
 import { X, ArrowLeft, Question, CaretRight } from '@phosphor-icons/react'
 import { useTranslation } from 'react-i18next'
 import { useMobile } from '../../../contexts'
@@ -26,6 +26,9 @@ import { cn } from '../../../lib/utils'
 import { UnifiedPageHeader } from '../UnifiedPageHeader'
 import { FilterSelect } from '../Select'
 import { FloatingHelpPanel } from '../FloatingHelpPanel'
+import { PageHead } from '../../list/PageHead'
+import { StateTabs } from '../../list/StateTabs'
+import { viewTabId } from '../../list/viewTabId'
 
 // =============================================================================
 // PANEL WIDTH CONSTANTS
@@ -58,6 +61,17 @@ export function ResponsiveLayout({
   
   // Actions (top-right buttons)
   actions,
+
+  // List template (all optional): passing `total`, `intent` or `views` swaps the header for the
+  // page head (title, total in words, intent, actions; no Help button, the top bar has it)
+  total, // e.g. "276 certificates"
+  intent, // one sentence saying what the page is for
+  // State tabs with counters, in place of the stats bar: [{ id, label, count, tone }]
+  views,
+  activeView, // id of the selected view; null when no single view matches
+  onViewChange, // (id) => void
+  viewsLabel, // accessible name of the tab list
+  viewsAside, // ReactNode at the right end of the tab row
   
   // Stats bar (optional - array of { icon, label, value, variant, filterValue })
   stats,
@@ -105,6 +119,10 @@ export function ResponsiveLayout({
   
   // Show inline header when sidebar is visible (matches AppShell's breakpoint)
   const showInlineHeader = screenWidth >= 768
+  const listPage = total !== undefined || intent !== undefined || views !== undefined
+  const hasViews = Array.isArray(views) && views.length > 0
+  const viewsId = useId()
+  const viewsPanelId = `${viewsId}-panel`
   
   // Sidebar tab mode
   const useSidebar = tabLayout === 'sidebar' && tabs && tabs.length > 0
@@ -197,10 +215,25 @@ export function ResponsiveLayout({
   return (
     <div className={cn(
       'flex flex-col h-full w-full overflow-hidden',
+      listPage && 'lv-stage',
       className
     )}>
+      {/* LIST TEMPLATE: page head at every width, then the state tabs */}
+      {listPage && <PageHead title={title} total={total} intent={intent} actions={actions} />}
+      {listPage && hasViews && (
+        <StateTabs
+          views={views}
+          active={activeView}
+          onChange={onViewChange}
+          label={viewsLabel}
+          baseId={viewsId}
+          controls={viewsPanelId}
+          aside={viewsAside}
+        />
+      )}
+
       {/* HEADER - Show when sidebar is visible (>= 768px) */}
-      {showInlineHeader && (
+      {!listPage && showInlineHeader && (
         <UnifiedPageHeader
           title={title}
           subtitle={subtitle}
@@ -268,7 +301,7 @@ export function ResponsiveLayout({
       )}
 
       {/* MOBILE ACTIONS (< 768px): Show page actions below stats */}
-      {!showInlineHeader && actions && (
+      {!listPage && !showInlineHeader && actions && (
         <div className="shrink-0 px-3 py-2 border-b border-border-op50 bg-secondary-op50 flex items-center justify-end gap-2 overflow-x-auto scrollbar-hide">
           {actions}
         </div>
@@ -278,7 +311,7 @@ export function ResponsiveLayout({
       {afterStats}
       
       {/* MAIN AREA - Content + SlideOver/SplitPanel */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className={cn('flex-1 flex overflow-hidden', listPage && 'lv-main')}>
         
         {/* SIDEBAR TAB NAVIGATION (desktop, sidebar mode) */}
         {useSidebar && showInlineHeader && (
@@ -343,6 +376,19 @@ export function ResponsiveLayout({
             <LoadingState />
           ) : useSidebar && sidebarContentClass && !splitView ? (
             <div className={sidebarContentClass}>{children}</div>
+          ) : listPage ? (
+            // The state tabs filter this panel; without tabs it is a plain column
+            <div
+              className="lv-panel"
+              {...(hasViews ? {
+                role: 'tabpanel',
+                id: viewsPanelId,
+                'aria-labelledby': views.some(v => v.id === activeView) ? viewTabId(viewsId, activeView) : undefined,
+                'aria-label': views.some(v => v.id === activeView) ? undefined : viewsLabel,
+              } : {})}
+            >
+              {children}
+            </div>
           ) : (
             children
           )}
