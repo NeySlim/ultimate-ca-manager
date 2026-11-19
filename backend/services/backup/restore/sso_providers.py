@@ -148,19 +148,45 @@ def settle_provider_types(backup_data, replacing: bool, warnings: List[str],
         _leave_out(backup_data, left_out)
 
 
+def _held_here(account, key: Optional[str], external_id) -> bool:
+    """Whether the account ``account`` names is already bound here to ``external_id`` by a
+    provider of the IdP ``key``: an orphan of that identity would never be signed in with."""
+    from models import User, UserSSOIdentity
+    from models.sso import SSOProvider
+    if (key is None or not isinstance(external_id, str) or not external_id
+            or not isinstance(account, dict) or not isinstance(account.get('username'), str)):
+        return False
+    providers = (SSOProvider.query
+                 .join(UserSSOIdentity, UserSSOIdentity.provider_id == SSOProvider.id)
+                 .join(User, User.id == UserSSOIdentity.user_id)
+                 .filter(User.username == account['username'],
+                         UserSSOIdentity.external_id == external_id))
+    return any(_comparable(provider.idp_key()) == _comparable(key) for provider in providers)
+
+
 def _leave_out(backup_data, rows: List[Dict[str, Any]]) -> None:
-    """Drop ``rows`` from the archive; what names them becomes an orphan of their IdP."""
+    """Drop ``rows`` from the archive; what names them becomes an orphan of their IdP, unless
+    the account already holds that identity here."""
     keys = {row['name']: _idp_key(row) for row in rows}
     backup_data[SECTION] = [row for row in backup_data.get(SECTION) if not any(row is r for r in rows)]
 
     def named(ref):
         return isinstance(ref, dict) and ref.get('name') in keys
 
-    for row in backup_data.get('user_sso_identities') or []:
+    identities = backup_data.get('user_sso_identities')
+    redundant = []
+    for row in identities if isinstance(identities, list) else []:
         ref = row.get(f'provider_id{REFERENCE_SUFFIX}') if isinstance(row, dict) else None
         if named(ref):
+            if _held_here(row.get(f'user_id{REFERENCE_SUFFIX}'), keys[ref['name']],
+                          row.get('external_id')):
+                redundant.append(row)
+                continue
             row.update({'provider_id': None, f'provider_id{REFERENCE_SUFFIX}': None,
                         'orphan_of': keys[ref['name']]})
+    if redundant:
+        backup_data['user_sso_identities'] = [
+            row for row in identities if not any(row is r for r in redundant)]
     # An archive of 2.254 names the provider on the account row
     for row in backup_data.get('users') or []:
         ref = row.get(f'sso_provider_id{REFERENCE_SUFFIX}') if isinstance(row, dict) else None
