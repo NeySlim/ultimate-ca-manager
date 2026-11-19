@@ -133,6 +133,22 @@ describe('LoginPage during a maintenance', () => {
     await waitFor(() => expect(s.navigate).toHaveBeenCalledWith('/dashboard'))
   })
 
+  it('sends one request when the countdown ends while a submitted attempt is in flight', async () => {
+    let finish
+    s.loginPassword.mockRejectedValueOnce(refused(2))
+      .mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    renderLogin()
+    await submitPassword()
+    await screen.findByRole('status')
+    await tick(1000)
+    fireEvent.click(screen.getByText('auth.login'))
+    await waitFor(() => expect(s.loginPassword).toHaveBeenCalledTimes(2))
+    await tick(3000)
+    expect(s.loginPassword).toHaveBeenCalledTimes(2)
+    await act(async () => { finish({ user: { username: 'alice' } }) })
+    await waitFor(() => expect(s.navigate).toHaveBeenCalledWith('/dashboard'))
+  })
+
   it('stops trying once another failure comes, and shows that one', async () => {
     s.loginPassword.mockRejectedValueOnce(refused(2)).mockRejectedValue(new Error('Invalid credentials'))
     renderLogin()
