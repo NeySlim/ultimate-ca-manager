@@ -87,6 +87,13 @@ class TestInjection:
         assert '"' not in plain
         assert star is None or not re.search(r'[\x00-\x1f\x7f"]', star)
 
+    @pytest.mark.parametrize('name', ['a＂; filename＝evil.exe; x＝＂テ', '..／..／etc／passwd テ', 'a＼b テ', 'a℀b ℅ テ', 'a﹨b；テ'])
+    def test_compatibility_forms_fold_to_no_injection(self, name):
+        value = content_disposition(name, '.p12', fallback='r1')
+        assert value.isascii() and value.count('"') == 2
+        _, plain, _ = parse(value)
+        assert not re.search(r'[/\\"]', plain)
+
     def test_separators_become_underscores(self):
         _, plain, star = parse(content_disposition('テ/..\\x', '.crt', fallback='r1'))
         assert '/' not in star and '\\' not in star and star == 'テ_.._x.crt'

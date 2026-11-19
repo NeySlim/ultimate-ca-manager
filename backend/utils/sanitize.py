@@ -25,7 +25,8 @@ def sanitize_filename(name):
 
 def _ascii_fallback(text):
     """The ASCII reading of *text* (accents folded), or '' when nothing readable is left."""
-    folded = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('ascii')
+    # NFKD turns compatibility forms (fullwidth quote, solidus) into ASCII: clean after folding.
+    folded = _clean_filename(unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('ascii'))
     return folded if any(c.isalnum() for c in folded) else ''
 
 
