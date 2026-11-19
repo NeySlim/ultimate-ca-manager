@@ -380,7 +380,7 @@ def download_mtls_certificate(cert_id):
     legacy = opts.get('legacy', False)  # 3DES/SHA-1 profile (#331)
     chain_sent = 'include_chain' in opts or 'include_root' in opts
     # A PKCS#12 needs the password only a JSON body carries
-    if request.method == 'GET' and fmt == 'pkcs12':
+    if request.method != 'POST' and fmt == 'pkcs12':
         return error_response('PKCS12 export requires POST with JSON body (format, password)', 400)
 
     # Authorize via auth_certificates ownership (not string match on subject)

@@ -372,7 +372,7 @@ def export_certificate(cert_id):
     legacy = opts.get('legacy', False)
     variant, variant_err = requested_chain_variant(opts, certificate)
     # A GET reads no password, so it serves no key
-    if request.method == 'GET' and (include_key or export_format in KEY_FORMATS):
+    if request.method != 'POST' and (include_key or export_format in KEY_FORMATS):
         return error_response(
             'Password and private key exports must use POST with a JSON body, '
             'not the query string', 400)

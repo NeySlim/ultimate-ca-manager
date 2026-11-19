@@ -316,13 +316,13 @@ def export_user_certificate(cert_id):
         return refused
     export_format = opts.get('format', 'pem')
     password = opts.get('password', '')
-    is_get = request.method == 'GET'
+    by_query = request.method != 'POST'
     # A GET reads no password, so it serves no key: the certificate alone, or 400
-    include_key = opts.get('include_key', False if is_get else _key_by_default(export_format))
+    include_key = opts.get('include_key', False if by_query else _key_by_default(export_format))
     include_chain = opts.get('include_chain', _chain_by_default(export_format))
     include_root = opts.get('include_root', False)
     legacy = opts.get('legacy', False)  # 3DES/SHA-1 profile (#331)
-    if is_get and (include_key or export_format in ('pkcs12', 'p12', 'pfx', 'jks', 'key')):
+    if by_query and (include_key or export_format in ('pkcs12', 'p12', 'pfx', 'jks', 'key')):
         return error_response(
             'Password and private key exports must use POST with a JSON body, '
             'not the query string', 400)
