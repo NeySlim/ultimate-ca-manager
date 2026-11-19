@@ -20,6 +20,7 @@ import { casService } from '../../services'
 import { useNotification } from '../../contexts'
 import { usePermission } from '../../hooks/usePermission'
 import { canExportPrivateKey } from '../../lib/exportPermissions'
+import { downloadBlob } from '../../lib/utils'
 
 export function TakeOfflineModal({ open, onClose, ca, onSuccess }) {
   const { t } = useTranslation()
@@ -53,15 +54,7 @@ export function TakeOfflineModal({ open, onClose, ca, onSuccess }) {
   }
 
   const downloadKeyBlob = (blob) => {
-    const fname = `${(ca?.descr || ca?.common_name || `ca-${ca?.id}`).replace(/[^A-Za-z0-9._-]/g, '_')}-offline.key`
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = fname
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    URL.revokeObjectURL(url)
+    downloadBlob(blob, `${ca?.descr || ca?.common_name || `ca-${ca?.id}`}-offline.key`)
   }
 
   const handleSubmit = async (e) => {

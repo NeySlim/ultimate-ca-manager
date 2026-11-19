@@ -423,7 +423,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
       const created = extractData(response)
       if (created?.pending && created?.csr_pem) {
         // Hand the CSR to the user right away — it goes to the external CA.
-        const name = (created.descr || created.common_name || 'ca').replace(/[^a-zA-Z0-9._-]+/g, '_')
+        const name = created.descr || created.common_name || 'ca'
         downloadBlob(new Blob([created.csr_pem], { type: 'application/x-pem-file' }), `${name}.csr`)
         showSuccess(t('cas.csrDownloadStarted'))
       } else {

@@ -280,7 +280,7 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
   const handleDownloadCsr = async () => {
     try {
       const blob = await casService.downloadCsr(id)
-      const name = (data?.common_name || data?.descr || 'ca').replace(/[^a-zA-Z0-9._-]+/g, '_')
+      const name = data?.common_name || data?.descr || 'ca'
       downloadBlob(blob, `${name}.csr`)
     } catch (err) {
       showError(err?.message || t('cas.csrDownloadFailed', 'Failed to download CSR'))
