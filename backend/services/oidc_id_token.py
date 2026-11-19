@@ -547,6 +547,8 @@ def verify_id_token(id_token, provider, expected_nonce, verify=True, ssl_verify=
     if tenants:
         # The template comes from the authority's discovery document, never from the token
         template = _get_discovery(provider, issuer, ssl_verify)['issuer']
+        # Checked on the document used: one cached while the provider had a single issuer is not a template
+        _check_issuer_template(template, issuer)
         tid = _token_tenant(claims)
     _check_discovery_algorithm(provider, issuer, ssl_verify, algorithm)
 
