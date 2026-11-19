@@ -427,20 +427,47 @@ def _refuse_container(value: Any, column, where: str) -> None:
             "where this column takes a single value")
 
 
-def _refuse_non_text(value: Any, where: str) -> None:
-    # A field a dedicated restorer reads (a PEM, an encrypted key) is text or absent; the value is not echoed
-    if value is not None and not isinstance(value, str):
-        kind = {list: 'list', dict: 'object', bool: 'boolean'}.get(type(value), 'number')
+# The encrypted private key of an archive: an object of hex text (BackupService._encrypt_private_key)
+_KEY_BLOB = 'private_key_pem_encrypted'
+_KEY_BLOB_PARTS = ('salt', 'nonce', 'ciphertext')
+
+
+def _kind_of(value: Any) -> str:
+    return {list: 'list', dict: 'object', bool: 'boolean', str: 'text'}.get(type(value), 'number')
+
+
+def _is_hex(value: Any) -> bool:
+    try:
+        bytes.fromhex(value)
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
+def _refuse_unreadable_handled(name: str, value: Any, where: str) -> None:
+    """A field a dedicated restorer reads itself: a PEM is text, the encrypted key an object
+    of hex text; either may be absent. The value is never echoed (it may be a secret)."""
+    if value is None:
+        return
+    if name == _KEY_BLOB:
+        if isinstance(value, dict) and (not value or all(
+                isinstance(value.get(part), str) and _is_hex(value[part])
+                for part in _KEY_BLOB_PARTS)):
+            return
         raise RestoreValidationError(
-            f"Invalid backup: {where} holds a {kind} where this field takes text")
+            f"Invalid backup: {where} holds a {_kind_of(value)} that is not an encrypted key "
+            f"(an object of {', '.join(_KEY_BLOB_PARTS)} in hexadecimal)")
+    if not isinstance(value, str):
+        raise RestoreValidationError(
+            f"Invalid backup: {where} holds a {_kind_of(value)} where this field takes text")
 
 
 def refuse_containers_in_columns(backup_data) -> None:
     """RestoreValidationError, before any write, for a value no restorer of the row can take.
 
     A list or an object in a non JSON column, or in a secret property over a column of
-    another name; anything but text in a field the dedicated restorers read themselves
-    (`Section.handled`: the PEMs and the encrypted private keys)."""
+    another name; a field the dedicated restorers read themselves (`Section.handled`) that is
+    neither absent nor of the shape they read: text for a PEM, an object for the encrypted key."""
     from ..section_store import SectionStore, section_kind
     for section_name, section in SECTIONS.items():
         if section_kind(backup_data, section_name) != 'list':
@@ -455,7 +482,7 @@ def refuse_containers_in_columns(backup_data) -> None:
             for name, value in row.items():
                 column = columns.get(name)
                 if name in handled:
-                    _refuse_non_text(value, f"{section_name}.{name}")
+                    _refuse_unreadable_handled(name, value, f"{section_name}.{name}")
                 elif column is not None and name not in section.handled:
                     _refuse_container(value, column, f"{section_name}.{name}")
                 elif (column is None and name in section.secrets

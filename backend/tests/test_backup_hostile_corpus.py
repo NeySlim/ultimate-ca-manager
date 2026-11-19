@@ -489,6 +489,13 @@ HANDLED_ROWS = {
     'ssh_cas': {'refid': 'hc-ssh-ca', 'descr': 'hc-ssh-ca'},
 }
 NOT_TEXT = {'list': [MARKER], 'object': {'v': MARKER}, 'integer': 987654321, 'boolean': True}
+# The encrypted key is an object of hex text: text, or an object of anything else, is not one
+NOT_A_KEY = {**NOT_TEXT, 'text': MARKER,
+             'object': {'salt': MARKER, 'nonce': '00', 'ciphertext': '00'},
+             'object of numbers': {'salt': 1, 'nonce': 2, 'ciphertext': 987654321}}
+UNREADABLE = sorted(
+    (field, shape) for field in HANDLED_FIELDS
+    for shape in (NOT_A_KEY if field.endswith('.private_key_pem_encrypted') else NOT_TEXT))
 
 
 @contextmanager
@@ -616,14 +623,14 @@ class TestASectionOfTheWrongTypeIsRefusedByName:
         assert WebhookEndpoint.query.filter_by(name='hc-hook').count() == 0
 
     @pytest.mark.parametrize('mode', ['merge', 'replace'])
-    @pytest.mark.parametrize('field', sorted(HANDLED_FIELDS))
-    @pytest.mark.parametrize('shape', sorted(NOT_TEXT))
-    def test_a_value_that_is_not_text_in_a_handled_field_writes_nothing(
+    @pytest.mark.parametrize('field,shape', UNREADABLE)
+    def test_a_value_its_restorer_cannot_read_in_a_handled_field_writes_nothing(
             self, target, field, shape, mode):
         from models import CA, Certificate
         from models.ssh import SSHCertificateAuthority
         section, name = field.split('.')
-        payload = {section: [dict(HANDLED_ROWS[section], **{name: NOT_TEXT[shape]})]}
+        value = (NOT_A_KEY if name == 'private_key_pem_encrypted' else NOT_TEXT)[shape]
+        payload = {section: [dict(HANDLED_ROWS[section], **{name: value})]}
         before = _census()
         with pytest.raises(RestoreValidationError) as refusal:
             _service()._restore_payload(payload, b'\0' * 32, mode)
