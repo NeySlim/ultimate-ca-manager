@@ -102,3 +102,12 @@ def test_a_duration_beyond_the_maximum_is_still_capped(auth_client):
     cert = _certificate(r)
     span = (_parse(cert['valid_to']) - _parse(cert['valid_from'])).total_seconds()
     assert span <= 3600 + 300 + 1
+
+
+@pytest.mark.parametrize('issue', [_sign, _generate])
+def test_a_range_ending_past_the_product_maximum_is_refused(auth_client, issue):
+    """The end of a typed range is at most ten years from now, wherever it starts."""
+    ca = _ca(auth_client)
+    r = issue(auth_client, ca['id'], valid_from='9999-01-01T00:00:00Z', valid_to='9999-01-02T00:00:00Z')
+    assert r.status_code == 400, r.data
+    assert 'valid_to' in r.get_json()['message']

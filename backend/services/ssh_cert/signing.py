@@ -134,6 +134,8 @@ class SSHCertificateSigningMixin:
                 raise ValueError('valid_from is in the past')
             if valid_to <= now_ts:
                 raise ValueError('valid_to is in the past')
+            if valid_to > now_ts + MAX_VALIDITY_SECONDS:
+                raise ValueError(f'valid_to is more than {MAX_VALIDITY_SECONDS} seconds from now')
             start = valid_from if valid_from is not None else now_ts
             span = valid_to - start
             if span < 60 or span > MAX_VALIDITY_SECONDS:
