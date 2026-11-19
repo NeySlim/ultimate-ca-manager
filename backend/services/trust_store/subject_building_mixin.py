@@ -26,6 +26,11 @@ class SubjectBuildingMixin:
 
         order = ['C', 'ST', 'L', 'O', 'OU', 'CN', 'email']
 
+        # A key outside the table would silently vanish from the subject
+        unknown = sorted(str(k) for k in dn_dict if k not in oid_map)
+        if unknown:
+            raise ValueError(f"Unknown subject field(s): {', '.join(unknown)}")
+
         for field in order:
             if field in dn_dict and dn_dict[field]:
                 attributes.append(

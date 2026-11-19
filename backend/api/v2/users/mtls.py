@@ -192,7 +192,7 @@ def create_user_mtls_certificate(user_id):
             result = CertificateService.create_certificate(
                 descr=f"mTLS certificate for {target_user.username}",
                 caref=ca.refid,
-                dn={'commonName': name},
+                dn={'CN': name},
                 cert_type='usr_cert',
                 key_type=browser_key_type(ca, name),
                 validity_days=validity_days,
