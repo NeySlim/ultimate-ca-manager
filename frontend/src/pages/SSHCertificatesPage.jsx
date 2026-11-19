@@ -21,6 +21,7 @@ import { sshCertificatesService, sshCasService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission, useWebSocket, useClipboard, usePersistedState } from '../hooks'
 import { formatDate , downloadBlob} from '../lib/utils'
+import { sanitizeDownloadName } from '../lib/filename'
 import { SSH_EDDSA_KEY_TYPES, SSH_FIPS_DEFAULT_KEY_TYPE, sshEddsaRefused, sshKeyOptions, useKeyPlatform } from '../lib/policyAlgorithms'
 
 // ============= CONSTANTS =============
@@ -256,7 +257,7 @@ export default function SSHCertificatesPage() {
       const res = await sshCertificatesService.export(cert.id)
       const text = typeof res === 'string' ? res : (res.data?.certificate || res.data || JSON.stringify(res))
       const blob = new Blob([text], { type: 'text/plain' })
-      downloadBlob(blob, `${cert.key_id || t('sshCertificates.export.filename')}-cert.pub`)
+      downloadBlob(blob, sanitizeDownloadName(cert.key_id || t('sshCertificates.export.filename'), '-cert.pub'))
       showSuccess(t('sshCertificates.export.success'))
     } catch (error) {
       showError(error.message || t('common.operationFailed'))
@@ -1236,7 +1237,7 @@ function GeneratedResultView({ result, onClose }) {
                 {t('sshCertificates.generatedPrivateKey')}
               </label>
               <div className="flex items-center gap-1">
-                <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.private_key, keyId)}>
+                <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.private_key, sanitizeDownloadName(keyId, ''))}>
                   <Download size={12} /> {t('common.download')}
                 </Button>
                 <Button type="button" size="sm" variant="ghost" onClick={() => handleCopy(result.private_key)}>
@@ -1259,7 +1260,7 @@ function GeneratedResultView({ result, onClose }) {
               {t('sshCertificates.generatedCertificate')}
             </label>
             <div className="flex items-center gap-1">
-              <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.certificate, `${keyId}-cert.pub`)}>
+              <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.certificate, sanitizeDownloadName(keyId, '-cert.pub'))}>
                 <Download size={12} /> {t('common.download')}
               </Button>
               <Button type="button" size="sm" variant="ghost" onClick={() => handleCopy(result.certificate)}>
@@ -1281,7 +1282,7 @@ function GeneratedResultView({ result, onClose }) {
               {t('sshCertificates.publicKey')}
             </label>
             <div className="flex items-center gap-1">
-              <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.public_key, `${keyId}.pub`)}>
+              <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.public_key, sanitizeDownloadName(keyId, '.pub'))}>
                 <Download size={12} /> {t('common.download')}
               </Button>
               <Button type="button" size="sm" variant="ghost" onClick={() => handleCopy(result.public_key)}>
