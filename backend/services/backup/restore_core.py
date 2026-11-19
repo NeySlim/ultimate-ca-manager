@@ -138,6 +138,18 @@ GENERIC_SECTIONS = (
     'scep_requests',
 )
 
+# Certificates written are flushed and their PEMs let go by this many: the plan holds every
+# row it placed until the commit, and a reader of a PEM loads it again from the transaction
+PEM_RELEASE_ROWS = 1000
+_PEM_COLUMNS = ('crt', 'csr', 'prv')
+
+
+def _release_pems(certificates) -> None:
+    db.session.flush()
+    for cert in certificates:
+        db.session.expire(cert, _PEM_COLUMNS)
+
+
 RESTORED_SECTIONS = set(GENERIC_SECTIONS) | {
     'users', 'certificate_authorities', 'certificates', 'revoked_serials',
     'crl_number_counters', 'acme_accounts', 'acme_eab_credentials', 'configuration', 'groups',
@@ -1272,7 +1284,10 @@ class RestoreCoreMixin:
             cert.archived = bool(cert_data.get('archived', False))
             written.append(cert)
             results['certificates'] += 1
+            if len(written) % PEM_RELEASE_ROWS == 0:
+                _release_pems(written[-PEM_RELEASE_ROWS:])
         db.session.flush()
+        _release_pems(written[-(len(written) % PEM_RELEASE_ROWS or PEM_RELEASE_ROWS):])
         plan.written.setdefault('certificates', set()).update(cert.id for cert in written)
 
     def _restore_acme_accounts(self, backup_data: Dict, results: Dict) -> None:
