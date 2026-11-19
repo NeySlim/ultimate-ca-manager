@@ -235,7 +235,8 @@ def test_an_audit_entry_holding_a_nul_keeps_its_seal_on_sqlite(target, mode):
 def test_an_archived_audit_entry_holding_a_nul_is_rewritten_and_flagged_on_postgresql(target,
                                                                                        mode):
     """An archive from SQLite, presented by hand: PostgreSQL cannot store the NUL, so the entry
-    is rewritten, fails the chain check alone, and the report says the check will say so."""
+    is rewritten, fails the chain check, and the report says the check will say so. (Entries
+    restored here under new ids fail it too: the id is sealed, and the archive carries none.)"""
     if target != 'postgresql':
         pytest.skip('SQLite keeps the text as sealed')
     from models.audit_log import AuditLog
@@ -247,6 +248,6 @@ def test_an_archived_audit_entry_holding_a_nul_is_rewritten_and_flagged_on_postg
     db.session.expire_all()
     assert _probe_details() == ['clean one', f'with{ESCAPED}nul', 'clean two']
     flagged = AuditLog.query.filter_by(action='nul-probe', resource_id='1').one().id
-    assert _chain_errors() == [(flagged, 'tampered')]
+    assert (flagged, 'tampered') in _chain_errors()
     warning, = _nul_warnings(results)
     assert warning.startswith('audit_logs.details:') and 'integrity check' in warning
