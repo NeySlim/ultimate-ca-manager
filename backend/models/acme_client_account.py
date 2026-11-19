@@ -97,6 +97,23 @@ class AcmeClientAccount(db.Model):
         val = self.http_timeout_sec
         return val if val is not None else self.DEFAULT_HTTP_TIMEOUT_SEC
 
+    def held_key_algorithm(self):
+        """Algorithm of the account key already held, None while there is no key."""
+        if not self.account_key:
+            return None
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ec, rsa
+        from security.encryption import decrypt_text
+        try:
+            key = serialization.load_pem_private_key(decrypt_text(self.account_key).encode(), password=None)
+        except Exception:
+            return self.account_key_algorithm
+        if isinstance(key, rsa.RSAPrivateKey):
+            return 'RS256'
+        if isinstance(key, ec.EllipticCurvePrivateKey) and isinstance(key.curve, ec.SECP384R1):
+            return 'ES384'
+        return 'ES256'
+
     def to_dict(self, include_secrets: bool = False) -> dict:
         d = {
             'id': self.id,
@@ -104,7 +121,7 @@ class AcmeClientAccount(db.Model):
             'label': self.label,
             'email': self.email,
             'account_url': self.account_url,
-            'account_key_algorithm': self.account_key_algorithm,
+            'account_key_algorithm': self.held_key_algorithm() or self.account_key_algorithm,
             'eab_kid': self.eab_kid,
             'is_default': self.is_default,
             'proxy_slug': self.proxy_slug,

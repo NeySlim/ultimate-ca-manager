@@ -70,3 +70,15 @@ def test_the_algorithm_changes_while_no_key_exists(auth_client, accounts):
     r = auth_client.patch(f'{URL}/{a["id"]}', json={'account_key_algorithm': 'RS256'})
     assert r.status_code == 200, r.data[:300]
     assert r.get_json()['data']['account_key_algorithm'] == 'RS256'
+
+
+def test_a_stale_algorithm_column_shows_the_key_held_and_accepts_it_back(app, auth_client, accounts):
+    """An inherited row whose column disagrees with its key reports the key, and that value patches."""
+    a = accounts(account_key_pem=_pem(ec.SECP256R1()))
+    with app.app_context():
+        db.session.get(AcmeClientAccount, a['id']).account_key_algorithm = 'ES384'
+        db.session.commit()
+    shown = auth_client.get(f'{URL}/{a["id"]}').get_json()['data']['account_key_algorithm']
+    assert shown == 'ES256'
+    r = auth_client.patch(f'{URL}/{a["id"]}', json={'account_key_algorithm': shown})
+    assert r.status_code == 200, r.data[:300]
