@@ -79,6 +79,7 @@ def test_mapping(provider_id):
             'email': identity['email'],
             'groups': groups,
             'groups_readable': groups_error is None,
+            'groups_error': groups_error[:500] if groups_error else None,
             'group_source': report.get('source'),
             'diagnosis': diagnosis,
             'refusal': refusal,
