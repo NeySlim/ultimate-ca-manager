@@ -36,7 +36,7 @@ def _on_sqlite(app):
 
 
 @contextlib.contextmanager
-def file_database(app, path):
+def file_database(app, path, **engine_options):
     """The session database copied to a file the app opens with the product's engine options
     (one connection per checkout, sqlite3's default 5 s busy timeout)."""
     from sqlalchemy import create_engine
@@ -52,7 +52,8 @@ def file_database(app, path):
             target.close()
         finally:
             raw.close()
-        engines[None] = create_engine(f'sqlite:///{path}', hide_parameters=True)
+        engines[None] = create_engine(f'sqlite:///{path}', hide_parameters=True,
+                                      **engine_options)
         cluster_maintenance.install_engine_guard(app, engines[None])
     try:
         yield
@@ -242,6 +243,60 @@ def test_a_request_in_the_window_never_waits_in_sqlite(restore_held):
     assert took < 2.0, f"the request waited {took:.1f}s"
 
 
+@pytest.fixture
+def busy_app(app, tmp_path):
+    """The file database with a short busy timeout: a lock outlasts it at once."""
+    if not _on_sqlite(app):
+        pytest.skip('SQLite: the database file locked by another writer')
+    path = str(tmp_path / 'busy.db')
+    with file_database(app, path, connect_args={'timeout': 0.3}):
+        yield app, path
+
+
+@contextlib.contextmanager
+def writing(path):
+    """Another connection in the middle of a write: readers read, no other writer writes."""
+    writer = sqlite3.connect(path, timeout=0, isolation_level=None)
+    writer.execute('BEGIN IMMEDIATE')
+    writer.execute("UPDATE system_config SET value = value WHERE key = 'none'")
+    try:
+        yield
+    finally:
+        writer.execute('ROLLBACK')
+        writer.close()
+
+
+def test_a_login_that_meets_another_writer_answers_503_not_500(busy_app):
+    """The route catches the lock itself ('Failed to record login attempt'): still a 503."""
+    app, path = busy_app
+    user = _admin_user(app)
+    body = json.dumps({'username': user['username'], 'password': PASSWORD})
+    with writing(path):
+        refused = app.test_client().post('/api/v2/auth/login', data=body,
+                                         content_type='application/json')
+    assert refused.status_code == 503, refused.data
+    assert refused.headers['Retry-After']
+    assert refused.mimetype == 'application/problem+json'
+    # The writer gone, the same login goes through
+    again = app.test_client().post('/api/v2/auth/login', data=body,
+                                   content_type='application/json')
+    assert again.status_code == 200, again.data
+
+
+def test_a_500_that_met_no_lock_stays_a_500(busy_app, monkeypatch):
+    """Guard: only a request that met a lock is turned into a 503."""
+    app, _ = busy_app
+    user = _admin_user(app)
+    body = json.dumps({'username': user['username'], 'password': PASSWORD})
+
+    def broken(self, *a, **k):
+        raise RuntimeError('not a lock')
+    monkeypatch.setattr(User, 'reserve_login_attempt', broken)
+    failed = app.test_client().post('/api/v2/auth/login', data=body,
+                                    content_type='application/json')
+    assert failed.status_code == 500, failed.data
+
+
 def test_a_session_revoked_before_the_restore_reads_nothing(held_app):
     app, path = held_app
     job_id = _restore_job(app)
@@ -297,6 +352,114 @@ def test_a_session_checked_before_the_restore_only_is_not_trusted(held_app):
     assert seen.headers['Retry-After']
     assert cancel.status_code == 503
     assert not restore_job.cancel_flagged(job_id)
+
+
+def _api_key(app, user_id, lifetime):
+    from datetime import timedelta
+    from auth.unified import AuthManager
+    from utils.datetime_utils import utc_now
+    with app.app_context():
+        made = AuthManager().create_api_key(user_id, f'held-{uuid.uuid4().hex[:6]}', ['*'],
+                                            not_after=utc_now() + timedelta(seconds=lifetime))
+        db.session.remove()
+    return made['key']
+
+
+def test_an_api_key_that_expires_during_the_restore_reads_nothing(held_app):
+    """Checked during the gate, then expired: the held window refuses it as the database would."""
+    app, path = held_app
+    job_id = _restore_job(app)
+    url = f'/api/v2/system/jobs/{job_id}'
+    user = _admin_user(app)
+    lifetime = 2.0
+    made_at = time.monotonic()
+    key = _api_key(app, user['id'], lifetime)
+    lasting = _api_key(app, user['id'], 3600)
+    client = app.test_client()
+    gate = _gate(app, job_id).raise_gate()
+    try:
+        assert client.get(url, headers={'X-API-Key': key}).status_code == 200
+        assert client.get(url, headers={'X-API-Key': lasting}).status_code == 200
+        time.sleep(max(0.0, lifetime + 0.5 - (time.monotonic() - made_at)))
+        gate.set_view(phase=restore_job.APPLYING, held=True)
+        with holding(path):
+            expired = client.get(url, headers={'X-API-Key': key})
+            expired_cancel = client.post(f'{url}/cancel', headers={'X-API-Key': key})
+            still = client.get(url, headers={'X-API-Key': lasting})
+    finally:
+        gate.lift()
+        with app.app_context():
+            db.session.execute(T.delete().where(T.c.id == job_id))
+            db.session.commit()
+    assert still.status_code == 200, still.data
+    assert expired.status_code == 401, expired.data
+    assert expired_cancel.status_code == 401, expired_cancel.data
+    assert not restore_job.cancel_flagged(job_id)
+
+
+def test_a_credential_refused_during_the_gate_is_forgotten(held_app):
+    """Checked, then refused by the database during the same gate: never answered from memory."""
+    app, path = held_app
+    job_id = _restore_job(app)
+    url = f'/api/v2/system/jobs/{job_id}'
+    user = _admin_user(app)
+    key = _api_key(app, user['id'], 3600)
+    client = app.test_client()
+    gate = _gate(app, job_id).raise_gate()
+    try:
+        assert client.get(url, headers={'X-API-Key': key}).status_code == 200
+        # Revoked by a writer the gate does not see (another process on the file)
+        other = sqlite3.connect(path)
+        other.execute('UPDATE api_keys SET is_active = 0 WHERE user_id = ?', (user['id'],))
+        other.commit()
+        other.close()
+        assert client.get(url, headers={'X-API-Key': key}).status_code == 401
+        gate.set_view(phase=restore_job.APPLYING, held=True)
+        with holding(path):
+            seen = client.get(url, headers={'X-API-Key': key})
+            cancel = client.post(f'{url}/cancel', headers={'X-API-Key': key})
+    finally:
+        gate.lift()
+        with app.app_context():
+            db.session.execute(T.delete().where(T.c.id == job_id))
+            db.session.commit()
+    assert seen.status_code == 503, seen.data
+    assert cancel.status_code == 503, cancel.data
+    assert not restore_job.cancel_flagged(job_id)
+
+
+def test_a_check_made_during_a_previous_restore_is_not_used(held_app):
+    """Two restores one after the other: a check from the first one's gate never serves the
+    second, whatever the memory kept between them."""
+    app, path = held_app
+    first, second = _restore_job(app), None
+    user = _admin_user(app)
+    client = _client(app, user['username'])
+    gate = _gate(app, first).raise_gate()
+    try:
+        assert client.get(f'/api/v2/system/jobs/{first}').status_code == 200
+    finally:
+        gate.lift()
+    with app.app_context():
+        db.session.execute(T.delete().where(T.c.id == first))
+        db.session.commit()
+        db.session.remove()
+    second = _restore_job(app)
+    url = f'/api/v2/system/jobs/{second}'
+    gate = _gate(app, second).raise_gate()
+    try:
+        gate.set_view(phase=restore_job.APPLYING, held=True)
+        with holding(path):
+            seen = client.get(url)
+            cancel = client.post(f'{url}/cancel')
+    finally:
+        gate.lift()
+        with app.app_context():
+            db.session.execute(T.delete().where(T.c.id == second))
+            db.session.commit()
+    assert seen.status_code == 503, seen.data
+    assert cancel.status_code == 503, cancel.data
+    assert not restore_job.cancel_flagged(second)
 
 
 def test_a_session_without_the_right_reads_nothing(restore_held, viewer_client):
@@ -481,7 +644,8 @@ def test_a_progress_that_crosses_another_writer_keeps_the_jobs_outcome(crossing_
 
 
 def test_a_lock_held_past_the_jobs_wait_still_concludes_it_as_its_error(crossing_job, monkeypatch):
-    """The wait is bounded: past it, the write raises like any other database error."""
+    """Guard on the bound: past the wait the write raises like any other database error.
+    Without the wait it passes too (sqlite3's own timeout); it fails when the wait never ends."""
     monkeypatch.setattr(runner, 'JOB_LOCK_WAIT_SECONDS', 0.5)
 
     def run(ctx, path):
@@ -494,3 +658,213 @@ def test_a_lock_held_past_the_jobs_wait_still_concludes_it_as_its_error(crossing
     job_id = crossing_job.start()
     row = _final(crossing_job.app, job_id)
     assert (row['state'], row['reason']) == ('failed', 'error'), row
+
+
+def test_no_hsts_header_while_its_setting_cannot_be_read(restore_held, monkeypatch):
+    """hsts_enabled=false in the database: a 503 of the held window sends no HSTS either."""
+    for var in ('UCM_HSTS_ENABLED', 'ucm_hsts_enabled'):
+        monkeypatch.delenv(var, raising=False)
+    app, path = restore_held.app, restore_held.path
+    other = sqlite3.connect(path)  # written outside the gate's guard, as before the restore
+    other.execute("DELETE FROM system_config WHERE key = 'hsts_enabled'")
+    other.execute("INSERT INTO system_config (key, value) VALUES ('hsts_enabled', 'false')")
+    other.commit()
+    other.close()
+    try:
+        with restore_held.hold():
+            refused = restore_held.admin.get('/api/v2/groups')
+        assert refused.status_code == 503, refused.data
+        assert 'Strict-Transport-Security' not in refused.headers
+    finally:
+        other = sqlite3.connect(path)
+        other.execute("DELETE FROM system_config WHERE key = 'hsts_enabled'")
+        other.commit()
+        other.close()
+
+
+def test_an_untrusted_forwarded_host_is_refused_while_held(restore_held, monkeypatch):
+    """The direct client's X-Forwarded-Host gets the same 403 as when the database answers."""
+    monkeypatch.delenv('UCM_TRUSTED_PROXIES', raising=False)
+    app, job_id, admin = restore_held.app, restore_held.job_id, restore_held.admin
+    url = f'/api/v2/system/jobs/{job_id}'
+    assert admin.get(url).status_code == 200
+    monkeypatch.setitem(app.config, 'TRUSTED_PROXY_HOPS', 1)
+    spoofed = {'headers': {'X-Forwarded-Host': 'localhost'},
+               'environ_overrides': {'REMOTE_ADDR': '203.0.113.1'}}
+    assert admin.get(url, **spoofed).status_code == 403
+    with restore_held.hold():
+        seen = admin.get(url, **spoofed)
+        cancel = admin.post(f'{url}/cancel', **spoofed)
+        plain = admin.get(url)
+    assert seen.status_code == 403, seen.data
+    assert cancel.status_code == 403, cancel.data
+    assert plain.status_code == 200, plain.data
+    assert not restore_job.cancel_flagged(job_id)
+
+
+
+@pytest.mark.parametrize('per_user', [2, 100], ids=['own-share', 'memory-full'])
+def test_one_account_cannot_evict_another_from_the_held_memory(held_app, monkeypatch, per_user):
+    """The memory is bounded; what one account brings in pushes out its own checks first."""
+    from auth import restore_hold
+    app, path = held_app
+    monkeypatch.setattr(restore_hold, 'MAX_ENTRIES', 4)
+    monkeypatch.setattr(restore_hold, 'MAX_PER_USER', per_user)
+    job_id = _restore_job(app)
+    url = f'/api/v2/system/jobs/{job_id}'
+    victim, crowd = _admin_user(app), _admin_user(app)
+    victim_key = _api_key(app, victim['id'], 3600)
+    keys = [_api_key(app, crowd['id'], 3600) for _ in range(6)]
+    client = app.test_client()
+    gate = _gate(app, job_id).raise_gate()
+    try:
+        assert client.get(url, headers={'X-API-Key': victim_key}).status_code == 200
+        for key in keys:
+            assert client.get(url, headers={'X-API-Key': key}).status_code == 200
+        gate.set_view(phase=restore_job.APPLYING, held=True)
+        with holding(path):
+            victim_seen = client.get(url, headers={'X-API-Key': victim_key})
+            latest = client.get(url, headers={'X-API-Key': keys[-1]})
+            first = client.get(url, headers={'X-API-Key': keys[0]})
+    finally:
+        gate.lift()
+        with app.app_context():
+            db.session.execute(T.delete().where(T.c.id == job_id))
+            db.session.commit()
+    assert victim_seen.status_code == 200, victim_seen.data
+    assert latest.status_code == 200, latest.data
+    assert first.status_code == 503, first.data
+
+
+# -- the session that starts the restore follows it through the held database -------------
+
+RESTORE_PASSWORD = 'Restore-Job-Password-9'  # the archive fixture's
+
+
+class StartedElsewhere:
+    """The restore the route starts is run by a script: its gate goes up ``gate_at`` seconds
+    after the start, its transaction holds the file from ``held_at`` until released."""
+
+    def __init__(self, app, path, monkeypatch, gate_at, held_at, before_gate=None):
+        self.app, self.path = app, path
+        self.gate_at, self.held_at, self.before_gate = gate_at, held_at, before_gate
+        self.held, self.release, self.done = (threading.Event(), threading.Event(),
+                                              threading.Event())
+        self.job_id, self.thread = None, None
+        monkeypatch.setattr(runner, 'dispatch_job', self._dispatch)
+
+    def _dispatch(self, job_id):
+        self.job_id = job_id
+        assert store.claim_job(db.session, job_id, 'elsewhere/1/x', jobs._now()) is not None
+        db.session.commit()
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
+
+    def _run(self):
+        started = time.monotonic()
+        try:
+            time.sleep(self.gate_at)
+            if self.before_gate:
+                self.before_gate()
+            gate = _gate(self.app, self.job_id).raise_gate()
+            try:
+                time.sleep(max(0.0, self.held_at - (time.monotonic() - started)))
+                gate.set_view(phase=restore_job.APPLYING, held=True)
+                with holding(self.path):
+                    self.held.set()
+                    self.release.wait(60)
+            finally:
+                gate.lift()
+        finally:
+            self.done.set()
+
+    def finish(self):
+        self.release.set()
+        assert self.done.wait(60)
+        if self.job_id:
+            for suffix in (restore_job.CANCEL_SUFFIX, restore_job.ARCHIVE_SUFFIX):
+                store.purge_file(store.file_name_for(self.job_id, suffix))
+            with self.app.app_context():
+                db.session.execute(T.delete().where(T.c.id == self.job_id))
+                db.session.commit()
+                db.session.remove()
+            restore_job.remove_state()
+
+
+def _post_restore(client, blob):
+    import io
+    return client.post('/api/v2/system/restore', data={
+        'file': (io.BytesIO(blob), 'r.ucmbkp'), 'password': RESTORE_PASSWORD},
+        content_type='multipart/form-data')
+
+
+@pytest.fixture
+def started_elsewhere(archive, held_app, monkeypatch):
+    app, path = held_app
+    monkeypatch.setattr(jobs, 'JOB_WAIT_SECONDS', 3)
+    made = []
+
+    def make(**kwargs):
+        made.append(StartedElsewhere(app, path, monkeypatch, **kwargs))
+        return made[-1]
+    yield types.SimpleNamespace(app=app, path=path, archive=archive, make=make)
+    for script in made:
+        script.finish()
+
+
+def test_a_restore_held_before_its_wait_ends_answers_202_and_its_session_follows(
+        started_elsewhere):
+    """No Prefer: the POST waits; the transaction holds the database before the wait ends."""
+    app = started_elsewhere.app
+    admin = _client(app, 'admin', 'changeme123')
+    script = started_elsewhere.make(gate_at=0.3, held_at=1.5)
+    started, took = _timed(_post_restore, admin, started_elsewhere.archive)
+    assert script.held.is_set()
+    assert started.status_code == 202, started.data
+    assert took < 5, took
+    job = started.get_json()['data']['job']
+    assert job['id'] == script.job_id and job['phase'] == restore_job.APPLYING
+    url = started.headers['Location']
+    seen = admin.get(url)
+    assert seen.status_code == 200, seen.data
+    cancelled = admin.post(f'{url}/cancel')
+    assert cancelled.status_code == 200, cancelled.data
+    assert restore_job.cancel_flagged(script.job_id)
+
+
+def test_a_session_revoked_between_the_start_and_the_gate_reads_nothing(started_elsewhere):
+    app, path = started_elsewhere.app, started_elsewhere.path
+    user = _admin_user(app)
+    client = _client(app, user['username'])
+
+    def revoke():
+        other = sqlite3.connect(path)
+        other.execute('UPDATE users SET session_version = session_version + 1 WHERE id = ?',
+                      (user['id'],))
+        other.commit()
+        other.close()
+    script = started_elsewhere.make(gate_at=0.3, held_at=1.5, before_gate=revoke)
+    started = _post_restore(client, started_elsewhere.archive)
+    assert script.held.is_set()
+    assert started.status_code == 202, started.data
+    url = started.headers['Location']
+    seen = client.get(url)
+    cancel = client.post(f'{url}/cancel')
+    assert seen.status_code in (401, 503), seen.data
+    assert cancel.status_code in (401, 503), cancel.data
+    assert not restore_job.cancel_flagged(script.job_id)
+
+
+def test_the_dialogs_first_poll_after_the_wait_reads_the_held_job(started_elsewhere):
+    """The interface's case: 202 at the end of the wait, then the database held, then the
+    dialog's first poll."""
+    app = started_elsewhere.app
+    admin = _client(app, 'admin', 'changeme123')
+    script = started_elsewhere.make(gate_at=0.3, held_at=3.5)
+    started = _post_restore(admin, started_elsewhere.archive)
+    assert started.status_code == 202, started.data
+    assert not script.held.is_set()
+    assert script.held.wait(10)
+    seen = admin.get(started.headers['Location'])
+    assert seen.status_code == 200, seen.data
+    assert seen.get_json()['data']['phase'] == restore_job.APPLYING

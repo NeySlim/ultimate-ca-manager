@@ -418,6 +418,7 @@ def init_app(app):
     app.before_request_funcs.setdefault(None, []).insert(0, restore_hold.before_request)
     app.before_request(gate)
     app.register_error_handler(MaintenanceActive, lambda e: refusal())
+    app.after_request(sqlite_wait.answer_locked_500)
     with app.app_context():
         install_engine_guard(app, db.engine)
 

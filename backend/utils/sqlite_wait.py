@@ -22,6 +22,7 @@ IN_C_MS = 20
 RETRY_FIRST, RETRY_MAX = 0.01, 0.1
 BUSY_RETRY_AFTER_SECONDS = 5
 _BUSY_INFO = 'ucm_busy_timeout'
+_LOCK_MET = 'ucm_lock_met'
 _DEADLINE = 'ucm_lock_deadline'
 BUSY_MESSAGE = 'The database is busy with another write: retry shortly.'
 
@@ -122,6 +123,15 @@ def _do_executemany(cursor, statement, parameters, context):
     return _execute(cursor, statement, parameters, context, many=True)
 
 
+def _on_error(context):
+    """Marks the request that met a SQLite lock, even if its route catches the error."""
+    if not is_locked(context.original_exception):
+        return
+    from flask import g, has_request_context, request
+    if has_request_context():
+        setattr(g, _LOCK_MET, request._get_current_object())
+
+
 _installed = []
 
 
@@ -134,12 +144,31 @@ def install():
     event.listen(Engine, 'do_execute', _do_execute)
     event.listen(Engine, 'do_execute_no_params', _do_execute_no_params)
     event.listen(Engine, 'do_executemany', _do_executemany)
+    event.listen(Engine, 'handle_error', _on_error)
 
 
 def locked_refusal(exc):
     """503 with Retry-After for a request that met a lock it may not wait for; else None."""
     if not is_locked(exc):
         return None
+    return _refusal()
+
+
+def answer_locked_500(response):
+    """after_request: a 500 from a request that met a SQLite lock, whatever route caught it,
+    becomes the 503 with Retry-After of locked_refusal, rewritten in place (headers kept)."""
+    from flask import g, request
+    if response.status_code != 500 or g.get(_LOCK_MET) is not request._get_current_object():
+        return response
+    refused = _refusal(serve_job=False)
+    response.set_data(refused.get_data())
+    response.status_code = refused.status_code
+    response.headers['Content-Type'] = refused.headers['Content-Type']
+    response.headers['Retry-After'] = refused.headers['Retry-After']
+    return response
+
+
+def _refusal(serve_job=True):
     from models import db
     try:
         db.session.rollback()
@@ -147,10 +176,11 @@ def locked_refusal(exc):
         pass
     from services import cluster_maintenance
     if window():
-        from auth.restore_hold import answer_without_database
-        answer = answer_without_database()
-        if answer is not None:
-            return answer
+        if serve_job:
+            from auth.restore_hold import answer_without_database
+            answer = answer_without_database()
+            if answer is not None:
+                return answer
         return cluster_maintenance.refusal(message=cluster_maintenance.HELD_MESSAGE)
     from flask import jsonify
     from utils.response import PROBLEM_CONTENT_TYPE, build_problem

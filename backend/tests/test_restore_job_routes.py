@@ -328,3 +328,35 @@ def test_only_the_restore_holding_the_maintenance_is_cancelled_through_it(
     assert r.get_json()['data']['cancel_requested'] is True
     with app.app_context():
         assert jobs.get_job(job_id)['cancel_requested']
+
+
+def test_the_end_steps_show_the_rows_phase_and_progress(app, auth_client, archive, finished,
+                                                        no_restart, monkeypatch):
+    """Past the commit the local state is older than the row: the route shows the row
+    (paused before the end steps, as the sessions they revoke include the caller's)."""
+    reached, release = threading.Event(), threading.Event()
+    real = restore_job._finish_steps
+
+    def paused(job_id):
+        reached.set()
+        assert release.wait(30)
+        return real(job_id)
+    monkeypatch.setattr(restore_job, '_finish_steps', paused)
+    assert auth_client.get('/api/v2/system/jobs').status_code == 200
+    r = _post(auth_client, ROUTES[0], archive, {'Prefer': 'respond-async'})
+    job_id = r.get_json()['data']['job']['id']
+    finished.release()
+    try:
+        assert reached.wait(30)
+        seen = auth_client.get(f'/api/v2/system/jobs/{job_id}')
+        with app.app_context():
+            row = store.job_row(db.session, job_id)
+            db.session.remove()
+    finally:
+        release.set()
+    assert runner.join_local(job_id, 60)
+    assert seen.status_code == 200, seen.data
+    data = seen.get_json()['data']
+    assert row['state'] == 'running' and row['phase'] == restore_job.COMMITTED
+    assert data['phase'] == row['phase']
+    assert data['progress'] == {'done': row['progress_done'], 'total': row['progress_total']}

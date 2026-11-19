@@ -169,7 +169,8 @@ class AuthManager:
             'auth_method': 'api_key',
             'permissions': permissions,
             'api_key_id': api_key.id,
-            'api_key_name': api_key.name
+            'api_key_name': api_key.name,
+            'api_key_expires_at': api_key.expires_at
         }
     
     def verify_session(self):

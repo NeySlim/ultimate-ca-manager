@@ -14,6 +14,8 @@ import types
 from flask import g, request, session
 
 MAX_ENTRIES = 4096
+# One account's checks push out its own oldest ones first, never another account's
+MAX_PER_USER = 32
 # The restore job's own routes, served from its local state while the database is held
 HELD_ENDPOINTS = frozenset({'system_v2.get_job', 'system_v2.cancel_job'})
 _FINGERPRINT = ('user_id', 'session_version', 'restore_epoch', 'account_created', 'login_time')
@@ -75,16 +77,53 @@ def remember(auth_result):
                                                    'force_password_change', False)),
              'auth_method': auth_result['auth_method'],
              'permissions': list(auth_result['permissions'] or []),
-             'api_key_id': auth_result.get('api_key_id')}
+             'api_key_id': auth_result.get('api_key_id'),
+             'expires_at': auth_result.get('api_key_expires_at')}
     if key[0] == 'session':
         from auth.unified import AuthManager
         entry['fingerprint'] = _fingerprint()
         entry['limits'] = AuthManager.session_limits()
     with _lock:
         entries = _entries_for(gate)
-        if key not in entries and len(entries) >= MAX_ENTRIES:
-            entries.pop(next(iter(entries)))
+        entries.pop(key, None)
+        _make_room(entries, entry['user_id'])
         entries[key] = entry
+
+
+def _make_room(entries, user_id):
+    """Under _lock: the account's oldest check past its share; when full, the oldest check of
+    the account holding the most."""
+    own = [k for k, e in entries.items() if e['user_id'] == user_id]
+    if len(own) >= MAX_PER_USER:
+        entries.pop(own[0])
+    elif len(entries) >= MAX_ENTRIES:
+        counts = {}
+        for e in entries.values():
+            counts[e['user_id']] = counts.get(e['user_id'], 0) + 1
+        largest = max(counts, key=counts.get)
+        entries.pop(next(k for k, e in entries.items() if e['user_id'] == largest))
+
+
+def recheck():
+    """The request still in flight when its restore's gate goes up (the one that started it):
+    its credential checked again against the database, then remembered. True once done."""
+    from utils.sqlite_wait import is_locked, window
+    if window() != 'gate' or not request.path.startswith('/api/') or _credential() is None:
+        return False
+    from auth.unified import AuthManager
+    from models import db
+    try:
+        result = AuthManager().authenticate_request(request)
+    except Exception as e:  # noqa: BLE001 - a lock: tried again at the next slice
+        if not is_locked(e):
+            raise
+        db.session.rollback()
+        return False
+    if result:
+        remember(result)
+    else:
+        forget()
+    return True
 
 
 def forget():
@@ -101,10 +140,17 @@ def _checked(view):
     key = _credential()
     if key is None:
         return None
+    gate = _gate_key(view)
     with _lock:
-        entry = _entries_for(_gate_key(view)).get(key)
-    if entry is None or entry['host'] != request.host:
+        entry = _entries_for(gate).get(key)
+    # Only a check made during this very gate counts, the memory emptied or not
+    if entry is None or entry['gate'] != gate or entry['host'] != request.host:
         return False
+    # A key that expired since its check is refused as the database would refuse it
+    if entry['expires_at'] is not None:
+        from utils.datetime_utils import utc_now
+        if entry['expires_at'] < utc_now():
+            return None
     if key[0] == 'session':
         if entry['fingerprint'] != _fingerprint():
             return False
@@ -122,6 +168,10 @@ def _serve_job(view):
     from auth.twofa_enforcement import ENROLL_SESSION_KEY
     from services import cluster_maintenance
     from utils.response import AUTHENTICATION_REQUIRED_PROBLEM, error_response
+    from middleware.public_host_middleware import untrusted_forwarded_host_refusal
+    refused = untrusted_forwarded_host_refusal()
+    if refused is not None:
+        return refused
     entry = _checked(view)
     if entry is None:
         return error_response('Authentication required', 401,

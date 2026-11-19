@@ -132,10 +132,49 @@ def started_response(job_id, extra=None):
         seconds = 0 if asynchronous else jobs.JOB_WAIT_SECONDS
     if asynchronous and seconds == 0:
         return accepted(jobs.get_job(job_id), applied='respond-async', extra=extra)
-    row = jobs.wait_for_job(job_id, seconds)
+    row, local = _wait_for_job(job_id, seconds)
+    applied = 'respond-async' if asynchronous else None
+    if local is not None:
+        return _with_headers(success_response(
+            data={'job': local, **(extra or {})},
+            message='Accepted: the job runs in the background', status=202),
+            Location=location(job_id), **({'Preference_Applied': applied} if applied else {}))
     if row is not None and row['state'] in jobs.FINAL_STATES:
         return final_response(row, extra)
-    return accepted(row, applied='respond-async' if asynchronous else None, extra=extra)
+    return accepted(row, applied=applied, extra=extra)
+
+
+def _wait_for_job(job_id, seconds):
+    """(row, None) as wait_for_job, or (None, the restore's local view) once its SQLite
+    transaction holds the database or keeps the row locked. Waits in slices: when a local
+    restore's gate goes up meanwhile, the caller is checked again against the database."""
+    import time as _time
+    from services import cluster_maintenance
+    from services.jobs import restore as restore_job
+    from services.jobs.runner import WAIT_POLL_SECONDS
+    from auth import restore_hold
+    from utils.sqlite_wait import is_locked, window
+    deadline = _time.monotonic() + max(0.0, seconds)
+    rechecked = False
+    while True:
+        cluster_maintenance.current(refresh=True)
+        rechecked = rechecked or restore_hold.recheck()
+        local = restore_job.local_view(job_id) if window() == 'held' else None
+        if local is not None:
+            return None, local
+        left = max(0.0, deadline - _time.monotonic())
+        try:
+            row = jobs.wait_for_job(job_id, min(left, WAIT_POLL_SECONDS))
+        except Exception as e:  # noqa: BLE001 - only a lock is answered from the local state
+            if not is_locked(e):
+                raise
+            db.session.rollback()
+            local = restore_job.local_view(job_id)
+            if local is None:
+                raise
+            return None, local
+        if row is None or row['state'] in jobs.FINAL_STATES or _time.monotonic() >= deadline:
+            return row, None
 
 
 def _readable(kind):
@@ -174,6 +213,17 @@ def _held_view(job_id):
     if view is None or not _readable(view.get('kind')):
         return None
     return view
+
+
+def _held_progress(job_id, row):
+    """The restore's local view while it says held and its row has not passed the commit."""
+    from services.jobs import restore as restore_job
+    if row['state'] != 'running' or row['phase'] in restore_job.VALIDATED:
+        return None
+    state = restore_job.read_state()
+    if state is None or state.get('job_id') != job_id or not (state.get('view') or {}).get('held'):
+        return None
+    return state['view']
 
 
 def _held_job(job_id, view):
@@ -226,9 +276,9 @@ def get_job(job_id):
     if row is None:
         return error_response('Job not found', 404)
     view = jobs.public_view(row)
-    held = _held_view(job_id) if view['state'] == 'running' else None
+    held = _held_progress(job_id, row)
     if held is not None:
-        # The SQLite transaction keeps the run from writing its row: its local state is newer
+        # Only while its SQLite transaction holds the database is the local state newer
         view.update(phase=held.get('phase', view['phase']), progress=held.get('progress', view['progress']))
     return success_response(data=view)
 

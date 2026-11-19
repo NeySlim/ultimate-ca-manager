@@ -11,8 +11,9 @@ setup — see issue #154) either by `hsts_enabled=false` in SystemConfig or by
 `UCM_HSTS_ENABLED=0` in the environment.
 
 All three helpers are DB-tolerant: they never raise if the DB / SystemConfig
-table is unavailable (e.g. during boot before init, under safe mode), they just
-fall back to defaults.
+table is unavailable (e.g. during boot before init, under safe mode). Without an
+env override, an unreadable `hsts_enabled` emits no header; the other two fall
+back to defaults.
 """
 import os
 
@@ -49,14 +50,18 @@ def hsts_env_locked() -> list[str]:
     return locked
 
 
-def _cfg_value(key: str):
+# A setting the database could not give (locked, unavailable, table missing)
+_UNREADABLE = object()
+
+
+def _cfg_value(key: str, unreadable=None):
     """Read a SystemConfig value, tolerating any DB error / missing table."""
     try:
         from models import SystemConfig
         row = SystemConfig.query.filter_by(key=key).first()
         return row.value if row else None
     except Exception:
-        return None
+        return unreadable
 
 
 def hsts_enabled() -> bool:
@@ -64,7 +69,10 @@ def hsts_enabled() -> bool:
     env = _env_override('ucm_hsts_enabled')
     if env is not None:
         return not _is_disabled(env)
-    val = _cfg_value('hsts_enabled')
+    val = _cfg_value('hsts_enabled', unreadable=_UNREADABLE)
+    # Unread, it may be off: one response without HSTS beats pinning a year by mistake
+    if val is _UNREADABLE:
+        return False
     if val is None:
         return True
     return not _is_disabled(val)

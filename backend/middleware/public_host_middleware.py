@@ -54,6 +54,14 @@ def _proxy_header_spoof_attempt() -> bool:
     return not _remote_is_trusted_proxy()
 
 
+def untrusted_forwarded_host_refusal():
+    """403 for an admin path reached with X-Forwarded-Host from a non-proxy peer; else None.
+    Reads no database: the restore's held window applies it too."""
+    if _proxy_header_spoof_attempt() and is_admin_ui_path(request.path):
+        return error_response('Untrusted X-Forwarded-Host from non-proxy client', 403)
+    return None
+
+
 def init_public_host_middleware(app):
     @app.before_request
     def enforce_public_host_roles():
@@ -61,11 +69,9 @@ def init_public_host_middleware(app):
         if skip_public_host_middleware(path):
             return None
 
-        if _proxy_header_spoof_attempt() and is_admin_ui_path(path):
-            return error_response(
-                'Untrusted X-Forwarded-Host from non-proxy client',
-                403,
-            )
+        refused = untrusted_forwarded_host_refusal()
+        if refused is not None:
+            return refused
 
         host = request.host.split(':')[0].lower()
         denied = check_host_access(path, host)
