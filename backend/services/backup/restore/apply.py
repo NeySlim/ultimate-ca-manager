@@ -427,14 +427,26 @@ def _refuse_container(value: Any, column, where: str) -> None:
             "where this column takes a single value")
 
 
+def _refuse_non_text(value: Any, where: str) -> None:
+    # A field a dedicated restorer reads (a PEM, an encrypted key) is text or absent; the value is not echoed
+    if value is not None and not isinstance(value, str):
+        kind = {list: 'list', dict: 'object', bool: 'boolean'}.get(type(value), 'number')
+        raise RestoreValidationError(
+            f"Invalid backup: {where} holds a {kind} where this field takes text")
+
+
 def refuse_containers_in_columns(backup_data) -> None:
-    """RestoreValidationError, before any write, for a list or an object in a non JSON
-    column of any row of the manifest: the dedicated restorers query by some of them."""
+    """RestoreValidationError, before any write, for a value no restorer of the row can take.
+
+    A list or an object in a non JSON column, or in a secret property over a column of
+    another name; anything but text in a field the dedicated restorers read themselves
+    (`Section.handled`: the PEMs and the encrypted private keys)."""
     from ..section_store import SectionStore, section_kind
     for section_name, section in SECTIONS.items():
         if section_kind(backup_data, section_name) != 'list':
             continue
         columns, _attribute_of = _mapping_of(load_model(section))
+        handled = set(section.handled.values())
         rows = (backup_data.iter_rows(section_name) if isinstance(backup_data, SectionStore)
                 else backup_data[section_name])
         for row in rows:
@@ -442,10 +454,13 @@ def refuse_containers_in_columns(backup_data) -> None:
                 continue
             for name, value in row.items():
                 column = columns.get(name)
-                if column is not None and name not in section.handled:
+                if name in handled:
+                    _refuse_non_text(value, f"{section_name}.{name}")
+                elif column is not None and name not in section.handled:
                     _refuse_container(value, column, f"{section_name}.{name}")
                 elif (column is None and name in section.secrets
                       and section.stored.get(name) != 'fields'):
+                    # A `fields` secret is an object; none is a property over another column today
                     _refuse_container(value, None, f"{section_name}.{name}")
 
 
