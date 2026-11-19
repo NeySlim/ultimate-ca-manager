@@ -6,8 +6,12 @@ from gunicorn.glogging import Logger
 # Query parameters that carry a credential: password reset and OAuth/OIDC callbacks.
 SECRET_PARAMS = ('token', 'code', 'state', 'access_token', 'id_token', 'refresh_token')
 
+# Any parameter whose name holds one of these: a password refused in a URL still reaches the log
+SECRET_NAME_PARTS = ('password', 'passphrase')
+
 _SECRET_VALUE = re.compile(
-    r'([?&;](?:%s)=)[^&;#\s"]*' % '|'.join(SECRET_PARAMS), re.IGNORECASE)
+    r'([?&;](?:%s|[\w.-]*(?:%s)[\w.-]*)=)[^&;#\s"]*'
+    % ('|'.join(SECRET_PARAMS), '|'.join(SECRET_NAME_PARTS)), re.IGNORECASE)
 
 
 def redact_url(value):

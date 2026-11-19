@@ -125,11 +125,12 @@ def create_acme_account():
     if key_type not in account_types:
         return error_response(f'Key type must be one of: {", ".join(account_types)}', 400)
 
-    # Check for existing account with same email
-    literal = email.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+    # Same address = one whole element of the stored JSON contact list, in any case,
+    # on both engines; `_` and `%` in it are literal, not wildcards
+    element = json.dumps(f'mailto:{email}').lower()
+    literal = element.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
     existing = AcmeAccount.query.filter(
-        # `_` and `%` in the address are literal, not wildcards
-        AcmeAccount.contact.like(f'%{literal}%', escape='\\')
+        db.func.lower(AcmeAccount.contact).like(f'%{literal}%', escape='\\')
     ).first()
     if existing:
         return error_response(f'An account with email {email} already exists', 409)

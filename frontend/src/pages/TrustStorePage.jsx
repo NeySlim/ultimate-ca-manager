@@ -22,7 +22,7 @@ import { useMobile } from '../contexts/MobileContext'
 import { usePermission, useModals, usePersistedState } from '../hooks'
 import { formatDate, cn, downloadBlob, warnSkippedExport, daysRemaining } from '../lib/utils'
 import { soleImported } from '../lib/importResult'
-import { expiryBucket, trustStoreExpiryStatus } from '../lib/expiry'
+import { TRUST_STORE_EXPIRY_WINDOW_DAYS, expiryBucket, trustStoreExpiryStatus } from '../lib/expiry'
 import { runInBatches } from '../lib/bulkChunks'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 import { TrustCertPanel } from '../components/detail/TrustCertPanel'
@@ -342,7 +342,7 @@ export default function TrustStorePage() {
         </div>
       ),
       mobileRender: (val, row) => {
-        const bucket = expiryBucket(daysRemaining(row.not_after))
+        const bucket = expiryBucket(daysRemaining(row.not_after), TRUST_STORE_EXPIRY_WINDOW_DAYS)
         const isExpired = bucket === 'expired'
         const isExpiringSoon = bucket === 'expiring'
         return (
@@ -387,7 +387,7 @@ export default function TrustStorePage() {
       mono: true,
       render: (val) => {
         if (!val) return <span className="text-text-tertiary">—</span>
-        const bucket = expiryBucket(daysRemaining(val))
+        const bucket = expiryBucket(daysRemaining(val), TRUST_STORE_EXPIRY_WINDOW_DAYS)
         const isExpired = bucket === 'expired'
         const isExpiringSoon = bucket === 'expiring'
         return (

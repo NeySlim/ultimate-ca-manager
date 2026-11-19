@@ -11,7 +11,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
-from utils.pkcs12_export import legacy_flag, pkcs12_encryption
+from utils.pkcs12_export import pkcs12_encryption
 from utils.algorithm_refusal import refuse_unexportable_key
 import fips_mode
 from fips_mode import FipsRestricted
@@ -39,7 +39,7 @@ from utils.db_transaction import safe_commit
 from utils.sanitize import content_disposition, sanitize_filename
 from utils.datetime_utils import utc_now, utc_isoformat
 from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message, revocable
-from utils.export_options import export_body, json_boolean, query_boolean
+from utils.export_options import BOOL, FORMAT, PASSWORD, TEXT, read_export_options
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,10 @@ def _chain_by_default(export_format):
 
 
 _EXPORT_FORMATS = ('pem', 'der', 'pkcs7', 'p7b', 'key', 'pkcs12', 'p12', 'pfx', 'jks')
+EXPORT_OPTIONS = {
+    'format': FORMAT, 'include_key': BOOL, 'include_chain': BOOL, 'include_root': BOOL,
+    'password': PASSWORD, 'legacy': BOOL, 'chain_variant': TEXT,
+}
 
 
 def _is_admin_or_operator(user):
@@ -307,45 +311,27 @@ def export_user_certificate(cert_id):
     if not cert:
         return error_response('Certificate data not found', 404)
 
-    data, refused = export_body('user-certificate')
+    opts, refused = read_export_options(EXPORT_OPTIONS, _EXPORT_FORMATS, 'user-certificate')
     if refused:
         return refused
-    if data is not None:
-        export_format = data.get('format', 'pem').lower()
-        password = data.get('password', '')
-        try:
-            include_key = json_boolean(data, 'include_key', _key_by_default(export_format))
-            include_chain = json_boolean(data, 'include_chain', _chain_by_default(export_format))
-            include_root = json_boolean(data, 'include_root', False)
-            legacy_value = json_boolean(data, 'legacy', False)
-        except ValueError as exc:
-            return error_response(str(exc), 400)
-        legacy = legacy_flag(legacy_value)  # 3DES/SHA-1 profile (#331)
-    else:
-        export_format = request.args.get('format', 'pem').lower()
-        password = ''
-        legacy = False
-        try:
-            include_key = query_boolean(request.args, 'include_key', False)
-            include_chain = query_boolean(request.args, 'include_chain', _chain_by_default(export_format))
-            include_root = query_boolean(request.args, 'include_root', False)
-        except ValueError as exc:
-            return error_response(str(exc), 400)
-        # Outside a JSON body no password is read, so no key is served: a GET
-        # carries the certificate alone unless it asks for a key (400).
-        if include_key or export_format in ('pkcs12', 'p12', 'pfx', 'jks', 'key'):
-            return error_response(
-                'Password and private key exports must use POST with a JSON body, '
-                'not the query string', 400)
+    export_format = opts.get('format', 'pem')
+    password = opts.get('password', '')
+    is_get = request.method == 'GET'
+    # A GET reads no password, so it serves no key: the certificate alone, or 400
+    include_key = opts.get('include_key', False if is_get else _key_by_default(export_format))
+    include_chain = opts.get('include_chain', _chain_by_default(export_format))
+    include_root = opts.get('include_root', False)
+    legacy = opts.get('legacy', False)  # 3DES/SHA-1 profile (#331)
+    if is_get and (include_key or export_format in ('pkcs12', 'p12', 'pfx', 'jks', 'key')):
+        return error_response(
+            'Password and private key exports must use POST with a JSON body, '
+            'not the query string', 400)
 
-    if export_format not in _EXPORT_FORMATS:
-        return error_response(f'Unsupported format: {export_format}', 400)
     from api.v2.certificates.export import inapplicable_option, requested_chain_variant
     option_err = inapplicable_option(export_format, include_key, include_chain)
     if option_err:
         return error_response(option_err, 400)
-    variant, variant_err = requested_chain_variant(
-        data if data is not None else request.args, cert)
+    variant, variant_err = requested_chain_variant(opts, cert)
     if variant_err:
         return variant_err
 

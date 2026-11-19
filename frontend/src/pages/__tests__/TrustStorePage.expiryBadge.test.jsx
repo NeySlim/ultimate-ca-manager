@@ -1,6 +1,7 @@
 /**
  * TrustStorePage expiry badges: the column and the mobile row follow the shared
- * day count (lib/utils daysRemaining), so an entry 12 hours from its end is not green.
+ * day count (lib/utils daysRemaining) and the trust store 90-day window, so an entry
+ * 12 hours or 60 days from its end is not green.
  */
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
@@ -85,7 +86,8 @@ describe('TrustStorePage expiry badges', () => {
     store.rows = [
       { id: 1, name: 'half-day', purpose: 'root_ca', not_after: at(12 * HOUR) },
       { id: 2, name: 'gone', purpose: 'root_ca', not_after: at(-HOUR) },
-      { id: 3, name: 'later', purpose: 'root_ca', not_after: at(60 * 24 * HOUR) },
+      { id: 3, name: 'later', purpose: 'root_ca', not_after: at(120 * 24 * HOUR) },
+      { id: 4, name: 'two-months', purpose: 'root_ca', not_after: at(60 * 24 * HOUR) },
     ]
     render(<MemoryRouter><TrustStorePage /></MemoryRouter>)
     await screen.findByTestId('not_after-1')
@@ -95,5 +97,8 @@ describe('TrustStorePage expiry badges', () => {
     expect(variantOf('mobile-name-2')).toBe('danger')
     expect(variantOf('not_after-3')).toBe('success')
     expect(variantOf('mobile-name-3')).toBe('success')
+    // The trust store's window is 90 days, the one its filter and the server use
+    expect(variantOf('not_after-4')).toBe('orange')
+    expect(variantOf('mobile-name-4')).toBe('orange')
   })
 })

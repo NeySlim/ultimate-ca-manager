@@ -18,7 +18,8 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
-from utils.pkcs12_export import legacy_flag, pkcs12_encryption
+from utils.export_options import BOOL, PASSWORD, read_export_options
+from utils.pkcs12_export import pkcs12_encryption
 from utils.algorithm_refusal import refuse_unexportable_key
 import fips_mode
 from fips_mode import FipsRestricted
@@ -30,7 +31,6 @@ from auth.unified import require_auth, has_permission
 # so the administrator half of the rule below answered no to everyone.
 from utils.response import success_response, error_response, created_response
 from utils.export_password import validate_export_password
-from utils.password_field import password_type_error
 from utils.key_codec import load_pem_bytes
 from utils.datetime_utils import utc_now
 from utils.db_transaction import safe_commit
@@ -211,6 +211,9 @@ def reject_key_recovery(rid):
     return success_response(data=req.to_dict(), message='Recovery request rejected')
 
 
+RECOVER_OPTIONS = {'password': PASSWORD, 'legacy': BOOL}
+
+
 @bp.route('/api/v2/key-recovery/<int:rid>/recover', methods=['POST'])
 @require_auth(['write:key_recovery'])
 def recover_key(rid):
@@ -224,15 +227,14 @@ def recover_key(rid):
     if req.requested_by != _username() and not has_permission('admin:key_recovery', getattr(g, 'permissions', [])):
         return error_response('Only the requester or an admin may recover this key', 403)
 
-    data = request.get_json(silent=True) or {}
-    type_err = password_type_error(data.get('password'))
-    if type_err:
-        return error_response(type_err, 400)
-    password = data.get('password') or ''
+    opts, refused = read_export_options(RECOVER_OPTIONS, log_name='key recovery')
+    if refused:
+        return refused
+    password = opts.get('password') or ''
     pw_err = validate_export_password(password)
     if pw_err:
         return error_response(pw_err, 400)
-    legacy = legacy_flag(data.get('legacy'))  # 3DES/SHA-1 profile (#331)
+    legacy = opts.get('legacy', False)  # 3DES/SHA-1 profile (#331)
 
     cert = _requested_certificate(req)
     if not cert or not cert.prv:

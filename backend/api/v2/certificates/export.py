@@ -29,13 +29,13 @@ from models.truststore import TrustedCertificate
 from utils.response import success_response, error_response
 from utils.export_password import (export_password_policy,
                                    validate_export_password)
-from utils.password_field import password_type_error
 from utils.sanitize import content_disposition
 from utils.key_codec import load_pem_bytes
 from utils.cert_issuer import (
     authority_key_identifier_hex, certificate_signed_by, is_self_signed,
 )
-from utils.export_options import export_body, json_boolean, query_boolean
+from utils.export_options import (
+    BOOL, FORMAT, PASSWORD, TEXT, json_boolean, query_boolean, read_export_options)
 from services.key_export_audit import audit_key_export, encrypt_key_pem
 from services.cert.related_pair import row_certificate
 from utils import related_cert
@@ -330,6 +330,14 @@ def export_all_certificates():
         return error_response('Export failed', 500)
 
 
+EXPORT_FORMATS = ('pem', 'der', 'pkcs7', 'p7b', 'key', 'pkcs12', 'pfx', 'jks', 'hybrid-bundle')
+KEY_FORMATS = ('pkcs12', 'pfx', 'jks', 'key')
+EXPORT_OPTIONS = {
+    'format': FORMAT, 'include_key': BOOL, 'include_chain': BOOL, 'include_root': BOOL,
+    'password': PASSWORD, 'legacy': BOOL, 'chain_variant': TEXT,
+}
+
+
 @bp.route('/api/v2/certificates/<int:cert_id>/export', methods=['GET', 'POST'])
 @require_auth(['read:certificates'])
 def export_certificate(cert_id):
@@ -351,42 +359,23 @@ def export_certificate(cert_id):
     if not certificate.crt:
         return error_response('Certificate data not available', 400)
 
-    data, refused = export_body('certificate')
+    opts, refused = read_export_options(EXPORT_OPTIONS, EXPORT_FORMATS, 'certificate')
     if refused:
         return refused
-    if data is not None:
-        export_format = data.get('format', 'pem').lower()
-        try:
-            include_key = json_boolean(data, 'include_key', False)
-            include_chain = json_boolean(data, 'include_chain', False)
-            include_root = json_boolean(data, 'include_root', False)
-            legacy_value = json_boolean(data, 'legacy', False)
-        except ValueError as exc:
-            return error_response(str(exc), 400)
-        type_err = password_type_error(data.get('password'))
-        if type_err:
-            return error_response(type_err, 400)
-        password = data.get('password')
-        # PKCS#12 compatibility profile (3DES/SHA-1) for importers that
-        # reject the AES-256/SHA-256 default (#331)
-        legacy = legacy_flag(legacy_value)
-        variant, variant_err = requested_chain_variant(data, certificate)
-    else:
-        export_format = request.args.get('format', 'pem').lower()
-        try:
-            include_key = query_boolean(request.args, 'include_key', False)
-            include_chain = query_boolean(request.args, 'include_chain', False)
-            include_root = query_boolean(request.args, 'include_root', False)
-        except ValueError as exc:
-            return error_response(str(exc), 400)
-        password = None
-        legacy = False
-        variant, variant_err = requested_chain_variant(request.args, certificate)
-        # Outside a JSON body no password is read, so no key is served
-        if include_key or export_format in ('pkcs12', 'pfx', 'jks', 'key'):
-            return error_response(
-                'Password and private key exports must use POST with a JSON body, '
-                'not the query string', 400)
+    export_format = opts.get('format', 'pem')
+    include_key = opts.get('include_key', False)
+    include_chain = opts.get('include_chain', False)
+    include_root = opts.get('include_root', False)
+    password = opts.get('password')
+    # PKCS#12 compatibility profile (3DES/SHA-1) for importers that
+    # reject the AES-256/SHA-256 default (#331)
+    legacy = opts.get('legacy', False)
+    variant, variant_err = requested_chain_variant(opts, certificate)
+    # A GET reads no password, so it serves no key
+    if request.method == 'GET' and (include_key or export_format in KEY_FORMATS):
+        return error_response(
+            'Password and private key exports must use POST with a JSON body, '
+            'not the query string', 400)
 
     if variant_err:
         return variant_err

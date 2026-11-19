@@ -122,7 +122,7 @@ def _renew_msca_certificate(cert):
     except PermissionError as e:
         return error_response(str(e), 403)
     except KerberosBusy as e:
-        db.session.rollback()
+        # nothing is pending here: a rekey was already restored and committed
         return kerberos_busy_response(e)
     except ValueError as e:
         logger.error(f"Cannot renew certificate {cert_id} via Microsoft CA: {e}")
