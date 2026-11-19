@@ -6,10 +6,12 @@ only when the restore asks for it. The store answers what the
 restore reads of a payload dict, so the restore code is the same for v1 to v4.
 """
 import codecs
+import contextvars
 import hashlib
 import json
 import logging
 import os
+import re
 import shutil
 import stat
 import struct
@@ -17,6 +19,7 @@ from sys import getrefcount
 import tempfile
 import time
 from collections import OrderedDict
+from contextlib import contextmanager
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -35,6 +38,48 @@ _FRAME_LEN = struct.Struct('>I')
 _NONCE_SIZE = 12
 # A store left by a killed worker; a live restore holds the backup lock anyway
 STALE_AFTER_SECONDS = 3600
+# A store a background job creates names the job: `.ucm_restore_<job id>.<random>`
+_OWNER = contextvars.ContextVar('ucm_section_store_owner', default=None)
+_OWNED = re.compile(r'^' + re.escape(STORE_PREFIX) + r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-'
+                    r'[0-9a-f]{4}-[0-9a-f]{12})\.')
+
+
+@contextmanager
+def owned_by(job_id: str):
+    """The stores created in this context carry ``job_id`` in their directory name."""
+    token = _OWNER.set(job_id)
+    try:
+        yield
+    finally:
+        _OWNER.reset(token)
+
+
+def _prefix() -> str:
+    owner = _OWNER.get()
+    return f'{STORE_PREFIX}{owner}.' if owner and _OWNED.match(f'{STORE_PREFIX}{owner}.') else STORE_PREFIX
+
+
+def remove_job_stores(doomed, directory: Optional[str] = None) -> int:
+    """Remove this disk's stores whose job ``doomed(job_id)`` names; how many went.
+
+    Only directories of the owned pattern, never through a link: the caller decides from the
+    job's row which jobs are final, so a store of an active job is never passed here."""
+    directory = directory or store_directory() or fallback_directory()
+    if not directory:
+        return 0
+    removed = 0
+    try:
+        entries = list(os.scandir(directory))
+    except OSError:
+        return 0
+    for entry in entries:
+        match = _OWNED.match(entry.name)
+        if not match or not entry.is_dir(follow_symlinks=False):
+            continue
+        if doomed(match.group(1)):
+            shutil.rmtree(entry.path, ignore_errors=True)
+            removed += not os.path.lexists(entry.path)
+    return removed
 
 
 def store_directory(spool: Optional[str] = None) -> Optional[str]:
@@ -172,7 +217,7 @@ class SectionStore:
 
     def __init__(self, directory: Optional[str] = None, capacity: int = DEFAULT_CAPACITY):
         self._dir = tempfile.mkdtemp(
-            prefix=STORE_PREFIX, dir=directory or store_directory() or fallback_directory())
+            prefix=_prefix(), dir=directory or store_directory() or fallback_directory())
         # Held only in memory: files a killed worker leaves behind stay unreadable
         self._aead = AESGCM(AESGCM.generate_key(bit_length=256))
         self._nonces = 0

@@ -181,6 +181,7 @@ def conclude_job(session, job_id, *, state, reason, from_states, now, result=Non
         session.commit()
     if row and row.get('file_name'):
         purge_file(row['file_name'])
+    purge_stores(job_id)
     return True
 
 
@@ -334,4 +335,29 @@ def sweep_job_files(executor, directory=None, keep_unknown=False):
         if row is None and keep_unknown and not _older_than(directory, name, UNKNOWN_FILE_SECONDS):
             continue
         removed += purge_file(name, directory)
-    return removed
+    return removed + sweep_stores(executor)
+
+
+def purge_stores(job_id):
+    """The decrypted sections a run of this (final) job left on this disk."""
+    try:
+        from services.backup.section_store import remove_job_stores
+        return remove_job_stores(lambda owner: owner == job_id)
+    except Exception as e:
+        logger.error(f"Job {job_id}: restore sections not removed: {type(e).__name__}")
+        return 0
+
+
+def sweep_stores(executor):
+    """This disk's restore sections whose job is final or unknown; never an active job's:
+    each node removes its own, whichever node concluded the job."""
+    from services.backup.section_store import remove_job_stores
+
+    def doomed(job_id):
+        row = _job_row(executor, job_id)
+        return row is None or row['state'] not in ACTIVE_STATES
+    try:
+        return remove_job_stores(doomed)
+    except Exception as e:
+        logger.error(f"Restore sections not swept: {type(e).__name__}")
+        return 0

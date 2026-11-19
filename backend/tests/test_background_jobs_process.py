@@ -6,6 +6,7 @@ own (never the application, its settings nor the host's): each asserts it. The s
 process tests run scheduler_main on a SQLite data directory under tmp_path.
 """
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -36,7 +37,23 @@ url, schema, mode, job_id, marker = sys.argv[2:7]
 args = {'options': f'-csearch_path={schema}'} if schema != '-' else {}
 engine = create_engine(url, connect_args=args)
 with Session(engine) as session:
-    if mode in ('kill', 'exit'):
+    if mode == 'store':  # a run that decrypted its archive's sections into a store, then dies
+        # The module alone, by its path: its package would load the application's settings
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            'section_store', os.path.join(sys.argv[1], 'services', 'backup', 'section_store.py'))
+        section_store = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(section_store)
+        SectionStore, owned_by = section_store.SectionStore, section_store.owned_by
+        assert store.claim_job(session, job_id, f'child/{os.getpid()}', utc_now()) is not None
+        with owned_by(job_id):
+            sections = SectionStore(directory=os.environ['UCM_TEST_STORE_DIR'])
+        sections.add_part('certificates', 0, [{'refid': 'r', 'crt': 'x' * 4096}] * 64)
+        sections.seal()
+        assert 'config.settings' not in sys.modules
+        open(marker, 'w').write(sections._dir)
+        time.sleep(120)
+    elif mode in ('kill', 'exit'):
         assert store.claim_job(session, job_id, f'child/{os.getpid()}', utc_now()) is not None
         with engine.begin() as conn:
             store.write_progress(conn, job_id, f'child/{os.getpid()}', 1, 10, 'working')
@@ -89,10 +106,10 @@ def database(request, tmp_path):
         admin.dispose()
 
 
-def _child(database, mode, job_id, marker):
+def _child(database, mode, job_id, marker, env=None):
     url, schema, _ = database
     return subprocess.Popen([sys.executable, '-I', '-c', CHILD, BACKEND, url, schema, mode, job_id,
-                             str(marker)], env=_env(), stdout=subprocess.PIPE,
+                             str(marker)], env={**_env(), **(env or {})}, stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE, text=True)
 
 
@@ -163,6 +180,53 @@ def test_a_killed_executor_is_concluded_by_the_next_start(app, database, tmp_pat
         assert not store.active_jobs(session)
     assert len(written) == lines
     assert not os.path.exists(os.path.join(directory, name))
+
+
+def test_a_killed_restore_leaves_no_sections_and_a_live_one_keeps_its_own(app, database, tmp_path):
+    """The store of a killed run goes when its job is concluded executor_lost, before any
+    sweep; the store of a job still running, here or on another node, survives every pass."""
+    from services.backup import section_store
+    _, _, engine = database
+    with app.app_context():
+        directory = section_store.store_directory()
+    with Session(engine) as session:
+        lost = _create(session, 'test_backup', 'backup')
+        live = _create(session, 'audit_verify', 'audit_verify')
+    children, stores = {}, {}
+    try:
+        for job_id in (lost, live):
+            marker = tmp_path / f'store-{job_id}'
+            children[job_id] = _child(database, 'store', job_id, marker,
+                                      env={'UCM_TEST_STORE_DIR': directory})
+            _wait_for(marker, children[job_id])
+            stores[job_id] = marker.read_text()
+            assert os.path.isdir(stores[job_id]) and os.listdir(stores[job_id])
+        os.kill(children[lost].pid, signal.SIGKILL)
+        children[lost].wait(timeout=10)
+        with app.app_context(), Session(engine) as session:
+            # Its lease lapsed (HA) or the scheduler restarted (one node): the same conclusion
+            session.execute(store.T.update().where(store.T.c.id == lost).values(
+                lease_expires_at=utc_now() - timedelta(seconds=1)))
+            session.commit()
+            assert store.recover_orphans(session, now=utc_now(), all_running=False) == 1
+            assert store.job_row(session, lost)['reason'] == 'executor_lost'
+            assert not os.path.exists(stores[lost]), 'the killed run left its sections'
+            assert os.path.isdir(stores[live])
+            store.sweep_job_files(session, keep_unknown=False)
+            assert os.path.isdir(stores[live]), 'the sweep removed a running job\'s sections'
+            # Its executor dead but the job not yet concluded: still active, still kept
+            os.kill(children[live].pid, signal.SIGKILL)
+            children[live].wait(timeout=10)
+            store.sweep_job_files(session, keep_unknown=False)
+            assert os.path.isdir(stores[live])
+            assert store.conclude_job(session, live, state='failed', reason='executor_lost',
+                                      from_states=('running',), now=utc_now())
+            assert not os.path.exists(stores[live])
+    finally:
+        for child in children.values():
+            _stop(child)
+        for path in stores.values():
+            shutil.rmtree(path, ignore_errors=True)
 
 
 @pytest.mark.parametrize('first, second', [('backup', 'backup'), ('restore', 'backup'),
