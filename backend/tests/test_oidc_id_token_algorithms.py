@@ -371,3 +371,55 @@ def test_an_okp_key_without_its_point_is_a_malformed_signing_key(idp, x):
     idp['keys'] = [jwk]
     with pytest.raises(OIDCValidationError, match='malformed JWKS signing key'):
         _verify(_token(key, 'EdDSA'))
+
+
+DISCOVERY_URL = f'{ISSUER}/.well-known/openid-configuration'
+
+
+def test_an_algorithm_the_idp_adds_is_accepted_after_one_rereading(idp):
+    key = _rsa_key()
+    idp['keys'] = [_jwk(key)]
+    idp['discovery'] = {'id_token_signing_alg_values_supported': ['RS256']}
+    _verify(_token(key, 'RS256'), oauth2_jwks_uri=None)
+    idp['discovery'] = {'id_token_signing_alg_values_supported': ['RS256', 'PS256']}
+    assert _verify(_token(key, 'PS256'), oauth2_jwks_uri=None)['sub'] == 'user-123'
+    assert idp['fetched'] == [DISCOVERY_URL, JWKS_URI, DISCOVERY_URL]
+
+
+def test_a_burst_of_unlisted_tokens_rereads_the_discovery_once(idp, monkeypatch):
+    import services.oidc_id_token as oidc
+    key = _rsa_key()
+    idp['keys'] = [_jwk(key)]
+    idp['discovery'] = {'id_token_signing_alg_values_supported': ['RS256']}
+    for _attempt in range(5):
+        with pytest.raises(oidc.OIDCValidationError, match='PS256 is not listed'):
+            _verify(_token(key, 'PS256'), oauth2_jwks_uri=None)
+    assert idp['fetched'] == [DISCOVERY_URL, DISCOVERY_URL]
+    # Once the window has passed, the next refusal reads it again
+    monkeypatch.setattr(oidc, '_REFRESH_INTERVAL_SECONDS', 0)
+    with pytest.raises(oidc.OIDCValidationError, match='PS256 is not listed'):
+        _verify(_token(key, 'PS256'), oauth2_jwks_uri=None)
+    assert idp['fetched'] == [DISCOVERY_URL] * 3
+
+
+@pytest.mark.parametrize('alg', ['none', 'HS256', 'RS1'])
+def test_an_algorithm_outside_the_product_list_stays_refused_whatever_the_idp_lists(idp, alg):
+    from services.oidc_id_token import OIDCValidationError
+    idp['keys'] = [_jwk(_rsa_key())]
+    idp['discovery'] = {'id_token_signing_alg_values_supported': ['RS256', alg]}
+    for _attempt in range(3):
+        with pytest.raises(OIDCValidationError, match=f'unsupported ID token signing algorithm {alg}'):
+            _verify(_token(None, alg, signature=b'x'), oauth2_jwks_uri=None)
+    assert idp['fetched'] == []
+
+
+def test_a_burst_of_forged_signatures_refreshes_the_jwks_once(idp):
+    from services.oidc_id_token import OIDCValidationError
+    key = _rsa_key()
+    idp['keys'] = [_jwk(key)]
+    header, _payload, sig = _token(key, 'RS256').split('.')
+    forged = f"{header}.{_b64(json.dumps(_claims(sub='admin')).encode())}.{sig}"
+    for _attempt in range(5):
+        with pytest.raises(OIDCValidationError, match='signature is invalid'):
+            _verify(forged)
+    assert idp['fetched'] == [JWKS_URI, JWKS_URI]
