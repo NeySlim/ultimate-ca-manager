@@ -75,7 +75,7 @@ Exportez les journaux filtrés en :
 - **JSON** : Lisible par machine, inclut tous les champs
 - **CSV** : Compatible avec les tableurs, inclut les champs clés
 
-Les exportations n'appliquent que la plage de dates, jusqu'à 10 000 entrées : les autres filtres ne sont pas appliqués.
+Les exportations suivent les filtres de la page (recherche, utilisateur, action, statut et plage de dates) et contiennent au plus 10 000 entrées.
 
 ## Nettoyage
 
