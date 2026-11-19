@@ -9,7 +9,7 @@ import logging
 
 from auth.unified import require_auth, has_permission
 from utils.response import success_response, error_response
-from utils.export_options import check_export_request
+from utils.export_options import check_export_request, json_boolean, query_boolean
 from utils.sanitize import sanitize_filename
 from utils.datetime_utils import utc_isoformat
 from models import CA, Certificate, db
@@ -179,14 +179,20 @@ def export_ca(ca_id):
     if request.method == 'POST' and request.is_json:
         data = request.get_json()
         export_format = data.get('format', 'pem').lower()
-        include_key = bool(data.get('include_key', False))
+        try:
+            include_key = json_boolean(data, 'include_key', False)
+        except ValueError as exc:
+            return error_response(str(exc), 400)
         include_chain = bool(data.get('include_chain', False))
         password = data.get('password')
         legacy = legacy_flag(data.get('legacy'))  # 3DES/SHA-1 profile (#331)
         variant, variant_err = _requested_variant(data, ca)
     else:
         export_format = request.args.get('format', 'pem').lower()
-        include_key = request.args.get('include_key', 'false').lower() == 'true'
+        try:
+            include_key = query_boolean(request.args, 'include_key', False)
+        except ValueError as exc:
+            return error_response(str(exc), 400)
         include_chain = request.args.get('include_chain', 'false').lower() == 'true'
         password = request.args.get('password')
         legacy = False

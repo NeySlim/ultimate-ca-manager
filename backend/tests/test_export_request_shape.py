@@ -439,3 +439,24 @@ def test_a_pem_export_password_follows_the_export_password_rule(auth_client, mat
     r = auth_client.post(url, json={**PEM_KEY_ROUTES[kind][0], 'password': 'short'})
     assert r.status_code == 400, r.data[:300]
     assert b'PRIVATE KEY' not in r.data and 'between 8 and' in r.get_json()['message']
+
+
+# 7. The CA route reads include_key as a boolean, as the certificate route does
+
+@pytest.mark.parametrize('value', ['false', 'true', 0, 1, 'no', None, []])
+def test_a_ca_include_key_that_is_not_a_boolean_is_refused(auth_client, material, value):
+    r = auth_client.post(f"/api/v2/cas/{material['ca']}/export", json={'format': 'pem', 'include_key': value})
+    assert r.status_code == 400, r.data[:300]
+    assert b'PRIVATE KEY' not in r.data and 'include_key' in r.get_json()['message']
+
+
+@pytest.mark.parametrize('value', ['1', 'yes', 'on'])
+def test_a_ca_query_include_key_that_is_not_true_or_false_is_refused(auth_client, material, value):
+    r = auth_client.get(f"/api/v2/cas/{material['ca']}/export?format=pem&include_key={value}")
+    assert r.status_code == 400 and b'PRIVATE KEY' not in r.data
+
+
+@pytest.mark.parametrize('body, has_key', [({'include_key': True}, True), ({'include_key': False}, False), ({}, False)])
+def test_a_ca_boolean_include_key_is_unchanged(auth_client, material, body, has_key):
+    r = auth_client.post(f"/api/v2/cas/{material['ca']}/export", json={'format': 'pem', **body})
+    assert r.status_code == 200 and (b'PRIVATE KEY' in r.data) == has_key
