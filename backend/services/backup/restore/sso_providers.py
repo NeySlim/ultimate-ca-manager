@@ -37,6 +37,13 @@ def refuse_archived_shared_types(backup_data) -> None:
     """BackupSchemaError, before any write, when the archive itself holds two providers of one type
     or a provider whose type is not one the product knows (an absent type is oauth2)."""
     from models.sso import SSOProvider
+    rows = backup_data.get(SECTION)
+    # Every row the restorer would write is checked: one without a text name escapes _archived
+    for row in rows if isinstance(rows, list) else []:
+        if isinstance(row, dict) and not (isinstance(row.get('name'), str) and row['name'].strip()):
+            raise BackupSchemaError(
+                "Cannot restore: one of the archive's SSO providers has no name, or a name "
+                "that is not text. Nothing has been changed.")
     by_type: Dict[str, List[str]] = {}
     for row in _archived(backup_data):
         kind = row.get('provider_type', 'oauth2')

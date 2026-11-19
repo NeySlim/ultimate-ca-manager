@@ -356,6 +356,27 @@ def test_an_archived_provider_type_out_of_the_list_is_refused(target, value, mod
     assert User.query.count() == 0
 
 
+UNNAMED = {'number': 123, 'none': None, 'empty': '', 'spaces': '  ', 'list': ['corp'],
+           'object': {'n': 'corp'}, 'false': False}
+
+
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+@pytest.mark.parametrize('name', sorted(UNNAMED))
+def test_an_archived_provider_without_a_text_name_is_refused(target, name, mode):
+    from services.backup.errors import BackupSchemaError
+    here = SSOProvider(name='other', provider_type='oauth2', **IDPS['oauth2'][2])
+    db.session.add(here)
+    db.session.commit()
+    archive = _archive('3.0', 'oauth2', IDPS['oauth2'][0], 'kate-sub')
+    archive['sso_providers'][0].update(name=UNNAMED[name], provider_type='x')
+    with pytest.raises(BackupSchemaError) as refused:
+        _restore(archive, mode)
+    assert 'name' in str(refused.value) and 'Nothing has been changed' in str(refused.value)
+    db.session.rollback()
+    assert [(p.name, p.provider_type) for p in SSOProvider.query.all()] == [('other', 'oauth2')]
+    assert User.query.count() == 0
+
+
 @pytest.mark.parametrize('kind, field', NOT_TEXT_FIELDS)
 def test_a_field_here_that_is_not_text_names_no_idp(app, kind, field):
     from services.backup.restore.sso_providers import _another_idp
