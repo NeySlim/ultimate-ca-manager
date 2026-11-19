@@ -127,3 +127,31 @@ class TestAcmePreflightFips:
         refusal = fips_csr_refusal(csr)
         assert refusal.startswith('The CSR key (algorithm 1.3.101.127) cannot be read'), refusal
         assert 'unreadable key' not in refusal
+
+
+class TestAcmePreflightKeyType:
+    """The preflight refuses a certificate key type as the real request does."""
+
+    def _post(self, client, key_type):
+        return post_json(client, '/api/v2/acme/client/preflight', {
+            'domains': ['preflight.example.com'], 'email': 'admin@example.com',
+            'challenge_type': 'http-01', 'mode': 'validate_only', 'key_type': key_type})
+
+    def test_unknown_key_type_is_refused(self, auth_client):
+        r = self._post(auth_client, 'DSA-1024')
+        assert r.status_code == 400, r.data
+        assert 'Invalid key type' in get_json(r)['message']
+
+    def test_fips_refused_key_type_is_refused(self, auth_client, monkeypatch):
+        from services.acme import acme_client_service as svc
+        monkeypatch.setattr(svc, 'fips_key_type_refusal',
+                            lambda label: 'EC-BP256 keys not available in FIPS mode')
+        r = self._post(auth_client, 'EC-BP256')
+        assert r.status_code == 400, r.data
+        assert 'FIPS' in get_json(r)['message']
+
+    def test_known_key_type_passes_the_check(self, auth_client, monkeypatch):
+        from services.acme.acme_preflight_service import AcmePreflightService
+        monkeypatch.setattr(AcmePreflightService, 'run', staticmethod(
+            lambda **kw: {'ok': True, 'mode': 'validate_only', 'steps': [], 'txt_records': []}))
+        assert self._post(auth_client, 'EC-P256').status_code == 200

@@ -4402,7 +4402,7 @@ Content-Type: application/json
 
 { "domains": ["www.example.com"], "challenge_type": "dns-01", "mode": "full" }
 ```
-Permission `write:acme`. Dry-run of a certificate request; returns a report with `ok` and per-step results. `domains` is required; `challenge_type` defaults to `dns-01`; `mode` is `full` (default) or `validate_only`; optional `email`, `acme_account_id`, `dns_provider_id` (integers), `key_source` (default `generate`), `csr_pem` and `verify_dns`.
+Permission `write:acme`. Dry-run of a certificate request; returns a report with `ok` and per-step results. `domains` is required; `challenge_type` defaults to `dns-01`; `mode` is `full` (default) or `validate_only`; optional `email`, `acme_account_id`, `dns_provider_id` (integers), `key_source` (default `generate`), `csr_pem` and `verify_dns`. `key_type` is checked as the certificate request checks it: an unknown type, or one FIPS mode refuses, answers `400` before any step runs.
 
 ---
 
