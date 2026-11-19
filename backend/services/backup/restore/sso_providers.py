@@ -40,7 +40,7 @@ def refuse_archived_shared_types(backup_data) -> None:
     from models.sso import SSOProvider
     rows = backup_data.get(SECTION)
     # Every row the restorer would write is checked: one without a text name escapes _archived.
-    # A blank name is text: an instance that let one be created must restore its own backup
+    # A blank name is text, given a name by name_blank_providers: 2.254 accepted one on a rename
     for row in rows if isinstance(rows, list) else []:
         if isinstance(row, dict) and not isinstance(row.get('name'), str):
             raise BackupSchemaError(
@@ -68,6 +68,38 @@ def refuse_archived_shared_types(backup_data) -> None:
                 f"{', '.join(repr(n) for n in names)}. UCM uses one SSO provider per type: restore "
                 "it on the release that wrote it, keep one provider of each type, then take a new "
                 "backup. Nothing has been changed.")
+
+
+def name_blank_providers(backup_data, warnings: List[str]) -> None:
+    """An archived provider with a blank name takes its type as its name, as the upgrade from 2.254
+    names it (numbered when another provider holds that name); what names it follows."""
+    from models.sso import SSOProvider
+    from utils.unique_names import first_free
+    from .names import _Rule, _follow_references
+    rows = _archived(backup_data)
+    blank = [index for index, row in enumerate(rows) if not row['name'].strip()]
+    if not blank:
+        return
+    before = [dict(row) for row in rows]
+    final = {index: row['name'] for index, row in enumerate(rows)}
+    taken = {row['name'] for row in rows if row['name'].strip()}
+    here = [(p.name, p.provider_type) for p in SSOProvider.query]
+    for index in blank:
+        kind = rows[index].get('provider_type', 'oauth2')
+        # A provider here of the same type under that name is this one, upgraded
+        final[index] = first_free(kind, taken | {name for name, held in here if held != kind})
+        taken.add(final[index])
+        warnings.append(f"sso_providers: the archive's {kind} provider with a blank name is "
+                        f"restored as {final[index]!r}")
+    _follow_references(backup_data, SECTION, _Rule('name', None), before, final, warnings)
+    # An archive of 2.254 names the provider on the account row
+    for row in backup_data.get('users') or []:
+        ref = row.get(f'sso_provider_id{REFERENCE_SUFFIX}') if isinstance(row, dict) else None
+        matches = [i for i in blank if isinstance(ref, dict) and ref.get('name') == before[i]['name']]
+        if matches:
+            row[f'sso_provider_id{REFERENCE_SUFFIX}'] = {**ref, 'name': final[matches[0]]}
+    for index in blank:
+        rows[index]['name'] = final[index]
 
 
 def _archived_tenants(row: Dict[str, Any], field: str) -> List[str]:

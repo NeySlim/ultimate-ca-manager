@@ -33,7 +33,8 @@ from .restore.apply import (apply_columns, apply_section, refuse_containers_in_c
                             relink_references)
 from .restore.names import rename_clashing_rows
 from .restore.orders import keep_newer_orders
-from .restore.sso_providers import refuse_archived_shared_types, settle_provider_types
+from .restore.sso_providers import (name_blank_providers, refuse_archived_shared_types,
+                                    settle_provider_types)
 from .restore.repairs import replay_repairs
 from .restore.conflict import conflict_from_integrity_error, is_value_too_long
 from .restore.replace import plan_replacement, remove_after_writes, remove_before_writes
@@ -375,6 +376,7 @@ class RestoreCoreMixin:
         # One SSO provider per type at the end, whatever the mode (restore/sso_providers.py)
         refuse_archived_shared_types(backup_data)
         sso_warnings: List[str] = []
+        name_blank_providers(backup_data, sso_warnings)
         settle_provider_types(backup_data, 'sso_providers' in pruned, sso_warnings, displaced)
         renamed_here: Dict[str, dict] = {}
         renamed = rename_clashing_rows(backup_data, ambiguous_references,
