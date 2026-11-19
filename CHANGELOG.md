@@ -7,6 +7,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Security
+
+- Exports: a password sent as a form or in a `GET`, as a non-string, under another name (`Password`, `passphrase`) or twice in the JSON body was ignored and the private key came back in clear. The export routes now answer 400 for these shapes, and the access log masks `password` and `passphrase` query values.
+
 ## [2.254.6] - 2026-11-19
 
 ### Security
