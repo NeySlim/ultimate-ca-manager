@@ -177,9 +177,9 @@ def list_certificates():
         )
 
         if sort_order == 'desc':
-            query = query.order_by(status_order.desc(), Certificate.subject.asc())
+            query = query.order_by(status_order.desc(), Certificate.subject.asc(), Certificate.id.asc())
         else:
-            query = query.order_by(status_order.asc(), Certificate.subject.asc())
+            query = query.order_by(status_order.asc(), Certificate.subject.asc(), Certificate.id.asc())
     elif sort_by == 'compliance_grade':
         # Approximate compliance score in SQL for sorting:
         # Key strength: RSA 4096/EC = best, RSA 2048 = good, RSA 1024 = bad
@@ -202,9 +202,9 @@ def list_certificates():
 
         level_order = key_level_order(Certificate.key_algo)
         if sort_order == 'desc':
-            query = query.order_by(compliance_order.desc(), level_order.desc(), _cn_sort.asc())
+            query = query.order_by(compliance_order.desc(), level_order.desc(), _cn_sort.asc(), Certificate.id.asc())
         else:
-            query = query.order_by(compliance_order.asc(), level_order.asc(), _cn_sort.asc())
+            query = query.order_by(compliance_order.asc(), level_order.asc(), _cn_sort.asc(), Certificate.id.asc())
     elif sort_column not in ('special', 'special_compliance'):
         # Tie-break on the primary key. Every sortable column here has
         # duplicates — `revoked` has two distinct values for the whole table —
