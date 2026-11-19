@@ -4,16 +4,12 @@ MIT krb5 reads KRB5_CLIENT_KTNAME when the initiator credential is acquired:
 inside requests-kerberos ``generate_request_header`` (``spnego.client`` then
 ``ctx.step``), during the HTTP exchange. The variable is process-wide, so it
 names one connection's keytab only while that connection holds the lock.
-The ticket the keytab yields goes to a MEMORY cache of that connection
-(KRB5CCNAME, set and restored with it), never to the process default cache.
 """
-import hashlib
 import os
 import threading
 from contextlib import contextmanager
 
 ENV = 'KRB5_CLIENT_KTNAME'
-CCACHE_ENV = 'KRB5CCNAME'
 _FILE_TYPES = ('FILE', 'WRFILE')
 # gevent patches threading under gunicorn: a greenlet waits here, it does not block the hub
 _LOCK = threading.RLock()
@@ -44,16 +40,10 @@ def managed_keytab_error(path):
     return None
 
 
-def ccache_name(owner, path, principal):
-    """The ticket cache of one identity: connection, keytab and principal."""
-    digest = hashlib.sha256(f'{owner}\0{path}\0{principal or ""}'.encode()).hexdigest()[:32]
-    return f'MEMORY:ucm-msca-{digest}'
-
-
 @contextmanager
 def client_keytab(path, principal=None, owner=None):
-    """KRB5_CLIENT_KTNAME is ``path`` and KRB5CCNAME the identity's cache inside the block,
-    what they were before outside it. Without a keytab nothing is set and no lock is taken."""
+    """KRB5_CLIENT_KTNAME is ``path`` inside the block and what it was before outside it.
+    Without a keytab nothing is set and no lock is taken."""
     error = managed_keytab_error(path)
     if error:
         raise ValueError(error)
@@ -63,16 +53,14 @@ def client_keytab(path, principal=None, owner=None):
     if not _LOCK.acquire(timeout=LOCK_WAIT_SECONDS):
         raise KerberosBusy('Another Kerberos sign-in to a Microsoft CA is in progress: try again')
     try:
-        before = {name: os.environ.get(name) for name in (ENV, CCACHE_ENV)}
+        before = os.environ.get(ENV)
         os.environ[ENV] = path
-        os.environ[CCACHE_ENV] = ccache_name(owner, path, principal)
         try:
             yield
         finally:
-            for name, value in before.items():
-                if value is None:
-                    os.environ.pop(name, None)
-                else:
-                    os.environ[name] = value
+            if before is None:
+                os.environ.pop(ENV, None)
+            else:
+                os.environ[ENV] = before
     finally:
         _LOCK.release()
