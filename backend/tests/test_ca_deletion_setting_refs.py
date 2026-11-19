@@ -255,7 +255,6 @@ def test_the_check_reads_only_the_declared_settings(app, create_ca):
     from sqlalchemy import event
     ca = create_ca(cn='Checked without a scan')
     with app.app_context():
-        row = db.session.get(CA, ca['id'])
         extra = [SystemConfig(key=f'unrelated.setting.{n}', value=str(n)) for n in range(40)]
         db.session.add_all(extra)
         db.session.commit()

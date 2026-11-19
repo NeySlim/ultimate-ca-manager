@@ -21,6 +21,7 @@ import fips_mode
 from fips_mode import FipsRestricted
 from models import CA, SSHCertificateAuthority, db
 from utils import key_algorithms
+from tests.ssh_cleanup import ssh_rows_stay_in_their_module  # noqa: F401
 
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 

@@ -7,6 +7,7 @@ restricted nothing.
 from models import Group, SSHCertificate, SSHCertificateAuthority, db
 from tests.test_ssh import _create_ssh_ca, _generate_test_ssh_key, post_json, put_json
 import pytest
+from tests.ssh_cleanup import ssh_rows_stay_in_their_module  # noqa: F401
 
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 

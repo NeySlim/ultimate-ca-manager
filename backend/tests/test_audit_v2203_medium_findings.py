@@ -26,6 +26,7 @@ Follow-ups to the #246 fixes (audited after merge):
 import json
 
 import pytest
+from tests.ssh_cleanup import ssh_rows_stay_in_their_module  # noqa: F401
 
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
 
