@@ -23,6 +23,7 @@ import { formatDate , downloadBlob, cn, extractData} from '../lib/utils'
 import { SSH_EDDSA_KEY_TYPES, SSH_FIPS_DEFAULT_KEY_TYPE, sshEddsaRefused, sshKeyOptions, useKeyPlatform } from '../lib/policyAlgorithms'
 import { findAlgorithm, isUsable, GROUP_RSA, GROUP_NIST } from '../lib/keyAlgorithms'
 import { HsmBadge } from './cas/CAListUtils'
+import { sanitizeFilename } from '../lib/exportDownload'
 
 const KEY_ALGORITHM_OPTIONS = [
   { value: 'ed25519', label: 'Ed25519' },
@@ -184,7 +185,7 @@ export default function SSHCAsPage() {
     try {
       const blob = await sshCasService.getSetupScript(ca.id, platform)
       const ext = platform === 'windows' ? 'ps1' : 'sh'
-      downloadBlob(blob, `ssh_ca_setup_${(ca.descr || 'ca').replace(/[^a-zA-Z0-9_-]/g, '_')}.${ext}`)
+      downloadBlob(blob, `ssh_ca_setup_${sanitizeFilename(ca.descr || 'ca')}.${ext}`)
     } catch (error) {
       showError(error.message || t('common.operationFailed'))
     }

@@ -37,6 +37,28 @@ describe('sanitizeFilename', () => {
     expect(sanitizeFilename('🔐🔐')).toBe('_')
   })
 
+  it('clips whole characters within a byte budget', () => {
+    const cjk = sanitizeFilename('\u6f22'.repeat(300))
+    expect(new TextEncoder().encode(cjk).length).toBeLessThanOrEqual(200)
+    expect(cjk).toBe('\u6f22'.repeat(66))
+    const astral = sanitizeFilename('a' + '\u{20000}'.repeat(200))
+    expect(astral).toBe('a' + '\u{20000}'.repeat(49))
+    expect(sanitizeFilename('x'.repeat(300))).toBe('x'.repeat(128))
+  })
+
+  it('drops invisible letters and a mark that opens the name', () => {
+    expect(sanitizeFilename('a\u3164b\u115fc\ufe0fd\u034fe')).toBe('abcde')
+    expect(sanitizeFilename('\u0301abc')).toBe('abc')
+    expect(sanitizeFilename('\u3164')).toBe('export')
+  })
+
+  it('never hands back a Windows device name', () => {
+    expect(sanitizeFilename('CON')).toBe('CON_')
+    expect(sanitizeFilename('com\u00b9')).toBe('com\u00b9_')
+    expect(sanitizeFilename('lpt3')).toBe('lpt3_')
+    expect(sanitizeFilename('console')).toBe('console')
+  })
+
   it('strips control characters, newlines included', () => {
     expect(sanitizeFilename('web\r\nContent-Type: evil')).toBe('web_Content-Type_evil')
     expect(sanitizeFilename('tab\there')).toBe('tab_here')
