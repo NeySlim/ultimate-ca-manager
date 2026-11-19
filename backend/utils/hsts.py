@@ -10,10 +10,9 @@ HSTS can be disabled entirely (for instances serving self-signed certs during
 setup — see issue #154) either by `hsts_enabled=false` in SystemConfig or by
 `UCM_HSTS_ENABLED=0` in the environment.
 
-All three helpers are DB-tolerant: they never raise if the DB / SystemConfig
-table is unavailable (e.g. during boot before init, under safe mode). A setting
-the environment does not fix and the database cannot give means no header at
-all; the individual helpers fall back to defaults for display.
+The builder never raises when the DB / SystemConfig table is unavailable (boot
+before init, safe mode): a setting the environment does not fix and the
+database cannot give means no header at all.
 """
 import os
 
@@ -87,28 +86,10 @@ def _max_age(src) -> int:
     return max(0, n)
 
 
-def hsts_enabled() -> bool:
-    """Whether HSTS should be emitted at all."""
-    val = _setting('hsts_enabled')
-    # Unread, it may be off: one response without HSTS beats pinning a year by mistake
-    return val is not _UNREADABLE and _enabled(val)
-
-
-def hsts_include_subdomains() -> bool:
-    """Whether the `includeSubDomains` directive is emitted (when HSTS is on)."""
-    val = _setting('hsts_include_subdomains')
-    return val is _UNREADABLE or _enabled(val)
-
-
-def hsts_max_age() -> int:
-    """HSTS max-age in seconds (clamped to >= 0)."""
-    src = _setting('hsts_max_age')
-    return _max_age(None if src is _UNREADABLE else src)
-
-
 def build_hsts_header() -> str | None:
     """The HSTS header value, or None when HSTS is off or any of its three
     settings the environment does not fix cannot be read from the database."""
+    # Unread, it may be off: one response without HSTS beats pinning a year by mistake
     enabled, subdomains, max_age = (
         _setting(k) for k in ('hsts_enabled', 'hsts_include_subdomains', 'hsts_max_age'))
     if _UNREADABLE in (enabled, subdomains, max_age) or not _enabled(enabled):

@@ -410,7 +410,7 @@ Content-Type: application/json
 
 { "format": "pkcs12", "password": "at-least-8-chars", "include_chain": true, "include_root": false, "legacy": false }
 ```
-Session only. `format` is `pem` (default) or `pkcs12`/`p12`. A PEM download is the certificate alone; it adds the issuing chain (and the root with `include_root=true`) only when `include_chain` or `include_root` is sent in the request, and `include_chain=false` keeps the certificate alone. PKCS12 is refused on the query-string form with `400` (the password must travel in a POST body); it also needs a stored private key. `legacy` selects the 3DES/SHA-1 profile. Returns the file as a download. `404` when the enrolment is not the caller's (admins may download any).
+Session only. `format` is `pem` (default) or `pkcs12`/`p12`. A PEM download is the certificate alone; it adds the issuing chain (and the root with `include_root=true`) only when `include_chain` or `include_root` is sent in the request, and `include_chain=false` keeps the certificate alone. PKCS12 is refused on the query-string form with `400` (the password must travel in a POST JSON body); it also needs a stored private key. A POST body must be a JSON object (`Content-Type: application/json`): a form, a `text/plain` body or a JSON value that is not an object answers `400`, as does a `password` in the query string, whatever the method and the body. `legacy` selects the 3DES/SHA-1 profile. Returns the file as a download. `404` when the enrolment is not the caller's (admins may download any).
 
 ```http
 POST /api/v2/mtls/enroll
@@ -698,6 +698,8 @@ GET /api/v2/cas/{ca_id}/export?format=pem&include_chain=true&chain_variant=cross
 
 `POST` takes `format`, `include_key`, `include_chain`, `password` (required for the PKCS12, PFX and JKS formats; with `format=pem` and `include_key` or with `key`, it encrypts the key as PKCS#8) and `legacy` in a JSON body. `chain_variant` is `auto` (default: the chain UCM serves), `primary` (the self-signed root)
 or `cross:<id>`; any other value, or one that is not part of the chain of this CA, answers 400.
+
+A POST body must be a JSON object (`Content-Type: application/json`): a form, a `text/plain` body or a JSON value that is not an object answers `400`, as does a `password` in the query string, whatever the method and the body. A private key leaves this route only through a JSON body: a GET, or a POST without a body, that asks for one (`include_key`, `format=key`, `pkcs12`, `p12`, `pfx`, `jks`) answers `400`.
 
 `include_key` with a format that carries no key (`der`, `p7b`, `pkcs7`) answers `400`. A `password` that is not a string, or outside the rule (8 to 256 characters, at most 1023 bytes in UTF-8), answers `400` whatever the format; a valid one is ignored when the output carries no private key (`der`, `p7b`, `pkcs7`, `pem` without `include_key`). A key export is audited as `private_key_exported`, `password-protected` or `unencrypted`. `legacy` applies to `pkcs12` and `pfx` only and is ignored for the other formats: a JKS keeps its own format, the Sun key protector for the key entry and a SHA-1 integrity digest, whatever `legacy` says.
 
@@ -993,7 +995,7 @@ JSON booleans in POST bodies; strings such as `"false"` are rejected.
 `include_key` with `der`, `pkcs7` or `p7b`, and `include_chain` with `der`, answer `400`
 naming the field: those formats carry no key, and DER a single certificate.
 
-A private key leaves this route only for a POST with a JSON body: a GET, or a POST whose body is not JSON, that asks for one (`include_key`, `format=key`, `pkcs12`, `pfx`, `jks`) or carries a `password` answers `400`.
+A POST body must be a JSON object (`Content-Type: application/json`): a form, a `text/plain` body or a JSON value that is not an object answers `400`, as does a `password` in the query string, whatever the method and the body. A private key leaves this route only through a JSON body: a GET, or a POST without a body, that asks for one (`include_key`, `format=key`, `pkcs12`, `pfx`, `jks`) answers `400`.
 
 The `password` encrypts every private key the response carries: required for `pkcs12`, `pfx` and `jks`; optional for `key`, `hybrid-bundle` and `pem` with `include_key`, where the key is PKCS#8 encrypted when one is given and written in clear when not. A `password` that is not a string, or outside the rule (8 to 256 characters and at most 1023 bytes in UTF-8, valid Unicode), answers `400` whatever the format, `der` and `pkcs7` included; a valid one is ignored when the output carries no private key (`der`, `pkcs7`/`p7b`, `pem` without `include_key`). The `private_key_exported` audit entry says `password-protected` or `unencrypted` accordingly. `legacy` applies to PKCS#12/PFX only: the JKS format keeps its own protection (Sun key protector and SHA-1 integrity digest) whatever `legacy` says.
 
@@ -1308,7 +1310,7 @@ POST /api/v2/user-certificates/{id}/export
 {"format": "pkcs12", "password": "mypassword", "include_chain": true, "include_root": false}
 ```
 
-A GET, or a POST whose body is not JSON, returns no key: its `include_key` defaults to false, and a request for a key (`include_key`, `format=key`, `pkcs12`, `p12`, `pfx`, `jks`) or a `password` there answers `400`. With `format=pem` and `include_key`, a `password` (POST) encrypts the key as PKCS#8; without one the key is written in clear. `password` is not read when the output carries no private key (it is not checked either), the same rule applies to the ones that are read (400 for a value that is not a string, or outside 8 to 256 characters and 1023 bytes in UTF-8), and `legacy` applies to `pkcs12` only (a JKS keeps the Sun key protector and its SHA-1 integrity digest). Each export is audited as `user_certificate_exported`; an export of the key alone also writes `private_key_exported`.
+A POST body must be a JSON object (`Content-Type: application/json`): a form, a `text/plain` body or a JSON value that is not an object answers `400`, as does a `password` in the query string, whatever the method and the body. A GET, or a POST without a body, returns no key: its `include_key` defaults to false, and a request for a key there (`include_key`, `format=key`, `pkcs12`, `p12`, `pfx`, `jks`) answers `400`. With `format=pem` and `include_key`, a `password` (POST) encrypts the key as PKCS#8; without one the key is written in clear. `password` is not read when the output carries no private key (it is not checked either), the same rule applies to the ones that are read (400 for a value that is not a string, or outside 8 to 256 characters and 1023 bytes in UTF-8), and `legacy` applies to `pkcs12` only (a JKS keeps the Sun key protector and its SHA-1 integrity digest). Each export is audited as `user_certificate_exported`; an export of the key alone also writes `private_key_exported`.
 
 **Query Parameters**:
 | Param | Type | Description |
@@ -1518,7 +1520,7 @@ Content-Type: application/json
 
 { "format": "csr" }
 ```
-Permission `read:csrs`. `format` is `csr` (default) or `key` (the private key, with an optional `password` for an encrypted export, which follows the shared export password rule: 8 to 256 characters, `400` otherwise; an empty one means an unencrypted key). With `format=csr` a `password` is ignored: a request holds no secret. The `GET` form refuses a `password` in the query string (`400`). `400` when the CSR has no private key for `key`; `404` for an unknown CSR.
+Permission `read:csrs`. `format` is `csr` (default) or `key` (the private key, with an optional `password` for an encrypted export, which follows the shared export password rule: 8 to 256 characters, `400` otherwise; an empty one means an unencrypted key). With `format=csr` a `password` is ignored: a request holds no secret. A POST body must be a JSON object (`Content-Type: application/json`): a form, a `text/plain` body or a JSON value that is not an object answers `400`, as does a `password` in the query string, whatever the method and the body. A `GET` with `format=key` returns the key in clear; a POST without a JSON body asking for it answers `400`. `400` when the CSR has no private key for `key`; `404` for an unknown CSR.
 
 ```http
 POST /api/v2/csrs/{csr_id}/resubmit

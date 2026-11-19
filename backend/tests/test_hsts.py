@@ -5,7 +5,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.hsts import build_hsts_header, hsts_enabled, hsts_include_subdomains, hsts_max_age, hsts_env_locked
+from utils.hsts import build_hsts_header, hsts_env_locked
 from models import SystemConfig, db
 
 
@@ -42,9 +42,6 @@ def _clean_hsts_env(monkeypatch, app):
 class TestHstsDefaults:
     def test_defaults_to_legacy_header(self, app):
         with app.app_context():
-            assert hsts_enabled() is True
-            assert hsts_include_subdomains() is True
-            assert hsts_max_age() == 31536000
             assert build_hsts_header() == 'max-age=31536000; includeSubDomains'
 
 
@@ -52,44 +49,40 @@ class TestHstsDisabled:
     def test_disabled_via_db(self, app):
         with app.app_context():
             _set_cfg('hsts_enabled', 'false')
-            assert hsts_enabled() is False
             assert build_hsts_header() is None
 
     def test_disabled_via_env(self, app, monkeypatch):
         monkeypatch.setenv('UCM_HSTS_ENABLED', '0')
         with app.app_context():
-            assert hsts_enabled() is False
             assert build_hsts_header() is None
 
     def test_env_override_wins_over_db(self, app, monkeypatch):
         monkeypatch.setenv('UCM_HSTS_ENABLED', 'true')
         with app.app_context():
             _set_cfg('hsts_enabled', 'false')
-            assert hsts_enabled() is True
+            assert build_hsts_header() == 'max-age=31536000; includeSubDomains'
 
 
 class TestHstsOptions:
     def test_drop_include_subdomains(self, app):
         with app.app_context():
             _set_cfg('hsts_include_subdomains', 'false')
-            assert hsts_include_subdomains() is False
             assert build_hsts_header() == 'max-age=31536000'
 
     def test_custom_max_age(self, app):
         with app.app_context():
             _set_cfg('hsts_max_age', '86400')
-            assert hsts_max_age() == 86400
             assert build_hsts_header() == 'max-age=86400; includeSubDomains'
 
     def test_invalid_max_age_falls_back(self, app):
         with app.app_context():
             _set_cfg('hsts_max_age', 'not-a-number')
-            assert hsts_max_age() == 31536000
+            assert build_hsts_header() == 'max-age=31536000; includeSubDomains'
 
     def test_negative_max_age_clamped(self, app):
         with app.app_context():
             _set_cfg('hsts_max_age', '-5')
-            assert hsts_max_age() == 0
+            assert build_hsts_header() == 'max-age=0; includeSubDomains'
 
 
 class TestHstsEnvLocked:

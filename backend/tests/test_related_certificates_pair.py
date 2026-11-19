@@ -467,8 +467,10 @@ def test_the_bundle_holds_both_keys_when_asked(auth_client, create_ca):
 def test_the_bundle_keys_need_the_private_key_permission(app, auth_client, create_ca, create_user):
     a, _b = _pair(auth_client, create_ca, 'pair-export-denied.example.com')
     operator = _login(app, create_user)
-    r = operator.get(f"/api/v2/certificates/{a['id']}/export?format=hybrid-bundle&include_key=true")
-    assert r.status_code == 403
+    r = operator.post(f"/api/v2/certificates/{a['id']}/export",
+                      json={'format': 'hybrid-bundle', 'include_key': True})
+    assert r.status_code == 403, r.data
+    assert 'read:private_keys' in r.get_json()['message']
     assert operator.get(f"/api/v2/certificates/{a['id']}/export?format=hybrid-bundle").status_code == 200
 
 

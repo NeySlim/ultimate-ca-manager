@@ -25,7 +25,7 @@ from fips_mode import FipsRestricted
 from utils.key_codec import load_pem_bytes
 
 from utils.export_password import validate_export_password
-from utils.export_options import json_boolean, query_boolean
+from utils.export_options import export_body, json_boolean, query_boolean
 from services.key_export_audit import audit_key_export, encrypt_key_pem
 
 logger = logging.getLogger(__name__)
@@ -170,8 +170,10 @@ def export_ca(ca_id):
     if not ca.crt:
         return error_response('CA certificate data not available', 400)
 
-    if request.method == 'POST' and request.is_json:
-        data = request.get_json()
+    data, refused = export_body('CA')
+    if refused:
+        return refused
+    if data is not None:
         export_format = data.get('format', 'pem').lower()
         try:
             include_key = json_boolean(data, 'include_key', False)
@@ -188,13 +190,11 @@ def export_ca(ca_id):
             include_chain = query_boolean(request.args, 'include_chain', False)
         except ValueError as exc:
             return error_response(str(exc), 400)
-        password = request.args.get('password')
+        password = None
         legacy = False
         variant, variant_err = _requested_variant(request.args, ca)
-        # Passwords and key-bearing formats must not travel in the URL
-        if password or include_key or export_format in ('pkcs12', 'p12', 'pfx', 'jks', 'key'):
-            if password:
-                logger.warning("Rejected CA %s export with password in query string", ca_id)
+        # Outside a JSON body no password is read, so no key is served
+        if include_key or export_format in ('pkcs12', 'p12', 'pfx', 'jks', 'key'):
             return error_response(
                 'Password and private key exports must use POST with a JSON body, '
                 'not the query string', 400)
@@ -222,7 +222,7 @@ def export_ca(ca_id):
         return error_response(pw_err, 400)
 
     try:
-        explicit = (data if request.method == 'POST' and request.is_json else request.args).get('chain_variant') not in (None, '', 'auto')
+        explicit = (data if data is not None else request.args).get('chain_variant') not in (None, '', 'auto')
         cert_pem, parent_pems = _export_chain(ca, include_chain, variant, explicit)
 
         # Private key only export

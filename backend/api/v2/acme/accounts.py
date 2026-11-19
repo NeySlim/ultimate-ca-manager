@@ -126,8 +126,10 @@ def create_acme_account():
         return error_response(f'Key type must be one of: {", ".join(account_types)}', 400)
 
     # Check for existing account with same email
+    literal = email.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
     existing = AcmeAccount.query.filter(
-        AcmeAccount.contact.like(f'%{email}%')
+        # `_` and `%` in the address are literal, not wildcards
+        AcmeAccount.contact.like(f'%{literal}%', escape='\\')
     ).first()
     if existing:
         return error_response(f'An account with email {email} already exists', 409)

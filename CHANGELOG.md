@@ -138,6 +138,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **A local ACME account is refused only for an e-mail already used.** Creating one whose address holds `_` or `%` answered `409` when another account's address matched it with those read as wildcards.
 - **A generated CSR keeps the State, Locality and Email entered.** `POST /api/v2/csrs` dropped them without an error, so the request carried only C, O, OU and CN; the form now also has an Email field, and re-keying a CSR as a new CSR keeps its email (#449). The email is trimmed and must be an ASCII address, else `400` (RFC 2985 §5.2.1).
 - **A SQLite lock no longer answers 500.** A request that meets the database locked by another write, longer than it may wait, and would have answered 500 (a sign-in that cannot count its attempt included) answers 503 with `Retry-After` instead; a route that turns the error into another status keeps it.
 - **HSTS is not sent when its settings cannot be read.** A response served while the database could not answer (locked by a restore, unavailable) carried the default HSTS header even with HSTS switched off or a shorter duration saved; it now carries none, unless the `UCM_HSTS_*` environment variables set each setting the database could not give.
@@ -340,11 +341,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Dashboard: `GET /api/v2/dashboard/system-status` returned the mail (with its host), webhook and auto-renewal status to any authenticated caller; these entries now need `read:settings`, like the same witnesses on `/dashboard/health`.
 - ACME client: revoking a certificate obtained from an ACME CA (single, bulk or approved request) only revoked it in UCM while the CA still answered "good"; the CA is now told (RFC 8555 §7.6) with reasons 1, 3, 4, 5 and 9 (privilegeWithdrawn included) and retried by the scheduler until it confirms, and the answer says when the revocation stayed local (`acme_local_only`), a hold included.
 - Dependencies: cbor2 6.1.2 → 6.3.0 (GHSA-6rgc-8hxm-rj7p, GHSA-55vx-2phh-7grr, GHSA-p6xp-9h6j-r278). A passkey sign-in response carrying crafted extension data crashed the worker before any signature was checked; it is now refused like any failed sign-in.
-- Export: a certificate or user certificate export whose body was not JSON (a form, `curl -d`) ignored the password it carried and returned the private key in clear. A private key now leaves these routes only for a POST with a JSON body; any other request asking for one answers `400`.
+- Export: a certificate, user certificate or CSR export whose body was not JSON (a form, `curl -d`) ignored the password it carried and returned the private key in clear. Export routes now answer `400` to a POST body that is not a JSON object and to a `password` in the query string, and a certificate key leaves them only through a JSON body.
 
 ### Upgrade notes
 
-- Exports: a GET or form request for a certificate's or user certificate's private key answers `400`; send a POST with a JSON body. A GET of a user certificate no longer includes its key (see UPGRADE.md).
+- Exports: a GET request for a certificate's or user certificate's private key, and any export POST whose body is not a JSON object, answer `400`; send a POST with a JSON body. A GET of a user certificate no longer includes its key (see UPGRADE.md).
 - Microsoft CA: a Kerberos connection whose keytab path lies inside the UCM data folder stops authenticating; move that keytab elsewhere and save the new path (see UPGRADE.md).
 - FIPS image: the module becomes the OpenSSL FIPS Provider 3.5.9 (certificate #5586) without any step; TLS 1.2 peers without Extended Master Secret are refused in both directions (see UPGRADE.md).
 - CA import: a CA with an RSA key under 2048 bits is no longer accepted together with its private key; import it without the key (read-only, for chains) or replace it.

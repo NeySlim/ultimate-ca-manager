@@ -16,6 +16,7 @@ from services.cert.unique_subject import OVERRIDE_FIELD, SubjectTaken, override_
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils import notices as notices_mod
 from utils.export_password import validate_export_password
+from utils.export_options import export_body
 from utils.password_field import password_type_error
 from utils.pagination import parse_request_pagination
 from utils.dn_validation import validate_dn_field
@@ -803,8 +804,10 @@ def export_csr(csr_id):
     if not cert or not cert.csr:
         return error_response('CSR not found', 404)
 
-    if request.method == 'POST' and request.is_json:
-        data = request.get_json(silent=True) or {}
+    data, refused = export_body('CSR')
+    if refused:
+        return refused
+    if data is not None:
         export_format = str(data.get('format') or 'csr').lower()
         type_err = password_type_error(data.get('password'))
         if type_err:
@@ -813,8 +816,9 @@ def export_csr(csr_id):
     else:
         export_format = (request.args.get('format') or 'csr').lower()
         password = None
-        if request.args.get('password'):
-            return error_response('Password must be sent via POST body (JSON), not query string', 400)
+        # A GET may fetch the key in clear; a POST asking for it must say so in JSON
+        if request.method == 'POST' and export_format == 'key':
+            return error_response('A key export by POST must use a JSON body', 400)
     if export_format not in ('csr', 'key'):
         return error_response('format must be csr or key', 400)
 
