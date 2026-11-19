@@ -504,14 +504,17 @@ def create_missing_indexes(engine, metadata):
     """create_all skips a table that exists, with its indexes: one a cut start left out (SQLite
     commits each statement) is created here. Any 3.0 database already holds the model's indexes."""
     from sqlalchemy import inspect as _inspect
+    from utils.serial_duplicates import INDEX as serial_index
     insp = _inspect(engine)
     tables = set(insp.get_table_names())
+    # Two certificates of one CA under one serial: the unique index waits for step 144
+    waiting = {serial_index} if _serial_steps_pending(engine) else set()
     for table in metadata.sorted_tables:
         if table.name not in tables:
             continue
         present = {i['name'] for i in insp.get_indexes(table.name)}
         for index in table.indexes:
-            if index.name not in present:
+            if index.name not in present and index.name not in waiting:
                 say(f"✓ Creating index {index.name} missing from {table.name}")
                 index.create(engine)
 

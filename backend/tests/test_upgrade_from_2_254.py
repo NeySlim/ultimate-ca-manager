@@ -268,6 +268,40 @@ def test_a_start_after_the_twins_are_resolved_runs_step_144_alone(base):
     assert base.upgrade()
 
 
+def test_a_start_with_twins_left_goes_on_without_the_unique_index(base):
+    """Two rows of one CA under one serial: the start's index pass leaves the unique index to
+    step 144, which creates it once the twins are resolved, instead of failing on them."""
+    import migration_runner
+    populate(base)
+    twin_crt = _material()['twin'][1]
+    base.run("INSERT INTO certificates (id, refid, descr, caref, serial_number, crt, renewed_times) "
+             "VALUES (5, 'cert-5', 'cert-5', 'ca-b', '255', :c, 0)", {'c': twin_crt})
+    assert base.upgrade()
+    migration_runner.create_missing_indexes(base.engine, fresh_metadata())
+    assert 'uix_certificates_ca_serial' not in snapshot_index_names(base)
+    assert base.run("SELECT key FROM system_config WHERE key = 'serial_unique_index_pending'") != []
+    # Every other index of the model is there
+    missing = {index.name for table in fresh_metadata().sorted_tables for index in table.indexes}
+    assert missing - snapshot_index_names(base) == {'uix_certificates_ca_serial'}
+    # Resolved: the next start creates it, and the index pass has nothing left to do
+    base.run("DELETE FROM certificates WHERE id IN (3, 5)")
+    assert base.upgrade()
+    migration_runner.create_missing_indexes(base.engine, fresh_metadata())
+    assert 'uix_certificates_ca_serial' in snapshot_index_names(base)
+
+
+def test_the_index_pass_restores_the_unique_index_when_nothing_is_pending(base):
+    """The index waits only while twins are listed: a start cut before it creates it."""
+    import migration_runner
+    populate(base)
+    base.run("DELETE FROM certificates WHERE id = 3")
+    assert base.upgrade()
+    assert base.run("SELECT key FROM system_config WHERE key = 'serial_unique_index_pending'") == []
+    base.run("DROP INDEX uix_certificates_ca_serial")
+    migration_runner.create_missing_indexes(base.engine, fresh_metadata())
+    assert 'uix_certificates_ca_serial' in snapshot_index_names(base)
+
+
 def test_a_replay_that_fails_leaves_the_key_for_the_next_start(base, monkeypatch):
     """The key is the only replay trigger: a failed replay must not have cleared it first."""
     import migrations._from_2_254 as package
