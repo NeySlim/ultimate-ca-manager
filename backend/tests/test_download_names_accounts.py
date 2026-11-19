@@ -167,6 +167,9 @@ def test_report_downloads(auth_client):
 def test_custom_pdf_named_after_the_requested_template(auth_client, name):
     pytest.importorskip('fpdf')
     sections = auth_client.get('/api/v2/reports/pdf/templates').get_json()['data']['sections']
+    days = [datetime.date.today().isoformat()]
     r = auth_client.post('/api/v2/reports/pdf/generate', json={'template': name, 'sections': sections[:1]})
-    today = datetime.date.today().isoformat()
+    days.append(datetime.date.today().isoformat())
+    # Midnight between the route's reading of the date and ours: either day is the right one
+    today = next((d for d in days if d in r.headers.get('Content-Disposition', '')), days[-1])
     assert_named(r, f'{name}-{today}', '.pdf', f"{plain_stem(name, '')}-{today}", prefix='ucm-report-')

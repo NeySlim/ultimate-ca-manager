@@ -46,6 +46,13 @@ def test_cross_certificate_export(app, auth_client, name):
     assert_named(auth_client.get(_x(b, xid, '/export') + '?format=der'), name, f'-cross-{xid}.cer', plain)
 
 
+def _drop_ssh_ca(app, ca_id):
+    from models.ssh import SSHCertificateAuthority
+    with app.app_context():
+        db.session.delete(db.session.get(SSHCertificateAuthority, ca_id))
+        db.session.commit()
+
+
 @pytest.fixture(params=NAMES, ids=NAME_IDS)
 def ssh_ca(app, auth_client, request):
     r = auth_client.post('/api/v2/ssh/cas', json={'descr': 'jp ssh ca', 'ca_type': 'host', 'key_type': 'ed25519'})
@@ -56,7 +63,8 @@ def ssh_ca(app, auth_client, request):
         row = db.session.get(SSHCertificateAuthority, data['id'])
         row.descr = request.param
         db.session.commit()
-    return data['id'], data['refid'], request.param
+    yield data['id'], data['refid'], request.param
+    _drop_ssh_ca(app, data['id'])
 
 
 def test_ssh_public_key_download(auth_client, ssh_ca):
@@ -95,6 +103,7 @@ def test_ssh_ascii_names_keep_their_historical_header(auth_client, app):
         'attachment; filename="ssh_ca_plain_ssh_ca_krl"'
     assert auth_client.get(f'/api/v2/ssh/cas/{ca_id}/setup-script').headers['Content-Disposition'] == \
         'attachment; filename="ssh_ca_setup_plain_ssh_ca.sh"'
+    _drop_ssh_ca(app, ca_id)
 
 
 def test_shared_store_download_header_is_quoted_ascii(app, monkeypatch):
