@@ -173,6 +173,17 @@ def _listed(names):
     """'a', 'a and b', 'a, b and c'."""
     return names[0] if len(names) == 1 else ', '.join(names[:-1]) + ' and ' + names[-1]
 
+_SORT_COLUMNS = {
+    'id': SSHCertificate.id,
+    'key_id': SSHCertificate.key_id,
+    'cert_type': SSHCertificate.cert_type,
+    'serial': SSHCertificate.serial,
+    'valid_from': SSHCertificate.valid_from,
+    'valid_to': SSHCertificate.valid_to,
+    'created_at': SSHCertificate.created_at,
+}
+
+
 @bp.route('/api/v2/ssh/certificates', methods=['GET'])
 @require_auth(['read:ssh'])
 def list_ssh_certificates():
@@ -225,7 +236,12 @@ def list_ssh_certificates():
             )
         )
 
-    query = query.order_by(SSHCertificate.created_at.desc())
+    # An unknown column or direction gives the default order, as on the other lists
+    sort_col = _SORT_COLUMNS.get(request.args.get('sort_by', ''), SSHCertificate.created_at)
+    if request.args.get('sort_order', 'desc').lower() == 'asc':
+        query = query.order_by(sort_col.asc(), SSHCertificate.id.asc())
+    else:
+        query = query.order_by(sort_col.desc(), SSHCertificate.id.desc())
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     shared = SSHCertificate.shared_serials()
 
