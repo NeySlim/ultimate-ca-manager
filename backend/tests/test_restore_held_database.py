@@ -868,3 +868,40 @@ def test_the_dialogs_first_poll_after_the_wait_reads_the_held_job(started_elsewh
     seen = admin.get(started.headers['Location'])
     assert seen.status_code == 200, seen.data
     assert seen.get_json()['data']['phase'] == restore_job.APPLYING
+
+
+def test_a_restore_that_ends_within_the_wait_answers_its_report_though_it_held_the_database(
+        started_elsewhere, monkeypatch):
+    """The start request sees the held database first; the restore then commits and ends
+    before the wait does: the POST answers the report, never a 202 its revoked session follows."""
+    app = started_elsewhere.app
+    seen_held = threading.Event()
+    real_view = restore_job.local_view
+
+    def spy(job_id):
+        view = real_view(job_id)
+        if view is not None:
+            seen_held.set()
+        return view
+    monkeypatch.setattr(restore_job, 'local_view', spy)
+    admin = _client(app, 'admin', 'changeme123')
+    script = started_elsewhere.make(gate_at=0.1, held_at=0.2)
+
+    def conclude():
+        # Released only once the start request has read the held state: the order is forced
+        assert seen_held.wait(10)
+        script.release.set()
+        assert script.done.wait(10)
+        with app.app_context():
+            assert store.conclude_job(db.session, script.job_id, state=store.SUCCEEDED,
+                                      reason=None, from_states=(store.RUNNING,), now=jobs._now(),
+                                      result={'code': 200, 'message': 'Restored',
+                                              'data': {'restored': {'users': 1}}})
+            db.session.remove()
+    ender = threading.Thread(target=conclude, daemon=True)
+    ender.start()
+    started = _post_restore(admin, started_elsewhere.archive)
+    ender.join(15)
+    assert seen_held.is_set()
+    assert started.status_code == 200, started.data
+    assert started.get_json()['data'] == {'restored': {'users': 1}}

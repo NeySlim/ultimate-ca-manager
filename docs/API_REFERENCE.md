@@ -3328,8 +3328,9 @@ it locked past a request's one-second wait), only the health probes, `GET /api/v
 are answered, from its local state and for a session or API key checked during this restore
 (same host; a session also sends its CSRF token; a start request still waiting when the restore
 begins checks its caller again at that moment): a credential not checked since the restore began answers
-`503`, a request with none `401`. A start request whose wait meets the held database answers
-`202` with the job as its local state shows it. Every other request answers `503` with
+`503`, a request with none `401`. A start request waits out the held database on the
+restore's local state: a restore that ends within the wait answers its result, one still held when
+the wait ends answers `202` with the job as its local state shows it. Every other request answers `503` with
 `Retry-After: 30` and the message `This UCM instance is restoring a backup and its transaction
 holds the database: only the health checks and the restore job are served until it ends. Retry
 later.`; OCSP answers the `tryLater` status (RFC 6960 section 2.3). A request that meets a SQLite
