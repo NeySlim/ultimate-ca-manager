@@ -35,6 +35,7 @@ from utils.nul_text import NUL, escape_nul
 
 from ..export_generic import CHAIN_VARIANT_FINGERPRINT, REFERENCE_SUFFIX, load_model
 from ..manifest import SECTIONS
+from . import audit_ids
 from .plan import RestorePlan, RestoreValidationError, row_label
 from .transaction import tick
 from .windows_profiles import IDENTITY as _PROFILE_IDENTITY, PROFILES as _PROFILES, restored_identity
@@ -146,19 +147,26 @@ def apply_section(section_name: str, rows: List[Dict[str, Any]],
         db.session.flush()
         plan.refresh(sorted(set(section.references.values())))
 
+    # An audit entry's seal covers its id: a replacement writes each back under its own
+    keep_ids = section_name == audit_ids.SECTION and plan.keep_audit_ids
+    if keep_ids:
+        audit_ids.hold_appends()
     applied = 0
     for row in rows:
         tick(1)
-        target_id = plan.existing_id(section_name, row)
+        target_id = row['id'] if keep_ids else plan.existing_id(section_name, row)
         instance = db.session.get(model, target_id) if target_id is not None else None
-        if instance is None:
-            instance = model()
+        created = instance is None
+        if created:
+            instance = model(id=row['id']) if keep_ids else model()
             db.session.add(instance)
 
         if _apply_or_leave_out(section_name, section, instance, row, columns,
                                attribute_of, plan):
             plan.place(section_name, row, instance)
             applied += 1
+            if created and section_name == audit_ids.SECTION and not keep_ids:
+                plan.audit_new += 1
 
     db.session.flush()
     return applied

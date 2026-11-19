@@ -69,6 +69,10 @@ class RestorePlan:
         self._placed: Dict[Tuple[str, int], Any] = {}
         # The identity rows here per key, as first read since the last refresh
         self._sso_rows: Dict[Tuple, List[Any]] = {}
+        # Audit entries written back under their archived ids (a replacement of an archive
+        # carrying them), else the number of those written under ids of this installation
+        self.keep_audit_ids = False
+        self.audit_new = 0
 
     # -- building ---------------------------------------------------------
 
@@ -81,6 +85,8 @@ class RestorePlan:
         plan.pruned = frozenset(pruned)
         plan.same_installation = same_installation(backup_data)
         plan._validate_shape(backup_data)
+        from .audit_ids import SECTION as _AUDIT, carried_ids
+        plan.keep_audit_ids = carried_ids(plan.rows.get(_AUDIT)) and _AUDIT in plan.pruned
         plan._index_target_rows(backup_data)
         plan._warn_shared_identities(pruned)
         return plan

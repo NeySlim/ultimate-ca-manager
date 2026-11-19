@@ -27,6 +27,7 @@ from .errors import BackupSchemaError, RestoreFilesUnwritable
 from .export_generic import REFERENCE_SUFFIX
 from .restore import RestorePlan, single_transaction
 from .restore.transaction import checkpoint, expect_rows, tick, ticking
+from .restore import audit_ids
 from .manifest import SECTIONS
 from .section_store import SectionStore, section_kind, section_length
 from .restore.apply import (apply_columns, apply_section, escape_nul_in_archive,
@@ -789,7 +790,7 @@ class RestoreCoreMixin:
             if name == 'user_sso_identities':
                 rows = self._identities_free_here(rows, plan)
             results[name] = apply_section(name, rows, plan)
-
+        audit_ids.settle(plan)
 
         # Rows of another installation can name user ids this one has not handed out yet
         from services.backup import user_id_counter

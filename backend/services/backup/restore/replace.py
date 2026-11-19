@@ -28,6 +28,7 @@ from models import db
 
 from ..export_generic import load_model
 from ..manifest import SECTIONS
+from . import audit_ids
 from .conflict import RestoreConflictError, describe_row
 from .plan import (
     _UNBOUND_TAKEN, RestorePlan, _normalise, _temporal_identity, shared_identity_warning,
@@ -125,6 +126,8 @@ def rows_to_remove(section_name: str, archived_rows: List[Dict[str, Any]],
     section = SECTIONS[section_name]
     if section.identity == ('id',):
         return []          # singleton configuration: nothing to prune
+    if section_name == audit_ids.SECTION and plan.keep_audit_ids:
+        return audit_ids.rows_to_remove(archived_rows, plan)
 
     archived = Counter()
     for row in archived_rows:
