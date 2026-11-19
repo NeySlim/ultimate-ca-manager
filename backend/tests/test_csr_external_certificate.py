@@ -141,7 +141,7 @@ class TestExternalCertificateCompletesCSR:
         assert csr['id'] in {c['id'] for c in _json(r)['data']}
 
         # The key stayed with the certificate: exportable with it
-        r = auth_client.get(f'{CERTS}/{csr["id"]}/export?format=key')
+        r = auth_client.post(f'{CERTS}/{csr["id"]}/export', json={'format': 'key'})
         assert r.status_code == 200
         assert b'PRIVATE KEY' in r.data
         r = auth_client.post(f'{CERTS}/{csr["id"]}/export',

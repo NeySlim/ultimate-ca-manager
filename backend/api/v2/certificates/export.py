@@ -381,8 +381,9 @@ def export_certificate(cert_id):
         password = request.args.get('password')
         legacy = False
         variant, variant_err = requested_chain_variant(request.args, certificate)
-        # SECURITY: never accept passwords via query string
-        if password or export_format in ('pkcs12', 'pfx', 'jks'):
+        # Outside a JSON body no password is read: a key never leaves in
+        # clear because the body carrying its password was not JSON.
+        if password or include_key or export_format in ('pkcs12', 'pfx', 'jks', 'key'):
             if password:
                 logger.warning(
                     "Rejected certificate export with password in query string "
@@ -390,9 +391,8 @@ def export_certificate(cert_id):
                     cert_id,
                 )
             return error_response(
-                'Password must be sent via POST body (JSON), not query string',
-                400,
-            )
+                'Password and private key exports must use POST with a JSON body, '
+                'not the query string', 400)
 
     if variant_err:
         return variant_err

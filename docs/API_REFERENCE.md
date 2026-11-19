@@ -955,8 +955,9 @@ GET /api/v2/certificates/{cert_id}
 # PEM format (certificate only)
 GET /api/v2/certificates/{cert_id}/export?format=pem
 
-# PEM with private key
-GET /api/v2/certificates/{cert_id}/export?format=pem&include_key=true
+# PEM with private key: POST with a JSON body, as for every export carrying a key
+POST /api/v2/certificates/{cert_id}/export
+{"format": "pem", "include_key": true}
 
 # PKCS12 (PFX): POST with a JSON body, the password never goes in the query string
 POST /api/v2/certificates/{cert_id}/export
@@ -991,6 +992,8 @@ JSON booleans in POST bodies; strings such as `"false"` are rejected.
 
 `include_key` with `der`, `pkcs7` or `p7b`, and `include_chain` with `der`, answer `400`
 naming the field: those formats carry no key, and DER a single certificate.
+
+A private key leaves this route only for a POST with a JSON body: a GET, or a POST whose body is not JSON, that asks for one (`include_key`, `format=key`, `pkcs12`, `pfx`, `jks`) or carries a `password` answers `400`.
 
 The `password` encrypts every private key the response carries: required for `pkcs12`, `pfx` and `jks`; optional for `key`, `hybrid-bundle` and `pem` with `include_key`, where the key is PKCS#8 encrypted when one is given and written in clear when not. A `password` that is not a string, or outside the rule (8 to 256 characters and at most 1023 bytes in UTF-8, valid Unicode), answers `400` whatever the format, `der` and `pkcs7` included; a valid one is ignored when the output carries no private key (`der`, `pkcs7`/`p7b`, `pem` without `include_key`). The `private_key_exported` audit entry says `password-protected` or `unencrypted` accordingly. `legacy` applies to PKCS#12/PFX only: the JKS format keeps its own protection (Sun key protector and SHA-1 integrity digest) whatever `legacy` says.
 
@@ -1300,18 +1303,18 @@ GET /api/v2/user-certificates/{id}
 
 ### Export User Certificate
 ```http
-GET /api/v2/user-certificates/{id}/export?format=pem&include_key=true&include_chain=true
+GET /api/v2/user-certificates/{id}/export?format=pem&include_chain=true
 POST /api/v2/user-certificates/{id}/export
 {"format": "pkcs12", "password": "mypassword", "include_chain": true, "include_root": false}
 ```
 
-With `format=pem` and `include_key`, a `password` (POST) encrypts the key as PKCS#8; without one the key is written in clear. `password` is not read when the output carries no private key (it is not checked either), the same rule applies to the ones that are read (400 for a value that is not a string, or outside 8 to 256 characters and 1023 bytes in UTF-8), and `legacy` applies to `pkcs12` only (a JKS keeps the Sun key protector and its SHA-1 integrity digest). Each export is audited as `user_certificate_exported`; an export of the key alone also writes `private_key_exported`.
+A GET, or a POST whose body is not JSON, returns no key: its `include_key` defaults to false, and a request for a key (`include_key`, `format=key`, `pkcs12`, `p12`, `pfx`, `jks`) or a `password` there answers `400`. With `format=pem` and `include_key`, a `password` (POST) encrypts the key as PKCS#8; without one the key is written in clear. `password` is not read when the output carries no private key (it is not checked either), the same rule applies to the ones that are read (400 for a value that is not a string, or outside 8 to 256 characters and 1023 bytes in UTF-8), and `legacy` applies to `pkcs12` only (a JKS keeps the Sun key protector and its SHA-1 integrity digest). Each export is audited as `user_certificate_exported`; an export of the key alone also writes `private_key_exported`.
 
 **Query Parameters**:
 | Param | Type | Description |
 |-------|------|-------------|
 | format | string | `pem` (default), `der`, `pkcs7` (or `p7b`), `key` (the private key alone, `.key`), `pkcs12` (`p12`, `pfx`) or `jks`; any other value is `400` |
-| include_key | bool | Include private key (default: true, false for `der`, `pkcs7`, `p7b`; `true` with those is `400`) |
+| include_key | bool | Include private key (JSON body only; default: true, false for `der`, `pkcs7`, `p7b`, and false for a GET; `true` with those formats is `400`) |
 | include_chain | bool | Include CA chain (default: true, false for `der` and `key`; `true` with `der` is `400`) |
 | include_root | bool | Include the final self-signed Root CA when the chain is included (default: false) |
 | password | string | PKCS12 and JKS password (required, min 8 chars); optional for `key`, where it encrypts the key as PKCS#8 |
