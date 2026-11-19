@@ -898,7 +898,32 @@
     "renewed": "证书已续期",
     "subjectTakenTitle": "主题已被使用",
     "subjectTakenConfirm": "主题 {{subject}} 已被此 CA 的序列号为 {{serial}} 的证书使用。仅当此证书与已使用该主题的证书属于同一实体时才确认：证书将签发给该实体，您的确认会记录在审计日志中。",
-    "issueAnyway": "签发给同一实体"
+    "issueAnyway": "签发给同一实体",
+    "intent": "查看、颁发和维护您的证书。",
+    "issue": "颁发",
+    "total_one": "{{count, number}} 个证书",
+    "total_other": "{{count, number}} 个证书",
+    "range_one": "第 {{start}}–{{end}} 个，共 {{count, number}} 个证书",
+    "range_other": "第 {{start}}–{{end}} 个，共 {{count, number}} 个证书",
+    "searchPlaceholder": "名称、描述、颁发者、序列号…",
+    "viewsLabel": "按状态筛选",
+    "views": {
+      "all": "全部",
+      "expiring": "待续期",
+      "valid": "有效",
+      "expired": "已过期",
+      "revoked": "已吊销",
+      "orphan": "孤立",
+      "archived": "已归档"
+    },
+    "state": "状态",
+    "expiry": "到期",
+    "keyHeld": "私钥由 UCM 保管",
+    "compareHint": "请选择一个或两个证书进行比较",
+    "exportSelectedPem": "导出为 PEM",
+    "bulkExported_one": "已导出 {{count}} 个证书",
+    "bulkExported_other": "已导出 {{count}} 个证书",
+    "listLabel": "证书列表"
   },
   "cas": {
     "chainRevoked": "上游已吊销",
@@ -4248,7 +4273,13 @@
     "hoursAgo_one": "{{count}} 小时前",
     "hoursAgo_other": "{{count}} 小时前",
     "daysAgo_one": "{{count}} 天前",
-    "daysAgo_other": "{{count}} 天前"
+    "daysAgo_other": "{{count}} 天前",
+    "inHours_one": "{{count}} 小时后",
+    "inHours_other": "{{count}} 小时后",
+    "inDays_one": "{{count}} 天后",
+    "inDays_other": "{{count}} 天后",
+    "overdueDays_one": "已过期 {{count}} 天",
+    "overdueDays_other": "已过期 {{count}} 天"
   },
   "validation": {
     "required": "此字段必填",
@@ -4678,7 +4709,21 @@
     "density": "密度",
     "compact": "紧凑",
     "default": "默认",
-    "comfortable": "舒适"
+    "comfortable": "舒适",
+    "columns": "列",
+    "range": "第 {{start}}–{{end}} 项，共 {{total, number}} 项",
+    "perPage": "{{size}} 条/页",
+    "previousPage": "上一页",
+    "nextPage": "下一页",
+    "selectedCount_one": "已选择 {{count}} 项",
+    "selectedCount_other": "已选择 {{count}} 项",
+    "clearSelection": "取消选择",
+    "selection": "选择",
+    "selectPage": "选择本页",
+    "selectRow": "选择 {{name}}",
+    "open": "打开",
+    "openRow": "打开 {{name}}",
+    "rowAction": "{{action}}：{{name}}"
   },
   "reconnect": {
     "countdown": "服务正在重启...",

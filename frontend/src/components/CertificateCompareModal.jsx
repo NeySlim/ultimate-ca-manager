@@ -34,16 +34,19 @@ function CompareField({ label, value1, value2, mono = false }) {
   )
 }
 
-export function CertificateCompareModal({ open, onClose, certificates = [], initialCert = null }) {
+export function CertificateCompareModal({ open, onClose, certificates = [], initialCert = null, secondCert = null }) {
   const { t } = useTranslation()
   const [cert1Id, setCert1Id] = useState(initialCert?.id || '')
-  const [cert2Id, setCert2Id] = useState('')
+  const [cert2Id, setCert2Id] = useState(secondCert?.id || '')
   
   useEffect(() => {
     if (initialCert?.id) {
       setCert1Id(initialCert.id)
     }
   }, [initialCert])
+
+  // A caller that hands both sides (two rows ticked in a list) sets the second too
+  useEffect(() => { setCert2Id(secondCert?.id || '') }, [secondCert])
   
   const cert1 = useMemo(() => certificates.find(c => String(c.id) === String(cert1Id)), [certificates, cert1Id])
   const cert2 = useMemo(() => certificates.find(c => String(c.id) === String(cert2Id)), [certificates, cert2Id])

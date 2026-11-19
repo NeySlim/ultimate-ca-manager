@@ -32,7 +32,7 @@ const stable = vi.hoisted(() => ({
 vi.mock('../../contexts', () => ({
   useNotification: () => stable.notify,
   // On a phone the detail opens in the page itself, with this page's export handler
-  useMobile: () => ({ isMobile: false, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
+  useMobile: () => ({ isMobile: false, isDesktop: true, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
   useInspector: () => ({
     openEntity: vi.fn(), closeWindow: vi.fn(), windows: [],
     prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
@@ -75,13 +75,17 @@ describe('CertificatesPage table export', () => {
     mocks.csv.mockReset()
   })
 
-  it('exports the common name column as displayed, with its description', async () => {
+  it('exports the name and the description as displayed, each in its column', async () => {
     render(<MemoryRouter><CertificatesPage /></MemoryRouter>)
     fireEvent.click(await screen.findByTitle('table.exportData'))
     fireEvent.click(await screen.findByText('table.exportCSV'))
     await waitFor(() => expect(mocks.csv).toHaveBeenCalled())
     const [rows, columns] = mocks.csv.mock.calls[0]
-    const cn = columns.find(c => c.key === 'cn')
-    expect(cn.accessor(rows[0])).toBe('host.example.com \u00b7 web front')
+    const value = (key) => {
+      const col = columns.find(c => c.key === key)
+      return col.accessor ? col.accessor(rows[0]) : rows[0][key]
+    }
+    expect(value('cn')).toBe('host.example.com')
+    expect(value('descr')).toBe('web front')
   })
 })

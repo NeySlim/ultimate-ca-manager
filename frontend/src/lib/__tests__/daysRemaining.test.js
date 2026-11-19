@@ -49,6 +49,13 @@ describe('daysRemaining', () => {
     expect(at('2026-05-30T12:00:00Z')).toBe(-2)
   })
 
+  it('counts from the instant it is handed, the clock otherwise', () => {
+    const now = new Date('2026-01-01T00:00:00Z')
+    expect(daysRemaining('2026-01-03T12:00:00Z', now)).toBe(3)
+    expect(daysRemaining('2025-12-31T23:00:00Z', now)).toBe(-1)
+    expect(daysRemaining('2026-01-03T12:00:00Z', now.toISOString())).toBe(3)
+  })
+
   it('returns null rather than NaN for a missing date', () => {
     expect(daysRemaining(null)).toBeNull()
     expect(daysRemaining(undefined)).toBeNull()

@@ -1,15 +1,16 @@
 /**
- * CertificatesPage — the row actions reach the same handlers, dialogs and
- * permission gates as the detail views (rename #286, revoke #334).
+ * CertificatesPage rows: one action (export) and a chevron; the row, its name and
+ * the chevron open the detail, where rename, renew, revoke and delete live; the
+ * checkbox selects without opening and feeds the batch bar.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 // Stable across renders: t and showError are loadData dependencies
 const stable = vi.hoisted(() => ({
   i18n: {
-    t: (key) => key,
+    t: (key, opts) => (opts && typeof opts.count === 'number' ? `${key}:${opts.count}` : key),
     i18n: { language: 'en', changeLanguage: () => {}, on: () => {}, off: () => {} },
   },
 }))
@@ -21,8 +22,9 @@ const perms = vi.hoisted(() => ({ write: true, del: true }))
 const windows = vi.hoisted(() => ({ openEntity: vi.fn(), closeWindow: vi.fn() }))
 const svc = vi.hoisted(() => ({
   getAll: vi.fn(), getById: vi.fn(), rename: vi.fn(), renew: vi.fn(),
-  revoke: vi.fn(), delete: vi.fn(), export: vi.fn(),
+  revoke: vi.fn(), delete: vi.fn(), export: vi.fn(), bulkExport: vi.fn(),
 }))
+const download = vi.hoisted(() => vi.fn())
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => stable.i18n,
@@ -32,7 +34,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('../../contexts', () => ({
   useNotification: () => notify,
-  useMobile: () => ({ isMobile: false, isTablet: false, sidebarOpen: true, setSidebarOpen: () => {} }),
+  useMobile: () => ({ isMobile: false, isDesktop: true, isTablet: false, sidebarOpen: true, setSidebarOpen: () => {} }),
   useInspector: () => ({
     ...windows, windows: [], prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: () => {},
   }),
@@ -66,6 +68,17 @@ vi.mock('../../services', () => ({
   truststoreService: { addFromCA: () => Promise.resolve({ data: {} }) },
 }))
 
+vi.mock('../../lib/utils', async () => {
+  const actual = await vi.importActual('../../lib/utils')
+  return { ...actual, downloadBlob: download }
+})
+
+// The comparison dialog shows which certificates it was handed
+vi.mock('../../components/CertificateCompareModal', () => ({
+  CertificateCompareModal: ({ open, initialCert, secondCert }) => (open
+    ? <div data-testid="compare">{`${initialCert?.id ?? '-'}|${secondCert?.id ?? '-'}`}</div> : null),
+}))
+
 import CertificatesPage from '../CertificatesPage'
 
 const VALID = {
@@ -80,111 +93,143 @@ async function renderWith(cert) {
   return screen.findByRole('row', { name: new RegExp(cert.cn.replace(/\./g, '\\.')) })
 }
 
+const OTHER = { ...VALID, id: 8, cn: 'api.example.com', common_name: 'api.example.com', descr: 'API' }
+const THIRD = { ...VALID, id: 9, cn: 'db.example.com', common_name: 'db.example.com', descr: 'Database' }
+
 const titles = (row) => within(row).getAllByRole('button').map(b => b.getAttribute('title')).filter(Boolean)
 
+async function renderRows(certs) {
+  svc.getAll.mockResolvedValue({ data: certs, meta: { total: certs.length } })
+  render(<MemoryRouter><CertificatesPage /></MemoryRouter>)
+  await screen.findByRole('row', { name: new RegExp(certs[0].cn.replace(/\./g, '\\.')) })
+}
+const rowBox = (cn) => within(screen.getByRole('row', { name: new RegExp(cn.replace(/\./g, '\\.')) })).getByRole('checkbox')
+
+beforeEach(() => {
+  window.localStorage.clear()
+  vi.clearAllMocks()
+  perms.write = true
+  perms.del = true
+})
+
 describe('CertificatesPage row actions', () => {
-  beforeEach(() => {
-    window.localStorage.clear()
-    vi.clearAllMocks()
-    perms.write = true
-    perms.del = true
-  })
-
-  it('offers every action to a writer who may delete', async () => {
+  it('keeps one action on the row, and the chevron', async () => {
     const row = await renderWith(VALID)
-    expect(titles(row)).toEqual([
-      'common.details', 'export.title', 'certificates.rename', 'common.renew', 'common.revoke', 'common.delete',
-    ])
+    expect(titles(row)).toEqual(['export.title', 'table.open'])
   })
 
-  it('keeps a read-only operator to details and export', async () => {
+  it('shows the same row to a read-only operator: exporting needs no write right', async () => {
     perms.write = false
     perms.del = false
     const row = await renderWith(VALID)
-    expect(titles(row)).toEqual(['common.details', 'export.title'])
+    expect(titles(row)).toEqual(['export.title', 'table.open'])
   })
 
-  it('gates delete on delete:certificates alone', async () => {
-    perms.del = false
+  it('names the row buttons after the certificate', async () => {
     const row = await renderWith(VALID)
-    expect(titles(row)).not.toContain('common.delete')
-    expect(titles(row)).toContain('common.revoke')
+    const names = within(row).getAllByRole('button').map((b) => b.getAttribute('aria-label')).filter(Boolean)
+    expect(names).toEqual(['table.rowAction', 'table.openRow'])
+    expect(within(row).getByRole('checkbox')).toHaveAttribute('aria-label', 'table.selectRow')
   })
 
-  it('offers neither renew nor revoke on a revoked row, nor renew without a key', async () => {
-    const revoked = await renderWith({ ...VALID, revoked: true, status: 'revoked' })
-    expect(titles(revoked)).toEqual(['common.details', 'export.title', 'certificates.rename', 'common.delete'])
-  })
-
-  it('offers no renewal for a certificate whose key UCM does not hold', async () => {
-    const row = await renderWith({ ...VALID, has_private_key: false })
-    expect(titles(row)).not.toContain('common.renew')
-    expect(titles(row)).toContain('common.revoke')
-  })
-
-  it('opens the detail window', async () => {
+  it.each([
+    ['the chevron', (row) => within(row).getByTitle('table.open')],
+    ['the name', (row) => within(row).getByRole('button', { name: 'web.example.com' })],
+    ['the row', (row) => row],
+  ])('opens the detail from %s', async (_, target) => {
     const row = await renderWith(VALID)
-    fireEvent.click(within(row).getByTitle('common.details'))
+    fireEvent.click(target(row))
+    expect(windows.openEntity).toHaveBeenCalledTimes(1)
     expect(windows.openEntity).toHaveBeenCalledWith('certificate', 7)
   })
 
-  it('opens the export dialog for that row', async () => {
+  it('opens the export dialog for that row, not the detail', async () => {
     const row = await renderWith(VALID)
     fireEvent.click(within(row).getByTitle('export.title'))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('web.example.com')).toBeInTheDocument()
+    expect(windows.openEntity).not.toHaveBeenCalled()
+  })
+})
+
+describe('CertificatesPage selection and batch bar', () => {
+  it('ticks a row without opening it and counts the selection', async () => {
+    await renderRows([VALID, OTHER])
+    expect(screen.queryByRole('group', { name: 'table.selection' })).toBeNull()
+    fireEvent.click(rowBox('web.example.com'))
+    const bar = screen.getByRole('group', { name: 'table.selection' })
+    expect(bar).toHaveTextContent('table.selectedCount:1')
+    expect(rowBox('web.example.com')).toBeChecked()
+    expect(rowBox('api.example.com')).not.toBeChecked()
+    expect(windows.openEntity).not.toHaveBeenCalled()
+    fireEvent.click(within(bar).getByText('table.clearSelection'))
+    expect(screen.queryByRole('group', { name: 'table.selection' })).toBeNull()
+    expect(rowBox('web.example.com')).not.toBeChecked()
   })
 
-  it('renames through the service and reloads', async () => {
-    notify.showPrompt.mockResolvedValueOnce('  Back door  ')
-    svc.rename.mockResolvedValue({ data: { ...VALID, descr: 'Back door' } })
-    const row = await renderWith(VALID)
-    const loads = svc.getAll.mock.calls.length
-    fireEvent.click(within(row).getByTitle('certificates.rename'))
-    await waitFor(() => expect(svc.rename).toHaveBeenCalledWith(7, 'Back door'))
-    expect(notify.showPrompt.mock.calls[0][1].defaultValue).toBe('Front door')
-    expect(notify.showSuccess).toHaveBeenCalledWith('certificates.renameSuccess')
-    await waitFor(() => expect(svc.getAll.mock.calls.length).toBeGreaterThan(loads))
+  it('selects the page from the header checkbox', async () => {
+    await renderRows([VALID, OTHER])
+    fireEvent.click(screen.getByRole('checkbox', { name: 'table.selectPage' }))
+    expect(rowBox('web.example.com')).toBeChecked()
+    expect(rowBox('api.example.com')).toBeChecked()
   })
 
-  it('renews through the shared renewal prompt', async () => {
-    notify.showPrompt.mockResolvedValueOnce('')
-    svc.renew.mockResolvedValue({ data: { id: 7 } })
-    const row = await renderWith(VALID)
-    fireEvent.click(within(row).getByTitle('common.renew'))
-    await waitFor(() => expect(svc.renew).toHaveBeenCalledWith(7, {}))
-    expect(notify.showPrompt.mock.calls[0][1].title).toBe('certificates.renewCertificate')
+  it('hands the two ticked certificates to the comparison', async () => {
+    await renderRows([VALID, OTHER, THIRD])
+    fireEvent.click(rowBox('web.example.com'))
+    fireEvent.click(rowBox('db.example.com'))
+    fireEvent.click(within(screen.getByRole('group', { name: 'table.selection' })).getByText('common.compare'))
+    expect(screen.getByTestId('compare')).toHaveTextContent('7|9')
   })
 
-  it('revokes through the reason dialog, with the hybrid pair question', async () => {
-    svc.getById.mockResolvedValue({ data: { id: 8, related_certificate_id: 7, revoked: false } })
-    svc.revoke.mockResolvedValue({ data: { related_not_revoked: 8 } })
-    const row = await renderWith({ ...VALID, related_certificate_id: 8 })
-    fireEvent.click(within(row).getByTitle('common.revoke'))
-    const dialog = await screen.findByRole('dialog')
-    fireEvent.change(within(dialog).getByTestId('revoke-reason'), { target: { value: 'keyCompromise' } })
-    const related = await within(dialog).findByLabelText('revocation.revokeRelated')
-    expect(related).toBeChecked()
-    fireEvent.click(related)
-    fireEvent.submit(within(dialog).getByTestId('revoke-form'))
-    await waitFor(() => expect(svc.revoke).toHaveBeenCalledWith(7, 'keyCompromise', { revokeRelated: false }))
-    expect(notify.showWarning).toHaveBeenCalledWith('revocation.relatedRevokeFailed')
+  it('compares one ticked certificate with another to pick, and refuses three', async () => {
+    await renderRows([VALID, OTHER, THIRD])
+    fireEvent.click(rowBox('api.example.com'))
+    const bar = screen.getByRole('group', { name: 'table.selection' })
+    fireEvent.click(within(bar).getByText('common.compare'))
+    expect(screen.getByTestId('compare')).toHaveTextContent('8|-')
+    fireEvent.click(rowBox('web.example.com'))
+    fireEvent.click(rowBox('db.example.com'))
+    const compare = within(bar).getByText('common.compare').closest('button')
+    expect(compare).toBeDisabled()
+    expect(compare).toHaveAttribute('title', 'certificates.compareHint')
   })
 
-  it('deletes an expired certificate after a confirmation', async () => {
-    notify.showConfirm.mockResolvedValueOnce(true)
-    svc.delete.mockResolvedValue({})
-    const row = await renderWith({ ...VALID, status: 'expired' })
-    fireEvent.click(within(row).getByTitle('common.delete'))
-    await waitFor(() => expect(svc.delete).toHaveBeenCalledWith(7))
+  it('exports the ticked certificates as one PEM file and reports the skipped ones', async () => {
+    const blob = Object.assign(new Blob(['pem']), { exportedCount: 1, skippedCount: 1, skipped: [{ id: 8 }] })
+    svc.bulkExport.mockResolvedValue(blob)
+    await renderRows([VALID, OTHER, THIRD])
+    fireEvent.click(rowBox('web.example.com'))
+    fireEvent.click(rowBox('db.example.com'))
+    fireEvent.click(within(screen.getByRole('group', { name: 'table.selection' })).getByText('certificates.exportSelectedPem'))
+    await waitFor(() => expect(svc.bulkExport).toHaveBeenCalledWith([7, 9], 'pem'))
+    await waitFor(() => expect(download).toHaveBeenCalledWith(blob, 'certificates_export.pem'))
+    expect(notify.showSuccess).toHaveBeenCalledWith('certificates.bulkExported:1')
+    expect(notify.showWarning).toHaveBeenCalledWith('export.skippedUnreadable:1')
   })
 
-  it('sends a still-valid certificate through the revocation dialog before deleting it', async () => {
-    notify.showConfirm.mockResolvedValueOnce(true)
-    const row = await renderWith(VALID)
-    fireEvent.click(within(row).getByTitle('common.delete'))
-    expect(await screen.findByTestId('revoke-form')).toBeInTheDocument()
-    expect(notify.showConfirm.mock.calls[0][0]).toBe('certificates.deleteNeedsRevoke')
-    expect(svc.delete).not.toHaveBeenCalled()
+  it('says why a batch export failed', async () => {
+    svc.bulkExport.mockRejectedValue(Object.assign(new Error('refused by policy'), { status: 403 }))
+    await renderRows([VALID])
+    fireEvent.click(rowBox('web.example.com'))
+    fireEvent.click(within(screen.getByRole('group', { name: 'table.selection' })).getByText('certificates.exportSelectedPem'))
+    await waitFor(() => expect(notify.showError).toHaveBeenCalledWith('refused by policy'))
+    expect(download).not.toHaveBeenCalled()
+  })
+
+  it('drops from the selection a row the list no longer shows', async () => {
+    await renderRows([VALID, OTHER])
+    fireEvent.click(rowBox('web.example.com'))
+    fireEvent.click(rowBox('api.example.com'))
+    svc.getAll.mockResolvedValue({ data: [OTHER], meta: { total: 1 } })
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: 'certificate' } }))
+    })
+    await waitFor(() => expect(screen.queryByRole('row', { name: /web\.example\.com/ })).toBeNull())
+    // The bar counts what is still on screen
+    expect(screen.getByRole('group', { name: 'table.selection' })).toHaveTextContent('table.selectedCount:1')
+    svc.bulkExport.mockResolvedValue(new Blob(['pem']))
+    fireEvent.click(within(screen.getByRole('group', { name: 'table.selection' })).getByText('certificates.exportSelectedPem'))
+    await waitFor(() => expect(svc.bulkExport).toHaveBeenCalledWith([8], 'pem'))
   })
 })

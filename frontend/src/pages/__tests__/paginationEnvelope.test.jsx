@@ -92,14 +92,15 @@ describe('DUP-FE-014a — the `pagination` envelope is not a contract', () => {
     certsGetAll.mockResolvedValue({ data: rows(3), pagination: { total: 99 } })
     render(<MemoryRouter><CertificatesPage /></MemoryRouter>)
     await waitFor(() => expect(certsGetAll).toHaveBeenCalled())
-    expect(await screen.findByText('certificates.subtitle:3')).toBeTruthy()
-    expect(screen.queryByText('certificates.subtitle:99')).toBeNull()
+    // The footer of the list says the count
+    expect(await screen.findByText('certificates.range:3')).toBeTruthy()
+    expect(screen.queryByText('certificates.range:99')).toBeNull()
   })
 
   it('CertificatesPage still honours meta.total', async () => {
     certsGetAll.mockResolvedValue({ data: rows(3), meta: { total: 42 } })
     render(<MemoryRouter><CertificatesPage /></MemoryRouter>)
-    expect(await screen.findByText('certificates.subtitle:42')).toBeTruthy()
+    expect(await screen.findByText('certificates.range:42')).toBeTruthy()
   })
 
   it('SSHCertificatesPage counts the rows received when only `pagination` is present', async () => {

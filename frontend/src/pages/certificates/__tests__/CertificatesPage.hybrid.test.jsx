@@ -95,7 +95,7 @@ const B = { id: 12, cn: 'pair.example.com', related_certificate_id: 11, hybrid_r
 const issuePair = async () => {
   render(<MemoryRouter><CertificatesPage /></MemoryRouter>)
   await waitFor(() => expect(mocks.getAll).toHaveBeenCalled())
-  fireEvent.click(screen.getAllByText('certificates.issueCertificate')[0])
+  fireEvent.click(screen.getByRole('button', { name: 'certificates.issue' }))
   fireEvent.click(await screen.findByText('submit-issue'))
   await waitFor(() => expect(mocks.create).toHaveBeenCalled())
 }

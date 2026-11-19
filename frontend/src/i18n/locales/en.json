@@ -898,7 +898,32 @@
     "renewed": "Certificate renewed",
     "subjectTakenTitle": "Subject already in use",
     "subjectTakenConfirm": "The subject {{subject}} is already carried by certificate serial {{serial}} of this CA. Confirm only if this certificate is for the same entity as the one that already carries this subject: it is then issued to that entity, and your confirmation is recorded in the audit log.",
-    "issueAnyway": "Issue to the same entity"
+    "issueAnyway": "Issue to the same entity",
+    "intent": "Inspect, issue and maintain your certificates.",
+    "issue": "Issue",
+    "total_one": "{{count, number}} certificate",
+    "total_other": "{{count, number}} certificates",
+    "range_one": "{{start}}–{{end}} of {{count, number}} certificate",
+    "range_other": "{{start}}–{{end}} of {{count, number}} certificates",
+    "searchPlaceholder": "Name, description, issuer, serial number…",
+    "viewsLabel": "Filter by state",
+    "views": {
+      "all": "All",
+      "expiring": "To renew",
+      "valid": "Valid",
+      "expired": "Expired",
+      "revoked": "Revoked",
+      "orphan": "Orphans",
+      "archived": "Archived"
+    },
+    "state": "State",
+    "expiry": "Expiry",
+    "keyHeld": "Private key held by UCM",
+    "compareHint": "Select one or two certificates to compare",
+    "exportSelectedPem": "Export as PEM",
+    "bulkExported_one": "{{count}} certificate exported",
+    "bulkExported_other": "{{count}} certificates exported",
+    "listLabel": "List of certificates"
   },
   "cas": {
     "chainRevoked": "Revoked upstream",
@@ -4251,7 +4276,13 @@
     "hoursAgo_one": "{{count}} hour ago",
     "hoursAgo_other": "{{count}} hours ago",
     "daysAgo_one": "{{count}} day ago",
-    "daysAgo_other": "{{count}} days ago"
+    "daysAgo_other": "{{count}} days ago",
+    "inHours_one": "in {{count}} hour",
+    "inHours_other": "in {{count}} hours",
+    "inDays_one": "in {{count}} day",
+    "inDays_other": "in {{count}} days",
+    "overdueDays_one": "expired {{count}} day ago",
+    "overdueDays_other": "expired {{count}} days ago"
   },
   "validation": {
     "required": "This field is required",
@@ -4681,7 +4712,21 @@
     "density": "Density",
     "compact": "Compact",
     "default": "Default",
-    "comfortable": "Comfortable"
+    "comfortable": "Comfortable",
+    "columns": "Columns",
+    "range": "{{start}}–{{end}} of {{total, number}}",
+    "perPage": "{{size}} / page",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "selectedCount_one": "{{count}} selected",
+    "selectedCount_other": "{{count}} selected",
+    "clearSelection": "Clear selection",
+    "selection": "Selection",
+    "selectPage": "Select the page",
+    "selectRow": "Select {{name}}",
+    "open": "Open",
+    "openRow": "Open {{name}}",
+    "rowAction": "{{action}}: {{name}}"
   },
   "policies": {
     "title": "Certificate Policies",

@@ -898,7 +898,32 @@
     "renewed": "Certificado renovado",
     "subjectTakenTitle": "Sujeto ya en uso",
     "subjectTakenConfirm": "El sujeto {{subject}} ya lo lleva el certificado con número de serie {{serial}} de esta CA. Confirme solo si este certificado es para la misma entidad que el que ya lleva este sujeto: se emitirá entonces a esa entidad y su confirmación quedará registrada en el registro de auditoría.",
-    "issueAnyway": "Emitir a la misma entidad"
+    "issueAnyway": "Emitir a la misma entidad",
+    "intent": "Inspeccione, emita y mantenga sus certificados.",
+    "issue": "Emitir",
+    "total_one": "{{count, number}} certificado",
+    "total_other": "{{count, number}} certificados",
+    "range_one": "{{start}}–{{end}} de {{count, number}} certificado",
+    "range_other": "{{start}}–{{end}} de {{count, number}} certificados",
+    "searchPlaceholder": "Nombre, descripción, emisor, número de serie…",
+    "viewsLabel": "Filtrar por estado",
+    "views": {
+      "all": "Todos",
+      "expiring": "Por renovar",
+      "valid": "Válidos",
+      "expired": "Expirados",
+      "revoked": "Revocados",
+      "orphan": "Huérfanos",
+      "archived": "Archivados"
+    },
+    "state": "Estado",
+    "expiry": "Vencimiento",
+    "keyHeld": "Clave privada guardada en UCM",
+    "compareHint": "Seleccione uno o dos certificados para comparar",
+    "exportSelectedPem": "Exportar como PEM",
+    "bulkExported_one": "{{count}} certificado exportado",
+    "bulkExported_other": "{{count}} certificados exportados",
+    "listLabel": "Lista de certificados"
   },
   "cas": {
     "chainRevoked": "Revocada aguas arriba",
@@ -4248,7 +4273,13 @@
     "hoursAgo_one": "hace {{count}} hora",
     "hoursAgo_other": "hace {{count}} horas",
     "daysAgo_one": "hace {{count}} día",
-    "daysAgo_other": "hace {{count}} días"
+    "daysAgo_other": "hace {{count}} días",
+    "inHours_one": "en {{count}} hora",
+    "inHours_other": "en {{count}} horas",
+    "inDays_one": "en {{count}} día",
+    "inDays_other": "en {{count}} días",
+    "overdueDays_one": "vencido hace {{count}} día",
+    "overdueDays_other": "vencido hace {{count}} días"
   },
   "validation": {
     "required": "Este campo es requerido",
@@ -4678,7 +4709,21 @@
     "density": "Densidad",
     "compact": "Compacto",
     "default": "Predeterminado",
-    "comfortable": "Cómodo"
+    "comfortable": "Cómodo",
+    "columns": "Columnas",
+    "range": "{{start}}–{{end}} de {{total, number}}",
+    "perPage": "{{size}} / página",
+    "previousPage": "Página anterior",
+    "nextPage": "Página siguiente",
+    "selectedCount_one": "{{count}} seleccionado",
+    "selectedCount_other": "{{count}} seleccionados",
+    "clearSelection": "Cancelar la selección",
+    "selection": "Selección",
+    "selectPage": "Seleccionar la página",
+    "selectRow": "Seleccionar {{name}}",
+    "open": "Abrir",
+    "openRow": "Abrir {{name}}",
+    "rowAction": "{{action}}: {{name}}"
   },
   "reconnect": {
     "countdown": "El servicio se está reiniciando...",

@@ -90,6 +90,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- **The Certificates page reads as a list.** State tabs with counters (All, To renew, Valid, Expired, Revoked, Archived) replace the stat tiles and the status filter, and the tab is part of the address; a row keeps one line, with its state, source and time left, one action (Export) and a chevron, while Rename, Renew, Revoke and Delete are in the certificate's detail. Compare and a PEM export of several certificates start from the ticked rows, and the compliance grade, hybrid link and creation date are behind the Columns button.
 - **User certificates sort and filter on the server.** A click on a column header sorts the whole list (`sort_by`, `sort_order`), absent values last in both directions on SQLite and PostgreSQL; `status=valid` no longer includes `expiring`, ask for both to get both.
 - **The trust store export follows the expiry filter on screen.** `GET /api/v2/truststore/export` takes `expiry` (`expired`, `expiring`, `valid`), and the page sends the states it lists, so the bundle holds what the table shows.
 - **The bulk export says how many items it exported.** Both `POST .../bulk/export` routes return `X-Exported-Count` (CORS-exposed), and the Operations page announces that number instead of the number selected.

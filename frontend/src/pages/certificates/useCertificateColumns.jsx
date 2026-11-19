@@ -1,224 +1,191 @@
 import { useMemo } from 'react'
 import {
-  Certificate, X, Info, CheckCircle, Clock, XCircle, LinkBreak, Archive, LinkSimple
+  Certificate, Info, CheckCircle, Clock, Warning, Prohibit, LinkBreak, Archive, LinkSimple, Key
 } from '@phosphor-icons/react'
-import { Badge, KeyIndicator } from '../../components'
-import { formatDate, extractCN, cn, joinCertificateName } from '../../lib/utils'
+import { Badge } from '../../components'
+import { StatusPill, SourceLabel, EntityName, RowMark, DueDate } from '../../components/list'
+import { formatDate, extractCN, cn } from '../../lib/utils'
 import { keyAlgorithmLabel } from '../../lib/keyAlgorithms'
+import { EXPIRY_WINDOW_DAYS } from '../../lib/expiry'
+import { sourceOf, sourceLabel, sourceIcon } from './certificateSources'
+
+const GRADE_TONES = { 'A+': 'good', A: 'good', B: 'good', C: 'warn', D: 'warn', F: 'bad' }
+const DUE_TONES = { expired: 'bad', expiring: 'warn', valid: '' }
+
+/** The one state a row shows: tone, icon and label of its pill. */
+export function certificateState(row, t) {
+  const status = row.revoked ? 'revoked' : row.status || 'unknown'
+  return {
+    valid: { tone: 'good', icon: CheckCircle, label: t('common.valid') },
+    expiring: { tone: 'warn', icon: Clock, label: t('certificates.views.expiring') },
+    expired: { tone: 'bad', icon: Warning, label: t('common.expired') },
+    revoked: { tone: 'muted', icon: Prohibit, label: t('common.revoked') },
+  }[status] || { tone: 'muted', icon: Info, label: t('common.unknown') }
+}
 
 export function useCertificateColumns(t) {
-  const getStatusBadge = (row) => {
-    const isRevoked = row.revoked
-    const status = isRevoked ? 'revoked' : row.status || 'unknown'
-    const config = {
-      valid: { variant: 'success', icon: CheckCircle, label: t('common.valid'), pulse: true },
-      expiring: { variant: 'warning', icon: Clock, label: t('common.expiring'), pulse: true },
-      expired: { variant: 'danger', icon: XCircle, label: t('common.expired'), pulse: false },
-      revoked: { variant: 'danger', icon: X, label: t('common.revoked'), pulse: false },
-      unknown: { variant: 'secondary', icon: Info, label: t('common.status'), pulse: false }
+  const columns = useMemo(() => {
+    const statePill = (row) => <StatusPill {...certificateState(row, t)} />
+    const source = (row) => {
+      const value = sourceOf(row)
+      return <SourceLabel icon={sourceIcon(value)} label={sourceLabel(value, t)} />
     }
-    const { variant, icon, label, pulse } = config[status] || config.unknown
-    return <Badge variant={variant} size="sm" icon={icon} dot pulse={pulse}>{label}</Badge>
-  }
-
-  const getSourceBadge = (row, size = 'sm') => {
-    const config = {
-      import: { variant: 'secondary', label: t('certificates.sourceImport') },
-      acme: { variant: 'cyan', label: t('certificates.sourceAcme') },
-      acme_client: { variant: 'green', label: t('certificates.sourceAcmeClient') },
-      letsencrypt: { variant: 'green', label: t('certificates.sourceLetsencrypt') },
-      scep: { variant: 'orange', label: t('certificates.sourceScep') },
-      msca: { variant: 'purple', label: t('certificates.sourceMsca') },
-      est: { variant: 'yellow', label: t('certificates.sourceEst') },
-    }
-    const source = config[row.source]
-    if (!source) return null
-    return <Badge variant={source.variant} size={size} dot>{source.label}</Badge>
-  }
-
-  // Member of a hybrid pair (RFC 9763), titled with its role
-  const getLinkedBadge = (row) => {
-    if (row.related_certificate_id == null) return null
-    const roleKey = { classical: 'certificates.hybrid.roleClassical', pq: 'certificates.hybrid.rolePq' }[row.hybrid_role]
-    return (
-      <Badge variant="info" size="sm" icon={LinkSimple} data-testid="hybrid-linked-badge"
-        title={t(roleKey || 'certificates.hybrid.relatedCertificate')}>
-        {t('certificates.hybrid.linked')}
-      </Badge>
+    // Member of a hybrid pair (RFC 9763), titled with its role
+    const roleOf = (row) => t({
+      classical: 'certificates.hybrid.roleClassical', pq: 'certificates.hybrid.rolePq',
+    }[row.hybrid_role] || 'certificates.hybrid.relatedCertificate')
+    const issuerOf = (row) => extractCN(row.issuer) || row.issuer_name || ''
+    // A revoked certificate has no deadline left to count down to
+    const due = (row, className) => (
+      <DueDate
+        className={className}
+        date={row.valid_to}
+        warnDays={EXPIRY_WINDOW_DAYS}
+        tone={row.revoked ? '' : DUE_TONES[row.status]}
+        relative={row.revoked ? null : undefined}
+      />
     )
-  }
 
-  const columns = useMemo(() => [
-    {
-      key: 'cn',
-      header: t('common.commonName'),
-      priority: 1,
-      sortable: true,
-      accessor: (row) => joinCertificateName(row.cn, row.subtitle),
-      render: (val, row) => (
-        <div className="flex items-center gap-2">
-          <div className={cn(
-            "w-6 h-6 rounded-lg flex items-center justify-center shrink-0",
-            row.has_private_key ? "icon-bg-emerald" : "icon-bg-blue"
-          )}>
-            <Certificate size={14} weight="duotone" />
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="font-medium truncate">{val}</span>
-            {row.subtitle && <span className="text-xs text-text-secondary truncate" title={row.subtitle}>{row.subtitle}</span>}
-          </div>
-          <KeyIndicator hasKey={row.has_private_key} size={14} />
-          {row.isOrphan && <Badge variant="warning" size="sm" icon={LinkBreak} title={t('certificates.orphanDescription')}>{t('certificates.orphan')}</Badge>}
-          {row.archived && <Badge variant="secondary" size="sm" icon={Archive} title={t('certificates.archivedDescription')}>{t('certificates.archived')}</Badge>}
-          {getSourceBadge(row, 'sm')}
-          {getLinkedBadge(row)}
-        </div>
-      ),
-      // Mobile: Icon + CN left + status badge right
-      mobileRender: (val, row) => (
-        <div className="flex items-center justify-between gap-2 w-full">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className={cn(
-              "w-6 h-6 rounded-lg flex items-center justify-center shrink-0",
-              row.has_private_key ? "icon-bg-emerald" : "icon-bg-blue"
-            )}>
-              <Certificate size={14} weight="duotone" />
+    return [
+      {
+        key: 'cn',
+        header: t('common.commonName'),
+        priority: 1,
+        sortable: true,
+        // One line: the name opens the detail, quiet marks follow it
+        render: (val, row) => (
+          <>
+            <EntityName icon={Certificate}>{val}</EntityName>
+            {row.has_private_key && <RowMark icon={Key} label={t('certificates.keyHeld')} />}
+            {row.related_certificate_id != null && <RowMark icon={LinkSimple} label={roleOf(row)} />}
+            {row.isOrphan && (
+              <RowMark icon={LinkBreak} tone="warn" label={t('certificates.orphanDescription')}>{t('certificates.orphan')}</RowMark>
+            )}
+            {row.archived && (
+              <RowMark icon={Archive} label={t('certificates.archivedDescription')}>{t('certificates.archived')}</RowMark>
+            )}
+          </>
+        ),
+        // Mobile card: name and description on the left, state on the right
+        mobileRender: (val, row) => (
+          <div className="flex items-center justify-between gap-2 w-full">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <Certificate size={16} className="shrink-0 text-text-secondary" aria-hidden="true" />
+              <div className="flex flex-col min-w-0">
+                <span className="font-medium truncate">{val || row.cn || row.common_name || t('common.certificate')}</span>
+                {row.subtitle && <span className="text-xs text-text-secondary truncate">{row.subtitle}</span>}
+              </div>
+              {row.has_private_key && <RowMark icon={Key} label={t('certificates.keyHeld')} />}
             </div>
-            <div className="flex flex-col min-w-0">
-              <span className="font-medium truncate">{val || row.cn || row.common_name || t('common.certificate')}</span>
-              {row.subtitle && <span className="text-xs text-text-secondary truncate">{row.subtitle}</span>}
-            </div>
-            <KeyIndicator hasKey={row.has_private_key} size={12} />
+            <div className="shrink-0">{statePill(row)}</div>
           </div>
-          <div className="shrink-0">
-            {getStatusBadge(row)}
-          </div>
-        </div>
-      )
-    },
-    {
-      key: 'status',
-      header: t('common.status'),
-      priority: 2,
-      sortable: true, // Groups by status type, then alphabetically
-      hideOnMobile: true, // Status shown in CN mobileRender
-      render: (val, row) => {
-        const isRevoked = row.revoked
-        const status = isRevoked ? 'revoked' : val || 'unknown'
-        const config = {
-          valid: { variant: 'success', icon: CheckCircle, label: t('common.valid'), pulse: true },
-          expiring: { variant: 'warning', icon: Clock, label: t('common.expiring'), pulse: true },
-          expired: { variant: 'danger', icon: XCircle, label: t('common.expired'), pulse: false },
-          revoked: { variant: 'danger', icon: X, label: t('common.revoked'), pulse: false },
-          unknown: { variant: 'secondary', icon: Info, label: t('common.status'), pulse: false }
-        }
-        const { variant, icon, label, pulse } = config[status] || config.unknown
-        return (
-          <Badge variant={variant} size="sm" icon={icon} dot pulse={pulse}>
-            {label}
-          </Badge>
         )
-      }
-    },
-    {
-      key: 'compliance_grade',
-      header: t('compliance.grade'),
-      priority: 2,
-      sortable: true,
-      hideOnMobile: true,
-      render: (val, row) => {
-        const grade = row.compliance_grade || 'F'
-        const score = row.compliance_score ?? 0
-        const config = {
-          'A+': { variant: 'emerald', label: 'A+' },
-          'A': { variant: 'success', label: 'A' },
-          'B': { variant: 'blue', label: 'B' },
-          'C': { variant: 'warning', label: 'C' },
-          'D': { variant: 'orange', label: 'D' },
-          'F': { variant: 'danger', label: 'F' },
-        }
-        const { variant, label } = config[grade] || config['F']
-        return (
-          <Badge variant={variant} size="sm" title={`${score}/100`}>
-            {label}
-          </Badge>
-        )
-      }
-    },
-    {
-      key: 'issuer',
-      header: t('common.issuer'),
-      priority: 3,
-      sortable: true,
-      render: (val, row) => (
-        <span className="text-text-secondary truncate">
-          {extractCN(val) || row.issuer_name || '—'}
-        </span>
-      ),
-      // Mobile: labeled CA info
-      mobileRender: (val, row) => (
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-text-tertiary">CA:</span>
-          <span className="text-text-secondary truncate">{extractCN(val) || row.issuer_name || '—'}</span>
-        </div>
-      )
-    },
-    {
-      key: 'valid_to',
-      header: t('common.expires'),
-      priority: 4,
-      sortable: true,
-      mono: true,
-      render: (val) => (
-        <span className="text-xs text-text-secondary whitespace-nowrap">
-          {formatDate(val)}
-        </span>
-      ),
-      // Mobile: labeled expiration with badges
-      mobileRender: (val, row) => (
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-text-tertiary">{t('common.expires').substring(0, 3)}:</span>
-            <span className="text-text-secondary font-mono">{formatDate(val)}</span>
+      },
+      {
+        // The description (Rename) when it says something else than the name
+        key: 'descr',
+        header: t('common.description'),
+        sortable: true,
+        hideOnMobile: true,
+        grow: true,
+        muted: true,
+        accessor: (row) => row.subtitle || '',
+        title: (row) => row.subtitle || '',
+        render: (val, row) => row.subtitle || ''
+      },
+      {
+        key: 'status',
+        header: t('certificates.state'),
+        priority: 2,
+        sortable: true, // Groups by status type, then alphabetically
+        hideOnMobile: true, // Shown in the name's mobile card
+        render: (val, row) => statePill(row)
+      },
+      {
+        key: 'issuer',
+        header: t('common.issuer'),
+        priority: 3,
+        sortable: true,
+        muted: true,
+        maxWidth: 260,
+        title: issuerOf,
+        render: (val, row) => issuerOf(row) || '—',
+        // Mobile card, under the name: who issued it and how, then when it is due
+        mobileRender: (val, row) => (
+          <div className="flex flex-col gap-0.5 text-xs">
+            <span className="flex items-center gap-2 min-w-0">
+              <span className="text-text-secondary truncate">{issuerOf(row) || '—'}</span>
+              {source(row)}
+              {row.isOrphan && <RowMark icon={LinkBreak} tone="warn" label={t('certificates.orphanDescription')}>{t('certificates.orphan')}</RowMark>}
+            </span>
+            {due(row, 'self-start')}
           </div>
-          {row.isOrphan && <Badge variant="warning" size="sm" icon={LinkBreak}>{t('certificates.orphan')}</Badge>}
-          {getSourceBadge(row, 'sm')}
-        </div>
-      )
-    },
-    {
-      // When the entry was added to UCM; an in-place renewal keeps it
-      key: 'created_at',
-      header: t('common.created'),
-      hideOnMobile: true,
-      sortable: true,
-      mono: true,
-      render: (val) => (
-        <span className="text-xs text-text-secondary whitespace-nowrap">
-          {formatDate(val)}
-        </span>
-      )
-    },
-    {
-      key: 'related_certificate_id',
-      header: t('certificates.hybrid.column'),
-      hideOnMobile: true,
-      sortable: false,
-      render: (val, row) => getLinkedBadge(row) || <span className="text-xs text-text-tertiary">—</span>,
-    },
-    {
-      key: 'key_type',
-      header: t('common.keyType'),
-      hideOnMobile: true,
-      sortable: true,
-      mono: true,
-      render: (val, row) => (
-        <span className="text-xs text-text-secondary">
-          {keyAlgorithmLabel(row.key_algorithm || row.key_algo || val, t, row.security_level) || '—'}
-        </span>
-      )
-    }
-  ], [t])
+        )
+      },
+      {
+        key: 'source',
+        header: t('certificates.source'),
+        sortable: false,
+        hideOnMobile: true,
+        accessor: (row) => sourceLabel(sourceOf(row), t),
+        render: (val, row) => source(row)
+      },
+      {
+        key: 'valid_to',
+        header: t('certificates.expiry'),
+        priority: 4,
+        sortable: true,
+        render: (val, row) => due(row)
+      },
+      {
+        key: 'key_type',
+        header: t('common.keyAlgorithm'),
+        hideOnMobile: true,
+        sortable: true,
+        muted: true,
+        small: true,
+        render: (val, row) => keyAlgorithmLabel(row.key_algorithm || row.key_algo || val, t, row.security_level) || '—'
+      },
+      {
+        key: 'compliance_grade',
+        header: t('compliance.grade'),
+        sortable: true,
+        hideOnMobile: true,
+        defaultHidden: true,
+        render: (val, row) => {
+          const grade = GRADE_TONES[row.compliance_grade] ? row.compliance_grade : 'F'
+          return (
+            <span className={cn('lv-grade', `is-${GRADE_TONES[grade]}`)} title={`${row.compliance_score ?? 0}/100`}>{grade}</span>
+          )
+        }
+      },
+      {
+        key: 'related_certificate_id',
+        header: t('certificates.hybrid.column'),
+        hideOnMobile: true,
+        sortable: false,
+        defaultHidden: true,
+        render: (val, row) => (row.related_certificate_id == null
+          ? <span className="text-xs text-text-tertiary">—</span>
+          : (
+            <Badge variant="info" size="sm" icon={LinkSimple} data-testid="hybrid-linked-badge" title={roleOf(row)}>
+              {t('certificates.hybrid.linked')}
+            </Badge>
+          ))
+      },
+      {
+        // When the entry was added to UCM; an in-place renewal keeps it
+        key: 'created_at',
+        header: t('common.created'),
+        hideOnMobile: true,
+        sortable: true,
+        muted: true,
+        small: true,
+        defaultHidden: true,
+        render: (val) => formatDate(val)
+      }
+    ]
+  }, [t])
 
   return columns
 }

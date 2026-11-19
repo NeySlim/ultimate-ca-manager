@@ -87,7 +87,7 @@ const renderPage = () => render(
 
 const issue = async () => {
   await waitFor(() => expect(getAll).toHaveBeenCalled())
-  fireEvent.click(screen.getAllByText('certificates.issueCertificate')[0])
+  fireEvent.click(screen.getByRole('button', { name: 'certificates.issue' }))
   fireEvent.click(await screen.findByText('submit-issue'))
   await waitFor(() => expect(create).toHaveBeenCalled())
 }

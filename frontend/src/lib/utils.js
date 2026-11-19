@@ -65,12 +65,13 @@ export function extractData(obj, key, fallback = null) {
 /**
  * Format date for display
  */
-export function formatDate(date, options = {}) {
+export function formatDate(date, { time, ...options } = {}) {
   if (!date) return '-'
   try {
     const tz = getAppTimezone()
     const fmt = getDateFormat()
-    const showTime = getShowTime()
+    // `time` (true or false) overrides the user's "show time" preference for one call
+    const showTime = typeof time === 'boolean' ? time : getShowTime()
     const d = new Date(date)
 
     const timeOpts = showTime ? { hour: '2-digit', minute: '2-digit' } : {}
@@ -244,11 +245,11 @@ export function publicBaseUrl(configured, fallbackPath) {
  * between the 7-day and 30-day bands. Prefer the server's field when the
  * payload has one; CA payloads do not.
  */
-export function daysRemaining(validTo) {
+export function daysRemaining(validTo, now = new Date()) {
   if (!validTo) return null
   const end = new Date(validTo)
   if (Number.isNaN(end.getTime())) return null
-  const millis = end - new Date()
+  const millis = end - new Date(now)
   return millis > 0 ? Math.ceil(millis / 86400000) : Math.floor(millis / 86400000)
 }
 

@@ -131,7 +131,8 @@ describe('locale file guards', () => {
   "acme.sh", "cert-manager", "certbot", "lego", "member (OpenLDAP / RFC 2307)",
   "memberOf (Active Directory)", "permit-X11-forwarding", "permit-agent-forwarding",
   "permit-port-forwarding", "permit-pty", "permit-user-rc", "ssh-certificate",
-  "uniqueMember (OpenLDAP groupOfUniqueNames)", "win-acme", "⚫ GitHub", "🔵 Google", "🟦 Microsoft Entra"
+  "uniqueMember (OpenLDAP groupOfUniqueNames)", "win-acme", "{{action}}: {{name}}", "⚫ GitHub", "🔵 Google",
+  "🟦 Microsoft Entra"
   ])
 
   it('ru translates the text: identical values are named protocols and products, under 4%', () => {

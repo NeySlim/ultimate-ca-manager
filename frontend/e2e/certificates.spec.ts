@@ -8,7 +8,8 @@ async function findCerts(api, cn: string) {
 
 async function openInInspector(page, cn: string) {
   await page.goto('/certificates')
-  await page.getByRole('main').getByRole('cell', { name: cn }).click()
+  // The name is the button that opens the row; the row's other controls carry the name too
+  await page.getByRole('main').getByRole('button', { name: cn, exact: true }).click()
   const panel = page.getByRole('tabpanel', { name: cn })
   await expect(panel.getByRole('heading', { name: cn })).toBeVisible()
   return panel
@@ -18,7 +19,7 @@ test('a certificate issued on screen is signed by the chosen CA', async ({ page,
   const ca = await createCA(api)
   const cn = `${uid('web')}.example.com`
   await page.goto('/certificates')
-  await page.getByRole('main').getByRole('button', { name: 'Issue', exact: true }).click()
+  await page.getByRole('button', { name: 'Issue', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Issue Certificate' })
   await dialog.getByLabel('Certificate Authority').click()
   await page.getByRole('option', { name: new RegExp(ca.common_name) }).click()
@@ -26,7 +27,7 @@ test('a certificate issued on screen is signed by the chosen CA', async ({ page,
   await dialog.getByRole('button', { name: 'Issue Certificate' }).click()
   await expect(dialog).toBeHidden()
 
-  await expect(page.getByRole('main').getByRole('cell', { name: cn })).toBeVisible()
+  await expect(page.getByRole('main').getByRole('button', { name: cn, exact: true })).toBeVisible()
   const [cert] = await findCerts(api, cn)
   expect(cert).toMatchObject({ issuer: `CN=${ca.common_name}`, revoked: false })
 })

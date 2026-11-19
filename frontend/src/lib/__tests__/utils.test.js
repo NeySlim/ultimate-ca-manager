@@ -11,6 +11,7 @@ import {
   certificateNames,
   certificateLabel
 } from '../utils'
+import { setShowTime } from '../../stores/dateFormatStore'
 
 describe('utils', () => {
   describe('cn', () => {
@@ -152,6 +153,19 @@ describe('utils', () => {
       // Invalid dates may return 'Invalid Date' or '-' depending on browser
       const result = formatDate('not-a-date')
       expect(['Invalid Date', '-']).toContain(result)
+    })
+
+    it('shows or hides the time for one call, whatever the preference says', () => {
+      const day = formatDate('2026-02-06T12:34:00Z', { time: false })
+      const exact = formatDate('2026-02-06T12:34:00Z', { time: true })
+      expect(day).not.toMatch(/34/)
+      expect(exact).toMatch(/34/)
+      expect(exact.startsWith(day.slice(0, 6))).toBe(true)
+      // Left out, the preference decides, as before
+      setShowTime(false)
+      expect(formatDate('2026-02-06T12:34:00Z')).toBe(day)
+      setShowTime(true)
+      expect(formatDate('2026-02-06T12:34:00Z')).toBe(exact)
     })
   })
 

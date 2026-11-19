@@ -34,7 +34,7 @@ let mockIsMobile = false
 
 vi.mock('../../contexts', () => ({
   useNotification: () => stable.notify,
-  useMobile: () => ({ isMobile: mockIsMobile, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
+  useMobile: () => ({ isMobile: mockIsMobile, isDesktop: !mockIsMobile, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
   useInspector: () => ({
     openEntity: vi.fn(), closeWindow: vi.fn(), windows: [],
     prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
@@ -87,8 +87,8 @@ describe('CertificatesPage — filter survives an external action (#345)', () =>
     await waitFor(() => expect(getAll).toHaveBeenCalled())
     expect(lastParams().status).toBeUndefined()
 
-    // A stat card sets the status filter, like the filter dropdown does
-    fireEvent.click(screen.getByText('common.valid'))
+    // A state tab sets the status filter
+    fireEvent.click(screen.getByRole('tab', { name: /certificates\.views\.valid/ }))
     await waitFor(() => expect(lastParams().status).toEqual(['valid']))
 
     const before = getAll.mock.calls.length
@@ -100,15 +100,17 @@ describe('CertificatesPage — filter survives an external action (#345)', () =>
     expect(lastParams().status).toEqual(['valid'])
   })
 
-  it('names a row by its Common Name and shows the description under it (#365)', async () => {
+  it('names a row by its Common Name and shows the description in its own column (#365)', async () => {
     getAll.mockResolvedValue({ data: [{
       id: 42, cn: 'host.example.com', common_name: 'host.example.com',
       descr: 'Renamed by an operator', status: 'valid', caref: 'ca-1',
     }], meta: { total: 1 } })
     renderPage()
     const row = await screen.findByRole('row', { name: /host\.example\.com/ })
-    const name = within(row).getByText('host.example.com')
-    expect(name.parentElement).toHaveTextContent(/^host\.example\.comRenamed by an operator$/)
+    const name = within(row).getByRole('button', { name: 'host.example.com' })
+    // One line per row: the name's cell holds the name alone, the description sits in the next cell
+    expect(name.closest('td')).toHaveTextContent(/^host\.example\.com$/)
+    expect(name.closest('td').nextElementSibling).toHaveTextContent(/^Renamed by an operator$/)
   })
 
   it('shows the description under the Common Name on mobile too', async () => {
@@ -121,11 +123,12 @@ describe('CertificatesPage — filter survives an external action (#345)', () =>
     expect(name.parentElement).toHaveTextContent(/^phone\.example\.comRenamed on mobile$/)
   })
 
-  it('exports the description with the Common Name', () => {
+  it('exports the description in its own column, beside the Common Name', () => {
     const { result } = renderHook(() => useCertificateColumns((key) => key))
-    const column = result.current.find(col => col.key === 'cn')
-    expect(column.accessor({ cn: 'host.example.com', subtitle: 'Renamed' })).toBe('host.example.com · Renamed')
-    expect(column.accessor({ cn: 'host.example.com', subtitle: null })).toBe('host.example.com')
+    const column = result.current.find(col => col.key === 'descr')
+    expect(result.current.find(col => col.key === 'cn').accessor).toBeUndefined()
+    expect(column.accessor({ cn: 'host.example.com', subtitle: 'Renamed' })).toBe('Renamed')
+    expect(column.accessor({ cn: 'host.example.com', subtitle: null })).toBe('')
   })
 
   it('does not repeat a description that is the CN', async () => {

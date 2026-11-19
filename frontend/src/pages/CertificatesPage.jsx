@@ -1,31 +1,28 @@
 /**
- * CertificatesPage - FROM SCRATCH with ResponsiveLayout + ResponsiveDataTable
- * 
- * DESKTOP: Dense table with hover rows, inline slide-over details
- * MOBILE: Card-style list with full-screen details, swipe gestures
+ * CertificatesPage: the list template (page head, state tabs, flat table) over
+ * ResponsiveLayout and ResponsiveDataTable.
+ *
+ * DESKTOP: a row opens the certificate in the inspector dock, where its actions live
+ * MOBILE: card list with a full-screen slide-over
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { 
-  Certificate, Download, Trash, X, Plus, Info,
-  CheckCircle, Warning, UploadSimple, Clock, ArrowClockwise, LinkBreak, Star, ArrowsLeftRight,
-  PencilSimple
+import {
+  Certificate, DownloadSimple, Plus, UploadSimple, Star, ArrowsLeftRight
 } from '@phosphor-icons/react'
 import {
-  ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, HelpCard,
+  ResponsiveLayout, ResponsiveDataTable, Button, Modal, ListButton,
   CertificateCompareModal
 } from '../components'
 import { ExportModal } from '../components/ExportModal'
-import { RevokeCertificateModal } from '../components/RevokeCertificateModal'
 import { SmartImportModal } from '../components/SmartImport'
 import { showNotices } from '../lib/notices'
-import { localOnlyRevocationWarning } from '../lib/revocationOutcome'
 import { certificatesService, casService, truststoreService } from '../services'
-import { useNotification, useMobile } from '../contexts'
+import { useNotification, useMobile, useInspector } from '../contexts'
 import { usePermission, useRecentHistory, useFavorites, useWebSocket, usePersistedState } from '../hooks'
-import { extractCN, cn, certificateNames, isOnHold } from '../lib/utils'
-import { parseOverviewFilters, toListParams, toSearch, withoutFilter } from '../lib/overviewFilters'
+import { extractCN, cn, certificateNames, downloadBlob, warnSkippedExport } from '../lib/utils'
+import { CERT_STATUSES, parseOverviewFilters, toListParams, toSearch, withoutFilter } from '../lib/overviewFilters'
 import { FilterChips } from '../components/ui/FilterChips'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
@@ -35,33 +32,12 @@ import { useCertificateColumns } from './certificates/useCertificateColumns'
 import { UploadKeyModal } from './certificates/UploadKeyModal'
 import { soleImported } from '../lib/importResult'
 import { useOpenEntity } from '../hooks/useOpenEntity'
-import { askRenewal } from '../lib/renewalPrompt'
-import { renameCertificate } from '../lib/certificateRename'
 import { issueWithSubjectOverride } from '../lib/uniqueSubject'
-
-// i18n keys for known certificate issuance sources (labelKey pattern: store the
-// KEY at module level, resolve with t() in the component). Options are built
-// from the sources actually present in the DB (stats endpoint), so unknown /
-// legacy values still appear — humanized — and "select all" == "no filter".
-const SOURCE_LABEL_KEYS = {
-  manual: 'sourceManual',
-  import: 'sourceImport',
-  imported: 'sourceImport',
-  upload: 'sourceUpload',
-  acme: 'sourceAcme',
-  acme_client: 'sourceAcmeClient',
-  letsencrypt: 'sourceLetsencrypt',
-  scep: 'sourceScep',
-  est: 'sourceEst',
-  msca: 'sourceMsca',
-  approval: 'sourceApproval',
-  web: 'sourceWeb',
-}
+import { sourceLabel } from './certificates/certificateSources'
 
 const NONE = []
-
-const humanizeSource = (s) =>
-  String(s).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+// The state tabs, in order; orphan shows when there are some, archived has no counter
+const STATE_VIEWS = ['expiring', 'valid', 'expired', 'revoked']
 
 // The row as the table shows it; the export uses the same one
 function normalizeCertificate(cert) {
@@ -81,6 +57,10 @@ export default function CertificatesPage() {
   const location = useLocation()
   const { isMobile } = useMobile()
   const openEntity = useOpenEntity()
+  // The certificate on top in the dock marks its row
+  const { opened = [], activeKey } = useInspector()
+  const docked = opened.find((o) => o.key === activeKey)
+  const dockedId = docked?.type === 'certificate' ? Number(docked.entityId) : undefined
   const { addToHistory } = useRecentHistory('certificates')
   const { isFavorite, toggleFavorite } = useFavorites('certificates')
   
@@ -98,6 +78,9 @@ export default function CertificatesPage() {
   const [showKeyModal, setShowKeyModal] = useState(false)
   const [showCompareModal, setShowCompareModal] = useState(false)
   const [exportRowCert, setExportRowCert] = useState(null)
+  // Rows ticked on the page on screen, and the two handed to the comparison
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [comparePair, setComparePair] = useState([null, null])
   
   // Pagination
   const [page, setPage] = useState(1)
@@ -109,7 +92,6 @@ export default function CertificatesPage() {
   const [sortOrder, setSortOrder] = useState('asc')
   
   // Filters
-  const [filterStatus, setFilterStatus] = usePersistedState('ucm-filter-certs-status', [])
   const [filterCA, setFilterCA] = usePersistedState('ucm-filter-certs-ca', [])
   const [filterSource, setFilterSource] = usePersistedState('ucm-filter-certs-source', [])
   const [filterTemplate, setFilterTemplate] = usePersistedState('ucm-filter-certs-template', [])
@@ -134,7 +116,12 @@ export default function CertificatesPage() {
   // while it is open, unapplied but kept in storage, and return once its filters are gone
   const linkView = urlFilters.length > 0
   const urlStatus = useMemo(() => urlFilters.filter(([k]) => k === 'status').map(([, v]) => v), [urlFilters])
-  const savedStatus = linkView ? NONE : filterStatus
+  // The state tab lives in the URL (`view`), so a reload or a shared link keeps it; a
+  // link view carries its own statuses instead and the tabs then edit those
+  const viewKey = new URLSearchParams(location.search).getAll('view').filter((v) => CERT_STATUSES.includes(v)).join(',')
+  const viewStatus = useMemo(() => (viewKey ? viewKey.split(',') : NONE), [viewKey])
+  const savedStatus = linkView ? NONE : viewStatus
+  const activeStatus = linkView ? urlStatus : viewStatus
   const savedCA = linkView ? NONE : filterCA
   const savedSource = linkView ? NONE : filterSource
   const savedTemplate = linkView ? NONE : filterTemplate
@@ -164,20 +151,17 @@ export default function CertificatesPage() {
       navigate({ pathname: location.pathname, search: toSearch(linked) }, { replace: true })
       return
     }
-    leaveLink()
-    if (filters.status) {
-      setFilterStatus(Array.isArray(filters.status) ? filters.status : [filters.status])
-    } else {
-      setFilterStatus([])
-    }
+    // One navigation leaves any link view and sets the statuses of the preset
+    const status = [].concat(filters.status || []).filter((v) => CERT_STATUSES.includes(v))
+    navigate({ pathname: location.pathname, search: status.length ? `?${status.map((v) => `view=${v}`).join('&')}` : '' }, { replace: true })
     if (filters.ca) setFilterCA(Array.isArray(filters.ca) ? filters.ca : [filters.ca])
     else setFilterCA([])
     if (filters.source) setFilterSource(Array.isArray(filters.source) ? filters.source : [filters.source])
     else setFilterSource([])
-  }, [leaveLink, navigate, location.pathname])
+  }, [navigate, location.pathname])
   
-  const { showSuccess, showError, showConfirm, showPrompt, showWarning } = useNotification()
-  const { canWrite, canDelete, hasPermission } = usePermission()
+  const { showSuccess, showError, showConfirm, showWarning } = useNotification()
+  const { canWrite, hasPermission } = usePermission()
   // One rule for every export surface on this page — the server's own (see
   // lib/exportPermissions): read:private_keys, not write:certificates.
   const canExportKey = canExportPrivateKey('certificate', { hasPermission, canWrite })
@@ -234,6 +218,11 @@ export default function CertificatesPage() {
 
       if (seq !== requestSeq.current) return
       setCertificates(certs)
+      // A selection never outlives the rows it was made on
+      setSelectedIds((prev) => {
+        const kept = new Set(certs.filter((c) => prev.has(c.id)).map((c) => c.id))
+        return kept.size === prev.size ? prev : kept
+      })
       const totalCount = certsRes.meta?.total || certs.length
       setTotal(totalCount)
       // The last row of the last page went away: stay on a page that exists
@@ -338,134 +327,6 @@ export default function CertificatesPage() {
     }
   }, [urlCertId, loading])
 
-  // Revoke certificate
-  // Revocation asks for the RFC 5280 reason (#334); the dialog is rendered below
-  const [revokingCert, setRevokingCert] = useState(null)
-  // Set when the operator asked to delete a still-valid certificate and
-  // accepted to revoke it first: the deletion resumes once the revocation
-  // is through.
-  const [deleteAfterRevoke, setDeleteAfterRevoke] = useState(false)
-  const [revoking, setRevoking] = useState(false)
-  const handleRevoke = (id) => {
-    const cert = certificates.find(c => c.id === id) || (selectedCert?.id === id ? selectedCert : null)
-    setRevokingCert(cert || { id })
-  }
-  const handleRevokeConfirm = async (reason, options) => {
-    if (!revokingCert) return
-    setRevoking(true)
-    try {
-      muteToasts()
-      const res = await certificatesService.revoke(revokingCert.id, reason, options)
-      if (res?.data?.approval_required) {
-        // Queued by a revocation policy: nothing is revoked, so nothing is deleted
-        showWarning(t('certificates.revocationApprovalRequired', { policy: res.data.policy_name }))
-        setRevokingCert(null)
-        setDeleteAfterRevoke(false)
-        loadData()
-        return
-      }
-      const alsoDelete = deleteAfterRevoke ? revokingCert.id : null
-      const relatedRevoked = res?.data?.related_revoked
-      const localOnly = localOnlyRevocationWarning(res, t)
-      if (localOnly) showWarning(localOnly)
-      else showSuccess(relatedRevoked != null
-        ? t('revocation.revokedWithRelated', { id: relatedRevoked })
-        : t('messages.success.other.revoked'))
-      if (res?.data?.related_not_revoked != null) {
-        showWarning(t('revocation.relatedRevokeFailed', { id: res.data.related_not_revoked }))
-      } else if (options?.revokeRelated && relatedRevoked == null) showWarning(t('revocation.relatedNotRevoked'))
-      setRevokingCert(null)
-      setDeleteAfterRevoke(false)
-      if (alsoDelete) {
-        try {
-          await certificatesService.delete(alsoDelete)
-          showSuccess(t('messages.success.delete.certificate'))
-        } catch (error) {
-          showError(error.message || t('messages.errors.deleteFailed.certificate'))
-        }
-      }
-      loadData()
-      setSelectedCert(null)
-    } catch {
-      showError(t('messages.errors.revokeFailed.certificate'))
-    } finally {
-      setRevoking(false)
-    }
-  }
-
-  // Renew certificate
-  const handleRenew = async (cert) => {
-    const body = await askRenewal(cert, { showPrompt, showConfirm, showError, t })
-    if (!body) return
-    try {
-      muteToasts()
-      const res = await certificatesService.renew(cert.id, body)
-      if (res?.data?.approval_required) {
-        // An issuance policy queued the renewal for approval
-        showWarning(t('certificates.approvalRequired', { policy: res.data.policy_name }))
-        loadData()
-        setSelectedCert(null)
-        return
-      }
-      const relatedRenewed = res?.data?.related_renewed
-      if (res?.meta?.msca_status === 'pending') {
-        showSuccess(t('certificates.renewPendingMsca', 'Renewal submitted to the Microsoft CA: pending approval'))
-      } else if (relatedRenewed?.length) {
-        showSuccess(t('certificates.hybrid.renewedWithRelated', { id: relatedRenewed.join(', #') }))
-      } else {
-        showSuccess(t('notifications.certificateIssued', { name: '' }).replace(': ', ''))
-      }
-      showNotices(res, showWarning)
-      loadData()
-      setSelectedCert(null)
-    } catch (error) {
-      showError(error.message || t('common.operationFailed'))
-    }
-  }
-
-  // Rename certificate (mutable display name, independent from CN — issue #286)
-  const handleRename = async (cert) => {
-    const updated = await renameCertificate(cert, { showPrompt, showSuccess, showError, t })
-    if (!updated) return
-    if (selectedCert?.id === cert.id) setSelectedCert({ ...selectedCert, ...updated })
-    loadData()
-  }
-
-  // Delete certificate
-  const handleDelete = async (id) => {
-    // A certificate still trusted by relying parties has to be revoked first,
-    // or it vanishes from UCM while staying valid everywhere else. Rather than
-    // let the server refuse after the fact, say so and offer to do both.
-    const cert = certificates.find(c => c.id === id) || (selectedCert?.id === id ? selectedCert : null)
-    const status = cert?.revoked ? 'revoked' : cert?.status
-    if (cert && status !== 'revoked' && status !== 'expired') {
-      const revokeFirst = await showConfirm(t('certificates.deleteNeedsRevoke'), {
-        title: t('common.deleteCertificate'),
-        confirmText: t('certificates.revokeThenDelete'),
-        variant: 'danger'
-      })
-      if (!revokeFirst) return
-      setDeleteAfterRevoke(true)
-      setRevokingCert(cert)
-      return
-    }
-    const confirmed = await showConfirm(t('messages.confirm.delete.certificate'), {
-      title: t('common.deleteCertificate'),
-      confirmText: t('common.delete'),
-      variant: 'danger'
-    })
-    if (!confirmed) return
-    try {
-      muteToasts()
-      await certificatesService.delete(id)
-      showSuccess(t('messages.success.delete.certificate'))
-      loadData()
-      setSelectedCert(null)
-    } catch (error) {
-      showError(error.message || t('messages.errors.deleteFailed.certificate'))
-    }
-  }
-
   const handleAddToTrustStore = async (caRefid) => {
     try {
       await truststoreService.addFromCA(caRefid)
@@ -499,49 +360,45 @@ export default function CertificatesPage() {
   // rows on screen made the card follow the current page (#345 review)
   const orphanCount = certStats.orphan || 0
 
-  // Stats - from backend API for accurate counts
-  // Each stat is clickable to filter the table
-  const stats = useMemo(() => {
-    const baseStats = [
-      { icon: CheckCircle, label: t('common.valid'), value: certStats.valid, variant: 'success', filterValue: 'valid' },
-      { icon: Warning, label: t('common.expiring'), shortLabel: t('common.expiring').substring(0, 3) + '.', value: certStats.expiring, variant: 'warning', filterValue: 'expiring' },
-      { icon: Clock, label: t('common.expired'), value: certStats.expired, variant: 'neutral', filterValue: 'expired' },
-      { icon: X, label: t('common.revoked'), shortLabel: t('common.revoked').substring(0, 3) + '.', value: certStats.revoked, variant: 'danger', filterValue: 'revoked' }
-    ]
-    // Add orphan stat if there are any
-    if (orphanCount > 0) {
-      baseStats.push({ icon: LinkBreak, label: t('certificates.orphan'), value: orphanCount, variant: 'warning', filterValue: 'orphan' })
-    }
-    baseStats.push({ icon: Certificate, label: t('common.total'), value: certStats.total, variant: 'primary', filterValue: '' })
-    return baseStats
-  }, [certStats, orphanCount, t])
-  
   // A link view edits the link's own statuses in the URL; the saved ones stay untouched
   const setUrlStatus = useCallback((next) => {
     const params = new URLSearchParams(withoutFilter(location.search, 'status'))
+    params.delete('view')
     next.forEach((v) => params.append('status', v))
     const qs = params.toString()
     navigate({ pathname: location.pathname, search: qs ? `?${qs}` : '' }, { replace: true })
   }, [location.pathname, location.search, navigate])
 
-  // Handle stat click to filter
-  const handleStatClick = useCallback((filterValue) => {
-    setPage(1) // Reset to first page when filtering
-    if (linkView) {
-      setUrlStatus(filterValue === '' ? []
-        : urlStatus.includes(filterValue) ? urlStatus.filter((v) => v !== filterValue) : [...urlStatus, filterValue])
-    } else if (filterValue === '') {
-      setFilterStatus([]) // "Total" clears all
-    } else {
-      setFilterStatus(prev => {
-        if (prev.includes(filterValue)) {
-          return prev.filter(v => v !== filterValue)
-        }
-        return [...prev, filterValue]
-      })
-    }
-  }, [linkView, urlStatus, setUrlStatus])
-  
+  const setViewStatus = useCallback((next) => {
+    const params = new URLSearchParams(location.search)
+    params.delete('view')
+    next.forEach((v) => params.append('view', v))
+    const qs = params.toString()
+    navigate({ pathname: location.pathname, search: qs ? `?${qs}` : '' }, { replace: true })
+  }, [location.pathname, location.search, navigate])
+
+  // One setter for the tabs, the chips and the presets: the link's statuses in a link view, the tab otherwise
+  const setStatus = useCallback((next) => {
+    setPage(1)
+    if (linkView) setUrlStatus(next)
+    else setViewStatus(next)
+  }, [linkView, setUrlStatus, setViewStatus])
+
+  // State tabs with the counters of the stats endpoint, over the whole inventory
+  const views = useMemo(() => [
+    { id: '', label: t('certificates.views.all'), count: certStats.total },
+    ...STATE_VIEWS.map((id) => ({
+      id, label: t(`certificates.views.${id}`), count: certStats[id],
+      tone: id === 'expiring' && certStats.expiring > 0 ? 'warn' : undefined,
+    })),
+    ...(orphanCount > 0 || activeStatus.includes('orphan')
+      ? [{ id: 'orphan', label: t('certificates.views.orphan'), count: orphanCount }] : []),
+    // No counter: the stats endpoint does not count archived certificates
+    { id: 'archived', label: t('certificates.views.archived') },
+  ], [certStats, orphanCount, activeStatus, t])
+  // Several statuses at once (a link, an older preset) are no single tab
+  const activeView = activeStatus.length === 0 ? '' : activeStatus.length === 1 ? activeStatus[0] : null
+
   // Handle sort change (server-side)
   const handleSortChange = useCallback((newSort) => {
     setPage(1) // Reset to first page when sorting
@@ -555,6 +412,7 @@ export default function CertificatesPage() {
         'expires': 'valid_to',
         'valid_to': 'valid_to',
         'key_type': 'key_algo',
+        'descr': 'descr',
         'created_at': 'created_at',
         'compliance_grade': 'compliance_grade'
       }
@@ -572,24 +430,28 @@ export default function CertificatesPage() {
   // Column definitions (extracted to sub-module)
   const columns = useCertificateColumns(t)
 
-  // Row actions: same permissions and dialogs as the detail views. Rebuilt on
-  // each render, so the handlers never see a stale list.
+  // One action on the row; rename, renew, revoke and delete live in the detail (dock, slide-over)
   const rowActions = (row) => [
-    { label: t('common.details'), icon: Info, onClick: () => handleSelectCert(row) },
-    { label: t('export.title'), icon: Download, onClick: () => setExportRowCert(row) },
-    ...(canWrite('certificates') ? [
-      { label: t('certificates.rename'), icon: PencilSimple, onClick: () => handleRename(row) }
-    ] : []),
-    ...(canWrite('certificates') && !row.revoked && (row.has_private_key || row.source === 'msca') ? [
-      { label: t('common.renew'), icon: ArrowClockwise, onClick: () => handleRenew(row) }
-    ] : []),
-    ...(canWrite('certificates') && (!row.revoked || isOnHold(row)) ? [
-      { label: t('common.revoke'), icon: X, variant: 'danger', onClick: () => handleRevoke(row.id) }
-    ] : []),
-    ...(canDelete('certificates') ? [
-      { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDelete(row.id) }
-    ] : [])
+    { label: t('export.title'), icon: DownloadSimple, onClick: () => setExportRowCert(row) },
   ]
+
+  const selectedRows = filteredCerts.filter((c) => selectedIds.has(c.id))
+  const handleCompareSelected = () => {
+    setComparePair([selectedRows[0] || null, selectedRows[1] || null])
+    setShowCompareModal(true)
+  }
+  const handleExportSelected = async () => {
+    const ids = selectedRows.map((c) => c.id)
+    if (!ids.length) return
+    try {
+      const blob = await certificatesService.bulkExport(ids, 'pem')
+      if (blob) downloadBlob(blob, 'certificates_export.pem')
+      showSuccess(t('certificates.bulkExported', { count: blob?.exportedCount ?? ids.length }))
+      warnSkippedExport(blob, t, showWarning)
+    } catch (err) {
+      showError(err?.status ? err.message : t('messages.errors.exportFailed.certificate'))
+    }
+  }
 
   // Export from row via ExportModal
   const handleExportRow = async (format, options = {}) => {
@@ -609,23 +471,22 @@ export default function CertificatesPage() {
   // Filters
   const filters = useMemo(() => [
     {
+      // The state tabs are its control: it stays here for the presets, the chips and Clear filters
       key: 'status',
-      label: t('common.status'),
+      label: t('certificates.state'),
       type: 'multiSelect',
-      hideChip: linkView, // the link's own chip row already shows its statuses
-      // A link view shows (and a preset saves) the link's statuses, not the stored ones it sets aside
-      value: linkView ? urlStatus : savedStatus,
-      onChange: (val) => {
-        setPage(1)
-        if (linkView) setUrlStatus(val)
-        else setFilterStatus(val)
-      },
-      placeholder: t('common.allStatus'),
+      hideControl: true,
+      // One status is the tab on screen, the link's are in its own chip row
+      hideChip: linkView || activeStatus.length < 2,
+      // A link view shows (and a preset saves) the link's statuses
+      value: activeStatus,
+      onChange: setStatus,
       options: [
         { value: 'valid', label: t('common.valid') },
-        { value: 'expiring', label: t('common.expiring') },
+        { value: 'expiring', label: t('certificates.views.expiring') },
         { value: 'expired', label: t('common.expired') },
         { value: 'revoked', label: t('common.revoked') },
+        { value: 'orphan', label: t('certificates.orphan') },
         { value: 'archived', label: t('certificates.archived') }
       ]
     },
@@ -650,7 +511,7 @@ export default function CertificatesPage() {
       placeholder: t('certificates.allSources'),
       options: (certStats.sources || []).map(src => ({
         value: src,
-        label: SOURCE_LABEL_KEYS[src] ? t(`certificates.${SOURCE_LABEL_KEYS[src]}`) : humanizeSource(src)
+        label: sourceLabel(src, t)
       }))
     },
     {
@@ -664,59 +525,7 @@ export default function CertificatesPage() {
         { value: 'modified', label: t('certificates.modifiedFromTemplate') }
       ]
     }
-  ], [linkView, urlStatus, savedStatus, savedCA, savedSource, savedTemplate, leaveLink, setUrlStatus, certStats.sources, cas, t])
-
-  // Help content
-  const helpContent = (
-    <div className="space-y-4">
-      {/* Quick Stats */}
-      <div className="visual-section">
-        <div className="visual-section-header">
-          <Certificate size={16} className="status-primary-text" />
-          {t('common.certificates')}
-        </div>
-        <div className="visual-section-body">
-          <div className="quick-info-grid">
-            <div className="help-stat-card">
-              <div className="help-stat-value help-stat-value-success">{stats.find(s => s.filterValue === 'valid')?.value || 0}</div>
-              <div className="help-stat-label">{t('common.valid')}</div>
-            </div>
-            <div className="help-stat-card">
-              <div className="help-stat-value help-stat-value-warning">{stats.find(s => s.filterValue === 'expiring')?.value || 0}</div>
-              <div className="help-stat-label">{t('common.expiring')}</div>
-            </div>
-            <div className="help-stat-card">
-              <div className="help-stat-value help-stat-value-danger">{stats.find(s => s.filterValue === 'expired')?.value || 0}</div>
-              <div className="help-stat-label">{t('common.expired')}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <HelpCard title={t('help.aboutCertificates')} variant="info">
-        {t('common.certificates')}
-      </HelpCard>
-      <HelpCard title={t('help.statusLegend')} variant="info">
-        <div className="space-y-1.5 mt-2">
-          <div className="flex items-center gap-2">
-            <Badge variant="success" size="sm" dot>{t('common.valid')}</Badge>
-            <span className="text-xs">{t('common.active')}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="warning" size="sm" dot>{t('common.expiring')}</Badge>
-            <span className="text-xs">{t('common.expiring')}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="danger" size="sm" dot>{t('common.revoked')}</Badge>
-            <span className="text-xs">{t('common.invalid')}</span>
-          </div>
-        </div>
-      </HelpCard>
-      <HelpCard title={t('help.exportFormats')} variant="tip">
-        {t('certificates.exportPEM')}, {t('certificates.exportDER')}, {t('certificates.exportPKCS12')}
-      </HelpCard>
-    </div>
-  )
+  ], [linkView, activeStatus, setStatus, savedCA, savedSource, savedTemplate, leaveLink, certStats.sources, cas, t])
 
   // Slide-over content
   const slideOverContent = selectedCert ? (
@@ -734,12 +543,22 @@ export default function CertificatesPage() {
     <>
       <ResponsiveLayout
         title={t('common.certificates')}
-        subtitle={t('certificates.subtitle', { count: total })}
-        icon={Certificate}
-        stats={stats}
-        onStatClick={handleStatClick}
-        activeStatFilter={linkView ? urlStatus : filterStatus}
-        helpPageKey="certificates"
+        total={t('certificates.total', { count: certStats.total })}
+        intent={t('certificates.intent')}
+        actions={canWrite('certificates') && (
+          <>
+            <ListButton quiet icon={UploadSimple} onClick={() => setShowImportModal(true)}>
+              {t('common.import')}
+            </ListButton>
+            <ListButton primary icon={Plus} title={t('certificates.issueCertificate')} onClick={() => setShowIssueModal(true)}>
+              {t('certificates.issue')}
+            </ListButton>
+          </>
+        )}
+        views={views}
+        activeView={activeView}
+        onViewChange={(id) => setStatus(id ? [id] : [])}
+        viewsLabel={t('certificates.viewsLabel')}
         splitView={isMobile}
         splitEmptyContent={isMobile ? (
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">
@@ -772,24 +591,29 @@ export default function CertificatesPage() {
         )}
         onSlideOverClose={() => setSelectedCert(null)}
       >
-        <div data-testid="overview-chips">
+        <div data-testid="overview-chips" className="shrink-0">
           <FilterChips
             filters={overviewChips}
             onRemove={removeUrlFilter}
             onClearAll={() => navigate({ pathname: location.pathname, search: '' }, { replace: true })}
+            className={isMobile ? undefined : 'lv-chips'}
           />
         </div>
         <ResponsiveDataTable
+          variant="list"
           data={filteredCerts}
           columns={columns}
           loading={loading}
           onRowClick={handleSelectCert}
-          selectedId={selectedCert?.id}
+          selectedId={isMobile ? selectedCert?.id : dockedId}
+          rowLabel={(row) => row.cn}
+          tableLabel={t('certificates.listLabel')}
+          rangeLabel={({ start, end, total: count }) => t('certificates.range', { start, end, count })}
           searchable
-          searchPlaceholder={t('common.search') + ' ' + t('common.certificates').toLowerCase() + '...'}
+          searchPlaceholder={t('certificates.searchPlaceholder')}
           externalSearch={searchValue}
           onSearchChange={(v) => { setSearchValue(v); setPage(1) }}
-          columnStorageKey="ucm-certs-columns"
+          columnStorageKey="ucm-certs-columns-v2"
           filterPresetsKey="ucm-certs-presets"
           densityStorageKey="ucm-certs-density"
           onApplyFilterPreset={handleApplyFilterPreset}
@@ -798,38 +622,24 @@ export default function CertificatesPage() {
           exportLoader={exportLoader}
           exportFilename="certificates"
           toolbarFilters={filters}
-          toolbarActions={
-            <div className="flex items-center gap-2">
-              {!isMobile && (
-                <Button type="button" size="sm" variant="secondary" onClick={() => setShowCompareModal(true)}>
-                  <ArrowsLeftRight size={14} />
-                  {t('common.compare') || 'Compare'}
-                </Button>
-              )}
-              {canWrite('certificates') && (
-                isMobile ? (
-                  <>
-                    <Button type="button" size="lg" variant="secondary" onClick={() => setShowImportModal(true)} className="w-11 h-11 p-0">
-                      <UploadSimple size={22} weight="bold" />
-                    </Button>
-                    <Button type="button" size="lg" onClick={() => setShowIssueModal(true)} className="w-11 h-11 p-0">
-                      <Plus size={22} weight="bold" />
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button type="button" size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
-                      <UploadSimple size={14} />
-                      {t('common.import')}
-                    </Button>
-                    <Button type="button" size="sm" onClick={() => setShowIssueModal(true)}>
-                      <Plus size={14} weight="bold" />
-                      {t('certificates.issueCertificate').split(' ')[0]}
-                    </Button>
-                  </>
-                )
-              )}
-            </div>
+          multiSelect
+          selectedIds={selectedIds}
+          onSelectionChange={setSelectedIds}
+          bulkActions={
+            <>
+              <ListButton
+                small
+                icon={ArrowsLeftRight}
+                onClick={handleCompareSelected}
+                disabled={selectedRows.length > 2}
+                title={selectedRows.length > 2 ? t('certificates.compareHint') : undefined}
+              >
+                {t('common.compare')}
+              </ListButton>
+              <ListButton small icon={DownloadSimple} onClick={handleExportSelected}>
+                {t('certificates.exportSelectedPem')}
+              </ListButton>
+            </>
           }
           sortable
           defaultSort={{ key: 'cn', direction: 'asc' }}
@@ -916,7 +726,8 @@ export default function CertificatesPage() {
         open={showCompareModal}
         onClose={() => setShowCompareModal(false)}
         certificates={certificates}
-        initialCert={selectedCert}
+        initialCert={comparePair[0] || selectedCert}
+        secondCert={comparePair[1]}
       />
 
       {/* Smart Import Modal */}
@@ -932,14 +743,6 @@ export default function CertificatesPage() {
         }}
       />
 
-      <RevokeCertificateModal
-        allowHold={!isOnHold(revokingCert)}
-        open={!!revokingCert}
-        onClose={() => { setRevokingCert(null); setDeleteAfterRevoke(false) }}
-        onConfirm={handleRevokeConfirm}
-        certificate={revokingCert}
-        loading={revoking}
-      />
       {/* Row Export Modal */}
       <ExportModal
         open={!!exportRowCert}
