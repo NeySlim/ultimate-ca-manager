@@ -161,11 +161,17 @@ def test_in_ha_the_rolling_restart_is_committed_with_the_list(app, auth_client, 
     monkeypatch.setattr('utils.ha.ha_enabled', lambda: True)
     with app.app_context():
         last = db.session.query(db.func.max(ClusterCommand.id)).scalar() or 0
-    data = _remove_former(auth_client, profile_id)
-    from services.cluster_commands import RESTART, ROLLING_RESTART_MESSAGE
-    assert data['restart_message'] == ROLLING_RESTART_MESSAGE and restarts == [1]
-    with app.app_context():
-        assert [c.kind for c in ClusterCommand.query.filter(ClusterCommand.id > last)] == [RESTART]
+    try:
+        data = _remove_former(auth_client, profile_id)
+        from services.cluster_commands import RESTART, ROLLING_RESTART_MESSAGE
+        assert data['restart_message'] == ROLLING_RESTART_MESSAGE and restarts == [1]
+        with app.app_context():
+            assert [c.kind for c in ClusterCommand.query.filter(ClusterCommand.id > last)] == [RESTART]
+    finally:
+        # The command is the only row a later file of this worker could count
+        with app.app_context():
+            ClusterCommand.query.filter(ClusterCommand.id > last).delete()
+            db.session.commit()
 
 
 def test_a_save_that_leaves_the_listener_as_it_is_asks_for_no_restart(app, auth_client, moved_by_api, restarts):
