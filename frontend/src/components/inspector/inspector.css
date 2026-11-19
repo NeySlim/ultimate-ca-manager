@@ -409,7 +409,7 @@
 .insp-stage.is-right .lv-due { gap: 8px; }
 /* Beside the inspector a capped column gives more of its width: the seven columns stay in view */
 .insp-stage.is-right .lv-table :is(th, td).lv-capped { max-width: 130px !important; }
-.insp-stage.is-right .lv-table :is(th, td).lv-grow { min-width: 170px; }
+.insp-stage.is-right .lv-table :is(th, td).lv-grow { min-width: 160px; }
 .insp-stage.is-right .lv-table th.lv-capped { overflow: hidden; text-overflow: ellipsis; }
 .insp-stage.is-right .lv-row-actions .lv-icon-btn:not(:last-child) { display: none; }
 
