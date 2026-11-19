@@ -2850,6 +2850,7 @@
     "hstsNote": "Le modifiche si applicano alla prossima risposta. La disabilitazione di HSTS non cancella le politiche già memorizzate nella cache del browser; i client esistenti devono attendere la scadenza del max-age precedente.",
     "hstsEnvLocked": "Una o più impostazioni HSTS sono forzate da variabili d'ambiente (UCM_HSTS_*) in /etc/ucm/ucm.env e non possono essere modificate qui. Rimuovere le variabili d'ambiente per gestire HSTS da questa interfaccia.",
     "adminFieldsLocked": "Alcuni campi di questa scheda richiedono il permesso di amministrazione delle impostazioni e sono bloccati. Le modifiche agli altri campi vengono comunque salvate.",
+    "adminKeysIgnored": "Not saved, administrator permission required: {{keys}}",
     "keyRecoveryTitle": "Recupero delle chiavi",
     "keyRecoveryDualControl": "Doppio controllo (quattro occhi)",
     "keyRecoveryDualControlDesc": "Richiede l'approvazione di ogni richiesta di recupero della chiave privata da parte di un secondo amministratore (l'approvatore deve essere diverso dal richiedente).",

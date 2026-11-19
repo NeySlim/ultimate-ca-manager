@@ -216,16 +216,16 @@ describe('BackupSection', () => {
     />
   )
 
-  it('locks the password only, and keeps the save and create buttons', () => {
+  it('locks the whole schedule, and keeps the save and create buttons', () => {
     renderBackup(OPERATOR)
     expect(field('settings.autoBackupPassword').control.disabled).toBe(true)
     expect(field('settings.autoBackupPassword').locked).toBe(true)
-    expect(toggle('settings.enableAutoBackups').disabled).toBeFalsy()
-    expect(field('settings.backupFrequency').control.disabled).toBeFalsy()
+    expect(toggle('settings.enableAutoBackups').disabled).toBe(true)
+    expect(field('settings.backupFrequency').control.disabled).toBe(true)
     expect(field('settings.backupFrequency').control.value).toBe('weekly')
     const retention = screen.getAllByText('settings.retentionPeriod')
       .map((n) => n.closest('[data-field]')).find(Boolean).querySelector('input')
-    expect(retention.disabled).toBeFalsy()
+    expect(retention.disabled).toBe(true)
     expect(retention.value).toBe('14')
     expect(screen.getAllByText('settings.saveSettings')).toHaveLength(2)
     expect(screen.getByText('settings.createBackup')).toBeInTheDocument()
@@ -242,6 +242,8 @@ describe('BackupSection', () => {
     renderBackup(ADMIN)
     expect(field('settings.autoBackupPassword').control.disabled).toBeFalsy()
     expect(field('settings.autoBackupPassword').locked).toBe(false)
+    expect(toggle('settings.enableAutoBackups').disabled).toBeFalsy()
+    expect(field('settings.backupFrequency').control.disabled).toBeFalsy()
   })
 })
 

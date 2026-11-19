@@ -174,6 +174,7 @@ def update_general_settings():
         return error_response('Request body must be a JSON object', 400)
     port_restart = False
     port_pinned_message = None
+    ignored_keys = []
 
     # Reserved keys are dropped before any validation; a body holding nothing
     # else is refused, so a mixed card still saves its other fields.
@@ -186,6 +187,7 @@ def update_general_settings():
         if reserved:
             logger.info('Ignored admin-only settings without admin:settings: %s',
                         ', '.join(reserved))
+            ignored_keys = reserved
             data = {k: v for k, v in data.items() if k not in _ADMIN_ONLY_SETTINGS}
 
     # List of allowed settings
@@ -564,7 +566,8 @@ def update_general_settings():
             restarted, detail = config_settings.restart_ucm_service()
             restart_message = ('Service restart initiated to apply the HTTP protocol port.'
                                if restarted else detail)
-    return success_response(data={'needs_restart': port_restart, 'restart_message': restart_message},
+    return success_response(data={'needs_restart': port_restart, 'restart_message': restart_message,
+                                  'ignored_keys': ignored_keys},
                             message='Settings saved successfully')
 
 

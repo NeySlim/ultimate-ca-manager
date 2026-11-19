@@ -18,7 +18,7 @@ export default function BackupSection({
   const { t } = useTranslation()
   const { copy, isCopied } = useClipboard()
   const isAdmin = hasPermission('admin:system')
-  // The KDF and the password need admin:settings; the schedule is refused by the API.
+  // The whole schedule needs admin:settings: the API drops these keys otherwise.
   const canAdminSettings = Boolean(hasPermission('admin:settings'))
   const canWriteSettings = Boolean(hasPermission('write:settings'))
   const allSelected = backups.length > 0 && selectedBackups.length === backups.length
@@ -55,6 +55,7 @@ export default function BackupSection({
             onChange={(val) => updateSetting('auto_backup_enabled', val)}
             label={t('settings.enableAutoBackups')}
             description={t('settings.autoBackupsDesc')}
+            disabled={!canAdminSettings}
           />
 
           {settings.auto_backup_enabled && (
@@ -69,6 +70,7 @@ export default function BackupSection({
                 value={settings.backup_frequency || 'daily'}
                 onChange={(val) => updateSetting('backup_frequency', val)}
                 helperText={t('settings.backupCadenceNote')}
+                disabled={!canAdminSettings}
               />
               <Select
                 label={t('settings.backupKdf')}
@@ -131,7 +133,8 @@ export default function BackupSection({
       <DetailSection title={t('settings.retentionPeriod')} icon={Broom} iconClass="icon-bg-amber">
         <div className="space-y-3">
           <Input
-            label={t('settings.retentionPeriod')}
+            label={<AdminLockLabel text={t('settings.retentionPeriod')} locked={!canAdminSettings} />}
+            disabled={!canAdminSettings}
             type="number"
             value={settings.backup_retention_days || 30}
             onChange={(e) => updateSetting('backup_retention_days', parseInt(e.target.value))}
@@ -140,7 +143,8 @@ export default function BackupSection({
             helperText={t('settings.retentionHelper')}
           />
           <Input
-            label={t('settings.backupMaxTotalMb')}
+            label={<AdminLockLabel text={t('settings.backupMaxTotalMb')} locked={!canAdminSettings} />}
+            disabled={!canAdminSettings}
             type="number"
             value={settings.backup_max_total_mb ?? 0}
             onChange={(e) => updateSetting('backup_max_total_mb', parseInt(e.target.value, 10) || 0)}

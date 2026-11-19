@@ -2922,6 +2922,8 @@ Content-Type: application/json
 }
 ```
 
+Some keys need `admin:settings` (session, password and HSTS policy, public addresses, the whole backup schedule, OCSP responder renewal). Without it they are dropped, and the response lists them in `data.ignored_keys` (empty when nothing was dropped); a body made only of such keys is refused with 403.
+
 ### Email Settings
 ```http
 # Get settings
