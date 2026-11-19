@@ -18,9 +18,23 @@ vi.mock('../utils', () => ({ downloadBlob }))
 import { exportFileName, sanitizeFilename } from '../exportDownload'
 
 describe('sanitizeFilename', () => {
-  it('collapses anything outside [A-Za-z0-9._-] to a single underscore', () => {
+  it('collapses anything that is not a letter, a digit or ._- to a single underscore', () => {
     expect(sanitizeFilename('a/b\\c:d')).toBe('a_b_c_d')
     expect(sanitizeFilename('spaces   and %%% signs')).toBe('spaces_and_signs')
+  })
+
+  it('keeps a name written in another script (#448)', () => {
+    expect(sanitizeFilename('テスト用')).toBe('テスト用')
+    expect(sanitizeFilename('Сервер №1')).toBe('Сервер_1')
+    expect(sanitizeFilename('Café crème')).toBe('Café_crème')
+    expect(sanitizeFilename('हिन्दी')).toBe('हिन्दी')
+  })
+
+  it('drops bidi marks, fullwidth separators and symbols', () => {
+    expect(sanitizeFilename('n\u202eb')).toBe('n_b')
+    expect(sanitizeFilename('a\uff0fb\uff3cc')).toBe('a_b_c')
+    expect(sanitizeFilename('a\u2028b\u200ec')).toBe('a_b_c')
+    expect(sanitizeFilename('🔐🔐')).toBe('_')
   })
 
   it('strips control characters, newlines included', () => {
