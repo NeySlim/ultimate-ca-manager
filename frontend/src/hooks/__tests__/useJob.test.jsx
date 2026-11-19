@@ -121,3 +121,16 @@ describe('useJob', () => {
     expect(acceptedJob({ data: { valid: true } })).toBeNull()
   })
 })
+
+describe('jobPercent', () => {
+  it('is null while the total is unknown, then a whole percentage, never above 100', async () => {
+    const { jobPercent } = await import('../useJob')
+    expect(jobPercent(undefined)).toBeNull()
+    expect(jobPercent({ done: null, total: null })).toBeNull()
+    expect(jobPercent({ done: 0, total: 255010 })).toBe(0)
+    expect(jobPercent({ done: 127505, total: 255010 })).toBe(50)
+    expect(jobPercent({ done: 255009, total: 255010 })).toBe(99)
+    expect(jobPercent({ done: 255010, total: 255010 })).toBe(100)
+    expect(jobPercent({ done: 300000, total: 255010 })).toBe(100)
+  })
+})

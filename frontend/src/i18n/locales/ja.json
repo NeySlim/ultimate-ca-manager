@@ -3590,7 +3590,7 @@
       "haNote": "HA モード: ノードは 1 つずつ更新され、前のノードが新しいバージョンで復帰してから次のノードが更新されます。"
     },
     "restoreJobStarting": "復元を開始しています",
-    "restoreJobProgress": "復元を実行中: {{total}} 手順中 {{done}} 手順目",
+    "restoreJobPercent": "Restore in progress: {{percent}}%",
     "restoreRunsInBackground": "復元はバックグラウンドで実行されます。完了するまで書き込みは拒否され、すべてのセッションがサインアウトされます。レポートを確認するには、再度サインインしてください。",
     "restoreCancel": "復元をキャンセル",
     "restoreCancelled": "復元はキャンセルされました。何も復元されていません",

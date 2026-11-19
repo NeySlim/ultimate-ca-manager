@@ -33,6 +33,7 @@ from models import db
 from ..export_generic import CHAIN_VARIANT_FINGERPRINT, REFERENCE_SUFFIX, load_model
 from ..manifest import SECTIONS
 from .plan import RestorePlan, RestoreValidationError, row_label
+from .transaction import tick
 from .windows_profiles import IDENTITY as _PROFILE_IDENTITY, PROFILES as _PROFILES, restored_identity
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,7 @@ def apply_columns(instance, section_name: str, row: Dict[str, Any],
     is the archive's row when `row` is a copy of it: the plan records the
     row written for that one (`RestorePlan.place`).
     """
+    tick(1)
     section = SECTIONS[section_name]
     columns, attribute_of = _mapping_of(type(instance))
     applied = _apply_or_leave_out(section_name, section, instance, row, columns,
@@ -143,6 +145,7 @@ def apply_section(section_name: str, rows: List[Dict[str, Any]],
 
     applied = 0
     for row in rows:
+        tick(1)
         target_id = plan.existing_id(section_name, row)
         instance = db.session.get(model, target_id) if target_id is not None else None
         if instance is None:
@@ -476,6 +479,7 @@ def relink_references(backup_data: Dict[str, Any], plan: RestorePlan) -> Dict[st
 
         changed = 0
         for row in rows:
+            tick()
             if not isinstance(row, dict):
                 continue
             target_id = plan.existing_id(section_name, row)

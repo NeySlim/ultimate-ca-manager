@@ -33,16 +33,20 @@ def marking(mark):
 
 
 _progress = contextvars.ContextVar('ucm_restore_progress', default=None)
+_row = contextvars.ContextVar('ucm_restore_row', default=None)
 _inside = contextvars.ContextVar('ucm_restore_inside', default=False)
 
 
 @contextmanager
-def progressing(hook):
-    """``hook(step)`` runs at each checkpoint of the restore; what it raises stops it."""
+def progressing(hook, row=None):
+    """``hook(step)`` runs at each checkpoint of the restore, ``row(applied, total)`` at each
+    row of its loops (braked by time on its side); what either raises stops the restore."""
     token = _progress.set(hook)
+    row_token = _row.set(row)
     try:
         yield
     finally:
+        _row.reset(row_token)
         _progress.reset(token)
 
 
@@ -50,6 +54,27 @@ def checkpoint(step):
     hook = _progress.get()
     if hook is not None:
         hook(step)
+
+
+def tick(applied=0):
+    """A checkpoint inside a loop of rows: ``applied`` rows written since the last one."""
+    row = _row.get()
+    if row is not None:
+        row(applied)
+
+
+def expect_rows(total):
+    """The rows the restore is about to write, for its progress."""
+    row = _row.get()
+    if row is not None:
+        row(0, total)
+
+
+def ticking(rows):
+    """``rows`` with a row checkpoint before each one (a loop that writes nothing)."""
+    for row in rows:
+        tick()
+        yield row
 
 
 def inside():

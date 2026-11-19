@@ -3589,7 +3589,7 @@
       "haNote": "Modo HA: los nodos se actualizan uno a uno, y el siguiente solo cuando el anterior ha vuelto con la nueva versión."
     },
     "restoreJobStarting": "La restauración está comenzando",
-    "restoreJobProgress": "Restauración en curso: paso {{done}} de {{total}}",
+    "restoreJobPercent": "Restore in progress: {{percent}}%",
     "restoreRunsInBackground": "La restauración se ejecuta en segundo plano. Se rechazan las escrituras hasta que termine, y cierra todas las sesiones: deberá volver a iniciar sesión para leer su informe.",
     "restoreCancel": "Cancelar la restauración",
     "restoreCancelled": "La restauración se canceló: no se restauró nada",

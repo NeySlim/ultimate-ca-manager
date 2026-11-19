@@ -273,26 +273,49 @@ class _Run:
         self.gate = None
         self._last = 0.0
         self._done = 0
+        self._phase = READING
+        self._rows = 0
+        self._rows_total = None
 
     def checkpoint(self, step):
-        from services.backup.restore import transaction
         done = STEPS.index(step) + 1 if step in STEPS else self._done
-        phase = READING if step == 'read' else APPLYING
         changed = done != self._done
         self._done = max(self._done, done)
-        now = time.monotonic()
-        if not changed and now - self._last < CHECK_SECONDS:
-            return
-        self._last = now
+        if changed:
+            self._phase = READING if step == 'read' else APPLYING
+            logger.info(f"Restore job {self.ctx.job_id}: step {step}")
+        if changed or time.monotonic() - self._last >= CHECK_SECONDS:
+            self._report()
+
+    def row(self, applied=0, total=None):
+        """A row of a loop: reported and the cancellation read once per CHECK_SECONDS at most."""
+        if total is not None:
+            self._rows_total = total
+        self._rows += applied
+        if time.monotonic() - self._last >= CHECK_SECONDS:
+            self._report()
+
+    def progress(self):
+        """(done, total): the steps passed plus the rows written, once the rows to write are
+        known (before that, None: the restore is reading its archive)."""
+        if self._rows_total is None:
+            return None, None
+        total = len(STEPS) + self._rows_total
+        return min(self._done + self._rows, total - 1), total
+
+    def _report(self):
+        from services.backup.restore import transaction
+        self._last = time.monotonic()
         held = self.sqlite and transaction.inside()
+        done, total = self.progress()
         if self.gate is not None:
-            self.gate.set_view(phase=phase, progress={'done': self._done, 'total': len(STEPS)},
-                             held=held)
+            self.gate.set_view(phase=self._phase, progress={'done': done, 'total': total},
+                               held=held)
         if cancel_flagged(self.ctx.job_id):
             raise JobCancelled(self.ctx.job_id)
         if held:
             return  # the restore transaction holds the SQLite database: no other connection writes
-        self.ctx.progress(done=self._done, total=len(STEPS), phase=phase)
+        self.ctx.progress(done=done, total=total, phase=self._phase)
 
     def mark(self, session, report):
         """In the restore transaction, last before its commit: the job is ``committed``
@@ -304,10 +327,11 @@ class _Run:
         if cancel_flagged(self.ctx.job_id):
             raise JobCancelled(self.ctx.job_id)
         # Every step has passed: the progress is complete, also where SQLite kept it unwritten
+        total = len(STEPS) + (self._rows_total or 0)
         done = session.execute(update(T).where(
             T.c.id == self.ctx.job_id, T.c.state == store.RUNNING,
             T.c.executor == self.ctx.executor, T.c.cancel_requested.is_(False),
-        ).values(phase=COMMITTED, progress_done=len(STEPS), progress_total=len(STEPS),
+        ).values(phase=COMMITTED, progress_done=total, progress_total=total,
                  result=_stored(report))).rowcount
         if done != 1:
             asked = session.execute(T.select().where(T.c.id == self.ctx.job_id)).mappings().first()
@@ -362,13 +386,15 @@ def run(ctx):
     ctx.view = jobs.public_view(row, with_result=False) if row else {'id': ctx.job_id, 'kind': KIND}
     password = ctx.secret
     path = ctx.file_path
-    ctx.progress(done=0, total=len(STEPS), phase=CHECKING)
+    ctx.progress(phase=CHECKING)
     try:
         fd = os.open(path or '', os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0))
     except OSError:
         outcome = _refused(500, GONE, 'Restore failed: the uploaded archive was gone')
     else:
-        with os.fdopen(fd, 'rb') as stream:
+        from services.backup.section_store import owned_by
+        # The sections it decrypts carry the job's id: whoever concludes the job removes them
+        with os.fdopen(fd, 'rb') as stream, owned_by(ctx.job_id):
             outcome = _restore(ctx, _Run(ctx, sqlite), stream, password)
     return outcome  # its audit line names the archive: the type's resource_param
 
@@ -399,7 +425,7 @@ def _restore(ctx, current, stream, password):
                     with database_migration_lock(purpose='the restore'), \
                             backup_operation_lock(purpose='the restore', fail_open=False), \
                             transaction.marking(current.mark), \
-                            transaction.progressing(current.checkpoint):
+                            transaction.progressing(current.checkpoint, current.row):
                         try:
                             results = service.restore_backup_from_stream(stream, password, mode=mode)
                         except (JobCancelled, JobLost):

@@ -3138,8 +3138,10 @@ A finished job is kept 30 days, and the latest of each kind always.
 A `restore` job (`admin:system`) holds every slot: nothing else runs beside it. Its `phase` is
 `checking`, `reading`, `applying` and `committing`, then, once the restore has committed,
 `committed`, `sessions_revoked`, `session_files_removed`, `caches_purged` and
-`crls_regenerated` as each step after the commit is done; `progress` counts the steps of the
-restore before the commit. It can be cancelled until its commit: nothing is restored. From
+`crls_regenerated` as each step after the commit is done; `progress` is empty while the archive
+is read, then counts the steps passed and the rows written (`total`: the ten steps plus the rows
+the archive carries) and reaches its total at the commit. It can be cancelled until its commit:
+nothing is restored, and a cancellation is read inside the loops over the rows too. From
 `committed` on, the cancel route answers `409` `The restore has committed: it can no longer be
 cancelled`. A restore that commits revokes every session, the caller's included: following the
 job then answers `401`; sign in again and read the job, whose `result` is the restore's answer.

@@ -3589,7 +3589,7 @@
       "haNote": "Modalità HA: i nodi si aggiornano uno alla volta, il successivo solo quando il precedente è tornato attivo sulla nuova versione."
     },
     "restoreJobStarting": "Il ripristino si sta avviando",
-    "restoreJobProgress": "Ripristino in corso: passaggio {{done}} di {{total}}",
+    "restoreJobPercent": "Restore in progress: {{percent}}%",
     "restoreRunsInBackground": "Il ripristino viene eseguito in background. Le scritture sono rifiutate finché non termina e il ripristino disconnette ogni sessione: dovrai accedere di nuovo per leggerne il report.",
     "restoreCancel": "Annulla il ripristino",
     "restoreCancelled": "Il ripristino è stato annullato: nulla è stato ripristinato",

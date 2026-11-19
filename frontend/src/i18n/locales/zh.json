@@ -3589,7 +3589,7 @@
       "haNote": "HA 模式：节点逐个更新，仅在上一个节点以新版本恢复后才更新下一个。"
     },
     "restoreJobStarting": "恢复正在启动",
-    "restoreJobProgress": "正在恢复：第 {{done}} 步，共 {{total}} 步",
+    "restoreJobPercent": "Restore in progress: {{percent}}%",
     "restoreRunsInBackground": "恢复在后台运行。恢复结束前将拒绝所有写入操作，并且所有会话都会被登出：您需要重新登录才能查看恢复报告。",
     "restoreCancel": "取消恢复",
     "restoreCancelled": "恢复已取消：未恢复任何内容",
