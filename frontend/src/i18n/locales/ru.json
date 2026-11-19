@@ -2803,6 +2803,7 @@
     "auditTitle": "Настройки журнала аудита",
     "smtpAuthRequired": "Требуется аутентификация",
     "smtpNoAuthHint": "Без аутентификации: подходит для локальных почтовых ретрансляторов (Postfix, sendmail и т. п.)",
+    "smtpNoAuthClearsOauth": "При сохранении удаляются сохранённые идентификатор клиента, секрет клиента и токен обновления OAuth2: чтобы вернуться к OAuth2, их нужно ввести и пройти авторизацию заново.",
     "smtpAuthMethod": "Способ аутентификации",
     "smtpAuthMethod_password": "Пароль",
     "smtpAuthMethod_oauth2": "OAuth2 (XOAUTH2)",

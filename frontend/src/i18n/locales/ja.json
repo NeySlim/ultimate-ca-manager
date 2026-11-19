@@ -2762,6 +2762,7 @@
     "auditTitle": "監査ログ設定",
     "smtpAuthRequired": "認証が必要",
     "smtpNoAuthHint": "認証なし: ローカルリレーサーバー（Postfix、sendmailなど）に適しています",
+    "smtpNoAuthClearsOauth": "Saving deletes the stored OAuth2 client ID, client secret and refresh token: going back to OAuth2 means entering them and authorizing again.",
     "smtpAuthMethod": "認証方式",
     "smtpAuthMethod_password": "パスワード",
     "smtpAuthMethod_oauth2": "OAuth2 (XOAUTH2)",

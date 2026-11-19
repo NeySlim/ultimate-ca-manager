@@ -2990,6 +2990,7 @@
     "smtpHost": "Serveur SMTP",
     "smtpAuthRequired": "Authentification requise",
     "smtpNoAuthHint": "Sans authentification : adapté aux serveurs relais locaux (Postfix, sendmail, etc.)",
+    "smtpNoAuthClearsOauth": "L'enregistrement supprime l'identifiant client, le secret client et le jeton d'actualisation OAuth2 enregistrés : revenir à OAuth2 demandera de les saisir et d'autoriser à nouveau.",
     "smtpAuthMethod": "Méthode d'authentification",
     "smtpAuthMethod_password": "Mot de passe",
     "smtpAuthMethod_oauth2": "OAuth2 (XOAUTH2)",

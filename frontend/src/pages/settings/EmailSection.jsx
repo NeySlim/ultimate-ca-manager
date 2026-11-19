@@ -83,6 +83,14 @@ export default function EmailSection({ settings, savedEmail, updateSetting, hand
             {(settings.smtp_auth_method || 'password') === 'none' && (
               <p className="text-xs text-text-tertiary">{t('settings.smtpNoAuthHint')}</p>
             )}
+            {/* Saving without authentication deletes the stored OAuth2 credentials (api/v2/settings/email) */}
+            {(settings.smtp_auth_method || 'password') === 'none' &&
+              (settings.has_oauth_client_secret || settings.has_oauth_refresh_token) && (
+              <p className="flex items-start gap-1.5 text-xs text-status-warning">
+                <Warning size={14} className="mt-0.5 shrink-0" />
+                {t('settings.smtpNoAuthClearsOauth')}
+              </p>
+            )}
 
             {(settings.smtp_auth_method || 'password') === 'password' && (
               <DetailGrid>
