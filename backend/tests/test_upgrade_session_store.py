@@ -6,6 +6,8 @@ PostgreSQL without Redis gets is test_sessions_store.test_configuration_picks_th
 """
 import pytest
 
+from tests.header_guard import guarded
+
 PROFILE = '/api/v2/account/profile'
 
 
@@ -39,7 +41,7 @@ def test_a_file_session_of_2x_is_not_taken_up_by_the_database_store(monkeypatch,
     from app import create_app
     apps = []
     try:
-        files = create_app('testing')
+        files = guarded(create_app('testing'))
         apps.append(files)
         clear_admin_password_flag(files)
         client = files.test_client()
@@ -48,7 +50,7 @@ def test_a_file_session_of_2x_is_not_taken_up_by_the_database_store(monkeypatch,
         assert any(sessions.iterdir()), 'the file store wrote no session'
 
         # A restart on the file store (SQLite, as in 2.x) keeps the session
-        again = create_app('testing')
+        again = guarded(create_app('testing'))
         apps.append(again)
         same = again.test_client()
         same.set_cookie('session', cookie)
@@ -56,7 +58,7 @@ def test_a_file_session_of_2x_is_not_taken_up_by_the_database_store(monkeypatch,
 
         monkeypatch.setattr(TestingConfig, 'SESSION_TYPE', 'sqlalchemy')
         monkeypatch.setattr(TestingConfig, 'SESSION_SQLALCHEMY_TABLE', 'flask_sessions', raising=False)
-        database = create_app('testing')
+        database = guarded(create_app('testing'))
         apps.append(database)
         assert database.config['SESSION_TYPE'] == 'sqlalchemy'
         upgraded = database.test_client()

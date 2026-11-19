@@ -177,6 +177,8 @@ def _app():
     os.environ['UCM_DATABASE_PATH'] = db_path
     from app import create_app
     application = create_app('testing')
+    from tests.conftest import configure_test_app
+    configure_test_app(application)
     yield application
     if os.path.exists(db_path):
         os.unlink(db_path)
