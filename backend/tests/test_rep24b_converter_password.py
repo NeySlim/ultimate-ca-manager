@@ -1,4 +1,7 @@
-"""The converter opens an encrypted private key (pasted or separate) with `password`, and never logs it."""
+"""Guards, not fixes: the converter route already took `password` before the page asked for it (no server change in that lot).
+
+The converter opens an encrypted private key (pasted or separate) with `password`, and never logs it.
+"""
 import logging
 
 from cryptography import x509
