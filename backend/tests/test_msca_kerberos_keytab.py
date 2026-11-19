@@ -100,9 +100,6 @@ def test_two_connections_never_share_the_variable(kerberos):
 
 # --- pywinrm 0.5.0 (the real Session, Protocol and Transport), its Kerberos auth faked ---
 
-CCACHE = 'KRB5CCNAME'
-
-
 class _WinrmKerberosAuth(requests.auth.AuthBase):
     """winrm.vendor.requests_kerberos.HTTPKerberosAuth: with force_preemptive its __call__
     acquires the credential (generate_request_header) on the first request."""
@@ -117,7 +114,7 @@ class _WinrmKerberosAuth(requests.auth.AuthBase):
         type(self).instances.append(self)
 
     def generate_request_header(self, response, host, is_preemptive=False):
-        self.seen.append((os.environ.get(ENV), os.environ.get(CCACHE)))
+        self.seen.append(os.environ.get(ENV))
         return 'Negotiate x'
 
     def __call__(self, request):
@@ -151,7 +148,7 @@ def pywinrm(monkeypatch):
         return 'shell'
 
     def get_command_output(self, shell_id, command_id):
-        state.running.append((os.environ.get(ENV), os.environ.get(CCACHE)))
+        state.running.append(os.environ.get(ENV))
         state.started.set()
         if state.hold is not None:
             state.hold.wait(5)
@@ -163,7 +160,6 @@ def pywinrm(monkeypatch):
     monkeypatch.setattr(winrm.protocol.Protocol, 'cleanup_command', lambda self, *a: None)
     monkeypatch.setattr(winrm.protocol.Protocol, 'close_shell', lambda self, *a: None)
     monkeypatch.setenv(ENV, 'FILE:/previous.keytab')
-    monkeypatch.setenv(CCACHE, 'FILE:/previous.ccache')
     return state
 
 
@@ -186,8 +182,8 @@ def test_the_winrm_channel_names_the_keytab_only_while_it_acquires(pywinrm, ssl)
     assert _run_ps(_channel_row(winrm_use_ssl=ssl, winrm_port=5986 if ssl else 5985)) == 'ok'
     auth, = _WinrmKerberosAuth.instances
     assert auth.kwargs['principal'] == 'svc@CORP'
-    assert [keytab for keytab, _cache in auth.seen] == ['/kt/svc.keytab']
-    assert [keytab for keytab, _cache in pywinrm.running] == ['FILE:/previous.keytab']
+    assert auth.seen == ['/kt/svc.keytab']
+    assert pywinrm.running == ['FILE:/previous.keytab']
     assert os.environ[ENV] == 'FILE:/previous.keytab'
 
 
@@ -223,7 +219,7 @@ def test_an_unexpected_pywinrm_runs_the_whole_command_under_the_keytab(pywinrm, 
                 pass
 
             def run_ps(self, script):
-                pywinrm.running.append((os.environ.get(ENV), os.environ.get(CCACHE)))
+                pywinrm.running.append(os.environ.get(ENV))
                 return SimpleNamespace(status_code=0, std_out=b'ok', std_err=b'')
         monkeypatch.setattr(winrm, 'Session', Session)
     elif shape == 'missing-attribute':
@@ -241,7 +237,7 @@ def test_an_unexpected_pywinrm_runs_the_whole_command_under_the_keytab(pywinrm, 
         _built_with.clear()
         monkeypatch.setattr(winrm.transport.Transport, 'build_session', _other_auth_session)
     assert _run_ps(_channel_row()) == 'ok'
-    assert [keytab for keytab, _cache in pywinrm.running] == ['/kt/svc.keytab']
+    assert pywinrm.running == ['/kt/svc.keytab']
     if shape == 'other-auth-class':
         # The session built with its encryption held back is dropped: pywinrm builds its own
         assert _built_with == ['never', 'auto']

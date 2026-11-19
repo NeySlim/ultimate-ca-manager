@@ -98,7 +98,7 @@ class MicrosoftCAConnectionMixin:
                 class _ConnectionKerberosAuth(HTTPKerberosAuth):
                     # The credential is acquired here: the connection keytab is named only meanwhile
                     def generate_request_header(self, *args, **kwargs):
-                        with client_keytab(keytab, principal=principal, owner=msca.id):
+                        with client_keytab(keytab):
                             return super().generate_request_header(*args, **kwargs)
 
                 # auth_method='basic' is a placeholder: the real auth is the

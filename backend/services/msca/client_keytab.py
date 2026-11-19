@@ -41,7 +41,7 @@ def managed_keytab_error(path):
 
 
 @contextmanager
-def client_keytab(path, principal=None, owner=None):
+def client_keytab(path):
     """KRB5_CLIENT_KTNAME is ``path`` inside the block and what it was before outside it.
     Without a keytab nothing is set and no lock is taken."""
     error = managed_keytab_error(path)

@@ -231,7 +231,7 @@ class MicrosoftCAAdminChannelMixin:
         the wrapper is in place, then the setup is sent as build_session would have.
         False when pywinrm is not shaped as expected: the caller then holds the keytab throughout.
         """
-        keytab, principal, owner = MicrosoftCAAdminChannelMixin._keytab_identity(msca)
+        keytab = msca.kerberos_keytab_path
         transport = getattr(getattr(session, 'protocol', None), 'transport', None)
         if transport is None or getattr(transport, 'session', True) is not None or not all(
                 hasattr(transport, name) for name in _PYWINRM_TRANSPORT):
@@ -251,7 +251,7 @@ class MicrosoftCAAdminChannelMixin:
         acquire = auth.generate_request_header
 
         def generate_request_header(*args, **kwargs):
-            with client_keytab(keytab, principal=principal, owner=owner):
+            with client_keytab(keytab):
                 return acquire(*args, **kwargs)
 
         auth.generate_request_header = generate_request_header
@@ -263,11 +263,6 @@ class MicrosoftCAAdminChannelMixin:
                 wanted == 'auto' and not transport.endpoint.lower().startswith('https'))):
             transport.setup_encryption(http)
         return True
-
-    @staticmethod
-    def _keytab_identity(msca):
-        return (msca.kerberos_keytab_path, msca.winrm_effective_username or msca.kerberos_principal or None,
-                getattr(msca, 'id', None))
 
     @staticmethod
     def _run_ps(msca, script):
@@ -283,8 +278,7 @@ class MicrosoftCAAdminChannelMixin:
                     or MicrosoftCAAdminChannelMixin._bind_client_keytab(session, msca):
                 result = session.run_ps(script)
             else:
-                keytab, principal, owner = MicrosoftCAAdminChannelMixin._keytab_identity(msca)
-                with client_keytab(keytab, principal=principal, owner=owner):
+                with client_keytab(msca.kerberos_keytab_path):
                     result = session.run_ps(script)
         except Exception as e:
             raise MSCAAdminChannelError(f'WinRM execution failed: {e}')
