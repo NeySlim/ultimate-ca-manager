@@ -183,6 +183,10 @@ export default function AuditLogsPage() {
     try {
       const res = await auditService.exportLogs({
         format,
+        search: search || undefined,
+        username: filterUsername || undefined,
+        action: filterAction.length > 0 ? filterAction : undefined,
+        success: filterSuccess !== '' ? filterSuccess : undefined,
         date_from: filterDateFrom || undefined,
         date_to: filterDateTo || undefined,
         limit: 10000

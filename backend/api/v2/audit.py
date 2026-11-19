@@ -141,18 +141,29 @@ def export_logs():
         date_from: Start date (ISO format)
         date_to: End date (ISO format)
         limit: Max records (default: 10000)
+        username, action (repeatable), category, resource_type (repeatable), success, search:
+            the filters of the list
     """
     format = request.args.get('format', 'json')
     limit = parse_request_limit(10000, 50000)
     
     # Parse dates
     date_from, date_to = parse_date_filter()
-    
+
+    success_param = request.args.get('success')
+    action_list = request.args.getlist('action')
+    resource_type_list = request.args.getlist('resource_type')
     data = AuditService.export_logs(
         format=format,
         date_from=date_from,
         date_to=date_to,
-        limit=limit
+        limit=limit,
+        username=request.args.get('username'),
+        action=action_list or None,
+        category=request.args.get('category'),
+        resource_type=resource_type_list or None,
+        success=None if success_param is None else success_param.lower() == 'true',
+        search=request.args.get('search'),
     )
     
     if format == 'csv':

@@ -15,9 +15,7 @@ logger = logging.getLogger(__name__)
 class AuditQueryMixin:
 
     @staticmethod
-    def get_logs(
-        page: int = 1,
-        per_page: int = 50,
+    def _filtered_query(
         username: Optional[str] = None,
         action=None,
         resource_type=None,
@@ -26,7 +24,8 @@ class AuditQueryMixin:
         date_to: Optional[datetime] = None,
         search: Optional[str] = None,
         category: Optional[str] = None
-    ) -> tuple:
+    ):
+        """The filters of the list, shared with the export so both select the same rows."""
         query = AuditLog.query
 
         if username:
@@ -68,6 +67,24 @@ class AuditQueryMixin:
                 )
             )
 
+        return query
+
+    @staticmethod
+    def get_logs(
+        page: int = 1,
+        per_page: int = 50,
+        username: Optional[str] = None,
+        action=None,
+        resource_type=None,
+        success: Optional[bool] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
+        search: Optional[str] = None,
+        category: Optional[str] = None
+    ) -> tuple:
+        query = AuditQueryMixin._filtered_query(
+            username=username, action=action, resource_type=resource_type, success=success,
+            date_from=date_from, date_to=date_to, search=search, category=category)
         query = query.order_by(AuditLog.timestamp.desc())
 
         total = query.count()
@@ -154,14 +171,11 @@ class AuditQueryMixin:
         format: str = 'json',
         date_from: Optional[datetime] = None,
         date_to: Optional[datetime] = None,
-        limit: int = 10000
+        limit: int = 10000,
+        **filters
     ) -> str:
-        query = AuditLog.query
-
-        if date_from:
-            query = query.filter(AuditLog.timestamp >= date_from)
-        if date_to:
-            query = query.filter(AuditLog.timestamp <= date_to)
+        """*filters* are those of get_logs: username, action, resource_type, success, search, category."""
+        query = AuditQueryMixin._filtered_query(date_from=date_from, date_to=date_to, **filters)
 
         query = query.order_by(AuditLog.timestamp.desc()).limit(limit)
         logs = query.all()

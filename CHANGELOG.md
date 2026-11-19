@@ -130,6 +130,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **The audit log export follows the filters of the list.** It exported every row of the period whatever search, user, action or status filter was set; it now holds only the filtered rows.
 - **Changing your own password from the Users page.** The page never asked for the current password the server requires, so editing your own account with a new password, or resetting it, always answered 400; it now asks for it.
 - **Fetching SAML metadata uses the TLS settings typed in the form.** Editing a SAML provider, the *skip verification* and CA bundle values typed were ignored in favour of the saved ones, so a test before saving failed with a message advising an option already ticked.
 - **The ACME preflight checks the key type.** A certificate key type that the request refuses (unknown, or not allowed in FIPS mode) passed the preflight and failed only at the real request; the preflight now answers 400 for it.

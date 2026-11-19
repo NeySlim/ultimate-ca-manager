@@ -2833,6 +2833,8 @@ GET /api/v2/audit/export?format=json&limit=10000
 GET /api/v2/audit/export?format=csv&date_from=2026-01-01
 ```
 
+The export takes the filters of the list (`username`, `action` and `resource_type`, repeatable, `category`, `success`, `search`, `date_from`, `date_to`) and holds only the rows they select.
+
 ### Cleanup Old Logs
 ```http
 POST /api/v2/audit/cleanup

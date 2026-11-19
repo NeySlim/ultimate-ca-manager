@@ -224,6 +224,54 @@ class TestExport:
         assert len(lines) >= 2, 'Expected header + at least one data row'
 
 
+class TestExportFilters:
+    """The export follows the filters of the list, through the same filtering code."""
+
+    @pytest.fixture
+    def rows(self, app):
+        import uuid
+        from services.audit_service import AuditService
+        tag = uuid.uuid4().hex[:8]
+        with app.app_context():
+            for user, action, ok, details in [
+                (f'ann-{tag}', f'rep24b_a_{tag}', True, f'first {tag}'),
+                (f'bob-{tag}', f'rep24b_a_{tag}', False, f'second {tag}'),
+                (f'bob-{tag}', f'rep24b_b_{tag}', True, f'third {tag}'),
+            ]:
+                AuditService.log_action(action=action, username=user, success=ok, details=details)
+        return tag
+
+    def _export(self, auth_client, query, fmt='json'):
+        r = auth_client.get(f'{BASE}/export?format={fmt}&limit=1000&{query}')
+        assert r.status_code == 200, r.data
+        return r
+
+    def test_export_keeps_only_the_filtered_rows(self, auth_client, rows):
+        tag = rows
+        listed = get_json(auth_client.get(
+            f'{BASE}/logs?username=bob-{tag}&action=rep24b_a_{tag}&success=false'))['data']
+        exported = json.loads(self._export(
+            auth_client, f'username=bob-{tag}&action=rep24b_a_{tag}&success=false').data)
+        assert [e['id'] for e in exported] == [l['id'] for l in listed]
+        assert len(exported) == 1 and exported[0]['details'] == f'second {tag}'
+
+    def test_export_search_and_csv(self, auth_client, rows):
+        tag = rows
+        text = self._export(auth_client, f'search=third+{tag}', 'csv').data.decode()
+        assert f'third {tag}' in text
+        assert f'first {tag}' not in text and f'second {tag}' not in text
+
+    def test_export_action_repeated(self, auth_client, rows):
+        tag = rows
+        exported = json.loads(self._export(
+            auth_client, f'action=rep24b_a_{tag}&action=rep24b_b_{tag}').data)
+        assert len(exported) == 3
+
+    def test_export_without_filters_is_unchanged(self, auth_client, rows):
+        exported = json.loads(self._export(auth_client, '').data)
+        assert len(exported) >= 3
+
+
 # ============================================================
 # Cleanup
 # ============================================================
