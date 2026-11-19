@@ -59,6 +59,8 @@ class ProfilesMixin:
         profile = db.session.get(ScanProfile, profile_id)
         if not profile:
             return None
+        was_scheduled = profile.schedule_enabled
+        was_interval = profile.schedule_interval_minutes
         if 'name' in data:
             profile.name = data['name'].strip()[:200]
         if 'description' in data:
@@ -88,7 +90,10 @@ class ProfilesMixin:
         if 'resolve_dns' in data:
             profile.resolve_dns = bool(data['resolve_dns'])
         profile.updated_at = utc_now()
-        if profile.schedule_enabled and not profile.next_scan_at:
+        # A new interval, or a schedule switched on again, restarts the wait as creation does
+        rescheduled = (profile.schedule_enabled and not was_scheduled) or (
+            profile.schedule_enabled and profile.schedule_interval_minutes != was_interval)
+        if profile.schedule_enabled and (rescheduled or not profile.next_scan_at):
             profile.next_scan_at = utc_now() + timedelta(
                 minutes=profile.schedule_interval_minutes)
         try:

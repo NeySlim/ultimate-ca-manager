@@ -2248,6 +2248,7 @@ GET /api/v2/discovery/runs?profile_id=1
 GET /api/v2/discovery/runs/{run_id}
 ```
 - `POST /profiles` (`201`): `name` (required, unique: `409`), `targets` (required, a non-empty list of at most 1000 hostnames, IP addresses or CIDR ranges), `ports` (a non-empty list of at most 100 integers from 1 to 65535), and optionally `description`, `schedule_enabled`, `schedule_interval_minutes` (1440 by default), `notify_on_new`, `notify_on_change`, `notify_on_expiry` (all true by default), `notify_email` (one valid address), `timeout` (1 to 30, default 5), `max_workers` (1 to 50, default 20) and `resolve_dns`. `PUT` updates the same fields; `DELETE` answers `204`.
+- `PUT /profiles/{profile_id}`: a new `schedule_interval_minutes` on a scheduled profile, or `schedule_enabled` turned on again, sets `next_scan_at` to now plus the interval, as creation does; any other update leaves it.
 - `POST /profiles/{profile_id}/scan` starts a scan with the profile's settings and returns `scan_run_id`.
 - `POST /scan` scans without a saved profile: `targets` (at most 500) or `subnet` (at most 1024 addresses), one of the two being required, plus `ports` (default `[443]`), `timeout` (1 to 30, default 5), `max_workers` (1 to 50, default 20) and `resolve_dns`. It returns `scan_run_id`.
 - `runs` lists scan runs (`items`, `total`); `runs/{run_id}` reads one, `404` when unknown.
