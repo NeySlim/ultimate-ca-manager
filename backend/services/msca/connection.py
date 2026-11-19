@@ -35,6 +35,16 @@ def saved_credential_retargets(msca, overrides):
     return changed_targets(current, overrides)
 
 
+def tested_values(msca, overrides):
+    """The saved fields a test reads, under the form's; secrets aside.
+    The Kerberos columns of a row saved under another method are never read."""
+    values = {k: getattr(msca, k) for k in _TESTED_FIELDS}
+    if msca.auth_method != 'kerberos':
+        values.update(kerberos_principal=None, kerberos_keytab_path=None)
+    values.update({k: v for k, v in overrides.items() if k in _TESTED_FIELDS})
+    return values
+
+
 class MicrosoftCAConnectionMixin:
 
     @staticmethod
@@ -149,8 +159,7 @@ class MicrosoftCAConnectionMixin:
         from types import SimpleNamespace
         if saved_credential_retargets(msca, overrides):
             raise ValueError('A saved credential is not sent to another target')
-        values = {k: getattr(msca, k) for k in _TESTED_FIELDS}
-        values.update({k: v for k, v in overrides.items() if k in _TESTED_FIELDS})
+        values = tested_values(msca, overrides)
         for field, column in (('password', '_password'), ('client_key_pem', '_client_key_pem')):
             typed = overrides.get(field)
             if isinstance(typed, str) and typed.strip() and typed.strip() not in MASKS:

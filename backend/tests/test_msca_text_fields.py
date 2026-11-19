@@ -38,11 +38,26 @@ def test_a_non_text_value_is_refused_on_update(app, auth_client, kerberos_id, fi
     assert field in get_json(r)['message']
 
 
-@pytest.mark.parametrize('field', ['name', 'server', 'ca_name', 'ca_bundle', 'default_template',
-                                   'username', 'client_cert_pem'])
-def test_a_non_text_value_is_refused_on_create(app, auth_client, field):
-    body = {'name': f'krb-null-{uuid.uuid4().hex[:8]}', 'server': 'adcs.corp.local', 'auth_method': 'basic',
+@pytest.mark.parametrize('field, method', [('name', 'basic'), ('server', 'basic'), ('ca_name', 'basic'),
+                                           ('ca_bundle', 'basic'), ('default_template', 'basic'),
+                                           ('username', 'basic'), ('client_cert_pem', 'certificate'),
+                                           ('client_key_pem', 'certificate')])
+def test_a_non_text_value_is_refused_on_create(app, auth_client, field, method):
+    body = {'name': f'krb-null-{uuid.uuid4().hex[:8]}', 'server': 'adcs.corp.local', 'auth_method': method,
             field: None}
     r = _send(auth_client, 'post', BASE, body)
     assert r.status_code == 400, r.data
     assert field in get_json(r)['message']
+
+
+def test_a_null_field_of_another_method_is_ignored_on_create(app, auth_client):
+    body = {'name': f'cert-null-{uuid.uuid4().hex[:8]}', 'server': 'adcs.corp.local',
+            'auth_method': 'certificate', 'username': None, 'kerberos_principal': None}
+    r = _send(auth_client, 'post', BASE, body)
+    assert r.status_code == 201, r.data
+
+
+def test_a_null_field_of_another_method_is_ignored_on_update(app, auth_client, kerberos_id):
+    r = _send(auth_client, 'put', f'{BASE}/{kerberos_id}', {'username': None, 'client_cert_pem': None,
+                                                            'name': f'krb-upd-{uuid.uuid4().hex[:8]}'})
+    assert r.status_code == 200, r.data

@@ -13,7 +13,7 @@ from utils.response import success_response, error_response, created_response, n
 from models import db
 from models.msca import MicrosoftCA, MSCARequest, basic_password_reaches
 from services.msca_service import MicrosoftCAService
-from services.msca.connection import saved_credential_retargets
+from services.msca.connection import saved_credential_retargets, tested_values
 from services.msca.client_keytab import managed_keytab_error
 from services.msca.requests import (MSCASignedElsewhere, SIGNED_MEANWHILE_MESSAGE, SUPERSEDED,
                                     SUPERSEDED_MESSAGE, msca_may_write_clause, supersede)
@@ -49,13 +49,19 @@ def _check_size(name: str, value, limit: int):
     return None
 
 
-# Fields read as text: null or another JSON type is a 400 naming the field, not a 500
-_TEXT_FIELDS = ('name', 'server', 'ca_name', 'ca_bundle', 'default_template', 'username',
-                'client_cert_pem', 'client_key_pem', 'kerberos_principal', 'kerberos_keytab_path')
+# Fields read as text: null or another JSON type is a 400 naming the field, not a 500.
+# A method's own fields are read only under that method, as v2 ignored the others
+_TEXT_FIELDS = ('name', 'server', 'ca_name', 'ca_bundle', 'default_template')
+_METHOD_TEXT_FIELDS = {'basic': ('username',), 'certificate': ('client_cert_pem', 'client_key_pem'),
+                       'kerberos': ('kerberos_principal', 'kerberos_keytab_path')}
 
 
-def _text_field_error(data):
-    for field in _TEXT_FIELDS:
+def _method_fields(method):
+    return _METHOD_TEXT_FIELDS.get(method, ()) if isinstance(method, str) else ()
+
+
+def _text_field_error(data, method):
+    for field in _TEXT_FIELDS + _method_fields(method):
         if field in data and not isinstance(data[field], str):
             return error_response(f"{field} must be a string", 400)
     return None
@@ -145,57 +151,80 @@ _WINRM_OVERRIDE_FIELDS = ('winrm_enabled', 'winrm_host', 'winrm_port', 'winrm_us
 # Kerberos credentials a channel test may override: the keytab and the principal it signs in as
 _WINRM_KERBEROS_FIELDS = ('kerberos_principal', 'kerberos_keytab_path')
 
-KERBEROS_ADMIN_MESSAGE = ('Setting a Kerberos keytab or principal, or moving a connection or test '
-                          'that uses one, requires the admin:system permission')
-_CERTSRV_TARGET_FIELDS = ('server', 'use_ssl', 'verify_ssl', 'ca_bundle')
+KERBEROS_ADMIN_MESSAGE = ('A Kerberos connection signs in as an identity of this server: creating one, '
+                          'moving it, changing its keytab or principal, or testing it against another '
+                          'target requires the admin:system permission')
+
+# What create and update read of a connection to know where it signs in with Kerberos, and the defaults
+_SIGN_IN_DEFAULTS = dict(server='', use_ssl=True, verify_ssl=True, ca_bundle=None, auth_method='certificate',
+                         username=None, kerberos_principal=None, kerberos_keytab_path=None,
+                         winrm_enabled=False, winrm_host=None, winrm_port=5986, winrm_use_ssl=True,
+                         winrm_verify_ssl=True, winrm_transport='kerberos', winrm_username=None)
 
 
 def _text(value):
     return value.strip() if isinstance(value, str) else (value or '')
 
 
-def _kerberos_forbidden():
-    """403 unless the caller holds admin:system: a keytab path names a credential the server reads itself."""
+def _sign_in_config(msca):
+    from types import SimpleNamespace
+    return SimpleNamespace(**{k: getattr(msca, k) if msca is not None else v
+                              for k, v in _SIGN_IN_DEFAULTS.items()})
+
+
+def _kerberos_sign_ins(cfg, channel=True):
+    """Each Kerberos sign-in ``cfg`` makes, by channel: where it goes and as whom
+    (keytab, principal, or without them the tickets the process holds)."""
+    uses = {}
+    if cfg.auth_method == 'kerberos':
+        uses['certsrv'] = {'server': str(cfg.server or '').strip().lower(), 'use_ssl': cfg.use_ssl,
+                           'verify_ssl': cfg.verify_ssl, 'ca_bundle': cfg.ca_bundle,
+                           'kerberos_principal': cfg.kerberos_principal,
+                           'kerberos_keytab_path': cfg.kerberos_keytab_path}
+    if channel and cfg.winrm_enabled and (cfg.winrm_transport or 'kerberos').lower() == 'kerberos':
+        uses['winrm'] = {**_winrm_channel(cfg), 'kerberos_keytab_path': cfg.kerberos_keytab_path}
+    return uses
+
+
+def _kerberos_forbidden(before, after):
+    """403 unless admin:system when ``after`` makes a Kerberos sign-in ``before`` did not make identically:
+    any Kerberos configuration is an identity of the system, with or without keytab."""
+    if all(ch in before and not changed_targets(before[ch], use) for ch, use in after.items()):
+        return None
     if _has_perm('admin:system', getattr(g, 'permissions', None) or []):
         return None
     return error_response(KERBEROS_ADMIN_MESSAGE, 403)
 
 
-def _saved_kerberos(msca):
-    return (_text(msca.kerberos_principal), _text(msca.kerberos_keytab_path))
-
-
-def _kerberos_after(msca, data):
-    """(principal, keytab) the connection would hold or use with ``data`` applied, or None off Kerberos."""
-    method = data.get('auth_method', msca.auth_method if msca else 'certificate')
-    if method != 'kerberos':
-        return None
-    saved = _saved_kerberos(msca) if msca and msca.auth_method == 'kerberos' else ('', '')
-    return tuple(_text(data[field]) if field in data else value
-                 for field, value in zip(('kerberos_principal', 'kerberos_keytab_path'), saved))
-
-
 def _kerberos_save_forbidden(msca, data):
-    """A save that sets or changes a keytab or principal, or moves a connection holding one."""
-    after = _kerberos_after(msca, data)
-    if after is None:
-        return None
-    saved = _saved_kerberos(msca) if msca and msca.auth_method == 'kerberos' else ('', '')
-    moved = msca is not None and any(saved) and (
-        changed_targets({k: getattr(msca, k) for k in _CERTSRV_TARGET_FIELDS}, data)
-        or changed_targets(_winrm_target_fields(msca), data))
-    return _kerberos_forbidden() if after != saved or moved else None
+    """The rule on the connection as this create (``msca`` None) or update would leave it."""
+    cfg = _sign_in_config(msca)
+    method = data.get('auth_method', cfg.auth_method)
+    if method != cfg.auth_method:  # the update clears the old method's credentials
+        cfg.username = cfg.kerberos_principal = cfg.kerberos_keytab_path = None
+    cfg.auth_method = method
+    for field in ('server', 'use_ssl', 'verify_ssl', 'ca_bundle'):
+        if field in data:
+            setattr(cfg, field, data[field])
+    for field in _method_fields(method):
+        if field in data:
+            setattr(cfg, field, _text(data[field]) or None)
+    err = _apply_winrm_fields(cfg, {k: data[k] for k in _WINRM_TARGET_FIELDS + ('winrm_enabled',) if k in data})
+    if err:
+        return err
+    before = _kerberos_sign_ins(_sign_in_config(msca)) if msca is not None else {}
+    return _kerberos_forbidden(before, _kerberos_sign_ins(cfg))
 
 
 def _kerberos_test_forbidden(msca, data):
-    """A test that uses a keytab or principal other than the saved ones, or toward another target."""
-    after = _kerberos_after(msca, data)
-    if not after or not any(after):
-        return None
-    if msca is not None and after == _saved_kerberos(msca) and not changed_targets(
-            {k: getattr(msca, k) for k in _CERTSRV_TARGET_FIELDS + ('auth_method',)}, data):
-        return None
-    return _kerberos_forbidden()
+    """The rule on the certsrv sign-in a test runs: the saved one, or the inline form's (``msca`` None)."""
+    from types import SimpleNamespace
+    if msca is None:
+        tested = {**_SIGN_IN_DEFAULTS, 'auth_method': 'basic',
+                  **{k: v for k, v in data.items() if k in _SIGN_IN_DEFAULTS}}
+        return _kerberos_forbidden({}, _kerberos_sign_ins(SimpleNamespace(**tested), channel=False))
+    return _kerberos_forbidden(_kerberos_sign_ins(_sign_in_config(msca), channel=False),
+                               _kerberos_sign_ins(SimpleNamespace(**tested_values(msca, data)), channel=False))
 
 
 def _winrm_channel(cfg):
@@ -325,7 +354,7 @@ def create_connection():
         return error_response("Request body required", 400)
     if not isinstance(data, dict):
         return error_response("Request body must be a JSON object", 400)
-    err = _text_field_error(data)
+    err = _text_field_error(data, data.get('auth_method', 'certificate'))
     if err:
         return err
 
@@ -497,7 +526,7 @@ def update_connection(msca_id):
         return error_response("Request body required", 400)
     if not isinstance(data, dict):
         return error_response("Request body must be a JSON object", 400)
-    err = _text_field_error(data)
+    err = _text_field_error(data, data.get('auth_method', msca.auth_method))
     if err:
         return err
     # A transport refused outright is the answer, before any question of secrets
@@ -655,8 +684,8 @@ def test_connection_inline():
     data = request.get_json()
     if not data or not data.get('server'):
         return error_response("Server hostname is required", 400)
-    # An unsaved connection has no saved target: any keytab or principal needs admin:system
-    err = _kerberos_test_forbidden(None, {'auth_method': 'basic', **data}) or _keytab_error(data)
+    # An unsaved connection has no saved sign-in: any Kerberos test needs admin:system
+    err = _kerberos_test_forbidden(None, data) or _keytab_error(data)
     if err:
         return err
     result = MicrosoftCAService.test_connection_inline(data)
