@@ -53,6 +53,8 @@ def _smtp_authenticate(server: smtplib.SMTP, config: SMTPConfig) -> None:
     Raises ``smtplib.SMTPAuthenticationError`` (or ``smtplib.SMTPException``)
     on failure — caller catches and reports.
     """
+    if getattr(config, 'smtp_auth', True) is False:
+        return  # "No authentication" is stored as smtp_auth off
     if (config.smtp_auth_method or 'password') == 'oauth2':
         if not config.smtp_user:
             raise smtplib.SMTPAuthenticationError(535, b'OAuth2 requires smtp_user (mailbox)')
