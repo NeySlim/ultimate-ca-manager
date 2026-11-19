@@ -86,7 +86,7 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 | `proxy.behindProxy` | `false` | Set `UCM_BEHIND_PROXY=1` (honor `X-Forwarded-*` for one hop) |
 | `proxy.trustedProxies` | `[]` | `UCM_TRUSTED_PROXIES`: proxy IPs / CIDRs allowed to set forwarded / client-cert headers (CIDR entries need UCM 2.224 or later) |
 | `extraEnv` | `[]` | Extra `UCM_*` env vars, for example `UCM_WORKER_TIMEOUT`: the seconds a web request may run before gunicorn restarts the worker, 30 to 3600 (default 120); a value outside these bounds stops the pod at startup |
-| `resources` | requests 100m/512Mi, limit 1Gi | Pod resources. 1Gi holds a restore of about 25 000 certificates; raise `limits.memory` above that (about 4Gi for 255 000 certificates, see the memory of backups and restores in the administration guide) |
+| `resources` | requests 100m/512Mi, limit 1Gi | Pod resources. `limits.memory` must hold the larger of the backup and the restore: 1Gi holds about 25 500 certificates with about 5% to spare; raise it above that (about 5Gi for 255 000 certificates, where the PostgreSQL backup takes more than the restore; see the memory of backups and restores in the administration guide) |
 | `livenessProbe` | enabled, 40 s delay, every 30 s, timeout 10 s, 3 failures | Liveness probe on `/health/live` |
 | `readinessProbe` | enabled, 20 s delay, every 15 s, timeout 10 s, 3 failures | Readiness probe on `/health/ready` |
 | `lifecycle.preStopSleepSeconds` | `10` | Sleep of the `preStop` hook, before UCM receives `SIGTERM`: the pod leaves the Service's endpoints first, so new connections go to the other pods; `0` removes the hook |
