@@ -27,6 +27,8 @@ from typing import Optional
 
 EXPORT_PASSWORD_MIN_LENGTH = 8
 EXPORT_PASSWORD_MAX_LENGTH = 256
+# A password that does not encode, or whose UTF-8 form is past this, breaks the encryption libraries.
+EXPORT_PASSWORD_MAX_BYTES = 1023
 
 
 def export_password_policy() -> dict:
@@ -58,4 +60,9 @@ def validate_export_password(password, *, allow_empty: bool = False) -> Optional
     if not (EXPORT_PASSWORD_MIN_LENGTH <= len(password)
             <= EXPORT_PASSWORD_MAX_LENGTH):
         return export_password_message()
+    try:
+        if len(password.encode('utf-8')) > EXPORT_PASSWORD_MAX_BYTES:
+            return f'Export password must be at most {EXPORT_PASSWORD_MAX_BYTES} bytes in UTF-8'
+    except UnicodeEncodeError:
+        return 'Export password must be valid Unicode text'
     return None
