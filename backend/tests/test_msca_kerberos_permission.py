@@ -394,3 +394,31 @@ def test_a_moved_server_needs_the_saved_secret_retyped(app, auth_client, method,
     assert _saved(app, row_id)[0] == 'adcs.corp.local'
     secret = {'password': 'typed'} if method == 'basic' else {'client_key_pem': 'typed-key'}
     assert _send(auth_client, 'put', f'{BASE}/{row_id}', {'server': 'new.corp.local', **secret}).status_code == 200
+
+
+# --- A Kerberos sign-in that cannot start now: nothing was sent, nothing is recorded ---
+
+def test_a_busy_kerberos_sign_in_at_signing_is_a_503_without_a_request(app, operator_client, monkeypatch):
+    from models.msca import MSCARequest
+    from services.cert_service import CertificateService
+    from services.msca.client_keytab import KerberosBusy
+
+    def factory(**kwargs):
+        client = MagicMock()
+        client.get_cert.side_effect = KerberosBusy('Another Kerberos sign-in is in progress: try again')
+        return client
+
+    monkeypatch.setitem(sys.modules, 'certsrv', SimpleNamespace(Certsrv=factory))
+    monkeypatch.setitem(sys.modules, 'requests_kerberos',
+                        SimpleNamespace(HTTPKerberosAuth=type('Auth', (), {'__init__': lambda self, **kw: None}),
+                                        OPTIONAL=1))
+    row_id = _row(app)
+    with app.app_context():
+        csr_id = CertificateService.generate_csr(descr='krb-busy', dn={'CN': 'krb-busy.test.local'},
+                                                 key_type='2048').id
+        db.session.commit()
+    r = _send(operator_client, 'post', f'{BASE}/{row_id}/sign/{csr_id}', {'template': 'WebServer'})
+    assert r.status_code == 503, r.data
+    assert 'Kerberos' in get_json(r)['message'] and r.headers.get('Retry-After')
+    with app.app_context():
+        assert MSCARequest.query.filter_by(msca_id=row_id).count() == 0

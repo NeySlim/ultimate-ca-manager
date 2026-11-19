@@ -3,6 +3,7 @@ from typing import Optional
 from models import db
 from models.msca import MicrosoftCA, MSCARequest
 from utils.datetime_utils import utc_now
+from .client_keytab import KerberosBusy
 from .connection import MicrosoftCAConnectionMixin
 from .requests import MicrosoftCARequestsMixin
 
@@ -94,6 +95,8 @@ class MicrosoftCACertsMixin:
                     'cert_pem': cert_pem,
                 }
 
+            except KerberosBusy:
+                raise  # nothing reached the CA: no request to record
             except Exception as submit_err:
                 # Locale-independent classification. certsrv only understands
                 # the English "Certificate Pending" page, so on a localized

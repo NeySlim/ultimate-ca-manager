@@ -14,7 +14,7 @@ from models import db
 from models.msca import MicrosoftCA, MSCARequest, basic_password_reaches
 from services.msca_service import MicrosoftCAService
 from services.msca.connection import saved_credential_retargets, tested_values
-from services.msca.client_keytab import managed_keytab_error
+from services.msca.client_keytab import KerberosBusy, managed_keytab_error
 from services.msca.requests import (MSCASignedElsewhere, SIGNED_MEANWHILE_MESSAGE, SUPERSEDED,
                                     SUPERSEDED_MESSAGE, msca_may_write_clause, supersede)
 from services.audit import AuditService
@@ -154,6 +154,9 @@ _WINRM_KERBEROS_FIELDS = ('kerberos_principal', 'kerberos_keytab_path')
 KERBEROS_ADMIN_MESSAGE = ('A Kerberos connection signs in as an identity of this server: creating one, '
                           'moving it, changing its keytab or principal, or testing it against another '
                           'target requires the admin:system permission')
+
+# Retry-After of a sign-in that waited its bound for another connection's Kerberos acquisition
+KERBEROS_RETRY_SECONDS = 5
 
 # What create and update read of a connection to know where it signs in with Kerberos, and the defaults
 _SIGN_IN_DEFAULTS = dict(server='', use_ssl=True, verify_ssl=True, ca_bundle=None, auth_method='certificate',
@@ -1151,6 +1154,11 @@ def sign_csr(msca_id, csr_id):
 
         return success_response(data=result)
 
+    except KerberosBusy as e:
+        _audit('msca.sign', msca, f"template={template} csr_id={csr_id} error={e}", success=False)
+        response, code = error_response(str(e), 503)
+        response.headers['Retry-After'] = str(KERBEROS_RETRY_SECONDS)
+        return response, code
     except ValueError as e:
         logger.error(f"Validation error signing CSR via MS CA: {e}", exc_info=True)
         _audit('msca.sign', msca, f"template={template} csr_id={csr_id} error={e}", success=False)
