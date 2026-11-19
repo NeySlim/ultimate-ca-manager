@@ -48,6 +48,7 @@ vi.mock('../../services', () => ({
 
 import { InspectorObject } from '../inspector/InspectorObject'
 import { ActionsHarness } from '../detail/__tests__/ActionsHarness'
+import { moreAction } from '../../test/moreActions'
 
 const CERT = { id: 4, common_name: 'web.example.com', descr: 'Front door', status: 'valid' }
 const WINDOW = { key: 'certificate:4', type: 'certificate', entityId: 4, data: null }
@@ -65,7 +66,8 @@ describe('rename in the floating detail window', () => {
     const changed = vi.fn()
     window.addEventListener('ucm:data-changed', changed)
     render(<InspectorObject entry={WINDOW} onTitle={() => {}} />)
-    fireEvent.click(await screen.findByText('certificates.rename'))
+    await screen.findByTitle('inspector.moreActionsShort')
+    fireEvent.click(moreAction('certificates.rename'))
     await waitFor(() => expect(certs.rename).toHaveBeenCalledWith(4, 'Back door'))
     await waitFor(() => expect(changed).toHaveBeenCalled())
     expect(changed.mock.calls[0][0].detail).toEqual({ type: 'certificate' })
@@ -76,7 +78,8 @@ describe('rename in the floating detail window', () => {
     authState.permissions = ['read:certificates', 'write:certificates']
     notify.showPrompt.mockResolvedValueOnce('Front door ')
     render(<InspectorObject entry={WINDOW} onTitle={() => {}} />)
-    fireEvent.click(await screen.findByText('certificates.rename'))
+    await screen.findByTitle('inspector.moreActionsShort')
+    fireEvent.click(moreAction('certificates.rename'))
     await waitFor(() => expect(notify.showPrompt).toHaveBeenCalled())
     expect(certs.rename).not.toHaveBeenCalled()
   })
@@ -85,7 +88,9 @@ describe('rename in the floating detail window', () => {
     authState.permissions = ['read:certificates']
     render(<InspectorObject entry={WINDOW} onTitle={() => {}} />)
     await screen.findByText('export.title')
-    expect(screen.queryByText('certificates.rename')).not.toBeInTheDocument()
+    // The menu is open: an absent item is a hidden action, not a closed menu
+    expect(moreAction('certificates.rename')).toBeNull()
+    expect(screen.getByRole('menu')).toBeInTheDocument()
   })
 })
 

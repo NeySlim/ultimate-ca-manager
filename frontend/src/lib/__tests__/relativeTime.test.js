@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import i18next from 'i18next'
-import { dueTone, relativeParts, relativeDue, relativeAgo } from '../relativeTime'
+import { dueTone, relativeParts, relativeDue, relativeAgo, shortParts, shortDue } from '../relativeTime'
 import { daysRemaining } from '../utils'
 import en from '../../i18n/locales/en.json'
 import fr from '../../i18n/locales/fr.json'
@@ -110,5 +110,41 @@ describe('dueTone', () => {
   it('is quiet without a date', () => {
     expect(dueTone(null, { now: NOW })).toBe('')
     expect(dueTone('nope', { now: NOW })).toBe('')
+  })
+})
+
+describe('shortDue', () => {
+  it.each([
+    [1, { key: 'time.shortDays', count: 1 }],
+    [59, { key: 'time.shortDays', count: 59 }],
+    [60, { key: 'time.shortMonths', count: 2 }],
+    [493, { key: 'time.shortMonths', count: 16 }],
+    [729, { key: 'time.shortMonths', count: 24 }],
+    [730, { key: 'time.shortYears', count: 2 }],
+    [3287, { key: 'time.shortYears', count: 9 }],
+    [0, { key: 'time.lapsed' }],
+    [-40, { key: 'time.lapsed' }],
+  ])('counts %i days in the unit of their size', (days, parts) => {
+    expect(shortParts(at(days * DAY), { now: NOW })).toEqual(parts)
+  })
+
+  it('has nothing to say without a date', () => {
+    expect(shortParts(null, { now: NOW })).toBeNull()
+    expect(shortDue('nope', t, { now: NOW })).toBe('')
+  })
+
+  it('reads short in English, French, Russian and Chinese', async () => {
+    const zh = (await import('../../i18n/locales/zh.json')).default
+    const say = async (lng, resources) => {
+      const i18n = i18next.createInstance()
+      await i18n.init({ lng, resources: { [lng]: { translation: resources } } })
+      return (days) => shortDue(at(days * DAY), i18n.t.bind(i18n), { now: NOW })
+    }
+    const [inEn, inFr, inRu, inZh] = await Promise.all([say('en', en), say('fr', fr), say('ru', ru), say('zh', zh)])
+    expect([3, 493, 3287, -2].map(inEn)).toEqual(['3 d', '16 mo', '9 y', 'Lapsed'])
+    expect([3, 493, 3287, -2].map(inFr)).toEqual(['3 j', '16 mois', '9 ans', 'Échu'])
+    expect([3, 493, 3287, -2].map(inRu)).toEqual(['3 дн.', '16 мес.', '9 л.', 'Истёк'])
+    expect([800, 7670].map(inRu)).toEqual(['2 г.', '21 г.'])
+    expect([3, 493, 3287, -2].map(inZh)).toEqual(['3 天', '16 个月', '9 年', '已到期'])
   })
 })

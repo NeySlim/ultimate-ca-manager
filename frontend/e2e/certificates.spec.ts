@@ -36,6 +36,8 @@ test('the inspector shows the certificate the row names', async ({ page, api }) 
   const cert = await issueCert(api, (await createCA(api)).id)
   const panel = await openInInspector(page, cert.common_name)
   await expect(panel.getByText(cert.serial_number, { exact: false }).first()).toBeVisible()
+  // The Overview lists the alternative names; Extensions says of which type they are
+  await panel.getByRole('tab', { name: 'Extensions', exact: true }).click()
   await expect(panel).toContainText(new RegExp(`DNS:\\s*${cert.common_name.replace(/\./g, '\\.')}`))
 })
 
@@ -56,7 +58,9 @@ test('a certificate revoked from the inspector is listed by the next CRL', async
   const ca = await createCA(api)
   const cert = await issueCert(api, ca.id)
   const panel = await openInInspector(page, cert.common_name)
-  await panel.getByRole('button', { name: 'Revoke', exact: true }).click()
+  // Revoke waits in the menu of the remaining actions
+  await panel.getByRole('button', { name: /^More actions for / }).click()
+  await page.getByRole('menuitem', { name: 'Revoke', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Revoke certificate' })
   await dialog.getByRole('button', { name: 'Revoke', exact: true }).click()
   await expect(dialog).toBeHidden()

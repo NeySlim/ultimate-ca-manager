@@ -273,6 +273,100 @@ describe('ResponsiveDataTable variant="list": header, toolbar and footer', () =>
   })
 })
 
+describe('ResponsiveDataTable variant="list": states and frame', () => {
+  const NAME_FIRST = [
+    { key: 'name', header: 'Name', priority: 1, grow: true, clipInside: true, render: (val) => <button type="button">{val}</button> },
+    { key: 'note', header: 'Note', maxWidth: 240, muted: true },
+    { key: 'issuer', header: 'Issuer', priority: 2 },
+  ]
+
+  it('draws bars in place of the rows while loading, at most twelve, out of the reading order', () => {
+    const { container, rerender } = render(<Harness loading pagination={{ page: 1, total: 0, perPage: 25, onChange: () => {} }} />)
+    expect(container.querySelector('.lv-workspace')).toHaveAttribute('aria-busy', 'true')
+    const bars = container.querySelectorAll('tr.lv-sk-row')
+    expect(bars).toHaveLength(12)
+    bars.forEach((tr) => expect(tr).toHaveAttribute('aria-hidden', 'true'))
+    expect(bars[0].querySelectorAll('.lv-sk').length).toBeGreaterThanOrEqual(3)
+    expect(screen.getAllByRole('status')).toHaveLength(1)
+    // The header stays: the table keeps its shape
+    expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toContain('Name')
+    rerender(<Harness loading pagination={{ page: 1, total: 0, perPage: 10, onChange: () => {} }} />)
+    expect(container.querySelectorAll('tr.lv-sk-row')).toHaveLength(10)
+    rerender(<Harness />)
+    expect(container.querySelector('.lv-workspace')).not.toHaveAttribute('aria-busy')
+    expect(container.querySelector('tr.lv-sk-row')).toBeNull()
+  })
+
+  it('keeps the header over an empty search and offers to reset it', () => {
+    const onSearchChange = vi.fn()
+    render(<Harness data={[]} searchable externalSearch="nothing" onSearchChange={onSearchChange} noMatchTitle="No thing matches"
+      emptyTitle="No thing yet" />)
+    expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toContain('Name')
+    const empty = document.querySelector('.lv-empty')
+    expect(within(empty).getByRole('heading', { level: 3 })).toHaveTextContent('No thing matches')
+    expect(empty).toHaveTextContent('table.adjustFilters')
+    expect(screen.getByRole('searchbox')).toHaveValue('nothing')
+    fireEvent.click(within(empty).getByRole('button', { name: 'table.clearFilters' }))
+    expect(onSearchChange).toHaveBeenCalledWith('')
+    // The footer keeps its place and has no range to say
+    expect(document.querySelector('footer.lv-footer')).toHaveTextContent(/^$/)
+  })
+
+  it('says a list is empty in the words of the page, with its action', () => {
+    render(<Harness data={[]} emptyTitle="No thing yet" emptyDescription="Make one." emptyAction={<button type="button">Make</button>} />)
+    const empty = document.querySelector('.lv-empty')
+    expect(within(empty).getByRole('heading', { level: 3 })).toHaveTextContent('No thing yet')
+    expect(empty).toHaveTextContent('Make one.')
+    expect(within(empty).getByRole('button', { name: 'Make' })).toBeInTheDocument()
+    expect(within(empty).queryByRole('button', { name: 'table.clearFilters' })).toBeNull()
+  })
+
+  it('notes under the table what the page says, the row height and the count of columns shown', () => {
+    render(<Harness footnote="Opened things stay available." />)
+    const caption = document.querySelector('.lv-caption')
+    expect(caption.firstElementChild).toHaveTextContent('Opened things stay available.')
+    expect(caption.lastElementChild).toHaveTextContent('table.rowHeight:{"px":36} · table.columnCount:{"count":3}')
+  })
+
+  it('offers a jump to a page once the pages are many, bounded to the pages there are', () => {
+    const onChange = vi.fn()
+    render(<Harness pagination={{ page: 2, total: 12840, perPage: 25, onChange, onPerPageChange: () => {} }} />)
+    const footer = document.querySelector('footer.lv-footer')
+    const field = within(footer).getByRole('spinbutton', { name: 'table.page' })
+    expect(field).toHaveValue(2)
+    expect(footer).toHaveTextContent('table.pageOf:{"pages":514}')
+    fireEvent.change(field, { target: { value: '40' } })
+    fireEvent.keyDown(field, { key: 'Enter' })
+    fireEvent.change(field, { target: { value: '9999' } })
+    fireEvent.click(within(footer).getByRole('button', { name: 'table.go' }))
+    fireEvent.change(field, { target: { value: '' } })
+    fireEvent.click(within(footer).getByRole('button', { name: 'table.go' }))
+    expect(onChange.mock.calls).toEqual([[40], [514]])
+  })
+
+  it('keeps the plain page count while the pages are few', () => {
+    render(<Harness pagination={{ page: 1, total: 500, perPage: 25, onChange: () => {} }} />)
+    const footer = document.querySelector('footer.lv-footer')
+    expect(within(footer).queryByRole('spinbutton')).toBeNull()
+    expect(footer).toHaveTextContent('1 / 20')
+  })
+
+  it('lets a name that takes the remaining width shorten itself, and marks a capped column', () => {
+    render(<Harness columns={NAME_FIRST} onRowClick={() => {}} selectedId={2} />)
+    const [, name, note, issuer] = cells(row(LONG))
+    expect(name).toHaveClass('lv-grow')
+    expect(name).not.toHaveClass('is-clipped')
+    expect(name.firstElementChild).toHaveClass('lv-cell', 'lv-fit')
+    expect(note).toHaveClass('lv-capped', 'is-clipped')
+    expect(note.style.maxWidth).toBe('240px')
+    expect(issuer).not.toHaveClass('lv-capped')
+    expect(screen.getAllByRole('columnheader').filter((th) => th.matches('.lv-capped')).map((th) => th.textContent)).toEqual(['Note'])
+    // The opened row says so to assistive technology too
+    expect(row('api.example.com')).toHaveAttribute('aria-current', 'true')
+    expect(row(LONG)).not.toHaveAttribute('aria-current')
+  })
+})
+
 describe('ResponsiveDataTable variant="list" on a phone', () => {
   beforeEach(() => { device.mobile = true })
 

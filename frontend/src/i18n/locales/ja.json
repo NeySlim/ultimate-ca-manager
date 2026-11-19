@@ -470,7 +470,8 @@
       "active": "アクティブ",
       "revoked": "失効済み"
     },
-    "duplicateKey": "上の別の行がすでに「{{key}}」を使用しています：どちらか一方しか保存できません"
+    "duplicateKey": "上の別の行がすでに「{{key}}」を使用しています：どちらか一方しか保存できません",
+    "retry": "Retry"
   },
   "commandPalette": {
     "searchPlaceholder": "コマンド、証明書、CA、ユーザーを検索...",
@@ -923,7 +924,13 @@
     "exportSelectedPem": "PEM でエクスポート",
     "bulkExported_one": "証明書 {{count}} 件をエクスポートしました",
     "bulkExported_other": "証明書 {{count}} 件をエクスポートしました",
-    "listLabel": "証明書の一覧"
+    "listLabel": "証明書の一覧",
+    "footnote": "Opened certificates stay available in the inspector.",
+    "noMatch": "No certificate matches",
+    "loadErrorTitle": "The certificates could not be loaded",
+    "loadErrorCause": "Cause: {{cause}}. The other pages and the inspector remain usable.",
+    "loadErrorNoAnswer": "the server did not answer",
+    "uploadKey": "Upload private key"
   },
   "cas": {
     "chainRevoked": "上位で失効",
@@ -4321,7 +4328,12 @@
     "inDays_one": "{{count}} 日後",
     "inDays_other": "{{count}} 日後",
     "overdueDays_one": "{{count}} 日前に期限切れ",
-    "overdueDays_other": "{{count}} 日前に期限切れ"
+    "overdueDays_other": "{{count}} 日前に期限切れ",
+    "lapsed": "Lapsed",
+    "shortDays": "{{count}} d",
+    "shortMonths": "{{count}} mo",
+    "shortYears_one": "{{count}} y",
+    "shortYears_other": "{{count}} y"
   },
   "validation": {
     "required": "この項目は必須です",
@@ -4703,8 +4715,6 @@
     "closeTab": "{{name}}を閉じる",
     "close": "インスペクターを閉じる",
     "closeOnNav": "ナビ時に閉じる",
-    "openCount": "開いているオブジェクト：{{count}}",
-    "more": "開いているすべてのオブジェクト",
     "dockBottom": "下部にドッキング",
     "dockRight": "右側にドッキング",
     "grow": "インスペクターを拡大",
@@ -4722,7 +4732,92 @@
       "overview": "概要",
       "chain": "チェーン",
       "extensions": "拡張",
-      "pem": "PEM"
+      "pem": "PEM",
+      "history": "History"
+    },
+    "fold": "Fold the inspector",
+    "unfold": "Unfold the inspector",
+    "notShown": "Open objects not shown",
+    "moreCount_one": "{{count}} more open object",
+    "moreCount_other": "{{count}} more open objects",
+    "loading": "Loading the object…",
+    "moreActions": "More actions for {{name}}",
+    "moreActionsShort": "More actions",
+    "favorite": "Add to favorites",
+    "unfavorite": "Remove from favorites",
+    "copyOf": "Copy: {{name}}",
+    "cert": {
+      "validity": "Certificate validity",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "remaining": "remaining",
+      "noExpiry": "No end date",
+      "validityShare": "{{percent}} percent of the validity left",
+      "renewSoon_one": "Renewal due within the next {{count}} day.",
+      "renewSoon_other": "Renewal due within the next {{count}} days.",
+      "revokedNotice": "This certificate must no longer be used.",
+      "onHoldNotice": "On hold: it can be restored or revoked for good.",
+      "revokedOn": "Revoked on {{date}}. Reason: {{reason}}.",
+      "identity": "Identity and key",
+      "none": "None",
+      "altNames": "Alternative names",
+      "moreNames_one": "{{count}} more name",
+      "moreNames_other": "{{count}} more names",
+      "sourceTemplate": "Source / template",
+      "noTemplate": "no template",
+      "templateModified": "{{name}} (modified: {{fields}})",
+      "weakHash": "obsolete",
+      "serial": "Serial number",
+      "serialDecimal": "Serial (decimal)",
+      "keyHeld": "Held by UCM",
+      "keyHeldIn": "Held by UCM ({{location}})",
+      "keyNotHeld": "Not held by UCM",
+      "trustChain": "Chain of trust",
+      "inTrustStore": "trust store",
+      "notHeld": "not held by UCM",
+      "selfSigned": "Self-signed: this certificate is its own issuer.",
+      "chainToRoot": "Chain complete up to {{anchor}}, a root authority held by UCM.",
+      "chainToStore": "Chain complete up to {{anchor}}, an anchor of the trust store.",
+      "chainPartial": "The issuing authority is held by UCM; the chain above it is not verified up to a root.",
+      "storeAnchor": "Anchor of the trust store",
+      "issuerNotHeld": "Issuer not held by UCM",
+      "rootAuthority": "Root authority",
+      "intermediateLevel": "Intermediate authority, level {{level}}",
+      "intermediate": "Intermediate authority",
+      "inspectAuthority": "Inspect the authority",
+      "crossCertified": "Cross-certified",
+      "subjectDn": "Distinguished name",
+      "record": "Fingerprints and record",
+      "noPem": "UCM holds no PEM for this certificate.",
+      "ext": {
+        "critical": "critical",
+        "permitted": "Permitted",
+        "excluded": "Excluded",
+        "present": "Present",
+        "none": "This certificate carries no extension."
+      },
+      "noDescription": "No description"
+    },
+    "history": {
+      "issued": "Certificate issued",
+      "imported": "Certificate imported",
+      "renewed": "Certificate renewed",
+      "renewedTimes_one": "Certificate renewed ({{count}} renewal in all)",
+      "renewedTimes_other": "Certificate renewed ({{count}} renewals in all)",
+      "revoked": "Certificate revoked",
+      "revokedReason": "Certificate revoked: {{reason}}",
+      "failed": "failed",
+      "empty": "No event is recorded for this certificate.",
+      "loading": "Reading the audit log…",
+      "noAudit": "This account cannot read the audit log: only what the certificate record keeps is shown.",
+      "loadFailed": "The audit log could not be read: only what the certificate record keeps is shown.",
+      "scope_one": "Events of this certificate in the latest certificate entry of the audit log ({{count}}).",
+      "scope_other": "Events of this certificate among the latest {{count}} certificate entries of the audit log.",
+      "openAudit": "Open the audit log"
+    },
+    "failure": {
+      "title": "Last failure",
+      "open": "Open the order"
     }
   },
   "table": {
@@ -4765,7 +4860,13 @@
     "selectRow": "{{name}} を選択",
     "open": "開く",
     "openRow": "{{name}} を開く",
-    "rowAction": "{{action}}: {{name}}"
+    "rowAction": "{{action}}: {{name}}",
+    "rowHeight": "{{px}} px per row",
+    "columnCount_one": "{{count}} column",
+    "columnCount_other": "{{count}} columns",
+    "page": "Page",
+    "pageOf": "of {{pages, number}}",
+    "go": "Go"
   },
   "reconnect": {
     "countdown": "サービスを再起動中...",

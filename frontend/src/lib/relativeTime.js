@@ -45,6 +45,30 @@ export const relativeDue = (date, t, opts) => say(relativeParts(date, { ...opts,
 /** "20 hours ago", "3 days ago"; '' without a date. */
 export const relativeAgo = (date, t, opts) => say(relativeParts(date, { ...opts, mode: 'event' }), t)
 
+// Below these the short count is in days, then in months, then in years
+const SHORT_DAYS_BELOW = 60
+const SHORT_MONTHS_BELOW = 730
+
+/**
+ * The key and count of the short wording of a due date ("3 d", "16 mo", "9 y", "Lapsed"):
+ * the unit follows the size. null without a date.
+ */
+export function shortParts(date, { now = new Date() } = {}) {
+  const days = daysRemaining(date, now)
+  if (days === null) return null
+  if (days <= 0) return { key: 'time.lapsed' }
+  if (days < SHORT_DAYS_BELOW) return { key: 'time.shortDays', count: days }
+  if (days < SHORT_MONTHS_BELOW) return { key: 'time.shortMonths', count: Math.round(days / 30.4375) }
+  return { key: 'time.shortYears', count: Math.round(days / 365.25) }
+}
+
+/** "3 d", "16 mo", "9 y", "Lapsed"; '' without a date. */
+export const shortDue = (date, t, opts) => {
+  const parts = shortParts(date, opts)
+  if (!parts) return ''
+  return parts.count === undefined ? t(parts.key) : t(parts.key, { count: parts.count })
+}
+
 /** 'bad' once the date is past, 'warn' inside warnDays, '' beyond or without a date. */
 export function dueTone(date, { now = new Date(), warnDays = 7 } = {}) {
   const ms = toTime(date)
