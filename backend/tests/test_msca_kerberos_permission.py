@@ -264,6 +264,38 @@ class TestOperatorRefusedAnyKerberos:
         assert outbound == []
 
 
+class TestOperatorRefusedChannelIdentity:
+    """The Kerberos WinRM channel signs in as its account (its own, else the basic user, else the
+    principal) with the keytab, toward winrm_host or else the server: each one changing is a 403."""
+
+    def _basic(self, app):
+        row_id = _row(app, auth_method='basic', username='svc', kerberos_principal=None,
+                      kerberos_keytab_path=None, winrm_host=None)
+        with app.app_context():
+            db.session.get(MicrosoftCA, row_id).password = 'saved-password'
+            db.session.commit()
+        return row_id
+
+    def _refused(self, app, client, row_id, body):
+        before = _snapshot(app, row_id)
+        _forbidden(_send(client, 'put', f'{BASE}/{row_id}', body))
+        assert _snapshot(app, row_id) == before
+
+    def test_the_keytab_leaves_a_channel_with_its_own_account(self, app, operator_client):
+        row_id = _row(app, winrm_username='officer@CORP.LOCAL')
+        self._refused(app, operator_client, row_id, {'auth_method': 'basic', 'username': 'u', 'password': 'p'})
+
+    def test_the_server_a_channel_without_host_falls_back_to(self, app, operator_client):
+        self._refused(app, operator_client, self._basic(app), {'server': 'attacker.example', 'password': 'p'})
+
+    def test_the_principal_leaves_a_channel_without_account(self, app, operator_client):
+        row_id = _row(app, kerberos_keytab_path=None)
+        self._refused(app, operator_client, row_id, {'auth_method': 'certificate'})
+
+    def test_the_basic_user_the_channel_signs_in_as(self, app, operator_client):
+        self._refused(app, operator_client, self._basic(app), {'username': 'other', 'password': 'p'})
+
+
 class TestOperatorAllowedKerberos:
 
     def test_renaming_and_the_saved_test(self, app, operator_client, outbound):
