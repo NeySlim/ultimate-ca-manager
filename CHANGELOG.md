@@ -130,6 +130,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **Uploading a certificate file in the shared certificate field works.** The file upload of the Microsoft CA client certificate field always answered 400 and its password prompt never opened; the file is now analysed and its certificate and key fill the fields.
 - **A discovery profile's next scan follows its new schedule.** Changing the interval, or switching the schedule off and on again, kept the old date: the profile ran at once on a stale one or waited out the old interval; it now restarts the wait.
 - **The audit log export follows the filters of the list.** It exported every row of the period whatever search, user, action or status filter was set; it now holds only the filtered rows.
 - **Changing your own password from the Users page.** The page never asked for the current password the server requires, so editing your own account with a new password, or resetting it, always answered 400; it now asks for it.

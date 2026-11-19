@@ -4101,6 +4101,8 @@ Content-Type: application/json
 }
 ```
 
+With `"include_pem": true` each `certificate` object of `data.objects` also carries its `pem`, and each `private_key` object its unencrypted PKCS#8 `pem` once the password opened it (a key still sealed has none). Without it no object has a `pem`. The request key is `content`, never `files`.
+
 ### Execute Import
 ```http
 POST /api/v2/import/execute
