@@ -30,6 +30,7 @@ from sqlalchemy.types import (
 )
 
 from models import db
+from utils.nul_text import NUL, escape_nul
 
 from ..export_generic import CHAIN_VARIANT_FINGERPRINT, REFERENCE_SUFFIX, load_model
 from ..manifest import SECTIONS
@@ -471,7 +472,7 @@ def _refuse_unreadable_handled(name: str, value: Any, where: str) -> None:
 def _holds_nul(value: Any) -> bool:
     """Whether a text in ``value``, at any depth and keys included, holds U+0000."""
     if isinstance(value, str):
-        return '\x00' in value
+        return NUL in value
     if isinstance(value, dict):
         return any(_holds_nul(k) or _holds_nul(v) for k, v in value.items())
     if isinstance(value, list):
@@ -479,27 +480,86 @@ def _holds_nul(value: Any) -> bool:
     return False
 
 
-def _refuse_nul(value: Any, where: str) -> None:
-    # PostgreSQL stores no U+0000 in text or JSON where SQLite does: refused on both alike
-    if _holds_nul(value):
-        raise RestoreValidationError(
-            f"Invalid backup: {where} holds a NUL character, which no text field can store")
+def _without_nul(value: Any) -> Any:
+    if isinstance(value, str):
+        return escape_nul(value)
+    if isinstance(value, dict):
+        return {_without_nul(k): _without_nul(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_without_nul(item) for item in value]
+    return value
 
 
-def refuse_containers_in_columns(backup_data, mappings=()) -> None:
+def _mapping_fields_with_nul(mapping: Dict[str, Any]) -> List[str]:
+    """The keys of ``mapping`` whose key or value holds a NUL; one level down in a mapping
+    value (configuration.settings), so a field is a setting rather than the whole section."""
+    fields = []
+    for key, value in mapping.items():
+        if isinstance(value, dict) and not _holds_nul(key):
+            fields.extend(f"{escape_nul(key)}.{escape_nul(inner)}" for inner, held in value.items()
+                          if _holds_nul(inner) or _holds_nul(held))
+        elif _holds_nul(key) or _holds_nul(value):
+            fields.append(escape_nul(key))
+    return fields
+
+
+# Fields named one by one in the report; past this many, a count
+NUL_WARNING_FIELDS = 20
+
+
+def escape_nul_in_archive(backup_data, sections) -> List[str]:
+    """Every text of ``sections`` (rows and mappings, keys and identities included, at any
+    depth) through escape_nul, before anything compares or follows them: a reference still
+    names the row it named. One warning per section.field, the value never echoed."""
+    from ..section_store import SectionStore, section_kind
+    fields: List[str] = []
+    for section_name in sorted(sections):
+        kind = section_kind(backup_data, section_name)
+        if kind == 'mapping':
+            mapping = backup_data[section_name]
+            hit = _mapping_fields_with_nul(mapping)
+            if hit:
+                backup_data[section_name] = _without_nul(mapping)
+                fields.extend(f"{section_name}.{name}" for name in hit)
+            continue
+        if kind != 'list':
+            continue
+        rows = (backup_data.iter_rows(section_name) if isinstance(backup_data, SectionStore)
+                else backup_data[section_name])
+        hit = {}
+        for row in rows:
+            if isinstance(row, dict):
+                for name, value in row.items():
+                    if _holds_nul(name) or _holds_nul(value):
+                        hit.setdefault(escape_nul(name), None)
+            elif _holds_nul(row):
+                hit.setdefault('(row)', None)
+        if hit:
+            # Loaded only when it holds one: written back through the store
+            backup_data[section_name] = _without_nul(backup_data[section_name])
+            fields.extend(f"{section_name}.{name}" for name in hit)
+    warnings = [
+        f"{field}: a NUL character, which PostgreSQL cannot store in text, was restored as "
+        "the two characters \\0" + (_AUDIT_NOTE if field.startswith('audit_logs.') else '')
+        for field in fields[:NUL_WARNING_FIELDS]]
+    if len(fields) > NUL_WARNING_FIELDS:
+        warnings.append(f"{len(fields) - NUL_WARNING_FIELDS} more fields held a NUL character, "
+                        "restored the same way")
+    return warnings
+
+
+# The seal of an audit entry covers its original text: the chain check no longer matches it
+_AUDIT_NOTE = ("; the audit log integrity check reports each such entry as altered, its seal "
+               "having been computed over the original text")
+
+
+def refuse_containers_in_columns(backup_data) -> None:
     """RestoreValidationError, before any write, for a value no restorer of the row can take.
 
     A list or an object in a non JSON column, or in a secret property over a column of
     another name; a field the dedicated restorers read themselves (`Section.handled`) that is
-    neither absent nor of the shape they read: text for a PEM, an object for the encrypted key;
-    a NUL character in any text of a row, or of the sections named in ``mappings`` the archive
-    holds as an object."""
+    neither absent nor of the shape they read: text for a PEM, an object for the encrypted key."""
     from ..section_store import SectionStore, section_kind
-    for section_name in sorted(mappings):
-        if section_kind(backup_data, section_name) == 'mapping':
-            for key, value in backup_data[section_name].items():
-                _refuse_nul(key, section_name)
-                _refuse_nul(value, f"{section_name}.{key}")
     for section_name, section in SECTIONS.items():
         if section_kind(backup_data, section_name) != 'list':
             continue
@@ -511,8 +571,6 @@ def refuse_containers_in_columns(backup_data, mappings=()) -> None:
             if not isinstance(row, dict):
                 continue
             for name, value in row.items():
-                _refuse_nul(name, section_name)
-                _refuse_nul(value, f"{section_name}.{name}")
                 column = columns.get(name)
                 if name in handled:
                     _refuse_unreadable_handled(name, value, f"{section_name}.{name}")
