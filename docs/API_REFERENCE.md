@@ -3978,6 +3978,8 @@ Content-Type: application/json
 }
 ```
 
+`password` opens the input (a PKCS#12/PFX file or an encrypted PEM) and the separate `private_key`, and is never logged; `pkcs12_password` protects a PKCS#12 or JKS output. The web interface shows the password field as soon as a separate key, an encrypted PEM or a PKCS#12 file is given.
+
 ---
 
 ## Global Search

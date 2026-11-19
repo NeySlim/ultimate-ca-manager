@@ -2610,6 +2610,7 @@
     "caChainPlaceholder": "中间和根证书...",
     "additionalCerts": "包含的额外证书...",
     "inputPassword": "输入密码",
+    "keyPasswordPlaceholder": "Password of the encrypted key or file (leave empty if none)",
     "forEncryptedFiles": "用于加密文件",
     "outputPkcs12Password": "输出 PKCS12 密码",
     "passwordForP12": ".p12 密码",

@@ -2610,6 +2610,7 @@
     "caChainPlaceholder": "Intermediate- und Root-Zertifikate...",
     "additionalCerts": "Zusätzliche Zertifikate einschließen...",
     "inputPassword": "Eingabe-Passwort",
+    "keyPasswordPlaceholder": "Password of the encrypted key or file (leave empty if none)",
     "forEncryptedFiles": "Für verschlüsselte Dateien",
     "outputPkcs12Password": "Ausgabe-PKCS12-Passwort",
     "passwordForP12": "Passwort für .p12",
