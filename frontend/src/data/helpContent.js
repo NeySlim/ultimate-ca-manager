@@ -19,24 +19,27 @@ export const helpContent = {
   dashboard: {
     title: 'Overview',
     subtitle: 'What needs action, and the state of the PKI',
-    overview: 'Six independent cards over the live data of your PKI. Each card loads on its own and shows its own loading, empty, error or missing-permission state. Every counter that has a list opens the certificate list filtered to exactly the certificates it counts.',
+    overview: 'A strip of four figures, then independent cards over the live data of your PKI. Each card loads on its own and shows its own loading, empty, error or missing-permission state. Every figure that has a list opens the certificate list filtered to exactly the certificates it counts.',
     sections: [
       {
         title: 'Cards',
         icon: ListChecks,
         items: [
-          { label: 'To handle', text: 'The six most urgent items, critical first, each linking to its record (with the right to read the trust store, the trust store certificates that expire within 90 days or have expired); a folded tier gives the total per kind, and the four renewal kinds open the certificate list' },
-          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the daily successes and failures, and the scheduler state; the TSA signer while the TSA is enabled (a warning while the CA certificate signs); and, with the right to read settings, whether email, webhooks and auto-renewal are set up' },
-          { label: 'Hierarchy', text: 'The authorities as a tree under their parent, with CRL and OCSP state, an offline or cross-signed mark, and the certificates each issued over 7 days; each authority opens its page' },
-          { label: 'Expiry horizon', text: 'The expiring and expired counters, each opening its list, and the five certificates that expire next' },
-          { label: 'Compliance', text: 'Live certificates by key algorithm and weakness (RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key); each counter opens the matching list' },
-          { label: 'Latest operations', text: 'The five most recent operations; with the audit permission, a link opens the whole trail' },
+          { label: 'Figures', text: 'Certificates (with the authorities and, when there are any, the pending requests and the SSH certificates), items to handle, expired certificates, and the ACME, SCEP and EST failures of the current UTC day' },
+          { label: 'To handle', text: 'The six most urgent interventions, critical first, each on two lines (the name and its type, then the cause) with its delay and exact date; a button where UCM can act (Renew, Retry, Publish now), a link to the record otherwise. Chips filter by type with their totals, and what only needs watching is folded apart (with the right to read the trust store, the trust store certificates that expire within 90 days or have expired are listed too)' },
+          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the successes and failures of the day and of the period, the last operation and a curve when there is something to draw; then the scheduler state, the TSA signer while the TSA is enabled (a warning while the CA certificate signs) and, with the right to read settings, whether email, webhooks and auto-renewal are set up' },
+          { label: 'Hierarchy', text: 'At most ten authorities, the trees that issued most first, each under its parent with CRL and OCSP state, an offline or cross-signed mark, and the certificates it issued over 7 days when there are any; each authority opens its page and a link opens them all' },
+          { label: 'Expiry horizon', text: 'The expiring and expired counters, each opening its list, and the six certificates that expire next, each with the days left and a bar for the validity already spent' },
+          { label: 'Certificate activity', text: 'Certificates issued, revoked and expired per day over 7, 15 or 30 days, as curves with their totals; the left and right arrow keys read the chart day by day' },
+          { label: 'Status distribution', text: 'Valid, expiring, expired and revoked certificates as a ring with their counts and shares; each line opens its list' },
+          { label: 'Compliance', text: 'Live certificates by key algorithm and weakness (RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key); each figure that has a list opens it' },
+          { label: 'Latest operations', text: 'The six most recent operations with their delay; with the audit permission, a link opens the whole trail' },
         ]
       },
     ],
     tips: [
-      'Pick the Operator, Manager or All cards preset in the header to choose which cards are shown',
-      'The layout is saved with your account and follows you across browsers',
+      'Pick the Operator or Manager preset in the header, or open Cards to show, hide and reorder the cards',
+      'Drag a card by its grip to move it, or focus the grip and use the arrow keys; the layout is saved with your account and follows you across browsers',
       'On the certificate list, filters coming from the overview appear as chips; remove one with its x',
     ],
     related: ['Certificates', 'CAs', 'Settings']
