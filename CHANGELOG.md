@@ -134,7 +134,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Fixed
 
 - **A generated CSR keeps the State, Locality and Email entered.** `POST /api/v2/csrs` dropped them without an error, so the request carried only C, O, OU and CN; the form now also has an Email field, and re-keying a CSR as a new CSR keeps its email (#449).
-- **A SQLite lock no longer answers 500.** A request that meets the database locked by another write, longer than it may wait, answers 503 with `Retry-After` instead of an internal error.
+- **A SQLite lock no longer answers 500.** A request that meets the database locked by another write, longer than it may wait, and would have answered 500 (a sign-in that cannot count its attempt included) answers 503 with `Retry-After` instead; a route that turns the error into another status keeps it.
 - **The converter asks for the password of an encrypted key.** A separate private key or a pasted encrypted PEM had no password field (only `.p12` and `.pfx` files did), so the conversion could not open it; the field now shows as soon as one is given.
 - **Uploading a certificate file in the shared certificate field works.** The file upload of the Microsoft CA client certificate field always answered 400 and its password prompt never opened; the file is now analysed and its certificate and key fill the fields.
 - **A discovery profile's next scan follows its new schedule.** Changing the interval, or switching the schedule off and on again, kept the old date: the profile ran at once on a stale one or waited out the old interval; it now restarts the wait.

@@ -36,7 +36,7 @@ def _on_sqlite(app):
 
 
 @contextlib.contextmanager
-def file_database(app, path):
+def file_database(app, path, **engine_options):
     """The session database copied to a file the app opens with the product's engine options
     (one connection per checkout, sqlite3's default 5 s busy timeout)."""
     from sqlalchemy import create_engine
@@ -52,7 +52,8 @@ def file_database(app, path):
             target.close()
         finally:
             raw.close()
-        engines[None] = create_engine(f'sqlite:///{path}', hide_parameters=True)
+        engines[None] = create_engine(f'sqlite:///{path}', hide_parameters=True,
+                                      **engine_options)
         cluster_maintenance.install_engine_guard(app, engines[None])
     try:
         yield
@@ -240,6 +241,60 @@ def test_a_request_in_the_window_never_waits_in_sqlite(restore_held):
     assert refused.status_code == 503, refused.data
     assert refused.headers['Retry-After']
     assert took < 2.0, f"the request waited {took:.1f}s"
+
+
+@pytest.fixture
+def busy_app(app, tmp_path):
+    """The file database with a short busy timeout: a lock outlasts it at once."""
+    if not _on_sqlite(app):
+        pytest.skip('SQLite: the database file locked by another writer')
+    path = str(tmp_path / 'busy.db')
+    with file_database(app, path, connect_args={'timeout': 0.3}):
+        yield app, path
+
+
+@contextlib.contextmanager
+def writing(path):
+    """Another connection in the middle of a write: readers read, no other writer writes."""
+    writer = sqlite3.connect(path, timeout=0, isolation_level=None)
+    writer.execute('BEGIN IMMEDIATE')
+    writer.execute("UPDATE system_config SET value = value WHERE key = 'none'")
+    try:
+        yield
+    finally:
+        writer.execute('ROLLBACK')
+        writer.close()
+
+
+def test_a_login_that_meets_another_writer_answers_503_not_500(busy_app):
+    """The route catches the lock itself ('Failed to record login attempt'): still a 503."""
+    app, path = busy_app
+    user = _admin_user(app)
+    body = json.dumps({'username': user['username'], 'password': PASSWORD})
+    with writing(path):
+        refused = app.test_client().post('/api/v2/auth/login', data=body,
+                                         content_type='application/json')
+    assert refused.status_code == 503, refused.data
+    assert refused.headers['Retry-After']
+    assert refused.mimetype == 'application/problem+json'
+    # The writer gone, the same login goes through
+    again = app.test_client().post('/api/v2/auth/login', data=body,
+                                   content_type='application/json')
+    assert again.status_code == 200, again.data
+
+
+def test_a_500_that_met_no_lock_stays_a_500(busy_app, monkeypatch):
+    """Guard: only a request that met a lock is turned into a 503."""
+    app, _ = busy_app
+    user = _admin_user(app)
+    body = json.dumps({'username': user['username'], 'password': PASSWORD})
+
+    def broken(self, *a, **k):
+        raise RuntimeError('not a lock')
+    monkeypatch.setattr(User, 'reserve_login_attempt', broken)
+    failed = app.test_client().post('/api/v2/auth/login', data=body,
+                                    content_type='application/json')
+    assert failed.status_code == 500, failed.data
 
 
 def test_a_session_revoked_before_the_restore_reads_nothing(held_app):
