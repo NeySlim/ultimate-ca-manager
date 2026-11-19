@@ -61,19 +61,13 @@ def mtls_on_a2(app):
 
 @pytest.fixture
 def listener(app):
-    """Writes what gunicorn_config records at start: the former CAs its listener trusts."""
-    from config.settings import DATA_DIR
-    from utils.client_cert import FORMER_CAS_FILE
-    path = os.path.join(str(DATA_DIR), FORMER_CAS_FILE)
+    """Pins what this worker's TLS context would have loaded: the former CAs its bundle trusts."""
+    from utils.client_cert import former_cas_header, pin_listener_trust
 
     def trusts(*refids):
-        with open(path, 'w') as handle:
-            json.dump(sorted(refids), handle)
+        pin_listener_trust([former_cas_header(refids) + '-----BEGIN CERTIFICATE-----\n' * (1 + len(refids))])
     yield trusts
-    try:
-        os.unlink(path)
-    except FileNotFoundError:
-        pass
+    pin_listener_trust(())
 
 
 @pytest.fixture
@@ -428,3 +422,56 @@ def test_a_profile_that_never_moved_lists_nothing_and_renews_as_before(
     r = _kerberos_renewal(client, world, realm_a, old, key, True)
     assert r.status_code == 200 and _archived(app, old) == [True]
     assert _count(app) > 0
+
+
+# --- The guard follows the trust this worker loaded, not a list rewritten since ----------------------
+
+@pytest.fixture
+def started_worker(app):
+    """A worker whose TLS context loaded the bundle in the data directory (anchor, former CAs); the
+    bundle is rewritten afterwards, as another node's start does in a shared directory."""
+    from config.settings import DATA_DIR
+    from utils import client_cert
+    bundle = os.path.join(str(DATA_DIR), 'mtls_ca.pem')
+
+    def write(*refids):
+        with app.app_context():
+            pems = [CA.query.filter_by(refid=r).one().crt for r in refids]
+        header = client_cert.former_cas_header(refids[1:])
+        with open(bundle, 'w') as handle:
+            handle.write(header + ''.join(_pem_text(p) for p in pems))
+
+    def start(*refids):
+        write(*refids)
+        client_cert.pin_listener_trust_file(bundle, lambda: None)
+    yield start, write
+    client_cert.pin_listener_trust(())
+    try:
+        os.unlink(bundle)
+    except FileNotFoundError:
+        pass
+
+
+def _pem_text(crt):
+    import base64
+    text = crt if crt.lstrip().startswith('-----') else base64.b64decode(crt).decode()
+    return text if text.endswith('\n') else text + '\n'
+
+
+def test_a_worker_that_loaded_a_former_ca_keeps_its_certificates_aside_after_a_rewrite(
+        app, client, world, realm_a, directory, request, started_worker, monkeypatch):
+    """The former CA is delisted and another node rewrites the bundle: this worker still
+    trusts it in TLS, so its certificates stay out of EST and of the login."""
+    from services.mtls_auth_service import MTLSAuthService
+    seen = []
+    monkeypatch.setattr(MTLSAuthService, 'authenticate_certificate',
+                        staticmethod(lambda info: seen.append(info) or (None, None, 'Certificate not enrolled')))
+    old, _k = _old(app, client, world, realm_a, True)
+    _data, a2, _profile_id = request.getfixturevalue('moved_by_api')
+    start, rewrite = started_worker
+    start(a2['refid'], world['cas']['A']['refid'])
+    rewrite(a2['refid'])
+    assert _peer_hook(app, old)[:3] == (False, True, False)
+    client.post('/api/v2/auth/login/mtls',
+                environ_base={'peercert': old.public_bytes(serialization.Encoding.DER)})
+    assert seen == []
