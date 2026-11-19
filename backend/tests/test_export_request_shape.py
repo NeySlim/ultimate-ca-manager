@@ -431,3 +431,11 @@ def test_a_pem_export_without_a_password_keeps_its_key_in_clear(auth_client, mat
     assert r.status_code == 200, r.data[:300]
     assert b'PRIVATE KEY-----' in r.data and b'ENCRYPTED PRIVATE KEY' not in r.data
     assert _last_audit(app, kind, material) == audit.replace('password-protected', 'unencrypted')
+
+
+@pytest.mark.parametrize('kind', list(PEM_KEY_ROUTES))
+def test_a_pem_export_password_follows_the_export_password_rule(auth_client, material, app, kind):
+    url = _url(kind, material, app, auth_client)
+    r = auth_client.post(url, json={**PEM_KEY_ROUTES[kind][0], 'password': 'short'})
+    assert r.status_code == 400, r.data[:300]
+    assert b'PRIVATE KEY' not in r.data and 'between 8 and' in r.get_json()['message']
