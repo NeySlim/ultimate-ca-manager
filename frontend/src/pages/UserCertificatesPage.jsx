@@ -92,6 +92,20 @@ export default function UserCertificatesPage() {
     setPage(1)
   }, [])
 
+  // Every page of the list as filtered and sorted on screen, for the table's export
+  const exportLoader = useCallback(async (paging) => {
+    const params = { ...paging }
+    if (filterStatus.length > 0) params.status = filterStatus
+    if (searchValue) params.search = searchValue
+    if (sort) {
+      params.sort_by = sort.by
+      params.sort_order = sort.order
+    }
+    const res = await userCertificatesService.getAll(params)
+    return { data: res.data?.items || [], meta: { total: res.data?.total || 0 } }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(filterStatus), searchValue, sort])
+
   // Listen for data change events (from inspectors)
   useEffect(() => {
     const handler = (e) => {
@@ -417,6 +431,7 @@ export default function UserCertificatesPage() {
         sortable
         onSortChange={handleSortChange}
         exportEnabled
+        exportLoader={exportLoader}
         exportFilename="user-certificates"
         pagination={{
           page,

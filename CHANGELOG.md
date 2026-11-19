@@ -130,6 +130,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **The table export holds the whole filtered list.** On a list paged by the server, the CSV and JSON export wrote only the page on screen; it now walks every page of the filtered and sorted list, up to 10 000 rows, and says when the file is cut.
 - **The trust store bundle export follows the purpose filter.** The button always exported every entry; it now exports the purposes selected in the table (`purpose` may be repeated).
 - **The discovery export follows the filters on screen.** It ignored the search, and the page sent none of its filters, so the file held every discovered certificate; it now holds what the table filters to.
 - **User certificates: sorting covers the whole list.** A click on a column header sorted only the page on screen; the sort is now asked of the server.

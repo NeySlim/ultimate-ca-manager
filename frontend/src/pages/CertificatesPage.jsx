@@ -173,6 +173,10 @@ export default function CertificatesPage() {
   const { muteToasts } = useWebSocket()
 
   const requestSeq = useRef(0)
+  // The filters and sort of the list on screen, for the table's export
+  const listParams = useRef({})
+  const exportLoader = useCallback(
+    (paging) => certificatesService.getAll({ ...listParams.current, ...paging }), [])
   const loadData = useCallback(async () => {
     // A reload started earlier must not overwrite a later one (filter changed
     // while an action's reload was in flight)
@@ -204,6 +208,8 @@ export default function CertificatesPage() {
       if (searchValue) params.search = searchValue
       Object.assign(params, toListParams(urlFilters))
       
+      listParams.current = Object.fromEntries(
+        Object.entries(params).filter(([k]) => k !== 'page' && k !== 'per_page'))
       const [certsRes, casRes, statsRes] = await Promise.all([
         certificatesService.getAll(params),
         casService.getAll(),
@@ -773,6 +779,7 @@ export default function CertificatesPage() {
           onApplyFilterPreset={handleApplyFilterPreset}
           presetExtras={presetExtras}
           exportEnabled
+          exportLoader={exportLoader}
           exportFilename="certificates"
           toolbarFilters={filters}
           toolbarActions={
