@@ -174,7 +174,7 @@ def test_trust_store_service_refuses_ml_dsa_pkcs12():
 @pytest.mark.parametrize('target', ['certificates/{cert}', 'cas/{ca}'])
 def test_other_formats_still_export(fmt, check, target, auth_client, material):
     r = _post(auth_client, f'/api/v2/{target.format(**material)}/export',
-              {'format': fmt, 'include_key': True})
+              {'format': fmt, 'include_key': fmt != 'der'})
     assert r.status_code == 200, r.data[:300]
     assert check(r.data)
 

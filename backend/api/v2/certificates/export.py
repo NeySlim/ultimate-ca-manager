@@ -238,6 +238,16 @@ def _named_cas(ca_certs):
     return named
 
 
+def inapplicable_option(export_format, include_key, include_chain):
+    """Message for a ticked option the format cannot carry (DER holds one
+    certificate, P7B no key); None when the combination is possible."""
+    if include_key and export_format in ('der', 'pkcs7', 'p7b'):
+        return f'include_key cannot be used with the {export_format} format: it holds no private key'
+    if include_chain and export_format == 'der':
+        return 'include_chain cannot be used with the der format: it holds a single certificate'
+    return None
+
+
 @bp.route('/api/v2/certificates/export', methods=['GET', 'POST'])
 @require_auth(['read:certificates'])
 def export_all_certificates():
@@ -351,6 +361,10 @@ def export_certificate(cert_id):
 
     if variant_err:
         return variant_err
+
+    option_err = inapplicable_option(export_format, include_key, include_chain)
+    if option_err:
+        return error_response(option_err, 400)
 
     # One rule for the password that encrypts the bundle (utils/export_password).
     # This route used to check presence only, so a one-character password

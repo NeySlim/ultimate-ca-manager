@@ -987,6 +987,9 @@ the leaf and intermediate certificates while clients keep the Root CA in their
 trust store. Both options, as well as `include_key` and `legacy`, must be actual
 JSON booleans in POST bodies; strings such as `"false"` are rejected.
 
+`include_key` with `der`, `pkcs7` or `p7b`, and `include_chain` with `der`, answer `400`
+naming the field: those formats carry no key, and DER a single certificate.
+
 `chain_variant` (`auto` by default, `primary`, or `cross:<id>`) picks the chain a cross-certificate makes
 possible; it is read from the JSON body or the query string. The variants of a certificate are listed in
 `chain_status.variants` of `GET /api/v2/certificates/{cert_id}`. An unknown value, or one that is not part of
