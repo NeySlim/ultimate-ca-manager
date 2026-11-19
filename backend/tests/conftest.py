@@ -913,6 +913,9 @@ def configure_test_app(application):
     application.config['WTF_CSRF_ENABLED'] = False
     # Deterministic FQDN: the CA OCSP/CDP/AIA auto-URLs must not depend on `hostname -f`.
     application.config['FQDN'] = 'ucm.test'
+    # Fail a request the real server would refuse (a non Latin-1 response header).
+    from tests.header_guard import guard_latin1_headers
+    guard_latin1_headers(application)
 
 
 # The session database never hands out an id twice, as PostgreSQL never does: a file's

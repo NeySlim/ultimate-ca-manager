@@ -1,6 +1,17 @@
 """Sanitization utilities for user-controlled input."""
 
 import re
+import unicodedata
+from urllib.parse import quote
+
+
+def _clean_filename(name):
+    """*name* without control characters, quotes and separators, at most 200 characters; '' if nothing is left."""
+    if not name:
+        return ''
+    name = re.sub(r'[\x00-\x1f\x7f\r\n]', '', name)
+    name = re.sub(r'[/\\]', '_', name)
+    return name.replace('"', '')[:200]
 
 
 def sanitize_filename(name):
@@ -9,17 +20,30 @@ def sanitize_filename(name):
     Removes/replaces characters that could cause header injection or
     filesystem issues.
     """
-    if not name:
-        return 'download'
-    # Remove any control characters and CRLF
-    name = re.sub(r'[\x00-\x1f\x7f\r\n]', '', name)
-    # Remove path separators
-    name = re.sub(r'[/\\]', '_', name)
-    # Remove quotes
-    name = name.replace('"', '')
-    # Limit length
-    name = name[:200]
-    return name or 'download'
+    return _clean_filename(name) or 'download'
+
+
+def _ascii_fallback(text):
+    """The ASCII reading of *text* (accents folded), or '' when nothing readable is left."""
+    folded = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('ascii')
+    return folded if any(c.isalnum() for c in folded) else ''
+
+
+def content_disposition(name, ext='', fallback=None, disposition='attachment', prefix=''):
+    """Complete Content-Disposition value for a download named *prefix* + *name* + *ext*.
+
+    An ASCII name gives ``attachment; filename="name.ext"``; any other gives that form with an
+    ASCII fallback plus ``filename*=UTF-8''...`` (RFC 6266 4.3, RFC 8187 3.2.3). The header is
+    always ASCII, since the server refuses one that is not Latin-1. *fallback* (e.g. a refid)
+    stands in when the name has no readable ASCII left; *prefix* is a constant ASCII lead-in.
+    """
+    stem = _clean_filename(name) or _clean_filename(fallback) or 'download'
+    full = f'{prefix}{stem}{ext}'
+    if full.isascii():
+        return f'{disposition}; filename="{full}"'
+    simple = _ascii_fallback(stem) or _ascii_fallback(_clean_filename(fallback)) or 'download'
+    encoded = quote(full, safe="!#$&+-.^_`|~", errors='replace')
+    return f'{disposition}; filename="{prefix}{simple}{ext}"; filename*=UTF-8\'\'{encoded}'
 
 
 def client_filename(name, limit=255):
