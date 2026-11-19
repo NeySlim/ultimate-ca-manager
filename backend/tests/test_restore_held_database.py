@@ -397,6 +397,37 @@ def test_an_api_key_that_expires_during_the_restore_reads_nothing(held_app):
     assert not restore_job.cancel_flagged(job_id)
 
 
+def test_a_credential_refused_during_the_gate_is_forgotten(held_app):
+    """Checked, then refused by the database during the same gate: never answered from memory."""
+    app, path = held_app
+    job_id = _restore_job(app)
+    url = f'/api/v2/system/jobs/{job_id}'
+    user = _admin_user(app)
+    key = _api_key(app, user['id'], 3600)
+    client = app.test_client()
+    gate = _gate(app, job_id).raise_gate()
+    try:
+        assert client.get(url, headers={'X-API-Key': key}).status_code == 200
+        # Revoked by a writer the gate does not see (another process on the file)
+        other = sqlite3.connect(path)
+        other.execute('UPDATE api_keys SET is_active = 0 WHERE user_id = ?', (user['id'],))
+        other.commit()
+        other.close()
+        assert client.get(url, headers={'X-API-Key': key}).status_code == 401
+        gate.set_view(phase=restore_job.APPLYING, held=True)
+        with holding(path):
+            seen = client.get(url, headers={'X-API-Key': key})
+            cancel = client.post(f'{url}/cancel', headers={'X-API-Key': key})
+    finally:
+        gate.lift()
+        with app.app_context():
+            db.session.execute(T.delete().where(T.c.id == job_id))
+            db.session.commit()
+    assert seen.status_code == 503, seen.data
+    assert cancel.status_code == 503, cancel.data
+    assert not restore_job.cancel_flagged(job_id)
+
+
 def test_a_check_made_during_a_previous_restore_is_not_used(held_app):
     """Two restores one after the other: a check from the first one's gate never serves the
     second, whatever the memory kept between them."""
@@ -613,7 +644,8 @@ def test_a_progress_that_crosses_another_writer_keeps_the_jobs_outcome(crossing_
 
 
 def test_a_lock_held_past_the_jobs_wait_still_concludes_it_as_its_error(crossing_job, monkeypatch):
-    """The wait is bounded: past it, the write raises like any other database error."""
+    """Guard on the bound: past the wait the write raises like any other database error.
+    Without the wait it passes too (sqlite3's own timeout); it fails when the wait never ends."""
     monkeypatch.setattr(runner, 'JOB_LOCK_WAIT_SECONDS', 0.5)
 
     def run(ctx, path):
