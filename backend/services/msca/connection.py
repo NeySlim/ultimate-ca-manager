@@ -7,13 +7,32 @@ from models import db
 from models.msca import MicrosoftCA, MSCARequest
 from utils.datetime_utils import utc_now
 from utils.encryption import decrypt_required
-from utils.secret_target import MASKS
+from utils.secret_target import MASKS, changed_targets, keeps_saved_secret
 
 logger = logging.getLogger(__name__)
 
 # What a form can change in a connection test; the secrets are handled apart
 _TESTED_FIELDS = ('server', 'ca_name', 'auth_method', 'username', 'client_cert_pem',
                   'kerberos_principal', 'kerberos_keytab_path', 'use_ssl', 'verify_ssl', 'ca_bundle')
+# Where and how a saved credential is sent, and the saved credential of each method
+_TARGET_FIELDS = ('server', 'use_ssl', 'verify_ssl', 'ca_bundle', 'auth_method')
+_SAVED_CREDENTIALS = {'basic': (('password', '_password'),),
+                      'certificate': (('client_key_pem', '_client_key_pem'),),
+                      'kerberos': (('kerberos_principal', 'kerberos_principal'),
+                                   ('kerberos_keytab_path', 'kerberos_keytab_path'))}
+
+
+def saved_credential_retargets(msca, overrides):
+    """Fields of a test form that would send a saved credential it did not retype elsewhere.
+    A blank value is no credential, never the saved one."""
+    method = overrides.get('auth_method', msca.auth_method)
+    if not any(keeps_saved_secret(overrides, field, getattr(msca, column), blank_clears=True)
+               for field, column in _SAVED_CREDENTIALS.get(method, ())):
+        return []
+    current = {k: getattr(msca, k) for k in _TARGET_FIELDS}
+    if method == 'basic':
+        current['username'] = msca.username
+    return changed_targets(current, overrides)
 
 
 class MicrosoftCAConnectionMixin:
@@ -120,14 +139,18 @@ class MicrosoftCAConnectionMixin:
     @staticmethod
     def _with_form_values(msca, overrides):
         """The saved connection under the form's values: what a test runs on, never persisted.
-        A secret left blank or masked is the saved one, decrypted."""
+        A secret left out or masked is the saved one, decrypted, and only for the saved target."""
         from types import SimpleNamespace
+        if saved_credential_retargets(msca, overrides):
+            raise ValueError('A saved credential is not sent to another target')
         values = {k: getattr(msca, k) for k in _TESTED_FIELDS}
         values.update({k: v for k, v in overrides.items() if k in _TESTED_FIELDS})
         for field, column in (('password', '_password'), ('client_key_pem', '_client_key_pem')):
             typed = overrides.get(field)
             if isinstance(typed, str) and typed.strip() and typed.strip() not in MASKS:
                 secret = typed
+            elif not keeps_saved_secret(overrides, field, getattr(msca, column), blank_clears=True):
+                secret = ''
             else:
                 secret = decrypt_required(getattr(msca, column), f'Microsoft CA {msca.id} {field}') \
                     if getattr(msca, column) else ''

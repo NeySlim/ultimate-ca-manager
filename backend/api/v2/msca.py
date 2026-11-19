@@ -7,11 +7,12 @@ import logging
 from flask import Blueprint, request, g
 from auth.unified import require_auth, has_permission as _has_perm
 from services.settings_registry import as_boolean_word
-from utils.secret_target import MASKS, keeps_saved_secret, retarget_error
+from utils.secret_target import MASKS, SECRET_TARGET_MESSAGE, keeps_saved_secret, retarget_error
 from utils.response import success_response, error_response, created_response, no_content_response
 from models import db
 from models.msca import MicrosoftCA, MSCARequest, basic_password_reaches
 from services.msca_service import MicrosoftCAService
+from services.msca.connection import saved_credential_retargets
 from services.msca.requests import (MSCASignedElsewhere, SIGNED_MEANWHILE_MESSAGE, SUPERSEDED,
                                     SUPERSEDED_MESSAGE, msca_may_write_clause, supersede)
 from services.audit import AuditService
@@ -571,6 +572,11 @@ def _test_overrides(msca, data):
     err = _msca_retarget_error(msca, data)
     if err:
         return None, err
+    # Nor does any saved credential of the tested method, a new method included
+    fields = saved_credential_retargets(msca, data)
+    if fields:
+        return None, error_response(SECRET_TARGET_MESSAGE, 400,
+                                    details={'code': 'secret_required_for_target', 'fields': fields})
     return {**data, **({'server': data['server'].strip()} if 'server' in data else {})}, None
 
 
