@@ -32,6 +32,7 @@ const stable = vi.hoisted(() => ({
 vi.mock('../../contexts', () => ({
   useNotification: () => stable.notify,
   useMobile: () => ({ isMobile: false, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
+  useAuth: () => ({ user: { id: 999 } }),
 }))
 
 vi.mock('../../contexts/InspectorContext', () => ({

@@ -23,7 +23,7 @@ import { hiddenFromIssuance, listedForIssuance, pickerCas, unlistedPickerCas } f
 import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
 import UserSecurityKeys from '../components/UserSecurityKeys'
 import UserApiKeys from '../components/UserApiKeys'
-import { useNotification, useMobile } from '../contexts'
+import { useNotification, useMobile, useAuth } from '../contexts'
 import { usePermission, useWebSocket, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
 import { reportSilentFailure } from '../lib/silentFailure'
@@ -32,6 +32,7 @@ import UserSecuritySection from './users/UserSecuritySection'
 export default function UsersGroupsPage() {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
+  const { user: me } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const { showSuccess, showError, showWarning, showConfirm, showPrompt } = useNotification()
   const { canWrite, canDelete } = usePermission()
@@ -201,8 +202,18 @@ export default function UsersGroupsPage() {
       confirmText: t('common.reset'),
     })
     if (!newPassword) return
+    // The server wants the current password to change your own
+    let currentPassword
+    if (me && user.id === me.id) {
+      currentPassword = await showPrompt(t('common.currentPassword'), {
+        title: t('users.resetPassword'),
+        type: 'password',
+        confirmText: t('common.reset'),
+      })
+      if (!currentPassword) return
+    }
     try {
-      await usersService.resetPassword(user.id, newPassword)
+      await usersService.resetPassword(user.id, newPassword, currentPassword)
       showSuccess(t('messages.success.other.passwordReset'))
     } catch (error) {
       showError(error.message || t('users.resetPasswordFailed'))
@@ -1228,6 +1239,7 @@ export default function UsersGroupsPage() {
       >
         <UserForm
           user={editingUser}
+          isSelf={Boolean(me && editingUser && editingUser.id === me.id)}
           onSubmit={editingUser ? handleUpdateUser : handleCreateUser}
           onCancel={() => { setShowUserModal(false); setEditingUser(null) }}
         />
@@ -1444,12 +1456,13 @@ export default function UsersGroupsPage() {
 
 // ============= USER FORM =============
 
-function UserForm({ user, onSubmit, onCancel }) {
+function UserForm({ user, isSelf = false, onSubmit, onCancel }) {
   const { t } = useTranslation()
   const [formData, setFormData] = useState({
     username: '',
     email: '',
     password: '',
+    current_password: '',
     full_name: '',
     role: 'viewer',
     custom_role_id: '',
@@ -1470,6 +1483,7 @@ function UserForm({ user, onSubmit, onCancel }) {
         username: user.username || '',
         email: user.email || '',
         password: '',
+        current_password: '',
         full_name: user.full_name || '',
         role: user.role || 'viewer',
         custom_role_id: user.custom_role_id || '',
@@ -1480,6 +1494,7 @@ function UserForm({ user, onSubmit, onCancel }) {
         username: '',
         email: '',
         password: '',
+        current_password: '',
         full_name: '',
         role: 'viewer',
         custom_role_id: '',
@@ -1494,6 +1509,8 @@ function UserForm({ user, onSubmit, onCancel }) {
     try {
       const data = { ...formData }
       if (user && !data.password) delete data.password
+      // Only a new password on your own account needs the current one
+      if (!user || !data.password || !isSelf) delete data.current_password
       data.custom_role_id = data.custom_role_id ? parseInt(data.custom_role_id) : null
       await onSubmit(data)
     } finally {
@@ -1535,6 +1552,16 @@ function UserForm({ user, onSubmit, onCancel }) {
         hasExistingValue={!!user}
         showStrength={!user}
       />
+      {user && isSelf && formData.password && (
+        <Input
+          label={t('common.currentPassword')}
+          type="password"
+          noAutofill
+          value={formData.current_password}
+          onChange={(e) => setFormData(p => ({ ...p, current_password: e.target.value }))}
+          required
+        />
+      )}
       <Select
         label={t('common.role')}
         value={formData.role}

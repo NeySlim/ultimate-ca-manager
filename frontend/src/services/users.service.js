@@ -26,8 +26,11 @@ export const usersService = {
 
   // The route reads new_password and refuses 400 without it; it does not
   // generate one, and it returns a message only (no password in the answer).
-  async resetPassword(id, newPassword) {
-    return apiClient.post(`/users/${id}/reset-password`, { new_password: newPassword })
+  async resetPassword(id, newPassword, currentPassword) {
+    const body = { new_password: newPassword }
+    // Required by the server when the account is the caller's own
+    if (currentPassword) body.current_password = currentPassword
+    return apiClient.post(`/users/${id}/reset-password`, body)
   },
 
   async reset2FA(id) {
