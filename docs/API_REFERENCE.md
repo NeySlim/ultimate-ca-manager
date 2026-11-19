@@ -1748,7 +1748,7 @@ GET /api/v2/truststore/export?format=pem&purpose=all
 - `add-from-ca` (`write:truststore`) adds a managed CA's certificate. Optional body `purpose` (default `root_ca` for a root, else `intermediate_ca`) and `notes`. `201`; `409` when it is already there, `400` when the CA awaits its certificate or the purpose is invalid, `404` for an unknown CA.
 - `bulk/delete` (`delete:truststore`) takes `{"ids": [1, 2]}` (a non-empty list of at most 100) and returns `success` (the removed ids) and `failed` (`{id, error}`).
 - `expiring` (`read:truststore`) lists trusted certificates expiring within `days` (default 90).
-- `export` (`read:truststore`) downloads a bundle: `format` `pem` (default) or `p7b`, `purpose` filters (default `all`). `404` when nothing matches. Unreadable entries are skipped and named in `X-Skipped-Certificates` and `X-Skipped-Certificates-Count` (first 100 ids and the total); `404` also when none is readable, with `details.skipped` (the first 100) and `details.skipped_count` (the total).
+- `export` (`read:truststore`) downloads a bundle: `format` `pem` (default) or `p7b`, `purpose` filters (default `all`; repeat it to keep several purposes). `404` when nothing matches. Unreadable entries are skipped and named in `X-Skipped-Certificates` and `X-Skipped-Certificates-Count` (first 100 ids and the total); `404` also when none is readable, with `details.skipped` (the first 100) and `details.skipped_count` (the total).
 
 ---
 

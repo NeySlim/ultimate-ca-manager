@@ -129,4 +129,19 @@ describe('TrustStorePage bundle export', () => {
     await waitFor(() => expect(showSuccess).toHaveBeenCalledWith('trustStore.bundleExported'))
     expect(showWarning).not.toHaveBeenCalled()
   })
+
+  it('exports the purposes the filter shows', async () => {
+    exportBundle.mockReset().mockResolvedValue(bundle(0))
+    renderPage()
+    fireEvent.click(await screen.findByText('only-custom'))
+    fireEvent.click(await screen.findByTitle('trustStore.exportBundle'))
+    await waitFor(() => expect(exportBundle).toHaveBeenCalledWith('pem', ['custom']))
+  })
+
+  it('exports everything with no filter', async () => {
+    exportBundle.mockReset().mockResolvedValue(bundle(0))
+    renderPage()
+    fireEvent.click(await screen.findByTitle('trustStore.exportBundle'))
+    await waitFor(() => expect(exportBundle).toHaveBeenCalledWith('pem', 'all'))
+  })
 })

@@ -130,6 +130,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **The trust store bundle export follows the purpose filter.** The button always exported every entry; it now exports the purposes selected in the table (`purpose` may be repeated).
 - **The discovery export follows the filters on screen.** It ignored the search, and the page sent none of its filters, so the file held every discovered certificate; it now holds what the table filters to.
 - **User certificates: sorting covers the whole list.** A click on a column header sorted only the page on screen; the sort is now asked of the server.
 - **User certificates: the status filter pages correctly.** Filtering by status cut the page first and dropped rows after, so matching certificates on later pages were unreachable and the total counted every row; the filter now runs before the page is cut.

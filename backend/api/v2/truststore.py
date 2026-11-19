@@ -566,20 +566,23 @@ def export_trust_bundle():
     
     Query params:
       - format: pem (default), p7b
-      - purpose: root_ca, intermediate_ca, system, all (default)
+      - purpose: root_ca, intermediate_ca, system, all (default); may be repeated
     """
     from flask import Response
     
     fmt = request.args.get('format', 'pem')
-    purpose = request.args.get('purpose', 'all')
+    purposes = [p for p in request.args.getlist('purpose') if p]
+    if not purposes or 'all' in purposes:
+        purposes = ['all']
+    purpose = '-'.join(purposes)
     
     if fmt not in ('pem', 'p7b'):
         return error_response('Unsupported format. Use: pem, p7b', 400)
     
     try:
         query = TrustedCertificate.query
-        if purpose != 'all':
-            query = query.filter_by(purpose=purpose)
+        if purposes != ['all']:
+            query = query.filter(TrustedCertificate.purpose.in_(purposes))
         
         certs = query.order_by(TrustedCertificate.name).all()
         

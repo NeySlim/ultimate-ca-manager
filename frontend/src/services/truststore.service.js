@@ -54,7 +54,9 @@ export const truststoreService = {
   },
 
   async exportBundle(format = 'pem', purpose = 'all') {
-    return apiClient.get(`/truststore/export?format=${format}&purpose=${purpose}`, {
+    // One purpose or a list: a repeated parameter asks for several
+    const purposes = (Array.isArray(purpose) ? purpose : [purpose]).map(encodeURIComponent)
+    return apiClient.get(`/truststore/export?format=${format}&${purposes.map((p) => `purpose=${p}`).join('&')}`, {
       responseType: 'blob'
     })
   },
