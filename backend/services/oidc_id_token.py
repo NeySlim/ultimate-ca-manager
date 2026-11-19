@@ -43,6 +43,10 @@ _CACHE_TTL_SECONDS = 3600
 _REFRESH_INTERVAL_SECONDS = 60
 _CLOCK_SKEW_SECONDS = 60
 _MAX_DOCUMENT_BYTES = 1024 * 1024
+# Microsoft Entra tenant-independent metadata: the issuer is this template, ``tid`` a GUID
+TENANT_PLACEHOLDER = '{tenantid}'
+_GUID = re.compile(r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}')
+MAX_TENANTS = 200
 _cache = {}
 _refreshed = {}  # cache key -> time.monotonic() of its last early reading
 _cache_lock = threading.Lock()
@@ -57,6 +61,54 @@ def clear_oidc_cache():
     with _cache_lock:
         _cache.clear()
         _refreshed.clear()
+
+
+def is_tenant_id(value):
+    """Whether ``value`` is a tenant id as Entra writes ``tid``: a GUID string, nothing around it."""
+    return isinstance(value, str) and _GUID.fullmatch(value) is not None
+
+
+def normalize_tenants(value):
+    """The accepted tenant ids ``value`` lists (a list, or text split on commas and blanks), in lower
+    case without repeats; ValueError for anything that is not a GUID. No wildcard exists."""
+    if value is None or value == '':
+        return []
+    if isinstance(value, str):
+        value = [item for item in re.split(r'[\s,;]+', value) if item]
+    if not isinstance(value, list):
+        raise ValueError('accepted tenants must be a list of tenant ids')
+    tenants = []
+    for item in value:
+        item = item.strip() if isinstance(item, str) else item
+        if not is_tenant_id(item):
+            raise ValueError(f'accepted tenant {json.dumps(item)[:60]} is not a tenant id (GUID)')
+        if item.lower() not in tenants:
+            tenants.append(item.lower())
+    if len(tenants) > MAX_TENANTS:
+        raise ValueError(f'at most {MAX_TENANTS} accepted tenants')
+    return tenants
+
+
+def provider_tenants(provider):
+    """The tenant ids ``provider`` accepts, or () when it validates one issuer.
+
+    A stored value that does not read as tenant ids refuses every token, never "any tenant"."""
+    raw = getattr(provider, 'oauth2_tenants', None)
+    # The column is text: only a string (or a list built in code) can configure tenants
+    if not isinstance(raw, (str, list)) or raw == '':
+        return ()
+    try:
+        return tuple(normalize_tenants(json.loads(raw) if isinstance(raw, str) else raw))
+    except (TypeError, ValueError) as exc:
+        raise OIDCValidationError('the accepted tenants of this provider are not readable') from exc
+
+
+def has_tenants(provider):
+    """Whether ``provider`` is set up for several tenants (its list may still be unreadable)."""
+    try:
+        return bool(provider_tenants(provider))
+    except OIDCValidationError:
+        return True
 
 
 def _b64url_decode(value):
@@ -157,6 +209,24 @@ def _provider_cache_key(provider, kind, url):
     return (getattr(provider, 'id', None), kind, url)
 
 
+def _check_issuer_template(template, issuer):
+    """``template`` is ``issuer`` with one path segment (organizations, common) as ``{tenantid}``:
+    the tenant-independent metadata of the authority the provider names, nothing wider."""
+    if not isinstance(template, str) or template.count(TENANT_PLACEHOLDER) != 1:
+        raise OIDCValidationError(_NOT_A_TEMPLATE)
+    prefix, suffix = template.split(TENANT_PLACEHOLDER)
+    segment = issuer[len(prefix):len(issuer) - len(suffix)]
+    if (not prefix.endswith('/') or not (suffix == '' or suffix.startswith('/'))
+            or len(issuer) <= len(prefix) + len(suffix)
+            or not issuer.startswith(prefix) or not issuer.endswith(suffix)
+            or not segment or '/' in segment or '{' in segment or '}' in segment):
+        raise OIDCValidationError(_NOT_A_TEMPLATE)
+
+
+_NOT_A_TEMPLATE = ('OIDC discovery issuer is not a {tenantid} template of the configured issuer: '
+                   'accepted tenants need a multi-tenant authority (organizations or common)')
+
+
 def _get_discovery(provider, issuer, verify, force_refresh=False):
     """The discovery document; ``force_refresh`` reads it again (kept cached until that succeeds)."""
     discovery_url = f"{issuer.rstrip('/')}/.well-known/openid-configuration"
@@ -166,7 +236,9 @@ def _get_discovery(provider, issuer, verify, force_refresh=False):
         return cached
 
     document = _fetch_json(discovery_url, verify, 'OIDC discovery')
-    if document.get('issuer') != issuer:
+    if provider_tenants(provider):
+        _check_issuer_template(document.get('issuer'), issuer)
+    elif document.get('issuer') != issuer:
         raise OIDCValidationError('OIDC discovery issuer mismatch')
     jwks_uri = document.get('jwks_uri')
     if not isinstance(jwks_uri, str) or not jwks_uri:
@@ -383,11 +455,42 @@ def unverified_claims_error(claims, provider, expected_nonce):
     apply; step 6 lets TLS stand in for the signature only.
     """
     try:
+        if has_tenants(provider):
+            raise OIDCValidationError(_TENANTS_NEED_VERIFICATION)
         issuer, client_id = _configured_issuer_and_client_id(provider)
         _validate_claims(claims or {}, issuer, client_id, expected_nonce)
     except OIDCValidationError as exc:
         return str(exc)
     return None
+
+
+_TENANTS_NEED_VERIFICATION = 'accepted tenants require ID token verification'
+
+
+def _token_tenant(claims):
+    """The ``tid`` of ``claims``, once a GUID string (before it enters any issuer)."""
+    tid = claims.get('tid')
+    if not is_tenant_id(tid):
+        raise OIDCValidationError('ID token has no tenant id (tid) that is a GUID')
+    return tid
+
+
+def _check_key_issuer(jwk, tid, token_issuer):
+    """Entra keys document: a key that names an issuer signs only for it, ``{tenantid}`` read as
+    the token's ``tid``; a key without one is bound by the issuer check that follows."""
+    if 'issuer' not in jwk:
+        return
+    key_issuer = jwk['issuer']
+    if not isinstance(key_issuer, str) or key_issuer.replace(TENANT_PLACEHOLDER, tid) != token_issuer:
+        raise OIDCValidationError('JWKS key issuer does not match the ID token issuer')
+
+
+def tenant_of(claims, provider):
+    """The tenant of verified ``claims`` for a multi-tenant ``provider``, else None."""
+    if not has_tenants(provider) or not isinstance(claims, dict):
+        return None
+    tid = claims.get('tid')
+    return tid if is_tenant_id(tid) else None
 
 
 def unverified_claims_are_valid(claims, provider, expected_nonce):
@@ -402,6 +505,8 @@ def verify_id_token(id_token, provider, expected_nonce, verify=True, ssl_verify=
     provider's explicit compatibility setting; nonce binding is still checked.
     """
     if not verify:
+        if has_tenants(provider):
+            raise OIDCValidationError(_TENANTS_NEED_VERIFICATION)
         claims = decode_id_token_unverified(id_token)
         nonce = claims.get('nonce')
         if expected_nonce and (
@@ -423,12 +528,20 @@ def verify_id_token(id_token, provider, expected_nonce, verify=True, ssl_verify=
         raise OIDCValidationError(f'unsupported ID token signing algorithm {_shown(algorithm)}')
     if not isinstance(kid, str) or not kid:
         raise OIDCValidationError('ID token is missing key ID')
+    tenants = provider_tenants(provider)
+    tid = None
+    if tenants:
+        # The template comes from the authority's discovery document, never from the token
+        template = _get_discovery(provider, issuer, ssl_verify)['issuer']
+        tid = _token_tenant(claims)
     _check_discovery_algorithm(provider, issuer, ssl_verify, algorithm)
 
     for force_refresh in (False, True):
         try:
             jwks = _get_jwks(provider, issuer, ssl_verify, force_refresh=force_refresh)
             jwk = _select_jwk(jwks, kid, algorithm)
+            if tid is not None:
+                _check_key_issuer(jwk, tid, claims.get('iss'))
             _verify_signature(jwk, algorithm, signing_input, signature)
             break
         except InvalidSignature:
@@ -440,5 +553,9 @@ def verify_id_token(id_token, provider, expected_nonce, verify=True, ssl_verify=
     else:  # pragma: no cover - loop always breaks or raises
         raise OIDCValidationError('ID token signature is invalid')
 
+    if tid is not None:
+        if tid not in tenants:
+            raise OIDCValidationError(f'ID token tenant {tid} is not accepted by this provider')
+        issuer = template.replace(TENANT_PLACEHOLDER, tid)
     _validate_claims(claims, issuer, client_id, expected_nonce)
     return claims

@@ -1,7 +1,7 @@
 from . import bp, VALID_ROLES
 from .helpers import (_get_ssl_verify, _cleanup_ssl_verify, _parse_json_field,
                       saml_groups, oidc_groups, mapped_attributes, oidc_identity,
-                      saml_identity, oidc_stable_id)
+                      saml_identity, oidc_stable_id, oidc_external_id, OIDC_TENANT_KEY)
 from .ldap_routes import _get_or_create_sso_user, _get_saml_auth
 from . import return_path, saml_sp
 from onelogin.saml2.constants import OneLogin_Saml2_Constants
@@ -13,8 +13,8 @@ from utils.db_transaction import safe_commit
 from models import db, User, UserSSOIdentity
 from models.sso import SSOProvider, SSOSession
 from services.audit_service import AuditService
-from services.oidc_id_token import (OIDCValidationError, unverified_claims_error,
-                                    verify_id_token)
+from services.oidc_id_token import (OIDCValidationError, has_tenants, tenant_of,
+                                    unverified_claims_error, verify_id_token)
 from utils.datetime_utils import utc_now
 from utils.ssrf_protection import (
     safe_request_get,
@@ -406,6 +406,9 @@ def oidc_sign_in(provider, code, code_verifier, expected_nonce):
         id_token = tokens.get('id_token')
         verification_enabled = provider.id_token_verify is not False
         trusted_id_claims = None
+        multi_tenant = has_tenants(provider)
+        if multi_tenant and not verification_enabled:
+            return None, _oidc_refusal('accepted tenants require ID token verification')
         if verification_enabled and (not id_token or not expected_nonce):
             return None, _oidc_refusal('missing ID token or session nonce')
         if id_token:
@@ -471,6 +474,13 @@ def oidc_sign_in(provider, code, code_verifier, expected_nonce):
         bound_claims = trusted_id_claims if token_unused is None else None
         groups, group_source = oidc_groups(userinfo, bound_claims, token_unused, attr_mapping)
         external_data = dict(userinfo, groups=groups)
+        session_id = oidc_stable_id(userinfo)
+        if multi_tenant:
+            # The identity is the verified token's tenant and subject, whatever UserInfo says
+            external_data[OIDC_TENANT_KEY] = tenant_of(trusted_id_claims, provider)
+            session_id = oidc_external_id(provider, external_data)
+            if session_id is None:
+                return None, _oidc_refusal('no tenant-scoped subject in the verified ID token')
         if mapped_attributes(attr_mapping, 'groups', set(userinfo) | set(bound_claims or {})):
             # A claim mapped to groups replaces roles and groups: UserInfo's roles go too.
             external_data.pop('roles', None)
@@ -484,7 +494,7 @@ def oidc_sign_in(provider, code, code_verifier, expected_nonce):
             if not id_token:
                 not_verified.append('no ID token was returned: the identity rests on UserInfo alone')
         return SignInIdentity(username, email, fullname, external_data, group_source,
-                              session_id=oidc_stable_id(userinfo) or username,
+                              session_id=session_id or username,
                               not_verified=not_verified), None
     finally:
         _cleanup_ssl_verify(verify)

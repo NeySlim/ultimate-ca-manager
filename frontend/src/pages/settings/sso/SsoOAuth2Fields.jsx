@@ -27,6 +27,10 @@ export default function SsoOAuth2Fields({
   secretProps,
 }) {
   const { t } = useTranslation()
+  // Accepted tenants: Entra multi-tenant only, so shown for its preset or once set
+  const hasTenants = !!(formData.oauth2_tenants || '').trim()
+  const showTenants = hasTenants || oauth2Preset === 'azure'
+    || (formData.oauth2_issuer || '').includes('login.microsoftonline.com')
 
   return (
     <div className="space-y-3">
@@ -89,6 +93,20 @@ export default function SsoOAuth2Fields({
             placeholder="https://idp.example.com/.well-known/jwks.json"
             helperText={t('sso.oidcJwksUriHelp')}
           />
+          {showTenants && (
+            <Textarea
+              label={t('sso.oidcTenants')}
+              value={formData.oauth2_tenants}
+              onChange={e => handleChange('oauth2_tenants', e.target.value)}
+              placeholder="00000000-0000-0000-0000-000000000000"
+              rows={3}
+              mono
+              helperText={t('sso.oidcTenantsHelp')}
+            />
+          )}
+          {hasTenants && !formData.id_token_verify && (
+            <p className="text-xs text-status-warning">{t('sso.oidcTenantsNeedVerify')}</p>
+          )}
           <ToggleSwitch
             checked={formData.id_token_verify}
             onChange={(val) => handleChange('id_token_verify', val)}

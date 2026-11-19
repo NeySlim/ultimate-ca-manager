@@ -19,7 +19,7 @@ STEPS = (
     '162_tsa_ca_signer_kept', '163_ssh_ca_hsm_key', '164_file_removals',
     '165_sso_ldap_group_base_dn', '166_trust_store_certificates_only', '167_user_sso_identities',
     '168_ssh_certificate_serial_unique', '169_background_jobs', '170_sso_sign_in_tests',
-    '171_acme_purge_indexes', '172_sso_ldap_nested_groups',
+    '171_acme_purge_indexes', '172_sso_ldap_nested_groups', '173_sso_oauth2_tenants',
     '174_windows_profile_renewal_cas',
 )
 
