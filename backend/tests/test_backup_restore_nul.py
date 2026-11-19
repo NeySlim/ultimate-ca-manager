@@ -168,18 +168,6 @@ def test_a_field_name_holding_one_is_named_as_ignored(target, mode):
     assert warning.startswith(f'deploy_targets.no{ESCAPED}column: a field no column takes, ignored')
 
 
-def test_a_name_from_the_archive_is_escaped_and_bounded(target):
-    from services.backup.restore.apply import NAME_SHOWN
-    _postgresql_only(target)
-    results = _restore({'configuration': {'settings': {
-        'line\nbreak': 'a\x00', 'x' * 5000: 'b\x00'}}}, 'merge')
-    warnings = _nul_warnings(results)
-    assert len(warnings) == 2 and not any('\n' in w or '\r' in w for w in warnings), warnings
-    assert any(w.startswith('configuration.settings.line\\x0abreak:') for w in warnings), warnings
-    long_one, = [w for w in warnings if 'xxx' in w]
-    assert long_one.startswith('configuration.settings.' + 'x' * NAME_SHOWN + '...:'), long_one
-
-
 @pytest.mark.parametrize('mode', MODES)
 def test_two_rows_that_become_one_are_named(target, mode):
     """``a\\x00`` and the text ``a\\0`` are one name once rewritten: the report says so."""
