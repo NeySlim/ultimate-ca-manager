@@ -11,7 +11,7 @@ from .helpers import _encrypt_ldap_password, _parse_json_field, _parse_group_lis
 from .connection_tests import _test_ldap_connection, _test_oauth2_connection, _test_saml_connection
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 from utils.secret_target import MASKS, keeps_saved_secret, retarget_error
-from services.oidc_id_token import clear_oidc_cache
+from services.oidc_id_token import clear_oidc_cache, has_tenants, normalize_tenants
 from utils.dn_parse import parse_dn
 from . import saml_sp
 
@@ -112,6 +112,23 @@ def _default_role(value):
     return value
 
 
+def _tenants(value):
+    """Stored accepted tenants: a JSON array of GUIDs, None for none. ValueError otherwise."""
+    tenants = normalize_tenants(value)
+    return json.dumps(tenants) if tenants else None
+
+
+def _tenants_error(provider):
+    """Why the accepted tenants of ``provider`` cannot be used as configured, else None."""
+    if provider.provider_type != 'oauth2' or not has_tenants(provider):
+        return None
+    if provider.id_token_verify is False:
+        return 'Accepted tenants require ID token verification'
+    if not (provider.oauth2_issuer or '').strip():
+        return 'Accepted tenants need the OIDC issuer of a multi-tenant authority (organizations or common)'
+    return None
+
+
 def _taken(data):
     """The answer to a creation whose name or type a provider already holds, else None."""
     if SSOProvider.query.filter_by(name=data['name']).first():
@@ -200,6 +217,11 @@ def create_provider():
         provider.oauth2_jwks_uri = data.get('oauth2_jwks_uri')
         # Verification is fail-closed unless an administrator explicitly opts out.
         provider.id_token_verify = data.get('id_token_verify', True) is not False
+        try:
+            provider.oauth2_tenants = _tenants(data.get('oauth2_tenants'))
+        except ValueError as e:
+            db.session.rollback()
+            return error_response(str(e), 400)
         provider.oauth2_verify_ssl = data.get('oauth2_verify_ssl', True)
         ca = data.get('oauth2_ca_bundle')
         provider.oauth2_ca_bundle = ca if isinstance(ca, str) and ca.strip() else None
@@ -245,7 +267,7 @@ def create_provider():
             return error_response(role_error, 400)
         provider.role_mapping = json.dumps(val)
 
-    signing_error = _sp_signing_error(provider)
+    signing_error = _sp_signing_error(provider) or _tenants_error(provider)
     if signing_error:
         db.session.rollback()
         return error_response(signing_error, 400)
@@ -392,6 +414,16 @@ def update_provider(provider_id=None, provider_type_name=None):
             provider.oauth2_scopes = json.dumps(data['oauth2_scopes'])
         if 'id_token_verify' in data:
             provider.id_token_verify = data['id_token_verify'] is not False
+        if 'oauth2_tenants' in data:
+            try:
+                provider.oauth2_tenants = _tenants(data['oauth2_tenants'])
+            except ValueError as e:
+                db.session.rollback()
+                return error_response(str(e), 400)
+        tenants_error = _tenants_error(provider)
+        if tenants_error:
+            db.session.rollback()
+            return error_response(tenants_error, 400)
 
     elif provider.provider_type == 'ldap':
         for field in ['ldap_server', 'ldap_port', 'ldap_use_ssl', 'ldap_bind_dn',
