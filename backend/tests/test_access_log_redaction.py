@@ -19,6 +19,11 @@ from utils.access_log import RedactingLogger, redact_url
     ('/api/v2/certificates?page=2', '/api/v2/certificates?page=2'),
     ('/api/v2/x?mytoken=keep', '/api/v2/x?mytoken=keep'),
     ('-', '-'),
+    ('/api/v2/csrs/4/export?format=key&password=Pw1', '/api/v2/csrs/4/export?format=key&password=[REDACTED]'),
+    ('/api/v2/certificates/4/export?Password=Pw1&format=pem',
+     '/api/v2/certificates/4/export?Password=[REDACTED]&format=pem'),
+    ('/api/v2/cas/4/export?PASSPHRASE=Pw1', '/api/v2/cas/4/export?PASSPHRASE=[REDACTED]'),
+    ('/api/v2/x?pkcs12_password=Pw1&a=1', '/api/v2/x?pkcs12_password=[REDACTED]&a=1'),
 ])
 def test_redact_url(url, expected):
     assert redact_url(url) == expected
