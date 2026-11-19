@@ -468,6 +468,16 @@ SHAPES = {
 }
 CONTAINERS = {'list': _list_as_text, 'object': _object_as_text}
 
+# Columns the users, SSO and API key restorers query by before the generic write
+READ_BEFORE_THE_COLUMNS = {
+    'users.username': ('users', {'username': 'hc-user', 'email': 'hc@corpus.test',
+                                 'role': 'viewer', 'active': True, 'password_hash': 'x'}),
+    'sso_providers.name': ('sso_providers', {'name': 'hc-sso', 'provider_type': 'oauth2',
+                                             'oauth2_issuer': 'https://idp.corpus.test'}),
+    'api_keys.key_hash': ('api_keys', {'key_hash': 'a' * 64, 'name': 'hc-key',
+                                       'user_id': None, 'user_id_ref': None}),
+}
+
 
 @contextmanager
 def _target_for(app, tmp_path, mode):
@@ -555,6 +565,43 @@ class TestASectionOfTheWrongTypeIsRefusedByName:
         assert f'{SECTION}.host' in str(refusal.value) and MARKER not in str(refusal.value)
         assert _census() == before
         assert DeployTarget.query.filter_by(name=TARGET['name']).count() == 0
+
+    @pytest.mark.parametrize('mode', ['merge', 'replace'])
+    @pytest.mark.parametrize('column', sorted(READ_BEFORE_THE_COLUMNS))
+    @pytest.mark.parametrize('shape', ['list', 'object'])
+    def test_a_container_in_a_column_a_dedicated_restorer_reads_writes_nothing(
+            self, target, column, shape, mode):
+        from models import User
+        from models.api_key import APIKey
+        from models.sso import SSOProvider
+        section, row = READ_BEFORE_THE_COLUMNS[column]
+        value = [MARKER] if shape == 'list' else {'v': MARKER}
+        payload = {section: [dict(row, **{column.split('.')[1]: value})]}
+        before = _census()
+        with pytest.raises(RestoreValidationError) as refusal:
+            _service()._restore_payload(payload, b'\0' * 32, mode)
+        db.session.rollback()
+        assert column in str(refusal.value) and MARKER not in str(refusal.value)
+        assert _census() == before
+        assert SSOProvider.query.count() == 0 and APIKey.query.count() == 0
+        assert User.query.count() == before['users']
+
+    def test_a_list_as_a_username_answers_400_naming_the_column(self, app, auth_client):
+        def mutate(data):
+            data['users'] = [dict(READ_BEFORE_THE_COLUMNS['users.username'][1],
+                                  username=[MARKER])]
+        with app.app_context():
+            blob = _forged([SECTION], mutate=mutate)
+            before = _census()
+
+        response = _restore(auth_client, blob)
+
+        with app.app_context():
+            after = _census()
+        _assert_refused_cleanly(response, before, after)
+        assert response.status_code == 400, response.data
+        message = _message(response)
+        assert 'users.username' in message and MARKER not in message, message
 
     def test_a_count_that_is_not_a_number_is_refused_by_name(
             self, app, auth_client):

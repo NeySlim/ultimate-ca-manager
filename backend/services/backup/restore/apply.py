@@ -415,17 +415,40 @@ def _secret_as_stored(section, name: str, value: Any, *, label: str = 'HSM provi
 _INTEGER_LIMIT = 2 ** 63 - 1
 
 
+def _refuse_container(value: Any, column, where: str) -> None:
+    # Only a JSON column holds a list or an object; the value is not echoed (it may be a secret)
+    if isinstance(value, (list, dict)) and not isinstance(column.type, JSON):
+        raise RestoreValidationError(
+            f"Invalid backup: {where} holds a {'list' if isinstance(value, list) else 'object'} "
+            "where this column takes a single value")
+
+
+def refuse_containers_in_columns(backup_data) -> None:
+    """RestoreValidationError, before any write, for a list or an object in a non JSON
+    column of any row of the manifest: the dedicated restorers query by some of them."""
+    from ..section_store import SectionStore, section_kind
+    for section_name, section in SECTIONS.items():
+        if section_kind(backup_data, section_name) != 'list':
+            continue
+        columns, _attribute_of = _mapping_of(load_model(section))
+        rows = (backup_data.iter_rows(section_name) if isinstance(backup_data, SectionStore)
+                else backup_data[section_name])
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            for name, value in row.items():
+                column = columns.get(name)
+                if column is not None and name not in section.handled:
+                    _refuse_container(value, column, f"{section_name}.{name}")
+
+
 def _coerce(value: Any, column, where: str) -> Any:
     """Turn an archived value back into what the column holds."""
     if value is None:
         return None
 
     kind = column.type
-    # Only a JSON column holds a list or an object; the value is not echoed (it may be a secret)
-    if isinstance(value, (list, dict)) and not isinstance(kind, JSON):
-        raise RestoreValidationError(
-            f"Invalid backup: {where} holds a {'list' if isinstance(value, list) else 'object'} "
-            "where this column takes a single value")
+    _refuse_container(value, column, where)
     try:
         if isinstance(kind, LargeBinary) and isinstance(value, str):
             return base64.b64decode(value)
