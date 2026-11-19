@@ -291,6 +291,17 @@ def test_the_certsrv_channel_uses_the_connection_cache(kerberos, monkeypatch):
     assert seen == [ccache_name(7, '/kt/svc.keytab', 'svc@CORP')]
 
 
+# --- The keytab alone makes the Kerberos admin channel usable ---
+
+def test_a_keytab_without_principal_or_account_is_a_usable_channel():
+    from services.msca.admin_channel import MicrosoftCAAdminChannelMixin
+    row = SimpleNamespace(winrm_enabled=True, winrm_transport='kerberos', kerberos_principal=None,
+                          winrm_username=None, kerberos_keytab_path='/kt/svc.keytab')
+    assert MicrosoftCAAdminChannelMixin.admin_channel_available(row)
+    row.kerberos_keytab_path = None
+    assert not MicrosoftCAAdminChannelMixin.admin_channel_available(row)
+
+
 # --- A file UCM manages is never a client keytab ------------------------------
 
 def _managed_paths(tmp_path):

@@ -57,7 +57,8 @@ class MicrosoftCAAdminChannelMixin:
         if not msca.winrm_enabled:
             return False
         if msca.winrm_transport == 'kerberos':
-            return bool(msca.kerberos_principal or msca.winrm_username)
+            # A keytab alone signs in as its first principal
+            return bool(msca.kerberos_principal or msca.winrm_username or msca.kerberos_keytab_path)
         return bool(msca.winrm_effective_username and msca.winrm_effective_password)
 
     @staticmethod
