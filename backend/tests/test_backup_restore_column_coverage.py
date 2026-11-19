@@ -34,6 +34,14 @@ UNFILLABLE: dict = {}
 
 _STAMP = datetime.datetime(2025, 3, 4, 5, 6, 7)
 
+_TENANT = '0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1'
+# {(section, column): value} -- columns a restore checks or normalizes: a value the product accepts
+_PARTICULAR = {
+    ('sso_providers', 'oauth2_tenants'): f'["{_TENANT}"]',          # tenant ids (GUIDs)
+    ('sso_providers', 'oauth2_role_tenants'): f'["{_TENANT}"]',     # among the accepted tenants
+    ('user_sso_identities', 'expected_tenant'): _TENANT,            # a lower-case GUID
+}
+
 
 def _fill_nullable(rows):
     """A value in every empty column the restore could drop without anyone noticing.
@@ -50,6 +58,8 @@ def _fill_nullable(rows):
             declared = str(column.type).upper()
             if 'DATETIME' in declared or 'TIMESTAMP' in declared:
                 value = _STAMP      # a moment no restore would produce
+            elif (name, column.name) in _PARTICULAR:
+                value = _PARTICULAR[(name, column.name)]
             elif getattr(row, attribute) is None:
                 index += 1
                 value = _value_for(column, index)
@@ -148,6 +158,13 @@ def test_every_exemption_is_still_needed_and_explained(both_archives):
         assert any(back.get(_key(name, row)) != row.get(column) for row in archived[name]), \
             f'{name}.{column} now comes back as archived: drop its exemption'
 
+
+
+def test_the_particular_values_are_the_archived_ones(both_archives):
+    """Each particular value reaches the archive, so the comparison above sees its column."""
+    archived, _restored, _refused = both_archives
+    for (name, column), value in _PARTICULAR.items():
+        assert [row.get(column) for row in archived[name]] == [value], (name, column)
 
 
 def test_a_column_left_empty_is_one_written_down(both_archives):
