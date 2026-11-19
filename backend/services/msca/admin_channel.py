@@ -243,8 +243,9 @@ class MicrosoftCAAdminChannelMixin:
         finally:
             transport.message_encryption = wanted
         auth = getattr(http, 'auth', None)
-        if not (callable(getattr(auth, 'generate_request_header', None))
-                and getattr(auth, 'force_preemptive', None) is not None):
+        # A session pywinrm does not keep would carry the wrapper to no request
+        if transport.session is not http or not (callable(getattr(auth, 'generate_request_header', None))
+                                                 and getattr(auth, 'force_preemptive', None) is not None):
             transport.session = None  # rebuilt by pywinrm itself, under the caller's lock
             return False
         acquire = auth.generate_request_header

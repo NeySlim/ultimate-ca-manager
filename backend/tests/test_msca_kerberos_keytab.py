@@ -211,7 +211,7 @@ def _other_auth_session(self):
     return self.session
 
 
-@pytest.mark.parametrize('shape', ['no-transport', 'missing-attribute', 'other-auth-class'])
+@pytest.mark.parametrize('shape', ['no-transport', 'missing-attribute', 'other-auth-class', 'session-not-kept'])
 def test_an_unexpected_pywinrm_runs_the_whole_command_under_the_keytab(pywinrm, monkeypatch, shape):
     """Never worse than before: a pywinrm the wrapper does not recognise keeps the keytab
     named (lock held, bounded wait for others) for the whole command."""
@@ -228,6 +228,15 @@ def test_an_unexpected_pywinrm_runs_the_whole_command_under_the_keytab(pywinrm, 
         monkeypatch.setattr(winrm, 'Session', Session)
     elif shape == 'missing-attribute':
         monkeypatch.delattr(winrm.transport.Transport, 'setup_encryption')
+    elif shape == 'session-not-kept':
+        # A pywinrm whose build_session hands out a session it does not keep for its requests
+        built = winrm.transport.Transport.build_session
+
+        def build_session(self):
+            http = built(self)
+            self.session = None
+            return http
+        monkeypatch.setattr(winrm.transport.Transport, 'build_session', build_session)
     else:
         _built_with.clear()
         monkeypatch.setattr(winrm.transport.Transport, 'build_session', _other_auth_session)

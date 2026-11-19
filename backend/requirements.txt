@@ -94,7 +94,8 @@ certsrv>=2.1.0
 # Pure-python wheels, bundled so air-gapped/policy-restricted deployments get
 # the admin channel out of the box (#159). Still lazy-imported in
 # services/msca/admin_channel.py and the feature degrades gracefully.
-pywinrm>=0.5.0
+# The Kerberos keytab wrapper is checked against 0.5's Transport; the next minor gets the same check
+pywinrm>=0.5.0,<0.6
 requests-ntlm>=1.3.0
 # JKS export support (Java KeyStore).
 # pyjks itself is a pure-python wheel, but it declares `twofish` as a dependency.
