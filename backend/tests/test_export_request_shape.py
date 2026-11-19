@@ -468,7 +468,7 @@ def test_a_ca_include_key_that_is_not_a_boolean_is_refused(auth_client, material
     assert b'PRIVATE KEY' not in r.data and 'include_key' in r.get_json()['message']
 
 
-@pytest.mark.parametrize('value', ['1', 'yes', 'on'])
+@pytest.mark.parametrize('value', ['1', '0', 'yes', 'no', 'on', ''])
 def test_a_ca_query_include_key_that_is_not_true_or_false_is_refused(auth_client, material, value):
     r = auth_client.get(f"/api/v2/cas/{material['ca']}/export?format=pem&include_key={value}")
     assert r.status_code == 400 and b'PRIVATE KEY' not in r.data
@@ -478,3 +478,24 @@ def test_a_ca_query_include_key_that_is_not_true_or_false_is_refused(auth_client
 def test_a_ca_boolean_include_key_is_unchanged(auth_client, material, body, has_key):
     r = auth_client.post(f"/api/v2/cas/{material['ca']}/export", json={'format': 'pem', **body})
     assert r.status_code == 200 and (b'PRIVATE KEY' in r.data) == has_key
+
+
+@pytest.mark.parametrize('fmt', ['pem', 'key'])
+def test_an_offline_ca_key_is_not_sealed_under_a_second_password(auth_client, create_ca, fmt):
+    """Its stored key is sealed under the offline password: a second one answers 409, not 500."""
+    ca = create_ca(cn=f'Export shape offline {fmt}')
+    offline = auth_client.post(f"/api/v2/cas/{ca['id']}/offline",
+                               json={'password': 'OfflineP@ss2026!', 'mode': 'password_protected'})
+    assert offline.status_code == 200, offline.data[:300]
+    url = f"/api/v2/cas/{ca['id']}/export"
+    body = {'format': fmt, **({'include_key': True} if fmt == 'pem' else {})}
+
+    r = auth_client.post(url, json={**body, 'password': PASSWORD})
+    assert r.status_code == 409, r.data[:300]
+    assert b'PRIVATE KEY' not in r.data
+
+    kept = auth_client.post(url, json=body)
+    assert kept.status_code == 200, kept.data[:300]
+    assert len(_key_blocks(kept.data, 'ENCRYPTED PRIVATE KEY')) == 1
+    for label in ('PRIVATE KEY', 'RSA PRIVATE KEY', 'EC PRIVATE KEY'):
+        assert not _key_blocks(kept.data, label), f'{label} in clear'

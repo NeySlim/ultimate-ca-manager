@@ -217,6 +217,11 @@ def export_ca(ca_id):
         # HSM-backed CAs cannot export their private key — it never leaves the HSM
         if ca.uses_hsm:
             return error_response('Cannot export HSM-backed key', 409)
+        # An offline CA's stored key is sealed under its offline password: no second one applies
+        if password and ca.offline and ca.prv and export_format in ('pem', 'key'):
+            return error_response(
+                'The key of an offline CA is sealed under its offline password; '
+                'export it without a password', 409)
 
     # Cap export password length (PKCS12/PFX/JKS or PEM-encrypted key)
     pw_err = _validate_export_password(password)
