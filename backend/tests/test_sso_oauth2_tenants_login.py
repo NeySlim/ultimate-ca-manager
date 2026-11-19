@@ -77,9 +77,9 @@ def entra(app, monkeypatch):
         assert r.status_code == 302
         return r.headers['Location']
 
-    def sign_in(tid, sub, username):
+    def sign_in(tid, sub, username, **extra):
         """What the provider's sign-in test reads: the same function as the login."""
-        state['claims'] = claims(tid, sub)
+        state['claims'] = claims(tid, sub, **extra)
         state['userinfo'] = {'sub': sub, 'preferred_username': username}
         with app.test_request_context('/api/v2/sso/callback/oauth2'):
             return login_routes.oidc_sign_in(db.session.get(SSOProvider, pid), 'c', 'v', 'n')
@@ -375,6 +375,7 @@ def test_role_claims_are_read_from_the_honoured_tenants_only(entra):
 
 
 def test_with_rules_a_user_without_role_of_a_tenant_not_honoured_is_refused(entra):
+    """Guard: no rule matches such a user in either tenant; this holds the reason recorded."""
     entra.configure(role_mapping='{"UCM.Admin": "admin"}', default_role='viewer',
                     oauth2_role_tenants=f'["{TENANT_A}"]')
     assert entra(TENANT_A, 'sub-na', 'mt-norole-a').endswith(REFUSED)
@@ -437,7 +438,7 @@ def test_the_sign_in_test_says_the_role_claims_are_not_honoured(entra):
     from api.v2.sso.ldap_routes import REFUSED as OUTCOME_REFUSED, decide_sso_account
     entra.configure(role_mapping='{"UCM.Admin": "admin"}', default_role='viewer',
                     oauth2_role_tenants=f'["{TENANT_A}"]')
-    identity, refusal = entra.sign_in(TENANT_B, 'sub-tb', 'mt-test-b')
+    identity, refusal = entra.sign_in(TENANT_B, 'sub-tb', 'mt-test-b', roles=['UCM.Admin'])
     assert refusal is None
     decision = decide_sso_account(db.session.get(SSOProvider, entra.pid), identity.username,
                                   identity.email, identity.fullname, identity.external_data)
