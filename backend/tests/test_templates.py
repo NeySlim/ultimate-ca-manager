@@ -45,6 +45,8 @@ def app():
     app = create_app('testing')
     app.config['TESTING'] = True
     app.config['WTF_CSRF_ENABLED'] = False
+    from tests.header_guard import guard_latin1_headers
+    guard_latin1_headers(app)  # this app serves exports: refuse what the real server refuses
 
     from tests.conftest import clear_admin_password_flag
     clear_admin_password_flag(app)
