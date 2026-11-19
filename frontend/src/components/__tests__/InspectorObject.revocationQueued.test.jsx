@@ -45,6 +45,7 @@ vi.mock('../../services', () => ({
 }))
 
 import { InspectorObject } from '../inspector/InspectorObject'
+import { moreAction } from '../../test/moreActions'
 
 const WINDOW = { key: 'certificate:4', type: 'certificate', entityId: 4, data: null }
 
@@ -57,7 +58,7 @@ async function revokeThenDelete(revokeResult) {
   notify.showConfirm.mockResolvedValue(true)
   render(<InspectorObject entry={WINDOW} onTitle={() => {}} />)
   await screen.findAllByText('web.example.com')
-  fireEvent.click(screen.getByLabelText('common.delete'))
+  fireEvent.click(moreAction('common.delete'))
   fireEvent.submit(await screen.findByText('revocation.confirm').then(el => el.closest('form')))
   await waitFor(() => expect(certificatesService.revoke).toHaveBeenCalledTimes(1))
   return certificatesService
