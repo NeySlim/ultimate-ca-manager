@@ -457,10 +457,14 @@ def download_mtls_certificate(cert_id):
             headers={'Content-Disposition': content_disposition(user.username, '-mtls.p12', fallback=f'user-{user.id}')},
         )
 
-    # Default: PEM. The certificate alone, plus its chain only when the caller asked for it
-    if chain_sent and include_chain:
-        from api.v2.certificates.export import _build_ca_chain
-        issuers = _build_ca_chain(cert, cert_pem, include_root=include_root)
+    # Default: PEM. The leaf alone (a stored import may carry its chain), plus the issuers only when asked
+    from api.v2.certificates.export import _build_ca_chain, _split_pem_certs
+    issuers = (_build_ca_chain(cert, cert_pem, include_root=include_root)
+               if chain_sent and include_chain else [])
+    stored = _split_pem_certs(cert_pem)
+    if stored:
+        cert_pem = stored[0].public_bytes(serialization.Encoding.PEM)
+    if issuers:
         cert_pem = cert_pem.rstrip(b'\n') + b'\n' + b''.join(
             c.public_bytes(serialization.Encoding.PEM) for c in issuers)
 
