@@ -426,7 +426,7 @@ Content-Type: application/json
 
 { "pem": "-----BEGIN CERTIFICATE-----...", "name": "Work laptop", "user_id": 2 }
 ```
-Session only. Imports a PEM certificate (plain or base64 of the PEM) issued by a CA of this server and enrolls it. `pem` is required; `user_id` is honoured for admins only. `400` for unparsable data, an expired or revoked certificate, or a foreign issuer; `409` when already enrolled. Responds `201`.
+Session only. Imports a certificate issued by a CA of this server and enrolls it. `pem` is the PEM text, base64 of it, or `BASE64:` followed by the base64 of a DER file (a `.cer` or `.crt`). It is required; `user_id` is honoured for admins only. `400` for unparsable data, an expired or revoked certificate, or a foreign issuer; `409` when already enrolled. Responds `201`.
 
 ```http
 GET /api/v2/mtls/available-certificates

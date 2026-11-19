@@ -597,16 +597,25 @@ def enroll_import_certificate():
         return error_response('PEM certificate data is required', 400)
 
     try:
-        if not pem_text.startswith('-----BEGIN'):
+        if pem_text.startswith('BASE64:'):
+            # A binary .cer/.crt, as the account page sends it: the DER bytes in base64
+            raw = base64.b64decode(pem_text[len('BASE64:'):], validate=True)
             try:
-                pem_text = base64.b64decode(pem_text).decode('utf-8')
-            except Exception:
-                return error_response('Invalid certificate format. Expected PEM data.', 400)
-
-        pem_bytes = pem_text.encode('utf-8')
-        cert_obj = cx509.load_pem_x509_certificate(pem_bytes, default_backend())
+                cert_obj = cx509.load_der_x509_certificate(raw, default_backend())
+                pem_bytes = cert_obj.public_bytes(serialization.Encoding.PEM)
+            except ValueError:
+                pem_bytes = raw
+                cert_obj = cx509.load_pem_x509_certificate(raw, default_backend())
+        else:
+            if not pem_text.startswith('-----BEGIN'):
+                try:
+                    pem_text = base64.b64decode(pem_text).decode('utf-8')
+                except Exception:
+                    return error_response('Invalid certificate format. Expected PEM data.', 400)
+            pem_bytes = pem_text.encode('utf-8')
+            cert_obj = cx509.load_pem_x509_certificate(pem_bytes, default_backend())
     except Exception as e:
-        logger.error(f"Failed to parse imported PEM: {e}")
+        logger.error(f"Failed to parse imported certificate: {e}")
         return error_response('Invalid PEM certificate data', 400)
     try:
         require_readable_extensions(cert_obj)
