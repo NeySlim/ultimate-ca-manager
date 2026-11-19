@@ -354,7 +354,8 @@ def test_an_archived_provider_type_out_of_the_list_is_refused(target, value, mod
     assert User.query.count() == 0
 
 
-UNNAMED = {'number': 123, 'none': None, 'empty': '', 'spaces': '  ', 'false': False}
+# A blank name is text: restored (test_restore_sso_one_per_type), never refused for its name
+UNNAMED = {'number': 123, 'none': None, 'false': False}
 
 
 @pytest.mark.parametrize('mode', ['merge', 'replace'])

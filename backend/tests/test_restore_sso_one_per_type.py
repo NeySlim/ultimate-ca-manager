@@ -132,6 +132,23 @@ def test_an_archive_holding_two_providers_of_a_type_is_refused(target, mode):
     assert User.query.filter_by(username='admin-keep').first() is None
 
 
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+def test_a_provider_named_blank_by_an_older_instance_is_restored(target, mode):
+    results = _restore({'sso_providers': [_archived_provider('   ', 'ldap', 'ldap.example')]}, mode)
+    db.session.expire_all()
+    assert [(kind, named) for kind, named, _id in _providers()] == [('ldap', '   ')], results
+
+
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+@pytest.mark.parametrize('name', [None, 5])
+def test_a_provider_name_that_is_not_text_is_refused(target, mode, name):
+    with pytest.raises(BackupSchemaError) as refused:
+        _restore({'sso_providers': [_archived_provider(name, 'ldap', 'ldap.example')]}, mode)
+    db.session.rollback()
+    assert 'not text' in str(refused.value) and 'Nothing has been changed' in str(refused.value)
+    assert _providers() == []
+
+
 # --- A replacement: the archive's provider of the type replaces the one here --------------------
 
 @pytest.mark.parametrize('fmt', FORMATS)

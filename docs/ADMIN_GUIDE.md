@@ -420,7 +420,7 @@ Backups and restores run in the scheduler process, and its memory grows with the
 | 25 500 | 0.27 GB (SQLite), 0.28 GB (PostgreSQL) | 0.54 GB (SQLite), 0.55 GB (PostgreSQL) |
 | 255 000 | 2.9 GB (SQLite), 3.85 GB (PostgreSQL) | 3.7 GB (SQLite and PostgreSQL) |
 
-The web worker stays near 0.25 GB and the gunicorn master near 0.22 GB. Size the host or the container for the restore of the largest archive it may receive, plus these two. A scheduler process stopped for want of memory takes its job with it: a restore then fails and restores nothing, and its archive and sections are removed when the job is concluded.
+The web worker stays near 0.25 GB and the gunicorn master near 0.22 GB. Size the host or the container for the larger of the backup and the restore, for the largest base it holds and the largest archive it may receive, plus these two: on PostgreSQL the backup of 255 000 certificates takes more than their restore. In a container, 1 GiB holds about 25 500 certificates with about 5% to spare, and about 5 GiB holds 255 000. A scheduler process stopped for want of memory takes its job with it: a restore then fails and restores nothing, and its archive and sections are removed when the job is concluded.
 
 ### Backup Contents
 

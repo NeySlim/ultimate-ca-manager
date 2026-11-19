@@ -39,9 +39,10 @@ def refuse_archived_shared_types(backup_data) -> None:
     tenants a sign-in would refuse."""
     from models.sso import SSOProvider
     rows = backup_data.get(SECTION)
-    # Every row the restorer would write is checked: one without a text name escapes _archived
+    # Every row the restorer would write is checked: one without a text name escapes _archived.
+    # A blank name is text: an instance that let one be created must restore its own backup
     for row in rows if isinstance(rows, list) else []:
-        if isinstance(row, dict) and not (isinstance(row.get('name'), str) and row['name'].strip()):
+        if isinstance(row, dict) and not isinstance(row.get('name'), str):
             raise BackupSchemaError(
                 "Cannot restore: one of the archive's SSO providers has no name, or a name "
                 "that is not text. Nothing has been changed.")

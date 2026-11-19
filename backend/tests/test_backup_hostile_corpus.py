@@ -479,6 +479,25 @@ READ_BEFORE_THE_COLUMNS = {
 }
 
 
+# Fields the dedicated certificate, CA and SSH CA restorers read themselves: text or absent
+HANDLED_FIELDS = sorted(
+    f'{name}.{field}' for name, section in manifest.SECTIONS.items()
+    for field in section.handled.values())
+HANDLED_ROWS = {
+    'certificates': {'refid': 'hc-cert', 'descr': 'hc-cert'},
+    'certificate_authorities': {'refid': 'hc-ca', 'descr': 'hc-ca'},
+    'ssh_cas': {'refid': 'hc-ssh-ca', 'descr': 'hc-ssh-ca'},
+}
+NOT_TEXT = {'list': [MARKER], 'object': {'v': MARKER}, 'integer': 987654321, 'boolean': True}
+# The encrypted key is an object of hex text: text, or an object of anything else, is not one
+NOT_A_KEY = {**NOT_TEXT, 'text': MARKER,
+             'object': {'salt': MARKER, 'nonce': '00', 'ciphertext': '00'},
+             'object of numbers': {'salt': 1, 'nonce': 2, 'ciphertext': 987654321}}
+UNREADABLE = sorted(
+    (field, shape) for field in HANDLED_FIELDS
+    for shape in (NOT_A_KEY if field.endswith('.private_key_pem_encrypted') else NOT_TEXT))
+
+
 @contextmanager
 def _target_for(app, tmp_path, mode):
     """A replacing restore prunes: it runs on an installation no other test wrote to."""
@@ -602,6 +621,48 @@ class TestASectionOfTheWrongTypeIsRefusedByName:
         assert 'webhook_endpoints.auth_token' in message and MARKER not in message
         assert _census() == before
         assert WebhookEndpoint.query.filter_by(name='hc-hook').count() == 0
+
+    @pytest.mark.parametrize('mode', ['merge', 'replace'])
+    @pytest.mark.parametrize('field,shape', UNREADABLE)
+    def test_a_value_its_restorer_cannot_read_in_a_handled_field_writes_nothing(
+            self, target, field, shape, mode):
+        from models import CA, Certificate
+        from models.ssh import SSHCertificateAuthority
+        section, name = field.split('.')
+        value = (NOT_A_KEY if name == 'private_key_pem_encrypted' else NOT_TEXT)[shape]
+        payload = {section: [dict(HANDLED_ROWS[section], **{name: value})]}
+        before = _census()
+        with pytest.raises(RestoreValidationError) as refusal:
+            _service()._restore_payload(payload, b'\0' * 32, mode)
+        db.session.rollback()
+        message = str(refusal.value)
+        assert field in message and MARKER not in message and '987654321' not in message, message
+        assert _census() == before
+        assert SSHCertificateAuthority.query.filter_by(refid='hc-ssh-ca').count() == 0
+        assert CA.query.filter_by(refid='hc-ca').count() == 0
+        assert Certificate.query.filter_by(refid='hc-cert').count() == 0
+
+    @pytest.mark.parametrize('shape', ['integer', 'list'])
+    def test_a_value_that_is_not_text_in_a_pem_answers_400(self, app, auth_client, shape):
+        from models import Certificate
+
+        def mutate(data):
+            data['certificates'] = [dict(HANDLED_ROWS['certificates'],
+                                         certificate_pem=NOT_TEXT[shape])]
+        with app.app_context():
+            blob = _forged([SECTION], mutate=mutate)
+            before = _census()
+
+        response = _restore(auth_client, blob)
+
+        with app.app_context():
+            after = _census()
+            assert Certificate.query.filter_by(refid='hc-cert').count() == 0
+        _assert_refused_cleanly(response, before, after)
+        assert response.status_code == 400, response.data
+        message = _message(response)
+        assert 'certificates.certificate_pem' in message, message
+        assert MARKER not in message and '987654321' not in message, message
 
     def test_a_list_as_a_username_answers_400_naming_the_column(self, app, auth_client):
         def mutate(data):

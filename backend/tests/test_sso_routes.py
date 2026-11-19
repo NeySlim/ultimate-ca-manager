@@ -218,6 +218,35 @@ class TestSSOProviderValidation:
         })
         assert r.status_code == 400
 
+    @pytest.mark.parametrize('name', ['', '   ', None, 5, ['x']])
+    def test_create_refuses_a_name_that_is_not_blank_free_text(self, app, auth_client, name):
+        from models import SSOProvider
+        r = _post(auth_client, '/api/v2/sso/providers', {
+            'name': name, 'provider_type': 'ldap', 'enabled': False,
+            'ldap_server': 'ldap.example.com', 'ldap_base_dn': 'dc=example,dc=com',
+        })
+        with app.app_context():
+            created = SSOProvider.query.filter_by(ldap_server='ldap.example.com').count()
+            SSOProvider.query.filter_by(ldap_server='ldap.example.com').delete()
+            SSOProvider.query.session.commit()
+        assert r.status_code == 400, r.data
+        assert 'Provider name' in get_json(r)['message'], r.data
+        assert created == 0
+
+    @pytest.mark.parametrize('name', ['', '   ', None, 5, ['x']])
+    def test_update_refuses_a_name_that_is_not_blank_free_text(self, app, auth_client, name):
+        listed = get_json(auth_client.get('/api/v2/sso/providers')).get('data', [])
+        saml = next(p for p in listed if p['name'] == 'Test SAML')
+        from models import SSOProvider, db
+        r = _put(auth_client, f'/api/v2/sso/providers/{saml["id"]}', {'name': name})
+        again = get_json(auth_client.get(f'/api/v2/sso/providers/{saml["id"]}'))['data']
+        with app.app_context():
+            db.session.get(SSOProvider, saml['id']).name = 'Test SAML'
+            db.session.commit()
+        assert r.status_code == 400, r.data
+        assert 'Provider name' in get_json(r)['message'], r.data
+        assert again['name'] == 'Test SAML'
+
     def test_create_missing_type(self, auth_client):
         r = _post(auth_client, '/api/v2/sso/providers', {
             'name': 'Missing Type',
