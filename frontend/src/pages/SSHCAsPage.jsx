@@ -802,8 +802,9 @@ function SSHCAModal({ ca, onSave, onClose }) {
       const payload = {
         descr: formData.description,
         ca_type: formData.ca_type,
-        default_ttl: formData.default_ttl || undefined,
-        max_ttl: formData.max_ttl || undefined,
+        // On edit an emptied field is sent as null so the server clears it
+        default_ttl: formData.default_ttl || (ca ? null : undefined),
+        max_ttl: formData.max_ttl || (ca ? null : undefined),
         default_extensions: formData.ca_type === 'user' ? formData.default_extensions : [],
         // An empty list is sent too: on edit, clearing the field must clear it
         allowed_principals: principals,
