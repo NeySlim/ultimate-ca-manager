@@ -129,6 +129,25 @@ describe('realm', () => {
     await waitFor(() => expect(mocks.create).toHaveBeenCalled())
     expect(mocks.create.mock.calls[0][0]).toMatchObject({ name: 'corp', realm: 'CORP.EXAMPLE' })
   })
+
+  it('sends null when a saved realm is emptied, so the server clears it', async () => {
+    renderEditor()
+    await loaded()
+    await waitFor(() => expect(realmInput()).toHaveValue('CORP.EXAMPLE'))
+    fireEvent.change(realmInput(), { target: { value: '' } })
+    fireEvent.click(screen.getByText('common.save'))
+    await waitFor(() => expect(mocks.update).toHaveBeenCalled())
+    expect(mocks.update.mock.calls[0][1]).toHaveProperty('realm', null)
+  })
+
+  it('does not send the realm when it is left untouched', async () => {
+    renderEditor()
+    await loaded()
+    await waitFor(() => expect(realmInput()).toHaveValue('CORP.EXAMPLE'))
+    fireEvent.click(screen.getByText('common.save'))
+    await waitFor(() => expect(mocks.update).toHaveBeenCalled())
+    expect(mocks.update.mock.calls[0][1]).not.toHaveProperty('realm')
+  })
 })
 
 describe('keytab', () => {

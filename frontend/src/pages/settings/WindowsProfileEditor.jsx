@@ -173,6 +173,7 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
     // The API checks the realm/connector pair when either is sent: send them only when changed
     const realm = form.realm.trim()
     if (realm && (isNew || realm !== (detail?.realm || ''))) payload.realm = realm
+    else if (!realm && !isNew && detail?.realm) payload.realm = null
     if (isNew || form.connector_id !== (detail?.connector_id ?? null)) payload.connector_id = form.connector_id
     if (isDefault && form.xcep_password) payload.xcep_password = form.xcep_password
     if (isDefault && form.wstep_password) payload.wstep_password = form.wstep_password
