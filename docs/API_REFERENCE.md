@@ -410,7 +410,7 @@ Content-Type: application/json
 
 { "format": "pkcs12", "password": "at-least-8-chars", "include_chain": true, "include_root": false, "legacy": false }
 ```
-Session only. `format` is `pem` (default) or `pkcs12`/`p12`. PKCS12 is refused on the query-string form with `400` (the password must travel in a POST body); it also needs a stored private key. `legacy` selects the 3DES/SHA-1 profile. Returns the file as a download. `404` when the enrolment is not the caller's (admins may download any).
+Session only. `format` is `pem` (default) or `pkcs12`/`p12`. A PEM download is the certificate alone; it adds the issuing chain (and the root with `include_root=true`) only when `include_chain` or `include_root` is sent in the request, and `include_chain=false` keeps the certificate alone. PKCS12 is refused on the query-string form with `400` (the password must travel in a POST body); it also needs a stored private key. `legacy` selects the 3DES/SHA-1 profile. Returns the file as a download. `404` when the enrolment is not the caller's (admins may download any).
 
 ```http
 POST /api/v2/mtls/enroll
@@ -700,6 +700,8 @@ GET /api/v2/cas/{ca_id}/export?format=pem&include_chain=true&chain_variant=cross
 
 `POST` takes `format`, `include_key`, `include_chain`, `password` (required for the PKCS12, PFX and JKS formats; with `format=pem` and `include_key` or with `key`, it encrypts the key as PKCS#8) and `legacy` in a JSON body. `chain_variant` is `auto` (default: the chain UCM serves), `primary` (the self-signed root)
 or `cross:<id>`; any other value, or one that is not part of the chain of this CA, answers 400.
+
+`include_key` with a format that carries no key (`der`, `p7b`, `pkcs7`) answers `400`. `password` is ignored when the output carries no private key (`der`, `p7b`, `pkcs7`, `pem` without `include_key`). `legacy` applies to `pkcs12` and `pfx` only and is ignored for the other formats: a JKS keeps its own format, the Sun key protector for the key entry and a SHA-1 integrity digest, whatever `legacy` says.
 
 ### Export All CAs
 ```http
@@ -992,6 +994,8 @@ JSON booleans in POST bodies; strings such as `"false"` are rejected.
 `include_key` with `der`, `pkcs7` or `p7b`, and `include_chain` with `der`, answer `400`
 naming the field: those formats carry no key, and DER a single certificate.
 
+`password` is ignored when the output carries no private key (`der`, `pkcs7`/`p7b`, `pem` without `include_key`), and `legacy` applies to PKCS#12/PFX only: the JKS format keeps its own protection (Sun key protector and SHA-1 integrity digest) whatever `legacy` says.
+
 `chain_variant` (`auto` by default, `primary`, or `cross:<id>`) picks the chain a cross-certificate makes
 possible; it is read from the JSON body or the query string. The variants of a certificate are listed in
 `chain_status.variants` of `GET /api/v2/certificates/{cert_id}`. An unknown value, or one that is not part of
@@ -1210,7 +1214,7 @@ POST /api/v2/certificates/export
 ```
 - Reads need `read:certificates`. `lint` checks one stored certificate against `profile` (`rfc5280` by default, `cabf` or `etsi`; `400` for another); `422` when the certificate cannot be linted. `lint/status` reports which linters are available and the accepted `profiles`. `compliance` returns aggregate compliance statistics (score and grade) across all certificates.
 - `submit-ct` (`write:certificates`) submits the certificate to the configured Certificate Transparency logs and returns the `logs` that accepted it with their `timestamp`. `400` when CT is not enabled in the [settings](#certificate-transparency), no valid log is configured, the certificate has no PEM, or no log accepted it.
-- `POST /certificates/export` is the body form of `GET /certificates/export`: `format` (`pem` or `p7b`, else `400`), `password` and `include_chain`; `404` when there is nothing to export.
+- `POST /certificates/export` is the body form of `GET /certificates/export`: `format` (`pem` or `p7b`, else `400`), `password` and `include_chain`; `404` when there is nothing to export. The bulk export carries public certificates only, so `password` and `legacy` are ignored there.
 
 ### Catalogs
 ```http
@@ -1303,7 +1307,7 @@ POST /api/v2/user-certificates/{id}/export
 {"format": "pkcs12", "password": "mypassword", "include_chain": true, "include_root": false}
 ```
 
-With `format=pem` and `include_key`, a `password` (POST) encrypts the key as PKCS#8; without one the key is written in clear.
+With `format=pem` and `include_key`, a `password` (POST) encrypts the key as PKCS#8; without one the key is written in clear. `password` is ignored when the output carries no private key, and `legacy` applies to `pkcs12` only (a JKS keeps the Sun key protector and its SHA-1 integrity digest).
 
 **Query Parameters**:
 | Param | Type | Description |
@@ -1513,7 +1517,7 @@ Content-Type: application/json
 
 { "format": "csr" }
 ```
-Permission `read:csrs`. `format` is `csr` (default) or `key` (the private key, with an optional `password` for an encrypted export); the `GET` form refuses a `password` in the query string (`400`). `400` when the CSR has no private key for `key`; `404` for an unknown CSR.
+Permission `read:csrs`. `format` is `csr` (default) or `key` (the private key, with an optional `password` for an encrypted export, which follows the shared export password rule: 8 to 256 characters, `400` otherwise; an empty one means an unencrypted key). With `format=csr` a `password` is ignored: a request holds no secret. The `GET` form refuses a `password` in the query string (`400`). `400` when the CSR has no private key for `key`; `404` for an unknown CSR.
 
 ```http
 POST /api/v2/csrs/{csr_id}/resubmit
@@ -2091,7 +2095,7 @@ POST /api/v2/microsoft-cas/test
 POST /api/v2/microsoft-cas/{id}/test
 ```
 - Permissions: the list, `GET /{id}` need `read:settings`; `enabled` (the enabled connections, for the signing dialog) needs `read:certificates`; `POST`, `PUT` and the two tests need `write:settings`; `DELETE` needs `delete:settings`.
-- `POST` fields: `name` (required, unique: `409`), `server` (required hostname), `auth_method` (`certificate` by default, `kerberos` or `basic`, else `400`), `ca_name`, `use_ssl` and `verify_ssl` (both default true), `ca_bundle`, `default_template` (`WebServer`), `enabled` (true), `username` and `password` (basic), `client_cert_pem` and `client_key_pem` (certificate), `kerberos_principal` and `kerberos_keytab_path`, `crl_sync_enabled`, `crl_url`, `inventory_sync_enabled`, and the WinRM admin channel fields `winrm_enabled`, `winrm_host`, `winrm_port`, `winrm_use_ssl`, `winrm_verify_ssl`, `winrm_transport`, `winrm_username`, `winrm_password`. `PUT` is a partial update of the same fields; a masked secret sent back keeps the stored one.
+- `POST` fields: `name` (required, unique: `409`), `server` (required hostname), `auth_method` (`certificate` by default, `kerberos` or `basic`, else `400`), `ca_name`, `verify_ssl` (default true), `ca_bundle` (the PEM that signs the CA web server certificate, used while `verify_ssl` is true), `use_ssl` (stored but without effect: enrollment always uses HTTPS), `default_template` (`WebServer`), `enabled` (true), `username` and `password` (basic), `client_cert_pem` and `client_key_pem` (certificate), `kerberos_principal` (the identity Kerberos authenticates as, when the cache or keytab holds several) and `kerberos_keytab_path`, `crl_sync_enabled`, `crl_url`, `inventory_sync_enabled`, and the WinRM admin channel fields `winrm_enabled`, `winrm_host`, `winrm_port`, `winrm_use_ssl`, `winrm_verify_ssl`, `winrm_transport`, `winrm_username`, `winrm_password`. `PUT` is a partial update of the same fields; a masked secret sent back keeps the stored one.
 - `DELETE` answers `204`, or `409` while requests are pending on the connection.
 - `POST /test` checks the connection with the submitted values before saving (`server` required); `POST /{id}/test` checks a saved one. With no body it tests the saved values and records the result; with a JSON body of form values (`server`, `ca_name`, `auth_method`, `username`, `password`, `client_cert_pem`, `client_key_pem`, `kerberos_principal`, `kerberos_keytab_path`, `use_ssl`, `verify_ssl`, `ca_bundle`) it tests those, takes a secret left out or masked from the saved connection, saves nothing, and refuses with `400` a saved password that would go to another server, TLS setting or account unless it is retyped (the rule of `PUT`). Both answer `400` with the error when the check fails.
 
@@ -3260,6 +3264,7 @@ Content-Type: application/json
   "private_key": "-----BEGIN PRIVATE KEY-----\n..."
 }
 ```
+`password` opens an encrypted input (PKCS#12, encrypted key). `output_password` (the older name `pkcs12_password` is still accepted; two different values answer `400`) protects the OUTPUT: it is required for `pkcs12` and `jks`, and encrypts a private key written as `pem` (PKCS#8, 8 to 256 characters, else `400`). A `der` output that would carry a private key refuses an `output_password` with `400`; with a certificate or a request in `der`, or a `pem` without a key, it is ignored.
 
 ### Backup Operations
 ```http
@@ -3505,7 +3510,7 @@ POST /api/v2/system/security/rate-limit/reset
   "whitelist_remove": ["192.0.2.11"]
 }
 ```
-`burst` defaults to a third of `rpm`. In HA mode the change is stored and applied on every node. `stats` (`read:settings`) returns the counters. `reset` (`admin:system`) clears the buckets, of one address with `{"ip": "..."}` or all, and the statistics too with `{"reset_stats": true}`.
+`burst` defaults to a third of `rpm`. The change is stored in the database, so it survives a restart, and read again when UCM starts; in HA mode it is also applied on every node. Only the process that answers applies it at once; any other worker process reads it when it starts. `stats` (`read:settings`) returns the counters. `reset` (`admin:system`) clears the buckets, of one address with `{"ip": "..."}` or all, and the statistics too with `{"reset_stats": true}`.
 
 ### Audit Retention
 ```http
@@ -3995,8 +4000,8 @@ Content-Type: application/json
   "pem": "-----BEGIN CERTIFICATE-----\n...",
   "input_type": "pem",
   "output_format": "pkcs12",
-  "password": "output-password",
-  "pkcs12_password": "pkcs12-password",
+  "password": "input-password",
+  "output_password": "output-password",
   "chain": "-----BEGIN CERTIFICATE-----\n...",
   "private_key": "-----BEGIN PRIVATE KEY-----\n..."
 }
