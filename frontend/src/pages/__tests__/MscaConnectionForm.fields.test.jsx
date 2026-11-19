@@ -1,6 +1,6 @@
 /** Microsoft CA form: every field shown has an effect on the server. */
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import './pageRenderingSetup.jsx'
 
 import MscaConnectionForm from '../settings/MscaConnectionForm'
@@ -21,5 +21,15 @@ describe('Microsoft CA form fields', () => {
   it('hides the CA bundle while TLS verification is off (it is not used then)', () => {
     renderForm({ verify_ssl: false })
     expect(screen.queryByText('msca.caBundle')).not.toBeInTheDocument()
+  })
+
+  it('has no HTTPS switch: the enrollment client only speaks HTTPS', () => {
+    const onSave = vi.fn()
+    const { container } = render(
+      <MscaConnectionForm connection={{ ...BASE }} onSave={onSave} onCancel={() => {}} />)
+    expect(screen.queryByText('msca.useSsl')).not.toBeInTheDocument()
+    fireEvent.submit(container.querySelector('form'))
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(onSave.mock.calls[0][0]).not.toHaveProperty('use_ssl')
   })
 })

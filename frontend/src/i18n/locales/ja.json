@@ -5574,7 +5574,6 @@
     "kerberosKeytabPlaceholder": "/etc/krb5.keytab",
     "defaultTemplate": "デフォルト証明書テンプレート",
     "defaultTemplatePlaceholder": "WebServer",
-    "useSsl": "HTTPSを使用",
     "verifySsl": "SSL証明書を検証",
     "caBundle": "カスタムCAバンドル (PEM)",
     "testConnection": "接続テスト",

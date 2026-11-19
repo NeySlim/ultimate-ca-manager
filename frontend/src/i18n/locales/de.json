@@ -5571,7 +5571,6 @@
     "kerberosKeytabPlaceholder": "/etc/krb5.keytab",
     "defaultTemplate": "Standard-Zertifikatvorlage",
     "defaultTemplatePlaceholder": "WebServer",
-    "useSsl": "HTTPS verwenden",
     "verifySsl": "SSL-Zertifikat überprüfen",
     "caBundle": "Benutzerdefiniertes CA-Bundle (PEM)",
     "testConnection": "Verbindung testen",

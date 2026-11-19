@@ -36,7 +36,6 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
     client_key_pem: '',
     kerberos_principal: connection?.kerberos_principal || '',
     kerberos_keytab_path: connection?.kerberos_keytab_path || '',
-    use_ssl: connection?.use_ssl ?? true,
     verify_ssl: connection?.verify_ssl ?? true,
     ca_bundle: connection?.ca_bundle || '',
     default_template: connection?.default_template || '',
@@ -91,7 +90,7 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
     saved: savedForm, current: formData, secret: formData.password,
     secretSaved: Boolean(connection?.auth_method === 'basic' && connection?.password
       && formData.auth_method === 'basic'),
-    fields: ['server', 'use_ssl', 'verify_ssl', 'ca_bundle', 'username',
+    fields: ['server', 'verify_ssl', 'ca_bundle', 'username',
       ...(connection?.winrm_password || typedSecret(formData.winrm_password) ? [] : WINRM_TARGET)],
   }
 
@@ -279,10 +278,6 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
 
       {/* SSL Settings */}
       <div className="flex items-center gap-4">
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={formData.use_ssl} onChange={(e) => updateField('use_ssl', e.target.checked)} className="rounded" />
-          {t('msca.useSsl')}
-        </label>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={formData.verify_ssl} onChange={(e) => updateField('verify_ssl', e.target.checked)} className="rounded" />
           {t('msca.verifySsl')}

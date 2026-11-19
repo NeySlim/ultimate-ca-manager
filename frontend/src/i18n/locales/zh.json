@@ -5571,7 +5571,6 @@
     "kerberosKeytabPlaceholder": "/etc/krb5.keytab",
     "defaultTemplate": "默认证书模板",
     "defaultTemplatePlaceholder": "WebServer",
-    "useSsl": "使用 HTTPS",
     "verifySsl": "验证 SSL 证书",
     "caBundle": "自定义 CA 包 (PEM)",
     "testConnection": "测试连接",
