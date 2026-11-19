@@ -119,3 +119,8 @@ tests/test_sso_sign_in_test*.py
 tests/test_ca_deletion_setting_refs.py
 tests/test_restore_transaction_plans.py
 tests/test_user_certificates_list.py
+tests/test_scep_requests_list.py
+tests/test_ssh_ca_list_all.py
+tests/test_truststore_export_purpose.py
+tests/test_discovery_export_filters.py
+tests/test_like_search_literal.py
