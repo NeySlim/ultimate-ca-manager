@@ -19,9 +19,36 @@ from utils.access_log import RedactingLogger, redact_url
     ('/api/v2/certificates?page=2', '/api/v2/certificates?page=2'),
     ('/api/v2/x?mytoken=keep', '/api/v2/x?mytoken=keep'),
     ('-', '-'),
+    ('/api/v2/csrs/4/export?format=key&password=Pw1', '/api/v2/csrs/4/export?format=key&password=[REDACTED]'),
+    ('/api/v2/certificates/4/export?Password=Pw1&format=pem',
+     '/api/v2/certificates/4/export?Password=[REDACTED]&format=pem'),
+    ('/api/v2/cas/4/export?PASSPHRASE=Pw1', '/api/v2/cas/4/export?PASSPHRASE=[REDACTED]'),
+    ('/api/v2/x?pkcs12_password=Pw1&a=1', '/api/v2/x?pkcs12_password=[REDACTED]&a=1'),
+    # The name as the server decodes it, however the URL spells it
+    ('/api/v2/csrs/4/export?pass%77ord=Pw1&format=key', '/api/v2/csrs/4/export?pass%77ord=[REDACTED]&format=key'),
+    ('/api/v2/csrs/4/export?password%5B%5D=Pw1', '/api/v2/csrs/4/export?password%5B%5D=[REDACTED]'),
+    ('/api/v2/csrs/4/export?password+=Pw1', '/api/v2/csrs/4/export?password+=[REDACTED]'),
+    ('/reset-password?%74oken=abc', '/reset-password?%74oken=[REDACTED]'),
+    ('/api/v2/x?pass%2Bword=keep', '/api/v2/x?pass%2Bword=keep'),
+    # A second "?" typed for "&": the secret parameter behind it is still one
+    ('/reset-password?lang=fr?token=abc', '/reset-password?lang=fr?token=[REDACTED]'),
+    ('/api/v2/certificates/4/export?format=key?password=S3cret',
+     '/api/v2/certificates/4/export?format=key?password=[REDACTED]'),
+    ('/cb?x=1?code=abc&state=s', '/cb?x=1?code=[REDACTED]&state=[REDACTED]'),
+    ('/reset-password?token=ab?cd=ef', '/reset-password?token=[REDACTED]'),
 ])
 def test_redact_url(url, expected):
     assert redact_url(url) == expected
+
+
+def test_a_long_run_of_question_marks_is_still_read_to_its_end():
+    """The line is masked whatever its length: a URL cannot make the log drop its own request."""
+    url = '/x?x=1' + '?a=' * 1300 + '?token=abc&b=2'
+    assert redact_url(url) == '/x?x=1' + '?a=' * 1300 + '?token=[REDACTED]&b=2'
+
+
+def test_a_name_cut_by_a_question_mark_does_not_hide_the_parameter_behind_it():
+    assert redact_url('/x?a?token=abc') == '/x?a?token=[REDACTED]'
 
 
 def test_the_gunicorn_line_carries_no_token():
