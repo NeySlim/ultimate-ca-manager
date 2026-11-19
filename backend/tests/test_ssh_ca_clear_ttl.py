@@ -1,4 +1,8 @@
-"""The default and maximum validity of an SSH CA can be emptied again."""
+"""The default and maximum validity of an SSH CA can be emptied again.
+
+The two `null` tests are guards: the server already cleared on `null`, the
+fix was the form sending it (SSHCAsPage.clearTtl.test.jsx proves that one).
+"""
 import pytest
 
 from tests.test_ssh import _generate_test_ssh_key, post_json, put_json
@@ -50,3 +54,22 @@ def test_an_emptied_maximum_stops_capping(auth_client):
     span = (datetime.fromisoformat(d['valid_to'].replace('Z', '+00:00'))
             - datetime.fromisoformat(d['valid_from'].replace('Z', '+00:00'))).total_seconds()
     assert span > 7200
+
+
+def test_an_emptied_default_signs_for_the_default_of_the_ca_type(auth_client):
+    """A host CA without a default signs for a year, as one created without it."""
+    from datetime import datetime
+    r = post_json(auth_client, '/api/v2/ssh/cas', {
+        'descr': 'Host TTL CA', 'ca_type': 'host', 'key_type': 'ed25519',
+        'allow_any_principal': True, 'default_ttl': '8h'})
+    assert r.status_code == 201, r.data
+    ca_id = r.get_json()['data']['id']
+    put_json(auth_client, f'/api/v2/ssh/cas/{ca_id}', {'default_ttl': None})
+    r = post_json(auth_client, '/api/v2/ssh/certificates', {
+        'ca_id': ca_id, 'public_key': _generate_test_ssh_key(), 'cert_type': 'host',
+        'principals': ['host.example']})
+    assert r.status_code == 201, r.data
+    d = r.get_json()['data']
+    span = (datetime.fromisoformat(d['valid_to'].replace('Z', '+00:00'))
+            - datetime.fromisoformat(d['valid_from'].replace('Z', '+00:00'))).total_seconds()
+    assert span >= 365 * 86400
