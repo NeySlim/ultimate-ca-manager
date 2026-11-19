@@ -430,6 +430,37 @@ def test_a_moved_server_needs_the_saved_secret_retyped(app, auth_client, method,
 
 # --- A Kerberos sign-in that cannot start now: nothing was sent, nothing is recorded ---
 
+def _signing_fails_with(app, monkeypatch, error):
+    """A Kerberos connection and a CSR whose submission raises ``error``: (connection id, CSR id)."""
+    from services.cert_service import CertificateService
+
+    def factory(**kwargs):
+        client = MagicMock()
+        client.get_cert.side_effect = error
+        return client
+
+    monkeypatch.setitem(sys.modules, 'certsrv', SimpleNamespace(Certsrv=factory))
+    monkeypatch.setitem(sys.modules, 'requests_kerberos',
+                        SimpleNamespace(HTTPKerberosAuth=type('Auth', (), {'__init__': lambda self, **kw: None}),
+                                        OPTIONAL=1))
+    row_id = _row(app)
+    with app.app_context():
+        csr_id = CertificateService.generate_csr(descr='krb-sign', dn={'CN': f'krb-{uuid.uuid4().hex[:8]}.test.local'},
+                                                 key_type='2048').id
+        db.session.commit()
+    return row_id, csr_id
+
+
+def test_another_signing_error_keeps_its_failed_request(app, operator_client, monkeypatch):
+    from models.msca import MSCARequest
+    row_id, csr_id = _signing_fails_with(app, monkeypatch, RuntimeError('CA unreachable'))
+    r = _send(operator_client, 'post', f'{BASE}/{row_id}/sign/{csr_id}', {'template': 'WebServer'})
+    assert r.status_code == 500, r.data
+    with app.app_context():
+        assert [(q.status, q.error_message) for q in MSCARequest.query.filter_by(msca_id=row_id)] == [
+            ('failed', 'CA unreachable')]
+
+
 def test_a_busy_kerberos_sign_in_at_signing_is_a_503_without_a_request(app, operator_client, monkeypatch):
     from models.msca import MSCARequest
     from services.cert_service import CertificateService
