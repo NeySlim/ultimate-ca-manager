@@ -452,6 +452,10 @@ def create_ca():
         if local_alg is not None and not local_alg.fips_approved:
             fips_mode.refuse(f'{local_alg.display} keys')
 
+        # An intermediate without a parent would be created as a self-signed root
+        if data.get('type') == 'intermediate' and not data.get('parentCAId'):
+            return error_response('parentCAId is required for an intermediate CA', 400)
+
         # Resolve parent CA for intermediate CAs
         caref = None
         if data.get('type') == 'intermediate' and data.get('parentCAId'):

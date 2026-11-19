@@ -307,6 +307,8 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const profileHorizon = createFormType !== 'external' ? horizons[horizonLabel] : null
   const pastProfileHorizon = Boolean(profileHorizon) && Number.isFinite(validityDaysValue)
     && Date.now() + validityDaysValue * 86400000 > Date.parse(profileHorizon) + 86400000
+  // An intermediate is signed by a parent: without one the server refuses it
+  const missingParent = createFormType === 'intermediate' && !createFormParentCAId
   const policyBlocksCreate = noDigestAllowed || noSchemeAllowed || (keyStorage === 'local'
     ? noKeyAllowed
     : createFormHsmKeyMode === 'generate' && hsmAlgorithmOptions.length === 0)
@@ -342,7 +344,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
 
   const handleCreateCA = async (e) => {
     e.preventDefault()
-    if (creatingRef.current) return
+    if (creatingRef.current || missingParent) return
     creatingRef.current = true
     setCreating(true)
     try {
@@ -892,7 +894,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
           <Button
             type="submit"
             disabled={
-              creating || policyBlocksCreate || (
+              creating || policyBlocksCreate || missingParent || (
               keyStorage === 'hsm' && (
                 hsmProviders.length === 0 ||
                 (createFormHsmKeyMode === 'existing' && !!createFormHsmProviderId && usableHsmKeys.length === 0)

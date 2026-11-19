@@ -64,6 +64,7 @@ export function Select({
   placeholder = 'Select...',
   error,
   disabled = false,
+  required = false,
   size = 'default',
   variant = 'default', // default, filter, minimal
   className,
@@ -75,7 +76,10 @@ export function Select({
   const rawChange = onValueChange || onChange
   const handleChange = rawChange ? (v) => rawChange(fromInternal(v)) : undefined
   const hasValue = value && value !== ''
-  
+  // Radix's own form control falls back to its first option, so `required`
+  // is enforced by a hidden input that is empty until something is chosen.
+  const unchosen = required && (value == null || (value === '' && !options.some(o => o.value === '')))
+
   const triggerStyles = cn(
     // Base styles
     'flex items-center justify-between rounded-md border',
@@ -109,10 +113,11 @@ export function Select({
       {label && (
         <label className="block text-sm font-medium text-text-primary">
           {label}
+          {required && <span className="status-danger-text"> *</span>}
         </label>
       )}
 
-      <SelectPrimitive.Root value={value == null ? value : toInternal(value)} onValueChange={handleChange} disabled={disabled}>
+      <SelectPrimitive.Root value={value == null ? value : toInternal(value)} onValueChange={handleChange} disabled={disabled} required={required}>
         <SelectPrimitive.Trigger className={triggerStyles}>
           <SelectPrimitive.Value placeholder={placeholder} />
           <SelectPrimitive.Icon>
@@ -179,6 +184,17 @@ export function Select({
           </SelectPrimitive.Content>
         </SelectPrimitive.Portal>
       </SelectPrimitive.Root>
+
+      {required && (
+        <input
+          tabIndex={-1}
+          aria-hidden="true"
+          required
+          onChange={() => {}}
+          value={unchosen ? '' : '1'}
+          className="sr-only"
+        />
+      )}
 
       {error && (
         <p className="text-xs status-danger-text">{error}</p>

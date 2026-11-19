@@ -577,6 +577,8 @@ resolving). Returned as `url_slug` (null when not opted in).
 }
 ```
 
+`parentCAId` is required for `type: intermediate`: without it the request answers `400` instead of creating a self-signed root. A `root` or `external` (CSR) CA takes none.
+
 ### Get CA Details
 ```http
 GET /api/v2/cas/{ca_id}

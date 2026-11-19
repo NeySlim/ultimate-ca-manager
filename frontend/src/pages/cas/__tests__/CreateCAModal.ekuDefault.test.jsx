@@ -56,14 +56,17 @@ vi.mock('../../../components', () => ({
 
 import { CreateCAModal } from '../CreateCAModal'
 
+const CAS = [{ id: 1, name: 'Signing CA', has_private_key: true }]
+
 async function openIntermediate() {
   mocks.getProviders.mockResolvedValue({ data: [] })
   mocks.create.mockResolvedValue({ data: { id: 1 } })
-  render(<CreateCAModal open onClose={vi.fn()} cas={[]} onSuccess={vi.fn()} />)
+  render(<CreateCAModal open onClose={vi.fn()} cas={CAS} onSuccess={vi.fn()} />)
   fireEvent.change(screen.getByLabelText('common.commonName (CN)'), {
     target: { value: 'Org Issuing CA' },
   })
   fireEvent.change(screen.getByLabelText('common.type'), { target: { value: 'intermediate' } })
+  fireEvent.change(screen.getByLabelText('cas.parentCA'), { target: { value: '1' } })
 }
 
 async function submittedPayload() {
