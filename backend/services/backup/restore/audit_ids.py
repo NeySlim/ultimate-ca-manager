@@ -9,7 +9,7 @@ entries here, and the report says that those do not verify.
 import json
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import text
+from sqlalchemy import func, text
 
 from models import db
 
@@ -19,6 +19,7 @@ SECTION = 'audit_logs'
 # Half the range of the column, an integer on PostgreSQL: an archive cannot bring the
 # sequence to its end, after which no entry would be written
 ID_LIMIT = 2 ** 30
+COLUMN_LIMIT = 2 ** 31 - 1
 KEYED_CHAIN = 2
 
 OTHER_KEY = ("{count} audit log entries sealed under another master key cannot be verified "
@@ -30,11 +31,20 @@ IMPORTED = ("{count} audit log entries imported from the archive do not verify o
             "installation: a merge writes them under new ids, which their seal covers")
 
 
-def carried_ids(rows: Optional[List[Dict[str, Any]]]) -> bool:
+def ceiling(replacing: bool) -> int:
+    """The highest archived id taken. A replacement writes the ids: ID_LIMIT, or the highest
+    id here once this server is past it (its own backups). A merge takes none from the archive."""
+    if not replacing:
+        return COLUMN_LIMIT
+    from models import AuditLog
+    return max(ID_LIMIT, db.session.query(func.max(AuditLog.id)).scalar() or 0)
+
+
+def carried_ids(rows: Optional[List[Dict[str, Any]]], highest: int = COLUMN_LIMIT) -> bool:
     """Whether every archived entry carries its id (False when none does).
 
-    Anything else is refused before the first write: an id that is not a whole number in
-    the column's range, one repeated, or an id on some rows and not on others."""
+    Anything else is refused before the first write: an id that is not a whole number from
+    1 to `highest`, one repeated, or an id on some rows and not on others."""
     carrying = None
     seen = set()
     for position, row in enumerate(rows or []):
@@ -49,10 +59,10 @@ def carried_ids(rows: Optional[List[Dict[str, Any]]]) -> bool:
         if not has:
             continue
         value = row['id']
-        if type(value) is not int or not 1 <= value <= ID_LIMIT:
+        if type(value) is not int or not 1 <= value <= highest:
             raise RestoreValidationError(
                 f"Invalid backup: row {position} of section '{SECTION}' holds an id that is "
-                f"not a whole number from 1 to {ID_LIMIT}; nothing has been changed")
+                f"not a whole number from 1 to {highest}; nothing has been changed")
         if value in seen:
             raise RestoreValidationError(
                 f"Invalid backup: row {position} of section '{SECTION}' repeats the id "

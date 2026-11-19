@@ -330,7 +330,6 @@ HOSTILE = {
     'negative': _set_first(-3),
     'zero': _set_first(0),
     'huge': _set_first(2 ** 31),
-    'past-the-limit': _set_first(ID_LIMIT + 1),
     'null': _set_first(None),
     'duplicate': _duplicate,
     'some-without': _one_without,
@@ -383,10 +382,39 @@ def test_only_keys_the_ledger_rotated_from_count_as_known(rows, counted):
 class TestTheCounterKeepsItsRoom:
     def test_the_last_number_of_the_column_is_refused(self):
         """An archive cannot bring the id counter to its end: half its range stays free."""
-        assert carried_ids([{'id': ID_LIMIT}]) is True
+        assert carried_ids([{'id': ID_LIMIT}], ID_LIMIT) is True
         assert 2 ** 31 - 1 - ID_LIMIT >= 2 ** 30 - 1
         with pytest.raises(RestoreValidationError, match='audit_logs'):
-            carried_ids([{'id': 2 ** 31 - 1}])
+            carried_ids([{'id': ID_LIMIT + 1}], ID_LIMIT)
+
+    def test_an_archive_past_the_limit_is_refused_in_a_replacement_and_still_merges(self, world):
+        source, target = world('source'), world('target')
+        with source.on():
+            _source_entries(2, first_id=ID_LIMIT)
+            blob = _backup()
+        with target.on():
+            _entries('target', 2)
+            before = _ledger()
+            with pytest.raises(RestoreValidationError, match=f'audit_logs.*1 to {ID_LIMIT};'):
+                _restore(blob)
+            db.session.rollback()
+            assert _ledger() == before
+            # A merge takes no id from the archive: nothing to bound
+            results = _restore(blob, 'merge')
+            assert _audit_warnings(results) == [IMPORTED.format(count=2)]
+            assert max(entry_id for entry_id, _action, _seal in _ledger()) < ID_LIMIT
+
+    def test_a_server_already_past_the_limit_restores_its_own_backup(self, world):
+        here = world('here')
+        with here.on():
+            _source_entries(2, first_id=ID_LIMIT)
+            archived = _ledger()
+            blob = _backup()
+            _entries('since', 1)
+            results = _restore(blob)
+            assert _ledger() == archived and _audit_warnings(results) == []
+            _log('after_restore')
+            assert _verify()['error_count'] == 0
 
     def test_entries_are_still_written_after_the_highest_id_accepted(self, world):
         """Proof on PostgreSQL, whose sequence ends; SQLite numbers past it either way."""

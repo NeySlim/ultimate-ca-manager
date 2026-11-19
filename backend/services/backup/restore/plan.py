@@ -85,8 +85,9 @@ class RestorePlan:
         plan.pruned = frozenset(pruned)
         plan.same_installation = same_installation(backup_data)
         plan._validate_shape(backup_data)
-        from .audit_ids import SECTION as _AUDIT, carried_ids
-        plan.keep_audit_ids = carried_ids(plan.rows.get(_AUDIT)) and _AUDIT in plan.pruned
+        from .audit_ids import SECTION as _AUDIT, carried_ids, ceiling
+        replacing = _AUDIT in plan.pruned
+        plan.keep_audit_ids = carried_ids(plan.rows.get(_AUDIT), ceiling(replacing)) and replacing
         plan._index_target_rows(backup_data)
         plan._warn_shared_identities(pruned)
         return plan
