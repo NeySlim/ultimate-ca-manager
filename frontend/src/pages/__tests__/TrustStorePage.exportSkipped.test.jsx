@@ -77,6 +77,7 @@ vi.mock('../../components/ui/responsive', () => ({
     <div>
       {toolbarActions}
       <button onClick={() => toolbarFilters[0].onChange(['custom'])}>only-custom</button>
+      <button onClick={() => toolbarFilters[1].onChange(['expired'])}>only-expired</button>
       {multiSelect && data.map((row) => (
         <input
           key={row.id} type="checkbox" aria-label={`select-${row.id}`}
@@ -135,13 +136,21 @@ describe('TrustStorePage bundle export', () => {
     renderPage()
     fireEvent.click(await screen.findByText('only-custom'))
     fireEvent.click(await screen.findByTitle('trustStore.exportBundle'))
-    await waitFor(() => expect(exportBundle).toHaveBeenCalledWith('pem', ['custom']))
+    await waitFor(() => expect(exportBundle).toHaveBeenCalledWith('pem', ['custom'], []))
   })
 
   it('exports everything with no filter', async () => {
     exportBundle.mockReset().mockResolvedValue(bundle(0))
     renderPage()
     fireEvent.click(await screen.findByTitle('trustStore.exportBundle'))
-    await waitFor(() => expect(exportBundle).toHaveBeenCalledWith('pem', 'all'))
+    await waitFor(() => expect(exportBundle).toHaveBeenCalledWith('pem', 'all', []))
+  })
+
+  it('exports the expiry states the filter shows', async () => {
+    exportBundle.mockReset().mockResolvedValue(bundle(0))
+    renderPage()
+    fireEvent.click(await screen.findByText('only-expired'))
+    fireEvent.click(await screen.findByTitle('trustStore.exportBundle'))
+    await waitFor(() => expect(exportBundle).toHaveBeenCalledWith('pem', 'all', ['expired']))
   })
 })

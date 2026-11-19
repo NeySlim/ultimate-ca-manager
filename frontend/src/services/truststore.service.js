@@ -53,10 +53,11 @@ export const truststoreService = {
     return this.remove(id)
   },
 
-  async exportBundle(format = 'pem', purpose = 'all') {
-    // One purpose or a list: a repeated parameter asks for several
+  async exportBundle(format = 'pem', purpose = 'all', expiry = []) {
+    // One purpose or a list, and the expiry states shown: a repeated parameter asks for several
     const purposes = (Array.isArray(purpose) ? purpose : [purpose]).map(encodeURIComponent)
-    return apiClient.get(`/truststore/export?format=${format}&${purposes.map((p) => `purpose=${p}`).join('&')}`, {
+    const expiries = expiry.map((e) => `&expiry=${encodeURIComponent(e)}`).join('')
+    return apiClient.get(`/truststore/export?format=${format}&${purposes.map((p) => `purpose=${p}`).join('&')}${expiries}`, {
       responseType: 'blob'
     })
   },
