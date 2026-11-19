@@ -30,6 +30,7 @@ from auth.unified import require_auth, has_permission
 # so the administrator half of the rule below answered no to everyone.
 from utils.response import success_response, error_response, created_response
 from utils.export_password import validate_export_password
+from utils.password_field import password_type_error
 from utils.key_codec import load_pem_bytes
 from utils.datetime_utils import utc_now
 from utils.db_transaction import safe_commit
@@ -224,6 +225,9 @@ def recover_key(rid):
         return error_response('Only the requester or an admin may recover this key', 403)
 
     data = request.get_json(silent=True) or {}
+    type_err = password_type_error(data.get('password'))
+    if type_err:
+        return error_response(type_err, 400)
     password = data.get('password') or ''
     pw_err = validate_export_password(password)
     if pw_err:

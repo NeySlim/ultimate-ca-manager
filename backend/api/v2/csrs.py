@@ -16,6 +16,7 @@ from services.cert.unique_subject import OVERRIDE_FIELD, SubjectTaken, override_
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils import notices as notices_mod
 from utils.export_password import validate_export_password
+from utils.password_field import password_type_error
 from utils.pagination import parse_request_pagination
 from utils.dn_validation import validate_dn_field
 from utils.san_parse import is_valid_san_email
@@ -805,6 +806,9 @@ def export_csr(csr_id):
     if request.method == 'POST' and request.is_json:
         data = request.get_json(silent=True) or {}
         export_format = str(data.get('format') or 'csr').lower()
+        type_err = password_type_error(data.get('password'))
+        if type_err:
+            return error_response(type_err, 400)
         password = data.get('password') or None
     else:
         export_format = (request.args.get('format') or 'csr').lower()

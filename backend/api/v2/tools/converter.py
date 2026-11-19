@@ -11,6 +11,7 @@ import fips_mode
 from fips_mode import FipsRestricted
 from utils.response import success_response, error_response
 from utils.export_password import validate_export_password
+from utils.password_field import password_type_error
 from utils.algorithm_refusal import refuse_unexportable_key
 from utils.key_codec import refuse_eddsa_key
 from utils.certificate_readability import UnreadableCertificate
@@ -35,10 +36,12 @@ def convert_certificate():
     output_format = data.get('output_format', 'pem')
     password = data.get('password', '') or None
     # output_password is the neutral name of pkcs12_password: the password of the OUTPUT (PEM key, PKCS#12, JKS)
+    for field in ('output_password', 'pkcs12_password'):
+        type_err = password_type_error(data.get(field), field)
+        if type_err:
+            return error_response(type_err, 400)
     output_password = data.get('output_password') or ''
     pkcs12_password = data.get('pkcs12_password') or ''
-    if not isinstance(output_password, str) or not isinstance(pkcs12_password, str):
-        return error_response('output_password must be a string', 400)
     if output_password and pkcs12_password and output_password != pkcs12_password:
         return error_response('Send the output password as output_password only', 400)
     pkcs12_password = output_password or pkcs12_password

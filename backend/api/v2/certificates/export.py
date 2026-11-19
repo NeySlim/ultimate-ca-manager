@@ -29,6 +29,7 @@ from models.truststore import TrustedCertificate
 from utils.response import success_response, error_response
 from utils.export_password import (export_password_policy,
                                    validate_export_password)
+from utils.password_field import password_type_error
 from utils.sanitize import content_disposition
 from utils.key_codec import load_pem_bytes
 from utils.cert_issuer import (
@@ -361,6 +362,9 @@ def export_certificate(cert_id):
             legacy_value = json_boolean(data, 'legacy', False)
         except ValueError as exc:
             return error_response(str(exc), 400)
+        type_err = password_type_error(data.get('password'))
+        if type_err:
+            return error_response(type_err, 400)
         password = data.get('password')
         # PKCS#12 compatibility profile (3DES/SHA-1) for importers that
         # reject the AES-256/SHA-256 default (#331)
