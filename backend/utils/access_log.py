@@ -1,5 +1,6 @@
 """Gunicorn access log that keeps secrets carried in a URL out of the file."""
 import re
+from urllib.parse import unquote_plus
 
 from gunicorn.glogging import Logger
 
@@ -9,16 +10,21 @@ SECRET_PARAMS = ('token', 'code', 'state', 'access_token', 'id_token', 'refresh_
 # Any parameter whose name holds one of these: a password refused in a URL still reaches the log
 SECRET_NAME_PARTS = ('password', 'passphrase')
 
-_SECRET_VALUE = re.compile(
-    r'([?&;](?:%s|[\w.-]*(?:%s)[\w.-]*)=)[^&;#\s"]*'
-    % ('|'.join(SECRET_PARAMS), '|'.join(SECRET_NAME_PARTS)), re.IGNORECASE)
+_PARAM = re.compile(r'([?&;])([^=&;#\s"]*)=([^&;#\s"]*)')
+
+
+def _secret_name(raw):
+    """Judged on the name the server decodes, so `pass%77ord` or `password[]` is a password."""
+    name = unquote_plus(raw).lower()
+    return name in SECRET_PARAMS or any(part in name for part in SECRET_NAME_PARTS)
 
 
 def redact_url(value):
     """``value`` with the secret query values replaced; anything else unchanged."""
     if not isinstance(value, str) or '=' not in value:
         return value
-    return _SECRET_VALUE.sub(r'\1[REDACTED]', value)
+    return _PARAM.sub(
+        lambda m: f'{m[1]}{m[2]}=[REDACTED]' if _secret_name(m[2]) else m[0], value)
 
 
 class RedactingLogger(Logger):
