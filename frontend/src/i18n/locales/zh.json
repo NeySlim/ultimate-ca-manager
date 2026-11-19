@@ -4058,6 +4058,7 @@
     "testConnection": "测试连接",
     "testConnectionSuccess": "连接成功",
     "testConnectionFailed": "连接失败",
+    "saveBeforeTest": "Save the provider first: the test runs on the saved settings",
     "testMapping": "测试映射",
     "testMappingDesc": "输入用户名以测试LDAP组解析和角色映射，无需登录。",
     "testMappingUserPlaceholder": "要测试的LDAP用户名",

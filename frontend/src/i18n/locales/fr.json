@@ -3879,6 +3879,7 @@
     "testMappingNotChecked": "Non vérifiés ici : le mot de passe, et le compte UCM que la connexion ouvrirait (un compte du même nom que cette identité ne peut pas ouvrir, un compte désactivé dans UCM, la création automatique de comptes désactivée, un e-mail qui appartient à un compte d'un autre fournisseur ou absent).",
     "testConnectionSuccess": "Connexion réussie",
     "testConnectionFailed": "Échec de la connexion",
+    "saveBeforeTest": "Save the provider first: the test runs on the saved settings",
     "testMappingFailed": "Échec du test de mapping",
     "connectionSection": "Connexion",
     "userSearchSection": "Recherche utilisateur",

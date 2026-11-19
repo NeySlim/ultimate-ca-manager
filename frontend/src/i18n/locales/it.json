@@ -4058,6 +4058,7 @@
     "testConnection": "Testa connessione",
     "testConnectionSuccess": "Connessione riuscita",
     "testConnectionFailed": "Connessione fallita",
+    "saveBeforeTest": "Save the provider first: the test runs on the saved settings",
     "testMapping": "Testa mappatura",
     "testMappingDesc": "Inserisci un nome utente per testare la risoluzione dei gruppi LDAP e la mappatura dei ruoli senza effettuare l'accesso.",
     "testMappingUserPlaceholder": "Nome utente LDAP da testare",

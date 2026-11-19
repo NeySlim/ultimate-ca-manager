@@ -4058,6 +4058,7 @@
     "testConnection": "Verbindung testen",
     "testConnectionSuccess": "Verbindung erfolgreich",
     "testConnectionFailed": "Verbindung fehlgeschlagen",
+    "saveBeforeTest": "Save the provider first: the test runs on the saved settings",
     "testMapping": "Zuordnung testen",
     "testMappingDesc": "Geben Sie einen Benutzernamen ein, um die LDAP-Gruppenauflösung und Rollenzuordnung ohne Anmeldung zu testen.",
     "testMappingUserPlaceholder": "LDAP-Benutzername zum Testen",

@@ -4061,6 +4061,7 @@
     "testConnection": "接続テスト",
     "testConnectionSuccess": "接続成功",
     "testConnectionFailed": "接続失敗",
+    "saveBeforeTest": "Save the provider first: the test runs on the saved settings",
     "testMapping": "マッピングテスト",
     "testMappingDesc": "ユーザー名を入力して、ログインせずにLDAPグループ解決とロールマッピングをテストします。",
     "testMappingUserPlaceholder": "テスト用LDAPユーザー名",

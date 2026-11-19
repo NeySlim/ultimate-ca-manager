@@ -5,6 +5,7 @@ import { ToggleSwitch } from '../../../components/ui/ToggleSwitch'
 import RoleMappingEditor from '../RoleMappingEditor'
 import ProvisioningNotice, { hasRoleRules } from './ProvisioningNotice'
 import MappingTestResult from './MappingTestResult'
+import TestConnectionButton from './TestConnectionButton'
 
 export default function SsoLdapFields({
   formData,
@@ -17,6 +18,7 @@ export default function SsoLdapFields({
   testingMapping,
   testMappingResult,
   handleTestConnection,
+  dirty,
   handleTestMapping,
   roleOptions,
   defaultRoleOptions,
@@ -146,10 +148,7 @@ export default function SsoLdapFields({
             placeholder={formData._directoryType === 'ad' ? 'DC=example,DC=com' : t('sso.baseDnPlaceholder')}
           />
           {provider?.id && (
-            <Button type="button" variant="secondary" size="sm" onClick={handleTestConnection} disabled={testingConnection} className="gap-1.5">
-              {testingConnection ? <LoadingSpinner size="xs" /> : <Plugs size={14} />}
-              {t('sso.testConnection')}
-            </Button>
+            <TestConnectionButton onClick={handleTestConnection} testing={testingConnection} dirty={dirty} icon={Plugs} />
           )}
         </div>
       </CompactSection>

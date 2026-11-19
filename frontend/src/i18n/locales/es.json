@@ -4058,6 +4058,7 @@
     "testConnection": "Probar conexión",
     "testConnectionSuccess": "Conexión exitosa",
     "testConnectionFailed": "Conexión fallida",
+    "saveBeforeTest": "Save the provider first: the test runs on the saved settings",
     "testMapping": "Probar mapeo",
     "testMappingDesc": "Ingrese un nombre de usuario para probar la resolución de grupos LDAP y mapeo de roles sin iniciar sesión.",
     "testMappingUserPlaceholder": "Nombre de usuario LDAP para probar",

@@ -1,12 +1,13 @@
 import { useTranslation } from 'react-i18next'
 import { Plugs, Lightning, TreeStructure, UserPlus } from '@phosphor-icons/react'
-import { Button, Input, Select, Textarea, LoadingSpinner, CompactSection } from '../../../components'
+import { Input, Select, Textarea, CompactSection } from '../../../components'
 import { ToggleSwitch } from '../../../components/ui/ToggleSwitch'
 import CopyableUrl from '../CopyableUrl'
 import MappingEditor from '../MappingEditor'
 import RoleMappingEditor from '../RoleMappingEditor'
 import LegacyGroupsNotice from './LegacyGroupsNotice'
 import ProvisioningNotice, { hasRoleRules } from './ProvisioningNotice'
+import TestConnectionButton from './TestConnectionButton'
 import SignInTestPanel from './SignInTestPanel'
 
 export default function SsoOAuth2Fields({
@@ -118,10 +119,7 @@ export default function SsoOAuth2Fields({
             />
           )}
           {provider?.id && (
-            <Button type="button" variant="secondary" size="sm" onClick={handleTestConnection} disabled={testingConnection} className="gap-1.5">
-              {testingConnection ? <LoadingSpinner size="xs" /> : <Plugs size={14} />}
-              {t('sso.testConnection')}
-            </Button>
+            <TestConnectionButton onClick={handleTestConnection} testing={testingConnection} dirty={dirty} icon={Plugs} />
           )}
           <SignInTestPanel provider={provider} dirty={dirty} formData={formData} handleChange={handleChange} />
         </div>

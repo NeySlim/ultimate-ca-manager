@@ -7,6 +7,7 @@ import MappingEditor from '../MappingEditor'
 import RoleMappingEditor from '../RoleMappingEditor'
 import LegacyGroupsNotice from './LegacyGroupsNotice'
 import ProvisioningNotice, { hasRoleRules } from './ProvisioningNotice'
+import TestConnectionButton from './TestConnectionButton'
 import SignInTestPanel from './SignInTestPanel'
 import { formatDate } from '../../../lib/utils'
 
@@ -140,10 +141,7 @@ export default function SsoSamlFields({
             />
           )}
           {provider?.id && (
-            <Button type="button" variant="secondary" size="sm" onClick={handleTestConnection} disabled={testingConnection} className="gap-1.5">
-              {testingConnection ? <LoadingSpinner size="xs" /> : <Shield size={14} />}
-              {t('sso.testConnection')}
-            </Button>
+            <TestConnectionButton onClick={handleTestConnection} testing={testingConnection} dirty={dirty} icon={Shield} />
           )}
           <SignInTestPanel provider={provider} dirty={dirty} formData={formData} handleChange={handleChange} />
         </div>
