@@ -289,7 +289,7 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
         </label>
       </div>
 
-      {!formData.verify_ssl && (
+      {formData.verify_ssl && (
         <Textarea
           label={t('msca.caBundle')}
           value={formData.ca_bundle}
