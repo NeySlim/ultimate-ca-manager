@@ -187,6 +187,20 @@ def test_an_ordinary_request_answers_503_with_retry_after_at_once(restore_held):
     assert live.status_code == 200 and live_took < FAST
 
 
+def test_revocation_status_answers_try_later_or_503_at_once(restore_held):
+    """OCSP says tryLater (RFC 6960 section 2.3); a CRL answers 503 with Retry-After."""
+    from cryptography.x509 import ocsp
+    client = restore_held.app.test_client()
+    with restore_held.hold():
+        status, took = _timed(client.post, '/ocsp', data=b'0', content_type='application/ocsp-request')
+        crl, crl_took = _timed(client.get, '/cdp/held-test.crl')
+    assert status.status_code == 200 and took < FAST
+    assert status.headers['Content-Type'] == 'application/ocsp-response'
+    assert ocsp.load_der_ocsp_response(status.data).response_status == \
+        ocsp.OCSPResponseStatus.TRY_LATER
+    assert crl.status_code == 503 and crl.headers['Retry-After'] and crl_took < FAST
+
+
 def test_a_request_in_the_window_never_waits_in_sqlite(restore_held):
     """Before the transaction is marked as holding the file, a request that meets the lock
     retries in Python, a yield between tries, and is refused 503 within a bound."""
@@ -309,21 +323,28 @@ def test_the_held_mark_drops_once_the_transaction_ends(app, archive, created, no
                                                        monkeypatch):
     """The worker reads the database again as soon as the restore's transaction is over."""
     from tests.test_restore_job import _assert_final, _lines_in, _start
-    views, real = [], restore_job.LocalGate.set_view
+    views, at_end_steps = [], []
+    real_set, real_finish = restore_job.LocalGate.set_view, restore_job._finish_steps
 
     def set_view(gate, **view):
         if 'held' in view:
             views.append(view['held'])
-        return real(gate, **view)
+        return real_set(gate, **view)
+
+    def finish_steps(job_id):
+        at_end_steps.append((restore_job.read_state() or {}).get('view', {}).get('held'))
+        return real_finish(job_id)
     monkeypatch.setattr(restore_job.LocalGate, 'set_view', set_view)
+    monkeypatch.setattr(restore_job, '_finish_steps', finish_steps)
     before = _lines_in(app)
     job_id, name = _start(app, archive, created)
     _assert_final(app, job_id, 'succeeded', 'done', before, name, True)
     if _on_sqlite(app):
         assert True in views, 'the transaction never said it holds the database'
-        assert views[-1] is False, 'the gate still says the database is held after the commit'
     else:
         assert True not in views
+    # The end steps run with the database free: the worker serves it again from the commit
+    assert at_end_steps == [False if _on_sqlite(app) else None], at_end_steps
 
 
 # -- a job's own writes wait for another writer -------------------------------------------
