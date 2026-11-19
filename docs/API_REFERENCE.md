@@ -1233,9 +1233,12 @@ GET /api/v2/user-certificates?status=valid&page=1&per_page=50
 **Query Parameters**:
 | Param | Type | Description |
 |-------|------|-------------|
-| status | string | Filter by status: `valid`, `expired`, `revoked` |
+| status | string | Filter by status: `valid`, `expiring`, `expired`, `revoked` (repeatable). Applied before paging: `total` and `pages` count the matching rows only |
+| search | string | Name, subject or serial contains |
+| sort_by | string | `created_at` (default), `name`, `valid_until`, `last_used_at` |
+| sort_order | string | `asc` or `desc` (default) |
 | page | int | Page number (default: 1) |
-| per_page | int | Items per page (default: 50) |
+| per_page | int | Items per page (default: 25) |
 
 **Response** `200`:
 ```json

@@ -130,6 +130,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **User certificates: the status filter pages correctly.** Filtering by status cut the page first and dropped rows after, so matching certificates on later pages were unreachable and the total counted every row; the filter now runs before the page is cut.
 - **Backup schedule fields locked without `admin:settings`.** An account with `write:settings` only saw "saved" while the server dropped the schedule it typed; the fields are now locked for it and a save that dropped keys names them (`data.ignored_keys`).
 - **Downloads named after an object with non-ASCII characters no longer fail.** An export of a certificate, CA, CSR, template or SSH CA named in Japanese, Cyrillic or any other script answered 500 on the real server; the response now carries an ASCII `filename` plus an RFC 6266 `filename*` holding the original name, and any file saved from the web interface keeps those characters instead of underscores (#448).
 - **Two revocations of one SSH certificate at once.** The later one rewrote the date and reason of the earlier; it is now refused as for a certificate already revoked.

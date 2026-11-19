@@ -70,6 +70,19 @@ def _get_certificate_for_auth_cert(auth_cert):
     return certificate_row_for(auth_cert)
 
 
+def _cert_status(certificate, now):
+    """The status a listing row shows and the status filter matches."""
+    if certificate is None:
+        return 'orphan'
+    if certificate.revoked:
+        return 'revoked'
+    if certificate.valid_to and certificate.valid_to <= now:
+        return 'expired'
+    if certificate.valid_to and certificate.valid_to <= now + timedelta(days=30):
+        return 'expiring'
+    return 'valid'
+
+
 def _build_cert_response(auth_cert, certificate, owner_user=None):
     """Build a combined response dict from auth_cert + certificate."""
     result = auth_cert.to_dict()
@@ -98,14 +111,7 @@ def _build_cert_response(auth_cert, certificate, owner_user=None):
         result['signature_algorithm'] = getattr(certificate, 'signature_algorithm', None)
         # Compute status + days_remaining
         now = utc_now()
-        if certificate.revoked:
-            result['status'] = 'revoked'
-        elif certificate.valid_to and certificate.valid_to <= now:
-            result['status'] = 'expired'
-        elif certificate.valid_to and certificate.valid_to <= now + timedelta(days=30):
-            result['status'] = 'expiring'
-        else:
-            result['status'] = 'valid'
+        result['status'] = _cert_status(certificate, now)
         if certificate.valid_to:
             result['days_remaining'] = compute_days_remaining(
                 certificate.valid_to, now)
@@ -180,47 +186,36 @@ def list_user_certificates():
     else:
         query = query.order_by(sort_col.desc(), AuthCertificate.id.desc())
 
-    # Execute with pagination
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    auth_certs = pagination.items
+    if status_filters:
+        # The status is computed from the bound certificate, so the filter
+        # runs before the page is cut: total and pages are those of the match.
+        now = utc_now()
+        matched = []
+        for ac in query.all():
+            cert = _get_certificate_for_auth_cert(ac)
+            if _cert_status(cert, now) in status_filters:
+                matched.append((ac, cert))
+        total = len(matched)
+        pages = (total + per_page - 1) // per_page
+        window = matched[(page - 1) * per_page:page * per_page]
+    else:
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        total, pages = pagination.total, pagination.pages
+        window = [(ac, _get_certificate_for_auth_cert(ac)) for ac in pagination.items]
 
-    # Build response with joined data
     results = []
     user_cache = {}
-    for ac in auth_certs:
-        cert = _get_certificate_for_auth_cert(ac)
-
-        # Status filter (post-query since status is computed)
-        if status_filters and cert:
-            now = utc_now()
-            matches = False
-            for sf in status_filters:
-                if sf == 'revoked' and cert.revoked:
-                    matches = True
-                elif sf == 'expired' and cert.valid_to and cert.valid_to <= now and not cert.revoked:
-                    matches = True
-                elif sf == 'valid' and cert.valid_to and cert.valid_to > now and not cert.revoked:
-                    matches = True
-                elif sf == 'expiring':
-                    threshold = now + timedelta(days=30)
-                    if cert.valid_to and now < cert.valid_to <= threshold and not cert.revoked:
-                        matches = True
-            if not matches:
-                continue
-
-        # Cache user lookup
+    for ac, cert in window:
         if ac.user_id not in user_cache:
             user_cache[ac.user_id] = db.session.get(User, ac.user_id)
-        owner = user_cache[ac.user_id]
-
-        results.append(_build_cert_response(ac, cert, owner))
+        results.append(_build_cert_response(ac, cert, user_cache[ac.user_id]))
 
     return success_response(data={
         'items': results,
-        'total': pagination.total,
+        'total': total,
         'page': page,
         'per_page': per_page,
-        'pages': pagination.pages,
+        'pages': pages,
     })
 
 
