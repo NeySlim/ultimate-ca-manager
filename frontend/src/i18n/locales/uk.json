@@ -2650,7 +2650,7 @@
     "caChainPlaceholder": "Проміжні та кореневі сертифікати...",
     "additionalCerts": "Додаткові сертифікати для включення...",
     "inputPassword": "Input Пароль",
-    "keyPasswordPlaceholder": "Password of the encrypted key or file (leave empty if none)",
+    "keyOrFilePasswordPlaceholder": "Password of the encrypted key or file (leave empty if none)",
     "forEncryptedFiles": "Для зашифрованих файлів",
     "outputPkcs12Password": "Output PKCS12 Пароль",
     "passwordForP12": "Пароль для .p12",

@@ -6,16 +6,34 @@ from urllib.parse import quote
 
 
 _UNSEEN = ('Cc', 'Cf', 'Zl', 'Zp')
+_MAX_BYTES = 200
+# Device names Windows refuses whatever follows the first dot (same list as the interface).
+_WINDOWS_DEVICE = re.compile(r'^(con|prn|aux|nul|com[0-9\u00b9\u00b2\u00b3]|lpt[0-9\u00b9\u00b2\u00b3])$', re.I)
+
+
+def _clip(text):
+    """The longest prefix of whole characters within 200 characters and 200 UTF-8 bytes."""
+    out, size = [], 0
+    for c in text[:200]:
+        size += len(c.encode('utf-8', 'replace'))
+        if size > _MAX_BYTES:
+            break
+        out.append(c)
+    return ''.join(out)
 
 
 def _clean_filename(name):
     """*name* without control, format (bidi), line-separator characters and quotes, separators
-    replaced by '_', at most 200 characters; '' if nothing is left."""
+    replaced by '_', no leading dot, no Windows device name, at most 200 characters and bytes; '' if nothing is left."""
     if not name:
         return ''
     name = ''.join(c for c in name if unicodedata.category(c) not in _UNSEEN)
     name = re.sub(r'[/\\]', '_', name)
-    return name.replace('"', '')[:200]
+    name = _clip(name.replace('"', '').lstrip('.'))
+    stem = name.split('.', 1)[0]
+    if _WINDOWS_DEVICE.match(stem):
+        name = f'{stem}_{name[len(stem):]}'
+    return name
 
 
 def sanitize_filename(name):

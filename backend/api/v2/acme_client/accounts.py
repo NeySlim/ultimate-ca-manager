@@ -303,20 +303,7 @@ def _label_taken(label, except_id=None):
 
 def _existing_key_algorithm(acct):
     """Algorithm of the account key already held, None while there is no key."""
-    if not acct.account_key:
-        return None
-    from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.asymmetric import ec, rsa
-    from security.encryption import decrypt_text
-    try:
-        key = serialization.load_pem_private_key(decrypt_text(acct.account_key).encode(), password=None)
-    except Exception:
-        return acct.account_key_algorithm
-    if isinstance(key, rsa.RSAPrivateKey):
-        return 'RS256'
-    if isinstance(key, ec.EllipticCurvePrivateKey) and isinstance(key.curve, ec.SECP384R1):
-        return 'ES384'
-    return 'ES256'
+    return acct.held_key_algorithm()
 
 
 @bp.route('/api/v2/acme/client/accounts/<int:account_id>', methods=['PATCH'])

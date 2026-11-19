@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { sanitizeDownloadName } from '../../../lib/filename'
 
 const mocks = vi.hoisted(() => ({
   getCrossCertificates: vi.fn(),
@@ -91,6 +92,17 @@ describe('CrossCertificatesSection', () => {
     fireEvent.click(await screen.findByLabelText('export.title'))
     await waitFor(() => expect(mocks.exportCrossCertificate).toHaveBeenCalledWith(9, 3, 'pem'))
     expect(mocks.downloadBlob).toHaveBeenCalled()
+  })
+
+  it('keeps the -cross-<id> suffix in the file name of a very long CA name', async () => {
+    mocks.exportCrossCertificate.mockResolvedValue(new Blob(['x']))
+    render(<CrossCertificatesSection ca={{ ...ca, name: 'r'.repeat(200) }} canWrite={false} />)
+    fireEvent.click(await screen.findByLabelText('export.title'))
+    await waitFor(() => expect(mocks.downloadBlob).toHaveBeenCalled())
+    const name = mocks.downloadBlob.mock.calls.at(-1)[1]
+    expect(name.endsWith('-cross-3.pem')).toBe(true)
+    // downloadBlob sanitizes again: nothing may change, or the suffix is clipped there
+    expect(sanitizeDownloadName(name)).toBe(name)
   })
 
   it('hides the write actions from a reader', async () => {

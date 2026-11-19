@@ -44,6 +44,52 @@ function missingPluralForms(keys, refKeys, categories) {
   return bases.flatMap(b => needed.map(c => `${b}_${c}`)).filter(k => !keys.has(k))
 }
 
+// JSON.parse keeps the last of two equal keys in one object; scan the text so
+// the earlier (often translated) value is not silently lost.
+function findDuplicateKeys(text) {
+  const dups = []
+  const stack = [] // per open container: Set of keys, or null for an array
+  const path = []
+  let i = 0
+  const readString = () => {
+    let j = i + 1
+    while (text[j] !== '"') j += text[j] === '\\' ? 2 : 1
+    const raw = text.slice(i, j + 1)
+    i = j + 1
+    return JSON.parse(raw)
+  }
+  let expectKey = false
+  while (i < text.length) {
+    const c = text[i]
+    if (c === '{') { stack.push(new Set()); expectKey = true; i++ }
+    else if (c === '[') { stack.push(null); expectKey = false; i++ }
+    else if (c === '}' || c === ']') { stack.pop(); if (stack[stack.length - 1] instanceof Set) path.pop(); expectKey = false; i++ }
+    else if (c === ',') { expectKey = stack[stack.length - 1] instanceof Set; i++ }
+    else if (c === '"') {
+      const str = readString()
+      const top = stack[stack.length - 1]
+      if (expectKey && top instanceof Set) {
+        if (top.has(str)) dups.push([...path.filter(Boolean), str].join('.'))
+        top.add(str)
+        path.push(str)
+        expectKey = false
+        // the value follows the colon; a scalar value pops its path entry
+        while (/\s/.test(text[i])) i++
+        i++ // ':'
+        while (/\s/.test(text[i])) i++
+        if (text[i] !== '{' && text[i] !== '[') {
+          if (text[i] === '"') readString()
+          else while (!/[,}\]\s]/.test(text[i])) i++
+          path.pop()
+        } else {
+          // container pushes its own frame; its closing pops this key
+        }
+      }
+    } else i++
+  }
+  return dups
+}
+
 function main() {
   const files = fs.readdirSync(LOCALES_DIR).filter(f => f.endsWith('.json'))
   if (files.length === 0) {
@@ -62,9 +108,16 @@ function main() {
   let hasErrors = false
 
   for (const file of files) {
-    if (file === REFERENCE_LOCALE) continue
     const filePath = path.join(LOCALES_DIR, file)
-    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'))
+    const text = fs.readFileSync(filePath, 'utf8')
+    const dupKeys = findDuplicateKeys(text)
+    if (dupKeys.length > 0) {
+      hasErrors = true
+      console.log(`  ❌ ${file} — duplicate keys in one object:`)
+      dupKeys.slice(0, 10).forEach(k => console.log(`       - ${k}`))
+    }
+    if (file === REFERENCE_LOCALE) continue
+    const data = JSON.parse(text)
     const keys = new Set(flattenKeys(data))
 
     const categories = new Intl.PluralRules(file.replace(/\.json$/, '')).resolvedOptions().pluralCategories
@@ -102,4 +155,4 @@ function main() {
 
 if (require.main === module) main()
 
-module.exports = { flattenKeys, isLocalePluralForm, missingPluralForms }
+module.exports = { findDuplicateKeys, flattenKeys, isLocalePluralForm, missingPluralForms }

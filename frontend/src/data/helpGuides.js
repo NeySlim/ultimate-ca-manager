@@ -1942,7 +1942,7 @@ Export filtered logs in:
 - **JSON**: Machine-readable, includes all fields
 - **CSV**: Spreadsheet-compatible, includes key fields
 
-Exports apply only the date range, up to 10,000 entries: the other filters are not applied.
+Exports follow the filters of the page (search, user, action, status and date range) and contain at most 10,000 entries.
 
 ## Cleanup
 
