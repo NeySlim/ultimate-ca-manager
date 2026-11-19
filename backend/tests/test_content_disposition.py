@@ -230,3 +230,20 @@ class TestAlignedWithTheInterface:
         assert content_disposition(once, '.p12') == content_disposition(name, '.p12')
         if len(name) <= 200:
             assert once == name
+
+
+class TestWindowsSpacesAndPercentEscapes:
+    @pytest.mark.parametrize('name, plain', [('COM1 ', 'COM1_'), ('nul  ', 'nul_'),
+                                             ('aux .txt', 'aux_.txt')])
+    def test_a_device_name_with_trailing_spaces_gets_its_underscore(self, name, plain):
+        """Windows drops the spaces before the extension: `COM1 .pem` is still COM1."""
+        assert content_disposition(name, '.pem') == f'attachment; filename="{plain}.pem"'
+
+    def test_an_ascii_name_with_a_percent_escape_keeps_it_out_of_filename(self):
+        """RFC 6266 appendix D: no %XX in `filename`; the name goes in `filename*`."""
+        disp, plain, star = parse(content_disposition('a%2Fb', '.pem', fallback='r1'))
+        assert (plain, star) == ('r1.pem', 'a%2Fb.pem')
+
+    def test_a_plain_ascii_name_is_unchanged(self):
+        """Guard: the historical header of a plain name stays."""
+        assert content_disposition('web server', '.pem') == 'attachment; filename="web server.pem"'
