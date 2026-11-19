@@ -95,6 +95,7 @@ def bulk_export_cas():
         if not pems:
             return nothing_readable(skipped, 'CA')
         headers = skipped_headers(skipped, 'CAs')
+        headers['X-Exported-Count'] = str(len(pems))
         if export_format == 'pem':
             headers['Content-Disposition'] = 'attachment; filename="ca-certificates.pem"'
             return Response(b''.join(p if p.endswith(b'\n') else p + b'\n' for p in pems),

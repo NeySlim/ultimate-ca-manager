@@ -211,6 +211,8 @@ class APIClient {
         data = await response.blob()
         const skipped = skippedCount(response.headers)
         if (skipped) data.skippedCount = skipped
+        const exported = response.headers.get('x-exported-count')
+        if (exported !== null && Number.isInteger(Number(exported))) data.exportedCount = Number(exported)
       } else {
         data = await response.text()
       }

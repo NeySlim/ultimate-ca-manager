@@ -313,3 +313,26 @@ def test_an_entry_read_back_holds_its_certificates_only(auth_client, rows, order
     for entry in (detail, listed):
         assert entry['certificate_pem'] == cert.decode()
         assert entry['key_type'] != 'Unknown'
+
+
+BULK = pytest.mark.parametrize('route', [r for r in ROUTES if 'bulk' in r.name], ids=repr)
+
+
+@BULK
+@BOTH
+def test_a_bulk_export_counts_what_it_exported(auth_client, rows, route, fmt):
+    ids = rows.made[route.kind]
+    assert route.call(auth_client, ids, fmt).headers['X-Exported-Count'] == '2'
+    rows.corrupt(route, ids[0])
+    # the unreadable row and an unknown id are left out of the count
+    r = route.call(auth_client, ids + [10 ** 9], fmt)
+    assert r.headers['X-Exported-Count'] == '1'
+    assert _count(route, fmt, r.data) == 1
+
+
+def test_the_exported_count_is_exposed_to_a_cross_origin_screen(app, auth_client):
+    from utils.public_endpoints import get_cors_origins
+    with app.app_context():
+        origin = get_cors_origins()[0]
+    r = auth_client.get('/api/v2/certificates/export', headers={'Origin': origin})
+    assert 'X-Exported-Count' in r.headers.get('Access-Control-Expose-Headers', '')

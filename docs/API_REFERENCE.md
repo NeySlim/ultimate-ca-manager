@@ -747,7 +747,7 @@ Content-Type: application/json
 }
 ```
 
-Returns the selected CA certificates as `format` `pem` (default) or `p7b`.
+Returns the selected CA certificates as `format` `pem` (default) or `p7b`. `X-Exported-Count` holds the number of certificates in the file: unknown ids and unreadable ones are not counted.
 
 An unreadable CA certificate (or cross-certificate, named `cross:<id>`) is skipped, logged, and named in `X-Skipped-CAs` (the first 100) with the total in `X-Skipped-CAs-Count`; the others are exported. When none is readable the answer is `404` in both PEM and P7B, with `details.skipped` (the first 100) and `details.skipped_count` (the total).
 
@@ -1192,7 +1192,7 @@ Content-Type: application/json
 }
 ```
 
-Returns the selected certificates as `format` `pem` (default) or `p7b`.
+Returns the selected certificates as `format` `pem` (default) or `p7b`. `X-Exported-Count` holds the number of certificates in the file: unknown ids, certificate requests and unreadable ones are not counted.
 
 An unreadable certificate is skipped, logged, and named in `X-Skipped-Certificates` (its first 100 ids) with the total in `X-Skipped-Certificates-Count`; the others are exported. When no certificate is readable the answer is `404` in both PEM and P7B, with `details.skipped` (the first 100) and `details.skipped_count` (the total).
 

@@ -79,9 +79,10 @@ vi.mock('../../components', async (orig) => ({
 
 import OperationsPage from '../OperationsPage'
 
-const blob = (skipped) => {
+const blob = (skipped, exported) => {
   const b = new Blob(['pem'])
   if (skipped) b.skippedCount = skipped
+  if (exported !== undefined) b.exportedCount = exported
   return b
 }
 
@@ -148,5 +149,17 @@ describe('OperationsPage bulk export of a selection', () => {
     await exportSelection()
     await waitFor(() => expect(mocks.showSuccess).toHaveBeenCalled())
     expect(mocks.showWarning).not.toHaveBeenCalled()
+  })
+
+  it('announces the number the server exported, not the number selected', async () => {
+    mocks.certBulkExport.mockResolvedValue(blob(0, 7))
+    await exportSelection()
+    await waitFor(() => expect(mocks.showSuccess).toHaveBeenCalledWith('operations.bulkSuccess:7'))
+  })
+
+  it('falls back to the selection when the server gave no count', async () => {
+    mocks.certBulkExport.mockResolvedValue(blob(0))
+    await exportSelection()
+    await waitFor(() => expect(mocks.showSuccess).toHaveBeenCalledWith('operations.bulkSuccess:1'))
   })
 })
