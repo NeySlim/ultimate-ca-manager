@@ -127,17 +127,17 @@ class TestTheScreenAgreesWithTheRuntime:
                 runtime = getattr(CRLQueryMixin, method)()
             assert (runtime, _general(auth_client)[key]) == (expected, expected), stored
 
-    @pytest.mark.parametrize('key,fn', [
-        ('hsts_enabled', 'hsts_enabled'),
-        ('hsts_include_subdomains', 'hsts_include_subdomains'),
+    @pytest.mark.parametrize('key,reading', [
+        ('hsts_enabled', lambda header: header is not None),
+        ('hsts_include_subdomains', lambda header: 'includeSubDomains' in header),
     ])
-    def test_strict_transport_security(self, app, auth_client, cfg, key, fn):
-        import utils.hsts as hsts
+    def test_strict_transport_security(self, app, auth_client, cfg, key, reading):
+        from utils.hsts import build_hsts_header
         for stored, expected in (('yes', True), ('off', False),
                                  ('false', False), (None, True)):
             cfg(**{key: stored})
             with app.app_context():
-                runtime = getattr(hsts, fn)()
+                runtime = reading(build_hsts_header())
             assert (runtime, _general(auth_client)[key]) == (expected, expected), stored
 
     def test_the_acme_server_switch(self, app, auth_client, cfg):
