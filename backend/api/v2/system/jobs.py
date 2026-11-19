@@ -176,6 +176,17 @@ def _held_view(job_id):
     return view
 
 
+def _held_progress(job_id, row):
+    """The restore's local view while it says held and its row has not passed the commit."""
+    from services.jobs import restore as restore_job
+    if row['state'] != 'running' or row['phase'] in restore_job.VALIDATED:
+        return None
+    state = restore_job.read_state()
+    if state is None or state.get('job_id') != job_id or not (state.get('view') or {}).get('held'):
+        return None
+    return state['view']
+
+
 def _held_job(job_id, view):
     """(local view, None) for the held restore the caller may read; (None, answer) otherwise."""
     from services import cluster_maintenance
@@ -226,9 +237,9 @@ def get_job(job_id):
     if row is None:
         return error_response('Job not found', 404)
     view = jobs.public_view(row)
-    held = _held_view(job_id) if view['state'] == 'running' else None
+    held = _held_progress(job_id, row)
     if held is not None:
-        # The SQLite transaction keeps the run from writing its row: its local state is newer
+        # Only while its SQLite transaction holds the database is the local state newer
         view.update(phase=held.get('phase', view['phase']), progress=held.get('progress', view['progress']))
     return success_response(data=view)
 

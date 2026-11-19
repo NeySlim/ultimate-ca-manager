@@ -3168,7 +3168,9 @@ A `restore` job (`admin:system`) holds every slot: nothing else runs beside it. 
 `committed`, `sessions_revoked`, `session_files_removed`, `caches_purged` and
 `crls_regenerated` as each step after the commit is done; `progress` is empty while the archive
 is read, then counts the steps passed and the rows written (`total`: the ten steps plus the rows
-the archive carries) and reaches its total at the commit. It can be cancelled until its commit:
+the archive carries) and reaches its total at the commit. While the restore's SQLite transaction
+holds the database, `phase` and `progress` come from the restore's local state; from `committed`
+on, and on PostgreSQL, from the job's row. It can be cancelled until its commit:
 nothing is restored, and a cancellation is read inside the loops over the rows too. From
 `committed` on, the cancel route answers `409` `The restore has committed: it can no longer be
 cancelled`. A restore that commits revokes every session, the caller's included: following the
