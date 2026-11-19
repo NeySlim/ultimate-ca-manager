@@ -335,6 +335,26 @@ def oidc_identity(userinfo, attr_mapping):
     return username, email, get('fullname', 'name')
 
 
+# Key of the verified ``tid`` in the external data of a multi-tenant sign-in; UserInfo's is replaced
+OIDC_TENANT_KEY = 'ucm_oidc_tenant'
+_EXTERNAL_ID_LENGTH = 255  # user_sso_identities.external_id
+
+
+def oidc_external_id(provider, external_data):
+    """The account's stable id at ``provider``: :func:`oidc_stable_id`, scoped as
+    ``<tid>/<sub>`` by the verified tenant when the provider accepts several tenants (claims are
+    interpreted within the tenant); None when that tenant or the id is missing."""
+    from services.oidc_id_token import has_tenants, is_tenant_id
+    value = oidc_stable_id(external_data)
+    if not has_tenants(provider):
+        return value
+    tid = (external_data or {}).get(OIDC_TENANT_KEY) if isinstance(external_data, dict) else None
+    if value is None or not is_tenant_id(tid):
+        return None
+    scoped = f'{tid}/{value}'
+    return scoped if len(scoped) <= _EXTERNAL_ID_LENGTH else None
+
+
 def oidc_stable_id(userinfo):
     """The account's stable id in UserInfo: ``sub``, else (GitHub, not an OIDC provider) the
     numeric ``id``; never ``login`` nor the e-mail, which can pass to another person."""
