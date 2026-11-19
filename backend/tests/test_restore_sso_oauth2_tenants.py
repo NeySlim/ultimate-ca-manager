@@ -130,6 +130,22 @@ def test_archived_role_tenants_and_expected_tenants_come_back(target, mode):
     assert row.expected_tenant == TENANT_A
 
 
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+def test_an_archived_expected_tenant_is_restored_as_a_lower_case_guid_or_none(target, mode):
+    """Any other value is dropped with a warning: it could not bind a sign-in, nor fit the column."""
+    data = _archive(json.dumps([TENANT_A, TENANT_B]))
+    data['user_sso_identities'][0].update(external_id=None, expected_tenant=f' {TENANT_A.upper()} ')
+    data['user_sso_identities'][1].update(external_id=None, expected_tenant='x' * 40)
+    results = _restore(data, mode)
+    db.session.expire_all()
+    provider = SSOProvider.query.filter_by(name='entra').one()
+    held = {User.query.get(r.user_id).username: r.expected_tenant
+            for r in UserSSOIdentity.query.filter_by(provider_id=provider.id)}
+    assert held == {'mt-alice': TENANT_A, 'mt-bob': None}
+    warned = [w for w in results.get('warnings') or [] if 'expected tenant' in w]
+    assert len(warned) == 1 and "'mt-bob'" in warned[0], results.get('warnings')
+
+
 def test_to_dict_shows_an_unreadable_stored_value_as_it_is(target):
     """Never as an empty list, which would read as a provider of one issuer."""
     provider = SSOProvider(name='raw', provider_type='oauth2', oauth2_tenants='["*"]',
