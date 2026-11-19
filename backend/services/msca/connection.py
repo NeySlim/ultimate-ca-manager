@@ -7,8 +7,13 @@ from models import db
 from models.msca import MicrosoftCA, MSCARequest
 from utils.datetime_utils import utc_now
 from utils.encryption import decrypt_required
+from utils.secret_target import MASKS
 
 logger = logging.getLogger(__name__)
+
+# What a form can change in a connection test; the secrets are handled apart
+_TESTED_FIELDS = ('server', 'ca_name', 'auth_method', 'username', 'client_cert_pem',
+                  'kerberos_principal', 'kerberos_keytab_path', 'use_ssl', 'verify_ssl', 'ca_bundle')
 
 
 class MicrosoftCAConnectionMixin:
@@ -111,7 +116,26 @@ class MicrosoftCAConnectionMixin:
                 pass
 
     @staticmethod
-    def test_connection(msca_id):
+    def _with_form_values(msca, overrides):
+        """The saved connection under the form's values: what a test runs on, never persisted.
+        A secret left blank or masked is the saved one, decrypted."""
+        from types import SimpleNamespace
+        values = {k: getattr(msca, k) for k in _TESTED_FIELDS}
+        values.update({k: v for k, v in overrides.items() if k in _TESTED_FIELDS})
+        for field, column in (('password', '_password'), ('client_key_pem', '_client_key_pem')):
+            typed = overrides.get(field)
+            if isinstance(typed, str) and typed.strip() and typed.strip() not in MASKS:
+                secret = typed
+            else:
+                secret = decrypt_required(getattr(msca, column), f'Microsoft CA {msca.id} {field}') \
+                    if getattr(msca, column) else ''
+            values[field] = secret
+            values[column] = secret
+        return SimpleNamespace(id=msca.id, name=msca.name, **values)
+
+    @staticmethod
+    def test_connection(msca_id, overrides=None):
+        """overrides: form values to test instead of the saved ones; nothing is saved then."""
         from .templates import MicrosoftCATemplatesMixin
 
         msca = db.session.get(MicrosoftCA, msca_id)
@@ -120,7 +144,12 @@ class MicrosoftCAConnectionMixin:
 
         client = None
         try:
-            client = MicrosoftCAConnectionMixin._get_client(msca)
+            if overrides:
+                tested = MicrosoftCAConnectionMixin._with_form_values(msca, overrides)
+                client = MicrosoftCAConnectionMixin._get_client(tested, typed=True)
+            else:
+                tested = msca
+                client = MicrosoftCAConnectionMixin._get_client(msca)
             ca_cert = client.get_ca_cert()
 
             templates = []
@@ -138,17 +167,18 @@ class MicrosoftCAConnectionMixin:
                     f"MS CA '{msca.name}': auth OK but template listing failed: {tpl_err}"
                 )
 
-            msca.last_test_at = utc_now()
-            msca.last_test_result = 'success' if permissions_ok else 'partial'
-            try:
-                db.session.commit()
-            except Exception as commit_err:
-                db.session.rollback()
-                logger.error(f"MS CA test result commit failed: {commit_err}")
+            if not overrides:
+                msca.last_test_at = utc_now()
+                msca.last_test_result = 'success' if permissions_ok else 'partial'
+                try:
+                    db.session.commit()
+                except Exception as commit_err:
+                    db.session.rollback()
+                    logger.error(f"MS CA test result commit failed: {commit_err}")
 
             result = {
                 'success': True,
-                'ca_name': msca.ca_name or msca.server,
+                'ca_name': tested.ca_name or tested.server,
                 'ca_cert_available': ca_cert is not None,
                 'templates': templates,
                 'permissions_ok': permissions_ok,
@@ -158,13 +188,14 @@ class MicrosoftCAConnectionMixin:
             return result
         except Exception as e:
             logger.error(f"MS CA connection test failed for '{msca.name}': {e}")
-            msca.last_test_at = utc_now()
-            msca.last_test_result = f'failed: {str(e)[:200]}'
-            try:
-                db.session.commit()
-            except Exception as commit_err:
-                db.session.rollback()
-                logger.error(f"MS CA test result commit failed: {commit_err}")
+            if not overrides:
+                msca.last_test_at = utc_now()
+                msca.last_test_result = f'failed: {str(e)[:200]}'
+                try:
+                    db.session.commit()
+                except Exception as commit_err:
+                    db.session.rollback()
+                    logger.error(f"MS CA test result commit failed: {commit_err}")
             return {'success': False, 'error': str(e)}
         finally:
             if client:

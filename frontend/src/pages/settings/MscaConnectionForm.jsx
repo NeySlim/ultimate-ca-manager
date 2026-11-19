@@ -10,6 +10,17 @@ import { secretInputProps, secretRequiredForTarget, typedSecret } from '../../li
 const WINRM_TARGET = ['winrm_host', 'winrm_port', 'winrm_use_ssl', 'winrm_verify_ssl',
   'winrm_transport', 'winrm_username']
 
+// What a connection test reads from the form; a secret not retyped stays on the server
+const TESTED_FIELDS = ['server', 'ca_name', 'auth_method', 'username', 'client_cert_pem',
+  'kerberos_principal', 'kerberos_keytab_path', 'use_ssl', 'verify_ssl', 'ca_bundle']
+
+function testedValues(formData) {
+  const values = Object.fromEntries(TESTED_FIELDS.map((field) => [field, formData[field]]))
+  if (formData.password) values.password = formData.password
+  if (formData.client_key_pem) values.client_key_pem = formData.client_key_pem
+  return values
+}
+
 export default function MscaConnectionForm({ connection, onSave, onCancel }) {
   const { t } = useTranslation()
   const { showSuccess, showError, showWarning } = useNotification()
@@ -130,7 +141,12 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
       const testData = { ...formData }
       let response
       if (connection?.id) {
-        response = await mscaService.test(connection.id)
+        // The saved password goes only where it was saved for (as on save)
+        if (secretRequiredForTarget(basicSecret)) {
+          showError(t('common.secretRequiredForTarget'))
+          return
+        }
+        response = await mscaService.test(connection.id, testedValues(formData))
       } else {
         response = await mscaService.testInline(testData)
       }

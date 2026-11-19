@@ -20,9 +20,9 @@ const mscaService = {
   delete: (id) =>
     apiClient.delete(`/microsoft-cas/${id}`),
 
-  // Test connection
-  test: (id) =>
-    apiClient.post(`/microsoft-cas/${id}/test`),
+  // Test connection; values from the form are tested instead of the saved ones
+  test: (id, values) =>
+    apiClient.post(`/microsoft-cas/${id}/test`, values),
 
   // Test connection inline (before save)
   testInline: (data) =>

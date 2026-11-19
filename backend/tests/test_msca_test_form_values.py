@@ -1,0 +1,101 @@
+"""Testing a saved Microsoft CA connection uses the values on the form.
+
+The test ran against the saved row whatever the form held, so a corrected
+server or password was reported as fine or broken on the old values. Typed
+values are used (saved secrets stay for what was not retyped) and nothing is saved.
+"""
+import json
+import sys
+import uuid
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
+import pytest
+
+from models import db
+from models.msca import MicrosoftCA
+
+
+@pytest.fixture
+def certsrv(monkeypatch):
+    calls = []
+
+    def factory(**kwargs):
+        calls.append(kwargs)
+        client = MagicMock()
+        client.session.get.return_value.text = '<Option Value="E;WebServer">'
+        return client
+
+    monkeypatch.setitem(sys.modules, 'certsrv', SimpleNamespace(Certsrv=factory))
+    return calls
+
+
+@pytest.fixture
+def connection(app):
+    with app.app_context():
+        row = MicrosoftCA(name=f'form-test-{uuid.uuid4().hex[:8]}', server='saved.example',
+                          auth_method='basic', username='saved-user', enabled=True)
+        row.password = 'saved-password'
+        db.session.add(row)
+        db.session.commit()
+        connection_id = row.id
+    yield connection_id
+    with app.app_context():
+        MicrosoftCA.query.filter_by(id=connection_id).delete()
+        db.session.commit()
+
+
+def _test(client, connection_id, body=None):
+    return client.post(f'/api/v2/microsoft-cas/{connection_id}/test',
+                       data=json.dumps(body) if body is not None else None,
+                       content_type='application/json')
+
+
+def test_no_body_tests_the_saved_connection(auth_client, connection, certsrv):
+    r = _test(auth_client, connection)
+    assert r.status_code == 200, r.data
+    assert certsrv[0]['server'] == 'saved.example'
+    assert certsrv[0]['username'] == 'saved-user'
+    assert certsrv[0]['password'] == 'saved-password'
+
+
+def test_typed_values_are_used_and_the_saved_secret_stays_for_the_rest(auth_client, connection, certsrv):
+    r = _test(auth_client, connection, {'ca_name': 'Typed CA', 'password': '********', 'verify_ssl': True})
+    assert r.status_code == 200, r.data
+    assert r.get_json()['data']['ca_name'] == 'Typed CA'
+    assert certsrv[0]['password'] == 'saved-password'
+    assert certsrv[0]['server'] == 'saved.example'
+
+
+def test_the_saved_password_does_not_follow_another_account(auth_client, connection, certsrv):
+    r = _test(auth_client, connection, {'username': 'typed-user'})
+    assert r.status_code == 400
+    assert certsrv == []
+
+
+def test_a_typed_password_goes_to_a_typed_server(auth_client, connection, certsrv):
+    r = _test(auth_client, connection, {'server': 'typed.example', 'password': 'typed-password'})
+    assert r.status_code == 200, r.data
+    assert (certsrv[0]['server'], certsrv[0]['password']) == ('typed.example', 'typed-password')
+
+
+def test_the_saved_password_does_not_follow_another_server(auth_client, connection, certsrv):
+    r = _test(auth_client, connection, {'server': 'elsewhere.example'})
+    assert r.status_code == 400
+    assert certsrv == []
+
+
+def test_the_test_saves_nothing(app, auth_client, connection, certsrv):
+    assert _test(auth_client, connection, {'username': 'typed-user', 'password': 'typed'}).status_code == 200
+    assert certsrv[0]['username'] == 'typed-user'
+    with app.app_context():
+        row = db.session.get(MicrosoftCA, connection)
+        assert (row.username, row.password, row.last_test_at) == ('saved-user', 'saved-password', None)
+
+
+@pytest.mark.parametrize('body, status', [({'server': ''}, 400), ({'server': 'x' * 501, 'password': 'p'}, 413),
+                                          ({'auth_method': 'bogus'}, 400), ({'username': 5}, 400),
+                                          (['not', 'an', 'object'], 400)])
+def test_an_invalid_value_is_refused(auth_client, connection, certsrv, body, status):
+    assert _test(auth_client, connection, body).status_code == status
+    assert certsrv == []

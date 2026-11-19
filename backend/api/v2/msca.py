@@ -543,11 +543,51 @@ def test_connection_inline():
     return error_response(result.get('error', 'Connection test failed'), 400)
 
 
+_TEST_STRING_FIELDS = ('server', 'ca_name', 'username', 'password', 'client_cert_pem',
+                       'client_key_pem', 'kerberos_principal', 'kerberos_keytab_path', 'ca_bundle')
+
+
+def _test_overrides(msca, data):
+    """(form values, error): the body of a test, held to the rules of a save."""
+    if not isinstance(data, dict):
+        return None, error_response("Request body must be a JSON object", 400)
+    for field in _TEST_STRING_FIELDS:
+        if field in data and not isinstance(data[field], str):
+            return None, error_response(f"{field} must be a string", 400)
+    for field in ('use_ssl', 'verify_ssl'):
+        if field in data and not isinstance(data[field], bool):
+            return None, error_response(f"{field} must be a boolean", 400)
+    if 'server' in data and not data['server'].strip():
+        return None, error_response("Server hostname is required", 400)
+    if data.get('auth_method', msca.auth_method) not in ('certificate', 'kerberos', 'basic'):
+        return None, error_response("Invalid auth method", 400)
+    for field, limit in (('client_cert_pem', MAX_PEM_FIELD_BYTES), ('client_key_pem', MAX_PEM_FIELD_BYTES),
+                         ('ca_bundle', MAX_PEM_FIELD_BYTES), ('kerberos_keytab_path', MAX_KEYTAB_PATH_LEN),
+                         ('server', MAX_SERVER_LEN)):
+        err = _check_size(field, data.get(field), limit)
+        if err:
+            return None, err
+    # A saved password never follows a changed target (as on save)
+    err = _msca_retarget_error(msca, data)
+    if err:
+        return None, err
+    return {**data, **({'server': data['server'].strip()} if 'server' in data else {})}, None
+
+
 @bp.route('/<int:msca_id>/test', methods=['POST'])
 @require_auth(['write:settings'])
 def test_connection(msca_id):
-    """Test connectivity to Microsoft CA"""
-    result = MicrosoftCAService.test_connection(msca_id)
+    """Test connectivity to Microsoft CA; a JSON body tests the form's values instead, saving nothing"""
+    data = request.get_json(silent=True)
+    overrides = None
+    if data:
+        msca = db.session.get(MicrosoftCA, msca_id)
+        if not msca:
+            return error_response("Connection not found", 404)
+        overrides, err = _test_overrides(msca, data)
+        if err:
+            return err
+    result = MicrosoftCAService.test_connection(msca_id, overrides)
     if result.get('success'):
         return success_response(data=result, message="Connection successful")
     return error_response(result.get('error', 'Connection test failed'), 400)
