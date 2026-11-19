@@ -698,7 +698,10 @@ def test_connection_inline():
     err = _kerberos_test_forbidden(None, data) or _keytab_error(data)
     if err:
         return err
-    result = MicrosoftCAService.test_connection_inline(data)
+    try:
+        result = MicrosoftCAService.test_connection_inline(data)
+    except KerberosBusy as e:
+        return kerberos_busy_response(e)
     if result.get('success'):
         return success_response(data=result, message="Connection successful")
     return error_response(result.get('error', 'Connection test failed'), 400)
@@ -751,7 +754,10 @@ def test_connection(msca_id):
         overrides, err = _test_overrides(msca, data)
         if err:
             return err
-    result = MicrosoftCAService.test_connection(msca_id, overrides)
+    try:
+        result = MicrosoftCAService.test_connection(msca_id, overrides)
+    except KerberosBusy as e:
+        return kerberos_busy_response(e)
     if result.get('success'):
         return success_response(data=result, message="Connection successful")
     return error_response(result.get('error', 'Connection test failed'), 400)
@@ -1013,6 +1019,8 @@ def list_templates(msca_id):
     try:
         templates = MicrosoftCAService.list_templates(msca_id)
         return success_response(data=templates)
+    except KerberosBusy as e:
+        return kerberos_busy_response(e)
     except Exception as e:
         logger.error(f"Failed to list templates: {e}")
         return error_response("Failed to retrieve templates", 500)

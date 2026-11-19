@@ -8,7 +8,7 @@ from models.msca import MicrosoftCA, MSCARequest
 from utils.datetime_utils import utc_now
 from utils.encryption import decrypt_required
 from utils.secret_target import MASKS, changed_targets, keeps_saved_secret
-from .client_keytab import client_keytab
+from .client_keytab import KerberosBusy, client_keytab
 
 logger = logging.getLogger(__name__)
 
@@ -201,6 +201,8 @@ class MicrosoftCAConnectionMixin:
                 permissions_ok = len(templates) > 0
                 if not permissions_ok:
                     permission_warning = 'authenticated_but_no_templates'
+            except KerberosBusy:
+                raise
             except Exception as tpl_err:
                 permission_warning = 'authenticated_but_template_access_denied'
                 logger.warning(
@@ -226,6 +228,8 @@ class MicrosoftCAConnectionMixin:
             if permission_warning:
                 result['warning'] = permission_warning
             return result
+        except KerberosBusy:
+            raise  # a wait, not a result: nothing is recorded
         except Exception as e:
             logger.error(f"MS CA connection test failed for '{msca.name}': {e}")
             if not overrides:
@@ -277,6 +281,8 @@ class MicrosoftCAConnectionMixin:
                 templates = sorted(templates) if templates else []
                 if not templates:
                     permission_warning = 'authenticated_but_no_templates'
+            except KerberosBusy:
+                raise
             except Exception:
                 permission_warning = 'authenticated_but_template_access_denied'
 
@@ -288,6 +294,8 @@ class MicrosoftCAConnectionMixin:
             if permission_warning:
                 result['warning'] = permission_warning
             return result
+        except KerberosBusy:
+            raise
         except Exception as e:
             logger.error(f"MS CA inline test failed: {e}")
             return {'success': False, 'error': str(e)}
