@@ -38,7 +38,8 @@ def export_body(log_name):
     from utils.response import error_response
 
     if 'password' in request.args:
-        logger.warning('Rejected %s export with a password in the query string', log_name)
+        logger.warning('Rejected %s export with a password in the query string (%s)',
+                       log_name, request.path)
         return None, error_response(
             'Password must be sent in a POST JSON body, not the query string', 400)
     if request.method != 'POST':
