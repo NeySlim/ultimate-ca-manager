@@ -16,6 +16,8 @@ from utils.dn_parse import parse_dn
 from . import saml_sp
 
 
+NESTED_NOT_BOOLEAN = 'ldap_nested_groups must be true or false'
+
 # SSO provider URL fields that the backend will dereference (metadata fetch,
 # token exchange, userinfo). Cloud metadata endpoints and loopback are blocked
 # to prevent credential exfiltration / probing UCM's own internals; LAN/RFC1918
@@ -241,7 +243,11 @@ def create_provider():
         provider.ldap_user_filter = data.get('ldap_user_filter', '(uid={username})')
         provider.ldap_group_filter = data.get('ldap_group_filter')
         provider.ldap_group_member_attr = data.get('ldap_group_member_attr', 'member')
-        provider.ldap_nested_groups = data.get('ldap_nested_groups') is True
+        nested = data.get('ldap_nested_groups', False)
+        if not isinstance(nested, bool):
+            db.session.rollback()
+            return error_response(NESTED_NOT_BOOLEAN, 400)
+        provider.ldap_nested_groups = nested
         try:
             provider.ldap_group_base_dn = _group_base_dn(data.get('ldap_group_base_dn'))
         except ValueError as e:
@@ -436,7 +442,10 @@ def update_provider(provider_id=None, provider_type_name=None):
         if 'ldap_start_tls' in data:
             provider.ldap_start_tls = bool(data['ldap_start_tls'])
         if 'ldap_nested_groups' in data:
-            provider.ldap_nested_groups = data['ldap_nested_groups'] is True
+            if not isinstance(data['ldap_nested_groups'], bool):
+                db.session.rollback()
+                return error_response(NESTED_NOT_BOOLEAN, 400)
+            provider.ldap_nested_groups = data['ldap_nested_groups']
         if 'ldap_group_base_dn' in data:
             try:
                 provider.ldap_group_base_dn = _group_base_dn(data['ldap_group_base_dn'])

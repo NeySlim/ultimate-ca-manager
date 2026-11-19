@@ -497,3 +497,25 @@ def test_the_option_goes_through_a_backup_and_a_restore(app):
             SSOProvider.query.filter_by(name=name).delete()
             db.session.commit()
             others.back()
+
+
+@pytest.mark.parametrize('value', ['true', 1, 'false', 0, None, [True]])
+def test_a_value_that_is_not_a_boolean_is_refused(app, auth_client, value):
+    name = f'nest-{uuid.uuid4().hex[:6]}'
+    body = {'name': name, 'provider_type': 'ldap', 'ldap_server': 'ldap.example.com',
+            'ldap_base_dn': 'dc=example,dc=com'}
+    try:
+        r = auth_client.post('/api/v2/sso/providers', json={**body, 'ldap_nested_groups': value})
+        assert r.status_code == 400 and 'ldap_nested_groups' in r.get_json()['message']
+        with app.app_context():
+            assert SSOProvider.query.filter_by(name=name).count() == 0
+        r = auth_client.post('/api/v2/sso/providers', json={**body, 'ldap_nested_groups': True})
+        pid = r.get_json()['data']['id']
+        r = auth_client.put(f'/api/v2/sso/providers/{pid}', json={'ldap_nested_groups': value})
+        assert r.status_code == 400 and 'ldap_nested_groups' in r.get_json()['message']
+        with app.app_context():
+            assert db.session.get(SSOProvider, pid).ldap_nested_groups is True
+    finally:
+        with app.app_context():
+            SSOProvider.query.filter_by(name=name).delete()
+            db.session.commit()
