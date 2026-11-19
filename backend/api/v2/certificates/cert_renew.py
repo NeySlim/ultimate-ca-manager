@@ -111,7 +111,8 @@ def _actor():
 
 def _renew_msca_certificate(cert):
     """Renew a Microsoft-CA-issued certificate through its AD CS connection."""
-    from api.v2.msca import renew_via_msca  # deferred: avoids circular import
+    from api.v2.msca import kerberos_busy_response, renew_via_msca  # deferred: avoids circular import
+    from services.msca.client_keytab import KerberosBusy
 
     username = g.current_user.username if hasattr(g, 'current_user') else 'system'
     cert_id = cert.id
@@ -120,6 +121,9 @@ def _renew_msca_certificate(cert):
         result = renew_via_msca(cert, username=username)
     except PermissionError as e:
         return error_response(str(e), 403)
+    except KerberosBusy as e:
+        db.session.rollback()
+        return kerberos_busy_response(e)
     except ValueError as e:
         logger.error(f"Cannot renew certificate {cert_id} via Microsoft CA: {e}")
         return error_response(str(e), 400)

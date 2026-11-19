@@ -165,6 +165,13 @@ _SIGN_IN_DEFAULTS = dict(server='', use_ssl=True, verify_ssl=True, ca_bundle=Non
                          winrm_verify_ssl=True, winrm_transport='kerberos', winrm_username=None)
 
 
+def kerberos_busy_response(error):
+    """503 with Retry-After: the sign-in waited its bound for another one and nothing reached the CA."""
+    response, code = error_response(str(error), 503)
+    response.headers['Retry-After'] = str(KERBEROS_RETRY_SECONDS)
+    return response, code
+
+
 def _text(value):
     return value.strip() if isinstance(value, str) else (value or '')
 
@@ -1156,9 +1163,7 @@ def sign_csr(msca_id, csr_id):
 
     except KerberosBusy as e:
         _audit('msca.sign', msca, f"template={template} csr_id={csr_id} error={e}", success=False)
-        response, code = error_response(str(e), 503)
-        response.headers['Retry-After'] = str(KERBEROS_RETRY_SECONDS)
-        return response, code
+        return kerberos_busy_response(e)
     except ValueError as e:
         logger.error(f"Validation error signing CSR via MS CA: {e}", exc_info=True)
         _audit('msca.sign', msca, f"template={template} csr_id={csr_id} error={e}", success=False)
@@ -1179,6 +1184,8 @@ def check_request_status(msca_id, request_id):
         if result.get('status') == SUPERSEDED:
             return success_response(data=result, message=SUPERSEDED_MESSAGE)
         return success_response(data=result)
+    except KerberosBusy as e:
+        return kerberos_busy_response(e)
     except MSCAImportError as e:
         logger.error(f"MS CA request {request_id} issued but UCM import failed: {e}")
         return error_response(
