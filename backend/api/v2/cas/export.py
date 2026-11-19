@@ -16,7 +16,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
-from utils.pkcs12_export import legacy_flag, pkcs12_encryption
+from utils.pkcs12_export import pkcs12_encryption
 from utils.algorithm_refusal import refuse_unexportable_key
 from utils.p7b import p7b_from_pems
 from utils.export_pems import readable_pems, skipped_headers, nothing_readable
@@ -25,7 +25,7 @@ from fips_mode import FipsRestricted
 from utils.key_codec import load_pem_bytes
 
 from utils.export_password import validate_export_password
-from utils.export_options import export_body, json_boolean, query_boolean
+from utils.export_options import BOOL, FORMAT, PASSWORD, TEXT, read_export_options
 from services.key_export_audit import audit_key_export, encrypt_key_pem
 
 logger = logging.getLogger(__name__)
@@ -150,6 +150,13 @@ def export_all_cas():
         return error_response('Export failed', 500)
 
 
+EXPORT_FORMATS = ('pem', 'der', 'pkcs7', 'p7b', 'key', 'pkcs12', 'pfx', 'jks')
+EXPORT_OPTIONS = {
+    'format': FORMAT, 'include_key': BOOL, 'include_chain': BOOL,
+    'password': PASSWORD, 'legacy': BOOL, 'chain_variant': TEXT,
+}
+
+
 @bp.route('/api/v2/cas/<int:ca_id>/export', methods=['GET', 'POST'])
 @require_auth(['read:cas'])
 def export_ca(ca_id):
@@ -170,34 +177,20 @@ def export_ca(ca_id):
     if not ca.crt:
         return error_response('CA certificate data not available', 400)
 
-    data, refused = export_body('CA')
+    opts, refused = read_export_options(EXPORT_OPTIONS, EXPORT_FORMATS, 'CA')
     if refused:
         return refused
-    if data is not None:
-        export_format = data.get('format', 'pem').lower()
-        try:
-            include_key = json_boolean(data, 'include_key', False)
-            include_chain = json_boolean(data, 'include_chain', False)
-        except ValueError as exc:
-            return error_response(str(exc), 400)
-        password = data.get('password')
-        legacy = legacy_flag(data.get('legacy'))  # 3DES/SHA-1 profile (#331)
-        variant, variant_err = _requested_variant(data, ca)
-    else:
-        export_format = request.args.get('format', 'pem').lower()
-        try:
-            include_key = query_boolean(request.args, 'include_key', False)
-            include_chain = query_boolean(request.args, 'include_chain', False)
-        except ValueError as exc:
-            return error_response(str(exc), 400)
-        password = None
-        legacy = False
-        variant, variant_err = _requested_variant(request.args, ca)
-        # Outside a JSON body no password is read, so no key is served
-        if include_key or export_format in ('pkcs12', 'p12', 'pfx', 'jks', 'key'):
-            return error_response(
-                'Password and private key exports must use POST with a JSON body, '
-                'not the query string', 400)
+    export_format = opts.get('format', 'pem')
+    include_key = opts.get('include_key', False)
+    include_chain = opts.get('include_chain', False)
+    password = opts.get('password')
+    legacy = opts.get('legacy', False)  # 3DES/SHA-1 profile (#331)
+    variant, variant_err = _requested_variant(opts, ca)
+    # A GET reads no password, so it serves no key
+    if request.method == 'GET' and (include_key or export_format in ('pkcs12', 'pfx', 'jks', 'key')):
+        return error_response(
+            'Password and private key exports must use POST with a JSON body, '
+            'not the query string', 400)
 
     if variant_err:
         return variant_err
@@ -222,7 +215,7 @@ def export_ca(ca_id):
         return error_response(pw_err, 400)
 
     try:
-        explicit = (data if data is not None else request.args).get('chain_variant') not in (None, '', 'auto')
+        explicit = opts.get('chain_variant') not in (None, '', 'auto')
         cert_pem, parent_pems = _export_chain(ca, include_chain, variant, explicit)
 
         # Private key only export

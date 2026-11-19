@@ -16,8 +16,7 @@ from services.cert.unique_subject import OVERRIDE_FIELD, SubjectTaken, override_
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils import notices as notices_mod
 from utils.export_password import validate_export_password
-from utils.export_options import export_body
-from utils.password_field import password_type_error
+from utils.export_options import FORMAT, PASSWORD, read_export_options
 from utils.pagination import parse_request_pagination
 from utils.dn_validation import validate_dn_field
 from utils.san_parse import is_valid_san_email
@@ -786,6 +785,9 @@ def resubmit_csr(csr_id):
     return created_response(data=row.to_dict(), message='Request pending again')
 
 
+EXPORT_OPTIONS = {'format': FORMAT, 'password': PASSWORD}
+
+
 @bp.route('/api/v2/csrs/<int:csr_id>/export', methods=['GET', 'POST'])
 @require_auth(['read:csrs'])
 def export_csr(csr_id):
@@ -804,23 +806,12 @@ def export_csr(csr_id):
     if not cert or not cert.csr:
         return error_response('CSR not found', 404)
 
-    data, refused = export_body('CSR')
+    # A GET may fetch the key in clear, with no password anywhere in the request
+    opts, refused = read_export_options(EXPORT_OPTIONS, ('csr', 'key'), 'CSR')
     if refused:
         return refused
-    if data is not None:
-        export_format = str(data.get('format') or 'csr').lower()
-        type_err = password_type_error(data.get('password'))
-        if type_err:
-            return error_response(type_err, 400)
-        password = data.get('password') or None
-    else:
-        export_format = (request.args.get('format') or 'csr').lower()
-        password = None
-        # A GET may fetch the key in clear; a POST asking for it must say so in JSON
-        if request.method == 'POST' and export_format == 'key':
-            return error_response('A key export by POST must use a JSON body', 400)
-    if export_format not in ('csr', 'key'):
-        return error_response('format must be csr or key', 400)
+    export_format = opts.get('format', 'csr')
+    password = opts.get('password') or None
 
     if export_format == 'key':
         if not has_permission('read:private_keys', getattr(g, 'permissions', []) or []):

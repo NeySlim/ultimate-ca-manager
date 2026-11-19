@@ -15,7 +15,7 @@ from cryptography import x509 as cx509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
-from utils.pkcs12_export import legacy_flag, pkcs12_encryption
+from utils.pkcs12_export import pkcs12_encryption
 from utils.algorithm_refusal import refuse_unexportable_key
 from utils.issuance_defaults import browser_key_type
 
@@ -38,7 +38,7 @@ from utils.response import success_response, error_response, created_response
 from utils.export_password import validate_export_password
 from utils.db_transaction import safe_commit
 from utils.sanitize import content_disposition
-from utils.export_options import export_body, json_boolean, query_boolean
+from utils.export_options import BOOL, FORMAT, PASSWORD, read_export_options
 
 logger = logging.getLogger(__name__)
 
@@ -355,42 +355,33 @@ def delete_mtls_certificate(cert_id):
     return success_response(**(answer or {'message': 'Certificate deleted'}))
 
 
+DOWNLOAD_FORMATS = ('pem', 'pkcs12', 'p12', 'pfx')
+DOWNLOAD_OPTIONS = {
+    'format': FORMAT, 'password': PASSWORD, 'include_chain': BOOL, 'include_root': BOOL,
+    'legacy': BOOL,
+}
+
+
 @bp.route('/certificates/<int:cert_id>/download', methods=['GET', 'POST'])
 @require_auth(session_only=True)
 def download_mtls_certificate(cert_id):
     """Download mTLS certificate as PEM or PKCS12"""
 
     user = g.current_user
-    data, refused = export_body('mTLS certificate')
+    opts, refused = read_export_options(DOWNLOAD_OPTIONS, DOWNLOAD_FORMATS, 'mTLS certificate')
     if refused:
         return refused
-    if data is not None:
-        fmt = str(data.get('format', 'pem')).lower()
-        password = data.get('password', '')
-        try:
-            include_chain = json_boolean(data, 'include_chain', True)
-            include_root = json_boolean(data, 'include_root', False)
-            legacy_value = json_boolean(data, 'legacy', False)
-        except ValueError as exc:
-            return error_response(str(exc), 400)
-        legacy = legacy_flag(legacy_value)  # 3DES/SHA-1 profile (#331)
-        chain_sent = 'include_chain' in data or 'include_root' in data
-    else:
-        fmt = request.args.get('format', 'pem')
-        password = ''
-        legacy = False
-        chain_sent = 'include_chain' in request.args or 'include_root' in request.args
-        try:
-            include_chain = query_boolean(request.args, 'include_chain', True)
-            include_root = query_boolean(request.args, 'include_root', False)
-        except ValueError as exc:
-            return error_response(str(exc), 400)
-        # A PKCS#12 needs the password only a JSON body carries
-        if fmt in ('p12', 'pkcs12'):
-            return error_response(
-                'PKCS12 export requires POST with JSON body (format, password)',
-                400,
-            )
+    fmt = opts.get('format', 'pem')
+    if fmt in ('p12', 'pfx'):
+        fmt = 'pkcs12'
+    password = opts.get('password', '')
+    include_chain = opts.get('include_chain', True)
+    include_root = opts.get('include_root', False)
+    legacy = opts.get('legacy', False)  # 3DES/SHA-1 profile (#331)
+    chain_sent = 'include_chain' in opts or 'include_root' in opts
+    # A PKCS#12 needs the password only a JSON body carries
+    if request.method == 'GET' and fmt == 'pkcs12':
+        return error_response('PKCS12 export requires POST with JSON body (format, password)', 400)
 
     # Authorize via auth_certificates ownership (not string match on subject)
     auth_cert = AuthCertificate.query.filter_by(id=cert_id, user_id=user.id).first()
