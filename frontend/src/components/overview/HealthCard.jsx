@@ -152,18 +152,26 @@ export function HealthCard() {
             const periods = Array.isArray(p.periods) ? p.periods : []
             const today = periods.at(-1)
             const drawn = sum(periods, 'ok') + sum(periods, 'failed') > 0
+            // Days were counted and none saw an operation: one line instead of four zeros
+            const idle = periods.length > 0 && !drawn
+            const last = p.last_operation_at && (
+              <span title={formatDate(p.last_operation_at)}>
+                {t('overview.health.lastOperation', { when: relativeTime(p.last_operation_at, lang) })}
+              </span>
+            )
             return (
               <li key={id} className="ov-health-row" {...rowProps(id)}>
                 <div className="ov-health-name">
                   {name(id)}
-                  <small title={p.last_operation_at ? formatDate(p.last_operation_at) : undefined}>
-                    {p.last_operation_at
-                      ? t('overview.health.lastOperation', { when: relativeTime(p.last_operation_at, lang) })
-                      : t('overview.health.noOperation')}
-                  </small>
+                  {!idle && <small>{last || t('overview.health.noOperation')}</small>}
                   <StatePill info={infos[id]} />
                 </div>
-                {periods.length > 0 && (
+                {idle && (
+                  <p className="ov-health-idle">
+                    {t('overview.health.idle', { count: periods.length })}{last && ' '}{last}
+                  </p>
+                )}
+                {!idle && periods.length > 0 && (
                   <div className="ov-health-stats">
                     <Stat span={t('overview.health.today')} ok={count(today?.ok)} failed={count(today?.failed)} t={t} />
                     <Stat span={t('overview.days', { count: periods.length })} ok={sum(periods, 'ok')} failed={sum(periods, 'failed')} t={t} />

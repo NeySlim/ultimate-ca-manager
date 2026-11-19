@@ -105,6 +105,25 @@ describe('cards shown', () => {
     expect(ALL.map((id) => slot(id).getAttribute('data-span'))).toEqual(['full', null, null, null, 'wide', null, 'wide', null])
   })
 
+  it('packs the cards by column from their own heights, in the saved order', () => {
+    const heights = { queue: 400, health: 300, hierarchy: 900, horizon: 480 }
+    const rect = vi.spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function measured() { return { height: heights[this.id?.slice(5)] ?? 200 } })
+    show()
+    rect.mockRestore()
+    expect(screen.getByTestId('overview-grid').hasAttribute('data-masonry')).toBe(true)
+    expect(ALL.slice(0, 5).map((id) => slot(id).style.gridRowEnd)).toEqual(['span 400', 'span 300', 'span 900', 'span 480', 'span 200'])
+    expect(cards()).toEqual(ALL)
+  })
+
+  it('a card shown again is packed with the others', () => {
+    store.prefs = { dashboard: { hidden: ['states'] } }
+    show()
+    fireEvent.click(screen.getByRole('button', { name: 'overview.layout.cardsLabel' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByLabelText('overview.cards.states'))
+    expect(slot('states').style.gridRowEnd).toMatch(/^span \d+$/)
+  })
+
   it('the queue fold follows the preference and is saved with the layout', () => {
     store.prefs = { dashboard: { queueShowAll: true } }
     show()

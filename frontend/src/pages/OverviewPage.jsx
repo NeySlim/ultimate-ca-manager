@@ -17,6 +17,7 @@ import { KofiSupportCard } from '../components/KofiSupportCard'
 import { useNotification } from '../contexts/NotificationContext'
 import { usePermission } from '../hooks/usePermission'
 import { REFRESH_EVENT } from '../lib/overviewRefresh'
+import { useMasonry } from '../lib/masonry'
 import { isVisible, moduleById } from '../navigation/registry'
 import { getPreferences, persistPreference, subscribePreferences } from '../stores/userPreferencesStore'
 import {
@@ -48,9 +49,11 @@ export default function OverviewPage() {
   const current = useRef(layout)
   current.current = layout
   const dragged = useRef(null)
+  const grid = useRef(null)
 
   const save = useCallback((next) => { setLayout(next); persistPreference('dashboard', next) }, [])
   const shown = visibleCards(layout)
+  useMasonry(grid, shown.join())
   const title = useCallback((id) => t(`overview.cards.${id}`), [t])
 
   // Keyboard moves keep the focus on the grip of the card that moved
@@ -196,7 +199,7 @@ export default function OverviewPage() {
             </button>
           </div>
         )}
-        <div className="ov-grid" data-testid="overview-grid">
+        <div className="ov-grid" data-testid="overview-grid" ref={grid}>
           {shown.map((id) => {
             const Card = CARDS[id]
             const marks = `${drag?.id === id ? ' is-dragged' : ''}${drag?.over === id && drag.id !== id ? ' is-target' : ''}`

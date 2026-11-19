@@ -153,12 +153,14 @@
 .ov-metric-sub { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; }
 
 /* Card grid: one column, two from 1024 px, three from 1280 px; a card never stretches to its neighbour */
-.ov-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+.ov-grid { --ov-gap: 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--ov-gap); align-items: start; }
+/* Measured (lib/masonry.js): thin rows, each slot spans its card plus one gap, later cards fill the short columns */
+.ov-grid[data-masonry] { grid-auto-flow: row dense; row-gap: 0; margin-bottom: calc(-1 * var(--ov-gap)); }
 .ov-slot { min-width: 0; border-radius: 6px; }
 .ov-slot.is-dragged { opacity: 0.45; }
 .ov-slot.is-target { outline: 2px dashed var(--accent); outline-offset: 3px; }
 @media (min-width: 1024px) {
-  .ov-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  .ov-grid { --ov-gap: 20px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ov-slot[data-span="full"] { grid-column: 1 / -1; }
 }
 @media (min-width: 1280px) {
@@ -343,6 +345,8 @@
 .ov-health-name a:hover { color: var(--accent); }
 .ov-health-name small { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; }
 .ov-health-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ov-health-idle { grid-column: 2 / -1; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.ov-health-row:has(.ov-health-idle) .ov-health-name .ov-pill { margin-top: 5px; }
 .ov-health-stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 12px; }
 .ov-health-values { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; }
 .ov-health-values strong { font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; }
@@ -366,6 +370,7 @@
 @container (max-width: 470px) {
   .ov-health-row { grid-template-columns: minmax(0, 1fr) minmax(84px, 0.6fr); }
   .ov-health-stats { grid-column: 1 / -1; grid-row: 2; }
+  .ov-health-idle { grid-column: 1 / -1; }
 }
 
 /* Hierarchy */
@@ -411,8 +416,11 @@ a.ov-status:hover { background: var(--hover); }
 .ov-meter.is-bad { background: color-mix(in srgb, var(--bad) 22%, transparent); }
 .ov-meter.is-bad span { background: var(--bad); }
 
-/* Compliance */
-.ov-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+/* Compliance: the algorithms on the left, the figures in their own compact grid, none stretched */
+.ov-compliance { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-items: start; }
+.ov-compliance.has-algo { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); }
+.ov-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; align-content: start; }
+.ov-compliance.has-algo .ov-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .ov-tile { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 11px 13px; border: 1px solid var(--line); border-radius: 5px; color: var(--text); text-decoration: none; }
 a.ov-tile:hover { background: var(--hover); }
 .ov-tile-value { display: flex; align-items: center; gap: 7px; }
@@ -428,9 +436,9 @@ a.ov-algo-row:hover { background: var(--hover); }
 .ov-algo-row strong { text-align: right; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .ov-algo-bar { grid-column: 1 / -1; height: 6px; border-radius: 2px; background: var(--raised); overflow: hidden; }
 .ov-algo-bar span { display: block; height: 100%; background: var(--muted); }
-@container (max-width: 520px) {
+@container (max-width: 600px) {
+  .ov-compliance.has-algo { grid-template-columns: minmax(0, 1fr); }
   .ov-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .ov-tile.is-algo { grid-column: 1 / -1; }
 }
 
 /* Latest operations */

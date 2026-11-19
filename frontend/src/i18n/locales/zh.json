@@ -6618,6 +6618,8 @@
       "subScheduler": "调度器：上次运行 {{when}}。",
       "lastOperation": "最近一次操作：{{when}}",
       "noOperation": "没有操作记录",
+      "idle_one": "{{count}} 天内无操作。",
+      "idle_other": "{{count}} 天内无操作。",
       "today": "今天",
       "successes_one": "{{count}} 次成功",
       "successes_other": "{{count}} 次成功",
