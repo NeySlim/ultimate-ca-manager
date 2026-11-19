@@ -132,7 +132,8 @@ class TestLength:
 
     def test_long_japanese_name_keeps_extension_and_bound(self):
         _, plain, star = parse(content_disposition('あ' * 300, '.crt', fallback='r1'))
-        assert star == 'あ' * 200 + '.crt' and plain == 'r1.crt'
+        assert star == 'あ' * 66 + '.crt' and plain == 'r1.crt'
+        assert len(('あ' * 66).encode()) <= 200
 
     def test_sanitize_filename_is_unchanged(self):
         assert sanitize_filename('a"b/c\r\n') == 'ab_c'
@@ -203,3 +204,29 @@ class TestRealServer:
             status, received, body = _get(server)
         assert (status, received, body) == (200, value, b'ok')
         assert parse(received)[2] == 'テスト用.p12'
+
+
+class TestAlignedWithTheInterface:
+    """Leading dots, Windows device names and the byte budget follow frontend/src/lib/filename.js."""
+
+    def test_leading_dots_are_dropped(self):
+        assert content_disposition('..hidden', '.crt') == 'attachment; filename="hidden.crt"'
+        assert content_disposition('...', '.crt', fallback='r1') == 'attachment; filename="r1.crt"'
+
+    @pytest.mark.parametrize('name', ['CON', 'nul', 'Lpt3', 'com1'])
+    def test_windows_device_names_get_an_underscore(self, name):
+        assert content_disposition(name, '.crt') == f'attachment; filename="{name}_.crt"'
+        assert content_disposition('console', '.crt') == 'attachment; filename="console.crt"'
+
+    def test_the_cut_counts_bytes_of_whole_characters(self):
+        star = parse(content_disposition('\U00020000' * 100, '.crt', fallback='r1'))[2]
+        stem = star[:-len('.crt')]
+        assert stem == '\U00020000' * 50 and len(stem.encode()) == 200
+
+    @pytest.mark.parametrize('name', ['web server', 'a' * 300, 'example.com', 'CA 2026-11', 'x.y.z'])
+    def test_an_ascii_label_is_unchanged_and_stable(self, name):
+        once = sanitize_filename(name)
+        assert sanitize_filename(once) == once
+        assert content_disposition(once, '.p12') == content_disposition(name, '.p12')
+        if len(name) <= 200:
+            assert once == name
