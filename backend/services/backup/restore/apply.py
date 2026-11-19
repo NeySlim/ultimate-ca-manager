@@ -468,13 +468,38 @@ def _refuse_unreadable_handled(name: str, value: Any, where: str) -> None:
             f"Invalid backup: {where} holds {_a_kind_of(value)} where this field takes text")
 
 
-def refuse_containers_in_columns(backup_data) -> None:
+def _holds_nul(value: Any) -> bool:
+    """Whether a text in ``value``, at any depth and keys included, holds U+0000."""
+    if isinstance(value, str):
+        return '\x00' in value
+    if isinstance(value, dict):
+        return any(_holds_nul(k) or _holds_nul(v) for k, v in value.items())
+    if isinstance(value, list):
+        return any(_holds_nul(item) for item in value)
+    return False
+
+
+def _refuse_nul(value: Any, where: str) -> None:
+    # PostgreSQL stores no U+0000 in text or JSON where SQLite does: refused on both alike
+    if _holds_nul(value):
+        raise RestoreValidationError(
+            f"Invalid backup: {where} holds a NUL character, which no text field can store")
+
+
+def refuse_containers_in_columns(backup_data, mappings=()) -> None:
     """RestoreValidationError, before any write, for a value no restorer of the row can take.
 
     A list or an object in a non JSON column, or in a secret property over a column of
     another name; a field the dedicated restorers read themselves (`Section.handled`) that is
-    neither absent nor of the shape they read: text for a PEM, an object for the encrypted key."""
+    neither absent nor of the shape they read: text for a PEM, an object for the encrypted key;
+    a NUL character in any text of a row, or of the sections named in ``mappings`` the archive
+    holds as an object."""
     from ..section_store import SectionStore, section_kind
+    for section_name in sorted(mappings):
+        if section_kind(backup_data, section_name) == 'mapping':
+            for key, value in backup_data[section_name].items():
+                _refuse_nul(key, section_name)
+                _refuse_nul(value, f"{section_name}.{key}")
     for section_name, section in SECTIONS.items():
         if section_kind(backup_data, section_name) != 'list':
             continue
@@ -486,6 +511,8 @@ def refuse_containers_in_columns(backup_data) -> None:
             if not isinstance(row, dict):
                 continue
             for name, value in row.items():
+                _refuse_nul(name, section_name)
+                _refuse_nul(value, f"{section_name}.{name}")
                 column = columns.get(name)
                 if name in handled:
                     _refuse_unreadable_handled(name, value, f"{section_name}.{name}")

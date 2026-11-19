@@ -350,7 +350,7 @@ class RestoreCoreMixin:
         # holding fewer rows than the archive says it holds, must not be
         # discovered halfway through a restore.
         self._check_payload_schema(backup_data)
-        refuse_containers_in_columns(backup_data)
+        refuse_containers_in_columns(backup_data, mappings=RESTORED_SECTIONS)
         self._check_serial_duplicates(backup_data)
         upgrade_archived_permissions(backup_data)
         windows_warnings: List[str] = []

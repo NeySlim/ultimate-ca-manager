@@ -160,3 +160,47 @@ def test_an_archived_plaintext_ssh_key_is_never_read(target, shape, mode):
     db.session.expire_all()
     stored = SSHCertificateAuthority.query.filter_by(refid='af-ssh-ca').one().private_key
     assert not stored or 'af-marker' not in decrypt_private_key(stored)
+
+
+# --- A NUL byte in a text ------------------------------------------------------------------------
+
+NUL_ROWS = {
+    'deploy_targets.host': ('deploy_targets', {'name': 'af-target', 'host': 'deploy\x00.test',
+                                               'port': 22, 'username': 'ucm', 'private_key': 'k'}),
+    'certificate_authorities.csr_pem': ('certificate_authorities',
+                                        dict(ROWS['certificate_authorities'],
+                                             csr_pem='-----BEGIN\x00')),
+    'certificates.descr': ('certificates', dict(ROWS['certificates'], descr='af\x00cert')),
+    # In a JSON column too: PostgreSQL refuses \u0000 there as in text
+    'groups.permissions': ('groups', {'name': 'af-group', 'permissions': ['read:cas', 'n\x00ul']}),
+}
+
+
+@pytest.mark.parametrize('mode', MODES)
+@pytest.mark.parametrize('field', sorted(NUL_ROWS))
+def test_a_nul_byte_in_a_text_is_refused_by_name_before_any_write(target, field, mode):
+    section, row = NUL_ROWS[field]
+    message = _refused({section: [row]}, mode, RestoreValidationError)
+    assert field in message and 'NUL' in message, message
+    assert '\x00' not in message
+
+
+def test_the_route_answers_400_for_a_nul_byte(app, auth_client):
+    with app.app_context():
+        blob = _forged(['deploy_targets'], certificate_authorities=[
+            dict(ROWS['certificate_authorities'], csr_pem='-----BEGIN\x00')])
+        before = _counts()
+    response = auth_client.post(RESTORE_URL, content_type='multipart/form-data', data={
+        'password': PASSWORD, 'file': (io.BytesIO(blob), 'fields.ucmbkp')})
+    assert response.status_code == 400, response.data
+    assert b'certificate_authorities.csr_pem' in response.data
+    with app.app_context():
+        assert _counts() == before
+
+
+@pytest.mark.parametrize('mode', MODES)
+def test_a_nul_byte_in_a_setting_is_refused_by_name_before_any_write(target, mode):
+    from models import SystemConfig
+    message = _refused({'configuration': {'af_setting': 'a\x00b'}}, mode, RestoreValidationError)
+    assert 'configuration.af_setting' in message and 'NUL' in message, message
+    assert SystemConfig.query.filter_by(key='af_setting').count() == 0
