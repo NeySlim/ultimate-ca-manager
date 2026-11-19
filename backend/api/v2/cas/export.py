@@ -25,7 +25,7 @@ from fips_mode import FipsRestricted
 from utils.key_codec import load_pem_bytes
 
 from utils.export_password import validate_export_password
-from services.key_export_audit import audit_key_export
+from services.key_export_audit import audit_key_export, encrypt_key_pem
 
 logger = logging.getLogger(__name__)
 
@@ -219,13 +219,7 @@ def export_ca(ca_id):
             if not ca.prv:
                 return error_response('CA has no private key', 400)
             key_pem = load_pem_bytes(ca.prv, context=f"CA {ca.id}")
-            if password:
-                private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
-                key_pem = private_key.private_bytes(
-                    encoding=serialization.Encoding.PEM,
-                    format=serialization.PrivateFormat.PKCS8,
-                    encryption_algorithm=serialization.BestAvailableEncryption(password.encode())
-                )
+            key_pem = encrypt_key_pem(key_pem, password)
             _audit_key_export(ca, export_format, password)
             return Response(
                 key_pem,
@@ -240,7 +234,8 @@ def export_ca(ca_id):
 
             # Include private key if requested
             if include_key and ca.prv:
-                key_pem = load_pem_bytes(ca.prv, context=f"CA {ca.id}")
+                key_pem = encrypt_key_pem(
+                    load_pem_bytes(ca.prv, context=f"CA {ca.id}"), password)
                 if not result.endswith(b'\n'):
                     result += b'\n'
                 result += key_pem
