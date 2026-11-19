@@ -91,7 +91,7 @@ def test_texts_say_a_kerberos_renewal_keeps_its_template():
 
 
 def test_texts_say_how_a_former_ca_renews_and_how_to_cut_it():
-    """Guide, API reference, UPGRADE, CHANGELOG and help (en, fr) say what a change of the issuing CA
+    """Guide, API reference, UPGRADE, CHANGELOG and help (en, fr, ru, zh) say what a change of the issuing CA
     lists, that the list only shrinks, that a cut or a revocation stops renewals at once, and that the
     listener trusts a listed CA for WSTEP renewal only."""
     root = GUIDE.parents[1]
@@ -108,6 +108,8 @@ def test_texts_say_how_a_former_ca_renews_and_how_to_cut_it():
     for path, phrase in ((help_dir / 'helpGuides.js', 'A former CA taken off the list, revoked or deleted renews nothing'),
                          (help_dir / 'help' / 'fr' / 'settings.js',
                           'Une ancienne AC retirée de la liste, révoquée ou supprimée ne renouvelle plus rien'),
-                         (help_dir / 'help' / 'ru' / 'settings.js', 'Former CAs that still renew'),
-                         (help_dir / 'help' / 'zh' / 'settings.js', 'Former CAs that still renew')):
+                         (help_dir / 'help' / 'ru' / 'settings.js',
+                          'Прежний ЦС, убранный из списка, отозванный или удалённый, с этого момента ничего не продлевает'),
+                         (help_dir / 'help' / 'zh' / 'settings.js',
+                          '被移出列表、已吊销或已删除的原 CA 自此不再续期任何证书')):
         assert phrase in path.read_text(), path
