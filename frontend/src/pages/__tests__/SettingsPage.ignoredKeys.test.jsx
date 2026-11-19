@@ -29,6 +29,7 @@ describe('SettingsPage: reserved settings without admin:settings', () => {
     settingsService.updateBulk = vi.fn().mockResolvedValue({
       data: { ignored_keys: ['session_timeout'] } })
     settingsService.getBackupSchedule = vi.fn().mockResolvedValue({ data: {} })
+    settingsService.getEmailSettings = vi.fn().mockResolvedValue({ data: {} })
 
     render(
       <MemoryRouter initialEntries={['/settings?tab=backup']}>
@@ -37,9 +38,11 @@ describe('SettingsPage: reserved settings without admin:settings', () => {
     )
     await waitFor(() => expect(screen.getByText('save-backup')).toBeTruthy())
     await waitFor(() => expect(settingsService.getAll).toHaveBeenCalled())
+    await act(async () => { await new Promise((r) => setTimeout(r, 50)) })
     await act(async () => { screen.getByText('save-backup').click() })
     await waitFor(() => expect(settingsService.updateBulk).toHaveBeenCalled())
     const sent = settingsService.updateBulk.mock.calls[0][0]
+    expect(sent.system_name).toBe('x')
     expect(sent).not.toHaveProperty('backup_retention_days')
     expect(sent).not.toHaveProperty('auto_backup_enabled')
     await waitFor(() => expect(notificationSpies.showWarning).toHaveBeenCalled())
