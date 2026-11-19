@@ -201,6 +201,35 @@ def test_revocation_status_answers_try_later_or_503_at_once(restore_held):
     assert crl.status_code == 503 and crl.headers['Retry-After'] and crl_took < FAST
 
 
+def test_the_web_workers_own_threads_never_wait_in_sqlite(restore_held, monkeypatch):
+    """A thread of the web worker outside any request (the WebSocket relay reader, a cache
+    timer) fails at once on the held database instead of stopping the worker for 5 s."""
+    from sqlalchemy import text
+    from sqlalchemy.exc import OperationalError
+    from utils import sqlite_wait
+    app = restore_held.app
+    monkeypatch.setattr(sqlite_wait, '_WEB_WORKER', [app])
+    with app.app_context():
+        engine = db.engine
+    outcome = {}
+
+    def read():
+        started = time.monotonic()
+        try:
+            with engine.connect() as conn:
+                conn.execute(text('SELECT COUNT(*) FROM users')).scalar()
+            outcome['error'] = None
+        except OperationalError as e:
+            outcome['error'] = e
+        outcome['took'] = time.monotonic() - started
+    with restore_held.hold():
+        thread = threading.Thread(target=read)
+        thread.start()
+        thread.join(30)
+    assert outcome['error'] is not None and sqlite_wait.is_locked(outcome['error'])
+    assert outcome['took'] < FAST, f"the thread waited {outcome['took']:.1f}s in sqlite3"
+
+
 def test_a_request_in_the_window_never_waits_in_sqlite(restore_held):
     """Before the transaction is marked as holding the file, a request that meets the lock
     retries in Python, a yield between tries, and is refused 503 within a bound."""

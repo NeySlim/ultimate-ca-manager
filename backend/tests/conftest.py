@@ -292,6 +292,14 @@ def _kek_refusal_ends_with_its_test():
 
 
 @pytest.fixture(autouse=True)
+def _no_web_worker_mode_after_its_test():
+    # post_worker_init, called by a few tests, marks the process as the gunicorn web worker
+    yield
+    from utils import sqlite_wait
+    sqlite_wait._WEB_WORKER.clear()
+
+
+@pytest.fixture(autouse=True)
 def _reset_acme_proxy_caches():
     """The ACME proxy caches are process-wide: no test may see another's."""
     from services.acme.acme_proxy_service import reset_proxy_caches

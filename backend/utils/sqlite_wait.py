@@ -37,13 +37,29 @@ def is_locked(exc) -> bool:
     return 'database is locked' in str(orig) or 'database table is locked' in str(orig)
 
 
+# The web worker's application: its own threads (greenlets) wait like its requests
+_WEB_WORKER = []
+
+
+def serve_web_worker(app):
+    """gunicorn post_worker_init: every query of this process, not only its requests."""
+    _WEB_WORKER[:] = [app]
+
+
 def window():
-    """None outside a restore gate seen by a request; else 'held' or 'gate'."""
+    """None outside a restore gate seen by the web worker; else 'held' or 'gate'."""
     from flask import current_app, has_request_context
-    if not has_request_context():
-        return None
     from services import cluster_maintenance
-    view = current_app.extensions.get(cluster_maintenance.EXTENSION)
+    if has_request_context():
+        app = current_app
+    elif _WEB_WORKER:
+        app = _WEB_WORKER[0]
+        from utils.ha import ha_enabled
+        if not ha_enabled():
+            cluster_maintenance.observe_local(app)  # no request may have read the gate yet
+    else:
+        return None
+    view = app.extensions.get(cluster_maintenance.EXTENSION)
     if view is None or not view.active() or \
             (view.row or {}).get('reason') != cluster_maintenance.LOCAL_REASON:
         return None
@@ -69,9 +85,9 @@ def _execute(cursor, statement, parameters, context, many=False):
     state = window()
     if state is None:
         return None
-    from flask import g
+    from flask import g, has_app_context
     run = cursor.executemany if many else cursor.execute
-    delay = RETRY_FIRST
+    delay, local_deadline = RETRY_FIRST, None
     while True:
         try:
             if parameters is None:
@@ -83,8 +99,11 @@ def _execute(cursor, statement, parameters, context, many=False):
             if not is_locked(exc):
                 raise
             # One wait per request, shared by its statements, from the first lock it met
-            deadline = g.setdefault(_DEADLINE, time.monotonic() + (
-                0 if state == 'held' else REQUEST_LOCK_WAIT_SECONDS))
+            budget = time.monotonic() + (0 if state == 'held' else REQUEST_LOCK_WAIT_SECONDS)
+            if has_app_context():
+                deadline = g.setdefault(_DEADLINE, budget)
+            else:
+                deadline = local_deadline = local_deadline or budget
             if time.monotonic() + delay > deadline:
                 raise
         time.sleep(delay)  # gevent: the other requests run meanwhile
