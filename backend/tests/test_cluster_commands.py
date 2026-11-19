@@ -132,11 +132,12 @@ def broken_emit(app, ha_commands, monkeypatch):
 
 def test_rate_limits_not_saved_when_the_command_is_not(app, auth_client, broken_emit):
     from security.rate_limiter import STORED_KEY, RateLimitConfig
+    old = _config(app, STORED_KEY)  # an earlier test may have stored a setting
     r = auth_client.put('/api/v2/system/security/rate-limit',
                         json={'custom_limits': {'/api/v2/cc-broken': {'rpm': 9, 'burst': 3}}})
     assert r.status_code != 200
     assert '/api/v2/cc-broken' not in RateLimitConfig.get_config()['custom_limits']
-    assert _config(app, STORED_KEY) is None and broken_emit() == []
+    assert _config(app, STORED_KEY) == old and broken_emit() == []
 
 
 def test_syslog_not_saved_when_the_command_is_not(app, auth_client, broken_emit):

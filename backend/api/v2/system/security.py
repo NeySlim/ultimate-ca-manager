@@ -616,39 +616,17 @@ def get_rate_limit_config():
 def update_rate_limit_config():
     """Update rate limiting configuration"""
     try:
-        from security.rate_limiter import RateLimitConfig
         data = request.get_json() or {}
 
-        from utils.ha import ha_enabled
-        if ha_enabled():
-            return _update_stored_rate_limits(data)
-
-        if 'enabled' in data:
-            RateLimitConfig.set_enabled(data['enabled'])
-
-        if 'custom_limits' in data:
-            for path, limit in data['custom_limits'].items():
-                RateLimitConfig.set_custom_limit(path, limit['rpm'], limit.get('burst', limit['rpm'] // 3))
-
-        if 'whitelist_add' in data:
-            for ip in data['whitelist_add']:
-                RateLimitConfig.add_whitelist(ip)
-
-        if 'whitelist_remove' in data:
-            for ip in data['whitelist_remove']:
-                RateLimitConfig.remove_whitelist(ip)
-
-        return success_response(
-            message="Rate limit config updated",
-            data=RateLimitConfig.get_config()
-        )
+        # Stored in the database on every deployment, so a restart keeps it
+        return _update_stored_rate_limits(data)
     except Exception as e:
         logger.error(f"Failed to update rate limit config: {e}")
         return error_response("Failed to update config", 500)
 
 
 def _update_stored_rate_limits(data):
-    """HA: the change is stored and its command emitted in one transaction, then applied here."""
+    """The change is stored (and, in HA, its command emitted) in one transaction, then applied here."""
     import json
     from models import SystemConfig
     from security.rate_limiter import STORED_KEY, RateLimitConfig
