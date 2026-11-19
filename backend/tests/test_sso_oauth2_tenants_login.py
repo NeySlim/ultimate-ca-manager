@@ -61,13 +61,13 @@ def entra(app, monkeypatch):
         {'access_token': 'at', 'id_token': _token(KEY, state['claims'])}))
     monkeypatch.setattr(login_routes, 'safe_request_get', lambda *_a, **_k: _Response(state['userinfo']))
 
-    def claims(tid, sub):
+    def claims(tid, sub, **extra):
         now = int(time.time())
         return {'iss': TEMPLATE.replace('{tenantid}', tid), 'tid': tid, 'aud': 'ucm-client',
-                'sub': sub, 'exp': now + 300, 'iat': now, 'nonce': 'n'}
+                'sub': sub, 'exp': now + 300, 'iat': now, 'nonce': 'n', **extra}
 
-    def login(tid, sub, username, email=None):
-        state['claims'] = claims(tid, sub)
+    def login(tid, sub, username, email=None, **extra):
+        state['claims'] = claims(tid, sub, **extra)
         state['userinfo'] = {'sub': sub, 'preferred_username': username,
                              'email': email or f'{username}@{tid[:8]}.example'}
         client = app.test_client()
@@ -345,3 +345,53 @@ def test_a_reset_of_a_former_tenant_taken_off_the_list_sets_none(entra, auth_cli
     entra.configure(oauth2_tenants=f'["{TENANT_A}"]')
     assert auth_client.post(f'/api/v2/users/{row.user_id}/sso-identities/{row.id}/reset').status_code == 200
     assert (_identity('mt-reset2').external_id, _identity('mt-reset2').expected_tenant) == (None, None)
+
+
+def _role_of(username):
+    db.session.expire_all()
+    return User.query.filter_by(username=username).one().role
+
+
+def test_role_claims_are_read_from_the_honoured_tenants_only(entra):
+    """Each listed tenant's administrators assign the app roles of their users."""
+    entra.configure(role_mapping='{"UCM.Admin": "admin"}', default_role='viewer',
+                    oauth2_role_tenants=f'["{TENANT_A}"]')
+    assert entra(TENANT_A, 'sub-ra', 'mt-roles-a', roles=['UCM.Admin']).endswith(OK)
+    assert _role_of('mt-roles-a') == 'admin'
+    assert entra(TENANT_B, 'sub-rb', 'mt-roles-b', roles=['UCM.Admin']).endswith(OK)
+    assert _role_of('mt-roles-b') == 'viewer'
+
+
+def test_a_tenant_whose_roles_are_not_honoured_changes_no_role_on_sign_in(entra):
+    entra.configure(role_mapping='{"UCM.Admin": "admin", "UCM.Reader": "auditor"}',
+                    default_role='viewer', sync_role_on_login=True,
+                    oauth2_role_tenants=f'["{TENANT_A}"]')
+    assert entra(TENANT_B, 'sub-sb', 'mt-sync-b', roles=['UCM.Reader']).endswith(OK)
+    assert _role_of('mt-sync-b') == 'viewer'
+    User.query.filter_by(username='mt-sync-b').one().role = 'operator'
+    db.session.commit()
+    assert entra(TENANT_B, 'sub-sb', 'mt-sync-b', roles=['UCM.Admin']).endswith(OK)
+    assert _role_of('mt-sync-b') == 'operator'
+    # The same claim from an honoured tenant syncs the role
+    assert entra(TENANT_A, 'sub-sa', 'mt-sync-a', roles=['UCM.Reader']).endswith(OK)
+    assert entra(TENANT_A, 'sub-sa', 'mt-sync-a', roles=['UCM.Admin']).endswith(OK)
+    assert _role_of('mt-sync-a') == 'admin'
+
+
+def test_group_claims_follow_the_same_rule(entra):
+    """Group values (object ids, or names a tenant chooses) are mapped like app roles."""
+    group = '5b6c7d8e-9f01-4a2b-8c3d-4e5f60718293'
+    entra.configure(role_mapping=f'{{"{group}": "admin"}}', default_role='viewer',
+                    oauth2_role_tenants=f'["{TENANT_A}"]')
+    assert entra(TENANT_B, 'sub-gb', 'mt-group-b', groups=[group]).endswith(OK)
+    assert _role_of('mt-group-b') == 'viewer'
+    assert entra(TENANT_A, 'sub-ga', 'mt-group-a', groups=[group]).endswith(OK)
+    assert _role_of('mt-group-a') == 'admin'
+
+
+def test_without_a_default_role_a_tenant_whose_roles_are_not_honoured_is_refused(entra):
+    entra.configure(role_mapping='{"UCM.Admin": "admin"}', default_role=None,
+                    oauth2_role_tenants=f'["{TENANT_A}"]')
+    assert 'sso_no_default_role' in entra(TENANT_B, 'sub-nd', 'mt-nodefault', roles=['UCM.Admin'])
+    detail = AuditLog.query.filter(AuditLog.action == 'login_failure').order_by(AuditLog.id.desc()).first()
+    assert 'role claims of its tenant are not honoured' in detail.details

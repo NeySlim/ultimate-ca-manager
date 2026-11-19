@@ -636,11 +636,26 @@ def _external_group_keys(provider, external_data):
     return [key(g) for g in _external_groups(external_data)]
 
 
+def roles_honoured(provider, external_data):
+    """Whether the role mapping reads this identity's claims: always for one issuer; for several
+    tenants, only a tenant listed in ``oauth2_role_tenants``, whose administrators assign roles."""
+    from services.oidc_id_token import has_tenants, provider_role_tenants
+    if provider.provider_type != 'oauth2' or not has_tenants(provider):
+        return True
+    tid = external_data.get(OIDC_TENANT_KEY) if isinstance(external_data, dict) else None
+    return isinstance(tid, str) and tid.lower() in provider_role_tenants(provider)
+
+
+def _honoured_rules(provider, external_data):
+    """The provider's rules that apply to this identity: none for a tenant whose roles are not honoured."""
+    return _mapping_rules(provider) if roles_honoured(provider, external_data) else {}
+
+
 def sso_admission(provider, external_data):
     """Whether a login may proceed. With mapping rules, only a user one of them
     matches; without rules, every user gets the default role, and no default
     role admits nobody (no implicit role)."""
-    rules = _mapping_rules(provider)
+    rules = _honoured_rules(provider, external_data)
     if rules:
         key = group_match_key(provider)
         groups = _external_group_keys(provider, external_data)
@@ -656,7 +671,7 @@ def _resolve_mapped_roles(provider, external_data):
     in mapping order, that names one. An invalid base role counts as viewer
     (as before) and an unknown custom role is ignored, both with a warning.
     """
-    role_mapping = _mapping_rules(provider)
+    role_mapping = _honoured_rules(provider, external_data)
     if not role_mapping:
         return None, None
     external_roles = _external_groups(external_data)

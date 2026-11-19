@@ -112,3 +112,42 @@ def test_an_unchanged_form_round_trips(app, api):
     r = api.put(f"/api/v2/sso/providers/{data['id']}", json=data)
     assert r.status_code == 200, r.get_json()
     assert r.get_json()['data']['oauth2_tenants'] == [TENANT_A]
+
+
+def _role_tenants(app):
+    with app.app_context():
+        return SSOProvider.query.filter_by(name=NAME).one().oauth2_role_tenants
+
+
+def test_role_tenants_are_none_by_default(app, api):
+    r = api.post('/api/v2/sso/providers', json=_payload(oauth2_tenants=[TENANT_A]))
+    assert r.get_json()['data']['oauth2_role_tenants'] == [] and _role_tenants(app) is None
+
+
+def test_role_tenants_are_a_subset_of_the_accepted_ones(app, api):
+    r = api.post('/api/v2/sso/providers', json=_payload(
+        oauth2_tenants=[TENANT_A, TENANT_B], oauth2_role_tenants=[TENANT_A.upper()]))
+    assert r.status_code == 200, r.get_json()
+    assert r.get_json()['data']['oauth2_role_tenants'] == [TENANT_A]
+    assert json.loads(_role_tenants(app)) == [TENANT_A]
+
+
+@pytest.mark.parametrize('role_tenants', [['9188040d-6c67-4c5b-b112-36a304b66dad'], ['*']],
+                         ids=['unlisted', 'wildcard'])
+def test_create_refuses_role_tenants_off_the_accepted_list(app, api, role_tenants):
+    r = api.post('/api/v2/sso/providers', json=_payload(
+        oauth2_tenants=[TENANT_A], oauth2_role_tenants=role_tenants))
+    assert r.status_code == 400 and 'tenant' in r.get_json()['message']
+    with app.app_context():
+        assert SSOProvider.query.filter_by(name=NAME).first() is None
+
+
+def test_update_refuses_dropping_an_accepted_tenant_whose_roles_are_honoured(app, api):
+    pid = api.post('/api/v2/sso/providers', json=_payload(
+        oauth2_tenants=[TENANT_A, TENANT_B], oauth2_role_tenants=[TENANT_B])).get_json()['data']['id']
+    r = api.put(f'/api/v2/sso/providers/{pid}', json={'oauth2_tenants': [TENANT_A]})
+    assert r.status_code == 400
+    assert json.loads(_stored(app)) == [TENANT_A, TENANT_B]
+    r = api.put(f'/api/v2/sso/providers/{pid}', json={'oauth2_tenants': [TENANT_A], 'oauth2_role_tenants': []})
+    assert r.status_code == 200 and r.get_json()['data']['oauth2_role_tenants'] == []
+    assert _role_tenants(app) is None

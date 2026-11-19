@@ -26,7 +26,7 @@ from . import saml_sp
 from .account_state import (
     SSO_NO_PASSWORD, bounded, describe_conflict, legacy_sso_account, orphan_text, own_identity,
 )
-from .helpers import _clear_ldap_failed_attempts, _ldap_attempt_failed, _release_ldap_attempt, _reserve_ldap_attempt, _resolve_mapped_roles, _resolve_role, _build_ldap_tls, _decrypt_ldap_password, sso_admission, _mapping_rules, _external_groups, oidc_external_id, OIDC_TENANT_KEY
+from .helpers import _clear_ldap_failed_attempts, _ldap_attempt_failed, _release_ldap_attempt, _reserve_ldap_attempt, _resolve_mapped_roles, _resolve_role, _build_ldap_tls, _decrypt_ldap_password, sso_admission, _mapping_rules, _external_groups, oidc_external_id, OIDC_TENANT_KEY, roles_honoured
 from .diagnostics import GroupSource, refusal_diagnosis
 
 @bp.route('/api/v2/sso/ldap/login', methods=['POST'])
@@ -534,7 +534,10 @@ _GENERIC_SOURCES = {'oauth2': "the IdP's claims", 'saml': 'the assertion', 'ldap
 def _unmapped_refusal(provider, username, external_data=None, group_source=None):
     """(code, text, diagnosis) of the refusal for want of a role: the groups read, their
     source and the remedy."""
-    if _mapping_rules(provider):
+    if _mapping_rules(provider) and not roles_honoured(provider, external_data):
+        reason, code = ("the role claims of its tenant are not honoured (role tenants) and the "
+                        "provider has no default role"), NO_DEFAULT_ROLE
+    elif _mapping_rules(provider):
         reason, code = 'no role mapping rule matches it', UNMAPPED
     else:
         reason, code = 'the provider has no role mapping rule and no default role', NO_DEFAULT_ROLE
