@@ -1,9 +1,10 @@
 /**
  * AppShell Component - Atelier layout: top bar, page, status bar
  */
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Outlet, useLocation } from 'react-router-dom'
+import { LoadingSpinner } from './LoadingSpinner'
 import { TopBar } from './shell/TopBar'
 import { StatusBar } from './shell/StatusBar'
 import { StateBanners } from './shell/StateBanners'
@@ -158,7 +159,10 @@ export function AppShell() {
         <div className="shell-content">
           <StateBanners onShowNodes={showNodes} onNotice={notice} />
           <div className="shell-page" id="shell-page" tabIndex={-1}>
-            <Outlet />
+            {/* A page whose code is still loading waits here: the bars stay on screen */}
+            <Suspense fallback={<div className="shell-page-wait" role="status" aria-label={t('common.loading')}><LoadingSpinner size="lg" /></div>}>
+              <Outlet />
+            </Suspense>
           </div>
         </div>
         <InspectorDock />

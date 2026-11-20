@@ -1,5 +1,6 @@
 /** The shell around the page: bar, status bar, search entries, help, and the overlays it keeps mounted. */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { lazy, Suspense } from 'react'
 import { render, screen, within, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
@@ -210,6 +211,34 @@ describe('AppShell', () => {
     // The notification panel's own foot is not a bar of the page
     expect(document.querySelectorAll('footer:not(.shell-notif-foot)')).toHaveLength(1)
     expect(screen.queryByText(/^windows\./)).toBeNull()
+  })
+})
+
+describe('a page whose code is still loading', () => {
+  it('waits inside the page area: the bars stay on screen, the application loader does not replace them', async () => {
+    let arrive
+    const Slow = lazy(() => new Promise((resolve) => { arrive = () => resolve({ default: () => <p>slow page</p> }) }))
+    render(
+      <InspectorProvider>
+        <MemoryRouter initialEntries={['/certificates']}>
+          <Suspense fallback={<p>application loader</p>}>
+            <Routes>
+              <Route element={<AppShell />}>
+                <Route path="*" element={<Slow />} />
+              </Route>
+            </Routes>
+          </Suspense>
+        </MemoryRouter>
+      </InspectorProvider>
+    )
+    expect(screen.queryByText('application loader')).toBeNull()
+    expect(screen.getByRole('banner')).toBeVisible()
+    expect(screen.getByRole('contentinfo')).toBeVisible()
+    const wait = within(document.getElementById('shell-page')).getByRole('status', { name: 'common.loading' })
+    expect(wait).toBeVisible()
+    await act(async () => { arrive() })
+    expect(await screen.findByText('slow page')).toBeVisible()
+    expect(screen.queryByRole('status', { name: 'common.loading' })).toBeNull()
   })
 })
 
