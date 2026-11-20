@@ -18,6 +18,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('../../../contexts/ThemeContext', () => ({
   useTheme: () => ({
     ...theme.value, setThemeFamily: theme.setThemeFamily, setMode: theme.setMode,
+    // A family the context might still list never reaches the menu: the mockup's five choices only
     themes: [{ id: 'atelier', nameKey: 'themes.atelier', accent: 'x' }, { id: 'aurore', nameKey: 'themes.aurore', accent: 'y' }, { id: 'purple', nameKey: 'themes.purple', accent: 'z' }],
   }),
 }))
@@ -45,13 +46,16 @@ beforeEach(() => {
 })
 
 describe('ThemeMenu', () => {
-  it('offers the five choices of the mockup, then the other families', async () => {
+  it('offers the five choices of the mockup and nothing else', async () => {
     const user = setup()
     await user.click(trigger())
-    const names = screen.getAllByRole('menuitemradio').map(b => b.textContent)
-    expect(names.slice(0, 5)).toEqual(['shell.theme.system' + 'shell.theme.systemNow|shell.theme.dark', 'shell.theme.dark',
+    const menu = screen.getByRole('menu')
+    const names = within(menu).getAllByRole('menuitemradio').map(b => b.textContent)
+    expect(names).toEqual(['shell.theme.system' + 'shell.theme.systemNow|shell.theme.dark', 'shell.theme.dark',
       'shell.theme.light', 'shell.theme.aurore', 'shell.theme.auroreLight'])
-    expect(names.slice(5)).toEqual(['themes.purple'])
+    expect(within(menu).queryByRole('group')).toBeNull()
+    expect(within(menu).queryByRole('separator')).toBeNull()
+    expect([...menu.children].map(c => c.getAttribute('role'))).toEqual(Array(5).fill('menuitemradio'))
   })
 
   it('applies family and mode together, closes, and gives the focus back to the button', async () => {
@@ -66,9 +70,6 @@ describe('ThemeMenu', () => {
     await user.click(screen.getByRole('menuitemradio', { name: /shell\.theme\.system/ }))
     expect(theme.setThemeFamily).toHaveBeenLastCalledWith('atelier')
     expect(theme.setMode).toHaveBeenLastCalledWith('system')
-    await user.click(trigger())
-    await user.click(screen.getByRole('menuitemradio', { name: /themes\.purple/ }))
-    expect(theme.setThemeFamily).toHaveBeenLastCalledWith('purple')
   })
 
   it('checks the current choice and focuses it on open', async () => {
@@ -101,6 +102,7 @@ describe('ThemeMenu', () => {
     await user.keyboard('{ArrowUp}')
     const choices = within(screen.getByRole('menu')).getAllByRole('menuitemradio')
     expect(choices[choices.length - 1]).toHaveFocus()
+    expect(choices[choices.length - 1]).toHaveTextContent('shell.theme.auroreLight')
   })
 
   it('names the theme in force on the button, as the mockup: "Theme: System (dark)", a menu popup', () => {

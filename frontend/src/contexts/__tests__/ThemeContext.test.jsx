@@ -43,10 +43,10 @@ describe('ThemeContext', () => {
     mount()
     expect(attr('data-theme')).toBe('atelier')
     expect(attr('data-mode')).toBe('dark')
-    expect(api.themes.map((t) => t.id)).toEqual(['atelier', 'aurore', 'purple', 'sunset'])
+    expect(api.themes.map((t) => t.id)).toEqual(['atelier', 'aurore'])
   })
 
-  for (const family of ['atelier', 'aurore', 'purple', 'sunset']) {
+  for (const family of ['atelier', 'aurore']) {
     for (const mode of ['dark', 'light']) {
       it(`sets data-theme=${family} data-mode=${mode}`, () => {
         mount()
@@ -74,7 +74,7 @@ describe('ThemeContext', () => {
 
   it('writes no inline colour variable on <html>', () => {
     mount()
-    act(() => { api.setThemeFamily('purple') })
+    act(() => { api.setThemeFamily('aurore') })
     expect(document.documentElement.getAttribute('style') || '').not.toMatch(/--/)
   })
 
@@ -94,14 +94,14 @@ describe('ThemeContext', () => {
 
   it('a server gray arriving after another family switches to atelier', () => {
     mount()
-    act(() => { api.setThemeFamily('purple') })
+    act(() => { api.setThemeFamily('aurore') })
     act(() => { listeners.forEach((cb) => cb({ theme_family: 'gray' })) })
     expect(attr('data-theme')).toBe('atelier')
   })
 
   it("setCurrentTheme('gray') selects atelier", () => {
     mount()
-    act(() => { api.setThemeFamily('purple') })
+    act(() => { api.setThemeFamily('aurore') })
     act(() => { api.setCurrentTheme('gray') })
     expect(attr('data-theme')).toBe('atelier')
   })
@@ -110,6 +110,54 @@ describe('ThemeContext', () => {
     localStorage.setItem('ucm-theme-family', 'nope')
     mount()
     expect(attr('data-theme')).toBe('atelier')
+  })
+
+  // The families of 2.x and of earlier 3.0 builds are gone: Atelier in the stored mode, nothing written back
+  for (const gone of ['purple', 'sunset', 'ocean', 'forest', 'cyber']) {
+    it(`a stored ${gone} (localStorage) gives Atelier in the stored mode`, () => {
+      localStorage.setItem('ucm-theme-family', gone)
+      localStorage.setItem('ucm-theme-mode', 'light')
+      mount()
+      expect(attr('data-theme')).toBe('atelier')
+      expect(attr('data-mode')).toBe('light')
+      expect(localStorage.getItem('ucm-theme-family')).toBe('atelier')
+      expect(persistPreference).not.toHaveBeenCalled()
+    })
+
+    it(`a server ${gone} gives Atelier in the stored mode, over another family kept in the browser`, () => {
+      localStorage.setItem('ucm-theme-family', 'aurore')
+      prefs.value = { theme_family: gone, theme_mode: 'light' }
+      mount()
+      expect(attr('data-theme')).toBe('atelier')
+      expect(attr('data-mode')).toBe('light')
+      expect(api.themeFamily).toBe('atelier')
+      expect(persistPreference).not.toHaveBeenCalled()
+    })
+  }
+
+  it('a retired family pushed again and again settles on Atelier without a write loop', () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem')
+    mount()
+    act(() => { api.setThemeFamily('aurore') })
+    persistPreference.mockClear()
+    setItem.mockClear()
+    for (let i = 0; i < 5; i++) act(() => { listeners.forEach((cb) => cb({ theme_family: 'purple', theme_mode: 'dark' })) })
+    expect(attr('data-theme')).toBe('atelier')
+    expect(persistPreference).not.toHaveBeenCalled()
+    // One switch to Atelier writes the two keys once; the next identical pushes write nothing
+    expect(setItem.mock.calls.filter(([k]) => k === 'ucm-theme-family')).toEqual([['ucm-theme-family', 'atelier']])
+    setItem.mockRestore()
+  })
+
+  it('a retired family asked through the setters selects Atelier', () => {
+    mount()
+    act(() => { api.setThemeFamily('aurore') })
+    act(() => { api.setCurrentTheme('purple') })
+    expect(attr('data-theme')).toBe('atelier')
+    act(() => { api.setThemeFamily('aurore') })
+    act(() => { api.setThemeFamily('sunset') })
+    expect(attr('data-theme')).toBe('atelier')
+    expect(persistPreference).toHaveBeenLastCalledWith('theme_family', 'atelier')
   })
 
   it('system mode follows matchMedia changes', () => {

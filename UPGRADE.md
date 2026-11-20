@@ -311,6 +311,7 @@ Database migrations run automatically at startup.
 
 - The side bar is replaced by a top bar with the Modules menu and pinned modules, and the floating detail windows by one docked inspector with a tab per object. Page addresses are kept, `/dashboard` included.
 - The overview replaces the dashboard: its choice of cards is saved with the account, and the widget layout 2.x kept in the browser is not carried over. The Gray theme is now called Atelier and is applied in its place.
+- The Purple Night and Orange Sunset themes are removed: 3.0 offers System, Dark, Light, Aurore dark and Aurore light only. An account set to Purple Night, Orange Sunset or another theme 3.0 does not offer opens in Atelier with its dark, light or system mode kept; the stored preference is left as it was until the user picks a theme.
 
 ### Upgrading to v2.243
 

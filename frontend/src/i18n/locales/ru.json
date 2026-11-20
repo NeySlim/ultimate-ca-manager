@@ -3142,9 +3142,7 @@
     "colorThemeDesc": "Выберите цветовую схему по своему вкусу",
     "themeFamilies": {
       "atelier": "Atelier",
-      "aurore": "Aurore",
-      "purple": "Пурпурная ночь",
-      "sunset": "Оранжевый закат"
+      "aurore": "Aurore"
     },
     "appearanceMode": "Режим оформления",
     "appearanceModeDesc": "Определяет, как интерфейс подстраивается под яркость",
@@ -7603,8 +7601,7 @@
       "dark": "Тёмная",
       "light": "Светлая",
       "aurore": "Аврора тёмная",
-      "auroreLight": "Аврора светлая",
-      "more": "Другие темы"
+      "auroreLight": "Аврора светлая"
     },
     "bell": {
       "title": "Уведомления",

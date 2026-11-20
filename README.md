@@ -78,7 +78,7 @@
 - **Global Search** -- Cross-resource search and command palette (Ctrl+K)
 
 ### Platform
-- **6 Themes** -- 3 color schemes (Gray, Purple Night, Orange Sunset) × Light/Dark; **per-user preferences persisted server-side** (language, theme, mode)
+- **Themes** -- Atelier and Aurore, each dark or light, or following the system; **per-user preferences persisted server-side** (language, theme, mode)
 - **i18n** -- 10 languages (EN, FR, DE, ES, IT, PT, UK, RU, ZH, JA)
 - **Persisted UI state** -- Filter selections persist across reloads on the main list pages (certificates, CAs, templates, policies, audit logs, trust store, users, SSH)
 - **Database** -- SQLite (default) or **native PostgreSQL backend** with bidirectional migration UI
