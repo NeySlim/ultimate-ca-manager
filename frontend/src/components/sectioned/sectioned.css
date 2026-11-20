@@ -160,6 +160,10 @@
   .sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) > .sf-short:not([hidden]) { grid-column: span 1; }
   .sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) > .sf-wide:not([hidden]) { grid-column: 1 / -1; }
 }
+/* Release notes read in a frame: headings at the legend size */
+.sf-body .prose :is(h1, h2, h3, h4) { font-size: 13px; line-height: 1.4; font-weight: 500; }
+/* A count inside a segment (Operations resource types), muted as the mockup's counts */
+.sf-body .ui-segmented .ops-count { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
 /* A button placed straight in a field grid keeps the width of its text */
 .sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) > :is(button, a.lv-btn) { justify-self: start; }
 /* A segmented choice keeps the width of its segments */

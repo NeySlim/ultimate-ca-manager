@@ -88,6 +88,14 @@ describe('OperationsPage sections', () => {
     expect(screen.queryByRole('heading', { level: 2, name: 'common.import' })).toBeNull()
   })
 
+  it('picks the bulk resource type from a segmented choice', async () => {
+    open('/operations?tab=bulk')
+    const group = await screen.findByRole('group', { name: 'operations.selectResource' })
+    expect(group).toHaveClass('ui-segmented')
+    const pressed = within(group).getAllByRole('button').filter((b) => b.getAttribute('aria-pressed') === 'true')
+    expect(pressed).toHaveLength(1)
+  })
+
   it('switches the frame from the table of contents and from the phone list', async () => {
     open()
     fireEvent.click(within(toc()).getByRole('link', { name: 'common.export' }))

@@ -992,32 +992,22 @@ export default function OperationsPage() {
         ) : (
           /* Desktop: two rows — chips, then search + filters + toggle */
           <div className="space-y-2">
-            <div className="flex items-center gap-1.5">
+            {/* The resource type as the mockup's segmented choice, its count after the name */}
+            <div className="ui-segmented" role="group" aria-label={t('operations.selectResource')}>
               {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
                 const Icon = config.icon
                 const isActive = bulkResourceType === key
                 const count = resourceCounts[key]
                 return (
                   <button
+                    type="button"
                     key={key}
+                    aria-pressed={isActive}
                     onClick={() => { setBulkResourceType(key); try { localStorage.setItem('ucm-ops-resource-type', key) } catch {}; setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()); setBulkSearch(''); setBulkPage(1); seenItemsRef.current.clear() }}
-                    className={cn(
-                      "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all border",
-                      isActive
-                        ? "border-accent-primary-op40 bg-accent-primary-op10 text-accent-primary"
-                        : "border-border bg-bg-primary text-text-secondary hover:text-text-primary hover:border-border-hover"
-                    )}
                   >
-                    <Icon size={15} weight={isActive ? "fill" : "duotone"} />
+                    <Icon size={14} aria-hidden="true" />
                     {t(`common.${key}Short`, key)}
-                    {count !== undefined && (
-                      <span className={cn(
-                        "text-xs font-semibold px-1.5 py-0.5 rounded-full min-w-[18px] text-center",
-                        isActive ? "bg-accent-primary-op15 text-accent-primary" : "bg-bg-tertiary text-text-tertiary"
-                      )}>
-                        {count}
-                      </span>
-                    )}
+                    {count !== undefined && <span className="ops-count">{count}</span>}
                   </button>
                 )
               })}
