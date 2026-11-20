@@ -62,6 +62,10 @@ test('the expiry count sits on its own link: no other link covered, the link kee
       const own = nav.locator('a.shell-navlink[data-module="certificates"]')
       await expect(own).toContainText(/certificates? expir/)
       const b = await box(badge)
+      // It covers neither the icon of its own link nor its label
+      expect(apart(b, await box(own.locator('> span:not(.shell-navicon):not(.sr-only)'))), `${path} at ${width}: label`).toBe(true)
+      const icon = own.locator('svg')
+      if (await icon.isVisible()) expect(apart(b, await box(icon)), `${path} at ${width}: icon`).toBe(true)
       // A link folded away at this width (a pin another test set) covers nothing
       for (const link of await nav.locator('a.shell-navlink:not([data-module="certificates"]):visible').all()) {
         expect(apart(b, await box(link)), `${path} at ${width}: ${await link.getAttribute('data-module')}`).toBe(true)

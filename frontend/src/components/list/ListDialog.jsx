@@ -9,8 +9,8 @@ import { cn } from '../../lib/utils'
 import './list.css'
 
 // Initial focus, as the mockup: an element marked data-autofocus (the safe action of a confirmation),
-// else the first field of the body, else Radix's default (the close button)
-const FIELDS = 'input:not([type="hidden"]):not([disabled]):not([readonly]):not([tabindex="-1"]), select:not([disabled]), textarea:not([disabled]):not([readonly])'
+// else the first field to fill (a list of check boxes is not one), else Radix's default (the close button)
+const FIELDS = 'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([disabled]):not([readonly]):not([tabindex="-1"]), select:not([disabled]), textarea:not([disabled]):not([readonly])'
 function focusFirstField(event) {
   const body = event.currentTarget?.querySelector('.lv-dialog-body')
   if (!body || body.contains(document.activeElement)) return

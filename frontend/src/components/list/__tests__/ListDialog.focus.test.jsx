@@ -33,6 +33,11 @@ describe('ListDialog initial focus', () => {
     expect(await screen.findByRole('button', { name: 'Cancel' })).toHaveFocus()
   })
 
+  it('keeps the close button over a list of check boxes, as the mockup\'s Columns dialog', async () => {
+    open(<><label><input type="checkbox" />Name</label><label><input type="checkbox" />State</label></>)
+    expect(await screen.findByRole('button', { name: 'common.closeWindow' })).toHaveFocus()
+  })
+
   it('keeps the close button when the body has nothing to fill', async () => {
     open(<p>Three nodes are up to date.</p>)
     expect(await screen.findByRole('button', { name: 'common.closeWindow' })).toHaveFocus()
