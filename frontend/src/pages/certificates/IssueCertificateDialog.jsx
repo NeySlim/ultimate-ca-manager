@@ -15,6 +15,7 @@ import { usePermission } from '../../hooks'
 import { issueWithSubjectOverride } from '../../lib/uniqueSubject'
 import { noticesOf } from '../../lib/notices'
 import { IssueCertificateForm } from './IssueCertificateForm'
+import { escapeYielded } from '../../components/list/dialogEscape'
 import './issue/issue.css'
 
 const P = 'certificates.issueForm.'
@@ -192,6 +193,8 @@ export function IssueCertificateDialog({
             e.preventDefault()
             if (opener.current?.isConnected) opener.current.focus()
           }}
+          // A toast above the dialog yields it an Escape typed here (still refused while sending)
+          onKeyDown={(e) => { if (e.key === 'Escape' && escapeYielded(e.nativeEvent)) changeOpen(false) }}
           // A modal of the Atelier closes by its buttons or Escape, never by a click beside it
           onPointerDownOutside={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}>
