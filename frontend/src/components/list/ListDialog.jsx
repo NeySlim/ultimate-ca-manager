@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/utils'
 import './list.css'
 
-export function ListDialog({ open, onOpenChange, title, subtitle, narrow = true, children, className, testId }) {
+export function ListDialog({ open, onOpenChange, title, subtitle, narrow = true, closable = true, children, className, testId }) {
   const { t } = useTranslation()
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -21,9 +21,11 @@ export function ListDialog({ open, onOpenChange, title, subtitle, narrow = true,
               <Dialog.Title asChild><h2>{title}</h2></Dialog.Title>
               {subtitle && <p>{subtitle}</p>}
             </div>
-            <Dialog.Close className="lv-btn is-icon is-quiet" aria-label={t('common.closeWindow')}>
-              <X size={16} aria-hidden="true" />
-            </Dialog.Close>
+            {closable && (
+              <Dialog.Close className="lv-btn is-icon is-quiet" aria-label={t('common.closeWindow')}>
+                <X size={16} aria-hidden="true" />
+              </Dialog.Close>
+            )}
           </header>
           <div className="lv-dialog-body">{children}</div>
         </Dialog.Content>

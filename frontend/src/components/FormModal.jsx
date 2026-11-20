@@ -18,6 +18,7 @@
  * </FormModal>
  */
 import { useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Modal } from './Modal'
 import { Button } from './Button'
 import { LoadingSpinner } from './LoadingSpinner'
@@ -32,8 +33,8 @@ export function FormModal({
   
   // Form props
   onSubmit,
-  submitLabel = 'Save',
-  cancelLabel = 'Cancel',
+  submitLabel,
+  cancelLabel,
   loading = false,
   disabled = false,
   variant = 'primary', // 'primary' | 'danger'
@@ -44,6 +45,7 @@ export function FormModal({
   // Footer customization
   footer,
 }) {
+  const { t } = useTranslation()
   // Only four of the six call sites pass `loading`, so the submit button often
   // stays live while the request runs and a second Enter re-runs the action.
   // The ref guard is independent of that prop and costs no re-render.
@@ -80,19 +82,19 @@ export function FormModal({
       size={size}
     >
       <form onSubmit={handleSubmit}>
-        <div className="p-4 space-y-4">
+        <div className="space-y-4">
           {children}
         </div>
 
         {footer ?? (
-          <div className="flex justify-end gap-2 p-4 border-t border-border">
+          <div className="ui-dialog-actions">
             <Button
               type="button"
               variant="secondary"
               onClick={handleClose}
               disabled={loading}
             >
-              {cancelLabel}
+              {cancelLabel ?? t('common.cancel')}
             </Button>
             <Button
               type="submit"
@@ -102,10 +104,10 @@ export function FormModal({
               {loading ? (
                 <>
                   <LoadingSpinner size="sm" />
-                  <span className="ml-2">Saving...</span>
+                  <span>{t('common.saving')}</span>
                 </>
               ) : (
-                submitLabel
+                submitLabel ?? t('common.save')
               )}
             </Button>
           </div>
@@ -122,24 +124,23 @@ export function ConfirmModal({
   open,
   onClose,
   onConfirm,
-  title = 'Confirm',
+  title,
   message,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   variant = 'danger',
   loading = false,
 }) {
+  const { t } = useTranslation()
   return (
-    <Modal open={open} onClose={onClose} title={title} size="sm">
-      <div className="p-4">
-        <p className="text-sm text-text-secondary">{message}</p>
-      </div>
-      <div className="flex justify-end gap-2 p-4 border-t border-border">
+    <Modal open={open} onClose={onClose} title={title ?? t('common.confirm')} size="sm">
+      <p className="ui-dialog-message">{message}</p>
+      <div className="ui-dialog-actions">
         <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
-          {cancelLabel}
+          {cancelLabel ?? t('common.cancel')}
         </Button>
         <Button type="button" variant={variant} onClick={onConfirm} disabled={loading}>
-          {loading ? <LoadingSpinner size="sm" /> : confirmLabel}
+          {loading ? <LoadingSpinner size="sm" /> : (confirmLabel ?? t('common.confirm'))}
         </Button>
       </div>
     </Modal>

@@ -1601,6 +1601,7 @@
     "yes": "Oui",
     "no": "Non",
     "ok": "OK",
+    "inputRequired": "Saisie requise",
     "apply": "Appliquer",
     "reset": "Réinitialiser",
     "back": "Retour",
