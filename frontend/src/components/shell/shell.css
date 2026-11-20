@@ -2,7 +2,6 @@
  * Atelier shell: top bar, Modules mega-menu, account popover, status bar.
  * Tokens only (styles/tokens.css); Aurore effects sit under its family selector.
  */
-/* Read by the inspector dock, which sits outside the shell and above the status bar */
 :root { --shell-status-h: 28px; }
 .shell-root {
   --shell-bar-h: 56px;
@@ -15,17 +14,16 @@
   background: var(--bg);
   color: var(--text);
 }
-/* Bar and page: the only area that makes room for the dock (variables set by InspectorDock) */
+/* Bar and page; the page and the inspector share the main area, in a column or side by side */
 .shell-stage {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  padding-bottom: var(--inspector-reserve-bottom, 0);
-  padding-right: var(--inspector-reserve-right, 0);
 }
-.shell-main { flex: 1; display: flex; min-height: 0; min-width: 0; overflow: auto; }
+.shell-main { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
+.shell-main.has-dock-right { flex-direction: row; }
 .shell-content { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
 
 /* Top bar */

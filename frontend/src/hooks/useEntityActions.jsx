@@ -11,7 +11,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Certificate, ShieldCheck, Trash, X, ArrowsClockwise, ShieldWarning, PushPin,
-  SealCheck, Vault, PencilSimple, Key,
+  SealCheck, Vault, PencilSimple, Key, UploadSimple,
 } from '@phosphor-icons/react'
 import { useNotification } from '../contexts'
 import { usePermission } from './index'
@@ -23,6 +23,7 @@ import { TakeOfflineModal } from '../components/cas/TakeOfflineModal'
 import { RestoreModal } from '../components/cas/RestoreModal'
 import { ImportCaKeyModal } from '../components/cas/ImportCaKeyModal'
 import { UploadCACertModal } from '../pages/cas/UploadCACertModal'
+import { UploadKeyModal } from '../pages/certificates/UploadKeyModal'
 import { certificatesService, casService, userCertificatesService } from '../services'
 import { ENTITY_RESOURCE, entityService, entityTitle } from '../lib/entityDetail'
 import { isOnHold, downloadBlob } from '../lib/utils'
@@ -69,6 +70,7 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
   const [restoreOpen, setRestoreOpen] = useState(false)
   const [importKeyOpen, setImportKeyOpen] = useState(false)
   const [uploadCertOpen, setUploadCertOpen] = useState(false)
+  const [uploadKeyOpen, setUploadKeyOpen] = useState(false)
   // The operator asked to delete a still-valid certificate and accepted to
   // revoke it first; the deletion resumes once the revocation is through.
   const [deleteAfterRevoke, setDeleteAfterRevoke] = useState(false)
@@ -324,6 +326,9 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
     row({ id: 'pins', label: t('templates.managePins', 'Manage Pins'), icon: PushPin,
       onClick: handleManagePins,
       visible: isCA && canWrite('cas') && canWrite('templates') && !data.pending }),
+    // A certificate held without its key takes one (the route checks it matches)
+    row({ id: 'uploadKey', label: t('certificates.uploadKey'), icon: UploadSimple,
+      onClick: () => setUploadKeyOpen(true), visible: isCert && canWrite('certificates') && !hasPrivateKey }),
     row({ id: 'rename', label: t('certificates.rename', 'Rename'), icon: PencilSimple,
       onClick: handleRename, visible: isCert && canWrite('certificates') }),
     row({ id: 'renew', label: t('common.renew', 'Renew'), icon: ArrowsClockwise, tone: 'success',
@@ -388,6 +393,10 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
           title={isCA ? t('cas.revoke', 'Revoke CA') : undefined}
           warning={isCA ? t('cas.revokeWarning') : undefined}
         />
+      )}
+      {isCert && (
+        <UploadKeyModal open={uploadKeyOpen} onOpenChange={setUploadKeyOpen} selectedCert={data} t={t}
+          onUploadComplete={(updated) => { if (updated?.id) onChanged?.({ ...data, ...updated }); refresh() }} />
       )}
       {lintable && (
         <KeyRecoveryRequestModal certId={id} certName={title} open={keyRecoveryOpen} onClose={() => setKeyRecoveryOpen(false)} />

@@ -923,7 +923,12 @@
     "exportSelectedPem": "导出为 PEM",
     "bulkExported_one": "已导出 {{count}} 个证书",
     "bulkExported_other": "已导出 {{count}} 个证书",
-    "listLabel": "证书列表"
+    "listLabel": "证书列表",
+    "uploadKey": "上传私钥",
+    "listNote": "已打开的证书仍可在检查器中查看。",
+    "loadFailed": "无法加载证书",
+    "loadFailedCause": "原因：{{message}}。其他视图和检查器仍可使用。",
+    "viewLog": "查看日志"
   },
   "cas": {
     "chainRevoked": "上游已吊销",
@@ -4279,7 +4284,16 @@
     "inDays_one": "{{count}} 天后",
     "inDays_other": "{{count}} 天后",
     "overdueDays_one": "已过期 {{count}} 天",
-    "overdueDays_other": "已过期 {{count}} 天"
+    "overdueDays_other": "已过期 {{count}} 天",
+    "short": {
+      "days_one": "{{count}} 天",
+      "days_other": "{{count}} 天",
+      "months_one": "{{count}} 个月",
+      "months_other": "{{count}} 个月",
+      "years_one": "{{count}} 年",
+      "years_other": "{{count}} 年",
+      "expired": "已过期"
+    }
   },
   "validation": {
     "required": "此字段必填",
@@ -4680,7 +4694,63 @@
       "overview": "概览",
       "chain": "证书链",
       "extensions": "扩展",
-      "pem": "PEM"
+      "pem": "PEM",
+      "history": "历史"
+    },
+    "moreOpen_one": "另有 {{count}} 个已打开的对象",
+    "moreOpen_other": "另有 {{count}} 个已打开的对象",
+    "hiddenObjects": "未显示的已打开对象",
+    "expand": "展开检查器",
+    "collapse": "折叠检查器",
+    "moreActions": "{{name}} 的其他操作",
+    "cert": {
+      "validity": "证书有效期",
+      "remaining": "剩余",
+      "days_one": "{{count}} 天",
+      "days_other": "{{count}} 天",
+      "validityLeft": "剩余 {{percent}}% 的有效期",
+      "revokedNotice": "此证书不得再使用。",
+      "revokedOn": "已于 {{date}} 吊销：{{reason}}。",
+      "renewSoon_one": "需在 {{count}} 天内续期。",
+      "renewSoon_other": "需在 {{count}} 天内续期。",
+      "expiredNotice_one": "已过期 {{count}} 天：请续期或替换。",
+      "expiredNotice_other": "已过期 {{count}} 天：请续期或替换。",
+      "lastFailure": "最近一次失败",
+      "order": "订单 #{{id}}",
+      "identity": "身份与密钥",
+      "none": "无",
+      "altName": "备用名称",
+      "signature": "签名",
+      "obsolete": "已过时",
+      "origin": "来源 / 模板",
+      "keyHeld": "保存在 UCM 中",
+      "keyNotHeld": "未保存在 UCM 中",
+      "compliance": "合规",
+      "chainOfTrust": "信任链",
+      "trustStore": "信任存储",
+      "moreDetails": "更多详情",
+      "rootCa": "根证书颁发机构",
+      "trustStoreAnchor": "信任存储锚点",
+      "intermediateCa": "中间证书颁发机构 · 第 {{level}} 级",
+      "inspectCa": "查看颁发机构",
+      "crossSigned": "交叉签名",
+      "variants_one": "提供 {{count}} 种证书链：导出时选择。",
+      "variants_other": "提供 {{count}} 种证书链：导出时选择其一。",
+      "noExtensions": "没有可显示的扩展。",
+      "critical": "关键",
+      "noPem": "此证书没有 PEM。",
+      "favorite": "添加到收藏",
+      "unfavorite": "从收藏中移除"
+    },
+    "history": {
+      "issued": "证书已签发",
+      "imported": "证书已导入",
+      "renewed": "证书已续期",
+      "revoked": "证书已吊销：{{reason}}",
+      "failed": "失败",
+      "noAudit": "您的角色无法读取审计日志：仅显示证书记录中的日期。",
+      "auditFailed": "无法读取审计日志：仅显示证书记录中的日期。",
+      "scope": "最近 {{count}} 次证书操作中的审计日志条目，以及证书记录中的日期。"
     }
   },
   "table": {
@@ -4723,7 +4793,15 @@
     "selectRow": "选择 {{name}}",
     "open": "打开",
     "openRow": "打开 {{name}}",
-    "rowAction": "{{action}}：{{name}}"
+    "rowAction": "{{action}}：{{name}}",
+    "retry": "重试",
+    "rowsNote_one": "每行 {{px}} px · {{count}} 列",
+    "rowsNote_other": "每行 {{px}} px · {{count}} 列",
+    "page": "页",
+    "pageOf": "共 {{total}} 页",
+    "goToPage": "转到",
+    "pageNumber": "页码",
+    "loadingRows": "正在加载行"
   },
   "reconnect": {
     "countdown": "服务正在重启...",

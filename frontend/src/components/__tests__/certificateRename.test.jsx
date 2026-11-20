@@ -2,7 +2,7 @@
  * Rename (#286) from the detail views: the floating window on desktop and
  * the action bar of the page slide-over, both on write:certificates.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const authState = vi.hoisted(() => ({ permissions: [] }))
@@ -48,6 +48,7 @@ vi.mock('../../services', () => ({
 
 import { InspectorObject } from '../inspector/InspectorObject'
 import { ActionsHarness } from '../detail/__tests__/ActionsHarness'
+import { chooseMoreAction, openMoreActions } from '../../test/moreActions'
 
 const CERT = { id: 4, common_name: 'web.example.com', descr: 'Front door', status: 'valid' }
 const WINDOW = { key: 'certificate:4', type: 'certificate', entityId: 4, data: null }
@@ -65,7 +66,7 @@ describe('rename in the floating detail window', () => {
     const changed = vi.fn()
     window.addEventListener('ucm:data-changed', changed)
     render(<InspectorObject entry={WINDOW} onTitle={() => {}} />)
-    fireEvent.click(await screen.findByText('certificates.rename'))
+    await chooseMoreAction('certificates.rename')
     await waitFor(() => expect(certs.rename).toHaveBeenCalledWith(4, 'Back door'))
     await waitFor(() => expect(changed).toHaveBeenCalled())
     expect(changed.mock.calls[0][0].detail).toEqual({ type: 'certificate' })
@@ -76,7 +77,7 @@ describe('rename in the floating detail window', () => {
     authState.permissions = ['read:certificates', 'write:certificates']
     notify.showPrompt.mockResolvedValueOnce('Front door ')
     render(<InspectorObject entry={WINDOW} onTitle={() => {}} />)
-    fireEvent.click(await screen.findByText('certificates.rename'))
+    await chooseMoreAction('certificates.rename')
     await waitFor(() => expect(notify.showPrompt).toHaveBeenCalled())
     expect(certs.rename).not.toHaveBeenCalled()
   })
@@ -85,7 +86,7 @@ describe('rename in the floating detail window', () => {
     authState.permissions = ['read:certificates']
     render(<InspectorObject entry={WINDOW} onTitle={() => {}} />)
     await screen.findByText('export.title')
-    expect(screen.queryByText('certificates.rename')).not.toBeInTheDocument()
+    expect(within(await openMoreActions()).queryByRole('menuitem', { name: 'certificates.rename' })).toBeNull()
   })
 })
 

@@ -1,24 +1,25 @@
 /**
- * InspectorObject: loads one opened entity, then renders the shared action bar,
- * the section tabs and the pure detail panel; the actions themselves live in
- * hooks/useEntityActions. The action modals are returned beside the body so
- * they sit outside the dock region.
+ * InspectorObject: loads one opened entity and renders its body in the dock. A
+ * certificate gets the Atelier detail (heading, actions, Overview, Chain,
+ * Extensions, History, PEM); the other types keep their panel under the same
+ * heading. The actions live in hooks/useEntityActions; their modals are returned
+ * beside the body.
  */
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CertificatePanel } from '../detail/CertificatePanel'
 import { CAPanel } from '../detail/CAPanel'
 import { TrustCertPanel } from '../detail/TrustCertPanel'
+import { CertificatePanel } from '../detail/CertificatePanel'
 import { ActionBar } from '../detail/ActionBar'
 import { useInspector } from '../../contexts/InspectorContext'
 import { usePermission } from '../../hooks'
 import { useEntityActions } from '../../hooks/useEntityActions'
 import { entityTitle, entitySubtitle } from '../../lib/entityDetail'
 import { extractData } from '../../lib/utils'
-import { LoadingSpinner } from '../LoadingSpinner'
-import { cn } from '../../lib/utils'
 import { INSPECTOR_TYPES } from './config'
 import { SectionTabs, tabId, panelId } from './InspectorTabs'
+import { CertificateDetail } from './certificate/CertificateDetail'
+import { DetailSkeleton } from './certificate/DetailSkeleton'
 
 export function InspectorObject({ entry, onTitle }) {
   const { t } = useTranslation()
@@ -54,42 +55,48 @@ export function InspectorObject({ entry, onTitle }) {
 
   if (!config) return null
   const Icon = config.icon
-  const sections = config.sections
+
+  let body
+  if (loading) body = <DetailSkeleton />
+  else if (!data) body = <div className="ins-empty">{failed ? t('inspector.loadFailed') : t('common.notFound', 'Not found')}</div>
+  else if (type === 'certificate') {
+    body = (
+      <CertificateDetail cert={data} objectKey={key} title={title} actions={actions} section={section}
+        onSection={setSection} onChanged={setData} onOpenRelated={(id) => openEntity('certificate', id)}
+        onOpenCa={(id) => openEntity('ca', id)} />
+    )
+  } else {
+    body = (
+      <>
+        <header className="ins-heading">
+          <div className="ins-title">
+            <Icon className="ins-title-icon" weight="duotone" aria-hidden="true" />
+            <div className="min-w-0">
+              <h2>{title}</h2>
+              <p className="ins-subtitle">{entitySubtitle(type, data, t)}</p>
+            </div>
+          </div>
+        </header>
+        <div className="ins-legacy-actions"><ActionBar actions={actions} /></div>
+        <SectionTabs objectKey={key} sections={config.sections} current={section} onSelect={setSection} />
+        <div role="tabpanel" id={`${panelId(key)}-section`} aria-labelledby={`${tabId(key)}-${section}`} className="ins-legacy">
+          {type === 'ca' ? (
+            <CAPanel ca={data} embedded section={section} onImportKey={handler('importKey')} onCaChanged={setData}
+              canWriteCas={canWrite('cas')} canAttachProfile={canWrite('cas') && hasPermission('admin:system')} />
+          ) : type === 'truststore' ? (
+            <TrustCertPanel cert={data} embedded section={section} />
+          ) : (
+            <CertificatePanel certificate={data} embedded section={section} />
+          )}
+        </div>
+      </>
+    )
+  }
 
   return (
     <>
-      <div role="tabpanel" id={panelId(key)} aria-labelledby={tabId(key)} className="flex-1 min-h-0 flex flex-col">
-        {loading ? (
-          <div className="flex-1 flex items-center justify-center"><LoadingSpinner size="md" /></div>
-        ) : data ? (
-          <>
-            <div className="shrink-0 flex items-center gap-2 px-3 py-2">
-              <div className={cn('p-1.5 rounded-lg shrink-0', config.iconClass)}><Icon size={16} weight="duotone" /></div>
-              <div className="min-w-0">
-                <h2 className="text-sm font-semibold text-text-primary truncate">{title}</h2>
-                <p className="text-xs text-text-tertiary truncate">{entitySubtitle(type, data, t)}</p>
-              </div>
-            </div>
-            <ActionBar actions={actions} />
-            <SectionTabs objectKey={key} sections={sections} current={section} onSelect={setSection} />
-            <div role="tabpanel" id={`${panelId(key)}-section`} aria-labelledby={`${tabId(key)}-${section}`}
-              className="flex-1 min-h-0 overflow-y-auto">
-              {type === 'ca' ? (
-                <CAPanel ca={data} embedded section={section} onImportKey={handler('importKey')} onCaChanged={setData}
-                  canWriteCas={canWrite('cas')} canAttachProfile={canWrite('cas') && hasPermission('admin:system')} />
-              ) : type === 'truststore' ? (
-                <TrustCertPanel cert={data} embedded section={section} />
-              ) : (
-                <CertificatePanel certificate={data} embedded section={section}
-                  onOpenRelated={type === 'certificate' ? (id) => openEntity('certificate', id) : undefined} />
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-text-tertiary text-sm">
-            {failed ? t('inspector.loadFailed') : t('common.notFound', 'Not found')}
-          </div>
-        )}
+      <div role="tabpanel" id={panelId(key)} aria-labelledby={tabId(key)} className="ins-object">
+        {body}
       </div>
       {modals}
     </>
