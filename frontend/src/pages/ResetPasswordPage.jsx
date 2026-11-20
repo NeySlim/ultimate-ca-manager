@@ -1,11 +1,12 @@
 /**
- * ResetPassword Page - Set new password using reset token
+ * New password from an emailed reset link (?token=), in the sign-in frame.
  */
-import { useState, useEffect } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Lock, CheckCircle, Warning, ArrowLeft } from '@phosphor-icons/react'
-import { Card, Button, Input, Logo } from '../components'
+import { CaretRight, Warning } from '@phosphor-icons/react'
+import { AuthFrame, AuthField } from '../components/auth/AuthFrame'
+import { PasswordMeter } from '../components/auth/PasswordMeter'
 import { authService } from '../services'
 
 export default function ResetPasswordPage() {
@@ -19,12 +20,7 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
-
-  useEffect(() => {
-    if (!token) {
-      setError(t('auth.invalidResetLink'))
-    }
-  }, [token])
+  const titleRef = useRef(null)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -44,6 +40,7 @@ export default function ResetPasswordPage() {
     try {
       await authService.resetPassword(token, password)
       setSuccess(true)
+      setTimeout(() => titleRef.current?.focus(), 0)
     } catch (err) {
       setError(err.message || t('auth.resetFailed'))
     } finally {
@@ -51,116 +48,62 @@ export default function ResetPasswordPage() {
     }
   }
 
+  if (success) {
+    return (
+      <AuthFrame ref={titleRef} title={t('auth.passwordReset')} lead={t('auth.passwordResetSuccess')}>
+        <button type="button" className="auth-btn is-primary auth-submit" onClick={() => navigate('/login')}>
+          <CaretRight size={16} aria-hidden="true" />{t('auth.goToLogin')}
+        </button>
+      </AuthFrame>
+    )
+  }
+
+  if (!token) {
+    return (
+      <AuthFrame ref={titleRef} title={t('auth.invalidLink')} lead={t('auth.invalidLinkDesc')}>
+        <Link to="/forgot-password" className="auth-btn is-primary auth-submit">
+          <CaretRight size={16} aria-hidden="true" />{t('auth.requestNewResetLink')}
+        </Link>
+        <Link to="/login" className="auth-link">{t('auth.backToLogin')}</Link>
+      </AuthFrame>
+    )
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg-primary p-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <Logo variant="stacked" size="lg" className="mx-auto" />
-        </div>
-
-        <Card className="p-6">
-          {success ? (
-            <div className="text-center space-y-4">
-              <div className="flex justify-center">
-                <div className="p-4 rounded-full bg-accent-success-op15">
-                  <CheckCircle size={48} weight="duotone" className="text-accent-success" />
-                </div>
-              </div>
-              
-              <div>
-                <h2 className="text-xl font-semibold text-text-primary">{t('auth.passwordReset')}</h2>
-                <p className="text-sm text-text-secondary mt-2">
-                  {t('auth.passwordResetSuccess')}
-                </p>
-              </div>
-
-              <Button type="button" onClick={() => navigate('/login')} className="w-full">
-                {t('auth.goToLogin')}
-              </Button>
-            </div>
-          ) : !token ? (
-            <div className="text-center space-y-4">
-              <div className="flex justify-center">
-                <div className="p-4 rounded-full bg-accent-danger-op15">
-                  <Warning size={48} weight="duotone" className="text-accent-danger" />
-                </div>
-              </div>
-              
-              <div>
-                <h2 className="text-xl font-semibold text-text-primary">{t('auth.invalidLink')}</h2>
-                <p className="text-sm text-text-secondary mt-2">
-                  {t('auth.invalidLinkDesc')}
-                </p>
-              </div>
-
-              <Link to="/forgot-password">
-                <Button variant="secondary" className="w-full">
-                  {t('auth.requestNewResetLink')}
-                </Button>
-              </Link>
-            </div>
-          ) : (
-            <>
-              <div className="text-center mb-6">
-                <h2 className="text-xl font-semibold text-text-primary">{t('auth.resetPasswordTitle')}</h2>
-                <p className="text-sm text-text-secondary mt-1">
-                  {t('auth.resetPasswordDesc')}
-                </p>
-              </div>
-
-              {error && (
-                <div className="mb-4 p-3 rounded-lg bg-accent-danger-op10 border border-accent-danger-op30 text-sm text-accent-danger">
-                  {error}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <Input
-                  label={t('common.newPassword')}
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  icon={<Lock size={18} />}
-                  placeholder={t('auth.minCharacters')}
-                  autoComplete="new-password"
-                  showStrength
-                  autoFocus
-                  required
-                />
-
-                <Input
-                  label={t('common.confirmPassword')}
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  icon={<Lock size={18} />}
-                  placeholder={t('auth.reenterPassword')}
-                  autoComplete="new-password"
-                  required
-                />
-
-                <Button type="submit" disabled={loading} className="w-full">
-                  {loading ? t('auth.resetting') : t('auth.resetPasswordTitle')}
-                </Button>
-              </form>
-
-              <div className="mt-6 text-center">
-                <Link 
-                  to="/login" 
-                  className="flex items-center justify-center gap-2 text-sm text-accent-primary hover:underline"
-                >
-                  <ArrowLeft size={16} />
-                  {t('auth.backToLogin')}
-                </Link>
-              </div>
-            </>
-          )}
-        </Card>
-
-        <p className="text-center text-xs text-text-tertiary mt-6">
-          {t('common.appName', 'Ultimate Certificate Manager v2')}
-        </p>
-      </div>
-    </div>
+    <AuthFrame ref={titleRef} title={t('auth.resetPasswordTitle')} lead={t('auth.resetPasswordDesc')}>
+      <form className="auth-form" onSubmit={handleSubmit} noValidate aria-busy={loading || undefined}>
+        <AuthField id="reset-new" label={t('common.newPassword')}>
+          <input
+            id="reset-new"
+            name="new-password"
+            type="password"
+            autoComplete="new-password"
+            autoFocus
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            aria-describedby="reset-new-hint"
+          />
+          <PasswordMeter password={password} />
+          <small id="reset-new-hint" className="auth-wait">{t('auth.minCharacters')}</small>
+        </AuthField>
+        <AuthField id="reset-confirm" label={t('common.confirmPassword')}>
+          <input
+            id="reset-confirm"
+            name="confirm-password"
+            type="password"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+          />
+        </AuthField>
+        {error && (
+          <div className="auth-error" role="alert"><Warning size={14} aria-hidden="true" /><span>{error}</span></div>
+        )}
+        <button type="submit" className="auth-btn is-primary auth-submit" disabled={loading}>
+          <CaretRight size={16} aria-hidden="true" />{loading ? t('auth.resetting') : t('auth.resetPasswordTitle')}
+        </button>
+      </form>
+      <Link to="/login" className="auth-link">{t('auth.backToLogin')}</Link>
+    </AuthFrame>
   )
 }

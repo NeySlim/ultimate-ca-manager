@@ -4,7 +4,9 @@
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Card, Logo, LoadingSpinner } from '../components'
+import { Warning } from '@phosphor-icons/react'
+import { AuthFrame } from '../components/auth/AuthFrame'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 import { isWebUrl, openChannel } from './settings/sso/signInTestChannel'
 
 export const LAUNCH_WAIT_MS = 30000
@@ -36,16 +38,11 @@ export default function SsoTestLaunchPage() {
   }, [])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg-primary p-4">
-      <Card className="w-full max-w-md p-6 space-y-4 text-center">
-        <Logo />
-        <div role="status" className="space-y-2">
-          {!failed && <LoadingSpinner size="sm" className="mx-auto" />}
-          <p className="text-sm text-text-secondary">
-            {failed ? t('sso.signInTestFailed') : t('sso.signInTestLaunching')}
-          </p>
-        </div>
-      </Card>
-    </div>
+    <AuthFrame title={t('sso.signInTest')} tools={false} footer={false}>
+      <div role="status" className={`auth-result${failed ? ' is-warn' : ''}`}>
+        {failed ? <Warning size={20} aria-hidden="true" /> : <LoadingSpinner size="sm" />}
+        <span>{failed ? t('sso.signInTestFailed') : t('sso.signInTestLaunching')}</span>
+      </div>
+    </AuthFrame>
   )
 }
