@@ -3,7 +3,7 @@
  * template, keeps a key the user picked, and never invents one when the server is silent.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, waitFor } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({ getEffective: vi.fn(), templates: [] }))
 
@@ -20,36 +20,30 @@ vi.mock('../../contexts', () => ({
   useNotification: () => ({ showError: vi.fn(), showSuccess: vi.fn(), showWarning: vi.fn() }),
 }))
 
-vi.mock('../../components', () => ({
-  Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-  Input: ({ label, ...props }) => <input aria-label={label || props.name} {...props} />,
-  DatePicker: () => null,
-  EkuMultiSelect: () => null,
-  Select: ({ label, options = [], value, onChange }) => (
-    <select aria-label={label} value={value ?? ''} data-state-value={value ?? ''} onChange={(e) => onChange?.(e.target.value)}>
-      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
-  ),
-}))
-
 import { IssueCertificateForm } from '../certificates/IssueCertificateForm'
+import { findAlgorithm } from '../../lib/keyAlgorithms'
+import { LABEL, choose, field, optionValues, reviewAndIssue, type } from '../certificates/__tests__/issueFormTestUtils'
 
 const deferred = () => { let resolve; const promise = new Promise((r) => { resolve = r }); return { promise, resolve } }
 
 const t = (key) => key
-const state = (label) => screen.getByLabelText(label).dataset.stateValue
+// Family and size of the key on screen, '' when the server default is left to the server
+const state = (which) => {
+  const pair = findAlgorithm(field(LABEL.key).value)?.issue ?? ['', '']
+  return which === 'common.keyType' ? pair[0] : pair[1]
+}
 const CAS = [{ id: 3, descr: 'CA three', has_private_key: true }, { id: 4, descr: 'CA four', has_private_key: true }]
 
 function renderForm(onSubmit = vi.fn().mockResolvedValue(undefined)) {
   render(<IssueCertificateForm cas={CAS} onSubmit={onSubmit} onCancel={() => {}} t={t} />)
   return onSubmit
 }
-const pickTemplate = (id) => fireEvent.change(screen.getByLabelText('certificates.templateOptional'), { target: { value: id } })
+const pickTemplate = (id) => choose(LABEL.template, id)
 const TEMPLATES = [
   { id: 7, name: 'EC template', key_type: 'EC-P384', dn_template: {} },
   { id: 8, name: 'Keyless template', key_type: '', dn_template: {} },
 ]
-const pickCa = (id) => fireEvent.change(screen.getByLabelText('common.certificateAuthority'), { target: { value: id } })
+const pickCa = (id) => choose(LABEL.ca, id)
 
 describe('IssueCertificateForm server default key', () => {
   beforeEach(() => { vi.clearAllMocks(); mocks.templates = [] })
@@ -74,7 +68,7 @@ describe('IssueCertificateForm server default key', () => {
     renderForm()
     pickCa('3')
     await waitFor(() => expect(state('common.keyType')).toBe('rsa'))
-    fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: 'ml-dsa' } })
+    choose(LABEL.key, 'ML-DSA-65')
     pickCa('4')
     await waitFor(() => expect(mocks.getEffective).toHaveBeenCalledWith({ ca_id: '4', template_id: undefined }))
     await new Promise((r) => setTimeout(r, 20))
@@ -102,10 +96,8 @@ describe('IssueCertificateForm server default key', () => {
     await waitFor(() => expect(mocks.getEffective).toHaveBeenCalled())
     await new Promise((r) => setTimeout(r, 20))
     expect(state('common.keyType')).toBe('')
-    fireEvent.change(screen.getByPlaceholderText('example.com'), { target: { value: 'host.example.test' } })
-    fireEvent.submit(screen.getByPlaceholderText('example.com').closest('form'))
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
-    expect(onSubmit.mock.calls[0][0].key_type).toBeUndefined()
+    type(LABEL.cn, 'host.example.test')
+    expect((await reviewAndIssue(onSubmit)).key_type).toBeUndefined()
   })
 
   it('keeps the key the user chose across a keyless template and a CA change', async () => {
@@ -116,8 +108,8 @@ describe('IssueCertificateForm server default key', () => {
     renderForm()
     pickCa('3')
     await waitFor(() => expect(state('common.keyType')).toBe('rsa'))
-    fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: 'ml-dsa' } })
-    await screen.findByLabelText('certificates.templateOptional')
+    choose(LABEL.key, 'ML-DSA-65')
+    await waitFor(() => expect(optionValues(LABEL.template)).toContain('8'))
     pickTemplate('8')
     pickCa('4')
     await waitFor(() => expect(mocks.getEffective).toHaveBeenCalledWith({ ca_id: '4', template_id: '8' }))
@@ -131,7 +123,7 @@ describe('IssueCertificateForm server default key', () => {
     renderForm()
     pickCa('3')
     await waitFor(() => expect(state('common.keySize')).toBe('3072'))
-    await screen.findByLabelText('certificates.templateOptional')
+    await waitFor(() => expect(optionValues(LABEL.template)).toContain('8'))
     pickTemplate('7')
     await waitFor(() => expect(state('common.keySize')).toBe('384'))
     pickTemplate('8')
@@ -144,7 +136,7 @@ describe('IssueCertificateForm server default key', () => {
     renderForm()
     pickCa('3')
     await waitFor(() => expect(state('common.keySize')).toBe('3072'))
-    await screen.findByLabelText('certificates.templateOptional')
+    await waitFor(() => expect(optionValues(LABEL.template)).toContain('8'))
     pickTemplate('7')
     await waitFor(() => expect(state('common.keySize')).toBe('384'))
     pickTemplate('')
@@ -157,7 +149,7 @@ describe('IssueCertificateForm server default key', () => {
     renderForm()
     pickCa('3')
     await waitFor(() => expect(state('common.keySize')).toBe('3072'))
-    await screen.findByLabelText('certificates.templateOptional')
+    await waitFor(() => expect(optionValues(LABEL.template)).toContain('8'))
     pickTemplate('7')
     await waitFor(() => expect(mocks.getEffective).toHaveBeenCalledWith({ ca_id: '3', template_id: '7' }))
     await new Promise((r) => setTimeout(r, 20))
@@ -174,7 +166,7 @@ describe('IssueCertificateForm server default key', () => {
     const onSubmit = renderForm()
     pickCa('3')
     await waitFor(() => expect(state('common.keySize')).toBe('3072'))
-    await screen.findByLabelText('certificates.templateOptional')
+    await waitFor(() => expect(optionValues(LABEL.template)).toContain('8'))
     pickTemplate('7')
     await waitFor(() => expect(state('common.keySize')).toBe('384'))
     pickTemplate('8')
@@ -191,10 +183,8 @@ describe('IssueCertificateForm server default key', () => {
     await waitFor(() => expect(state('common.keySize')).toBe('384'))
     pickTemplate('8')
     await waitFor(() => expect(state('common.keyType')).toBe(''))
-    fireEvent.change(screen.getByPlaceholderText('example.com'), { target: { value: 'host.example.test' } })
-    fireEvent.submit(screen.getByPlaceholderText('example.com').closest('form'))
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
-    expect(onSubmit.mock.calls[0][0].key_type).toBeUndefined()
+    type(LABEL.cn, 'host.example.test')
+    expect((await reviewAndIssue(onSubmit)).key_type).toBeUndefined()
   })
 
   it('keeps the key the user chose through two template changes', async () => {
@@ -203,8 +193,8 @@ describe('IssueCertificateForm server default key', () => {
     renderForm()
     pickCa('3')
     await waitFor(() => expect(state('common.keyType')).toBe('rsa'))
-    fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: 'ml-dsa' } })
-    await screen.findByLabelText('certificates.templateOptional')
+    choose(LABEL.key, 'ML-DSA-65')
+    await waitFor(() => expect(optionValues(LABEL.template)).toContain('8'))
     pickTemplate('8')
     await waitFor(() => expect(mocks.getEffective).toHaveBeenCalledWith({ ca_id: '3', template_id: '8' }))
     pickTemplate('')
@@ -243,25 +233,13 @@ describe('IssueCertificateForm server default key', () => {
     await waitFor(() => expect(state('common.keyType')).toBe(''))
   })
 
-  it('sizes a family the user switches to on the server default when it is of that family', async () => {
+  it('offers every allowed key in one list and keeps the one the user picks', async () => {
     mocks.getEffective.mockResolvedValue({ data: { allowed_key_types: null, default_key_type: 'EC-P384' } })
     renderForm()
     pickCa('3')
-    await waitFor(() => expect([state('common.keyType'), state('common.keySize')]).toEqual(['ecdsa', '384']))
-    fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: 'rsa' } })
-    await waitFor(() => expect(state('common.keySize')).toBe('2048'))
-    fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: 'ecdsa' } })
-    await waitFor(() => expect(state('common.keySize')).toBe('384'))
-  })
-
-  it('sizes an RSA family from the server default when that is an RSA key', async () => {
-    mocks.getEffective.mockResolvedValue({ data: { allowed_key_types: null, default_key_type: 'RSA-3072' } })
-    renderForm()
-    pickCa('3')
-    await waitFor(() => expect(state('common.keySize')).toBe('3072'))
-    fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: 'ecdsa' } })
-    await waitFor(() => expect(state('common.keySize')).toBe('256'))
-    fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: 'rsa' } })
-    await waitFor(() => expect(state('common.keySize')).toBe('3072'))
+    await waitFor(() => expect(field(LABEL.key).value).toBe('EC-P384'))
+    expect(optionValues(LABEL.key)).toEqual(expect.arrayContaining(['RSA-2048', 'RSA-3072', 'EC-P256', 'EC-P384', 'ML-DSA-65']))
+    choose(LABEL.key, 'RSA-3072')
+    expect([state('common.keyType'), state('common.keySize')]).toEqual(['rsa', '3072'])
   })
 })

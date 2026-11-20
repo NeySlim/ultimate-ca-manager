@@ -65,10 +65,10 @@ vi.mock('../../../services', () => ({
 }))
 
 vi.mock('../IssueCertificateForm', () => ({
-  IssueCertificateForm: ({ onSubmit }) => (
-    <button type="button" onClick={() => onSubmit({
+  IssueCertificateForm: ({ onSubmit, mode }) => (
+    <button type="button" onClick={() => onSubmit(mode === 'renew' ? {} : {
       cn: 'pair.example.com', hybrid: { classical: 'EC-P256', pq: 'ML-DSA-65' },
-    })}>submit-issue</button>
+    })}>{mode === 'renew' ? 'submit-renew' : 'submit-issue'}</button>
   ),
 }))
 
@@ -176,6 +176,8 @@ describe('CertificatesPage and a hybrid pair', () => {
     mocks.renew.mockResolvedValue({ data: answer })
     await openMemberOnMobile()
     fireEvent.click(screen.getByText('common.renew'))
+    // Renewal goes through the issue form, stubbed here
+    fireEvent.click(await screen.findByText('submit-renew'))
     await waitFor(() => expect(mocks.renew).toHaveBeenCalledWith(11, {}))
     await waitFor(() => expect(mocks.showSuccess).toHaveBeenCalledWith(toast))
   })

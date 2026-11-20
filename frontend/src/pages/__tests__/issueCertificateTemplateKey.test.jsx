@@ -1,19 +1,12 @@
 /**
  * #318: selecting an EC certificate template must carry its curve into the
  * issue form.
- *
- * handleTemplateChange sets key_type and key_size together, but the Key Size
- * <Select> swaps its option list (RSA sizes vs EC curves) on the key_type
- * change. Radix fires onValueChange when the previously selected item unmounts
- * during that swap; the wrapper used to forward it and blank key_size, so the
- * request went out as key_type=ecdsa with key_size='' and issuance failed.
- *
- * jsdom lacks the pointer-capture / scrollIntoView APIs Radix Select relies
- * on; they are polyfilled here so the portal can open.
+ * The template's key and a key picked by hand both reach the request as a full
+ * pair (key_type and key_size), never a type with an empty size.
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, waitFor } from '@testing-library/react'
+import { LABEL, choose, optionValues, reviewAndIssue, type } from '../certificates/__tests__/issueFormTestUtils'
 
 const EC_TEMPLATE = {
   id: 1,
@@ -52,60 +45,30 @@ beforeAll(() => {
 const t = (key) => key
 
 describe('IssueCertificateForm EC template key size (#318)', () => {
+  const CAS = [{ id: 1, descr: 'Test CA', subject: 'CN=Test CA', has_private_key: true }]
+
   it('carries the template curve into the submitted payload', async () => {
     const { IssueCertificateForm } = await import('../certificates/IssueCertificateForm')
-    const user = userEvent.setup()
     const onSubmit = vi.fn().mockResolvedValue(undefined)
-
-    const { container } = render(
-      <IssueCertificateForm
-        cas={[{ id: 1, descr: 'Test CA', subject: 'CN=Test CA' }]}
-        onSubmit={onSubmit}
-        onCancel={() => {}}
-        t={t}
-      />
-    )
-
-    // Wait for the template <Select> to render (it only appears once templates load)
-    await screen.findByText('certificates.templateOptional')
-    const templateTrigger = container.querySelectorAll('[role="combobox"]')[0]
-    await user.click(templateTrigger)
-    await user.click(await screen.findByRole('option', { name: 'EC Web Server' }))
-
-    await user.type(screen.getByPlaceholderText('example.com'), 'ec-host.example.test')
-    await user.click(container.querySelector('button[type="submit"]'))
-
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
-    const payload = onSubmit.mock.calls[0][0]
+    render(<IssueCertificateForm cas={CAS} onSubmit={onSubmit} onCancel={() => {}} t={t} />)
+    choose(LABEL.ca, '1')
+    await waitFor(() => expect(optionValues(LABEL.template)).toContain('1'))
+    choose(LABEL.template, '1')
+    type(LABEL.cn, 'ec-host.example.test')
+    const payload = await reviewAndIssue(onSubmit)
     expect(payload.key_type).toBe('ecdsa')
     expect(payload.key_size).toBe('256')
+    expect(payload.validity_days).toBe(397)
   }, 15000)
 
-  it('keeps a valid key size when Key Type is switched RSA -> ECDSA by hand', async () => {
+  it('sends a full pair for a key picked by hand', async () => {
     const { IssueCertificateForm } = await import('../certificates/IssueCertificateForm')
-    const user = userEvent.setup()
     const onSubmit = vi.fn().mockResolvedValue(undefined)
-
-    const { container } = render(
-      <IssueCertificateForm
-        cas={[{ id: 1, descr: 'Test CA', subject: 'CN=Test CA' }]}
-        onSubmit={onSubmit}
-        onCancel={() => {}}
-        t={t}
-      />
-    )
-
-    await screen.findByText('common.keyType')
-    const keyTypeTrigger = screen.getByText('common.keyType')
-      .closest('[class*="space-y"]').querySelector('[role="combobox"]')
-    await user.click(keyTypeTrigger)
-    await user.click(await screen.findByRole('option', { name: 'ECDSA' }))
-
-    await user.type(screen.getByPlaceholderText('example.com'), 'manual-ec.example.test')
-    await user.click(container.querySelector('button[type="submit"]'))
-
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
-    const payload = onSubmit.mock.calls[0][0]
+    render(<IssueCertificateForm cas={CAS} onSubmit={onSubmit} onCancel={() => {}} t={t} />)
+    choose(LABEL.ca, '1')
+    choose(LABEL.key, 'EC-P256')
+    type(LABEL.cn, 'manual-ec.example.test')
+    const payload = await reviewAndIssue(onSubmit)
     expect(payload.key_type).toBe('ecdsa')
     expect(payload.key_size).toBe('256')
   }, 15000)

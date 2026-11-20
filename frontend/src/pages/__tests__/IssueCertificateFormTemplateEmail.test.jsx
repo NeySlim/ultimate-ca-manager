@@ -1,12 +1,12 @@
 /**
- * #373: a template's subject Email now prefills the Subject Details field
+ * #373: a template's subject Email prefills the subject Email field (Advanced)
  * (skipped when it is the literal `{email}` placeholder), and per the
  * documented behaviour, on an email/combined cert that Email also becomes a
  * SAN via getAutoSansFromCn.
  */
-import { describe, it, expect, vi, beforeAll } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { describe, it, expect, vi } from 'vitest'
+import { render, waitFor } from '@testing-library/react'
+import { LABEL, P, choose, field, optionValues, reviewAndIssue, type } from '../certificates/__tests__/issueFormTestUtils'
 
 const REAL_EMAIL_TEMPLATE = {
   id: 1, name: 'Real Email Template', template_type: 'email',
@@ -31,77 +31,35 @@ vi.mock('../../contexts', () => ({
   useNotification: () => ({ showError: vi.fn(), showSuccess: vi.fn(), showWarning: vi.fn() }),
 }))
 
-beforeAll(() => {
-  global.ResizeObserver = class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  }
-  Element.prototype.hasPointerCapture = Element.prototype.hasPointerCapture || (() => false)
-  Element.prototype.setPointerCapture = Element.prototype.setPointerCapture || (() => {})
-  Element.prototype.releasePointerCapture = Element.prototype.releasePointerCapture || (() => {})
-  Element.prototype.scrollIntoView = Element.prototype.scrollIntoView || (() => {})
-})
-
 const t = (key) => key
+const CAS = [{ id: 1, descr: 'Test CA', subject: 'CN=Test CA', has_private_key: true }]
 
-const selectTemplate = async (user, container, name) => {
-  const templateTrigger = container.querySelectorAll('[role="combobox"]')[0]
-  await user.click(templateTrigger)
-  await user.click(await screen.findByRole('option', { name }))
-}
-
-const openSubjectDetails = async (user) => {
-  await user.click(screen.getByText('certificates.subjectDetails'))
+async function renderWithTemplate(id, onSubmit = vi.fn().mockResolvedValue(undefined)) {
+  const { IssueCertificateForm } = await import('../certificates/IssueCertificateForm')
+  render(<IssueCertificateForm cas={CAS} onSubmit={onSubmit} onCancel={() => {}} t={t} />)
+  choose(LABEL.ca, '1')
+  await waitFor(() => expect(optionValues(LABEL.template)).toContain(String(id)))
+  choose(LABEL.template, String(id))
+  return onSubmit
 }
 
 describe('IssueCertificateForm template Email prefill (#373)', () => {
-  it('case 6a: a real template email fills the subject Email field', async () => {
-    const { IssueCertificateForm } = await import('../certificates/IssueCertificateForm')
-    const user = userEvent.setup()
-    const { container } = render(
-      <IssueCertificateForm cas={[{ id: 1, descr: 'Test CA', subject: 'CN=Test CA' }]} onSubmit={vi.fn()} onCancel={() => {}} t={t} />
-    )
-
-    await screen.findByText('certificates.templateOptional')
-    // Selecting a template with a real subject email auto-opens the section.
-    await selectTemplate(user, container, 'Real Email Template')
-
-    const emailInput = await screen.findByPlaceholderText('certificates.emailPlaceholder')
-    expect(emailInput.value).toBe('pki@example.com')
+  it('case 6a: a real template email fills the subject Email field and opens Advanced', async () => {
+    await renderWithTemplate(1)
+    await waitFor(() => expect(field('common.email').value).toBe('pki@example.com'))
+    expect(field('common.email').closest('[hidden]')).toBeNull()
   }, 15000)
 
   it('case 6b: a {email} placeholder template leaves the subject Email field empty', async () => {
-    const { IssueCertificateForm } = await import('../certificates/IssueCertificateForm')
-    const user = userEvent.setup()
-    const { container } = render(
-      <IssueCertificateForm cas={[{ id: 1, descr: 'Test CA', subject: 'CN=Test CA' }]} onSubmit={vi.fn()} onCancel={() => {}} t={t} />
-    )
-
-    await screen.findByText('certificates.templateOptional')
-    await openSubjectDetails(user)
-    await selectTemplate(user, container, 'Placeholder Email Template')
-
-    const emailInput = await screen.findByPlaceholderText('certificates.emailPlaceholder')
-    expect(emailInput.value).toBe('')
+    await renderWithTemplate(2)
+    await waitFor(() => expect(field(`${P}template`).value).toBe('2'))
+    expect(field('common.email').value).toBe('')
   }, 15000)
 
   it('case 7: the template Email also lands as a SAN on the submitted payload', async () => {
-    const { IssueCertificateForm } = await import('../certificates/IssueCertificateForm')
-    const user = userEvent.setup()
-    const onSubmit = vi.fn().mockResolvedValue(undefined)
-    const { container } = render(
-      <IssueCertificateForm cas={[{ id: 1, descr: 'Test CA', subject: 'CN=Test CA' }]} onSubmit={onSubmit} onCancel={() => {}} t={t} />
-    )
-
-    await screen.findByText('certificates.templateOptional')
-    await selectTemplate(user, container, 'Real Email Template')
-
-    await user.type(screen.getByPlaceholderText('certificates.sanEmailPlaceholder'), 'someone@example.test')
-    await user.click(container.querySelector('button[type="submit"]'))
-
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
-    const payload = onSubmit.mock.calls[0][0]
+    const onSubmit = await renderWithTemplate(1)
+    type(LABEL.cn, 'someone@example.test')
+    const payload = await reviewAndIssue(onSubmit)
     expect(payload.email).toBe('pki@example.com')
     expect(payload.san_email).toContain('pki@example.com')
   }, 15000)

@@ -1,0 +1,333 @@
+/*
+ * Issue and renewal dialog of the Atelier: two steps (Configure, Review), the column of
+ * what the template and the CA policies impose, key source cards, typed SAN rows.
+ * Tokens only (styles/tokens.css); Aurore effects sit under its family selector.
+ */
+.iss-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: color-mix(in srgb, color-mix(in srgb, var(--bg) 45%, var(--ink)) 66%, transparent);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+.iss-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 201;
+  margin: auto;
+  width: min(920px, calc(100vw - 32px));
+  height: fit-content;
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--control);
+  border-radius: 8px;
+  box-shadow: 0 24px 100px color-mix(in srgb, var(--ink) 47%, transparent);
+  font-size: 13px;
+  /* The Atelier's IBM Plex Sans has a normal line height of about 1.28: kept whatever the font */
+  line-height: 1.28;
+}
+.iss-dialog :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* Zero specificity resets: the component rules below always win over them */
+.iss-dialog :where(h2, h3, p, dl, dd, ul) { margin: 0; }
+.iss-dialog :where(button, input, select, textarea) { font: inherit; color: inherit; }
+
+.iss-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 23px;
+  border-bottom: 1px solid var(--line);
+}
+.iss-head h2 { font-size: 18px; font-weight: 600; color: var(--text); }
+.iss-head p { font-size: 12px; color: var(--muted); margin-top: 5px; }
+.iss-body { padding: 22px 24px; }
+
+/* Buttons: flat, one pixel border */
+.iss-btn,
+.iss-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 6px 11px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.28;
+  cursor: pointer;
+}
+.iss-btn svg, .iss-icon-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+.iss-btn:hover:not(:disabled), .iss-icon-btn:hover:not(:disabled) { background-color: var(--hover); }
+.iss-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.iss-btn.is-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.iss-btn.is-primary:hover:not(:disabled) { background: var(--accent); filter: brightness(0.93); }
+.iss-btn.is-quiet { background: transparent; border-color: transparent; }
+.iss-icon-btn { width: 32px; padding: 6px; background: transparent; }
+.iss-icon-btn.is-quiet { border-color: transparent; }
+.iss-text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 0;
+  background: none;
+  border: 0;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+}
+.iss-text-link:hover { text-decoration: underline; }
+
+/* Steps */
+.iss-steps { display: flex; gap: 20px; align-items: center; margin-bottom: 22px; font-size: 12px; color: var(--muted); }
+.iss-steps > svg { width: 16px; height: 16px; }
+.iss-step { display: flex; gap: 8px; align-items: center; }
+.iss-step-mark {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--control);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+}
+.iss-step-mark svg { width: 13px; height: 13px; }
+.iss-step.is-active { color: var(--accent); }
+.iss-step.is-active .iss-step-mark { border-color: var(--accent); background: var(--selected); }
+
+/* Configure: fields and the column of what is imposed */
+.iss-layout { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 26px; }
+.iss-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 16px; align-content: start; }
+.iss-field { display: flex; flex-direction: column; gap: 7px; font-size: 12px; min-width: 0; border: 0; margin: 0; padding: 0; }
+.iss-field.is-full { grid-column: 1 / -1; }
+.iss-field > label, .iss-field > legend, .iss-label-row > label { font-size: 12px; color: var(--text); }
+.iss-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+/* The toggle keeps the label line at its text height, level with the field beside it */
+.iss-label-row .iss-text-link { padding: 0; height: 1em; display: inline-flex; align-items: center; overflow: visible; }
+.iss-label-row .iss-text-link svg { width: 15px; height: 15px; flex: none; }
+.iss-field > legend { padding: 0; margin-bottom: 7px; }
+.iss-field small, .iss-hint-text { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.iss-optional { color: var(--muted); font-weight: 400; }
+.iss-dialog :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid var(--control);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--text);
+}
+.iss-dialog :is(input, select, textarea):disabled,
+.iss-dialog input[readonly] { color: var(--muted); cursor: not-allowed; }
+.iss-dialog textarea { resize: vertical; min-height: 80px; }
+.iss-dialog .iss-mono { font-family: 'Fira Code', monospace; }
+.iss-dialog :is(input[type="checkbox"], input[type="radio"]) {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+}
+.iss-dialog [aria-invalid="true"] { border-color: var(--bad); box-shadow: 0 0 0 1px var(--bad); }
+.iss-error { display: flex; gap: 6px; align-items: flex-start; color: var(--bad); font-size: 12px; line-height: 1.5; }
+.iss-error svg { width: 13px; height: 13px; margin-top: 2px; flex-shrink: 0; }
+
+.iss-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.iss-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--control);
+  border-radius: 5px;
+  padding: 11px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.iss-choice:has(input:checked) { border-color: var(--accent); background: var(--selected); }
+.iss-choice:has(input:disabled) { opacity: 0.6; cursor: not-allowed; }
+.iss-choice small { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; line-height: 1.6; }
+
+.iss-rows { display: grid; gap: 8px; margin: 9px 0 4px; }
+.iss-rows:empty { margin: 4px 0 0; }
+.iss-san-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) 36px; gap: 8px; align-items: center; }
+.iss-ext-row { display: grid; grid-template-columns: minmax(0, 210px) minmax(0, 1fr) 36px; gap: 8px; align-items: center; }
+.iss-san-row .iss-icon-btn, .iss-ext-row .iss-icon-btn { width: 36px; min-height: 36px; }
+.iss-san-row .iss-error, .iss-ext-row :is(.iss-error, .iss-check) { grid-column: 1 / -1; }
+.iss-add-row { align-self: flex-start; color: var(--accent); padding-left: 6px; padding-right: 8px; }
+.iss-auto { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+
+.iss-advanced { border-top: 1px solid var(--line); padding-top: 12px; }
+.iss-advanced-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.iss-advanced-toggle:hover { background-color: var(--hover); }
+.iss-advanced-toggle svg { width: 16px; height: 16px; flex-shrink: 0; }
+.iss-advanced-toggle small { color: var(--muted); font-size: 12px; font-weight: 400; margin-left: 6px; line-height: 1.6; }
+.iss-advanced-panel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 18px 16px; padding: 14px 0 2px; }
+.iss-advanced-panel[hidden] { display: none; }
+.iss-advanced-panel .iss-field.is-full { grid-column: 1 / -1; }
+.iss-subject { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 16px; }
+.iss-subject .iss-field.is-wide { grid-column: span 2; }
+
+.iss-check { display: flex; align-items: center; gap: 10px; font-size: 12px; min-height: 36px; cursor: pointer; }
+.iss-eku-list { display: grid; gap: 0; }
+.iss-eku-list .iss-check { min-height: 30px; align-items: flex-start; padding: 4px 0; }
+.iss-eku-list .iss-check input { margin-top: 1px; }
+.iss-eku-list small { display: block; color: var(--muted); font-size: 12px; }
+.iss-eku-list .iss-mono { font-size: 12px; }
+.iss-inline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+
+.iss-hint {
+  background: var(--raised);
+  padding: 18px;
+  border-radius: 4px;
+  font-size: 12px;
+  align-self: start;
+}
+.iss-hint h3 { display: flex; align-items: center; gap: 6px; min-height: 18px; font-size: 13px; font-weight: 600; margin-bottom: 13px; }
+.iss-hint h3 svg { width: 16px; height: 16px; flex-shrink: 0; }
+.iss-hint p { font-size: 12px; line-height: 1.8; color: var(--muted); }
+.iss-hint p strong { color: var(--text); font-weight: 600; }
+.iss-hint dl { display: grid; grid-template-columns: 1fr; gap: 6px; margin: 14px 0; }
+.iss-hint dt { color: var(--muted); }
+.iss-hint dd { margin: 0 0 9px; overflow-wrap: anywhere; }
+.iss-muted { color: var(--muted); }
+
+.iss-announce { font-size: 12px; color: var(--muted); line-height: 1.6; margin-top: 16px; }
+.iss-announce:empty { margin: 0; }
+.iss-notice {
+  font-size: 12px;
+  line-height: 1.7;
+  padding: 11px 13px;
+  background: var(--raised);
+  border-radius: 4px;
+  color: var(--muted);
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+.iss-notice > svg { width: 14px; height: 14px; margin-top: 3px; flex-shrink: 0; }
+.iss-notice.is-bad { color: var(--bad); background: var(--badbg); }
+.iss-notice.is-warn { color: var(--warn); background: var(--warnbg); }
+.iss-notice.is-good { color: var(--good); background: var(--goodbg); }
+.iss-draft-note { margin-bottom: 18px; }
+
+/* Review */
+.iss-review { padding: 20px; background: var(--raised); border-radius: 4px; }
+.iss-review h3 { font-size: 16px; font-weight: 600; margin-bottom: 20px; overflow-wrap: anywhere; }
+.iss-review dl { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 16px; font-size: 12px; margin: 0; }
+.iss-review dt { color: var(--muted); }
+.iss-review dd { margin: 0; overflow-wrap: anywhere; }
+.iss-review-note { margin-top: 18px; }
+
+.iss-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 20px;
+  margin-top: 22px;
+  border-top: 1px solid var(--line);
+}
+.iss-actions .iss-btn { min-height: 36px; }
+
+.iss-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Aurore: glass dialog, gradient primary, rounder controls */
+:root[data-theme="aurore"] .iss-dialog {
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid color-mix(in srgb, var(--paper) 8%, transparent);
+  border-radius: 10px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--paper) 6%, transparent),
+    0 24px 60px -20px color-mix(in srgb, var(--ink) 70%, transparent);
+}
+:root[data-theme="aurore"][data-mode="light"] .iss-dialog {
+  background: color-mix(in srgb, var(--paper) 84%, transparent);
+  border-color: color-mix(in srgb, var(--text) 14%, transparent);
+  box-shadow: inset 0 1px 0 var(--paper), 0 24px 60px -20px color-mix(in srgb, var(--text) 35%, transparent);
+}
+:root[data-theme="aurore"] .iss-btn.is-primary {
+  background: linear-gradient(135deg, var(--grad-a), var(--grad-b));
+  color: var(--on-accent);
+  border-color: transparent;
+  box-shadow: 0 0 0 1px var(--glow), 0 8px 24px -8px var(--glow);
+}
+:root[data-theme="aurore"] .iss-btn:not(.is-primary):not(.is-quiet) {
+  background: color-mix(in srgb, var(--paper) 3%, transparent);
+  border-color: color-mix(in srgb, var(--paper) 10%, transparent);
+}
+:root[data-theme="aurore"][data-mode="light"] .iss-btn:not(.is-primary):not(.is-quiet) {
+  background: color-mix(in srgb, var(--paper) 70%, transparent);
+  border-color: var(--control);
+}
+:root[data-theme="aurore"] :is(.iss-btn, .iss-icon-btn, .iss-dialog input:not([type="checkbox"]):not([type="radio"]), .iss-dialog select, .iss-dialog textarea) {
+  border-radius: 6px;
+}
+
+@media (max-width: 800px) {
+  .iss-layout { grid-template-columns: 1fr; }
+  .iss-hint { display: none; }
+  .iss-fields { gap: 18px 12px; }
+  .iss-dialog :is(input:not([type="checkbox"]):not([type="radio"]), select) { min-height: 44px; font-size: 13px; }
+  .iss-dialog textarea { font-size: 13px; }
+  .iss-body { padding: 20px; }
+  .iss-head { padding: 17px 20px; }
+  .iss-head .iss-icon-btn { width: 40px; min-height: 40px; }
+  .iss-actions { flex-wrap: wrap; }
+  .iss-actions .iss-btn { min-height: 42px; }
+  .iss-steps { gap: 12px; }
+  .iss-choices { grid-template-columns: 1fr; }
+  .iss-choice { min-height: 58px; }
+  .iss-check { min-height: 44px; }
+  .iss-review dl { grid-template-columns: 100px minmax(0, 1fr); }
+  .iss-advanced-panel { grid-template-columns: 1fr; }
+  .iss-subject { grid-template-columns: 1fr; }
+  .iss-subject .iss-field.is-wide { grid-column: auto; }
+  .iss-san-row { grid-template-columns: 96px minmax(0, 1fr) 40px; }
+  .iss-ext-row { grid-template-columns: minmax(0, 1fr) 40px; grid-template-areas: "oid remove" "value value"; }
+  .iss-ext-row .iss-ext-oid { grid-area: oid; }
+  .iss-ext-row .iss-ext-value { grid-area: value; }
+  .iss-ext-row .iss-icon-btn { grid-area: remove; }
+  .iss-san-row .iss-icon-btn, .iss-ext-row .iss-icon-btn { width: 40px; min-height: 44px; }
+  .iss-advanced-toggle { min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iss-dialog, .iss-overlay { animation: none; transition: none; }
+}
