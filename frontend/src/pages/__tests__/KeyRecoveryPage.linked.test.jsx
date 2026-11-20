@@ -64,6 +64,49 @@ describe('KeyRecoveryPage queue', () => {
     expect(screen.getByText('3 en cours')).toBeInTheDocument()
   })
 
+  it('keeps the place of Approve… on one\'s own request, so the due dates of a group line up', async () => {
+    renderPage()
+    await screen.findByText('cn-one')
+    const slot = rowOf('cn-mine').querySelector('.wk-action > :first-child')
+    expect(slot).toHaveClass('is-placeholder')
+    expect(slot).toHaveAttribute('aria-hidden', 'true')
+    expect(within(rowOf('cn-mine')).queryByRole('button', { name: /Approuver/ })).toBeNull()
+    expect(rowOf('cn-one').querySelector('.is-placeholder')).toBeNull()
+    // A key to recover keeps the check column, empty: its text lines up with the group above
+    expect(rowOf('cn-two')).not.toHaveClass('no-check')
+    expect(within(rowOf('cn-two')).queryByRole('checkbox')).toBeNull()
+  })
+
+  it('says which request a decision was for, and ends a bulk one that went through on one message', async () => {
+    const success = vi.spyOn(stable.notify, 'showSuccess')
+    api.reject.mockResolvedValue({})
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Refuser la récupération de cn-one' }))
+    let dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByTestId('recovery-confirm')).toHaveTextContent('Refuser')
+    fireEvent.click(within(dialog).getByTestId('recovery-confirm'))
+    await waitFor(() => expect(success).toHaveBeenCalledWith('Demande #1 refusée'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Tout sélectionner : À approuver par un autre administrateur' }))
+    fireEvent.click(within(screen.getByRole('group', { name: 'Actions groupées' })).getByRole('button', { name: /Refuser/ }))
+    dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByTestId('recovery-confirm'))
+    await waitFor(() => expect(success).toHaveBeenCalledWith('2 demandes refusées'))
+    expect(screen.queryByTestId('bulk-outcome')).toBeNull()
+    success.mockRestore()
+  })
+
+  it('gives the focus back to the row button when a decision is left with Escape', async () => {
+    renderPage()
+    const button = await screen.findByRole('button', { name: 'Refuser la récupération de cn-one' })
+    button.focus()
+    fireEvent.click(button)
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await waitFor(() => expect(button).toHaveFocus())
+  })
+
   it('names the group plainly when dual control is off', async () => {
     dual = false
     renderPage()

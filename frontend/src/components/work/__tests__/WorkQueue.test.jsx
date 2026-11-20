@@ -3,15 +3,17 @@
  * history; loading, error and empty states; no selection without a bulk action.
  */
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { Warning, Clock } from '@phosphor-icons/react'
 
 const i18n = vi.hoisted(() => ({ current: null }))
-vi.mock('react-i18next', () => ({ useTranslation: () => i18n.current }))
+vi.mock('react-i18next', () => ({ useTranslation: () => i18n.current, Trans: ({ i18nKey, values }) => i18n.current.t(i18nKey, values).replace(/<\/?\w+>/g, '') }))
 import { frI18n } from './frI18n'
 i18n.current = frI18n
 
 import { WorkQueue, WorkButton } from '../WorkQueue'
+import { loadCause } from '../loadCause'
 
 const NOW = Date.now()
 const HOUR = 3600000
@@ -74,11 +76,12 @@ describe('WorkQueue', () => {
     for (const b of screen.getAllByRole('button', { name: 'Approuver…' })) expect(b).toBeEnabled()
   })
 
-  it('selects a whole group from its head, half-selected when only some rows are', () => {
+  it('selects a whole group from its head, clear until every row of it is ticked, as the mockup', () => {
     render(<WorkQueue {...base} groups={groups()} bulkActions={(ids) => <span>{ids.length} pris</span>} />)
     const all = screen.getByRole('checkbox', { name: 'Tout sélectionner : À traiter sous 48 h' })
     fireEvent.click(screen.getByRole('checkbox', { name: 'Sélectionner CSR à signer : a.example.com' }))
-    expect(all.indeterminate).toBe(true)
+    expect(all.indeterminate).toBe(false)
+    expect(all).not.toBeChecked()
     fireEvent.click(all)
     expect(screen.getByText('2 pris')).toBeInTheDocument()
     expect(screen.getByText('2 éléments sélectionnés')).toBeInTheDocument()
@@ -100,6 +103,35 @@ describe('WorkQueue', () => {
     render(<WorkQueue {...base} groups={groups(rows)} bulkActions={() => null} />)
     expect(screen.queryByRole('checkbox', { name: 'Sélectionner a' })).toBeNull()
     expect(screen.getByRole('checkbox', { name: 'Sélectionner b' })).toBeInTheDocument()
+  })
+
+  it('keeps the check column of a row the user may not select, so its text lines up', () => {
+    const rows = [row(1, 'a', 20, { selectable: false }), row(2, 'b', 30)]
+    render(<WorkQueue {...base} groups={groups(rows)} bulkActions={() => null} />)
+    const li = screen.getByText('a').closest('li')
+    expect(li).not.toHaveClass('no-check')
+    expect(li.querySelector('.wk-check')).toHaveAttribute('aria-hidden', 'true')
+    expect(within(li).queryByRole('checkbox')).toBeNull()
+  })
+
+  it('keeps the check column in the head of a group whose rows may not be selected', () => {
+    const rows = [row(1, 'a', 20, { selectable: false })]
+    render(<WorkQueue {...base} groups={groups(rows)} bulkActions={() => null} />)
+    const head = screen.getByRole('heading', { level: 2, name: /^À traiter sous 48 h/ }).closest('header')
+    expect(head.querySelector('.wk-check')).toHaveAttribute('aria-hidden', 'true')
+    expect(within(head).queryByRole('checkbox')).toBeNull()
+  })
+
+  it('gives the focus to the page title after Clear selection, as the mockup', async () => {
+    render(
+      <>
+        <header className="lv-head"><h1>Approbations</h1></header>
+        <WorkQueue {...base} groups={groups()} bulkActions={() => null} />
+      </>,
+    )
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Sélectionner CSR à signer : a.example.com' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Annuler la sélection' }))
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveFocus())
   })
 
   it('folds the history, its toggle saying so', () => {
@@ -128,6 +160,16 @@ describe('WorkQueue', () => {
     expect(screen.queryByTestId('work-empty')).toBeNull()
   })
 
+  it('draws its skeleton where the content comes: the hint line, two groups, the folded section', () => {
+    const { container } = render(<WorkQueue {...base} state="loading" groups={[]} history={{ label: 'Traitées', count: 0, children: null }} />)
+    const skel = container.querySelector('.wk-skel')
+    expect(skel).toHaveClass('wk-view')
+    expect(skel.querySelector(':scope > .wk-hint')).not.toBeNull()
+    expect(skel.querySelectorAll(':scope > .wk-panel')).toHaveLength(3)
+    expect(skel.querySelectorAll('.wk-group-head .wk-check')).toHaveLength(2)
+    expect(skel.querySelector('.wk-history-toggle')).not.toBeNull()
+  })
+
   it('shows the error with a Retry button', () => {
     const onRetry = vi.fn()
     render(<WorkQueue {...base} state="error" groups={[]} error={{ title: 'Échec du chargement', text: 'HTTP 503', onRetry }} />)
@@ -136,5 +178,24 @@ describe('WorkQueue', () => {
     expect(alert).toHaveTextContent('HTTP 503')
     fireEvent.click(within(alert).getByRole('button', { name: 'Réessayer' }))
     expect(onRetry).toHaveBeenCalled()
+  })
+
+  it('names the cause of a failed read as the mockup, with the journal for who may read it', () => {
+    const err = Object.assign(new Error('Service indisponible'), { status: 503, request: 'GET /api/v2/approvals' })
+    render(
+      <MemoryRouter>
+        <WorkQueue {...base} state="error" groups={[]}
+          error={{ title: 'Impossible de charger les demandes d’approbation', cause: loadCause(err, frI18n.t), onRetry: () => {}, journal: '/audit' }} />
+      </MemoryRouter>,
+    )
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent('Cause : le serveur a répondu 503 Service indisponible à GET /api/v2/approvals. Les autres vues et l’inspecteur restent utilisables.')
+    expect(within(alert).getByRole('link', { name: 'Voir le journal' })).toHaveAttribute('href', '/audit')
+  })
+
+  it('says the request alone when the server did not answer, the message when there is no request', () => {
+    expect(loadCause({ request: 'GET /api/v2/reports/schedule' }, frI18n.t)).toBeTruthy()
+    expect(loadCause(new Error('réseau coupé'), frI18n.t)).toBe('Cause : réseau coupé. Les autres vues et l’inspecteur restent utilisables.')
+    expect(loadCause(null, frI18n.t)).toBe('')
   })
 })

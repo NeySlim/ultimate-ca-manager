@@ -3,7 +3,9 @@
  * deadline and urgency group. The deadline is the server's (services/approval_gate.py):
  * expires_at, else seven days after creation.
  */
-import { Warning, Clock } from '@phosphor-icons/react'
+import { Warning } from '@phosphor-icons/react'
+import { ClockIcon } from '../../components/work/workIcons'
+import { casService } from '../../services'
 import { compactAgo } from '../../lib/relativeTime'
 import { formatDate } from '../../lib/utils'
 
@@ -66,8 +68,8 @@ export function approvalGroups(pending, t, now = Date.now()) {
   const sorted = [...pending].sort((a, b) => due(a) - due(b))
   return [
     { id: 'overdue', label: t('approvals.work.groups.overdue'), icon: Warning, tone: 'bad', test: (r) => due(r) < now },
-    { id: 'soon', label: t('approvals.work.groups.soon'), icon: Clock, tone: 'warn', test: (r) => due(r) >= now && due(r) - now < 48 * HOUR },
-    { id: 'later', label: t('approvals.work.groups.later'), icon: Clock, tone: '', test: (r) => due(r) - now >= 48 * HOUR },
+    { id: 'soon', label: t('approvals.work.groups.soon'), icon: ClockIcon, tone: 'warn', test: (r) => due(r) >= now && due(r) - now < 48 * HOUR },
+    { id: 'later', label: t('approvals.work.groups.later'), icon: ClockIcon, tone: '', test: (r) => due(r) - now >= 48 * HOUR },
   ].map(({ test, ...g }) => ({ ...g, requests: sorted.filter(test) }))
 }
 
@@ -78,4 +80,41 @@ export const lastVote = (req) => (req?.approvals?.length ? req.approvals[req.app
 export function decisionMeta(req) {
   const vote = lastVote(req)
   return [vote?.username, req?.resolved_at ? formatDate(req.resolved_at, { time: true }) : '', vote?.comment].filter(Boolean).join(' · ')
+}
+
+// The authorities by id, with their level (1 for a root), read once for the queue and its inspector
+const CA_INDEX_TTL = 60000
+let caIndex = null
+const caLabel = (ca) => ca?.common_name || ca?.descr || ca?.name || ''
+export function caIndexOf(list) {
+  const byId = new Map(list.map((ca) => [String(ca.id), ca]))
+  const out = new Map()
+  for (const ca of list) {
+    let level = 1
+    for (let c = ca, seen = new Set(); c?.parent_id != null && !seen.has(c.id); level += 1) {
+      seen.add(c.id)
+      c = byId.get(String(c.parent_id))
+      if (!c) break
+    }
+    out.set(String(ca.id), { name: caLabel(ca), level })
+  }
+  return out
+}
+export function loadCaIndex(now = Date.now()) {
+  if (caIndex && now - caIndex.at < CA_INDEX_TTL) return caIndex.promise
+  const promise = Promise.resolve(casService?.getAll?.())
+    .then((res) => caIndexOf(Array.isArray(res?.data) ? res.data : []))
+    .catch(() => { caIndex = null; return new Map() })
+  caIndex = { at: now, promise }
+  return promise
+}
+export const resetCaIndex = () => { caIndex = null }
+
+/** "DNS : name", "IP : 192.0.2.1", "E-mail : a@b", "URI : https://…": the type read from the value. */
+export function sanLine(value, t) {
+  const v = String(value || '')
+  const kind = /^[a-z][a-z0-9+.-]*:\/\//i.test(v) ? 'uri'
+    : v.includes('@') ? 'email'
+      : (/^\d{1,3}(\.\d{1,3}){3}$/.test(v) || (v.includes(':') && /^[0-9a-f:]+$/i.test(v))) ? 'ip' : 'dns'
+  return t(`approvals.work.detail.san.${kind}`, { value: v })
 }

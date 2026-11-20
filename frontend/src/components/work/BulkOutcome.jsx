@@ -1,8 +1,9 @@
 /**
- * Outcome of a bulk action, line by line: what went through, what failed and why.
+ * Outcome of a bulk action where one failed, line by line: what went through, what failed and why.
  */
 import { useTranslation } from 'react-i18next'
-import { CheckCircle, Warning } from '@phosphor-icons/react'
+import { Warning } from '@phosphor-icons/react'
+import { CheckIcon } from './workIcons'
 import { cn } from '../../lib/utils'
 import { WorkButton } from './WorkQueue'
 
@@ -20,7 +21,7 @@ export function BulkOutcome({ outcome, nameOf, onClose }) {
       <ul className="wk-outcome">
         {outcome.map((o, i) => (
           <li key={i} className={cn(o.ok ? 'is-ok' : 'is-failed')}>
-            {o.ok ? <CheckCircle aria-hidden="true" /> : <Warning aria-hidden="true" />}
+            {o.ok ? <CheckIcon aria-hidden="true" /> : <Warning aria-hidden="true" />}
             <span>
               <strong>{nameOf(o.item)}</strong>
               {' '}<span className="wk-muted">{o.ok ? t('work.bulk.ok') : t('work.bulk.ko')}</span>
@@ -29,8 +30,8 @@ export function BulkOutcome({ outcome, nameOf, onClose }) {
           </li>
         ))}
       </ul>
-      <div className="wk-dialog-actions">
-        <WorkButton primary onClick={onClose}>{t('common.close')}</WorkButton>
+      <div className="lv-dialog-actions">
+        <WorkButton primary data-write="false" onClick={onClose}>{t('common.close')}</WorkButton>
       </div>
     </div>
   )

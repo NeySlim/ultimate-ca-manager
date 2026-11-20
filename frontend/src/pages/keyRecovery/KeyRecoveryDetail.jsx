@@ -36,14 +36,16 @@ export function KeyRecoveryDetail({ data: req, objectKey, title, section, onSect
       .then((res) => { const row = res?.data || res; if (row?.id) onChanged?.({ ...row, dual_control: req.dual_control }) })
       .catch(() => {}),
   })
+  // The mockup's journal: what happened, its detail under it, who and when on the right
   const log = [
-    { at: req.requested_at, label: t('keyRecovery.work.log.requested'), meta: [req.requested_by, req.reason].filter(Boolean).join(' · ') },
+    { at: req.requested_at, label: t('keyRecovery.work.log.requested'), meta: req.reason, actor: req.requested_by },
     req.decided_at && {
       at: req.decided_at,
       label: t(req.status === 'rejected' ? 'keyRecovery.work.log.rejected' : 'keyRecovery.work.log.approved'),
-      meta: [req.decided_by, req.decision_note].filter(Boolean).join(' · '),
+      meta: req.decision_note || t('approvals.work.log.noReason'),
+      actor: req.decided_by,
     },
-    req.recovered_at && { at: req.recovered_at, label: t('keyRecovery.work.log.recovered'), meta: req.recovered_by },
+    req.recovered_at && { at: req.recovered_at, label: t('keyRecovery.work.log.recovered'), meta: '', actor: req.recovered_by },
   ].filter(Boolean).reverse()
 
   return (
@@ -75,7 +77,7 @@ export function KeyRecoveryDetail({ data: req, objectKey, title, section, onSect
                 [t('keyRecovery.reason'), req.reason],
                 [t('approvals.requester'), req.requested_by],
                 [t('approvals.work.detail.submitted'), when(req.requested_at)],
-                [t('common.status'), <StatusPill {...recoveryState(req, t)} />],
+                [t('approvals.work.detail.state'), <StatusPill {...recoveryState(req, t)} />],
               ]} />
             </section>
             {(req.decided_at || req.recovered_at) && (
@@ -93,7 +95,10 @@ export function KeyRecoveryDetail({ data: req, objectKey, title, section, onSect
           </div>
         ) : (
           <WorkRecords empty={t('approvals.work.log.none')}>
-            {log.map((e, i) => <WorkRecord key={i} title={e.label} meta={e.meta} badge={<span className="wk-rl-meta">{when(e.at)}</span>} />)}
+            {log.map((e, i) => (
+              <WorkRecord key={i} title={e.label} meta={e.meta}
+                badge={<span className="wk-rl-meta">{[e.actor, when(e.at)].filter(Boolean).join(' · ')}</span>} />
+            ))}
           </WorkRecords>
         )}
       </div>

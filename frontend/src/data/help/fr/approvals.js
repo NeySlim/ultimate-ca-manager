@@ -39,7 +39,7 @@ export default {
       },
     ],
     tips: [
-      'Tout rejet unique arrête immédiatement l\'approbation : c\'est intentionnel pour la sécurité.',
+      'Tout rejet unique arrête immédiatement l\'approbation : c\'est intentionnel pour la sécurité. Un refus demande un motif d’au moins cinq caractères.',
       'Tant qu\'un renouvellement attend une approbation, le planificateur laisse le certificat à cette décision, tant qu\'elle peut intervenir avant l\'expiration du certificat ; sous une politique de renouvellement, il ne renouvelle jamais sans elle.',
       'Chaque décision et son commentaire sont conservés dans la chronologie d\'approbation de la demande ; le journal d\'audit enregistre les approbations, pas le commentaire, une demande mise en file ni un rejet.',
     ],
@@ -105,14 +105,14 @@ Les demandes ouvertes sont groupées par échéance : **En retard**, **À traite
 ## Rejeter une demande
 
 1. Cliquez sur **Refuser…** sur sa ligne, ou dans l'inspecteur
-2. Entrez un **motif** (requis) : il est conservé dans la chronologie de la demande ; un rejet n'écrit aucune entrée dans le journal d'audit
+2. Entrez un **motif** d’au moins cinq caractères (requis) : il est conservé dans la chronologie de la demande ; un rejet n'écrit aucune entrée dans le journal d'audit
 3. Confirmez : la demande est immédiatement arrêtée
 
 > ⚠ Tout rejet unique arrête la demande entière. C'est intentionnel : si un examinateur identifie un problème, l'émission ne doit pas se poursuivre.
 
 ## Décider plusieurs demandes
 
-Cochez plusieurs lignes, ou tout un groupe depuis son en-tête, puis **Approuver…** ou **Refuser…** dans la barre qui remplace l'indication. Il n'existe pas de route groupée : chaque demande est traitée à son tour, et le bilan donne celles qui sont passées et pourquoi les autres ne le sont pas (vote déjà donné, demande expirée, émission en échec).
+Cochez plusieurs lignes, ou tout un groupe depuis son en-tête, puis **Approuver…** ou **Refuser…** dans la barre qui remplace l'indication. Il n'existe pas de route groupée : chaque demande est traitée à son tour. Quand toutes sont passées, un seul message le dit ; sinon le bilan donne celles qui sont passées et pourquoi les autres ne le sont pas (vote déjà donné, demande expirée, émission en échec).
 
 ## Historique des approbations
 

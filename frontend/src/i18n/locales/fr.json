@@ -5313,12 +5313,12 @@
     "approvedSuccess": "Demande approuvée",
     "issuanceFailed": "Certificat non émis, la demande reste en attente : {{reason}}",
     "requestClosed": "Demande fermée, plus rien ne peut la satisfaire : {{reason}}",
-    "rejectedSuccess": "Demande rejetée",
+    "rejectedSuccess": "Demande refusée",
     "actionFailed": "Échec de l'action",
     "noRequests": "Aucune demande d'approbation",
     "noRequestsDesc": "Les demandes d'approbation apparaîtront ici lorsque des certificats nécessiteront une approbation basée sur les politiques.",
     "searchPlaceholder": "Rechercher des demandes...",
-    "loadFailed": "Échec du chargement des demandes d'approbation",
+    "loadFailed": "Impossible de charger les demandes d’approbation",
     "certificateRequest": "Demande de certificat",
     "certificateIssued": "Certificat émis avec succès",
     "requestType": {
@@ -5348,7 +5348,7 @@
       "hint": "Cochez plusieurs demandes pour les approuver ou les refuser ensemble ; un sujet ouvre le détail.",
       "hintRead": "Un sujet ouvre le détail.",
       "emptyTitle": "Aucune demande en attente",
-      "emptyText": "Les demandes traitées restent dans l'historique ci-dessous ; les politiques disent quelles émissions en demandent une.",
+      "emptyText": "Les demandes traitées restent dans l’historique ci-dessous ; les politiques disent quelles émissions en demandent une.",
       "seePolicies": "Voir les politiques",
       "history": "Traitées récemment",
       "kind": "Approbation · {{source}}",
@@ -5373,7 +5373,7 @@
         "csr": "CSR à signer",
         "renewal": "Renouvellement",
         "revocation": "Révocation",
-        "ca_revocation": "Révocation d'AC",
+        "ca_revocation": "Révocation d’AC",
         "cross_revocation": "Révocation de certificat croisé",
         "acme_order": "Commande ACME",
         "est_enroll": "Enrôlement EST",
@@ -5406,10 +5406,13 @@
         "rejectMany": "Refuser les demandes",
         "reason": "Motif",
         "optional": "facultatif",
-        "approveHint": "Enregistré avec la décision.",
-        "rejectHint": "Obligatoire pour un refus : enregistré avec la décision.",
-        "reasonRequired": "Indiquez le motif du refus.",
-        "manyNote": "Chaque demande est traitée à son tour ; le bilan donne celles qui sont passées et pourquoi les autres ne le sont pas."
+        "approveHint": "Ajouté au journal avec la décision.",
+        "rejectHint": "Obligatoire pour un refus : ajouté au journal avec la décision.",
+        "reasonRequired": "Indiquez le motif du refus, {{min}} caractères au moins.",
+        "manyNote": "Chaque demande est traitée à son tour ; si l’une échoue, un bilan dit laquelle et pourquoi.",
+        "decidedNote": "La demande quitte la file, la barre d’état et la carte À traiter.",
+        "decidedNoteMany": "Les demandes quittent la file, la barre d’état et la carte À traiter.",
+        "csrNote": "Une CSR approuvée émet son certificat."
       },
       "sections": {
         "request": "Demande",
@@ -5420,26 +5423,46 @@
         "id": "Identifiant",
         "submitted": "Déposée",
         "due": "À traiter avant",
+        "state": "État",
+        "reason": "Motif",
         "votes": "Approbations",
         "csr": "CSR",
         "object": "Objet",
         "subject": "Sujet",
         "ca": "Autorité",
         "csrId": "CSR enregistrée",
+        "validity": "Validité",
+        "extraSan": "Noms alternatifs ajoutés",
         "days_one": "{{count}} jour",
         "days_other": "{{count}} jours",
         "decision": "Décision",
         "by": "Par",
         "on": "Le",
-        "noReason": "Aucun"
+        "noReason": "Aucun",
+        "san": {
+          "dns": "DNS : {{value}}",
+          "ip": "IP : {{value}}",
+          "email": "Courriel : {{value}}",
+          "uri": "URI : {{value}}"
+        }
       },
       "log": {
         "submitted": "Demande déposée",
-        "approved": "Approuvée",
-        "rejected": "Refusée",
+        "what": "{{what}} : {{subject}}.",
+        "approved": "Demande approuvée",
+        "rejected": "Demande refusée",
         "expired": "Expirée sans décision",
         "cancelled": "Annulée",
-        "none": "Aucune entrée."
+        "none": "Aucune entrée.",
+        "noReason": "Sans motif."
+      },
+      "toast": {
+        "approvedOne": "Demande #{{id}} approuvée",
+        "rejectedOne": "Demande #{{id}} refusée",
+        "approvedMany_one": "{{count}} demande approuvée",
+        "approvedMany_other": "{{count}} demandes approuvées",
+        "rejectedMany_one": "{{count}} demande refusée",
+        "rejectedMany_other": "{{count}} demandes refusées"
       }
     }
   },
@@ -5463,7 +5486,7 @@
     "recipients": "Destinataires",
     "generatedPreview": "Aperçu du rapport",
     "generatedAt": "Généré le",
-    "loadFailed": "Échec du chargement des rapports",
+    "loadFailed": "Impossible de charger les rapports",
     "generated": "Rapport généré",
     "generateFailed": "Échec de la génération du rapport",
     "downloaded": "Rapport téléchargé",
@@ -5574,10 +5597,10 @@
       "intent": "Inventaires et échéances planifiés.",
       "total_one": "{{count}} rapport planifié",
       "total_other": "{{count}} rapports planifiés",
-      "hint": "Cochez plusieurs rapports pour les télécharger ou suspendre leur planification ensemble ; un nom ouvre le détail.",
+      "hint": "Cochez plusieurs rapports pour les télécharger ou suspendre leur planification ensemble ; les chiffres suivent l’inventaire, comme la vue d’ensemble.",
       "hintRead": "Un nom ouvre le détail.",
       "emptyTitle": "Aucun rapport planifié",
-      "emptyText": "Un rapport envoie l'inventaire, les échéances ou la conformité par courriel, à la fréquence choisie.",
+      "emptyText": "Un rapport envoie l’inventaire, les échéances ou la conformité par courriel, à la fréquence choisie.",
       "unscheduled": "Non planifiés",
       "schedule": "Planifier un rapport",
       "scheduleAsk": "Planifier…",
@@ -5588,6 +5611,8 @@
       "suspended_other": "{{count}} planifications suspendues",
       "testAsk": "Envoyer un test…",
       "customPdf": "Composer un PDF…",
+      "pdfName": "{{name}} (PDF)",
+      "actionsTitle": "Actions du rapport",
       "downloadNamed": "Télécharger {{name}}",
       "noRecipient": "Aucun destinataire",
       "groups": {
@@ -5595,14 +5620,14 @@
         "later": "Planifiés"
       },
       "freq": {
-        "daily": "Quotidien · {{time}} UTC",
-        "weekly": "Hebdomadaire · {{time}} UTC",
-        "monthly": "Mensuel · {{time}} UTC"
+        "daily": "Quotidien · {{time}}",
+        "weekly": "Hebdomadaire · {{time}}",
+        "monthly": "Mensuel · {{time}}"
       },
       "freqLong": {
-        "daily": "Quotidien, à {{time}} UTC",
-        "weekly": "Hebdomadaire, le {{day}}, à {{time}} UTC",
-        "monthly": "Mensuel, le {{day}}, à {{time}} UTC"
+        "daily": "Quotidien, à {{time}}",
+        "weekly": "Hebdomadaire, le {{day}}, à {{time}}",
+        "monthly": "Mensuel, le {{day}}, à {{time}}"
       },
       "dayName": {
         "mon": "lundi",
@@ -5613,6 +5638,8 @@
         "sat": "samedi",
         "sun": "dimanche"
       },
+      "monthDay_one": "{{count}}er",
+      "monthDay_other": "{{count}}",
       "state": {
         "scheduled": "Planifié",
         "unscheduled": "Non planifié"
@@ -5632,20 +5659,38 @@
       "generatedAt": "Calculé le {{date}}.",
       "compute": "Calculer",
       "seeCertificates": "Voir ces certificats",
-      "noRuns": "Le serveur ne fournit pas d'historique des exécutions : la planification et la prochaine exécution sont ce qui est connu.",
-      "pdfPreview": "Un rapport PDF s'examine en le téléchargeant.",
+      "noRuns": "Le serveur ne fournit pas d’historique des exécutions : la planification et la prochaine exécution sont ce qui est connu.",
+      "pdfPreview": "Un rapport PDF s’examine en le téléchargeant.",
       "previewIntro": "Générez le rapport maintenant pour voir ses lignes.",
       "previewCount_one": "{{count}} ligne affichée sur {{total}}",
       "previewCount_other": "{{count}} lignes affichées sur {{total}}",
       "dialog": {
         "content": "Contenu",
-        "time": "Heure d'envoi (UTC)",
-        "timeHint": "Format HH:MM, en heure UTC comme le planificateur.",
-        "timeInvalid": "Indiquez une heure au format HH:MM.",
+        "time": "Heure d’envoi",
+        "timeUtc": "Heure d’envoi (UTC)",
+        "timeHint": "Format HH:MM.",
+        "timeHintUtc": "Format HH:MM, en heure UTC comme le planificateur.",
+        "timeInvalid": "Heure invalide : format HH:MM, de 00:00 à 23:59.",
         "recipientsHint": "Une ou plusieurs adresses séparées par des virgules.",
-        "recipientsRequired": "Indiquez au moins un destinataire : sans destinataire, rien n'est envoyé.",
+        "recipientsRequired": "Saisissez au moins une adresse.",
+        "recipientsInvalid": "Adresse invalide : par exemple pki@example.com, séparées par des virgules.",
+        "emailInvalid": "Adresse invalide : par exemple pki@example.com.",
         "save": "Planifier",
-        "editTitle": "Modifier la planification"
+        "editTitle": "Modifier la planification",
+        "scheduleSubtitle": "Envoyé par courriel aux destinataires, à la fréquence choisie.",
+        "scheduleNote": "Le rapport part par courriel à chaque exécution ; « Envoyer un test… », dans le menu « ⋯ » du rapport, vérifie l’envoi avant.",
+        "pdfTitle": "Composer un PDF",
+        "pdfSubtitle": "Les sections choisies, téléchargées en un seul PDF."
+      },
+      "downloadedMany_one": "{{count}} rapport téléchargé",
+      "downloadedMany_other": "{{count}} rapports téléchargés",
+      "downloadedOutcome_one": "{{count}} rapport",
+      "downloadedOutcome_other": "{{count}} rapports",
+      "utcTime": "{{time}} UTC",
+      "figure": {
+        "expiring_one": "{{count}} certificat à J+{{days}}",
+        "expiring_other": "{{count}} certificats à J+{{days}}",
+        "expiringNote": "Même fenêtre que l’horizon à {{days}} jours de la vue d’ensemble, hors certificats révoqués."
       }
     },
     "invalidEmail": "Adresse électronique invalide"
@@ -6919,7 +6964,7 @@
   "keyRecovery": {
     "title": "Récupération de clés",
     "subtitle": "Récupération sous double contrôle des clés privées archivées",
-    "loadFailed": "Échec du chargement des demandes",
+    "loadFailed": "Impossible de charger les demandes de récupération",
     "actionFailed": "Action échouée",
     "dualControlOn": "Double contrôle activé",
     "empty": "Aucune demande de récupération",
@@ -6931,12 +6976,12 @@
     "decidedBy": "décidé par {{user}}",
     "recoveredBy": "récupéré par {{user}}",
     "approve": "Approuver",
-    "reject": "Rejeter",
+    "reject": "Refuser",
     "recover": "Récupérer",
     "download": "Télécharger .p12",
     "submitRequest": "Envoyer la demande",
     "approved": "Demande approuvée",
-    "rejected": "Demande rejetée",
+    "rejected": "Demande refusée",
     "recovered": "Clé récupérée",
     "requestSubmitted": "Demande de récupération envoyée pour approbation",
     "recoverTitle": "Récupérer la clé privée",
@@ -6951,7 +6996,7 @@
     "status": {
       "pending": "En attente",
       "approved": "Approuvée",
-      "rejected": "Rejetée",
+      "rejected": "Refusée",
       "recovered": "Récupérée",
       "cancelled": "Annulée"
     },
@@ -6961,7 +7006,7 @@
       "total_other": "{{count}} en cours",
       "hint": "Cochez plusieurs demandes pour les approuver ou les refuser ensemble ; un certificat ouvre le détail.",
       "hintDual": "Double contrôle : une demande est approuvée par un autre administrateur que son demandeur ; un certificat ouvre le détail.",
-      "emptyText": "Une récupération se demande depuis l'inspecteur d'un certificat, avec un motif.",
+      "emptyText": "Une récupération se demande depuis l’inspecteur d’un certificat, avec un motif.",
       "groups": {
         "approve": "À approuver",
         "approveOther": "À approuver par un autre administrateur",
@@ -6973,6 +7018,8 @@
       "approveAsk": "Approuver…",
       "rejectAsk": "Refuser…",
       "recoverAsk": "Récupérer…",
+      "approve": "Approuver",
+      "reject": "Refuser",
       "approveNamed": "Approuver la récupération de {{name}}",
       "rejectNamed": "Refuser la récupération de {{name}}",
       "recoverNamed": "Récupérer la clé de {{name}}",
@@ -6985,13 +7032,25 @@
         "rejectOne": "Refuser la récupération",
         "rejectMany": "Refuser les récupérations",
         "note": "Note",
-        "noteHint": "Conservée avec la décision."
+        "noteHint": "Conservée avec la décision.",
+        "approveNote": "Approuvée, la demande passe dans À récupérer : son demandeur ou un administrateur télécharge la clé une fois.",
+        "approveNoteMany": "Approuvées, les demandes passent dans À récupérer : leur demandeur ou un administrateur télécharge chaque clé une fois.",
+        "rejectNote": "Refusée, la demande quitte la file pour l’historique ci-dessous.",
+        "rejectNoteMany": "Refusées, les demandes quittent la file pour l’historique ci-dessous."
       },
       "log": {
         "requested": "Récupération demandée",
         "approved": "Demande approuvée",
         "rejected": "Demande refusée",
         "recovered": "Clé récupérée"
+      },
+      "toast": {
+        "approvedOne": "Demande #{{id}} approuvée",
+        "rejectedOne": "Demande #{{id}} refusée",
+        "approvedMany_one": "{{count}} demande approuvée",
+        "approvedMany_other": "{{count}} demandes approuvées",
+        "rejectedMany_one": "{{count}} demande refusée",
+        "rejectedMany_other": "{{count}} demandes refusées"
       }
     }
   },
@@ -7701,11 +7760,12 @@
     "selectAll": "Tout sélectionner : {{group}}",
     "loading": "Chargement de la file…",
     "retry": "Réessayer",
+    "viewLog": "Voir le journal",
     "bulkLabel": "Actions groupées",
     "selected_one": "{{count}} élément sélectionné",
     "selected_other": "{{count}} éléments sélectionnés",
     "cancelSelection": "Annuler la sélection",
-    "historyEmpty": "Rien pour l'instant.",
+    "historyEmpty": "Rien pour l’instant.",
     "bulk": {
       "title": "Bilan",
       "done_one": "{{count}} réussie",
@@ -7714,6 +7774,16 @@
       "failed_other": "{{count}} échouées",
       "ok": "réussie",
       "ko": "échouée"
+    },
+    "cause": {
+      "status": "Cause : le serveur a répondu {{status}} {{reason}} à <mono>{{request}}</mono>. Les autres vues et l’inspecteur restent utilisables.",
+      "noAnswer": "Cause : le serveur n’a pas répondu à <mono>{{request}}</mono>. Les autres vues et l’inspecteur restent utilisables.",
+      "message": "Cause : {{message}}. Les autres vues et l’inspecteur restent utilisables."
+    },
+    "dialog": {
+      "request": "Demande #{{id}}",
+      "requests_one": "{{count}} demande",
+      "requests_other": "{{count}} demandes"
     }
   }
 }

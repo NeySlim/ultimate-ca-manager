@@ -26,15 +26,17 @@ vi.mock('../../../hooks', () => ({
   }),
 }))
 const api = vi.hoisted(() => ({ generate: vi.fn(), getSchedule: vi.fn(), download: vi.fn() }))
-vi.mock('../../../services', () => ({ reportsService: api }))
+const certs = vi.hoisted(() => ({ getStats: vi.fn() }))
+vi.mock('../../../services', () => ({ reportsService: api, certificatesService: certs }))
 
 import { InspectorObject } from '../../../components/inspector/InspectorObject'
+import { setAppTimezone } from '../../../stores/timezoneStore'
 
 const entry = (key, schedule) => ({ key: `report:${key}`, type: 'report', entityId: key, data: { key, schedule } })
 const show = (e) => render(<MemoryRouter><InspectorObject entry={e} onTitle={() => {}} /></MemoryRouter>)
 const WEEKLY = { enabled: true, frequency: 'weekly', time: '08:00', day_of_week: 0, recipients: ['pki@example.com'], format: 'csv' }
 
-beforeEach(() => { vi.clearAllMocks(); stable.perms = ['read:audit', 'export:audit', 'write:settings'] })
+beforeEach(() => { vi.clearAllMocks(); setAppTimezone('UTC'); stable.perms = ['read:audit', 'export:audit', 'write:settings'] })
 
 describe('ReportDetail in the inspector', () => {
   it('heads with the name and schedule state, the Report section first', () => {
@@ -43,8 +45,31 @@ describe('ReportDetail in the inspector', () => {
     expect(screen.getAllByText('Planifié').length).toBeGreaterThan(0)
     expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Rapport', 'Exécutions', 'Aperçu'])
     expect(screen.getByRole('tab', { name: 'Rapport' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByText('Hebdomadaire, le lundi, à 08:00 UTC')).toBeInTheDocument()
+    expect(screen.getByText('Hebdomadaire, le lundi, à 08:00')).toBeInTheDocument()
     expect(screen.getByText('pki@example.com')).toBeInTheDocument()
+  })
+
+  it('names its content as the queue does, not by its long description', () => {
+    show(entry('expiring_certificates', WEEKLY))
+    expect(screen.getByText('Contenu', { selector: 'dt' }).nextElementSibling).toHaveTextContent('Certificats expirants')
+  })
+
+  it('gives the current figure the certificate counters hold, with its sentence, for a reader of the certificates', async () => {
+    stable.perms = [...stable.perms, 'read:certificates']
+    certs.getStats.mockResolvedValue({ data: { expiring: 8 } })
+    show(entry('expiring_certificates', WEEKLY))
+    expect(await screen.findByText('8 certificats à J+30')).toBeInTheDocument()
+    expect(screen.getByText('Même fenêtre que l’horizon à 30 jours de la vue d’ensemble, hors certificats révoqués.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Calculer' })).toBeNull()
+    expect(api.generate).not.toHaveBeenCalled()
+  })
+
+  it('titles its « ⋯ » dialog and names the report in it', async () => {
+    show(entry('expiring_certificates', WEEKLY))
+    fireEvent.click(screen.getByTestId('inspector-more-actions'))
+    const dialog = await screen.findByTestId('inspector-actions-dialog')
+    expect(dialog).toHaveTextContent('Actions du rapport')
+    expect(dialog).toHaveTextContent('Certificats expirants')
   })
 
   it('links to the certificates a report lists', () => {
@@ -63,7 +88,7 @@ describe('ReportDetail in the inspector', () => {
   it('says the server serves no run history', () => {
     const { container } = show(entry('audit_summary', WEEKLY))
     fireEvent.click(screen.getByRole('tab', { name: 'Exécutions' }))
-    expect(container).toHaveTextContent('ne fournit pas d\'historique des exécutions')
+    expect(container).toHaveTextContent('ne fournit pas d’historique des exécutions')
   })
 
   it('previews the rows of the report', async () => {

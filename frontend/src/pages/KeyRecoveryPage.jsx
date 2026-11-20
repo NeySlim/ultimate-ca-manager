@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next'
 import { Check, Prohibit, DownloadSimple } from '@phosphor-icons/react'
 import { ResponsiveLayout } from '../components'
 import { StatusPill } from '../components/list'
-import { WorkQueue, WorkButton, WorkRecord, WorkRecords, workSpot, focusWork } from '../components/work'
+import { WorkQueue, WorkButton, WorkRecord, WorkRecords, workSpot, focusWork, loadCause } from '../components/work'
 import { keyRecoveryService } from '../services'
 import { useNotification, useInspector } from '../contexts'
 import { usePermission } from '../hooks'
@@ -36,7 +36,7 @@ export default function KeyRecoveryPage() {
   const [requests, setRequests] = useState([])
   const [dualControl, setDualControl] = useState(true)
   const [state, setState] = useState('loading')
-  const [failure, setFailure] = useState('')
+  const [failure, setFailure] = useState(null)
   const [linked, setLinked] = useState(null)
 
   const load = useCallback(async ({ quiet = false } = {}) => {
@@ -48,7 +48,7 @@ export default function KeyRecoveryPage() {
       setDualControl(data.dual_control !== false)
       setState('ready')
     } catch (e) {
-      setFailure(e?.message || '')
+      setFailure(e || null)
       setState('error')
     }
   }, [])
@@ -91,7 +91,8 @@ export default function KeyRecoveryPage() {
   }, [requests, linked, dualControl])
 
   const actions = useRecoveryActions({
-    onDone: () => load({ quiet: true }).then(() => requestAnimationFrame(() => focusWork(root.current, spot.current))),
+    onDone: () => load({ quiet: true }),
+    refocus: () => focusWork(root.current, spot.current),
   })
   const ask = (kind, reqs) => {
     spot.current = workSpot(root.current, reqs.map((r) => r.id))
@@ -102,14 +103,17 @@ export default function KeyRecoveryPage() {
   const activeKey = inspector?.activeKey || ''
   const openedId = activeKey.startsWith('key_recovery:') ? Number(activeKey.slice(13)) : linked?.id
 
-  const rowActions = (req) => (disabled) => {
+  // A row without Approve… where its group has some keeps the button's place: the due dates line up
+  const rowActions = (req, approveSlot) => (disabled) => {
     const rights = recoveryRights(req, who)
     const name = nameOf(req)
     return (
       <>
-        {rights.approve && (
+        {rights.approve ? (
           <WorkButton icon={Check} disabled={disabled} onClick={() => ask('approve', [req])}
             aria-label={t('keyRecovery.work.approveNamed', { name })}>{t('keyRecovery.work.approveAsk')}</WorkButton>
+        ) : approveSlot && (
+          <span className="wk-btn is-placeholder" aria-hidden="true"><Check aria-hidden="true" />{t('keyRecovery.work.approveAsk')}</span>
         )}
         {rights.reject && (
           <WorkButton quiet icon={Prohibit} disabled={disabled} onClick={() => ask('reject', [req])}
@@ -123,31 +127,34 @@ export default function KeyRecoveryPage() {
     )
   }
 
-  const groups = recoveryGroups(all, t, dualControl).map((g) => ({
-    ...g,
-    items: g.requests.map((req) => {
-      const at = req.status === 'approved' ? req.decided_at || req.requested_at : req.requested_at
-      return {
-        id: req.id,
-        title: nameOf(req),
-        kind: t('keyRecovery.work.kind'),
-        facts: [
-          t('keyRecovery.work.requestedBy', { user: req.requested_by, ago: compactAgo(req.requested_at, t) }),
-          req.reason && t('keyRecovery.work.reason', { reason: req.reason }),
-          req.status === 'approved' && req.decided_by && t('keyRecovery.decidedBy', { user: req.decided_by }),
-        ].filter(Boolean),
-        // No deadline: the date the request reached this step
-        due: at,
-        dueLabel: compactAgo(at, t),
-        dueDate: when(at),
-        tone: '',
-        onOpen: () => open(req),
-        // Only a request the user may decide on goes into a bulk decision
-        selectable: recoveryRights(req, who).reject,
-        actions: rowActions(req),
-      }
-    }),
-  }))
+  const groups = recoveryGroups(all, t, dualControl).map((g) => {
+    const approveSlot = g.requests.some((r) => recoveryRights(r, who).approve)
+    return {
+      ...g,
+      items: g.requests.map((req) => {
+        const at = req.status === 'approved' ? req.decided_at || req.requested_at : req.requested_at
+        return {
+          id: req.id,
+          title: nameOf(req),
+          kind: t('keyRecovery.work.kind'),
+          facts: [
+            t('keyRecovery.work.requestedBy', { user: req.requested_by, ago: compactAgo(req.requested_at, t) }),
+            req.reason && t('keyRecovery.work.reason', { reason: req.reason }),
+            req.status === 'approved' && req.decided_by && t('keyRecovery.decidedBy', { user: req.decided_by }),
+          ].filter(Boolean),
+          // No deadline: the date the request reached this step
+          due: at,
+          dueLabel: compactAgo(at, t),
+          dueDate: when(at),
+          tone: '',
+          onOpen: () => open(req),
+          // Only a request the user may decide on goes into a bulk decision
+          selectable: recoveryRights(req, who).reject,
+          actions: rowActions(req, approveSlot),
+        }
+      }),
+    }
+  })
 
   const pendingById = new Map(all.filter((r) => r.status === 'pending').map((r) => [r.id, r]))
   const bulkActions = hasPermission('admin:key_recovery') ? (ids) => {
@@ -166,6 +173,7 @@ export default function KeyRecoveryPage() {
   return (
     <>
       <ResponsiveLayout
+        className="wk-page"
         title={t('keyRecovery.title')}
         total={state === 'ready' ? t('keyRecovery.work.total', { count: open_ }) : ''}
         intent={t('keyRecovery.work.intent')}
@@ -175,7 +183,7 @@ export default function KeyRecoveryPage() {
           rootRef={root}
           label={t('keyRecovery.title')}
           state={state}
-          error={{ title: t('keyRecovery.loadFailed'), text: failure, onRetry: () => load() }}
+          error={{ title: t('keyRecovery.loadFailed'), cause: loadCause(failure, t), onRetry: () => load(), journal: hasPermission('read:audit') && '/audit' }}
           hint={t(dualControl ? 'keyRecovery.work.hintDual' : 'keyRecovery.work.hint')}
           groups={groups}
           bulkActions={bulkActions}

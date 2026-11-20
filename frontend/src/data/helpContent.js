@@ -1877,7 +1877,7 @@ export const helpContent = {
       },
     ],
     tips: [
-      'Any single rejection immediately stops the approval: this is intentional for security.',
+      'Any single rejection immediately stops the approval: this is intentional for security. A rejection asks for a reason of at least five characters.',
       'While a renewal awaits approval, the scheduler leaves the certificate to that decision, as long as it can come before the certificate expires; under a renewal policy it never renews without one.',
       'Each decision and its comment are kept in the request\'s approval timeline; the audit log records approvals, not the comment, a queued request or a rejection.',
     ],
@@ -1950,7 +1950,7 @@ export const helpContent = {
         title: 'Scheduling',
         icon: CalendarBlank,
         items: [
-          { label: 'Schedule a report', text: 'Choose any data report or PDF template, then its frequency (daily, weekly or monthly), time (UTC), format and recipients; the scheduled reports are grouped by next run' },
+          { label: 'Schedule a report', text: 'Choose any data report or PDF template, then its frequency (daily, weekly or monthly), time (typed in UTC when your timezone is not UTC, shown in your timezone in the queue), format and recipients; the scheduled reports are grouped by next run' },
           { label: 'Attachment', text: 'The report is attached to the email in its format: CSV or JSON for data reports, PDF for the PDF templates' },
         ]
       },

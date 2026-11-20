@@ -5305,7 +5305,7 @@
     "noRequests": "No approval requests",
     "noRequestsDesc": "Approval requests will appear here when certificates require policy-based approval.",
     "searchPlaceholder": "Search requests...",
-    "loadFailed": "Failed to load approval requests",
+    "loadFailed": "Could not load the approval requests",
     "certificateRequest": "Certificate Request",
     "certificateIssued": "Certificate issued successfully",
     "requestType": {
@@ -5393,10 +5393,13 @@
         "rejectMany": "Reject the requests",
         "reason": "Reason",
         "optional": "optional",
-        "approveHint": "Recorded with the decision.",
-        "rejectHint": "Required for a rejection: recorded with the decision.",
-        "reasonRequired": "Give the reason for the rejection.",
-        "manyNote": "Each request is decided in turn; the outcome lists those that went through and why the others did not."
+        "approveHint": "Added to the log with the decision.",
+        "rejectHint": "Required for a rejection: added to the log with the decision.",
+        "reasonRequired": "Give the reason for the rejection, {{min}} characters at least.",
+        "manyNote": "Each request is decided in turn; if one fails, an outcome says which and why.",
+        "decidedNote": "The request leaves the queue, the status bar and the To handle card.",
+        "decidedNoteMany": "The requests leave the queue, the status bar and the To handle card.",
+        "csrNote": "An approved CSR issues its certificate."
       },
       "sections": {
         "request": "Request",
@@ -5407,26 +5410,46 @@
         "id": "Identifier",
         "submitted": "Submitted",
         "due": "To handle before",
+        "state": "State",
+        "reason": "Reason",
         "votes": "Approvals",
         "csr": "CSR",
         "object": "Object",
         "subject": "Subject",
         "ca": "Authority",
         "csrId": "Stored CSR",
+        "validity": "Validity",
+        "extraSan": "Added alternative names",
         "days_one": "{{count}} day",
         "days_other": "{{count}} days",
         "decision": "Decision",
         "by": "By",
         "on": "On",
-        "noReason": "None"
+        "noReason": "None",
+        "san": {
+          "dns": "DNS: {{value}}",
+          "ip": "IP: {{value}}",
+          "email": "Email: {{value}}",
+          "uri": "URI: {{value}}"
+        }
       },
       "log": {
         "submitted": "Request submitted",
-        "approved": "Approved",
-        "rejected": "Rejected",
+        "what": "{{what}}: {{subject}}.",
+        "approved": "Request approved",
+        "rejected": "Request rejected",
         "expired": "Expired without a decision",
         "cancelled": "Cancelled",
-        "none": "No entry."
+        "none": "No entry.",
+        "noReason": "No reason."
+      },
+      "toast": {
+        "approvedOne": "Request #{{id}} approved",
+        "rejectedOne": "Request #{{id}} rejected",
+        "approvedMany_one": "{{count}} request approved",
+        "approvedMany_other": "{{count}} requests approved",
+        "rejectedMany_one": "{{count}} request rejected",
+        "rejectedMany_other": "{{count}} requests rejected"
       }
     }
   },
@@ -5450,7 +5473,7 @@
     "recipients": "Recipients",
     "generatedPreview": "Report Preview",
     "generatedAt": "Generated",
-    "loadFailed": "Failed to load reports",
+    "loadFailed": "Could not load the reports",
     "generated": "Report generated",
     "generateFailed": "Failed to generate report",
     "downloaded": "Report downloaded",
@@ -5561,7 +5584,7 @@
       "intent": "Scheduled inventories and due dates.",
       "total_one": "{{count}} scheduled report",
       "total_other": "{{count}} scheduled reports",
-      "hint": "Tick several reports to download them or suspend their schedule together; a name opens the detail.",
+      "hint": "Tick several reports to download them or suspend their schedule together; the figures follow the inventory, as the overview does.",
       "hintRead": "A name opens the detail.",
       "emptyTitle": "No scheduled report",
       "emptyText": "A report sends the inventory, the due dates or the compliance by e-mail, at the chosen frequency.",
@@ -5575,6 +5598,8 @@
       "suspended_other": "{{count}} schedules suspended",
       "testAsk": "Send a test…",
       "customPdf": "Build a PDF…",
+      "pdfName": "{{name}} (PDF)",
+      "actionsTitle": "Report actions",
       "downloadNamed": "Download {{name}}",
       "noRecipient": "No recipient",
       "groups": {
@@ -5582,14 +5607,14 @@
         "later": "Scheduled"
       },
       "freq": {
-        "daily": "Daily · {{time}} UTC",
-        "weekly": "Weekly · {{time}} UTC",
-        "monthly": "Monthly · {{time}} UTC"
+        "daily": "Daily · {{time}}",
+        "weekly": "Weekly · {{time}}",
+        "monthly": "Monthly · {{time}}"
       },
       "freqLong": {
-        "daily": "Daily, at {{time}} UTC",
-        "weekly": "Weekly, on {{day}}, at {{time}} UTC",
-        "monthly": "Monthly, on day {{day}}, at {{time}} UTC"
+        "daily": "Daily, at {{time}}",
+        "weekly": "Weekly, on {{day}}, at {{time}}",
+        "monthly": "Monthly, on day {{day}}, at {{time}}"
       },
       "dayName": {
         "mon": "Monday",
@@ -5600,6 +5625,8 @@
         "sat": "Saturday",
         "sun": "Sunday"
       },
+      "monthDay_one": "{{count}}",
+      "monthDay_other": "{{count}}",
       "state": {
         "scheduled": "Scheduled",
         "unscheduled": "Not scheduled"
@@ -5626,13 +5653,31 @@
       "previewCount_other": "{{count}} rows shown out of {{total}}",
       "dialog": {
         "content": "Content",
-        "time": "Sending time (UTC)",
-        "timeHint": "HH:MM format, UTC time, as the scheduler runs.",
-        "timeInvalid": "Give a time in the HH:MM format.",
+        "time": "Sending time",
+        "timeUtc": "Sending time (UTC)",
+        "timeHint": "HH:MM format.",
+        "timeHintUtc": "HH:MM format, UTC time, as the scheduler runs.",
+        "timeInvalid": "Invalid time: HH:MM format, from 00:00 to 23:59.",
         "recipientsHint": "One or more addresses separated by commas.",
-        "recipientsRequired": "Give at least one recipient: without one, nothing is sent.",
+        "recipientsRequired": "Enter at least one address.",
+        "recipientsInvalid": "Invalid address: for example pki@example.com, separated by commas.",
+        "emailInvalid": "Invalid address: for example pki@example.com.",
         "save": "Schedule",
-        "editTitle": "Change the schedule"
+        "editTitle": "Change the schedule",
+        "scheduleSubtitle": "Sent by e-mail to the recipients, at the chosen frequency.",
+        "scheduleNote": "The report is sent by e-mail at each run; “Send a test…”, in the report’s “⋯” menu, checks delivery beforehand.",
+        "pdfTitle": "Build a PDF",
+        "pdfSubtitle": "The chosen sections, downloaded as one PDF."
+      },
+      "downloadedMany_one": "{{count}} report downloaded",
+      "downloadedMany_other": "{{count}} reports downloaded",
+      "downloadedOutcome_one": "{{count}} report",
+      "downloadedOutcome_other": "{{count}} reports",
+      "utcTime": "{{time}} UTC",
+      "figure": {
+        "expiring_one": "{{count}} certificate at D+{{days}}",
+        "expiring_other": "{{count}} certificates at D+{{days}}",
+        "expiringNote": "The same window as the {{days}}-day horizon of the overview, revoked certificates left out."
       }
     },
     "invalidEmail": "Invalid email address"
@@ -6919,7 +6964,7 @@
   "keyRecovery": {
     "title": "Key Recovery",
     "subtitle": "Dual-control recovery of archived private keys",
-    "loadFailed": "Failed to load recovery requests",
+    "loadFailed": "Could not load the recovery requests",
     "actionFailed": "Action failed",
     "dualControlOn": "Dual control on",
     "empty": "No recovery requests",
@@ -6973,6 +7018,8 @@
       "approveAsk": "Approve…",
       "rejectAsk": "Reject…",
       "recoverAsk": "Recover…",
+      "approve": "Approve",
+      "reject": "Reject",
       "approveNamed": "Approve the recovery of {{name}}",
       "rejectNamed": "Reject the recovery of {{name}}",
       "recoverNamed": "Recover the key of {{name}}",
@@ -6985,13 +7032,25 @@
         "rejectOne": "Reject the recovery",
         "rejectMany": "Reject the recoveries",
         "note": "Note",
-        "noteHint": "Kept with the decision."
+        "noteHint": "Kept with the decision.",
+        "approveNote": "Approved, the request moves to To recover: its requester or an administrator downloads the key once.",
+        "approveNoteMany": "Approved, the requests move to To recover: their requester or an administrator downloads each key once.",
+        "rejectNote": "Rejected, the request leaves the queue for the history below.",
+        "rejectNoteMany": "Rejected, the requests leave the queue for the history below."
       },
       "log": {
         "requested": "Recovery requested",
         "approved": "Request approved",
         "rejected": "Request rejected",
         "recovered": "Key recovered"
+      },
+      "toast": {
+        "approvedOne": "Request #{{id}} approved",
+        "rejectedOne": "Request #{{id}} rejected",
+        "approvedMany_one": "{{count}} request approved",
+        "approvedMany_other": "{{count}} requests approved",
+        "rejectedMany_one": "{{count}} request rejected",
+        "rejectedMany_other": "{{count}} requests rejected"
       }
     }
   },
@@ -7701,6 +7760,7 @@
     "selectAll": "Select all: {{group}}",
     "loading": "Loading the queue…",
     "retry": "Retry",
+    "viewLog": "View the log",
     "bulkLabel": "Bulk actions",
     "selected_one": "{{count}} item selected",
     "selected_other": "{{count}} items selected",
@@ -7714,6 +7774,16 @@
       "failed_other": "{{count}} failed",
       "ok": "done",
       "ko": "failed"
+    },
+    "cause": {
+      "status": "Cause: the server answered {{status}} {{reason}} to <mono>{{request}}</mono>. The other views and the inspector stay usable.",
+      "noAnswer": "Cause: the server did not answer <mono>{{request}}</mono>. The other views and the inspector stay usable.",
+      "message": "Cause: {{message}}. The other views and the inspector stay usable."
+    },
+    "dialog": {
+      "request": "Request #{{id}}",
+      "requests_one": "{{count}} request",
+      "requests_other": "{{count}} requests"
     }
   }
 }

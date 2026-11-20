@@ -3,19 +3,19 @@
  * then the Report, Runs and Preview sections. The server keeps no run history it
  * serves: Runs says so; Preview generates the report now.
  */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { ChartBar, DownloadSimple, Clock, PaperPlaneTilt, PauseCircle, CaretRight, Play } from '@phosphor-icons/react'
+import { DownloadSimple, Clock, PaperPlaneTilt, PauseCircle, CaretRight, Play } from '@phosphor-icons/react'
 import { StatusPill } from '../../components/list'
-import { WorkButton } from '../../components/work'
+import { WorkButton, ChartIcon } from '../../components/work'
 import { SectionTabs, tabId, panelId } from '../../components/inspector/InspectorTabs'
 import { MoreActionsMenu } from '../../components/inspector/certificate/MoreActionsMenu'
 import { usePermission } from '../../hooks'
-import { reportsService } from '../../services'
+import { reportsService, certificatesService } from '../../services'
 import { formatDate } from '../../lib/utils'
 import {
-  isPdf, reportDescription, nextRun, frequencyLong, formatLabel, scheduleOf, scheduleState, parseReport, CERTIFICATE_LINKS,
+  isPdf, reportName, nextRun, frequencyLong, formatLabel, scheduleOf, scheduleState, parseReport, reportFigure, CERTIFICATE_LINKS,
 } from './reportModel'
 import { useReportActions } from './useReportActions'
 import { ReportPreview } from './ReportPreview'
@@ -31,7 +31,7 @@ function Props({ rows }) {
 
 export function ReportDetail({ data, objectKey, title, section, onSection, onChanged }) {
   const { t } = useTranslation()
-  const { hasPermission, canWrite } = usePermission()
+  const { hasPermission, canWrite, canRead } = usePermission()
   const { key } = data
   const schedule = scheduleOf({ [key]: data.schedule }, key)
   const canExport = hasPermission('export:audit')
@@ -39,6 +39,19 @@ export function ReportDetail({ data, objectKey, title, section, onSection, onCha
   const [report, setReport] = useState(null)
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [figure, setFigure] = useState(null)
+  const more = useRef(null)
+  // A figure the certificate counters already hold is shown as it is, without computing the report
+  const counted = key === 'expiring_certificates' && canRead('certificates')
+  useEffect(() => {
+    if (!counted) return undefined
+    let live = true
+    Promise.resolve(certificatesService?.getStats?.())
+      .then((res) => { if (live) setFigure(reportFigure(key, res?.data, t)) })
+      .catch(() => {})
+    return () => { live = false }
+  }, [counted, key, t])
+  const fromMenu = () => more.current?.querySelector('button')
   const actions = useReportActions({
     schedules: { [key]: schedule },
     onDone: () => reportsService.getSchedule().then((res) => onChanged?.({ key, schedule: scheduleOf(res?.data, key) })).catch(() => {}),
@@ -58,9 +71,9 @@ export function ReportDetail({ data, objectKey, title, section, onSection, onCha
 
   const next = nextRun(schedule)
   const menu = [
-    canSchedule && { id: 'schedule', icon: Clock, label: t(schedule.enabled ? 'reports.work.editSchedule' : 'reports.work.scheduleAsk'), onClick: () => actions.openSchedule(key) },
+    canSchedule && { id: 'schedule', icon: Clock, label: t(schedule.enabled ? 'reports.work.editSchedule' : 'reports.work.scheduleAsk'), onClick: () => actions.openSchedule(key, fromMenu) },
     canSchedule && schedule.enabled && { id: 'suspend', icon: PauseCircle, label: t('reports.work.suspend'), onClick: () => actions.suspend([key]) },
-    canSchedule && { id: 'test', icon: PaperPlaneTilt, label: t('reports.work.testAsk'), onClick: () => actions.openTest(key) },
+    canSchedule && { id: 'test', icon: PaperPlaneTilt, label: t('reports.work.testAsk'), onClick: () => actions.openTest(key, fromMenu) },
   ].filter(Boolean)
   const certLink = CERTIFICATE_LINKS[key]
 
@@ -68,13 +81,16 @@ export function ReportDetail({ data, objectKey, title, section, onSection, onCha
     <>
       <header className="ins-heading">
         <div className="ins-title">
-          <ChartBar className="ins-title-icon" aria-hidden="true" />
+          <ChartIcon className="ins-title-icon" aria-hidden="true" />
           <h2>{title}</h2>
           <StatusPill {...scheduleState(schedule, t)} />
         </div>
         <div className="ins-actions">
           {canExport && <WorkButton icon={DownloadSimple} onClick={() => actions.download(key)}>{t('reports.download')}</WorkButton>}
-          <MoreActionsMenu items={menu} label={t('inspector.moreActions', { name: title })} />
+          <span ref={more} style={{ display: 'contents' }}>
+            <MoreActionsMenu items={menu} label={t('inspector.moreActions', { name: title })}
+              title={t('reports.work.actionsTitle')} name={title} />
+          </span>
         </div>
       </header>
       <SectionTabs objectKey={objectKey} sections={['report', 'runs', 'preview']} current={section} onSelect={onSection}
@@ -86,7 +102,7 @@ export function ReportDetail({ data, objectKey, title, section, onSection, onCha
             <section>
               <h3 className="ins-section-title">{t('reports.work.detail.schedule')}</h3>
               <Props rows={[
-                [t('reports.work.dialog.content'), reportDescription(key, t)],
+                [t('reports.work.dialog.content'), reportName(key, t)],
                 [t('reports.frequency'), schedule.enabled ? frequencyLong(schedule, t) : <span className="ins-muted">{t('reports.work.state.unscheduled')}</span>],
                 schedule.enabled && [t('reports.work.detail.next'), next ? formatDate(next, { time: true }) : '—'],
                 [t('reports.recipients'), schedule.recipients?.length ? schedule.recipients.join(', ') : <span className="ins-muted">{t('reports.work.noRecipient')}</span>],
@@ -96,7 +112,12 @@ export function ReportDetail({ data, objectKey, title, section, onSection, onCha
             {!isPdf(key) && (
               <section>
                 <h3 className="ins-section-title">{t('reports.work.detail.figure')}</h3>
-                {report ? (
+                {figure ? (
+                  <>
+                    <p className="wk-figure"><strong>{figure}</strong></p>
+                    <p className="ins-muted">{t('reports.work.figure.expiringNote', { days: 30 })}</p>
+                  </>
+                ) : report ? (
                   <>
                     <p className="wk-figure"><strong>{t('reports.work.items', { count: report.items.length })}</strong></p>
                     <p className="ins-muted">{t('reports.work.generatedAt', { date: formatDate(report.generatedAt, { time: true }) })}</p>
@@ -106,7 +127,7 @@ export function ReportDetail({ data, objectKey, title, section, onSection, onCha
                 )}
                 {failed && <p className="ins-notice is-bad" role="alert">{t('reports.generateFailed')}</p>}
                 {certLink && (
-                  <p style={{ marginTop: 10 }}>
+                  <p>
                     <Link className="lv-text-link" to={certLink}><CaretRight size={14} aria-hidden="true" />{t('reports.work.seeCertificates')}</Link>
                   </p>
                 )}

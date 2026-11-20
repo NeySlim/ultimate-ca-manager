@@ -7,11 +7,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { Check, Prohibit, Gavel } from '@phosphor-icons/react'
+import { Check, Prohibit } from '@phosphor-icons/react'
 import { ResponsiveLayout } from '../components'
 import { StatusPill } from '../components/list'
-import { WorkQueue, WorkButton, WorkRecord, WorkRecords, workSpot, focusWork } from '../components/work'
-import { approvalsService, casService } from '../services'
+import { WorkQueue, WorkButton, WorkRecord, WorkRecords, workSpot, focusWork, loadCause, PolicyIcon } from '../components/work'
+import { approvalsService } from '../services'
 import { useNotification, useInspector } from '../contexts'
 import { usePermission } from '../hooks'
 import { useOpenEntity } from '../hooks/useOpenEntity'
@@ -20,7 +20,7 @@ import { formatDate } from '../lib/utils'
 import { stateLabel } from '../lib/stateLabel'
 import {
   approvalGroups, requestTitle, typeLabel, subjectOf, requestKind, requestFacts, requestDeadline,
-  stateOf, decisionMeta,
+  stateOf, decisionMeta, loadCaIndex,
 } from './approvals/approvalModel'
 import { useApprovalDecision } from './approvals/useApprovalDecision'
 
@@ -30,7 +30,7 @@ const HISTORY_SIZE = 100
 export default function ApprovalsPage() {
   const { t } = useTranslation()
   const { showError, showInfo } = useNotification()
-  const { canWrite, canRead } = usePermission()
+  const { canWrite, canRead, hasPermission } = usePermission()
   const inspector = useInspector()
   const openEntity = useOpenEntity()
   const root = useRef(null)
@@ -38,7 +38,7 @@ export default function ApprovalsPage() {
 
   const [requests, setRequests] = useState([])
   const [state, setState] = useState('loading')
-  const [failure, setFailure] = useState('')
+  const [failure, setFailure] = useState(null)
   const [linked, setLinked] = useState(null)
   const [caNames, setCaNames] = useState({})
 
@@ -49,7 +49,7 @@ export default function ApprovalsPage() {
       setRequests(Array.isArray(res?.data) ? res.data : [])
       setState('ready')
     } catch (err) {
-      setFailure(err?.message || '')
+      setFailure(err || null)
       setState('error')
     }
   }, [])
@@ -68,13 +68,9 @@ export default function ApprovalsPage() {
   useEffect(() => {
     if (!needCas) return undefined
     let cancelled = false
-    casService.getAll()
-      .then((res) => {
-        if (cancelled) return
-        const list = Array.isArray(res?.data) ? res.data : []
-        setCaNames(Object.fromEntries(list.map((ca) => [ca.id, ca.common_name || ca.descr || ca.name])))
-      })
-      .catch(() => {})
+    loadCaIndex().then((index) => {
+      if (!cancelled) setCaNames(Object.fromEntries([...index].map(([id, ca]) => [id, ca.name])))
+    })
     return () => { cancelled = true }
   }, [needCas])
 
@@ -111,7 +107,8 @@ export default function ApprovalsPage() {
 
   // After a decision the focus goes to the action of the row now at the same place
   const decision = useApprovalDecision({
-    onDone: () => load({ quiet: true }).then(() => requestAnimationFrame(() => focusWork(root.current, spot.current))),
+    onDone: () => load({ quiet: true }),
+    refocus: () => focusWork(root.current, spot.current),
   })
   const ask = (kind, reqs) => {
     spot.current = workSpot(root.current, reqs.map((r) => r.id))
@@ -139,7 +136,7 @@ export default function ApprovalsPage() {
       title: requestTitle(req, t),
       titleNode: title(req),
       kind: requestKind(req, t),
-      facts: requestFacts(req, t, { caName: caNames[req.request_summary?.ca_id] }),
+      facts: requestFacts(req, t, { caName: caNames[String(req.request_summary?.ca_id)] }),
       due: requestDeadline(req),
       dueDate: formatDate(requestDeadline(req), { time: true }),
       onOpen: () => open(req),
@@ -151,12 +148,13 @@ export default function ApprovalsPage() {
   const bulkActions = mayDecide ? (ids) => decisionButtons(ids.map((id) => byId.get(id)).filter(Boolean), false) : undefined
 
   const policiesLink = canRead('policies') && (
-    <Link className="wk-btn" to="/policies"><Gavel aria-hidden="true" />{t('approvals.work.seePolicies')}</Link>
+    <Link className="wk-btn" to="/policies"><PolicyIcon aria-hidden="true" />{t('approvals.work.seePolicies')}</Link>
   )
 
   return (
     <>
       <ResponsiveLayout
+        className="wk-page"
         title={t('common.approvals')}
         total={state === 'ready' ? t('approvals.work.total', { count: pending.length }) : ''}
         intent={t('approvals.work.intent')}
@@ -166,7 +164,7 @@ export default function ApprovalsPage() {
           rootRef={root}
           label={t('common.approvals')}
           state={state}
-          error={{ title: t('approvals.loadFailed'), text: failure, onRetry: () => load() }}
+          error={{ title: t('approvals.loadFailed'), cause: loadCause(failure, t), onRetry: () => load(), journal: hasPermission('read:audit') && '/audit' }}
           hint={mayDecide ? t('approvals.work.hint') : t('approvals.work.hintRead')}
           groups={groups}
           bulkActions={bulkActions}
