@@ -81,15 +81,15 @@ test.describe('desktop, errors', () => {
     await dialog.getByRole('button', { name: 'Review the request' }).click()
     const cn = dialog.getByLabel('Common name')
     await expect(cn).toHaveAttribute('aria-invalid', 'true')
-    const colours = await cn.evaluate((el) => {
+    // Asked until it holds: the border colour eases in
+    await expect.poll(() => cn.evaluate((el) => {
       const probe = document.createElement('span')
       probe.style.color = 'var(--bad)'
       el.parentElement.appendChild(probe)
       const bad = getComputedStyle(probe).color
       probe.remove()
-      return { bad, border: getComputedStyle(el).borderTopColor }
-    })
-    expect(colours.border).toBe(colours.bad)
+      return getComputedStyle(el).borderTopColor === bad
+    })).toBe(true)
     // Advanced stays folded: nothing of it is in error
     await expect(dialog.getByRole('button', { name: /Advanced/ })).toHaveAttribute('aria-expanded', 'false')
   })
