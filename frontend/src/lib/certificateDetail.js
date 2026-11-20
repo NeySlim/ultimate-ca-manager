@@ -206,3 +206,39 @@ export function lastAcmeFailure(cert, orders = []) {
   return f
 }
 
+
+// Stored certificate types as people name them; an unknown type is humanized, never shown raw
+const CERT_TYPE_KEYS = {
+  server_cert: 'server', client_cert: 'client', combined_cert: 'combined', code_signing: 'codeSigning',
+  email_cert: 'emailSmime', ca_cert: 'ca', intermediate_ca: 'intermediateCA', root_ca: 'rootCA',
+  self_signed: 'selfSigned', timestamping: 'timestamping',
+}
+const humanize = (s) => String(s).replace(/[_-]+/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
+
+/** "server_cert" reads « Serveur ». */
+export function certTypeLabel(type, t) {
+  if (!type) return null
+  const key = CERT_TYPE_KEYS[type]
+  return key ? t(`certificates.sourceTypes.${key}`, humanize(type)) : humanize(type)
+}
+
+// Products a certificate is imported from, under their own spelling
+const PRODUCT_NAMES = { opnsense: 'OPNsense', pfsense: 'pfSense', msca: 'Microsoft AD CS', adcs: 'Microsoft AD CS', openbao: 'OpenBao', vault: 'Vault' }
+
+/** Who or what created a certificate, or where it came from: a known source, a product, else the value as sent (a user name). */
+export function originLabel(value, sources, t) {
+  if (!value) return null
+  const v = String(value)
+  if (sources.keys[v]) return sources.label(v, t)
+  return PRODUCT_NAMES[v.toLowerCase()] || v
+}
+
+/** A compliance reason of the server: a known code, else « RSA 512 (critique) » with its flag in the reader's language. */
+export function complianceReasonLabel(reason, t) {
+  if (reason == null) return ''
+  const s = String(reason)
+  const code = s.toLowerCase()
+  if (/^[a-z_]+$/.test(code)) return t(`compliance.reasons.${code}`, s)
+  const m = /^(.*) \((weak|critical)\)$/.exec(s)
+  return m ? `${m[1]} (${t(`compliance.reasons.${m[2]}`, m[2])})` : s
+}

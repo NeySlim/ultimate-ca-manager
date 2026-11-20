@@ -7,10 +7,10 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Clock, Warning, ShieldCheck, TreeStructure, Certificate, CaretRight } from '@phosphor-icons/react'
 import { formatDate, extractCN, cn } from '../../../lib/utils'
-import { validityFacts, chainNodes, lastAcmeFailure, certificateKeyLabel, serialHex } from '../../../lib/certificateDetail'
+import { validityFacts, chainNodes, lastAcmeFailure, certificateKeyLabel, serialHex, certTypeLabel, originLabel, complianceReasonLabel } from '../../../lib/certificateDetail'
 import { compactAgo } from '../../../lib/relativeTime'
 import { signatureHashName } from '../../../lib/signatureName'
-import { sourceLabel, sourceOf } from '../../../pages/certificates/certificateSources'
+import { sourceLabel, sourceOf, SOURCE_LABEL_KEYS } from '../../../pages/certificates/certificateSources'
 import { usePermission } from '../../../hooks'
 import { acmeService } from '../../../services/acme.service'
 import { CertDeploySection } from '../../deploy/CertDeploySection'
@@ -170,6 +170,8 @@ export function MiniChain({ cert, title, openCa }) {
   )
 }
 
+const SOURCES = { keys: SOURCE_LABEL_KEYS, label: sourceLabel }
+
 function MoreDetails({ cert }) {
   const { t } = useTranslation()
   const row = (label, value, mono) => (value ? [<dt key={`${label}-t`}>{label}</dt>, <dd key={`${label}-d`} className={mono ? 'ins-mono' : undefined}>{value}</dd>] : null)
@@ -184,7 +186,7 @@ function MoreDetails({ cert }) {
           <dl className="ins-props">
             {row(t('details.subjectDN'), cert.subject)}
             {row(t('details.issuerDN'), cert.issuer)}
-            {row(t('details.certType'), cert.cert_type)}
+            {row(t('details.certType'), certTypeLabel(cert.cert_type, t))}
             {row(t('certificates.windowsProfile'), cert.windows_profile_id != null ? (cert.windows_profile_name || `#${cert.windows_profile_id}`) : null)}
             {row(t('common.validFrom'), cert.valid_from && formatDate(cert.valid_from, { time: true }))}
             {row(t('common.validUntil'), cert.valid_to && formatDate(cert.valid_to, { time: true }))}
@@ -207,7 +209,7 @@ function MoreDetails({ cert }) {
               {breakdown.map(([key, item]) => (
                 <div key={key}>
                   <span className="ins-muted">{t(`compliance.criteria.${key}`)}</span>
-                  <span>{item.score}/{item.max} · {t(`compliance.reasons.${item.reason}`, item.reason)}</span>
+                  <span>{item.score}/{item.max} · {complianceReasonLabel(item.reason, t)}</span>
                 </div>
               ))}
             </div>
@@ -217,8 +219,8 @@ function MoreDetails({ cert }) {
           <h3 className="ins-section-title">{t('details.metadata')}</h3>
           <dl className="ins-props">
             {row(t('common.created'), cert.created_at && formatDate(cert.created_at))}
-            {row(t('details.createdBy'), cert.created_by)}
-            {row(t('details.importedFrom'), cert.imported_from)}
+            {row(t('details.createdBy'), originLabel(cert.created_by, SOURCES, t))}
+            {row(t('details.importedFrom'), originLabel(cert.imported_from, SOURCES, t))}
             {row(t('details.referenceId'), cert.refid, true)}
             {row(t('details.caReference'), cert.caref, true)}
           </dl>

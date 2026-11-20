@@ -959,6 +959,10 @@
     "liveScope": "Revoked and expired certificates left out.",
     "columnsNote": "The common name and the state always stay visible.",
     "perPageLabel": "Certificates per page",
+    "selectedOnPage_one": "{{count}} certificate selected on this page",
+    "selectedOnPage_few": "{{count}} certificates selected on this page",
+    "selectedOnPage_many": "{{count}} certificates selected on this page",
+    "selectedOnPage_other": "{{count}} certificates selected on this page",
     "exportSelected": "Export",
     "complianceColumn": "Compliance",
     "archivedMark": "Archived: superseded by a renewal or re-enrolment, kept for history",
@@ -7925,7 +7929,8 @@
       "lifetime_over_days": "Строк дії понад (днів)",
       "no_key": "Без приватного ключа",
       "incomplete_chain": "Неповний ланцюжок",
-      "renewal": "Оновлення"
+      "renewal": "Оновлення",
+      "weak_key": "Compliance"
     },
     "filterValue": {
       "true": "так",
@@ -7938,7 +7943,8 @@
       "expired": "Прострочений",
       "revoked": "Відкликаний",
       "orphan": "Сирота",
-      "archived": "Заархівовано"
+      "archived": "Заархівовано",
+      "weakKey": "Weak key, {{algo}} < {{bits}}"
     },
     "hierarchy": {
       "crlOn": "CRL увімк.",

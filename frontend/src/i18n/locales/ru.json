@@ -959,6 +959,10 @@
     "liveScope": "Без отозванных и истёкших сертификатов.",
     "columnsNote": "Общее имя и состояние всегда остаются видимыми.",
     "perPageLabel": "Сертификатов на странице",
+    "selectedOnPage_one": "{{count}} сертификат выбран на этой странице",
+    "selectedOnPage_few": "{{count}} сертификата выбрано на этой странице",
+    "selectedOnPage_many": "{{count}} сертификатов выбрано на этой странице",
+    "selectedOnPage_other": "{{count}} сертификата выбрано на этой странице",
     "exportSelected": "Экспорт",
     "complianceColumn": "Соответствие",
     "archivedMark": "В архиве: заменён при продлении или повторной регистрации, хранится для истории",
@@ -7928,7 +7932,8 @@
       "lifetime_over_days": "Срок жизни больше (дни)",
       "no_key": "Нет закрытого ключа",
       "incomplete_chain": "Неполная цепочка",
-      "renewal": "Продление"
+      "renewal": "Продление",
+      "weak_key": "Соответствие"
     },
     "filterValue": {
       "true": "да",
@@ -7941,7 +7946,8 @@
       "expired": "Истёк",
       "revoked": "Отозван",
       "orphan": "Без издателя",
-      "archived": "В архиве"
+      "archived": "В архиве",
+      "weakKey": "Слабый ключ, {{algo}} < {{bits}}"
     },
     "hierarchy": {
       "crlOn": "CRL включён",

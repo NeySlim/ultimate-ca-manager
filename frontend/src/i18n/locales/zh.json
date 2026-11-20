@@ -949,6 +949,8 @@
     "liveScope": "不含已吊销和已过期的证书。",
     "columnsNote": "通用名称和状态始终可见。",
     "perPageLabel": "每页证书数",
+    "selectedOnPage_one": "本页已选择 {{count}} 个证书",
+    "selectedOnPage_other": "本页已选择 {{count}} 个证书",
     "exportSelected": "导出",
     "complianceColumn": "合规性",
     "archivedMark": "已归档：已被续期或重新注册取代，保留作为历史记录",
@@ -7675,7 +7677,8 @@
       "lifetime_over_days": "有效期超过（天）",
       "no_key": "无私钥",
       "incomplete_chain": "证书链不完整",
-      "renewal": "续期"
+      "renewal": "续期",
+      "weak_key": "合规性"
     },
     "filterValue": {
       "true": "是",
@@ -7688,7 +7691,8 @@
       "expired": "已过期",
       "revoked": "已吊销",
       "orphan": "孤立",
-      "archived": "已归档"
+      "archived": "已归档",
+      "weakKey": "弱密钥，{{algo}} < {{bits}}"
     },
     "hierarchy": {
       "crlOn": "CRL 已启用",

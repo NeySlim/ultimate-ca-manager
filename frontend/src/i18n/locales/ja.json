@@ -949,6 +949,8 @@
     "liveScope": "Revoked and expired certificates left out.",
     "columnsNote": "The common name and the state always stay visible.",
     "perPageLabel": "Certificates per page",
+    "selectedOnPage_one": "{{count}} certificate selected on this page",
+    "selectedOnPage_other": "{{count}} certificates selected on this page",
     "exportSelected": "Export",
     "complianceColumn": "Compliance",
     "archivedMark": "Archived: superseded by a renewal or re-enrolment, kept for history",
@@ -7678,7 +7680,8 @@
       "lifetime_over_days": "有効期間（日）超",
       "no_key": "秘密鍵なし",
       "incomplete_chain": "不完全なチェーン",
-      "renewal": "更新"
+      "renewal": "更新",
+      "weak_key": "Compliance"
     },
     "filterValue": {
       "true": "はい",
@@ -7691,7 +7694,8 @@
       "expired": "期限切れ",
       "revoked": "失効済み",
       "orphan": "孤立",
-      "archived": "アーカイブ済み"
+      "archived": "アーカイブ済み",
+      "weakKey": "Weak key, {{algo}} < {{bits}}"
     },
     "hierarchy": {
       "crlOn": "CRL有効",

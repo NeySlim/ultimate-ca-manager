@@ -131,6 +131,19 @@ describe('CertificatesPage: overview filters in the URL', () => {
     await waitFor(() => expect(lastParams().ca_id).toEqual(['1']))
   })
 
+  it('reads the weak-key link of the compliance card as one chip, as the mockup, and removes both filters', async () => {
+    renderAt('/certificates?live=true&key_algo_prefix=RSA&key_bits_below=3072')
+    await waitFor(() => expect(lastParams().key_bits_below).toBe('3072'))
+    const applied = screen.getByTestId('applied-filters')
+    expect(applied.querySelectorAll('.lv-chip')).toHaveLength(1)
+    expect(applied.querySelector('[data-filter="weak_key"]')).toHaveTextContent('table.filterChip')
+    removeChip('weak_key')
+    await waitFor(() => expect(lastParams().key_bits_below).toBeUndefined())
+    expect(lastParams().key_algo_prefix).toBeUndefined()
+    expect(lastParams().live).toBe('true')
+    expect(screen.getByTestId('where').textContent).toBe('?live=true')
+  })
+
   it('sends none without them', async () => {
     renderAt('/certificates')
     await waitFor(() => expect(getAll).toHaveBeenCalled())

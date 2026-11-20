@@ -122,6 +122,7 @@ export function ResponsiveDataTable({
   card, // list template on a phone: row => { description, meta, status, end } draws Atelier records
   noMatch, // list template, nothing matches the filters: { title, description, action }
   columnsNote, // list template: the sentence of the columns dialog
+  selectionLabel, // list template: (count) => words of the selection bar (« 3 certificats sélectionnés sur cette page »)
 
   // Custom class
   className
@@ -812,7 +813,7 @@ export function ResponsiveDataTable({
       {/* BULK ACTION BAR */}
       {flat && multiSelect && selectionCount > 0 && bulkActions && (
         <div className="lv-batch" role="group" aria-label={t('table.selection')}>
-          <strong>{t('table.selectedCount', { count: selectionCount })}</strong>
+          <strong>{selectionLabel ? selectionLabel(selectionCount) : t('table.selectedCount', { count: selectionCount })}</strong>
           {bulkActions}
           <span className="lv-spacer" />
           <button type="button" className="lv-btn is-quiet" onClick={() => onSelectionChange(new Set())}>

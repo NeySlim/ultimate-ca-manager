@@ -1381,6 +1381,8 @@
     "liveScope": "Hors certificats révoqués et expirés.",
     "columnsNote": "Le nom commun et l’état restent toujours visibles.",
     "perPageLabel": "Certificats par page",
+    "selectedOnPage_one": "{{count}} certificat sélectionné sur cette page",
+    "selectedOnPage_other": "{{count}} certificats sélectionnés sur cette page",
     "exportSelected": "Exporter",
     "complianceColumn": "Conformité",
     "archivedMark": "Archivé : remplacé par un renouvellement ou un ré-enrôlement, conservé pour l’historique",
@@ -7678,7 +7680,8 @@
       "lifetime_over_days": "Durée de vie au-delà de (jours)",
       "no_key": "Pas de clé privée",
       "incomplete_chain": "Chaîne incomplète",
-      "renewal": "Renouvellement"
+      "renewal": "Renouvellement",
+      "weak_key": "Conformité"
     },
     "filterValue": {
       "true": "oui",
@@ -7691,7 +7694,8 @@
       "expired": "Expiré",
       "revoked": "Révoqué",
       "orphan": "Orphelin",
-      "archived": "Archivé"
+      "archived": "Archivé",
+      "weakKey": "Clé faible, {{algo}} < {{bits}}"
     },
     "hierarchy": {
       "crlOn": "CRL activée",

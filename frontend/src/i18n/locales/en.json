@@ -949,6 +949,8 @@
     "liveScope": "Revoked and expired certificates left out.",
     "columnsNote": "The common name and the state always stay visible.",
     "perPageLabel": "Certificates per page",
+    "selectedOnPage_one": "{{count}} certificate selected on this page",
+    "selectedOnPage_other": "{{count}} certificates selected on this page",
     "exportSelected": "Export",
     "complianceColumn": "Compliance",
     "archivedMark": "Archived: superseded by a renewal or re-enrolment, kept for history",
@@ -7678,7 +7680,8 @@
       "lifetime_over_days": "Lifetime over (days)",
       "no_key": "No private key",
       "incomplete_chain": "Incomplete chain",
-      "renewal": "Renewal"
+      "renewal": "Renewal",
+      "weak_key": "Compliance"
     },
     "filterValue": {
       "true": "yes",
@@ -7691,7 +7694,8 @@
       "expired": "Expired",
       "revoked": "Revoked",
       "orphan": "Orphan",
-      "archived": "Archived"
+      "archived": "Archived",
+      "weakKey": "Weak key, {{algo}} < {{bits}}"
     },
     "hierarchy": {
       "crlOn": "CRL on",
