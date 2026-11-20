@@ -146,12 +146,14 @@ describe('what a list row leaves to the detail', () => {
     await waitFor(() => expect(svc.certs.renew).toHaveBeenCalledWith(4, {}))
   })
 
-  it('keeps its surface under the result screen of a renewal, and settles when that screen closes', async () => {
-    svc.certs.renew.mockResolvedValue({ data: { id: 7, common_name: 'web.example.com' } })
+  it('keeps its surface open under and after the result screen of a renewal, and reloads its certificate', async () => {
+    svc.certs.renew.mockResolvedValue({ data: { id: 4, common_name: 'web.example.com' } })
+    svc.certs.getById.mockResolvedValue({ data: { ...CERT, valid_to: '2031-01-01T00:00:00Z' } })
     const onClose = vi.fn()
+    const onChanged = vi.fn()
     const onOpenEntity = vi.fn()
     function Harness() {
-      const r = useEntityActions({ type: 'certificate', entity: CERT, permissions: ALL, onClose, onOpenEntity })
+      const r = useEntityActions({ type: 'certificate', entity: CERT, permissions: ALL, onClose, onChanged, onOpenEntity })
       return <>{r.actions.map(a => <button key={a.id} type="button" onClick={a.onClick}>{`action-${a.id}`}</button>)}{r.modals}</>
     }
     const renewOnce = async () => {
@@ -162,15 +164,18 @@ describe('what a list row leaves to the detail', () => {
     }
     render(<Harness />)
     const result = await renewOnce()
-    expect(onClose).not.toHaveBeenCalled()
     fireEvent.click(within(result).getByRole('button', { name: 'common.close' }))
-    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+    // The inspector stays on the certificate, renewed in place, and shows it as the server now has it
+    await waitFor(() => expect(onChanged).toHaveBeenCalledWith(expect.objectContaining({ id: 4, valid_to: '2031-01-01T00:00:00Z' })))
+    expect(svc.certs.getById).toHaveBeenCalledWith(4)
+    expect(onClose).not.toHaveBeenCalled()
     expect(onOpenEntity).not.toHaveBeenCalled()
-    // "View the certificate" settles the same way, then opens the renewed certificate
+    // "View the certificate" reloads it the same way and opens the renewed certificate
     const again = await renewOnce()
     fireEvent.click(within(again).getByRole('button', { name: /resultViewCertificate/ }))
-    await waitFor(() => expect(onOpenEntity).toHaveBeenCalledWith('certificate', 7))
-    expect(onClose).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(onOpenEntity).toHaveBeenCalledWith('certificate', 4))
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(2))
+    expect(onClose).not.toHaveBeenCalled()
   })
 
   it('sends a still-valid certificate to the revocation dialog before deleting it', async () => {

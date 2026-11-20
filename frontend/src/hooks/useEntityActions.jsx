@@ -94,6 +94,9 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
   // After an action: close the surface, or keep it and reload the entity in place
   const settle = async () => {
     if (afterMutation !== 'refresh') return close()
+    return reload()
+  }
+  const reload = async () => {
     try {
       const res = await entityService(type)?.getById?.(id)
       const fresh = res?.data ?? res
@@ -405,8 +408,8 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
       )}
       {isCert && renewOpen && (
         <IssueCertificateDialog open={renewOpen} mode="renew" certificate={data} onMutate={onMutate}
-          // The result screen stays on its surface: the surface settles once that screen is closed
-          onOpenChange={(next) => { setRenewOpen(next); if (!next && renewed.current) { renewed.current = false; settle() } }}
+          // Renewed in place: the surface stays on the certificate and reloads it once the result screen closes
+          onOpenChange={(next) => { setRenewOpen(next); if (!next && renewed.current) { renewed.current = false; reload() } }}
           onIssued={() => { renewed.current = true; refresh() }}
           onOpen={(issued) => { if (issued?.id) onOpenEntity?.('certificate', issued.id) }} />
       )}
