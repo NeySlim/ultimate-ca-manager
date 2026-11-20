@@ -1,60 +1,53 @@
 /**
- * Textarea Component
+ * Textarea Component - the Atelier field: 12 px label, 80 px control, hint or error under it
  */
 import { useId } from 'react'
+import { WarningCircle } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
 
-export function Textarea({ 
-  label, 
-  error, 
+export function Textarea({
+  label,
+  error,
   helperText,
   maxLength,
   showCount = false,
   className,
   value = '',
-  ...props 
+  ...props
 }) {
   // The label names the field (assistive technologies, getByLabelText)
   const autoId = useId()
   const fieldId = props.id ?? autoId
+  const describedBy = [error ? `${fieldId}-error` : null, !error && helperText ? `${fieldId}-help` : null, props['aria-describedby']]
+    .filter(Boolean).join(' ') || undefined
   return (
-    <div className={cn("space-y-1.5", className)}>
+    <div className={cn('ui-field', className)}>
       {label && (
-        <div className="flex items-center justify-between">
-          <label htmlFor={fieldId} className="block text-sm font-medium text-text-primary">
-            {label}
-            {props.required && <span className="status-danger-text ml-1">*</span>}
-          </label>
+        <label htmlFor={fieldId} className="ui-label">
+          {label}
+          {props.required && <span className="ui-required" aria-hidden="true">*</span>}
           {showCount && maxLength && (
-            <span className="text-xs text-text-secondary">
-              {value.length}/{maxLength}
-            </span>
+            <span className="ui-label-side">{value.length}/{maxLength}</span>
           )}
-        </div>
+        </label>
       )}
-      
+
       <textarea
-        className={cn(
-          "w-full px-2.5 py-1.5 bg-tertiary-op80 border rounded-md text-sm text-text-primary placeholder-secondary-op60",
-          "focus:outline-none focus:ring-2 focus:ring-accent-primary-op50 focus:border-accent-primary focus:bg-bg-tertiary",
-          "disabled:opacity-50 disabled:cursor-not-allowed",
-          "transition-all duration-200 resize-y",
-          "hover:border-secondary-op50 hover:bg-bg-tertiary",
-          error && "border-accent-danger focus:ring-accent-danger-op50",
-          !error && "border-border"
-        )}
+        className="ui-control"
         value={value}
         maxLength={maxLength}
+        aria-invalid={error ? true : undefined}
         {...props}
+        aria-describedby={describedBy}
         id={fieldId}
       />
 
       {error && (
-        <p className="text-xs status-danger-text">{error}</p>
+        <p id={`${fieldId}-error`} className="ui-error"><WarningCircle aria-hidden="true" />{error}</p>
       )}
-      
+
       {helperText && !error && (
-        <p className="text-xs text-text-secondary">{helperText}</p>
+        <p id={`${fieldId}-help`} className="ui-help">{helperText}</p>
       )}
     </div>
   )

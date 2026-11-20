@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { X } from '@phosphor-icons/react'
+import { useTranslation } from 'react-i18next'
 
 /**
  * TagsInput - Modern tag/chip input for multiple values (emails, etc.)
@@ -7,6 +8,7 @@ import { X } from '@phosphor-icons/react'
  * Click the × on a tag to remove it.
  */
 export default function TagsInput({ value = [], onChange, label, placeholder, helperText, validate, className = '' }) {
+  const { t } = useTranslation()
   const [input, setInput] = useState('')
   const inputRef = useRef(null)
 
@@ -42,26 +44,26 @@ export default function TagsInput({ value = [], onChange, label, placeholder, he
   }
 
   return (
-    <div className={className}>
+    <div className={`ui-field ${className}`}>
       {label && (
-        <label className="block text-xs font-medium text-text-secondary mb-1">{label}</label>
+        <span className="ui-label">{label}</span>
       )}
       <div
-        className="flex flex-wrap items-center gap-2 min-h-[38px] px-2.5 py-1.5 rounded-lg border border-border bg-bg-secondary cursor-text transition-colors focus-within:border-accent-primary focus-within:ring-1 focus-within:ring-accent-primary"
+        className="ui-control flex flex-wrap items-center gap-1.5 cursor-text"
         onClick={() => inputRef.current?.focus()}
       >
         {value.map((tag, i) => (
           <span
             key={i}
-            className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-md bg-bg-secondary text-accent-primary text-sm font-medium border border-border"
+            className="lv-chip"
           >
             {tag}
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); removeTag(i) }}
-              className="p-0.5 rounded hover:bg-bg-tertiary hover:text-status-danger transition-colors"
+              aria-label={`${t('common.remove')} ${tag}`}
             >
-              <X size={12} weight="bold" />
+              <X aria-hidden="true" />
             </button>
           </span>
         ))}
@@ -74,11 +76,12 @@ export default function TagsInput({ value = [], onChange, label, placeholder, he
           onPaste={handlePaste}
           onBlur={() => addTag(input)}
           placeholder={value.length === 0 ? placeholder : ''}
-          className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-sm text-text-primary placeholder:text-text-tertiary"
+          aria-label={typeof label === 'string' ? label : undefined}
+          className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-xs text-text-primary placeholder:text-text-tertiary"
         />
       </div>
       {helperText && (
-        <p className="text-xs text-text-tertiary mt-1">{helperText}</p>
+        <p className="ui-help">{helperText}</p>
       )}
     </div>
   )

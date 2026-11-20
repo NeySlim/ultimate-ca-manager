@@ -31,45 +31,57 @@ describe('Button Component', () => {
     expect(handleClick).not.toHaveBeenCalled()
   })
 
+  // Every variant is the Atelier button (.lv-btn): the variant only picks its tone
   it('renders with primary variant by default', () => {
     render(<Button>Primary</Button>)
     const button = screen.getByRole('button')
-    expect(button.className).toContain('btn-gradient')
+    expect(button.className).toContain('lv-btn')
+    expect(button.className).toContain('is-primary')
   })
 
-  it('renders secondary variant correctly', () => {
-    render(<Button variant="secondary">Secondary</Button>)
-    const button = screen.getByRole('button')
-    expect(button.className).toContain('btn-soft')
-    expect(button.className).toContain('text-text-primary')
+  it.each([
+    ['secondary', []],
+    ['outline', []],
+    ['ghost', ['is-quiet']],
+    ['danger', ['is-danger']],
+    ['danger-soft', ['is-danger']],
+    ['warning-soft', ['is-warn']],
+    ['success', ['is-primary']],
+  ])('renders the %s variant as the Atelier button', (variant, tones) => {
+    render(<Button variant={variant}>V</Button>)
+    const cls = screen.getByRole('button').className.split(/\s+/)
+    expect(cls).toContain('lv-btn')
+    for (const tone of tones) expect(cls).toContain(tone)
+    for (const other of ['is-primary', 'is-quiet', 'is-danger', 'is-warn'].filter(c => !tones.includes(c))) {
+      expect(cls).not.toContain(other)
+    }
   })
 
-  it('renders danger variant correctly', () => {
-    render(<Button variant="danger">Danger</Button>)
-    const button = screen.getByRole('button')
-    expect(button.className).toContain('btn-gradient')
-    expect(button.className).toContain('danger')
+  it('keeps the 32 px button for sm, default and lg, and the 26 px one for xs', () => {
+    for (const size of ['sm', 'default', 'lg']) {
+      const { unmount } = render(<Button size={size}>S</Button>)
+      expect(screen.getByRole('button').className).not.toContain('is-small')
+      unmount()
+    }
+    render(<Button size="xs">X</Button>)
+    expect(screen.getByRole('button').className).toContain('is-small')
   })
 
-  it('renders ghost variant correctly', () => {
-    render(<Button variant="ghost">Ghost</Button>)
-    const button = screen.getByRole('button')
-    expect(button.className).toContain('hover:bg-tertiary-op80')
+  it('makes a lone named icon the square icon button, never a labelled one', () => {
+    const Icon = () => <svg data-testid="i" />
+    const { unmount } = render(<Button aria-label="Delete"><Icon /></Button>)
+    expect(screen.getByRole('button', { name: 'Delete' }).className).toContain('is-icon')
+    unmount()
+    render(<Button aria-label="Delete"><Icon />Delete</Button>)
+    expect(screen.getByRole('button').className).not.toContain('is-icon')
   })
 
-  it('renders small size correctly', () => {
-    render(<Button size="sm">Small</Button>)
-    const button = screen.getByRole('button')
-    expect(button.className).toContain('px-2.5')
-    expect(button.className).toContain('py-1.5')
-    expect(button.className).toContain('text-xs')
-  })
-
-  it('renders large size correctly', () => {
-    render(<Button size="lg">Large</Button>)
-    const button = screen.getByRole('button')
-    expect(button.className).toContain('px-4')
-    expect(button.className).toContain('py-2')
+  it('keeps no gradient or soft class of the previous interface', () => {
+    for (const variant of ['primary', 'secondary', 'danger', 'success', 'danger-soft', 'warning-soft']) {
+      const { unmount } = render(<Button variant={variant}>V</Button>)
+      expect(screen.getByRole('button').className).not.toMatch(/btn-gradient|btn-soft|btn-danger-soft|btn-warning-soft|rounded-md/)
+      unmount()
+    }
   })
 
   it('renders children including icons', () => {

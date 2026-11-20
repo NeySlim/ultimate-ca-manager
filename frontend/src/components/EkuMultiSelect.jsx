@@ -11,7 +11,7 @@
  *  - disabled
  */
 import { useMemo, useState } from 'react'
-import { Plus, X, Lock } from '@phosphor-icons/react'
+import { Plus, X, Lock, WarningCircle } from '@phosphor-icons/react'
 import { useTranslation } from 'react-i18next'
 import { Button } from './Button'
 
@@ -95,10 +95,10 @@ export function EkuMultiSelect({
   )
 
   return (
-    <div className="space-y-2">
-      <label className="block text-sm font-medium text-text-primary">
+    <div className="ui-field">
+      <span className="ui-label">
         {t('certificates.eku.title')}
-      </label>
+      </span>
 
       {/* Locked defaults from cert_type */}
       {defaults.length > 0 && (
@@ -106,7 +106,7 @@ export function EkuMultiSelect({
           {defaults.map((oid) => (
             <span
               key={oid}
-              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-bg-tertiary border border-border text-text-secondary"
+              className="ui-badge lv-pill is-muted is-chip"
               title={`${labelFor(oid)} (${oid}): ${t('certificates.eku.defaultLocked')}`}
             >
               <Lock size={12} weight="fill" />
@@ -122,7 +122,7 @@ export function EkuMultiSelect({
           {value.map((oid) => (
             <span
               key={oid}
-              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-accent-primary-op20 border border-accent-primary text-accent-primary"
+              className="lv-chip"
               title={oid}
             >
               <span>{labelFor(oid)}</span>
@@ -133,10 +133,9 @@ export function EkuMultiSelect({
                 type="button"
                 onClick={() => removeOid(oid)}
                 disabled={disabled}
-                className="hover:text-error"
                 aria-label={t('common.remove')}
               >
-                <X size={12} weight="bold" />
+                <X aria-hidden="true" />
               </button>
             </span>
           ))}
@@ -150,7 +149,8 @@ export function EkuMultiSelect({
           value={picker}
           onChange={handlePickerChange}
           disabled={disabled || remaining <= 0 || availableOptions.length === 0}
-          className="flex-1 px-2.5 py-1.5 bg-tertiary-op80 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-accent-primary-op50"
+          aria-label={t('certificates.eku.addKnown')}
+          className="ui-control flex-1"
         >
           <option value="">{t('certificates.eku.addKnown')}</option>
           {availableOptions.map((e) => (
@@ -171,7 +171,8 @@ export function EkuMultiSelect({
             onKeyDown={handleCustomKeyDown}
             placeholder={t('certificates.eku.customPlaceholder')}
             disabled={disabled || remaining <= 0}
-            className="flex-1 px-2.5 py-1.5 bg-tertiary-op80 border border-border rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-accent-primary-op50"
+            aria-label={t('certificates.eku.customPlaceholder')}
+            className="ui-control flex-1 font-mono"
           />
           <Button
             type="button"
@@ -179,16 +180,17 @@ export function EkuMultiSelect({
             size="sm"
             onClick={() => addOid(customOid)}
             disabled={disabled || !customOid || remaining <= 0}
+            aria-label={t('common.add')}
           >
-            <Plus size={14} weight="bold" />
+            <Plus aria-hidden="true" />
           </Button>
         </div>
       </div>
 
       {customError && (
-        <p className="text-xs text-error">{customError}</p>
+        <p className="ui-error"><WarningCircle aria-hidden="true" />{customError}</p>
       )}
-      <p className="text-xs text-text-tertiary">
+      <p className="ui-help">
         {t('certificates.eku.helper', { remaining })}
       </p>
     </div>

@@ -103,7 +103,7 @@
 /* Fields side by side as in the Atelier grid: two per row, any other block on a row of its own */
 .sf-body .sf-group-body > :is(.space-y-3, .space-y-4) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .sf-body .sf-group-body > :is(.space-y-3, .space-y-4) > :not([hidden]) { grid-column: 1 / -1; margin-top: 0; margin-bottom: 0; }
-.sf-body .sf-group-body > :is(.space-y-3, .space-y-4) > .space-y-1\.5:not([hidden]) { grid-column: auto; }
+.sf-body .sf-group-body > :is(.space-y-3, .space-y-4) > :is(.space-y-1\.5, .ui-field):not([hidden]) { grid-column: auto; }
 
 /* Test of a section with the values typed, and its result */
 .sf-test { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid var(--line); }

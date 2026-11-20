@@ -1,10 +1,10 @@
 /**
- * Input Component - Text input with label, error, and enhanced focus
+ * Input Component - the Atelier field: 12 px label, 36 px control, hint or error under it
  * Supports password fields with show/hide toggle and strength indicator
  * Supports credential fields with "already set" indicator
  */
 import { forwardRef, useEffect, useId, useMemo, useState } from 'react'
-import { Eye, EyeSlash, CheckCircle } from '@phosphor-icons/react'
+import { Eye, EyeSlash, CheckCircle, WarningCircle } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
 import { useTranslation } from 'react-i18next'
 import { barsForScore, fetchPasswordStrength, localPasswordStrength } from '../lib/passwordStrength'
@@ -14,10 +14,10 @@ import { barsForScore, fetchPasswordStrength, localPasswordStrength } from '../l
 // "strong" where the server said "fair", and a meter that overstates is
 // worse than no meter.
 const LEVEL_STYLE = {
-  weak: { labelKey: 'passwordStrength.weak', color: 'bg-accent-danger', text: 'text-accent-danger' },
-  fair: { labelKey: 'passwordStrength.fair', color: 'bg-accent-warning', text: 'text-accent-warning' },
-  good: { labelKey: 'passwordStrength.good', color: 'bg-accent-warning', text: 'text-accent-warning' },
-  strong: { labelKey: 'passwordStrength.strong', color: 'bg-accent-success', text: 'text-accent-success' },
+  weak: { labelKey: 'passwordStrength.weak', tone: 'is-bad' },
+  fair: { labelKey: 'passwordStrength.fair', tone: 'is-warn' },
+  good: { labelKey: 'passwordStrength.good', tone: 'is-warn' },
+  strong: { labelKey: 'passwordStrength.strong', tone: 'is-good' },
 }
 
 export const Input = forwardRef(function Input({ 
@@ -89,109 +89,82 @@ export const Input = forwardRef(function Input({
     ? '••••••••••••'
     : placeholder
 
+  const helpId = `${fieldId}-help`
+  const errorId = `${fieldId}-error`
+  const hintText = hasExistingValue ? t('common.enterNewToChange') : helperText
+  const describedBy = [error ? errorId : null, !error && hintText ? helpId : null, props['aria-describedby']]
+    .filter(Boolean).join(' ') || undefined
+  const canReveal = isPassword && (props.value || internalValue)
+
   return (
-    <div className={cn("space-y-1.5", className)}>
+    <div className={cn('ui-field', className)}>
       {label && (
-        <label htmlFor={fieldId} className="block text-xs font-medium text-text-secondary leading-[20px]">
-          <span className="flex items-center gap-1 h-[20px]">
-            {typeof label === 'string' ? label : label}
-            {required && !hasExistingValue && <span className="status-danger-text">*</span>}
-            {hasExistingValue && (
-              <span className="inline-flex items-center gap-1 px-1.5 text-xs font-medium bg-status-success-op20 text-status-success rounded leading-[16px]">
-                <CheckCircle size={10} weight="fill" />
-                {t('common.set')}
-              </span>
-            )}
-          </span>
+        <label htmlFor={fieldId} className="ui-label">
+          {label}
+          {required && !hasExistingValue && <span className="ui-required" aria-hidden="true">*</span>}
+          {hasExistingValue && (
+            <span className="ui-set">
+              <CheckCircle weight="fill" aria-hidden="true" />
+              {t('common.set')}
+            </span>
+          )}
         </label>
       )}
-      
-      <div className="relative">
-        {icon && (
-          <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary">
-            {icon}
-          </div>
-        )}
+
+      <div className="ui-control-wrap">
+        {icon && <span className="ui-control-icon">{icon}</span>}
         <input
           ref={ref}
           type={inputType}
-          className={cn(
-            "w-full px-2.5 py-1.5 bg-bg-tertiary border rounded-md text-sm text-text-primary placeholder-text-tertiary",
-            "transition-all duration-150",
-            "hover:border-text-tertiary",
-            "focus:outline-none focus:border-accent-primary",
-            "disabled:opacity-50 disabled:cursor-not-allowed",
-            error ? "border-accent-danger" : "border-border",
-            icon && "pl-9",
-            isPassword && "pr-10"
-          )}
-          style={{
-            '--focus-shadow': 'color-mix(in srgb, var(--accent-primary) 15%, transparent)',
-            ...(useTextMasking ? { WebkitTextSecurity: 'disc', textSecurity: 'disc' } : {})
-          }}
-          onFocus={(e) => {
-            e.target.style.boxShadow = '0 0 0 3px var(--focus-shadow), 0 1px 2px color-mix(in srgb, var(--accent-primary) 10%, transparent)';
-          }}
-          onBlur={(e) => {
-            e.target.style.boxShadow = '';
-          }}
+          className={cn('ui-control', icon && 'pl-9', isPassword && 'has-reveal')}
+          style={useTextMasking ? { WebkitTextSecurity: 'disc', textSecurity: 'disc' } : undefined}
           onChange={handleChange}
           placeholder={effectivePlaceholder}
           required={required && !hasExistingValue}
           autoComplete={noAutofill ? 'off' : undefined}
+          aria-invalid={error ? true : undefined}
           {...props}
+          aria-describedby={describedBy}
           id={fieldId}
         />
-        
+
         {/* Password toggle -- hidden when there's nothing typed to reveal.
             An "already set" field shows a literal '••••••••' placeholder
             (never a real loaded secret, which is never sent to the browser),
             and placeholders are never masked/unmasked by type or CSS in any
             browser -- showing the toggle there just invites a user to click
             "reveal" on text that was never masked in the first place. */}
-        {isPassword && (props.value || internalValue) && (
+        {canReveal && (
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary transition-colors"
+            className="ui-reveal"
+            aria-label={showPassword ? t('auth.page.hidePassword') : t('auth.page.showPassword')}
             tabIndex={-1}
           >
-            {showPassword ? <EyeSlash size={18} /> : <Eye size={18} />}
+            {showPassword ? <EyeSlash aria-hidden="true" /> : <Eye aria-hidden="true" />}
           </button>
         )}
       </div>
-      
+
       {/* Password strength indicator */}
       {strength && passwordValue && (
-        <div className="space-y-1">
-          <div className="flex gap-1">
+        <>
+          <div className="ui-meter" aria-hidden="true">
             {[...Array(5)].map((_, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "h-1 flex-1 rounded-full transition-colors",
-                  i < strength.bars ? strength.color : "bg-border"
-                )}
-              />
+              <span key={i} className={i < strength.bars ? strength.tone : undefined} />
             ))}
           </div>
-          <p className={cn("text-xs", strength.text)}>
-            {t(strength.labelKey)}
-          </p>
-        </div>
+          <p className={cn('ui-meter-label', strength.tone)}>{t(strength.labelKey)}</p>
+        </>
       )}
 
       {error && (
-        <p className="text-xs status-danger-text">{error}</p>
+        <p id={errorId} className="ui-error"><WarningCircle aria-hidden="true" />{error}</p>
       )}
-      
-      {/* Helper text - show "enter new to change" for existing values */}
-      {hasExistingValue && !error && (
-        <p className="text-xs text-text-tertiary italic">{t('common.enterNewToChange')}</p>
-      )}
-      
-      {helperText && !error && !hasExistingValue && (
-        <p className="text-xs text-text-tertiary">{helperText}</p>
+
+      {!error && hintText && (
+        <p id={helpId} className="ui-help">{hintText}</p>
       )}
     </div>
   )

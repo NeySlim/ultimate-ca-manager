@@ -12,7 +12,7 @@
  * - lg: Large forms (mobile)
  */
 import * as SelectPrimitive from '@radix-ui/react-select'
-import { CaretDown, Check } from '@phosphor-icons/react'
+import { CaretDown, Check, WarningCircle } from '@phosphor-icons/react'
 import { cn } from '../../lib/utils'
 
 // Radix Select forbids value="" on an Item, and the previous workaround
@@ -80,7 +80,8 @@ export function Select({
   // is enforced by a hidden input that is empty until something is chosen.
   const unchosen = required && (value == null || (value === '' && !options.some(o => o.value === '')))
 
-  const triggerStyles = cn(
+  // A form select is the Atelier field; filter and minimal triggers keep the toolbar geometry
+  const triggerStyles = variant === 'default' ? cn('ui-select-trigger', triggerClassName) : cn(
     // Base styles
     'flex items-center justify-between rounded-md border',
     'focus:outline-none focus:ring-2 focus:ring-accent-primary-op30 focus:border-accent-primary',
@@ -109,16 +110,16 @@ export function Select({
   )
 
   return (
-    <div className={cn(label && "space-y-1.5", className)}>
+    <div className={cn(label && 'ui-field', className)}>
       {label && (
-        <label className="block text-sm font-medium text-text-primary">
+        <label className="ui-label">
           {label}
-          {required && <span className="status-danger-text"> *</span>}
+          {required && <span className="ui-required" aria-hidden="true">*</span>}
         </label>
       )}
 
       <SelectPrimitive.Root value={value == null ? value : toInternal(value)} onValueChange={handleChange} disabled={disabled} required={required}>
-        <SelectPrimitive.Trigger className={triggerStyles}>
+        <SelectPrimitive.Trigger className={triggerStyles} aria-invalid={error ? true : undefined}>
           <SelectPrimitive.Value placeholder={placeholder} />
           <SelectPrimitive.Icon>
             <CaretDown 
@@ -133,47 +134,29 @@ export function Select({
 
         <SelectPrimitive.Portal>
           <SelectPrimitive.Content
-            className={cn(
-              // Glass effect
-              "bg-secondary-op95 backdrop-blur-md",
-              "border border-border-op50 rounded-lg",
-              "shadow-xl",
-              "overflow-hidden",
-              // Animation
-              "animate-in fade-in-0 zoom-in-95",
-              "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
-              "data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2",
-              sizeConfig.content
-            )}
+            className="ui-pop" 
             position="popper"
             sideOffset={4}
             align="start"
           >
-            <SelectPrimitive.Viewport className="p-1 max-h-60 overflow-auto">
+            <SelectPrimitive.Viewport className="max-h-72 overflow-auto">
               {groupOptions(options).map(({ heading, items }, i) => {
                 const rendered = items.map(option => (
                   <SelectPrimitive.Item
                     key={toInternal(option.value)}
                     value={toInternal(option.value)}
                     disabled={option.disabled}
-                    className={cn(
-                      "flex items-center gap-2 rounded-md cursor-pointer outline-none",
-                      "transition-colors duration-100",
-                      "text-text-primary",
-                      "hover:bg-tertiary-op80 data-[highlighted]:bg-tertiary-op80",
-                      "data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed",
-                      sizeConfig.item
-                    )}
+                    className="ui-pop-item"
                   >
-                    <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
-                    <SelectPrimitive.ItemIndicator className="ml-auto">
-                      <Check size={sizeConfig.icon} className="text-accent-primary" />
+                    <span className="ui-pop-label"><SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText></span>
+                    <SelectPrimitive.ItemIndicator className="ui-pop-check">
+                      <Check aria-hidden="true" />
                     </SelectPrimitive.ItemIndicator>
                   </SelectPrimitive.Item>
                 ))
                 return heading ? (
                   <SelectPrimitive.Group key={`g${i}`}>
-                    <SelectPrimitive.Label className="px-2.5 pt-1.5 pb-1 text-xs font-semibold text-text-tertiary">
+                    <SelectPrimitive.Label className="ui-pop-heading">
                       {heading}
                     </SelectPrimitive.Label>
                     {rendered}
@@ -197,7 +180,7 @@ export function Select({
       )}
 
       {error && (
-        <p className="text-xs status-danger-text">{error}</p>
+        <p className="ui-error"><WarningCircle aria-hidden="true" />{error}</p>
       )}
     </div>
   )

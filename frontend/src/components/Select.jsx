@@ -3,7 +3,7 @@
  */
 import { useState, useRef, useEffect, useCallback, useId } from 'react'
 import * as Select from '@radix-ui/react-select'
-import { CaretDown, Check, MagnifyingGlass, X } from '@phosphor-icons/react'
+import { CaretDown, Check, MagnifyingGlass, WarningCircle, X } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
 
 // Radix Select forbids value="" on an Item; the old workaround filtered
@@ -58,9 +58,9 @@ export function SelectComponent({
   }
 
   return (
-    <div className={cn("space-y-1.5", className)}>
+    <div className={cn('ui-field', className)}>
       {label && (
-        <label htmlFor={fieldId} className="block text-sm font-medium text-text-primary">
+        <label htmlFor={fieldId} className="ui-label">
           {label}
         </label>
       )}
@@ -68,38 +68,31 @@ export function SelectComponent({
       <Select.Root value={value == null ? value : toInternal(value)} onValueChange={handleValueChange} disabled={disabled}>
         <Select.Trigger
           id={fieldId}
-          className={cn(
-            "w-full flex items-center justify-between px-2.5 py-1.5 bg-tertiary-op80 border rounded-md text-sm",
-            "focus:outline-none focus:ring-2 focus:ring-accent-primary-op50 focus:border-accent-primary focus:bg-bg-tertiary",
-            "disabled:opacity-50 disabled:cursor-not-allowed",
-            "transition-all duration-200",
-            "hover:border-secondary-op50 hover:bg-bg-tertiary",
-            error ? "border-accent-danger" : "border-border",
-            value ? "text-text-primary" : "text-secondary-op60"
-          )}
+          className="ui-select-trigger"
+          aria-invalid={error ? true : undefined}
         >
-          <Select.Value placeholder={placeholder} />
+          <span><Select.Value placeholder={placeholder} /></span>
           <Select.Icon>
-            <CaretDown size={14} className="text-text-secondary" />
+            <CaretDown aria-hidden="true" />
           </Select.Icon>
         </Select.Trigger>
 
         <Select.Portal>
           <Select.Content
-            className="bg-secondary-op95 backdrop-blur-md border border-border-op50 rounded-lg shadow-xl overflow-hidden z-50 animate-scaleIn"
+            className="ui-pop"
             position="popper"
             sideOffset={4}
           >
-            <Select.Viewport className="p-1">
+            <Select.Viewport className="max-h-72">
               {options.map(option => (
                 <Select.Item
                   key={toInternal(option.value)}
                   value={toInternal(option.value)}
-                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-text-primary rounded-md cursor-pointer outline-none hover:bg-tertiary-op80 data-[highlighted]:bg-tertiary-op80 transition-colors duration-100"
+                  className="ui-pop-item"
                 >
-                  <Select.ItemText>{option.label}</Select.ItemText>
-                  <Select.ItemIndicator className="ml-auto">
-                    <Check size={14} className="text-accent-primary" />
+                  <span className="ui-pop-label"><Select.ItemText>{option.label}</Select.ItemText></span>
+                  <Select.ItemIndicator className="ui-pop-check">
+                    <Check aria-hidden="true" />
                   </Select.ItemIndicator>
                 </Select.Item>
               ))}
@@ -109,10 +102,10 @@ export function SelectComponent({
       </Select.Root>
 
       {helperText && !error && (
-        <p className="text-xs text-text-tertiary">{helperText}</p>
+        <p className="ui-help">{helperText}</p>
       )}
       {error && (
-        <p className="text-xs status-danger-text">{error}</p>
+        <p className="ui-error"><WarningCircle aria-hidden="true" />{error}</p>
       )}
     </div>
   )
@@ -193,9 +186,9 @@ function SearchableSelect({ label, options, value, onChange, placeholder, error,
   }
 
   return (
-    <div className={cn("space-y-1.5", className)} ref={containerRef}>
+    <div className={cn('ui-field', className)} ref={containerRef}>
       {label && (
-        <label htmlFor={fieldId} className="block text-sm font-medium text-text-primary">{label}</label>
+        <label htmlFor={fieldId} className="ui-label">{label}</label>
       )}
 
       {/* Trigger / display */}
@@ -204,31 +197,25 @@ function SearchableSelect({ label, options, value, onChange, placeholder, error,
         type="button"
         disabled={disabled}
         onClick={() => { if (!disabled) { setOpen(prev => !prev); setTimeout(() => inputRef.current?.focus(), 0) } }}
-        className={cn(
-          "w-full flex items-center justify-between px-2.5 py-1.5 bg-tertiary-op80 border rounded-md text-sm text-left",
-          "focus:outline-none focus:ring-2 focus:ring-accent-primary-op50 focus:border-accent-primary focus:bg-bg-tertiary",
-          "disabled:opacity-50 disabled:cursor-not-allowed",
-          "transition-all duration-200",
-          "hover:border-secondary-op50 hover:bg-bg-tertiary",
-          error ? "border-accent-danger" : "border-border",
-          value ? "text-text-primary" : "text-secondary-op60"
-        )}
+        className="ui-select-trigger"
+        data-placeholder={selectedOption ? undefined : ''}
+        aria-invalid={error ? true : undefined}
       >
-        <span className="truncate">{selectedOption?.label || placeholder}</span>
-        <CaretDown size={14} className={cn("text-text-secondary shrink-0 transition-transform", open && "rotate-180")} />
+        <span>{selectedOption?.label || placeholder}</span>
+        <CaretDown aria-hidden="true" className={cn(open && "rotate-180")} />
       </button>
 
       {/* Dropdown */}
       {open && (
         <div className="relative z-50">
-          <div className="absolute top-0 left-0 w-full bg-secondary-op95 backdrop-blur-md border border-border-op50 rounded-lg shadow-xl overflow-hidden animate-scaleIn">
+          <div className="ui-pop absolute top-1 left-0 w-full">
             {/* Search input */}
             <div className="flex items-center gap-2 px-2.5 py-2 border-b border-border-op30">
               <MagnifyingGlass size={14} className="text-text-tertiary shrink-0" />
               <input
                 ref={inputRef}
                 type="text"
-                className="w-full bg-transparent text-sm text-text-primary placeholder:text-text-tertiary outline-none"
+                className="w-full bg-transparent text-xs text-text-primary placeholder:text-text-tertiary outline-none"
                 placeholder={`Search...`}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -253,15 +240,13 @@ function SearchableSelect({ label, options, value, onChange, placeholder, error,
                     type="button"
                     onClick={() => handleSelect(option.value)}
                     onMouseEnter={() => setHighlightIdx(idx)}
-                    className={cn(
-                      "w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-text-primary rounded-md cursor-pointer text-left transition-colors duration-100",
-                      idx === highlightIdx && "bg-tertiary-op80",
-                      option.value === value && "font-medium"
-                    )}
+                    className="ui-pop-item"
+                    data-highlighted={idx === highlightIdx ? '' : undefined}
+                    data-state={option.value === value ? 'checked' : undefined}
                   >
-                    <span className="truncate">{option.label}</span>
+                    <span className="ui-pop-label truncate">{option.label}</span>
                     {option.value === value && (
-                      <Check size={14} className="ml-auto text-accent-primary shrink-0" />
+                      <span className="ui-pop-check"><Check aria-hidden="true" /></span>
                     )}
                   </button>
                 ))
@@ -272,10 +257,10 @@ function SearchableSelect({ label, options, value, onChange, placeholder, error,
       )}
 
       {helperText && !error && (
-        <p className="text-xs text-text-tertiary">{helperText}</p>
+        <p className="ui-help">{helperText}</p>
       )}
       {error && (
-        <p className="text-xs status-danger-text">{error}</p>
+        <p className="ui-error"><WarningCircle aria-hidden="true" />{error}</p>
       )}
     </div>
   )
