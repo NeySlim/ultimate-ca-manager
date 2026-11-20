@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowClockwise } from '@phosphor-icons/react'
-import { Button, LoadingSpinner, DetailGrid, DetailField, ServiceReconnectOverlay } from '../../components'
+import { Button, LoadingSpinner, ServiceReconnectOverlay } from '../../components'
+import { formatBytes } from '../../lib/fileSize'
+import { compactAgo } from '../../lib/relativeTime'
 import { systemService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useServiceReconnect } from '../../hooks'
 import { usePermission } from '../../hooks'
-import { FormGroup } from '../../components/sectioned'
+import { FormGroup, FormProps } from '../../components/sectioned'
 
 export default function ServiceStatusWidget() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { showError, showConfirm } = useNotification()
   const { canWrite } = usePermission()
   const [status, setStatus] = useState(null)
@@ -33,16 +35,6 @@ export default function ServiceStatusWidget() {
     const interval = setInterval(fetchStatus, 30000)
     return () => clearInterval(interval)
   }, [])
-
-  const formatUptime = (seconds) => {
-    if (!seconds) return '-'
-    const days = Math.floor(seconds / 86400)
-    const hours = Math.floor((seconds % 86400) / 3600)
-    const mins = Math.floor((seconds % 3600) / 60)
-    if (days > 0) return `${days}d ${hours}h ${mins}m`
-    if (hours > 0) return `${hours}h ${mins}m`
-    return `${mins}m`
-  }
 
   const handleRestart = async () => {
     const confirmed = await showConfirm(t('settings.restartConfirmMessage'), {
@@ -71,29 +63,29 @@ export default function ServiceStatusWidget() {
       {loading ? (
         <LoadingSpinner size="sm" />
       ) : status ? (
-        <div className="space-y-3">
-          <DetailGrid columns={2}>
-            <DetailField label={t('settings.version')} value={`v${status.version}`} />
-            <DetailField label="PID" value={status.pid} />
-            <DetailField label={t('settings.uptime')} value={formatUptime(status.uptime_seconds)} />
-            <DetailField label={t('settings.memory')} value={`${status.memory_mb} MB`} />
-            <DetailField label="Python" value={status.python_version} />
-            <DetailField label={t('settings.environment')} value={status.is_docker ? 'Docker' : 'System'} />
-          </DetailGrid>
+        <div className="sf-stack">
+          <FormProps items={[
+            [t('settings.version'), `v${status.version}`],
+            ['PID', status.pid],
+            [t('settings.about.started'), status.uptime_seconds ? compactAgo(new Date(Date.now() - status.uptime_seconds * 1000), t) : '—'],
+            [t('settings.memory'), status.memory_mb ? formatBytes(status.memory_mb * 1024 * 1024, i18n?.language) : '—'],
+            ['Python', status.python_version],
+            [t('settings.environment'), status.is_docker ? 'Docker' : t('settings.about.envNative')],
+          ]} />
           {canWrite('settings') && !status.is_docker && (
-            <div className="pt-2">
-              <Button type="button" variant="outline" onClick={handleRestart} disabled={restarting}>
+            <div className="sf-actions-row">
+              <Button type="button" variant="secondary" onClick={handleRestart} disabled={restarting}>
                 <ArrowClockwise size={16} className={restarting ? 'spin' : ''} />
                 {restarting ? t('settings.restarting') : t('settings.restartService')}
               </Button>
             </div>
           )}
           {status.is_docker && (
-            <p className="text-xs text-text-tertiary pt-2">{t('settings.dockerRestartNotice')}</p>
+            <p className="sf-hint">{t('settings.dockerRestartNotice')}</p>
           )}
         </div>
       ) : (
-        <p className="text-secondary">{t('settings.serviceStatusUnavailable')}</p>
+        <p className="sf-hint">{t('settings.serviceStatusUnavailable')}</p>
       )}
     </FormGroup>
     </>

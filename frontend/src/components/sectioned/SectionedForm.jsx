@@ -2,7 +2,7 @@
  * Sectioned form template (Atelier settings page): table of contents, a select to jump on
  * a phone, one full-width frame per section, groups of fields, a sticky save bar.
  */
-import { Component, forwardRef, useId } from 'react'
+import { Component, Fragment, forwardRef, useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check, Warning, WarningCircle } from '@phosphor-icons/react'
 import { cn } from '../../lib/utils'
@@ -155,6 +155,17 @@ export const FormSection = forwardRef(function FormSection(
     </section>
   )
 })
+
+/** Properties read in a frame (the mockup's `.props`): a term and its value per line; a falsy item is skipped. */
+export function FormProps({ items, className }) {
+  return (
+    <dl className={cn('sf-props', className)}>
+      {items.filter(Boolean).map(([term, value]) => (
+        <Fragment key={term}><dt>{term}</dt><dd>{value}</dd></Fragment>
+      ))}
+    </dl>
+  )
+}
 
 /** A group of fields inside a section, with its legend; same props as the former detail section. */
 export function FormGroup({ title, description, subtitle, actions, badge, children, className }) {

@@ -8,12 +8,14 @@ import {
   UploadSimple, DownloadSimple, Lightning,
   CheckCircle, XCircle, Clock, X, Certificate, ShieldCheck, Trash, 
   ArrowsClockwise, Prohibit, PencilSimple, FileText, User, Crown, Info,
-  Table, ShoppingCart, Package, CaretDown, MagnifyingGlass
+  Table, ShoppingCart, CaretDown, MagnifyingGlass, WarningCircle, Question, PlugsConnected
 } from '@phosphor-icons/react'
 import { 
   ResponsiveLayout, ResponsiveDataTable, Button, Input, 
   ConfirmModal, Badge, KeyIndicator, TransferPanel
 } from '../components'
+import { HelpCard } from '../components/HelpCard'
+import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { SmartImportWidget } from '../components/SmartImport'
 import { 
   opnsenseService, casService, certificatesService, 
@@ -434,6 +436,7 @@ export default function OperationsPage() {
     } catch { /* non-critical */ }
   }
 
+  const opnsenseTestButton = useRef(null)
   const handleTestConf = async () => {
     setProcessing(true)
     setTestResult(null)
@@ -452,6 +455,8 @@ export default function OperationsPage() {
       showError(error.message || t('importExport.opnsense.connectionFailed'))
     } finally {
       setProcessing(false)
+      // The button was disabled during the test: the focus goes back to it, as in the mockup
+      requestAnimationFrame(() => opnsenseTestButton.current?.focus())
     }
   }
 
@@ -750,71 +755,52 @@ export default function OperationsPage() {
       </FormGroup>
 
       <FormGroup title={t('importExport.opnsense.title')} description={t('importExport.opnsense.description')}>
-        <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form onSubmit={(e) => e.preventDefault()} className="sf-stack">
+          <div className="sf-grid">
             <Input label={t('importExport.opnsense.hostLabel')} value={opnsenseHost} onChange={(e) => setOpnsenseHost(e.target.value)} placeholder={t('importExport.opnsense.hostPlaceholder')} />
-            <Input label={t('common.portLabel')} value={opnsensePort} onChange={(e) => setOpnsensePort(e.target.value)} placeholder={t('common.portPlaceholder')} />
+            <Input className="sf-short" label={t('common.portLabel')} inputMode="numeric" value={opnsensePort} onChange={(e) => setOpnsensePort(e.target.value)} placeholder={t('common.portPlaceholder')} />
             <Input label={t('importExport.opnsense.apiKeyLabel')} value={opnsenseApiKey} onChange={(e) => setOpnsenseApiKey(e.target.value)} placeholder={t('importExport.opnsense.apiKeyLabel')} />
             <Input label={t('importExport.opnsense.apiSecretLabel')} type="password" noAutofill value={opnsenseApiSecret} onChange={(e) => setOpnsenseApiSecret(e.target.value)} placeholder={t('importExport.opnsense.apiSecretLabel')} />
           </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={!opnsenseVerifySsl} onChange={(e) => setOpnsenseVerifySsl(!e.target.checked)} className="w-4 h-4 rounded border-border text-accent-primary" />
-            <span className="text-sm text-text-secondary">{t('importExport.opnsense.ignoreCert')}</span>
-          </label>
+          <ToggleSwitch
+            checked={!opnsenseVerifySsl}
+            onChange={(ignore) => setOpnsenseVerifySsl(!ignore)}
+            label={t('importExport.opnsense.ignoreCert')}
+          />
           {!opnsenseVerifySsl && (
-            <p className="text-xs text-status-warning">{t('importExport.opnsense.sslWarning')}</p>
+            <HelpCard variant="warning">{t('importExport.opnsense.sslWarning')}</HelpCard>
           )}
 
-          {testResult && (
-            <>
-              {testResult.success ? (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-status-success">
-                    <CheckCircle size={18} weight="fill" />
-                    <span className="text-sm font-medium">{t('importExport.opnsense.connectedSuccessfully')}</span>
-                  </div>
-                  {testResult.stats && (
-                    <div className="flex gap-4">
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-secondary">
-                        <ShieldCheck size={16} className="text-accent-primary" />
-                        <span className="text-sm font-medium">{testResult.stats.cas} CA{testResult.stats.cas > 1 ? 's' : ''}</span>
-                      </div>
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-secondary">
-                        <Certificate size={16} className="text-accent-primary" />
-                        <span className="text-sm font-medium">{testResult.stats.certificates} {t('common.certificates')}</span>
-                      </div>
-                    </div>
-                  )}
-                  {testItems.length > 0 && (
-                    <div className="border border-border rounded-lg overflow-hidden">
-                      <div className="flex items-center justify-between px-3 py-2 bg-bg-secondary border-b border-border">
-                        <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
-                          <input type="checkbox" checked={testItems.every(i => i.selected)} onChange={(e) => toggleAllItems(e.target.checked)} className="w-4 h-4 rounded border-border text-accent-primary" />
-                          {t('importExport.opnsense.selectAll')} ({testItems.filter(i => i.selected).length}/{testItems.length})
-                        </label>
-                      </div>
-                      <div className="max-h-64 overflow-y-auto divide-y divide-border">
-                        {testItems.map(item => (
-                          <label key={item.id} className="flex items-center gap-3 px-3 py-2 hover:bg-bg-secondary cursor-pointer transition-colors">
-                            <input type="checkbox" checked={item.selected} onChange={() => toggleItemSelection(item.id)} className="w-4 h-4 rounded border-border text-accent-primary shrink-0" />
-                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold uppercase shrink-0 ${item.type === 'CA' ? 'bg-accent-primary-op15 text-accent-primary' : 'bg-status-info-op15 text-status-info'}`}>
-                              {item.type}
-                            </span>
-                            <span className="text-sm truncate">{item.name || t('common.unnamed')}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-sm text-status-danger">{testResult.error || t('importExport.opnsense.connectionFailed')}</div>
-              )}
-            </>
+          {testResult?.success && testItems.length > 0 && (
+            <div>
+              <ToggleSwitch
+                checked={testItems.every(i => i.selected)}
+                onChange={(on) => toggleAllItems(on)}
+                label={`${t('importExport.opnsense.selectAll')} (${testItems.filter(i => i.selected).length}/${testItems.length})`}
+              />
+              <ul className="sf-records sf-records-scroll">
+                {testItems.map(item => (
+                  <li key={item.id}>
+                    <ToggleSwitch
+                      checked={item.selected}
+                      onChange={() => toggleItemSelection(item.id)}
+                      label={(
+                        <span className="sf-record-title">
+                          <strong>{item.name || t('common.unnamed')}</strong>
+                          <Badge variant={item.type === 'CA' ? 'primary' : 'info'}>{item.type === 'CA' ? t('common.ca') : t('common.certificate')}</Badge>
+                        </span>
+                      )}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" onClick={handleTestConf} disabled={processing || !opnsenseHost || !opnsenseApiKey || !opnsenseApiSecret}>
+          {/* The test as the mockup's test zone: the button, then its result on the line */}
+          <div className="sf-test">
+            <Button ref={opnsenseTestButton} type="button" variant="secondary" onClick={handleTestConf} disabled={processing || !opnsenseHost || !opnsenseApiKey || !opnsenseApiSecret}>
+              <PlugsConnected size={16} />
               {processing ? t('common.testing') : t('common.testConnection')}
             </Button>
             {testResult?.success && testItems.some(i => i.selected) && (
@@ -823,82 +809,63 @@ export default function OperationsPage() {
                 {t('importExport.opnsense.importSelected', { count: testItems.filter(i => i.selected).length })}
               </Button>
             )}
+            {testResult ? (
+              <p className={testResult.success ? 'sf-test-result is-good' : 'sf-test-result is-bad'} role="status">
+                {testResult.success ? <CheckCircle aria-hidden="true" /> : <WarningCircle aria-hidden="true" />}
+                <span>
+                  {testResult.success
+                    ? (testResult.stats
+                      ? t('importExport.opnsense.connectedWithCounts', { cas: testResult.stats.cas, certificates: testResult.stats.certificates })
+                      : t('importExport.opnsense.connectedSuccessfully'))
+                    : (testResult.error || t('importExport.opnsense.connectionFailed'))}
+                </span>
+              </p>
+            ) : (
+              <p className="sf-test-result">
+                <Question aria-hidden="true" />
+                <span>{t('importExport.opnsense.testHint')}</span>
+              </p>
+            )}
           </div>
         </form>
       </FormGroup>
     </>
   )
 
+  // Each export as a record of the mockup's list: the format, what it holds, its download button
+  const exportRow = (key, label, desc, onClick) => (
+    <li key={key}>
+      <div className="sf-record-main">
+        <strong>{label}</strong>
+        <span className="sf-record-meta">{desc}</span>
+      </div>
+      <div className="sf-record-actions">
+        <Button type="button" variant="secondary" onClick={onClick} aria-label={`${t('common.download')} ${label}`}>
+          <DownloadSimple size={16} />
+          {t('common.download')}
+        </Button>
+      </div>
+    </li>
+  )
+
   const renderExportTab = () => (
     <>
       <FormGroup title={t('importExport.export.allCertsTitle')} description={t('importExport.export.allCertsDesc')}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <button
-            onClick={() => handleExport(certificatesService.exportAll, 'pem', 'certificates')}
-            className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-secondary-op50 hover:bg-bg-secondary hover:border-accent-primary-op30 transition-all text-left"
-          >
-            <div className="w-10 h-10 rounded-lg icon-bg-blue flex items-center justify-center">
-              <FileText size={20} weight="fill" className="text-paper" />
-            </div>
-            <div>
-              <div className="text-sm font-semibold text-text-primary">{t('importExport.export.pemBundle')}</div>
-              <p className="text-xs text-text-secondary mt-0.5">{t('importExport.export.pemDesc')}</p>
-            </div>
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-accent-primary group-hover:underline">
-              <DownloadSimple size={14} /> {t('common.download')}
-            </span>
-          </button>
-          <button
-            onClick={() => handleExport(certificatesService.exportAll, 'pkcs7', 'certificates')}
-            className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-secondary-op50 hover:bg-bg-secondary hover:border-accent-primary-op30 transition-all text-left"
-          >
-            <div className="w-10 h-10 rounded-lg icon-bg-violet flex items-center justify-center">
-              <Package size={20} weight="fill" className="text-paper" />
-            </div>
-            <div>
-              <div className="text-sm font-semibold text-text-primary">{t('importExport.export.p7bBundle')}</div>
-              <p className="text-xs text-text-secondary mt-0.5">{t('importExport.export.p7bDesc')}</p>
-            </div>
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-accent-primary group-hover:underline">
-              <DownloadSimple size={14} /> {t('common.download')}
-            </span>
-          </button>
-        </div>
+        <ul className="sf-records">
+          {exportRow('cert-pem', t('importExport.export.pemBundle'), t('importExport.export.pemDesc'),
+            () => handleExport(certificatesService.exportAll, 'pem', 'certificates'))}
+          {exportRow('cert-p7b', t('importExport.export.p7bBundle'), t('importExport.export.p7bDesc'),
+            () => handleExport(certificatesService.exportAll, 'pkcs7', 'certificates'))}
+        </ul>
       </FormGroup>
 
       <FormGroup title={t('importExport.export.allCAsTitle')} description={t('importExport.export.allCAsDesc', { count: cas.length })}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <button
-            onClick={() => handleExport(casService.exportAll, 'pem', 'ca-certificates')}
-            className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-secondary-op50 hover:bg-bg-secondary hover:border-accent-primary-op30 transition-all text-left"
-          >
-            <div className="w-10 h-10 rounded-lg icon-bg-emerald flex items-center justify-center">
-              <FileText size={20} weight="fill" className="text-paper" />
-            </div>
-            <div>
-              <div className="text-sm font-semibold text-text-primary">{t('importExport.export.pemBundle')}</div>
-              <p className="text-xs text-text-secondary mt-0.5">{t('importExport.export.pemDesc')}</p>
-            </div>
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-accent-primary group-hover:underline">
-              <DownloadSimple size={14} /> {t('common.download')}
-            </span>
-          </button>
-          <button
-            onClick={() => handleExport(casService.exportAll, 'pkcs7', 'ca-certificates')}
-            className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-secondary-op50 hover:bg-bg-secondary hover:border-accent-primary-op30 transition-all text-left"
-          >
-            <div className="w-10 h-10 rounded-lg icon-bg-orange flex items-center justify-center">
-              <Package size={20} weight="fill" className="text-paper" />
-            </div>
-            <div>
-              <div className="text-sm font-semibold text-text-primary">{t('importExport.export.p7bBundle')}</div>
-              <p className="text-xs text-text-secondary mt-0.5">{t('importExport.export.p7bDesc')}</p>
-            </div>
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-accent-primary group-hover:underline">
-              <DownloadSimple size={14} /> {t('common.download')}
-            </span>
-          </button>
-        </div>
+        <ul className="sf-records">
+          {exportRow('ca-pem', t('importExport.export.pemBundle'), t('importExport.export.pemDesc'),
+            () => handleExport(casService.exportAll, 'pem', 'ca-certificates'))}
+          {exportRow('ca-p7b', t('importExport.export.p7bBundle'), t('importExport.export.p7bDesc'),
+            () => handleExport(casService.exportAll, 'pkcs7', 'ca-certificates'))}
+        </ul>
       </FormGroup>
     </>
   )

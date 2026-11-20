@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {  FloppyDisk, ArrowsClockwise } from '@phosphor-icons/react'
 import { Button, Input, Select, Badge } from '../../components'
+import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { useNotification } from '../../contexts'
 import { certificatesService, settingsService } from '../../services'
 import { certificateLabel } from '../../lib/utils'
@@ -242,54 +243,50 @@ export default function GeneralSection({ settings, fieldErrors = {}, updateSetti
             value={settings.date_format || 'short'}
             onChange={(val) => updateSetting('date_format', val)}
           />
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={settings.show_time !== 'false' && settings.show_time !== false}
-              onChange={(e) => updateSetting('show_time', e.target.checked)}
-              className="rounded"
-            />
-            {t('settings.showTime')}
-          </label>
+          <ToggleSwitch
+            checked={settings.show_time !== 'false' && settings.show_time !== false}
+            onChange={(on) => updateSetting('show_time', on)}
+            label={t('settings.showTime')}
+          />
         </div>
       </FormGroup>
-      <FormGroup title={t('settings.metrics.title')}>
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Badge variant={settings.metrics_enabled ? 'success' : 'secondary'} size="sm">
-              {settings.metrics_enabled ? t('common.enabled') : t('common.disabled')}
-            </Badge>
-            <span className="text-xs text-text-secondary">{t('settings.metrics.subtitle')}</span>
+      <FormGroup
+        title={t('settings.metrics.title')}
+        description={t('settings.metrics.subtitle')}
+        badge={(
+          <Badge variant={settings.metrics_enabled ? 'success' : 'secondary'} size="sm">
+            {settings.metrics_enabled ? t('common.enabled') : t('common.disabled')}
+          </Badge>
+        )}
+      >
+        <div className="sf-stack">
+          <div className="sf-grid">
+            <Input
+              label={t('settings.metrics.token')}
+              type="text"
+              value={metricsToken}
+              onChange={(e) => setMetricsToken(e.target.value)}
+              placeholder={settings.metrics_enabled ? t('settings.metrics.tokenRotatePlaceholder') : t('settings.metrics.tokenPlaceholder')}
+              helperText={t('settings.metrics.tokenHelper')}
+            />
           </div>
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
-              <Input
-                label={t('settings.metrics.token')}
-                type="text"
-                value={metricsToken}
-                onChange={(e) => setMetricsToken(e.target.value)}
-                placeholder={settings.metrics_enabled ? t('settings.metrics.tokenRotatePlaceholder') : t('settings.metrics.tokenPlaceholder')}
-                helperText={t('settings.metrics.tokenHelper')}
-              />
-            </div>
+          <div className="sf-actions-row">
             <Button type="button" variant="secondary" onClick={generateToken} disabled={!canWrite('settings')}>
               <ArrowsClockwise size={16} />
               {t('settings.metrics.generate')}
             </Button>
-          </div>
-          {canWrite('settings') && (
-            <div className="flex items-center gap-2 pt-1">
+            {canWrite('settings') && (
               <Button type="button" onClick={saveMetricsToken} disabled={metricsBusy || !metricsToken}>
                 <FloppyDisk size={16} />
                 {settings.metrics_enabled ? t('settings.metrics.rotate') : t('settings.metrics.enable')}
               </Button>
-              {settings.metrics_enabled && (
-                <Button type="button" variant="danger-soft" onClick={disableMetrics} disabled={metricsBusy}>
-                  {t('settings.metrics.disable')}
-                </Button>
-              )}
-            </div>
-          )}
+            )}
+            {canWrite('settings') && settings.metrics_enabled && (
+              <Button type="button" variant="danger" onClick={disableMetrics} disabled={metricsBusy}>
+                {t('settings.metrics.disable')}
+              </Button>
+            )}
+          </div>
         </div>
       </FormGroup>
       <ServiceStatusWidget />

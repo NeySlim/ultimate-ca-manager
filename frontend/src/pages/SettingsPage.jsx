@@ -692,7 +692,7 @@ export default function SettingsPage() {
       setDbStats({
         certificates: stats.counts?.certificates || 0,
         cas: stats.counts?.cas || 0,
-        size: stats.size_mb ? `${stats.size_mb} MB` : '-',
+        size_mb: stats.size_mb || null,
         last_optimized: stats.last_vacuum || null
       })
     } catch (error) { reportSilentFailure('loadDbStats', error) }

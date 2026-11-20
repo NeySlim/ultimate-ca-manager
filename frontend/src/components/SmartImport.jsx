@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next'
 import { 
   UploadSimple, FileText, Key, ShieldCheck, Certificate,
   WarningCircle, CheckCircle, XCircle, LockSimple, Link,
-  CaretDown, CaretRight, ArrowsClockwise, File, Trash
+  CaretDown, CaretRight, ArrowsClockwise, File, Trash, MagnifyingGlass, Question
 } from '@phosphor-icons/react'
 import { Button } from './Button'
 import { Badge } from './Badge'
@@ -573,7 +573,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
           {files.map((file, i) => {
             const isEncryptable = file.name.match(/\.(p12|pfx|key)$/i) || (file.type === 'text' && file.data && file.data.includes('ENCRYPTED'))
             return (
-              <div key={i} className="p-2 bg-bg-secondary rounded-lg space-y-2">
+              <div key={i} className="py-2 border-b border-border space-y-2">
                 <div className="flex items-center gap-2">
                   <File size={16} className="text-text-secondary shrink-0" />
                   <span className="text-sm flex-1 truncate">{file.name}</span>
@@ -605,10 +605,11 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         </div>
       )}
       
-      {/* Or paste PEM */}
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border"></div></div>
-        <div className="relative flex justify-center text-xs uppercase"><span className="bg-bg-primary px-2 text-text-secondary">{t('common.orPastePem')}</span></div>
+      {/* Or paste PEM: the same separator as the tools, in sentence case */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1 h-px bg-border" />
+        <span className="text-xs text-text-secondary">{t('common.orPastePem')}</span>
+        <div className="flex-1 h-px bg-border" />
       </div>
       
       <textarea
@@ -620,10 +621,10 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
       
       {/* Global password for encrypted content */}
       {hasEncrypted && (useGlobalPassword || hasEncryptedPem) && (
-        <div className="flex items-center gap-2 p-3 rounded-lg alert-bg-amber">
-          <LockSimple size={18} className="shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-medium">{t('import.encryptedDetected')}</p>
+        <div className="ui-notice is-warn">
+          <LockSimple aria-hidden="true" />
+          <div className="ui-notice-body">
+            <strong>{t('import.encryptedDetected')}</strong>
             <input
               type="text"
               value={password}
@@ -637,13 +638,27 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         </div>
       )}
       
-      {/* Actions */}
-      <div className="flex justify-end gap-2 pt-2">
-        {onCancel && <Button type="button" variant="secondary" onClick={onCancel}>{t('common.cancel')}</Button>}
-        <Button type="button" onClick={handleAnalyze} disabled={(!pemContent.trim() && files.length === 0) || isAnalyzing}>
-          {isAnalyzing ? <><ArrowsClockwise size={16} className="animate-spin" /> {t('import.analyzing')}</> : t('import.analyze')}
-        </Button>
-      </div>
+      {/* Actions: a dialog ends on its buttons at the right; on a page the action opens the
+          mockup's test zone, button on the left and what it does beside it */}
+      {onCancel ? (
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="secondary" onClick={onCancel}>{t('common.cancel')}</Button>
+          <Button type="button" onClick={handleAnalyze} disabled={(!pemContent.trim() && files.length === 0) || isAnalyzing}>
+            {isAnalyzing ? <><ArrowsClockwise size={16} className="animate-spin" /> {t('import.analyzing')}</> : t('import.analyze')}
+          </Button>
+        </div>
+      ) : (
+        <div className="sf-test">
+          <Button type="button" onClick={handleAnalyze} disabled={(!pemContent.trim() && files.length === 0) || isAnalyzing}>
+            {isAnalyzing ? <ArrowsClockwise size={16} className="animate-spin" /> : <MagnifyingGlass size={16} />}
+            {isAnalyzing ? t('import.analyzing') : t('import.analyze')}
+          </Button>
+          <p className="sf-test-result">
+            <Question aria-hidden="true" />
+            <span>{t('import.analyzeHint')}</span>
+          </p>
+        </div>
+      )}
     </div>
   )
   

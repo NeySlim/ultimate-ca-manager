@@ -92,9 +92,11 @@
   background-color: var(--panel);
   color: var(--text);
 }
+/* A field out of bounds: the mockup's error border and ring (`.field [aria-invalid=true]`) */
+.sf-body:not(.sf-body-fill) :is(input, select, textarea, button[role="combobox"])[aria-invalid="true"] { border-color: var(--bad); box-shadow: 0 0 0 1px var(--bad); }
 /* A field that cannot be changed reads as the mockup's read-only field: raised, plain text */
 .sf-body:not(.sf-body-fill) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea):is(:disabled, [readonly]) {
-  background-color: var(--raised);
+  background-color: var(--raised) !important;
   color: var(--text);
   opacity: 1;
 }
@@ -123,7 +125,6 @@
 .sf-props { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: 10px 16px; margin: 0; font-size: 12px; }
 .sf-props dt { color: var(--muted); }
 .sf-props dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
-@container (min-width: 600px) { .sf-props { grid-template-columns: 160px minmax(0, 1fr); } }
 
 /* Records listed in a frame (providers, webhooks, archives, keys): the mockup's record list */
 .sf-records { list-style: none; margin: 0; padding: 0; }
@@ -136,7 +137,22 @@
 .sf-record-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .sf-records-empty { margin: 0; padding: 9px 0; font-size: 12px; color: var(--muted); }
 .sf-records > li > input[type="checkbox"] { flex: 0 0 auto; }
+/* A long list of records to choose from scrolls inside its own height */
+.sf-records-scroll { max-height: 288px; overflow-y: auto; scrollbar-width: thin; }
 .sf-records-lead { margin: 0 0 6px; }
+/* A copyable value as a record row: name, value, description, copy on the right */
+.sf-copy { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.sf-copy:last-child { border-bottom: 0; }
+.sf-copy strong { font-size: 13px; font-weight: 500; color: var(--text); overflow-wrap: anywhere; }
+.sf-copy-value { color: var(--text); overflow-wrap: anywhere; user-select: all; }
+/* A link as the mockup's text link: accent, 500 */
+.sf-link { color: var(--accent); font-weight: 500; text-decoration: none; }
+.sf-link:hover { text-decoration: underline; }
+.sf-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+/* Blocks of a group one under the other, 16 px apart; a row of actions keeps their width */
+.sf-stack { display: grid; gap: 16px; min-width: 0; }
+.sf-actions-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sf-stack > :is(button, a.lv-btn, .lv-btn) { justify-self: start; }
 .sf-records-summary { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0 0 12px; font-size: 12px; color: var(--muted); }
 .sf-records-summary > span { display: inline-flex; align-items: center; gap: 6px; }
 .sf-records-summary svg { width: 14px; height: 14px; }
@@ -150,16 +166,21 @@
    The grid is a group's direct block (.space-y-3/.space-y-4) or any block marked .sf-grid. */
 .sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) > :not([hidden]) { grid-column: 1 / -1; margin-top: 0; margin-bottom: 0; }
-.sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) > :is(.space-y-1\.5, .ui-field):not([hidden]) { grid-column: auto; }
+.sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) > :is(.space-y-1\.5, .ui-field, .sf-cell):not([hidden]) { grid-column: auto; }
 /* Fields a section lays out itself: the same two columns, one on a phone */
 .sf-body .sf-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 /* A frame over 900 px packs the short fields (port, hour, protocol) two in the room of one */
 @container (min-width: 900px) {
   .sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) > :is(.space-y-1\.5, .ui-field):not([hidden]) { grid-column: span 2; }
+  .sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) > :is(.space-y-1\.5, .ui-field, .sf-cell):not([hidden]) { grid-column: span 2; }
   .sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) > .sf-short:not([hidden]) { grid-column: span 1; }
   .sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) > .sf-wide:not([hidden]) { grid-column: 1 / -1; }
 }
+/* Release notes folded under their line, read in the frame without a box */
+.sf-notes > summary { display: list-item; min-height: 24px; font-size: 12px; line-height: 24px; color: var(--muted); cursor: pointer; }
+.sf-notes > summary:hover { color: var(--text); }
+.sf-notes > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+.sf-notes-body { margin-top: 8px; max-height: 256px; overflow-y: auto; font-size: 12px; line-height: 1.6; color: var(--muted); scrollbar-width: thin; }
 /* Release notes read in a frame: headings at the legend size */
 .sf-body .prose :is(h1, h2, h3, h4) { font-size: 13px; line-height: 1.4; font-weight: 500; }
 /* A count inside a segment (Operations resource types), muted as the mockup's counts */
@@ -168,6 +189,11 @@
 .sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) > :is(button, a.lv-btn) { justify-self: start; }
 /* A segmented choice keeps the width of its segments */
 .sf-body .ui-field > .ui-segmented { align-self: flex-start; }
+
+/* A file drop zone reads as a field of the frame: 1 px dashed control line, radius 4 */
+.sf-body .border-dashed { border-width: 1px; border-radius: 4px; padding: 14px; }
+.sf-body .border-dashed:not(.border-accent-primary) { border-color: var(--control); }
+:root[data-theme="aurore"] .sf-body .border-dashed { border-radius: 6px; }
 
 /* Test of a section with the values typed, and its result */
 .sf-test { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid var(--line); }
@@ -180,6 +206,8 @@
 .sf-test-result svg { width: 13px; height: 13px; margin-top: 2px; flex-shrink: 0; }
 
 .sf-test.sf-under-group { margin-top: 20px; }
+/* A test that opens its group has nothing above it to set apart: no rule */
+.sf-group-body > .sf-test:first-child, .sf-group-body > :first-child > .sf-test:first-child { border-top: 0; padding-top: 0; }
 /* A set of check boxes under one label */
 .sf-checks { margin: 0; padding: 0; border: 0; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
 .sf-checks > legend { padding: 0; margin-bottom: 7px; }

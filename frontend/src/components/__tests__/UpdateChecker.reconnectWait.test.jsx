@@ -62,7 +62,7 @@ describe('waiting for UCM after an update', () => {
   it('keeps waiting through a FIPS rebuild, with the reason on screen', async () => {
     render(<UpdateChecker />)
     await tick(0)
-    fireEvent.click(screen.getByText('Install Update'))
+    fireEvent.click(screen.getByText('settings.updates.install'))
     await tick(0)
     expect(mocks.post).toHaveBeenCalledWith('/system/updates/install', expect.anything())
     expect(screen.getByText('reconnect.updateNote:10')).toBeInTheDocument()

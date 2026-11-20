@@ -1,24 +1,25 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  Globe, GithubLogo, WarningCircle, Archive, Coffee,
-} from '@phosphor-icons/react'
-import { Badge, Logo, DetailGrid, DetailField, Button } from '../../components'
+import { Archive } from '@phosphor-icons/react'
+import { Button } from '../../components'
 import { systemService } from '../../services'
 import { useNotification } from '../../contexts'
 import { usePermission } from '../../hooks'
 import { downloadBlob } from '../../lib/utils'
+import { formatBytes } from '../../lib/fileSize'
+import { compactAgo } from '../../lib/relativeTime'
 import FipsPreflightPanel from './FipsPreflightPanel'
 import CompliancePreflightPanel from './CompliancePreflightPanel'
 import { KOFI_URL } from '../../lib/support'
-import { FormGroup } from '../../components/sectioned'
+import { FormGroup, FormProps } from '../../components/sectioned'
+
+const REPO = 'https://github.com/NeySlim/ultimate-ca-manager'
 
 export default function AboutSection() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { showError, showSuccess } = useNotification()
   const { isAdmin, hasPermission } = usePermission()
   const [info, setInfo] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [bundleLoading, setBundleLoading] = useState(false)
 
   const handleDownloadBundle = async () => {
@@ -42,135 +43,81 @@ export default function AboutSection() {
         setInfo(response.data)
       } catch {
         setInfo(null)
-      } finally {
-        setLoading(false)
       }
     }
     fetchInfo()
   }, [])
 
-  const formatUptime = (seconds) => {
-    if (!seconds) return '—'
-    const d = Math.floor(seconds / 86400)
-    const h = Math.floor((seconds % 86400) / 3600)
-    const m = Math.floor((seconds % 3600) / 60)
-    if (d > 0) return `${d}d ${h}h ${m}m`
-    if (h > 0) return `${h}h ${m}m`
-    return `${m}m`
-  }
+  // The start of the service worded as the mockup words a past event (« il y a 19 h »)
+  const started = info?.uptime_seconds
+    ? compactAgo(new Date(Date.now() - info.uptime_seconds * 1000), t)
+    : '—'
+  const links = [
+    { href: REPO, title: 'GitHub', meta: t('settings.about.sourceCode') },
+    { href: `${REPO}/issues`, title: t('settings.about.issues'), meta: t('settings.about.reportBugs') },
+    { href: `${REPO}/wiki`, title: t('settings.about.documentation'), meta: t('settings.about.wikiGuides') },
+    { href: KOFI_URL, title: t('settings.about.support'), meta: t('settings.about.supportDesc') },
+  ]
 
   return (
     <>
-
-      {/* Logo & branding */}
-      <div className="flex flex-col items-center py-6 mb-4">
-        <Logo variant="vertical" size="lg" />
-        <div className="mt-3">
-          <Badge variant="primary" size="sm">
-            {loading ? '...' : `v${info?.version || __APP_VERSION__}`}
-          </Badge>
-        </div>
-      </div>
-
-      {/* System info */}
       <FormGroup title={t('settings.about.systemInfo')}>
-        <DetailGrid>
-          <DetailField label={t('settings.about.version')} value={info?.version || '—'} />
-          <DetailField label={t('settings.about.pythonVersion')} value={info?.python_version || '—'} />
-          <DetailField label={t('settings.about.uptime')} value={formatUptime(info?.uptime_seconds)} />
-          <DetailField label={t('settings.about.memory')} value={info?.memory_mb ? `${info.memory_mb} MB` : '—'} />
-          <DetailField label={t('settings.about.environment')} value={info?.is_docker ? 'Docker' : 'Native'} />
-        </DetailGrid>
+        <FormProps items={[
+          [t('settings.about.version'), info?.version || __APP_VERSION__],
+          [t('settings.about.pythonVersion'), info?.python_version || '—'],
+          [t('settings.about.started'), started],
+          [t('settings.about.memory'), info?.memory_mb ? formatBytes(info.memory_mb * 1024 * 1024, i18n?.language) : '—'],
+          [t('settings.about.environment'), info ? (info.is_docker ? 'Docker' : t('settings.about.envNative')) : '—'],
+        ]} />
       </FormGroup>
 
-      {/* Diagnostic bundle — admin only */}
+      {/* Diagnostic bundle: admin only */}
       {isAdmin() && (
         <FormGroup title={t('settings.about.diagnostic')}>
-          <div className="flex items-center justify-between gap-3 p-3 bg-tertiary-50 border border-border rounded-lg">
-            <div className="min-w-0">
-              <div className="text-sm font-medium text-text-primary">{t('settings.about.logBundle')}</div>
-              <div className="text-xs text-text-secondary">{t('settings.about.logBundleHint')}</div>
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              onClick={handleDownloadBundle}
-              disabled={bundleLoading}
-            >
-              <Archive size={14} />
-              {bundleLoading ? t('common.preparing') : t('common.download')}
-            </Button>
-          </div>
+          <ul className="sf-records">
+            <li>
+              <div className="sf-record-main">
+                <strong>{t('settings.about.logBundle')}</strong>
+                <span className="sf-record-meta">{t('settings.about.logBundleHint')}</span>
+              </div>
+              <div className="sf-record-actions">
+                <Button type="button" variant="secondary" onClick={handleDownloadBundle} disabled={bundleLoading}>
+                  <Archive size={16} />
+                  {bundleLoading ? t('common.preparing') : t('common.download')}
+                </Button>
+              </div>
+            </li>
+          </ul>
         </FormGroup>
       )}
 
+      <FormGroup title={t('settings.about.links')}>
+        <ul className="sf-records">
+          {links.map((link) => (
+            <li key={link.href}>
+              <div className="sf-record-main">
+                <strong><a className="sf-link" href={link.href} target="_blank" rel="noopener noreferrer">{link.title}</a></strong>
+                <span className="sf-record-meta">{link.meta}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </FormGroup>
+
+      <FormGroup title={t('settings.about.license')}>
+        <ul className="sf-records">
+          <li>
+            <div className="sf-record-main">
+              <strong>GNU AGPL v3.0 only</strong>
+              <span className="sf-record-meta">© 2025-2026 Lionel Alarcon: {t('settings.about.licenseDesc')}</span>
+            </div>
+          </li>
+        </ul>
+      </FormGroup>
+
+      {/* The checks last, as the mockup ends a frame with its test */}
       {hasPermission('admin:system') && <FipsPreflightPanel />}
       {(hasPermission('admin:system') || hasPermission('admin:settings')) && <CompliancePreflightPanel />}
-
-      {/* Links */}
-      <FormGroup title={t('settings.about.links')}>
-        <div className="space-y-2">
-          <a
-            href="https://github.com/NeySlim/ultimate-ca-manager"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 p-3 bg-tertiary-50 border border-border rounded-lg hover:bg-bg-tertiary transition-colors"
-          >
-            <GithubLogo size={20} className="text-text-secondary" />
-            <div>
-              <div className="text-sm font-medium text-text-primary">GitHub</div>
-              <div className="text-xs text-text-secondary">{t('settings.about.sourceCode')}</div>
-            </div>
-          </a>
-          <a
-            href="https://github.com/NeySlim/ultimate-ca-manager/issues"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 p-3 bg-tertiary-50 border border-border rounded-lg hover:bg-bg-tertiary transition-colors"
-          >
-            <WarningCircle size={20} className="text-text-secondary" />
-            <div>
-              <div className="text-sm font-medium text-text-primary">{t('settings.about.issues')}</div>
-              <div className="text-xs text-text-secondary">{t('settings.about.reportBugs')}</div>
-            </div>
-          </a>
-          <a
-            href="https://github.com/NeySlim/ultimate-ca-manager/wiki"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 p-3 bg-tertiary-50 border border-border rounded-lg hover:bg-bg-tertiary transition-colors"
-          >
-            <Globe size={20} className="text-text-secondary" />
-            <div>
-              <div className="text-sm font-medium text-text-primary">{t('settings.about.documentation')}</div>
-              <div className="text-xs text-text-secondary">{t('settings.about.wikiGuides')}</div>
-            </div>
-          </a>
-          <a
-            href={KOFI_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 p-3 bg-tertiary-50 border border-border rounded-lg hover:bg-bg-tertiary transition-colors"
-          >
-            <Coffee size={20} className="kofi-icon" />
-            <div>
-              <div className="text-sm font-medium text-text-primary">{t('settings.about.support')}</div>
-              <div className="text-xs text-text-secondary">{t('settings.about.supportDesc')}</div>
-            </div>
-          </a>
-        </div>
-      </FormGroup>
-
-      {/* License */}
-      <FormGroup title={t('settings.about.license')}>
-        <div className="p-3 bg-tertiary-50 border border-border rounded-lg">
-          <p className="text-sm text-text-primary font-medium">GNU AGPL v3.0 only</p>
-          <p className="text-xs text-text-secondary mt-1">
-            © 2025-2026 Lionel Alarcon: {t('settings.about.licenseDesc')}
-          </p>
-        </div>
-      </FormGroup>
     </>
   )
 }
