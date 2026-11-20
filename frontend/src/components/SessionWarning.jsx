@@ -5,11 +5,13 @@
  * the console unmounts and the sign-in page keeps the current page in ?next=.
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Clock, ArrowClockwise } from '@phosphor-icons/react'
 import { useAuth, useNotification } from '../contexts'
 import { authService } from '../services'
 import { focusPageTitle } from '../lib/focusPageTitle'
+import { BANNER_SLOT } from '../lib/sessionBannerSlot'
 import './auth/auth.css'
 
 const WARNING_BEFORE = 5 * 60 * 1000 // Show warning 5 minutes before expiry
@@ -144,25 +146,27 @@ export function SessionWarning() {
     }
   }, [checkSession, lock, showSuccess, t])
 
-  // The region stays mounted so its announcement is read, the banner shown or not
-  const live = <span className="sr-only" aria-live="polite">{announce}</span>
   if (!user) return null
+  // The region stays mounted so its announcement is read once, the banner shown or not
+  const live = <span className="sr-only" aria-live="polite">{announce}</span>
   if (!showWarning) return live
 
-  return (
+  const banner = (
     <div className="session-banner" role="region" aria-labelledby="session-banner-title">
       <Clock size={20} aria-hidden="true" />
       <p>
         <strong id="session-banner-title">{t('session.expiresIn', { time: formatTime(secondsLeft) })}</strong>
         <span>{t('session.lockNotice')}</span>
       </p>
-      {/* Announced once, not at every tick of the countdown */}
-      {live}
       <button type="button" className="auth-btn is-primary" onClick={extendSession}>
         <ArrowClockwise size={17} aria-hidden="true" />{t('session.extend')}
       </button>
     </div>
   )
+  // Between the console's top bar and its page in the tab order, as the design inserts it;
+  // in place where no console is shown (a gate over it)
+  const slot = document.getElementById(BANNER_SLOT)
+  return <>{live}{slot ? createPortal(banner, slot) : banner}</>
 }
 
 export default SessionWarning

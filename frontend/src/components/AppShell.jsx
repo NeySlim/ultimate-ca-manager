@@ -23,6 +23,7 @@ import { useNotification } from '../contexts/NotificationContext'
 import { InspectorDock } from './inspector/InspectorDock'
 import { useDockPlacement } from './inspector/placement'
 import { useThemeColor } from '../lib/themeColor'
+import { BANNER_SLOT } from '../lib/sessionBannerSlot'
 
 export function AppShell() {
   const { t } = useTranslation()
@@ -139,6 +140,8 @@ export function AppShell() {
         hasHelp={hasHelp}
         onNotice={notice}
       />
+      {/* The session expiry banner comes here, after the bar's buttons in the tab order */}
+      <div id={BANNER_SLOT} style={{ display: 'contents' }} />
 
       <div className={`shell-main${dockPlacement === 'right' ? ' has-dock-right' : ''}`}>
         <div className="shell-content">
