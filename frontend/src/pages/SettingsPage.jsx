@@ -8,13 +8,14 @@ import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import { 
-  Gear, EnvelopeSimple, ShieldCheck, Database, ListBullets, FloppyDisk, 
-  Envelope, Download, Trash, HardDrives, Lock, Key, Palette, Sun, Moon, Desktop, Info,
+  Database, ListBullets, FloppyDisk, 
+  Envelope, Download, Trash, HardDrives, Lock, Palette, Sun, Moon, Desktop, Info,
   Timer, Clock, WarningCircle, UploadSimple, Certificate, Eye, ArrowsClockwise, Rocket,
   Plus, PencilSimple, TestTube, Lightning, Globe, Shield, CheckCircle, XCircle, MagnifyingGlass,
   Bell, Copy, Power, ArrowClockwise, LockKey, Warning, User, GithubLogo,
   Plugs, UsersThree, UserPlus, TreeStructure, CaretDown, Play,
-  WindowsLogo, ClockClockwise, IdentificationBadge, CloudArrowUp
+  WindowsLogo, ClockClockwise, IdentificationBadge, CloudArrowUp,
+  SlidersHorizontal, PaperPlaneTilt, Archive,
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
@@ -87,17 +88,17 @@ import { fieldProblems, fieldSection } from './settings/fieldChecks'
 
 // Sections: label, sentence of the frame, icon; `permission` hides one from other roles
 const BASE_SETTINGS_CATEGORIES = [
-  { id: 'general', labelKey: 'settings.tabs.general', descKey: 'settings.generalSubtitle', icon: Gear, color: 'icon-bg-blue' },
+  { id: 'general', labelKey: 'settings.tabs.general', descKey: 'settings.generalSubtitle', icon: SlidersHorizontal, color: 'icon-bg-blue' },
   { id: 'appearance', labelKey: 'settings.tabs.appearance', descKey: 'settings.appearanceSubtitle', icon: Palette, color: 'icon-bg-violet' },
-  { id: 'email', labelKey: 'settings.tabs.email', descKey: 'settings.emailSubtitle', icon: EnvelopeSimple, color: 'icon-bg-teal' },
-  { id: 'security', labelKey: 'settings.tabs.security', descKey: 'settings.securitySubtitle', icon: ShieldCheck, color: 'icon-bg-amber' },
-  { id: 'sso', labelKey: 'settings.tabs.sso', descKey: 'sso.subtitle', icon: Key, color: 'icon-bg-purple' },
+  { id: 'email', labelKey: 'settings.tabs.email', descKey: 'settings.emailSubtitle', icon: PaperPlaneTilt, color: 'icon-bg-teal' },
+  { id: 'security', labelKey: 'settings.tabs.security', descKey: 'settings.securitySubtitle', icon: Lock, color: 'icon-bg-amber' },
+  { id: 'sso', labelKey: 'settings.tabs.sso', descKey: 'sso.subtitle', icon: UsersThree, color: 'icon-bg-purple' },
   // Listing, downloading and restoring an archive are admin:system on the API (the archive
   // holds every key and secret): the section is shown to that permission only.
-  { id: 'backup', labelKey: 'settings.tabs.backup', descKey: 'settings.backupSubtitle', icon: Database, color: 'icon-bg-emerald', permission: 'admin:system' },
+  { id: 'backup', labelKey: 'settings.tabs.backup', descKey: 'settings.backupSubtitle', icon: Archive, color: 'icon-bg-emerald', permission: 'admin:system' },
   { id: 'audit', labelKey: 'settings.tabs.audit', descKey: 'settings.auditSubtitle', icon: ListBullets, color: 'icon-bg-orange' },
   { id: 'database', labelKey: 'settings.tabs.database', descKey: 'settings.databaseSubtitle', icon: HardDrives, color: 'icon-bg-teal' },
-  { id: 'https', labelKey: 'settings.tabs.https', descKey: 'settings.httpsSubtitle', icon: Lock, color: 'icon-bg-emerald' },
+  { id: 'https', labelKey: 'settings.tabs.https', descKey: 'settings.httpsSubtitle', icon: Certificate, color: 'icon-bg-emerald' },
   { id: 'updates', labelKey: 'settings.tabs.updates', descKey: 'settings.updatesSubtitle', icon: Rocket, color: 'icon-bg-violet' },
   { id: 'scheduler', labelKey: 'settings.tabs.scheduler', descKey: 'scheduler.subtitle', icon: Timer, color: 'icon-bg-blue' },
   { id: 'webhooks', labelKey: 'settings.tabs.webhooks', descKey: 'webhooks.subtitle', icon: Bell, color: 'icon-bg-orange' },
@@ -2288,7 +2289,7 @@ export default function SettingsPage() {
       <ResponsiveLayout
         title={t('common.settings')}
         total={t('sectioned.sectionCount', { count: sections.length })}
-        intent={t('settings.intent')}
+        intent={t('shell.moduleDesc.settings')}
         helpPageKey="settings"
       >
         <SavePartsContext.Provider value={parts.api}>

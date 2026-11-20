@@ -2952,7 +2952,6 @@
     },
     "selectResource": "Type de ressource",
     "selectCA": "Veuillez sélectionner une AC",
-    "intent": "Importer, exporter et agir sur plusieurs éléments à la fois.",
     "tocLabel": "Opérations"
   },
   "notifications": {
@@ -4097,7 +4096,6 @@
     "restoreSignInAgain": "La restauration a probablement été validée : elle a fermé cette session. Reconnectez-vous pour lire son compte rendu.",
     "restoreSignIn": "Se reconnecter",
     "restoreContactLost": "Le serveur ne répond plus pendant la restauration. Rechargez la page plus tard pour voir comment elle s’est terminée.",
-    "intent": "Configuration générale de l’instance.",
     "tocLabel": "Sections des paramètres",
     "historyTitle": "Historique des modifications",
     "historyIntent": "Les derniers enregistrements des paramètres, tels que le journal d’audit les consigne.",
@@ -4687,7 +4685,6 @@
     "pkcs12PasswordRequired": "Le mot de passe est requis pour les fichiers PKCS12/PFX",
     "pkcs12OutputPasswordRequired": "Le mot de passe est requis pour la sortie PKCS12",
     "pkcs12PasswordPlaceholder": "Mot de passe du fichier PKCS12/PFX",
-    "intent": "Vérifier un serveur, décoder, comparer et convertir certificats et clés.",
     "tocLabel": "Outils",
     "toolCount_one": "{{count}} outil",
     "toolCount_other": "{{count}} outils"

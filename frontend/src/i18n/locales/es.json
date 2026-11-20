@@ -529,7 +529,6 @@
     },
     "selectResource": "Tipo de recurso",
     "selectCA": "Seleccione una CA",
-    "intent": "Import, export and act on many items at once.",
     "tocLabel": "Operations"
   },
   "auth": {
@@ -3017,7 +3016,6 @@
     "pkcs12PasswordRequired": "Se requiere contraseña para archivos PKCS12/PFX",
     "pkcs12OutputPasswordRequired": "Se requiere contraseña para la salida PKCS12",
     "pkcs12PasswordPlaceholder": "Contraseña del archivo PKCS12/PFX",
-    "intent": "Check a server, decode, match and convert certificates and keys.",
     "tocLabel": "Tools",
     "toolCount_one": "{{count}} tool",
     "toolCount_other": "{{count}} tools"
@@ -3965,7 +3963,6 @@
     "restoreSignInAgain": "Es probable que la restauración se haya aplicado definitivamente: cerró esta sesión. Vuelva a iniciar sesión para leer su informe.",
     "restoreSignIn": "Volver a iniciar sesión",
     "restoreContactLost": "El servidor dejó de responder durante la restauración. Recargue la página más tarde para ver cómo terminó.",
-    "intent": "General configuration of the instance.",
     "tocLabel": "Settings sections",
     "historyTitle": "Change history",
     "historyIntent": "The latest saves of the settings, as the audit log records them.",

@@ -85,7 +85,7 @@ export default function AboutSection() {
 
       {/* Diagnostic bundle — admin only */}
       {isAdmin() && (
-        <FormGroup title={t('settings.about.diagnostic')} className="mt-4">
+        <FormGroup title={t('settings.about.diagnostic')}>
           <div className="flex items-center justify-between gap-3 p-3 bg-tertiary-50 border border-border rounded-lg">
             <div className="min-w-0">
               <div className="text-sm font-medium text-text-primary">{t('settings.about.logBundle')}</div>
@@ -109,7 +109,7 @@ export default function AboutSection() {
       {(hasPermission('admin:system') || hasPermission('admin:settings')) && <CompliancePreflightPanel />}
 
       {/* Links */}
-      <FormGroup title={t('settings.about.links')} className="mt-4">
+      <FormGroup title={t('settings.about.links')}>
         <div className="space-y-2">
           <a
             href="https://github.com/NeySlim/ultimate-ca-manager"
@@ -163,7 +163,7 @@ export default function AboutSection() {
       </FormGroup>
 
       {/* License */}
-      <FormGroup title={t('settings.about.license')} className="mt-4">
+      <FormGroup title={t('settings.about.license')}>
         <div className="p-3 bg-tertiary-50 border border-border rounded-lg">
           <p className="text-sm text-text-primary font-medium">GNU AGPL v3.0 only</p>
           <p className="text-xs text-text-secondary mt-1">

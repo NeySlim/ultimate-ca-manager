@@ -27,7 +27,7 @@ export default function FipsPreflightPanel() {
   }
 
   return (
-    <FormGroup title={t('settings.fipsPreflight.title')} className="mt-4">
+    <FormGroup title={t('settings.fipsPreflight.title')}>
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3 p-3 bg-tertiary-50 border border-border rounded-lg">
           <div className="min-w-0 text-xs text-text-secondary">{t('settings.fipsPreflight.hint')}</div>

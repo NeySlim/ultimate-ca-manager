@@ -382,28 +382,26 @@ export default function CertificateToolsPage() {
     <>
       <FormGroup title={t('tools.sectionConnection')}>
       <div className="space-y-4">
-      <div className="flex gap-3">
-        <div className="flex-1">
-          <Input
-            label={t('tools.hostname')}
-            placeholder={t('common.commonNamePlaceholder')}
-            value={sslHostname}
-            onChange={(e) => setSslHostname(e.target.value)}
-          />
-        </div>
-        <div className="w-24">
-          <Input
-            label={t('common.portLabel')}
-            placeholder={t('common.portPlaceholder')}
-            value={sslPort}
-            onChange={(e) => setSslPort(e.target.value)}
-          />
-        </div>
+      <Input
+        label={t('tools.hostname')}
+        placeholder={t('common.commonNamePlaceholder')}
+        value={sslHostname}
+        onChange={(e) => setSslHostname(e.target.value)}
+      />
+      <Input
+        className="sf-short"
+        label={t('common.portLabel')}
+        placeholder={t('common.portPlaceholder')}
+        inputMode="numeric"
+        value={sslPort}
+        onChange={(e) => setSslPort(e.target.value)}
+      />
+      <div className="sf-test">
+        <Button type="button" onClick={handleCheckSSL} disabled={loading}>
+          {loading ? <Spinner size={16} className="animate-spin" /> : <Globe size={16} />}
+          {t('tools.checkSSL')}
+        </Button>
       </div>
-      <Button type="button" onClick={handleCheckSSL} disabled={loading}>
-        {loading ? <Spinner size={16} className="animate-spin" /> : <Globe size={16} />}
-        {t('tools.checkSSL')}
-      </Button>
     </div>
     </FormGroup>
     </>
@@ -422,10 +420,12 @@ export default function CertificateToolsPage() {
         rows={8}
         accept=".pem,.csr,.der"
       />
-      <Button type="button" onClick={handleDecodeCSR} disabled={loading}>
-        {loading ? <Spinner size={16} className="animate-spin" /> : <FileMagnifyingGlass size={16} />}
-        {t('tools.decodeCsr')}
-      </Button>
+      <div className="sf-test">
+        <Button type="button" onClick={handleDecodeCSR} disabled={loading}>
+          {loading ? <Spinner size={16} className="animate-spin" /> : <FileMagnifyingGlass size={16} />}
+          {t('tools.decodeCsr')}
+        </Button>
+      </div>
     </div>
     </FormGroup>
     </>
@@ -444,10 +444,12 @@ export default function CertificateToolsPage() {
         rows={8}
         accept=".pem,.crt,.cer,.der"
       />
-      <Button type="button" onClick={handleDecodeCert} disabled={loading}>
-        {loading ? <Spinner size={16} className="animate-spin" /> : <Certificate size={16} />}
-        {t('tools.decodeCert')}
-      </Button>
+      <div className="sf-test">
+        <Button type="button" onClick={handleDecodeCert} disabled={loading}>
+          {loading ? <Spinner size={16} className="animate-spin" /> : <Certificate size={16} />}
+          {t('tools.decodeCert')}
+        </Button>
+      </div>
     </div>
     </FormGroup>
     </>
@@ -493,10 +495,12 @@ export default function CertificateToolsPage() {
         onChange={(e) => setMatchPassword(e.target.value)}
         className="max-w-xs"
       />
-      <Button type="button" onClick={handleMatchKeys} disabled={loading}>
-        {loading ? <Spinner size={16} className="animate-spin" /> : <Key size={16} />}
-        {t('tools.matchKeys')}
-      </Button>
+      <div className="sf-test">
+        <Button type="button" onClick={handleMatchKeys} disabled={loading}>
+          {loading ? <Spinner size={16} className="animate-spin" /> : <Key size={16} />}
+          {t('tools.matchKeys')}
+        </Button>
+      </div>
     </div>
     </FormGroup>
     </>
@@ -650,10 +654,12 @@ export default function CertificateToolsPage() {
         />
       )}
 
-      <Button type="button" onClick={handleConvert} disabled={loading}>
-        {loading ? <Spinner size={16} className="animate-spin" /> : <ArrowsLeftRight size={16} />}
-        {t('tools.convert')}
-      </Button>
+      <div className="sf-test">
+        <Button type="button" onClick={handleConvert} disabled={loading}>
+          {loading ? <Spinner size={16} className="animate-spin" /> : <ArrowsLeftRight size={16} />}
+          {t('tools.convert')}
+        </Button>
+      </div>
     </div>
     </FormGroup>
     </>
@@ -1025,7 +1031,7 @@ export default function CertificateToolsPage() {
     <ResponsiveLayout
       title={t('common.tools')}
       total={t('tools.toolCount', { count: sections.length })}
-      intent={t('tools.intent')}
+      intent={t('shell.moduleDesc.tools')}
       helpPageKey="certTools"
     >
       <FormLayout

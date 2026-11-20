@@ -84,7 +84,7 @@ describe('OperationsPage sections', () => {
 
   it('opens on the operation a link names', async () => {
     open('/operations?tab=bulk')
-    expect(await screen.findByRole('heading', { level: 2, name: 'operations.bulkActions' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: 'operations.bulkActions' })).toHaveFocus()
     expect(screen.queryByRole('heading', { level: 2, name: 'common.import' })).toBeNull()
   })
 

@@ -159,6 +159,8 @@
   .sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) > .sf-short:not([hidden]) { grid-column: span 1; }
   .sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) > .sf-wide:not([hidden]) { grid-column: 1 / -1; }
 }
+/* A button placed straight in a field grid keeps the width of its text */
+.sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) > :is(button, a.lv-btn) { justify-self: start; }
 /* A segmented choice keeps the width of its segments */
 .sf-body .ui-field > .ui-segmented { align-self: flex-start; }
 

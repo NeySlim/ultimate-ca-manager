@@ -1160,7 +1160,7 @@ export default function OperationsPage() {
     <ResponsiveLayout
       title={t('operations.title', 'Operations')}
       total={t('sectioned.sectionCount', { count: TABS.length })}
-      intent={t('operations.intent')}
+      intent={t('shell.moduleDesc.operations')}
       helpPageKey="operations"
     >
       <FormLayout

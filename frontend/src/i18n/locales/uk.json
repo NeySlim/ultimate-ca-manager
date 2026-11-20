@@ -531,7 +531,6 @@
     },
     "selectResource": "Тип ресурсу",
     "selectCA": "Виберіть CA",
-    "intent": "Import, export and act on many items at once.",
     "tocLabel": "Operations"
   },
   "auth": {
@@ -3083,7 +3082,6 @@
     "pkcs12PasswordRequired": "Пароль обов'язковий для файлів PKCS12/PFX",
     "pkcs12OutputPasswordRequired": "Пароль обов'язковий для виводу PKCS12",
     "pkcs12PasswordPlaceholder": "Пароль файлу PKCS12/PFX",
-    "intent": "Check a server, decode, match and convert certificates and keys.",
     "tocLabel": "Tools",
     "toolCount_one": "{{count}} tool",
     "toolCount_other": "{{count}} tools",
@@ -4039,7 +4037,6 @@
     "restoreSignInAgain": "Відновлення, імовірно, остаточно застосовано: воно завершило цю сесію. Увійдіть знову, щоб прочитати його звіт.",
     "restoreSignIn": "Увійти знову",
     "restoreContactLost": "Сервер перестав відповідати під час відновлення. Перезавантажте сторінку трохи згодом, щоб побачити, чим воно завершилося.",
-    "intent": "General configuration of the instance.",
     "tocLabel": "Settings sections",
     "historyTitle": "Change history",
     "historyIntent": "The latest saves of the settings, as the audit log records them.",

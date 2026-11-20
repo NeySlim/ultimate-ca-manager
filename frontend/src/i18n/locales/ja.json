@@ -529,7 +529,6 @@
     },
     "selectResource": "リソースタイプ",
     "selectCA": "CAを選択してください",
-    "intent": "Import, export and act on many items at once.",
     "tocLabel": "Operations"
   },
   "auth": {
@@ -3017,7 +3016,6 @@
     "pkcs12PasswordRequired": "PKCS12/PFXファイルにはパスワードが必要です",
     "pkcs12OutputPasswordRequired": "PKCS12出力にはパスワードが必要です",
     "pkcs12PasswordPlaceholder": "PKCS12/PFXファイルのパスワード",
-    "intent": "Check a server, decode, match and convert certificates and keys.",
     "tocLabel": "Tools",
     "toolCount_one": "{{count}} tool",
     "toolCount_other": "{{count}} tools"
@@ -3966,7 +3964,6 @@
     "restoreSignInAgain": "復元はおそらく確定しています。このセッションはサインアウトされました。レポートを確認するには、再度サインインしてください。",
     "restoreSignIn": "再度サインイン",
     "restoreContactLost": "復元中にサーバーが応答しなくなりました。しばらくしてからページを再読み込みして、結果を確認してください。",
-    "intent": "General configuration of the instance.",
     "tocLabel": "Settings sections",
     "historyTitle": "Change history",
     "historyIntent": "The latest saves of the settings, as the audit log records them.",

@@ -74,7 +74,7 @@ export default function CompliancePreflightPanel() {
   }
 
   return (
-    <FormGroup title={t('settings.compliancePreflight.title')} className="mt-4">
+    <FormGroup title={t('settings.compliancePreflight.title')}>
       <div className="space-y-3">
         <Select
           label={t('settings.compliancePreflight.defaultProfile')}
