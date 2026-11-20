@@ -92,8 +92,8 @@ const BASE_SETTINGS_CATEGORIES = [
   { id: 'security', labelKey: 'settings.tabs.security', descKey: 'settings.securitySubtitle', icon: ShieldCheck, color: 'icon-bg-amber' },
   { id: 'sso', labelKey: 'settings.tabs.sso', descKey: 'sso.subtitle', icon: Key, color: 'icon-bg-purple' },
   // Listing, downloading and restoring an archive are admin:system on the API (the archive
-  // holds every key and secret); the schedule inside is read:settings, its fields gated there.
-  { id: 'backup', labelKey: 'settings.tabs.backup', descKey: 'settings.backupSubtitle', icon: Database, color: 'icon-bg-emerald', permission: ['admin:system', 'read:settings'] },
+  // holds every key and secret): the section is shown to that permission only.
+  { id: 'backup', labelKey: 'settings.tabs.backup', descKey: 'settings.backupSubtitle', icon: Database, color: 'icon-bg-emerald', permission: 'admin:system' },
   { id: 'audit', labelKey: 'settings.tabs.audit', descKey: 'settings.auditSubtitle', icon: ListBullets, color: 'icon-bg-orange' },
   { id: 'database', labelKey: 'settings.tabs.database', descKey: 'settings.databaseSubtitle', icon: HardDrives, color: 'icon-bg-teal' },
   { id: 'https', labelKey: 'settings.tabs.https', descKey: 'settings.httpsSubtitle', icon: Lock, color: 'icon-bg-emerald' },
