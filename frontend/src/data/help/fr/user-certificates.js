@@ -2,7 +2,7 @@ export default {
   helpContent: {
     title: 'Certificats utilisateur',
     subtitle: 'Gérer les certificats clients mTLS',
-    overview: 'Gestion dédiée des certificats clients mTLS enrôlés depuis la page Compte. Consultez, exportez, révoquez et supprimez les certificats émis aux utilisateurs pour l\'authentification TLS mutuelle.',
+    overview: 'Gestion dédiée des certificats clients mTLS enrôlés depuis la page Compte. Consultez, exportez, révoquez et supprimez les certificats émis aux utilisateurs pour l’authentification TLS mutuelle.',
     sections: [
       {
         title: 'Statut du certificat',
@@ -25,7 +25,7 @@ export default {
         title: 'Permissions',
         items: [
           { label: 'Viewers', text: 'Ne voient que leurs propres certificats' },
-          { label: 'Operators', text: 'Peuvent consulter, exporter, révoquer et supprimer tous les certificats utilisateur ; exporter la clé privée du certificat d\'un autre utilisateur exige read:private_keys, que ce rôle n\'a pas' },
+          { label: 'Operators', text: 'Peuvent consulter, exporter, révoquer et supprimer tous les certificats utilisateur ; exporter la clé privée du certificat d’un autre utilisateur exige read:private_keys, que ce rôle n’a pas' },
           { label: 'Admins', text: 'Accès complet, clés privées incluses' },
           { label: 'Auditors', text: 'Peuvent consulter et exporter les certificats, sans leur clé privée' },
         ]
@@ -33,9 +33,9 @@ export default {
     ],
     tips: [
       'Enrôlez de nouveaux certificats mTLS depuis Mon compte → Sécurité',
-      'Les certificats sont stockés et gérés par UCM comme n\'importe quel autre certificat',
+      'Les certificats sont stockés et gérés par UCM comme n’importe quel autre certificat',
       'Utilisez la barre de statistiques pour filtrer rapidement par statut',
-      'Cliquez sur une ligne pour afficher les détails complets du certificat dans l\'inspecteur',
+      'Cliquez sur une ligne pour afficher les détails complets du certificat dans l’inspecteur',
     ],
     warnings: [
       'Révoquer un certificat utilisateur empêche immédiatement la connexion mTLS avec ce certificat',
@@ -45,9 +45,9 @@ export default {
   helpGuides: {
     title: 'Certificats utilisateur',
     content: `
-## Vue d'ensemble
+## Vue d’ensemble
 
-La page Certificats utilisateur gère les certificats clients mTLS enrôlés depuis **Mon compte → Sécurité**, section **Certificats clients (mTLS)**. Contrairement aux certificats classiques, ceux-ci sont spécifiquement liés à des comptes utilisateur pour l'authentification TLS mutuelle.
+La page Certificats utilisateur gère les certificats clients mTLS enrôlés depuis **Mon compte → Sécurité**, section **Certificats clients (mTLS)**. Contrairement aux certificats classiques, ceux-ci sont spécifiquement liés à des comptes utilisateur pour l’authentification TLS mutuelle.
 
 Les certificats présents ici sont entièrement gérés par UCM : ils sont stockés en base de données avec leurs clés privées et peuvent être exportés, révoqués ou supprimés à tout moment.
 
@@ -69,11 +69,11 @@ Les certificats présents ici sont entièrement gérés par UCM : ils sont stock
 
 1. Sélectionnez un certificat → **Exporter**
 2. Choisissez le format :
-   - **PEM** : Certificat + clé privée + chaîne d'AC au format texte
+   - **PEM** : Certificat + clé privée + chaîne d’AC au format texte
    - **PKCS#12** : Archive binaire, protégée par mot de passe (8 caractères minimum)
 3. Cliquez sur **Télécharger**
 
-Le fichier exporté peut être importé dans des navigateurs, des systèmes d'exploitation ou des clients API pour l'authentification mTLS.
+Le fichier exporté peut être importé dans des navigateurs, des systèmes d’exploitation ou des clients API pour l’authentification mTLS.
 
 > ⚠ Le mot de passe PKCS#12 doit comporter au moins 8 caractères.
 
@@ -88,11 +88,11 @@ Le fichier exporté peut être importé dans des navigateurs, des systèmes d'ex
    - Unspecified
 3. Confirmez la révocation
 
-> ⚠ La révocation d'un certificat empêche immédiatement la connexion mTLS avec ce certificat. La révocation est définitive.
+> ⚠ La révocation d’un certificat empêche immédiatement la connexion mTLS avec ce certificat. La révocation est définitive.
 
 ## Supprimer un certificat
 
-La suppression retire à la fois le certificat et l'association utilisateur-certificat. Seuls les admins et les operators peuvent supprimer.
+La suppression retire à la fois le certificat et l’association utilisateur-certificat. Seuls les admins et les operators peuvent supprimer.
 
 > ⚠ La suppression est définitive et ne peut pas être annulée.
 
@@ -101,7 +101,7 @@ La suppression retire à la fois le certificat et l'association utilisateur-cert
 | Rôle | Consultation | Export | Révocation | Suppression |
 |------|--------------|--------|------------|-------------|
 | Admin | Tous | Tous | Tous | Tous |
-| Operator | Tous | Tous (la clé privée d'un autre utilisateur exige read:private_keys) | Tous | Tous |
+| Operator | Tous | Tous (la clé privée d’un autre utilisateur exige read:private_keys) | Tous | Tous |
 | Auditor | Tous | Certificat seul, sans clé privée | ✗ | ✗ |
 | Viewer | Les siens | Les siens | ✗ | ✗ |
 

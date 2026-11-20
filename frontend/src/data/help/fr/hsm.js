@@ -7,7 +7,7 @@ export default {
       {
         title: 'Fournisseurs pris en charge',
         definitions: [
-          { term: 'PKCS#11', description: 'Interface HSM standard de l\'industrie (Thales, Entrust, SoftHSM)' },
+          { term: 'PKCS#11', description: 'Interface HSM standard de l’industrie (Thales, Entrust, SoftHSM)' },
           { term: 'AWS CloudHSM', description: 'HSM basé sur le cloud Amazon Web Services' },
           { term: 'Azure Key Vault', description: 'Stockage de clés géré Microsoft Azure' },
           { term: 'Google KMS', description: 'Service de gestion des clés Google Cloud' },
@@ -18,38 +18,38 @@ export default {
         title: 'Actions',
         items: [
           { label: 'Nouveau fournisseur', text: 'Configurer la connexion à un HSM (chemin de bibliothèque, identifiants, slot)' },
-          { label: 'Tester la connexion', text: 'Vérifier que le HSM est joignable et que les identifiants sont valides ; pour un module PKCS#11, enregistre aussi ce qu\'il déclare (bibliothèque, fabricant, versions de la bibliothèque et du firmware), affiché sur la page du fournisseur' },
+          { label: 'Tester la connexion', text: 'Vérifier que le HSM est joignable et que les identifiants sont valides ; pour un module PKCS#11, enregistre aussi ce qu’il déclare (bibliothèque, fabricant, versions de la bibliothèque et du firmware), affiché sur la page du fournisseur' },
           { label: 'Générer', text: 'Créer une nouvelle paire de clés directement sur le HSM' },
-          { label: 'Synchroniser les clés', text: 'Relit les clés du fournisseur depuis le jeton : les nouvelles sont ajoutées, celles qui ont disparu du jeton sont retirées, sauf celles qu\'une AC utilise, qui sont conservées. Si la lecture du jeton échoue, rien n\'est retiré. Le message donne les décomptes, les clés conservées et les clés illisibles ; le bouton reste désactivé pendant la synchronisation' },
+          { label: 'Synchroniser les clés', text: 'Relit les clés du fournisseur depuis le jeton : les nouvelles sont ajoutées, celles qui ont disparu du jeton sont retirées, sauf celles qu’une AC utilise, qui sont conservées. Si la lecture du jeton échoue, rien n’est retiré. Le message donne les décomptes, les clés conservées et les clés illisibles ; le bouton reste désactivé pendant la synchronisation' },
           { label: 'Statut', text: 'Surveiller la santé de la connexion du fournisseur' },
-          { label: 'Certification', text: 'Déclarer la certification du HSM : Common Criteria EAL 4+, EUCC élevé, FIPS 140-3 niveau 3, FIPS 140-2 niveau 3 ou autre. Laissée vide, elle n\'est pas déclarée. Le profil de conformité eu-acm n\'accepte que Common Criteria EAL 4+, EUCC élevé et FIPS 140-3 niveau 3 (jusqu\'au 31 décembre 2030) pour une AC adossée à un HSM' },
-          { label: "Nom déjà utilisé (v2.249)", text: "Générer une clé sous un nom qu'OpenBao ou Azure Key Vault détient déjà est refusé (409) : importez une clé existante par une synchronisation de clés (POST /api/v2/hsm/providers/<id>/sync)" },
-          { label: "Une génération à la fois (v2.249)", text: "Les générations de clé passent à tour de rôle sur chaque fournisseur, et celle qui attend encore après 60 secondes reçoit un 409. Une clé dont l'enregistrement n'a pas pu être stocké est supprimée du HSM" },
-          { label: "PIN dans les sauvegardes (v2.249)", text: "Une sauvegarde contient en clair, dans l'archive protégée par son mot de passe, le PIN ou le jeton du fournisseur, afin de se restaurer sur une autre installation. Une valeur que seule la clé d'une autre installation ouvre est abandonnée à la restauration, avec une entrée de journal demandant de la saisir de nouveau" },
-          { label: "SoftHSM en mode FIPS (v2.247)", text: "Le mode FIPS refuse un nouveau fournisseur SoftHSM, SoftHSM n'étant pas un module validé ; UCM_FIPS_ALLOW_SOFTHSM=1 en autorise un pour les tests" },
+          { label: 'Certification', text: 'Déclarer la certification du HSM : Common Criteria EAL 4+, EUCC élevé, FIPS 140-3 niveau 3, FIPS 140-2 niveau 3 ou autre. Laissée vide, elle n’est pas déclarée. Le profil de conformité eu-acm n’accepte que Common Criteria EAL 4+, EUCC élevé et FIPS 140-3 niveau 3 (jusqu’au 31 décembre 2030) pour une AC adossée à un HSM' },
+          { label: "Nom déjà utilisé (v2.249)", text: "Générer une clé sous un nom qu’OpenBao ou Azure Key Vault détient déjà est refusé (409) : importez une clé existante par une synchronisation de clés (POST /api/v2/hsm/providers/<id>/sync)" },
+          { label: "Une génération à la fois (v2.249)", text: "Les générations de clé passent à tour de rôle sur chaque fournisseur, et celle qui attend encore après 60 secondes reçoit un 409. Une clé dont l’enregistrement n’a pas pu être stocké est supprimée du HSM" },
+          { label: "PIN dans les sauvegardes (v2.249)", text: "Une sauvegarde contient en clair, dans l’archive protégée par son mot de passe, le PIN ou le jeton du fournisseur, afin de se restaurer sur une autre installation. Une valeur que seule la clé d’une autre installation ouvre est abandonnée à la restauration, avec une entrée de journal demandant de la saisir de nouveau" },
+          { label: "SoftHSM en mode FIPS (v2.247)", text: "Le mode FIPS refuse un nouveau fournisseur SoftHSM, SoftHSM n’étant pas un module validé ; UCM_FIPS_ALLOW_SOFTHSM=1 en autorise un pour les tests" },
         ]
       },
       {
         title: 'AC adossées à HSM (v2.130+)',
-        content: 'Une fois un fournisseur HSM configuré, vous pouvez épingler la clé privée d\'une AC à ce HSM dès sa création :',
+        content: 'Une fois un fournisseur HSM configuré, vous pouvez épingler la clé privée d’une AC à ce HSM dès sa création :',
         items: [
-          { label: 'Bascule Stockage de clé', text: 'Sur le formulaire de création d\'AC, choisir Local (chiffré en DB) ou HSM. Sélectionner le fournisseur + label de clé' },
+          { label: 'Bascule Stockage de clé', text: 'Sur le formulaire de création d’AC, choisir Local (chiffré en DB) ou HSM. Sélectionner le fournisseur + label de clé' },
           { label: 'Chemin de signature', text: 'Chaque émission, signature de CRL et signature OCSP de cette AC passe par le HSM, la clé ne sort jamais' },
-          { label: 'Restrictions d\'export', text: 'L\'export PKCS#12, JKS et clé seule est désactivé pour les AC HSM (seul le certificat public / la chaîne peut être exporté)' },
+          { label: 'Restrictions d’export', text: 'L’export PKCS#12, JKS et clé seule est désactivé pour les AC HSM (seul le certificat public / la chaîne peut être exporté)' },
           { label: 'CRL & OCSP', text: 'Les deux fonctionnent de manière transparente avec les AC HSM (signés via HSM)' },
           { label: 'Migration', text: 'Les AC locales existantes ne peuvent pas être déplacées vers un HSM après création, choisir à la création' },
-          { label: 'Une autorité par clé', text: 'Une clé HSM sert une seule autorité, X.509 ou SSH. Les listes de clés existantes ne proposent que des clés inutilisées, une seconde AC sur une clé est refusée (409) avec le nom de l\'AC qui la tient, et une clé ou son fournisseur ne peut pas être supprimé tant qu\'une AC le tient' },
+          { label: 'Une autorité par clé', text: 'Une clé HSM sert une seule autorité, X.509 ou SSH. Les listes de clés existantes ne proposent que des clés inutilisées, une seconde AC sur une clé est refusée (409) avec le nom de l’AC qui la tient, et une clé ou son fournisseur ne peut pas être supprimé tant qu’une AC le tient' },
           { label: 'Droits', text: 'Créer une AC sur une clé HSM, X.509 ou SSH, exige read:hsm en plus de write:cas ou write:ssh_cas ; sans lui, le choix HSM est indisponible' },
-          { label: 'AC SSH', text: 'Une AC SSH, utilisateur ou hôte, peut utiliser une clé de signature RSA ou ECDSA P-256/P-384/P-521 (voir AC SSH). En mode HA, une clé sur SoftHSM ou sur un lecteur de carte à puce local est refusée, car elle n\'existe que sur un nœud' },
+          { label: 'AC SSH', text: 'Une AC SSH, utilisateur ou hôte, peut utiliser une clé de signature RSA ou ECDSA P-256/P-384/P-521 (voir AC SSH). En mode HA, une clé sur SoftHSM ou sur un lecteur de carte à puce local est refusée, car elle n’existe que sur un nœud' },
         ]
       },
       {
         title: 'Clés ML-DSA',
-        content: 'Les clés ML-DSA-44, ML-DSA-65 et ML-DSA-87 (FIPS 204) ne sont proposées que sur les fournisseurs qui signent avec elles. Elles signent les données elles-mêmes : aucun digest n\'est choisi.',
+        content: 'Les clés ML-DSA-44, ML-DSA-65 et ML-DSA-87 (FIPS 204) ne sont proposées que sur les fournisseurs qui signent avec elles. Elles signent les données elles-mêmes : aucun digest n’est choisi.',
         items: [
           { label: 'PKCS#11', text: 'Un jeton qui implémente PKCS#11 3.2 avec les mécanismes ML-DSA' },
           { label: 'OpenBao / Vault Transit', text: 'Types de clé Transit mldsa-44, mldsa-65 et mldsa-87' },
-          { label: 'Google Cloud KMS', text: 'Versions de clé PQ_SIGN_ML_DSA, reprises de l\'API KMS mais pas encore testées sur le service. KMS signe au plus 64 Kio de données : une CRL plus grande ne peut pas être signée' },
+          { label: 'Google Cloud KMS', text: 'Versions de clé PQ_SIGN_ML_DSA, reprises de l’API KMS mais pas encore testées sur le service. KMS signe au plus 64 Kio de données : une CRL plus grande ne peut pas être signée' },
           { label: 'Non disponible', text: 'Les fournisseurs Azure Key Vault et AWS CloudHSM ne détiennent aucune clé ML-DSA, et le mode FIPS refuse ML-DSA sur tous les fournisseurs' },
         ]
       },
@@ -57,44 +57,44 @@ export default {
     tips: [
       'Utilisez SoftHSM pour les tests avant de déployer avec un HSM physique',
       'Les clés générées sur un HSM ne quittent jamais le matériel : elles ne peuvent pas être exportées',
-      'Testez la connexion avant d\'utiliser un fournisseur HSM pour la signature d\'AC',
+      'Testez la connexion avant d’utiliser un fournisseur HSM pour la signature d’AC',
       'Pour les AC racines à longue durée de vie en production, préférez le stockage de clé adossé à HSM',
     ],
     warnings: [
-      'La certification déclarée est l\'affirmation de l\'opérateur sur le HSM : UCM ne vérifie pas le matériel. Les profils alignés sur eIDAS la lisent pour contrôler la protection de la clé de l\'AC',
+      'La certification déclarée est l’affirmation de l’opérateur sur le HSM : UCM ne vérifie pas le matériel. Les profils alignés sur eIDAS la lisent pour contrôler la protection de la clé de l’AC',
       'Une mauvaise configuration du fournisseur HSM peut empêcher la signature de certificats',
-      'Perdre l\'accès au HSM signifie perdre l\'accès aux clés qui y sont stockées',
+      'Perdre l’accès au HSM signifie perdre l’accès aux clés qui y sont stockées',
     ],
   },
   helpGuides: {
     title: 'Modules de sécurité matériels',
     content: `
-## Vue d'ensemble
+## Vue d’ensemble
 
 Les modules de sécurité matériels (HSM) fournissent un stockage inviolable pour les clés cryptographiques. Les clés privées stockées sur un HSM ne quittent jamais le matériel, offrant le plus haut niveau de protection des clés.
 
 ## Fournisseurs pris en charge
 
 ### PKCS#11
-L'interface HSM standard de l'industrie. Appareils pris en charge :
+L’interface HSM standard de l’industrie. Appareils pris en charge :
 - **Thales Luna** / **SafeNet**
 - **Entrust nShield**
 - **SoftHSM** (logiciel, pour les tests)
 - Tout appareil compatible PKCS#11
 
-> 💡 **Docker** : SoftHSM est pré-installé dans l'image Docker. Au premier démarrage, un jeton par défaut est auto-initialisé et enregistré comme fournisseur \`SoftHSM-Default\` : prêt à l'emploi immédiatement. En mode FIPS, SoftHSM n'est pas un module validé : le fournisseur par défaut n'est pas créé et un fournisseur SoftHSM est refusé, sauf si \`UCM_FIPS_ALLOW_SOFTHSM=1\` en autorise un pour des tests.
+> 💡 **Docker** : SoftHSM est pré-installé dans l’image Docker. Au premier démarrage, un jeton par défaut est auto-initialisé et enregistré comme fournisseur \`SoftHSM-Default\` : prêt à l’emploi immédiatement. En mode FIPS, SoftHSM n’est pas un module validé : le fournisseur par défaut n’est pas créé et un fournisseur SoftHSM est refusé, sauf si \`UCM_FIPS_ALLOW_SOFTHSM=1\` en autorise un pour des tests.
 
 Configuration :
 - **Chemin de la bibliothèque** : Chemin vers la bibliothèque partagée PKCS#11 (.so/.dll)
 - **Libellé du jeton** : Libellé du jeton à utiliser (obligatoire)
 - **Slot** : Numéro de slot HSM (facultatif)
-- **PIN** : PIN utilisateur pour l'authentification
+- **PIN** : PIN utilisateur pour l’authentification
 
 ### AWS CloudHSM
 HSM basé sur le cloud Amazon Web Services :
 - **ID du cluster** : Identifiant du cluster CloudHSM
 - **Étiquette de token** : étiquette du token PKCS#11 CloudHSM
-- **Utilisateur crypto / Mot de passe crypto** : l'utilisateur crypto (CU) avec lequel UCM se connecte ; aucune clé d'accès AWS n'est nécessaire
+- **Utilisateur crypto / Mot de passe crypto** : l’utilisateur crypto (CU) avec lequel UCM se connecte ; aucune clé d’accès AWS n’est nécessaire
 
 ### Azure Key Vault
 Stockage de clés géré Microsoft Azure :
@@ -105,16 +105,16 @@ Stockage de clés géré Microsoft Azure :
 ### Google Cloud KMS
 Service de gestion des clés Google Cloud :
 - **Projet** : ID du projet GCP
-- **Emplacement** : Emplacement de l'anneau de clés KMS
-- **Anneau de clés** : Nom de l'anneau de clés
+- **Emplacement** : Emplacement de l’anneau de clés KMS
+- **Anneau de clés** : Nom de l’anneau de clés
 - **Identifiants** : Clé JSON du compte de service
 
 ### OpenBao / Vault Transit
-Moteur de secrets Transit OpenBao ou HashiCorp Vault. Les clés sont gérées à distance via l'API Transit : aucune bibliothèque PKCS#11 requise.
+Moteur de secrets Transit OpenBao ou HashiCorp Vault. Les clés sont gérées à distance via l’API Transit : aucune bibliothèque PKCS#11 requise.
 
 Configuration :
 - **URL** : Adresse du serveur (ex. \`https://openbao.example.com:8200\`)
-- **Token** : Jeton d'authentification
+- **Token** : Jeton d’authentification
 - **Chemin de montage** : Point de montage du moteur Transit (par défaut : \`transit\`)
 - **Espace de noms** : Espace de noms optionnel pour les configurations multi-locataires
 - **Ignorer la vérification TLS** : Ignorer la vérification du certificat TLS (pour les certificats auto-signés)
@@ -122,7 +122,7 @@ Configuration :
 Types de clés pris en charge :
 - RSA 2048, 3072, 4096
 - ECDSA P-256, P-384, P-521
-- ML-DSA-44, ML-DSA-65, ML-DSA-87 (clés Transit \`mldsa-*\`, sur une version d'OpenBao qui les gère)
+- ML-DSA-44, ML-DSA-65, ML-DSA-87 (clés Transit \`mldsa-*\`, sur une version d’OpenBao qui les gère)
 - AES-256-GCM (symétrique)
 
 > 💡 OpenBao est un fork communautaire de HashiCorp Vault. UCM fonctionne avec les deux.
@@ -139,46 +139,46 @@ Types de clés pris en charge :
 5. Cliquez sur **Tester** sur le nouveau fournisseur pour vérifier la connexion
 
 ### Tester la connexion
-Testez toujours la connexion après avoir créé ou modifié un fournisseur. UCM vérifie qu'il peut communiquer avec le HSM et s'authentifier. Pour un module PKCS#11, le test enregistre aussi ce que le module déclare (bibliothèque, fabricant, versions de la bibliothèque et du firmware), affiché sur la page du fournisseur.
+Testez toujours la connexion après avoir créé ou modifié un fournisseur. UCM vérifie qu’il peut communiquer avec le HSM et s’authentifier. Pour un module PKCS#11, le test enregistre aussi ce que le module déclare (bibliothèque, fabricant, versions de la bibliothèque et du firmware), affiché sur la page du fournisseur.
 
 ### Statut du fournisseur
 Chaque fournisseur affiche un indicateur de statut de connexion :
 - **Connecté** : Le HSM est accessible et authentifié
 - **Déconnecté** : Impossible de joindre le HSM
-- **Erreur** : Problème d'authentification ou de configuration
+- **Erreur** : Problème d’authentification ou de configuration
 
 ## Gestion des clés
 
 ### Générer des clés
 1. Sélectionnez un fournisseur connecté
 2. Cliquez sur **Générer**
-3. Choisissez l'algorithme (RSA 2048/4096, ECDSA P-256/P-384)
+3. Choisissez l’algorithme (RSA 2048/4096, ECDSA P-256/P-384)
 4. Entrez un label/alias pour la clé
 5. Cliquez sur **Générer**
 
-La clé est créée directement sur le HSM. UCM ne stocke qu'une référence.
+La clé est créée directement sur le HSM. UCM ne stocke qu’une référence.
 
 ### Clés ML-DSA
 Les clés ML-DSA-44, ML-DSA-65 et ML-DSA-87 (FIPS 204) ne sont proposées que sur les fournisseurs qui signent avec elles :
 - **PKCS#11** : un jeton qui implémente PKCS#11 3.2 avec les mécanismes ML-DSA
 - **OpenBao / Vault Transit** : types de clé \`mldsa-44\`, \`mldsa-65\` et \`mldsa-87\`
-- **Google Cloud KMS** : versions de clé \`PQ_SIGN_ML_DSA_*\`, reprises de l'API KMS mais pas encore testées sur le service. KMS signe au plus 64 Kio de données : une CRL plus grande ne peut pas être signée
+- **Google Cloud KMS** : versions de clé \`PQ_SIGN_ML_DSA_*\`, reprises de l’API KMS mais pas encore testées sur le service. KMS signe au plus 64 Kio de données : une CRL plus grande ne peut pas être signée
 
-Les fournisseurs Azure Key Vault et AWS CloudHSM ne détiennent aucune clé ML-DSA, et le mode FIPS refuse ML-DSA sur tous les fournisseurs. Une clé ML-DSA signe les données elles-mêmes : aucun digest n'est choisi.
+Les fournisseurs Azure Key Vault et AWS CloudHSM ne détiennent aucune clé ML-DSA, et le mode FIPS refuse ML-DSA sur tous les fournisseurs. Une clé ML-DSA signe les données elles-mêmes : aucun digest n’est choisi.
 
 ### Synchroniser les clés
 Cliquez sur **Synchroniser les clés** dans les détails du fournisseur pour relire les clés du jeton.
 - Les nouvelles clés sont ajoutées.
-- Les clés qui ont disparu du jeton sont retirées, sauf celles qu'une AC utilise : elles sont conservées.
-- Si la lecture du jeton échoue, rien n'est retiré.
+- Les clés qui ont disparu du jeton sont retirées, sauf celles qu’une AC utilise : elles sont conservées.
+- Si la lecture du jeton échoue, rien n’est retiré.
 
-Le message donne les décomptes, le nombre de clés conservées parce qu'une AC les utilise, le nombre de clés illisibles et le nombre de clés utilisées par une AC dont le matériel a changé sur le jeton. Le bouton est désactivé pendant la synchronisation.
+Le message donne les décomptes, le nombre de clés conservées parce qu’une AC les utilise, le nombre de clés illisibles et le nombre de clés utilisées par une AC dont le matériel a changé sur le jeton. Le bouton est désactivé pendant la synchronisation.
 ### Utiliser les clés HSM
-Lors de la création d'une AC, sélectionnez un fournisseur HSM et une clé au lieu de générer une clé logicielle. Les opérations de signature de l'AC sont effectuées sur le HSM.
+Lors de la création d’une AC, sélectionnez un fournisseur HSM et une clé au lieu de générer une clé logicielle. Les opérations de signature de l’AC sont effectuées sur le HSM.
 
-Une clé HSM sert une seule autorité, X.509 ou SSH. Créer une AC sur une clé HSM exige la permission \`read:hsm\` en plus de \`write:cas\` (\`write:ssh_cas\` pour une AC SSH), et une clé qu'une AC tient ne peut pas être supprimée.
+Une clé HSM sert une seule autorité, X.509 ou SSH. Créer une AC sur une clé HSM exige la permission \`read:hsm\` en plus de \`write:cas\` (\`write:ssh_cas\` pour une AC SSH), et une clé qu’une AC tient ne peut pas être supprimée.
 
-> ⚠ Les clés générées sur un HSM ne peuvent pas être exportées. Si vous perdez l'accès au HSM, vous perdez les clés.
+> ⚠ Les clés générées sur un HSM ne peuvent pas être exportées. Si vous perdez l’accès au HSM, vous perdez les clés.
 
 > 💡 Utilisez SoftHSM pour le développement et les tests avant le déploiement avec des HSM physiques.
 `

@@ -2,7 +2,7 @@ export default {
   helpContent: {
     title: 'Outils de certificat',
     subtitle: 'Décoder, convertir et vérifier les certificats',
-    overview: 'Une suite d\'outils pour travailler avec les certificats, CSR et clés. Décodez les certificats pour inspecter leur contenu, convertissez entre formats, vérifiez les points de terminaison SSL distants et vérifiez les correspondances de clés.',
+    overview: 'Une suite d’outils pour travailler avec les certificats, CSR et clés. Décodez les certificats pour inspecter leur contenu, convertissez entre formats, vérifiez les points de terminaison SSL distants et vérifiez les correspondances de clés.',
     sections: [
       {
         title: 'Disposition de la page',
@@ -15,10 +15,10 @@ export default {
       {
         title: 'Outils disponibles',
         items: [
-          { label: 'Vérificateur SSL', text: 'Se connecter à un hôte distant et inspecter le certificat qu\'il présente (le certificat final seulement, pas la chaîne)' },
+          { label: 'Vérificateur SSL', text: 'Se connecter à un hôte distant et inspecter le certificat qu’il présente (le certificat final seulement, pas la chaîne)' },
           { label: 'Décodeur de CSR', text: 'Collez une CSR au format PEM pour voir son sujet, ses SAN et ses infos de clé' },
           { label: 'Décodeur de certificat', text: 'Collez un certificat au format PEM pour inspecter son sujet, son émetteur, sa validité, sa clé, ses SAN, ses usages de clé et ses empreintes ; CDP, AIA et politiques ne sont pas affichés' },
-          { label: 'Vérificateur de correspondance de clé', text: 'Vérifier qu\'un certificat, une CSR et une clé privée correspondent' },
+          { label: 'Vérificateur de correspondance de clé', text: 'Vérifier qu’un certificat, une CSR et une clé privée correspondent' },
           { label: 'Convertisseur', text: 'Convertir entre les formats PEM, DER, PKCS#12 et PKCS#7' },
         ]
       },
@@ -43,15 +43,15 @@ export default {
   helpGuides: {
     title: 'Outils de certificat',
     content: `
-## Vue d'ensemble
+## Vue d’ensemble
 
 Une boîte à outils pour inspecter, convertir et vérifier les certificats sans quitter UCM.
 
 ## Vérificateur SSL
 
-Inspecter le certificat SSL/TLS d'un serveur distant :
+Inspecter le certificat SSL/TLS d’un serveur distant :
 
-1. Entrez le **nom d'hôte** (par ex. \`google.com\`)
+1. Entrez le **nom d’hôte** (par ex. \`google.com\`)
 2. Changez optionnellement le **port** (par défaut : 443)
 3. Cliquez sur **Vérifier SSL**
 
@@ -66,7 +66,7 @@ Seul le certificat que présente le serveur est lu, pas le reste de sa chaîne.
 
 ## Décodeur de CSR
 
-Analyser et afficher le contenu d'une CSR :
+Analyser et afficher le contenu d’une CSR :
 
 1. Collez une CSR au format PEM
 2. Cliquez sur **Décoder**
@@ -75,7 +75,7 @@ Affiche : Sujet, SAN, algorithme de clé, taille de clé, algorithme de signatur
 
 ## Décodeur de certificat
 
-Analyser et afficher les détails d'un certificat :
+Analyser et afficher les détails d’un certificat :
 
 1. Collez un certificat au format PEM
 2. Cliquez sur **Décoder**
@@ -84,18 +84,18 @@ Affiche : Sujet, émetteur, SAN, validité, numéro de série, utilisation de la
 
 ## Vérificateur de correspondance de clé
 
-Vérifier qu'un certificat, une CSR et une clé privée correspondent :
+Vérifier qu’un certificat, une CSR et une clé privée correspondent :
 
 1. Collez le PEM du **certificat**
 2. Collez le PEM de la **clé privée** (optionnellement chiffrée : fournissez le mot de passe)
 3. Collez optionnellement le PEM de la **CSR**
 4. Cliquez sur **Vérifier les clés**
 
-UCM compare les clés publiques (RSA, EC, EdDSA, ML-DSA). Une correspondance confirme qu'ils forment une paire valide. Une clé privée ML-DSA doit contenir sa graine : un fichier de clé ne contenant que la forme étendue est refusé.
+UCM compare les clés publiques (RSA, EC, EdDSA, ML-DSA). Une correspondance confirme qu’ils forment une paire valide. Une clé privée ML-DSA doit contenir sa graine : un fichier de clé ne contenant que la forme étendue est refusé.
 
 ## Clés post-quantiques
 
-Les décodeurs et le vérificateur SSL nomment une clé **ML-DSA** ou **SLH-DSA** avec son niveau de sécurité NIST, par ex. *ML-DSA-65 (niveau 3)*. Ces clés n'ont pas de taille en bits. UCM ne sait pas encore écrire une clé ML-DSA dans un PKCS#12 ou un JKS, la boîte de dialogue d'export les grise donc : exportez plutôt en PEM avec la clé privée.
+Les décodeurs et le vérificateur SSL nomment une clé **ML-DSA** ou **SLH-DSA** avec son niveau de sécurité NIST, par ex. *ML-DSA-65 (niveau 3)*. Ces clés n’ont pas de taille en bits. UCM ne sait pas encore écrire une clé ML-DSA dans un PKCS#12 ou un JKS, la boîte de dialogue d’export les grise donc : exportez plutôt en PEM avec la clé privée.
 
 ## Convertisseur
 
@@ -112,7 +112,7 @@ Crée un fichier P12/PFX protégé par mot de passe à partir de :
 - Mot de passe pour le fichier P12
 
 ### PKCS#12 → PEM
-Extrait le certificat, la clé et la chaîne d'un fichier P12 :
+Extrait le certificat, la clé et la chaîne d’un fichier P12 :
 - Téléversez le fichier P12
 - Entrez le mot de passe
 - Téléchargez les composants PEM extraits

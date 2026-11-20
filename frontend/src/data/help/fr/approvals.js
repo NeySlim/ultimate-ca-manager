@@ -1,60 +1,60 @@
 export default {
   helpContent: {
-    title: 'Demandes d\'approbation',
-    subtitle: 'Gestion du flux d\'approbation de certificats',
-    overview: 'Examinez et gérez les demandes d\'approbation de certificats. Lorsqu\'une politique exige une approbation, l\'émission du certificat est suspendue jusqu\'à ce que le nombre requis d\'approbateurs aient examiné et approuvé la demande.',
+    title: 'Demandes d’approbation',
+    subtitle: 'Gestion du flux d’approbation de certificats',
+    overview: 'Examinez et gérez les demandes d’approbation de certificats. Lorsqu’une politique exige une approbation, l’émission du certificat est suspendue jusqu’à ce que le nombre requis d’approbateurs aient examiné et approuvé la demande.',
     sections: [
       {
         title: 'Cycle de vie des demandes',
         items: [
-          { label: 'En attente', text: 'En attente d\'examen, le certificat ne peut pas encore être émis' },
+          { label: 'En attente', text: 'En attente d’examen, le certificat ne peut pas encore être émis' },
           { label: 'Approuvée', text: 'Toutes les approbations requises ont été reçues, le certificat peut être émis' },
           { label: 'Rejetée', text: 'Tout rejet arrête immédiatement la demande' },
           { label: 'Expirée', text: 'Non décidée sous sept jours ; clôturée comme expirée et jamais comptée comme en attente' },
-          { label: 'Annulée', text: 'Son demandeur a effectué l\'action directement ou approuvé un doublon : personne n\'approuve sa propre demande' },
+          { label: 'Annulée', text: 'Son demandeur a effectué l’action directement ou approuvé un doublon : personne n’approuve sa propre demande' },
         ]
       },
       {
         title: 'Origine des demandes',
         items: [
-          { label: 'Formulaire d\'émission', text: 'Une demande de certificat correspondant à une politique qui exige une approbation' },
-          { label: 'Signature de CSR et signature en masse', text: 'La signature d\'une requête stockée, seule ou depuis Opérations, est mise en file de la même façon ; l\'approbation effectue la signature' },
-          { label: 'Renouvellement', text: 'Le renouvellement d\'un certificat, seul ou en masse, est également mis en file ; un renouvellement impossible à honorer (révoqué, clé non détenue par le serveur) est refusé immédiatement' },
-          { label: 'Révocation', text: 'La révocation d\'un certificat (seul, en masse, depuis les certificats utilisateur) ou d\'une AC intermédiaire sous une politique de révocation est mise en file ; l\'approbation révoque avec le motif demandé' },
-          { label: 'Planificateur', text: 'Sous une politique de renouvellement, le planificateur met le renouvellement en file ; l\'approbation re-signe la clé détenue par le serveur, comme l\'aurait fait le planificateur' },
-          { label: 'Protocoles d\'enrôlement', text: "Une finalisation ACME, un enrôlement, un réenrôlement ou une génération de clé côté serveur EST, une demande SCEP (même sur un profil à approbation automatique) ou un enrôlement ou renouvellement WSTEP soumis à une politique d'approbation est retenu : le client est informé que la demande est en attente et l'interroge à intervalles réguliers ; l'approbation émet le certificat par ce protocole, un rejet ou une expiration est signalé au client comme un refus" },
-          { label: 'Administrateurs', text: 'Contournent la file sur tous les chemins, comme sur le formulaire d\'émission' },
+          { label: 'Formulaire d’émission', text: 'Une demande de certificat correspondant à une politique qui exige une approbation' },
+          { label: 'Signature de CSR et signature en masse', text: 'La signature d’une requête stockée, seule ou depuis Opérations, est mise en file de la même façon ; l’approbation effectue la signature' },
+          { label: 'Renouvellement', text: 'Le renouvellement d’un certificat, seul ou en masse, est également mis en file ; un renouvellement impossible à honorer (révoqué, clé non détenue par le serveur) est refusé immédiatement' },
+          { label: 'Révocation', text: 'La révocation d’un certificat (seul, en masse, depuis les certificats utilisateur) ou d’une AC intermédiaire sous une politique de révocation est mise en file ; l’approbation révoque avec le motif demandé' },
+          { label: 'Planificateur', text: 'Sous une politique de renouvellement, le planificateur met le renouvellement en file ; l’approbation re-signe la clé détenue par le serveur, comme l’aurait fait le planificateur' },
+          { label: 'Protocoles d’enrôlement', text: "Une finalisation ACME, un enrôlement, un réenrôlement ou une génération de clé côté serveur EST, une demande SCEP (même sur un profil à approbation automatique) ou un enrôlement ou renouvellement WSTEP soumis à une politique d’approbation est retenu : le client est informé que la demande est en attente et l’interroge à intervalles réguliers ; l’approbation émet le certificat par ce protocole, un rejet ou une expiration est signalé au client comme un refus" },
+          { label: 'Administrateurs', text: 'Contournent la file sur tous les chemins, comme sur le formulaire d’émission' },
         ]
       },
       {
         title: 'Demandes clôturées à votre place',
         items: [
           { label: 'Signée ou renouvelée directement', text: 'Une demande en file dont la cible a entre-temps été signée ou renouvelée par un administrateur est clôturée comme approuvée par cette action et liée au certificat' },
-          { label: 'Supprimée ou révoquée', text: 'Une demande dont la cible a été supprimée ou révoquée est clôturée comme rejetée ; une suspension de certificat laisse la demande de renouvellement en attente jusqu\'à la levée de la suspension' },
-          { label: 'Déjà satisfaite', text: 'Approuver une demande déjà satisfaite la clôture sur le certificat existant ; approuver l\'une de plusieurs demandes pour la même cible clôture les autres comme approuvées par vous' },
-          { label: 'Cible disparue', text: 'Approuver une demande dont la requête stockée, le certificat ou l\'AC n\'existe plus la clôture comme rejetée' },
-          { label: 'Révoquée ou renouvelée entre-temps', text: 'Une révocation en file dont le certificat a été révoqué directement est clôturée comme approuvée ; si le certificat a été renouvelé depuis, elle est clôturée comme rejetée à l\'approbation' },
+          { label: 'Supprimée ou révoquée', text: 'Une demande dont la cible a été supprimée ou révoquée est clôturée comme rejetée ; une suspension de certificat laisse la demande de renouvellement en attente jusqu’à la levée de la suspension' },
+          { label: 'Déjà satisfaite', text: 'Approuver une demande déjà satisfaite la clôture sur le certificat existant ; approuver l’une de plusieurs demandes pour la même cible clôture les autres comme approuvées par vous' },
+          { label: 'Cible disparue', text: 'Approuver une demande dont la requête stockée, le certificat ou l’AC n’existe plus la clôture comme rejetée' },
+          { label: 'Révoquée ou renouvelée entre-temps', text: 'Une révocation en file dont le certificat a été révoqué directement est clôturée comme approuvée ; si le certificat a été renouvelé depuis, elle est clôturée comme rejetée à l’approbation' },
           { label: 'Échéance', text: 'Une demande attend sept jours ; passé ce délai, elle est clôturée comme expirée, jamais comptée comme en attente, et le planificateur de renouvellement reprend pour son certificat' },
         ]
       },
     ],
     tips: [
-      'Tout rejet unique arrête immédiatement l\'approbation : c\'est intentionnel pour la sécurité. Un refus demande un motif d’au moins cinq caractères.',
-      'Tant qu\'un renouvellement attend une approbation, le planificateur laisse le certificat à cette décision, tant qu\'elle peut intervenir avant l\'expiration du certificat ; sous une politique de renouvellement, il ne renouvelle jamais sans elle.',
-      'Chaque décision et son commentaire sont conservés dans la chronologie d\'approbation de la demande ; le journal d\'audit enregistre les approbations, pas le commentaire, une demande mise en file ni un rejet.',
+      'Tout rejet unique arrête immédiatement l’approbation : c’est intentionnel pour la sécurité. Un refus demande un motif d’au moins cinq caractères.',
+      'Tant qu’un renouvellement attend une approbation, le planificateur laisse le certificat à cette décision, tant qu’elle peut intervenir avant l’expiration du certificat ; sous une politique de renouvellement, il ne renouvelle jamais sans elle.',
+      'Chaque décision et son commentaire sont conservés dans la chronologie d’approbation de la demande ; le journal d’audit enregistre les approbations, pas le commentaire, une demande mise en file ni un rejet.',
     ],
   },
   helpGuides: {
-    title: 'Demandes d\'approbation',
+    title: 'Demandes d’approbation',
     content: `
-## Vue d'ensemble
+## Vue d’ensemble
 
-La page des approbations affiche toutes les demandes de certificats qui nécessitent une approbation manuelle avant l'émission. Les flux d'approbation sont configurés dans les **politiques** : lorsqu'une politique a « Approbation requise » activé, toute demande de certificat correspondante crée une demande d'approbation ici.
+La page des approbations affiche toutes les demandes de certificats qui nécessitent une approbation manuelle avant l’émission. Les flux d’approbation sont configurés dans les **politiques** : lorsqu’une politique a « Approbation requise » activé, toute demande de certificat correspondante crée une demande d’approbation ici.
 
 ## Cycle de vie des demandes
 
 ### En attente
-La demande est en attente d'examen. Le certificat ne peut pas être émis tant que le nombre requis d'approbateurs n'a pas approuvé. Les demandes en attente apparaissent en premier par défaut.
+La demande est en attente d’examen. Le certificat ne peut pas être émis tant que le nombre requis d’approbateurs n’a pas approuvé. Les demandes en attente apparaissent en premier par défaut.
 
 ### Approuvée
 Toutes les approbations requises ont été reçues. Le certificat sera émis automatiquement une fois approuvé.
@@ -63,65 +63,65 @@ Toutes les approbations requises ont été reçues. Le certificat sera émis aut
 Tout rejet unique arrête immédiatement la demande. Le certificat ne sera pas émis. Un commentaire de rejet est requis pour expliquer le motif.
 
 ### Expirée
-La demande n'a pas été décidée sous sept jours. Les demandes expirées doivent être soumises à nouveau.
+La demande n’a pas été décidée sous sept jours. Les demandes expirées doivent être soumises à nouveau.
 
 ### Annulée
-Son demandeur a effectué l'action directement, ou approuvé une autre demande pour la même cible : personne n'approuve sa propre demande, elle est donc clôturée sans vote.
+Son demandeur a effectué l’action directement, ou approuvé une autre demande pour la même cible : personne n’approuve sa propre demande, elle est donc clôturée sans vote.
 
 ## Origine des demandes
 
-Au-delà du formulaire d'émission, une politique qui exige une approbation met aussi en file :
-- **Signature de CSR** et **signature en masse** depuis Opérations : l'approbation effectue la signature
-- **Renouvellement** et **renouvellement en masse** : l'approbation effectue le renouvellement ; un renouvellement impossible à honorer (certificat révoqué, clé non détenue par le serveur) est refusé immédiatement au lieu d'être mis en file
-- **Révocation** (d'un certificat, en masse, d'un certificat utilisateur, d'une AC intermédiaire) sous une politique de révocation : l'approbation révoque avec le motif et la date d'invalidité demandés, après une nouvelle vérification (un certificat renouvelé depuis la demande n'est pas révoqué)
-- Le **planificateur de renouvellement**, sous une politique de renouvellement : il met le renouvellement en file une fois, et l'approbation l'effectue comme l'aurait fait le planificateur
+Au-delà du formulaire d’émission, une politique qui exige une approbation met aussi en file :
+- **Signature de CSR** et **signature en masse** depuis Opérations : l’approbation effectue la signature
+- **Renouvellement** et **renouvellement en masse** : l’approbation effectue le renouvellement ; un renouvellement impossible à honorer (certificat révoqué, clé non détenue par le serveur) est refusé immédiatement au lieu d’être mis en file
+- **Révocation** (d’un certificat, en masse, d’un certificat utilisateur, d’une AC intermédiaire) sous une politique de révocation : l’approbation révoque avec le motif et la date d’invalidité demandés, après une nouvelle vérification (un certificat renouvelé depuis la demande n’est pas révoqué)
+- Le **planificateur de renouvellement**, sous une politique de renouvellement : il met le renouvellement en file une fois, et l’approbation l’effectue comme l’aurait fait le planificateur
 
 Les administrateurs contournent la file sur tous les chemins.
 
 ## Demandes clôturées à votre place
 
 - Une demande en file dont la cible a entre-temps été **signée ou renouvelée directement** par un administrateur est clôturée comme approuvée par cette action et liée au certificat
-- Une demande dont la cible a été **supprimée ou révoquée** est clôturée comme rejetée ; une suspension de certificat laisse la demande de renouvellement en attente jusqu'à la levée de la suspension
-- Approuver une demande **déjà satisfaite** la clôture sur le certificat existant ; approuver l'une de plusieurs demandes pour la même cible clôture les autres comme approuvées par vous
-- Approuver une demande dont la requête stockée, le certificat ou l'AC **n'existe plus** la clôture comme rejetée
-- Une révocation en file dont le certificat a été **révoqué directement** est clôturée comme approuvée (annulée si son demandeur l'a révoqué) ; si le certificat a été **renouvelé** depuis, elle est clôturée comme rejetée à l'approbation ; approuvée pendant une suspension du certificat, elle rend la suspension définitive avec son motif
+- Une demande dont la cible a été **supprimée ou révoquée** est clôturée comme rejetée ; une suspension de certificat laisse la demande de renouvellement en attente jusqu’à la levée de la suspension
+- Approuver une demande **déjà satisfaite** la clôture sur le certificat existant ; approuver l’une de plusieurs demandes pour la même cible clôture les autres comme approuvées par vous
+- Approuver une demande dont la requête stockée, le certificat ou l’AC **n’existe plus** la clôture comme rejetée
+- Une révocation en file dont le certificat a été **révoqué directement** est clôturée comme approuvée (annulée si son demandeur l’a révoqué) ; si le certificat a été **renouvelé** depuis, elle est clôturée comme rejetée à l’approbation ; approuvée pendant une suspension du certificat, elle rend la suspension définitive avec son motif
 
-Une clôture comme rejetée notifie les webhooks comme le fait un rejet ; une clôture comme approuvée n'envoie aucun webhook.
+Une clôture comme rejetée notifie les webhooks comme le fait un rejet ; une clôture comme approuvée n’envoie aucun webhook.
 
 ## Échéance
 
-Une demande attend **sept jours** une décision. Passé ce délai, elle est clôturée comme expirée, n'est jamais comptée comme en attente, et le planificateur de renouvellement reprend pour son certificat. Tant qu'un renouvellement attend une approbation, le planificateur laisse le certificat à cette décision, tant qu'elle peut intervenir avant l'expiration du certificat ; sous une politique de renouvellement, il ne renouvelle jamais sans elle.
+Une demande attend **sept jours** une décision. Passé ce délai, elle est clôturée comme expirée, n’est jamais comptée comme en attente, et le planificateur de renouvellement reprend pour son certificat. Tant qu’un renouvellement attend une approbation, le planificateur laisse le certificat à cette décision, tant qu’elle peut intervenir avant l’expiration du certificat ; sous une politique de renouvellement, il ne renouvelle jamais sans elle.
 
 ## La file
 
-Les demandes ouvertes sont groupées par échéance : **En retard**, **À traiter sous 48 h** et **Plus tard**, chacune avec son compteur. Une ligne donne ce que la demande demande et son sujet, une pastille qui nomme sa source (CSR, certificat, renouvellement, révocation, AC, ACME, EST, SCEP, WSTEP), qui l'a demandée et quand, la politique, l'autorité, et l'échéance en forme courte au-dessus de sa date exacte. Un sujet ouvre la demande dans l'inspecteur, avec ses sections **Demande** et **Journal**.
+Les demandes ouvertes sont groupées par échéance : **En retard**, **À traiter sous 48 h** et **Plus tard**, chacune avec son compteur. Une ligne donne ce que la demande demande et son sujet, une pastille qui nomme sa source (CSR, certificat, renouvellement, révocation, AC, ACME, EST, SCEP, WSTEP), qui l’a demandée et quand, la politique, l’autorité, et l’échéance en forme courte au-dessus de sa date exacte. Un sujet ouvre la demande dans l’inspecteur, avec ses sections **Demande** et **Journal**.
 
 ## Approuver une demande
 
-1. Cliquez sur **Approuver…** sur sa ligne, ou dans l'inspecteur
+1. Cliquez sur **Approuver…** sur sa ligne, ou dans l’inspecteur
 2. Donnez éventuellement un motif : il est enregistré avec la décision
-3. Confirmez : ce que l'approbation a émis (un certificat, ou une AC) s'ouvre dans l'inspecteur
+3. Confirmez : ce que l’approbation a émis (un certificat, ou une AC) s’ouvre dans l’inspecteur
 
 ## Rejeter une demande
 
-1. Cliquez sur **Refuser…** sur sa ligne, ou dans l'inspecteur
-2. Entrez un **motif** d’au moins cinq caractères (requis) : il est conservé dans la chronologie de la demande ; un rejet n'écrit aucune entrée dans le journal d'audit
+1. Cliquez sur **Refuser…** sur sa ligne, ou dans l’inspecteur
+2. Entrez un **motif** d’au moins cinq caractères (requis) : il est conservé dans la chronologie de la demande ; un rejet n’écrit aucune entrée dans le journal d’audit
 3. Confirmez : la demande est immédiatement arrêtée
 
-> ⚠ Tout rejet unique arrête la demande entière. C'est intentionnel : si un examinateur identifie un problème, l'émission ne doit pas se poursuivre.
+> ⚠ Tout rejet unique arrête la demande entière. C’est intentionnel : si un examinateur identifie un problème, l’émission ne doit pas se poursuivre.
 
 ## Décider plusieurs demandes
 
-Cochez plusieurs lignes, ou tout un groupe depuis son en-tête, puis **Approuver…** ou **Refuser…** dans la barre qui remplace l'indication. Il n'existe pas de route groupée : chaque demande est traitée à son tour. Quand toutes sont passées, un seul message le dit ; sinon le bilan donne celles qui sont passées et pourquoi les autres ne le sont pas (vote déjà donné, demande expirée, émission en échec).
+Cochez plusieurs lignes, ou tout un groupe depuis son en-tête, puis **Approuver…** ou **Refuser…** dans la barre qui remplace l’indication. Il n’existe pas de route groupée : chaque demande est traitée à son tour. Quand toutes sont passées, un seul message le dit ; sinon le bilan donne celles qui sont passées et pourquoi les autres ne le sont pas (vote déjà donné, demande expirée, émission en échec).
 
 ## Historique des approbations
 
-Chaque demande maintient un historique d'approbation complet montrant :
-- Qui a approuvé ou rejeté (nom d'utilisateur)
-- Quand l'action a été effectuée (horodatage)
+Chaque demande maintient un historique d’approbation complet montrant :
+- Qui a approuvé ou rejeté (nom d’utilisateur)
+- Quand l’action a été effectuée (horodatage)
 - Commentaire fourni (le cas échéant)
 
-Cet historique est stocké avec la demande, pas dans le journal d'audit.
+Cet historique est stocké avec la demande, pas dans le journal d’audit.
 
 ## Traitées récemment
 
@@ -129,7 +129,7 @@ Les demandes décidées (approuvées, refusées, expirées, annulées) sont repl
 
 ## Permissions
 
-- **read:approvals** : Voir les demandes d'approbation
+- **read:approvals** : Voir les demandes d’approbation
 - **write:approvals** : Approuver ou rejeter les demandes
 
 > 💡 Configurez les notifications par e-mail dans les politiques pour alerter les approbateurs lorsque de nouvelles demandes arrivent.

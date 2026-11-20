@@ -9,32 +9,32 @@ export default {
         items: [
           { label: 'Auto-régénération', text: 'Activer la régénération automatique des CRL par AC' },
           { label: 'Régénération manuelle', text: 'Forcer la régénération immédiate de la CRL' },
-          { label: 'Télécharger la CRL', text: 'Télécharger la CRL au format PEM (fichier .crl) ; la forme DER est servie à l\'URL CDP' },
+          { label: 'Télécharger la CRL', text: 'Télécharger la CRL au format PEM (fichier .crl) ; la forme DER est servie à l’URL CDP' },
           { label: 'Déploiement de CRL', text: 'Associer une cible SSH/SFTP pour transférer automatiquement chaque CRL régénérée. Chaque liaison définit le format, le chemin de destination, les CRL parentes et une commande de rechargement facultative' },
           { label: 'URL CDP', text: 'URL du point de distribution CRL à intégrer dans les certificats' },
-          { label: 'Validité', text: 'Validité de la CRL par AC de 1 jour à 5 ans (90j/180j/1a/3a/5a pour les AC hors ligne qui ne peuvent pas re-signer à l\'échéance). Un avertissement s\'affiche au-delà d\'un an, les parties utilisatrices peuvent conserver des données de révocation périmées pendant toute la fenêtre' },
+          { label: 'Validité', text: 'Validité de la CRL par AC de 1 jour à 5 ans (90j/180j/1a/3a/5a pour les AC hors ligne qui ne peuvent pas re-signer à l’échéance). Un avertissement s’affiche au-delà d’un an, les parties utilisatrices peuvent conserver des données de révocation périmées pendant toute la fenêtre' },
           { label: 'Digest de signature', text: 'SHA-256, SHA-384 ou SHA-512 pour une AC RSA ou EC. Une AC Ed25519, Ed448 ou ML-DSA signe sans digest : un digest enregistré auparavant est affiché comme ignoré, avec un bouton Effacer' },
           { label: "Condensat par défaut (v2.251)", text: "Sans condensat défini, une AC P-384 ou P-521 signe ses CRL avec SHA-384 ou SHA-512. Les CRL déjà émises gardent le leur : la suivante applique la règle" },
-          { label: 'CRL externe', text: "Les AC sans clé ou hors ligne ne peuvent pas auto-signer une CRL, téléversez depuis le panneau de détails de l'AC une CRL générée auprès de la clé hors ligne ; elle est validée (signature, émetteur, monotonie) et servie à la même URL CDP (v2.215)" },
+          { label: 'CRL externe', text: "Les AC sans clé ou hors ligne ne peuvent pas auto-signer une CRL, téléversez depuis le panneau de détails de l’AC une CRL générée auprès de la clé hors ligne ; elle est validée (signature, émetteur, monotonie) et servie à la même URL CDP (v2.215)" },
           { label: 'CRL delta', text: 'Lorsque les CRL delta sont activées, un nouveau delta est généré juste après chaque CRL complète, de sorte que le delta servi se rapporte toujours à la dernière base' },
-          { label: 'Numéro de CRL', text: 'Les CRL de base et delta d\'une AC partagent un même numéro croissant, jamais attribué à deux CRL, même lorsque deux générations s\'exécutent en même temps. Le numéro le plus élevé atteint est conservé par nom et clé d\'AC et voyage dans les sauvegardes : une AC restaurée sur un autre serveur, ou supprimée puis réimportée, repart de ce numéro' },
+          { label: 'Numéro de CRL', text: 'Les CRL de base et delta d’une AC partagent un même numéro croissant, jamais attribué à deux CRL, même lorsque deux générations s’exécutent en même temps. Le numéro le plus élevé atteint est conservé par nom et clé d’AC et voyage dans les sauvegardes : une AC restaurée sur un autre serveur, ou supprimée puis réimportée, repart de ce numéro' },
         ]
       },
       {
         title: 'Service OCSP',
         items: [
           { label: 'Statut', text: 'Indique si le répondeur OCSP est actif pour chaque AC' },
-          { label: 'URL AIA', text: 'URL d\'accès aux informations de l\'autorité, Points de terminaison du répondeur OCSP et de téléchargement du certificat de l\'émetteur AC intégrés dans les certificats émis' },
+          { label: 'URL AIA', text: 'URL d’accès aux informations de l’autorité, Points de terminaison du répondeur OCSP et de téléchargement du certificat de l’émetteur AC intégrés dans les certificats émis' },
           { label: 'Cache', text: 'Cache de réponses avec nettoyage automatique quotidien des entrées expirées' },
           { label: 'Total des requêtes', text: 'Nombre de requêtes OCSP traitées depuis le démarrage du service, et combien ont été servies depuis le cache' },
-          { label: 'Cache HTTP', text: 'Une réponse sans nonce peut être conservée par les caches HTTP jusqu\'à son nextUpdate, une heure au plus (RFC 5019 §6.2 : Expires, Last-Modified, ETag) ; une réponse avec nonce n\'est pas réutilisée' },
-          { label: 'Répondeur délégué', text: 'Signer les réponses avec un certificat OCSPSigning dédié au lieu de la clé de l\'AC, assignez-en un par AC depuis son panneau sur cette page' },
-          { label: 'Renouvellement auto du répondeur', text: 'Une tâche quotidienne réémet le certificat du répondeur délégué avant expiration (même paire de clés, renouvelé à l\'identique) et le relie, activé par défaut. Le commutateur et sa fenêtre (jours avant expiration, 30 par défaut) se trouvent dans Paramètres › Sécurité' },
+          { label: 'Cache HTTP', text: 'Une réponse sans nonce peut être conservée par les caches HTTP jusqu’à son nextUpdate, une heure au plus (RFC 5019 §6.2 : Expires, Last-Modified, ETag) ; une réponse avec nonce n’est pas réutilisée' },
+          { label: 'Répondeur délégué', text: 'Signer les réponses avec un certificat OCSPSigning dédié au lieu de la clé de l’AC, assignez-en un par AC depuis son panneau sur cette page' },
+          { label: 'Renouvellement auto du répondeur', text: 'Une tâche quotidienne réémet le certificat du répondeur délégué avant expiration (même paire de clés, renouvelé à l’identique) et le relie, activé par défaut. Le commutateur et sa fenêtre (jours avant expiration, 30 par défaut) se trouvent dans Paramètres › Sécurité' },
         ]
       },
     ],
     tips: [
-      'Activez l\'auto-régénération pour maintenir les CRL à jour après les révocations de certificats',
+      'Activez l’auto-régénération pour maintenir les CRL à jour après les révocations de certificats',
       'Copiez les URL CDP, OCSP et AIA CA Issuers pour les intégrer dans vos profils de certificat',
       'OCSP fournit une vérification de révocation en temps réel et est préféré aux CRL',
     ],
@@ -42,14 +42,14 @@ export default {
   helpGuides: {
     title: 'CRL & OCSP',
     content: `
-## Vue d'ensemble
+## Vue d’ensemble
 
 Les listes de révocation de certificats (CRL) et le protocole OCSP (Online Certificate Status Protocol) permettent aux clients de vérifier si un certificat a été révoqué. UCM prend en charge les deux mécanismes.
 
 ## Gestion des CRL
 
-### Qu'est-ce qu'une CRL ?
-Une CRL est une liste signée de numéros de série de certificats révoqués, publiée par une AC. Les clients téléchargent la CRL et vérifient si le numéro de série d'un certificat y figure.
+### Qu’est-ce qu’une CRL ?
+Une CRL est une liste signée de numéros de série de certificats révoqués, publiée par une AC. Les clients téléchargent la CRL et vérifient si le numéro de série d’un certificat y figure.
 
 ### CRL par AC
 Chaque AC a sa propre CRL. La liste des CRL affiche toutes vos AC avec :
@@ -58,40 +58,40 @@ Chaque AC a sa propre CRL. La liste des CRL affiche toutes vos AC avec :
 - **Auto-régénération** : Si les mises à jour automatiques de la CRL sont activées
 
 ### Régénérer une CRL
-Cliquez sur **Régénérer** pour reconstruire immédiatement la CRL d'une AC. C'est utile après avoir révoqué des certificats.
+Cliquez sur **Régénérer** pour reconstruire immédiatement la CRL d’une AC. C’est utile après avoir révoqué des certificats.
 
 ### Auto-régénération
-Activez l'auto-régénération pour reconstruire automatiquement la CRL chaque fois qu'un certificat est révoqué. Basculez cette option par AC.
+Activez l’auto-régénération pour reconstruire automatiquement la CRL chaque fois qu’un certificat est révoqué. Basculez cette option par AC.
 
 ### Validité de la CRL
 La planification de la CRL (par AC) définit la durée de validité de chaque CRL publiée. Les options vont de **1 jour à 5 ans** : 1j, 2j, 3j, 7j, 14j, 30j, 90j, 180j, 1a, 3a, 5a.
 
 - **Les AC en ligne** devraient garder une validité courte (quelques jours) pour que les parties utilisatrices récupèrent rapidement les révocations
-- **Les AC hors ligne** (typiquement une racine qui ne peut pas re-signer les CRL à l'échéance) sont le cas d'usage prévu des options longues : de 90j à 5a
-- Un avertissement s'affiche au-delà d'un an : les parties utilisatrices peuvent conserver des données de révocation périmées pendant toute la fenêtre de validité
+- **Les AC hors ligne** (typiquement une racine qui ne peut pas re-signer les CRL à l’échéance) sont le cas d’usage prévu des options longues : de 90j à 5a
+- Un avertissement s’affiche au-delà d’un an : les parties utilisatrices peuvent conserver des données de révocation périmées pendant toute la fenêtre de validité
 
 ### Numéros de CRL
-Chaque CRL porte un numéro de CRL (RFC 5280 §5.2.3). Les CRL de base et delta d'une AC partagent une même séquence croissante, et aucun numéro n'est jamais attribué à deux CRL, même lorsqu'une révocation et le planificateur en génèrent une en même temps.
+Chaque CRL porte un numéro de CRL (RFC 5280 §5.2.3). Les CRL de base et delta d’une AC partagent une même séquence croissante, et aucun numéro n’est jamais attribué à deux CRL, même lorsqu’une révocation et le planificateur en génèrent une en même temps.
 
-Le numéro le plus élevé atteint est conservé pour chaque nom et clé d'AC, hors de l'AC elle-même, et voyage dans les sauvegardes. Une AC restaurée sur un autre serveur, ou supprimée puis réimportée, repart de ce numéro au lieu de recommencer à 1.
+Le numéro le plus élevé atteint est conservé pour chaque nom et clé d’AC, hors de l’AC elle-même, et voyage dans les sauvegardes. Une AC restaurée sur un autre serveur, ou supprimée puis réimportée, repart de ce numéro au lieu de recommencer à 1.
 
 ### Point de distribution CRL (CDP)
-L'URL CDP est intégrée dans les certificats pour que les clients sachent où télécharger la CRL. Copiez l'URL depuis les détails de la CRL.
+L’URL CDP est intégrée dans les certificats pour que les clients sachent où télécharger la CRL. Copiez l’URL depuis les détails de la CRL.
 
 \`\`\`
 http://your-server:8080/cdp/{ca_refid}.crl
 \`\`\`
 
-> 💡 **Activé automatiquement** : Lorsque vous créez une nouvelle AC, le CDP est automatiquement activé si une URL de base de protocole ou un serveur de protocole HTTP est configuré. L'URL CDP est générée automatiquement, aucune étape manuelle nécessaire.
+> 💡 **Activé automatiquement** : Lorsque vous créez une nouvelle AC, le CDP est automatiquement activé si une URL de base de protocole ou un serveur de protocole HTTP est configuré. L’URL CDP est générée automatiquement, aucune étape manuelle nécessaire.
 
-> ⚠️ **Important** : Les URL sont générées automatiquement en utilisant le port du protocole HTTP et le FQDN du serveur. Si vous accédez à UCM via \`localhost\`, l'URL ne peut pas être générée. Configurez d'abord votre **FQDN** ou l'**URL de base du protocole** dans Paramètres → Général.
+> ⚠️ **Important** : Les URL sont générées automatiquement en utilisant le port du protocole HTTP et le FQDN du serveur. Si vous accédez à UCM via \`localhost\`, l’URL ne peut pas être générée. Configurez d’abord votre **FQDN** ou l'**URL de base du protocole** dans Paramètres → Général.
 
 ### Télécharger les CRL
-Le bouton de téléchargement enregistre la CRL au format PEM (fichier .crl). L'URL CDP la sert au format DER pour les clients et d'autres systèmes.
+Le bouton de téléchargement enregistre la CRL au format PEM (fichier .crl). L’URL CDP la sert au format DER pour les clients et d’autres systèmes.
 
 ## Répondeur OCSP
 
-### Qu'est-ce qu'OCSP ?
+### Qu’est-ce qu’OCSP ?
 OCSP fournit une vérification de statut de certificat en temps réel. Au lieu de télécharger une CRL entière, les clients envoient une requête pour un certificat spécifique et obtiennent une réponse immédiate.
 
 ### Statut OCSP
@@ -104,32 +104,32 @@ La section OCSP affiche :
 
 UCM met en cache les réponses OCSP pour les performances. Le cache est :
 - **Nettoyé automatiquement** : Les réponses expirées sont purgées quotidiennement par le planificateur
-- **Invalidé à la révocation** : Lorsqu'un certificat est révoqué, sa réponse OCSP en cache est immédiatement supprimée
-- **Invalidé à la levée de suspension** : Lorsqu'une suspension de certificat est levée, le cache OCSP est mis à jour
+- **Invalidé à la révocation** : Lorsqu’un certificat est révoqué, sa réponse OCSP en cache est immédiatement supprimée
+- **Invalidé à la levée de suspension** : Lorsqu’une suspension de certificat est levée, le cache OCSP est mis à jour
 
 ### Répondeur OCSP délégué
 
-Par défaut, les réponses OCSP sont signées avec la clé de l'AC elle-même. Un **répondeur délégué** utilise à la place un certificat dédié doté de l'EKU **OCSPSigning** : Assignez-en un par AC depuis la section **Répondeur délégué** de l'AC sélectionnée dans la liste de cette page (seuls les certificats portant l'EKU OCSPSigning et une clé privée sont éligibles).
+Par défaut, les réponses OCSP sont signées avec la clé de l’AC elle-même. Un **répondeur délégué** utilise à la place un certificat dédié doté de l’EKU **OCSPSigning** : Assignez-en un par AC depuis la section **Répondeur délégué** de l’AC sélectionnée dans la liste de cette page (seuls les certificats portant l’EKU OCSPSigning et une clé privée sont éligibles).
 
-**Renouvellement automatique** : une tâche quotidienne réémet le certificat du répondeur avant son expiration, même paire de clés et mêmes extensions, renouvelé à l'identique, et relie la configuration du répondeur de l'AC au nouveau certificat. Les certificats de signature OCSP à courte durée de vie (p. ex. un modèle de 90 jours) tournent sans action manuelle. Activé par défaut ; il peut être désactivé et la fenêtre de renouvellement ajustée dans Paramètres › Sécurité.
+**Renouvellement automatique** : une tâche quotidienne réémet le certificat du répondeur avant son expiration, même paire de clés et mêmes extensions, renouvelé à l’identique, et relie la configuration du répondeur de l’AC au nouveau certificat. Les certificats de signature OCSP à courte durée de vie (p. ex. un modèle de 90 jours) tournent sans action manuelle. Activé par défaut ; il peut être désactivé et la fenêtre de renouvellement ajustée dans Paramètres › Sécurité.
 
 ### URL AIA
-L'extension AIA (Authority Information Access) est intégrée dans les certificats pour indiquer aux clients où trouver :
+L’extension AIA (Authority Information Access) est intégrée dans les certificats pour indiquer aux clients où trouver :
 
 **Répondeur OCSP** : vérification de révocation en temps réel :
 \`\`\`
 http://your-server:8080/ocsp
 \`\`\`
 
-**CA Issuers** (RFC 5280 §4.2.2.1) : téléchargement du certificat de l'AC émettrice pour la construction de chaîne :
+**CA Issuers** (RFC 5280 §4.2.2.1) : téléchargement du certificat de l’AC émettrice pour la construction de chaîne :
 \`\`\`
 http://your-server:8080/ca/{ca_refid}.cer   (format DER)
 http://your-server:8080/ca/{ca_refid}.pem   (format PEM)
 \`\`\`
 
-Activez CA Issuers par AC dans la section **AIA CA Issuers** du panneau de cette AC sur cette page. L'URL est générée automatiquement en utilisant le serveur de protocole HTTP et le FQDN configuré.
+Activez CA Issuers par AC dans la section **AIA CA Issuers** du panneau de cette AC sur cette page. L’URL est générée automatiquement en utilisant le serveur de protocole HTTP et le FQDN configuré.
 
-> ⚠️ **Prérequis** : Les URL de protocole (CDP, OCSP, AIA) nécessitent un **FQDN** valide ou une **URL de base du protocole** configurée dans Paramètres → Général. Si vous accédez à UCM via \`localhost\`, l'activation de ces fonctionnalités échouera, configurez d'abord le FQDN.
+> ⚠️ **Prérequis** : Les URL de protocole (CDP, OCSP, AIA) nécessitent un **FQDN** valide ou une **URL de base du protocole** configurée dans Paramètres → Général. Si vous accédez à UCM via \`localhost\`, l’activation de ces fonctionnalités échouera, configurez d’abord le FQDN.
 
 ### OCSP vs CRL
 

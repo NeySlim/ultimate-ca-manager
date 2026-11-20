@@ -2,126 +2,126 @@ export default {
   helpContent: {
     title: 'ACME',
     subtitle: 'Gestion automatisée des certificats',
-    overview: 'UCM prend en charge deux modes ACME : client ACME pour les certificats publics depuis toute AC conforme RFC 8555 (Let\'s Encrypt, ZeroSSL, HARICA, etc.), et serveur ACME local pour l\'automatisation PKI interne avec mappage multi-AC de domaines.',
+    overview: 'UCM prend en charge deux modes ACME : client ACME pour les certificats publics depuis toute AC conforme RFC 8555 (Let’s Encrypt, ZeroSSL, HARICA, etc.), et serveur ACME local pour l’automatisation PKI interne avec mappage multi-AC de domaines.',
     sections: [
       {
         title: "Renewal Information (ARI, RFC 9773)",
         content: "Le serveur ACME local publie une ressource renewalInfo : les clients y apprennent le moment idéal pour renouveler chaque certificat.",
         items: [
-          { label: "Fenêtre suggérée", text: "Renvoie une fenêtre début/fin centrée avant l'expiration, pour étaler les renouvellements" },
+          { label: "Fenêtre suggérée", text: "Renvoie une fenêtre début/fin centrée avant l’expiration, pour étaler les renouvellements" },
           { label: "Révocation", text: "Un certificat révoqué renvoie une fenêtre dans le passé → les clients conformes renouvellent immédiatement" },
           { label: "Sans authentification", text: "renewalInfo est un simple GET, ni compte ni JWS requis (RFC 9773)" },
-          { label: "Proxy ACME (v2.252)", text: "Pour un certificat émis via le proxy, la fenêtre de l'AC en amont est relayée avec son Retry-After, conservée jusqu'à une heure. La fenêtre est calculée localement quand l'AC n'annonce pas de renewalInfo ou ne donne pas de réponse exploitable, ou quand le certificat est révoqué dans UCM" },
+          { label: "Proxy ACME (v2.252)", text: "Pour un certificat émis via le proxy, la fenêtre de l’AC en amont est relayée avec son Retry-After, conservée jusqu’à une heure. La fenêtre est calculée localement quand l’AC n’annonce pas de renewalInfo ou ne donne pas de réponse exploitable, ou quand le certificat est révoqué dans UCM" },
         ]
       },
       {
         title: 'Client ACME',
         items: [
-          { label: 'Client', text: 'Demander des certificats depuis toute AC ACME, Let\'s Encrypt, ZeroSSL, HARICA ou personnalisée' },
-          { label: 'Onglet des orders (v2.219)', text: 'Les orders du client ont leur propre onglet « Let\'s Encrypt orders » dans la barre latérale, avec compteur visibles/total et filtre de statut, à l\'image de la vue Local orders' },
-          { label: 'Autorités de certification (AC)', text: 'Un ou plusieurs comptes par AC, plusieurs comptes peuvent partager la même URL de répertoire (ex. deux comptes Let\'s Encrypt pour une séparation administrative) ; une URL de répertoire vide vaut Let\'s Encrypt Production' },
+          { label: 'Client', text: 'Demander des certificats depuis toute AC ACME, Let’s Encrypt, ZeroSSL, HARICA ou personnalisée' },
+          { label: 'Onglet des orders (v2.219)', text: 'Les orders du client ont leur propre onglet « Let’s Encrypt orders » dans la barre latérale, avec compteur visibles/total et filtre de statut, à l’image de la vue Local orders' },
+          { label: 'Autorités de certification (AC)', text: 'Un ou plusieurs comptes par AC, plusieurs comptes peuvent partager la même URL de répertoire (ex. deux comptes Let’s Encrypt pour une séparation administrative) ; une URL de répertoire vide vaut Let’s Encrypt Production' },
           { label: 'Serveur personnalisé', text: 'Définir une URL de répertoire ACME personnalisée pour utiliser toute AC conforme RFC 8555' },
           { label: 'EAB', text: 'Prise en charge de la liaison de compte externe pour les AC nécessitant une pré-inscription (ZeroSSL, HARICA, etc.)' },
-          { label: 'Types de clés', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 ou P-384, ML-DSA-44, ML-DSA-65 ou ML-DSA-87 pour les clés de certificat ; ML-DSA n\'est pas proposé sur un build qui ne l\'inclut pas, ni en mode FIPS quand le module FIPS ne l\'approuve pas. Un défaut configuré que cette instance ne sait pas générer fait échouer la commande au lieu de retomber sur RSA-2048 (v2.248)' },
-          { label: 'Clé réutilisée en mode FIPS', text: 'Réutiliser la clé d\'un certificat source est refusé quand le mode FIPS n\'approuve pas cette clé, ML-DSA compris (v2.248)' },
+          { label: 'Types de clés', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 ou P-384, ML-DSA-44, ML-DSA-65 ou ML-DSA-87 pour les clés de certificat ; ML-DSA n’est pas proposé sur un build qui ne l’inclut pas, ni en mode FIPS quand le module FIPS ne l’approuve pas. Un défaut configuré que cette instance ne sait pas générer fait échouer la commande au lieu de retomber sur RSA-2048 (v2.248)' },
+          { label: 'Clé réutilisée en mode FIPS', text: 'Réutiliser la clé d’un certificat source est refusé quand le mode FIPS n’approuve pas cette clé, ML-DSA compris (v2.248)' },
           { label: 'Clés de compte', text: 'Algorithmes ES256 (P-256), ES384 (P-384) ou RS256 pour les clés de compte ACME' },
           { label: 'Fournisseurs DNS', text: 'Configurer les fournisseurs de défi DNS-01 (Cloudflare, Route53, Tencent DNSPod, Plesk, etc.). Plesk passe par son API XML ; Verify TLS Certificate peut être désactivé pour un panneau auto-signé et un délai de propagation DNS ajouté' },
-          { label: 'Custom Command', text: 'Type de fournisseur DNS exécutant des commandes locales configurées par l\'admin pour créer/supprimer les TXT, détails de l\'enregistrement passés via les variables d\'environnement DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION. Chemin binaire absolu requis, sans shell, timeout configurable' },
+          { label: 'Custom Command', text: 'Type de fournisseur DNS exécutant des commandes locales configurées par l’admin pour créer/supprimer les TXT, détails de l’enregistrement passés via les variables d’environnement DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION. Chemin binaire absolu requis, sans shell, timeout configurable' },
           { label: 'Domaines', text: 'Associer des domaines aux fournisseurs DNS pour la validation automatique' },
-          { label: 'HTTP-01', text: 'UCM sert le fichier de challenge de ses orders en attente sur /.well-known/acme-challenge/ via le port du protocole HTTP (8080 par défaut) : redirigez ce chemin depuis le port 80 du domaine vers UCM. Verify vérifie d\'abord le fichier, et les orders HTTP-01 se renouvellent automatiquement' },
-          { label: "Renouvellement en place (v2.251)", text: "Un renouvellement conserve l'id et le refid du certificat : la liaison HTTPS, les liaisons de déploiement et les webhooks le suivent. Les certificats que d'anciens renouvellements ont importés comme nouvelles lignes restent dans l'inventaire : archivez-les ou supprimez-les à la main" },
-          { label: "Orders interrompus (v2.251)", text: "Un order laissé en traitement par un redémarrage repasse en attente avec un message, prêt pour Verify Challenge, en 15 minutes environ. Un certificat que l'AC a émis avant un redémarrage ou un import échoué est récupéré par Check Status, la finalisation ou le prochain renouvellement" },
-          { label: "Orders en attente périmés (v2.251)", text: "La tâche de renouvellement supprime, avec leurs enregistrements TXT, les orders en attente depuis plus de 7 jours dont l'order chez l'AC a expiré ou dont l'expiration est inconnue, et audite chaque suppression. Les enregistrements TXT d'un order dont la validation a échoué sont supprimés dès qu'il est invalide" },
-          { label: "Liste des orders (v2.251)", text: "L'onglet des orders Let's Encrypt charge tous les orders, jusqu'à 5000, quatre pages à la fois, et réessaie une page refusée en 429 après son Retry-After. Une page toujours manquante laisse les orders obtenus, avec un avis que la liste est partielle" },
-          { label: "Échecs de renouvellement (v2.251)", text: "Un order affiche son nombre de renouvellements échoués, avec la dernière erreur et sa date. Après 5 échecs de renouvellement planifié, il est retenté une fois par jour, et chaque échec, manuel compris, émet l'événement acme_order.renewal_failed" },
-          { label: "Renouvellement automatique par order (v2.251)", text: "Un order sélectionné affiche un interrupteur Renouvellement automatique qui arrête ou reprend son renouvellement. Supprimer un certificat après l'avoir révoqué désactive le renouvellement de son order, avec un message" },
-          { label: "Un renouvellement à la fois (v2.251)", text: "Un renouvellement ou une finalisation verrouille son order : un second lancé entre-temps reçoit un 409, et le planificateur ignore l'order" },
-          { label: "Compte ou fournisseur manquant (v2.251)", text: "Un order dont le compte AC a été supprimé, dont le fournisseur DNS est désactivé, ou qui réutilise la clé d'un certificat supprimé s'arrête avant l'AC avec un message qui dit quoi faire. Supprimer ou désactiver un compte AC est refusé (409) tant que des orders émis se renouvellent par lui" },
-          { label: "Clés compromises (v2.251)", text: "Une clé révoquée pour compromission, quelle que soit l'AC qui a émis son certificat, est refusée (409) à la requête et avant qu'un renouvellement n'ouvre un order, même après la suppression de ce certificat. Un renouvellement réglé pour réutiliser une telle clé en génère une nouvelle" },
-          { label: "Révocation auprès de l'AC", text: "Révoquer un certificat obtenu via ACME (par le client, ou par le proxy sous un compte amont détenu par UCM) le révoque aussi auprès de cette AC, qu'il soit révoqué seul, en masse, par une demande approuvée, comme certificat utilisateur, avec l'inscription ou l'utilisateur auquel il appartient, comme membre lié d'une paire, ou par sa clé auprès du serveur ACME propre à UCM. Si l'AC ne confirme pas, la révocation reste due et est renvoyée par la tâche de renouvellement ; une suspension reste dans UCM, ACME n'en ayant pas. Si aucun compte d'UCM ne peut parler pour lui, il reste local et un avertissement indique de le révoquer directement auprès de l'AC. Le motif est envoyé quand il vaut keyCompromise, affiliationChanged, superseded, cessationOfOperation ou privilegeWithdrawn" },
-          { label: "Révocation au renouvellement (v2.251)", text: "Avec Révoquer l'ancien certificat après renouvellement activé (ACME local › Politique de renouvellement), l'AC reçoit la raison locale quand c'est keyCompromise, affiliationChanged, superseded ou cessationOfOperation, et aucune sinon. Une révocation échouée est retentée par la tâche de renouvellement jusqu'à l'expiration du certificat, en émettant acme_order.revocation_failed" },
-          { label: "Seuil de renouvellement (v2.249)", text: "Le seuil Jours avant expiration s'applique quand l'AC ne suggère aucune fenêtre de renouvellement (ARI). Un certificat dont la durée de vie est inférieure à 1,5 fois ce seuil se renouvelle plutôt dans son dernier tiers" },
+          { label: 'HTTP-01', text: 'UCM sert le fichier de challenge de ses orders en attente sur /.well-known/acme-challenge/ via le port du protocole HTTP (8080 par défaut) : redirigez ce chemin depuis le port 80 du domaine vers UCM. Verify vérifie d’abord le fichier, et les orders HTTP-01 se renouvellent automatiquement' },
+          { label: "Renouvellement en place (v2.251)", text: "Un renouvellement conserve l’id et le refid du certificat : la liaison HTTPS, les liaisons de déploiement et les webhooks le suivent. Les certificats que d’anciens renouvellements ont importés comme nouvelles lignes restent dans l’inventaire : archivez-les ou supprimez-les à la main" },
+          { label: "Orders interrompus (v2.251)", text: "Un order laissé en traitement par un redémarrage repasse en attente avec un message, prêt pour Verify Challenge, en 15 minutes environ. Un certificat que l’AC a émis avant un redémarrage ou un import échoué est récupéré par Check Status, la finalisation ou le prochain renouvellement" },
+          { label: "Orders en attente périmés (v2.251)", text: "La tâche de renouvellement supprime, avec leurs enregistrements TXT, les orders en attente depuis plus de 7 jours dont l’order chez l’AC a expiré ou dont l’expiration est inconnue, et audite chaque suppression. Les enregistrements TXT d’un order dont la validation a échoué sont supprimés dès qu’il est invalide" },
+          { label: "Liste des orders (v2.251)", text: "L’onglet des orders Let’s Encrypt charge tous les orders, jusqu’à 5000, quatre pages à la fois, et réessaie une page refusée en 429 après son Retry-After. Une page toujours manquante laisse les orders obtenus, avec un avis que la liste est partielle" },
+          { label: "Échecs de renouvellement (v2.251)", text: "Un order affiche son nombre de renouvellements échoués, avec la dernière erreur et sa date. Après 5 échecs de renouvellement planifié, il est retenté une fois par jour, et chaque échec, manuel compris, émet l’événement acme_order.renewal_failed" },
+          { label: "Renouvellement automatique par order (v2.251)", text: "Un order sélectionné affiche un interrupteur Renouvellement automatique qui arrête ou reprend son renouvellement. Supprimer un certificat après l’avoir révoqué désactive le renouvellement de son order, avec un message" },
+          { label: "Un renouvellement à la fois (v2.251)", text: "Un renouvellement ou une finalisation verrouille son order : un second lancé entre-temps reçoit un 409, et le planificateur ignore l’order" },
+          { label: "Compte ou fournisseur manquant (v2.251)", text: "Un order dont le compte AC a été supprimé, dont le fournisseur DNS est désactivé, ou qui réutilise la clé d’un certificat supprimé s’arrête avant l’AC avec un message qui dit quoi faire. Supprimer ou désactiver un compte AC est refusé (409) tant que des orders émis se renouvellent par lui" },
+          { label: "Clés compromises (v2.251)", text: "Une clé révoquée pour compromission, quelle que soit l’AC qui a émis son certificat, est refusée (409) à la requête et avant qu’un renouvellement n’ouvre un order, même après la suppression de ce certificat. Un renouvellement réglé pour réutiliser une telle clé en génère une nouvelle" },
+          { label: "Révocation auprès de l’AC", text: "Révoquer un certificat obtenu via ACME (par le client, ou par le proxy sous un compte amont détenu par UCM) le révoque aussi auprès de cette AC, qu’il soit révoqué seul, en masse, par une demande approuvée, comme certificat utilisateur, avec l’inscription ou l’utilisateur auquel il appartient, comme membre lié d’une paire, ou par sa clé auprès du serveur ACME propre à UCM. Si l’AC ne confirme pas, la révocation reste due et est renvoyée par la tâche de renouvellement ; une suspension reste dans UCM, ACME n’en ayant pas. Si aucun compte d’UCM ne peut parler pour lui, il reste local et un avertissement indique de le révoquer directement auprès de l’AC. Le motif est envoyé quand il vaut keyCompromise, affiliationChanged, superseded, cessationOfOperation ou privilegeWithdrawn" },
+          { label: "Révocation au renouvellement (v2.251)", text: "Avec Révoquer l’ancien certificat après renouvellement activé (ACME local › Politique de renouvellement), l’AC reçoit la raison locale quand c’est keyCompromise, affiliationChanged, superseded ou cessationOfOperation, et aucune sinon. Une révocation échouée est retentée par la tâche de renouvellement jusqu’à l’expiration du certificat, en émettant acme_order.revocation_failed" },
+          { label: "Seuil de renouvellement (v2.249)", text: "Le seuil Jours avant expiration s’applique quand l’AC ne suggère aucune fenêtre de renouvellement (ARI). Un certificat dont la durée de vie est inférieure à 1,5 fois ce seuil se renouvelle plutôt dans son dernier tiers" },
           { label: "Noms longs (v2.249)", text: "Un premier nom de plus de 64 caractères est placé seul dans le nom alternatif du sujet, marqué critique, au lieu de faire échouer la finalisation" },
-          { label: "Domaine et wildcard (v2.252)", text: "Un order pour un domaine et son wildcard reçoit une valeur TXT par autorisation sous le nom partagé, et les fournisseurs DNS ajoutent chaque valeur à côté des autres. DuckDNS, Hurricane Electric et FreeDNS gardent une seule valeur par nom : un tel order est donc refusé avant d'interroger l'AC, tout comme un order DuckDNS qui nomme deux hôtes sous un même sous-domaine ; demandez-les dans des orders séparés, l'un après l'autre" },
-          { label: "Nettoyage TXT (v2.252)", text: "Le nettoyage ne supprime que la valeur TXT de son order : un autre order, ou le wildcard et l'apex qui partagent le nom, gardent la leur. DuckDNS, Hurricane Electric et FreeDNS ne tiennent qu'une valeur par nom : ils l'effacent seulement si aucun autre order en cours n'utilise le nom" },
+          { label: "Domaine et wildcard (v2.252)", text: "Un order pour un domaine et son wildcard reçoit une valeur TXT par autorisation sous le nom partagé, et les fournisseurs DNS ajoutent chaque valeur à côté des autres. DuckDNS, Hurricane Electric et FreeDNS gardent une seule valeur par nom : un tel order est donc refusé avant d’interroger l’AC, tout comme un order DuckDNS qui nomme deux hôtes sous un même sous-domaine ; demandez-les dans des orders séparés, l’un après l’autre" },
+          { label: "Nettoyage TXT (v2.252)", text: "Le nettoyage ne supprime que la valeur TXT de son order : un autre order, ou le wildcard et l’apex qui partagent le nom, gardent la leur. DuckDNS, Hurricane Electric et FreeDNS ne tiennent qu’une valeur par nom : ils l’effacent seulement si aucun autre order en cours n’utilise le nom" },
           { label: "Noms uniques (v2.251)", text: "Un nom de fournisseur DNS ou de compte AC externe déjà utilisé est refusé (409), à la création comme au renommage. La mise à jour a renommé les doublons existants « nom (2) », « nom (3) », du plus ancien au plus récent" },
           { label: "Équipe Vercel (v2.251)", text: "Le fournisseur Vercel accepte un Team ID facultatif pour les domaines appartenant à une équipe" },
-          { label: 'Fournisseur RFC 2136 (v2.252)', text: 'Le serveur DNS peut être un nom d\'hôte. Une Zone renseignée est utilisée pour les noms qu\'elle contient ; pour les autres noms, ou quand elle est vide, la zone est lue dans le SOA que renvoie le serveur configuré, puis auprès du résolveur système' },
-          { label: 'Moment de renouvellement ARI (v2.252)', text: 'Quand l\'AC suggère une fenêtre de renouvellement, chaque certificat se renouvelle lors de la dernière passe de 6 heures précédant un instant aléatoire tiré une fois dans cette fenêtre. La fenêtre est revérifiée après le Retry-After de l\'AC, borné entre une minute et un jour, et jamais une fois le certificat expiré (RFC 9773)' },
-          { label: 'Erreurs de l\'AC (v2.252)', text: 'Une page d\'erreur de l\'AC qui n\'est pas un problème ACME (un 503 HTML) est signalée avec son statut HTTP et son Retry-After' },
-          { label: "Jeton RcodeZero (v2.251)", text: "RcodeZero exige un jeton d'API avec accès en lecture et écriture à la zone, pas un jeton limité à la permission ACME" },
-          { label: "Checkdomain (v2.251)", text: "Checkdomain supprime une valeur en réécrivant les enregistrements de la zone sans elle, comme le documente son API, après avoir lu toutes les pages. Le SOA, le NS de l'apex et les copies www générées sont exclus de cette réécriture" },
+          { label: 'Fournisseur RFC 2136 (v2.252)', text: 'Le serveur DNS peut être un nom d’hôte. Une Zone renseignée est utilisée pour les noms qu’elle contient ; pour les autres noms, ou quand elle est vide, la zone est lue dans le SOA que renvoie le serveur configuré, puis auprès du résolveur système' },
+          { label: 'Moment de renouvellement ARI (v2.252)', text: 'Quand l’AC suggère une fenêtre de renouvellement, chaque certificat se renouvelle lors de la dernière passe de 6 heures précédant un instant aléatoire tiré une fois dans cette fenêtre. La fenêtre est revérifiée après le Retry-After de l’AC, borné entre une minute et un jour, et jamais une fois le certificat expiré (RFC 9773)' },
+          { label: 'Erreurs de l’AC (v2.252)', text: 'Une page d’erreur de l’AC qui n’est pas un problème ACME (un 503 HTML) est signalée avec son statut HTTP et son Retry-After' },
+          { label: "Jeton RcodeZero (v2.251)", text: "RcodeZero exige un jeton d’API avec accès en lecture et écriture à la zone, pas un jeton limité à la permission ACME" },
+          { label: "Checkdomain (v2.251)", text: "Checkdomain supprime une valeur en réécrivant les enregistrements de la zone sans elle, comme le documente son API, après avoir lu toutes les pages. Le SOA, le NS de l’apex et les copies www générées sont exclus de cette réécriture" },
         ]
       },
       {
         title: 'Serveur ACME local',
         items: [
-          { label: 'Configuration', text: 'Activer/désactiver le serveur ACME intégré, sélectionner l\'AC par défaut' },
-          { label: 'Domaines locaux', text: 'Associer des domaines internes à des AC spécifiques pour l\'émission multi-AC' },
+          { label: 'Configuration', text: 'Activer/désactiver le serveur ACME intégré, sélectionner l’AC par défaut' },
+          { label: 'Domaines locaux', text: 'Associer des domaines internes à des AC spécifiques pour l’émission multi-AC' },
           { label: 'Comptes', text: 'Voir et gérer les comptes clients ACME enregistrés' },
-          { label: 'E-mail du compte (v2.218)', text: 'L\'e-mail de contact d\'un compte local peut être modifié depuis son panneau de détails. Selon la RFC 8555, le contact appartient au client ACME : sa prochaine mise à jour de compte peut donc écraser la valeur' },
-          { label: 'Historique', text: 'Suivre toutes les commandes d\'émission de certificats ACME' },
-                  { label: 'Orders locaux (v2.217)', text: 'L\'onglet Local orders liste les orders du serveur intégré avec filtre de statut, suppression unitaire et purge ; les orders expirés non émis sont purgés automatiquement toutes les 6 h, et un digest de signature par défaut s\'applique aux orders sans profil. Depuis la v2.218, la purge supprime aussi les défis frères résiduels encore pending des autorisations déjà validées, et depuis la v2.252 les nonces expirés et utilisés' },
+          { label: 'E-mail du compte (v2.218)', text: 'L’e-mail de contact d’un compte local peut être modifié depuis son panneau de détails. Selon la RFC 8555, le contact appartient au client ACME : sa prochaine mise à jour de compte peut donc écraser la valeur' },
+          { label: 'Historique', text: 'Suivre toutes les commandes d’émission de certificats ACME' },
+                  { label: 'Orders locaux (v2.217)', text: 'L’onglet Local orders liste les orders du serveur intégré avec filtre de statut, suppression unitaire et purge ; les orders expirés non émis sont purgés automatiquement toutes les 6 h, et un digest de signature par défaut s’applique aux orders sans profil. Depuis la v2.218, la purge supprime aussi les défis frères résiduels encore pending des autorisations déjà validées, et depuis la v2.252 les nonces expirés et utilisés' },
                   { label: 'Profils et templates (v2.221)', text: 'Les profils de certificat (draft-ietf-acme-profiles) sont publiés dans le directory et choisis par le client à chaque order. Chaque profil fixe validité et digest et peut lier un template de certificat, dont les KU/EKU gouvernent alors le certificat émis' },
-                  { label: 'Profil par défaut', text: 'La plupart des clients ne demandent aucun profil. Le profil par défaut, choisi sous les profils, s\'applique à leurs commandes ; sans lui, elles reçoivent 90 jours et le digest par défaut' },
-                  { label: 'Révocation (v2.248)', text: 'Le certificat envoyé par un client pour le révoquer doit correspondre octet pour octet à celui stocké. Seule une clé de certificat RSA ou EC P-256, P-384 ou P-521 peut signer la requête elle-même : révoquez un certificat ML-DSA, EdDSA ou Brainpool avec le compte qui l\'a commandé' },
-                  { label: 'Révocation par autorisations (v2.252)', text: 'Un compte détenant des autorisations valides et non expirées pour chaque nom et adresse IP d\'un certificat émis par ce serveur ACME peut le révoquer, même si un autre compte l\'a commandé (RFC 8555 §7.6). Les autorisations accordées par approbation automatique ne comptent pas' },
-                  { label: 'Dates demandées (v2.252)', text: 'Une commande peut demander notBefore et notAfter (duration de cert-manager, --not-after de lego) : le certificat porte exactement ces dates. Une fenêtre plus longue que la validité du profil, hors de celle de l\'AC émettrice, interdite par une politique ou déjà passée est refusée au lieu d\'être émise avec d\'autres dates' },
-                  { label: 'Expiration (v2.252)', text: 'Une commande expirée, ou dont l\'autorisation valide a expiré, ne peut plus être finalisée : elle devient invalide et le client passe une nouvelle commande. Une autorisation valide expirée est lue comme expirée' },
-                  { label: 'Défis (v2.252)', text: 'Lire un défi avec une charge utile vide ne démarre jamais sa validation : le client envoie {} pour cela. Un certificat tls-alpn-01 doit porter exactement le nom ou l\'adresse IP validé comme nom alternatif du sujet' },
-                  { label: 'Identités CAA (v2.252)', text: 'Le répertoire annonce les identifiants CAA configurés dans caaIdentities, sinon l\'hôte ACME public, la même liste que celle contre laquelle la finalisation vérifie les enregistrements CAA' },
+                  { label: 'Profil par défaut', text: 'La plupart des clients ne demandent aucun profil. Le profil par défaut, choisi sous les profils, s’applique à leurs commandes ; sans lui, elles reçoivent 90 jours et le digest par défaut' },
+                  { label: 'Révocation (v2.248)', text: 'Le certificat envoyé par un client pour le révoquer doit correspondre octet pour octet à celui stocké. Seule une clé de certificat RSA ou EC P-256, P-384 ou P-521 peut signer la requête elle-même : révoquez un certificat ML-DSA, EdDSA ou Brainpool avec le compte qui l’a commandé' },
+                  { label: 'Révocation par autorisations (v2.252)', text: 'Un compte détenant des autorisations valides et non expirées pour chaque nom et adresse IP d’un certificat émis par ce serveur ACME peut le révoquer, même si un autre compte l’a commandé (RFC 8555 §7.6). Les autorisations accordées par approbation automatique ne comptent pas' },
+                  { label: 'Dates demandées (v2.252)', text: 'Une commande peut demander notBefore et notAfter (duration de cert-manager, --not-after de lego) : le certificat porte exactement ces dates. Une fenêtre plus longue que la validité du profil, hors de celle de l’AC émettrice, interdite par une politique ou déjà passée est refusée au lieu d’être émise avec d’autres dates' },
+                  { label: 'Expiration (v2.252)', text: 'Une commande expirée, ou dont l’autorisation valide a expiré, ne peut plus être finalisée : elle devient invalide et le client passe une nouvelle commande. Une autorisation valide expirée est lue comme expirée' },
+                  { label: 'Défis (v2.252)', text: 'Lire un défi avec une charge utile vide ne démarre jamais sa validation : le client envoie {} pour cela. Un certificat tls-alpn-01 doit porter exactement le nom ou l’adresse IP validé comme nom alternatif du sujet' },
+                  { label: 'Identités CAA (v2.252)', text: 'Le répertoire annonce les identifiants CAA configurés dans caaIdentities, sinon l’hôte ACME public, la même liste que celle contre laquelle la finalisation vérifie les enregistrements CAA' },
         ]
       },
       {
         title: 'Proxy ACME',
         items: [
-          { label: 'Compte AC en amont', text: 'Sélectionnez l\'un des comptes dans Autorités de certification (AC) : son URL de répertoire (Let\'s Encrypt, ZeroSSL, toute AC RFC 8555) et ses identifiants EAB sont définis sur ce compte' },
-          { label: 'État du compte', text: 'Indique si UCM est enregistré auprès de l\'AC en amont. Les comptes sont auto-enregistrés à la première requête proxy' },
-          { label: 'Test de connexion', text: 'Vérifiez la connectivité avec l\'AC en amont et vérifiez si des identifiants EAB sont requis' },
-          { label: 'Réinitialiser le compte', text: 'Effacez l\'inscription en amont du compte AC sélectionné pour forcer une nouvelle inscription' },
+          { label: 'Compte AC en amont', text: 'Sélectionnez l’un des comptes dans Autorités de certification (AC) : son URL de répertoire (Let’s Encrypt, ZeroSSL, toute AC RFC 8555) et ses identifiants EAB sont définis sur ce compte' },
+          { label: 'État du compte', text: 'Indique si UCM est enregistré auprès de l’AC en amont. Les comptes sont auto-enregistrés à la première requête proxy' },
+          { label: 'Test de connexion', text: 'Vérifiez la connectivité avec l’AC en amont et vérifiez si des identifiants EAB sont requis' },
+          { label: 'Réinitialiser le compte', text: 'Effacez l’inscription en amont du compte AC sélectionné pour forcer une nouvelle inscription' },
           { label: 'Identifiants EAB', text: 'Identifiants External Account Binding pour les AC qui les exigent (ex: ZeroSSL, Google Trust), saisis sur le compte AC dans Autorités de certification (AC)' },
           { label: 'Défis DNS', text: 'UCM gère les défis DNS-01 pour le compte des clients en utilisant les fournisseurs DNS configurés' },
           { label: 'Purge des certificats remplacés', text: 'Bascule opt-in : quand un ordre proxy se finalise, les certificats précédemment importés par des ordres proxy pour exactement le même ensemble de domaines sont supprimés. Les certificats révoqués sont toujours conservés ; les certificats hors proxy ne sont jamais touchés. Désactivé par défaut' },
-                  { label: 'Pre-checks clients (v2.217)', text: 'Le proxy publie aussi les valeurs TXT dns-01 calculées avec la clé de compte de chaque client : les pre-checks de propagation de lego/Traefik/Caddy passent sans être désactivés, sauf sur DuckDNS, Hurricane Electric et FreeDNS, qui ne tiennent qu\'une valeur : désactivez-y le pre-check du client ; un new-order retenté renvoie l\'order encore pending du compte' },
-          { label: "Compatibilité des clients (v2.246)", text: "Avec EAB exigé, une recherche onlyReturnExisting et un new-account avec une clé enregistrée renvoient le compte existant (cert-manager). L'URL du compte répond aux lectures, aux mises à jour de contact et à la désactivation, la désactivation d'autorisation est acceptée (lego), et les réponses de challenge portent Link rel=\"up\"" },
-          { label: 'Erreurs en amont (v2.252)', text: 'Une erreur de l\'AC en amont parvient au client avec son type (rateLimited, badCSR, rejectedIdentifier, alreadyRevoked...), son statut, ses sous-problèmes et son Retry-After. Les erreurs sur le compte en amont du proxy restent serverInternal' },
-          { label: 'Profils et validité (v2.252)', text: 'Le répertoire liste les profils de l\'AC en amont. Un profil, notBefore et notAfter demandés par le client sont transmis en amont, un new-order réessayé ne réutilise un order en attente que s\'il les porte, et un profil que l\'AC en amont n\'offre pas est refusé avec invalidProfile' },
-          { label: 'Enregistrement TXT refusé (v2.252)', text: 'Quand le fournisseur DNS refuse l\'enregistrement TXT, le défi n\'est pas soumis en amont : l\'order, ses autorisations et ses défis deviennent invalides, aucun de ses autres défis n\'est soumis, et le message du fournisseur est journalisé et conservé sur l\'order. Les enregistrements TXT d\'un order invalide ou désactivé sont supprimés' },
-          { label: 'Échec de soumission du défi (v2.252)', text: 'Quand l\'AC en amont refuse la réponse au défi (nonce refusé plus de trois fois, limite de débit), ou répond par une 5xx ou rien sans que l\'autorisation montre le défi pris en compte, l\'order devient invalide avec l\'erreur en amont et le reste même si l\'AC le valide plus tard. Ses enregistrements TXT sont supprimés (deux minutes plus tard tant que l\'AC peut encore en lire un, ou lors de la passe d\'entretien des orders toutes les 15 minutes quand un redémarrage a interrompu ce délai) ; le prochain order du client sur les mêmes noms est validé à nouveau, ou est prêt aussitôt quand l\'AC les a déjà validés' },
-          { label: 'Contrôles de la CSR (v2.252)', text: 'À la finalisation, la CSR doit nommer exactement les identifiants de l\'order, dans son CN ou son SAN (RFC 8555 §7.4) : sinon elle est refusée avec badCSR avant que quoi que ce soit n\'atteigne l\'AC en amont' },
-          { label: 'Autorisation désactivée (v2.252)', text: 'Un order dont le client a désactivé l\'autorisation reste invalide et ne reçoit aucun certificat, même quand l\'order d\'un autre compte sur le même order en amont est émis (RFC 8555 §7.5.2)' },
-          { label: 'URL inconnues (v2.252)', text: 'Une URL ou une méthode qu\'aucune route ne sert sous /acme ou /acme/proxy reçoit un document de problème malformed avec un lien vers le répertoire, en 405 avec Allow quand une autre méthode est servie, comme un GET sur une ressource en POST seul (RFC 8555 §6.3)' },
-          { label: 'Lectures de défi (v2.252)', text: 'Le proxy lit un défi via son autorisation, jamais par un POST-as-GET sur le défi, qui démarre la validation chez certaines AC avant que le TXT n\'existe. Le changement de clé n\'est pas proposé par le répertoire du proxy' },
+                  { label: 'Pre-checks clients (v2.217)', text: 'Le proxy publie aussi les valeurs TXT dns-01 calculées avec la clé de compte de chaque client : les pre-checks de propagation de lego/Traefik/Caddy passent sans être désactivés, sauf sur DuckDNS, Hurricane Electric et FreeDNS, qui ne tiennent qu’une valeur : désactivez-y le pre-check du client ; un new-order retenté renvoie l’order encore pending du compte' },
+          { label: "Compatibilité des clients (v2.246)", text: "Avec EAB exigé, une recherche onlyReturnExisting et un new-account avec une clé enregistrée renvoient le compte existant (cert-manager). L’URL du compte répond aux lectures, aux mises à jour de contact et à la désactivation, la désactivation d’autorisation est acceptée (lego), et les réponses de challenge portent Link rel=\"up\"" },
+          { label: 'Erreurs en amont (v2.252)', text: 'Une erreur de l’AC en amont parvient au client avec son type (rateLimited, badCSR, rejectedIdentifier, alreadyRevoked...), son statut, ses sous-problèmes et son Retry-After. Les erreurs sur le compte en amont du proxy restent serverInternal' },
+          { label: 'Profils et validité (v2.252)', text: 'Le répertoire liste les profils de l’AC en amont. Un profil, notBefore et notAfter demandés par le client sont transmis en amont, un new-order réessayé ne réutilise un order en attente que s’il les porte, et un profil que l’AC en amont n’offre pas est refusé avec invalidProfile' },
+          { label: 'Enregistrement TXT refusé (v2.252)', text: 'Quand le fournisseur DNS refuse l’enregistrement TXT, le défi n’est pas soumis en amont : l’order, ses autorisations et ses défis deviennent invalides, aucun de ses autres défis n’est soumis, et le message du fournisseur est journalisé et conservé sur l’order. Les enregistrements TXT d’un order invalide ou désactivé sont supprimés' },
+          { label: 'Échec de soumission du défi (v2.252)', text: 'Quand l’AC en amont refuse la réponse au défi (nonce refusé plus de trois fois, limite de débit), ou répond par une 5xx ou rien sans que l’autorisation montre le défi pris en compte, l’order devient invalide avec l’erreur en amont et le reste même si l’AC le valide plus tard. Ses enregistrements TXT sont supprimés (deux minutes plus tard tant que l’AC peut encore en lire un, ou lors de la passe d’entretien des orders toutes les 15 minutes quand un redémarrage a interrompu ce délai) ; le prochain order du client sur les mêmes noms est validé à nouveau, ou est prêt aussitôt quand l’AC les a déjà validés' },
+          { label: 'Contrôles de la CSR (v2.252)', text: 'À la finalisation, la CSR doit nommer exactement les identifiants de l’order, dans son CN ou son SAN (RFC 8555 §7.4) : sinon elle est refusée avec badCSR avant que quoi que ce soit n’atteigne l’AC en amont' },
+          { label: 'Autorisation désactivée (v2.252)', text: 'Un order dont le client a désactivé l’autorisation reste invalide et ne reçoit aucun certificat, même quand l’order d’un autre compte sur le même order en amont est émis (RFC 8555 §7.5.2)' },
+          { label: 'URL inconnues (v2.252)', text: 'Une URL ou une méthode qu’aucune route ne sert sous /acme ou /acme/proxy reçoit un document de problème malformed avec un lien vers le répertoire, en 405 avec Allow quand une autre méthode est servie, comme un GET sur une ressource en POST seul (RFC 8555 §6.3)' },
+          { label: 'Lectures de défi (v2.252)', text: 'Le proxy lit un défi via son autorisation, jamais par un POST-as-GET sur le défi, qui démarre la validation chez certaines AC avant que le TXT n’existe. Le changement de clé n’est pas proposé par le répertoire du proxy' },
         ]
       },
       {
         title: 'DNS UPDATE (RFC 2136) pour le proxy ACME',
         items: [
-          { label: 'Fonction', text: 'Les clients utilisent leur solveur rfc2136 standard (certbot, lego, cert-manager, acme.sh, win-acme, Posh-ACME) et le dirigent vers UCM. UCM crée toujours l\'enregistrement TXT avec son propre fournisseur DNS' },
+          { label: 'Fonction', text: 'Les clients utilisent leur solveur rfc2136 standard (certbot, lego, cert-manager, acme.sh, win-acme, Posh-ACME) et le dirigent vers UCM. UCM crée toujours l’enregistrement TXT avec son propre fournisseur DNS' },
           { label: 'Clés', text: 'Créez des clés pour chaque compte proxy dans Autorités de certification (AC). Une clé peut être liée à un identifiant EAB : elle ne fonctionne alors que pour les commandes du compte ACME enregistré avec cet identifiant. UCM affiche le secret une seule fois' },
-          { label: 'Modifications acceptées', text: 'UCM accepte uniquement un enregistrement TXT sous _acme-challenge avec la valeur qu\'il attend pour la commande. Il refuse les autres modifications. Il répond toujours NOERROR à une suppression' },
+          { label: 'Modifications acceptées', text: 'UCM accepte uniquement un enregistrement TXT sous _acme-challenge avec la valeur qu’il attend pour la commande. Il refuse les autres modifications. Il répond toujours NOERROR à une suppression' },
           { label: 'Port et réseau', text: 'Définissez le port du listener dans la section Proxy ACME (0 le désactive, 1024 à 65535, redémarrage nécessaire). À utiliser uniquement sur le réseau interne. Pour utiliser le port 53, redirigez-le dans Docker ou Kubernetes, ou avec le pare-feu' },
-          { label: 'Algorithmes', text: 'hmac-sha256, hmac-sha384 et hmac-sha512. UCM refuse md5 et sha1, valeurs par défaut de nombreux clients : définissez l\'algorithme dans chaque client. cert-manager ne prend pas en charge sha384, et win-acme le calcule de façon incorrecte' },
-          { label: 'Découverte de la zone (SOA)', text: 'Les clients demandent l\'enregistrement SOA pour trouver la zone, et UCM y répond. win-acme envoie à la place des mises à jour de test, et utilise toujours le port 53' },
-          { label: 'Vérifications DNS des clients', text: 'Certains clients vérifient l\'enregistrement TXT dans le DNS public avant de continuer (lego, cert-manager, acme.sh). Ils ont besoin d\'un résolveur qui voit la zone publique, ou d\'un délai d\'attente : --dns.propagation-wait (lego), --dnssleep (acme.sh), --dns01-recursive-nameservers (cert-manager)' },
+          { label: 'Algorithmes', text: 'hmac-sha256, hmac-sha384 et hmac-sha512. UCM refuse md5 et sha1, valeurs par défaut de nombreux clients : définissez l’algorithme dans chaque client. cert-manager ne prend pas en charge sha384, et win-acme le calcule de façon incorrecte' },
+          { label: 'Découverte de la zone (SOA)', text: 'Les clients demandent l’enregistrement SOA pour trouver la zone, et UCM y répond. win-acme envoie à la place des mises à jour de test, et utilise toujours le port 53' },
+          { label: 'Vérifications DNS des clients', text: 'Certains clients vérifient l’enregistrement TXT dans le DNS public avant de continuer (lego, cert-manager, acme.sh). Ils ont besoin d’un résolveur qui voit la zone publique, ou d’un délai d’attente : --dns.propagation-wait (lego), --dnssleep (acme.sh), --dns01-recursive-nameservers (cert-manager)' },
         ]
       },
       {
         title: 'Identifiants EAB (côté serveur)',
-        content: 'Lorsque UCM joue le rôle de serveur ACME, le External Account Binding (RFC 8555 §7.3.4) permet d\'exiger des identifiants pré-émis avant qu\'un client puisse créer un compte :',
+        content: 'Lorsque UCM joue le rôle de serveur ACME, le External Account Binding (RFC 8555 §7.3.4) permet d’exiger des identifiants pré-émis avant qu’un client puisse créer un compte :',
         items: [
           { label: 'Émettre', text: 'Générer une nouvelle paire kid + clé HMAC depuis ACME → EAB Credentials' },
           { label: 'Distribuer', text: 'Transmettre le kid + HMAC au client (cert-manager, certbot, acme.sh)' },
           { label: 'Lier', text: 'Le client signe un JWS avec la clé MAC sur newAccount pour lier son compte ACME' },
-          { label: 'Révocation', text: 'Révoquer un kid à tout moment, les comptes existants continuent, les nouvelles liaisons sont refusées. Pour faire une rotation, créez un nouveau kid et révoquez l\'ancien' },
-          { label: 'Audit', text: 'Émission, rotation et révocation sont auditées sous l\'opérateur qui les a effectuées' },
-          { label: 'Restrictions de domaines', text: 'Limiter un identifiant aux domaines qu\'il peut demander : * (tous), *.example.com (tous les sous-domaines), ou une liste explicite, une liste vide bloque entièrement l\'émission. Appliqué sur new-order/new-authz, serveur et proxy ; pertinent seulement quand l\'EAB est exigé' },
+          { label: 'Révocation', text: 'Révoquer un kid à tout moment, les comptes existants continuent, les nouvelles liaisons sont refusées. Pour faire une rotation, créez un nouveau kid et révoquez l’ancien' },
+          { label: 'Audit', text: 'Émission, rotation et révocation sont auditées sous l’opérateur qui les a effectuées' },
+          { label: 'Restrictions de domaines', text: 'Limiter un identifiant aux domaines qu’il peut demander : * (tous), *.example.com (tous les sous-domaines), ou une liste explicite, une liste vide bloque entièrement l’émission. Appliqué sur new-order/new-authz, serveur et proxy ; pertinent seulement quand l’EAB est exigé' },
         ]
       },
       {
         title: 'Résolveurs DNS personnalisés (DNS-01)',
         items: [
-          { label: 'Mode', text: 'ACME → Let\'s Encrypt → résolveurs DNS-01 : Automatique (résolveurs listés, autoritaires, publics, puis système), Résolveur système uniquement, ou Résolveurs listés uniquement. Les modes restreints n\'interrogent jamais les résolveurs publics, pour les réseaux qui les bloquent' },
+          { label: 'Mode', text: 'ACME → Let’s Encrypt → résolveurs DNS-01 : Automatique (résolveurs listés, autoritaires, publics, puis système), Résolveur système uniquement, ou Résolveurs listés uniquement. Les modes restreints n’interrogent jamais les résolveurs publics, pour les réseaux qui les bloquent' },
           { label: 'Split-horizon', text: 'Utile lorsque votre serveur autoritaire est interne mais la vue publique est cachée ailleurs' },
           { label: 'Enregistrements obsolètes', text: 'Évite la mise en cache des résolveurs publics pendant les renouvellements rapides' },
           { label: 'Entrées host:port', text: 'IP séparées par des virgules avec un port optionnel (127.0.0.1:5353, [2001:db8::53]:5300), chaque résolveur gardant son propre port : par ex. un BIND en loopback seul ou dnsmasq sur un port alternatif' },
@@ -132,27 +132,27 @@ export default {
         content: 'La validation HTTP-01 et TLS-ALPN-01 fonctionne nativement pour les cibles RFC1918, loopback, .lan / .local / .corp, le mode de déploiement principal de UCM.',
         items: [
           { label: 'Bascule', text: 'ACME → ACME Local → Autoriser les adresses privées et internes (par défaut : activé)' },
-          { label: 'Bascule', text: 'Onglet Let\'s Encrypt → Autoriser une AC ACME sur loopback, pour une AC colocalisée sur 127.0.0.1 (par défaut : désactivé)' },
+          { label: 'Bascule', text: 'Onglet Let’s Encrypt → Autoriser une AC ACME sur loopback, pour une AC colocalisée sur 127.0.0.1 (par défaut : désactivé)' },
           { label: 'Toujours bloqué', text: 'Les IP de métadonnées cloud (169.254.169.254, fd00:ec2::254, etc.) sont bloquées inconditionnellement' },
         ]
       },
       {
         title: 'Résolution multi-AC',
-        content: 'Lorsqu\'un client ACME demande un certificat, UCM résout l\'AC de signature dans cet ordre :',
+        content: 'Lorsqu’un client ACME demande un certificat, UCM résout l’AC de signature dans cet ordre :',
         items: [
           '1. Mappage de domaine local : correspondance exacte du domaine, puis domaine parent',
-          '2. Mappage de domaine DNS : vérifie l\'AC émettrice configurée pour le fournisseur DNS',
-          '3. Valeur par défaut globale : l\'AC définie dans la configuration du serveur ACME',
+          '2. Mappage de domaine DNS : vérifie l’AC émettrice configurée pour le fournisseur DNS',
+          '3. Valeur par défaut globale : l’AC définie dans la configuration du serveur ACME',
           '4. Première AC disponible avec une clé privée',
         ]
       },
       {
-        title: 'Certificats d\'adresse IP (RFC 8738)',
-        content: 'Le serveur ACME local peut émettre des certificats pour des adresses IPv4 et IPv6, pas seulement des noms DNS. Utilisez le type d\'identifiant « ip » dans la commande.',
+        title: 'Certificats d’adresse IP (RFC 8738)',
+        content: 'Le serveur ACME local peut émettre des certificats pour des adresses IPv4 et IPv6, pas seulement des noms DNS. Utilisez le type d’identifiant « ip » dans la commande.',
         items: [
           { label: 'Identifiant', text: 'Commande avec { "type": "ip", "value": "192.0.2.10" } (IPv4) ou un littéral IPv6 comme 2001:db8::1' },
           { label: 'Défis', text: 'Seuls HTTP-01 et TLS-ALPN-01 sont proposés, DNS-01 est interdit pour les identifiants IP selon RFC 8738' },
-          { label: 'SNI TLS-ALPN-01', text: 'La validation utilise la forme reverse-DNS (in-addr.arpa / ip6.arpa) comme nom d\'hôte SNI' },
+          { label: 'SNI TLS-ALPN-01', text: 'La validation utilise la forme reverse-DNS (in-addr.arpa / ip6.arpa) comme nom d’hôte SNI' },
           { label: 'SAN émis', text: 'Le certificat porte un SAN iPAddress ; les commandes mixtes DNS + IP sont prises en charge' },
           { label: 'IP internes', text: 'Les adresses RFC1918 et loopback se valident nativement, le mode de déploiement principal de UCM' },
         ]
@@ -161,18 +161,18 @@ export default {
         title: 'Validation DNS persistante (dns-persist-01)',
         content: 'Le serveur ACME local peut valider des domaines via un enregistrement TXT persistant lié au compte ACME (draft-ietf-acme-dns-persist) : renouvellement sans écriture DNS. Opt-in, désactivé par défaut.',
         items: [
-          { label: 'Enregistrement', text: 'Créez _validation-persist.<domain> TXT "<issuer-domain>; accounturi=<account URL>", l\'objet challenge annonce les deux valeurs attendues' },
+          { label: 'Enregistrement', text: 'Créez _validation-persist.<domain> TXT "<issuer-domain>; accounturi=<account URL>", l’objet challenge annonce les deux valeurs attendues' },
           { label: 'Activation', text: 'ACME → ACME local → Validation DNS persistante (dns-persist-01)' },
           { label: 'Wildcard / sous-domaines', text: 'Ajoutez policy=wildcard pour autoriser aussi les certificats wildcard et les sous-domaines du nom validé' },
           { label: 'persistUntil', text: 'persistUntil=<unix timestamp> optionnel : bloque les nouvelles validations après cette date' },
-          { label: 'Sécurité', text: 'L\'enregistrement donne au compte la capacité d\'émission tant qu\'il existe, supprimez le TXT pour la révoquer' },
+          { label: 'Sécurité', text: 'L’enregistrement donne au compte la capacité d’émission tant qu’il existe, supprimez le TXT pour la révoquer' },
         ]
       }
     ],
     tips: [
       'URL du répertoire ACME : https://votre-serveur:port/acme/directory',
       'Utilisez une URL de répertoire personnalisée pour se connecter à ZeroSSL, HARICA ou toute AC RFC 8555',
-      'Les identifiants EAB (Key ID + clé HMAC) sont fournis par votre AC lors de l\'inscription',
+      'Les identifiants EAB (Key ID + clé HMAC) sont fournis par votre AC lors de l’inscription',
       'Quand UCM est le serveur ACME, émettez vos propres identifiants EAB dans ACME → EAB Credentials',
       'Pour Kubernetes/cert-manager : voir les manifests de référence sous examples/kubernetes/cert-manager/',
       'Les clés ECDSA P-256 offrent une sécurité équivalente à RSA-2048 avec une taille bien plus petite',
@@ -180,7 +180,7 @@ export default {
       'Toute AC avec une clé privée peut être sélectionnée comme AC émettrice',
       'Les domaines génériques (*.example.com) nécessitent la validation DNS-01',
       'Chaque compte AC conserve sa propre inscription en amont : basculer le proxy sur un autre compte utilise celle de ce compte',
-      'Utilisez l\'URL du proxy avec certbot : certbot certonly --server https://votre-serveur:port/acme/proxy/directory',
+      'Utilisez l’URL du proxy avec certbot : certbot certonly --server https://votre-serveur:port/acme/proxy/directory',
     ],
     warnings: [
       'La validation de domaine est requise : votre serveur doit être accessible ou le DNS configuré',
@@ -190,57 +190,57 @@ export default {
   helpGuides: {
     title: 'ACME',
     content: `
-## Vue d'ensemble
+## Vue d’ensemble
 
 UCM prend en charge ACME (Automated Certificate Management Environment) en deux modes :
 
-- **Client ACME** : Obtenir des certificats depuis toute AC conforme RFC 8555 (Let's Encrypt, ZeroSSL, HARICA ou personnalisée)
-- **Serveur ACME local** : Serveur ACME intégré pour l'automatisation PKI interne avec support multi-AC
+- **Client ACME** : Obtenir des certificats depuis toute AC conforme RFC 8555 (Let’s Encrypt, ZeroSSL, HARICA ou personnalisée)
+- **Serveur ACME local** : Serveur ACME intégré pour l’automatisation PKI interne avec support multi-AC
 
 ## Client ACME
 
 ### Paramètres du client
 Gérez la configuration de votre client ACME :
 - **Environnement** : Staging (test) ou Production (certificats réels)
-- **E-mail de contact** : Requis pour l'enregistrement du compte
-- **Renouvellement automatique** : Renouveler automatiquement les certificats avant l'expiration
-- **Type de clé de certificat** : RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 ou P-384, ML-DSA-44, ML-DSA-65 ou ML-DSA-87. ML-DSA n'est pas proposé sur un build qui ne l'inclut pas, ni en mode FIPS quand le module FIPS ne l'approuve pas. Un type configuré que cette instance ne sait pas générer fait échouer la commande au lieu de retomber sur RSA-2048
+- **E-mail de contact** : Requis pour l’enregistrement du compte
+- **Renouvellement automatique** : Renouveler automatiquement les certificats avant l’expiration
+- **Type de clé de certificat** : RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 ou P-384, ML-DSA-44, ML-DSA-65 ou ML-DSA-87. ML-DSA n’est pas proposé sur un build qui ne l’inclut pas, ni en mode FIPS quand le module FIPS ne l’approuve pas. Un type configuré que cette instance ne sait pas générer fait échouer la commande au lieu de retomber sur RSA-2048
 - **Algorithme de clé de compte** : ES256, ES384 ou RS256 pour la signature du compte ACME
-- **Renouvellement en place** (v2.251) : un renouvellement conserve l'id et le refid du certificat, donc sa liaison HTTPS, ses liaisons de déploiement et ses webhooks le suivent
-- **Renouvellements échoués** (v2.251) : la liste des orders affiche le nombre d'échecs et la dernière erreur ; après 5 échecs de renouvellement planifié, un order est retenté une fois par jour. L'interrupteur **Renouvellement automatique** d'un order sélectionné arrête ou reprend son renouvellement
+- **Renouvellement en place** (v2.251) : un renouvellement conserve l’id et le refid du certificat, donc sa liaison HTTPS, ses liaisons de déploiement et ses webhooks le suivent
+- **Renouvellements échoués** (v2.251) : la liste des orders affiche le nombre d’échecs et la dernière erreur ; après 5 échecs de renouvellement planifié, un order est retenté une fois par jour. L’interrupteur **Renouvellement automatique** d’un order sélectionné arrête ou reprend son renouvellement
 - **Liste des orders** (v2.251) : tous les orders sont chargés, quatre pages à la fois ; une page toujours manquante après ses nouvelles tentatives laisse un avis que la liste est partielle
 - **Clés compromises** (v2.251) : une clé révoquée pour compromission est refusée (409) à la requête et avant tout renouvellement qui ouvrirait un order
-- **Révocation auprès de l'AC** : Un certificat obtenu via ACME (par le client ACME, ou par le proxy sous un compte amont détenu par UCM) est aussi révoqué auprès de cette AC, qu'il soit révoqué seul, en masse, par une demande approuvée, comme certificat utilisateur, avec l'inscription ou l'utilisateur auquel il appartient, comme membre lié d'une paire, ou par sa clé auprès du serveur ACME propre à UCM. Si l'AC ne confirme pas, la révocation reste due et est renvoyée par la tâche de renouvellement jusqu'à ce que l'AC confirme ou que le certificat expire ; une suspension reste dans UCM, ACME n'en ayant pas. Si aucun compte d'UCM ne peut parler pour lui, la révocation reste locale et un avertissement indique de la révoquer directement auprès de l'AC. Le motif est envoyé quand il vaut keyCompromise, affiliationChanged, superseded, cessationOfOperation ou privilegeWithdrawn.
+- **Révocation auprès de l’AC** : Un certificat obtenu via ACME (par le client ACME, ou par le proxy sous un compte amont détenu par UCM) est aussi révoqué auprès de cette AC, qu’il soit révoqué seul, en masse, par une demande approuvée, comme certificat utilisateur, avec l’inscription ou l’utilisateur auquel il appartient, comme membre lié d’une paire, ou par sa clé auprès du serveur ACME propre à UCM. Si l’AC ne confirme pas, la révocation reste due et est renvoyée par la tâche de renouvellement jusqu’à ce que l’AC confirme ou que le certificat expire ; une suspension reste dans UCM, ACME n’en ayant pas. Si aucun compte d’UCM ne peut parler pour lui, la révocation reste locale et un avertissement indique de la révoquer directement auprès de l’AC. Le motif est envoyé quand il vaut keyCompromise, affiliationChanged, superseded, cessationOfOperation ou privilegeWithdrawn.
 
 ### Serveur ACME personnalisé
-Utilisez toute AC conforme RFC 8555, pas seulement Let's Encrypt :
+Utilisez toute AC conforme RFC 8555, pas seulement Let’s Encrypt :
 
 | Fournisseur AC | URL du répertoire |
 |---|---|
-| **Let's Encrypt** | *(par défaut, laisser vide)* |
+| **Let’s Encrypt** | *(par défaut, laisser vide)* |
 | **ZeroSSL** | \`https://acme.zerossl.com/v2/DV90\` |
 | **HARICA** | \`https://acme-v02.harica.gr/acme/<token>/directory\` |
 | **Google Trust** | \`https://dv.acme-v02.api.pki.goog/directory\` |
 
-Définissez l'URL du répertoire de votre AC comme **URL du répertoire ACME** de son compte dans **Autorités de certification (AC)**.
+Définissez l’URL du répertoire de votre AC comme **URL du répertoire ACME** de son compte dans **Autorités de certification (AC)**.
 
 ### Autorités de certification (AC)
-Gérez tous les comptes externes avec lesquels UCM s'enregistre :
+Gérez tous les comptes externes avec lesquels UCM s’enregistre :
 
-- **Plusieurs comptes par AC autorisés** : plusieurs comptes peuvent partager la même URL de répertoire (ex. deux comptes Let's Encrypt avec des e-mails de contact différents pour la séparation administrative, utile avec dns-persist-01). La ligne du compte, pas l'URL, sert d'identité.
-- **URL de répertoire vide** : vaut par défaut Let's Encrypt Production.
+- **Plusieurs comptes par AC autorisés** : plusieurs comptes peuvent partager la même URL de répertoire (ex. deux comptes Let’s Encrypt avec des e-mails de contact différents pour la séparation administrative, utile avec dns-persist-01). La ligne du compte, pas l’URL, sert d’identité.
+- **URL de répertoire vide** : vaut par défaut Let’s Encrypt Production.
 - **Compte par défaut** : utilisé quand une demande ne sélectionne aucun compte ; les recherches par URL renvoient le compte par défaut.
-- **Import** : importez la clé privée d'un compte existant à la création : les enveloppes PKCS#8, SEC1/X9.62 (\`BEGIN EC PRIVATE KEY\`) et PKCS#1 (\`BEGIN RSA PRIVATE KEY\`) sont acceptées ; l'algorithme est déduit automatiquement.
+- **Import** : importez la clé privée d’un compte existant à la création : les enveloppes PKCS#8, SEC1/X9.62 (\`BEGIN EC PRIVATE KEY\`) et PKCS#1 (\`BEGIN RSA PRIVATE KEY\`) sont acceptées ; l’algorithme est déduit automatiquement.
 - **Point de terminaison proxy dédié** : chaque compte peut exposer \`/acme/proxy/<slug>/directory\` avec son propre slug.
 
 ### Liaison de compte externe (EAB)
-Certains AC nécessitent des identifiants EAB pour lier votre compte ACME à un compte existant chez l'AC :
+Certains AC nécessitent des identifiants EAB pour lier votre compte ACME à un compte existant chez l’AC :
 
 1. Inscrivez-vous sur le portail de votre AC pour obtenir le **Key ID EAB** et la **clé HMAC**
 2. Entrez les deux valeurs (**Identifiant de clé EAB**, **Clé HMAC EAB**) sur le compte AC dans **Autorités de certification (AC)**
-3. La clé HMAC est encodée en base64url (fournie par l'AC)
+3. La clé HMAC est encodée en base64url (fournie par l’AC)
 
-> 💡 EAB est requis par ZeroSSL, HARICA, Google Trust Services et la plupart des AC d'entreprise.
+> 💡 EAB est requis par ZeroSSL, HARICA, Google Trust Services et la plupart des AC d’entreprise.
 
 ### ECDSA vs RSA
 
@@ -254,23 +254,23 @@ Certains AC nécessitent des identifiants EAB pour lier votre compte ACME à un 
 Les clés ECDSA sont recommandées pour les déploiements modernes : plus petites, plus rapides et tout aussi sécurisées.
 
 ### Source de la clé
-Lors d'une demande de certificat, choisissez d'où vient la clé privée :
+Lors d’une demande de certificat, choisissez d’où vient la clé privée :
 
 - **Générer une nouvelle clé** *(défaut)* : UCM crée une paire de clés à chaque ordre
-- **Réutiliser la clé au renouvellement** : conserve la même clé privée d'un renouvellement à l'autre (nécessaire pour DANE/TLSA et le key pinning) ; la première émission génère la clé, les renouvellements la rechargent
-- **Fournir un CSR externe** : collez un CSR PEM généré ailleurs ; UCM le soumet au finalize et la clé privée n'entre jamais dans UCM. Les domaines du CSR doivent correspondre exactement aux identifiants de l'ordre
+- **Réutiliser la clé au renouvellement** : conserve la même clé privée d’un renouvellement à l’autre (nécessaire pour DANE/TLSA et le key pinning) ; la première émission génère la clé, les renouvellements la rechargent
+- **Fournir un CSR externe** : collez un CSR PEM généré ailleurs ; UCM le soumet au finalize et la clé privée n’entre jamais dans UCM. Les domaines du CSR doivent correspondre exactement aux identifiants de l’ordre
 
-En mode FIPS, réutiliser la clé d'un certificat source est refusé quand FIPS n'approuve pas cette clé (ML-DSA compris).
+En mode FIPS, réutiliser la clé d’un certificat source est refusé quand FIPS n’approuve pas cette clé (ML-DSA compris).
 
 ### Preflight (test à blanc)
-**Lancer le preflight** sur le formulaire de demande valide toute la requête contre le répertoire **staging** de Let's Encrypt, sans consommer les limites de production :
+**Lancer le preflight** sur le formulaire de demande valide toute la requête contre le répertoire **staging** de Let’s Encrypt, sans consommer les limites de production :
 
-- Vérifie la syntaxe des domaines, l'email de contact, le compte ACME / EAB et la connectivité AC
+- Vérifie la syntaxe des domaines, l’email de contact, le compte ACME / EAB et la connectivité AC
 - Le mode **Complet** crée un ordre staging et prévisualise les enregistrements TXT \`_acme-challenge\` exacts à publier
-- **Validation seule** vérifie configuration et connectivité sans créer d'ordre
+- **Validation seule** vérifie configuration et connectivité sans créer d’ordre
 - Peut vérifier la propagation DNS des TXT une fois les enregistrements ajoutés
 
-> 💡 Les AC personnalisées n'ont pas d'endpoint staging : le preflight ne valide alors que la configuration et la connectivité.
+> 💡 Les AC personnalisées n’ont pas d’endpoint staging : le preflight ne valide alors que la configuration et la connectivité.
 
 ### Fournisseurs DNS
 Configurez les fournisseurs de défi DNS-01 pour la validation de domaine. Les fournisseurs pris en charge incluent :
@@ -286,27 +286,27 @@ Configurez les fournisseurs de défi DNS-01 pour la validation de domaine. Les f
 
 Chaque fournisseur nécessite des identifiants API spécifiques au service DNS.
 
-Le nettoyage ne supprime que la valeur TXT de son order : un autre order, ou le wildcard et l'apex qui partagent le nom, gardent la leur ; DuckDNS, Hurricane Electric et FreeDNS ne tiennent qu'une valeur par nom : ils l'effacent seulement si aucun autre order en cours ne l'utilise, et refusent un order pour un domaine et son wildcard (v2.252). Vercel accepte un **Team ID** facultatif pour les domaines appartenant à une équipe, et RcodeZero exige un jeton avec accès en lecture et écriture à la zone. Un nom de fournisseur déjà utilisé est refusé (v2.251). Le fournisseur RFC 2136 accepte un nom d'hôte comme serveur DNS et utilise une **Zone** renseignée pour les noms qu'elle contient ; sinon la zone provient du SOA que renvoie le serveur configuré (v2.252).
+Le nettoyage ne supprime que la valeur TXT de son order : un autre order, ou le wildcard et l’apex qui partagent le nom, gardent la leur ; DuckDNS, Hurricane Electric et FreeDNS ne tiennent qu’une valeur par nom : ils l’effacent seulement si aucun autre order en cours ne l’utilise, et refusent un order pour un domaine et son wildcard (v2.252). Vercel accepte un **Team ID** facultatif pour les domaines appartenant à une équipe, et RcodeZero exige un jeton avec accès en lecture et écriture à la zone. Un nom de fournisseur déjà utilisé est refusé (v2.251). Le fournisseur RFC 2136 accepte un nom d’hôte comme serveur DNS et utilise une **Zone** renseignée pour les noms qu’elle contient ; sinon la zone provient du SOA que renvoie le serveur configuré (v2.252).
 
 #### Fournisseur Custom Command
-Pour les services DNS sans pilote natif, le fournisseur **Custom Command** exécute des commandes locales configurées par l'admin pour créer/supprimer les enregistrements TXT. Les détails de l'enregistrement sont passés en variables d'environnement :
+Pour les services DNS sans pilote natif, le fournisseur **Custom Command** exécute des commandes locales configurées par l’admin pour créer/supprimer les enregistrements TXT. Les détails de l’enregistrement sont passés en variables d’environnement :
 
 - \`DOMAIN\` : domaine de base en cours de validation
-- \`RECORD_NAME\` : nom complet de l'enregistrement TXT (\`_acme-challenge.example.com\`)
+- \`RECORD_NAME\` : nom complet de l’enregistrement TXT (\`_acme-challenge.example.com\`)
 - \`RECORD_VALUE\` : contenu du TXT (digest du défi)
-- \`TTL\` : TTL de l'enregistrement en secondes
+- \`TTL\` : TTL de l’enregistrement en secondes
 - \`ACTION\` : \`create\` ou \`delete\`
 
-La commande exige un **chemin binaire absolu**, s'exécute sans shell (ni pipes ni expansion) et est tuée après un timeout configurable (5-300 s, 60 par défaut). Utilisez un petit script wrapper pour relier n'importe quel outillage DNS externe.
+La commande exige un **chemin binaire absolu**, s’exécute sans shell (ni pipes ni expansion) et est tuée après un timeout configurable (5-300 s, 60 par défaut). Utilisez un petit script wrapper pour relier n’importe quel outillage DNS externe.
 
 ### Résolveurs DNS personnalisés
-**Résolveurs DNS-01** choisit où UCM recherche les enregistrements TXT \`_acme-challenge\` : **Automatique** (résolveurs listés, puis serveurs autoritaires de la zone, puis résolveurs publics, puis résolveur système), **Résolveur système uniquement** ou **Résolveurs listés uniquement**. Les modes restreints n'interrogent jamais les résolveurs publics, pour les réseaux qui les bloquent. Les entrées sont des IP séparées par des virgules avec un port optionnel, par ex. \`127.0.0.1:5353\` ou \`[2001:db8::53]:5300\`.
+**Résolveurs DNS-01** choisit où UCM recherche les enregistrements TXT \`_acme-challenge\` : **Automatique** (résolveurs listés, puis serveurs autoritaires de la zone, puis résolveurs publics, puis résolveur système), **Résolveur système uniquement** ou **Résolveurs listés uniquement**. Les modes restreints n’interrogent jamais les résolveurs publics, pour les réseaux qui les bloquent. Les entrées sont des IP séparées par des virgules avec un port optionnel, par ex. \`127.0.0.1:5353\` ou \`[2001:db8::53]:5300\`.
 
 ### Challenges HTTP-01
-UCM sert le fichier de challenge de ses orders en attente sur \`/.well-known/acme-challenge/<token>\`, via le port du protocole HTTP (8080 par défaut). L'AC le récupère sur le port 80 du domaine : redirigez donc ce chemin vers UCM depuis votre reverse proxy, ou liez UCM au port 80. **Verify Challenge** récupère d'abord le fichier et ne soumet pas s'il n'est pas servi ; **Force verification** soumet quand même. Les orders HTTP-01 se renouvellent automatiquement.
+UCM sert le fichier de challenge de ses orders en attente sur \`/.well-known/acme-challenge/<token>\`, via le port du protocole HTTP (8080 par défaut). L’AC le récupère sur le port 80 du domaine : redirigez donc ce chemin vers UCM depuis votre reverse proxy, ou liez UCM au port 80. **Verify Challenge** récupère d’abord le fichier et ne soumet pas s’il n’est pas servi ; **Force verification** soumet quand même. Les orders HTTP-01 se renouvellent automatiquement.
 
 ### Domaines
-Associez vos domaines aux fournisseurs DNS. Lors de la demande d'un certificat pour un domaine, UCM utilise le fournisseur associé pour créer les enregistrements de défi DNS-01.
+Associez vos domaines aux fournisseurs DNS. Lors de la demande d’un certificat pour un domaine, UCM utilise le fournisseur associé pour créer les enregistrements de défi DNS-01.
 
 1. Cliquez sur **Ajouter un domaine**
 2. Entrez le nom de domaine (par ex. \`example.com\` ou \`*.example.com\`)
@@ -318,7 +318,7 @@ Associez vos domaines aux fournisseurs DNS. Lors de la demande d'un certificat p
 
 ## Mode Proxy ACME
 
-Le proxy ACME permet aux clients internes de demander des certificats à une AC publique (Let's Encrypt, ZeroSSL, etc.) via UCM, sans accès direct à Internet. UCM agit comme intermédiaire, gérant les défis DNS-01 et transférant les requêtes à l'AC en amont.
+Le proxy ACME permet aux clients internes de demander des certificats à une AC publique (Let’s Encrypt, ZeroSSL, etc.) via UCM, sans accès direct à Internet. UCM agit comme intermédiaire, gérant les défis DNS-01 et transférant les requêtes à l’AC en amont.
 
 ### Quand utiliser le mode proxy
 - Serveurs internes sans accès direct à Internet
@@ -326,21 +326,21 @@ Le proxy ACME permet aux clients internes de demander des certificats à une AC 
 - Audit et suivi de toutes les émissions de certificats publics
 
 ### Configuration
-1. Allez dans **ACME** → onglet **Let's Encrypt**
-2. Faites défiler jusqu'à la section **Proxy ACME**
-3. Sélectionnez un **Compte AC en amont** dans **Autorités de certification (AC)** (Let's Encrypt, Actalis, ZeroSSL, URL personnalisée, EAB)
-4. Cliquez sur **Tester la connexion** pour vérifier la connectivité avec l'AC en amont
+1. Allez dans **ACME** → onglet **Let’s Encrypt**
+2. Faites défiler jusqu’à la section **Proxy ACME**
+3. Sélectionnez un **Compte AC en amont** dans **Autorités de certification (AC)** (Let’s Encrypt, Actalis, ZeroSSL, URL personnalisée, EAB)
+4. Cliquez sur **Tester la connexion** pour vérifier la connectivité avec l’AC en amont
 5. Enregistrez le compte amont si nécessaire (email + **Enregistrer le compte**)
-6. UCM enregistre automatiquement un compte à la première requête proxy si ce n'est pas déjà fait
+6. UCM enregistre automatiquement un compte à la première requête proxy si ce n’est pas déjà fait
 
 ### Chemins proxy dédiés (multi-AC)
 Chaque compte AC externe peut exposer son propre endpoint proxy ACME :
 
-1. Ouvrez **Autorités de certification (AC)** (même onglet Let's Encrypt)
+1. Ouvrez **Autorités de certification (AC)** (même onglet Let’s Encrypt)
 2. Modifiez ou créez un compte AC
 3. Activez **Exposer via le proxy ACME**
 4. Définissez un **Chemin proxy (slug)** unique : ex. \`actalis-production\`, \`letsencrypt-staging\`
-5. Enregistrez : l'URL apparaît dans la section proxy et sur la fiche du compte
+5. Enregistrez : l’URL apparaît dans la section proxy et sur la fiche du compte
 
 Les clients utilisent :
 \`\`\`
@@ -355,20 +355,20 @@ https://your-ucm-server:8443/acme/proxy/directory
 Slugs réservés (interdits) : \`directory\`, \`new-order\`, \`challenge\`, \`acct\`, etc.
 
 ### Gestion des comptes
-- Le **badge de statut du compte** indique si UCM est enregistré auprès de l'AC en amont
+- Le **badge de statut du compte** indique si UCM est enregistré auprès de l’AC en amont
 - Chaque compte AC conserve sa propre inscription en amont : basculer sur un autre compte utilise celle de ce compte, enregistrée à la première requête proxy si nécessaire
 - Utilisez le bouton **Réinitialiser le compte** pour effacer manuellement les identifiants si nécessaire
 - **Test de connexion** vérifie si le répertoire en amont est accessible et si un EAB est requis
 
 ### Purge des certificats remplacés
-Chaque renouvellement via le proxy importe un nouveau certificat dans l'inventaire, si bien que les certificats remplacés s'accumulent avec le temps. La bascule **Purger les certificats remplacés** (réglages proxy) nettoie automatiquement : quand un ordre proxy se finalise, les certificats précédemment importés par des ordres proxy pour **exactement le même ensemble de domaines** sont supprimés.
+Chaque renouvellement via le proxy importe un nouveau certificat dans l’inventaire, si bien que les certificats remplacés s’accumulent avec le temps. La bascule **Purger les certificats remplacés** (réglages proxy) nettoie automatiquement : quand un ordre proxy se finalise, les certificats précédemment importés par des ordres proxy pour **exactement le même ensemble de domaines** sont supprimés.
 
 - **Les certificats révoqués sont toujours conservés** : la trace de révocation reste intacte
 - Les certificats non émis via le proxy ne sont jamais touchés
 - Désactivé par défaut
 
 ### Utilisation du proxy
-Dirigez vos clients ACME internes vers le répertoire proxy de l'AC cible.
+Dirigez vos clients ACME internes vers le répertoire proxy de l’AC cible.
 
 **URL par slug** (recommandé lorsque plusieurs AC sont exposées) :
 \`\`\`
@@ -392,32 +392,32 @@ certbot certonly \\
   -d subdomain.example.com
 \`\`\`
 
-> 💡 Les identifiants EAB du compte AC en amont sont distincts de l'EAB client : ils authentifient UCM auprès de l'AC en amont, pas vos clients auprès de UCM. Définissez-les sur ce compte dans **Autorités de certification (AC)**.
+> 💡 Les identifiants EAB du compte AC en amont sont distincts de l’EAB client : ils authentifient UCM auprès de l’AC en amont, pas vos clients auprès de UCM. Définissez-les sur ce compte dans **Autorités de certification (AC)**.
 
 > ⚠ Prérequis : le domaine (ou un domaine parent couvrant les sous-domaines) doit être configuré dans ACME Domains avec un fournisseur DNS. Le proxy ne gère que dns-01.
 
 > ⚠ Évitez les demandes simultanées pour le même FQDN (Certbot + interface UCM) : le second enregistrement TXT peut écraser le premier.
 
-Les erreurs de l'AC en amont parviennent au client avec leur type ACME, leur statut et leur Retry-After (une limite de débit est un 429 \`rateLimited\`, pas une panne du proxy). Un profil, \`notBefore\` et \`notAfter\` sont transmis en amont ; un profil que l'AC en amont ne liste pas est refusé avec \`invalidProfile\`. Quand le fournisseur DNS refuse l'enregistrement TXT, le défi n'est pas soumis en amont et l'order devient invalide, avec le message du fournisseur dans les journaux. Quand l'AC en amont refuse la réponse au défi, ou répond par une 5xx ou rien sans que l'autorisation montre le défi pris en compte, l'order devient aussi invalide définitivement avec l'erreur en amont et ses enregistrements TXT sont supprimés : le prochain order du client est validé à nouveau. Une CSR qui ne nomme pas exactement les identifiants de l'order est refusée avec \`badCSR\` avant d'atteindre l'AC en amont (v2.252).
+Les erreurs de l’AC en amont parviennent au client avec leur type ACME, leur statut et leur Retry-After (une limite de débit est un 429 \`rateLimited\`, pas une panne du proxy). Un profil, \`notBefore\` et \`notAfter\` sont transmis en amont ; un profil que l’AC en amont ne liste pas est refusé avec \`invalidProfile\`. Quand le fournisseur DNS refuse l’enregistrement TXT, le défi n’est pas soumis en amont et l’order devient invalide, avec le message du fournisseur dans les journaux. Quand l’AC en amont refuse la réponse au défi, ou répond par une 5xx ou rien sans que l’autorisation montre le défi pris en compte, l’order devient aussi invalide définitivement avec l’erreur en amont et ses enregistrements TXT sont supprimés : le prochain order du client est validé à nouveau. Une CSR qui ne nomme pas exactement les identifiants de l’order est refusée avec \`badCSR\` avant d’atteindre l’AC en amont (v2.252).
 
 > ℹ️ En environnement lab / certificat auto-signé, ajoutez \`--no-verify-ssl\` à Certbot.
 
 ### DNS UPDATE (RFC 2136)
-Les clients qui ne peuvent utiliser qu'un solveur rfc2136 standard peuvent aussi utiliser le proxy ACME. Ils envoient la mise à jour DNS à UCM, et UCM crée l'enregistrement TXT avec son propre fournisseur DNS.
+Les clients qui ne peuvent utiliser qu’un solveur rfc2136 standard peuvent aussi utiliser le proxy ACME. Ils envoient la mise à jour DNS à UCM, et UCM crée l’enregistrement TXT avec son propre fournisseur DNS.
 
 #### Configuration
 1. Activez **Exposer via le proxy ACME** sur le compte AC et définissez un chemin de proxy (voir ci-dessus)
-2. Dans la section **Proxy ACME**, définissez le **port du listener DNS UPDATE** (0 le désactive, 1024 à 65535). Redémarrez UCM pour l'appliquer
+2. Dans la section **Proxy ACME**, définissez le **port du listener DNS UPDATE** (0 le désactive, 1024 à 65535). Redémarrez UCM pour l’appliquer
 3. Rendez le port accessible uniquement depuis le réseau interne. Pour le port 53, redirigez-le vers le listener dans Docker ou Kubernetes, ou avec le pare-feu
 4. Sur la carte du compte AC, cliquez sur **Clés DNS UPDATE (RFC 2136)**, puis sur **Nouvelle clé**
 5. Choisissez un algorithme (hmac-sha256 par défaut) et, si besoin, un identifiant EAB
-6. Copiez le secret et l'extrait de configuration pour votre client. UCM affiche le secret une seule fois
+6. Copiez le secret et l’extrait de configuration pour votre client. UCM affiche le secret une seule fois
 
 #### Ce que UCM accepte
 - Uniquement les enregistrements TXT sous \`_acme-challenge\` avec la valeur que UCM attend pour la commande
 - UCM répond toujours NOERROR à une suppression
 - Une clé fonctionne pour le compte proxy auquel elle appartient. Avec un lien EAB, elle ne fonctionne que pour les commandes du compte ACME enregistré avec cet identifiant
-- Révoquez une clé pour l'arrêter immédiatement. Supprimez une clé révoquée pour la retirer
+- Révoquez une clé pour l’arrêter immédiatement. Supprimez une clé révoquée pour la retirer
 
 #### Notes sur les clients
 - **Algorithme** : UCM refuse les valeurs par défaut de nombreux clients (HMAC-MD5, hmac-sha1). Définissez hmac-sha256 (ou sha512) dans chaque client
@@ -425,7 +425,7 @@ Les clients qui ne peuvent utiliser qu'un solveur rfc2136 standard peuvent aussi
 - **lego** : définissez \`DNSUPDATE_TSIG_ALGORITHM\`. La valeur par défaut est hmac-sha1. Utilisez \`--dns.propagation-wait\` si lego ne voit pas la zone publique
 - **cert-manager** : ne prend en charge que HMACSHA256 et HMACSHA512, pas sha384. Il trouve la zone avec ses résolveurs récursifs : définissez \`--dns01-recursive-nameservers\` sur un résolveur qui voit la zone publique
 - **acme.sh** : utilisez \`dns_nsupdate\` avec \`NSUPDATE_KEY\` qui pointe vers le fichier de clé BIND. Utilisez \`--dnssleep\` si les vérifications du DNS public échouent
-- **win-acme** : envoie toujours la mise à jour au port 53 (\`--serverport\` sert de délai d'attente) : redirigez donc le port 53 vers le listener UCM. Il calcule hmac-sha384 de façon incorrecte : utilisez sha256
+- **win-acme** : envoie toujours la mise à jour au port 53 (\`--serverport\` sert de délai d’attente) : redirigez donc le port 53 vers le listener UCM. Il calcule hmac-sha384 de façon incorrecte : utilisez sha256
 - **Posh-ACME** : \`DDNSNameserver\` est obligatoire. Sans lui, nsupdate envoie la mise à jour au MNAME de la zone sur le port 53
 
 Exemple (acme.sh) :
@@ -443,7 +443,7 @@ acme.sh --issue --dns dns_nsupdate --server https://ucm.example.com/acme/proxy/<
 ### Configuration
 - **Activer/Désactiver** : Basculer le serveur ACME intégré
 - **AC par défaut** : Sélectionner quelle AC signe les certificats par défaut
-- **Conditions d'utilisation** : titre et texte Markdown optionnels, servis par UCM et liés depuis le répertoire
+- **Conditions d’utilisation** : titre et texte Markdown optionnels, servis par UCM et liés depuis le répertoire
 
 ### URL du répertoire ACME
 \`\`\`
@@ -453,7 +453,7 @@ https://your-server:8443/acme/directory
 Les clients comme certbot, acme.sh ou Caddy utilisent cette URL pour découvrir les points de terminaison ACME.
 
 ### Domaines locaux (multi-AC)
-Associez des domaines internes à des AC spécifiques. Cela permet à différents domaines d'être signés par différentes AC.
+Associez des domaines internes à des AC spécifiques. Cela permet à différents domaines d’être signés par différentes AC.
 
 1. Cliquez sur **Ajouter un domaine**
 2. Entrez le domaine (par ex. \`internal.corp\` ou \`*.dev.local\`)
@@ -462,10 +462,10 @@ Associez des domaines internes à des AC spécifiques. Cela permet à différent
 5. Cliquez sur **Enregistrer**
 
 ### Ordre de résolution des AC
-Lorsqu'un client ACME demande un certificat, UCM détermine l'AC de signature dans cet ordre :
+Lorsqu’un client ACME demande un certificat, UCM détermine l’AC de signature dans cet ordre :
 1. **Mappage de domaine local** : Correspondance exacte, puis correspondance de domaine parent
-2. **Mappage de domaine DNS** : L'AC configurée pour le fournisseur DNS
-3. **Valeur par défaut globale** : L'AC définie dans la configuration du serveur ACME
+2. **Mappage de domaine DNS** : L’AC configurée pour le fournisseur DNS
+3. **Valeur par défaut globale** : L’AC définie dans la configuration du serveur ACME
 4. **Première disponible** : Toute AC avec une clé privée
 
 ### Identifiants EAB (côté serveur)
@@ -475,14 +475,14 @@ Chaque identifiant peut être restreint aux **domaines pour lesquels il peut dem
 - \`*\` : tout domaine (valeur par défaut pour les identifiants nouveaux et préexistants)
 - \`*.example.com\` : le domaine et tous ses sous-domaines
 - Une liste explicite de domaines
-- Une **liste vide bloque entièrement l'émission** pour cet identifiant
+- Une **liste vide bloque entièrement l’émission** pour cet identifiant
 
-Les restrictions sont appliquées sur new-order et new-authz, à la fois sur le serveur ACME intégré et sur le proxy. Elles n'ont de sens que quand l'**EAB est exigé** : sinon les clients peuvent simplement s'enregistrer sans identifiant.
+Les restrictions sont appliquées sur new-order et new-authz, à la fois sur le serveur ACME intégré et sur le proxy. Elles n’ont de sens que quand l'**EAB est exigé** : sinon les clients peuvent simplement s’enregistrer sans identifiant.
 
 ### Comptes
 Voir les comptes clients ACME enregistrés :
 - ID du compte et e-mail de contact
-- Date d'inscription
+- Date d’inscription
 - Nombre de commandes
 
 ### Historique
@@ -490,21 +490,21 @@ Parcourir les certificats émis via ACME :
 - Nom commun
 - Statut
 - Émetteur
-- Date d'expiration
+- Date d’expiration
 - Source
 
 ### Dates demandées
-Une commande peut porter \`notBefore\` et \`notAfter\` (cert-manager avec une \`duration\`, \`--not-after\` de lego). Le certificat est émis avec exactement ces dates, ou la demande est refusée comme \`malformed\` : une fenêtre plus longue que la validité du profil (15 minutes de décalage d'horloge exclues), hors de la validité de l'AC émettrice, ou déjà passée. Une fenêtre plus longue que la validité maximale d'une politique est refusée à la finalisation comme \`malformed\` et la commande devient invalide ; une fenêtre qui finit au-delà d'un horizon de type de clé est refusée comme \`badCSR\` et la commande reste prête pour une CSR avec une autre clé. Sans elles, la validité du profil s'applique.
+Une commande peut porter \`notBefore\` et \`notAfter\` (cert-manager avec une \`duration\`, \`--not-after\` de lego). Le certificat est émis avec exactement ces dates, ou la demande est refusée comme \`malformed\` : une fenêtre plus longue que la validité du profil (15 minutes de décalage d’horloge exclues), hors de la validité de l’AC émettrice, ou déjà passée. Une fenêtre plus longue que la validité maximale d’une politique est refusée à la finalisation comme \`malformed\` et la commande devient invalide ; une fenêtre qui finit au-delà d’un horizon de type de clé est refusée comme \`badCSR\` et la commande reste prête pour une CSR avec une autre clé. Sans elles, la validité du profil s’applique.
 
 ### Révocation
-Un client révoque avec la clé de son compte ou avec la clé du certificat lui-même, et le certificat envoyé doit correspondre octet pour octet à celui stocké : un numéro de série seul ne suffit jamais. Un compte détenant des autorisations valides et non expirées pour chaque nom et chaque adresse IP d'un certificat émis par ce serveur ACME peut aussi le révoquer, quel que soit celui qui l'a commandé ; les autorisations accordées par approbation automatique ne comptent pas. Seule une clé RSA ou EC P-256, P-384 ou P-521 peut signer une requête ACME ; un certificat ML-DSA, EdDSA ou Brainpool se révoque donc avec le compte qui l'a commandé, et UCM l'indique dans son refus.
+Un client révoque avec la clé de son compte ou avec la clé du certificat lui-même, et le certificat envoyé doit correspondre octet pour octet à celui stocké : un numéro de série seul ne suffit jamais. Un compte détenant des autorisations valides et non expirées pour chaque nom et chaque adresse IP d’un certificat émis par ce serveur ACME peut aussi le révoquer, quel que soit celui qui l’a commandé ; les autorisations accordées par approbation automatique ne comptent pas. Seule une clé RSA ou EC P-256, P-384 ou P-521 peut signer une requête ACME ; un certificat ML-DSA, EdDSA ou Brainpool se révoque donc avec le compte qui l’a commandé, et UCM l’indique dans son refus.
 
-## Certificats d'adresse IP (RFC 8738)
+## Certificats d’adresse IP (RFC 8738)
 
 Le serveur ACME local peut émettre des certificats pour des **adresses IP** (IPv4 et IPv6), pas seulement des noms DNS. Utile pour les services internes, les équipements et les hôtes adressés directement par IP.
 
 ### Commander un certificat IP
-Utilisez le type d'identifiant \`ip\` dans la commande ACME :
+Utilisez le type d’identifiant \`ip\` dans la commande ACME :
 \`\`\`json
 {
   "identifiers": [
@@ -517,13 +517,13 @@ Les commandes mixtes DNS + IP sont également prises en charge.
 
 ### Validation
 - **HTTP-01** et **TLS-ALPN-01** sont les seuls défis proposés pour les identifiants IP. **DNS-01 est interdit** pour les IP par la RFC 8738.
-- **HTTP-01** se connecte directement à l'IP (les littéraux IPv6 sont entre crochets, ex. \`http://[2001:db8::1]/...\`).
-- **TLS-ALPN-01** utilise la forme reverse-DNS de l'IP (\`in-addr.arpa\` / \`ip6.arpa\`) comme nom d'hôte SNI.
+- **HTTP-01** se connecte directement à l’IP (les littéraux IPv6 sont entre crochets, ex. \`http://[2001:db8::1]/...\`).
+- **TLS-ALPN-01** utilise la forme reverse-DNS de l’IP (\`in-addr.arpa\` / \`ip6.arpa\`) comme nom d’hôte SNI.
 
-- **TLS-ALPN-01** exige que le SubjectAltName du certificat de validation contienne exactement le nom ou l'IP validé, rien d'autre.
+- **TLS-ALPN-01** exige que le SubjectAltName du certificat de validation contienne exactement le nom ou l’IP validé, rien d’autre.
 
 ### Certificat émis
-Le certificat signé contient une entrée SubjectAltName **iPAddress** pour chaque IP validée. La CSR peut aussi placer l'une des adresses IP de la commande dans son common name.
+Le certificat signé contient une entrée SubjectAltName **iPAddress** pour chaque IP validée. La CSR peut aussi placer l’une des adresses IP de la commande dans son common name.
 
 > 💡 Les adresses internes (RFC1918, loopback) se valident nativement : le mode de déploiement principal de UCM. Les IP de métadonnées cloud restent bloquées.
 
@@ -533,22 +533,22 @@ Le serveur ACME local prend en charge **dns-persist-01** (draft-ietf-acme-dns-pe
 
 ### Mise en place
 1. Activez-le dans **ACME → ACME local → Validation DNS persistante** (désactivé par défaut).
-2. Créez l'enregistrement une seule fois :
+2. Créez l’enregistrement une seule fois :
 \`\`\`
 _validation-persist.app.example.com. IN TXT "ca.example.com; accounturi=https://ca.example.com/acme/acct/<id>"
 \`\`\`
-L'objet challenge annonce les valeurs attendues \`accounturi\` et \`issuer-domain-names\`.
+L’objet challenge annonce les valeurs attendues \`accounturi\` et \`issuer-domain-names\`.
 
 ### Options
 - \`policy=wildcard\` : autorise aussi les certificats wildcard et les sous-domaines du nom validé (un enregistrement sur un domaine parent couvre ses enfants)
 - \`persistUntil=<unix-timestamp>\` : bloque les nouvelles validations après cette date
 
-> ⚠️ L'enregistrement donne la capacité d'émission à la clé du compte ACME tant qu'il existe : supprimez le TXT pour la révoquer.
+> ⚠️ L’enregistrement donne la capacité d’émission à la clé du compte ACME tant qu’il existe : supprimez le TXT pour la révoquer.
 
 ## Utiliser certbot
 
 \`\`\`
-# Enregistrer un compte (Let's Encrypt : par défaut)
+# Enregistrer un compte (Let’s Encrypt : par défaut)
 certbot register --agree-tos --email admin@example.com
 
 # Enregistrer avec une AC ACME personnalisée + EAB
@@ -570,7 +570,7 @@ certbot renew --server https://your-server:8443/acme/directory
 ## Utiliser acme.sh
 
 \`\`\`
-# Par défaut (Let's Encrypt)
+# Par défaut (Let’s Encrypt)
 acme.sh --issue -d example.com --standalone
 
 # AC ACME personnalisée avec EAB et ECDSA
@@ -582,16 +582,16 @@ acme.sh --issue \\
   -d example.com --standalone
 \`\`\`
 
-> ⚠ Pour ACME interne, les clients doivent faire confiance à l'AC UCM. Installez le certificat de l'AC racine dans le magasin de confiance du client.
+> ⚠ Pour ACME interne, les clients doivent faire confiance à l’AC UCM. Installez le certificat de l’AC racine dans le magasin de confiance du client.
 
 ## Renewal Information (ARI, RFC 9773)
 
 Le serveur ACME local annonce \`renewalInfo\` dans son directory et sert une **fenêtre de renouvellement suggérée** par certificat.
 
-- Fenêtre centrée avant l'expiration → renouvellements étalés dans le temps
+- Fenêtre centrée avant l’expiration → renouvellements étalés dans le temps
 - Certificat révoqué → fenêtre dans le passé (renouveler tout de suite)
 - GET non authentifié sur \`/acme/renewalInfo/<certID>\`
-- Proxy ACME : la fenêtre de l'AC en amont est relayée avec son Retry-After pour un certificat émis via le proxy ; calculée localement quand l'AC n'en a pas ou ne répond pas
+- Proxy ACME : la fenêtre de l’AC en amont est relayée avec son Retry-After pour un certificat émis via le proxy ; calculée localement quand l’AC n’en a pas ou ne répond pas
 
 `
   }

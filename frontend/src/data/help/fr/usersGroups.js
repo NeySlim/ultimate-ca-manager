@@ -2,17 +2,17 @@ export default {
   helpContent: {
     title: 'Utilisateurs et groupes',
     subtitle: 'Gestion des identités et des accès',
-    overview: 'Gérez les comptes utilisateurs et les appartenances aux groupes. Attribuez des rôles pour contrôler l\'accès aux fonctionnalités UCM. Les groupes permettent la gestion des permissions en masse pour les équipes.',
+    overview: 'Gérez les comptes utilisateurs et les appartenances aux groupes. Attribuez des rôles pour contrôler l’accès aux fonctionnalités UCM. Les groupes permettent la gestion des permissions en masse pour les équipes.',
     sections: [
       {
         title: 'Utilisateurs',
         items: [
-          { label: 'Créer un utilisateur', text: 'Ajouter un nouvel utilisateur avec nom d\'utilisateur, e-mail et mot de passe initial' },
+          { label: 'Créer un utilisateur', text: 'Ajouter un nouvel utilisateur avec nom d’utilisateur, e-mail et mot de passe initial' },
           { label: 'Rôles', text: 'Attribuer des rôles système ou personnalisés pour contrôler les permissions' },
           { label: 'Statut', text: 'Activer ou désactiver les comptes utilisateurs' },
-          { label: 'Réinitialisation du mot de passe', text: 'Réinitialiser le mot de passe d\'un utilisateur (action administrateur). Les sessions ouvertes de l\'utilisateur sont fermées, comme par une réinitialisation de la 2FA' },
-          { label: 'Supprimer un utilisateur', text: "Supprimer un utilisateur révoque les certificats qu'il a inscrits pour mTLS (cessationOfOperation), puis les supprime. Un certificat que l'AC ne peut pas révoquer ne bloque pas la suppression : il reste valide, est nommé dans l'avertissement et le journal d'audit, et doit être révoqué sous Certificats. Un échec après certaines révocations conserve l'utilisateur et nomme les certificats déjà révoqués. Retirer un utilisateur ou l'un de ses certificats mTLS avertit quand l'AC ACME qui a émis un certificat n'a pas été informée de sa révocation" },
-          { label: 'Clés API', text: 'Dans le détail d\'un utilisateur, liste ses clés API et révoque une clé compromise ou inutilisée : elle cesse de fonctionner immédiatement, et une clé révoquée ou expirée peut ensuite être supprimée. Les propriétaires créent leurs clés depuis leur page Compte' },
+          { label: 'Réinitialisation du mot de passe', text: 'Réinitialiser le mot de passe d’un utilisateur (action administrateur). Les sessions ouvertes de l’utilisateur sont fermées, comme par une réinitialisation de la 2FA' },
+          { label: 'Supprimer un utilisateur', text: "Supprimer un utilisateur révoque les certificats qu’il a inscrits pour mTLS (cessationOfOperation), puis les supprime. Un certificat que l’AC ne peut pas révoquer ne bloque pas la suppression : il reste valide, est nommé dans l’avertissement et le journal d’audit, et doit être révoqué sous Certificats. Un échec après certaines révocations conserve l’utilisateur et nomme les certificats déjà révoqués. Retirer un utilisateur ou l’un de ses certificats mTLS avertit quand l’AC ACME qui a émis un certificat n’a pas été informée de sa révocation" },
+          { label: 'Clés API', text: 'Dans le détail d’un utilisateur, liste ses clés API et révoque une clé compromise ou inutilisée : elle cesse de fonctionner immédiatement, et une clé révoquée ou expirée peut ensuite être supprimée. Les propriétaires créent leurs clés depuis leur page Compte' },
           { label: 'Source', text: 'Indique ce qui ouvre chaque compte : Local (son mot de passe UCM), ou chaque fournisseur qui lui est rattaché, par type et par nom (par exemple OAuth2 · Okta, SAML · AD FS). Un compte peut être rattaché à plusieurs fournisseurs.' },
         ]
       },
@@ -30,43 +30,43 @@ export default {
       'Les utilisateurs désactivés ne peuvent pas se connecter mais leurs données sont préservées',
     ],
     warnings: [
-      'La suppression d\'un utilisateur est permanente : envisagez la désactivation à la place',
+      'La suppression d’un utilisateur est permanente : envisagez la désactivation à la place',
     ],
   },
   helpGuides: {
     title: 'Utilisateurs et groupes',
     content: `
-## Vue d'ensemble
+## Vue d’ensemble
 
-Gérez les comptes utilisateurs, les groupes et les attributions de rôles. Les utilisateurs s'authentifient sur UCM via mot de passe, SSO, WebAuthn ou mTLS. Les groupes permettent la gestion des permissions en masse.
+Gérez les comptes utilisateurs, les groupes et les attributions de rôles. Les utilisateurs s’authentifient sur UCM via mot de passe, SSO, WebAuthn ou mTLS. Les groupes permettent la gestion des permissions en masse.
 
 ## Onglet Utilisateurs
 
 ### Créer un utilisateur
 1. Cliquez sur **Créer un utilisateur**
-2. Entrez le **nom d'utilisateur** (unique, ne peut pas être modifié ultérieurement)
+2. Entrez le **nom d’utilisateur** (unique, ne peut pas être modifié ultérieurement)
 3. Entrez l'**e-mail** (utilisé pour les notifications et la récupération)
 4. Définissez un **mot de passe initial**
 5. Sélectionnez un **rôle** (Admin, Opérateur, Auditeur, Lecteur ou personnalisé)
 6. Cliquez sur **Créer**
 
-### Statut de l'utilisateur
+### Statut de l’utilisateur
 - **Actif** : Peut se connecter et effectuer des actions
 - **Désactivé** : Ne peut pas se connecter, les données sont préservées
 
-Basculez le statut d'un utilisateur sans supprimer son compte.
+Basculez le statut d’un utilisateur sans supprimer son compte.
 
 ### Réinitialisation du mot de passe
-Les administrateurs peuvent réinitialiser le mot de passe de tout utilisateur. L'utilisateur n'est pas invité à le changer à la prochaine connexion : donnez-lui le nouveau mot de passe et demandez-lui de le changer sous Mon compte.
+Les administrateurs peuvent réinitialiser le mot de passe de tout utilisateur. L’utilisateur n’est pas invité à le changer à la prochaine connexion : donnez-lui le nouveau mot de passe et demandez-lui de le changer sous Mon compte.
 
 ### Clés de sécurité
-Dans la fiche d'un utilisateur, les administrateurs voient ses clés de sécurité et peuvent en désactiver ou en retirer une, typiquement une clé perdue, qui sinon permet toujours de se connecter sans mot de passe. Retirer le dernier second facteur d'un compte qui en exige un demande une seconde confirmation ; l'utilisateur enrôle alors à nouveau un facteur à la prochaine connexion.
+Dans la fiche d’un utilisateur, les administrateurs voient ses clés de sécurité et peuvent en désactiver ou en retirer une, typiquement une clé perdue, qui sinon permet toujours de se connecter sans mot de passe. Retirer le dernier second facteur d’un compte qui en exige un demande une seconde confirmation ; l’utilisateur enrôle alors à nouveau un facteur à la prochaine connexion.
 
 ### Supprimer un utilisateur
-Supprimer un utilisateur révoque les certificats qu'il a inscrits pour mTLS (motif cessationOfOperation), puis les supprime. Un certificat que l'AC ne peut pas révoquer ne bloque pas la suppression : il reste valide, l'avertissement et le journal d'audit le nomment, et vous le révoquez sous Certificats. Si la suppression échoue après certaines révocations, le message nomme les certificats déjà révoqués : ils restent révoqués.
+Supprimer un utilisateur révoque les certificats qu’il a inscrits pour mTLS (motif cessationOfOperation), puis les supprime. Un certificat que l’AC ne peut pas révoquer ne bloque pas la suppression : il reste valide, l’avertissement et le journal d’audit le nomment, et vous le révoquez sous Certificats. Si la suppression échoue après certaines révocations, le message nomme les certificats déjà révoqués : ils restent révoqués.
 
 ### Clés API
-Chaque utilisateur peut avoir plusieurs clés API pour l'accès programmatique. Les clés API héritent des permissions du rôle de l'utilisateur. Voir la page Compte pour gérer vos propres clés.
+Chaque utilisateur peut avoir plusieurs clés API pour l’accès programmatique. Les clés API héritent des permissions du rôle de l’utilisateur. Voir la page Compte pour gérer vos propres clés.
 
 ## Onglet Groupes
 
@@ -82,7 +82,7 @@ Chaque utilisateur peut avoir plusieurs clés API pour l'accès programmatique. 
 - Les utilisateurs peuvent appartenir à plusieurs groupes
 
 ### Permissions de groupe
-Les permissions effectives d'un utilisateur sont l'**union** de :
+Les permissions effectives d’un utilisateur sont l'**union** de :
 - Les permissions de leur rôle directement attribué
 - Les permissions de leur rôle personnalisé, le cas échéant
 - Les permissions accordées par chaque groupe auquel ils appartiennent
@@ -92,15 +92,15 @@ Les permissions effectives d'un utilisateur sont l'**union** de :
 ### Rôles système
 - **Admin** : Accès complet à toutes les fonctionnalités
 - **Opérateur** : Peut gérer les certificats, AC, CSR, ACME, SSH et les paramètres système ; modèles et groupes en lecture seule, aucun accès aux utilisateurs ni au RBAC
-- **Auditeur** : Accès en lecture seule à toutes les données opérationnelles pour la conformité et l'audit
+- **Auditeur** : Accès en lecture seule à toutes les données opérationnelles pour la conformité et l’audit
 - **Lecteur** : Accès en lecture seule aux certificats, AC et modèles
 
 ### Rôles personnalisés
 Créez des rôles avec des permissions granulaires sur la page **RBAC**.
 
-> 💡 Utilisez les groupes pour gérer les permissions d'équipe plutôt que d'attribuer des rôles à des utilisateurs individuels.
+> 💡 Utilisez les groupes pour gérer les permissions d’équipe plutôt que d’attribuer des rôles à des utilisateurs individuels.
 
-## Source d'authentification
+## Source d’authentification
 
 La colonne **Source** indique ce qui ouvre chaque compte :
 - **Local** : créé et géré dans UCM (mot de passe local)
@@ -108,7 +108,7 @@ La colonne **Source** indique ce qui ouvre chaque compte :
 
 Depuis la v2.133, les rôles modifiés manuellement dans UCM sur des utilisateurs SSO sont **conservés** entre deux connexions, sauf si **« Synchroniser le rôle à chaque connexion »** est activé sur le fournisseur (voir page **Paramètres → SSO**).
 
-Le panneau du compte liste ses **fournisseurs d'authentification unique**, chacun lié, en attente de sa première connexion, ou laissé par un fournisseur supprimé. **Rattacher un fournisseur** en ajoute un : les fournisseurs déjà rattachés continuent d'ouvrir le compte, et la prochaine connexion via le nouveau avec le nom d'utilisateur ou l'e-mail du compte lie son identité. **Réinitialiser l'identité** efface l'identité d'un fournisseur dont l'IdP l'a changée, et **Détacher** retire un fournisseur, chacun après confirmation ; rattacher, réinitialiser et détacher ferment toutes les sessions du compte. Pour déplacer un compte vers un autre fournisseur, rattachez le nouveau, puis détachez l'ancien. Le mot de passe du compte, s'il en a un, est conservé, sauf si la case qui le retire est cochée, après quoi aucune connexion par mot de passe n'ouvre le compte ; un mot de passe n'est demandé à un compte qui n'en a pas que lorsque son dernier fournisseur est détaché, et il redevient alors un compte local.
+Le panneau du compte liste ses **fournisseurs d’authentification unique**, chacun lié, en attente de sa première connexion, ou laissé par un fournisseur supprimé. **Rattacher un fournisseur** en ajoute un : les fournisseurs déjà rattachés continuent d’ouvrir le compte, et la prochaine connexion via le nouveau avec le nom d’utilisateur ou l’e-mail du compte lie son identité. **Réinitialiser l’identité** efface l’identité d’un fournisseur dont l’IdP l’a changée, et **Détacher** retire un fournisseur, chacun après confirmation ; rattacher, réinitialiser et détacher ferment toutes les sessions du compte. Pour déplacer un compte vers un autre fournisseur, rattachez le nouveau, puis détachez l’ancien. Le mot de passe du compte, s’il en a un, est conservé, sauf si la case qui le retire est cochée, après quoi aucune connexion par mot de passe n’ouvre le compte ; un mot de passe n’est demandé à un compte qui n’en a pas que lorsque son dernier fournisseur est détaché, et il redevient alors un compte local.
 `
   }
 }

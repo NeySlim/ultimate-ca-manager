@@ -2,12 +2,12 @@ export default {
   helpContent: {
     title: 'Importation et exportation',
     subtitle: 'Migration de données et sauvegarde',
-    overview: 'Importez des certificats depuis des sources externes et exportez vos données PKI. L\'importation intelligente détecte automatiquement les types de fichiers. L\'intégration OPNsense importe à la demande les certificats et AC d\'un pare-feu.',
+    overview: 'Importez des certificats depuis des sources externes et exportez vos données PKI. L’importation intelligente détecte automatiquement les types de fichiers. L’intégration OPNsense importe à la demande les certificats et AC d’un pare-feu.',
     sections: [
       {
         title: 'Importation',
         items: [
-          { label: 'Importation intelligente', text: 'Téléversez n\'importe quel fichier de certificat, UCM détecte automatiquement le format (PEM, DER, P12, P7B)' },
+          { label: 'Importation intelligente', text: 'Téléversez n’importe quel fichier de certificat, UCM détecte automatiquement le format (PEM, DER, P12, P7B)' },
           { label: 'Import OPNsense', text: 'Connectez-vous à un pare-feu OPNsense et importez ses certificats et AC, une fois par exécution (pas de synchronisation continue)' },
         ]
       },
@@ -15,35 +15,35 @@ export default {
         title: 'Exportation',
         items: [
           { label: 'Exporter les certificats', text: 'Téléchargement en masse des certificats en bundle PEM ou PKCS#7' },
-          { label: 'Exporter les AC', text: 'Téléchargement en masse des certificats et chaînes d\'AC' },
+          { label: 'Exporter les AC', text: 'Téléchargement en masse des certificats et chaînes d’AC' },
         ]
       },
       {
         title: 'Intégration OPNsense',
         items: [
-          { label: 'Connexion', text: 'Fournir l\'hôte et le port OPNsense, la clé API et le secret API' },
-          { label: 'Tester la connexion', text: 'Vérifier la connectivité avant l\'importation' },
+          { label: 'Connexion', text: 'Fournir l’hôte et le port OPNsense, la clé API et le secret API' },
+          { label: 'Tester la connexion', text: 'Vérifier la connectivité avant l’importation' },
           { label: 'Sélectionner les éléments', text: 'Choisir quels certificats et AC importer' },
         ]
       },
     ],
     tips: [
-      'L\'importation intelligente gère les bundles PEM avec plusieurs certificats dans un seul fichier',
-      'Testez la connexion OPNsense avant d\'exécuter une importation complète',
+      'L’importation intelligente gère les bundles PEM avec plusieurs certificats dans un seul fichier',
+      'Testez la connexion OPNsense avant d’exécuter une importation complète',
       'Les fichiers PKCS#12 nécessitent le mot de passe correct pour importer les clés privées',
-      'Les certificats post-quantiques (ML-DSA, SLH-DSA) et les clés ML-DSA s\'importent en PEM ou DER, et les certificats portent un badge Post-quantique ; UCM ne sait pas encore lire une clé ML-DSA dans un fichier PKCS#12',
+      'Les certificats post-quantiques (ML-DSA, SLH-DSA) et les clés ML-DSA s’importent en PEM ou DER, et les certificats portent un badge Post-quantique ; UCM ne sait pas encore lire une clé ML-DSA dans un fichier PKCS#12',
     ],
   },
   helpGuides: {
     title: 'Importation et exportation',
     content: `
-## Vue d'ensemble
+## Vue d’ensemble
 
 Importez des certificats depuis des sources externes et exportez vos données PKI pour la sauvegarde ou la migration.
 
 ## Importation intelligente
 
-L'assistant d'importation intelligente détecte automatiquement les types de fichiers et les traite :
+L’assistant d’importation intelligente détecte automatiquement les types de fichiers et les traite :
 
 ### Formats pris en charge
 - **PEM** : Certificats, AC et clés simples ou groupés
@@ -57,18 +57,18 @@ L'assistant d'importation intelligente détecte automatiquement les types de fic
 3. Examinez les éléments détectés (AC, certificats, clés)
 4. Cliquez sur **Importer** pour les ajouter à UCM
 
-> 💡 L'importation intelligente gère les bundles PEM avec plusieurs certificats dans un seul fichier. Elle distingue automatiquement les AC des certificats d'entité finale.
+> 💡 L’importation intelligente gère les bundles PEM avec plusieurs certificats dans un seul fichier. Elle distingue automatiquement les AC des certificats d’entité finale.
 
 ### Certificats post-quantiques
-Les certificats **ML-DSA** (FIPS 204) et **SLH-DSA** (FIPS 205) s'importent en PEM ou DER, de même que les clés privées ML-DSA. Ils sont affichés avec leur niveau de sécurité, par ex. *ML-DSA-65 (niveau 3)*, et un badge **Post-quantique**. UCM ne sait pas encore lire une clé ML-DSA dans un fichier PKCS#12 : importez le certificat et la clé en PEM.
+Les certificats **ML-DSA** (FIPS 204) et **SLH-DSA** (FIPS 205) s’importent en PEM ou DER, de même que les clés privées ML-DSA. Ils sont affichés avec leur niveau de sécurité, par ex. *ML-DSA-65 (niveau 3)*, et un badge **Post-quantique**. UCM ne sait pas encore lire une clé ML-DSA dans un fichier PKCS#12 : importez le certificat et la clé en PEM.
 
 ## Intégration OPNsense
 
-Importez les certificats et AC d'un pare-feu OPNsense, à la demande (UCM ne les maintient pas synchronisés) :
+Importez les certificats et AC d’un pare-feu OPNsense, à la demande (UCM ne les maintient pas synchronisés) :
 
 ### Configuration
 1. Dans OPNsense, créez une clé API (Système → Accès → Utilisateurs → Clés API)
-2. Dans UCM, entrez l'hôte et le port OPNsense, la clé API et le secret API
+2. Dans UCM, entrez l’hôte et le port OPNsense, la clé API et le secret API
 3. Cliquez sur **Tester la connexion** : cela vérifie la connexion et liste les certificats et AC disponibles
 
 ### Importation
@@ -91,12 +91,12 @@ Exportation en masse de toutes les autorités de certification :
 
 ## Migration entre instances UCM
 
-Pour migrer d'une instance UCM à une autre :
+Pour migrer d’une instance UCM à une autre :
 1. Créez une **sauvegarde** sur la source (Paramètres → Sauvegarde)
 2. Installez UCM sur la destination
 3. **Restaurez** la sauvegarde sur la destination
 
-Cela préserve toutes les données : certificats, AC, clés, utilisateurs, paramètres et journaux d'audit.
+Cela préserve toutes les données : certificats, AC, clés, utilisateurs, paramètres et journaux d’audit.
 `
   }
 }
