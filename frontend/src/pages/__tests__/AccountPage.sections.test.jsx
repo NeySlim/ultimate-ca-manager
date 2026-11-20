@@ -73,6 +73,7 @@ vi.mock('../../components', async (orig) => ({
 }))
 
 import AccountPage from '../AccountPage'
+import { accountService } from '../../services'
 import { dropAllDrafts } from '../../components/sectioned/draftMemory'
 
 beforeAll(() => {
@@ -152,5 +153,26 @@ describe('AccountPage sections', () => {
     expect(box).toHaveAccessibleDescription('account.closeInspectorOnNavHint')
     fireEvent.click(box)
     expect(env.windows.toggleCloseOnNav).toHaveBeenCalledTimes(1)
+  })
+
+  it('reads the profile as lines of terms and values, as the mockup props', async () => {
+    open()
+    const profile = await screen.findByRole('region', { name: 'account.profile' })
+    const props = profile.querySelector('dl.sf-props')
+    expect(props).not.toBeNull()
+    expect(within(props).getByText('common.username').tagName).toBe('DT')
+    expect(within(props).getAllByText('alice').every((el) => el.tagName === 'DD')).toBe(true)
+  })
+
+  it('lists the API keys one per line with the revoke action named', async () => {
+    accountService.getApiKeys.mockResolvedValueOnce({ data: [
+      { id: 4, name: 'ci', key_prefix: 'ucm_ab', is_active: true, is_expired: false, created_at: '2026-11-01T10:00:00Z', permissions: ['read:certificates'] },
+    ] })
+    open()
+    const keys = await screen.findByRole('region', { name: 'account.apiKeys' })
+    const row = (await within(keys).findByText('ci')).closest('li')
+    expect(row.closest('ul')).toHaveClass('sf-records')
+    expect(row).toHaveTextContent('read:certificates')
+    expect(within(row).getByRole('button', { name: 'common.revoke' })).toBeInTheDocument()
   })
 })

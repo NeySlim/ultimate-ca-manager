@@ -136,6 +136,7 @@
 .sf-record-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .sf-records-empty { margin: 0; padding: 9px 0; font-size: 12px; color: var(--muted); }
 .sf-records > li > input[type="checkbox"] { flex: 0 0 auto; }
+.sf-records-lead { margin: 0 0 6px; }
 .sf-records-summary { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0 0 12px; font-size: 12px; color: var(--muted); }
 .sf-records-summary > span { display: inline-flex; align-items: center; gap: 6px; }
 .sf-records-summary svg { width: 14px; height: 14px; }

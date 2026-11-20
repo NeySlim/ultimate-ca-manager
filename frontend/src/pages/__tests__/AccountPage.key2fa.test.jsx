@@ -124,7 +124,7 @@ describe('AccountPage: security key as second factor', () => {
   it('lists the active second factors', async () => {
     await openSecurity({ two_factor_enabled: true, webauthn_2fa: true,
                          two_factor_methods: ['totp', 'webauthn'], two_factor_enforced: true }, [KEY])
-    expect(screen.getByText(/account\.activeSecondFactors: account\.authenticatorApp, account\.securityKey/)).toBeInTheDocument()
+    expect(screen.getByText(/account\.activeSecondFactorswork\.sepaccount\.authenticatorApp, account\.securityKey/)).toBeInTheDocument()
     expect(screen.getByText(/account\.twoFactorEnforced/)).toBeInTheDocument()
   })
 })
