@@ -67,10 +67,10 @@ test.describe('preferences', () => {
     expect((await stored).status()).toBe(200)
     await page.goto('/')
 
-    await expect(page.getByRole('heading', { level: 1, name: "Vue d'ensemble" })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Vue d’ensemble' })).toBeVisible()
     await expect(page.locator('html')).toHaveAttribute('lang', 'fr')
     await page.reload()
-    await expect(page.getByRole('heading', { level: 1, name: "Vue d'ensemble" })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Vue d’ensemble' })).toBeVisible()
     expect((await own.get('/auth/verify')).preferences.language).toBe('fr')
   })
 
