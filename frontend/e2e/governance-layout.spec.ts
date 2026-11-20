@@ -12,9 +12,10 @@ const css = (locator, prop: string) => locator.evaluate((el, p) => getComputedSt
 test.describe('desktop', () => {
   test.use({ viewport: { width: 1600, height: 1000 } })
 
-  test('the schedule dialog keeps the mockup geometry and gives the focus back on Escape', async ({ page }) => {
+  test('the schedule dialog keeps the mockup geometry and gives the focus back on Escape', async ({ page, api }) => {
     await page.goto('/reports')
-    const open = page.getByRole('main').getByRole('button', { name: 'Schedule a report' }).first()
+    // The page head sits beside the main area, not inside it
+    const open = page.locator('.lv-head').getByRole('button', { name: 'Schedule a report' })
     await open.focus()
     await open.click()
     const dialog = page.getByRole('dialog')
@@ -55,7 +56,7 @@ test.describe('desktop', () => {
     }
   })
 
-  test('an empty approvals queue says so in the mockup panel', async ({ page }) => {
+  test('an empty approvals queue says so in the mockup panel', async ({ page, api }) => {
     await page.goto('/approvals')
     const main = page.getByRole('main')
     const empty = main.getByTestId('work-empty')
@@ -70,7 +71,7 @@ test.describe('desktop', () => {
 test.describe('phone', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
-  test('the reports head keeps its actions on the title line, 40 px, nothing sideways', async ({ page }) => {
+  test('the reports head keeps its actions on the title line, 40 px, nothing sideways', async ({ page, api }) => {
     await page.goto('/reports')
     const head = page.locator('.lv-head')
     const h1 = await box(head.locator('h1'))
@@ -79,6 +80,7 @@ test.describe('phone', () => {
     expect(Math.abs(p.y - h1.y)).toBeLessThanOrEqual(1)
     expect(Math.round(p.height)).toBe(40)
     expect(Math.round(390 - (p.x + p.width))).toBe(16)
+    // Asked at once: the loading skeleton fits the screen too
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   })
 })
