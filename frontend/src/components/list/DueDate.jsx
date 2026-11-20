@@ -1,10 +1,11 @@
 /**
- * Due date of the list template: the day, then how far it is, coloured by urgency.
- * The exact date and time show on hover and on keyboard focus.
+ * Due date of the list template: the day, then how far it is in a short form
+ * ("3 d", "5 mo", "Expired"), coloured by urgency. The exact date and time and the
+ * long wording show on hover and on keyboard focus.
  */
 import { useTranslation } from 'react-i18next'
 import { cn, formatDate } from '../../lib/utils'
-import { dueTone, relativeDue } from '../../lib/relativeTime'
+import { dueTone, relativeDue, relativeShort } from '../../lib/relativeTime'
 import './list.css'
 
 /**
@@ -18,9 +19,10 @@ export function DueDate({ date, warnDays = 7, tone, relative, now, className }) 
   const time = date ? new Date(date) : null
   if (!time || Number.isNaN(time.getTime())) return <span className={cn('lv-due', className)}>—</span>
   const shownTone = tone ?? dueTone(date, { now, warnDays })
-  const far = relative === undefined ? relativeDue(date, t, { now }) : relative
+  const far = relative === undefined ? relativeShort(date, t, { now }) : relative
+  const tip = [formatDate(date, { time: true }), relative === undefined ? relativeDue(date, t, { now }) : null].filter(Boolean).join(' · ')
   return (
-    <span className={cn('lv-due lv-tip', shownTone && `is-${shownTone}`, className)} tabIndex={0} data-tip={formatDate(date, { time: true })}>
+    <span className={cn('lv-due lv-tip', shownTone && `is-${shownTone}`, className)} tabIndex={0} data-tip={tip}>
       <time dateTime={time.toISOString()}>{formatDate(date, { time: false })}</time>
       {far && <span className="lv-due-rel">{far}</span>}
     </span>

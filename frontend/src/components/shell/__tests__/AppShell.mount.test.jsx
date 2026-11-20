@@ -13,8 +13,10 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 vi.mock('../../../contexts/AuthContext', () => ({
-  useAuth: () => ({ user: { username: 'probe', role: 'admin' }, logout: vi.fn(), permissions: perms.list, authMethod: null }),
+  useAuth: () => ({ user: { username: 'probe', role: 'admin' }, logout: vi.fn(), permissions: perms.list, authMethod: null, isAuthenticated: true }),
 }))
+vi.mock('../../../contexts/MobileContext', () => ({ useMobile: () => ({ isMobile: false }) }))
+vi.mock('../../inspector/InspectorObject', () => ({ InspectorObject: ({ entry }) => <p>{`object ${entry.key}`}</p> }))
 vi.mock('../../../contexts/ThemeContext', () => ({
   useTheme: () => ({ themeFamily: 'atelier', setThemeFamily: vi.fn(), mode: 'dark', setMode: vi.fn(), themes: [] }),
 }))
@@ -37,17 +39,27 @@ vi.mock('../../UpdatePopup', () => ({ UpdatePopup: () => <div data-testid="updat
 vi.mock('../../KofiSupportCard', () => ({ KofiSupportCard: () => <div data-testid="kofi" /> }))
 
 import { AppShell } from '../../AppShell'
+import { InspectorProvider, useInspector } from '../../../contexts/InspectorContext'
+
+let inspector
+function Grab() {
+  inspector = useInspector()
+  return null
+}
 
 function setup(path = '/') {
   const user = userEvent.setup()
   render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route element={<AppShell />}>
-          <Route path="*" element={<p>page body</p>} />
-        </Route>
-      </Routes>
-    </MemoryRouter>
+    <InspectorProvider>
+      <Grab />
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="*" element={<p>page body</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </InspectorProvider>
   )
   return user
 }
@@ -126,6 +138,26 @@ describe('AppShell', () => {
     expect(stage).not.toContainElement(bar)
     expect(bar.parentElement).toHaveClass('shell-root')
     expect(bar.parentElement.lastElementChild === bar || bar.previousElementSibling === stage).toBe(true)
+  })
+
+  it('puts the open inspector in the page flow: under the page, or beside it on the right', () => {
+    window.innerWidth = 1600
+    localStorage.clear()
+    setup('/certificates')
+    const main = document.querySelector('.shell-main')
+    expect(main.querySelector('[data-testid="inspector-dock"]')).toBeNull()
+    act(() => inspector.openEntity('certificate', 1))
+    const dock = screen.getByTestId('inspector-dock')
+    // A sibling of the page inside the main area, above the status bar, never fixed to the window
+    expect(dock.parentElement).toBe(main)
+    expect(dock.previousElementSibling).toHaveClass('shell-content')
+    expect(dock).toHaveClass('is-bottom')
+    expect(main).not.toHaveClass('has-dock-right')
+    expect(document.querySelector('.shell-stage')).not.toContainElement(screen.getByRole('contentinfo'))
+    act(() => inspector.setGeometry({ position: 'right' }))
+    expect(main).toHaveClass('has-dock-right')
+    expect(dock).toHaveClass('is-right')
+    act(() => inspector.setGeometry({ position: 'bottom' }))
   })
 
   it.each(['/certificates', '/'])('has one bottom bar on %s', (path) => {

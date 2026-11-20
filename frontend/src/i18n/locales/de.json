@@ -923,7 +923,12 @@
     "exportSelectedPem": "Als PEM exportieren",
     "bulkExported_one": "{{count}} Zertifikat exportiert",
     "bulkExported_other": "{{count}} Zertifikate exportiert",
-    "listLabel": "Liste der Zertifikate"
+    "listLabel": "Liste der Zertifikate",
+    "uploadKey": "Upload private key",
+    "listNote": "Open certificates stay available in the inspector.",
+    "loadFailed": "Could not load the certificates",
+    "loadFailedCause": "Cause: {{message}}. The other views and the inspector stay usable.",
+    "viewLog": "View the log"
   },
   "cas": {
     "chainRevoked": "Übergeordnet gesperrt",
@@ -4318,7 +4323,16 @@
     "inDays_one": "in {{count}} Tag",
     "inDays_other": "in {{count}} Tagen",
     "overdueDays_one": "seit {{count}} Tag abgelaufen",
-    "overdueDays_other": "seit {{count}} Tagen abgelaufen"
+    "overdueDays_other": "seit {{count}} Tagen abgelaufen",
+    "short": {
+      "days_one": "{{count}} d",
+      "days_other": "{{count}} d",
+      "months_one": "{{count}} mo",
+      "months_other": "{{count}} mo",
+      "years_one": "{{count}} y",
+      "years_other": "{{count}} y",
+      "expired": "Expired"
+    }
   },
   "validation": {
     "required": "Dieses Feld ist erforderlich",
@@ -4719,7 +4733,63 @@
       "overview": "Übersicht",
       "chain": "Kette",
       "extensions": "Erweiterungen",
-      "pem": "PEM"
+      "pem": "PEM",
+      "history": "History"
+    },
+    "moreOpen_one": "{{count}} more open object",
+    "moreOpen_other": "{{count}} more open objects",
+    "hiddenObjects": "Open objects not shown",
+    "expand": "Unfold the inspector",
+    "collapse": "Fold the inspector",
+    "moreActions": "Other actions for {{name}}",
+    "cert": {
+      "validity": "Certificate validity",
+      "remaining": "remaining",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "validityLeft": "{{percent}} percent of the validity left",
+      "revokedNotice": "This certificate must no longer be used.",
+      "revokedOn": "Revoked on {{date}}: {{reason}}.",
+      "renewSoon_one": "Renewal due within the next {{count}} day.",
+      "renewSoon_other": "Renewal due within the next {{count}} days.",
+      "expiredNotice_one": "Expired {{count}} day ago: renew or replace it.",
+      "expiredNotice_other": "Expired {{count}} days ago: renew or replace it.",
+      "lastFailure": "Last failure",
+      "order": "Order #{{id}}",
+      "identity": "Identity and key",
+      "none": "None",
+      "altName": "Alternative name",
+      "signature": "Signature",
+      "obsolete": "obsolete",
+      "origin": "Origin / template",
+      "keyHeld": "Held in UCM",
+      "keyNotHeld": "Not held in UCM",
+      "compliance": "Compliance",
+      "chainOfTrust": "Chain of trust",
+      "trustStore": "trust store",
+      "moreDetails": "More details",
+      "rootCa": "Root authority",
+      "trustStoreAnchor": "Trust store anchor",
+      "intermediateCa": "Intermediate authority · level {{level}}",
+      "inspectCa": "Inspect the authority",
+      "crossSigned": "Cross-signed",
+      "variants_one": "{{count}} chain variant is served: choose it when exporting.",
+      "variants_other": "{{count}} chain variants are served: choose one when exporting.",
+      "noExtensions": "No extension to show.",
+      "critical": "critical",
+      "noPem": "No PEM for this certificate.",
+      "favorite": "Add to favorites",
+      "unfavorite": "Remove from favorites"
+    },
+    "history": {
+      "issued": "Certificate issued",
+      "imported": "Certificate imported",
+      "renewed": "Certificate renewed",
+      "revoked": "Certificate revoked: {{reason}}",
+      "failed": "failed",
+      "noAudit": "Your role cannot read the audit log: only the dates of the certificate's record are shown.",
+      "auditFailed": "The audit log could not be read: only the dates of the certificate's record are shown.",
+      "scope": "Audit log entries among the latest {{count}} operations on certificates, and the dates of the certificate's record."
     }
   },
   "table": {
@@ -4762,7 +4832,15 @@
     "selectRow": "{{name}} auswählen",
     "open": "Öffnen",
     "openRow": "{{name}} öffnen",
-    "rowAction": "{{action}}: {{name}}"
+    "rowAction": "{{action}}: {{name}}",
+    "retry": "Retry",
+    "rowsNote_one": "{{px}} px per row · {{count}} column",
+    "rowsNote_other": "{{px}} px per row · {{count}} columns",
+    "page": "Page",
+    "pageOf": "of {{total}}",
+    "goToPage": "Go",
+    "pageNumber": "Page number",
+    "loadingRows": "Loading the rows"
   },
   "reconnect": {
     "countdown": "Dienst wird neu gestartet...",

@@ -12,7 +12,8 @@ const InspectorContext = createContext(null)
 
 export const MAX_OPEN = 8
 export const SIZE_LIMITS = { height: [200, 4000], width: [360, 720] }
-const DEFAULTS = { position: 'bottom', height: 380, width: 520 }
+// The defaults of the Atelier layout: a 278 px band under the list, a 460 px column beside it
+const DEFAULTS = { position: 'bottom', height: 278, width: 460 }
 const PREFS_KEY = 'ucm-inspector-prefs'
 
 const keyOf = (type, id) => `${type}:${id}`
@@ -49,6 +50,8 @@ export function InspectorProvider({ children }) {
   const [geometry, setGeometry] = useState(() => ({ ...DEFAULTS, ...readLocal(), ...cleanGeometry(getPreferences().inspector) }))
   const [closeOnNav, setCloseOnNav] = useState(readLocalCloseOnNav)
   const [focusToken, setFocusToken] = useState(0)
+  // Folded to its tab strip; any opening unfolds it (session only, like the active object)
+  const [collapsed, setCollapsed] = useState(false)
   const origins = useRef(new Map())
   const openedRef = useRef([])
   const geometryRef = useRef(geometry)
@@ -78,6 +81,7 @@ export function InspectorProvider({ children }) {
       setOpened(openedRef.current)
     }
     setActiveKey(key)
+    setCollapsed(false)
     setFocusToken((n) => n + 1)
   }, [])
 
@@ -114,6 +118,7 @@ export function InspectorProvider({ children }) {
     openedRef.current = []
     setOpened([])
     setActiveKey(null)
+    setCollapsed(false)
   }, [])
 
   const setEntityData = useCallback((key, data) => {
@@ -143,8 +148,8 @@ export function InspectorProvider({ children }) {
     opened, activeKey, setActiveKey, openEntity, closeEntity, closeAll, setEntityData,
     openCount: opened.length, focusToken,
     ...geometry, setGeometry: updateGeometry,
-    closeOnNav, toggleCloseOnNav,
-  }), [opened, activeKey, openEntity, closeEntity, closeAll, setEntityData, focusToken, geometry, updateGeometry, closeOnNav, toggleCloseOnNav])
+    closeOnNav, toggleCloseOnNav, collapsed, setCollapsed,
+  }), [opened, activeKey, openEntity, closeEntity, closeAll, setEntityData, focusToken, geometry, updateGeometry, closeOnNav, toggleCloseOnNav, collapsed])
 
   return <InspectorContext.Provider value={value}>{children}</InspectorContext.Provider>
 }

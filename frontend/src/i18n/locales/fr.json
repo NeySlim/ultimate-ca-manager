@@ -1352,7 +1352,12 @@
     "exportSelectedPem": "Exporter en PEM",
     "bulkExported_one": "{{count}} certificat exporté",
     "bulkExported_other": "{{count}} certificats exportés",
-    "listLabel": "Liste des certificats"
+    "listLabel": "Liste des certificats",
+    "uploadKey": "Téléverser la clé privée",
+    "listNote": "Les certificats ouverts restent disponibles dans l'inspecteur.",
+    "loadFailed": "Impossible de charger les certificats",
+    "loadFailedCause": "Cause : {{message}}. Les autres vues et l'inspecteur restent utilisables.",
+    "viewLog": "Voir le journal"
   },
   "common": {
     "duplicateKey": "Une ligne plus haut utilise déjà « {{key}} » : une seule des deux peut être enregistrée",
@@ -4240,7 +4245,16 @@
     "inDays_one": "dans {{count}} jour",
     "inDays_other": "dans {{count}} jours",
     "overdueDays_one": "échu depuis {{count}} jour",
-    "overdueDays_other": "échu depuis {{count}} jours"
+    "overdueDays_other": "échu depuis {{count}} jours",
+    "short": {
+      "days_one": "{{count}} j",
+      "days_other": "{{count}} j",
+      "months_one": "{{count}} mois",
+      "months_other": "{{count}} mois",
+      "years_one": "{{count}} an",
+      "years_other": "{{count}} ans",
+      "expired": "Échu"
+    }
   },
   "tools": {
     "groups": {
@@ -4722,7 +4736,63 @@
       "overview": "Aperçu",
       "chain": "Chaîne",
       "extensions": "Extensions",
-      "pem": "PEM"
+      "pem": "PEM",
+      "history": "Historique"
+    },
+    "moreOpen_one": "{{count}} autre objet ouvert",
+    "moreOpen_other": "{{count}} autres objets ouverts",
+    "hiddenObjects": "Objets ouverts non affichés",
+    "expand": "Déplier l'inspecteur",
+    "collapse": "Replier l'inspecteur",
+    "moreActions": "Autres actions pour {{name}}",
+    "cert": {
+      "validity": "Validité du certificat",
+      "remaining": "restants",
+      "days_one": "{{count}} jour",
+      "days_other": "{{count}} jours",
+      "validityLeft": "{{percent}} pour cent de la validité restante",
+      "revokedNotice": "Ce certificat ne doit plus être utilisé.",
+      "revokedOn": "Révoqué le {{date}} : {{reason}}.",
+      "renewSoon_one": "Renouvellement à prévoir sous {{count}} jour.",
+      "renewSoon_other": "Renouvellement à prévoir dans les {{count}} prochains jours.",
+      "expiredNotice_one": "Échu depuis {{count}} jour : renouvelez-le ou remplacez-le.",
+      "expiredNotice_other": "Échu depuis {{count}} jours : renouvelez-le ou remplacez-le.",
+      "lastFailure": "Dernier échec",
+      "order": "Commande n° {{id}}",
+      "identity": "Identité et clé",
+      "none": "Aucune",
+      "altName": "Nom alternatif",
+      "signature": "Signature",
+      "obsolete": "obsolète",
+      "origin": "Origine / modèle",
+      "keyHeld": "Présente dans UCM",
+      "keyNotHeld": "Absente de UCM",
+      "compliance": "Conformité",
+      "chainOfTrust": "Chaîne de confiance",
+      "trustStore": "magasin de confiance",
+      "moreDetails": "Plus de détails",
+      "rootCa": "Autorité racine",
+      "trustStoreAnchor": "Ancre du magasin de confiance",
+      "intermediateCa": "Autorité intermédiaire · niveau {{level}}",
+      "inspectCa": "Inspecter l'autorité",
+      "crossSigned": "Signée de manière croisée",
+      "variants_one": "{{count}} variante de chaîne est servie : choisissez-la à l’export.",
+      "variants_other": "{{count}} variantes de chaîne sont servies : choisissez-en une à l’export.",
+      "noExtensions": "Aucune extension à afficher.",
+      "critical": "critique",
+      "noPem": "Aucun PEM pour ce certificat.",
+      "favorite": "Ajouter aux favoris",
+      "unfavorite": "Retirer des favoris"
+    },
+    "history": {
+      "issued": "Certificat émis",
+      "imported": "Certificat importé",
+      "renewed": "Certificat renouvelé",
+      "revoked": "Certificat révoqué : {{reason}}",
+      "failed": "échec",
+      "noAudit": "Votre rôle ne peut pas lire le journal d'audit : seules les dates de la fiche du certificat sont affichées.",
+      "auditFailed": "Le journal d'audit n'a pas pu être lu : seules les dates de la fiche du certificat sont affichées.",
+      "scope": "Entrées du journal d'audit parmi les {{count}} dernières opérations sur les certificats, et dates de la fiche du certificat."
     }
   },
   "table": {
@@ -4765,7 +4835,15 @@
     "selectRow": "Sélectionner {{name}}",
     "open": "Ouvrir",
     "openRow": "Ouvrir {{name}}",
-    "rowAction": "{{action}} : {{name}}"
+    "rowAction": "{{action}} : {{name}}",
+    "retry": "Réessayer",
+    "rowsNote_one": "{{px}} px par ligne · {{count}} colonne",
+    "rowsNote_other": "{{px}} px par ligne · {{count}} colonnes",
+    "page": "Page",
+    "pageOf": "sur {{total}}",
+    "goToPage": "Aller",
+    "pageNumber": "Numéro de page",
+    "loadingRows": "Chargement des lignes"
   },
   "reconnect": {
     "countdown": "Le service redémarre...",

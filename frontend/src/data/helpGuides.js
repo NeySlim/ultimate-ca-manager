@@ -404,7 +404,8 @@ Tick two certificates in the list and click **Compare** in the selection bar to 
 - **Text search**: Search by subject, issuer, display name or serial number (SANs are not searched)
 - **Sorting**: By name, expiry date, creation date, status
 - **Columns**: Common name, description, state, issuer, source, expiry and key algorithm by default; the **Columns** button adds the compliance grade, the hybrid link and the creation date
-- **Row actions**: Export on the row; Rename, Renew, Revoke and Delete in the detail a click on the row opens
+- **Row actions**: Export on the row; the other actions in the inspector a click on the row opens: Export and Renew in its heading, Rename, Revoke, Delete and the rest in its ⋯ menu
+- **Inspector**: opens under the list, inside the page margins, or on its right from 1400 px wide. Drag its edge or use the arrow keys on it to resize it, fold it to its tab strip, enlarge it. Open certificates stay as tabs; those that do not fit go into a +N menu. Its tabs are Overview, Chain, Extensions, History and PEM; History lists the dates of the record and, with read:audit, the audit entries of this certificate among the latest 100 on certificates
 
 ## Conformance linting
 

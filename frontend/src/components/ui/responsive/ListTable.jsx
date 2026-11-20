@@ -1,8 +1,9 @@
 /**
  * ListTable: the desktop table of the list template (ResponsiveDataTable variant="list").
- * Columns take the width of their content and the `grow` column absorbs the rest, so a
- * name is never cut while there is room; every row keeps one height; a row carries its
- * checkbox, its own actions and a chevron that opens the detail.
+ * Columns take the width of their content and the `grow` column absorbs the rest, its
+ * content shortened by an ellipsis when the room runs out (a `fill` cell lets its own
+ * content do it); every row keeps one height; a row carries its checkbox, its own
+ * actions and a chevron that opens the detail. Loading draws skeleton rows.
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -11,6 +12,8 @@ import { cn } from '../../../lib/utils'
 import '../../list/list.css'
 
 const SORT = { asc: 'ascending', desc: 'descending' }
+const SKELETON_ROWS = 12
+const skWidth = (i, base, spread) => `${base + ((i * 37) % spread)}%`
 
 export function ListTable({
   data,
@@ -58,21 +61,26 @@ export function ListTable({
     }
   }, [resizing, setColumnWidth])
 
-  // A width set by hand or capped by the column clips its cell; the others follow their content
+  // A width set by hand or capped by the column clips its cell; the others follow their content.
+  // Caps and floors go through variables so a narrow page (right dock) can tighten them.
   const sizing = (col) => {
     const px = columnWidths[col.key]
     if (px) return { clip: true, style: { width: px, minWidth: px, maxWidth: px } }
-    if (col.grow) return { clip: true, style: undefined }
-    if (col.maxWidth) return { clip: true, style: { maxWidth: col.maxWidth } }
+    if (col.grow) return { clip: true, style: col.minWidth ? { '--lv-min': `${col.minWidth}px` } : undefined }
+    if (col.maxWidth) {
+      return {
+        clip: true, capped: true,
+        style: { '--lv-max': `${col.maxWidth}px`, ...(col.narrowMaxWidth ? { '--lv-max-narrow': `${col.narrowMaxWidth}px` } : {}) },
+      }
+    }
     return { clip: false, style: undefined }
   }
 
   const nameOf = (row) => rowLabel?.(row) ?? ''
   const hasActions = Boolean(rowActions || onRowClick)
-  const span = columns.length + (hasActions ? 1 : 0) + (multiSelect ? 1 : 0)
 
   return (
-    <div className="lv-scroll" role="region" tabIndex={0} aria-label={label}>
+    <div className="lv-scroll" role="region" tabIndex={0} aria-label={label} aria-busy={loading || undefined}>
       <table className={cn('lv-table', `is-${density}`, resizing && 'select-none')}>
         {label && <caption className="sr-only">{label}</caption>}
         <thead>
@@ -90,7 +98,7 @@ export function ListTable({
               </th>
             )}
             {columns.map((col) => {
-              const { style } = sizing(col)
+              const { style, capped } = sizing(col)
               const canSort = sortable && col.sortable !== false
               const sorted = sort?.key === col.key ? sort.direction : null
               return (
@@ -98,7 +106,7 @@ export function ListTable({
                   key={col.key}
                   scope="col"
                   style={style}
-                  className={cn(col.grow && !columnWidths[col.key] && 'lv-grow')}
+                  className={cn(col.grow && !columnWidths[col.key] && 'lv-grow', capped && 'lv-capped')}
                   aria-sort={canSort ? (SORT[sorted] || 'none') : undefined}
                 >
                   {canSort ? (
@@ -123,9 +131,21 @@ export function ListTable({
           </tr>
         </thead>
         <tbody>
-          {loading ? (
-            <tr><td colSpan={span}><div className="lv-loading" role="status">{t('common.loading')}</div></td></tr>
-          ) : data.map((row, idx) => {
+          {loading ? Array.from({ length: SKELETON_ROWS }, (_, i) => (
+            <tr key={`sk-${i}`} className="lv-sk-row" aria-hidden={i > 0 || undefined}>
+              {multiSelect && <td className="lv-col-check"><div className="lv-cell"><span className="lv-sk is-box" /></div></td>}
+              {columns.map((col) => (
+                <td key={col.key} className={cn(col.grow && !columnWidths[col.key] && 'lv-grow')}>
+                  <div className="lv-cell">
+                    {i === 0 && col === columns[0] && <span className="sr-only" role="status">{t('table.loadingRows')}</span>}
+                    <span className={cn('lv-sk', col.skeleton === 'pill' && 'is-pill')}
+                      style={{ width: col.grow ? skWidth(i, 45, 40) : (col.skeletonWidth || 64) }} />
+                  </div>
+                </td>
+              ))}
+              {hasActions && <td className="lv-col-actions" />}
+            </tr>
+          )) : data.map((row, idx) => {
             const name = nameOf(row)
             const checked = multiSelect && (selectedIds?.has(row.id) || false)
             const actions = rowActions?.(row) || []
@@ -148,7 +168,7 @@ export function ListTable({
                   </td>
                 )}
                 {columns.map((col) => {
-                  const { clip, style } = sizing(col)
+                  const { clip, capped, style } = sizing(col)
                   const raw = row[col.key]
                   const content = col.render ? col.render(raw, row) : (raw ?? '—')
                   const tip = col.title ? col.title(row) : raw
@@ -158,6 +178,7 @@ export function ListTable({
                       style={style}
                       className={cn(
                         col.grow && !columnWidths[col.key] && 'lv-grow',
+                        capped && 'lv-capped',
                         clip && 'is-clipped',
                         col.muted && 'is-muted',
                         col.small && 'is-small',
@@ -165,9 +186,11 @@ export function ListTable({
                         col.className
                       )}
                     >
-                      {clip
-                        ? <div className="lv-clip" title={typeof tip === 'string' && tip ? tip : undefined}>{content}</div>
-                        : <div className="lv-cell">{content}</div>}
+                      {col.fill
+                        ? <div className="lv-cell lv-fill">{content}</div>
+                        : clip
+                          ? <div className="lv-clip" title={typeof tip === 'string' && tip ? tip : undefined}>{content}</div>
+                          : <div className="lv-cell">{content}</div>}
                     </td>
                   )
                 })}

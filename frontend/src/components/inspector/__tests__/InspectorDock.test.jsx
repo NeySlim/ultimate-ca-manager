@@ -1,10 +1,11 @@
 /**
- * The inspector dock: one region for every object opened for detail, with
- * object tabs, section tabs, a focus that goes in and comes back, Escape, a
- * keyboard-resizable grip and a position kept as a user preference.
+ * The inspector dock: one bordered frame in the page flow for every object opened
+ * for detail, with object tabs (overflow in a « +N » menu), a focus that goes in and
+ * comes back, Escape, a keyboard-resizable grip, a fold, and a position kept as a
+ * user preference.
  */
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const env = vi.hoisted(() => ({ mobile: false, authenticated: true }))
 const mocks = vi.hoisted(() => ({
@@ -35,107 +36,137 @@ vi.mock('../../../services', () => ({
   truststoreService: { getById: vi.fn() },
 }))
 vi.mock('../../../services/account.service', () => ({ accountService: { updatePreferences: mocks.updatePreferences } }))
-vi.mock('../../detail/CertificatePanel', () => ({
-  CertificatePanel: ({ certificate, section }) => <div data-testid="panel">{`${certificate.common_name}:${section}`}</div>,
+vi.mock('../certificate/CertificateDetail', () => ({
+  CertificateDetail: ({ cert, section }) => <div data-testid="panel">{`${cert.common_name}:${section}`}</div>,
 }))
 
 import { InspectorProvider, useInspector } from '../../../contexts/InspectorContext'
 import { applyServerPreferences, setAuthenticated } from '../../../stores/userPreferencesStore'
 import { InspectorDock } from '../InspectorDock'
 
-const CERTS = { 1: { id: 1, common_name: 'one.example.com' }, 2: { id: 2, common_name: 'two.example.com' } }
+const CERTS = Object.fromEntries([1, 2, 3, 4, 5, 6].map((i) => [i, { id: i, common_name: `c${i}.example.com` }]))
 
 function Opener() {
   const { openEntity } = useInspector()
   return (
     <>
-      <button onClick={() => openEntity('certificate', 1)}>open-1</button>
-      <button onClick={() => openEntity('certificate', 2)}>open-2</button>
+      {[1, 2, 3, 4, 5, 6].map((i) => <button key={i} onClick={() => openEntity('certificate', i)}>{`open-${i}`}</button>)}
     </>
   )
 }
 
 const renderDock = () => render(<InspectorProvider><Opener /><InspectorDock /></InspectorProvider>)
+const open = async (i) => {
+  fireEvent.click(screen.getByText(`open-${i}`))
+  await screen.findByText(`c${i}.example.com:overview`)
+}
 
 describe('InspectorDock', () => {
+  let widthSpy
   beforeEach(() => {
     vi.clearAllMocks()
     env.mobile = false
     env.authenticated = true
     window.innerWidth = 1600
-    window.innerHeight = 900
+    window.innerHeight = 1000
     localStorage.clear()
     setAuthenticated(false)
     mocks.certificatesService.getById.mockImplementation((id) => Promise.resolve({ data: CERTS[id] }))
     mocks.updatePreferences.mockResolvedValue({})
   })
+  afterEach(() => widthSpy?.mockRestore())
 
   it('renders nothing until an object is opened', () => {
     renderDock()
     expect(screen.queryByTestId('inspector-dock')).toBeNull()
   })
 
-  it('shows an opened object in a named region with tabs and a tabpanel', async () => {
+  it('shows an opened object in a named region with an object tab and a tabpanel', async () => {
     renderDock()
-    fireEvent.click(screen.getByText('open-1'))
-    const dock = await screen.findByTestId('inspector-dock')
+    await open(1)
+    const dock = screen.getByTestId('inspector-dock')
     expect(dock).toHaveAttribute('aria-label', 'inspector.region')
-    expect(await screen.findByText('one.example.com:overview')).toBeInTheDocument()
-    expect(screen.getAllByRole('tablist')).toHaveLength(2)
-    const objectTab = screen.getByRole('tab', { name: 'one.example.com' })
+    expect(dock).toHaveAttribute('role', 'region')
+    const objectTab = screen.getByRole('tab', { name: 'c1.example.com' })
     expect(objectTab).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getAllByRole('tabpanel').length).toBeGreaterThan(0)
+    expect(screen.getByRole('tabpanel', { name: 'c1.example.com' })).toBeInTheDocument()
   })
 
-  it('maps the section tabs onto the panel section', async () => {
+  it('sits in the page flow, at the bottom by default, never fixed to the window', async () => {
     renderDock()
-    fireEvent.click(screen.getByText('open-1'))
-    await screen.findByText('one.example.com:overview')
-    fireEvent.click(screen.getByRole('tab', { name: 'inspector.sections.chain' }))
-    expect(screen.getByText('one.example.com:chain')).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'inspector.sections.chain' })).toHaveAttribute('aria-selected', 'true')
-    // No history tab: the API has no history to show
-    expect(screen.queryByRole('tab', { name: /history/i })).toBeNull()
+    await open(1)
+    const dock = screen.getByTestId('inspector-dock')
+    expect(dock).toHaveClass('ins-dock', 'is-bottom')
+    expect(dock.className).not.toMatch(/fixed|inset-0|bottom-\[/)
+    // The mockup band: 278 px high
+    expect(dock.style.height).toBe('278px')
+    fireEvent.click(screen.getByRole('button', { name: 'inspector.dockRight' }))
+    await waitFor(() => expect(dock).toHaveClass('is-right'))
+    expect(dock.style.width).toBe('460px')
+    expect(screen.getByTestId('inspector-grip')).toHaveAttribute('aria-orientation', 'vertical')
+  })
+
+  it('falls back to the bottom when the window is too narrow for the right dock', async () => {
+    localStorage.setItem('ucm-inspector-prefs', JSON.stringify({ position: 'right' }))
+    window.innerWidth = 1300
+    renderDock()
+    await open(1)
+    expect(screen.getByTestId('inspector-dock')).toHaveClass('is-bottom')
+    expect(screen.queryByRole('button', { name: 'inspector.dockRight' })).toBeNull()
   })
 
   it('moves the focus to the active tab, then gives it back to the opener on close', async () => {
     renderDock()
     const opener = screen.getByText('open-1')
     opener.focus()
-    fireEvent.click(opener)
-    await screen.findByText('one.example.com:overview')
-    await waitFor(() => expect(screen.getByRole('tab', { name: 'one.example.com' })).toHaveFocus())
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'one.example.com' }), { key: 'Escape' })
+    await open(1)
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'c1.example.com' })).toHaveFocus())
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'c1.example.com' }), { key: 'Escape' })
     await waitFor(() => expect(screen.queryByTestId('inspector-dock')).toBeNull())
     await waitFor(() => expect(opener).toHaveFocus())
   })
 
   it('closes only the active object on Escape and opens many', async () => {
     renderDock()
-    fireEvent.click(screen.getByText('open-1'))
-    await screen.findByText('one.example.com:overview')
-    fireEvent.click(screen.getByText('open-2'))
-    await screen.findByText('two.example.com:overview')
-    expect(await screen.findByRole('tab', { name: 'two.example.com' })).toHaveAttribute('aria-selected', 'true')
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'two.example.com' }), { key: 'Escape' })
-    await screen.findByText('one.example.com:overview')
-    expect(screen.queryByRole('tab', { name: 'two.example.com' })).toBeNull()
+    await open(1)
+    await open(2)
+    expect(screen.getByRole('tab', { name: 'c2.example.com' })).toHaveAttribute('aria-selected', 'true')
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'c2.example.com' }), { key: 'Escape' })
+    await screen.findByText('c1.example.com:overview')
+    expect(screen.queryByRole('tab', { name: 'c2.example.com' })).toBeNull()
+  })
+
+  it('closes the focused object tab with the Delete key', async () => {
+    renderDock()
+    await open(1)
+    await open(2)
+    const tab = screen.getByRole('tab', { name: 'c2.example.com' })
+    fireEvent.keyDown(tab, { key: 'Delete' })
+    await waitFor(() => expect(screen.queryByRole('tab', { name: 'c2.example.com' })).toBeNull())
+    expect(screen.getByRole('tab', { name: 'c1.example.com' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('moves between object tabs with the arrow keys', async () => {
+    renderDock()
+    await open(1)
+    await open(2)
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'c2.example.com' }), { key: 'ArrowLeft' })
+    await screen.findByText('c1.example.com:overview')
+    expect(screen.getByRole('tab', { name: 'c1.example.com' })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('keeps the focus in the dock when one of two objects closes, then returns it to the opener', async () => {
     renderDock()
     const opener = screen.getByText('open-1')
     opener.focus()
-    fireEvent.click(opener)
-    await screen.findByText('one.example.com:overview')
+    await open(1)
     const second = screen.getByText('open-2')
     second.focus()
-    fireEvent.click(second)
-    await screen.findByText('two.example.com:overview')
-    await waitFor(() => expect(screen.getByRole('tab', { name: 'two.example.com' })).toHaveFocus())
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'two.example.com' }), { key: 'Escape' })
-    await waitFor(() => expect(screen.getByRole('tab', { name: 'one.example.com' })).toHaveFocus())
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'one.example.com' }), { key: 'Escape' })
+    await open(2)
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'c2.example.com' })).toHaveFocus())
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'c2.example.com' }), { key: 'Escape' })
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'c1.example.com' })).toHaveFocus())
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'c1.example.com' }), { key: 'Escape' })
     await waitFor(() => expect(screen.queryByTestId('inspector-dock')).toBeNull())
     await waitFor(() => expect(opener).toHaveFocus())
   })
@@ -144,8 +175,7 @@ describe('InspectorDock', () => {
     renderDock()
     const opener = screen.getByText('open-1')
     opener.focus()
-    fireEvent.click(opener)
-    await screen.findByText('one.example.com:overview')
+    await open(1)
     const close = screen.getByRole('button', { name: 'inspector.close' })
     close.focus()
     fireEvent.click(close)
@@ -153,109 +183,136 @@ describe('InspectorDock', () => {
     await waitFor(() => expect(opener).toHaveFocus())
   })
 
-  it('reserves its room on the root while open, bottom then right, and releases it', async () => {
-    const root = document.documentElement.style
+  it('folds to its tab strip and unfolds, and a new opening unfolds it', async () => {
     renderDock()
-    fireEvent.click(screen.getByText('open-1'))
-    await screen.findByTestId('inspector-dock')
-    expect(root.getPropertyValue('--inspector-reserve-bottom')).toBe('380px')
-    expect(root.getPropertyValue('--inspector-reserve-right')).toBe('0px')
-    fireEvent.click(screen.getByRole('button', { name: 'inspector.dockRight' }))
-    await waitFor(() => expect(root.getPropertyValue('--inspector-reserve-right')).toBe('520px'))
-    expect(root.getPropertyValue('--inspector-reserve-bottom')).toBe('0px')
-    fireEvent.click(screen.getByRole('button', { name: 'inspector.close' }))
-    await waitFor(() => expect(root.getPropertyValue('--inspector-reserve-right')).toBe(''))
-    expect(root.getPropertyValue('--inspector-reserve-bottom')).toBe('')
+    await open(1)
+    const dock = screen.getByTestId('inspector-dock')
+    fireEvent.click(screen.getByRole('button', { name: 'inspector.collapse' }))
+    expect(dock).toHaveClass('is-collapsed')
+    expect(screen.getByTestId('panel').closest('.ins-body')).toHaveAttribute('hidden')
+    expect(screen.queryByTestId('inspector-grip')).toBeNull()
+    // The strip stays usable
+    expect(screen.getByRole('tab', { name: 'c1.example.com' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'inspector.expand' }))
+    expect(dock).not.toHaveClass('is-collapsed')
+    fireEvent.click(screen.getByRole('button', { name: 'inspector.collapse' }))
+    await open(2)
+    expect(dock).not.toHaveClass('is-collapsed')
   })
 
-  it('sits above the status bar on the desktop, docked at the bottom or on the right', async () => {
+  it('grows to the most the window allows, then back to the band', async () => {
     renderDock()
-    fireEvent.click(screen.getByText('open-1'))
-    const dock = await screen.findByTestId('inspector-dock')
-    expect(dock).toHaveClass('bottom-[var(--shell-status-h,0px)]')
-    expect(dock).not.toHaveClass('bottom-0')
-    fireEvent.click(screen.getByRole('button', { name: 'inspector.dockRight' }))
-    await waitFor(() => expect(screen.getByTestId('inspector-grip')).toHaveAttribute('aria-orientation', 'vertical'))
-    expect(dock).toHaveClass('bottom-[var(--shell-status-h,0px)]', 'top-0', 'right-0')
-    expect(dock).not.toHaveClass('bottom-0')
-  })
-
-  it('counts the open objects in its header', async () => {
-    renderDock()
-    fireEvent.click(screen.getByText('open-1'))
-    await screen.findByText('one.example.com:overview')
-    expect(screen.getByTestId('inspector-count').firstElementChild).toHaveTextContent(/^1$/)
-    fireEvent.click(screen.getByText('open-2'))
-    await screen.findByText('two.example.com:overview')
-    expect(screen.getByTestId('inspector-count').firstElementChild).toHaveTextContent(/^2$/)
-    expect(screen.getByTestId('inspector-count')).toHaveAttribute('title', 'inspector.openCount')
+    await open(1)
+    const dock = screen.getByTestId('inspector-dock')
+    fireEvent.click(screen.getByRole('button', { name: 'inspector.grow' }))
+    expect(dock.style.height).toBe('600px')
+    fireEvent.click(screen.getByRole('button', { name: 'inspector.shrink' }))
+    expect(dock.style.height).toBe('278px')
   })
 
   it('switches close on navigate from its header and remembers it', async () => {
     renderDock()
-    fireEvent.click(screen.getByText('open-1'))
-    await screen.findByText('one.example.com:overview')
+    await open(1)
     const toggle = screen.getByRole('button', { name: 'inspector.closeOnNav' })
     expect(toggle).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(toggle)
     expect(toggle).toHaveAttribute('aria-pressed', 'false')
     expect(JSON.parse(localStorage.getItem('ucm-inspector-prefs')).closeOnNav).toBe(false)
-    // The dock stays open and the focus stays on the switch
     expect(screen.getByTestId('inspector-dock')).toBeInTheDocument()
   })
 
   it('closes an object from its own close button', async () => {
     renderDock()
-    fireEvent.click(screen.getByText('open-1'))
-    await screen.findByText('one.example.com:overview')
+    await open(1)
     fireEvent.click(screen.getByRole('button', { name: 'inspector.closeTab' }))
     expect(screen.queryByTestId('inspector-dock')).toBeNull()
   })
 
   it('keeps the focus in the dock when an inactive object closes from its own button', async () => {
     renderDock()
-    fireEvent.click(screen.getByText('open-1'))
-    await screen.findByText('one.example.com:overview')
-    fireEvent.click(screen.getByText('open-2'))
-    await screen.findByText('two.example.com:overview')
-    await waitFor(() => expect(screen.getByRole('tab', { name: 'two.example.com' })).toHaveFocus())
-    const closeOne =screen.getAllByRole('button', { name: 'inspector.closeTab' })[0]
+    await open(1)
+    await open(2)
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'c2.example.com' })).toHaveFocus())
+    const closeOne = screen.getAllByRole('button', { name: 'inspector.closeTab' })[0]
     closeOne.focus()
     fireEvent.click(closeOne)
-    await waitFor(() => expect(screen.queryByRole('tab', { name: 'one.example.com' })).toBeNull())
-    await waitFor(() => expect(screen.getByRole('tab', { name: 'two.example.com' })).toHaveFocus())
+    await waitFor(() => expect(screen.queryByRole('tab', { name: 'c1.example.com' })).toBeNull())
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'c2.example.com' })).toHaveFocus())
+  })
+
+  it('puts the tabs beyond the strip in a « +N » menu, the active one always shown', async () => {
+    // 400 px for six tabs of at least 120 px: two fit beside the « +N » button
+    widthSpy = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function () {
+      return this.classList?.contains('ins-tabs-zone') ? 400 : 0
+    })
+    renderDock()
+    for (const i of [1, 2, 3, 4, 5, 6]) await open(i)
+    const strip = screen.getByTestId('inspector-object-tabs')
+    expect(within(strip).getAllByRole('tab')).toHaveLength(2)
+    expect(within(strip).getByRole('tab', { name: 'c6.example.com' })).toHaveAttribute('aria-selected', 'true')
+    const more = screen.getByTestId('inspector-tabs-more')
+    expect(more).toHaveTextContent('+4')
+    expect(more).toHaveAttribute('aria-haspopup', 'menu')
+    fireEvent.click(more)
+    const menu = screen.getByRole('menu', { name: 'inspector.hiddenObjects' })
+    const item = within(menu).getByRole('menuitem', { name: 'c3.example.com' })
+    fireEvent.click(item)
+    await screen.findByText('c3.example.com:overview')
+    expect(within(strip).getByRole('tab', { name: 'c3.example.com' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+
+  it('closes a hidden object from the « +N » menu and leaves it with Escape', async () => {
+    widthSpy = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function () {
+      return this.classList?.contains('ins-tabs-zone') ? 400 : 0
+    })
+    renderDock()
+    for (const i of [1, 2, 3, 4, 5]) await open(i)
+    const more = screen.getByTestId('inspector-tabs-more')
+    expect(more).toHaveTextContent('+3')
+    fireEvent.click(more)
+    fireEvent.click(within(screen.getByRole('menu')).getAllByRole('menuitem', { name: 'inspector.closeTab' })[0])
+    await waitFor(() => expect(screen.getByTestId('inspector-tabs-more')).toHaveTextContent('+2'))
+    // The menu stays open on the remaining objects
+    expect(within(screen.getByRole('menu')).getAllByRole('menuitem', { name: 'inspector.closeTab' })).toHaveLength(2)
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
+    expect(screen.queryByRole('menu')).toBeNull()
+    // Escape in the menu closes the menu, not the active object
+    expect(screen.getByTestId('inspector-dock')).toBeInTheDocument()
   })
 
   it('resizes from the keyboard within its limits and remembers the size', async () => {
     renderDock()
-    fireEvent.click(screen.getByText('open-1'))
-    const grip = await screen.findByTestId('inspector-grip')
+    await open(1)
+    const grip = screen.getByTestId('inspector-grip')
     const before = Number(grip.getAttribute('aria-valuenow'))
     fireEvent.keyDown(grip, { key: 'ArrowUp' })
     expect(Number(grip.getAttribute('aria-valuenow'))).toBe(before + 24)
     expect(JSON.parse(localStorage.getItem('ucm-inspector-prefs')).height).toBe(before + 24)
     for (let i = 0; i < 100; i++) fireEvent.keyDown(grip, { key: 'ArrowDown' })
     expect(Number(grip.getAttribute('aria-valuenow'))).toBe(Number(grip.getAttribute('aria-valuemin')))
+    fireEvent.keyDown(grip, { key: 'End' })
+    expect(Number(grip.getAttribute('aria-valuenow'))).toBe(600)
   })
 
   it('is a full-screen modal dialog on mobile', async () => {
     env.mobile = true
     renderDock()
-    fireEvent.click(screen.getByText('open-1'))
-    const dock = await screen.findByTestId('inspector-dock')
+    await open(1)
+    const dock = screen.getByTestId('inspector-dock')
     expect(dock).toHaveAttribute('role', 'dialog')
     expect(dock).toHaveAttribute('aria-modal', 'true')
-    expect(dock).toHaveClass('inset-0')
-    expect(dock).not.toHaveClass('bottom-[var(--shell-status-h,0px)]')
+    expect(dock).toHaveClass('is-mobile')
     expect(screen.queryByTestId('inspector-grip')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'inspector.collapse' })).toBeNull()
   })
 
   it('reads the position from the server preference and saves a change', async () => {
     setAuthenticated(true)
     act(() => applyServerPreferences({ inspector: { position: 'right', width: 600 } }))
     renderDock()
-    fireEvent.click(screen.getByText('open-1'))
-    const grip = await screen.findByTestId('inspector-grip')
+    await open(1)
+    const grip = screen.getByTestId('inspector-grip')
     expect(grip).toHaveAttribute('aria-orientation', 'vertical')
     expect(grip).toHaveAttribute('aria-valuenow', '600')
     fireEvent.click(screen.getByRole('button', { name: 'inspector.dockBottom' }))
@@ -267,16 +324,15 @@ describe('InspectorDock', () => {
   it('ignores an invalid stored geometry', async () => {
     localStorage.setItem('ucm-inspector-prefs', JSON.stringify({ position: 'left', height: 'tall', width: 5 }))
     renderDock()
-    fireEvent.click(screen.getByText('open-1'))
-    const grip = await screen.findByTestId('inspector-grip')
+    await open(1)
+    const grip = screen.getByTestId('inspector-grip')
     expect(grip).toHaveAttribute('aria-orientation', 'horizontal')
-    expect(grip).toHaveAttribute('aria-valuenow', '380')
+    expect(grip).toHaveAttribute('aria-valuenow', '278')
   })
 
   it('closes everything on sign-out', async () => {
     const { rerender } = renderDock()
-    fireEvent.click(screen.getByText('open-1'))
-    await screen.findByText('one.example.com:overview')
+    await open(1)
     env.authenticated = false
     rerender(<InspectorProvider><Opener /><InspectorDock /></InspectorProvider>)
     await waitFor(() => expect(screen.queryByTestId('inspector-dock')).toBeNull())

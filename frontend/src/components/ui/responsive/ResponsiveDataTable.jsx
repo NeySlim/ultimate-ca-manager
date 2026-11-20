@@ -21,6 +21,10 @@ import { ListTable } from './ListTable'
 import '../../list/list.css'
 
 const EXPORT_MAX_ROWS = 10000
+// Row height of each density in the list template (list.css --lv-row)
+const ROW_PX = { compact: 36, default: 40, comfortable: 44 }
+// From this many pages the list footer offers to jump to a page by its number
+const PAGE_JUMP_FROM = 10
 const EXPORT_PAGE_SIZE = 100
 
 export function ResponsiveDataTable({
@@ -105,6 +109,7 @@ export function ResponsiveDataTable({
   rowLabel, // (row) => string: names the row in the labels of its checkbox and actions
   rangeLabel, // ({ start, end, total }) => string: "1–25 of 276 certificates"
   tableLabel, // accessible name of the table
+  footNote, // text under the table, left of the density and column count
 
   // Custom class
   className
@@ -673,7 +678,19 @@ export function ResponsiveDataTable({
         )}
         
         {/* Empty state content */}
-        <div className={cn('flex-1 flex flex-col items-center justify-center py-16 px-4', flat && 'lv-table-box')}>
+        {flat ? (
+          <div className="lv-table-box">
+            <div className="lv-empty" data-testid="list-empty">
+              {EmptyIcon && <EmptyIcon aria-hidden="true" />}
+              <h3>{hasActiveFilters ? t('table.noResults') : emptyTitle}</h3>
+              <p>{hasActiveFilters ? t('table.adjustFilters') : emptyDescription}</p>
+              {hasActiveFilters ? (
+                <button type="button" className="lv-btn" onClick={handleClearAllChips}>{t('table.clearFilters')}</button>
+              ) : emptyAction}
+            </div>
+          </div>
+        ) : (
+        <div className="flex-1 flex flex-col items-center justify-center py-16 px-4">
           {EmptyIcon && (
             <div className="w-16 h-16 rounded-2xl bg-bg-tertiary flex items-center justify-center mb-4">
               <EmptyIcon size={32} className="text-text-secondary" />
@@ -697,6 +714,7 @@ export function ResponsiveDataTable({
             </button>
           ) : emptyAction}
         </div>
+        )}
       </div>
     )
   }
@@ -813,6 +831,7 @@ export function ResponsiveDataTable({
           rowClickOpens={list}
         />
       ) : list ? (
+        <>
         <div className="lv-table-box">
           <ListTable
             data={paginatedData}
@@ -843,6 +862,11 @@ export function ResponsiveDataTable({
             </footer>
           )}
         </div>
+        <div className="lv-caption" data-testid="list-caption">
+          <span>{footNote}</span>
+          <span>{t('table.rowsNote', { px: ROW_PX[density] || ROW_PX.compact, count: visibleColumns.length })}</span>
+        </div>
+        </>
       ) : (
         <DesktopTable
           data={paginatedData}
@@ -1897,6 +1921,29 @@ function MobileCardRow({
 // PAGINATION BAR
 // =============================================================================
 
+function PageJump({ page, totalPages, onChange }) {
+  const { t } = useTranslation()
+  const [value, setValue] = useState(String(page))
+  useEffect(() => { setValue(String(page)) }, [page])
+  const go = (e) => {
+    e.preventDefault()
+    const n = Math.min(totalPages, Math.max(1, parseInt(value, 10) || page))
+    setValue(String(n))
+    if (n !== page) onChange(n)
+  }
+  return (
+    <form className="lv-page-jump" onSubmit={go} noValidate>
+      <label className="lv-page-jump">
+        <span>{t('table.page')}</span>
+        <input type="number" min={1} max={totalPages} value={value} inputMode="numeric"
+          aria-label={t('table.pageNumber')} onChange={(e) => setValue(e.target.value)} />
+      </label>
+      <span>{t('table.pageOf', { total: totalPages })}</span>
+      <button type="submit" className="lv-btn is-small">{t('table.goToPage')}</button>
+    </form>
+  )
+}
+
 function PaginationBar({ page, total, perPage, onChange, onPerPageChange, isMobile, flat = false, range }) {
   const { t } = useTranslation()
   const totalPages = Math.ceil(total / perPage)
@@ -1912,7 +1959,7 @@ function PaginationBar({ page, total, perPage, onChange, onPerPageChange, isMobi
     />
   )
 
-  // List template: the range in words, the page size, the pages
+  // List template: the range in words, the page size, the pages (a page number to jump to on a long list)
   if (flat) {
     return (
       <footer className="lv-footer">
@@ -1923,7 +1970,9 @@ function PaginationBar({ page, total, perPage, onChange, onPerPageChange, isMobi
             onClick={() => onChange(page - 1)} disabled={page <= 1}>
             <CaretLeft size={14} aria-hidden="true" />
           </button>
-          <span>{page} / {totalPages}</span>
+          {totalPages >= PAGE_JUMP_FROM
+            ? <PageJump page={page} totalPages={totalPages} onChange={onChange} />
+            : <span>{page} / {totalPages}</span>}
           <button type="button" className="lv-btn is-small is-icon" aria-label={t('table.nextPage')}
             onClick={() => onChange(page + 1)} disabled={page >= totalPages}>
             <CaretRight size={14} aria-hidden="true" />

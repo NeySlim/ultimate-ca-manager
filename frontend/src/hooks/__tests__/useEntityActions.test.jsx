@@ -100,6 +100,13 @@ describe('what a list row leaves to the detail', () => {
     expect(offered(CERT, rights(['delete:certificates']))).toEqual(['export', 'delete'])
   })
 
+  it('offers the key upload only to a writer, on a certificate that holds no key', () => {
+    expect(visible(run('certificate', { ...CERT, has_private_key: false }, ALL))).toContain('uploadKey')
+    expect(visible(run('certificate', CERT, ALL))).not.toContain('uploadKey')
+    expect(visible(run('certificate', { ...CERT, has_private_key: false }, rights()))).not.toContain('uploadKey')
+    expect(visible(run('ca', { ...CA, has_private_key: false }, rights(['write:cas'])))).not.toContain('uploadKey')
+  })
+
   it('offers neither renew nor revoke on a revoked certificate, nor renew without its key', () => {
     expect(offered({ ...CERT, revoked: true, status: 'revoked' }, ALL)).toEqual(['export', 'rename', 'delete'])
     expect(offered({ ...CERT, has_private_key: false }, ALL)).toEqual(['export', 'rename', 'revoke', 'delete'])

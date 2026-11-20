@@ -15,6 +15,8 @@ import { KofiSupportCard } from './KofiSupportCard'
 import { useNotification } from '../contexts/NotificationContext'
 import { usePermission } from '../hooks'
 import { certificatesService } from '../services'
+import { InspectorDock } from './inspector/InspectorDock'
+import { useDockPlacement } from './inspector/placement'
 
 export function AppShell() {
   const { t } = useTranslation()
@@ -27,6 +29,8 @@ export function AppShell() {
   // Help key requested by the shell itself (navigation help); cleared on close
   const [helpOverride, setHelpOverride] = useState(null)
   const { showWarning } = useNotification()
+  // The inspector sits in the page flow: under the page, or beside it on the right
+  const dockPlacement = useDockPlacement()
 
   // Derive the active nav item from the URL (see resolveActivePageId)
   const activePage = resolveActivePageId(location.pathname)
@@ -134,7 +138,7 @@ export function AppShell() {
 
   return (
     <div className="shell-root">
-      {/* The stage makes room for the inspector dock; the status bar stays under both */}
+      {/* The stage holds the page and the inspector; the status bar stays under both */}
       <div className="shell-stage">
       <TopBar
         can={can}
@@ -146,12 +150,13 @@ export function AppShell() {
         hasHelp={hasHelp}
       />
 
-      <div className="shell-main">
+      <div className={`shell-main${dockPlacement === 'right' ? ' has-dock-right' : ''}`}>
         <div className="shell-content">
           <div className="flex-1 flex min-h-0 min-w-0 overflow-auto">
             <Outlet />
           </div>
         </div>
+        <InspectorDock />
       </div>
       </div>
 

@@ -210,7 +210,7 @@
 .lv-table th {
   position: relative;
   height: 34px;
-  padding: 0 10px;
+  padding: 0 14px;
   background: var(--raised);
   border-bottom: 1px solid var(--line);
   color: var(--muted);
@@ -235,10 +235,10 @@
 .lv-resize { position: absolute; top: 0; right: -4px; z-index: 1; width: 8px; height: 100%; cursor: col-resize; }
 .lv-resize:hover,
 .lv-resize.is-active { background: var(--accent); opacity: 0.6; }
-.lv-table td { height: var(--lv-row); padding: 0 10px; border-bottom: 1px solid var(--line); }
+.lv-table td { height: var(--lv-row); padding: 0 14px; border-bottom: 1px solid var(--line); }
 .lv-table tbody tr:last-child td { border-bottom: 0; }
-.lv-table th:first-child,
-.lv-table td:first-child { padding-left: 14px; }
+/* Beside a right dock the cells keep 10 px, as the mockup does */
+.has-dock-right .lv-table :is(th, td):not(:first-child) { padding-left: 10px; padding-right: 10px; }
 .lv-table th:last-child,
 .lv-table td:last-child { padding-right: 12px; }
 .lv-table tbody tr { transition: background-color 120ms ease; }
@@ -250,12 +250,15 @@
 /* The box that keeps every row at --lv-row whatever a cell holds */
 .lv-cell { display: flex; align-items: center; height: calc(var(--lv-row) - 1px); min-width: 0; }
 .lv-clip { display: block; height: calc(var(--lv-row) - 1px); overflow: hidden; text-overflow: ellipsis; line-height: calc(var(--lv-row) - 1px); }
-.lv-table :is(th, td).lv-grow { width: 100%; min-width: 64px; max-width: 1px; }
+.lv-table :is(th, td).lv-grow { width: 100%; min-width: var(--lv-min, 64px); max-width: 1px; }
+.lv-table :is(th, td).lv-capped { max-width: var(--lv-max); }
+.has-dock-right .lv-table :is(th, td).lv-grow { min-width: min(var(--lv-min, 64px), 120px); }
+.has-dock-right .lv-table :is(th, td).lv-capped { max-width: var(--lv-max-narrow, var(--lv-max)); }
 .lv-table th.lv-grow { overflow: hidden; text-overflow: ellipsis; }
 .lv-table td.is-clipped { overflow: hidden; text-overflow: ellipsis; }
 .lv-table td.is-muted { color: var(--muted); }
 .lv-table td.is-small { font-size: 12px; }
-.lv-col-check { width: 44px; }
+.lv-table :is(th, td).lv-col-check { width: 40px; padding: 0 6px; }
 .lv-check { display: flex; align-items: center; justify-content: center; min-width: 28px; min-height: 30px; cursor: pointer; }
 .lv-col-actions { width: 1%; }
 /* The row's actions stay in reach when long names push the table past its box */
@@ -277,6 +280,11 @@
 }
 .lv-icon-btn:hover { background: color-mix(in srgb, var(--text) 10%, transparent); }
 .lv-loading { padding: 42px 18px; text-align: center; color: var(--muted); font-size: 12px; }
+/* Skeleton rows: bars at the size of the content they stand for */
+.lv-sk { display: inline-block; height: 10px; max-width: 100%; border-radius: 3px; background: color-mix(in srgb, var(--muted) 26%, transparent); }
+.lv-sk.is-box { width: 16px; height: 16px; }
+.lv-sk.is-pill { height: 18px; border-radius: 999px; }
+.lv-table tbody tr.lv-sk-row:hover { background: var(--panel); }
 
 /* The name that opens the detail, and what follows it on the line */
 .lv-entity {
@@ -294,6 +302,24 @@
   cursor: pointer;
 }
 .lv-entity > svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--muted); }
+.lv-entity-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A cell whose content shortens itself: the name gives way, the marks after it stay whole */
+.lv-cell.lv-fill { overflow: hidden; }
+.lv-fill > .lv-entity { flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.lv-fill > .lv-mark { flex-shrink: 0; }
+.lv-float-tip {
+  position: fixed;
+  z-index: 60;
+  max-width: min(640px, calc(100vw - 32px));
+  padding: 4px 8px;
+  background: var(--raised);
+  border: 1px solid var(--control);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
 .lv-entity:hover { color: var(--accent); }
 .lv-mark { display: inline-flex; align-items: center; gap: 5px; margin-left: 8px; color: var(--muted); font-size: 12px; }
 .lv-mark svg { width: 12px; height: 12px; flex-shrink: 0; }
@@ -347,6 +373,24 @@
   white-space: nowrap;
   pointer-events: none;
 }
+
+/* Under the table: what stays open, the density and the columns on screen */
+.lv-caption { display: flex; justify-content: space-between; gap: 12px; padding-top: 7px; flex-shrink: 0; font-size: 12px; color: var(--muted); }
+/* Read error of the list: cause, Retry */
+.lv-error { display: flex; align-items: flex-start; gap: 14px; margin: 4px 0 18px; padding: 18px 20px; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--bad); border-radius: 5px; }
+.lv-error > svg { width: 22px; height: 22px; flex-shrink: 0; color: var(--bad); }
+.lv-error h2 { margin: 0; font-size: 15px; font-weight: 600; color: var(--text); }
+.lv-error p { margin: 6px 0 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.lv-error-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 14px; }
+.lv-text-link { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; color: var(--accent); font-size: 12px; font-weight: 500; text-decoration: none; }
+.lv-text-link:hover { text-decoration: underline; }
+/* Nothing to list: icon, title, what to do */
+.lv-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 42px 18px; text-align: center; white-space: normal; }
+.lv-empty > svg { width: 32px; height: 32px; margin-bottom: 14px; color: var(--muted); }
+.lv-empty h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); }
+.lv-empty p { margin: 9px 0 20px; font-size: 12px; color: var(--muted); }
+.lv-page-jump { display: inline-flex; align-items: center; gap: 6px; }
+.lv-page-jump input { width: 72px; min-height: 28px; padding: 2px 6px; background: var(--panel); border: 1px solid var(--control); border-radius: 4px; color: var(--text); font: inherit; font-size: 12px; }
 
 /* Footer: range, page size, pages */
 .lv-footer {

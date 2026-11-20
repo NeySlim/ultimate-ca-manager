@@ -84,11 +84,30 @@ describe('ResponsiveDataTable variant="list": rows', () => {
     expect(screen.getAllByRole('columnheader').filter((th) => th.matches('.lv-grow')).map((th) => th.textContent)).toEqual(['Note'])
   })
 
+  it('lets a fill column shorten its own content, with a floor, and caps go through variables', () => {
+    const columns = [
+      { key: 'name', header: 'Name', grow: true, fill: true, minWidth: 160, render: (val) => <button type="button">{val}</button> },
+      { key: 'note', header: 'Note', maxWidth: 320, narrowMaxWidth: 150 },
+      { key: 'issuer', header: 'Issuer', maxWidth: 200 },
+    ]
+    render(<Harness columns={columns} />)
+    const [, name, note] = cells(row(LONG))
+    expect(name).toHaveClass('lv-grow')
+    expect(name.firstElementChild.matches('div.lv-cell.lv-fill')).toBe(true)
+    expect(name.style.getPropertyValue('--lv-min')).toBe('160px')
+    expect(note).toHaveClass('lv-capped', 'is-clipped')
+    expect(note.style.getPropertyValue('--lv-max')).toBe('320px')
+    expect(note.style.getPropertyValue('--lv-max-narrow')).toBe('150px')
+    // The header of the grow column is the name, never the note
+    expect(screen.getAllByRole('columnheader').filter((th) => th.matches('.lv-grow')).map((th) => th.textContent)).toEqual(['Name'])
+  })
+
   it('gives a clipped cell its whole text on hover', () => {
     render(<Harness />)
     const [, , note, issuer] = cells(row(LONG))
     expect(note.firstElementChild).toHaveAttribute('title', 'Front door of the shop, renamed by an operator')
-    expect(issuer.style.maxWidth).toBe('200px')
+    expect(issuer).toHaveClass('lv-capped')
+    expect(issuer.style.getPropertyValue('--lv-max')).toBe('200px')
     expect(issuer.firstElementChild).toHaveAttribute('title', 'Issuing CA 1')
     // Nothing to tell for an empty cell
     expect(cells(row('api.example.com'))[2].firstElementChild).not.toHaveAttribute('title')
@@ -252,11 +271,31 @@ describe('ResponsiveDataTable variant="list": header, toolbar and footer', () =>
     )
     const footer = document.querySelector('footer.lv-footer')
     expect(footer).toHaveTextContent('26–50 of 276 things')
-    expect(footer).toHaveTextContent('2 / 12')
+    // From ten pages on, a page number to jump to
+    const jump = within(footer).getByRole('spinbutton', { name: 'table.pageNumber' })
+    expect(jump).toHaveValue(2)
+    expect(footer).toHaveTextContent('table.pageOf:{"total":12}')
     expect(footer).toHaveTextContent('table.perPage:{"size":25}')
     fireEvent.click(within(footer).getByRole('button', { name: 'table.nextPage' }))
     fireEvent.click(within(footer).getByRole('button', { name: 'table.previousPage' }))
     expect(onChange.mock.calls).toEqual([[3], [1]])
+    fireEvent.change(jump, { target: { value: '40' } })
+    fireEvent.click(within(footer).getByRole('button', { name: 'table.goToPage' }))
+    expect(onChange).toHaveBeenLastCalledWith(12)
+  })
+
+  it('counts the pages without a jump below ten pages', () => {
+    render(<Harness pagination={{ page: 2, total: 100, perPage: 25, onChange: () => {} }} />)
+    const footer = document.querySelector('footer.lv-footer')
+    expect(footer).toHaveTextContent('2 / 4')
+    expect(within(footer).queryByRole('spinbutton')).toBeNull()
+  })
+
+  it('says under the table what stays open, the row height and the columns on screen', () => {
+    render(<Harness footNote="Open things stay in the inspector." />)
+    const caption = screen.getByTestId('list-caption')
+    expect(caption).toHaveTextContent('Open things stay in the inspector.')
+    expect(caption).toHaveTextContent('table.rowsNote:{"px":36,"count":')
   })
 
   it('falls back to the plain range and stops at the ends', () => {
@@ -267,9 +306,14 @@ describe('ResponsiveDataTable variant="list": header, toolbar and footer', () =>
     expect(within(footer).getByRole('button', { name: 'table.nextPage' })).toBeDisabled()
   })
 
-  it('says it is loading', () => {
+  it('draws skeleton rows while loading, and says so', () => {
     render(<Harness loading />)
-    expect(screen.getByRole('status')).toHaveTextContent('common.loading')
+    expect(screen.getByRole('status')).toHaveTextContent('table.loadingRows')
+    expect(document.querySelector('.lv-scroll')).toHaveAttribute('aria-busy', 'true')
+    const rows = document.querySelectorAll('tbody tr.lv-sk-row')
+    expect(rows.length).toBe(12)
+    expect(rows[0].querySelectorAll('.lv-sk').length).toBeGreaterThan(2)
+    expect(screen.queryByText('api.example.com')).toBeNull()
   })
 })
 

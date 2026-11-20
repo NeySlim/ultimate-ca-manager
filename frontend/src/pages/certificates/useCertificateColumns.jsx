@@ -5,7 +5,7 @@ import {
 import { Badge } from '../../components'
 import { StatusPill, SourceLabel, EntityName, RowMark, DueDate } from '../../components/list'
 import { formatDate, extractCN, cn } from '../../lib/utils'
-import { keyAlgorithmLabel } from '../../lib/keyAlgorithms'
+import { certificateKeyLabel } from '../../lib/certificateDetail'
 import { EXPIRY_WINDOW_DAYS } from '../../lib/expiry'
 import { sourceOf, sourceLabel, sourceIcon } from './certificateSources'
 
@@ -42,7 +42,7 @@ export function useCertificateColumns(t) {
         date={row.valid_to}
         warnDays={EXPIRY_WINDOW_DAYS}
         tone={row.revoked ? '' : DUE_TONES[row.status]}
-        relative={row.revoked ? null : undefined}
+        relative={row.revoked ? t('common.revoked') : undefined}
       />
     )
 
@@ -52,6 +52,10 @@ export function useCertificateColumns(t) {
         header: t('common.commonName'),
         priority: 1,
         sortable: true,
+        // The name takes the room left by the other columns and shortens itself with an ellipsis
+        grow: true,
+        fill: true,
+        minWidth: 160,
         // One line: the name opens the detail, quiet marks follow it
         render: (val, row) => (
           <>
@@ -87,8 +91,11 @@ export function useCertificateColumns(t) {
         header: t('common.description'),
         sortable: true,
         hideOnMobile: true,
-        grow: true,
         muted: true,
+        // Content-sized up to a cap, the whole text on hover
+        maxWidth: 320,
+        narrowMaxWidth: 150,
+        skeletonWidth: 140,
         accessor: (row) => row.subtitle || '',
         title: (row) => row.subtitle || '',
         render: (val, row) => row.subtitle || ''
@@ -99,6 +106,8 @@ export function useCertificateColumns(t) {
         priority: 2,
         sortable: true, // Groups by status type, then alphabetically
         hideOnMobile: true, // Shown in the name's mobile card
+        skeleton: 'pill',
+        skeletonWidth: 74,
         render: (val, row) => statePill(row)
       },
       {
@@ -107,7 +116,9 @@ export function useCertificateColumns(t) {
         priority: 3,
         sortable: true,
         muted: true,
+        // Capped so the name keeps its room; a longer issuer keeps its whole name on hover
         maxWidth: 260,
+        narrowMaxWidth: 150,
         title: issuerOf,
         render: (val, row) => issuerOf(row) || '—',
         // Mobile card, under the name: who issued it and how, then when it is due
@@ -127,6 +138,9 @@ export function useCertificateColumns(t) {
         header: t('certificates.source'),
         sortable: false,
         hideOnMobile: true,
+        maxWidth: 220,
+        narrowMaxWidth: 120,
+        title: (row) => sourceLabel(sourceOf(row), t),
         accessor: (row) => sourceLabel(sourceOf(row), t),
         render: (val, row) => source(row)
       },
@@ -135,6 +149,7 @@ export function useCertificateColumns(t) {
         header: t('certificates.expiry'),
         priority: 4,
         sortable: true,
+        skeletonWidth: 120,
         render: (val, row) => due(row)
       },
       {
@@ -144,7 +159,7 @@ export function useCertificateColumns(t) {
         sortable: true,
         muted: true,
         small: true,
-        render: (val, row) => keyAlgorithmLabel(row.key_algorithm || row.key_algo || val, t, row.security_level) || '—'
+        render: (val, row) => certificateKeyLabel(row, t) || '—'
       },
       {
         key: 'compliance_grade',

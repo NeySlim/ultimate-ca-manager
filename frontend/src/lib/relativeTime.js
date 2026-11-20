@@ -53,3 +53,21 @@ export function dueTone(date, { now = new Date(), warnDays = 7 } = {}) {
   if (left <= 0) return 'bad'
   return left < warnDays * DAY ? 'warn' : ''
 }
+
+// Short form of a due date: days below two months, months below two years, then years
+const SHORT_MONTH_DAYS = 60
+const SHORT_YEAR_DAYS = 730
+
+/** The i18n key and count of the short form ("3 d", "5 mo", "9 y", "Expired"), or null without a date. */
+export function shortParts(date, { now = new Date() } = {}) {
+  const ms = toTime(date)
+  if (ms === null) return null
+  if (ms - new Date(now).getTime() <= 0) return { key: 'time.short.expired' }
+  const days = daysRemaining(date, now)
+  if (days < SHORT_MONTH_DAYS) return { key: 'time.short.days', count: days }
+  if (days < SHORT_YEAR_DAYS) return { key: 'time.short.months', count: Math.floor(days / 30.44) }
+  return { key: 'time.short.years', count: Math.floor(days / 365.25) }
+}
+
+/** "3 d", "5 mo", "9 y", "Expired" in the user's language; '' without a date. */
+export const relativeShort = (date, t, opts) => say(shortParts(date, opts), t)

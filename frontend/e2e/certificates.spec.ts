@@ -15,6 +15,12 @@ async function openInInspector(page, cn: string) {
   return panel
 }
 
+// Actions other than Export and Renew sit in the « ⋯ » menu of the heading, rendered in a portal
+async function moreAction(page, panel, cn: string, name: string) {
+  await panel.getByRole('button', { name: `Other actions for ${cn}` }).click()
+  await page.getByRole('menuitem', { name, exact: true }).click()
+}
+
 test('a certificate issued on screen is signed by the chosen CA', async ({ page, api }) => {
   const ca = await createCA(api)
   const cn = `${uid('web')}.example.com`
@@ -36,6 +42,7 @@ test('the inspector shows the certificate the row names', async ({ page, api }) 
   const cert = await issueCert(api, (await createCA(api)).id)
   const panel = await openInInspector(page, cert.common_name)
   await expect(panel.getByText(cert.serial_number, { exact: false }).first()).toBeVisible()
+  await panel.getByRole('tab', { name: 'Extensions', exact: true }).click()
   await expect(panel).toContainText(new RegExp(`DNS:\\s*${cert.common_name.replace(/\./g, '\\.')}`))
 })
 
@@ -56,7 +63,7 @@ test('a certificate revoked from the inspector is listed by the next CRL', async
   const ca = await createCA(api)
   const cert = await issueCert(api, ca.id)
   const panel = await openInInspector(page, cert.common_name)
-  await panel.getByRole('button', { name: 'Revoke', exact: true }).click()
+  await moreAction(page, panel, cert.common_name, 'Revoke')
   const dialog = page.getByRole('dialog', { name: 'Revoke certificate' })
   await dialog.getByRole('button', { name: 'Revoke', exact: true }).click()
   await expect(dialog).toBeHidden()
