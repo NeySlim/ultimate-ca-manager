@@ -66,8 +66,8 @@ vi.mock('../../services', () => ({
 
 // The form itself is not under test: a stub that submits what the real one would
 vi.mock('../certificates/IssueCertificateForm', () => ({
-  IssueCertificateForm: ({ onSubmit }) => (
-    <button type="button" onClick={() => onSubmit({ cn: 'new.example.com' })}>submit-issue</button>
+  IssueCertificateForm: ({ onSubmit, onSent }) => (
+    <button type="button" onClick={async () => onSent(await onSubmit({ cn: 'new.example.com' }))}>submit-issue</button>
   ),
 }))
 
@@ -130,6 +130,8 @@ describe('CertificatesPage — finding a new certificate (#368)', () => {
     create.mockResolvedValue({ data: { id: 99, cn: 'new.example.com' } })
     renderPage()
     await issue()
+    // The result screen first, then the certificate on demand
+    fireEvent.click(await screen.findByRole('button', { name: 'certificates.issueForm.resultViewCertificate' }))
     await waitFor(() => expect(openEntity).toHaveBeenCalledWith('certificate', 99))
   })
 

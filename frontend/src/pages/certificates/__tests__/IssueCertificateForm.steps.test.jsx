@@ -251,6 +251,27 @@ describe('IssueCertificateForm steps', () => {
     expect(body.validity_days).toBeLessThanOrEqual(11)
   })
 
+  it('unfolds Advanced when an extension is in error, also behind an earlier error', async () => {
+    renderForm()
+    fill()
+    openAdvanced()
+    fireEvent.click(screen.getByText('customExtensions.add'))
+    fireEvent.click(screen.getByText('customExtensions.add'))
+    const [oid0, oid1] = screen.getAllByLabelText(`${P}extOid`)
+    const values = screen.getAllByLabelText(`${P}extValue`)
+    fireEvent.change(oid0, { target: { value: 'not.an.oid' } })
+    fireEvent.change(oid1, { target: { value: '1.3.6.1.4.1.32473.1' } })
+    openAdvanced()
+    type(LABEL.days, '0')
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`${P}toReview`) }))
+    await waitFor(() => expect(document.activeElement).toBe(field(LABEL.days)))
+    expect(screen.getByRole('button', { name: new RegExp(`${P}advanced`) }).getAttribute('aria-expanded')).toBe('true')
+    expect(oid0.getAttribute('aria-invalid')).toBe('true')
+    // An empty value is marked on the value, not on its OID
+    expect(oid1.getAttribute('aria-invalid')).toBeNull()
+    expect(values[1].getAttribute('aria-invalid')).toBe('true')
+  })
+
   it('focuses the first field in error and marks it invalid', async () => {
     renderForm()
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`${P}toReview`) }))

@@ -6,6 +6,7 @@
  */
 import { describe, it, expect, vi } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import { LABEL, P, choose, field, optionValues, reviewAndIssue, type } from '../certificates/__tests__/issueFormTestUtils'
 
 const REAL_EMAIL_TEMPLATE = {
@@ -44,10 +45,12 @@ async function renderWithTemplate(id, onSubmit = vi.fn().mockResolvedValue(undef
 }
 
 describe('IssueCertificateForm template Email prefill (#373)', () => {
-  it('case 6a: a real template email fills the subject Email field and opens Advanced', async () => {
+  it('case 6a: a real template email fills the subject Email field; Advanced stays folded and says so', async () => {
     await renderWithTemplate(1)
     await waitFor(() => expect(field('common.email').value).toBe('pki@example.com'))
-    expect(field('common.email').closest('[hidden]')).toBeNull()
+    const toggle = screen.getByRole('button', { name: new RegExp(`${P}advanced`) })
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(toggle.textContent).toContain(`${P}advancedHintTemplate`)
   }, 15000)
 
   it('case 6b: a {email} placeholder template leaves the subject Email field empty', async () => {
