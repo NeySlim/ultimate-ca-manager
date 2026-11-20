@@ -12,11 +12,17 @@ const box = async (locator): Promise<Box> => {
   return b as Box
 }
 
+// Other tests issue certificates at the same time: the list is searched down to this one
+async function openListOn(page, name: string) {
+  await page.goto('/certificates')
+  await page.getByRole('main').getByRole('searchbox').fill(name)
+}
+
 test.use({ viewport: { width: W, height: H } })
 
 test('the list shows its seven columns whole and the inspector opens in the page flow', async ({ page, api }) => {
   const cert = await issueCert(api, (await createCA(api)).id)
-  await page.goto('/certificates')
+  await openListOn(page, cert.common_name)
   const main = page.getByRole('main')
   await expect(main.getByRole('button', { name: cert.common_name, exact: true })).toBeVisible()
 
@@ -76,7 +82,7 @@ test('the list shows its seven columns whole and the inspector opens in the page
 
 test('the inspector band grows to 420 px and Escape closes it from the list', async ({ page, api }) => {
   const cert = await issueCert(api, (await createCA(api)).id)
-  await page.goto('/certificates')
+  await openListOn(page, cert.common_name)
   const main = page.getByRole('main')
   await main.getByRole('button', { name: cert.common_name, exact: true }).click()
   const dock = page.getByTestId('inspector-dock')
@@ -85,6 +91,7 @@ test('the inspector band grows to 420 px and Escape closes it from the list', as
   await dock.getByRole('button', { name: 'Enlarge the inspector' }).click()
   expect(Math.round((await box(dock)).height)).toBe(420)
   // The focus back on the list, Escape still closes the inspector
+  await main.getByRole('searchbox').fill('')
   await main.getByRole('searchbox').focus()
   await page.keyboard.press('Escape')
   await expect(dock).toBeHidden()
@@ -121,7 +128,7 @@ test.describe('on a phone', () => {
 
   test('each certificate is a record inside the 16 px gutter, and the inspector takes the screen', async ({ page, api }) => {
     const cert = await issueCert(api, (await createCA(api)).id)
-    await page.goto('/certificates')
+    await openListOn(page, cert.common_name)
     const main = page.getByRole('main')
     await expect(main.getByRole('table')).toHaveCount(0)
     const record = main.getByRole('listitem').filter({ has: page.getByRole('button', { name: cert.common_name, exact: true }) })
@@ -148,7 +155,7 @@ test.describe('at 1000 px', () => {
 
   test('keeps one row action, the columns tool by its icon, an overview in two columns', async ({ page, api }) => {
     const cert = await issueCert(api, (await createCA(api)).id)
-    await page.goto('/certificates')
+    await openListOn(page, cert.common_name)
     const main = page.getByRole('main')
     const row = main.getByRole('row', { name: new RegExp(cert.common_name.replace(/\./g, '\\.')) })
     await expect(row).toBeVisible()
