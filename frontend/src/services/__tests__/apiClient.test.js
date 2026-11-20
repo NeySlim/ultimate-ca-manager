@@ -374,6 +374,40 @@ describe('API Client', () => {
       expect(window.location.href).toBe('/login?next=%2Fcertificates%3Fstatus%3Dexpiring')
     })
 
+    it('does not stack a second redirect when the route guard reached the login page first', async () => {
+      const assigned = []
+      window.location = { pathname: '/certificates', search: '', set href(v) { assigned.push(v) }, get href() { return assigned.at(-1) ?? '' } }
+      let answerCheck
+      global.fetch
+        .mockResolvedValueOnce({
+          ok: false, status: 401,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          json: () => Promise.resolve({ error: 'Unauthorized' })
+        })
+        .mockImplementationOnce(() => new Promise((resolve) => { answerCheck = resolve }))
+      const { apiClient } = await import('../apiClient')
+      const call = apiClient.get('/certificates')
+      await vi.waitFor(() => expect(answerCheck).toBeTypeOf('function'))
+      // The guard's <Navigate> lands on the sign-in page while the session check is in flight
+      window.location.pathname = '/login'
+      window.location.search = '?next=%2Fcertificates'
+      answerCheck({ ok: false, status: 401, json: () => Promise.resolve({}) })
+      await expect(call).rejects.toMatchObject({ status: 401 })
+      expect(assigned).toEqual([])
+    })
+
+    it('keeps only a known page in the next of its redirect', async () => {
+      window.location = { pathname: '/no-such-page', search: '', href: '' }
+      global.fetch.mockResolvedValueOnce({
+        ok: false, status: 401,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve({ error: 'Unauthorized' })
+      })
+      const { apiClient } = await import('../apiClient')
+      await expect(apiClient.get('/certificates')).rejects.toThrow()
+      expect(window.location.href).toBe('/login')
+    })
+
     it('redirects once when parallel calls all get 401, and sends no call after', async () => {
       const assigned = []
       window.location = { pathname: '/dashboard', set href(v) { assigned.push(v) }, get href() { return assigned.at(-1) ?? '' } }
