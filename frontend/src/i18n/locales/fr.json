@@ -4254,6 +4254,18 @@
       "years_one": "{{count}} an",
       "years_other": "{{count}} ans",
       "expired": "Échu"
+    },
+    "compact": {
+      "inHours_one": "dans {{count}} h",
+      "inHours_other": "dans {{count}} h",
+      "inDays_one": "dans {{count}} j",
+      "inDays_other": "dans {{count}} j",
+      "hoursAgo_one": "il y a {{count}} h",
+      "hoursAgo_other": "il y a {{count}} h",
+      "daysAgo_one": "il y a {{count}} j",
+      "daysAgo_other": "il y a {{count}} j",
+      "overdueDays_one": "échu depuis {{count}} j",
+      "overdueDays_other": "échu depuis {{count}} j"
     }
   },
   "tools": {
@@ -4730,7 +4742,10 @@
       "certificate": "Certificat",
       "ca": "AC",
       "truststore": "Certificat de confiance",
-      "user_certificate": "Certificat utilisateur"
+      "user_certificate": "Certificat utilisateur",
+      "approval": "Demande d'approbation",
+      "key_recovery": "Récupération de clé",
+      "report": "Rapport"
     },
     "sections": {
       "overview": "Aperçu",
@@ -4988,7 +5003,108 @@
     "summaryProtocol": "Protocole",
     "summaryIdentity": "Identité du protocole",
     "summaryCsr": "Demande de certificat (CSR)",
-    "triggerScheduler": "Planificateur de renouvellement"
+    "triggerScheduler": "Planificateur de renouvellement",
+    "work": {
+      "intent": "Demandes en attente de validation.",
+      "total_one": "{{count}} en attente",
+      "total_other": "{{count}} en attente",
+      "hint": "Cochez plusieurs demandes pour les approuver ou les refuser ensemble ; un sujet ouvre le détail.",
+      "hintRead": "Un sujet ouvre le détail.",
+      "emptyTitle": "Aucune demande en attente",
+      "emptyText": "Les demandes traitées restent dans l'historique ci-dessous ; les politiques disent quelles émissions en demandent une.",
+      "seePolicies": "Voir les politiques",
+      "history": "Traitées récemment",
+      "kind": "Approbation · {{source}}",
+      "requestedBy": "Demandée par {{user}} {{ago}}",
+      "scheduler": "le planificateur de renouvellement",
+      "unknownRequester": "un demandeur inconnu",
+      "votes_one": "{{count}} approbation sur {{need}}",
+      "votes_other": "{{count}} approbations sur {{need}}",
+      "groups": {
+        "overdue": "En retard",
+        "soon": "À traiter sous 48 h",
+        "later": "Plus tard"
+      },
+      "approve": "Approuver",
+      "reject": "Refuser",
+      "approveAsk": "Approuver…",
+      "rejectAsk": "Refuser…",
+      "approveNamed": "Approuver {{name}}",
+      "rejectNamed": "Refuser {{name}}",
+      "what": {
+        "certificate": "Certificat à émettre",
+        "csr": "CSR à signer",
+        "renewal": "Renouvellement",
+        "revocation": "Révocation",
+        "ca_revocation": "Révocation d'AC",
+        "cross_revocation": "Révocation de certificat croisé",
+        "acme_order": "Commande ACME",
+        "est_enroll": "Enrôlement EST",
+        "scep_request": "Demande SCEP",
+        "wstep_request": "Demande WSTEP"
+      },
+      "source": {
+        "certificate": "certificat",
+        "csr": "CSR",
+        "renewal": "renouvellement",
+        "revocation": "révocation",
+        "ca_revocation": "AC",
+        "cross_revocation": "certificat croisé",
+        "acme_order": "ACME",
+        "est_enroll": "EST",
+        "scep_request": "SCEP",
+        "wstep_request": "WSTEP"
+      },
+      "state": {
+        "pending": "En attente",
+        "approved": "Approuvée",
+        "rejected": "Refusée",
+        "expired": "Expirée",
+        "cancelled": "Annulée"
+      },
+      "dialog": {
+        "approveOne": "Approuver la demande",
+        "approveMany": "Approuver les demandes",
+        "rejectOne": "Refuser la demande",
+        "rejectMany": "Refuser les demandes",
+        "reason": "Motif",
+        "optional": "facultatif",
+        "approveHint": "Enregistré avec la décision.",
+        "rejectHint": "Obligatoire pour un refus : enregistré avec la décision.",
+        "reasonRequired": "Indiquez le motif du refus.",
+        "manyNote": "Chaque demande est traitée à son tour ; le bilan donne celles qui sont passées et pourquoi les autres ne le sont pas."
+      },
+      "sections": {
+        "request": "Demande",
+        "log": "Journal"
+      },
+      "detail": {
+        "request": "Demande",
+        "id": "Identifiant",
+        "submitted": "Déposée",
+        "due": "À traiter avant",
+        "votes": "Approbations",
+        "csr": "CSR",
+        "object": "Objet",
+        "subject": "Sujet",
+        "ca": "Autorité",
+        "csrId": "CSR enregistrée",
+        "days_one": "{{count}} jour",
+        "days_other": "{{count}} jours",
+        "decision": "Décision",
+        "by": "Par",
+        "on": "Le",
+        "noReason": "Aucun"
+      },
+      "log": {
+        "submitted": "Demande déposée",
+        "approved": "Approuvée",
+        "rejected": "Refusée",
+        "expired": "Expirée sans décision",
+        "cancelled": "Annulée",
+        "none": "Aucune entrée."
+      }
+    }
   },
   "reports": {
     "title": "Rapports",
@@ -5116,7 +5232,86 @@
         "audit": "Sécurité et audit",
         "recommendations": "Recommandations"
       }
-    }
+    },
+    "work": {
+      "intent": "Inventaires et échéances planifiés.",
+      "total_one": "{{count}} rapport planifié",
+      "total_other": "{{count}} rapports planifiés",
+      "hint": "Cochez plusieurs rapports pour les télécharger ou suspendre leur planification ensemble ; un nom ouvre le détail.",
+      "hintRead": "Un nom ouvre le détail.",
+      "emptyTitle": "Aucun rapport planifié",
+      "emptyText": "Un rapport envoie l'inventaire, les échéances ou la conformité par courriel, à la fréquence choisie.",
+      "unscheduled": "Non planifiés",
+      "schedule": "Planifier un rapport",
+      "scheduleAsk": "Planifier…",
+      "scheduleNamed": "Planifier {{name}}",
+      "editSchedule": "Modifier la planification…",
+      "suspend": "Suspendre la planification",
+      "suspended_one": "{{count}} planification suspendue",
+      "suspended_other": "{{count}} planifications suspendues",
+      "testAsk": "Envoyer un test…",
+      "customPdf": "Composer un PDF…",
+      "downloadNamed": "Télécharger {{name}}",
+      "noRecipient": "Aucun destinataire",
+      "groups": {
+        "today": "Prochaine exécution sous 24 h",
+        "later": "Planifiés"
+      },
+      "freq": {
+        "daily": "Quotidien · {{time}} UTC",
+        "weekly": "Hebdomadaire · {{time}} UTC",
+        "monthly": "Mensuel · {{time}} UTC"
+      },
+      "freqLong": {
+        "daily": "Quotidien, à {{time}} UTC",
+        "weekly": "Hebdomadaire, le {{day}}, à {{time}} UTC",
+        "monthly": "Mensuel, le {{day}}, à {{time}} UTC"
+      },
+      "dayName": {
+        "mon": "lundi",
+        "tue": "mardi",
+        "wed": "mercredi",
+        "thu": "jeudi",
+        "fri": "vendredi",
+        "sat": "samedi",
+        "sun": "dimanche"
+      },
+      "state": {
+        "scheduled": "Planifié",
+        "unscheduled": "Non planifié"
+      },
+      "sections": {
+        "report": "Rapport",
+        "runs": "Exécutions",
+        "preview": "Aperçu"
+      },
+      "detail": {
+        "schedule": "Planification",
+        "next": "Prochaine exécution",
+        "figure": "Chiffre actuel"
+      },
+      "items_one": "{{count}} ligne",
+      "items_other": "{{count}} lignes",
+      "generatedAt": "Calculé le {{date}}.",
+      "compute": "Calculer",
+      "seeCertificates": "Voir ces certificats",
+      "noRuns": "Le serveur ne fournit pas d'historique des exécutions : la planification et la prochaine exécution sont ce qui est connu.",
+      "pdfPreview": "Un rapport PDF s'examine en le téléchargeant.",
+      "previewIntro": "Générez le rapport maintenant pour voir ses lignes.",
+      "previewCount_one": "{{count}} ligne affichée sur {{total}}",
+      "previewCount_other": "{{count}} lignes affichées sur {{total}}",
+      "dialog": {
+        "content": "Contenu",
+        "time": "Heure d'envoi (UTC)",
+        "timeHint": "Format HH:MM, en heure UTC comme le planificateur.",
+        "timeInvalid": "Indiquez une heure au format HH:MM.",
+        "recipientsHint": "Une ou plusieurs adresses séparées par des virgules.",
+        "recipientsRequired": "Indiquez au moins un destinataire : sans destinataire, rien n'est envoyé.",
+        "save": "Planifier",
+        "editTitle": "Modifier la planification"
+      }
+    },
+    "invalidEmail": "Adresse électronique invalide"
   },
   "messages": {
     "errors": {
@@ -6422,6 +6617,45 @@
       "rejected": "Rejetée",
       "recovered": "Récupérée",
       "cancelled": "Annulée"
+    },
+    "work": {
+      "intent": "Clés privées demandées, approuvées par un administrateur, puis récupérées une fois.",
+      "total_one": "{{count}} en cours",
+      "total_other": "{{count}} en cours",
+      "hint": "Cochez plusieurs demandes pour les approuver ou les refuser ensemble ; un certificat ouvre le détail.",
+      "hintDual": "Double contrôle : une demande est approuvée par un autre administrateur que son demandeur ; un certificat ouvre le détail.",
+      "emptyText": "Une récupération se demande depuis l'inspecteur d'un certificat, avec un motif.",
+      "groups": {
+        "approve": "À approuver",
+        "approveOther": "À approuver par un autre administrateur",
+        "recover": "À récupérer"
+      },
+      "kind": "Récupération de clé",
+      "requestedBy": "Demandée par {{user}} {{ago}}",
+      "reason": "Motif : {{reason}}",
+      "approveAsk": "Approuver…",
+      "rejectAsk": "Refuser…",
+      "recoverAsk": "Récupérer…",
+      "approveNamed": "Approuver la récupération de {{name}}",
+      "rejectNamed": "Refuser la récupération de {{name}}",
+      "recoverNamed": "Récupérer la clé de {{name}}",
+      "certificate": "Certificat",
+      "recoveredBy": "Récupérée par",
+      "recoveredOn": "Récupérée le",
+      "dialog": {
+        "approveOne": "Approuver la récupération",
+        "approveMany": "Approuver les récupérations",
+        "rejectOne": "Refuser la récupération",
+        "rejectMany": "Refuser les récupérations",
+        "note": "Note",
+        "noteHint": "Conservée avec la décision."
+      },
+      "log": {
+        "requested": "Récupération demandée",
+        "approved": "Demande approuvée",
+        "rejected": "Demande refusée",
+        "recovered": "Clé récupérée"
+      }
     }
   },
   "updatePopup": {
@@ -6932,6 +7166,27 @@
     "states": {
       "sub": "Les certificats par état. Chaque ligne ouvre sa liste.",
       "alt": "{{total}} certificats : {{valid}} valides, {{expiring}} expirent bientôt, {{expired}} expirés, {{revoked}} révoqués."
+    }
+  },
+  "work": {
+    "sep": " : ",
+    "selectRow": "Sélectionner {{name}}",
+    "selectAll": "Tout sélectionner : {{group}}",
+    "loading": "Chargement de la file…",
+    "retry": "Réessayer",
+    "bulkLabel": "Actions groupées",
+    "selected_one": "{{count}} élément sélectionné",
+    "selected_other": "{{count}} éléments sélectionnés",
+    "cancelSelection": "Annuler la sélection",
+    "historyEmpty": "Rien pour l'instant.",
+    "bulk": {
+      "title": "Bilan",
+      "done_one": "{{count}} réussie",
+      "done_other": "{{count}} réussies",
+      "failed_one": "{{count}} échouée",
+      "failed_other": "{{count}} échouées",
+      "ok": "réussie",
+      "ko": "échouée"
     }
   }
 }

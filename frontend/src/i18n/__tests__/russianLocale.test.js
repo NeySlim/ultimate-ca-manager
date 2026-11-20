@@ -127,11 +127,11 @@ describe('locale file guards', () => {
   "PKCS7 (.p7b)", "PKI", "Posh-ACME", "Python", "QcCClegislation", "QcCompliance", "QcLimitValue", "QcPDS",
   "QcRetentionPeriod", "QcSSCD", "QcType", "RBAC", "RFC 5280", "RSA", "RSA 2048", "RSA 3072", "RSA 4096",
   "RSA-PSS", "SAML", "SAML 2.0", "SAN DNS", "SCEP", "SHA-1", "SHA-256", "SSH", "SSH / SFTP", "SSL/TLS",
-  "SSO", "STARTTLS", "TOTP", "TSA", "UCM {{version}}", "UPN", "URI", "URL", "WebSocket", "X-API-Key",
+  "SSO", "STARTTLS", "TOTP", "TSA", "UCM {{version}}", "UPN", "URI", "URL", "WSTEP", "WebSocket", "X-API-Key",
   "acme.sh", "cert-manager", "certbot", "lego", "member (OpenLDAP / RFC 2307)",
   "memberOf (Active Directory)", "permit-X11-forwarding", "permit-agent-forwarding",
   "permit-port-forwarding", "permit-pty", "permit-user-rc", "ssh-certificate",
-  "uniqueMember (OpenLDAP groupOfUniqueNames)", "win-acme", "{{action}}: {{name}}", "⚫ GitHub", "🔵 Google",
+  "uniqueMember (OpenLDAP groupOfUniqueNames)", "win-acme", "{{action}}: {{name}}", ": ", "⚫ GitHub", "🔵 Google",
   "🟦 Microsoft Entra"
   ])
 

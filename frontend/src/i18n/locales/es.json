@@ -4332,6 +4332,18 @@
       "years_one": "{{count}} y",
       "years_other": "{{count}} y",
       "expired": "Expired"
+    },
+    "compact": {
+      "inHours_one": "in {{count}} h",
+      "inHours_other": "in {{count}} h",
+      "inDays_one": "in {{count}} d",
+      "inDays_other": "in {{count}} d",
+      "hoursAgo_one": "{{count}} h ago",
+      "hoursAgo_other": "{{count}} h ago",
+      "daysAgo_one": "{{count}} d ago",
+      "daysAgo_other": "{{count}} d ago",
+      "overdueDays_one": "overdue by {{count}} d",
+      "overdueDays_other": "overdue by {{count}} d"
     }
   },
   "validation": {
@@ -4727,7 +4739,10 @@
       "certificate": "Certificado",
       "ca": "CA",
       "truststore": "Certificado de confianza",
-      "user_certificate": "Certificado de usuario"
+      "user_certificate": "Certificado de usuario",
+      "approval": "Approval request",
+      "key_recovery": "Key recovery",
+      "report": "Report"
     },
     "sections": {
       "overview": "Resumen",
@@ -4914,7 +4929,108 @@
     "summaryProtocol": "Protocolo",
     "summaryIdentity": "Identidad del protocolo",
     "summaryCsr": "Solicitud de certificado (CSR)",
-    "triggerScheduler": "Planificador de renovaciones"
+    "triggerScheduler": "Planificador de renovaciones",
+    "work": {
+      "intent": "Requests awaiting validation.",
+      "total_one": "{{count}} pending",
+      "total_other": "{{count}} pending",
+      "hint": "Tick several requests to approve or reject them together; a subject opens the detail.",
+      "hintRead": "A subject opens the detail.",
+      "emptyTitle": "No pending request",
+      "emptyText": "Handled requests stay in the history below; the policies say which issuances need one.",
+      "seePolicies": "See the policies",
+      "history": "Recently handled",
+      "kind": "Approval · {{source}}",
+      "requestedBy": "Requested by {{user}} {{ago}}",
+      "scheduler": "the renewal scheduler",
+      "unknownRequester": "an unknown requester",
+      "votes_one": "{{count}} of {{need}} approvals",
+      "votes_other": "{{count}} of {{need}} approvals",
+      "groups": {
+        "overdue": "Overdue",
+        "soon": "To handle within 48 h",
+        "later": "Later"
+      },
+      "approve": "Approve",
+      "reject": "Reject",
+      "approveAsk": "Approve…",
+      "rejectAsk": "Reject…",
+      "approveNamed": "Approve {{name}}",
+      "rejectNamed": "Reject {{name}}",
+      "what": {
+        "certificate": "Certificate to issue",
+        "csr": "CSR to sign",
+        "renewal": "Renewal",
+        "revocation": "Revocation",
+        "ca_revocation": "CA revocation",
+        "cross_revocation": "Cross-certificate revocation",
+        "acme_order": "ACME order",
+        "est_enroll": "EST enrolment",
+        "scep_request": "SCEP request",
+        "wstep_request": "WSTEP request"
+      },
+      "source": {
+        "certificate": "certificate",
+        "csr": "CSR",
+        "renewal": "renewal",
+        "revocation": "revocation",
+        "ca_revocation": "CA",
+        "cross_revocation": "cross certificate",
+        "acme_order": "ACME",
+        "est_enroll": "EST",
+        "scep_request": "SCEP",
+        "wstep_request": "WSTEP"
+      },
+      "state": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "expired": "Expired",
+        "cancelled": "Cancelled"
+      },
+      "dialog": {
+        "approveOne": "Approve the request",
+        "approveMany": "Approve the requests",
+        "rejectOne": "Reject the request",
+        "rejectMany": "Reject the requests",
+        "reason": "Reason",
+        "optional": "optional",
+        "approveHint": "Recorded with the decision.",
+        "rejectHint": "Required for a rejection: recorded with the decision.",
+        "reasonRequired": "Give the reason for the rejection.",
+        "manyNote": "Each request is decided in turn; the outcome lists those that went through and why the others did not."
+      },
+      "sections": {
+        "request": "Request",
+        "log": "Log"
+      },
+      "detail": {
+        "request": "Request",
+        "id": "Identifier",
+        "submitted": "Submitted",
+        "due": "To handle before",
+        "votes": "Approvals",
+        "csr": "CSR",
+        "object": "Object",
+        "subject": "Subject",
+        "ca": "Authority",
+        "csrId": "Stored CSR",
+        "days_one": "{{count}} day",
+        "days_other": "{{count}} days",
+        "decision": "Decision",
+        "by": "By",
+        "on": "On",
+        "noReason": "None"
+      },
+      "log": {
+        "submitted": "Request submitted",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "expired": "Expired without a decision",
+        "cancelled": "Cancelled",
+        "none": "No entry."
+      }
+    }
   },
   "messages": {
     "confirm": {
@@ -5376,7 +5492,86 @@
         "audit": "Seguridad y auditoría",
         "recommendations": "Recomendaciones"
       }
-    }
+    },
+    "work": {
+      "intent": "Scheduled inventories and due dates.",
+      "total_one": "{{count}} scheduled report",
+      "total_other": "{{count}} scheduled reports",
+      "hint": "Tick several reports to download them or suspend their schedule together; a name opens the detail.",
+      "hintRead": "A name opens the detail.",
+      "emptyTitle": "No scheduled report",
+      "emptyText": "A report sends the inventory, the due dates or the compliance by e-mail, at the chosen frequency.",
+      "unscheduled": "Not scheduled",
+      "schedule": "Schedule a report",
+      "scheduleAsk": "Schedule…",
+      "scheduleNamed": "Schedule {{name}}",
+      "editSchedule": "Change the schedule…",
+      "suspend": "Suspend the schedule",
+      "suspended_one": "{{count}} schedule suspended",
+      "suspended_other": "{{count}} schedules suspended",
+      "testAsk": "Send a test…",
+      "customPdf": "Build a PDF…",
+      "downloadNamed": "Download {{name}}",
+      "noRecipient": "No recipient",
+      "groups": {
+        "today": "Next run within 24 h",
+        "later": "Scheduled"
+      },
+      "freq": {
+        "daily": "Daily · {{time}} UTC",
+        "weekly": "Weekly · {{time}} UTC",
+        "monthly": "Monthly · {{time}} UTC"
+      },
+      "freqLong": {
+        "daily": "Daily, at {{time}} UTC",
+        "weekly": "Weekly, on {{day}}, at {{time}} UTC",
+        "monthly": "Monthly, on day {{day}}, at {{time}} UTC"
+      },
+      "dayName": {
+        "mon": "Monday",
+        "tue": "Tuesday",
+        "wed": "Wednesday",
+        "thu": "Thursday",
+        "fri": "Friday",
+        "sat": "Saturday",
+        "sun": "Sunday"
+      },
+      "state": {
+        "scheduled": "Scheduled",
+        "unscheduled": "Not scheduled"
+      },
+      "sections": {
+        "report": "Report",
+        "runs": "Runs",
+        "preview": "Preview"
+      },
+      "detail": {
+        "schedule": "Schedule",
+        "next": "Next run",
+        "figure": "Current figure"
+      },
+      "items_one": "{{count}} row",
+      "items_other": "{{count}} rows",
+      "generatedAt": "Computed on {{date}}.",
+      "compute": "Compute",
+      "seeCertificates": "See these certificates",
+      "noRuns": "The server does not serve a run history: the schedule and the next run are what is known.",
+      "pdfPreview": "A PDF report is previewed by downloading it.",
+      "previewIntro": "Generate the report now to see its rows.",
+      "previewCount_one": "{{count}} row shown out of {{total}}",
+      "previewCount_other": "{{count}} rows shown out of {{total}}",
+      "dialog": {
+        "content": "Content",
+        "time": "Sending time (UTC)",
+        "timeHint": "HH:MM format, UTC time, as the scheduler runs.",
+        "timeInvalid": "Give a time in the HH:MM format.",
+        "recipientsHint": "One or more addresses separated by commas.",
+        "recipientsRequired": "Give at least one recipient: without one, nothing is sent.",
+        "save": "Schedule",
+        "editTitle": "Change the schedule"
+      }
+    },
+    "invalidEmail": "Invalid email address"
   },
   "export": {
     "title": "Exportar",
@@ -6419,6 +6614,45 @@
       "rejected": "Rechazada",
       "recovered": "Recuperada",
       "cancelled": "Cancelada"
+    },
+    "work": {
+      "intent": "Private keys asked back, approved by an administrator, then recovered once.",
+      "total_one": "{{count}} open",
+      "total_other": "{{count}} open",
+      "hint": "Tick several requests to approve or reject them together; a certificate opens the detail.",
+      "hintDual": "Dual control: a request is approved by another administrator than its requester; a certificate opens the detail.",
+      "emptyText": "A recovery is asked from a certificate's inspector, with a reason.",
+      "groups": {
+        "approve": "To approve",
+        "approveOther": "To approve by another administrator",
+        "recover": "To recover"
+      },
+      "kind": "Key recovery",
+      "requestedBy": "Requested by {{user}} {{ago}}",
+      "reason": "Reason: {{reason}}",
+      "approveAsk": "Approve…",
+      "rejectAsk": "Reject…",
+      "recoverAsk": "Recover…",
+      "approveNamed": "Approve the recovery of {{name}}",
+      "rejectNamed": "Reject the recovery of {{name}}",
+      "recoverNamed": "Recover the key of {{name}}",
+      "certificate": "Certificate",
+      "recoveredBy": "Recovered by",
+      "recoveredOn": "Recovered on",
+      "dialog": {
+        "approveOne": "Approve the recovery",
+        "approveMany": "Approve the recoveries",
+        "rejectOne": "Reject the recovery",
+        "rejectMany": "Reject the recoveries",
+        "note": "Note",
+        "noteHint": "Kept with the decision."
+      },
+      "log": {
+        "requested": "Recovery requested",
+        "approved": "Request approved",
+        "rejected": "Request rejected",
+        "recovered": "Key recovered"
+      }
     }
   },
   "updatePopup": {
@@ -6929,6 +7163,27 @@
     "states": {
       "sub": "Certificates by state. Each line opens its list.",
       "alt": "{{total}} certificates: {{valid}} valid, {{expiring}} expiring, {{expired}} expired, {{revoked}} revoked."
+    }
+  },
+  "work": {
+    "sep": ": ",
+    "selectRow": "Select {{name}}",
+    "selectAll": "Select all: {{group}}",
+    "loading": "Loading the queue…",
+    "retry": "Retry",
+    "bulkLabel": "Bulk actions",
+    "selected_one": "{{count}} item selected",
+    "selected_other": "{{count}} items selected",
+    "cancelSelection": "Clear selection",
+    "historyEmpty": "Nothing yet.",
+    "bulk": {
+      "title": "Outcome",
+      "done_one": "{{count}} done",
+      "done_other": "{{count}} done",
+      "failed_one": "{{count}} failed",
+      "failed_other": "{{count}} failed",
+      "ok": "done",
+      "ko": "failed"
     }
   }
 }

@@ -4,7 +4,7 @@
 import { useAuth } from '../contexts/AuthContext'
 
 export function usePermission() {
-  const { permissions } = useAuth()
+  const { permissions, user } = useAuth()
 
   /**
    * Check if user has a specific permission
@@ -44,5 +44,7 @@ export function usePermission() {
     canDelete,
     isAdmin,
     permissions,
+    // Who is signed in: a rule tied to the requester (dual control) compares names
+    username: user?.username,
   }
 }
