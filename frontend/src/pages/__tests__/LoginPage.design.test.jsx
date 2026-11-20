@@ -134,6 +134,32 @@ describe('LoginPage, as designed', () => {
     expect(screen.getByRole('button', { name: 'auth.page.submit' })).not.toBeDisabled()
   }, 8000)
 
+  it('ends the countdown on the sentence alone, without the warning sign', async () => {
+    s.loginPassword.mockRejectedValue(refusal(429, 'Too many requests', { retryAfter: 1 }))
+    renderLogin()
+    await submit()
+    expect((await screen.findByRole('alert')).querySelector('svg')).not.toBeNull()
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('auth.page.canRetry'), { timeout: 3000 })
+    expect(screen.getByRole('alert').querySelector('svg')).toBeNull()
+  }, 6000)
+
+  it('says the sign-in under way to assistive technology only: the card keeps its size', async () => {
+    let answer
+    s.loginPassword.mockReturnValue(new Promise((_, reject) => { answer = reject }))
+    renderLogin()
+    await screen.findByLabelText('auth.page.username')
+    // Mounted before the attempt, so that its change is read
+    const status = document.getElementById('login-progress')
+    expect(status).toHaveClass('sr-only')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(status).toHaveTextContent('')
+    await submit()
+    await waitFor(() => expect(status).toHaveTextContent('auth.signingIn'))
+    expect(screen.getAllByText('auth.signingIn')).toEqual([status])
+    await act(async () => { answer(refusal(401, 'Invalid credentials')) })
+    await waitFor(() => expect(status).toHaveTextContent(''))
+  })
+
   it('a 429 without a delay asks to wait and leaves the button on', async () => {
     s.loginPassword.mockRejectedValue(refusal(429, 'Too many requests'))
     renderLogin()

@@ -721,7 +721,8 @@ export default function LoginPage() {
 
   const errorBlock = (rateLimit || formError) && (
     <div className="auth-error" role="alert">
-      <Warning size={14} aria-hidden="true" />
+      {/* The end of a countdown is the sentence alone, as in the design */}
+      {!(rateLimit?.wait != null && !rateLimit.left) && <Warning size={14} aria-hidden="true" />}
       <span>
         {!rateLimit ? formError
           : rateLimit.wait == null ? t('auth.page.tooManyNoDelay')
@@ -884,9 +885,6 @@ export default function LoginPage() {
         {ssoOnly ? errorBlock : signInForm(handlePasswordLogin, locked ? t('auth.page.unlock') : t('auth.page.submit'), locked ? Lock : CaretRight)}
         {alternatives.length > 0 && !ssoOnly && <p className="auth-sep"><span>{t('auth.page.or')}</span></p>}
         {alternatives}
-        {loading && statusMessage && statusMessage !== t('auth.touchSecurityKey') && (
-          <p className="auth-wait" aria-live="polite">{statusMessage}</p>
-        )}
         {(locked || (emailConfigured && !locked)) && (
           <div className="auth-links">
             {locked
@@ -902,6 +900,8 @@ export default function LoginPage() {
     <AuthFrame ref={titleRef} title={title} lead={lead}>
       {body}
       <p className="sr-only" aria-live="polite">{announce}</p>
+      {/* The attempt under way is said, not shown: the card keeps its size while the request runs */}
+      <p className="sr-only" id="login-progress" aria-live="polite">{loading && statusMessage !== t('auth.touchSecurityKey') ? statusMessage : ''}</p>
     </AuthFrame>
   )
 }
