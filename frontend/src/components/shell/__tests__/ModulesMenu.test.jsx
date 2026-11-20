@@ -245,3 +245,19 @@ describe('Modules menu: pins', () => {
     expect(screen.queryByRole('button', { name: 'shell.pinModule|common.audit' })).toBeNull()
   })
 })
+
+describe('Modules menu: its place under the button', () => {
+  it('follows its button when the bar gains a link while the menu is open', async () => {
+    const user = userEvent.setup()
+    const host = (permissions) => <MemoryRouter><Host permissions={permissions} /></MemoryRouter>
+    const { rerender } = render(host(ROLES.viewer))
+    let left = 300
+    vi.spyOn(button(), 'getBoundingClientRect').mockImplementation(() => ({ left, top: 0, width: 119, height: 61 }))
+    await user.click(button())
+    expect(menu().style.left).toBe('300px')
+    // The rights arrive: the bar grows a link and pushes the button to the right
+    left = 393
+    rerender(host(ROLES.admin))
+    expect(menu().style.left).toBe('393px')
+  })
+})

@@ -42,7 +42,8 @@ export function ModulesMenu({ can, pins, onTogglePin, activeId, onOpenHelp, onNo
     place()
     window.addEventListener('resize', place)
     return () => window.removeEventListener('resize', place)
-  }, [open, buttonRef])
+  // No dependency list: the bar may gain a link while the menu is open, and the button moves
+  })
 
   const onKeyDown = (e) => {
     rootProps.onKeyDown(e)
