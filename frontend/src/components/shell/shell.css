@@ -426,6 +426,9 @@ button.shell-ha-link:hover { background: var(--hover); }
   .shell-main-nav { display: none; }
   .shell-brand { min-width: 0; }
   .shell-brand-mark svg { width: 24px; height: 28px; }
+  /* The picker needs the room: the name stays for screen readers, the search keeps its icon */
+  .shell-brand strong { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .shell-search kbd { display: none; }
   .shell-mobile-nav {
     display: block;
     flex: 1 1 auto;
