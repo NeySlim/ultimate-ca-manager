@@ -6,6 +6,7 @@ import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { formatDate } from '../../lib/utils'
 import { anchorPickerCas } from '../../lib/caSelection'
 import AdminLockLabel from './AdminLockLabel'
+import { fieldBounds } from './fieldChecks'
 import { FormGroup, FormProps } from '../../components/sectioned'
 
 // The API sends a list; the textarea edits one entry per line.
@@ -17,7 +18,7 @@ function networksList(value) {
   return networksText(value).split(/[\s,;]+/).filter(Boolean)
 }
 
-export default function SecuritySection({ settings, updateSetting, hasPermission, encryptionStatus, setShowEnableEncryptionModal, setShowDisableEncryptionModal, handleDownloadExistingMasterKey, handleEncryptRemainingKeys, handleRotateDataKey, encryptionLoading, secretsStatus, handleRotateSessionKey, sessionKeyLoading, anomalies, anomaliesLoading, loadAnomalies, mtlsSettings, setMtlsSettings, mtlsLoading, cas }) {
+export default function SecuritySection({ settings, fieldErrors = {}, updateSetting, hasPermission, encryptionStatus, setShowEnableEncryptionModal, setShowDisableEncryptionModal, handleDownloadExistingMasterKey, handleEncryptRemainingKeys, handleRotateDataKey, encryptionLoading, secretsStatus, handleRotateSessionKey, sessionKeyLoading, anomalies, anomaliesLoading, loadAnomalies, mtlsSettings, setMtlsSettings, mtlsLoading, cas }) {
   const { t } = useTranslation()
   // Fields the API writes for admin:settings only are shown, but disabled.
   const canAdminSettings = Boolean(hasPermission('admin:settings'))
@@ -200,7 +201,7 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
           </div>
         </FormGroup>
       )}
-      <FormGroup title={t('common.twoFactorAuth')}>
+      <FormGroup title={t('settings.mfaGroup')}>
         <div className="space-y-4">
           <ToggleSwitch
             checked={settings.enforce_2fa || false}
@@ -264,9 +265,10 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
                 type="number"
                 value={settings.hsts_max_age ?? 31536000}
                 onChange={(e) => updateSetting('hsts_max_age', parseInt(e.target.value))}
-                min="0"
                 helperText={t('settings.hstsMaxAgeDesc')}
                 disabled={adminLocked || settings.hsts_env_locked?.includes('hsts_max_age')}
+                {...fieldBounds('hsts_max_age')}
+                error={fieldErrors['hsts_max_age']}
               />
             </>
           )}
@@ -283,9 +285,9 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
             type="number"
             value={settings.ocsp_response_validity_hours ?? 24}
             onChange={(e) => updateSetting('ocsp_response_validity_hours', parseInt(e.target.value))}
-            min="1"
-            max="168"
             helperText={t('settings.ocspResponseValidityDesc')}
+            {...fieldBounds('ocsp_response_validity_hours')}
+            error={fieldErrors['ocsp_response_validity_hours']}
           />
           <ToggleSwitch
             checked={settings.ocsp_responder_auto_renew ?? true}
@@ -301,10 +303,10 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
               type="number"
               value={settings.ocsp_responder_renew_days ?? 30}
               onChange={(e) => updateSetting('ocsp_responder_renew_days', parseInt(e.target.value))}
-              min="1"
-              max="365"
               helperText={t('settings.ocspResponderRenewDaysDesc')}
               disabled={canAdminSettings === false}
+              {...fieldBounds('ocsp_responder_renew_days')}
+              error={fieldErrors['ocsp_responder_renew_days']}
             />
           )}
           <ToggleSwitch
@@ -346,8 +348,8 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
             type="number"
             value={settings.min_password_length || 8}
             onChange={(e) => updateSetting('min_password_length', parseInt(e.target.value))}
-            min="6"
-            max="32"
+            {...fieldBounds('min_password_length')}
+            error={fieldErrors['min_password_length']}
           />
           <div className="space-y-2">
             <ToggleSwitch
@@ -419,9 +421,9 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
               type="number"
               value={Math.round((settings.session_max_lifetime || 86400) / 3600)}
               onChange={(e) => updateSetting('session_max_lifetime', parseInt(e.target.value) * 3600)}
-              min="1"
-              max="720"
               helperText={t('settings.sessionDurationHelper')}
+              {...fieldBounds('session_max_lifetime')}
+              error={fieldErrors['session_max_lifetime']}
             />
         </div>
       </FormGroup>

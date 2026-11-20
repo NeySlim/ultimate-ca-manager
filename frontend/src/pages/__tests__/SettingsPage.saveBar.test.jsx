@@ -167,7 +167,7 @@ describe('SettingsPage: one page, one save bar', () => {
     await loaded()
     await waitFor(() => expect(bar()).toHaveTextContent('sectioned.lastSavedBy'))
     const history = screen.getByRole('region', { name: 'settings.historyTitle' })
-    expect(within(history).getByText('General Settings')).toBeInTheDocument()
+    expect(within(history).getByText('settings.history.general')).toBeInTheDocument()
     expect(within(history).queryByText('Auto-Renewal')).toBeNull()
   })
 

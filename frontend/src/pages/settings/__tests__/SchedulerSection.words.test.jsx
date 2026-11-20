@@ -12,6 +12,8 @@ const { notify, api, i18n } = vi.hoisted(() => ({
   api: { getSchedulerTasks: vi.fn(), runSchedulerTask: vi.fn() },
   i18n: {
     t: (key, opts) => (key.startsWith('scheduler.tasks.') && !KNOWN.has(key) ? key
+      : key === 'scheduler.skipReasons.notConfigured' ? 'tr(notConfigured)'
+      : opts?.reason !== undefined ? `${key}:${opts.reason}`
       : opts?.count !== undefined ? `${key}:${opts.count}` : key.startsWith('scheduler.tasks.') ? `tr(${key})` : key),
     i18n: { language: 'fr' },
   },
@@ -47,5 +49,15 @@ describe('SchedulerSection words', () => {
     const other = screen.getByText('Brand new task').closest('tr')
     const more = within(other).getAllByRole('cell').map((c) => c.textContent)
     expect(more.slice(1, 4)).toEqual(['scheduler.interval.daily', 'time.compact.hoursAgo:13', 'time.compact.minutesAgo:1'])
+  })
+
+  it('words a skip reason a task gives as an English sentence', async () => {
+    api.getSchedulerTasks.mockResolvedValue({ data: { tasks: [
+      { name: 'ad_health', label: 'AD health', interval: 3600, last_run: at(-60000), next_run: at(3600000),
+        last_status: 'skipped', last_reason: 'not configured or disabled', run_count: 1 },
+    ], total: 1, warnings: 0 } })
+    render(<SchedulerSection hasPermission={() => false} />)
+    expect(await screen.findByText('scheduler.skipped:tr(notConfigured)')).toBeInTheDocument()
+    expect(screen.queryByText(/not configured or disabled/)).toBeNull()
   })
 })

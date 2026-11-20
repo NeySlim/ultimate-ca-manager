@@ -5,6 +5,7 @@ import { Button, Badge } from '../../components'
 import { useNotification } from '../../contexts'
 import { systemService } from '../../services'
 import { FormGroup } from '../../components/sectioned'
+import { useRefocusAfter } from '../../components/sectioned/useRefocus'
 import { compactRun } from '../../lib/relativeTime'
 
 const POLL_MS = 15000
@@ -36,9 +37,30 @@ function taskLabel(t, task) {
 
 // A run that did nothing on purpose reads differently from a successful one:
 // the backup task reports why it stood down (off, not due yet).
+// Reasons some tasks give as English sentences rather than codes
+const REASON_CODES = {
+  'not configured or disabled': 'notConfigured',
+  'bind credentials missing': 'bindMissing',
+  'another operation in progress': 'busy',
+  'claimed by another node': 'otherNode',
+  'another node is running the expiry checks': 'otherNode',
+}
+
+// Disabled while its task runs, it gets the focus back when the run ends, as the mockup's test
+function RunButton({ busy, onRun, children }) {
+  const ref = useRef(null)
+  useRefocusAfter(busy, ref)
+  return (
+    <Button ref={ref} type="button" variant="secondary" onClick={onRun} disabled={busy}>
+      <Play size={13} weight="fill" />
+      {children}
+    </Button>
+  )
+}
+
 function skipReason(t, reason) {
   if (!reason) return t('scheduler.skipReasons.unknown')
-  const key = `scheduler.skipReasons.${reason}`
+  const key = `scheduler.skipReasons.${REASON_CODES[reason] || reason}`
   const label = t(key)
   return label === key ? reason : label
 }
@@ -126,7 +148,7 @@ export default function SchedulerSection({ hasPermission }) {
           <div className="p-6 text-center text-sm text-text-secondary">{t('scheduler.noTasks')}</div>
         ) : (
           <div className="ui-table-box overflow-x-auto">
-            <table className="ui-table">
+            <table className="ui-table sf-task-table">
               <thead>
                 <tr>
                   <th>{t('scheduler.colTask')}</th>
@@ -173,14 +195,9 @@ export default function SchedulerSection({ hasPermission }) {
                     <td className="text-right text-text-secondary tabular-nums">{task.run_count}</td>
                     {canRun && (
                       <td className="text-right">
-                        <Button
-                          type="button" size="sm" variant="secondary"
-                          onClick={() => handleRun(task.name, taskLabel(t, task))}
-                          disabled={!!running[task.name]}
-                        >
-                          <Play size={13} weight="fill" />
+                        <RunButton busy={!!running[task.name]} onRun={() => handleRun(task.name, taskLabel(t, task))}>
                           {t('scheduler.runNow')}
-                        </Button>
+                        </RunButton>
                       </td>
                     )}
                   </tr>

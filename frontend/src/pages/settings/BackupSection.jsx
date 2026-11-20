@@ -8,10 +8,11 @@ import { useClipboard } from '../../hooks/useClipboard'
 import { formatSize, formatBytes, formatPercent, serverUtcToIso } from '../../lib/fileSize'
 import { formatDate } from '../../lib/utils'
 import { restoreMaxBytes, restoreLegacyCeilingExceeded } from './restoreLimits'
+import { fieldBounds } from './fieldChecks'
 import { FormGroup } from '../../components/sectioned'
 
 export default function BackupSection({
-  settings, updateSetting, saving, hasPermission,
+  settings, fieldErrors = {}, updateSetting, saving, hasPermission,
   backups, backupMeta = {}, backupSchedule = {}, backupQuery = {}, updateBackupQuery,
   selectedBackups = [], toggleSelectBackup, toggleSelectAllBackups,
   handleBulkDeleteBackups, handleRunRetention, backupBusy,
@@ -133,9 +134,9 @@ export default function BackupSection({
             type="number"
             value={settings.backup_retention_days || 30}
             onChange={(e) => updateSetting('backup_retention_days', parseInt(e.target.value))}
-            min="1"
-            max="3650"
             helperText={t('settings.retentionHelper')}
+            {...fieldBounds('backup_retention_days')}
+            error={fieldErrors['backup_retention_days']}
           />
           <Input
             className="sf-short"
@@ -144,9 +145,9 @@ export default function BackupSection({
             type="number"
             value={settings.backup_max_total_mb ?? 0}
             onChange={(e) => updateSetting('backup_max_total_mb', parseInt(e.target.value, 10) || 0)}
-            min="0"
-            max="1048576"
             helperText={t('settings.backupMaxTotalMbHelper')}
+            {...fieldBounds('backup_max_total_mb')}
+            error={fieldErrors['backup_max_total_mb']}
           />
           {storedMiB && (
             <p className="sf-hint" data-testid="backup-space-used">

@@ -180,7 +180,7 @@ export default function DeploySection() {
   return (
     <>
 
-      <HelpCard variant="info" title={t('deploy.helpTitle')} className="mb-4">
+      <HelpCard variant="info" title={t('deploy.helpTitle')}>
         {t('deploy.helpDescription')}
       </HelpCard>
 

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Database, Globe, Shield, TestTube, Power, PencilSimple, Trash, Plus, ArrowsClockwise } from '@phosphor-icons/react'
-import { Button, Badge, HelpCard } from '../../components'
+import { Button, Badge } from '../../components'
 
 export default function SsoSection({ ssoProviders, ssoLoading, ssoTesting, handleSsoCreate, handleSsoEdit, handleSsoToggle, handleSsoTest, setSsoConfirmDelete, hasPermission }) {
   const { t } = useTranslation()
@@ -9,10 +9,6 @@ export default function SsoSection({ ssoProviders, ssoLoading, ssoTesting, handl
   const canDelete = hasPermission('delete:sso')
   return (
     <>
-
-      <HelpCard variant="info" title={t('sso.helpTitle')}>
-        {t('sso.helpDescription')}
-      </HelpCard>
 
       {ssoLoading ? (
         <div className="flex items-center justify-center py-12">

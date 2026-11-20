@@ -188,11 +188,11 @@ export function FormGroup({ title, description, subtitle, actions, badge, childr
 }
 
 /**
- * Save bar: nothing pending (with the last save when known), or what is pending, with
+ * Save bar: nothing pending (with the last save when known), or the fields pending, with
  * « Undo changes » and « Save ». `stateRef` takes the focus after a save or an undo.
  */
 export const SaveBar = forwardRef(function SaveBar(
-  { count, sectionLabels = [], lastSaved, saving, failed = [], onReset, onSave, disabled }, stateRef,
+  { count, sectionLabels = [], fieldLabels = [], lastSaved, saving, failed = [], onReset, onSave, disabled }, stateRef,
 ) {
   const { t } = useTranslation()
   const dirty = count > 0
@@ -209,7 +209,10 @@ export const SaveBar = forwardRef(function SaveBar(
       <Warning aria-hidden="true" />
       <span>
         <strong>{t('sectioned.pendingTitle')}</strong>
-        {t('sectioned.pendingCount', { count, sections: sectionLabels.join(', ') })}
+        {/* The changed fields by name when the page knows them, else a count per section */}
+        {fieldLabels.length
+          ? t('sectioned.pendingFields', { fields: fieldLabels.join(', ') })
+          : t('sectioned.pendingCount', { count, sections: sectionLabels.join(', ') })}
       </span>
     </>
   ) : (

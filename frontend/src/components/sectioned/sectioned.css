@@ -190,6 +190,9 @@
 /* A segmented choice keeps the width of its segments */
 .sf-body .ui-field > .ui-segmented { align-self: flex-start; }
 
+/* The task table keeps the mockup's 36 px rows: its run button is the compact one */
+.sf-task-table td .lv-btn { min-height: 28px; padding-block: 3px; }
+
 /* A file drop zone reads as a field of the frame: 1 px dashed control line, radius 4 */
 .sf-body .border-dashed { border-width: 1px; border-radius: 4px; padding: 14px; }
 .sf-body .border-dashed:not(.border-accent-primary) { border-color: var(--control); }
@@ -264,6 +267,7 @@
   .sf-savebar { position: static; bottom: 0; padding: 10px 12px; }
   .sf-savebar.is-dirty { position: sticky; }
   .sf-savebar .lv-btn { min-height: 42px; flex: 1 1 auto; }
+  .sf-task-table td .lv-btn { min-height: 40px; }
 }
 
 @media (max-height: 999px) and (min-width: 900px) {

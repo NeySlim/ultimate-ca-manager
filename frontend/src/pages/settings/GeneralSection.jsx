@@ -10,6 +10,7 @@ import { fetchAllPages } from '../../lib/fetchAllPages'
 import ServiceStatusWidget from './ServiceStatusWidget'
 import PublicEndpointsPanel from './PublicEndpointsPanel'
 import AdminLockLabel from './AdminLockLabel'
+import { fieldBounds } from './fieldChecks'
 import { FormGroup } from '../../components/sectioned'
 
 export default function GeneralSection({ settings, fieldErrors = {}, updateSetting, canWrite, hasPermission, savedVersion = 0 }) {
@@ -91,6 +92,7 @@ export default function GeneralSection({ settings, fieldErrors = {}, updateSetti
             label={lockedLabel('settings.baseUrl')}
             disabled={adminLocked}
             value={settings.base_url || ''}
+            error={fieldErrors.base_url}
             onChange={(e) => updateSetting('base_url', e.target.value)}
             placeholder={t('settings.baseUrlPlaceholder')}
             helperText={t('settings.baseUrlHelper')}
@@ -99,6 +101,7 @@ export default function GeneralSection({ settings, fieldErrors = {}, updateSetti
             label={lockedLabel('settings.protocolBaseUrl')}
             disabled={adminLocked}
             value={settings.protocol_base_url || ''}
+            error={fieldErrors.protocol_base_url}
             onChange={(e) => updateSetting('protocol_base_url', e.target.value)}
             placeholder="http://admin.ucm.example.com:8080"
             helperText={t('settings.protocolBaseUrlHelper')}
@@ -172,9 +175,9 @@ export default function GeneralSection({ settings, fieldErrors = {}, updateSetti
             type="number"
             value={Math.round((settings.session_timeout || 28800) / 60)}
             onChange={(e) => updateSetting('session_timeout', parseInt(e.target.value) * 60)}
-            min="5"
-            max="1440"
             helperText={t('settings.sessionTimeoutHelper')}
+            {...fieldBounds('session_timeout')}
+            error={fieldErrors['session_timeout']}
           />
           <Input
             className="sf-short"
@@ -183,9 +186,9 @@ export default function GeneralSection({ settings, fieldErrors = {}, updateSetti
             type="number"
             value={settings.max_login_attempts || 5}
             onChange={(e) => updateSetting('max_login_attempts', parseInt(e.target.value))}
-            min="3"
-            max="20"
             helperText={t('settings.maxLoginAttemptsHelper')}
+            {...fieldBounds('max_login_attempts')}
+            error={fieldErrors['max_login_attempts']}
           />
           <Input
             className="sf-short"
@@ -194,9 +197,9 @@ export default function GeneralSection({ settings, fieldErrors = {}, updateSetti
             type="number"
             value={Math.round((settings.lockout_duration || 900) / 60)}
             onChange={(e) => updateSetting('lockout_duration', parseInt(e.target.value) * 60)}
-            min="1"
-            max="60"
             helperText={t('settings.lockoutDurationHelper')}
+            {...fieldBounds('lockout_duration')}
+            error={fieldErrors['lockout_duration']}
           />
           <Select
             label={t('settings.timezone')}

@@ -16,30 +16,35 @@ export default function CTSection({ ctSettings, setCtSettings, ctLoading, ctNewL
       ) : (
         <FormGroup title={t('settings.ct')}>
           <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-text-primary mb-2 block">{t('settings.ctLogUrls')}</label>
+            {/* The logs as the mockup's record list; a new one typed in a full-width field, its button under it */}
+            <div className="sf-stack">
               {ctSettings.log_urls?.length > 0 && (
-                <div className="space-y-2 mb-3">
+                <ul className="sf-records" aria-label={t('settings.ctLogUrls')}>
                   {ctSettings.log_urls.map((url, i) => (
-                    <div key={i} className="flex items-center gap-2 p-2 bg-tertiary-50 border border-border rounded-lg">
-                      <span className="flex-1 text-xs font-mono text-text-secondary truncate">{url}</span>
-                      <Button type="button" size="sm" variant="danger" onClick={() => handleCtRemoveLogUrl(i)}>
-                        <Trash size={14} />
-                      </Button>
-                    </div>
+                    <li key={i}>
+                      <div className="sf-record-main"><span className="sf-copy-value">{url}</span></div>
+                      <div className="sf-record-actions">
+                        <Button type="button" variant="danger" onClick={() => handleCtRemoveLogUrl(i)}
+                          aria-label={`${t('common.delete')} ${url}`} title={t('common.delete')}>
+                          <Trash size={16} />
+                        </Button>
+                      </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               )}
-              <div className="flex gap-2">
+              <div className="sf-grid">
                 <Input
+                  label={t('settings.ctLogUrls')}
                   value={ctNewLogUrl}
                   onChange={(e) => setCtNewLogUrl(e.target.value)}
                   placeholder="https://ct.googleapis.com/logs/us1/argon2027h1/"
-                  className="flex-1"
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCtAddLogUrl() } }}
                 />
+              </div>
+              <div className="sf-actions-row">
                 <Button type="button" variant="secondary" onClick={handleCtAddLogUrl}>
-                  <Plus size={14} />
+                  <Plus size={16} />
                   {t('settings.ctAddLogUrl')}
                 </Button>
               </div>

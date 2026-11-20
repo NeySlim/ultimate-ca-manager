@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Bell, TestTube, ArrowsClockwise, Lightning, PencilSimple, Trash, Plus, ClockCounterClockwise } from '@phosphor-icons/react'
-import { Button, Badge, HelpCard, EmptyState } from '../../components'
+import { Button, Badge, EmptyState } from '../../components'
 import { webhookEventLabel } from './WebhookForm'
 import WebhookDeliveriesModal from './WebhookDeliveriesModal'
 import { FormGroup } from '../../components/sectioned'
@@ -14,10 +14,6 @@ export default function WebhooksSection({ webhooks, webhooksLoading, webhookTest
   const canDelete = hasPermission('delete:settings')
   return (
     <>
-
-      <HelpCard variant="info" title={t('webhooks.helpTitle')}>
-        {t('webhooks.helpDescription')}
-      </HelpCard>
 
       {webhooksLoading ? (
         <div className="flex items-center justify-center py-12">
