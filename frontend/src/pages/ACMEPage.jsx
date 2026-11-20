@@ -597,8 +597,8 @@ export default function ACMEPage() {
 
   const handleDeactivateCaAccount = async (id) => {
     const confirmed = await showConfirm(t('acme.confirmDeactivateCaAccount'), {
-      title: t('common.deactivateAccount'),
-      confirmText: t('common.deactivate'),
+      title: t('acme.deactivateAccountTitle'),
+      confirmText: t('common.deactivateAccount'),
       variant: 'danger'
     })
     if (!confirmed) return
