@@ -1,26 +1,22 @@
 /**
- * Multi-Method Login Page
- * 
- * Architecture:
- * - AuthContext.checkSession() runs on mount (including /login)
- * - If mTLS middleware auto-logged in → AuthContext sets isAuthenticated → App redirects to /
- * - If not auto-logged → LoginPage renders with state machine:
- *   idle → detecting → username → auth (webauthn_prompt | password_form) → 2fa → done
- * 
- * Auto-login priority: mTLS (0 interaction) → WebAuthn (1 touch) → Password (manual)
+ * Sign-in page and lock screen, in the sign-in frame.
+ *
+ * AuthContext.checkSession() runs on mount (mTLS auto-login lands in the console
+ * at once). Otherwise the page goes: init → form (username and password, or one of
+ * the other doors: SSO, LDAP, client certificate, security key) → 2fa when asked.
+ * A session locked after inactivity (lib/sessionLock) shows the same form for the
+ * same account, read-only username, and returns to ?next= once signed in again.
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
-import { ShieldCheck, Fingerprint, Key, User, ArrowRight, ArrowLeft, GithubLogo, Palette, Globe, SignIn, Lock } from '@phosphor-icons/react'
-import { Card, Button, Input, Logo, LoadingSpinner } from '../components'
-import { languages } from '../i18n'
+import { CaretRight, Lock, Users, Key, Fingerprint, Eye, EyeSlash, Warning, Database } from '@phosphor-icons/react'
 import { useAuth, useNotification } from '../contexts'
-import { useTheme } from '../contexts/ThemeContext'
+import { AuthFrame, AuthField } from '../components/auth/AuthFrame'
 import { authMethodsService } from '../services/auth-methods.service'
 import { authService } from '../services/auth.service'
-import { cn } from '../lib/utils'
 import { safeNext } from '../navigation/safeNext'
+import { readLock, clearLock } from '../lib/sessionLock'
 import {
   NO_ANSWER_RETRY_S, NO_ANSWER_TRIES, isMaintenanceRefusal, isNoAnswer, isRestoreMaintenance, maintenanceRetrySeconds,
 } from './loginMaintenance'
@@ -30,8 +26,11 @@ const STORAGE_AUTH_METHOD_KEY = 'ucm_last_auth_method'
 const SSO_RETRY_BASE_MS = 2000
 const SSO_RETRY_MAX_MS = 30000
 const NO_EVENT = { preventDefault() {} }
+const PROTOCOLS = { oauth2: 'OAuth 2.0', saml: 'SAML 2.0', ldap: 'LDAP' }
 
 const toProviderList = (ssoData) => (Array.isArray(ssoData?.data) ? ssoData.data : [])
+const providerName = (p) => p.display_name || p.name
+const initialsOf = (name) => (name || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
 // The LDAP provider the saved username last signed in with, if still offered
 const savedLdapProvider = (providers) => {
@@ -44,24 +43,8 @@ const savedLdapProvider = (providers) => {
   }
 }
 
-const getSSOIcon = (provider) => {
-  const name = provider.name?.toLowerCase() || ''
-  const type = provider.provider_type
-  if (name.includes('google')) return '🔵'
-  if (name.includes('microsoft') || name.includes('azure') || name.includes('entra')) return '🟦'
-  if (name.includes('github')) return '⚫'
-  if (name.includes('gitlab')) return '🟠'
-  if (name.includes('okta')) return '🔷'
-  if (name.includes('keycloak')) return '🔐'
-  if (name.includes('auth0')) return '🔴'
-  if (type === 'ldap') return '📁'
-  if (type === 'saml') return '🔒'
-  if (type === 'oauth2') return '🔑'
-  return '🔐'
-}
-
 export default function LoginPage() {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   // Where to go after signing in: a known internal page from ?next=, else the dashboard.
@@ -75,37 +58,44 @@ export default function LoginPage() {
   const outage = useRef(null)
   const latestAttempt = useRef({})
   const { login, sessionChecked } = useAuth()
-  const { showError, showSuccess, showInfo } = useNotification()
-  const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
+  const { showSuccess, showInfo } = useNotification()
   const passwordRef = useRef(null)
+  const usernameRef = useRef(null)
+  const codeRef = useRef(null)
+  const titleRef = useRef(null)
 
-  // State machine: 'init' | 'username' | 'auth' | '2fa' | 'ldap'
+  // The account of a session locked after inactivity: unlocked by the same account only
+  const [locked, setLocked] = useState(readLock)
+  const lockedRef = useRef(locked)
+  lockedRef.current = locked
+
+  // State machine: 'init' | 'form' | '2fa' | 'ldap'
   const [step, setStep] = useState('init')
-  const [username, setUsername] = useState('')
+  const [username, setUsername] = useState(() => locked?.username || '')
   // Read by the SSO retry, which outlives the render that started it
   const stepRef = useRef(step)
   stepRef.current = step
   const [password, setPassword] = useState('')
+  const [reveal, setReveal] = useState(false)
   const [totpCode, setTotpCode] = useState('')
   const [twoFactorMethods, setTwoFactorMethods] = useState(['totp'])
   // Which door asked for the second factor: 'password' or 'ldap'
   const twoFactorFrom = useRef('password')
   const [loading, setLoading] = useState(false)
-  const [authMethod, setAuthMethod] = useState(null)
-  const [userMethods, setUserMethods] = useState(null)
   const [statusMessage, setStatusMessage] = useState('')
-  const [hasSavedUsername, setHasSavedUsername] = useState(false)
+  // One message for the attempt refused, shown in the card; field errors beside their field
+  const [formError, setFormError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
   const [emailConfigured, setEmailConfigured] = useState(false)
-  const [themeMenuOpen, setThemeMenuOpen] = useState(false)
-  const [langMenuOpen, setLangMenuOpen] = useState(false)
   const [globalMethods, setGlobalMethods] = useState(null)
-  
+  const [preferKey, setPreferKey] = useState(false)
+  // The user has started on the form: a late provider load no longer switches it
+  const touched = useRef(false)
+
   // SSO state
   const [ssoProviders, setSsoProviders] = useState([])
   const [ssoLoadFailed, setSsoLoadFailed] = useState(false)
   const [selectedLdapProvider, setSelectedLdapProvider] = useState(null)
-
-  const currentLang = languages.find(l => l.code === (i18n.language?.split('-')[0] || 'en')) || languages[0]
 
   // Save helpers
   const saveUsername = (name) => {
@@ -125,20 +115,25 @@ export default function LoginPage() {
     try { return JSON.parse(localStorage.getItem(STORAGE_AUTH_METHOD_KEY) || '{}').method || null } catch { return null }
   }
 
+  // Signed in: the lock is lifted; another account than the locked one starts on the dashboard
+  const finish = (who) => {
+    const lockedAs = lockedRef.current?.username
+    clearLock()
+    navigate(lockedAs && who && who !== lockedAs ? '/dashboard' : landing)
+  }
+
   // ═══════════════════════════════════════════════════
   // INIT: After AuthContext finishes session check,
   // if we're still here (not auto-logged in), detect methods
   // ═══════════════════════════════════════════════════
   useEffect(() => {
     if (!sessionChecked) return
-    
-    // Load saved username
+
+    // Load saved username (the locked account wins)
     let lastUsername = ''
     try { lastUsername = localStorage.getItem(STORAGE_KEY) || '' } catch {}
-    if (lastUsername) {
-      setUsername(lastUsername)
-      setHasSavedUsername(true)
-    }
+    if (lastUsername && !lockedRef.current) setUsername(lastUsername)
+    setPreferKey(Boolean(lastUsername) && getSavedAuthMethod() === 'webauthn')
 
     // Check email config
     authService.isEmailConfigured()
@@ -169,8 +164,10 @@ export default function LoginPage() {
       const ldapProvider = lastUsername ? savedLdapProvider(providers) : null
       if (ldapProvider) {
         setSelectedLdapProvider(ldapProvider)
-        setStep('ldap')
-        return
+        if (!lockedRef.current) {
+          setStep('ldap')
+          return
+        }
       }
 
       // If mTLS cert present but not enrolled, show info
@@ -178,9 +175,9 @@ export default function LoginPage() {
         showInfo(t('auth.certNotEnrolled'))
       }
 
-      setStep('username')
+      setStep('form')
     }).catch(() => {
-      setStep('username')
+      setStep('form')
     })
   }, [sessionChecked]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -211,7 +208,7 @@ export default function LoginPage() {
           let lastUsername = ''
           try { lastUsername = localStorage.getItem(STORAGE_KEY) || '' } catch {}
           const ldapProvider = lastUsername ? savedLdapProvider(providers) : null
-          if (ldapProvider && stepRef.current === 'username') {
+          if (ldapProvider && stepRef.current === 'form' && !lockedRef.current && !touched.current) {
             setSelectedLdapProvider(ldapProvider)
             setStep('ldap')
           }
@@ -239,23 +236,25 @@ export default function LoginPage() {
   }, [ssoLoadFailed])
 
   // SSO callback handling
+  const [ssoCompleting, setSsoCompleting] = useState(false)
   useEffect(() => {
     const ssoComplete = window.location.pathname.includes('sso-complete')
     if (ssoComplete) {
       setLoading(true)
-      setStatusMessage(t('auth.signingIn'))
+      setSsoCompleting(true)
       authService.verifySession()
         .then(async (data) => {
           const verifyData = data.data || data
-          await login(verifyData?.user?.username || 'sso_user', null, verifyData)
-          showSuccess(t('auth.welcomeBackUser', { username: verifyData?.user?.username || 'User' }))
-          navigate(landing)
+          const who = verifyData?.user?.username
+          await login(who || 'sso_user', null, verifyData)
+          showSuccess(t('auth.welcomeBackUser', { username: who || 'User' }))
+          finish(who)
         })
         .catch(() => {
-          showError(t('auth.ssoError'))
+          setFormError(t('auth.ssoError'))
           setLoading(false)
-          setStatusMessage('')
-          setStep('username')
+          setSsoCompleting(false)
+          setStep('form')
         })
       return
     }
@@ -280,24 +279,40 @@ export default function LoginPage() {
         'sso_email_conflict': t('auth.ssoEmailConflict'),
         'saml_logout_rejected': t('auth.samlLogoutRejected'),
       }
-      showError(errorMessages[error] || t('auth.ssoError'))
+      setFormError(errorMessages[error] || t('auth.ssoError'))
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Focus password field
+  // First field to fill: the password once the username is known, the code at the second factor
   useEffect(() => {
-    if (authMethod === 'password' && step === 'auth' && passwordRef.current) {
-      passwordRef.current.focus()
+    if (step === '2fa') codeRef.current?.focus()
+    else if (step === 'form' || step === 'ldap') {
+      if (username && step === 'form') passwordRef.current?.focus()
+      else usernameRef.current?.focus()
     }
-  }, [authMethod, step])
+  }, [step]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ═══════════════════════════════════════════════════
   // AUTH METHOD HANDLERS (standalone, no cascading)
   // ═══════════════════════════════════════════════════
 
+  // Empty fields are named beside their field, the first one gets the focus
+  const missing = (fields) => {
+    const errors = {}
+    for (const [name, value, message] of fields) if (!value) errors[name] = message
+    setFieldErrors(errors)
+    const first = fields.find(([name]) => errors[name])
+    if (first) {
+      setFormError('')
+      ;({ username: usernameRef, password: passwordRef, code: codeRef })[first[0]]?.current?.focus()
+    }
+    return Boolean(first)
+  }
+
   const attemptWebAuthn = useCallback(async () => {
+    if (missing([['username', username.trim(), t('auth.page.usernameMissing')]])) return
     clearMaintenance()
-    setAuthMethod('webauthn')
+    setFormError('')
     setStatusMessage(t('auth.touchSecurityKey'))
     setLoading(true)
     try {
@@ -306,16 +321,16 @@ export default function LoginPage() {
       saveAuthMethod('webauthn')
       await login(username, null, userData)
       showSuccess(t('auth.welcomeBackUser', { username }))
-      navigate(landing)
+      finish(username)
     } catch (error) {
-      // Cancelled or failed → fall to password
-      setAuthMethod('password')
       setStatusMessage('')
       setLoading(false)
       // A security key is touched again by the user: no attempt is made for them
       if (noteRefusal(error, 'webauthn', false)) return
-      if (error.message?.includes('cancelled') || error.message?.includes('abort')) {
+      if (error.message?.includes('cancelled') || error.message?.includes('abort') || error.name === 'NotAllowedError') {
         showInfo(t('auth.securityKeyCancelled'))
+      } else {
+        setFormError(error.message || t('auth.invalidCredentials'))
       }
     }
   }, [username, login, navigate, showSuccess, showInfo, t]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -333,11 +348,12 @@ export default function LoginPage() {
     setMaintenance(null)
   }
 
-  // A 429 or a maintenance's 503 shown as a banner (true); `again` names the attempt repeated, by
-  // itself after the Retry-After when `auto`, or from the banner's button
+  // A 429 or a maintenance's 503 shown in the card (true); `again` names the attempt repeated, by
+  // itself after the Retry-After when `auto`, or from the notice's button
   const noteRefusal = (error, again, auto = true) => {
     if (isMaintenanceRefusal(error)) {
       setRateLimit(null)
+      setFormError('')
       maintenanceRetry.current = again
       outage.current = { restoring: isRestoreMaintenance(error), lost: 0 }
       setMaintenance({ restoring: isRestoreMaintenance(error), seconds: auto ? maintenanceRetrySeconds(error) : null })
@@ -352,7 +368,9 @@ export default function LoginPage() {
       return true
     }
     clearMaintenance()
-    return noteRateLimit(error)
+    const limited = noteRateLimit(error)
+    if (limited) setFormError('')
+    return limited
   }
 
   // Never a second request while one is in flight; each attempt drops the one planned
@@ -378,50 +396,26 @@ export default function LoginPage() {
     return () => clearTimeout(timer)
   }, [maintenance, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleContinue = async (e) => {
-    e?.preventDefault()
-    if (!username.trim()) {
-      showError(t('auth.usernameRequired'))
-      return
-    }
-
-    setLoading(true)
-    setStatusMessage(t('auth.checkingMethods'))
-
-    try {
-      saveUsername(username)
-      const methods = await authMethodsService.detectMethods(username)
-      setUserMethods(methods)
-      setStep('auth')
-
-      // Auto-attempt WebAuthn if this device last signed in with a key —
-      // the API no longer discloses per-user credential counts (anti-enumeration)
-      if (methods.webauthn && authMethodsService.isWebAuthnSupported() && getSavedAuthMethod() === 'webauthn') {
-        await attemptWebAuthn()
-        return
-      }
-
-      // Fallback to password
-      setAuthMethod('password')
-      setStatusMessage('')
-    } catch {
-      setStep('auth')
-      setAuthMethod('password')
-      setUserMethods({ password: true })
-      setStatusMessage('')
-    } finally {
-      setLoading(false)
-    }
+  // A refused attempt other than a 429 or a maintenance: its message in the card
+  const refuse = (error, again, fallback) => {
+    if (!noteRefusal(error, again)) setFormError(error?.message || fallback)
   }
 
   const handlePasswordLogin = async (e) => {
     e.preventDefault()
-    if (!password) {
-      showError(t('auth.passwordRequired'))
+    if (missing([
+      ['username', username.trim(), t('auth.page.usernameMissing')],
+      ['password', password, t('auth.page.passwordMissing')],
+    ])) return
+
+    // A locked LDAP account unlocks through its directory
+    if (lockedRef.current?.method === 'ldap' && selectedLdapProvider) {
+      handleLDAPLogin(NO_EVENT)
       return
     }
 
     clearMaintenance()
+    setFormError('')
     setLoading(true)
     setStatusMessage(t('auth.signingIn'))
 
@@ -442,15 +436,12 @@ export default function LoginPage() {
       await login(username, password, userData)
       // #141: if 2FA enrolment is enforced, the session is established but
       // restricted; the ForceEnroll2FA overlay takes over after navigation.
-      if (userData.requires_2fa_enrollment) {
-        navigate(landing)
-        return
-      }
-      showSuccess(t('auth.welcomeBackUser', { username }))
-      navigate(landing)
+      if (!userData.requires_2fa_enrollment) showSuccess(t('auth.welcomeBackUser', { username }))
+      finish(username)
     } catch (error) {
-      if (!noteRefusal(error, 'password')) showError(error.message || t('auth.invalidCredentials'))
+      refuse(error, 'password', t('auth.invalidCredentials'))
       if (!maintenanceRetry.current) setPassword('')  // kept while a maintenance is waited out
+      passwordRef.current?.focus()
     } finally {
       setLoading(false)
       setStatusMessage('')
@@ -459,12 +450,10 @@ export default function LoginPage() {
 
   const handle2FAVerify = async (e) => {
     e.preventDefault()
-    if (!totpCode || totpCode.length < 6) {
-      showError(t('auth.totpCodeRequired'))
-      return
-    }
+    if (missing([['code', totpCode.length >= 6, t('auth.totpCodeRequired')]])) return
 
     clearMaintenance()
+    setFormError('')
     setLoading(true)
     try {
       const userData = await authMethodsService.login2FA(totpCode)
@@ -472,9 +461,9 @@ export default function LoginPage() {
       saveTwoFactorMethod()
       await login(username, password, userData)
       showSuccess(t('auth.welcomeBackUser', { username }))
-      navigate(landing)
+      finish(username)
     } catch (error) {
-      if (!noteRefusal(error, 'totp')) showError(error.message || t('auth.invalidTotpCode'))
+      refuse(error, 'totp', t('auth.invalidTotpCode'))
       if (!maintenanceRetry.current) setTotpCode('')
     } finally {
       setLoading(false)
@@ -483,6 +472,7 @@ export default function LoginPage() {
 
   const handle2FAWebAuthn = async () => {
     clearMaintenance()
+    setFormError('')
     setLoading(true)
     try {
       const userData = await authMethodsService.login2FAWebAuthn()
@@ -490,15 +480,32 @@ export default function LoginPage() {
       saveTwoFactorMethod()
       await login(username, password, userData)
       showSuccess(t('auth.welcomeBackUser', { username }))
-      navigate(landing)
+      finish(username)
     } catch (error) {
       if (noteRefusal(error, 'key2fa', false)) {
-        // banner shown
+        // notice shown
       } else if (error.message?.includes('cancelled') || error.message?.includes('abort') || error.name === 'NotAllowedError') {
         showInfo(t('auth.twoFactorKeyCancelled'))
       } else {
-        showError(t('auth.twoFactorKeyFailed'))
+        setFormError(t('auth.twoFactorKeyFailed'))
       }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleMTLSLogin = async () => {
+    clearMaintenance()
+    setFormError('')
+    setLoading(true)
+    try {
+      const userData = await authMethodsService.loginMTLS()
+      const who = userData?.user?.username || globalMethods?.mtls_user
+      await login(who, null, userData)
+      showSuccess(t('auth.welcomeBackUser', { username: who }))
+      finish(who)
+    } catch (error) {
+      refuse(error, 'mtls', t('auth.autoLoginFailed'))
     } finally {
       setLoading(false)
     }
@@ -511,11 +518,16 @@ export default function LoginPage() {
     ldap: () => handleLDAPLogin(NO_EVENT),
     webauthn: () => attemptWebAuthn(),
     key2fa: () => handle2FAWebAuthn(),
+    mtls: () => handleMTLSLogin(),
   }
 
   const handleSSOLogin = (provider) => {
     if (provider.provider_type === 'ldap') {
+      clearMaintenance()
+      setRateLimit(null)
       setSelectedLdapProvider(provider)
+      setFieldErrors({})
+      setFormError('')
       setStep('ldap')
     } else {
       // The server keeps the page with this login and hands it back on /login/sso-complete.
@@ -526,12 +538,13 @@ export default function LoginPage() {
 
   const handleLDAPLogin = async (e) => {
     e.preventDefault()
-    if (!username || !password) {
-      showError(t('auth.enterCredentials'))
-      return
-    }
+    if (missing([
+      ['username', username.trim(), t('auth.page.usernameMissing')],
+      ['password', password, t('auth.page.passwordMissing')],
+    ])) return
 
     clearMaintenance()
+    setFormError('')
     setLoading(true)
     setStatusMessage(t('auth.authenticating'))
 
@@ -552,9 +565,9 @@ export default function LoginPage() {
       saveAuthMethod('ldap', selectedLdapProvider?.id)
       await login(username, null, responseData)
       showSuccess(t('auth.welcomeBackUser', { username }))
-      navigate(landing)
+      finish(username)
     } catch (error) {
-      if (!noteRefusal(error, 'ldap')) showError(error.message || t('auth.ldapFailed'))
+      refuse(error, 'ldap', t('auth.ldapFailed'))
       if (!maintenanceRetry.current) setPassword('')
     } finally {
       setLoading(false)
@@ -564,22 +577,37 @@ export default function LoginPage() {
 
   const handleBack = () => {
     clearMaintenance()
-    setStep('username')
-    setAuthMethod(null)
+    setRateLimit(null)
+    setFormError('')
+    setFieldErrors({})
+    setStep('form')
     setPassword('')
+    setTotpCode('')
     setStatusMessage('')
-    setSelectedLdapProvider(null)
-    try { localStorage.removeItem(STORAGE_AUTH_METHOD_KEY) } catch {}
+    if (!lockedRef.current) {
+      setSelectedLdapProvider(null)
+      try { localStorage.removeItem(STORAGE_AUTH_METHOD_KEY) } catch {}
+    }
   }
 
-  const handleChangeUser = () => {
+  // Back from the second factor to the door that asked for it
+  const handleBackFrom2fa = () => {
+    clearMaintenance()
+    setRateLimit(null)
+    setFormError('')
+    setFieldErrors({})
+    setTotpCode('')
+    setStep(twoFactorFrom.current === 'ldap' && selectedLdapProvider && !lockedRef.current ? 'ldap' : 'form')
+  }
+
+  // The lock screen gives way to the sign-in form; the page asked for stays in ?next=
+  const handleSwitchAccount = () => {
+    clearLock()
+    setLocked(null)
     setUsername('')
-    setHasSavedUsername(false)
-    try {
-      localStorage.removeItem(STORAGE_KEY)
-      localStorage.removeItem(STORAGE_AUTH_METHOD_KEY)
-    } catch {}
     handleBack()
+    setSelectedLdapProvider(null)
+    titleRef.current?.focus()
   }
 
   // ═══════════════════════════════════════════════════
@@ -591,610 +619,224 @@ export default function LoginPage() {
     return null
   }
 
-  return (
-    <div className="min-h-dvh flex items-start sm:items-center justify-center bg-gradient-to-br from-bg-primary via-bg-secondary to-bg-tertiary p-2 sm:p-4 pt-2 sm:pt-4 overflow-hidden">
-      <Card className="w-full max-w-md p-4 sm:p-8 space-y-3 sm:space-y-5">
-        {/* Logo */}
-        <div className="flex justify-center mb-1 sm:mb-2">
-          <Logo variant="horizontal" size="lg" className="scale-90 sm:scale-100" />
-        </div>
+  const keySupported = authMethodsService.isWebAuthnSupported()
+  const redirectProviders = ssoProviders.filter(p => p.provider_type !== 'ldap')
+  const ldapProviders = ssoProviders.filter(p => p.provider_type === 'ldap')
+  const mtlsReady = globalMethods?.mtls && globalMethods.mtls_status === 'enrolled'
+  const keyOffered = keySupported && globalMethods?.webauthn !== false
+  const lockedVia = locked?.method || ''
+  // An SSO account has no password here: its lock screen offers the provider only
+  const ssoOnly = Boolean(locked) && lockedVia === 'sso' && redirectProviders.length > 0
 
-        {/* Title */}
-        <div className="text-center">
-          <h1 className="text-xl sm:text-2xl font-bold text-text-primary mb-1 sm:mb-2">
-            {step === 'username' 
-              ? (username ? t('auth.welcomeBack') : t('auth.login'))
-              : t('auth.welcomeBack')
-            }
-          </h1>
-          <p className="text-sm text-text-secondary">
-            {step === 'username' 
-              ? (globalMethods?.mtls && globalMethods.mtls_status === 'present_not_enrolled'
-                ? t('auth.certNotEnrolled')
-                : username ? t('auth.clickToContinue') : t('auth.signInToContinue'))
-              : statusMessage || (authMethod === 'password' ? t('auth.enterPasswordToContinue') : t('auth.chooseAuthMethod'))
-            }
-          </p>
-        </div>
+  const alt = (key, Icon, label, detail, onClick) => (
+    <button key={key} type="button" className="auth-btn auth-alt" onClick={onClick} disabled={loading}>
+      <Icon size={17} aria-hidden="true" />
+      <span>{label}<small>{detail}</small></span>
+    </button>
+  )
+  const keyButton = alt('key', Fingerprint, t('auth.page.keyButton'),
+    loading && statusMessage === t('auth.touchSecurityKey') ? statusMessage : t('auth.page.keyDetail'), () => attemptWebAuthn())
+  const mtlsButton = alt('mtls', Key, t('auth.page.mtlsButton'), t('auth.page.mtlsDetail', { username: globalMethods?.mtls_user || '' }), handleMTLSLogin)
+  const ssoButtons = redirectProviders.map(p => alt(`sso-${p.id}`, Users,
+    locked ? t('auth.page.resumeSso') : t('auth.page.ssoButton'),
+    <><span>{providerName(p)}</span> · {PROTOCOLS[p.provider_type] || p.provider_type}</>,
+    () => handleSSOLogin(p)))
+  const ldapButtons = ldapProviders.map(p => alt(`ldap-${p.id}`, Database, t('auth.page.ldapButton'),
+    <><span>{providerName(p)}</span> · LDAP</>, () => handleSSOLogin(p)))
 
-        {rateLimit && (
-          <div role="alert" className="rounded-lg border border-status-danger bg-bg-secondary p-3 text-sm text-text-primary">
-            <strong className="block">{t('auth.tooManyAttempts')}</strong>
-            <span className="text-text-secondary">
-              {rateLimit.retryAfter != null
-                ? t('auth.retryAfterSeconds', { seconds: rateLimit.retryAfter })
-                : t('auth.retryLater')}
-            </span>
-          </div>
-        )}
+  let alternatives
+  if (locked) {
+    alternatives = [
+      ...(lockedVia === 'sso' ? ssoButtons : []),
+      ...((lockedVia === 'mtls' || lockedVia === 'certificate') && mtlsReady ? [mtlsButton] : []),
+      ...(lockedVia === 'webauthn' && keyOffered ? [keyButton] : []),
+    ]
+  } else {
+    alternatives = preferKey && keyOffered
+      ? [keyButton, ...ssoButtons, ...ldapButtons, ...(mtlsReady ? [mtlsButton] : [])]
+      : [...ssoButtons, ...ldapButtons, ...(mtlsReady ? [mtlsButton] : []), ...(keyOffered ? [keyButton] : [])]
+  }
 
-        {maintenance && (
-          <div role="status" className="rounded-lg border border-status-warning bg-bg-secondary p-3 text-sm text-text-primary">
-            <strong className="block">
-              {maintenance.restoring ? t('auth.maintenanceRestoring') : t('auth.maintenanceActive')}
-            </strong>
-            <div className="mt-2 flex items-center justify-between gap-2">
-              <span className="text-text-secondary">
-                {maintenance.seconds != null ? t('auth.maintenanceRetryIn', { seconds: maintenance.seconds }) : null}
-              </span>
-              <Button type="button" size="sm" variant="secondary" onClick={retryNow} disabled={loading}>
-                {t('auth.retryNow')}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 1: Username */}
-        {step === 'username' && (
-          <div className="space-y-3 sm:space-y-4">
-            {/* SSO Providers — shown first */}
-            {ssoProviders.length > 0 && (
-              <div className="space-y-3">
-                <div className="grid gap-2">
-                  {ssoProviders.map((provider) => (
-                    <button
-                      key={provider.id}
-                      onClick={() => handleSSOLogin(provider)}
-                      disabled={loading}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-bg-secondary hover:bg-bg-tertiary hover:border-accent-op50 transition-all text-text-primary font-medium"
-                    >
-                      <span className="text-lg">{provider.icon || getSSOIcon(provider)}</span>
-                      <span>{provider.display_name || provider.name}</span>
-                    </button>
-                  ))}
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-px bg-border" />
-                  <span className="text-xs text-text-tertiary uppercase tracking-wider">{t('auth.orSignInLocally')}</span>
-                  <div className="flex-1 h-px bg-border" />
-                </div>
-              </div>
-            )}
-
-            {/* If username saved from localStorage: show identity card */}
-            {hasSavedUsername && username ? (
-              <>
-                {/* Clickable user identity card */}
-                <button
-                  onClick={handleContinue}
-                  disabled={loading}
-                  className="w-full text-left relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-bg-secondary to-bg-tertiary p-3 sm:p-4 hover:border-accent-op50 hover:shadow-lg transition-all group"
-                >
-                  <div className="absolute top-0 right-0 w-20 h-20 sm:w-24 sm:h-24 bg-accent-op5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:bg-accent-op10 transition-colors" />
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent-primary to-accent-op70 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                      <User size={20} className="text-on-accent sm:hidden" weight="bold" />
-                      <User size={24} className="text-on-accent hidden sm:block" weight="bold" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-text-secondary uppercase tracking-wider font-medium">{t('auth.continueAs')}</p>
-                      <p className="text-base sm:text-lg font-semibold text-text-primary truncate">{username}</p>
-                    </div>
-                    <div className="text-accent-primary group-hover:translate-x-1 transition-transform">
-                      <ArrowRight size={24} weight="bold" />
-                    </div>
-                  </div>
-                  {loading && (
-                    <div className="absolute inset-0 bg-primary-op50 flex items-center justify-center rounded-xl">
-                      <LoadingSpinner size="md" />
-                    </div>
-                  )}
-                </button>
-
-                {/* Option to use different account */}
-                <button
-                  onClick={() => {
-                    setUsername('')
-                    setHasSavedUsername(false)
-                    try {
-                      localStorage.removeItem(STORAGE_KEY)
-                      localStorage.removeItem(STORAGE_AUTH_METHOD_KEY)
-                    } catch { /* Safari private mode */ }
-                  }}
-                  className="w-full text-sm text-text-secondary hover:text-accent-primary transition-colors py-2"
-                  disabled={loading}
-                >
-                  {t('auth.useDifferentAccount')}
-                </button>
-              </>
-            ) : (
-              /* No saved username: show input field */
-              <form onSubmit={handleContinue} className="space-y-4">
-                <Input
-                  label={t('common.username')}
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder={t('auth.enterUsername')}
-                  disabled={loading}
-                  autoComplete="username"
-                  autoFocus
-                  icon={<User size={18} />}
-                />
-
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={loading || !username.trim()}
-                >
-                  {loading ? (
-                    <>
-                      <LoadingSpinner size="sm" />
-                      <span>{t('auth.checking')}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>{t('auth.continue')}</span>
-                      <ArrowRight size={18} weight="bold" />
-                    </>
-                  )}
-                </Button>
-              </form>
-            )}
-          </div>
-        )}
-
-        {/* Step 2: Authentication */}
-        {step === 'auth' && (
-          <div className="space-y-3 sm:space-y-5">
-            {/* User identity card - modern design */}
-            <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-bg-secondary to-bg-tertiary p-3 sm:p-4">
-              <div className="absolute top-0 right-0 w-20 h-20 sm:w-24 sm:h-24 bg-accent-op5 rounded-full -translate-y-1/2 translate-x-1/2" />
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent-primary to-accent-op70 flex items-center justify-center shadow-lg">
-                  <User size={20} className="text-on-accent sm:hidden" weight="bold" />
-                  <User size={24} className="text-on-accent hidden sm:block" weight="bold" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-text-secondary uppercase tracking-wider font-medium">{t('auth.signingInAs')}</p>
-                  <p className="text-base sm:text-lg font-semibold text-text-primary truncate">{username}</p>
-                </div>
-                <button
-                  onClick={handleChangeUser}
-                  className="px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-accent-primary hover:bg-accent-op10 rounded-lg transition-all"
-                  disabled={loading}
-                >
-                  {t('common.change')}
-                </button>
-              </div>
-            </div>
-
-            {/* Loading state for auto-auth */}
-            {loading && (authMethod === 'mtls' || authMethod === 'webauthn') && (
-              <div className="flex flex-col items-center gap-2 py-2 sm:gap-4 sm:py-6">
-                <div className="relative">
-                  <LoadingSpinner size="lg" />
-                  {authMethod === 'mtls' && <ShieldCheck size={24} className="absolute inset-0 m-auto text-accent-primary" />}
-                  {authMethod === 'webauthn' && <Fingerprint size={24} className="absolute inset-0 m-auto text-accent-primary" />}
-                </div>
-                <p className="text-sm text-text-secondary animate-pulse">
-                  {statusMessage}
-                </p>
-              </div>
-            )}
-
-            {/* WebAuthn option (when not loading) */}
-            {authMethod === 'webauthn' && !loading && (
-              <div className="space-y-2 sm:space-y-3">
-                <Button
-                  onClick={() => attemptWebAuthn()}
-                  className="w-full"
-                  variant="secondary"
-                  disabled={loading}
-                >
-                  <Fingerprint size={20} weight="fill" />
-                  <span>{t('auth.trySecurityKeyAgain')}</span>
-                </Button>
-                
-                <button
-                  onClick={() => setAuthMethod('password')}
-                  className="w-full text-sm text-text-secondary hover:text-accent-primary transition-colors py-1.5 sm:py-2"
-                >
-                  {t('auth.usePasswordInstead')}
-                </button>
-              </div>
-            )}
-
-            {/* Password form */}
-            {authMethod === 'password' && (
-              <form onSubmit={handlePasswordLogin} className="space-y-3 sm:space-y-4">
-                {/* Hidden username field for accessibility */}
-                <input
-                  type="text"
-                  name="username"
-                  autoComplete="username"
-                  value={username}
-                  readOnly
-                  className="sr-only"
-                  tabIndex={-1}
-                />
-                
-                <Input
-                  ref={passwordRef}
-                  label={t('common.password')}
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={t('auth.enterPassword')}
-                  disabled={loading}
-                  autoComplete="current-password"
-                  autoFocus
-                  icon={<Key size={18} />}
-                />
-
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={loading || !password}
-                >
-                  {loading ? (
-                    <>
-                      <LoadingSpinner size="sm" />
-                      <span>{t('auth.signingIn')}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Key size={18} weight="fill" />
-                      <span>{t('auth.login')}</span>
-                    </>
-                  )}
-                </Button>
-
-                {/* Forgot Password Link - only if email configured */}
-                {emailConfigured && (
-                  <div className="text-center">
-                    <Link
-                      to="/forgot-password"
-                      className="text-sm text-accent-primary hover:text-accent-op80 hover:underline transition-colors"
-                    >
-                      {t('auth.forgotPassword')}
-                    </Link>
-                  </div>
-                )}
-
-                {/* Show WebAuthn option if available */}
-                {userMethods?.webauthn && authMethodsService.isWebAuthnSupported() && (
-                  <button
-                    onClick={() => attemptWebAuthn()}
-                    className="w-full text-sm text-text-secondary hover:text-accent-primary transition-colors py-2 flex items-center justify-center gap-2"
-                    type="button"
-                    disabled={loading}
-                  >
-                    <Fingerprint size={16} />
-                    <span>{t('auth.useSecurityKey')}</span>
-                  </button>
-                )}
-              </form>
-            )}
-
-            {/* Back button */}
-            <button
-              onClick={handleBack}
-              className="w-full text-sm text-text-secondary hover:text-text-primary transition-colors py-1.5 sm:py-2 flex items-center justify-center gap-1"
-              disabled={loading}
-            >
-              <ArrowLeft size={14} />
-              <span>{t('common.back')}</span>
-            </button>
-          </div>
-        )}
-
-        {/* Auth methods available indicator */}
-        {step === 'auth' && userMethods && (
-          <div className="flex justify-center gap-1.5 sm:gap-2 pt-1 sm:pt-2">
-            {userMethods.mtls && (
-              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'mtls' ? 'bg-accent-primary text-on-accent' : 'bg-bg-secondary text-text-secondary'}`}>
-                <ShieldCheck size={12} weight="fill" />
-                <span>mTLS</span>
-              </div>
-            )}
-            {userMethods.webauthn && authMethodsService.isWebAuthnSupported() && (
-              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'webauthn' ? 'bg-accent-primary text-on-accent' : 'bg-bg-secondary text-text-secondary'}`}>
-                <Fingerprint size={12} weight="fill" />
-                <span>{t('common.key')}</span>
-              </div>
-            )}
-            <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'password' ? 'bg-accent-primary text-on-accent' : 'bg-bg-secondary text-text-secondary'}`}>
-              <Key size={12} weight="fill" />
-              <span>{t('common.password')}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2b: 2FA verification (TOTP code or security key) */}
-        {step === '2fa' && (
-          <div className="space-y-3 sm:space-y-5">
-            <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-bg-secondary to-bg-tertiary p-3 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-status-warning flex items-center justify-center shadow-lg">
-                  <Lock size={20} weight="fill" className="text-on-accent" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-text-primary text-sm sm:text-base">{t('auth.twoFactorTitle')}</h3>
-                  <p className="text-xs text-text-secondary">
-                    {twoFactorMethods.includes('totp') ? t('auth.twoFactorDescription') : t('auth.twoFactorKeyDescription')}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {twoFactorMethods.includes('totp') && (
-              <form onSubmit={handle2FAVerify} className="space-y-3 sm:space-y-4">
-                <Input
-                  label={t('auth.totpCode')}
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={8}
-                  value={totpCode}
-                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="000000"
-                  disabled={loading}
-                  autoComplete="one-time-code"
-                  autoFocus
-                  icon={<ShieldCheck size={18} />}
-                />
-
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={loading || totpCode.length < 6}
-                >
-                  {loading ? (
-                    <>
-                      <LoadingSpinner size="sm" />
-                      <span>{t('auth.verifying')}</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShieldCheck size={18} weight="fill" />
-                      <span>{t('auth.verify')}</span>
-                    </>
-                  )}
-                </Button>
-              </form>
-            )}
-
-            {twoFactorMethods.includes('webauthn') && authMethodsService.isWebAuthnSupported() && (
-              <Button
-                variant={twoFactorMethods.includes('totp') ? 'secondary' : 'primary'}
-                className="w-full"
-                disabled={loading}
-                onClick={handle2FAWebAuthn}
-              >
-                <Fingerprint size={18} weight="fill" />
-                <span>{t('auth.twoFactorUseSecurityKey')}</span>
-              </Button>
-            )}
-
-            <button
-              onClick={() => { clearMaintenance(); setStep('auth'); setTotpCode(''); setAuthMethod('password') }}
-              className="flex items-center justify-center gap-2 text-sm text-text-secondary hover:text-text-primary cursor-pointer transition-colors py-2 w-full"
-            >
-              <ArrowLeft size={16} />
-              <span>{t('common.back')}</span>
-            </button>
-          </div>
-        )}
-
-        {/* Step 3: LDAP Login */}
-        {step === 'ldap' && selectedLdapProvider && (
-          <div className="space-y-3 sm:space-y-5">
-            {/* Provider header */}
-            <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-bg-secondary to-bg-tertiary p-3 sm:p-4">
-              <div className="absolute top-0 right-0 w-20 h-20 sm:w-24 sm:h-24 bg-accent-op5 rounded-full -translate-y-1/2 translate-x-1/2" />
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent-primary to-accent-op70 flex items-center justify-center shadow-lg text-xl">
-                  {selectedLdapProvider.icon || getSSOIcon(selectedLdapProvider)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-text-secondary uppercase tracking-wider font-medium">{t('auth.signingInWith')}</p>
-                  <p className="text-base sm:text-lg font-semibold text-text-primary truncate">
-                    {selectedLdapProvider.display_name || selectedLdapProvider.name}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* LDAP Login form */}
-            <form onSubmit={handleLDAPLogin} className="space-y-3 sm:space-y-4">
-              <Input
-                label={t('common.username')}
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder={t('auth.ldapUsername')}
-                disabled={loading}
-                autoComplete="username"
-                autoFocus
-                icon={<User size={18} />}
-              />
-              
-              <Input
-                label={t('common.password')}
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={t('auth.enterPassword')}
-                disabled={loading}
-                autoComplete="current-password"
-                icon={<Key size={18} />}
-              />
-
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={loading || !username || !password}
-              >
-                {loading ? (
-                  <>
-                    <LoadingSpinner size="sm" />
-                    <span>{statusMessage || t('auth.signingIn')}</span>
-                  </>
-                ) : (
-                  <>
-                    <SignIn size={18} weight="bold" />
-                    <span>{t('auth.login')}</span>
-                  </>
-                )}
-              </Button>
-            </form>
-
-            {/* Back button */}
-            <button
-              onClick={handleBack}
-              className="w-full text-sm text-text-secondary hover:text-text-primary transition-colors py-1.5 sm:py-2 flex items-center justify-center gap-1"
-              disabled={loading}
-            >
-              <ArrowLeft size={14} />
-              <span>{t('common.back')}</span>
-            </button>
-          </div>
-        )}
-
-        {/* Footer with actions */}
-        <div className="pt-3 sm:pt-4 border-t border-border space-y-2 sm:space-y-3">
-          {/* Action buttons row */}
-          <div className="flex items-center justify-center gap-2 relative">
-            {/* Language Selector - Flag only */}
-            <div className="relative">
-              <button
-                onClick={() => { setLangMenuOpen(!langMenuOpen); setThemeMenuOpen(false) }}
-                className="flex items-center justify-center w-9 h-9 rounded-md bg-bg-tertiary hover:bg-bg-secondary border border-border text-text-secondary hover:text-text-primary transition-colors"
-                title={t('settings.language')}
-              >
-                <span className="text-lg">{currentLang.flag}</span>
-              </button>
-              
-              {/* Language dropdown */}
-              {langMenuOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" role="presentation" onClick={() => setLangMenuOpen(false)} />
-                  <div className="absolute bottom-full mb-2 left-0 z-50 bg-bg-secondary border border-border rounded-lg shadow-xl p-1.5 min-w-[140px]">
-                    {languages.map((lang) => (
-                      <button
-                        key={lang.code}
-                        onClick={() => { 
-                          i18n.changeLanguage(lang.code)
-                          try { localStorage.setItem('i18nextLng', lang.code) } catch {}
-                          setLangMenuOpen(false)
-                        }}
-                        className={cn(
-                          "w-full px-2 py-1.5 text-left text-sm rounded flex items-center gap-2",
-                          "hover:bg-bg-tertiary transition-colors",
-                          currentLang.code === lang.code && "text-accent-primary bg-accent-primary-op10"
-                        )}
-                      >
-                        <span>{lang.flag}</span>
-                        {lang.name}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-            
-            {/* Theme Selector */}
-            <div className="relative">
-              <button
-                onClick={() => { setThemeMenuOpen(!themeMenuOpen); setLangMenuOpen(false) }}
-                className="flex items-center justify-center w-9 h-9 rounded-md bg-bg-tertiary hover:bg-bg-secondary border border-border text-text-secondary hover:text-text-primary transition-colors"
-                title={t('common.theme')}
-              >
-                <Palette size={18} />
-              </button>
-              
-              {/* Theme dropdown */}
-              {themeMenuOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" role="presentation" onClick={() => setThemeMenuOpen(false)} />
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 bg-bg-secondary border border-border rounded-lg shadow-xl p-1.5 min-w-[160px]">
-                    {/* Color Themes */}
-                    <div className="px-2 py-0.5 text-xs text-text-tertiary uppercase tracking-wider">{t('settings.color')}</div>
-                    {themes.map((theme) => (
-                      <button
-                        key={theme.id}
-                        onClick={() => { setThemeFamily(theme.id); setThemeMenuOpen(false) }}
-                        className={cn(
-                          "w-full px-2 py-1.5 text-left text-sm rounded flex items-center gap-2",
-                          "hover:bg-bg-tertiary transition-colors",
-                          themeFamily === theme.id && "text-accent-primary bg-accent-primary-op10"
-                        )}
-                      >
-                        <div 
-                          className="w-3 h-3 rounded-full border border-border"
-                          style={{ background: theme.accent }}
-                        />
-                        {t(theme.nameKey)}
-                      </button>
-                    ))}
-                    
-                    {/* Separator */}
-                    <div className="h-px bg-border my-1.5" />
-                    
-                    {/* Mode */}
-                    <div className="px-2 py-0.5 text-xs text-text-tertiary uppercase tracking-wider">{t('settings.tabs.appearance')}</div>
-                    {[
-                      { id: 'system', labelKey: 'settings.followSystem' },
-                      { id: 'dark', labelKey: 'settings.dark' },
-                      { id: 'light', labelKey: 'settings.light' }
-                    ].map(opt => (
-                      <button
-                        key={opt.id}
-                        onClick={() => { setMode(opt.id); setThemeMenuOpen(false) }}
-                        className={cn(
-                          "w-full px-2 py-1.5 text-left text-sm rounded",
-                          "hover:bg-bg-tertiary transition-colors",
-                          mode === opt.id && "text-accent-primary bg-accent-primary-op10"
-                        )}
-                      >
-                        {t(opt.labelKey)}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-            
-            {/* GitHub Link */}
-            <a
-              href="https://github.com/NeySlim/ultimate-ca-manager"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center w-9 h-9 rounded-md bg-bg-tertiary hover:bg-bg-secondary border border-border text-text-secondary hover:text-text-primary transition-colors"
-              title="GitHub"
-            >
-              <GithubLogo size={18} />
-            </a>
-          </div>
-          
-          {/* Version */}
-          <p className="text-center text-xs text-text-tertiary">
-            Ultimate Certificate Manager v{__APP_VERSION__ || '2'}
-          </p>
-        </div>
-      </Card>
+  const errorBlock = (rateLimit || formError) && (
+    <div className="auth-error" role="alert">
+      <Warning size={14} aria-hidden="true" />
+      {rateLimit ? (
+        <span>
+          <strong>{t('auth.tooManyAttempts')}</strong>
+          <span>{rateLimit.retryAfter != null ? t('auth.retryAfterSeconds', { seconds: rateLimit.retryAfter }) : t('auth.retryLater')}</span>
+        </span>
+      ) : <span>{formError}</span>}
     </div>
+  )
+
+  const maintenanceBlock = maintenance && (
+    <div className="auth-notice" role="status">
+      <strong>{maintenance.restoring ? t('auth.maintenanceRestoring') : t('auth.maintenanceActive')}</strong>
+      {maintenance.seconds != null && <span>{t('auth.maintenanceRetryIn', { seconds: maintenance.seconds })}</span>}
+      <button type="button" className="auth-btn" onClick={retryNow} disabled={loading}>{t('auth.retryNow')}</button>
+    </div>
+  )
+
+  const passwordField = (
+    <AuthField id="login-pass" label={t('auth.page.password')} error={fieldErrors.password}>
+      <div className="auth-password">
+        <input
+          ref={passwordRef}
+          id="login-pass"
+          name="password"
+          type={reveal ? 'text' : 'password'}
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => { touched.current = true; setPassword(e.target.value); if (fieldErrors.password) setFieldErrors(f => ({ ...f, password: undefined })) }}
+          disabled={loading}
+          aria-invalid={fieldErrors.password ? 'true' : undefined}
+          aria-describedby={fieldErrors.password ? 'login-pass-error' : undefined}
+        />
+        <button
+          type="button"
+          className="auth-icon-btn"
+          aria-pressed={reveal}
+          aria-label={reveal ? t('auth.page.hidePassword') : t('auth.page.showPassword')}
+          title={reveal ? t('auth.page.hidePassword') : t('auth.page.showPassword')}
+          onClick={() => setReveal(r => !r)}
+        >
+          {reveal ? <EyeSlash size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+        </button>
+      </div>
+    </AuthField>
+  )
+
+  const usernameField = (
+    <AuthField id="login-user" label={t('auth.page.username')} error={fieldErrors.username}>
+      <input
+        ref={usernameRef}
+        id="login-user"
+        name="username"
+        autoComplete="username"
+        autoCapitalize="none"
+        spellCheck={false}
+        value={username}
+        readOnly={Boolean(locked)}
+        onChange={(e) => { if (locked) return; touched.current = true; setUsername(e.target.value); if (fieldErrors.username) setFieldErrors(f => ({ ...f, username: undefined })) }}
+        disabled={loading && !locked}
+        aria-invalid={fieldErrors.username ? 'true' : undefined}
+        aria-describedby={fieldErrors.username ? 'login-user-error' : undefined}
+      />
+    </AuthField>
+  )
+
+  const signInForm = (onSubmit, submitLabel, SubmitIcon) => (
+    <form className="auth-form" onSubmit={onSubmit} noValidate aria-busy={loading || undefined}>
+      {usernameField}
+      {passwordField}
+      {errorBlock}
+      <button type="submit" className="auth-btn is-primary auth-submit" disabled={loading}>
+        <SubmitIcon size={16} aria-hidden="true" />{submitLabel}
+      </button>
+    </form>
+  )
+
+  const lockedCard = locked && (
+    <p className="auth-user">
+      <span className="auth-avatar" aria-hidden="true">{initialsOf(locked.name || locked.username)}</span>
+      <span>
+        <strong>{locked.name || locked.username}</strong>
+        <span>{locked.role ? `${locked.role} · ` : ''}<span className="auth-mono">{locked.username}</span></span>
+      </span>
+    </p>
+  )
+
+  const title = locked ? t('auth.page.lockedTitle') : step === '2fa' ? t('auth.twoFactorTitle') : t('auth.page.signInTitle')
+  let lead = locked ? t('auth.page.lockedLead') : t('auth.page.lead')
+  let body
+
+  if (ssoCompleting) {
+    body = <p className="auth-wait" role="status">{t('auth.signingIn')}</p>
+  } else if (step === '2fa') {
+    lead = twoFactorMethods.includes('totp') ? t('auth.twoFactorDescription') : t('auth.twoFactorKeyDescription')
+    body = (
+      <>
+        {lockedCard}
+        {maintenanceBlock}
+        {twoFactorMethods.includes('totp') && (
+          <form className="auth-form" onSubmit={handle2FAVerify} noValidate aria-busy={loading || undefined}>
+            <AuthField id="login-code" label={t('auth.totpCode')} error={fieldErrors.code}>
+              <input
+                ref={codeRef}
+                id="login-code"
+                name="code"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={8}
+                autoComplete="one-time-code"
+                placeholder="000000"
+                value={totpCode}
+                onChange={(e) => { setTotpCode(e.target.value.replace(/\D/g, '')); if (fieldErrors.code) setFieldErrors({}) }}
+                disabled={loading}
+                aria-invalid={fieldErrors.code ? 'true' : undefined}
+                aria-describedby={fieldErrors.code ? 'login-code-error' : undefined}
+              />
+            </AuthField>
+            {errorBlock}
+            <button type="submit" className="auth-btn is-primary auth-submit" disabled={loading}>
+              <CaretRight size={16} aria-hidden="true" />{t('auth.verify')}
+            </button>
+          </form>
+        )}
+        {!twoFactorMethods.includes('totp') && errorBlock}
+        {twoFactorMethods.includes('webauthn') && keySupported && (
+          <>
+            {twoFactorMethods.includes('totp') && <p className="auth-sep"><span>{t('auth.page.or')}</span></p>}
+            <button type="button" className={`auth-btn ${twoFactorMethods.includes('totp') ? 'auth-alt' : 'is-primary auth-submit'}`}
+              onClick={handle2FAWebAuthn} disabled={loading}>
+              <Fingerprint size={17} aria-hidden="true" />
+              <span>{t('auth.twoFactorUseSecurityKey')}</span>
+            </button>
+          </>
+        )}
+        <button type="button" className="auth-link" onClick={handleBackFrom2fa} disabled={loading}>{t('common.back')}</button>
+      </>
+    )
+  } else if (step === 'ldap' && selectedLdapProvider) {
+    body = (
+      <>
+        <p className="auth-user">
+          <span className="auth-avatar" aria-hidden="true"><Database size={14} /></span>
+          <span>
+            <strong>{providerName(selectedLdapProvider)}</strong>
+            <span>{t('auth.signingInWith')} LDAP</span>
+          </span>
+        </p>
+        {maintenanceBlock}
+        {signInForm(handleLDAPLogin, t('auth.page.submit'), CaretRight)}
+        <button type="button" className="auth-link" onClick={handleBack} disabled={loading}>{t('common.back')}</button>
+      </>
+    )
+  } else {
+    body = (
+      <>
+        {lockedCard}
+        {maintenanceBlock}
+        {ssoOnly ? errorBlock : signInForm(handlePasswordLogin, locked ? t('auth.page.unlock') : t('auth.page.submit'), locked ? Lock : CaretRight)}
+        {alternatives.length > 0 && !ssoOnly && <p className="auth-sep"><span>{t('auth.page.or')}</span></p>}
+        {alternatives}
+        {loading && statusMessage && statusMessage !== t('auth.touchSecurityKey') && (
+          <p className="auth-wait" aria-live="polite">{statusMessage}</p>
+        )}
+        {(locked || (emailConfigured && !locked)) && (
+          <div className="auth-links">
+            {locked
+              ? <button type="button" className="auth-link" onClick={handleSwitchAccount}>{t('auth.page.switchAccount')}</button>
+              : <Link to="/forgot-password" className="auth-link">{t('auth.forgotPassword')}</Link>}
+          </div>
+        )}
+      </>
+    )
+  }
+
+  return (
+    <AuthFrame ref={titleRef} title={title} lead={lead}>
+      {body}
+    </AuthFrame>
   )
 }

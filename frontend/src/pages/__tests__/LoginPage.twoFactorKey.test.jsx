@@ -55,10 +55,9 @@ import LoginPage from '../LoginPage'
 async function reachSecondFactor(methods) {
   services.loginPassword.mockResolvedValue({ requires_2fa: true, methods })
   render(<MemoryRouter initialEntries={['/login']}><LoginPage /></MemoryRouter>)
-  fireEvent.change(await screen.findByPlaceholderText('auth.enterUsername'), { target: { value: 'alice' } })
-  fireEvent.click(screen.getByText('auth.continue'))
-  fireEvent.change(await screen.findByPlaceholderText('auth.enterPassword'), { target: { value: 'pw' } })
-  fireEvent.click(screen.getByText('auth.login'))
+  fireEvent.change(await screen.findByLabelText('auth.page.username'), { target: { value: 'alice' } })
+  fireEvent.change(await screen.findByLabelText('auth.page.password'), { target: { value: 'pw' } })
+  fireEvent.click(screen.getByText('auth.page.submit'))
   await screen.findByText('auth.twoFactorTitle')
 }
 
@@ -98,7 +97,7 @@ describe('LoginPage: security key at the 2FA step', () => {
     services.login2FAWebAuthn.mockRejectedValue(Object.assign(new Error('Security key verification failed'), { status: 401 }))
     await reachSecondFactor(['webauthn'])
     fireEvent.click(screen.getByText('auth.twoFactorUseSecurityKey'))
-    await waitFor(() => expect(services.showError).toHaveBeenCalledWith('auth.twoFactorKeyFailed'))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('auth.twoFactorKeyFailed'))
     expect(services.login).not.toHaveBeenCalled()
   })
 })

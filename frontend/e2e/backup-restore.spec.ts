@@ -56,10 +56,9 @@ test('a restore that runs as a job signs the page out and shows its report after
 
   await expect(restore.getByText(/The restore has probably committed/)).toBeVisible({ timeout: 120_000 })
   await restore.getByRole('button', { name: 'Sign in again' }).click()
-  await page.getByLabel('Username').fill(ADMIN_USER)
-  await page.getByRole('button', { name: 'Continue' }).click()
-  await page.getByLabel('Password').fill(ADMIN_PASSWORD)
-  await page.getByRole('button', { name: 'Sign In' }).click()
+  await page.getByLabel('Username', { exact: true }).fill(ADMIN_USER)
+  await page.getByLabel('Password', { exact: true }).fill(ADMIN_PASSWORD)
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 
   const report = page.getByRole('dialog', { name: 'Restore report' })
   await expect(report.getByText(/Backup restored successfully/)).toBeVisible({ timeout: 60_000 })

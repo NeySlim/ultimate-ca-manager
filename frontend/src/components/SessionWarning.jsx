@@ -1,15 +1,15 @@
 /**
- * SessionWarning Component - Warn user before session expires
- * Shows countdown popup when session is about to expire.
- * Uses the actual backend session_timeout (from /auth/verify) instead of a hardcoded value.
- * Before logging out, verifies with the backend that the session is truly expired.
+ * Session expiry warning: a banner over the console in the last minutes of the
+ * inactivity timeout (backend session_timeout, from /auth/verify), with Extend.
+ * At the end, once the server confirms the session is gone, the screen locks:
+ * the console unmounts and the sign-in page keeps the current page in ?next=.
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Timer, ArrowsClockwise } from '@phosphor-icons/react'
-import { Modal, Button } from '../components'
+import { Clock, ArrowClockwise } from '@phosphor-icons/react'
 import { useAuth } from '../contexts'
 import { authService } from '../services'
+import './auth/auth.css'
 
 const WARNING_BEFORE = 5 * 60 * 1000 // Show warning 5 minutes before expiry
 const UNKNOWN_RECHECK = 30 * 1000 // Server unreachable: ask again after this
@@ -18,7 +18,7 @@ const FALLBACK_TIMEOUT = 8 * 60 * 60 * 1000 // 8h fallback (matches backend defa
 
 export function SessionWarning() {
   const { t } = useTranslation()
-  const { user, logout, checkSession } = useAuth()
+  const { user, lock, checkSession } = useAuth()
   const [showWarning, setShowWarning] = useState(false)
   const [secondsLeft, setSecondsLeft] = useState(0)
   const [lastActivity, setLastActivity] = useState(Date.now())
@@ -46,10 +46,12 @@ export function SessionWarning() {
     fetchTimeout()
   }, [user])
 
-  // Track user activity
+  // Track user activity; once the warning shows, only Extend keeps the session
+  const warningRef = useRef(false)
+  warningRef.current = showWarning
   useEffect(() => {
-    const updateActivity = () => setLastActivity(Date.now())
-    
+    const updateActivity = () => { if (!warningRef.current) setLastActivity(Date.now()) }
+
     const events = ['mousedown', 'keydown', 'scroll', 'touchstart']
     events.forEach(event => window.addEventListener(event, updateActivity, { passive: true }))
     
@@ -113,9 +115,9 @@ export function SessionWarning() {
     } finally {
       checkingRef.current = false
     }
-    recheckAtRef.current = Infinity // one logout, not one per tick while it runs
-    logout()
-  }, [checkSession, logout])
+    recheckAtRef.current = Infinity // one lock, not one per tick while it runs
+    lock()
+  }, [checkSession, lock])
 
   const extendSession = useCallback(async () => {
     // /auth/verify refreshes the server session; only a server that says it
@@ -126,9 +128,9 @@ export function SessionWarning() {
       setLastActivity(Date.now())
       setShowWarning(false)
     } else if (stillValid === false) {
-      logout()
+      lock()
     }
-  }, [checkSession, logout])
+  }, [checkSession, lock])
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60)
@@ -139,42 +141,18 @@ export function SessionWarning() {
   if (!user || !showWarning) return null
 
   return (
-    <Modal
-      open={showWarning}
-      onClose={() => {}} // Don't allow closing by clicking outside
-      title={t('session.expiring')}
-    >
-      <div className="p-4 text-center space-y-4">
-        <div className="flex justify-center">
-          <div className="p-4 rounded-full bg-accent-warning-op15">
-            <Timer size={48} weight="duotone" className="text-accent-warning" />
-          </div>
-        </div>
-        
-        <div>
-          <p className="text-text-primary font-medium">
-            {t('session.willExpireIn')}
-          </p>
-          <p className="text-3xl font-bold text-accent-warning mt-2">
-            {formatTime(secondsLeft)}
-          </p>
-        </div>
-        
-        <p className="text-sm text-text-secondary">
-          {t('session.clickToContinue')}
-        </p>
-        
-        <div className="flex gap-3 justify-center pt-2">
-          <Button type="button" variant="secondary" onClick={logout}>
-            {t('session.logOutNow')}
-          </Button>
-          <Button type="button" onClick={extendSession}>
-            <ArrowsClockwise size={16} />
-            {t('session.stayLoggedIn')}
-          </Button>
-        </div>
-      </div>
-    </Modal>
+    <div className="session-banner" role="region" aria-labelledby="session-banner-title">
+      <Clock size={20} aria-hidden="true" />
+      <p>
+        <strong id="session-banner-title">{t('session.expiresIn', { time: formatTime(secondsLeft) })}</strong>
+        <span>{t('session.lockNotice')}</span>
+      </p>
+      {/* Announced once, not at every tick of the countdown */}
+      <span className="sr-only" aria-live="polite">{t('session.expiringSoon')}</span>
+      <button type="button" className="auth-btn is-primary" onClick={extendSession}>
+        <ArrowClockwise size={16} aria-hidden="true" />{t('session.extend')}
+      </button>
+    </div>
   )
 }
 

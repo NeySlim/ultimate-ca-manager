@@ -10,6 +10,7 @@ import { authService } from '../services/auth.service'
 import { accountService } from '../services/account.service'
 import { apiClient } from '../services/apiClient'
 import { setAppTimezone } from '../stores/timezoneStore'
+import { saveLock } from '../lib/sessionLock'
 import { setDateFormat, setShowTime } from '../stores/dateFormatStore'
 import { applyServerPreferences, getPreferences, setAuthenticated as setPrefsAuthenticated } from '../stores/userPreferencesStore'
 import i18n from '../i18n'
@@ -190,6 +191,21 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // Inactivity lock: the console goes at once, the server session is closed after
+  // (it may not answer), and the account is kept for the lock screen.
+  const lock = () => {
+    saveLock({ username: user?.username, name: user?.full_name, role: user?.role, method: authMethod })
+    setUser(null)
+    setIsAuthenticated(false)
+    setPermissions([])
+    setRole(null)
+    setAuthMethod(null)
+    setForcePasswordChange(false)
+    setMustEnroll2fa(false)
+    setPrefsAuthenticated(false)
+    authService.logout().catch(() => {})
+  }
+
   const clearForcePasswordChange = () => setForcePasswordChange(false)
 
   const value = {
@@ -204,6 +220,7 @@ export function AuthProvider({ children }) {
     mustEnroll2fa,
     login,
     logout,
+    lock,
     checkSession,
     clearForcePasswordChange,
   }

@@ -45,18 +45,17 @@ function renderLogin() {
   render(<MemoryRouter initialEntries={['/login']}><LoginPage /></MemoryRouter>)
 }
 async function typeUsername() {
-  fireEvent.change(await screen.findByPlaceholderText('auth.enterUsername'), { target: { value: 'alice' } })
+  fireEvent.change(await screen.findByLabelText('auth.page.username'), { target: { value: 'alice' } })
 }
 async function submitPassword() {
-  fireEvent.click(screen.getByText('auth.continue'))
-  fireEvent.change(await screen.findByPlaceholderText('auth.enterPassword'), { target: { value: 'pw' } })
-  fireEvent.click(screen.getByText('auth.login'))
+  fireEvent.change(await screen.findByLabelText('auth.page.password'), { target: { value: 'pw' } })
+  fireEvent.click(screen.getByText('auth.page.submit'))
 }
 async function submitLdap() {
   fireEvent.click(await screen.findByText('Corporate LDAP'))
-  fireEvent.change(await screen.findByPlaceholderText('auth.ldapUsername'), { target: { value: 'alice' } })
-  fireEvent.change(screen.getByPlaceholderText('auth.enterPassword'), { target: { value: 'pw' } })
-  fireEvent.submit(screen.getByPlaceholderText('auth.enterPassword').closest('form'))
+  fireEvent.change(await screen.findByLabelText('auth.page.username'), { target: { value: 'alice' } })
+  fireEvent.change(screen.getByLabelText('auth.page.password'), { target: { value: 'pw' } })
+  fireEvent.submit(screen.getByLabelText('auth.page.password').closest('form'))
 }
 
 describe('LoginPage 429 banner across methods', () => {
@@ -84,10 +83,9 @@ describe('LoginPage 429 banner across methods', () => {
     await typeUsername()
     await submitPassword()
     await screen.findByRole('alert')
-    fireEvent.click(screen.getByText('common.back'))
     await submitLdap()
-    await waitFor(() => expect(s.showError).toHaveBeenCalledWith('Invalid LDAP credentials'))
-    expect(screen.queryByRole('alert')).toBeNull()
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Invalid LDAP credentials'))
+    expect(screen.getByRole('alert')).not.toHaveTextContent('auth.tooManyAttempts')
   })
 
   it('drops a password 429 banner when an LDAP login reaches the second factor', async () => {
@@ -97,7 +95,6 @@ describe('LoginPage 429 banner across methods', () => {
     await typeUsername()
     await submitPassword()
     await screen.findByRole('alert')
-    fireEvent.click(screen.getByText('common.back'))
     await submitLdap()
     await screen.findByText('auth.twoFactorTitle')
     expect(screen.queryByRole('alert')).toBeNull()
@@ -134,12 +131,12 @@ describe('LoginPage 429 banner across methods', () => {
     s.authenticateWebAuthn.mockRejectedValueOnce(tooMany()).mockRejectedValue(new Error('no'))
     renderLogin()
     await typeUsername()
-    fireEvent.click(screen.getByText('auth.continue'))
-    fireEvent.click(await screen.findByText('auth.useSecurityKey'))
+    fireEvent.click(await screen.findByText('auth.page.keyButton'))
     expect(await screen.findByRole('alert')).toHaveTextContent('auth.tooManyAttempts')
-    fireEvent.click(await screen.findByText('auth.useSecurityKey'))
+    fireEvent.click(await screen.findByText('auth.page.keyButton'))
     await waitFor(() => expect(s.authenticateWebAuthn).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('no'))
+    expect(screen.getByRole('alert')).not.toHaveTextContent('auth.tooManyAttempts')
   })
 
   it('drops a password 429 banner when the next attempt reaches the second factor', async () => {
@@ -148,8 +145,8 @@ describe('LoginPage 429 banner across methods', () => {
     await typeUsername()
     await submitPassword()
     await screen.findByRole('alert')
-    fireEvent.change(screen.getByPlaceholderText('auth.enterPassword'), { target: { value: 'pw' } })
-    fireEvent.click(screen.getByText('auth.login'))
+    fireEvent.change(screen.getByLabelText('auth.page.password'), { target: { value: 'pw' } })
+    fireEvent.click(screen.getByText('auth.page.submit'))
     await screen.findByText('auth.twoFactorTitle')
     expect(screen.queryByRole('alert')).toBeNull()
   })

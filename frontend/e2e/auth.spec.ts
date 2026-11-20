@@ -3,10 +3,9 @@ import { test, expect, ADMIN_USER, ADMIN_PASSWORD, Api, createUser } from './sup
 test.describe('sign-in and session', () => {
   test('password sign-in opens the console and the server knows the session', async ({ page }) => {
     await page.goto('/login')
-    await page.getByLabel('Username').fill(ADMIN_USER)
-    await page.getByRole('button', { name: 'Continue' }).click()
-    await page.getByLabel('Password').fill(ADMIN_PASSWORD)
-    await page.getByRole('button', { name: 'Sign In' }).click()
+    await page.getByLabel('Username', { exact: true }).fill(ADMIN_USER)
+    await page.getByLabel('Password', { exact: true }).fill(ADMIN_PASSWORD)
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 
     await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible()
     await expect(page.getByRole('button', { name: `My Account: ${ADMIN_USER}` })).toBeVisible()
@@ -18,10 +17,9 @@ test.describe('sign-in and session', () => {
     const user = await createUser(api, 'viewer')
     await page.context().clearCookies()
     await page.goto('/login')
-    await page.getByLabel('Username').fill(user.username)
-    await page.getByRole('button', { name: 'Continue' }).click()
-    await page.getByLabel('Password').fill(`${user.password}-wrong`)
-    await page.getByRole('button', { name: 'Sign In' }).click()
+    await page.getByLabel('Username', { exact: true }).fill(user.username)
+    await page.getByLabel('Password', { exact: true }).fill(`${user.password}-wrong`)
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 
     await expect(page.getByText(/invalid|incorrect/i).first()).toBeVisible()
     await expect(page).toHaveURL(/\/login/)
@@ -34,7 +32,7 @@ test.describe('sign-in and session', () => {
     await page.getByRole('button', { name: `My Account: ${ADMIN_USER}` }).click()
     await page.getByRole('button', { name: 'Sign Out' }).click()
 
-    await expect(page.getByRole('heading', { name: 'Sign In' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible()
     expect(await api.status('GET', '/certificates')).toBe(401)
   })
 
@@ -50,7 +48,7 @@ test.describe('sign-in and session', () => {
     // The next page asked for, or a request the console makes first, leads to the sign-in page;
     // in the second case the console's own redirect aborts this navigation
     await page.goto('/certificates').catch(e => { if (!String(e).includes('ERR_ABORTED')) throw e })
-    await expect(page.getByRole('heading', { name: 'Sign In' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible()
     await expect(page).toHaveURL(url => url.pathname === '/login')
     expect((await (await page.request.get('/api/v2/auth/verify')).json()).data.authenticated).toBe(false)
   })

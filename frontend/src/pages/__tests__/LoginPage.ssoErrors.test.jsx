@@ -1,8 +1,8 @@
 /**
- * LoginPage: a SAML login that expired or was started elsewhere says so.
+ * LoginPage: an SSO refusal handed back in ?error= is said in the card, in clear.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 const services = vi.hoisted(() => ({
@@ -42,7 +42,7 @@ vi.mock('../../services/auth.service', () => ({
 }))
 
 vi.mock('../../services/auth-methods.service', () => ({
-  authMethodsService: { detectMethods: services.detectMethods },
+  authMethodsService: { detectMethods: services.detectMethods, isWebAuthnSupported: () => false },
 }))
 
 import LoginPage from '../LoginPage'
@@ -63,11 +63,11 @@ describe('LoginPage SSO errors', () => {
     ['saml_logout_rejected', 'auth.samlLogoutRejected'],
   ])('explains the %s refusal', async (code, key) => {
     render(<MemoryRouter initialEntries={[`/login?error=${code}`]}><LoginPage /></MemoryRouter>)
-    await waitFor(() => expect(services.showError).toHaveBeenCalledWith(key))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(key))
   })
 
   it('asks to start an expired or foreign SAML login again', async () => {
     render(<MemoryRouter initialEntries={['/login?error=saml_login_expired']}><LoginPage /></MemoryRouter>)
-    await waitFor(() => expect(services.showError).toHaveBeenCalledWith('auth.samlLoginExpired'))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('auth.samlLoginExpired'))
   })
 })

@@ -51,7 +51,7 @@ vi.mock('../../services/auth.service', () => ({
 }))
 
 vi.mock('../../services/auth-methods.service', () => ({
-  authMethodsService: { detectMethods: services.detectMethods },
+  authMethodsService: { detectMethods: services.detectMethods, isWebAuthnSupported: () => false },
 }))
 
 import LoginPage from '../LoginPage'
@@ -93,7 +93,7 @@ describe('LoginPage — SSO provider loading', () => {
     renderLogin()
 
     // Login form is shown without SSO buttons after the failed load.
-    expect(await screen.findByText('auth.signInToContinue')).toBeInTheDocument()
+    expect(await screen.findByText('auth.page.lead')).toBeInTheDocument()
     expect(screen.queryByText('Company SSO')).not.toBeInTheDocument()
 
     await act(async () => { window.dispatchEvent(new Event('online')) })
@@ -138,20 +138,19 @@ describe('LoginPage — SSO provider loading', () => {
     it('reselects it as the first load would have', async () => {
       services.getSsoProviders.mockRejectedValueOnce(networkError()).mockResolvedValue(LDAP)
       renderLogin()
-      expect(await screen.findByText('auth.continueAs')).toBeInTheDocument()
+      expect(await screen.findByLabelText('auth.page.username')).toHaveValue('alice')
       await act(async () => { window.dispatchEvent(new Event('online')) })
-      expect(await screen.findByText('auth.signingInWith')).toBeInTheDocument()
+      expect(await screen.findByText('auth.signingInWith LDAP')).toBeInTheDocument()
     })
 
     it('leaves the form alone once the user has moved on', async () => {
       services.getSsoProviders.mockRejectedValueOnce(networkError()).mockResolvedValue(LDAP)
       renderLogin()
-      fireEvent.click(await screen.findByText('auth.continueAs'))
-      await waitFor(() => expect(services.detectMethods).toHaveBeenCalledWith('alice'))
+      fireEvent.change(await screen.findByLabelText('auth.page.password'), { target: { value: 'p' } })
       await act(async () => { window.dispatchEvent(new Event('online')) })
       await waitFor(() => expect(services.getSsoProviders).toHaveBeenCalledTimes(2))
       await act(async () => {})
-      expect(screen.queryByText('auth.signingInWith')).not.toBeInTheDocument()
+      expect(screen.queryByText('auth.signingInWith LDAP')).not.toBeInTheDocument()
     })
   })
 })
