@@ -378,14 +378,14 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
 
       {isDefault && (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Input label={`${t('xcepWstep.xcepTitle')}: ${t('common.username')}`} value={form.xcep_username}
+        <Input label={`${t('xcepWstep.xcepTitle')}${t('work.sep')}${t('common.username')}`} value={form.xcep_username}
           onChange={(e) => update('xcep_username')(e.target.value)} disabled={readOnly} />
-        <Input label={`${t('xcepWstep.xcepTitle')}: ${t('common.password')}`} type="password" value={form.xcep_password || ''}
+        <Input label={`${t('xcepWstep.xcepTitle')}${t('work.sep')}${t('common.password')}`} type="password" value={form.xcep_password || ''}
           onChange={(e) => update('xcep_password')(e.target.value)}
           placeholder={detail?.xcep_password_set ? '••••••••' : ''} disabled={readOnly} />
-        <Input label={`${t('xcepWstep.wstepTitle')}: ${t('common.username')}`} value={form.wstep_username}
+        <Input label={`${t('xcepWstep.wstepTitle')}${t('work.sep')}${t('common.username')}`} value={form.wstep_username}
           onChange={(e) => update('wstep_username')(e.target.value)} disabled={readOnly} />
-        <Input label={`${t('xcepWstep.wstepTitle')}: ${t('common.password')}`} type="password" value={form.wstep_password || ''}
+        <Input label={`${t('xcepWstep.wstepTitle')}${t('work.sep')}${t('common.password')}`} type="password" value={form.wstep_password || ''}
           onChange={(e) => update('wstep_password')(e.target.value)}
           placeholder={detail?.wstep_password_set ? '••••••••' : ''} disabled={readOnly} />
       </div>

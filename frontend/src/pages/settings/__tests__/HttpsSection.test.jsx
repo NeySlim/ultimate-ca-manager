@@ -39,7 +39,7 @@ describe('HttpsSection bound certificate indicator (#303 follow-up)', () => {
       type: 'CA-Signed',
       bound_certificate: { refid: 'ref-1', descr: 'Web UI cert', exists: true },
     })
-    expect(screen.getByText(/settings\.httpsBound: Web UI cert/)).toBeInTheDocument()
+    expect(screen.getByText(/settings\.httpsBoundwork\.sepWeb UI cert/)).toBeInTheDocument()
     expect(screen.getByText('settings.httpsBoundDesc')).toBeInTheDocument()
     fireEvent.click(screen.getByText('settings.httpsUnbind'))
     expect(onUnbind).toHaveBeenCalled()
@@ -50,7 +50,7 @@ describe('HttpsSection bound certificate indicator (#303 follow-up)', () => {
       type: 'CA-Signed',
       bound_certificate: { refid: 'ref-1', common_name: 'ucm.example.com', descr: 'Web UI cert', exists: true },
     })
-    expect(screen.getByText('settings.httpsBound: ucm.example.com · Web UI cert')).toBeInTheDocument()
+    expect(screen.getByText('settings.httpsBoundwork.sepucm.example.com · Web UI cert')).toBeInTheDocument()
   })
 
   it('makes the unbound state explicit', () => {

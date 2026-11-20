@@ -62,7 +62,7 @@ describe('SecuritySection private key mirror status', () => {
       key_files_on_disk: 3,
     })
 
-    expect(screen.getByText('settings.keyFilesOnDisk:')).toBeInTheDocument()
+    expect(screen.getByText('settings.keyFilesOnDiskwork.sep')).toBeInTheDocument()
     expect(screen.getByText('3')).toBeInTheDocument()
     expect(screen.getByText('settings.keyFilesRemovalPending')).toBeInTheDocument()
   })
@@ -76,7 +76,7 @@ describe('SecuritySection private key mirror status', () => {
       key_files_on_disk: 0,
     })
 
-    expect(screen.getByText('settings.keyFilesOnDisk:')).toBeInTheDocument()
+    expect(screen.getByText('settings.keyFilesOnDiskwork.sep')).toBeInTheDocument()
     expect(screen.getByText('0')).toBeInTheDocument()
     expect(screen.queryByText('settings.keyFilesRemovalPending')).not.toBeInTheDocument()
   })

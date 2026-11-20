@@ -36,7 +36,7 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
               )}
               {encryptionStatus.enabled && encryptionStatus.key_source && (
                 <span className="text-xs text-text-tertiary">
-                  {t('settings.keySource')}: {encryptionStatus.key_file_path}
+                  {t('settings.keySource')}{t('work.sep')}{encryptionStatus.key_file_path}
                 </span>
               )}
             </div>
@@ -44,10 +44,10 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
             {encryptionStatus.enabled && encryptionStatus.kek_fingerprint && (
               <div className="flex items-center gap-3 flex-wrap text-xs text-text-secondary">
                 <span>
-                  {t('settings.kekFingerprint')}: <code className="text-text-primary">{encryptionStatus.kek_fingerprint}</code>
+                  {t('settings.kekFingerprint')}{t('work.sep')}<code className="text-text-primary">{encryptionStatus.kek_fingerprint}</code>
                 </span>
                 <span>
-                  {t('settings.dekVersion')}: <strong className="text-text-primary">{encryptionStatus.dek_version}</strong>
+                  {t('settings.dekVersion')}{t('work.sep')}<strong className="text-text-primary">{encryptionStatus.dek_version}</strong>
                 </span>
                 {encryptionStatus.rotation_in_progress && (
                   <Badge variant="warning">{t('settings.dekRotationInProgress')}</Badge>
@@ -83,16 +83,16 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
             {encryptionStatus.total_keys > 0 && (
               <div className="flex gap-4 text-sm">
                 <span className="text-text-secondary">
-                  {t('settings.encryptedKeys')}: <strong className="text-text-primary">{encryptionStatus.encrypted_count}</strong>
+                  {t('settings.encryptedKeys')}{t('work.sep')}<strong className="text-text-primary">{encryptionStatus.encrypted_count}</strong>
                 </span>
                 <span className="text-text-secondary">
-                  {t('settings.unencryptedKeys')}: <strong className="text-text-primary">{encryptionStatus.unencrypted_count}</strong>
+                  {t('settings.unencryptedKeys')}{t('work.sep')}<strong className="text-text-primary">{encryptionStatus.unencrypted_count}</strong>
                 </span>
               </div>
             )}
 
             <div className="flex items-center gap-2 text-sm">
-              <span className="text-text-secondary">{t('settings.keyFilesOnDisk')}:</span>
+              <span className="text-text-secondary">{t('settings.keyFilesOnDisk')}{t('work.sep')}</span>
               <strong className="text-text-primary">{encryptionStatus.key_files_on_disk ?? 0}</strong>
               {encryptionStatus.enabled && encryptionStatus.key_files_on_disk > 0 && (
                 <Badge variant="warning">{t('settings.keyFilesRemovalPending')}</Badge>
@@ -237,7 +237,7 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
         <div className="space-y-4">
           <p className="text-xs text-text-secondary">{t('settings.adminAllowlistDesc')}</p>
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-text-secondary">{t('settings.adminAllowlistYourIp')}:</span>
+            <span className="text-text-secondary">{t('settings.adminAllowlistYourIp')}{t('work.sep')}</span>
             <strong className="text-text-primary font-mono">{settings.admin_client_ip || '-'}</strong>
           </div>
           <Textarea
