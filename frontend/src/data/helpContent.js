@@ -57,7 +57,7 @@ export const helpContent = {
         items: [
           { label: 'Open', text: 'Select Modules, or press Down Arrow on the button; focus moves to the first page' },
           { label: 'Move', text: 'Up Arrow, Down Arrow, Home and End move between pages; Escape closes the menu and returns to the button' },
-          { label: 'Pin', text: 'The pin button next to a page keeps it in the top bar; three at most, and the menu says so when you try a fourth' },
+          { label: 'Pin', text: 'The pin button next to a page keeps it in the top bar; three at most, and a message says so when you try a fourth' },
           { label: 'Pinned', text: 'Pinned modules appear after Activity in the main bar; the head of the menu counts its pages and your pins' },
         ]
       },
@@ -74,7 +74,7 @@ export const helpContent = {
         title: 'Account menu',
         icon: Users,
         items: [
-          { label: 'Account', text: 'Your profile and settings, language and sign out' },
+          { label: 'Account', text: 'Your name, role and sign-in method with the inactivity lock, then My account and Sign out. The language is chosen on My account and on the sign-in page; Settings is in the Modules menu and the search' },
         ]
       },
       {
@@ -90,7 +90,7 @@ export const helpContent = {
         title: 'Theme menu',
         icon: Stack,
         items: [
-          { label: 'Choose', text: 'The sun or moon button sets the color theme and the mode; System follows your device, and the icon shows the mode applied' },
+          { label: 'Choose', text: 'The theme button (sun or moon, sparkles in the Aurore family) sets the color theme and the mode; System follows your device, and the button names the theme applied' },
           { label: 'Keyboard', text: 'Up Arrow and Down Arrow loop over the options; Escape or Tab closes the menu and returns to the button' },
           { label: 'Saved', text: 'The choice is the one under Settings, Appearance, and follows you to every browser' },
         ]
@@ -104,6 +104,7 @@ export const helpContent = {
           { label: 'Actions', text: 'A failed ACME renewal offers Retry and a CRL to publish offers Publish, for who may do it; the other items only open their page' },
           { label: 'Rights', text: 'You only see items from sources you may read; a source you have no right on shows nothing' },
           { label: 'Read', text: 'Mark an item or all of them read; the marks are saved with your preferences, and an item that resolves leaves the panel' },
+          { label: 'Keyboard', text: 'Escape closes the panel wherever the focus is and returns to the bell; a click outside leaves it open. After Mark read the focus stays on the line, after Mark all read it goes to the title' },
           { label: 'Open', text: 'Open goes to the page of the item and marks it read; approvals are decided on their own page' },
           { label: 'Email', text: 'For who may read the settings, the foot says whether email notification is on and links to its settings' },
         ]
@@ -113,8 +114,10 @@ export const helpContent = {
         icon: Stack,
         items: [
           { label: 'Status bar', text: 'In high availability mode the status bar shows the nodes, or how many stopped sending heartbeats, and the node you are on; select it to list the nodes' },
+          { label: 'Approvals', text: 'For who may read them, the status bar links the approvals waiting for a decision, with their count' },
           { label: 'Degraded', text: 'When a node stops sending heartbeats, a banner says so and what still works: reading and issuing on the nodes that answer, scheduled tasks on the leader node' },
-          { label: 'Maintenance', text: 'During a cluster maintenance, a restore for instance, the server refuses every write: the banner says until when, and the write buttons are disabled with that reason' },
+          { label: 'Maintenance', text: 'During a cluster maintenance, a restore for instance, the server refuses every write: the banner says until when, and the write buttons of every page are disabled with that reason' },
+          { label: 'Offline', text: 'When the network is lost, a banner says so: reading continues with the data already loaded, the write buttons of every page are disabled, and they come back by themselves with the network' },
           { label: 'Live connection', text: 'The icon after the service state in the status bar is the live connection to the server; select it to reconnect' },
         ]
       },
@@ -124,7 +127,7 @@ export const helpContent = {
         items: [
           { label: 'Initial setup', text: 'On an instance without any CA nor certificate, administrators see the Initial setup card on the overview and on the certificate list: a root, an issuing CA, a protocol' },
           { label: 'Steps', text: 'Each step opens the screen that does it, and is ticked once what it creates exists' },
-          { label: 'Later and Hide', text: 'Later folds the card into one line; Hide closes it, and a finished setup is not shown again' },
+          { label: 'Later and Hide', text: 'Later folds the card into one line and Resume opens it again; Hide closes a finished setup, which is not shown again' },
         ]
       },
     ],

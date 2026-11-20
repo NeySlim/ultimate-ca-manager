@@ -17,14 +17,16 @@ A tour of the Ultimate Certificate Manager console: where each module lives and 
 A menu path in this guide such as **Modules** > **PKI** > **Certificates** means: open the **Modules** menu in the top bar, pick the group, then the page. The top bar holds:
 
 - the UCM logo, which goes back to the Dashboard
-- **Dashboard**, **Certificates** and **Certificate Authorities**, always present; a count badge next to Certificates shows how many certificates are expiring or expired, and selecting it dismisses it until the count changes
+- **Dashboard**, **Certificates** and **Certificate Authorities**, always present; a count on the Certificates link shows how many certificates are expiring or expired, and following the link dismisses it until the count changes
 - up to three modules you pinned
-- the **Modules** menu, which lists every module you may open in four groups: **PKI**, **Protocols**, **Governance** and **Administration**. Modules you have no right to are not shown. The pin button next to a module keeps it in the bar
-- search (`Ctrl K`), the help button, the live-link indicator, the theme menu, the notification bell and your account menu
+- the **Modules** menu, which lists every module you may open in four groups: **PKI**, **Protocols**, **Governance** and **Administration**. Modules you have no right to are not shown. The pin button next to a module keeps it in the bar; a message says so when a fourth is refused
+- search (`Ctrl K`), the help button, the theme menu, the notification bell and your account menu (your name, role and sign-in method, **My Account** and **Sign out**)
 
-The bell lists what needs your attention: critical items and pending approvals from the To handle queue (ACME order failed, ACME renewal failed, Approval pending, CRL due, CRL missing, Manual renewal due, Automatic renewal blocked, CA expiring, Deployment left on the old certificate, HTTPS left on the old certificate, Trust store certificate expiring or expired), plus Backup failed, Restore failed, Session revoked and Sessions revoked from the audit log. Queue entries open the page of the item, audit entries open the audit log, and a queue entry without a path has no link; nothing is approved or retried from the bell itself. Mark an item, or all of them, as read.
+The bell lists what needs your attention: critical items and pending approvals from the To handle queue (ACME failure, Approval pending, CRL due, CRL missing, Manual renewal due, Automatic renewal blocked, CA expiring, Deployment left on the old certificate, HTTPS left on the old certificate, Trust store certificate expiring or expired), plus Backup failed, Restore failed, Session revoked and Sessions revoked from the audit log. Queue entries open the page of the item, audit entries open the audit log, and a queue entry without a path has no link; nothing is approved or retried from the bell itself. Mark an item, or all of them, as read.
 
-A status bar shows whether the service is running and the UCM version; on an instance in HA mode it also names the node and whether it is the leader.
+A status bar shows the UCM version, whether the service is running and the live connection, links the approvals waiting for a decision when you may read them, and on an instance in HA mode names the node and whether it is the leader.
+
+When the network is lost, or while a cluster maintenance holds the writes, a banner says so and the write buttons of every page, the details and the dialogs are disabled until it ends; reading goes on.
 
 On a page, the **list** holds the items and the **details** show the selected item, beside the list on wide screens and over the page on narrower ones.
 
@@ -292,7 +294,7 @@ An SSH CA on an HSM key keeps its private key on the token and needs the `read:h
 
 ### Settings
 
-Open **Modules** > **Administration** > **Settings** (administrators), or **Settings** in the account menu. The tabs are: General, Appearance & Language, Email, Security, SSO, Backup, Audit, Database, HTTPS, Updates, Scheduler, Webhooks, CT, Auto-Renewal, Deployment, Microsoft CA, Active Directory, Windows Autoenrollment and About; a tab you have no right to is not shown.
+Open **Modules** > **Administration** > **Settings** (administrators), or **Settings** from the search (`Ctrl K`). The tabs are: General, Appearance & Language, Email, Security, SSO, Backup, Audit, Database, HTTPS, Updates, Scheduler, Webhooks, CT, Auto-Renewal, Deployment, Microsoft CA, Active Directory, Windows Autoenrollment and About; a tab you have no right to is not shown.
 
 - **Backup** takes and restores archives. In HA mode they are stored in PostgreSQL.
 - **Updates** installs updates; in HA mode on DEB and RPM it updates the nodes one at a time.
@@ -316,7 +318,7 @@ Configure SSO in **Settings** > **SSO** (administrators only). Each provider typ
 
 ## My Account
 
-Open **My Account** from the account menu (your name, right end of the top bar). Its tabs are **Profile** (name, e-mail, account information), **Security** (password, two-factor authentication, security keys, client certificates for mutual TLS) and **API Keys** (create a key with a scope, optionally expiring, and revoke it). The account menu also holds the **Language** choice and **Sign Out**, and **Settings** for administrators.
+Open **My Account** from the account menu (your name, right end of the top bar). Its tabs are **Profile** (name, e-mail, account information), **Security** (password, two-factor authentication, security keys, client certificates for mutual TLS) and **API Keys** (create a key with a scope, optionally expiring, and revoke it). The **Language** is chosen in the Profile tab and on the sign-in page; the account menu holds **Sign out**.
 
 ### Enabling 2FA (TOTP)
 
