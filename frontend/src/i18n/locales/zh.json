@@ -3071,9 +3071,7 @@
     "colorThemeDesc": "选择适合您偏好的配色方案",
     "themeFamilies": {
       "atelier": "Atelier",
-      "aurore": "Aurore",
-      "purple": "Purple Night",
-      "sunset": "Orange Sunset"
+      "aurore": "Aurore"
     },
     "appearanceMode": "外观模式",
     "appearanceModeDesc": "控制界面亮度的适应方式",
@@ -7390,8 +7388,7 @@
       "dark": "深色",
       "light": "浅色",
       "aurore": "极光深色",
-      "auroreLight": "极光浅色",
-      "more": "更多主题"
+      "auroreLight": "极光浅色"
     },
     "bell": {
       "title": "通知",

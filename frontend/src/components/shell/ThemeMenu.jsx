@@ -1,11 +1,11 @@
 /**
  * Theme menu of the top bar, as the mockup's: 220 px, one choice per line with its icon
  * (System, Dark, Light, Aurore dark, Aurore light), the current one checked; a choice closes
- * the menu and gives the focus back to the button. The product's other families follow.
+ * the menu and gives the focus back to the button. Nothing else: these five are the product's themes.
  */
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Desktop, Moon, Sun, Sparkle, Palette, Check } from '@phosphor-icons/react'
+import { Desktop, Moon, Sun, Sparkle, Check } from '@phosphor-icons/react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useDisclosure, moveFocus } from './useDisclosure'
 
@@ -16,11 +16,10 @@ const CHOICES = [
   { id: 'aurore', family: 'aurore', mode: 'dark', labelKey: 'shell.theme.aurore', Icon: Sparkle },
   { id: 'aurore-light', family: 'aurore', mode: 'light', labelKey: 'shell.theme.auroreLight', Icon: Sparkle },
 ]
-const MAIN_FAMILIES = new Set(['atelier', 'aurore'])
 
 export function ThemeMenu() {
   const { t } = useTranslation()
-  const { themeFamily, setThemeFamily, mode, setMode, resolvedMode, themes } = useTheme()
+  const { themeFamily, setThemeFamily, mode, setMode, resolvedMode } = useTheme()
   const { open, setOpen, close, buttonRef, rootProps } = useDisclosure()
   const panelRef = useRef(null)
   // Up arrow on the button opens on the last choice, down arrow on the current one
@@ -31,7 +30,7 @@ export function ThemeMenu() {
   const current = CHOICES.find(c => c.family === themeFamily && c.mode === mode)
   const currentName = current?.id === 'system'
     ? `${t('shell.theme.system')} (${modeName.toLowerCase()})`
-    : current ? t(current.labelKey) : t((themes.find(th => th.id === themeFamily) || {}).nameKey || 'shell.theme.menu')
+    : t(current?.labelKey || 'shell.theme.menu')
   // The button shows the applied theme: sparkles for Aurore, otherwise the resolved mode
   const ButtonIcon = themeFamily === 'aurore' ? Sparkle : resolvedMode === 'light' ? Sun : Moon
 
@@ -68,8 +67,6 @@ export function ThemeMenu() {
     moveFocus(e, items())
   }
 
-  const others = themes.filter(th => !MAIN_FAMILIES.has(th.id))
-
   return (
     <div className="shell-pop-wrap" {...rootProps} onKeyDown={onKeyDown}>
       <button
@@ -101,22 +98,6 @@ export function ThemeMenu() {
             </button>
           )
         })}
-        {others.length > 0 && (
-          <div role="group" aria-label={t('shell.theme.more')}>
-            <div className="ui-pop-sep" role="separator" />
-            {others.map(theme => {
-              const checked = themeFamily === theme.id
-              return (
-                <button key={theme.id} type="button" role="menuitemradio" tabIndex={-1} aria-checked={checked}
-                  className="ui-pop-item" onClick={() => choose(() => setThemeFamily(theme.id))}>
-                  <Palette aria-hidden="true" />
-                  <span className="ui-pop-label">{t(theme.nameKey)}</span>
-                  <span className="ui-pop-check" aria-hidden="true"><Check /></span>
-                </button>
-              )
-            })}
-          </div>
-        )}
       </div>
     </div>
   )

@@ -5,7 +5,7 @@ import path from 'path'
 
 const TOKENS_CSS = path.resolve(__dirname, '../../styles/tokens.css')
 
-export const FAMILIES = ['atelier', 'aurore', 'purple', 'sunset']
+export const FAMILIES = ['atelier', 'aurore']
 export const MODES = ['dark', 'light']
 export const TOKEN_NAMES = [
   'bg', 'panel', 'raised', 'hover', 'text', 'muted', 'line', 'control', 'accent', 'selected',

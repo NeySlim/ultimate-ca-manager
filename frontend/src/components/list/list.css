@@ -575,6 +575,13 @@
   .lv-toolbar .lv-filter { flex: 1 1 0; min-width: 0; }
   .lv-toolbar .lv-filter > button { width: 100%; max-width: none; min-height: 40px; }
   .lv-toolbar .lv-btn.is-icon { width: 40px; height: 40px; }
+  /* A strip (mobileFilterStrip): every filter keeps half the line, as the mockup's two do, and the
+     product's next ones follow out of view, reached by a swipe or Tab; the 5 px padding leaves room
+     for the focus ring. A filter's menu, which the strip would clip, opens as a sheet (a native select's place). */
+  .lv-toolbar .lv-tools.is-strip { overflow-x: auto; scrollbar-width: none; scroll-snap-type: x mandatory; scroll-padding-inline: 5px; padding: 5px; margin: -5px; }
+  .lv-toolbar .lv-tools.is-strip::-webkit-scrollbar { display: none; }
+  .lv-toolbar .lv-tools.is-strip > .lv-filter { flex: 0 0 calc((100% - 8px) / 2); scroll-snap-align: start; }
+  .lv-toolbar .lv-tools.is-strip .lv-filter > .ui-pop { position: fixed; top: auto; right: 8px; bottom: 8px; left: 8px; max-width: none; margin: 0; }
   .lv-footer { padding: 10px; gap: 8px; flex-wrap: wrap; }
   .lv-footer .lv-page-arrow { width: 38px; height: 38px; }
   .lv-footer .lv-page-size { min-height: 38px; }

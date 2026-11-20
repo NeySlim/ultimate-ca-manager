@@ -3141,9 +3141,7 @@
     "colorThemeDesc": "Виберіть кольорову схему за вашими вподобаннями",
     "themeFamilies": {
       "atelier": "Atelier",
-      "aurore": "Aurore",
-      "purple": "Пурпурова ніч",
-      "sunset": "Помаранчевий захід"
+      "aurore": "Aurore"
     },
     "appearanceMode": "Режим вигляду",
     "appearanceModeDesc": "Контролюйте як адаптується яскравість інтерфейсу",
@@ -7600,8 +7598,7 @@
       "dark": "Dark",
       "light": "Light",
       "aurore": "Aurore dark",
-      "auroreLight": "Aurore light",
-      "more": "More themes"
+      "auroreLight": "Aurore light"
     },
     "bell": {
       "title": "Сповіщення",

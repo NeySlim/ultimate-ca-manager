@@ -3071,9 +3071,7 @@
     "colorThemeDesc": "お好みの配色を選択してください",
     "themeFamilies": {
       "atelier": "Atelier",
-      "aurore": "Aurore",
-      "purple": "パープルナイト",
-      "sunset": "オレンジサンセット"
+      "aurore": "Aurore"
     },
     "appearanceMode": "外観モード",
     "appearanceModeDesc": "インターフェースの明るさの調整方法を制御",
@@ -7393,8 +7391,7 @@
       "dark": "Dark",
       "light": "Light",
       "aurore": "Aurore dark",
-      "auroreLight": "Aurore light",
-      "more": "More themes"
+      "auroreLight": "Aurore light"
     },
     "bell": {
       "title": "通知",

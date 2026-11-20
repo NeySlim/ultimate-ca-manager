@@ -351,7 +351,7 @@ Pages that ask for your current password (password change, turning off the secur
 
 ## Themes
 
-The theme button in the top bar opens the theme menu: **System** (follows your OS light/dark preference), **Dark**, **Light**, **Aurore dark** and **Aurore light**, the current choice checked. The other color themes are listed below them.
+The theme button in the top bar opens the theme menu: **System** (follows your OS light/dark preference), **Dark**, **Light**, **Aurore dark** and **Aurore light**, the current choice checked. These five are the only themes; an account set to a theme of an earlier version (Purple Night, Orange Sunset, Gray) opens in Atelier with its light or dark mode kept.
 
 The choice is saved with your account and follows you to every browser.
 

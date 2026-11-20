@@ -38,7 +38,7 @@ export default {
       {
         title: 'Menu du thème',
         items: [
-          { label: 'Choisir', text: 'Le bouton du thème propose Système, Sombre, Clair, Aurore sombre et Aurore clair, le choix courant coché ; Système suit votre appareil, l’icône montre le mode appliqué (des étincelles pour Aurore), et les autres thèmes de couleurs suivent' },
+          { label: 'Choisir', text: 'Le bouton du thème propose Système, Sombre, Clair, Aurore sombre et Aurore clair, le choix courant coché ; Système suit votre appareil, l’icône montre le mode appliqué (des étincelles pour Aurore)' },
           { label: 'Clavier', text: 'Les flèches Haut et Bas parcourent les options en boucle ; Échap ou Tab ferme le menu et revient au bouton' },
           { label: 'Enregistré', text: 'Le choix est celui de Paramètres, Apparence, et vous suit dans tous les navigateurs' },
         ]

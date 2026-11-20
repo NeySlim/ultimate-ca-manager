@@ -3208,9 +3208,7 @@
     "colorThemeDesc": "Choisissez un schéma de couleurs selon vos préférences",
     "themeFamilies": {
       "atelier": "Atelier",
-      "aurore": "Aurore",
-      "purple": "Nuit pourpre",
-      "sunset": "Coucher de soleil orangé"
+      "aurore": "Aurore"
     },
     "appearanceMode": "Mode d’apparence",
     "followSystem": "Suivre le système",
@@ -7393,8 +7391,7 @@
       "dark": "Sombre",
       "light": "Clair",
       "aurore": "Aurore sombre",
-      "auroreLight": "Aurore clair",
-      "more": "Autres thèmes"
+      "auroreLight": "Aurore clair"
     },
     "bell": {
       "title": "Notifications",

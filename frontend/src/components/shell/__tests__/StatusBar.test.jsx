@@ -77,6 +77,19 @@ describe('StatusBar', () => {
     expect(screen.getByText('shell.haNodes|3').closest('.shell-ha-link')).toHaveClass('is-good')
   })
 
+  // On a phone the mockup's bar holds the version line, then approvals and the cluster state on one
+  // line: the node and its role are kept for assistive technology only (the node list has them)
+  it('marks the node and its role as the part a phone keeps out of sight, never the indicator', async () => {
+    vi.stubGlobal('fetch', answer({
+      status: 'ok', version: '3.0.0', ha: true, node_id: 'n1', leader: true,
+      cluster: { leader_node_id: 'n1', nodes: 2, stale: 1 },
+    }))
+    const { container } = render(<StatusBar />)
+    await screen.findByText('shell.haNode|n1')
+    expect([...container.querySelectorAll('.shell-status-node')].map((e) => e.textContent)).toEqual(['shell.haNode|n1', 'shell.haLeader'])
+    expect(screen.getByText('shell.haLate|1').closest('.shell-status-node')).toBeNull()
+  })
+
   it('says how many nodes are late, as a warning, in place of the node count', async () => {
     vi.stubGlobal('fetch', answer({
       status: 'ok', version: '3.0.0', ha: true, node_id: 'n2', leader: false,

@@ -22,31 +22,11 @@ const themeFamilies = {
       light: { surface: '#eef0f8', accent: '#3742bd' },
     },
   },
-  purple: {
-    id: 'purple',
-    name: 'Purple Night',
-    nameKey: 'settings.themeFamilies.purple',
-    swatch: {
-      dark: { surface: '#301E47', accent: '#A855F7' },
-      light: { surface: '#E8DFF5', accent: '#9a3ff0' },
-    },
-  },
-  sunset: {
-    id: 'sunset',
-    name: 'Orange Sunset',
-    nameKey: 'settings.themeFamilies.sunset',
-    swatch: {
-      dark: { surface: '#3A1F16', accent: '#F97316' },
-      light: { surface: '#FDDCB5', accent: '#cd4d0b' },
-    },
-  },
 }
 
-// Preferences stored before the rename ('gray') read as 'atelier'.
-const normalizeFamily = (id) => {
-  const family = id === 'gray' ? 'atelier' : id
-  return Object.prototype.hasOwnProperty.call(themeFamilies, family) ? family : null
-}
+// The two families of the mockup. A stored family that no longer exists (gray, purple, sunset of
+// 2.x or earlier builds) reads as Atelier; the stored mode is kept and nothing is sent to the server.
+const normalizeFamily = (id) => (Object.prototype.hasOwnProperty.call(themeFamilies, id) ? id : 'atelier')
 
 const ThemeContext = createContext()
 
@@ -78,9 +58,8 @@ export function ThemeProvider({ children }) {
       const savedFamily = localStorage.getItem('ucm-theme-family')
       const savedMode = localStorage.getItem('ucm-theme-mode')
       
-      const family = normalizeFamily(savedFamily)
-      if (family) {
-        setThemeFamily(family)
+      if (savedFamily) {
+        setThemeFamily(normalizeFamily(savedFamily))
       }
       if (savedMode && ['system', 'dark', 'light'].includes(savedMode)) {
         setMode(savedMode)
@@ -107,8 +86,8 @@ export function ThemeProvider({ children }) {
   // theme state. Triggered when AuthContext applies values from the server.
   useEffect(() => {
     const apply = (prefs) => {
-      const family = normalizeFamily(prefs.theme_family)
-      if (family) {
+      if (typeof prefs.theme_family === 'string' && prefs.theme_family) {
+        const family = normalizeFamily(prefs.theme_family)
         setThemeFamily(prev => prev !== family ? family : prev)
       }
       if (prefs.theme_mode && ['system', 'dark', 'light'].includes(prefs.theme_mode)) {
@@ -121,8 +100,9 @@ export function ThemeProvider({ children }) {
 
   // Wrap setters so user changes propagate to the server when authenticated.
   const setThemeFamilyAndPersist = useCallback((value) => {
-    setThemeFamily(value)
-    persistPreference('theme_family', value)
+    const family = normalizeFamily(value)
+    setThemeFamily(family)
+    persistPreference('theme_family', family)
   }, [])
   const setModeAndPersist = useCallback((value) => {
     setMode(value)
@@ -131,14 +111,14 @@ export function ThemeProvider({ children }) {
 
   const currentTheme = `${themeFamily}-${resolvedMode}`
   const setCurrentTheme = useCallback((themeId) => {
-    if (normalizeFamily(themeId)) {
-      setThemeFamilyAndPersist(normalizeFamily(themeId))
-    } else if (themeId === 'dark') {
+    if (themeId === 'dark') {
       setThemeFamilyAndPersist('atelier')
       setModeAndPersist('dark')
     } else if (themeId === 'light') {
       setThemeFamilyAndPersist('atelier')
       setModeAndPersist('light')
+    } else {
+      setThemeFamilyAndPersist(themeId)
     }
   }, [setThemeFamilyAndPersist, setModeAndPersist])
 

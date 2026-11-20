@@ -87,9 +87,10 @@ export function StatusBar({ onShowNodes, can }) {
       {ha && (
         <span className="shell-status-ha">
           {indicator}
-          {ha.node && <span>{t('shell.haNode', { node: ha.node })}</span>}
-          {ha.leader === true && <span>{t('shell.haLeader')}</span>}
-          {ha.leader === false && <span>{t('shell.haFollower')}</span>}
+          {/* The product's addition to the mockup's indicator, out of sight on a phone */}
+          {ha.node && <span className="shell-status-node">{t('shell.haNode', { node: ha.node })}</span>}
+          {ha.leader === true && <span className="shell-status-node">{t('shell.haLeader')}</span>}
+          {ha.leader === false && <span className="shell-status-node">{t('shell.haFollower')}</span>}
         </span>
       )}
       <span className="shell-status-shortcut">

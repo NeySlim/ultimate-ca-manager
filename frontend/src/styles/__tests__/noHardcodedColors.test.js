@@ -29,8 +29,7 @@ export const EXCEPTIONS = [
   { file: 'components/ProviderIcons.jsx', all: true, reason: 'third-party brand colours' },
   {
     file: 'contexts/ThemeContext.jsx',
-    values: ['#233143', '#94bfff', '#eaf0f6', '#245bb1', '#1a2036', '#a5b4ff', '#eef0f8', '#3742bd',
-      '#301e47', '#a855f7', '#e8dff5', '#9a3ff0', '#3a1f16', '#f97316', '#fddcb5', '#cd4d0b'],
+    values: ['#233143', '#94bfff', '#eaf0f6', '#245bb1', '#1a2036', '#a5b4ff', '#eef0f8', '#3742bd'],
     reason: 'theme picker swatches show a theme other than the active one',
   },
   {

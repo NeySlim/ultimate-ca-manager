@@ -3071,9 +3071,7 @@
     "colorThemeDesc": "Elija un esquema de colores según su preferencia",
     "themeFamilies": {
       "atelier": "Atelier",
-      "aurore": "Aurore",
-      "purple": "Noche púrpura",
-      "sunset": "Atardecer naranja"
+      "aurore": "Aurore"
     },
     "appearanceMode": "Modo de apariencia",
     "appearanceModeDesc": "Controle cómo se adapta el brillo de la interfaz",
@@ -7390,8 +7388,7 @@
       "dark": "Dark",
       "light": "Light",
       "aurore": "Aurore dark",
-      "auroreLight": "Aurore light",
-      "more": "More themes"
+      "auroreLight": "Aurore light"
     },
     "bell": {
       "title": "Notificaciones",

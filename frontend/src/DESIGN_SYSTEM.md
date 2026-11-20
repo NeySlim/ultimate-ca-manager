@@ -13,17 +13,15 @@
 Colors are **not** hardcoded. `ThemeContext.jsx` sets `data-theme` and
 `data-mode` on `<html>`; `styles/tokens.css` holds one block per
 `[data-theme][data-mode]` pair (bare `:root` = Atelier dark, the fallback).
-There are **4 theme families** × **2 modes**:
+There are **2 theme families** × **2 modes**, the five choices of the theme menu (System, Dark, Light, Aurore dark, Aurore light):
 
 | Family | `id` | Accent | Modes |
 |--------|------|--------|-------|
 | Atelier (default) | `atelier` | `#4F8EF7` | dark / light |
 | Aurore | `aurore` | `#6b78e0` | dark / light |
-| Purple Night | `purple` | `#A855F7` | dark / light |
-| Orange Sunset | `sunset` | `#F97316` | dark / light |
 
-A stored `gray` (localStorage or server preference) reads as `atelier`; the
-next write persists `atelier`.
+A stored family that no longer exists (`gray`, `purple`, `sunset` or any other, in localStorage or
+the server preference) reads as `atelier` in the stored mode; nothing is sent back to the server.
 
 ### The 21 tokens
 
@@ -35,9 +33,9 @@ next write persists `atelier`.
 | `--control` | Border of controls (3:1 on `--bg`) |
 | `--accent` `--selected` `--on-accent` | Accent, selected-row background, and the text colour on accent, good and bad button fills |
 | `--good` `--goodbg` `--warn` `--warn-fill` `--warnbg` `--bad` `--badbg` | Status text, tinted backgrounds, and the amber fill |
-| `--grad-a` `--grad-b` `--glow` | Aurore gradient and halo (accent for the other families) |
+| `--grad-a` `--grad-b` `--glow` | Aurore gradient and halo (accent for Atelier) |
 
-`themeContrast.test.js` enforces WCAG on all 8 palettes: 4.5:1 for text pairs,
+`themeContrast.test.js` enforces WCAG on all 4 palettes: 4.5:1 for text pairs,
 3:1 for `--accent`, `--control` and `--warn-fill` on `--bg`. All text is 4.5:1, `--on-accent`
 included (on the accent, good and bad gradients, and on `--grad-a`/`--grad-b` for Aurore), as is
 `--text-tertiary` on `--bg` and `--panel`. `--line` is
@@ -56,7 +54,7 @@ only, not on the family.
 
 **Rule.** No `#rrggbb`, `rgb()`/`rgba()`/`hsl()` literal and no Tailwind palette class
 (`text-red-500`, `bg-white`, `border-gray-800`) in `src`: use a token, an alias or a helper class.
-Three constants (`--ink`, `--paper`, `--scrim`) are declared in each of the 8 palettes and pinned in the baseline; `bg-scrim-NN` is the overlay. There is no `--hue-*` token.
+Three constants (`--ink`, `--paper`, `--scrim`) are declared in each of the 4 palettes and pinned in the baseline; `bg-scrim-NN` is the overlay. There is no `--hue-*` token.
 `styles/__tests__/noHardcodedColors.test.js` enforces it and lists the exceptions with their reason.
 
 Mode resolves from `system` / `dark` / `light` (persisted in localStorage +

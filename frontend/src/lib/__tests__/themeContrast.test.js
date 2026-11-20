@@ -1,5 +1,5 @@
 /**
- * WCAG contrast matrix over the 8 family x mode palettes of styles/tokens.css:
+ * WCAG contrast matrix over the 4 family x mode palettes of styles/tokens.css:
  * 4.5:1 for text, 3:1 for fills and control borders.
  * `line` is a decorative divider (exempt from 1.4.11); `control` is the border that carries 3:1.
  */
@@ -44,7 +44,7 @@ const TEXT_PAIRS = [
 const FILL_PAIRS = [['accent', 'bg'], ['control', 'bg'], ['warn-fill', 'bg']]
 
 describe('theme contrast matrix', () => {
-  it('finds all 8 palettes', () => {
+  it('finds all 4 palettes', () => {
     expect(Object.keys(tokens).sort()).toEqual(
       FAMILIES.flatMap((f) => MODES.map((m) => `${f}-${m}`)).sort()
     )

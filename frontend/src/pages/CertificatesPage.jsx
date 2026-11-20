@@ -623,6 +623,8 @@ export default function CertificatesPage() {
           exportLoader={exportLoader}
           exportFilename="certificates"
           toolbarFilters={filters}
+          // The mockup's two filters keep their width on a phone; the template filter follows in the strip
+          mobileFilterStrip
           multiSelect
           selectedIds={selectedIds}
           onSelectionChange={setSelectedIds}

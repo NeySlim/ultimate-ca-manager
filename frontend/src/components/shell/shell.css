@@ -483,6 +483,8 @@ button.shell-ha-link:hover { background: var(--hover); }
   .shell-pop-item { min-height: 44px; }
   .shell-status-shortcut { display: none; }
   .shell-statusbar { height: auto; min-height: 34px; margin-top: auto; padding: 7px 16px; font-size: 12px; flex-wrap: wrap; row-gap: 2px; }
+  /* The mockup's two lines: the node and its role stay for assistive technology, the node list shows them */
+  .shell-status-node { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
   .shell-notif-panel { top: 0; bottom: 0; z-index: 60; width: 100%; border: 0; }
   .shell-notif-head { padding: 10px 8px 10px 16px; }
   .shell-notif-head .shell-icon-btn { width: 40px; height: 40px; min-width: 40px; min-height: 40px; }
