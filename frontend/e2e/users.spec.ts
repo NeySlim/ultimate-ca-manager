@@ -11,7 +11,7 @@ test('an operator neither sees nor opens the administration pages', async ({ api
   await page.goto('/')
   await page.getByRole('button', { name: 'Modules' }).click()
   const menu = page.getByRole('navigation', { name: 'Product modules' })
-  await expect(menu.getByRole('link', { name: 'Certificates', exact: true })).toBeVisible()
+  await expect(menu.locator('a[href="/templates"]')).toBeVisible()
   for (const m of ADMIN_ONLY) await expect(menu.locator(`a[href="${m.path}"]`)).toHaveCount(0)
 
   // The route sends the operator back to the overview
