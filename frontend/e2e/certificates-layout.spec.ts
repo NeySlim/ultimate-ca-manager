@@ -123,6 +123,30 @@ for (const [w, h] of [[390, 844], [800, 1000]]) {
   })
 }
 
+// The two first filters share their line at the mockup's widths; the third takes the next line whole
+for (const [w, width, second] of [[390, 151, 175], [800, 356, 380]]) {
+  test.describe(`the filters at ${w} px`, () => {
+    test.use({ viewport: { width: w, height: 1000 } })
+    test('are those of the mockup, with no 140 px cap', async ({ page, api }) => {
+      await createCA(api)
+      await page.goto('/certificates')
+      const filters = page.getByRole('main').locator('.lv-toolbar .lv-filter > button')
+      await expect(filters.first()).toBeVisible()
+      const [a, b, c] = [await box(filters.nth(0)), await box(filters.nth(1)), await box(filters.nth(2))]
+      expect(Math.round(a.x)).toBe(16)
+      expect(Math.round(a.width)).toBe(width)
+      expect(Math.round(b.x)).toBe(second)
+      expect(Math.round(b.width)).toBe(width)
+      expect(Math.round(b.y)).toBe(Math.round(a.y))
+      // The third, under the first two, spans both
+      expect(Math.round(c.x)).toBe(16)
+      expect(c.y).toBeGreaterThan(a.y + a.height)
+      expect(Math.round(c.width)).toBe(2 * width + 8)
+      expect(await filters.nth(0).evaluate((el) => getComputedStyle(el).maxWidth)).toBe('none')
+    })
+  })
+}
+
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 

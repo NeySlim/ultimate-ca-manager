@@ -105,7 +105,7 @@
   cursor: pointer;
 }
 .lv-view:first-child { padding-left: 2px; }
-.lv-view:hover { color: var(--text); background: var(--hover); }
+.lv-view:hover { background: var(--hover); }
 .lv-view:focus-visible { outline-offset: -2px; }
 .lv-view:is([aria-selected="true"], [aria-pressed="true"]) { color: var(--accent); border-bottom-color: var(--accent); }
 .lv-counter {
@@ -137,18 +137,18 @@
   border-radius: 4px;
   color: var(--muted);
 }
-.lv-search:focus-within { border-color: var(--accent); }
 .lv-search input {
   width: 100%;
   min-height: 32px;
   padding: 6px 0;
   background: transparent;
   border: 0;
+  border-radius: 4px;
   color: var(--text);
   font-size: 12px;
 }
+/* The field takes the page's focus ring, the frame keeps its border, as the mockup */
 .lv-search input:focus { outline: none; }
-.lv-search input:focus-visible { outline: none; }
 .lv-search input::placeholder { color: var(--muted); opacity: 1; }
 .lv-search input::-webkit-search-cancel-button { display: none; }
 .lv-search-clear {
@@ -172,6 +172,10 @@
   color: var(--text);
   line-height: normal;
 }
+/* A filter keeps its look on hover and takes the focus ring of the page, as the mockup's select */
+.lv-filter > button:hover { background: var(--panel); border-color: var(--control); }
+.lv-filter > button:focus { box-shadow: none; border-color: var(--control); }
+.lv-filter > button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .lv-divider { width: 1px; height: 20px; margin: 0 3px; background: var(--line); }
 /* Active filters under the toolbar: a label, square chips, a note */
 .lv-applied { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: -2px 0 12px; font-size: 12px; color: var(--muted); flex-shrink: 0; }
@@ -347,7 +351,7 @@
   overflow-wrap: anywhere;
   pointer-events: none;
 }
-.lv-entity:hover:not(:disabled) { color: var(--accent); background: var(--hover); }
+.lv-entity:hover:not(:disabled) { background: var(--hover); }
 .lv-mark { display: inline-flex; align-items: center; gap: 5px; margin-left: 8px; color: var(--muted); font-size: 12px; }
 .lv-mark svg { width: 12px; height: 12px; flex-shrink: 0; }
 .lv-mark.is-warn { color: var(--warn); }
@@ -631,6 +635,9 @@
 :root[data-theme="aurore"] .lv-table tbody tr.is-opened { background: linear-gradient(90deg, var(--selected), color-mix(in srgb, var(--selected) 55%, var(--panel))); background-color: var(--selected); }
 :root[data-theme="aurore"] .lv-table tbody tr.is-opened td:first-child { position: relative; box-shadow: none; }
 :root[data-theme="aurore"] .lv-table tbody tr.is-opened td:first-child::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: linear-gradient(180deg, var(--grad-a), var(--grad-b)); pointer-events: none; }
+/* Aurore: the focus ring wears the mockup's 5 px halo */
+:root[data-theme="aurore"] :is(.lv-stage, .lv-dialog) :is(button, a, input, select, [tabindex]):focus-visible { box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent); }
+:root[data-theme="aurore"] :is(.lv-stage, .lv-dialog) .lv-btn.is-primary:focus-visible { box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent), 0 8px 24px -8px var(--glow); }
 @media (prefers-reduced-motion: no-preference) {
   :root[data-theme="aurore"] :is(.lv-btn, .lv-icon-btn, .lv-table tbody tr) { transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease; }
 }
