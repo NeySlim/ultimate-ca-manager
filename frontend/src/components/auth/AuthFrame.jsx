@@ -1,8 +1,9 @@
 /**
- * Frame of the pages shown before sign-in: theme and language at the top right,
+ * Frame of the pages shown before sign-in: a skip link, theme and language at the top right,
  * one card (brand, title, lead, content), version and project link below.
  */
-import { forwardRef } from 'react'
+import { forwardRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Warning } from '@phosphor-icons/react'
 import { Logo } from '../Logo'
 import { ThemeMenu } from '../shell/ThemeMenu'
@@ -12,9 +13,22 @@ import './auth.css'
 export const PROJECT_URL = 'https://github.com/NeySlim/ultimate-ca-manager'
 
 export const AuthFrame = forwardRef(function AuthFrame({ title, lead, children, tools = true, footer = true }, titleRef) {
+  const { t } = useTranslation()
+  // The tab names the screen while it shows, then gives the console its title back
+  useEffect(() => {
+    if (typeof title !== 'string' || !title) return undefined
+    const before = document.title
+    document.title = `${title} · UCM`
+    return () => { document.title = before }
+  }, [title])
+  const skip = (e) => {
+    e.preventDefault()
+    document.getElementById('main')?.focus()
+  }
   return (
     <div className="auth-page">
-      <main className="auth" id="main">
+      <a className="auth-skip" href="#main" onClick={skip}>{t('auth.page.skipToContent')}</a>
+      <main className="auth" id="main" tabIndex={-1}>
         {tools && (
           <div className="auth-tools">
             <AuthLanguageMenu />

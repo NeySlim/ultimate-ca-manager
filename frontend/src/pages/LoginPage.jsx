@@ -10,13 +10,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
-import { CaretRight, Lock, Users, Key, Fingerprint, Eye, EyeSlash, Warning, Database } from '@phosphor-icons/react'
+import { CaretRight, Lock, Key, Fingerprint, Eye, EyeSlash, Warning, Database } from '@phosphor-icons/react'
 import { useAuth, useNotification } from '../contexts'
 import { AuthFrame, AuthField } from '../components/auth/AuthFrame'
 import { authMethodsService } from '../services/auth-methods.service'
 import { authService } from '../services/auth.service'
 import { safeNext } from '../navigation/safeNext'
-import { readLock, clearLock } from '../lib/sessionLock'
+import { readLock, clearLock, takeJustLocked } from '../lib/sessionLock'
+import { roleLabel, roleInSentence } from '../lib/roleLabel'
+import { focusPageTitle } from '../lib/focusPageTitle'
 import {
   NO_ANSWER_RETRY_S, NO_ANSWER_TRIES, isMaintenanceRefusal, isNoAnswer, isRestoreMaintenance, maintenanceRetrySeconds,
 } from './loginMaintenance'
@@ -30,6 +32,17 @@ const PROTOCOLS = { oauth2: 'OAuth 2.0', saml: 'SAML 2.0', ldap: 'LDAP' }
 
 const toProviderList = (ssoData) => (Array.isArray(ssoData?.data) ? ssoData.data : [])
 const providerName = (p) => p.display_name || p.name
+// The design's two offset busts (its `users` icon), drawn like its other strokes
+function SsoIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M3 20a6 6 0 0 1 12 0M16 4.5a3.5 3.5 0 0 1 0 7m2 2.5a6 6 0 0 1 3 6" />
+    </svg>
+  )
+}
+
 const initialsOf = (name) => (name || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
 // The LDAP provider the saved username last signed in with, if still offered
@@ -44,7 +57,7 @@ const savedLdapProvider = (providers) => {
 }
 
 export default function LoginPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   // Where to go after signing in: a known internal page from ?next=, else the dashboard.
@@ -87,6 +100,11 @@ export default function LoginPage() {
   const [formError, setFormError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const [emailConfigured, setEmailConfigured] = useState(false)
+  // The field to focus once the form is enabled again (after a refusal or a switch of account)
+  const [focusNext, setFocusNext] = useState(null)
+  // A polite announcement of the page itself (the lock that just happened)
+  const [announce, setAnnounce] = useState('')
+  const arrivedLocked = useRef(Boolean(locked) && takeJustLocked())
   const [globalMethods, setGlobalMethods] = useState(null)
   const [preferKey, setPreferKey] = useState(false)
   // The user has started on the form: a late provider load no longer switches it
@@ -115,11 +133,20 @@ export default function LoginPage() {
     try { return JSON.parse(localStorage.getItem(STORAGE_AUTH_METHOD_KEY) || '{}').method || null } catch { return null }
   }
 
+  // The design's greeting: the account's name and role, as far as the answer gives them
+  const welcome = (userData, who) => {
+    const u = userData?.user || {}
+    const name = u.full_name || u.username || who || ''
+    const role = roleInSentence(t, u.custom_role_name || u.role, i18n?.language)
+    showSuccess(role ? t('auth.page.signedIn', { name, role }) : t('auth.page.signedInNoRole', { name }))
+  }
+
   // Signed in: the lock is lifted; another account than the locked one starts on the dashboard
   const finish = (who) => {
     const lockedAs = lockedRef.current?.username
     clearLock()
     navigate(lockedAs && who && who !== lockedAs ? '/dashboard' : landing)
+    focusPageTitle()
   }
 
   // ═══════════════════════════════════════════════════
@@ -137,7 +164,7 @@ export default function LoginPage() {
 
     // Check email config
     authService.isEmailConfigured()
-      .then(data => setEmailConfigured(data?.configured || false))
+      .then(data => setEmailConfigured(data?.data?.configured === true))
       .catch(() => {})
 
     // Load SSO providers + detect global auth methods in parallel.
@@ -247,7 +274,7 @@ export default function LoginPage() {
           const verifyData = data.data || data
           const who = verifyData?.user?.username
           await login(who || 'sso_user', null, verifyData)
-          showSuccess(t('auth.welcomeBackUser', { username: who || 'User' }))
+          welcome(verifyData, who)
           finish(who)
         })
         .catch(() => {
@@ -283,14 +310,33 @@ export default function LoginPage() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // First field to fill: the password once the username is known, the code at the second factor
+  // Nothing is focused when the page opens; the lock that just happened focuses the title and
+  // is announced. Later steps start on their first field to fill.
+  const shownStep = useRef('init')
   useEffect(() => {
+    const opening = shownStep.current === 'init'
+    shownStep.current = step
+    if (step === 'init') return
+    if (opening) {
+      if (arrivedLocked.current) {
+        titleRef.current?.focus()
+        setAnnounce(t('auth.page.lockedAnnounce'))
+      }
+      return
+    }
     if (step === '2fa') codeRef.current?.focus()
     else if (step === 'form' || step === 'ldap') {
       if (username && step === 'form') passwordRef.current?.focus()
       else usernameRef.current?.focus()
     }
   }, [step]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A field is focused once enabled again: focusing it while disabled would leave the focus on body
+  useEffect(() => {
+    if (!focusNext || loading) return
+    ;({ username: usernameRef, password: passwordRef, code: codeRef })[focusNext]?.current?.focus()
+    setFocusNext(null)
+  }, [focusNext, loading])
 
   // ═══════════════════════════════════════════════════
   // AUTH METHOD HANDLERS (standalone, no cascading)
@@ -320,7 +366,7 @@ export default function LoginPage() {
       saveUsername(username)
       saveAuthMethod('webauthn')
       await login(username, null, userData)
-      showSuccess(t('auth.welcomeBackUser', { username }))
+      welcome(userData, username)
       finish(username)
     } catch (error) {
       setStatusMessage('')
@@ -335,12 +381,20 @@ export default function LoginPage() {
     }
   }, [username, login, navigate, showSuccess, showInfo, t]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // The server's 429: shown as it sends it, with the wait only when it gives one (no local timer).
+  // The server's 429: its Retry-After counted down on screen, the sign-in held until it ends
   const noteRateLimit = (error) => {
     if (error?.status !== 429) { setRateLimit(null); return false }
-    setRateLimit({ retryAfter: Number.isFinite(error.retryAfter) ? error.retryAfter : null })
+    const wait = Number.isFinite(error.retryAfter) && error.retryAfter > 0 ? Math.ceil(error.retryAfter) : null
+    setRateLimit({ wait, left: wait })
     return true
   }
+
+  useEffect(() => {
+    if (!rateLimit?.left) return undefined
+    const timer = setTimeout(() => setRateLimit(r => (r?.left ? { ...r, left: r.left - 1 } : r)), 1000)
+    return () => clearTimeout(timer)
+  }, [rateLimit])
+  const waiting = Boolean(rateLimit?.left)
 
   const clearMaintenance = () => {
     maintenanceRetry.current = null
@@ -396,13 +450,16 @@ export default function LoginPage() {
     return () => clearTimeout(timer)
   }, [maintenance, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // A refused attempt other than a 429 or a maintenance: its message in the card
-  const refuse = (error, again, fallback) => {
-    if (!noteRefusal(error, again)) setFormError(error?.message || fallback)
+  // A refused attempt other than a 429 or a maintenance: the credentials refused (401) in the
+  // page's own words, any other answer as the server words it
+  const refuse = (error, again, refused, statuses = [401]) => {
+    if (noteRefusal(error, again)) return
+    setFormError(statuses.includes(error?.status) || !error?.message ? refused : error.message)
   }
 
   const handlePasswordLogin = async (e) => {
     e.preventDefault()
+    if (waiting) return  // the server's wait first, as the disabled button says
     if (missing([
       ['username', username.trim(), t('auth.page.usernameMissing')],
       ['password', password, t('auth.page.passwordMissing')],
@@ -436,12 +493,12 @@ export default function LoginPage() {
       await login(username, password, userData)
       // #141: if 2FA enrolment is enforced, the session is established but
       // restricted; the ForceEnroll2FA overlay takes over after navigation.
-      if (!userData.requires_2fa_enrollment) showSuccess(t('auth.welcomeBackUser', { username }))
+      if (!userData.requires_2fa_enrollment) welcome(userData, username)
       finish(username)
     } catch (error) {
-      refuse(error, 'password', t('auth.invalidCredentials'))
+      refuse(error, 'password', t('auth.page.refused'))
       if (!maintenanceRetry.current) setPassword('')  // kept while a maintenance is waited out
-      passwordRef.current?.focus()
+      setFocusNext('password')
     } finally {
       setLoading(false)
       setStatusMessage('')
@@ -450,6 +507,7 @@ export default function LoginPage() {
 
   const handle2FAVerify = async (e) => {
     e.preventDefault()
+    if (waiting) return  // the server's wait first, as the disabled button says
     if (missing([['code', totpCode.length >= 6, t('auth.totpCodeRequired')]])) return
 
     clearMaintenance()
@@ -460,11 +518,13 @@ export default function LoginPage() {
       saveUsername(username)
       saveTwoFactorMethod()
       await login(username, password, userData)
-      showSuccess(t('auth.welcomeBackUser', { username }))
+      welcome(userData, username)
       finish(username)
     } catch (error) {
-      refuse(error, 'totp', t('auth.invalidTotpCode'))
+      // A malformed code (400) is refused like a wrong one
+      refuse(error, 'totp', t('auth.invalidTotpCode'), [400, 401])
       if (!maintenanceRetry.current) setTotpCode('')
+      setFocusNext('code')
     } finally {
       setLoading(false)
     }
@@ -479,7 +539,7 @@ export default function LoginPage() {
       saveUsername(username)
       saveTwoFactorMethod()
       await login(username, password, userData)
-      showSuccess(t('auth.welcomeBackUser', { username }))
+      welcome(userData, username)
       finish(username)
     } catch (error) {
       if (noteRefusal(error, 'key2fa', false)) {
@@ -502,7 +562,7 @@ export default function LoginPage() {
       const userData = await authMethodsService.loginMTLS()
       const who = userData?.user?.username || globalMethods?.mtls_user
       await login(who, null, userData)
-      showSuccess(t('auth.welcomeBackUser', { username: who }))
+      welcome(userData, who)
       finish(who)
     } catch (error) {
       refuse(error, 'mtls', t('auth.autoLoginFailed'))
@@ -538,6 +598,7 @@ export default function LoginPage() {
 
   const handleLDAPLogin = async (e) => {
     e.preventDefault()
+    if (waiting) return  // the server's wait first, as the disabled button says
     if (missing([
       ['username', username.trim(), t('auth.page.usernameMissing')],
       ['password', password, t('auth.page.passwordMissing')],
@@ -564,11 +625,12 @@ export default function LoginPage() {
       saveUsername(username)
       saveAuthMethod('ldap', selectedLdapProvider?.id)
       await login(username, null, responseData)
-      showSuccess(t('auth.welcomeBackUser', { username }))
+      welcome(responseData, username)
       finish(username)
     } catch (error) {
-      refuse(error, 'ldap', t('auth.ldapFailed'))
+      refuse(error, 'ldap', t('auth.invalidCredentials'))
       if (!maintenanceRetry.current) setPassword('')
+      setFocusNext('password')
     } finally {
       setLoading(false)
       setStatusMessage('')
@@ -607,7 +669,7 @@ export default function LoginPage() {
     setUsername('')
     handleBack()
     setSelectedLdapProvider(null)
-    titleRef.current?.focus()
+    setFocusNext('username')
   }
 
   // ═══════════════════════════════════════════════════
@@ -637,7 +699,7 @@ export default function LoginPage() {
   const keyButton = alt('key', Fingerprint, t('auth.page.keyButton'),
     loading && statusMessage === t('auth.touchSecurityKey') ? statusMessage : t('auth.page.keyDetail'), () => attemptWebAuthn())
   const mtlsButton = alt('mtls', Key, t('auth.page.mtlsButton'), t('auth.page.mtlsDetail', { username: globalMethods?.mtls_user || '' }), handleMTLSLogin)
-  const ssoButtons = redirectProviders.map(p => alt(`sso-${p.id}`, Users,
+  const ssoButtons = redirectProviders.map(p => alt(`sso-${p.id}`, SsoIcon,
     locked ? t('auth.page.resumeSso') : t('auth.page.ssoButton'),
     <><span>{providerName(p)}</span> · {PROTOCOLS[p.provider_type] || p.provider_type}</>,
     () => handleSSOLogin(p)))
@@ -660,18 +722,18 @@ export default function LoginPage() {
   const errorBlock = (rateLimit || formError) && (
     <div className="auth-error" role="alert">
       <Warning size={14} aria-hidden="true" />
-      {rateLimit ? (
-        <span>
-          <strong>{t('auth.tooManyAttempts')}</strong>
-          <span>{rateLimit.retryAfter != null ? t('auth.retryAfterSeconds', { seconds: rateLimit.retryAfter }) : t('auth.retryLater')}</span>
-        </span>
-      ) : <span>{formError}</span>}
+      <span>
+        {!rateLimit ? formError
+          : rateLimit.wait == null ? t('auth.page.tooManyNoDelay')
+            : rateLimit.left ? t('auth.page.tooManyWait', { count: rateLimit.wait }) : t('auth.page.canRetry')}
+      </span>
     </div>
   )
+  const waitLine = waiting && <p className="auth-wait">{t('auth.page.retryIn', { seconds: rateLimit.left })}</p>
 
   const maintenanceBlock = maintenance && (
     <div className="auth-notice" role="status">
-      <strong>{maintenance.restoring ? t('auth.maintenanceRestoring') : t('auth.maintenanceActive')}</strong>
+      <span>{maintenance.restoring ? t('auth.maintenanceRestoring') : t('auth.maintenanceActive')}</span>
       {maintenance.seconds != null && <span>{t('auth.maintenanceRetryIn', { seconds: maintenance.seconds })}</span>}
       <button type="button" className="auth-btn" onClick={retryNow} disabled={loading}>{t('auth.retryNow')}</button>
     </div>
@@ -692,12 +754,12 @@ export default function LoginPage() {
           aria-invalid={fieldErrors.password ? 'true' : undefined}
           aria-describedby={fieldErrors.password ? 'login-pass-error' : undefined}
         />
+        {/* One label, the state in aria-pressed, as in the design */}
         <button
           type="button"
           className="auth-icon-btn"
           aria-pressed={reveal}
-          aria-label={reveal ? t('auth.page.hidePassword') : t('auth.page.showPassword')}
-          title={reveal ? t('auth.page.hidePassword') : t('auth.page.showPassword')}
+          aria-label={t('auth.page.showPassword')}
           onClick={() => setReveal(r => !r)}
         >
           {reveal ? <EyeSlash size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
@@ -730,8 +792,9 @@ export default function LoginPage() {
       {usernameField}
       {passwordField}
       {errorBlock}
-      <button type="submit" className="auth-btn is-primary auth-submit" disabled={loading}>
-        <SubmitIcon size={16} aria-hidden="true" />{submitLabel}
+      {waitLine}
+      <button type="submit" className="auth-btn is-primary auth-submit" disabled={loading || waiting}>
+        <SubmitIcon size={17} aria-hidden="true" />{submitLabel}
       </button>
     </form>
   )
@@ -741,7 +804,7 @@ export default function LoginPage() {
       <span className="auth-avatar" aria-hidden="true">{initialsOf(locked.name || locked.username)}</span>
       <span>
         <strong>{locked.name || locked.username}</strong>
-        <span>{locked.role ? `${locked.role} · ` : ''}<span className="auth-mono">{locked.username}</span></span>
+        <span>{locked.role ? `${roleLabel(t, locked.role)} · ` : ''}<span className="auth-mono">{locked.username}</span></span>
       </span>
     </p>
   )
@@ -778,8 +841,9 @@ export default function LoginPage() {
               />
             </AuthField>
             {errorBlock}
-            <button type="submit" className="auth-btn is-primary auth-submit" disabled={loading}>
-              <CaretRight size={16} aria-hidden="true" />{t('auth.verify')}
+            {waitLine}
+            <button type="submit" className="auth-btn is-primary auth-submit" disabled={loading || waiting}>
+              <CaretRight size={17} aria-hidden="true" />{t('auth.verify')}
             </button>
           </form>
         )}
@@ -837,6 +901,7 @@ export default function LoginPage() {
   return (
     <AuthFrame ref={titleRef} title={title} lead={lead}>
       {body}
+      <p className="sr-only" aria-live="polite">{announce}</p>
     </AuthFrame>
   )
 }

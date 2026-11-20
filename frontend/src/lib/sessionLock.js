@@ -28,3 +28,17 @@ export function readLock() {
 export function clearLock() {
   try { sessionStorage.removeItem(KEY) } catch { /* noop */ }
 }
+
+// Set by the in-app lock and taken once by the lock screen: a reload or an address typed
+// in opens it quietly, the lock that just happened moves the focus and is announced.
+let justLocked = false
+
+export function markJustLocked() {
+  justLocked = true
+}
+
+export function takeJustLocked() {
+  const was = justLocked
+  justLocked = false
+  return was
+}

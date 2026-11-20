@@ -30,7 +30,7 @@ export default {
       {
         title: 'Session',
         items: [
-          { label: 'Avertissement', text: 'Cinq minutes avant la fin du délai d\'inactivité, un bandeau affiche le temps restant ; Prolonger garde la session, toute autre activité ne la prolonge plus' },
+          { label: 'Avertissement', text: 'Cinq minutes avant la fin du délai d\'inactivité, un bandeau affiche le temps restant ; Prolonger garde la session et dit pour combien de temps, toute autre activité ne la prolonge plus' },
           { label: 'Verrouillage', text: 'À la fin, la session se ferme et l\'écran se verrouille : rien de la console ne reste ouvert derrière' },
           { label: 'Retour', text: 'Reconnectez-vous avec le même compte pour revenir à la page où vous étiez ; Se connecter avec un autre compte repart de zéro' },
         ]

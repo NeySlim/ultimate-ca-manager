@@ -65,4 +65,33 @@ test.describe('sign-in card at phone width', () => {
     expect(Math.abs(theme.width - 40)).toBeLessThanOrEqual(EPS)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   })
+
+  test('the theme and language menus open 8 px under their button, never over it', async ({ page }) => {
+    await page.context().clearCookies()
+    await page.goto('/login')
+    for (const [name, menu] of [['Theme', '#shell-theme-menu'], ['Language', '#auth-language-menu']]) {
+      const button = page.getByRole('button', { name, exact: true })
+      const b = await box(button)
+      await button.click()
+      const m = await box(page.locator(menu))
+      expect(Math.abs(m.y - (b.y + b.height + 8))).toBeLessThanOrEqual(EPS)
+      expect(Math.abs(m.x + m.width - (b.x + b.width))).toBeLessThanOrEqual(EPS)
+      expect(m.x).toBeGreaterThanOrEqual(0)
+      await page.keyboard.press('Escape')
+    }
+  })
+})
+
+test.describe('sign-in page by keyboard', () => {
+  test('the first tab stop skips to the content, the tab names the screen', async ({ page }) => {
+    await page.context().clearCookies()
+    await page.goto('/login')
+    await expect(page.getByRole('heading', { level: 1, name: 'Sign in', exact: true })).toBeVisible()
+    await expect(page).toHaveTitle('Sign in · UCM')
+    await page.keyboard.press('Tab')
+    const skip = page.getByRole('link', { name: 'Skip to content', exact: true })
+    await expect(skip).toBeFocused()
+    const s = await box(skip)
+    expect(Math.abs(s.y - 12)).toBeLessThanOrEqual(EPS)
+  })
 })

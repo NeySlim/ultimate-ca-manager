@@ -51,7 +51,7 @@ export default function ForgotPasswordPage() {
       >
         <p className="auth-wait">{t('auth.checkEmailHint')}</p>
         <button type="button" className="auth-btn auth-submit" onClick={() => setSent(false)}>
-          <ArrowClockwise size={16} aria-hidden="true" />{t('auth.tryAnotherEmail')}
+          <ArrowClockwise size={17} aria-hidden="true" />{t('auth.tryAnotherEmail')}
         </button>
         {back}
       </AuthFrame>
@@ -68,7 +68,6 @@ export default function ForgotPasswordPage() {
             name="email"
             type="email"
             autoComplete="email"
-            autoFocus
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             aria-invalid={error ? 'true' : undefined}
@@ -76,7 +75,7 @@ export default function ForgotPasswordPage() {
           />
         </AuthField>
         <button type="submit" className="auth-btn is-primary auth-submit" disabled={loading}>
-          <CaretRight size={16} aria-hidden="true" />{loading ? t('auth.sending') : t('auth.sendResetLink')}
+          <CaretRight size={17} aria-hidden="true" />{loading ? t('auth.sending') : t('auth.sendResetLink')}
         </button>
       </form>
       {back}

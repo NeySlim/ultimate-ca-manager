@@ -14,6 +14,8 @@
  *   retry     - Not implemented
  */
 
+import { loginUrl } from '../navigation/safeNext'
+
 const API_BASE_URL = '/api/v2'
 
 // CSRF token storage key
@@ -240,13 +242,14 @@ class APIClient {
           if (data?.type === AUTHENTICATION_REQUIRED_PROBLEM) return this.request(endpoint, options, true)
           throw error
         }
-        if (response.status === 401 && !isLoginPage && !isAuthEndpoint && !loginRedirectPending) {
+        // Read again after the session check: a route guard may have reached the sign-in page
+        // meanwhile, and its ?next= already names the page asked for (one redirect, never nested)
+        if (response.status === 401 && !isLoginPage && !isAuthEndpoint && !loginRedirectPending
+            && !window.location.pathname?.includes('/login')) {
           console.warn('🚪 401 Unauthorized - redirecting to login')
           loginRedirectPending = true
-          // The page asked for comes back after sign-in; LoginPage validates it (safeNext).
           const { pathname = '/', search = '' } = window.location
-          const back = pathname === '/' || pathname === '/dashboard' ? '' : `?next=${encodeURIComponent(pathname + search)}`
-          window.location.href = `/login${back}`
+          window.location.href = loginUrl(pathname, search)
         }
         
         throw error
