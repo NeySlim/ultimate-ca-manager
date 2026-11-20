@@ -1307,7 +1307,8 @@ function SearchBar({
             <button
               type="button"
               onClick={() => setShowPresetsMenu?.(!showPresetsMenu)}
-              className={tool(showPresetsMenu)}
+              // A bare icon like its neighbours until presets are saved and counted
+              className={flat ? cn('lv-btn', !filterPresets?.length && 'is-icon is-bare') : tool(showPresetsMenu)}
               title={t('table.filterPresets')}
               aria-label={flat ? t('table.filterPresets') : undefined}
               aria-expanded={flat ? Boolean(showPresetsMenu) : undefined}

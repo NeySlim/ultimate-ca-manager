@@ -22,7 +22,7 @@
 /* Beside the page, under the top bar; the page keeps 16 px from it */
 .ins-dock.is-right { align-self: stretch; height: auto; margin: 14px 24px 14px -8px; border-radius: 5px; }
 .ins-dock.is-mobile { position: fixed; inset: 0; z-index: 40; border: 0; border-radius: 0; }
-.ins-dock :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ins-dock :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 /* Resize grip centred on the edge the dock grows from */
 .ins-grip {
@@ -214,7 +214,7 @@
   white-space: nowrap;
   cursor: pointer;
 }
-.ins-detail-tabs [role="tab"]:hover { color: var(--text); }
+.ins-detail-tabs [role="tab"]:hover { color: var(--text); background: var(--hover); }
 .ins-detail-tabs [role="tab"][aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
 .ins-detail-tabs [role="tab"]:focus-visible { outline-offset: -2px; }
 .ins-panel { flex: 1; min-height: 0; overflow: auto; padding: 14px 18px 18px; scrollbar-width: thin; }
@@ -303,7 +303,7 @@
 .ins-chain-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 14px 0 0; font-size: 12px; }
 
 /* Extensions: label and OID on the left, value on the right, two columns */
-.ins-extensions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 28px; margin: 0; }
+.ins-extensions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 28px; margin: 13px 0; }
 .ins-extensions[data-columns="1"] { grid-template-columns: 1fr; }
 .ins-extension { display: flex; justify-content: space-between; gap: 16px; padding: 5px 0 10px; border-bottom: 1px solid var(--line); font-size: 12px; }
 .ins-extension dt { font-weight: 500; }
@@ -314,7 +314,7 @@
 .ins-history { margin: 0; padding: 0; list-style: none; }
 .ins-history li { display: flex; align-items: center; gap: 16px; min-height: 34px; padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
 .ins-history time { flex-shrink: 0; width: 100px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.ins-history li > svg { flex-shrink: 0; color: var(--muted); }
+.ins-history li > svg { flex-shrink: 0; }
 .ins-history li.is-failed > svg { color: var(--bad); }
 .ins-history .ins-what { min-width: 0; overflow-wrap: anywhere; }
 .ins-history .ins-actor { margin-left: auto; flex-shrink: 0; color: var(--muted); }
