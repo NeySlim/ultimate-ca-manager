@@ -7,6 +7,7 @@ test('a key requested, approved by another administrator, then recovered', async
 
   // Request from the certificate's inspector
   await page.goto('/certificates')
+  await page.getByRole('main').getByRole('searchbox').fill(cert.common_name)
   await page.getByRole('main').getByRole('button', { name: cert.common_name, exact: true }).click()
   const panel = page.getByRole('tabpanel', { name: cert.common_name })
   // Every action but Export and Renew is in the Certificate actions dialog of the heading's « ⋯ »

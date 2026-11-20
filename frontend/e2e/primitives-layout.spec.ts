@@ -48,7 +48,7 @@ test('the export dialog is the 760 px dialog with translated actions', async ({ 
 
 test('the theme menu is 220 px and lists the five choices of the mockup', async ({ page, api }) => {
   await page.goto('/certificates')
-  await page.getByRole('button', { name: 'Theme', exact: true }).click()
+  await page.getByRole('button', { name: /^Theme: / }).click()
   const menu = page.getByRole('menu', { name: 'Theme' })
   await expect(menu).toBeVisible()
   near((await box(menu)).width, 220)

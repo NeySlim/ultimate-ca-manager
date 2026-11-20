@@ -8,6 +8,8 @@ async function findCerts(api, cn: string) {
 
 async function openInInspector(page, cn: string) {
   await page.goto('/certificates')
+  // Other tests issue certificates at the same time: the list is searched down to this one
+  await page.getByRole('main').getByRole('searchbox').fill(cn)
   // The name is the button that opens the row; the row's other controls carry the name too
   await page.getByRole('main').getByRole('button', { name: cn, exact: true }).click()
   const panel = page.getByRole('tabpanel', { name: cn })
@@ -47,6 +49,7 @@ test('a certificate issued on screen is signed by the chosen CA', async ({ page,
   await result.getByRole('button', { name: 'View the certificate' }).click()
   await expect(result).toBeHidden()
 
+  await page.getByRole('main').getByRole('searchbox').fill(cn)
   await expect(page.getByRole('main').getByRole('button', { name: cn, exact: true })).toBeVisible()
   const [cert] = await findCerts(api, cn)
   expect(cert).toMatchObject({ issuer: `CN=${ca.common_name}`, revoked: false })

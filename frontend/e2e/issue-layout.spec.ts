@@ -74,7 +74,7 @@ test.describe('desktop', () => {
 test.describe('desktop, errors', () => {
   test.use({ viewport: { width: 1600, height: 1000 } })
 
-  test('a field in error takes the bad colour on its border, focused or not', async ({ page }) => {
+  test('a field in error takes the bad colour on its border, focused or not', async ({ page, api }) => {
     await page.goto('/certificates?action=create')
     const dialog = page.getByRole('dialog', { name: 'Issue a certificate' })
     await expect(dialog).toBeVisible()
@@ -98,7 +98,7 @@ test.describe('desktop, errors', () => {
 test.describe('narrow phone', () => {
   test.use({ viewport: { width: 360, height: 780 } })
 
-  test('the fields stack in one column under 380 px, as the Atelier', async ({ page }) => {
+  test('the fields stack in one column under 380 px, as the Atelier', async ({ page, api }) => {
     await page.goto('/certificates?action=create')
     const dialog = page.getByRole('dialog', { name: 'Issue a certificate' })
     await expect(dialog).toBeVisible()

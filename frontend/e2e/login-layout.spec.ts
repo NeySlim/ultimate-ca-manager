@@ -69,7 +69,7 @@ test.describe('sign-in card at phone width', () => {
   test('the theme and language menus open 8 px under their button, never over it', async ({ page }) => {
     await page.context().clearCookies()
     await page.goto('/login')
-    for (const [name, menu] of [['Theme', '#shell-theme-menu'], ['Language', '#auth-language-menu']]) {
+    for (const [name, menu] of [[/^Theme: /, '#shell-theme-menu'], ['Language', '#auth-language-menu']] as const) {
       const button = page.getByRole('button', { name, exact: true })
       const b = await box(button)
       await button.click()
