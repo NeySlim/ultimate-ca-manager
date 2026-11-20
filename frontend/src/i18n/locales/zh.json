@@ -655,7 +655,8 @@
       "unlock": "解锁",
       "switchAccount": "使用其他账户登录",
       "skipToContent": "跳到内容",
-      "tooManyWait": "尝试次数过多：请等待 {{seconds}} 秒后再试。",
+      "tooManyWait_one": "尝试次数过多：请等待 {{count}} 秒后再试。",
+      "tooManyWait_other": "尝试次数过多：请等待 {{count}} 秒后再试。",
       "tooManyNoDelay": "尝试次数过多：请稍候再试。",
       "retryIn": "{{seconds}} 秒后可再次尝试。",
       "canRetry": "现在可以重试。",
@@ -4748,7 +4749,8 @@
     "expiresIn": "您的会话将在 {{time}} 后过期",
     "lockNotice": "如无操作，屏幕将锁定，当前页面会被保留。",
     "announceLeft": "您的会话将在 {{time}} 后过期。选择“延长”以保持会话。",
-    "extended": "会话已延长 {{minutes}} 分钟。",
+    "extended_one": "会话已延长 {{count}} 分钟。",
+    "extended_other": "会话已延长 {{count}} 分钟。",
     "extend": "延长"
   },
   "password": {

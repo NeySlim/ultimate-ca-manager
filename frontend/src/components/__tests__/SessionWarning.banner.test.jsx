@@ -7,7 +7,7 @@ import { render, act, screen, fireEvent } from '@testing-library/react'
 
 const auth = vi.hoisted(() => ({ checkSession: vi.fn(), lock: vi.fn(), showSuccess: vi.fn() }))
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key, o) => (o?.time ? `${key}|${o.time}` : o?.minutes != null ? `${key}|${o.minutes}` : key) }) }))
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key, o) => (o?.time ? `${key}|${o.time}` : o?.count != null ? `${key}|${o.count}` : key) }) }))
 vi.mock('../../contexts', () => ({
   useAuth: () => ({ user: { username: 'admin' }, checkSession: auth.checkSession, lock: auth.lock }),
   useNotification: () => ({ showSuccess: auth.showSuccess }),

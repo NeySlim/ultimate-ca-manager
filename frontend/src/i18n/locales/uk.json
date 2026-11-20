@@ -657,7 +657,10 @@
       "unlock": "Розблокувати",
       "switchAccount": "Увійти з іншим обліковим записом",
       "skipToContent": "Skip to content",
-      "tooManyWait": "Too many attempts: wait {{seconds}} seconds before trying again.",
+      "tooManyWait_one": "Too many attempts: wait {{count}} second before trying again.",
+      "tooManyWait_other": "Too many attempts: wait {{count}} seconds before trying again.",
+      "tooManyWait_few": "Too many attempts: wait {{count}} seconds before trying again.",
+      "tooManyWait_many": "Too many attempts: wait {{count}} seconds before trying again.",
       "tooManyNoDelay": "Too many attempts: wait before trying again.",
       "retryIn": "Next attempt possible in {{seconds}} s.",
       "canRetry": "You can try again.",
@@ -4852,7 +4855,10 @@
     "expiresIn": "Ваш сеанс завершиться через {{time}}",
     "lockNotice": "Без дій екран заблокується, поточну сторінку буде збережено.",
     "announceLeft": "Your session expires in {{time}}. Choose Extend to keep it.",
-    "extended": "Session extended by {{minutes}} minutes.",
+    "extended_one": "Session extended by {{count}} minute.",
+    "extended_other": "Session extended by {{count}} minutes.",
+    "extended_few": "Session extended by {{count}} minutes.",
+    "extended_many": "Session extended by {{count}} minutes.",
     "extend": "Продовжити"
   },
   "password": {

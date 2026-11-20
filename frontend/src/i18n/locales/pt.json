@@ -655,7 +655,8 @@
       "unlock": "Desbloquear",
       "switchAccount": "Iniciar sessão com outra conta",
       "skipToContent": "Skip to content",
-      "tooManyWait": "Too many attempts: wait {{seconds}} seconds before trying again.",
+      "tooManyWait_one": "Too many attempts: wait {{count}} second before trying again.",
+      "tooManyWait_other": "Too many attempts: wait {{count}} seconds before trying again.",
       "tooManyNoDelay": "Too many attempts: wait before trying again.",
       "retryIn": "Next attempt possible in {{seconds}} s.",
       "canRetry": "You can try again.",
@@ -4748,7 +4749,8 @@
     "expiresIn": "A sua sessão expira dentro de {{time}}",
     "lockNotice": "Sem ação, o ecrã é bloqueado e a página atual é mantida.",
     "announceLeft": "Your session expires in {{time}}. Choose Extend to keep it.",
-    "extended": "Session extended by {{minutes}} minutes.",
+    "extended_one": "Session extended by {{count}} minute.",
+    "extended_other": "Session extended by {{count}} minutes.",
     "extend": "Prolongar"
   },
   "password": {

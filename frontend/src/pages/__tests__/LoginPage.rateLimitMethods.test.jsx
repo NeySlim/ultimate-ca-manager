@@ -10,7 +10,7 @@ const s = vi.hoisted(() => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key, o) => (o && o.seconds != null ? `${key}|${o.seconds}` : key),
+    t: (key, o) => (o && (o.seconds ?? o.count) != null ? `${key}|${o.seconds ?? o.count}` : key),
     i18n: { language: 'en', changeLanguage: vi.fn(), on: vi.fn(), off: vi.fn() },
   }),
   Trans: ({ children }) => children,

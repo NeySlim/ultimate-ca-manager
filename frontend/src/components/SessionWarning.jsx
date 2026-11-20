@@ -134,7 +134,7 @@ export function SessionWarning() {
       unknownSinceRef.current = null
       setLastActivity(Date.now())
       setShowWarning(false)
-      const extended = t('session.extended', { minutes: Math.round(sessionTimeoutRef.current / 60000) })
+      const extended = t('session.extended', { count: Math.max(1, Math.round(sessionTimeoutRef.current / 60000)) })
       setAnnounce(extended)
       showSuccess(extended)
       // The button goes with the banner: the focus goes to the page's title, not to the body

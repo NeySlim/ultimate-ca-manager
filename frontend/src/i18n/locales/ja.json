@@ -655,7 +655,8 @@
       "unlock": "ロック解除",
       "switchAccount": "別のアカウントでサインイン",
       "skipToContent": "Skip to content",
-      "tooManyWait": "Too many attempts: wait {{seconds}} seconds before trying again.",
+      "tooManyWait_one": "Too many attempts: wait {{count}} second before trying again.",
+      "tooManyWait_other": "Too many attempts: wait {{count}} seconds before trying again.",
       "tooManyNoDelay": "Too many attempts: wait before trying again.",
       "retryIn": "Next attempt possible in {{seconds}} s.",
       "canRetry": "You can try again.",
@@ -4751,7 +4752,8 @@
     "expiresIn": "セッションはあと {{time}} で期限切れになります",
     "lockNotice": "操作がない場合、画面がロックされ、現在のページは保持されます。",
     "announceLeft": "Your session expires in {{time}}. Choose Extend to keep it.",
-    "extended": "Session extended by {{minutes}} minutes.",
+    "extended_one": "Session extended by {{count}} minute.",
+    "extended_other": "Session extended by {{count}} minutes.",
     "extend": "延長"
   },
   "password": {

@@ -725,7 +725,7 @@ export default function LoginPage() {
       <span>
         {!rateLimit ? formError
           : rateLimit.wait == null ? t('auth.page.tooManyNoDelay')
-            : rateLimit.left ? t('auth.page.tooManyWait', { seconds: rateLimit.wait }) : t('auth.page.canRetry')}
+            : rateLimit.left ? t('auth.page.tooManyWait', { count: rateLimit.wait }) : t('auth.page.canRetry')}
       </span>
     </div>
   )
