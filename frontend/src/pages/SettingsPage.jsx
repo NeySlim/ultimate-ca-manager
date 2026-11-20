@@ -111,15 +111,13 @@ const BASE_SETTINGS_CATEGORIES = [
   { id: 'about', labelKey: 'settings.tabs.about', descKey: 'settings.about.subtitle', icon: Info, color: 'icon-bg-gray' },
 ]
 
-// Groups of the table of contents; the frames follow the same order
+// Groups of the table of contents, named by what they hold; the frames follow the same
+// order. Four groups keep every entry in view on a 1000 px high window.
 const SETTINGS_GROUPS = [
-  { id: 'system', labelKey: 'settings.groups.system', ids: ['general', 'updates', 'scheduler', 'database', 'https', 'backup'] },
-  { id: 'security', labelKey: 'settings.groups.security', ids: ['security', 'sso', 'ct'] },
-  { id: 'notifications', labelKey: 'settings.groups.notifications', ids: ['email', 'webhooks'] },
-  { id: 'automation', labelKey: 'settings.groups.automation', ids: ['autoRenewal', 'deploy'] },
+  { id: 'instance', labelKey: 'settings.groups.instance', ids: ['general', 'appearance', 'updates', 'scheduler', 'database', 'https', 'backup', 'about'] },
+  { id: 'security', labelKey: 'settings.groups.security', ids: ['security', 'sso', 'ct', 'audit'] },
+  { id: 'automation', labelKey: 'settings.groups.automation', ids: ['email', 'webhooks', 'autoRenewal', 'deploy'] },
   { id: 'integrations', labelKey: 'settings.groups.integrations', ids: ['microsoftCA', 'adConnector', 'xcepWstep'] },
-  { id: 'interface', labelKey: 'settings.groups.interface', ids: ['appearance', 'audit'] },
-  { id: 'about', labelKey: 'settings.groups.about', ids: ['about'] },
 ]
 
 // Audit actions a save of these sections writes (resource_type settings)
@@ -411,6 +409,7 @@ export default function SettingsPage() {
   // Syslog state
   const [syslogConfig, setSyslogConfig] = useState({ enabled: false, host: '', port: 514, protocol: 'udp', tls: false, tls_verify: true, framing: 'line', categories: ['certificate', 'ca', 'csr', 'user', 'acme', 'scep', 'system'] })
   const [syslogTesting, setSyslogTesting] = useState(false)
+  const [syslogTestResult, setSyslogTestResult] = useState(null)
   const [syslogSaving, setSyslogSaving] = useState(false)
   const [savedSyslog, setSavedSyslog] = useState(syslogConfig)
 
@@ -439,6 +438,7 @@ export default function SettingsPage() {
   const [arLoading, setArLoading] = useState(false)
   const [arSaving, setArSaving] = useState(false)
   const [arRunning, setArRunning] = useState(false)
+  const [arRunResult, setArRunResult] = useState(null)
   const [savedAr, setSavedAr] = useState(arSettings)
 
   // All settings categories (SSO now integrated directly)
@@ -1177,13 +1177,22 @@ export default function SettingsPage() {
     }
   }
 
+  // The test sends to the saved forwarding; its result stays beside the button
   const handleTestSyslog = async () => {
+    if (!savedSyslog.enabled || !savedSyslog.host) {
+      setSyslogTestResult({ ok: false, text: t('settings.syslogTestOff') })
+      return
+    }
     setSyslogTesting(true)
     try {
       const response = await settingsService.testSyslog()
-      showSuccess(response.message || t('settings.syslogTestSuccess'))
+      const text = response.message || t('settings.syslogTestSuccess')
+      setSyslogTestResult({ ok: true, text })
+      showSuccess(text)
     } catch (error) {
-      showError(error.message || t('settings.syslogTestFailed'))
+      const text = error.message || t('settings.syslogTestFailed')
+      setSyslogTestResult({ ok: false, text })
+      showError(text)
     } finally {
       setSyslogTesting(false)
     }
@@ -1191,6 +1200,7 @@ export default function SettingsPage() {
 
   const updateSyslogConfig = (key, value) => {
     clearFieldError(`syslog.${key}`)
+    setSyslogTestResult(null)
     setSyslogConfig(prev => ({ ...prev, [key]: value }))
   }
 
@@ -1303,18 +1313,20 @@ export default function SettingsPage() {
 
   const handleArRunNow = async () => {
     setArRunning(true)
+    setArRunResult(null)
     try {
       const response = await settingsService.runAutoRenewalNow()
       const stats = response.data || {}
-      showSuccess(
-        t('settings.autoRenewalRunSuccess', {
-          renewed: stats.renewed || 0,
-          failed: stats.failed || 0,
-        })
-      )
+      const done = t('settings.autoRenewalRunSuccess', {
+        renewed: stats.renewed || 0,
+        failed: stats.failed || 0,
+      })
+      showSuccess(done)
       const waiting = autoRenewalWaitingMessage(stats.waiting, t)
       if (waiting) showInfo(waiting)
+      setArRunResult({ ok: !stats.failed, text: waiting ? `${done}. ${waiting}` : done })
     } catch (error) {
+      setArRunResult({ ok: false, text: error.message || t('settings.autoRenewalRunFailed') })
       showError(error.message || t('settings.autoRenewalRunFailed'))
     } finally {
       setArRunning(false)
@@ -2089,6 +2101,7 @@ export default function SettingsPage() {
             updateSyslogConfig={updateSyslogConfig}
             syslogSaving={syslogSaving}
             syslogTesting={syslogTesting}
+            syslogTestResult={syslogTestResult}
             handleSaveSyslog={handleSaveSyslog}
             handleTestSyslog={handleTestSyslog}
           />
@@ -2168,6 +2181,7 @@ export default function SettingsPage() {
             arRunning={arRunning}
             handleArSave={handleArSave}
             handleArRunNow={handleArRunNow}
+            arRunResult={arRunResult}
           />
         )
       case 'microsoftCA':

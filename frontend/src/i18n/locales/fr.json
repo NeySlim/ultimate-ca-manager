@@ -3221,6 +3221,10 @@
     "theme": "Thème",
     "language": "Langue",
     "smtpPort": "Port SMTP",
+    "testEmailSavedHint": "Le test envoie un courriel par le relais enregistré ; enregistrez d’abord vos modifications.",
+    "syslogTestSavedHint": "Le test envoie un message au serveur syslog enregistré ; enregistrez d’abord vos modifications.",
+    "syslogTestOff": "Syslog désactivé : cochez la case et enregistrez pour tester.",
+    "autoRenewalRunHint": "Lance maintenant un passage de renouvellement avec les paramètres enregistrés.",
     "portOutOfRange": "Port hors plage : un entier de 1 à 65535.",
     "smtpUsername": "Nom d'utilisateur SMTP",
     "smtpPassword": "Mot de passe SMTP",
@@ -3651,13 +3655,10 @@
     "version": "Version",
     "environment": "Environnement",
     "groups": {
-      "system": "Système",
-      "security": "Sécurité",
-      "notifications": "Notifications",
-      "interface": "Interface",
-      "about": "Info",
-      "integrations": "Intégrations",
-      "automation": "Automatisation"
+      "instance": "Instance",
+      "security": "Sécurité et audit",
+      "integrations": "Intégrations Windows",
+      "automation": "Notifications et automatisation"
     },
     "remoteSyslog": "Syslog distant",
     "remoteSyslogDesc": "Transférer les événements d'audit vers un serveur syslog distant pour la centralisation des logs et l'intégration SIEM.",

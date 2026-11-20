@@ -45,7 +45,8 @@ test('the settings save bar stays above the status bar and counts a change', asy
   await expect(bar).toBeVisible()
   const b = await box(bar)
   const status = await box(page.getByRole('contentinfo'))
-  expect(b.y + b.height).toBeLessThanOrEqual(status.y + EPS)
+  // 24 px above the status bar, the content scrolls in that band (the mockup's scroll-view padding)
+  expect(Math.abs(status.y - (b.y + b.height) - 24)).toBeLessThanOrEqual(EPS)
   await expect(bar.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
 
   await page.getByLabel('Syslog hostname').fill(`e2e-${Date.now()}`)
@@ -61,4 +62,18 @@ test('a link to ?tab= lands the settings page on that frame', async ({ page, api
   const t = await box(title)
   expect(t.y).toBeGreaterThanOrEqual(0)
   expect(t.y).toBeLessThan(H / 2)
+})
+
+test('every settings section is in view in the table of contents, no title cut', async ({ page, api }) => {
+  await page.goto('/settings')
+  const nav = page.getByRole('navigation', { name: 'Settings sections', exact: true })
+  await expect(nav).toBeVisible()
+  const status = await box(page.getByRole('contentinfo'))
+  const links = nav.getByRole('link')
+  expect(await links.count()).toBe(19)
+  for (const item of [...await links.all(), ...await nav.locator('.sf-toc-group-title').all()]) {
+    const r = await box(item)
+    expect(r.y + r.height).toBeLessThanOrEqual(status.y - 24 + EPS)
+  }
+  expect(await nav.evaluate((el) => el.scrollHeight <= el.clientHeight)).toBe(true)
 })

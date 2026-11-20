@@ -3421,6 +3421,10 @@
     "smtpHostPlaceholder": "smtp.example.com",
     "smtpPassword": "SMTPパスワード",
     "smtpPort": "SMTPポート",
+    "testEmailSavedHint": "The test sends an email through the saved relay; save your changes first.",
+    "syslogTestSavedHint": "The test sends a message to the saved syslog server; save your changes first.",
+    "syslogTestOff": "Syslog is off: tick the box and save to test.",
+    "autoRenewalRunHint": "Runs a renewal pass now with the saved settings.",
     "portOutOfRange": "Port out of range: a whole number from 1 to 65535.",
     "smtpUsername": "SMTPユーザー名",
     "subtitle": "システム構成",
@@ -3519,13 +3523,10 @@
     "version": "バージョン",
     "environment": "環境",
     "groups": {
-      "system": "システム",
-      "security": "セキュリティ",
-      "notifications": "通知",
-      "interface": "インターフェース",
-      "about": "情報",
-      "integrations": "統合",
-      "automation": "自動化"
+      "instance": "Instance",
+      "security": "Security and audit",
+      "integrations": "Windows integrations",
+      "automation": "Notifications and automation"
     },
     "remoteSyslog": "リモートsyslog",
     "remoteSyslogDesc": "監査ログのイベントをリモートsyslogサーバーに転送し、ログの一元管理とSIEM連携を実現します。",

@@ -1,8 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks/useClipboard'
-import { Envelope, Bell, Warning, ArrowsClockwise, CheckCircle, XCircle, Key, Copy, Info, PencilSimple } from '@phosphor-icons/react'
-import { Button, Input, DetailGrid } from '../../components'
+import { Bell, Warning, ArrowsClockwise, CheckCircle, XCircle, Key, Copy, Info, PencilSimple, PaperPlaneTilt, Question } from '@phosphor-icons/react'
+import { Button, Input, Select } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import TagsInput from '../../components/ui/TagsInput'
 import EmailTemplateWindow from '../../components/EmailTemplateWindow'
@@ -33,51 +33,58 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
     <>
       <FormGroup title={t('settings.smtpConfig')}>
         <div className="space-y-5">
-          {/* Server */}
-          <DetailGrid>
-            <div className="col-span-full md:col-span-1">
-              <Input
-                label={t('settings.smtpHost')}
-                value={settings.smtp_host || ''}
-                onChange={(e) => updateSetting('smtp_host', e.target.value)}
-                placeholder={t('settings.smtpHostPlaceholder')}
-              />
-            </div>
-            <div className="col-span-full md:col-span-1">
-              <Input
-                label={t('settings.smtpPort')}
-                type="number"
-                inputMode="numeric"
-                value={settings.smtp_port ?? 587}
-                onChange={(e) => updateSetting('smtp_port', e.target.value === '' ? '' : Number(e.target.value))}
-                error={fieldErrors.smtp_port}
-              />
-            </div>
-          </DetailGrid>
+          {/* Server: host and sender, the port and the encryption as short fields */}
+          <div className="sf-grid">
+            <Input
+              label={t('settings.smtpHost')}
+              value={settings.smtp_host || ''}
+              onChange={(e) => updateSetting('smtp_host', e.target.value)}
+              placeholder={t('settings.smtpHostPlaceholder')}
+            />
+            <Input
+              className="sf-short"
+              label={t('settings.smtpPort')}
+              type="number"
+              inputMode="numeric"
+              value={settings.smtp_port ?? 587}
+              onChange={(e) => updateSetting('smtp_port', e.target.value === '' ? '' : Number(e.target.value))}
+              error={fieldErrors.smtp_port}
+            />
+            <Select
+              className="sf-short"
+              label={t('settings.smtpSecurity')}
+              value={settings.smtp_security || 'starttls'}
+              onChange={(mode) => updateSetting('smtp_security', mode)}
+              options={[['starttls', 'smtpSecurityStarttls'], ['ssl', 'smtpSecuritySsl'], ['none', 'smtpSecurityNone']]
+                .map(([value, labelKey]) => ({ value, label: t(`settings.${labelKey}`) }))}
+            />
+            <Input
+              label={t('settings.fromEmail')}
+              type="email"
+              value={settings.smtp_from_email || ''}
+              onChange={(e) => updateSetting('smtp_from_email', e.target.value)}
+              placeholder={t('settings.fromEmailPlaceholder')}
+            />
+            <Select
+              label={t('settings.smtpAuthMethod')}
+              value={settings.smtp_auth_method || 'password'}
+              onChange={(method) => {
+                updateSetting('smtp_auth_method', method)
+                setOauthDirty(prev => prev || method === 'oauth2')
+              }}
+              options={['password', 'oauth2', 'none'].map((value) => ({ value, label: t(`settings.smtpAuthMethod_${value}`) }))}
+            />
+            <Select
+              label={t('settings.emailFormat')}
+              value={settings.smtp_content_type || 'html'}
+              onChange={(fmt) => updateSetting('smtp_content_type', fmt)}
+              options={['html', 'text', 'both'].map((value) => ({ value, label: t(`settings.emailFormat_${value}`) }))}
+              helperText={t('settings.smtpSecurityHint')}
+            />
+          </div>
 
-          {/* Authentication */}
-          <div className="border-t border-border pt-4 space-y-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-text-secondary">{t('settings.smtpAuthMethod')}:</span>
-              {['password', 'oauth2', 'none'].map(method => (
-                <button
-                  key={method}
-                  type="button"
-                  onClick={() => {
-                    updateSetting('smtp_auth_method', method)
-                    setOauthDirty(prev => prev || method === 'oauth2')
-                  }}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                    (settings.smtp_auth_method || 'password') === method
-                      ? 'bg-accent-primary text-on-accent'
-                      : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
-                  }`}
-                >
-                  {t(`settings.smtpAuthMethod_${method}`)}
-                </button>
-              ))}
-            </div>
-
+          {/* Authentication: what the chosen method asks */}
+          <div className="space-y-3">
             {(settings.smtp_auth_method || 'password') === 'none' && (
               <p className="text-xs text-text-tertiary">{t('settings.smtpNoAuthHint')}</p>
             )}
@@ -91,15 +98,12 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
             )}
 
             {(settings.smtp_auth_method || 'password') === 'password' && (
-              <DetailGrid>
-                <div className="col-span-full md:col-span-1">
+              <div className="sf-fields">
                   <Input
                     label={t('settings.smtpUsername')}
                     value={settings.smtp_username || ''}
                     onChange={(e) => updateSetting('smtp_username', e.target.value)}
                   />
-                </div>
-                <div className="col-span-full md:col-span-1">
                   <Input
                     label={t('settings.smtpPassword')}
                     type="password"
@@ -109,14 +113,13 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
                     hasExistingValue={settings.smtp_password === '********'}
                     {...secretInputProps(t, secretTargets.password)}
                   />
-                </div>
-              </DetailGrid>
+              </div>
             )}
 
             {(settings.smtp_auth_method || 'password') === 'oauth2' && (
               <div className="space-y-3">
                 {/* Mailbox / username (XOAUTH2 uses email address as user) */}
-                <DetailGrid>
+                <div className="sf-fields">
                   <div className="col-span-full md:col-span-1">
                     <Input
                       label={t('settings.smtpUsername')}
@@ -124,35 +127,33 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
                       onChange={(e) => updateSetting('smtp_username', e.target.value)}
                     />
                   </div>
-                </DetailGrid>
+                </div>
 
-                {/* Provider selector */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm text-text-secondary">{t('settings.smtpOauthProvider')}:</span>
-                  {['google', 'microsoft', 'microsoft365', 'custom'].map(provider => (
-                    <button
-                      key={provider}
-                      type="button"
-                      onClick={() => applyOAuthProviderPreset(provider)}
-                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                        (settings.smtp_oauth_provider || 'google') === provider
-                          ? 'bg-accent-primary text-on-accent'
-                          : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
-                      }`}
-                    >
-                      {t(`settings.smtpOauthProvider_${provider}`)}
-                    </button>
-                  ))}
+                {/* Provider: a preset that fills the endpoints */}
+                <div className="ui-field">
+                  <span className="ui-label" id="smtp-oauth-provider">{t('settings.smtpOauthProvider')}</span>
+                  <div className="ui-segmented" role="group" aria-labelledby="smtp-oauth-provider">
+                    {['google', 'microsoft', 'microsoft365', 'custom'].map(provider => (
+                      <button
+                        key={provider}
+                        type="button"
+                        aria-pressed={(settings.smtp_oauth_provider || 'google') === provider}
+                        onClick={() => applyOAuthProviderPreset(provider)}
+                      >
+                        {t(`settings.smtpOauthProvider_${provider}`)}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Per-provider setup guide */}
                 {oauthProviderSetup[settings.smtp_oauth_provider || 'google'] && (
-                  <div className="flex items-start gap-2 p-3 bg-status-info-op10 border border-status-info-op30 rounded-lg text-xs text-text-secondary">
-                    <Info size={16} className="shrink-0 mt-0.5 text-status-info" />
-                    <div className="space-y-1.5 flex-1">
-                      <p className="font-medium text-text-primary">
+                  <div className="ui-notice">
+                    <Info aria-hidden="true" />
+                    <div className="ui-notice-body space-y-1.5">
+                      <p><strong>
                         {t(`settings.smtpOauthSetup_${settings.smtp_oauth_provider || 'google'}_title`)}
-                      </p>
+                      </strong></p>
                       <p className="whitespace-pre-line">
                         {t(`settings.smtpOauthSetup_${settings.smtp_oauth_provider || 'google'}_steps`)}
                       </p>
@@ -160,7 +161,7 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
                         href={oauthProviderSetup[settings.smtp_oauth_provider || 'google'].consoleUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-accent-primary hover:underline font-medium"
+                        className="inline-flex items-center gap-1 text-accent-primary hover:underline"
                       >
                         {oauthProviderSetup[settings.smtp_oauth_provider || 'google'].consoleLabel} ↗
                       </a>
@@ -168,7 +169,7 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
                   </div>
                 )}
 
-                <DetailGrid>
+                <div className="sf-fields">
                   {(settings.smtp_oauth_provider || 'google') === 'microsoft365' && (
                     <div className="col-span-full md:col-span-1">
                       <Input
@@ -263,15 +264,15 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
                       </Button>
                     </div>
                   </div>
-                </DetailGrid>
+                </div>
 
                 {/* Authorization status + actions */}
                 {/* Unverified-app warning notice — only shown before authorization */}
                 {!settings.has_oauth_refresh_token && ['google', 'microsoft', 'microsoft365'].includes(settings.smtp_oauth_provider || 'google') && (
-                  <div className="flex items-start gap-2 p-3 bg-status-info-op10 border border-status-info-op30 rounded-lg text-xs text-text-secondary">
-                    <Warning size={16} className="shrink-0 mt-0.5 text-status-info" />
-                    <div className="space-y-1">
-                      <p className="font-medium text-text-primary">{t('settings.smtpOauthUnverifiedTitle')}</p>
+                  <div className="ui-notice is-warn">
+                    <Warning aria-hidden="true" />
+                    <div className="ui-notice-body">
+                      <p><strong>{t('settings.smtpOauthUnverifiedTitle')}</strong></p>
                       <p>{t('settings.smtpOauthUnverifiedBody')}</p>
                     </div>
                   </div>
@@ -279,10 +280,8 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
 
                 {/* Authorization status + actions */}
                 <div className="flex flex-wrap items-center gap-3 pt-1">
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                    settings.has_oauth_refresh_token
-                      ? 'bg-status-success-op10 text-status-success'
-                      : 'bg-bg-tertiary text-text-tertiary'
+                  <span className={`inline-flex items-center gap-1.5 text-xs ${
+                    settings.has_oauth_refresh_token ? 'text-status-success' : 'text-text-secondary'
                   }`}>
                     {settings.has_oauth_refresh_token
                       ? <><CheckCircle size={13} />{t('settings.smtpOauthStatusAuthorized')}</>
@@ -317,93 +316,32 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
             )}
           </div>
 
-          {/* Options */}
-          <div className="border-t border-border pt-4 space-y-3">
-            <DetailGrid>
-              <div className="col-span-full md:col-span-1">
-                <Input
-                  label={t('settings.fromEmail')}
-                  type="email"
-                  value={settings.smtp_from_email || ''}
-                  onChange={(e) => updateSetting('smtp_from_email', e.target.value)}
-                  placeholder={t('settings.fromEmailPlaceholder')}
-                />
-              </div>
-            </DetailGrid>
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-text-secondary">{t('settings.smtpSecurity')}:</span>
-                {[['none', 'smtpSecurityNone'], ['starttls', 'smtpSecurityStarttls'], ['ssl', 'smtpSecuritySsl']].map(([mode, labelKey]) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => updateSetting('smtp_security', mode)}
-                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                      (settings.smtp_security || 'starttls') === mode
-                        ? 'bg-accent-primary text-on-accent'
-                        : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
-                    }`}
-                  >
-                    {t(`settings.${labelKey}`)}
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-text-secondary">{t('settings.emailFormat')}:</span>
-                {['html', 'text', 'both'].map(fmt => (
-                  <button
-                    key={fmt}
-                    type="button"
-                    onClick={() => updateSetting('smtp_content_type', fmt)}
-                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                      (settings.smtp_content_type || 'html') === fmt
-                        ? 'bg-accent-primary text-on-accent'
-                        : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
-                    }`}
-                  >
-                    {t(`settings.emailFormat_${fmt}`)}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <p className="text-xs text-text-tertiary">{t('settings.smtpSecurityHint')}</p>
-          </div>
-
-          {/* Test result banner */}
-          {emailTestResult && (
-            <div className={`flex items-start gap-3 p-3 rounded-lg text-sm ${
-              emailTestResult.success
-                ? 'bg-status-success-op10 text-status-success'
-                : 'bg-status-danger-op10 text-status-danger'
-            }`}>
-              {emailTestResult.success
-                ? <CheckCircle size={18} className="shrink-0 mt-0.5" />
-                : <WarningCircle size={18} className="shrink-0 mt-0.5" />
-              }
-              <span className="break-all">{emailTestResult.message}</span>
-            </div>
-          )}
-
-          {/* Actions */}
+          {/* Test of the saved relay: the recipient, the button and its result on one line */}
           {canWrite('settings') && (
-            <div className="space-y-3 pt-1">
-              <DetailGrid>
-                <div className="col-span-full md:col-span-1">
-                  <Input
-                    label={t('settings.testRecipient')}
-                    type="email"
-                    value={settings._testRecipient || ''}
-                    onChange={(e) => updateSetting('_testRecipient', e.target.value)}
-                    placeholder={defaultTestRecipient || 'admin@example.com'}
-                  />
-                </div>
-                <div className="col-span-full md:col-span-1 flex items-end gap-2">
-                  <Button type="button" variant="secondary" onClick={handleTestEmail} disabled={emailTesting}>
-                    {emailTesting ? <ArrowsClockwise size={16} className="animate-spin" /> : <Envelope size={16} />}
-                    {t('settings.testEmail')}
-                  </Button>
-                </div>
-              </DetailGrid>
+            <div className="sf-test">
+              <Input
+                className="sf-test-field"
+                label={t('settings.testRecipient')}
+                type="email"
+                value={settings._testRecipient || ''}
+                onChange={(e) => updateSetting('_testRecipient', e.target.value)}
+                placeholder={defaultTestRecipient || 'admin@example.com'}
+              />
+              <Button type="button" variant="secondary" onClick={handleTestEmail} disabled={emailTesting}>
+                {emailTesting ? <ArrowsClockwise size={16} className="animate-spin" /> : <PaperPlaneTilt size={16} />}
+                {t('settings.testEmail')}
+              </Button>
+              {emailTestResult ? (
+                <p className={`sf-test-result ${emailTestResult.success ? 'is-good' : 'is-bad'}`} role="status">
+                  {emailTestResult.success ? <CheckCircle aria-hidden="true" /> : <WarningCircle aria-hidden="true" />}
+                  <span className="break-all">{emailTestResult.message}</span>
+                </p>
+              ) : (
+                <p className="sf-test-result">
+                  <Question aria-hidden="true" />
+                  <span>{t('settings.testEmailSavedHint')}</span>
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -433,10 +371,10 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
 
       <FormGroup title={t('settings.expiryAlerts')}>
         {!settings.smtp_host ? (
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-bg-tertiary text-text-secondary text-sm">
-            <Warning size={20} className="text-status-warning shrink-0" />
-            {t('settings.smtpRequiredForAlerts')}
-          </div>
+          <p className="ui-notice is-warn">
+            <Warning aria-hidden="true" />
+            <span className="ui-notice-body">{t('settings.smtpRequiredForAlerts')}</span>
+          </p>
         ) : (
         <div className="space-y-4">
           <ToggleSwitch
@@ -445,15 +383,14 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
             label={t('settings.enableExpiryAlerts')}
             size="sm"
           />
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-2">
-              {t('settings.alertDays')}
-            </label>
-            <div className="flex flex-wrap gap-2">
+          <div className="ui-field">
+            <span className="ui-label" id="expiry-alert-days">{t('settings.alertDays')}</span>
+            <div className="ui-segmented" role="group" aria-labelledby="expiry-alert-days">
               {[90, 60, 30, 14, 7, 3, 1].map(d => (
                 <button
                   key={d}
                   type="button"
+                  aria-pressed={expiryAlerts.alert_days.includes(d)}
                   onClick={() => {
                     setExpiryAlerts(prev => ({
                       ...prev,
@@ -462,17 +399,12 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
                         : [...prev.alert_days, d].sort((a, b) => b - a)
                     }))
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    expiryAlerts.alert_days.includes(d)
-                      ? 'bg-accent-primary text-on-accent'
-                      : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
-                  }`}
                 >
-                  {d}d
+                  {t('time.short.days', { count: d })}
                 </button>
               ))}
             </div>
-            <p className="text-xs text-text-tertiary mt-1">{t('settings.alertDaysHelp')}</p>
+            <p className="ui-help">{t('settings.alertDaysHelp')}</p>
           </div>
           <TagsInput
             label={t('settings.alertRecipients')}

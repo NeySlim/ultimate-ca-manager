@@ -28,8 +28,10 @@ vi.mock('../settings/EmailSection', () => ({
   ),
 }))
 vi.mock('../settings/AuditSection', () => ({
-  default: ({ syslogConfig, updateSyslogConfig, updateSetting, settings }) => (
+  default: ({ syslogConfig, updateSyslogConfig, updateSetting, settings, handleTestSyslog, syslogTestResult }) => (
     <>
+      <button type="button" onClick={handleTestSyslog}>test-syslog</button>
+      {syslogTestResult && <p data-testid="syslog-result">{`${syslogTestResult.ok}:${syslogTestResult.text}`}</p>}
       <input aria-label="syslog-host" value={syslogConfig.host || ''} onChange={(e) => updateSyslogConfig('host', e.target.value)} />
       <input aria-label="retention" value={settings.audit_retention_days ?? ''} onChange={(e) => updateSetting('audit_retention_days', e.target.value)} />
     </>
@@ -186,6 +188,23 @@ describe('SettingsPage: one page, one save bar', () => {
     fireEvent.change(name, { target: { value: 'PKI 2' } })
     await act(async () => { fireEvent.keyDown(name, { key: 'Enter' }) })
     expect(settingsService.updateBulk).toHaveBeenCalledWith(expect.objectContaining({ system_name: 'PKI 2' }))
+  })
+
+  it('tests the saved syslog forwarding and keeps the result beside the button', async () => {
+    settingsService.testSyslog = vi.fn().mockResolvedValue({ message: 'sent' })
+    await loaded()
+    await act(async () => { fireEvent.click(screen.getByText('test-syslog')) })
+    expect(settingsService.testSyslog).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('syslog-result')).toHaveTextContent('true:sent')
+  })
+
+  it('says syslog is off instead of testing a forwarding that is not saved on', async () => {
+    settingsService.getSyslogConfig = vi.fn().mockResolvedValue({ data: { enabled: false, host: 'log.example.com', port: 514 } })
+    settingsService.testSyslog = vi.fn()
+    await loaded()
+    await act(async () => { fireEvent.click(screen.getByText('test-syslog')) })
+    expect(settingsService.testSyslog).not.toHaveBeenCalled()
+    expect(screen.getByTestId('syslog-result')).toHaveTextContent('false:settings.syslogTestOff')
   })
 
   it('lands a link to ?tab= on the frame of that section', async () => {

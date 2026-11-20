@@ -3421,6 +3421,10 @@
     "smtpHostPlaceholder": "smtp.ejemplo.com",
     "smtpPassword": "Contraseña SMTP",
     "smtpPort": "Puerto SMTP",
+    "testEmailSavedHint": "The test sends an email through the saved relay; save your changes first.",
+    "syslogTestSavedHint": "The test sends a message to the saved syslog server; save your changes first.",
+    "syslogTestOff": "Syslog is off: tick the box and save to test.",
+    "autoRenewalRunHint": "Runs a renewal pass now with the saved settings.",
     "portOutOfRange": "Port out of range: a whole number from 1 to 65535.",
     "smtpUsername": "Usuario SMTP",
     "subtitle": "Configuración del sistema",
@@ -3519,13 +3523,10 @@
     "version": "Versión",
     "environment": "Entorno",
     "groups": {
-      "system": "Sistema",
-      "security": "Seguridad",
-      "notifications": "Notificaciones",
-      "interface": "Interfaz",
-      "about": "Información",
-      "integrations": "Integraciones",
-      "automation": "Automatización"
+      "instance": "Instance",
+      "security": "Security and audit",
+      "integrations": "Windows integrations",
+      "automation": "Notifications and automation"
     },
     "remoteSyslog": "Syslog remoto",
     "remoteSyslogDesc": "Reenvíe los eventos del registro de auditoría a un servidor syslog remoto para centralizar los registros e integrarlos con un SIEM.",

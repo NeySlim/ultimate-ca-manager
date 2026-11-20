@@ -3490,6 +3490,10 @@
     "smtpHostPlaceholder": "smtp.example.com",
     "smtpPassword": "Пароль SMTP",
     "smtpPort": "Порт SMTP",
+    "testEmailSavedHint": "Тест отправляет письмо через сохранённый ретранслятор; сначала сохраните изменения.",
+    "syslogTestSavedHint": "Тест отправляет сообщение на сохранённый сервер syslog; сначала сохраните изменения.",
+    "syslogTestOff": "Syslog выключен: отметьте флажок и сохраните, чтобы проверить.",
+    "autoRenewalRunHint": "Запускает проход продления сейчас с сохранёнными параметрами.",
     "portOutOfRange": "Порт вне диапазона: целое число от 1 до 65535.",
     "smtpUsername": "Имя пользователя SMTP",
     "subtitle": "Конфигурация системы",
@@ -3588,13 +3592,10 @@
     "version": "Версия",
     "environment": "Окружение",
     "groups": {
-      "system": "Система",
-      "security": "Безопасность",
-      "notifications": "Уведомления",
-      "interface": "Интерфейс",
-      "about": "Сведения",
-      "integrations": "Интеграции",
-      "automation": "Автоматизация"
+      "instance": "Экземпляр",
+      "security": "Безопасность и аудит",
+      "integrations": "Интеграции Windows",
+      "automation": "Уведомления и автоматизация"
     },
     "remoteSyslog": "Удалённый Syslog",
     "remoteSyslogDesc": "Пересылать события журнала аудита на удалённый сервер syslog для централизованного журналирования и интеграции с SIEM.",

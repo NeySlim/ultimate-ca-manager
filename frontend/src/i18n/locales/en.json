@@ -3422,6 +3422,10 @@
     "smtpHostPlaceholder": "smtp.example.com",
     "smtpPassword": "SMTP Password",
     "smtpPort": "SMTP Port",
+    "testEmailSavedHint": "The test sends an email through the saved relay; save your changes first.",
+    "syslogTestSavedHint": "The test sends a message to the saved syslog server; save your changes first.",
+    "syslogTestOff": "Syslog is off: tick the box and save to test.",
+    "autoRenewalRunHint": "Runs a renewal pass now with the saved settings.",
     "portOutOfRange": "Port out of range: a whole number from 1 to 65535.",
     "smtpUsername": "SMTP Username",
     "subtitle": "System Configuration",
@@ -3520,13 +3524,10 @@
     "version": "Version",
     "environment": "Environment",
     "groups": {
-      "system": "System",
-      "security": "Security",
-      "notifications": "Notifications",
-      "interface": "Interface",
-      "about": "Info",
-      "integrations": "Integrations",
-      "automation": "Automation"
+      "instance": "Instance",
+      "security": "Security and audit",
+      "integrations": "Windows integrations",
+      "automation": "Notifications and automation"
     },
     "remoteSyslog": "Remote Syslog",
     "remoteSyslogDesc": "Forward audit log events to a remote syslog server for centralized logging and SIEM integration.",

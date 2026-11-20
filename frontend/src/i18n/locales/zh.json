@@ -3421,6 +3421,10 @@
     "smtpHostPlaceholder": "smtp.example.com",
     "smtpPassword": "SMTP密码",
     "smtpPort": "SMTP端口",
+    "testEmailSavedHint": "测试通过已保存的中继发送一封邮件；请先保存修改。",
+    "syslogTestSavedHint": "测试向已保存的 syslog 服务器发送一条消息；请先保存修改。",
+    "syslogTestOff": "Syslog 已关闭：勾选该项并保存后再测试。",
+    "autoRenewalRunHint": "立即使用已保存的设置运行一次续期。",
     "portOutOfRange": "端口超出范围：须为 1 到 65535 之间的整数。",
     "smtpUsername": "SMTP用户名",
     "subtitle": "系统配置",
@@ -3519,13 +3523,10 @@
     "version": "版本",
     "environment": "环境",
     "groups": {
-      "system": "系统",
-      "security": "安全",
-      "notifications": "通知",
-      "interface": "界面",
-      "about": "信息",
-      "integrations": "集成",
-      "automation": "自动化"
+      "instance": "实例",
+      "security": "安全与审计",
+      "integrations": "Windows 集成",
+      "automation": "通知与自动化"
     },
     "remoteSyslog": "远程 Syslog",
     "remoteSyslogDesc": "将审计日志事件转发至远程 Syslog 服务器，用于集中日志收集与 SIEM 对接。",

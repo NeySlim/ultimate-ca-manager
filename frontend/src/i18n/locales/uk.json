@@ -3489,6 +3489,10 @@
     "smtpHostPlaceholder": "smtp.example.com",
     "smtpPassword": "Пароль SMTP",
     "smtpPort": "Порт SMTP",
+    "testEmailSavedHint": "The test sends an email through the saved relay; save your changes first.",
+    "syslogTestSavedHint": "The test sends a message to the saved syslog server; save your changes first.",
+    "syslogTestOff": "Syslog is off: tick the box and save to test.",
+    "autoRenewalRunHint": "Runs a renewal pass now with the saved settings.",
     "portOutOfRange": "Port out of range: a whole number from 1 to 65535.",
     "smtpUsername": "Користувач SMTP",
     "subtitle": "Конфігурація системи",
@@ -3587,13 +3591,10 @@
     "version": "Версія",
     "environment": "Середовище",
     "groups": {
-      "system": "Система",
-      "security": "Безпека",
-      "notifications": "Сповіщення",
-      "interface": "Інтерфейс",
-      "about": "Інфо",
-      "integrations": "Інтеграції",
-      "automation": "Автоматизація"
+      "instance": "Instance",
+      "security": "Security and audit",
+      "integrations": "Windows integrations",
+      "automation": "Notifications and automation"
     },
     "remoteSyslog": "Віддалений syslog",
     "remoteSyslogDesc": "Пересилати події журналу аудиту на віддалений сервер syslog для централізованого журналювання та інтеграції із SIEM.",
