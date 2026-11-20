@@ -6,9 +6,9 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { DownloadSimple, Plus, FilePdf, PauseCircle, Clock } from '@phosphor-icons/react'
+import { DownloadSimple, Plus, FilePdf, PauseCircle } from '@phosphor-icons/react'
 import { ResponsiveLayout } from '../components'
-import { WorkQueue, WorkButton, WorkRecord, WorkRecords, loadCause } from '../components/work'
+import { WorkQueue, WorkButton, WorkRecord, WorkRecords, loadCause, ClockIcon } from '../components/work'
 import { reportsService, certificatesService } from '../services'
 import { useInspector } from '../contexts'
 import { usePermission } from '../hooks'
@@ -116,8 +116,7 @@ export default function ReportsPage() {
         actions={(canExport || canSchedule) && (
           <>
             {canExport && (
-              <WorkButton quiet icon={FilePdf} onClick={actions.openPdf} className="lv-hide-mobile"
-                aria-label={t('reports.work.customPdf')}>{t('reports.work.customPdf')}</WorkButton>
+              <WorkButton quiet icon={FilePdf} onClick={actions.openPdf} className="wk-not-phone">{t('reports.work.customPdf')}</WorkButton>
             )}
             {canSchedule && <WorkButton primary icon={Plus} onClick={() => actions.openSchedule()}>{t('reports.work.schedule')}</WorkButton>}
           </>
@@ -149,7 +148,7 @@ export default function ReportsPage() {
                     action={<>
                       {downloadButton(e, false)}
                       {canSchedule && (
-                        <WorkButton icon={Clock} onClick={() => actions.openSchedule(e.key)}
+                        <WorkButton icon={ClockIcon} onClick={() => actions.openSchedule(e.key)}
                           aria-label={t('reports.work.scheduleNamed', { name: reportName(e.key, t) })}>{t('reports.work.scheduleAsk')}</WorkButton>
                       )}
                     </>} />
@@ -157,6 +156,12 @@ export default function ReportsPage() {
               </WorkRecords>
             ),
           }}
+          // On a phone the head keeps the mockup's one action: the PDF composer goes under the queue
+          after={canExport && (
+            <p className="wk-phone-only">
+              <WorkButton quiet icon={FilePdf} onClick={actions.openPdf}>{t('reports.work.customPdf')}</WorkButton>
+            </p>
+          )}
         />
       </ResponsiveLayout>
       {actions.dialog}

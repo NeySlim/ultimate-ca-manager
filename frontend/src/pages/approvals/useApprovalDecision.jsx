@@ -7,9 +7,9 @@
  */
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, Prohibit, Warning, Question } from '@phosphor-icons/react'
+import { Prohibit, Warning, Question } from '@phosphor-icons/react'
 import { Modal } from '../../components/Modal'
-import { WorkButton, BulkOutcome, runEach, rememberFocus } from '../../components/work'
+import { WorkButton, BulkOutcome, runEach, rememberFocus, CheckIcon } from '../../components/work'
 import { approvalsService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useOpenEntity } from '../../hooks/useOpenEntity'
@@ -26,8 +26,9 @@ function approvalFailure(result, t) {
 }
 
 export const changedEvent = () => window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: 'approval' } }))
-// The shortest reason a rejection takes
+// The shortest reason a rejection takes, the longest any reason takes (the mockup's)
 export const REASON_MIN = 5
+export const REASON_MAX = 200
 
 /** onDone reloads after a decision; refocus places the focus once the dialog is gone (else it goes back where it was). */
 export function useApprovalDecision({ onDone, refocus } = {}) {
@@ -160,7 +161,7 @@ export function useApprovalDecision({ onDone, refocus } = {}) {
               {t('approvals.work.dialog.reason')}
               {approve && <> <span className="wk-optional">{t('approvals.work.dialog.optional')}</span></>}
             </label>
-            <textarea id="decision-reason" ref={box} rows={3} maxLength={2000} value={comment} autoFocus
+            <textarea id="decision-reason" ref={box} rows={3} maxLength={REASON_MAX} value={comment} autoFocus
               onChange={(e) => { setComment(e.target.value); if (invalid) setInvalid(false) }}
               aria-invalid={invalid || undefined}
               aria-describedby={invalid ? 'decision-hint decision-error' : 'decision-hint'} />
@@ -174,12 +175,11 @@ export function useApprovalDecision({ onDone, refocus } = {}) {
             <span>
               {t(many ? 'approvals.work.dialog.decidedNoteMany' : 'approvals.work.dialog.decidedNote')}
               {approve && !many && ask.requests[0].request_type === 'csr' && <> {t('approvals.work.dialog.csrNote')}</>}
-              {many && <> {t('approvals.work.dialog.manyNote')}</>}
             </span>
           </p>
           <div className="lv-dialog-actions">
             <WorkButton onClick={dismiss}>{t('common.cancel')}</WorkButton>
-            <WorkButton type="submit" primary={approve} danger={!approve} icon={approve ? Check : Prohibit} disabled={busy}
+            <WorkButton type="submit" primary={approve} danger={!approve} icon={approve ? CheckIcon : Prohibit} disabled={busy}
               data-testid="decision-confirm">
               {t(approve ? 'approvals.work.approve' : 'approvals.work.reject')}{many ? ` (${ask.requests.length})` : ''}
             </WorkButton>

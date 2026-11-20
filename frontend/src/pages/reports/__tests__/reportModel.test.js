@@ -3,7 +3,7 @@
  * HH:MM in UTC, weekly on day_of_week with 0 for Monday, monthly on day_of_month.
  */
 import { describe, it, expect } from 'vitest'
-import { nextRun, reportGroups, scheduleOf, parseReport, scheduleClock, frequencyPill, frequencyLong, typedInUtc, reportFigure, reportName } from '../reportModel'
+import { nextRun, reportGroups, scheduleOf, parseReport, scheduleClock, scheduleForm, toSchedulerClock, frequencyPill, frequencyLong, reportFigure, reportName } from '../reportModel'
 import { frT } from '../../../components/work/__tests__/frI18n'
 
 // Wednesday 18 November 2026, 10:30 UTC
@@ -73,10 +73,13 @@ describe('scheduleClock: the hour of a schedule in the user\'s timezone', () => 
     expect(frequencyPill(daily, frT, { now: new Date(Date.UTC(2026, 6, 1, 3)), tz: 'Europe/Paris' })).toBe('Quotidien · 08:00')
   })
 
-  it('moves a weekly run to the day it falls on for the user', () => {
-    const monday = { enabled: true, frequency: 'weekly', time: '23:30', day_of_week: 0 }
-    expect(frequencyLong(monday, frT, { now: NOW, tz: 'Europe/Paris' })).toBe('Hebdomadaire, le mardi, à 00:30')
-    expect(frequencyLong(monday, frT, { now: NOW, tz: 'UTC' })).toBe('Hebdomadaire, le lundi, à 23:30')
+  it('converts a weekly run that stays on its day, keeps UTC, said, for one the conversion moves', () => {
+    const early = { enabled: true, frequency: 'weekly', time: '08:00', day_of_week: 0 }
+    expect(frequencyLong(early, frT, { now: NOW, tz: 'Europe/Paris' })).toBe('Hebdomadaire, le lundi, à 09:00')
+    const late = { enabled: true, frequency: 'weekly', time: '23:30', day_of_week: 0 }
+    expect(frequencyLong(late, frT, { now: NOW, tz: 'Europe/Paris' })).toBe('Hebdomadaire, le lundi, à 23:30 UTC')
+    expect(frequencyPill(late, frT, { now: NOW, tz: 'Europe/Paris' })).toBe('Hebdomadaire · 23:30 UTC')
+    expect(frequencyLong(late, frT, { now: NOW, tz: 'UTC' })).toBe('Hebdomadaire, le lundi, à 23:30')
   })
 
   it('keeps UTC, said, for a monthly run the conversion moves to another day', () => {
@@ -86,9 +89,39 @@ describe('scheduleClock: the hour of a schedule in the user\'s timezone', () => 
     expect(frequencyLong(first, frT, { now: NOW, tz: 'Europe/Paris' })).toBe('Mensuel, le 1er, à 03:00')
   })
 
-  it('says a typed time is UTC only when the user is not on UTC', () => {
-    expect(typedInUtc(NOW, 'UTC')).toBe(false)
-    expect(typedInUtc(NOW, 'Europe/Paris')).toBe(true)
+})
+
+describe('the schedule dialog: typed in the user\'s timezone, stored in UTC', () => {
+  const paris = { now: NOW, tz: 'Europe/Paris' }
+  it('opens on the time and day the row reads', () => {
+    expect(scheduleForm({ frequency: 'monthly', time: '06:45', day_of_month: 1 }, paris)).toMatchObject({ utc: false, time: '07:45', day_of_month: 1 })
+    expect(scheduleForm({ frequency: 'weekly', time: '23:30', day_of_week: 6 }, paris)).toMatchObject({ utc: true, time: '23:30', day_of_week: 6 })
+    expect(scheduleForm({ frequency: 'daily', time: '06:00' }, { now: NOW, tz: 'UTC' })).toMatchObject({ utc: false, time: '06:00' })
+  })
+
+  it('stores a typed time back at the scheduler\'s hour, summer time too', () => {
+    expect(toSchedulerClock({ frequency: 'monthly', time: '07:45', day_of_week: 1, day_of_month: 1 }, paris)).toEqual({ time: '06:45', day_of_week: 1, day_of_month: 1 })
+    expect(toSchedulerClock({ frequency: 'daily', time: '08:00', day_of_week: 1, day_of_month: 1 }, { now: new Date(Date.UTC(2026, 6, 1, 3)), tz: 'Europe/Paris' }))
+      .toMatchObject({ time: '06:00' })
+    // Typed in summer for a run after the clocks go back: the offset of the run's day counts
+    expect(toSchedulerClock({ frequency: 'monthly', time: '07:45', day_of_week: 1, day_of_month: 1 }, { now: new Date(Date.UTC(2026, 9, 20, 10)), tz: 'Europe/Paris' }))
+      .toMatchObject({ time: '06:45', day_of_month: 1 })
+    expect(toSchedulerClock({ frequency: 'daily', time: '20:00', day_of_week: 1, day_of_month: 1 }, { now: NOW, tz: 'America/New_York' })).toMatchObject({ time: '01:00' })
+  })
+
+  it('moves a weekly or monthly day with the run, refuses a monthly one out of days 1 to 28', () => {
+    expect(toSchedulerClock({ frequency: 'weekly', time: '00:30', day_of_week: 0, day_of_month: 1 }, paris)).toMatchObject({ time: '23:30', day_of_week: 6 })
+    expect(toSchedulerClock({ frequency: 'monthly', time: '00:30', day_of_week: 0, day_of_month: 15 }, paris)).toMatchObject({ time: '23:30', day_of_month: 14 })
+    expect(toSchedulerClock({ frequency: 'monthly', time: '00:30', day_of_week: 0, day_of_month: 1 }, paris)).toBeNull()
+    expect(toSchedulerClock({ frequency: 'monthly', time: '22:00', day_of_week: 0, day_of_month: 28 }, { now: NOW, tz: 'America/New_York' })).toBeNull()
+  })
+
+  it('reads back what it stores: the row and the dialog give the same hour', () => {
+    for (const tz of ['Europe/Paris', 'America/New_York', 'Asia/Kolkata', 'UTC']) {
+      const typed = { frequency: 'monthly', time: '10:15', day_of_week: 2, day_of_month: 12 }
+      const stored = toSchedulerClock(typed, { now: NOW, tz })
+      expect(scheduleForm({ ...typed, ...stored }, { now: NOW, tz })).toMatchObject({ utc: false, time: '10:15', day_of_month: 12 })
+    }
   })
 })
 

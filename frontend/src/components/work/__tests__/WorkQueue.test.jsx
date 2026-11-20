@@ -60,6 +60,15 @@ describe('WorkQueue', () => {
     expect(screen.getByText('Cochez plusieurs demandes')).toBeInTheDocument()
   })
 
+  it('keeps the empty check column without a right to select: heads and text keep the template\'s place', () => {
+    const { container } = render(<WorkQueue {...base} groups={groups()} />)
+    for (const el of container.querySelectorAll('.wk-group-head, .wk-row')) {
+      expect(el.firstElementChild).toHaveClass('wk-check')
+      expect(el.firstElementChild).toHaveAttribute('aria-hidden', 'true')
+    }
+    expect(container.querySelectorAll('.wk-row')).toHaveLength(3)
+  })
+
   it('selects rows from the keyboard, swaps the hint for the bulk bar and disables the row actions', () => {
     const bulk = vi.fn((ids) => <WorkButton>Approuver… ({ids.join(',')})</WorkButton>)
     render(<WorkQueue {...base} groups={groups()} bulkActions={bulk} />)
@@ -168,6 +177,13 @@ describe('WorkQueue', () => {
     expect(skel.querySelectorAll(':scope > .wk-panel')).toHaveLength(3)
     expect(skel.querySelectorAll('.wk-group-head .wk-check')).toHaveLength(2)
     expect(skel.querySelector('.wk-history-toggle')).not.toBeNull()
+  })
+
+  it('gives its hint line the hint\'s own text, hidden under the bar, so it takes the same lines', () => {
+    const { container } = render(<WorkQueue {...base} state="loading" groups={[]} />)
+    const ghost = container.querySelector('.wk-skel > .wk-hint .wk-skel-ghost')
+    expect(ghost).toHaveTextContent('Cochez plusieurs demandes')
+    expect(ghost.closest('[aria-hidden="true"]')).not.toBeNull()
   })
 
   it('shows the error with a Retry button', () => {

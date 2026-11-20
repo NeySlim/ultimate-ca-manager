@@ -3199,7 +3199,7 @@ Once approved, the archived key is released as a **password-protected PKCS#12** 
 
 ## The queue
 
-The page lists the requests **to approve** (with dual control on, **to approve by another administrator**), then the keys **to recover**; closed requests (recovered, rejected, cancelled) are folded under **Recently handled**. A row offers only what the server would accept from you: **Approve…** and **Reject…** with admin:key_recovery, never the approval of your own request while dual control is on; **Recover…** for the requester or an administrator of key recovery. Several requests can be approved or rejected together: each is decided in turn; one message says when all went through, otherwise the outcome lists them one by one. A certificate name opens the request in the inspector, with its **Request** and **Log** sections.
+The page lists the requests **to approve** (with dual control on, **to approve by another administrator**), then the keys **to recover**; closed requests (recovered, rejected, cancelled) are folded under **Recently handled**. A row offers only what the server would accept from you: **Approve…** and **Reject…** with admin:key_recovery, never the approval of your own request while dual control is on; **Recover…** for the requester or an administrator of key recovery. Several requests can be approved or rejected together: each is decided in turn; one message says when all went through, otherwise the outcome lists them one by one. A rejection takes a reason of five characters at least, an approval an optional note; either stays with the decision. A certificate name opens the request in the inspector, with its **Request** and **Log** sections.
 
 ## Requirements
 
@@ -3250,7 +3250,7 @@ Certificates revoked during the chosen period (default: 30 days), with revocatio
 
 ## Executive PDF Report
 
-The **Executive Summary** template is one of the reports of the page: its **Download** button generates the PDF, suitable for management reviews, board presentations, and compliance audits. **Build a PDF…** in the page head composes one from the sections you choose.
+The **Executive Summary** template is one of the reports of the page: its **Download** button generates the PDF, suitable for management reviews, board presentations, and compliance audits. **Build a PDF…** in the page head (under the queue on a phone) composes one from the sections you choose.
 
 ### Contents
 The PDF report includes 9 sections:
@@ -3271,7 +3271,7 @@ The report includes visual elements: risk gauge bar, status distribution, compli
 
 ## The queue
 
-Scheduled reports are grouped by their next run: **Next run within 24 h**, then **Scheduled**. A row gives the report, its frequency and time in a pill (in your timezone; a monthly run that would fall on another day for you keeps its UTC time, said), the current figure when the certificate counters hold it (Expiring Certificates) or else its format, its recipients, and the next run in short form above its exact date. The reports without a schedule are folded under **Not scheduled**, each with **Download** and **Schedule…**.
+Scheduled reports are grouped by their next run: **Next run within 24 h**, then **Scheduled**. A row gives the report, its frequency and time in a pill (in your timezone; a weekly or monthly run that would fall on another day for you keeps its UTC time, said), the current figure when the certificate counters hold it (Expiring Certificates) or else its format, its recipients, and the next run in short form above its exact date. The reports without a schedule are folded under **Not scheduled**, each with **Download** and **Schedule…**.
 
 ## Viewing a report
 
@@ -3292,11 +3292,11 @@ A report's name opens it in the inspector:
 Every data report and every PDF template can be scheduled, each with its own frequency, time and recipients. Schedule **Expiring Certificates** daily to catch expiring certificates before they cause outages.
 
 ### Frequency
-**Daily**, **Weekly** (choose the day of week) or **Monthly** (choose the day of month). The scheduler runs in UTC: when your timezone is not UTC, the time is typed in UTC, and the queue shows it in your timezone.
+**Daily**, **Weekly** (choose the day of week) or **Monthly** (choose the day of month). The scheduler runs in UTC: the time is typed in your timezone, as the queue shows it, and converted when saved; a weekly or monthly run whose day the conversion would change is typed in UTC, as the dialog says.
 
 ### Configuration
 1. Click **Schedule a report**, or **Schedule…** on a report folded under **Not scheduled**
-2. Choose the content, the frequency and its day, the sending time (in UTC when your timezone is not UTC) and, for a data report, the format (CSV or JSON)
+2. Choose the content, the frequency and its day, the sending time (in your timezone) and, for a data report, the format (CSV or JSON)
 3. Give one or more recipients, separated by commas: without a recipient, nothing is sent
 4. Click **Schedule**
 

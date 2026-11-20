@@ -62,8 +62,12 @@ beforeEach(() => {
 
 describe('ReportsPage queue', () => {
   it('heads the page with the scheduled count, the intent and Schedule a report', async () => {
-    renderPage()
+    const { container } = renderPage()
     expect(await screen.findByText('2 rapports planifiés')).toBeInTheDocument()
+    expect(screen.getByText('Cochez plusieurs rapports pour les télécharger ensemble ; les chiffres suivent l’inventaire, comme la vue d’ensemble.')).toBeInTheDocument()
+    // The PDF composer leaves the head on a phone for a line under the queue
+    expect(container.querySelector('.lv-actions .wk-not-phone')).toHaveTextContent('Composer un PDF…')
+    expect(container.querySelector('.wk-view > .wk-phone-only')).toHaveTextContent('Composer un PDF…')
     expect(screen.getByText('Inventaires et échéances planifiés.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Planifier un rapport' })).toHaveClass('is-primary')
   })
@@ -101,8 +105,8 @@ describe('ReportsPage queue', () => {
     const toggle = await screen.findByRole('button', { name: /^Non planifiés/ })
     expect(toggle).toHaveTextContent('Non planifiés9')
     fireEvent.click(toggle)
-    expect(screen.getByRole('button', { name: 'Planifier Résumé d\'audit' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Télécharger Résumé d\'audit' }))
+    expect(screen.getByRole('button', { name: 'Planifier Résumé d’audit' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Télécharger Résumé d’audit' }))
     await waitFor(() => expect(api.download).toHaveBeenCalledWith('audit_summary', 'csv', 30))
   })
 
@@ -160,6 +164,9 @@ describe('ReportsPage queue', () => {
     renderPage()
     fireEvent.click(await screen.findByRole('button', { name: 'Composer un PDF…' }))
     const dialog = await screen.findByRole('dialog')
+    // One sentence says what the dialog does: its subtitle
+    expect(dialog).toHaveTextContent('Les sections choisies, téléchargées en un seul PDF.')
+    expect(dialog).not.toHaveTextContent('Sélectionnez les sections')
     fireEvent.click(within(dialog).getByLabelText('Certificats expirants'))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Générer le PDF' }))
     await waitFor(() => expect(api.generateCustomPDF).toHaveBeenCalledWith({ sections: ['expiry'] }))

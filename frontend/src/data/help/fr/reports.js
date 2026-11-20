@@ -26,7 +26,7 @@ export default {
       {
         title: 'Programmation',
         items: [
-          { label: 'Planifier un rapport', text: 'Choisissez n\'importe quel rapport de données ou modèle PDF, puis sa fréquence (quotidienne, hebdomadaire ou mensuelle), son heure (saisie en UTC si votre fuseau n’est pas UTC, affichée dans votre fuseau dans la file), son format et ses destinataires ; les rapports planifiés sont groupés par prochaine exécution' },
+          { label: 'Planifier un rapport', text: 'Choisissez n\'importe quel rapport de données ou modèle PDF, puis sa fréquence (quotidienne, hebdomadaire ou mensuelle), son heure (saisie et affichée dans votre fuseau ; une exécution hebdomadaire ou mensuelle qui tomberait un autre jour pour vous garde son heure UTC, signalée), son format et ses destinataires ; les rapports planifiés sont groupés par prochaine exécution' },
           { label: 'Pièce jointe', text: 'Le rapport est joint à l\'e-mail dans son format : CSV ou JSON pour les rapports de données, PDF pour les modèles PDF' },
         ]
       },
@@ -66,7 +66,7 @@ Certificats révoqués sur la période choisie (30 jours par défaut), avec la d
 
 ## Rapport PDF exécutif
 
-Le modèle **Résumé exécutif** est l'un des rapports de la page : son bouton **Télécharger** génère le PDF, adapté aux revues de direction, présentations et audits de conformité. **Composer un PDF…** dans l'en-tête de la page en assemble un à partir des sections choisies.
+Le modèle **Résumé exécutif** est l'un des rapports de la page : son bouton **Télécharger** génère le PDF, adapté aux revues de direction, présentations et audits de conformité. **Composer un PDF…** dans l'en-tête de la page (sous la file sur un téléphone) en assemble un à partir des sections choisies.
 
 ### Contenu
 Le rapport PDF comprend 9 sections :
@@ -87,7 +87,7 @@ Le rapport inclut des éléments visuels : barre de jauge de risque, distributio
 
 ## La file
 
-Les rapports planifiés sont groupés par prochaine exécution : **Prochaine exécution sous 24 h**, puis **Planifiés**. Une ligne donne le rapport, sa fréquence et son heure dans une pastille (dans votre fuseau ; une exécution mensuelle qui tomberait un autre jour pour vous garde son heure UTC, signalée), le chiffre actuel quand les compteurs des certificats le donnent (Certificats expirants) ou sinon son format, ses destinataires, et la prochaine exécution en forme courte au-dessus de sa date exacte. Les rapports sans planification sont repliés sous **Non planifiés**, chacun avec **Télécharger** et **Planifier…**.
+Les rapports planifiés sont groupés par prochaine exécution : **Prochaine exécution sous 24 h**, puis **Planifiés**. Une ligne donne le rapport, sa fréquence et son heure dans une pastille (dans votre fuseau ; une exécution hebdomadaire ou mensuelle qui tomberait un autre jour pour vous garde son heure UTC, signalée), le chiffre actuel quand les compteurs des certificats le donnent (Certificats expirants) ou sinon son format, ses destinataires, et la prochaine exécution en forme courte au-dessus de sa date exacte. Les rapports sans planification sont repliés sous **Non planifiés**, chacun avec **Télécharger** et **Planifier…**.
 
 ## Consulter un rapport
 
@@ -108,11 +108,11 @@ Le nom d'un rapport l'ouvre dans l'inspecteur :
 Chaque rapport de données et chaque modèle PDF peut être planifié, avec sa propre fréquence, son heure et ses destinataires. Planifiez **Certificats expirants** chaque jour pour détecter les certificats expirants avant qu'ils ne causent des pannes.
 
 ### Fréquence
-**Quotidienne**, **Hebdomadaire** (choisissez le jour de la semaine) ou **Mensuelle** (choisissez le jour du mois). Le planificateur tourne en UTC : si votre fuseau n’est pas UTC, l’heure se saisit en UTC et la file l’affiche dans votre fuseau.
+**Quotidienne**, **Hebdomadaire** (choisissez le jour de la semaine) ou **Mensuelle** (choisissez le jour du mois). Le planificateur tourne en UTC : l’heure se saisit dans votre fuseau, comme la file l’affiche, et se convertit à l’enregistrement ; une exécution hebdomadaire ou mensuelle dont la conversion changerait le jour se saisit en UTC, comme le dialogue le dit.
 
 ### Configuration
 1. Cliquez sur **Planifier un rapport**, ou sur **Planifier…** sur un rapport replié sous **Non planifiés**
-2. Choisissez le contenu, la fréquence et son jour, l'heure d'envoi (en UTC si votre fuseau n’est pas UTC) et, pour un rapport de données, le format (CSV ou JSON)
+2. Choisissez le contenu, la fréquence et son jour, l’heure d’envoi (dans votre fuseau) et, pour un rapport de données, le format (CSV ou JSON)
 3. Indiquez un ou plusieurs destinataires, séparés par des virgules : sans destinataire, rien n'est envoyé
 4. Cliquez sur **Planifier**
 

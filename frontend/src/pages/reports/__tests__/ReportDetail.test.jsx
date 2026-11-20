@@ -2,8 +2,8 @@
  * A report in the inspector, through the shared InspectorObject: heading, the
  * Report, Runs and Preview sections, the certificates it lists, its actions by right.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 const stable = vi.hoisted(() => ({ i18n: null, perms: [] }))
@@ -25,7 +25,7 @@ vi.mock('../../../hooks', () => ({
     canRead: (r) => stable.perms.includes(`read:${r}`), canDelete: () => false,
   }),
 }))
-const api = vi.hoisted(() => ({ generate: vi.fn(), getSchedule: vi.fn(), download: vi.fn() }))
+const api = vi.hoisted(() => ({ generate: vi.fn(), getSchedule: vi.fn(), download: vi.fn(), updateSchedule: vi.fn() }))
 const certs = vi.hoisted(() => ({ getStats: vi.fn() }))
 vi.mock('../../../services', () => ({ reportsService: api, certificatesService: certs }))
 
@@ -72,6 +72,15 @@ describe('ReportDetail in the inspector', () => {
     expect(dialog).toHaveTextContent('Certificats expirants')
   })
 
+  it('titles the test dialog as its button, in the mockup\'s words', async () => {
+    show(entry('expiring_certificates', WEEKLY))
+    fireEvent.click(screen.getByTestId('inspector-more-actions'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Envoyer un test…' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Envoyer un test' })
+    expect(dialog).toHaveTextContent('Envoyer un rapport test « Certificats expirants » pour vérifier la livraison par courriel.')
+    expect(within(dialog).getByLabelText('Courriel du destinataire')).toBeInTheDocument()
+  })
+
   it('links to the certificates a report lists', () => {
     show(entry('expiring_certificates', WEEKLY))
     expect(screen.getByRole('link', { name: 'Voir ces certificats' })).toHaveAttribute('href', '/certificates?status=expiring')
@@ -97,6 +106,58 @@ describe('ReportDetail in the inspector', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Aperçu' }))
     fireEvent.click(screen.getByRole('button', { name: 'Générer' }))
     expect(await screen.findByText('a.example.com')).toBeInTheDocument()
+  })
+
+  describe('schedule dialog, in the timezone the row reads', () => {
+    const MONTHLY = { enabled: true, frequency: 'monthly', time: '06:45', day_of_month: 1, recipients: ['direction-si@example.com'], format: 'csv' }
+    // Friday 20 November 2026, 10:00 UTC: the next runs fall in winter time, Paris at UTC+1
+    beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(Date.UTC(2026, 10, 20, 10))); setAppTimezone('Europe/Paris') })
+    afterEach(() => { vi.useRealTimers() })
+    const openEdit = async () => {
+      fireEvent.click(screen.getByTestId('inspector-more-actions'))
+      fireEvent.click(await screen.findByRole('button', { name: 'Modifier la planification…' }))
+      return screen.findByTestId('schedule-form')
+    }
+
+    it('shows the hour of the row, saves it back in UTC', async () => {
+      api.updateSchedule.mockResolvedValue({ data: {} })
+      show(entry('audit_summary', MONTHLY))
+      expect(screen.getByText('Mensuel, le 1er, à 07:45')).toBeInTheDocument()
+      const form = await openEdit()
+      expect(within(form).getByLabelText('Heure d’envoi')).toHaveValue('07:45')
+      expect(within(form).getByText('Format HH:MM.')).toBeInTheDocument()
+      fireEvent.click(within(form).getByRole('button', { name: 'Planifier' }))
+      await waitFor(() => expect(api.updateSchedule).toHaveBeenCalledWith({ audit_summary: expect.objectContaining({ time: '06:45', day_of_month: 1 }) }))
+    })
+
+    it('converts a typed hour and day to the scheduler\'s UTC, moving a weekly day when it has to', async () => {
+      api.updateSchedule.mockResolvedValue({ data: {} })
+      show(entry('audit_summary', { ...MONTHLY, frequency: 'weekly', time: '08:00', day_of_week: 0 }))
+      const form = await openEdit()
+      expect(within(form).getByLabelText('Heure d’envoi')).toHaveValue('09:00')
+      fireEvent.change(within(form).getByLabelText('Heure d’envoi'), { target: { value: '00:30' } })
+      fireEvent.click(within(form).getByRole('button', { name: 'Planifier' }))
+      // Monday 00:30 in Paris is Sunday 23:30 UTC
+      await waitFor(() => expect(api.updateSchedule).toHaveBeenCalledWith({ audit_summary: expect.objectContaining({ time: '23:30', day_of_week: 6 }) }))
+    })
+
+    it('keeps UTC on both sides, said, when the conversion moves a weekly day', async () => {
+      show(entry('audit_summary', { ...MONTHLY, frequency: 'weekly', time: '23:30', day_of_week: 6 }))
+      expect(screen.getByText('Hebdomadaire, le dimanche, à 23:30 UTC')).toBeInTheDocument()
+      const form = await openEdit()
+      expect(within(form).getByLabelText('Heure d’envoi (UTC)')).toHaveValue('23:30')
+      expect(within(form).getByLabelText('Jour de la semaine')).toHaveValue('6')
+      expect(within(form).getByText('Format HH:MM, en heure UTC comme le planificateur.')).toBeInTheDocument()
+    })
+
+    it('refuses a monthly hour the conversion would move out of the days of the month', async () => {
+      show(entry('audit_summary', MONTHLY))
+      const form = await openEdit()
+      fireEvent.change(within(form).getByLabelText('Heure d’envoi'), { target: { value: '00:30' } })
+      fireEvent.click(within(form).getByRole('button', { name: 'Planifier' }))
+      expect(await within(form).findByText(/un autre jour du mois en UTC/)).toBeInTheDocument()
+      expect(api.updateSchedule).not.toHaveBeenCalled()
+    })
   })
 
   it('offers neither download nor computation without export:audit', () => {

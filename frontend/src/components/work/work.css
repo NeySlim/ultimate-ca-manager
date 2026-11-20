@@ -6,8 +6,11 @@
 .wk-view { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-content: start; color: var(--text); font-size: 13px; line-height: normal; }
 .wk-view h2, .wk-view h3, .wk-view p { margin: 0; }
 .wk-view :is(button, a, input, [tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-/* No transition on the queue's controls, as the Atelier themes (Aurore animates its own, below) */
-:is(.wk-view, .lv-dialog, .ins-heading) :is(.wk-btn, .wk-subject, .wk-history-toggle, .wk-check input) { transition: none; }
+/* No transition on the queue's controls, its dialogs' fields and close button, as the Atelier themes (Aurore animates its buttons, below) */
+:is(.wk-view, .lv-dialog, .ins-heading) :is(.wk-btn, .wk-subject, .wk-history-toggle, .wk-check input),
+.wk-dialog .wk-field :is(input, select, textarea), .lv-dialog:has(.wk-dialog) .lv-dialog-head .lv-btn { transition: none; }
+/* Shown on one side of the phone width only */
+.wk-phone-only { display: none; }
 
 .wk-hint { display: flex; align-items: center; gap: 8px; min-height: 38px; font-size: 12px; color: var(--muted); }
 .wk-hint svg { width: 14px; height: 14px; flex-shrink: 0; }
@@ -50,7 +53,6 @@
 .wk-row:last-child { border-bottom: 0; }
 .wk-row.is-checked, .wk-row.is-opened { background: var(--selected); }
 .wk-row.is-opened { box-shadow: inset 2px 0 var(--accent); }
-.wk-row.no-check { grid-template-columns: minmax(0, 1fr) 170px auto; padding-left: 18px; }
 .wk-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .wk-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; min-width: 0; }
 .wk-subject {
@@ -119,6 +121,8 @@
 .wk-btn.is-danger { background: var(--badbg); border-color: var(--bad); color: var(--bad); }
 /* Buttons of the inspector heading: 28 px, as the mockup's dock heading */
 .ins-actions .wk-btn { min-height: 28px; padding: 4px 9px; }
+/* The load error's buttons keep the list template's 14 px icon */
+.lv-error-actions .wk-btn svg { width: 14px; height: 14px; }
 /* A button another row has and this one lacks keeps its place, so the due dates line up */
 .wk-btn.is-placeholder { visibility: hidden; }
 
@@ -182,6 +186,9 @@
 .wk-skel-bar.is-thin { height: 8px; }
 /* The long bar of the hint line gives way on a narrow screen */
 .wk-skel-bar.is-fluid { flex-shrink: 1; min-width: 0; }
+.wk-skel-hint-text { position: relative; display: flex; align-items: center; flex: 1; min-width: 0; align-self: stretch; }
+.wk-skel-hint-text > .wk-skel-bar { position: absolute; left: 0; top: 50%; margin-top: -5px; }
+.wk-skel-ghost { visibility: hidden; }
 .wk-skel .wk-row { min-height: 61px; }
 .wk-skel .wk-main { gap: 10px; }
 .wk-skel .wk-group-head { min-height: 47px; }
@@ -192,7 +199,7 @@
 .wk-dialog { display: block; font-size: 13px; color: var(--text); }
 .wk-dialog > p:first-child { margin: 0; }
 .wk-review { padding: 20px; background: var(--raised); border-radius: 4px; }
-.wk-dialog-list { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.8; }
+.wk-dialog-list { margin: 0; padding-left: 18px; list-style: disc; font-size: 12px; line-height: 1.8; }
 .wk-dialog-list .wk-muted, .wk-muted { color: var(--muted); }
 .wk-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; font-size: 12px; }
 .wk-review + .wk-field, .wk-dialog > .wk-notice + .wk-field, .wk-dialog > p + .wk-field { margin-top: 16px; }
@@ -244,7 +251,14 @@
 .wk-detail-grid > section { min-width: 0; }
 .wk-figure strong { font-size: 18px; font-weight: 500; }
 .wk-figure + p { margin: 6px 0 10px; }
+.wk-figure-note { font-size: 12px; line-height: normal; }
+/* A value that opens its object in the text's own colour and weight, underlined on hover */
+.ins-link.wk-quiet-link { color: inherit; font-weight: inherit; }
+/* The mockup's text link of the figure: 13 px, its 17 px chevron against the words */
+.wk-figure-link.lv-text-link { display: inline-block; min-height: 0; padding: 3px 0; font-size: 13px; line-height: normal; }
+.wk-figure-link svg { display: inline; width: 17px; height: 17px; vertical-align: middle; }
 .wk-detail-grid section > .wk-btn + p { margin-top: 10px; }
+.wk-detail-grid section > .wk-btn + .wk-figure-link { display: table; margin-top: 10px; }
 .wk-pre { max-height: 220px; margin: 10px 0 0; padding: 10px 12px; overflow: auto; background: var(--raised); border-radius: 4px; font-family: ui-monospace, 'Fira Code', monospace; font-size: 12px; white-space: pre; }
 .wk-table-box { max-height: 340px; overflow: auto; border: 1px solid var(--line); border-radius: 4px; }
 .wk-table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
@@ -254,9 +268,10 @@
 @media (max-width: 1250px) {
   .wk-btn.is-placeholder { display: none; }
   .wk-row { grid-template-columns: 28px minmax(0, 1fr) 150px; }
-  .wk-row.no-check { grid-template-columns: minmax(0, 1fr) 150px; }
   .wk-action { grid-column: 2 / -1; justify-content: flex-start; }
-  .wk-row.no-check .wk-action { grid-column: 1 / -1; }
+  /* Skeleton rows at the height of these rows: the actions on a line of their own */
+  .wk-skel .wk-main { min-height: 44px; justify-content: center; }
+  .wk-skel .wk-action .wk-skel-bar { height: 32px !important; }
 }
 @media (max-width: 800px) {
   /* Phone head of the queue pages, as the mockup's: the actions stay on the title line, 40 px */
@@ -265,15 +280,19 @@
   .wk-page .lv-intent { line-height: 1.6; }
   .wk-page .lv-actions { flex-wrap: nowrap; }
   .wk-page .lv-actions .wk-btn { min-height: 40px; }
-  /* A secondary page action keeps its icon only, its name read by assistive technology */
-  .wk-btn.lv-hide-mobile { width: 40px; padding: 6px; gap: 0; font-size: 0; }
+  .wk-not-phone { display: none; }
+  .wk-phone-only { display: block; }
+  /* Buttons of the inspector heading, 40 px on a phone as the mockup's dock */
+  .ins-actions .wk-btn { min-height: 40px; }
   .wk-scroll { overflow: visible; padding-inline: var(--lv-gutter, 16px); }
   .wk-row { grid-template-columns: 32px minmax(0, 1fr); padding: 12px 14px 12px 8px; }
-  .wk-row.no-check { grid-template-columns: minmax(0, 1fr); padding-left: 14px; }
   .wk-row .wk-due, .wk-action { grid-column: 2; }
-  .wk-row.no-check .wk-due, .wk-row.no-check .wk-action { grid-column: 1; }
+  /* Skeleton rows at the height of a phone row: two lines of subject, the due date, a 40 px button */
+  .wk-skel .wk-main { min-height: 60px; justify-content: center; }
+  .wk-skel .wk-due { min-height: 34px; align-items: center; }
+  .wk-skel .wk-action .wk-skel-bar { height: 40px !important; }
   .wk-action { justify-content: flex-start; }
-  .wk-action .wk-btn { min-height: 40px; }
+  .wk-action .wk-btn, .wk-phone-only .wk-btn { min-height: 40px; }
   .wk-group-head { padding: 8px 14px 8px 8px; }
   .wk-bar { padding: 10px; }
   .wk-bar .wk-btn { min-height: 40px; }
@@ -315,10 +334,20 @@
 :root[data-theme="aurore"] .wk-btn.is-primary:hover:not(:disabled) { filter: brightness(1.07); box-shadow: 0 0 0 1px var(--glow), 0 10px 30px -8px var(--glow); }
 :root[data-theme="aurore"][data-mode="dark"] .wk-btn:not(.is-primary):not(.is-danger):not(.is-quiet):hover:not(:disabled) { background: color-mix(in srgb, var(--grad-a) 12%, transparent); }
 :root[data-theme="aurore"][data-mode="light"] .wk-btn:not(.is-primary):not(.is-danger):not(.is-quiet):hover:not(:disabled) { background: color-mix(in srgb, var(--grad-a) 8%, transparent); }
+/* The primary lifts on hover even with reduced motion, as the mockup: only the transition goes */
+:root[data-theme="aurore"] .wk-btn.is-primary:hover:not(:disabled) { transform: translateY(-1px); }
 @media (prefers-reduced-motion: no-preference) {
   :root[data-theme="aurore"] .wk-btn { transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease; }
-  :root[data-theme="aurore"] .wk-btn.is-primary:hover:not(:disabled) { transform: translateY(-1px); }
 }
+/* Aurore family: the keyboard focus wears the mockup's halo around its outline, the primary keeps its glow */
+:root[data-theme="aurore"] :is(.wk-view, .lv-dialog:has(.wk-dialog), .ins-heading:has(.wk-btn)) :focus-visible {
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent);
+}
+:root[data-theme="aurore"] :is(.wk-view, .lv-dialog:has(.wk-dialog), .ins-heading:has(.wk-btn)) .wk-btn.is-primary:focus-visible {
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent), 0 8px 24px -8px var(--glow);
+}
+/* Aurore family: rounder dialog fields */
+:root[data-theme="aurore"] .wk-dialog .wk-field :is(input, select, textarea) { border-radius: 6px; }
 /* Aurore family: the queue panels in the gradient frame of the list's table box */
 :root[data-theme="aurore"] .wk-panel {
   border-color: transparent;

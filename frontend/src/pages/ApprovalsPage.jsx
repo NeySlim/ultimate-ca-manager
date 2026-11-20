@@ -7,10 +7,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { Check, Prohibit } from '@phosphor-icons/react'
+import { Prohibit } from '@phosphor-icons/react'
 import { ResponsiveLayout } from '../components'
 import { StatusPill } from '../components/list'
-import { WorkQueue, WorkButton, WorkRecord, WorkRecords, workSpot, focusWork, loadCause, PolicyIcon } from '../components/work'
+import { WorkQueue, WorkButton, WorkRecord, WorkRecords, workSpot, focusWork, loadCause, PolicyIcon, CheckIcon } from '../components/work'
 import { approvalsService } from '../services'
 import { useNotification, useInspector } from '../contexts'
 import { usePermission } from '../hooks'
@@ -122,7 +122,7 @@ export default function ApprovalsPage() {
   const title = (req) => <>{typeLabel(req, t)}{t('work.sep')}<span>{subjectOf(req)}</span></>
   const decisionButtons = (reqs, disabled, name) => (
     <>
-      <WorkButton icon={Check} disabled={disabled} onClick={() => ask('approve', reqs)}
+      <WorkButton icon={CheckIcon} disabled={disabled} onClick={() => ask('approve', reqs)}
         aria-label={name ? t('approvals.work.approveNamed', { name }) : undefined}>{t('approvals.work.approveAsk')}</WorkButton>
       <WorkButton quiet icon={Prohibit} disabled={disabled} onClick={() => ask('reject', reqs)}
         aria-label={name ? t('approvals.work.rejectNamed', { name }) : undefined}>{t('approvals.work.rejectAsk')}</WorkButton>

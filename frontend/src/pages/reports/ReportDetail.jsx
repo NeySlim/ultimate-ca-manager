@@ -6,9 +6,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { DownloadSimple, Clock, PaperPlaneTilt, PauseCircle, CaretRight, Play } from '@phosphor-icons/react'
+import { DownloadSimple, PaperPlaneTilt, PauseCircle, CaretRight, Play } from '@phosphor-icons/react'
 import { StatusPill } from '../../components/list'
-import { WorkButton, ChartIcon } from '../../components/work'
+import { WorkButton, ChartIcon, ClockIcon } from '../../components/work'
 import { SectionTabs, tabId, panelId } from '../../components/inspector/InspectorTabs'
 import { MoreActionsMenu } from '../../components/inspector/certificate/MoreActionsMenu'
 import { usePermission } from '../../hooks'
@@ -71,7 +71,7 @@ export function ReportDetail({ data, objectKey, title, section, onSection, onCha
 
   const next = nextRun(schedule)
   const menu = [
-    canSchedule && { id: 'schedule', icon: Clock, label: t(schedule.enabled ? 'reports.work.editSchedule' : 'reports.work.scheduleAsk'), onClick: () => actions.openSchedule(key, fromMenu) },
+    canSchedule && { id: 'schedule', icon: ClockIcon, label: t(schedule.enabled ? 'reports.work.editSchedule' : 'reports.work.scheduleAsk'), onClick: () => actions.openSchedule(key, fromMenu) },
     canSchedule && schedule.enabled && { id: 'suspend', icon: PauseCircle, label: t('reports.work.suspend'), onClick: () => actions.suspend([key]) },
     canSchedule && { id: 'test', icon: PaperPlaneTilt, label: t('reports.work.testAsk'), onClick: () => actions.openTest(key, fromMenu) },
   ].filter(Boolean)
@@ -115,21 +115,19 @@ export function ReportDetail({ data, objectKey, title, section, onSection, onCha
                 {figure ? (
                   <>
                     <p className="wk-figure"><strong>{figure}</strong></p>
-                    <p className="ins-muted">{t('reports.work.figure.expiringNote', { days: 30 })}</p>
+                    <p className="ins-muted wk-figure-note">{t('reports.work.figure.expiringNote', { days: 30 })}</p>
                   </>
                 ) : report ? (
                   <>
                     <p className="wk-figure"><strong>{t('reports.work.items', { count: report.items.length })}</strong></p>
-                    <p className="ins-muted">{t('reports.work.generatedAt', { date: formatDate(report.generatedAt, { time: true }) })}</p>
+                    <p className="ins-muted wk-figure-note">{t('reports.work.generatedAt', { date: formatDate(report.generatedAt, { time: true }) })}</p>
                   </>
                 ) : (
                   <WorkButton icon={Play} disabled={!canExport || busy} onClick={generate}>{t('reports.work.compute')}</WorkButton>
                 )}
                 {failed && <p className="ins-notice is-bad" role="alert">{t('reports.generateFailed')}</p>}
                 {certLink && (
-                  <p>
-                    <Link className="lv-text-link" to={certLink}><CaretRight size={14} aria-hidden="true" />{t('reports.work.seeCertificates')}</Link>
-                  </p>
+                  <Link className="lv-text-link wk-figure-link" to={certLink}><CaretRight aria-hidden="true" />{t('reports.work.seeCertificates')}</Link>
                 )}
               </section>
             )}

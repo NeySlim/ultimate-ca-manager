@@ -60,17 +60,17 @@ export function WorkRecords({ children, empty }) {
   return list.length ? <ul className="wk-records">{list}</ul> : <p className="wk-none">{empty}</p>
 }
 
-// A row the user may not select keeps the check column empty: its text lines up with the others
-function WorkRow({ row, checked, opened, selecting, onToggle, checkColumn, selectable }) {
+// A row the user may not select keeps the check column, empty: its text lines up with the template's
+function WorkRow({ row, checked, opened, selecting, onToggle, selectable }) {
   const { t } = useTranslation()
   return (
-    <li className={cn('wk-row', checked && 'is-checked', opened && 'is-opened', !checkColumn && 'no-check')} data-work-row={row.id}>
-      {checkColumn && (selectable ? (
+    <li className={cn('wk-row', checked && 'is-checked', opened && 'is-opened')} data-work-row={row.id}>
+      {selectable ? (
         <label className="wk-check">
           <input type="checkbox" checked={checked} onChange={() => onToggle(row.id)}
             aria-label={t('work.selectRow', { name: row.title })} />
         </label>
-      ) : <span className="wk-check" aria-hidden="true" />)}
+      ) : <span className="wk-check" aria-hidden="true" />}
       <div className="wk-main">
         <p className="wk-head">
           <button type="button" className="wk-subject" onClick={row.onOpen} data-work-open={row.id}>{row.titleNode ?? row.title}</button>
@@ -94,12 +94,12 @@ function WorkGroup({ group, selected, openedId, toggle, setMany, selecting, sele
   return (
     <section className="wk-panel wk-group" aria-labelledby={headId} data-work-group={group.id}>
       <header className="wk-group-head">
-        {selectable && (ids.length > 0 ? (
+        {selectable && ids.length > 0 ? (
           <label className="wk-check">
             <input type="checkbox" checked={all} onChange={() => setMany(ids, !all)}
               aria-label={t('work.selectAll', { group: group.label })} />
           </label>
-        ) : <span className="wk-check" aria-hidden="true" />)}
+        ) : <span className="wk-check" aria-hidden="true" />}
         <h2 id={headId}>
           <span className={cn('wk-tone', group.tone && `is-${group.tone}`)}><Icon aria-hidden="true" /></span>
           {group.label}
@@ -109,22 +109,25 @@ function WorkGroup({ group, selected, openedId, toggle, setMany, selecting, sele
       <ul className="wk-list">
         {group.items.map((row) => (
           <WorkRow key={row.id} row={row} checked={selected.has(row.id)} opened={openedId === row.id}
-            selecting={selecting} onToggle={toggle} checkColumn={selectable} selectable={selectable && row.selectable !== false} />
+            selecting={selecting} onToggle={toggle} selectable={selectable && row.selectable !== false} />
         ))}
       </ul>
     </section>
   )
 }
 
-// Skeleton at the size of what replaces it: the hint line, groups with a 47 px head and
-// 61 px rows, the folded section; fixed bars, nothing moves when the rows arrive
-function WorkSkeleton({ history }) {
+// Skeleton at the size of what replaces it: the hint line (its text hidden under the bar
+// gives it the same lines), groups with a 47 px head and 61 px rows, the folded section
+function WorkSkeleton({ history, hint }) {
   const { t } = useTranslation()
   const bar = (style, kind) => <span className={cn('wk-skel-bar', kind && `is-${kind}`)} style={style} />
   return (
     <div className="wk-view wk-skel" role="status" aria-live="polite" aria-busy="true">
       <span className="sr-only">{t('work.loading')}</span>
-      <p className="wk-hint" aria-hidden="true">{bar({ width: 14, height: 14 })}{bar({ width: 420 }, 'fluid')}</p>
+      <p className="wk-hint wk-skel-hint" aria-hidden="true">
+        {bar({ width: 14, height: 14 })}
+        <span className="wk-skel-hint-text">{bar({ width: 420 }, 'fluid')}<span className="wk-skel-ghost">{hint}</span></span>
+      </p>
       {[2, 1].map((n, g) => (
         <section key={g} className="wk-panel" aria-hidden="true">
           <header className="wk-group-head">
@@ -161,8 +164,9 @@ function WorkSkeleton({ history }) {
  * @param {(ids: string[], clear: () => void) => import('react').ReactNode} [p.bulkActions]  no selection without it
  * @param {{title,text,action}} p.empty
  * @param {{label,count,children}} [p.history]
+ * @param {import('react').ReactNode} [p.after]  under the queue, once loaded
  */
-export function WorkQueue({ state = 'ready', error, hint, groups, bulkActions, openedId, empty, history, label, rootRef }) {
+export function WorkQueue({ state = 'ready', error, hint, groups, bulkActions, openedId, empty, history, after, label, rootRef }) {
   const { t } = useTranslation()
   const [picked, setPicked] = useState(() => new Set())
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -187,7 +191,7 @@ export function WorkQueue({ state = 'ready', error, hint, groups, bulkActions, o
   // Clear selection leaves with its bar: the focus goes to the page title, as in the mockup
   const clearAndFocus = () => { clear(); requestAnimationFrame(focusTitle) }
 
-  if (state === 'loading') return <div className="wk-scroll" ref={rootRef}><WorkSkeleton history={!!history} /></div>
+  if (state === 'loading') return <div className="wk-scroll" ref={rootRef}><WorkSkeleton history={!!history} hint={hint} /></div>
   if (state === 'error') {
     return (
       <div className="wk-scroll" ref={rootRef}>
@@ -248,6 +252,7 @@ export function WorkQueue({ state = 'ready', error, hint, groups, bulkActions, o
             </div>
           </section>
         )}
+        {after}
       </div>
     </div>
   )
