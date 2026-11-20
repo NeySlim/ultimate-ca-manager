@@ -7176,7 +7176,6 @@
     "theme": {
       "menu": "Tema",
       "label": "Tema: {{theme}}",
-      "current": "Theme: {{name}}",
       "system": "System",
       "systemNow": "{{mode}} currently",
       "dark": "Dark",

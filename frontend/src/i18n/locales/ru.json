@@ -7351,7 +7351,6 @@
     "theme": {
       "menu": "Тема",
       "label": "Тема: {{theme}}",
-      "current": "Тема: {{name}}",
       "system": "Системная",
       "systemNow": "сейчас {{mode}}",
       "dark": "Тёмная",

@@ -7176,7 +7176,6 @@
     "theme": {
       "menu": "主题",
       "label": "主题：{{theme}}",
-      "current": "主题：{{name}}",
       "system": "跟随系统",
       "systemNow": "当前为{{mode}}",
       "dark": "深色",

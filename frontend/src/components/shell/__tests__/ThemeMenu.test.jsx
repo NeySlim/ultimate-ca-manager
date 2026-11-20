@@ -49,7 +49,7 @@ describe('ThemeMenu', () => {
     const user = setup()
     await user.click(trigger())
     const names = screen.getAllByRole('menuitemradio').map(b => b.textContent)
-    expect(names.slice(0, 5)).toEqual(['shell.theme.system' + 'shell.theme.systemNow', 'shell.theme.dark',
+    expect(names.slice(0, 5)).toEqual(['shell.theme.system' + 'shell.theme.systemNow|shell.theme.dark', 'shell.theme.dark',
       'shell.theme.light', 'shell.theme.aurore', 'shell.theme.auroreLight'])
     expect(names.slice(5)).toEqual(['themes.purple'])
   })
@@ -75,7 +75,7 @@ describe('ThemeMenu', () => {
     theme.value = { themeFamily: 'atelier', mode: 'dark', resolvedMode: 'dark' }
     const user = setup()
     await user.click(trigger())
-    const dark = screen.getByRole('menuitemradio', { name: /shell\.theme\.dark/ })
+    const dark = screen.getByRole('menuitemradio', { name: 'shell.theme.dark' })
     expect(dark).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByRole('menuitemradio', { name: /shell\.theme\.system/ })).toHaveAttribute('aria-checked', 'false')
     expect(dark).toHaveFocus()
@@ -85,7 +85,7 @@ describe('ThemeMenu', () => {
     theme.value = { themeFamily: 'atelier', mode: 'system', resolvedMode: 'light' }
     setup()
     expect(trigger().querySelector('svg')).toHaveAttribute('data-mode', 'light')
-    expect(trigger().getAttribute('title')).toBe('shell.theme.current|shell.theme.system (shell.theme.light)')
+    expect(trigger().getAttribute('title')).toBe('shell.theme.label|shell.theme.system (shell.theme.light)')
   })
 
   it('opens on the down arrow of its button', async () => {
@@ -97,8 +97,8 @@ describe('ThemeMenu', () => {
 
   it('names the theme in force on the button, as the mockup: "Theme: System (dark)", a menu popup', () => {
     setup()
-    expect(trigger()).toHaveAccessibleName('shell.theme.label|shell.theme.systemNow|settings.dark')
-    expect(trigger()).toHaveAttribute('title', 'shell.theme.label|shell.theme.systemNow|settings.dark')
+    expect(trigger()).toHaveAccessibleName('shell.theme.label|shell.theme.system (shell.theme.dark)')
+    expect(trigger()).toHaveAttribute('title', 'shell.theme.label|shell.theme.system (shell.theme.dark)')
     expect(trigger()).toHaveAttribute('aria-haspopup', 'menu')
   })
 
