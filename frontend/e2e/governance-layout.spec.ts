@@ -1,4 +1,4 @@
-import { test, expect } from './support/fixtures'
+import { test, expect, createCA } from './support/fixtures'
 
 // Approvals, Reports and Key recovery against the Atelier mockup: head, dialogs, focus, phone head
 type Box = { x: number; y: number; width: number; height: number }
@@ -35,6 +35,24 @@ test.describe('desktop', () => {
     await confirm.click()
     await expect(dialog.getByText('Invalid time: HH:MM format, from 00:00 to 23:59.')).toBeVisible()
     await expect(dialog.getByLabel(/^Sending time/)).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+    await expect(open).toBeFocused()
+  })
+
+  test('Escape closes the schedule dialog while a toast sits above it', async ({ page, api }) => {
+    // The server's events reach the page once its socket has said "connected"
+    const socket = page.waitForEvent('websocket', (ws) => ws.url().includes('/socket.io'))
+      .then((ws) => ws.waitForEvent('framereceived', { predicate: (f) => String(f.payload).includes('"connected"'), timeout: 30000 }))
+    await page.goto('/reports')
+    const open = page.locator('.lv-head').getByRole('button', { name: 'Schedule a report' })
+    await open.click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByLabel('Content')).toBeFocused()
+    // An event of the server announced while the dialog is open: the toast is the topmost layer
+    await socket
+    await createCA(api)
+    await expect(page.locator('.ui-toast').filter({ hasText: /^CA created: / }).first()).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(dialog).toBeHidden()
     await expect(open).toBeFocused()
