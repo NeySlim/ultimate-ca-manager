@@ -13,6 +13,7 @@ export const SOURCE_LABEL_KEYS = {
   acme: 'sourceAcme',
   acme_client: 'sourceAcmeClient',
   'acme-renewal': 'sourceAcmeRenewal',
+  issued: 'sourceIssued',
   letsencrypt: 'sourceLetsencrypt',
   scep: 'sourceScep',
   est: 'sourceEst',
