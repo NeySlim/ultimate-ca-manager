@@ -47,6 +47,7 @@ import { notificationSpies } from './pageRenderingSetup.jsx'
 
 import SettingsPage from '../SettingsPage'
 import { settingsService } from '../../services/settings.service'
+import { auditService } from '../../services'
 import { dropAllDrafts } from '../../components/sectioned/draftMemory'
 
 const renderPage = (entry = '/settings') => render(
@@ -154,6 +155,29 @@ describe('SettingsPage: one page, one save bar', () => {
     expect(port).not.toHaveAttribute('aria-invalid')
     await act(async () => { fireEvent.click(saveButton()) })
     expect(settingsService.updateEmailSettings).toHaveBeenCalledWith(expect.objectContaining({ smtp_port: 2525 }))
+  })
+
+  it('dates the last save from a real save only, not from a renewal run in the same log', async () => {
+    auditService.getLogs = vi.fn().mockResolvedValue({ data: [
+      { id: 3, action: 'auto_renewal_manual_run', resource_name: 'Auto-Renewal', details: 'Manual run: 0 renewed', username: 'bob', timestamp: '2026-11-19T10:00:00Z' },
+      { id: 2, action: 'settings_update', resource_name: 'General Settings', details: 'Updated general settings', username: 'alice', timestamp: '2026-11-18T09:00:00Z' },
+    ] })
+    await loaded()
+    await waitFor(() => expect(bar()).toHaveTextContent('sectioned.lastSavedBy'))
+    const history = screen.getByRole('region', { name: 'settings.historyTitle' })
+    expect(within(history).getByText('General Settings')).toBeInTheDocument()
+    expect(within(history).queryByText('Auto-Renewal')).toBeNull()
+  })
+
+  it('says only that nothing is pending when the log holds no save', async () => {
+    auditService.getLogs = vi.fn().mockResolvedValue({ data: [
+      { id: 3, action: 'auto_renewal_manual_run', resource_name: 'Auto-Renewal', username: 'bob', timestamp: '2026-11-19T10:00:00Z' },
+    ] })
+    await loaded()
+    await waitFor(() => expect(auditService.getLogs).toHaveBeenCalled())
+    await waitFor(() => expect(screen.getByRole('region', { name: 'settings.historyTitle' })).toBeInTheDocument())
+    expect(bar()).toHaveTextContent('sectioned.nothingPending')
+    expect(bar()).not.toHaveTextContent('sectioned.lastSaved')
   })
 
   it('lands a link to ?tab= on the frame of that section', async () => {

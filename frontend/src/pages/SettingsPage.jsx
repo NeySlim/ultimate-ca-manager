@@ -122,6 +122,9 @@ const SETTINGS_GROUPS = [
   { id: 'about', labelKey: 'settings.groups.about', ids: ['about'] },
 ]
 
+// Audit actions a save of these sections writes (resource_type settings)
+const SETTINGS_SAVE_ACTIONS = ['settings_update', 'syslog_config_updated', 'mtls_settings_update', 'ct_settings_updated']
+
 // Draft of the page kept for the tab (components/sectioned/draftMemory)
 const SETTINGS_DRAFT = 'settings'
 
@@ -522,12 +525,14 @@ export default function SettingsPage() {
     }
   }
 
-  // The settings carry no date: the last saves are read from the audit log, when readable
+  // The settings carry no date: the last saves are read from the audit log, when readable.
+  // Only an entry a save writes counts (a manual renewal run or an OAuth consent is no save).
   const loadSettingsLog = async () => {
     if (!hasPermission('read:audit')) return
     try {
-      const res = await auditService.getLogs({ resource_type: 'settings', success: true, per_page: 5 })
-      setSettingsLog(Array.isArray(res?.data) ? res.data : [])
+      const res = await auditService.getLogs({ resource_type: 'settings', success: true, per_page: 25 })
+      const saves = (Array.isArray(res?.data) ? res.data : []).filter((e) => SETTINGS_SAVE_ACTIONS.includes(e.action))
+      setSettingsLog(saves.slice(0, 5))
     } catch (error) { reportSilentFailure('loadSettingsLog', error) }
   }
 

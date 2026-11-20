@@ -16,8 +16,10 @@ export default function SettingsHistory({ entries }) {
         <ul className="sf-history-list">
           {entries.map((entry) => (
             <li key={entry.id}>
-              <strong>{entry.resource_name || entry.action}</strong>
-              <span className="sf-history-detail">{entry.details}</span>
+              <span className="sf-history-main">
+                <strong>{entry.resource_name || entry.action}</strong>
+                {entry.details && <span className="sf-history-detail">{entry.details}</span>}
+              </span>
               <span className="sf-history-meta">{entry.username} · {formatDate(entry.timestamp, { time: true })}</span>
             </li>
           ))}

@@ -138,12 +138,14 @@
 
 /* History of the saves, read from the audit log */
 .sf-history { border: 1px solid var(--line); border-radius: 5px; background: var(--panel); min-width: 0; }
-.sf-history-list { list-style: none; margin: 0; padding: 4px 20px 8px; }
-.sf-history-list li { display: flex; align-items: baseline; gap: 4px 16px; flex-wrap: wrap; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+/* Rows of the mockup's record list: title over its detail, author and date on the right */
+.sf-history-list { list-style: none; margin: 0; padding: 18px 20px; }
+.sf-history-list li { display: flex; align-items: center; gap: 6px 16px; flex-wrap: wrap; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
 .sf-history-list li:last-child { border-bottom: 0; }
-.sf-history-list strong { font-weight: 500; color: var(--text); }
-.sf-history-list .sf-history-detail { flex: 1 1 300px; min-width: 0; color: var(--muted); overflow-wrap: anywhere; }
-.sf-history-list .sf-history-meta { margin-left: auto; color: var(--muted); white-space: nowrap; }
+.sf-history-main { flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sf-history-list strong { font-size: 13px; font-weight: 500; color: var(--text); overflow-wrap: anywhere; }
+.sf-history-list .sf-history-detail { min-width: 0; color: var(--muted); overflow-wrap: anywhere; }
+.sf-history-list .sf-history-meta { color: var(--muted); overflow-wrap: anywhere; }
 .sf-history-empty { padding: 18px 20px; font-size: 12px; color: var(--muted); }
 
 .sr-only-sf { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }

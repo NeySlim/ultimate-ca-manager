@@ -1143,7 +1143,7 @@ export const helpContent = {
         title: 'Page layout',
         content: 'Every section is on one page, in a frame of its own; the table of contents on the left lists them by group (on a phone, the Go to section list).',
         items: [
-          { label: 'Save bar', text: 'At the bottom of the page: No changes pending, with the date and the account of the last save when you can read the audit log; once a field changes, the count of changes and their sections, with Undo changes (back to the values loaded) and Save. Save stores every changed section through its usual route' },
+          { label: 'Save bar', text: 'At the bottom of the page: No changes pending, with the date and the account of the last save of the settings when you can read the audit log (a renewal run or an OAuth consent is not a save); once a field changes, the count of changes and their sections, with Undo changes (back to the values loaded) and Save. Save stores every changed section through its usual route' },
           { label: 'Save in error', text: 'A port out of 1 to 65535 (SMTP, syslog, ACME public port) is marked on its field and nothing is sent until it is corrected. A section whose save fails is marked To correct in the table of contents and names the error in its frame; the other sections are saved and what you typed stays' },
           { label: 'Own actions', text: 'A test, an import, a generation or a list (SSO providers, webhooks, connections, Windows profiles, backups) keeps its button in its section and acts at once' },
           { label: 'Links', text: 'A link to /settings?tab=<section> (overview, palette, other pages) opens the page on that section' },
