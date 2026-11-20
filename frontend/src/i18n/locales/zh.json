@@ -3679,7 +3679,12 @@
     "restoreLost": "恢复在提交完成前中断：未恢复任何内容。请重新开始。",
     "restoreSignInAgain": "恢复很可能已提交生效：此会话已被登出。请重新登录以查看恢复报告。",
     "restoreSignIn": "重新登录",
-    "restoreContactLost": "恢复期间服务器停止响应。请稍后刷新页面，查看恢复的结果。"
+    "restoreContactLost": "恢复期间服务器停止响应。请稍后刷新页面，查看恢复的结果。",
+    "intent": "实例的常规配置。",
+    "tocLabel": "设置部分",
+    "historyTitle": "修改历史",
+    "historyIntent": "设置的最近保存记录，来自审计日志。",
+    "historyEmpty": "没有修改。"
   },
   "account": {
     "profile": "个人资料",
@@ -6930,5 +6935,28 @@
       "sub": "按状态统计的证书。每一行打开对应列表。",
       "alt": "共 {{total}} 张证书：有效 {{valid}}，即将到期 {{expiring}}，已过期 {{expired}}，已吊销 {{revoked}}。"
     }
+  },
+  "sectioned": {
+    "flagModified": "已修改",
+    "flagError": "待更正",
+    "pendingTitle": "已修改，未保存",
+    "pendingCount_one": "：{{sections}} 中有 {{count}} 处修改。",
+    "pendingCount_other": "：{{sections}} 中有 {{count}} 处修改。",
+    "nothingPending": "没有待保存的修改。",
+    "lastSavedBy": "最后保存于 {{date}}，由 {{user}} 保存。",
+    "lastSaved": "最后保存于 {{date}}。",
+    "saveFailedTitle": "未保存",
+    "saveFailedIn": "：请在 {{sections}} 中更正；其他部分已保存，输入内容已保留。",
+    "saveFailedToast": "未保存：{{sections}}。",
+    "savedToast": "设置已保存。",
+    "undo": "撤销修改",
+    "saving": "正在保存…",
+    "leaveTitle": "不保存就离开？",
+    "leaveConfirm": "部分修改尚未保存。离开此页面将丢弃这些修改。",
+    "leave": "离开页面",
+    "jumpLabel": "转到部分",
+    "sectionCount_one": "{{count}} 个部分",
+    "sectionCount_other": "{{count}} 个部分",
+    "sectionFailed": "无法显示此部分。请重新加载页面后重试。"
   }
 }

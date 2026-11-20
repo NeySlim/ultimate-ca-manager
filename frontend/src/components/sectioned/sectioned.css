@@ -1,0 +1,169 @@
+/*
+ * Sectioned form template: a table of contents on the left, one full-width frame per section,
+ * a sticky save bar. Geometry of the Atelier settings page; theme tokens only.
+ */
+.sf-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 24px; align-items: start; padding-bottom: 24px; }
+.sf-toc { position: sticky; top: 0; padding-top: 2px; max-height: calc(100dvh - 210px); overflow-y: auto; scrollbar-width: thin; }
+.sf-toc ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.sf-toc-group + .sf-toc-group { margin-top: 8px; }
+.sf-toc-group-title { display: flex; align-items: center; margin: 0; padding: 6px 10px; font-size: 12px; font-weight: 500; color: var(--muted); }
+.sf-toc a {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.sf-toc a:hover { color: var(--text); background: var(--hover); }
+.sf-toc a[aria-current="true"] { color: var(--accent); background: var(--selected); }
+.sf-toc a > svg { width: 15px; height: 15px; flex-shrink: 0; }
+.sf-toc a > span:first-of-type { min-width: 0; overflow-wrap: anywhere; }
+.sf-toc :is(a, button):focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.sf-flag { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--warn); white-space: nowrap; }
+.sf-flag.is-bad { color: var(--bad); }
+.sf-flag svg { width: 12px; height: 12px; }
+
+.sf-main { display: grid; gap: 18px; min-width: 0; }
+.sf-form { display: grid; gap: 18px; min-width: 0; }
+.sf-jump { display: none; flex-direction: column; gap: 7px; font-size: 12px; }
+.sf-jump select {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid var(--control);
+  border-radius: 4px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+/* One frame per section: heading with its sentence, then the body */
+.sf-section {
+  scroll-margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel);
+  min-width: 0;
+  container-type: inline-size;
+}
+.sf-section.is-error { border-color: var(--bad); }
+.sf-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 17px 19px;
+  border-bottom: 1px solid var(--line);
+}
+.sf-heading > div:first-child { min-width: 0; }
+.sf-heading h2 { margin: 0; font-size: 14px; font-weight: 600; color: var(--text); }
+.sf-heading h2:focus { outline: none; }
+.sf-heading h2:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.sf-heading p { margin: 5px 0 0; font-size: 12px; color: var(--muted); }
+.sf-heading-aside { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.sf-section-error { display: flex; align-items: flex-start; gap: 6px; margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--bad); }
+.sf-section-error svg { width: 13px; height: 13px; margin-top: 2px; flex-shrink: 0; }
+.sf-body { padding: 18px 20px; display: grid; gap: 20px; min-width: 0; color: var(--text); }
+
+/* A group of fields inside a section: the legend of the Atelier settings grid */
+.sf-group { min-width: 0; }
+.sf-group-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.sf-legend { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; font-weight: 500; color: var(--text); }
+.sf-group-desc { margin: 4px 0 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.sf-group-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.sf-group-body { min-width: 0; }
+
+/* Fields of the sections, at the geometry of the Atelier fields: label, 36 px control, hint */
+.sf-body label { font-size: 12px; font-weight: 400; color: var(--text); }
+.sf-body :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea) {
+  font-size: 12px;
+  border-radius: 4px;
+  border-color: var(--control);
+  background-color: var(--panel);
+  color: var(--text);
+}
+.sf-body :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select) { height: 36px; padding: 8px 10px; }
+.sf-body button[role="combobox"] { height: 36px; padding: 8px 10px; font-size: 12px; border-radius: 4px; border-color: var(--control); background-color: var(--panel); }
+.sf-body .space-y-1\.5 > label { line-height: normal; }
+.sf-body .space-y-1\.5 > label > span { height: auto; }
+.sf-body .space-y-1\.5 > :not([hidden]) ~ :not([hidden]) { margin-top: 7px; }
+.sf-body .space-y-1\.5 > p { font-size: 12px; line-height: 1.6; color: var(--muted); }
+.sf-body .sf-hint, .sf-body small { font-size: 12px; line-height: 1.6; color: var(--muted); }
+
+/* Fields side by side as in the Atelier grid: two per row, any other block on a row of its own */
+.sf-body .sf-group-body > :is(.space-y-3, .space-y-4) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.sf-body .sf-group-body > :is(.space-y-3, .space-y-4) > :not([hidden]) { grid-column: 1 / -1; margin-top: 0; margin-bottom: 0; }
+.sf-body .sf-group-body > :is(.space-y-3, .space-y-4) > .space-y-1\.5:not([hidden]) { grid-column: auto; }
+
+/* Test of a section with the values typed, and its result */
+.sf-test { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid var(--line); }
+.sf-test-result { display: flex; gap: 6px; align-items: flex-start; font-size: 12px; line-height: 1.5; min-width: 0; flex: 1 1 260px; color: var(--muted); }
+.sf-test-result.is-good { color: var(--good); }
+.sf-test-result.is-bad { color: var(--bad); }
+.sf-test-result svg { width: 13px; height: 13px; margin-top: 2px; flex-shrink: 0; }
+
+/* Save bar: what is pending, undo, save */
+.sf-savebar {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  box-shadow: 0 -10px 24px -18px var(--scrim);
+}
+.sf-savebar.is-dirty { border-color: var(--warn-fill); }
+.sf-state { display: flex; align-items: flex-start; gap: 7px; margin: 0 auto 0 0; font-size: 12px; line-height: 1.5; color: var(--muted); flex: 1 1 280px; min-width: 0; }
+.sf-state > svg { width: 14px; height: 14px; margin-top: 1px; flex-shrink: 0; color: var(--good); }
+.sf-savebar.is-dirty .sf-state, .sf-savebar.is-dirty .sf-state > svg { color: var(--warn); }
+.sf-savebar.is-error .sf-state, .sf-savebar.is-error .sf-state > svg { color: var(--bad); }
+.sf-state strong { font-weight: 600; }
+.sf-state:focus { outline: none; }
+.sf-state:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* History of the saves, read from the audit log */
+.sf-history { border: 1px solid var(--line); border-radius: 5px; background: var(--panel); min-width: 0; }
+.sf-history-list { list-style: none; margin: 0; padding: 4px 20px 8px; }
+.sf-history-list li { display: flex; align-items: baseline; gap: 4px 16px; flex-wrap: wrap; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.sf-history-list li:last-child { border-bottom: 0; }
+.sf-history-list strong { font-weight: 500; color: var(--text); }
+.sf-history-list .sf-history-detail { flex: 1 1 300px; min-width: 0; color: var(--muted); overflow-wrap: anywhere; }
+.sf-history-list .sf-history-meta { margin-left: auto; color: var(--muted); white-space: nowrap; }
+.sf-history-empty { padding: 18px 20px; font-size: 12px; color: var(--muted); }
+
+.sr-only-sf { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+@media (max-width: 899px) {
+  .sf-layout { grid-template-columns: 1fr; gap: 12px; padding: 0 var(--lv-gutter, 16px) 16px; }
+  .sf-toc { display: none; }
+  .sf-jump { display: flex; }
+  .sf-body { padding: 16px; }
+  .sf-heading { padding: 17px 16px; flex-wrap: wrap; }
+  .sf-body :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select) { height: 44px; font-size: 13px; }
+  .sf-body .sf-group-body > :is(.space-y-3, .space-y-4) { grid-template-columns: 1fr; }
+  .sf-savebar { position: static; padding: 10px 12px; }
+  .sf-savebar.is-dirty { position: sticky; }
+  .sf-savebar .lv-btn { min-height: 42px; flex: 1 1 auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-toc a { transition: none; }
+}
+
+/* Aurore family: frames keep the gradient border of its panels */
+:root[data-theme="aurore"] :is(.sf-section, .sf-savebar, .sf-history) { border-radius: 6px; }
+:root[data-theme="aurore"] :is(.sf-section, .sf-history):not(.is-error) {
+  border-color: transparent;
+  background: linear-gradient(var(--panel), var(--panel)) padding-box,
+    linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 55%, transparent), color-mix(in srgb, var(--grad-b) 25%, transparent) 60%, var(--line)) border-box;
+}

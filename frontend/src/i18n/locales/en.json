@@ -3680,7 +3680,12 @@
     "restoreLost": "The restore stopped before it committed: nothing was restored. Start it again.",
     "restoreSignInAgain": "The restore has probably committed: it signed this session out. Sign in again to read its report.",
     "restoreSignIn": "Sign in again",
-    "restoreContactLost": "The server stopped answering during the restore. Reload the page later to see how it ended."
+    "restoreContactLost": "The server stopped answering during the restore. Reload the page later to see how it ended.",
+    "intent": "General configuration of the instance.",
+    "tocLabel": "Settings sections",
+    "historyTitle": "Change history",
+    "historyIntent": "The latest saves of the settings, as the audit log records them.",
+    "historyEmpty": "No changes."
   },
   "account": {
     "profile": "Profile",
@@ -6933,5 +6938,28 @@
       "sub": "Certificates by state. Each line opens its list.",
       "alt": "{{total}} certificates: {{valid}} valid, {{expiring}} expiring, {{expired}} expired, {{revoked}} revoked."
     }
+  },
+  "sectioned": {
+    "flagModified": "Modified",
+    "flagError": "To correct",
+    "pendingTitle": "Modified, not saved",
+    "pendingCount_one": ": {{count}} change in {{sections}}.",
+    "pendingCount_other": ": {{count}} changes in {{sections}}.",
+    "nothingPending": "No changes pending.",
+    "lastSavedBy": "Last saved on {{date}} by {{user}}.",
+    "lastSaved": "Last saved on {{date}}.",
+    "saveFailedTitle": "Not saved",
+    "saveFailedIn": ": to correct in {{sections}}; the other sections are saved and your input is kept.",
+    "saveFailedToast": "Not saved: {{sections}}.",
+    "savedToast": "Settings saved.",
+    "undo": "Undo changes",
+    "saving": "Saving…",
+    "leaveTitle": "Leave without saving?",
+    "leaveConfirm": "Some changes are not saved. Leaving the page discards them.",
+    "leave": "Leave the page",
+    "jumpLabel": "Go to section",
+    "sectionCount_one": "{{count}} section",
+    "sectionCount_other": "{{count}} sections",
+    "sectionFailed": "This section could not be shown. Reload the page to try again."
   }
 }
