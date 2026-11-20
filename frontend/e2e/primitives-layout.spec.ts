@@ -1,4 +1,4 @@
-import { test, expect } from './support/fixtures'
+import { test, expect, createCA, issueCert } from './support/fixtures'
 
 // Base components at the Atelier geometry: 32 px buttons with a 4 px radius, 36 px fields,
 // 16 px check boxes, the 760 px dialog and the 220 px theme menu
@@ -36,8 +36,11 @@ test('settings fields, buttons and check lines follow the mockup', async ({ page
 })
 
 test('the export dialog is the 760 px dialog with translated actions', async ({ page, api }) => {
+  // Its own certificate, searched: the list may be empty, or changed by tests running beside
+  const cert = await issueCert(api, (await createCA(api)).id)
   await page.goto('/certificates')
-  const row = page.locator('tbody tr').first()
+  await page.getByRole('main').getByRole('searchbox').fill(cert.common_name)
+  const row = page.locator('tbody tr').filter({ hasText: cert.common_name })
   await expect(row).toBeVisible()
   await row.getByRole('button', { name: /Export/ }).click()
   const dialog = page.getByRole('dialog')
@@ -51,6 +54,8 @@ test('the theme menu is 220 px and lists the five choices of the mockup', async 
   await page.getByRole('button', { name: /^Theme: / }).click()
   const menu = page.getByRole('menu', { name: 'Theme' })
   await expect(menu).toBeVisible()
+  // The System line's two lines of text take the height of the mockup's font, once it is loaded
+  await page.evaluate(() => document.fonts.ready.then(() => undefined))
   near((await box(menu)).width, 220)
   for (const name of ['System', 'Dark', 'Light', 'Aurore dark', 'Aurore light']) {
     await expect(menu.getByRole('menuitemradio', { name: new RegExp(`^${name}`) })).toBeVisible()

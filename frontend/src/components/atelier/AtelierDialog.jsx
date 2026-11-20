@@ -6,6 +6,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Icon } from './Icon'
+import { escapeYielded } from '../list/dialogEscape'
 
 export function AtelierDialog({ title, subtitle, size = '', onClose, children, testId }) {
   const { t } = useTranslation()
@@ -43,7 +44,10 @@ export function AtelierDialog({ title, subtitle, size = '', onClose, children, t
 
   return (
     <dialog ref={ref} className={size} aria-labelledby="modal-title" role="dialog" aria-modal="true" data-testid={testId}
-      onKeyDown={(e) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); close.current?.() } }}>
+      onKeyDown={(e) => {
+        // A toast above the dialog yields an Escape typed here (marked, already prevented)
+        if (e.key === 'Escape' && (!e.defaultPrevented || escapeYielded(e.nativeEvent))) { e.preventDefault(); close.current?.() }
+      }}>
       <header className="modal-head">
         <div>
           <h2 id="modal-title">{title}</h2>

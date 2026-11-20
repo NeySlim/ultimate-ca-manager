@@ -158,8 +158,9 @@ textarea.ui-control { min-height: 80px; resize: vertical; }
 .ui-dialog-notice { margin: 0 0 20px; }
 .ui-dialog-notice .ui-notice-body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 
-/* Toast: the mockup's inverted pill, bottom centre; a toast that stays is its framed failure line */
-.ui-toast-viewport { width: max-content; max-width: calc(100vw - 32px); margin: 0; padding: 0; list-style: none; }
+/* Toast: the mockup's inverted pill, bottom centre; a toast that stays is its framed failure line.
+   The pointer goes through the viewport and a passing toast to what lies under them */
+.ui-toast-viewport { width: max-content; max-width: calc(100vw - 32px); margin: 0; padding: 0; list-style: none; pointer-events: none; }
 .ui-toast { max-width: calc(100vw - 32px); padding: 13px 19px; background: var(--text); color: var(--bg); border-radius: 5px; box-shadow: 0 8px 30px color-mix(in srgb, var(--ink) 26.7%, transparent); font-size: 12px; line-height: normal; pointer-events: none; }
 .ui-toast-text { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
 .ui-toast.is-held { display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 14px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-left: 4px solid var(--bad); pointer-events: auto; }
