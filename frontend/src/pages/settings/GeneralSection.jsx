@@ -272,7 +272,7 @@ export default function GeneralSection({ settings, fieldErrors = {}, updateSetti
                 helperText={t('settings.metrics.tokenHelper')}
               />
             </div>
-            <Button type="button" variant="secondary" onClick={generateToken} disabled={!canWrite('settings')}>
+            <Button type="button" variant="secondary" onClick={generateToken} disabled={!canWrite('settings')} data-write>
               <ArrowsClockwise size={16} />
               {t('settings.metrics.generate')}
             </Button>

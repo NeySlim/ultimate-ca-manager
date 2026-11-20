@@ -109,6 +109,7 @@ export default function AutoRenewalSection({
             variant="secondary"
             onClick={handleArRunNow}
             disabled={arRunning || !arSettings.enabled}
+            data-write
           >
             {arRunning ? <ArrowsClockwise size={14} className="animate-spin" /> : <Lightning size={14} />}
             {t('settings.autoRenewalRunNow')}

@@ -25,6 +25,7 @@ vi.mock('../../../components', () => ({
 }))
 
 import SchedulerSection from '../SchedulerSection'
+import { blockedWhileSuspended } from '../../../components/shell/__tests__/writeGuardProbe'
 
 const NOW = new Date('2026-11-20T12:00:00Z')
 const at = (ms) => new Date(NOW.getTime() + ms).toISOString()
@@ -47,5 +48,13 @@ describe('SchedulerSection words', () => {
     const other = screen.getByText('Brand new task').closest('tr')
     const more = within(other).getAllByRole('cell').map((c) => c.textContent)
     expect(more.slice(1, 4)).toEqual(['scheduler.interval.daily', 'time.compact.hoursAgo:13', 'time.compact.minutesAgo:1'])
+  })
+})
+
+describe('SchedulerSection write guard', () => {
+  it('suspends Run with the other writes', async () => {
+    render(<SchedulerSection hasPermission={() => true} />)
+    const row = (await screen.findByText('tr(scheduler.tasks.scheduled_backup)')).closest('tr')
+    expect(blockedWhileSuspended(within(row).getByRole('button', { name: /scheduler.runNow/ }))).toBe(true)
   })
 })

@@ -649,7 +649,7 @@ export default function TemplatesPage() {
                   <Plus size={14} weight="bold" />
                   {t('templates.new')}
                 </Button>
-                <Button type="button" size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
+                <Button type="button" size="sm" variant="secondary" onClick={() => setShowImportModal(true)} data-write>
                   <FileArrowUp size={14} />
                   {t('common.import')}
                 </Button>

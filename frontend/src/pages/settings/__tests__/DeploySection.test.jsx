@@ -36,6 +36,7 @@ vi.mock('../../../components/Modal', () => ({
 }))
 
 import DeploySection from '../DeploySection'
+import { blockedWhileSuspended } from '../../../components/shell/__tests__/writeGuardProbe'
 
 describe('DeploySection same-host preset', () => {
   it('fills the local SFTP target fields', async () => {
@@ -147,5 +148,15 @@ describe('DeploySection HTTP API target (#428)', () => {
     fireEvent.submit(dialog.querySelector('form'))
     await vi.waitFor(() => expect(deployService.updateTarget).toHaveBeenCalled())
     expect(deployService.updateTarget.mock.calls[0][1].http_headers).toEqual({})
+  })
+})
+
+describe('DeploySection write guard', () => {
+  it('suspends Add a target with the other writes', async () => {
+    const { deployService } = await import('../../../services')
+    deployService.getTargets = vi.fn().mockResolvedValue({ data: [{ id: 3, kind: 'http', name: 'fw', enabled: true, url: 'https://fw.example.net/api', http_method: 'PUT', failure_count: 0 }] })
+    render(<DeploySection />)
+    await screen.findByText('PUT https://fw.example.net/api')
+    expect(blockedWhileSuspended(screen.getByText('deploy.addTarget').closest('button'))).toBe(true)
   })
 })

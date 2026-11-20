@@ -186,11 +186,11 @@ export default function CaAccountsManager({
                       </Button>
                     )}
                     {!acct.is_default && (
-                      <Button type="button" variant="secondary" size="sm" onClick={() => onSetDefault(acct.id)}>
+                      <Button type="button" variant="secondary" size="sm" onClick={() => onSetDefault(acct.id)} data-write>
                         <Star size={12} /> {t('acme.setDefault')}
                       </Button>
                     )}
-                    <Button type="button" variant="secondary" size="sm" onClick={() => openEdit(acct)}>
+                    <Button type="button" variant="secondary" size="sm" onClick={() => openEdit(acct)} data-write>
                       <PencilSimple size={12} /> {t('common.edit')}
                     </Button>
                     {canDelete && acct.is_registered && onDeactivate && (

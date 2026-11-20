@@ -9,6 +9,7 @@ import SsoSection from '../SsoSection'
 import WebhooksSection from '../WebhooksSection'
 import MicrosoftCASection from '../MicrosoftCASection'
 import BackupSection from '../BackupSection'
+import { blockedWhileSuspended } from '../../../components/shell/__tests__/writeGuardProbe'
 
 vi.mock('../WebhookDeliveriesModal', () => ({ default: () => null }))
 
@@ -77,5 +78,27 @@ describe('settings record lists', () => {
     expect(row.textContent).not.toContain('UTC')
     expect(row.textContent).toMatch(/1[.,]5\s?(MB|Mo)/)
     expect(within(row).getByRole('button', { name: 'common.download' })).toBeInTheDocument()
+  })
+})
+
+describe('settings record lists: write guard', () => {
+  it('suspends Add a webhook with the other writes', () => {
+    hooks(can('read:settings', 'write:settings', 'admin:system'))
+    expect(blockedWhileSuspended(screen.getByRole('button', { name: /webhooks.addWebhook/ }))).toBe(true)
+  })
+
+  it('suspends Add a connection with the other writes', () => {
+    msca(can('read:settings', 'admin:system'))
+    expect(blockedWhileSuspended(screen.getByRole('button', { name: /msca.addConnection/ }))).toBe(true)
+  })
+
+  it('suspends Create a backup and Clean up now with the other writes', () => {
+    render(
+      <BackupSection settings={{}} updateSetting={noop} hasPermission={can('admin:system', 'write:settings')}
+        backups={[{ filename: 'ucm_backup_1.ucmbkp', size: '1.5 MB', size_bytes: 1.5 * 1024 * 1024, created_at: '2026-11-20 10:05:00 UTC' }]}
+        backupMeta={{ total: 1, total_size_bytes: 1.5 * 1024 * 1024 }} updateBackupQuery={noop} setShowBackupModal={noop} handleRunRetention={noop} />,
+    )
+    expect(blockedWhileSuspended(screen.getByRole('button', { name: /settings.createBackup/ }))).toBe(true)
+    expect(blockedWhileSuspended(screen.getByRole('button', { name: /settings.backupCleanupNow/ }))).toBe(true)
   })
 })

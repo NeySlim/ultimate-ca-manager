@@ -177,6 +177,7 @@ export default function SchedulerSection({ hasPermission }) {
                           type="button" size="sm" variant="secondary"
                           onClick={() => handleRun(task.name, taskLabel(t, task))}
                           disabled={!!running[task.name]}
+                          data-write
                         >
                           <Play size={13} weight="fill" />
                           {t('scheduler.runNow')}

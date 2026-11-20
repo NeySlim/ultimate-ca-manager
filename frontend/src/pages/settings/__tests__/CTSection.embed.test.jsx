@@ -18,6 +18,7 @@ vi.mock('../../../components/ui/ToggleSwitch', () => ({
 }))
 
 import CTSection from '../CTSection'
+import { blockedWhileSuspended } from '../../../components/shell/__tests__/writeGuardProbe'
 
 const renderWith = (ctSettings) => render(
   <CTSection ctSettings={ctSettings} setCtSettings={vi.fn()} ctLoading={false} ctSaving={false}
@@ -36,5 +37,12 @@ describe('CTSection: embedding depends on CT being enabled', () => {
     renderWith({ enabled: true, embed_sct: true, required: false, log_urls: [] })
     expect(screen.getByText('settings.ctEmbedSct')).toBeInTheDocument()
     expect(screen.getByText('settings.ctRequired')).toBeInTheDocument()
+  })
+})
+
+describe('CTSection write guard', () => {
+  it('suspends Add a CT log URL with the other writes', () => {
+    renderWith({ enabled: true, embed_sct: false, required: false, log_urls: [] })
+    expect(blockedWhileSuspended(screen.getByText('settings.ctAddLogUrl').closest('button'))).toBe(true)
   })
 })

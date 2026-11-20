@@ -10,6 +10,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('../DnsUpdateKeysPanel', () => ({ default: () => null }))
 
 import CaAccountsManager from '../CaAccountsManager'
+import { blockedWhileSuspended } from '../../../components/shell/__tests__/writeGuardProbe'
 
 const account = (extra = {}) => ({
   id: 1, label: 'Actalis', directory_url: 'https://ca.example/dir', email: 'a@example.com',
@@ -42,5 +43,13 @@ describe('CaAccountsManager edit form', () => {
     await user.click(screen.getByRole('button', { name: 'common.save' }))
     expect(onUpdate).toHaveBeenCalled()
     expect(onUpdate.mock.calls[0][1]).not.toHaveProperty('account_key_algorithm')
+  })
+})
+
+describe('CaAccountsManager write guard', () => {
+  it('suspends Set as default and Edit with the other writes', () => {
+    render(<CaAccountsManager accounts={[account()]} canWrite canDelete onUpdate={vi.fn()} onSetDefault={vi.fn()} />)
+    expect(blockedWhileSuspended(screen.getByRole('button', { name: /acme.setDefault/ }))).toBe(true)
+    expect(blockedWhileSuspended(screen.getByRole('button', { name: /common.edit/ }))).toBe(true)
   })
 })

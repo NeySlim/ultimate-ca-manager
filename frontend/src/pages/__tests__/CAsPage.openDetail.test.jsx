@@ -86,6 +86,7 @@ vi.mock('../../components/SmartImport', () => ({
 }))
 
 import CAsPage from '../CAsPage'
+import { blockedWhileSuspended } from '../../components/shell/__tests__/writeGuardProbe'
 
 const renderPage = () => render(<MemoryRouter><CAsPage /></MemoryRouter>)
 
@@ -133,5 +134,15 @@ describe('CAsPage — opens detail after create/import', () => {
     fireEvent.click(await screen.findByText('fire-import-complete'))
     await waitFor(() => expect(screen.queryByText('fire-import-complete')).not.toBeInTheDocument())
     expect(openEntity).not.toHaveBeenCalled()
+  })
+})
+
+describe('CAsPage write guard', () => {
+  it('suspends Import with the other writes', async () => {
+    mockIsMobile = false
+    mockCanRead = true
+    getAll.mockResolvedValue({ data: [] })
+    renderPage()
+    expect(blockedWhileSuspended(await screen.findByRole('button', { name: /common.import/ }))).toBe(true)
   })
 })

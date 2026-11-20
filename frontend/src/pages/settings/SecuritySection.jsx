@@ -161,6 +161,7 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
                     <Button
                       onClick={() => setShowDisableEncryptionModal(true)}
                       variant="outline"
+                      data-write
                     >
                       <Lock size={16} />
                       {encryptionStatus.disabling ? t('settings.runDisableAgain') : t('settings.disableEncryption')}

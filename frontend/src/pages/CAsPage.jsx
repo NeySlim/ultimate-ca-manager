@@ -320,7 +320,7 @@ export default function CAsPage() {
             )}
             {canWrite('cas') && (
               <>
-                <ListButton quiet icon={UploadSimple} onClick={() => setShowImportModal(true)}>
+                <ListButton quiet icon={UploadSimple} onClick={() => setShowImportModal(true)} data-write>
                   {t('common.import')}
                 </ListButton>
                 <ListButton primary icon={Plus} title={t('common.createCA')} onClick={() => openModal('create')}>

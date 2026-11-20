@@ -38,7 +38,7 @@ export default function CTSection({ ctSettings, setCtSettings, ctLoading, ctNewL
                   className="flex-1"
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCtAddLogUrl() } }}
                 />
-                <Button type="button" variant="secondary" onClick={handleCtAddLogUrl}>
+                <Button type="button" variant="secondary" onClick={handleCtAddLogUrl} data-write>
                   <Plus size={14} />
                   {t('settings.ctAddLogUrl')}
                 </Button>

@@ -21,7 +21,9 @@ vi.mock('../../../hooks/useWebSocket', () => ({
 }))
 vi.mock('../../../hooks/usePermission', () => ({ usePermission: () => ({ hasPermission: api.can }) }))
 
+import { OverviewContext } from '../shared'
 import { QueueCard, ComplianceCard, HealthCard, HierarchyCard, HorizonCard, ActivityCard, TrendCard, StatesCard } from '..'
+import { blockedWhileSuspended } from '../../../components/shell/__tests__/writeGuardProbe'
 
 const show = (ui) => render(<MemoryRouter>{ui}</MemoryRouter>)
 const item = (i) => ({ kind: 'manual_renewal_due', tier: 'warning', id: i, label: `cert-${i}`, due_at: null, href_hint: `/certificates/${i}` })
@@ -247,5 +249,16 @@ describe('a card with two requests keeps what one of them gave', () => {
     show(<HorizonCard />)
     await screen.findByText('overview.horizon.expiring')
     expect(screen.queryByRole('note')).toBeNull()
+  })
+})
+
+describe('queue card write guard', () => {
+  it('suspends Publish now with the other writes', async () => {
+    api.can.mockReturnValue(true)
+    api.getQueue.mockResolvedValue({ data: { items: [{ kind: 'crl_due', tier: 'warning', id: 14, label: 'Services CA', due_at: null, href_hint: '/crl-ocsp?ca=14' }], counts: { crl_due: 1 }, total: 1 } })
+    const notify = { showSuccess: vi.fn(), showError: vi.fn() }
+    show(<OverviewContext.Provider value={{ notify }}><QueueCard /></OverviewContext.Provider>)
+    const publish = await screen.findByRole('button', { name: /overview.queue.publish/ })
+    expect(blockedWhileSuspended(publish)).toBe(true)
   })
 })

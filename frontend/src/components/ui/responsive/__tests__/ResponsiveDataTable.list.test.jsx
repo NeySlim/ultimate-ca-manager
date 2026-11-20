@@ -20,6 +20,7 @@ vi.mock('../../../../contexts', () => ({
 }))
 
 import { ResponsiveDataTable } from '../ResponsiveDataTable'
+import { blockedWhileSuspended } from '../../../../components/shell/__tests__/writeGuardProbe'
 
 const LONG = 'a-very-long-common-name-that-used-to-be-cut.internal.example.com'
 const ROWS = [
@@ -388,5 +389,12 @@ describe('ResponsiveDataTable without the variant', () => {
   it('honours defaultHidden too', () => {
     mount()
     expect(screen.getAllByRole('columnheader').map((th) => th.textContent).filter(Boolean)).not.toContain('Grade')
+  })
+})
+
+describe('ResponsiveDataTable page jump and the write guard', () => {
+  it('leaves Go enabled while writes are suspended: going to a page only reads', () => {
+    render(<Harness pagination={{ page: 2, total: 276, perPage: 12, onChange: () => {}, onPerPageChange: () => {} }} />)
+    expect(blockedWhileSuspended(screen.getByRole('button', { name: 'table.goToPage' }))).toBe(false)
   })
 })

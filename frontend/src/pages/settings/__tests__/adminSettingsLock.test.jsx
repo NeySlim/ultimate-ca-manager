@@ -49,6 +49,7 @@ import GeneralSection from '../GeneralSection'
 import SecuritySection from '../SecuritySection'
 import BackupSection from '../BackupSection'
 import AuditSection from '../AuditSection'
+import { blockedWhileSuspended } from '../../../components/shell/__tests__/writeGuardProbe'
 
 const OPERATOR = ['read:settings', 'write:settings']
 const ADMIN = [...OPERATOR, 'admin:settings', 'admin:system']
@@ -253,5 +254,13 @@ describe('AuditSection', () => {
   it('hides it without write:settings', () => {
     renderAudit(['read:settings'])
     expect(saveButtons()).toHaveLength(0)
+  })
+})
+
+describe('GeneralSection write guard', () => {
+  it('suspends Generate (metrics token) with the other writes', () => {
+    render(<GeneralSection settings={{}} updateSetting={vi.fn()} handleSave={vi.fn()} saving={false}
+      canWrite={() => true} hasPermission={granting(ADMIN)} />)
+    expect(blockedWhileSuspended(screen.getByText('settings.metrics.generate').closest('button'))).toBe(true)
   })
 })

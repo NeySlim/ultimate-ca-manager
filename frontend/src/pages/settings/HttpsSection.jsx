@@ -150,6 +150,7 @@ export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelected
           <Button
             variant="secondary"
             onClick={() => setShowHttpsImportModal(true)}
+            data-write
           >
             <UploadSimple size={16} className="mr-2" />
             {t('common.importCertificate')}

@@ -26,6 +26,7 @@ vi.mock('../../../components/ui/ToggleSwitch', () => ({
 }))
 
 import SecuritySection from '../SecuritySection'
+import { blockedWhileSuspended } from '../../../components/shell/__tests__/writeGuardProbe'
 
 const renderSection = (encryptionStatus, extra = {}) => render(
   <SecuritySection
@@ -122,6 +123,12 @@ describe('SecuritySection disabling encryption', () => {
   it('is offered when the key comes from the key file', () => {
     renderSection({ ...status, key_source: 'file' })
     expect(screen.getByText('settings.disableEncryption')).toBeInTheDocument()
+  })
+
+  it('is a write the central guard takes while writes are suspended', () => {
+    renderSection({ ...status, key_source: 'file' }, {})
+    const btn = screen.getByText('settings.disableEncryption').closest('button')
+    expect(blockedWhileSuspended(btn)).toBe(true)
   })
 
   it('is offered when the key comes from the environment: it stays configured, unused', () => {

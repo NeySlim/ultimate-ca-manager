@@ -113,7 +113,7 @@ export default function BackupSection({
 
           {canWriteSettings && (
             <div className="flex gap-2">
-              <Button type="button" variant="secondary" onClick={() => setShowBackupModal(true)}>
+              <Button type="button" variant="secondary" onClick={() => setShowBackupModal(true)} data-write>
                 <Database size={16} />
                 {backupRunning ? t('settings.backupInProgress') : t('settings.createBackup')}
               </Button>
@@ -166,7 +166,7 @@ export default function BackupSection({
           {(canWriteSettings || isAdmin) && (
             <div className="flex gap-2">
               {isAdmin && (
-                <Button type="button" variant="secondary" onClick={handleRunRetention} disabled={backupBusy}>
+                <Button type="button" variant="secondary" onClick={handleRunRetention} disabled={backupBusy} data-write>
                   <Broom size={16} />
                   {t('settings.backupCleanupNow')}
                 </Button>

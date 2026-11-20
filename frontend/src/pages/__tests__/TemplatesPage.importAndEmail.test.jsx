@@ -70,6 +70,7 @@ vi.mock('../../services/eku.service', () => ({
 }))
 
 import TemplatesPage from '../TemplatesPage'
+import { blockedWhileSuspended } from '../../components/shell/__tests__/writeGuardProbe'
 
 const renderPage = () => render(<MemoryRouter><TemplatesPage /></MemoryRouter>)
 
@@ -240,4 +241,11 @@ describe('TemplatesPage Email field: not type="email" (built-in copies carry {em
     await waitFor(() => expect(svc.update).toHaveBeenCalledTimes(1))
     expect(svc.update.mock.calls[0][1].enforce_san_types).toBe(true)
   }, 15000)
+})
+
+describe('TemplatesPage write guard', () => {
+  it('suspends Import with the other writes', async () => {
+    renderPage()
+    expect(blockedWhileSuspended(await screen.findByRole('button', { name: 'common.import' }))).toBe(true)
+  })
 })
