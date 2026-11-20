@@ -3,12 +3,13 @@
  * leading to the screen that does it. Shown to an administrator of an instance without any
  * CA nor certificate, then until its steps are done; closed or finished, never again.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Check, Clock, Gear, Lock, Plus } from '@phosphor-icons/react'
 import { acmeService, casService, dashboardService, estService, scepService } from '../../services'
 import { getPreferences, persistPreference, subscribePreferences } from '../../stores/userPreferencesStore'
+import { certificateKeyLabel } from '../../lib/certificateDetail'
 import { guardProps, useWriteGuard } from './health'
 
 export const SETUP_PREF = 'setup_card'
@@ -38,6 +39,7 @@ const listOf = (res) => {
   return Array.isArray(d) ? d : Array.isArray(d?.items) ? d.items : []
 }
 const usable = (res) => { const d = res?.data ?? res; return !!d?.enabled && !!(d.issuing_ca_id || d.ca_id) }
+const caName = (ca) => ca?.common_name || ca?.descr || ca?.name || ''
 
 /**
  * What the instance holds, null while unknown. The counts come first, from the overview's own
@@ -55,12 +57,17 @@ async function readState(share) {
   if (cas.status !== 'fulfilled') return null
   const list = listOf(cas.value)
   const ok = (r) => r.status === 'fulfilled' && usable(r.value)
+  const rootCa = list.find(c => c.is_root)
+  const issuingCa = list.find(c => !c.is_root)
+  const protocolName = ok(acme) ? 'ACME' : ok(scep) ? 'SCEP' : ok(est) ? 'EST' : null
   return {
     certificates,
     cas: list.length,
-    root: list.some(c => c.is_root),
-    issuing: list.some(c => !c.is_root),
-    protocol: ok(acme) || ok(scep) || ok(est),
+    root: !!rootCa,
+    issuing: !!issuingCa,
+    protocol: !!protocolName,
+    // What exists, for the summary of a step done
+    rootCa, issuingCa, protocolName,
   }
 }
 
@@ -74,6 +81,15 @@ export function SetupCard({ admin = false, share }) {
   const [pref, savePref] = useSetupPreference()
   const [state, setState] = useState(null)
   const [later, setLater] = useState(() => readLocal(LATER_KEY, sessionStorage) === '1')
+  // Where the focus goes once the card is folded or unfolded: Resume, or the current step's button
+  const [focusTo, setFocusTo] = useState(null)
+  const resumeRef = useRef(null)
+  const stepRef = useRef(null)
+  useEffect(() => {
+    if (!focusTo) return
+    ;(focusTo === 'resume' ? resumeRef : stepRef).current?.focus()
+    setFocusTo(null)
+  }, [focusTo])
   const final = FINAL.includes(pref)
 
   useEffect(() => {
@@ -108,15 +124,30 @@ export function SetupCard({ admin = false, share }) {
   const count = n < 3
     ? <><strong>{t('shell.setup.count', { count: n })}</strong>{t('shell.setup.left', { count: 3 - n })}</>
     : <strong>{t('shell.setup.count', { count: n })}</strong>
-  const fold = (value) => { writeLocal(LATER_KEY, value ? '1' : '0', sessionStorage); setLater(value) }
+  const fold = (value) => {
+    writeLocal(LATER_KEY, value ? '1' : '0', sessionStorage)
+    setLater(value)
+    setFocusTo(value ? 'resume' : 'step')
+  }
+  // A step done says what exists, as the mockup does; a fixed sentence when the API names nothing
+  const doneText = (id) => {
+    const what = (ca) => [caName(ca), certificateKeyLabel(ca, t)].filter(Boolean).join(', ')
+    if (id === 'root' && caName(state.rootCa)) return t('shell.setup.doneWhat', { what: what(state.rootCa) })
+    if (id === 'issuing' && caName(state.issuingCa)) {
+      return caName(state.rootCa)
+        ? t('shell.setup.steps.issuing.doneWith', { what: what(state.issuingCa), root: caName(state.rootCa) })
+        : t('shell.setup.doneWhat', { what: what(state.issuingCa) })
+    }
+    if (id === 'protocol' && state.protocolName) return t('shell.setup.steps.protocol.doneWith', { protocol: state.protocolName })
+    return t(`shell.setup.steps.${id}.done`)
+  }
 
   if (later && !complete) {
     return (
       <div className="shell-setup-later" id="shell-setup-later">
         <Gear size={16} aria-hidden="true" />
         <p>{t('shell.setup.laterLine')} {count}. {t('shell.setup.nextStep', { step: lowerFirst(t(`shell.setup.steps.${next.id}.title`), i18n?.language) })}</p>
-        <button type="button" className="shell-btn" onClick={() => fold(false)}>{t('shell.setup.resume')}</button>
-        <button type="button" className="shell-btn is-quiet" onClick={() => savePref('closed')}>{t('shell.setup.hide')}</button>
+        <button type="button" ref={resumeRef} className="shell-btn" onClick={() => fold(false)}>{t('shell.setup.resume')}</button>
       </div>
     )
   }
@@ -152,21 +183,21 @@ export function SetupCard({ admin = false, share }) {
           const key = `shell.setup.steps.${s.id}`
           return (
             <li key={s.id} className={`shell-setup-step ${s.done ? 'is-done' : blocked ? 'is-blocked' : 'is-todo'}`} aria-current={current ? 'step' : undefined}>
-              <span className="shell-setup-num" aria-hidden="true">{s.done ? <Check size={14} /> : i + 1}</span>
+              <span className="shell-setup-num" aria-hidden="true">{s.done ? <Check size={13} /> : i + 1}</span>
               <div className="shell-setup-text">
                 <h3>{i + 1}. {t(`${key}.title`)}</h3>
-                <p>{s.done ? t(`${key}.done`) : t(`${key}.todo`)}</p>
+                <p>{s.done ? doneText(s.id) : t(`${key}.todo`)}</p>
               </div>
               <span className={`shell-setup-state${s.done ? ' is-good' : blocked ? '' : ' is-warn'}`}>
-                {s.done ? <Check size={14} aria-hidden="true" /> : blocked ? <Lock size={14} aria-hidden="true" /> : <Clock size={14} aria-hidden="true" />}
+                {s.done ? <Check size={13} aria-hidden="true" /> : blocked ? <Lock size={13} aria-hidden="true" /> : <Clock size={13} aria-hidden="true" />}
                 {s.done ? t('shell.setup.stateDone') : blocked ? t('shell.setup.stateAfter', { step: nextIndex + 1 }) : t('shell.setup.stateTodo')}
               </span>
               {!s.done && (blocked || guard.suspended ? (
-                <button type="button" className={`shell-btn${current ? ' is-primary' : ''}`} {...guardProps(guard, true)}>
+                <button type="button" ref={current ? stepRef : undefined} className={`shell-btn${current ? ' is-primary' : ''}`} {...guardProps(guard, true)}>
                   {t(`${key}.action`)}
                 </button>
               ) : (
-                <Link className={`shell-btn${current ? ' is-primary' : ''}`} to={s.to}>{t(`${key}.action`)}</Link>
+                <Link ref={current ? stepRef : undefined} className={`shell-btn${current ? ' is-primary' : ''}`} to={s.to}>{t(`${key}.action`)}</Link>
               ))}
             </li>
           )

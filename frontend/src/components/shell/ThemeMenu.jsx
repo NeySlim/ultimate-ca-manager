@@ -4,7 +4,7 @@
  */
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Sun, Moon, Check } from '@phosphor-icons/react'
+import { Sun, Moon, Sparkle, Check } from '@phosphor-icons/react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useDisclosure, moveFocus } from './useDisclosure'
 
@@ -20,7 +20,11 @@ export function ThemeMenu() {
   const { open, setOpen, close, buttonRef, rootProps } = useDisclosure()
   const panelRef = useRef(null)
   const items = () => [...(panelRef.current?.querySelectorAll('button') || [])]
-  const Icon = resolvedMode === 'light' ? Sun : Moon
+  // The mockup's button icon: sparkles for the Aurore family, else the applied mode
+  const Icon = themeFamily === 'aurore' ? Sparkle : resolvedMode === 'light' ? Sun : Moon
+  const modeName = t(resolvedMode === 'light' ? 'settings.light' : 'settings.dark')
+  const current = themeFamily === 'aurore' ? t(resolvedMode === 'light' ? 'shell.theme.auroreLight' : 'shell.theme.auroreDark')
+    : mode === 'system' ? t('shell.theme.systemNow', { mode: modeName.toLocaleLowerCase() }) : modeName
 
   useEffect(() => {
     if (open) {
@@ -46,14 +50,14 @@ export function ThemeMenu() {
         type="button"
         ref={buttonRef}
         className="shell-icon-btn"
-        aria-haspopup="true"
+        aria-haspopup="menu"
         aria-expanded={open}
         aria-controls="shell-theme-menu"
-        aria-label={t('shell.theme.menu')}
-        title={t('shell.theme.menu')}
+        aria-label={t('shell.theme.label', { theme: current })}
+        title={t('shell.theme.label', { theme: current })}
         onClick={() => setOpen(!open)}
       >
-        <Icon size={18} aria-hidden="true" data-mode={resolvedMode} />
+        <Icon size={16} aria-hidden="true" data-mode={resolvedMode} />
       </button>
       <div id="shell-theme-menu" ref={panelRef} className="shell-pop" hidden={!open}>
         <div role="radiogroup" aria-label={t('settings.colorTheme')} className="shell-pop-group shell-pop-first">

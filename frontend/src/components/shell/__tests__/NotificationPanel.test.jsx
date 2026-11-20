@@ -11,7 +11,7 @@ const m = vi.hoisted(() => ({
 }))
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k, o) => (o && o.count != null ? `${k}|${o.count}` : o && o.date ? `${k}|${o.date}` : tStub(k, o)), i18n: { language: 'en' } }),
+  useTranslation: () => ({ t: (k, o) => (o && o.state && o.count == null ? `${k}|${o.state}` : o && o.count != null ? `${k}|${o.count}` : o && o.date ? `${k}|${o.date}` : tStub(k, o)), i18n: { language: 'en' } }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 vi.mock('../../../services/dashboard.service', () => ({ dashboardService: { getQueue: m.getQueue } }))
@@ -44,7 +44,7 @@ function setup(permissions = ROLES.admin) {
   render(<MemoryRouter><NotificationBell can={canFor(permissions)} /></MemoryRouter>)
   return user
 }
-const bell = () => screen.getByRole('button', { name: /shell\.bell\.title/ })
+const bell = () => screen.getByRole('button', { name: /^shell\.bell\.label\|/ })
 const panel = () => screen.getByRole('complementary', { name: 'shell.bell.title' })
 const row = (key) => panel().querySelector(`[data-notification="${key}"]`)
 

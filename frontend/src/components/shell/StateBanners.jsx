@@ -1,23 +1,54 @@
 /**
- * Banners at the top of the workspace, HA mode only: a cluster maintenance (every write
- * suspended, as the server refuses them) or a degraded cluster (silent nodes, what still works).
- * Outside HA, or with a healthy cluster, nothing is rendered.
+ * Banners at the top of the workspace: offline (reading continues, writes wait for the network),
+ * then, in HA mode, a cluster maintenance (every write suspended, as the server refuses them)
+ * or a degraded cluster (silent nodes, what still works). Nothing in the nominal state.
  */
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowsClockwise, Check, Clock, HardDrives, Warning } from '@phosphor-icons/react'
+import { ArrowsClockwise, Check, Clock, HardDrives, Plug, Warning } from '@phosphor-icons/react'
 import { formatDate } from '../../lib/utils'
-import { haState, useHealth, WRITES_NOTE_ID } from './health'
+import { haState, useHealth, useOnline, OFFLINE_NOTE_ID, WRITES_NOTE_ID } from './health'
 
-/** onShowNodes: opens the node list (read:settings); omitted, the banner has no button. */
-export function StateBanners({ onShowNodes }) {
+/** Says the network change once: offline to assistive technology, back online in a message. */
+function useNetworkNotice(online, onNotice) {
   const { t } = useTranslation()
-  const ha = haState(useHealth())
-  if (!ha) return null
+  const [said, setSaid] = useState('')
+  const previous = useRef(online)
+  useEffect(() => {
+    if (previous.current === online) return
+    previous.current = online
+    if (online) {
+      setSaid('')
+      onNotice?.(t('shell.offline.back'))
+    } else setSaid(t('shell.offline.said'))
+  }, [online]) // eslint-disable-line react-hooks/exhaustive-deps
+  return said
+}
 
-  if (ha.maintenance) {
+/**
+ * onShowNodes: opens the node list (read:settings); omitted, the banner has no button.
+ * onNotice(message): the shell's message, for the network coming back.
+ */
+export function StateBanners({ onShowNodes, onNotice }) {
+  const { t } = useTranslation()
+  const online = useOnline()
+  const said = useNetworkNotice(online, onNotice)
+  const ha = haState(useHealth())
+
+  const offline = !online && (
+    <div className="shell-state-banner" id="shell-offline-banner">
+      <Plug size={18} aria-hidden="true" />
+      <p id={OFFLINE_NOTE_ID}>
+        <strong>{t('shell.offline.title')}</strong>{' '}{t('shell.offline.text')}
+      </p>
+    </div>
+  )
+
+  let cluster = null
+  if (ha?.maintenance) {
     const m = ha.maintenance
     const reason = t(`shell.ha.reasons.${m.reason}`, { defaultValue: m.reason || '' })
-    return (
+    cluster = (
       <div className="shell-state-banner is-warn" id="shell-maintenance-banner">
         <ArrowsClockwise size={18} aria-hidden="true" />
         <p id={WRITES_NOTE_ID}>
@@ -26,10 +57,8 @@ export function StateBanners({ onShowNodes }) {
         </p>
       </div>
     )
-  }
-
-  if (ha.stale > 0) {
-    return (
+  } else if (ha && ha.stale > 0) {
+    cluster = (
       <div className="shell-state-banner is-warn" id="shell-ha-banner">
         <Warning size={18} aria-hidden="true" />
         <div className="shell-ha-what">
@@ -54,5 +83,12 @@ export function StateBanners({ onShowNodes }) {
       </div>
     )
   }
-  return null
+
+  return (
+    <>
+      <p className="sr-only" role="status">{said}</p>
+      {offline}
+      {cluster}
+    </>
+  )
 }

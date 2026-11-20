@@ -1207,7 +1207,7 @@ function SearchBar({
                 ))}
               </div>
               <div className="lv-dialog-actions">
-                <button type="button" className="lv-btn is-primary" onClick={() => setShowColumnMenu?.(false)}>{t('table.done')}</button>
+                <button type="button" className="lv-btn is-primary" data-write="false" onClick={() => setShowColumnMenu?.(false)}>{t('table.done')}</button>
               </div>
             </ListDialog>
           </>

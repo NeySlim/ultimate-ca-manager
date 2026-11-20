@@ -1,11 +1,12 @@
 /**
  * Open state shared by the shell's popovers: closes on Escape (focus back to
  * the button), on a click outside, when focus leaves, and on a route change.
+ * `{ light: false }` keeps a panel open on a click outside or a focus leaving it.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 
-export function useDisclosure() {
+export function useDisclosure({ light = true } = {}) {
   const { pathname } = useLocation()
   const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
@@ -19,11 +20,11 @@ export function useDisclosure() {
   useEffect(() => { setOpen(false) }, [pathname])
 
   useEffect(() => {
-    if (!open) return undefined
+    if (!open || !light) return undefined
     const onDown = (e) => { if (!rootRef.current?.contains(e.target)) setOpen(false) }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
-  }, [open])
+  }, [open, light])
 
   const onKeyDown = (e) => {
     if (open && e.key === 'Escape') {
@@ -32,7 +33,7 @@ export function useDisclosure() {
     }
   }
   const onBlur = (e) => {
-    if (open && e.relatedTarget && !rootRef.current?.contains(e.relatedTarget)) setOpen(false)
+    if (light && open && e.relatedTarget && !rootRef.current?.contains(e.relatedTarget)) setOpen(false)
   }
 
   return { open, setOpen, close, rootRef, buttonRef, rootProps: { ref: rootRef, onKeyDown, onBlur } }

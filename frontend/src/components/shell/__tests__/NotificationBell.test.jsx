@@ -11,7 +11,7 @@ const m = vi.hoisted(() => ({
 }))
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k, o) => (o && o.count != null ? `${k}|${o.count}${o.state ? `|${o.state}` : ''}` : tStub(k, o)), i18n: { language: 'en' } }),
+  useTranslation: () => ({ t: (k, o) => (o && o.state && o.count == null ? `${k}|${o.state}` : o && o.count != null ? `${k}|${o.count}${o.state ? `|${o.state}` : ''}` : tStub(k, o)), i18n: { language: 'en' } }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 vi.mock('../../../services/dashboard.service', () => ({ dashboardService: { getQueue: m.getQueue } }))
@@ -49,7 +49,7 @@ function setup(permissions = ROLES.admin) {
   render(<MemoryRouter><NotificationBell can={canFor(permissions)} /></MemoryRouter>)
   return user
 }
-const bell = () => screen.getByRole('button', { name: /shell\.bell\.title/ })
+const bell = () => screen.getByRole('button', { name: /^shell\.bell\.label\|/ })
 
 beforeEach(() => {
   m.getQueue.mockReset().mockResolvedValue(QUEUE)
@@ -119,10 +119,10 @@ describe('NotificationBell', () => {
     await waitFor(() => expect(bell()).toHaveAccessibleName(/\|4/))
     await user.click(bell())
     const unread = document.querySelectorAll('.shell-notif-item.is-unread').length
-    expect(bell()).toHaveAccessibleName(`shell.bell.title: shell.bell.unread|${unread}`)
+    expect(bell()).toHaveAccessibleName(`shell.bell.label|shell.bell.unread|${unread}`)
     await user.click(screen.getByRole('button', { name: /shell\.bell\.markRead: web\.example/ }))
     expect(document.querySelectorAll('.shell-notif-item.is-unread').length).toBe(unread - 1)
-    expect(bell()).toHaveAccessibleName(`shell.bell.title: shell.bell.unread|${unread - 1}`)
+    expect(bell()).toHaveAccessibleName(`shell.bell.label|shell.bell.unread|${unread - 1}`)
     expect(m.persistPreference).toHaveBeenLastCalledWith('notifications_read', ['acme_order_failed:7'])
   })
 
@@ -133,7 +133,7 @@ describe('NotificationBell', () => {
     await user.click(screen.getByRole('button', { name: 'shell.bell.markAllRead' }))
     expect(m.persistPreference).toHaveBeenCalledTimes(1)
     expect(m.persistPreference.mock.calls[0][1]).toHaveLength(4)
-    expect(bell()).toHaveAccessibleName('shell.bell.title: shell.bell.allRead')
+    expect(bell()).toHaveAccessibleName('shell.bell.label|shell.bell.noneUnread')
     expect(document.querySelector('.shell-notif-head [role="status"]')).toHaveTextContent('shell.bell.summary|4|shell.bell.allRead')
   })
 
@@ -161,7 +161,7 @@ describe('NotificationBell', () => {
     await act(async () => {})
     expect(m.getQueue).not.toHaveBeenCalled()
     expect(m.getLogs).not.toHaveBeenCalled()
-    expect(bell()).toHaveAccessibleName('shell.bell.title: shell.bell.allRead')
+    expect(bell()).toHaveAccessibleName('shell.bell.label|shell.bell.noneUnread')
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
@@ -202,6 +202,69 @@ describe('NotificationBell', () => {
     expect(screen.getByRole('heading', { name: 'shell.bell.title' })).toHaveFocus()
     await user.keyboard('{Escape}')
     expect(bell()).toHaveFocus()
+  })
+
+  it('after Mark read, puts the focus on the first action left on the line; after Mark all read, on the title', async () => {
+    const user = setup()
+    await waitFor(() => expect(bell()).toHaveAccessibleName(/\|4/))
+    await user.click(bell())
+    await user.click(screen.getByRole('button', { name: /shell\.bell\.markRead: web\.example/ }))
+    const line = document.querySelector('[data-notification="acme_order_failed:7"]')
+    expect(line.querySelector('.shell-notif-actions a, .shell-notif-actions button')).toHaveFocus()
+    await user.click(screen.getByRole('button', { name: 'shell.bell.markAllRead' }))
+    expect(screen.getByRole('heading', { name: 'shell.bell.title' })).toHaveFocus()
+  })
+
+  it('closes on Escape wherever the focus is, and not on a click outside', async () => {
+    const user = setup()
+    await user.click(bell())
+    await user.click(document.body)
+    expect(screen.getByRole('complementary', { name: 'shell.bell.title' })).toBeVisible()
+    document.activeElement.blur()
+    expect(document.activeElement).toBe(document.body)
+    await user.keyboard('{Escape}')
+    expect(bell()).toHaveAttribute('aria-expanded', 'false')
+    expect(bell()).toHaveFocus()
+  })
+
+  it('shows the exact unread count, never "9+"', async () => {
+    m.getQueue.mockResolvedValue({ data: { counts: {}, items: Array.from({ length: 12 }, (_, i) => (
+      { kind: 'acme_order_failed', tier: 'critical', id: 100 + i, label: `h${i}.example`, due_at: null, href_hint: '/acme' })) } })
+    m.getLogs.mockResolvedValue({ data: [] })
+    setup()
+    await waitFor(() => expect(document.querySelector('.shell-bell-count')).toHaveTextContent('12'))
+  })
+
+  it('names a CRL line after its authority', async () => {
+    m.getQueue.mockResolvedValue({ data: { counts: {}, items: [
+      { kind: 'crl_due', tier: 'critical', id: 5, label: 'Services CA', due_at: null, href_hint: '/crl-ocsp' }] } })
+    m.getLogs.mockResolvedValue({ data: [] })
+    const user = setup()
+    await waitFor(() => expect(bell()).toHaveAccessibleName(/\|1/))
+    await user.click(bell())
+    expect(document.querySelector('.shell-notif-title')).toHaveTextContent('shell.bell.crlTitle|Services CA')
+  })
+
+  it('makes the rest of the shell inert behind the full-screen panel of a phone, and only there', async () => {
+    const shell = document.createElement('div')
+    shell.innerHTML = '<div class="shell-main"></div><footer class="shell-statusbar"></footer>'
+    document.body.appendChild(shell)
+    const matchMedia = vi.fn().mockReturnValue({ matches: true })
+    vi.stubGlobal('matchMedia', matchMedia)
+    try {
+      const user = setup()
+      await user.click(bell())
+      expect(shell.querySelector('.shell-main')).toHaveAttribute('inert')
+      expect(shell.querySelector('.shell-statusbar')).toHaveAttribute('inert')
+      await user.keyboard('{Escape}')
+      expect(shell.querySelector('.shell-main')).not.toHaveAttribute('inert')
+      matchMedia.mockReturnValue({ matches: false })
+      await user.click(bell())
+      expect(shell.querySelector('.shell-main')).not.toHaveAttribute('inert')
+    } finally {
+      vi.unstubAllGlobals()
+      shell.remove()
+    }
   })
 
   it('asks for failed backups and restores in their own request, and for nothing else', async () => {

@@ -8,13 +8,14 @@ import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/utils'
 import './list.css'
 
-export function ListDialog({ open, onOpenChange, title, subtitle, narrow = true, children, className, testId }) {
+/** narrow: 520 px (default); wide: 920 px, as the mockup's dialog.wide; neither: 760 px. */
+export function ListDialog({ open, onOpenChange, title, subtitle, narrow = true, wide = false, children, className, testId }) {
   const { t } = useTranslation()
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="lv-dialog-backdrop" />
-        <Dialog.Content className={cn('lv-dialog', narrow && 'is-narrow', className)} data-testid={testId}
+        <Dialog.Content className={cn('lv-dialog', wide ? 'is-wide' : narrow && 'is-narrow', className)} data-testid={testId}
           aria-describedby={undefined}>
           <header className="lv-dialog-head">
             <div>

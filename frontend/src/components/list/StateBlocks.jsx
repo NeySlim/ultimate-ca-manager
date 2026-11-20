@@ -70,7 +70,7 @@ export function LoadError({ title, cause, onRetry, journal, journalLabel, classN
         <h2>{title}</h2>
         {cause && <p>{cause}</p>}
         <div className="lv-error-actions">
-          {onRetry && <ListButton primary icon={ArrowsClockwise} onClick={onRetry}>{t('table.retry')}</ListButton>}
+          {onRetry && <ListButton primary data-write="false" icon={ArrowsClockwise} onClick={onRetry}>{t('table.retry')}</ListButton>}
           {journal && (
             <Link className="lv-text-link" to={journal}>{journalLabel || t('certificates.viewLog')}<CaretRight size={14} aria-hidden="true" /></Link>
           )}

@@ -1,9 +1,10 @@
 /** Theme menu: same ThemeContext as Appearance, applied mode icon, keyboard loop and focus return. */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { Sparkle, Moon } from '@phosphor-icons/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { tStub } from './shellTestUtils'
 
 const theme = vi.hoisted(() => ({
   setThemeFamily: vi.fn(), setMode: vi.fn(),
@@ -11,7 +12,7 @@ const theme = vi.hoisted(() => ({
 }))
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: tStub, i18n: { language: 'en' } }),
+  useTranslation: () => ({ t: (k, o) => (o ? `${k}|${Object.values(o).join(',')}` : k), i18n: { language: 'en' } }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 vi.mock('../../../contexts/ThemeContext', () => ({
@@ -23,7 +24,13 @@ vi.mock('../../../contexts/ThemeContext', () => ({
 
 import { ThemeMenu } from '../ThemeMenu'
 
-const trigger = () => screen.getByRole('button', { name: 'shell.theme.menu' })
+const trigger = () => screen.getByRole('button', { name: /^shell\.theme\.label\|/ })
+const drawn = (svg) => svg.innerHTML
+const drawnOf = (Icon) => {
+  const box = document.createElement('div')
+  box.innerHTML = renderToStaticMarkup(<Icon size={16} />)
+  return box.querySelector('svg').innerHTML
+}
 
 function setup() {
   const user = userEvent.setup()
@@ -61,6 +68,26 @@ describe('ThemeMenu', () => {
     theme.value = { themeFamily: 'atelier', mode: 'system', resolvedMode: 'light' }
     setup()
     expect(trigger().querySelector('svg')).toHaveAttribute('data-mode', 'light')
+  })
+
+  it('names the theme in force on the button, as the mockup: "Theme: System (dark)", a menu popup', () => {
+    setup()
+    expect(trigger()).toHaveAccessibleName('shell.theme.label|shell.theme.systemNow|settings.dark')
+    expect(trigger()).toHaveAttribute('title', 'shell.theme.label|shell.theme.systemNow|settings.dark')
+    expect(trigger()).toHaveAttribute('aria-haspopup', 'menu')
+  })
+
+  it('draws sparkles for the Aurore family and a 16 px icon, else the applied mode', () => {
+    theme.value = { themeFamily: 'aurore', mode: 'light', resolvedMode: 'light' }
+    const { unmount } = render(<MemoryRouter><ThemeMenu /></MemoryRouter>)
+    expect(trigger()).toHaveAccessibleName('shell.theme.label|shell.theme.auroreLight')
+    const svg = trigger().querySelector('svg')
+    expect(svg).toHaveAttribute('width', '16')
+    expect(drawn(svg)).toBe(drawnOf(Sparkle))
+    unmount()
+    theme.value = { themeFamily: 'atelier', mode: 'dark', resolvedMode: 'dark' }
+    render(<MemoryRouter><ThemeMenu /></MemoryRouter>)
+    expect(drawn(trigger().querySelector('svg'))).toBe(drawnOf(Moon))
   })
 
   it('loops the arrow keys over the options', async () => {

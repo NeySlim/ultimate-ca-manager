@@ -3,21 +3,21 @@
  * pages of the main bar, each module with its one-line description and a pin toggle.
  * A disclosure, not an ARIA menu: items are links.
  */
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { PushPin, Stack, CaretDown, Question } from '@phosphor-icons/react'
+import { PushPinSimple, Stack, CaretDown, Question } from '@phosphor-icons/react'
 import { menuGroupsFor, menuLabelKey } from '../../navigation/registry'
 import { canPinModule, MAX_PINS, FIXED_IDS } from './pins'
 import { useDisclosure, moveFocus } from './useDisclosure'
 
 const EDGE = 16
 
-export function ModulesMenu({ can, pins, onTogglePin, activeId, onOpenHelp }) {
+/** onNotice(message): the shell's message, for a refused fourth pin. */
+export function ModulesMenu({ can, pins, onTogglePin, activeId, onOpenHelp, onNotice }) {
   const { t } = useTranslation()
   const { open, setOpen, close, buttonRef, rootProps } = useDisclosure()
   const menuRef = useRef(null)
-  const [notice, setNotice] = useState('')
   const groups = menuGroupsFor(can)
   const pages = groups.reduce((n, g) => n + g.modules.length, 0)
   const full = pins.length >= MAX_PINS
@@ -28,7 +28,6 @@ export function ModulesMenu({ can, pins, onTogglePin, activeId, onOpenHelp }) {
 
   useEffect(() => {
     if (open) links()[0]?.focus()
-    else setNotice('')
   }, [open])
 
   // The menu opens under its button, kept inside the window with a 16 px margin
@@ -56,8 +55,8 @@ export function ModulesMenu({ can, pins, onTogglePin, activeId, onOpenHelp }) {
     if (open && (menuRef.current?.contains(e.target) || e.target === buttonRef.current)) moveFocus(e, links())
   }
 
-  // A refused fourth pin is explained in the menu foot, in place of the hint, not by silence
-  const pin = (id) => setNotice(onTogglePin(id) ? '' : t('shell.pinFull'))
+  // A refused fourth pin is explained in a message, as the mockup's toast, not by silence
+  const pin = (id) => { if (!onTogglePin(id)) onNotice?.(t('shell.pinFull')) }
 
   return (
     <div className="shell-modules" {...rootProps} onKeyDown={onKeyDown}>
@@ -109,7 +108,7 @@ export function ModulesMenu({ can, pins, onTogglePin, activeId, onOpenHelp }) {
                           title={pinned ? t('shell.pinRemove') : full ? t('shell.pinFullTitle') : t('shell.pinAdd')}
                           onClick={() => pin(m.id)}
                         >
-                          <PushPin size={14} weight={pinned ? 'fill' : 'regular'} aria-hidden="true" />
+                          <PushPinSimple size={14} aria-hidden="true" />
                         </button>
                       )}
                     </li>
@@ -120,8 +119,8 @@ export function ModulesMenu({ can, pins, onTogglePin, activeId, onOpenHelp }) {
           ))}
         </div>
         <div className="shell-menu-foot">
-          <PushPin size={13} aria-hidden="true" />
-          <p role="status" className={notice ? 'shell-menu-notice' : undefined}>{notice || t('shell.pinHint')}</p>
+          <PushPinSimple size={13} aria-hidden="true" />
+          <p>{t('shell.pinHint')}</p>
           {onOpenHelp && (
             <button type="button" className="shell-link-button" onClick={() => { close(); onOpenHelp('navigation') }}>
               <Question size={13} aria-hidden="true" />{t('shell.navHelp')}

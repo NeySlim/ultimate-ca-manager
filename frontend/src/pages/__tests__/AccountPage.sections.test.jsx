@@ -7,7 +7,8 @@ import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vite
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
-const m = vi.hoisted(() => ({ createApiKey: vi.fn() }))
+const m = vi.hoisted(() => ({ createApiKey: vi.fn(), persistPreference: vi.fn() }))
+vi.mock('../../stores/userPreferencesStore', async (orig) => ({ ...(await orig()), persistPreference: m.persistPreference }))
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key) => key, i18n: { language: 'en', changeLanguage: vi.fn(), on: vi.fn(), off: vi.fn() } }),
@@ -91,6 +92,13 @@ describe('AccountPage sections', () => {
       expect(screen.getByRole('region', { name })).toBeInTheDocument()
     }
     expect(screen.queryByTestId('sf-savebar')).toBeNull()
+  })
+
+  it('carries the language of the account in its profile, saved with the preferences', async () => {
+    open()
+    const select = await screen.findByRole('combobox', { name: 'settings.language' })
+    fireEvent.change(select, { target: { value: 'fr' } })
+    expect(m.persistPreference).toHaveBeenCalledWith('language', 'fr')
   })
 
   it('lands a link to ?tab= on its frame', async () => {

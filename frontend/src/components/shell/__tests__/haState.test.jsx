@@ -10,7 +10,7 @@ vi.mock('react-i18next', () => ({
 }))
 vi.mock('../../../services/system.service', () => ({ systemService: { getServiceStatus } }))
 
-import { haState, guardProps, useHealth, useWriteGuard, resetHealthForTests, WRITES_NOTE_ID } from '../health'
+import { haState, guardProps, useHealth, useWriteGuard, resetHealthForTests, WRITES_NOTE_ID, OFFLINE_NOTE_ID } from '../health'
 import { StateBanners } from '../StateBanners'
 import { NodesDialog } from '../NodesDialog'
 
@@ -18,8 +18,16 @@ const answer = (body) => vi.fn().mockResolvedValue({ ok: true, json: async () =>
 const HA = (extra = {}) => ({ status: 'ok', version: '3.0', ha: true, node_id: 'n1', leader: true,
   cluster: { leader_node_id: 'n1', nodes: 3, stale: 0 }, ...extra })
 
-beforeEach(() => { resetHealthForTests() })
-afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
+// The browser's network state, switched as a real one: the property, then its event
+let online = true
+const goOnline = (value) => act(() => { online = value; window.dispatchEvent(new Event(value ? 'online' : 'offline')) })
+
+beforeEach(() => {
+  resetHealthForTests()
+  online = true
+  vi.spyOn(navigator, 'onLine', 'get').mockImplementation(() => online)
+})
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); vi.restoreAllMocks() })
 
 describe('haState', () => {
   it('is null outside HA mode and before an answer', () => {
@@ -73,6 +81,47 @@ describe('shared poll', () => {
     vi.stubGlobal('fetch', answer({ status: 'ok', version: '3.0', ha: false, maintenance: { reason: 'restore' } }))
     render(<Probe />)
     await waitFor(() => expect(screen.getByTestId('probe')).toHaveTextContent('3.0/false'))
+  })
+})
+
+describe('offline', () => {
+  function Guard() {
+    const g = useWriteGuard()
+    return <p data-testid="guard">{`${g.suspended}/${g.reason}/${g.noteId}`}</p>
+  }
+
+  it('suspends writes while the browser is offline, pointing to the offline sentence, and resumes with the network', async () => {
+    vi.stubGlobal('fetch', answer({ status: 'ok', version: '3.0', ha: false }))
+    render(<Guard />)
+    expect(screen.getByTestId('guard')).toHaveTextContent('false/null/undefined')
+    goOnline(false)
+    expect(screen.getByTestId('guard')).toHaveTextContent(`true/offline/${OFFLINE_NOTE_ID}`)
+    goOnline(true)
+    expect(screen.getByTestId('guard')).toHaveTextContent('false/null/undefined')
+  })
+
+  it('shows the neutral offline banner of the mockup, whose sentence the guard points to', async () => {
+    vi.stubGlobal('fetch', answer({ status: 'ok', version: '3.0', ha: false }))
+    const { container } = render(<StateBanners />)
+    expect(container.querySelector('.shell-state-banner')).toBeNull()
+    goOnline(false)
+    const banner = container.querySelector('#shell-offline-banner')
+    expect(banner).not.toHaveClass('is-warn')
+    expect(banner.querySelector('p')).toHaveAttribute('id', OFFLINE_NOTE_ID)
+    expect(banner).toHaveTextContent('shell.offline.title shell.offline.text')
+  })
+
+  it('says the network went, then says it came back in a message', async () => {
+    vi.stubGlobal('fetch', answer({ status: 'ok', version: '3.0', ha: false }))
+    const onNotice = vi.fn()
+    render(<StateBanners onNotice={onNotice} />)
+    goOnline(false)
+    expect(screen.getByRole('status')).toHaveTextContent('shell.offline.said')
+    expect(onNotice).not.toHaveBeenCalled()
+    goOnline(true)
+    expect(onNotice).toHaveBeenCalledWith('shell.offline.back')
+    expect(screen.getByRole('status')).toHaveTextContent('')
+    expect(document.getElementById('shell-offline-banner')).toBeNull()
   })
 })
 
@@ -139,6 +188,23 @@ describe('NodesDialog', () => {
     expect(screen.getByText('shell.nodes.silent')).toBeInTheDocument()
     expect(screen.getAllByText(/^shell\.nodes\.secondsAgo\|1[12]$/)).toHaveLength(2)
     expect(screen.getByText('shell.nodes.introLate|1')).toBeInTheDocument()
+  })
+
+  it('is the list template dialog of the mockup: wide, its state on one line, closed by its Close button', async () => {
+    getServiceStatus.mockResolvedValue({ data: { cluster: { nodes: [
+      { node_id: 'n1', leader: true, stopped: false, stale: false, version: '3.0', heartbeat_at: new Date().toISOString() }] } } })
+    const onClose = vi.fn()
+    render(<NodesDialog open onClose={onClose} ha={{ stale: 0 }} />)
+    const dialog = await screen.findByRole('dialog', { name: 'shell.nodes.title' })
+    expect(dialog).toHaveClass('lv-dialog', 'is-wide')
+    const state = (await screen.findByText('shell.nodes.live')).closest('span')
+    expect(state.tagName).toBe('SPAN')
+    expect(state.querySelector('svg')).toHaveAttribute('width', '13')
+    const close = screen.getByRole('button', { name: 'common.close' })
+    expect(close).toHaveClass('lv-btn', 'is-primary')
+    expect(close).toHaveAttribute('data-write', 'false')
+    await userEvent.click(close)
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('says when the list cannot be read', async () => {

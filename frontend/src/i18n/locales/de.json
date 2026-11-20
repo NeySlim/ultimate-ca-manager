@@ -7130,6 +7130,7 @@
   },
   "shell": {
     "mainNav": "Hauptnavigation",
+    "skipToContent": "Zum Inhalt springen",
     "modules": "Module",
     "modulesMenuLabel": "Produktmodule",
     "pinCount": "{{count}} / {{max}} in der Leiste angeheftet",
@@ -7143,15 +7144,20 @@
     "escapeKey": "Esc",
     "searchPlaceholder": "Suchen…",
     "navigate": "Navigieren",
-    "signedInWith": "Angemeldet mit {{method}}",
+    "signedInWith": "Angemeldet mit {{method}}.",
+    "accountLabel": "Konto: {{name}}, {{role}}",
+    "accountLabelName": "Konto: {{name}}",
+    "lockAfter_one": "Sperre nach {{count}} Min. Inaktivität.",
+    "lockAfter_other": "Sperre nach {{count}} Min. Inaktivität.",
+    "signOut": "Abmelden",
     "method": {
       "password": "Passwort",
       "mtls": "Clientzertifikat",
       "webauthn": "Sicherheitsschlüssel",
       "session": "Browsersitzung"
     },
-    "expiringBadge_one": "{{count}} Zertifikat läuft ab oder ist abgelaufen. Ausblenden.",
-    "expiringBadge_other": "{{count}} Zertifikate laufen ab oder sind abgelaufen. Ausblenden.",
+    "expiringCount_one": "{{count}} Zertifikat läuft ab oder ist abgelaufen",
+    "expiringCount_other": "{{count}} Zertifikate laufen ab oder sind abgelaufen",
     "statusRunning": "Dienst läuft",
     "statusUnreachable": "Dienst nicht erreichbar",
     "statusSafeMode": "Abgesicherter Modus",
@@ -7163,12 +7169,21 @@
     "haNodes_other": "{{count}} Knoten · alle aktuell",
     "haLate_one": "{{count}} Knoten im Rückstand",
     "haLate_other": "{{count}} Knoten im Rückstand",
+    "approvalsPending_one": "{{count}} Genehmigung ausstehend",
+    "approvalsPending_other": "{{count}} Genehmigungen ausstehend",
+    "approvalsNone": "Keine Genehmigung ausstehend",
     "theme": {
-      "menu": "Design"
+      "menu": "Design",
+      "label": "Design: {{theme}}",
+      "systemNow": "System ({{mode}})",
+      "auroreDark": "Aurore dunkel",
+      "auroreLight": "Aurore hell"
     },
     "bell": {
       "title": "Benachrichtigungen",
+      "label": "Benachrichtigungen: {{state}}",
       "allRead": "Alle gelesen",
+      "noneUnread": "keine ungelesen",
       "markAllRead": "Alle als gelesen markieren",
       "markRead": "Als gelesen markieren",
       "open": "Öffnen",
@@ -7206,6 +7221,7 @@
       "retryLabel": "ACME-Erneuerung von {{name}} wiederholen",
       "publish": "Veröffentlichen",
       "publishLabel": "CRL von {{name}} jetzt veröffentlichen",
+      "crlTitle": "CRL von {{name}}",
       "close": "Benachrichtigungen schließen",
       "mailOn": "E-Mail-Benachrichtigung aktiviert.",
       "mailOff": "E-Mail-Benachrichtigung deaktiviert.",
@@ -7313,6 +7329,7 @@
       "stateDone": "Erledigt",
       "stateTodo": "Offen",
       "stateAfter": "Nach Schritt {{step}}",
+      "doneWhat": "{{what}}.",
       "steps": {
         "root": {
           "title": "Offline-Root erstellen oder eine CA importieren",
@@ -7324,15 +7341,23 @@
           "title": "Erste ausstellende CA erstellen",
           "todo": "Sie signiert die Zertifikate der Dienste, unter der Root.",
           "done": "Eine ausstellende CA ist unter der Root eingerichtet.",
+          "doneWith": "{{what}}, unter {{root}}.",
           "action": "Ausstellende CA erstellen"
         },
         "protocol": {
           "title": "Ein erstes Protokoll aktivieren",
           "todo": "ACME für Server, SCEP für Netzwerkgeräte.",
           "done": "Ein Registrierungsprotokoll ist auf einer ausstellenden CA aktiv.",
+          "doneWith": "{{protocol}} aktiv.",
           "action": "Protokoll wählen"
         }
       }
+    },
+    "offline": {
+      "title": "Offline.",
+      "text": "Die Ansicht läuft mit den bereits geladenen Daten weiter; Aktionen sind ausgesetzt und werden bei Rückkehr des Netzwerks von selbst wieder möglich.",
+      "said": "Offline: Die Ansicht läuft weiter, Aktionen sind ausgesetzt.",
+      "back": "Verbindung wiederhergestellt: Aktionen sind wieder verfügbar."
     }
   },
   "overview": {

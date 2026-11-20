@@ -5,8 +5,9 @@
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import * as Dialog from '@radix-ui/react-dialog'
 import { Check, HardDrives, Warning } from '@phosphor-icons/react'
-import { Modal } from '../Modal'
+import { ListDialog } from '../list/ListDialog'
 import { systemService } from '../../services/system.service'
 import { relativeAgo } from '../../lib/relativeTime'
 
@@ -38,41 +39,42 @@ export function NodesDialog({ open, onClose, ha }) {
       : t('shell.nodes.introCurrent')
 
   return (
-    <Modal open={open} onClose={onClose} title={t('shell.nodes.title')} size="lg">
-      <div className="shell-nodes">
-        <p className="shell-nodes-intro">{intro}</p>
-        {failed && <p className="shell-nodes-intro" role="alert">{t('shell.nodes.loadFailed')}</p>}
-        {nodes && (
-          <ul className="shell-node-list">
-            {nodes.map(n => {
-              const late = n.stale && !n.stopped
-              const beat = Date.parse(n.heartbeat_at)
-              return (
-                <li key={n.node_id} className={`shell-node-card${late ? ' is-late' : ''}`}>
-                  <div className="shell-node-head">
-                    <strong className="shell-mono">{n.node_id}</strong>
-                    {n.leader
-                      ? <span className="shell-node-badge is-good"><Check size={14} aria-hidden="true" />{t('shell.nodes.leader')}</span>
-                      : <span className="shell-node-badge"><HardDrives size={14} aria-hidden="true" />{t('shell.nodes.secondary')}</span>}
-                  </div>
-                  <dl className="shell-node-props">
-                    <dt>{t('shell.nodes.heartbeat')}</dt>
-                    <dd>{Number.isFinite(beat) ? beatText(beat, t) : '–'}</dd>
-                    <dt>{t('shell.nodes.state')}</dt>
-                    <dd>
-                      {n.stopped ? t('shell.nodes.stopped')
-                        : late ? <span className="is-warn"><Warning size={14} aria-hidden="true" />{t('shell.nodes.silent')}</span>
-                          : <span className="is-good"><Check size={14} aria-hidden="true" />{t('shell.nodes.live')}</span>}
-                    </dd>
-                    <dt>{t('shell.nodes.version')}</dt>
-                    <dd>{n.version || '–'}</dd>
-                  </dl>
-                </li>
-              )
-            })}
-          </ul>
-        )}
+    <ListDialog open={open} onOpenChange={(next) => { if (!next) onClose() }} title={t('shell.nodes.title')} wide narrow={false} testId="shell-nodes-dialog">
+      <p className="shell-nodes-intro">{intro}</p>
+      {failed && <p className="shell-nodes-intro" role="alert">{t('shell.nodes.loadFailed')}</p>}
+      {nodes && (
+        <ul className="shell-node-list">
+          {nodes.map(n => {
+            const late = n.stale && !n.stopped
+            const beat = Date.parse(n.heartbeat_at)
+            return (
+              <li key={n.node_id} className={`shell-node-card${late ? ' is-late' : ''}`}>
+                <div className="shell-node-head">
+                  <strong className="shell-mono">{n.node_id}</strong>
+                  {n.leader
+                    ? <span className="shell-node-badge is-good"><Check size={13} aria-hidden="true" />{t('shell.nodes.leader')}</span>
+                    : <span className="shell-node-badge"><HardDrives size={13} aria-hidden="true" />{t('shell.nodes.secondary')}</span>}
+                </div>
+                <dl className="shell-node-props">
+                  <dt>{t('shell.nodes.heartbeat')}</dt>
+                  <dd>{Number.isFinite(beat) ? beatText(beat, t) : '–'}</dd>
+                  <dt>{t('shell.nodes.state')}</dt>
+                  <dd>
+                    {n.stopped ? t('shell.nodes.stopped')
+                      : late ? <span className="is-warn"><Warning size={13} aria-hidden="true" />{t('shell.nodes.silent')}</span>
+                        : <span className="is-good"><Check size={13} aria-hidden="true" />{t('shell.nodes.live')}</span>}
+                  </dd>
+                  <dt>{t('shell.nodes.version')}</dt>
+                  <dd>{n.version || '–'}</dd>
+                </dl>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <div className="lv-dialog-actions">
+        <Dialog.Close className="lv-btn is-primary" data-write="false">{t('common.close')}</Dialog.Close>
       </div>
-    </Modal>
+    </ListDialog>
   )
 }

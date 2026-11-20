@@ -4,7 +4,7 @@ import { Globe } from '@phosphor-icons/react'
 import { persistPreference } from '../../stores/userPreferencesStore'
 
 export default function LanguageSelector({ className = '' }) {
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
 
   const handleChange = (e) => {
     const newLang = e.target.value
@@ -24,6 +24,7 @@ export default function LanguageSelector({ className = '' }) {
       <select
         value={i18n.language?.split('-')[0] || 'en'}
         onChange={handleChange}
+        aria-label={t('settings.language')}
         className="bg-bg-secondary border border-border rounded-md px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
       >
         {languages.map((lang) => (

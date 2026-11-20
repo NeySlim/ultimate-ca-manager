@@ -25,6 +25,8 @@
 .shell-main { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
 .shell-main.has-dock-right { flex-direction: row; }
 .shell-content { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
+.shell-page { flex: 1; display: flex; min-height: 0; min-width: 0; overflow: auto; }
+.shell-page:focus { outline: none; }
 
 /* Top bar */
 .shell-topbar {
@@ -47,9 +49,6 @@
 .shell-brand strong { font-size: 21px; font-weight: 600; letter-spacing: -0.5px; }
 .shell-main-nav { display: flex; align-items: stretch; align-self: stretch; gap: 5px; min-width: 0; }
 .shell-fixed { display: flex; align-items: stretch; flex-shrink: 0; position: relative; }
-/* A link followed by its badge gives it the room of its own right padding */
-.shell-fixed.has-badge .shell-navlink { padding-right: 8px; }
-.shell-fixed.has-badge .shell-navlink.is-active::after { right: 8px; }
 /* Full-height links of the main bar; the current one is filled and underlined */
 .shell-navlink {
   position: relative;
@@ -79,24 +78,26 @@
   background: var(--accent);
 }
 .shell-pin-label { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.shell-navicon { position: relative; display: inline-flex; }
+/* Expiry count on the Certificates icon, drawn as the bell's count: outside the link's layout */
 .shell-badge {
-  align-self: center;
-  flex-shrink: 0;
-  margin: 0 8px 0 0;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
-  line-height: 20px;
-  white-space: nowrap;
-  border: 0;
-  border-radius: 999px;
+  position: absolute;
+  top: -8px;
+  left: 9px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
   background: var(--warn-fill);
   color: var(--bg);
   font-size: 11px;
   font-weight: 700;
-  cursor: pointer;
+  line-height: 16px;
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
-.shell-badge:hover { opacity: 0.75; }
 
 .shell-mobile-nav { display: none; }
 .shell-tools { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
@@ -119,7 +120,6 @@
 }
 .shell-search:hover { background: var(--hover); }
 .shell-search span { text-align: left; }
-.shell-search kbd { margin-left: auto; padding: 2px 4px; line-height: normal; }
 .shell-search kbd, .shell-status-shortcut kbd {
   padding: 0 4px;
   border: 1px solid var(--control);
@@ -129,6 +129,8 @@
   font-size: 12px;
   line-height: 16px;
 }
+/* The search key keeps the mockup's own kbd box: 2px 4px at the font's line height */
+.shell-search kbd { margin-left: auto; padding: 2px 4px; line-height: normal; }
 .shell-icon-btn {
   display: inline-grid;
   place-items: center;
@@ -183,12 +185,18 @@
 .shell-btn.is-primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .shell-text-link { display: inline-flex; align-items: center; gap: 4px; padding: 3px 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 500; text-decoration: none; cursor: pointer; }
 .shell-text-link:hover { text-decoration: underline; }
+.shell-notif-foot .shell-text-link { display: inline; padding: 0; }
 
 .shell-topbar :focus-visible, .shell-pop :focus-visible, .shell-menu :focus-visible, .shell-statusbar :focus-visible,
 .shell-notif-panel :focus-visible, .shell-state-banner :focus-visible, .shell-setup :focus-visible, .shell-setup-later :focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline-offset: 3px;
+  box-shadow: none;
 }
+/* Skip link: first tab stop, shown at the top left while focused */
+.shell-skip { position: fixed; left: 16px; top: -60px; z-index: 100; padding: 14px; background: var(--panel); color: var(--text); font-size: 13px; text-decoration: none; }
+.shell-skip:focus { top: 12px; }
+.shell-skip:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; box-shadow: none; }
 
 /* Modules mega-menu */
 .shell-modules { display: flex; align-items: stretch; }
@@ -205,7 +213,7 @@
   border: 1px solid var(--control);
   border-top: 0;
   border-radius: 0 0 6px 6px;
-  box-shadow: var(--shadow-xl);
+  box-shadow: 0 18px 50px color-mix(in srgb, var(--ink) 47%, transparent);
   font-size: 13px;
   line-height: normal;
 }
@@ -230,7 +238,6 @@
 .shell-pin[aria-disabled="true"] { opacity: 0.42; cursor: not-allowed; }
 .shell-menu-foot { display: flex; align-items: center; gap: 7px; margin-top: 8px; padding: 10px 8px 0; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
 .shell-menu-foot p { margin: 0; }
-.shell-menu-notice { color: var(--warn); }
 .shell-link-button { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
 .shell-link-button:hover { text-decoration: underline; }
 
@@ -248,18 +255,18 @@
   background: var(--panel);
   border: 1px solid var(--control);
   border-radius: 6px;
-  box-shadow: var(--shadow-xl);
+  box-shadow: 0 18px 50px color-mix(in srgb, var(--ink) 40%, transparent);
 }
 .shell-pop[hidden] { display: none; }
-.shell-user-id { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px 10px; border-bottom: 1px solid var(--line); margin-bottom: 4px; font-size: 12px; color: var(--muted); }
-.shell-user-id strong { color: var(--text); font-size: 13px; }
+.shell-user-menu { width: 270px; }
+.shell-user-id { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px 11px; border-bottom: 1px solid var(--line); margin-bottom: 6px; font-size: 12px; line-height: 1.5; color: var(--text); }
+.shell-user-id strong { font-size: 13px; }
 .shell-muted { color: var(--muted); }
 .shell-pop-group { display: flex; flex-direction: column; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
 .shell-pop-label { padding: 4px 10px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.shell-pop-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; padding: 6px 10px; border: 0; border-radius: 4px; background: none; color: var(--text); font: inherit; font-size: 13px; text-align: left; text-decoration: none; cursor: pointer; }
+.shell-pop-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 6px 10px; border: 0; border-radius: 4px; background: none; color: var(--text); font: inherit; font-size: 13px; line-height: normal; text-align: left; text-decoration: none; cursor: pointer; }
 .shell-pop-item:hover { background: var(--hover); }
 .shell-pop-item[aria-pressed="true"] { background: var(--selected); }
-.shell-danger { margin-top: 4px; color: var(--bad); border-top: 1px solid var(--line); border-radius: 0 0 4px 4px; }
 .shell-grow { flex: 1; }
 .shell-swatch { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--line); }
 
@@ -277,7 +284,7 @@
   flex-direction: column;
   background: var(--panel);
   border-left: 1px solid var(--control);
-  box-shadow: var(--shadow-xl);
+  box-shadow: -18px 0 50px -20px color-mix(in srgb, var(--ink) 47%, transparent);
   font-size: 13px;
   line-height: normal;
   text-align: left;
@@ -327,19 +334,22 @@
   color: var(--muted);
 }
 .shell-statusbar > * { white-space: nowrap; }
-.shell-status-live, .shell-status-text, .shell-status-ha, .shell-status-shortcut { display: inline-flex; align-items: center; gap: 6px; }
+.shell-status-live, .shell-status-text, .shell-status-ha { display: inline-flex; align-items: center; gap: 6px; }
+.shell-status-shortcut { display: inline-flex; align-items: center; gap: 5px; }
 .shell-status-ha { gap: 9px; }
 .shell-ws { padding: 0 2px; }
 .shell-ha-link { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 8px; border: 0; border-radius: 3px; background: none; font: inherit; font-size: 12px; color: inherit; }
 button.shell-ha-link { cursor: pointer; }
+.shell-approvals-link { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 8px; border-radius: 3px; color: var(--accent); font-weight: 500; text-decoration: none; }
+.shell-approvals-link:hover { background: var(--hover); }
 button.shell-ha-link:hover { background: var(--hover); }
 .shell-ha-link.is-good { color: var(--good); }
 .shell-ha-link.is-warn { color: var(--warn); }
 .shell-status-escape { margin-left: 10px; }
-.shell-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-.shell-dot.is-good { background: var(--good); }
-.shell-dot.is-warn { background: var(--warn); }
-.shell-dot.is-bad { background: var(--bad); }
+.shell-dot { flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; color: var(--muted); background: currentColor; }
+.shell-dot.is-good { color: var(--good); }
+.shell-dot.is-warn { color: var(--warn); }
+.shell-dot.is-bad { color: var(--bad); }
 
 /* Banners at the top of the workspace (HA): what is suspended, what still works */
 .shell-state-banner { display: flex; align-items: flex-start; gap: 12px; flex-shrink: 0; margin: 12px 24px 0; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--control); border-radius: 5px; font-size: 13px; line-height: 1.5; color: var(--text); }
@@ -350,22 +360,22 @@ button.shell-ha-link:hover { background: var(--hover); }
 .shell-state-banner > p, .shell-ha-what { flex: 1; min-width: 0; }
 .shell-ha-can { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 6px 0 0; padding: 0; font-size: 12px; color: var(--muted); }
 .shell-ha-can li { display: flex; align-items: center; gap: 6px; }
-.shell-ha-can svg { color: var(--text); }
+.shell-ha-can svg { flex-shrink: 0; color: var(--text); }
 
-/* Cluster nodes dialog */
-.shell-nodes { padding: 16px; font-size: 13px; line-height: normal; }
-.shell-nodes-intro { margin: 0 0 14px; font-size: 12px; color: var(--muted); }
-.shell-node-list { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin: 0; padding: 0; }
-.shell-node-card { padding: 12px 14px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); }
+/* Cluster nodes dialog (inside the list template's dialog) */
+.shell-nodes-intro { margin: 0 0 14px; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.shell-node-list { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; }
+.shell-node-card { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 5px; background: var(--raised); }
 .shell-node-card.is-late { border-left: 4px solid var(--warn-fill); }
-.shell-node-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
-.shell-mono { font-family: var(--font-mono, ui-monospace, monospace); }
-.shell-node-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.shell-node-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.shell-mono { font-family: 'Fira Code', monospace; font-size: 12px; }
+.shell-node-badge { display: inline-flex; align-items: center; gap: 6px; padding: 1px 8px 1px 6px; font-size: 12px; white-space: nowrap; color: var(--muted); }
 .shell-node-badge.is-good, .shell-node-props .is-good { color: var(--good); }
 .shell-node-props .is-warn { color: var(--warn); }
-.shell-node-props { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 12px; margin: 0; font-size: 12px; }
+.shell-node-props { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; margin: 0; font-size: 12px; }
 .shell-node-props dt { color: var(--muted); }
-.shell-node-props dd { margin: 0; display: inline-flex; align-items: center; gap: 6px; }
+.shell-node-props dd { margin: 0; }
+.shell-node-props svg { vertical-align: -2px; margin-right: 4px; }
 
 /* First run: the "Initial setup" card, its folded line */
 .shell-setup { flex-shrink: 0; margin: 0 0 18px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); overflow: hidden; font-size: 13px; line-height: normal; color: var(--text); }
@@ -397,13 +407,18 @@ button.shell-ha-link:hover { background: var(--hover); }
 .shell-setup-later p { flex: 1; margin: 0; }
 .shell-setup-later strong { font-weight: 600; }
 
+/* Wide screens: 34 px side margins for the bars and the page */
+@media (min-width: 1800px) {
+  .shell-topbar, .shell-statusbar { padding-left: 34px; padding-right: 34px; }
+  .shell-content .lv-stage { --lv-gutter: 34px; }
+}
 @media (max-width: 1700px) {
   .shell-navlink { padding: 0 12px; }
   .shell-navlink.is-active::after { left: 12px; right: 12px; }
 }
 @media (max-width: 1440px) {
   .shell-pin-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .shell-pinned { padding: 0 12px; }
+  .shell-main-nav > .shell-pinned { padding: 0 12px; }
 }
 @media (max-width: 1250px) {
   .shell-topbar { gap: 15px; }
@@ -414,11 +429,17 @@ button.shell-ha-link:hover { background: var(--hover); }
   .shell-search { min-width: 120px; }
   .shell-search span { display: none; }
 }
+/* Pinned modules leave the bar before the links would run over the search */
+@media (max-width: 1100px) {
+  .shell-main-nav > .shell-pinned { display: none; }
+}
 @media (max-width: 1000px) {
+  .shell-help { display: none; }
   .shell-topbar { padding: 0 18px; gap: 16px; }
   .shell-navlink { padding: 0 9px; }
   .shell-navlink.is-active::after { left: 9px; right: 9px; }
   .shell-main-nav .shell-navlink svg { display: none; }
+  .shell-badge { position: static; margin-left: 2px; }
   .shell-search { min-width: 64px; }
 }
 
@@ -430,18 +451,20 @@ button.shell-ha-link:hover { background: var(--hover); }
   /* The picker needs the room: the name stays for screen readers, the search keeps its icon */
   .shell-brand strong { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .shell-search kbd { display: none; }
+  /* The mockup's picker (12 px, 5px 8px, 190 px at most); touch targets stay 44 px high */
   .shell-mobile-nav {
     display: block;
     flex: 1 1 auto;
     min-width: 0;
+    max-width: 190px;
     min-height: 44px;
-    padding: 0 8px;
+    padding: 5px 8px;
     border: 1px solid var(--control);
-    border-radius: 6px;
-    background: var(--bg);
+    border-radius: 4px;
+    background: var(--panel);
     color: var(--text);
     font: inherit;
-    font-size: 14px;
+    font-size: 12px;
   }
   .shell-topbar { gap: 8px; padding: 0 10px; }
   .shell-tools { gap: 2px; margin-left: 0; }
@@ -451,15 +474,16 @@ button.shell-ha-link:hover { background: var(--hover); }
   .shell-pop { position: fixed; right: 8px; left: 8px; width: auto; top: var(--shell-bar-h); }
   .shell-pop-item { min-height: 44px; }
   .shell-status-shortcut { display: none; }
-  .shell-statusbar { height: auto; min-height: 34px; padding: 7px 16px; font-size: 12px; flex-wrap: wrap; row-gap: 2px; }
+  .shell-statusbar { height: auto; min-height: 34px; margin-top: auto; padding: 7px 16px; font-size: 12px; flex-wrap: wrap; row-gap: 2px; }
   .shell-notif-panel { top: 0; bottom: 0; z-index: 60; width: 100%; border: 0; }
   .shell-notif-head { padding: 10px 8px 10px 16px; }
-  .shell-notif-head .shell-icon-btn { width: 40px; height: 40px; }
+  .shell-notif-head .shell-icon-btn { width: 40px; height: 40px; min-width: 40px; min-height: 40px; }
   .shell-notif-actions .shell-btn { min-height: 40px; }
   .shell-notif-item { padding: 13px 16px; }
   .shell-state-banner { flex-wrap: wrap; margin: 12px 16px 0; }
   .shell-state-banner > p, .shell-state-banner .shell-ha-what { flex-basis: calc(100% - 34px); }
   .shell-state-banner > .shell-btn { margin-left: 30px; }
+  .shell-node-list { grid-template-columns: 1fr; }
   .shell-setup-step { grid-template-columns: 28px minmax(0, 1fr); row-gap: 8px; }
   .shell-setup-step .shell-setup-state, .shell-setup-step .shell-btn { grid-column: 2; justify-self: start; }
   .shell-setup-bar { flex-basis: 110px; }
@@ -467,6 +491,14 @@ button.shell-ha-link:hover { background: var(--hover); }
 }
 @media (max-width: 380px) {
   .shell-brand strong { display: none; }
+}
+/* Phone width: the whole document scrolls, the top bar sticks, the status bar ends the page */
+@media (max-width: 800px) {
+  html:has(.shell-root), html:has(.shell-root) body { height: auto; min-height: 100%; overflow: visible; }
+  html:has(.shell-root) #root { height: auto; min-height: 100dvh; }
+  .shell-root { height: auto; min-height: 100dvh; overflow: visible; }
+  .shell-stage, .shell-main, .shell-content, .shell-page { flex: 0 0 auto; min-height: 0; overflow: visible; }
+  .shell-topbar { position: sticky; top: 0; z-index: 30; }
 }
 
 /* Aurore family: a drifting glow behind the page, glass on the bars and menus */
@@ -479,8 +511,8 @@ button.shell-ha-link:hover { background: var(--hover); }
   pointer-events: none;
   background:
     radial-gradient(1100px 700px at 16% 2%, color-mix(in srgb, var(--grad-a) 36%, transparent), transparent 60%),
-    radial-gradient(800px 600px at 90% 98%, color-mix(in srgb, var(--grad-b) 28%, transparent), transparent 60%);
-  animation: shell-aurore-drift 60s ease-in-out infinite alternate;
+    radial-gradient(800px 600px at 90% 98%, color-mix(in srgb, var(--grad-b) 22%, transparent), transparent 60%);
+  animation: shell-aurore-drift 90s ease-in-out infinite alternate;
 }
 :root[data-theme="aurore"][data-mode="light"] body::before {
   background:
@@ -508,32 +540,41 @@ button.shell-ha-link:hover { background: var(--hover); }
 }
 :root[data-theme="aurore"] .shell-topbar { border-bottom: 1px solid transparent; border-image: linear-gradient(90deg, var(--grad-a), var(--grad-b) 45%, transparent) 1; }
 :root[data-theme="aurore"] .shell-statusbar { border-top: 1px solid transparent; border-image: linear-gradient(90deg, var(--grad-a), var(--grad-b) 45%, transparent) 1; }
-:root[data-theme="aurore"] :is(.shell-menu, .shell-pop) {
+:root[data-theme="aurore"] :is(.shell-menu, .shell-pop, .shell-notif-panel) {
   background: color-mix(in srgb, var(--panel) 80%, transparent);
   -webkit-backdrop-filter: blur(16px) saturate(1.4);
   backdrop-filter: blur(16px) saturate(1.4);
-  border-color: color-mix(in srgb, var(--text) 10%, transparent);
+  border-color: color-mix(in srgb, var(--paper) 8%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--paper) 6%, transparent), 0 24px 60px -20px color-mix(in srgb, var(--ink) 70%, transparent);
 }
-:root[data-theme="aurore"] .shell-brand strong {
-  background: linear-gradient(90deg, var(--accent), var(--grad-b));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+:root[data-theme="aurore"] .shell-menu { background: color-mix(in srgb, var(--panel) 78%, transparent); }
+:root[data-theme="aurore"][data-mode="light"] :is(.shell-menu, .shell-pop, .shell-notif-panel) {
+  background: color-mix(in srgb, var(--paper) 84%, transparent);
+  border-color: color-mix(in srgb, var(--text) 14%, transparent);
+  box-shadow: inset 0 1px 0 var(--paper), 0 24px 60px -20px color-mix(in srgb, var(--text) 35%, transparent);
+}
+:root[data-theme="aurore"][data-mode="light"] :is(.shell-topbar, .shell-statusbar)::before { background: color-mix(in srgb, var(--paper) 66%, transparent); }
+:root[data-theme="aurore"][data-mode="light"] .shell-navlink.is-active { background: linear-gradient(180deg, color-mix(in srgb, var(--grad-a) 10%, transparent), transparent), var(--selected); }
+/* Shell buttons in Aurore: 6 px corners; plain ones on a faint glass, as the mockup's .btn */
+:root[data-theme="aurore"] :is(.shell-search, .shell-icon-btn, .shell-btn) { border-radius: 6px; }
+:root[data-theme="aurore"] :is(.shell-search, .shell-btn:not(.is-primary):not(.is-quiet)) { background: color-mix(in srgb, var(--paper) 3%, transparent); border-color: color-mix(in srgb, var(--paper) 10%, transparent); }
+:root[data-theme="aurore"] :is(.shell-search, .shell-btn:not(.is-primary):not(.is-quiet)):hover:not(:disabled) { background: color-mix(in srgb, var(--grad-a) 12%, transparent); }
+:root[data-theme="aurore"][data-mode="light"] :is(.shell-search, .shell-btn:not(.is-primary):not(.is-quiet)) { background: color-mix(in srgb, var(--paper) 70%, transparent); border-color: var(--control); }
+:root[data-theme="aurore"][data-mode="light"] :is(.shell-search, .shell-btn:not(.is-primary):not(.is-quiet)):hover:not(:disabled) { background: color-mix(in srgb, var(--grad-a) 8%, transparent); }
+:root[data-theme="aurore"] .shell-dot { box-shadow: 0 0 8px currentColor; }
+:root[data-theme="aurore"] :is(.shell-topbar, .shell-pop, .shell-menu, .shell-statusbar, .shell-notif-panel, .shell-state-banner, .shell-setup, .shell-setup-later) :focus-visible {
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent);
 }
 :root[data-theme="aurore"] .shell-navlink.is-active { background: linear-gradient(180deg, color-mix(in srgb, var(--grad-a) 18%, transparent), transparent), var(--selected); }
 :root[data-theme="aurore"] .shell-navlink.is-active::after { background: linear-gradient(90deg, var(--grad-a), var(--grad-b)); }
 :root[data-theme="aurore"] .shell-count { border-radius: 999px; padding: 1px 7px; background: color-mix(in srgb, currentColor 14%, transparent); border-color: color-mix(in srgb, currentColor 35%, transparent); }
-:root[data-theme="aurore"] .shell-notif-panel {
-  background: color-mix(in srgb, var(--panel) 80%, transparent);
-  -webkit-backdrop-filter: blur(16px) saturate(1.4);
-  backdrop-filter: blur(16px) saturate(1.4);
-  border-color: color-mix(in srgb, var(--text) 10%, transparent);
-}
 :root[data-theme="aurore"] .shell-notif-group h3 { background: color-mix(in srgb, var(--raised) 92%, transparent); }
+:root[data-theme="aurore"][data-mode="light"] .shell-notif-group h3 { background: color-mix(in srgb, var(--bg) 94%, transparent); }
 :root[data-theme="aurore"] .shell-bell-count { background: linear-gradient(135deg, var(--grad-a), var(--grad-b)); color: var(--bg); }
 :root[data-theme="aurore"][data-mode="light"] .shell-bell-count { color: var(--on-accent); }
 :root[data-theme="aurore"] .shell-notif-item.is-unread { box-shadow: inset 3px 0 0 var(--grad-a); }
 :root[data-theme="aurore"] .shell-navlink:not(.is-active):hover { background: color-mix(in srgb, var(--grad-a) 10%, transparent); }
+:root[data-theme="aurore"][data-mode="light"] .shell-navlink:not(.is-active):hover { background: color-mix(in srgb, var(--grad-a) 8%, transparent); }
 @media (max-width: 800px) {
   :root[data-theme="aurore"] :is(.shell-pop, .shell-notif-panel) { background: var(--panel); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }

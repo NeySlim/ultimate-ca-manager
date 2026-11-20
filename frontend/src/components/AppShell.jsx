@@ -8,7 +8,9 @@ import { TopBar } from './shell/TopBar'
 import { StatusBar } from './shell/StatusBar'
 import { StateBanners } from './shell/StateBanners'
 import { NodesDialog } from './shell/NodesDialog'
-import { haState, useHealth } from './shell/health'
+import { haState, useHealth, useWriteGuard } from './shell/health'
+import { useCentralWriteGuard } from './shell/writeGuard'
+import { moduleById } from '../navigation/registry'
 import { usePins } from './shell/pins'
 import { resolveActivePageId } from './shell/activePage'
 import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
@@ -16,6 +18,7 @@ import { FloatingHelpPanel } from './ui/FloatingHelpPanel'
 import { UpdatePopup } from './UpdatePopup'
 import { KofiSupportCard } from './KofiSupportCard'
 import { usePermission } from '../hooks'
+import { useNotification } from '../contexts/NotificationContext'
 import { InspectorDock } from './inspector/InspectorDock'
 import { useDockPlacement } from './inspector/placement'
 
@@ -25,6 +28,9 @@ export function AppShell() {
   const { isAdmin, hasPermission } = usePermission()
   const can = { isAdmin, hasPermission }
   const { pins, toggle: togglePin } = usePins(can)
+  // The shell's own messages (refused pin, network back), in the app's message area
+  const messages = useNotification()
+  const notice = (text) => messages?.showInfo?.(text)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [helpModalOpen, setHelpModalOpen] = useState(false)
   // Help key requested by the shell itself (navigation help); cleared on close
@@ -35,6 +41,8 @@ export function AppShell() {
   const [nodesOpen, setNodesOpen] = useState(false)
   const ha = haState(useHealth())
   const showNodes = hasPermission('read:settings') ? () => setNodesOpen(true) : undefined
+  // Offline or in maintenance, every write control of every page waits, pointing to the banner
+  useCentralWriteGuard(useWriteGuard())
 
   // Derive the active nav item from the URL (see resolveActivePageId)
   const activePage = resolveActivePageId(location.pathname)
@@ -71,6 +79,41 @@ export function AppShell() {
 
   // No arrival notice on expiries: the state counters and the bell already say them
 
+  // The tab names the page; the browser chrome takes the theme's background
+  const pageModule = moduleById(activePage === '' ? 'dashboard' : activePage)
+  const pageName = pageModule ? t(pageModule.barKey || pageModule.labelKey) : ''
+  useEffect(() => {
+    document.title = pageName ? `${pageName} · UCM` : 'UCM'
+  }, [pageName])
+  useEffect(() => {
+    const root = document.documentElement
+    const paint = () => {
+      let meta = document.querySelector('meta[name="theme-color"]')
+      if (!meta) {
+        meta = document.createElement('meta')
+        meta.name = 'theme-color'
+        document.head.appendChild(meta)
+      }
+      const bg = getComputedStyle(root).getPropertyValue('--bg').trim()
+      if (bg) meta.content = bg
+    }
+    paint()
+    const observer = new MutationObserver(paint)
+    observer.observe(root, { attributes: true, attributeFilter: ['data-theme', 'data-mode'] })
+    return () => observer.disconnect()
+  }, [])
+
+  // Closing the palette gives the focus back to the search button when nothing else took it
+  const setPalette = (open) => {
+    setCommandPaletteOpen(open)
+    if (!open) {
+      setTimeout(() => {
+        const active = document.activeElement
+        if (!active || active === document.body) document.getElementById('shell-search')?.focus()
+      }, 0)
+    }
+  }
+
   // Keyboard shortcuts
   useKeyboardShortcuts({
     onCommandPalette: () => setCommandPaletteOpen(true)
@@ -95,6 +138,9 @@ export function AppShell() {
 
   return (
     <div className="shell-root">
+      <a className="shell-skip" href="#shell-page" onClick={(e) => { e.preventDefault(); document.getElementById('shell-page')?.focus() }}>
+        {t('shell.skipToContent')}
+      </a>
       {/* The stage holds the page and the inspector; the status bar stays under both */}
       <div className="shell-stage">
       <TopBar
@@ -105,12 +151,13 @@ export function AppShell() {
         onOpenSearch={() => setCommandPaletteOpen(true)}
         onOpenHelp={openHelp}
         hasHelp={hasHelp}
+        onNotice={notice}
       />
 
       <div className={`shell-main${dockPlacement === 'right' ? ' has-dock-right' : ''}`}>
         <div className="shell-content">
-          <StateBanners onShowNodes={showNodes} />
-          <div className="flex-1 flex min-h-0 min-w-0 overflow-auto">
+          <StateBanners onShowNodes={showNodes} onNotice={notice} />
+          <div className="shell-page" id="shell-page" tabIndex={-1}>
             <Outlet />
           </div>
         </div>
@@ -118,12 +165,12 @@ export function AppShell() {
       </div>
       </div>
 
-      <StatusBar onShowNodes={showNodes} />
+      <StatusBar onShowNodes={showNodes} can={can} />
       {showNodes && <NodesDialog open={nodesOpen} onClose={() => setNodesOpen(false)} ha={ha} />}
 
       <CommandPalette
         open={commandPaletteOpen}
-        onOpenChange={setCommandPaletteOpen}
+        onOpenChange={setPalette}
       />
 
       {/* Help Panel (floating desktop / bottom sheet mobile) */}

@@ -6599,7 +6599,7 @@
   "websocket": {
     "status": {
       "active": "Real-time updates active",
-      "connecting": "Connecting...",
+      "connecting": "Connecting…",
       "disabled": "Real-time updates disabled",
       "error": "Connection error",
       "live": "Live",
@@ -7133,6 +7133,7 @@
   },
   "shell": {
     "mainNav": "Main navigation",
+    "skipToContent": "Skip to content",
     "modules": "Modules",
     "modulesMenuLabel": "Product modules",
     "pinCount": "{{count}} / {{max}} pinned in the bar",
@@ -7146,15 +7147,20 @@
     "escapeKey": "Esc",
     "searchPlaceholder": "Search…",
     "navigate": "Navigate",
-    "signedInWith": "Signed in with {{method}}",
+    "signedInWith": "Signed in with {{method}}.",
+    "accountLabel": "Account: {{name}}, {{role}}",
+    "accountLabelName": "Account: {{name}}",
+    "lockAfter_one": "Locks after {{count}} min of inactivity.",
+    "lockAfter_other": "Locks after {{count}} min of inactivity.",
+    "signOut": "Sign out",
     "method": {
       "password": "password",
       "mtls": "client certificate",
       "webauthn": "security key",
       "session": "browser session"
     },
-    "expiringBadge_one": "{{count}} certificate expiring or expired. Dismiss.",
-    "expiringBadge_other": "{{count}} certificates expiring or expired. Dismiss.",
+    "expiringCount_one": "{{count}} certificate expiring or expired",
+    "expiringCount_other": "{{count}} certificates expiring or expired",
     "statusRunning": "Service running",
     "statusUnreachable": "Service unreachable",
     "statusSafeMode": "Safe mode",
@@ -7166,20 +7172,29 @@
     "haNodes_other": "{{count}} nodes · all up to date",
     "haLate_one": "{{count}} node late",
     "haLate_other": "{{count}} nodes late",
+    "approvalsPending_one": "{{count}} approval pending",
+    "approvalsPending_other": "{{count}} approvals pending",
+    "approvalsNone": "No approval pending",
     "theme": {
-      "menu": "Theme"
+      "menu": "Theme",
+      "label": "Theme: {{theme}}",
+      "systemNow": "System ({{mode}})",
+      "auroreDark": "Aurore dark",
+      "auroreLight": "Aurore light"
     },
     "bell": {
       "title": "Notifications",
+      "label": "Notifications: {{state}}",
       "allRead": "All read",
+      "noneUnread": "none unread",
       "markAllRead": "Mark all read",
       "markRead": "Mark read",
       "open": "Open",
       "new": "Unread",
       "empty": "No notification: nothing awaits an intervention.",
       "kinds": {
-        "acme_order_failed": "ACME order failed",
-        "acme_client_renewal_failed": "ACME renewal failed",
+        "acme_order_failed": "ACME failure",
+        "acme_client_renewal_failed": "ACME failure",
         "approval_pending": "Approval pending",
         "scep_request_pending": "SCEP request pending",
         "key_recovery_pending": "Key recovery pending",
@@ -7209,6 +7224,7 @@
       "retryLabel": "Retry the ACME renewal of {{name}}",
       "publish": "Publish",
       "publishLabel": "Publish the CRL of {{name}} now",
+      "crlTitle": "CRL of {{name}}",
       "close": "Close the notifications",
       "mailOn": "Email notification enabled.",
       "mailOff": "Email notification disabled.",
@@ -7316,6 +7332,7 @@
       "stateDone": "Done",
       "stateTodo": "To do",
       "stateAfter": "After step {{step}}",
+      "doneWhat": "{{what}}.",
       "steps": {
         "root": {
           "title": "Create the offline root or import a CA",
@@ -7327,15 +7344,23 @@
           "title": "Create the first issuing CA",
           "todo": "It signs the certificates of the services, under the root.",
           "done": "An issuing CA is in place under the root.",
+          "doneWith": "{{what}}, under {{root}}.",
           "action": "Create the issuing CA"
         },
         "protocol": {
           "title": "Enable a first protocol",
           "todo": "ACME for servers, SCEP for network devices.",
           "done": "An enrollment protocol is active on an issuing CA.",
+          "doneWith": "{{protocol}} active.",
           "action": "Choose a protocol"
         }
       }
+    },
+    "offline": {
+      "title": "Offline.",
+      "text": "Browsing continues with the data already loaded; actions are suspended and will resume by themselves when the network returns.",
+      "said": "Offline: browsing continues, actions are suspended.",
+      "back": "Connection restored: actions are available again."
     }
   },
   "overview": {

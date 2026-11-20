@@ -50,6 +50,11 @@ describe('LoadError', () => {
     expect(within(alert).getByRole('link')).toHaveAttribute('href', '/audit')
   })
 
+  it('keeps Retry out of the write guard: reading again is not a write', () => {
+    render(<MemoryRouter><LoadError title="Could not load" onRetry={() => {}} /></MemoryRouter>)
+    expect(screen.getByRole('button', { name: 'table.retry' })).toHaveAttribute('data-write', 'false')
+  })
+
   it('has no journal link for who may not read it', () => {
     render(<MemoryRouter><LoadError title="Could not load" onRetry={() => {}} /></MemoryRouter>)
     expect(screen.queryByRole('link')).toBeNull()
