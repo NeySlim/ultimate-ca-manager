@@ -5333,9 +5333,9 @@
         "rejectHint": "Required for a rejection: added to the log with the decision.",
         "reasonRequired": "Give the reason for the rejection, {{min}} characters at least.",
         "manyNote": "Each request is decided in turn; if one fails, an outcome says which and why.",
-        "decidedNote": "Once decided, the request leaves the queue and the To handle card.",
-        "decidedNoteMany": "Once decided, the requests leave the queue and the To handle card.",
-        "csrNote": "An approved CSR is signed, its certificate opens in the inspector."
+        "decidedNote": "The request leaves the queue, the status bar and the To handle card.",
+        "decidedNoteMany": "The requests leave the queue, the status bar and the To handle card.",
+        "csrNote": "An approved CSR issues its certificate."
       },
       "sections": {
         "request": "Request",

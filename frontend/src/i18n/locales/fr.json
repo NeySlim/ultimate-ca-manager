@@ -5407,9 +5407,9 @@
         "rejectHint": "Obligatoire pour un refus : ajouté au journal avec la décision.",
         "reasonRequired": "Indiquez le motif du refus, {{min}} caractères au moins.",
         "manyNote": "Chaque demande est traitée à son tour ; si l’une échoue, un bilan dit laquelle et pourquoi.",
-        "decidedNote": "Une fois décidée, la demande quitte la file et la carte À traiter.",
-        "decidedNoteMany": "Une fois décidées, les demandes quittent la file et la carte À traiter.",
-        "csrNote": "Une CSR approuvée est signée, son certificat s’ouvre dans l’inspecteur."
+        "decidedNote": "La demande quitte la file, la barre d’état et la carte À traiter.",
+        "decidedNoteMany": "Les demandes quittent la file, la barre d’état et la carte À traiter.",
+        "csrNote": "Une CSR approuvée émet son certificat."
       },
       "sections": {
         "request": "Demande",

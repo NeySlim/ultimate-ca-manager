@@ -5333,9 +5333,9 @@
         "rejectHint": "拒绝时必填：与决定一起记入日志。",
         "reasonRequired": "请填写拒绝理由，至少 {{min}} 个字符。",
         "manyNote": "逐个处理每个请求；如有失败，结果会说明是哪一个及原因。",
-        "decidedNote": "决定后，请求将离开队列和“待处理”卡片。",
-        "decidedNoteMany": "决定后，这些请求将离开队列和“待处理”卡片。",
-        "csrNote": "批准的 CSR 会被签名，其证书将在检查器中打开。"
+        "decidedNote": "该请求将离开队列、状态栏和“待处理”卡片。",
+        "decidedNoteMany": "这些请求将离开队列、状态栏和“待处理”卡片。",
+        "csrNote": "批准的 CSR 会签发其证书。"
       },
       "sections": {
         "request": "请求",
