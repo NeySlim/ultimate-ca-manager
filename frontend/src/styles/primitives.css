@@ -155,7 +155,7 @@ textarea.ui-control { min-height: 80px; resize: vertical; }
 .ui-dialog-message { margin: 0; font-size: 13px; line-height: 1.8; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
 .ui-dialog-message + .ui-field { margin-top: 18px; }
 
-.ui-dialog-notice { margin: 0; }
+.ui-dialog-notice { margin: 0 0 20px; }
 .ui-dialog-notice .ui-notice-body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* Toast: the mockup's inverted pill, bottom centre; a toast that stays is its framed failure line */
