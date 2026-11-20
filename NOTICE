@@ -34,9 +34,9 @@ THIRD-PARTY FONTS
 The web interface ships these fonts, unmodified, under frontend/dist/fonts/
 (frontend/public/fonts/ in the source), each with its licence text beside it:
 
-- Inter 4.001 (Regular, Medium, SemiBold, Bold),
-  Copyright 2016 The Inter Project Authors, https://github.com/rsms/inter,
-  SIL Open Font License 1.1 (LICENSE-Inter.txt).
+- IBM Plex Sans 3.201 (Regular, Medium, SemiBold, Bold),
+  Copyright 2019 IBM Corp., https://github.com/IBM/plex,
+  SIL Open Font License 1.1 (LICENSE-IBMPlexSans.txt).
 - Fira Code 6.002 (Regular, Medium, SemiBold),
   Copyright 2014-2021 The Fira Code Project Authors, https://github.com/tonsky/FiraCode,
   SIL Open Font License 1.1 (LICENSE-FiraCode.txt).

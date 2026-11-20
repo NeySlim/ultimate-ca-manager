@@ -135,13 +135,18 @@ describe('CertificatesPage: columns', () => {
     ])
   })
 
-  it('keeps the compliance grade, the hybrid link and the creation date in the Columns menu', async () => {
+  it('keeps the compliance grade, the hybrid link and the creation date in the Columns dialog', async () => {
     await mount()
     fireEvent.click(screen.getByRole('button', { name: 'table.columns' }))
-    for (const name of ['compliance.grade', 'certificates.hybrid.column', 'common.created']) {
-      fireEvent.click(screen.getByRole('button', { name }))
+    const dialog = screen.getByRole('dialog', { name: 'table.columnsDialogTitle' })
+    // The name and the state always show: the dialog does not offer them
+    expect(within(dialog).queryByRole('checkbox', { name: 'common.commonName' })).toBeNull()
+    expect(within(dialog).queryByRole('checkbox', { name: 'certificates.state' })).toBeNull()
+    for (const name of ['certificates.complianceColumn', 'certificates.hybrid.column', 'common.created']) {
+      fireEvent.click(within(dialog).getByRole('checkbox', { name }))
     }
-    expect(headers().slice(7)).toEqual(['compliance.grade', 'certificates.hybrid.column', 'common.created'])
+    fireEvent.click(within(dialog).getByRole('button', { name: 'table.done' }))
+    expect(headers().slice(7)).toEqual(['certificates.complianceColumn', 'certificates.hybrid.column', 'common.created'])
     const cells = within(row('gone.example.com')).getAllByRole('cell')
     expect(cells[8]).toHaveTextContent(/^A$/)
     expect(within(cells[8]).getByTitle('93/100')).toBeInTheDocument()
@@ -160,7 +165,7 @@ describe('CertificatesPage: columns', () => {
     expect(screen.getByRole('searchbox')).toHaveAttribute('placeholder', 'certificates.searchPlaceholder')
     expect(screen.getByTitle('table.exportData')).toBeInTheDocument()
     expect(screen.getByTitle('table.filterPresets')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'table.density' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'table.densityComfortable' })).toHaveAttribute('aria-pressed', 'false')
     for (const filter of ['common.allCAs', 'certificates.allSources', 'certificates.allTemplates']) {
       expect(screen.getByRole('button', { name: filter })).toBeInTheDocument()
     }
@@ -203,8 +208,8 @@ describe('CertificatesPage: rows', () => {
     expect(due('soon.example.com')).toHaveClass('is-warn')
     expect(due('late.example.com').querySelector('.lv-due-rel')).toHaveTextContent(/^time\.short\.expired$/)
     expect(due('late.example.com')).toHaveClass('is-bad')
-    // The exact date and time, one level down
-    expect(due('web.example.com')).toHaveAttribute('tabindex', '0')
+    // The exact date and time, one level down, out of the tab order
+    expect(due('web.example.com')).not.toHaveAttribute('tabindex')
     expect(due('web.example.com').dataset.tip).toBeTruthy()
   })
 
@@ -216,15 +221,15 @@ describe('CertificatesPage: rows', () => {
     expect(due.className).not.toMatch(/is-(warn|bad)/)
   })
 
-  it('gives the name the room left, shortened by an ellipsis, the description a capped width', async () => {
+  it('gives the name a floor it is never cut under, and the description the room left', async () => {
     await mount()
     const [, name, descr] = within(row('web.example.com')).getAllByRole('cell')
-    expect(name).toHaveClass('lv-grow')
-    expect(name.querySelector('.lv-fill .lv-entity .lv-entity-text')).toHaveTextContent('web.example.com')
-    expect(descr).not.toHaveClass('lv-grow')
-    expect(descr).toHaveClass('lv-capped')
+    expect(name).toHaveClass('lv-floor')
+    expect(name).not.toHaveClass('lv-grow')
+    expect(name.querySelector('.lv-entity .lv-entity-text')).toHaveTextContent('web.example.com')
+    expect(descr).toHaveClass('lv-grow')
     const grow = screen.getAllByRole('columnheader').filter((th) => th.matches('.lv-grow'))
-    expect(grow.map((th) => th.textContent)).toEqual(['common.commonName'])
+    expect(grow.map((th) => th.textContent)).toEqual(['common.description'])
   })
 
   it('says under the table that open certificates stay in the inspector, with the density and the columns', async () => {
@@ -244,7 +249,8 @@ describe('CertificatesPage: rows', () => {
 
   it('says the range of the page in words', async () => {
     await mount()
-    expect(document.querySelector('footer.lv-footer')).toHaveTextContent('certificates.range:1/25/276')
+    // Twelve rows a page by default, as in the mockup
+    expect(document.querySelector('footer.lv-footer')).toHaveTextContent('certificates.range:1/12/276')
   })
 
   it('marks the row of the certificate on top in the dock', async () => {
@@ -270,22 +276,33 @@ describe('CertificatesPage on a phone', () => {
     await mount()
     expect(screen.queryByRole('table')).toBeNull()
     expect(screen.getByRole('heading', { level: 1, name: 'common.certificates' })).toBeInTheDocument()
-    expect(screen.getAllByRole('tab').length).toBeGreaterThanOrEqual(6)
+    expect(within(screen.getByRole('group', { name: 'certificates.viewsLabel' })).getAllByRole('button').length).toBeGreaterThanOrEqual(6)
     expect(screen.getByRole('button', { name: 'certificates.issue' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'common.import' })).toBeInTheDocument()
   })
 
-  it('shows on a card the name, its description, the state, the issuer, the source and the expiry', async () => {
+  it('shows an Atelier record: the name, its description, issuer, source and key, the state and the expiry date', async () => {
     await mount([WEB])
-    const name = screen.getByText('web.example.com')
-    expect(name.parentElement).toHaveTextContent(/^web\.example\.comFront door$/)
-    // One card on screen: its second line says who issued it, how, and when it is due
-    const list = screen.getByRole('main')
-    expect(list.querySelectorAll('.lv-pill')).toHaveLength(1)
-    expect(list.querySelector('.lv-pill')).toHaveTextContent('common.valid')
-    expect(within(list).getByText('Issuing CA 1')).toBeInTheDocument()
-    expect(within(list).getByText('certificates.sourceAcme')).toBeInTheDocument()
-    expect(list.querySelector('.lv-due-rel')).toHaveTextContent('time.short.months:6')
+    const record = screen.getByRole('listitem')
+    expect(within(record).getByRole('button', { name: 'web.example.com' })).toBeInTheDocument()
+    expect(within(record).getByRole('checkbox', { name: 'table.selectRow' })).toBeInTheDocument()
+    expect(record.querySelector('.lv-mrecord-desc')).toHaveTextContent('Front door')
+    const meta = [...record.querySelectorAll('.lv-mrecord-meta > span')].map((s) => s.textContent)
+    expect(meta).toEqual(['Issuing CA 1', 'certificates.sourceAcme', 'certificates.keyInUcm'])
+    const status = record.querySelector('.lv-mrecord-status')
+    expect(status.querySelectorAll('.lv-pill')).toHaveLength(1)
+    expect(status.querySelector('.lv-pill')).toHaveTextContent('common.valid')
+    expect(status.querySelector('time')).toHaveAttribute('dateTime', WEB.valid_to)
+  })
+
+  it('keeps the filters and the export on a phone, not the columns or the density', async () => {
+    await mount([WEB])
+    for (const filter of ['common.allCAs', 'certificates.allSources']) {
+      expect(screen.getByRole('button', { name: filter })).toBeInTheDocument()
+    }
+    expect(screen.getByTitle('table.exportData')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'table.columns' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'table.densityComfortable' })).toBeNull()
   })
 })
 

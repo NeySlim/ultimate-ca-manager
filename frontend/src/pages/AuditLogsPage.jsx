@@ -2,6 +2,7 @@
  * Audit Logs Page - Migrated to ResponsiveLayout
  * View and filter audit logs with real-time updates
  */
+import { useLocation } from 'react-router-dom';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
@@ -112,7 +113,9 @@ export default function AuditLogsPage() {
   const [total, setTotal] = useState(0);
   
   // Search & Filters
-  const [search, setSearch] = useState('');
+  // A link may open the log on a search (an inspector's « View its activity »)
+  const location = useLocation();
+  const [search, setSearch] = useState(() => new URLSearchParams(location.search).get('search') || '');
   const [filterUsername, setFilterUsername] = usePersistedState('ucm-filter-audit-username', '');
   const [filterAction, setFilterAction] = usePersistedState('ucm-filter-audit-action', []);
   const [filterSuccess, setFilterSuccess] = usePersistedState('ucm-filter-audit-success', '');

@@ -1,6 +1,6 @@
 /**
  * Bottom bar: only what /health reports (version, service state, HA node and cluster),
- * the live connection and the search shortcut. Nothing is shown for a field the API omits.
+ * the live connection and the shortcuts (search, close the inspector). Nothing is shown for a field the API omits.
  */
 import { useTranslation } from 'react-i18next'
 import { ArrowsClockwise, Check, Warning } from '@phosphor-icons/react'
@@ -62,7 +62,10 @@ export function StatusBar({ onShowNodes }) {
           {ha.leader === false && <span>{t('shell.haFollower')}</span>}
         </span>
       )}
-      <span className="shell-status-shortcut"><kbd>Ctrl K</kbd> {t('common.search')}</span>
+      <span className="shell-status-shortcut">
+        <kbd>Ctrl K</kbd> {t('common.search')}
+        <span className="shell-status-escape"><kbd>{t('shell.escapeKey')}</kbd> {t('inspector.close')}</span>
+      </span>
     </footer>
   )
 }

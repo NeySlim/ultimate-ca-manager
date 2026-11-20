@@ -12,6 +12,8 @@ const InspectorContext = createContext(null)
 
 export const MAX_OPEN = 8
 export const SIZE_LIMITS = { height: [200, 4000], width: [360, 720] }
+// What the bottom dock shows of the saved height: 210 to 450 px (and 60 % of the window), Agrandir 420
+export const DOCK_HEIGHT = { min: 210, max: 450, grown: 420 }
 // The defaults of the Atelier layout: a 278 px band under the list, a 460 px column beside it
 const DEFAULTS = { position: 'bottom', height: 278, width: 460 }
 const PREFS_KEY = 'ucm-inspector-prefs'

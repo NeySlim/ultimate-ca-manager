@@ -7,33 +7,34 @@
 /* ============================================
    SELF-HOSTED FONTS
    ============================================ */
+/* IBM Plex Sans of the Atelier mockup; its files hold TrueType data, hence the format hint */
 @font-face {
-  font-family: 'Inter';
+  font-family: 'IBM Plex Sans';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('/fonts/Inter-Regular.woff2') format('woff2');
+  src: url('/fonts/plex-0.woff2') format('truetype');
 }
 @font-face {
-  font-family: 'Inter';
+  font-family: 'IBM Plex Sans';
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url('/fonts/Inter-Medium.woff2') format('woff2');
+  src: url('/fonts/plex-1.woff2') format('truetype');
 }
 @font-face {
-  font-family: 'Inter';
+  font-family: 'IBM Plex Sans';
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url('/fonts/Inter-SemiBold.woff2') format('woff2');
+  src: url('/fonts/plex-2.woff2') format('truetype');
 }
 @font-face {
-  font-family: 'Inter';
+  font-family: 'IBM Plex Sans';
   font-style: normal;
   font-weight: 700;
   font-display: swap;
-  src: url('/fonts/Inter-Bold.woff2') format('woff2');
+  src: url('/fonts/plex-3.woff2') format('truetype');
 }
 @font-face {
   font-family: 'Fira Code';
@@ -219,9 +220,14 @@
   border: 1px solid var(--detail-field-border);
 }
 
+/* The interface reads at the font's own line height, as the Atelier mockup does */
+html {
+  line-height: normal;
+}
+
 body {
   margin: 0;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   overflow: hidden;
@@ -245,35 +251,19 @@ html, body, #root {
     @apply bg-bg-primary text-text-primary font-sans antialiased;
   }
   
-  /* Theme-aware checkboxes & radios */
+  /* Native checkboxes in the accent colour, as the Atelier mockup draws them */
   input[type="checkbox"] {
-    appearance: none;
-    -webkit-appearance: none;
+    accent-color: var(--accent);
     width: 16px;
     height: 16px;
     min-width: 16px;
-    min-height: 16px;
-    border: 1.5px solid var(--border);
-    border-radius: 4px;
-    background-color: var(--bg-secondary);
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: 12px 12px;
+    min-height: 0;
+    margin: 0;
     cursor: pointer;
     flex-shrink: 0;
-    transition: all 0.15s ease;
-  }
-  input[type="checkbox"]:hover {
-    border-color: var(--accent-primary);
-    background-color: var(--bg-tertiary);
-  }
-  input[type="checkbox"]:checked {
-    background-color: var(--accent-primary) !important;
-    border-color: var(--accent-primary) !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E") !important;
   }
   input[type="checkbox"]:focus-visible {
-    outline: 2px solid var(--accent-primary);
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
   input[type="radio"] {

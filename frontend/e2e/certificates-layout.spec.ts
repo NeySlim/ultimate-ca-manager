@@ -73,3 +73,46 @@ test('the list shows its seven columns whole and the inspector opens in the page
   expect((await box(main)).height).toBeGreaterThan(list.height)
   await dock.getByRole('button', { name: 'Unfold the inspector' }).click()
 })
+
+test('the inspector band grows to 420 px and Escape closes it from the list', async ({ page, api }) => {
+  const cert = await issueCert(api, (await createCA(api)).id)
+  await page.goto('/certificates')
+  const main = page.getByRole('main')
+  await main.getByRole('button', { name: cert.common_name, exact: true }).click()
+  const dock = page.getByTestId('inspector-dock')
+  await expect(dock).toBeVisible()
+  expect(Math.round((await box(dock)).height)).toBe(278)
+  await dock.getByRole('button', { name: 'Enlarge the inspector' }).click()
+  expect(Math.round((await box(dock)).height)).toBe(420)
+  // The focus back on the list, Escape still closes the inspector
+  await main.getByRole('searchbox').focus()
+  await page.keyboard.press('Escape')
+  await expect(dock).toBeHidden()
+})
+
+test.describe('on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
+
+  test('each certificate is a record inside the 16 px gutter, and the inspector takes the screen', async ({ page, api }) => {
+    const cert = await issueCert(api, (await createCA(api)).id)
+    await page.goto('/certificates')
+    const main = page.getByRole('main')
+    await expect(main.getByRole('table')).toHaveCount(0)
+    const record = main.getByRole('listitem').filter({ has: page.getByRole('button', { name: cert.common_name, exact: true }) })
+    await expect(record).toBeVisible()
+    const r = await box(record)
+    expect(r.x).toBeGreaterThanOrEqual(16 - EPS)
+    expect(r.x + r.width).toBeLessThanOrEqual(390 - 16 + EPS)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    const name = await box(record.getByRole('button', { name: cert.common_name, exact: true }))
+    expect(name.height).toBeGreaterThanOrEqual(42 - EPS)
+    await record.getByRole('button', { name: cert.common_name, exact: true }).click()
+    const dock = page.getByTestId('inspector-dock')
+    await expect(dock).toBeVisible()
+    const d = await box(dock)
+    expect(Math.round(d.x)).toBe(0)
+    expect(Math.round(d.width)).toBe(390)
+    expect(Math.round(d.height)).toBe(844)
+  })
+})
+

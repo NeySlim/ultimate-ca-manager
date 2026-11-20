@@ -55,7 +55,7 @@ export default {
         '3xs': ['0.75rem', { lineHeight: '1rem' }],  // 12px
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['IBM Plex Sans', 'system-ui', 'sans-serif'],
         mono: ['Fira Code', 'ui-monospace', 'monospace'],
       },
       animation: {

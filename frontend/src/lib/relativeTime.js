@@ -63,20 +63,29 @@ export function dueTone(date, { now = new Date(), warnDays = 7 } = {}) {
   return left < warnDays * DAY ? 'warn' : ''
 }
 
-// Short form of a due date: days below two months, months below two years, then years
+// Short form of a due date: days below two months, then months, then years and the
+// months left beyond twelve months ("1 y 4 mo", "9 y" when no month is left)
 const SHORT_MONTH_DAYS = 60
-const SHORT_YEAR_DAYS = 730
+const YEAR_DAYS = 365.25
+const MONTH_DAYS = 30.44
 
-/** The i18n key and count of the short form ("3 d", "5 mo", "9 y", "Expired"), or null without a date. */
+/** The i18n key and counts of the short form ("3 d", "5 mo", "1 y 4 mo", "Expired"), or null without a date. */
 export function shortParts(date, { now = new Date() } = {}) {
   const ms = toTime(date)
   if (ms === null) return null
   if (ms - new Date(now).getTime() <= 0) return { key: 'time.short.expired' }
   const days = daysRemaining(date, now)
   if (days < SHORT_MONTH_DAYS) return { key: 'time.short.days', count: days }
-  if (days < SHORT_YEAR_DAYS) return { key: 'time.short.months', count: Math.floor(days / 30.44) }
-  return { key: 'time.short.years', count: Math.floor(days / 365.25) }
+  const years = Math.floor(days / YEAR_DAYS)
+  if (years < 1) return { key: 'time.short.months', count: Math.floor(days / MONTH_DAYS) }
+  const months = Math.floor((days - years * YEAR_DAYS) / MONTH_DAYS)
+  return months > 0
+    ? { key: 'time.short.yearsMonths', count: years, months }
+    : { key: 'time.short.years', count: years }
 }
 
-/** "3 d", "5 mo", "9 y", "Expired" in the user's language; '' without a date. */
-export const relativeShort = (date, t, opts) => say(shortParts(date, opts), t)
+/** "3 d", "5 mo", "1 y 4 mo", "9 y", "Expired" in the user's language; '' without a date. */
+export const relativeShort = (date, t, opts) => {
+  const parts = shortParts(date, opts)
+  return parts ? t(parts.key, { count: parts.count, months: parts.months }) : ''
+}

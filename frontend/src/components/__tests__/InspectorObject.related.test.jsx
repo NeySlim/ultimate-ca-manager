@@ -4,6 +4,7 @@
  * about the linked certificate reaches the service.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -54,7 +55,7 @@ const MEMBER = {
 const PARTNER = { id: 5, common_name: 'pair.example.com', related_certificate_id: 4, revoked: false, hybrid_role: 'pq' }
 
 const open = async () => {
-  render(<InspectorObject entry={WINDOW} onTitle={() => {}} />)
+  render(<InspectorObject entry={WINDOW} onTitle={() => {}} />, { wrapper: MemoryRouter })
   await screen.findAllByText('pair.example.com')
 }
 
@@ -79,7 +80,7 @@ describe('InspectorObject of a hybrid pair member', () => {
 
   it('keeps the linked certificate valid when unchecked', async () => {
     await open()
-    await chooseMoreAction('Revoke')
+    await chooseMoreAction('inspector.cert.revokeAction')
     fireEvent.click(await screen.findByLabelText('revocation.revokeRelated'))
     fireEvent.submit(screen.getByTestId('revoke-form'))
     await waitFor(() => expect(mocks.certificatesService.revoke)
@@ -89,7 +90,7 @@ describe('InspectorObject of a hybrid pair member', () => {
   it('names the linked certificate the server revoked too', async () => {
     mocks.certificatesService.revoke.mockResolvedValue({ data: { id: 4, revoked: true, related_revoked: 5 } })
     await open()
-    await chooseMoreAction('Revoke')
+    await chooseMoreAction('inspector.cert.revokeAction')
     expect(await screen.findByLabelText('revocation.revokeRelated')).toBeChecked()
     fireEvent.submit(screen.getByTestId('revoke-form'))
     await waitFor(() => expect(mocks.notify.showSuccess).toHaveBeenCalledWith('revocation.revokedWithRelated'))
@@ -114,7 +115,7 @@ describe('InspectorObject of a hybrid pair member', () => {
   it('says the linked certificate could not be revoked', async () => {
     mocks.certificatesService.revoke.mockResolvedValue({ data: { id: 4, revoked: true, related_not_revoked: 5 } })
     await open()
-    await chooseMoreAction('Revoke')
+    await chooseMoreAction('inspector.cert.revokeAction')
     await screen.findByLabelText('revocation.revokeRelated')
     fireEvent.submit(screen.getByTestId('revoke-form'))
     await waitFor(() => expect(mocks.notify.showWarning).toHaveBeenCalledWith('revocation.relatedRevokeFailed'))
@@ -123,19 +124,22 @@ describe('InspectorObject of a hybrid pair member', () => {
 
   it('warns when the linked certificate was not revoked', async () => {
     await open()
-    await chooseMoreAction('Revoke')
+    await chooseMoreAction('inspector.cert.revokeAction')
     await screen.findByLabelText('revocation.revokeRelated')
     fireEvent.submit(screen.getByTestId('revoke-form'))
     await waitFor(() => expect(mocks.notify.showWarning).toHaveBeenCalledWith('revocation.relatedNotRevoked'))
   })
 
-  it('shows why the server refused the bundle', async () => {
-    const reason = 'Certificate 5 has no private key; export the bundle without keys'
-    mocks.certificatesService.export.mockRejectedValue(Object.assign(new Error(reason), { status: 400 }))
+  it.each([
+    ['why the server refused the bundle', Object.assign(new Error('Certificate 5 has no private key; export the bundle without keys'), { status: 400 }),
+      'Certificate 5 has no private key; export the bundle without keys'],
+    ['the generic message without an answer', Object.assign(new Error('Network error'), { status: 0 }), 'common.exportFailed'],
+  ])('shows %s', async (_name, error, toast) => {
+    mocks.certificatesService.export.mockRejectedValue(error)
     await open()
     fireEvent.click(screen.getByText('Export'))
     fireEvent.click(screen.getByText('export.formats.hybridBundle').closest('button'))
     fireEvent.submit(screen.getByText('PEM').closest('form'))
-    await waitFor(() => expect(mocks.notify.showError).toHaveBeenCalledWith(reason))
+    await waitFor(() => expect(mocks.notify.showError).toHaveBeenCalledWith(toast))
   })
 })

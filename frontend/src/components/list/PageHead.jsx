@@ -20,7 +20,7 @@ export function PageHead({ title, total, intent, actions, className }) {
   )
 }
 
-/** Button of the template: `primary` for the page's main action, `quiet` for a secondary one. */
+/** Button of the template: `primary` for the page's main action, `quiet` for a secondary one; a labelled icon is 17 px, a lone one 16. */
 export function ListButton({ icon: Icon, primary = false, quiet = false, small = false, className, children, type = 'button', ...props }) {
   return (
     <button
@@ -28,7 +28,7 @@ export function ListButton({ icon: Icon, primary = false, quiet = false, small =
       className={cn('lv-btn', primary && 'is-primary', quiet && 'is-quiet', small && 'is-small', !children && 'is-icon', className)}
       {...props}
     >
-      {Icon && <Icon size={small ? 14 : 16} aria-hidden="true" />}
+      {Icon && <Icon size={small ? 14 : children ? 17 : 16} aria-hidden="true" />}
       {children}
     </button>
   )

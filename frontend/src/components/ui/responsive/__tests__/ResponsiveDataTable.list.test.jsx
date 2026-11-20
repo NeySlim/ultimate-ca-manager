@@ -222,16 +222,26 @@ describe('ResponsiveDataTable variant="list": header, toolbar and footer', () =>
 
   it('offers the columns under a visible label and keeps the choice', () => {
     render(<Harness searchable columnStorageKey="test-columns" />)
-    const headers = () => screen.getAllByRole('columnheader').map((th) => th.textContent).filter(Boolean)
+    // The modal dialog hides the page from the accessibility tree while it is open
+    const headers = () => screen.getAllByRole('columnheader', { hidden: true }).map((th) => th.textContent).filter(Boolean)
     // A column flagged defaultHidden waits in the menu
     expect(headers()).toEqual(['Name', 'Note', 'Issuer'])
     const button = screen.getByRole('button', { name: 'table.columns' })
-    expect(button).toHaveAttribute('aria-expanded', 'false')
+    expect(button).toHaveAttribute('aria-haspopup', 'dialog')
     fireEvent.click(button)
-    expect(button).toHaveAttribute('aria-expanded', 'true')
-    fireEvent.click(screen.getByRole('button', { name: 'Grade' }))
+    const dialog = screen.getByRole('dialog', { name: 'table.columnsDialogTitle' })
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Grade' }))
     expect(headers()).toEqual(['Name', 'Note', 'Issuer', 'Grade'])
     expect(JSON.parse(window.localStorage.getItem('test-columns'))).toEqual([])
+    fireEvent.click(within(dialog).getByRole('button', { name: 'table.done' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('does not offer a column that always shows', () => {
+    render(<Harness searchable columnStorageKey="test-columns-2" columns={[{ ...COLUMNS[0], alwaysVisible: true }, ...COLUMNS.slice(1)]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'table.columns' }))
+    const dialog = screen.getByRole('dialog', { name: 'table.columnsDialogTitle' })
+    expect(within(dialog).getAllByRole('checkbox').map((c) => c.closest('label').textContent)).toEqual(['Note', 'Issuer', 'Grade'])
   })
 
   it('lets a saved choice of columns win over the default', () => {
@@ -266,28 +276,30 @@ describe('ResponsiveDataTable variant="list": header, toolbar and footer', () =>
     render(
       <Harness
         rangeLabel={({ start, end, total }) => `${start}–${end} of ${total} things`}
-        pagination={{ page: 2, total: 276, perPage: 25, onChange, onPerPageChange: () => {} }}
+        pagination={{ page: 2, total: 276, perPage: 12, pageSizes: [12, 25, 50, 100], onChange, onPerPageChange: () => {} }}
       />,
     )
     const footer = document.querySelector('footer.lv-footer')
-    expect(footer).toHaveTextContent('26–50 of 276 things')
-    // From ten pages on, a page number to jump to
+    expect(footer).toHaveTextContent('13–24 of 276 things')
+    // Beyond twenty pages, a page number to jump to
     const jump = within(footer).getByRole('spinbutton', { name: 'table.pageNumber' })
     expect(jump).toHaveValue(2)
-    expect(footer).toHaveTextContent('table.pageOf:{"total":12}')
-    expect(footer).toHaveTextContent('table.perPage:{"size":25}')
+    expect(footer).toHaveTextContent('table.pageOf:{"total":23}')
+    const size = within(footer).getByRole('combobox', { name: 'table.perPageLabel' })
+    expect([...size.options].map((o) => o.value)).toEqual(['12', '25', '50', '100'])
+    expect(size).toHaveValue('12')
     fireEvent.click(within(footer).getByRole('button', { name: 'table.nextPage' }))
     fireEvent.click(within(footer).getByRole('button', { name: 'table.previousPage' }))
     expect(onChange.mock.calls).toEqual([[3], [1]])
     fireEvent.change(jump, { target: { value: '40' } })
     fireEvent.click(within(footer).getByRole('button', { name: 'table.goToPage' }))
-    expect(onChange).toHaveBeenLastCalledWith(12)
+    expect(onChange).toHaveBeenLastCalledWith(23)
   })
 
-  it('counts the pages without a jump below ten pages', () => {
-    render(<Harness pagination={{ page: 2, total: 100, perPage: 25, onChange: () => {} }} />)
+  it('counts the pages without a jump up to twenty pages', () => {
+    render(<Harness pagination={{ page: 2, total: 240, perPage: 12, onChange: () => {} }} />)
     const footer = document.querySelector('footer.lv-footer')
-    expect(footer).toHaveTextContent('2 / 4')
+    expect(footer).toHaveTextContent('2 / 20')
     expect(within(footer).queryByRole('spinbutton')).toBeNull()
   })
 

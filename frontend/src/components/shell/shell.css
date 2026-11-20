@@ -335,6 +335,7 @@ button.shell-ha-link { cursor: pointer; }
 button.shell-ha-link:hover { background: var(--hover); }
 .shell-ha-link.is-good { color: var(--good); }
 .shell-ha-link.is-warn { color: var(--warn); }
+.shell-status-escape { margin-left: 10px; }
 .shell-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .shell-dot.is-good { background: var(--good); }
 .shell-dot.is-warn { background: var(--warn); }

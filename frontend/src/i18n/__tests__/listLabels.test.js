@@ -17,19 +17,19 @@ const say = async (lng, resources) => {
 describe('list template labels', () => {
   it('reads in English', async () => {
     const t = await say('en', en)
-    expect(t('certificates.total', { count: 1 })).toBe('1 certificate')
-    expect(t('certificates.total', { count: 1234 })).toBe('1,234 certificates')
+    expect(t('certificates.total', { count: 1 })).toBe('1 identity')
+    expect(t('certificates.total', { count: 1234 })).toBe('1,234 identities')
     expect(t('certificates.range', { start: 1, end: 25, count: 1276 })).toBe('1–25 of 1,276 certificates')
     expect(t('table.range', { start: 26, end: 50, total: 1276 })).toBe('26–50 of 1,276')
     expect(t('table.selectedCount', { count: 2 })).toBe('2 selected')
     expect(t('table.perPage', { size: 25 })).toBe('25 / page')
-    expect(t('table.rowAction', { action: 'Export', name: 'web.example.com' })).toBe('Export: web.example.com')
+    expect(t('table.rowAction', { action: 'Export', name: 'web.example.com' })).toBe('Export web.example.com')
   })
 
   it('reads in French, with its plurals and its thousands separator', async () => {
     const t = await say('fr', fr)
-    expect(t('certificates.total', { count: 1 })).toBe('1 certificat')
-    expect(t('certificates.total', { count: 1234 })).toMatch(/^1\s234 certificats$/)
+    expect(t('certificates.total', { count: 1 })).toBe('1 identité')
+    expect(t('certificates.total', { count: 1234 })).toMatch(/^1\s234 identités$/)
     expect(t('certificates.range', { start: 1, end: 25, count: 276 })).toBe('1–25 sur 276 certificats')
     expect(t('table.selectedCount', { count: 1 })).toBe('1 sélectionné')
     expect(t('table.selectedCount', { count: 3 })).toBe('3 sélectionnés')
@@ -48,7 +48,7 @@ describe('list template labels', () => {
   it('takes the Russian forms', async () => {
     const t = await say('ru', ru)
     expect([1, 2, 5, 21].map((count) => t('certificates.total', { count }))).toEqual([
-      '1 сертификат', '2 сертификата', '5 сертификатов', '21 сертификат',
+      '1 субъект', '2 субъекта', '5 субъектов', '21 субъект',
     ])
     expect(t('certificates.range', { start: 1, end: 25, count: 276 })).toBe('1–25 из 276 сертификатов')
   })

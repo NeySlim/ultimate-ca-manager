@@ -24,6 +24,15 @@ describe('StatusBar', () => {
     expect(screen.getByText('shell.statusRunning')).toBeInTheDocument()
   })
 
+  it('reminds the shortcuts: Ctrl K searches, Escape closes the inspector', async () => {
+    vi.stubGlobal('fetch', answer({ status: 'ok', version: '3.0.0', ha: false }))
+    const { container } = render(<StatusBar />)
+    await screen.findByText('shell.statusRunning')
+    const keys = [...container.querySelectorAll('.shell-status-shortcut kbd')].map((k) => k.textContent)
+    expect(keys).toEqual(['Ctrl K', 'shell.escapeKey'])
+    expect(container.querySelector('.shell-status-escape')).toHaveTextContent('shell.escapeKey inspector.close')
+  })
+
   it('shows no HA part outside HA mode', async () => {
     vi.stubGlobal('fetch', answer({ status: 'ok', version: '3.0.0', ha: false, node_id: 'n1', leader: true }))
     render(<StatusBar />)

@@ -9,5 +9,13 @@ export function signatureShortName(signatureAlgorithm) {
   return signatureAlgorithm.split('-')[0]
 }
 
+// The hash of a signature as the Atelier detail names it: 'SHA-256' of 'SHA256-RSA',
+// 'RSASSA-PSS' of a PSS label, a post-quantum name whole
+export function signatureHashName(signatureAlgorithm) {
+  const short = signatureShortName(signatureAlgorithm)
+  const m = /^SHA(1|224|256|384|512)$/i.exec(short)
+  return m ? `SHA-${m[1]}` : short
+}
+
 // HSM provider types whose keys sign RSA-PSS (Azure and Google KMS do not here)
 export const PSS_HSM_TYPES = ['pkcs11', 'aws-cloudhsm', 'openbao']

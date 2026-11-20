@@ -89,3 +89,10 @@ describe('AuditLogsPage export', () => {
     })
   })
 })
+
+describe('AuditLogsPage opened on a search', () => {
+  it('reads the search of the link, as the certificate inspector writes it', async () => {
+    render(<MemoryRouter initialEntries={['/audit?search=web.example.com']}><AuditLogsPage /></MemoryRouter>)
+    await waitFor(() => expect(auditService.getLogs).toHaveBeenCalledWith(expect.objectContaining({ search: 'web.example.com' })))
+  })
+})

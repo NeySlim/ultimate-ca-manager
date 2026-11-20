@@ -1,6 +1,7 @@
 /** What the certificate inspector derives from the API detail. */
 import { describe, it, expect } from 'vitest'
-import { validityFacts, chainNodes, extensionRows, historyEntries, lastAcmeFailure, certificateKeyLabel } from '../certificateDetail'
+import { validityFacts, chainNodes, extensionRows, historyEntries, lastAcmeFailure, certificateKeyLabel, serialHex } from '../certificateDetail'
+import { signatureHashName } from '../signatureName'
 
 const NOW = new Date('2026-11-20T12:00:00Z')
 const DAY = 86400000
@@ -58,9 +59,21 @@ describe('extensionRows', () => {
     expect(rows.map((r) => [r.oid, r.critical, r.values])).toEqual([
       ['2.5.29.17', false, ['DNS: a.example']],
       ['2.5.29.19', true, ['CA: FALSE']],
-      ['2.5.29.37', false, ['serverAuth']],
+      ['2.5.29.37', false, ['TLS Web Server Authentication']],
       ['1.2.3.4', false, ['0a0b']],
     ])
+  })
+
+  it('writes the X.509 names and readable values, the same in every language', () => {
+    const rows = extensionRows({
+      key_usage: { critical: true, usages: ['digitalSignature', 'keyEncipherment', 'unknownBit'] },
+      extended_key_usage: { usages: [{ name: 'serverAuth' }, { name: 'clientAuth' }, { oid: '1.2.3' }] },
+    })
+    expect(rows.map((r) => [r.label, r.values])).toEqual([
+      ['Key Usage', ['Digital Signature, Key Encipherment, unknownBit']],
+      ['Extended Key Usage', ['TLS Web Server Authentication', 'TLS Web Client Authentication', '1.2.3']],
+    ])
+    expect(rows.every((r) => !('labelKey' in r))).toBe(true)
   })
 
   it('falls back to the combined SAN text', () => {
@@ -106,5 +119,25 @@ describe('lastAcmeFailure', () => {
     const orders = [{ id: 2, certificate_id: 7, status: 'invalid', error_message: 'dns', last_error_at: at(-5) }]
     expect(lastAcmeFailure({ id: 7, renewed_at: at(-1) }, orders)).toBeNull()
     expect(lastAcmeFailure({ id: 7 }, [])).toBeNull()
+  })
+})
+
+describe('serialHex', () => {
+  it('writes a serial as colon-separated octets, a decimal one converted', () => {
+    expect(serialHex('19')).toBe('13')
+    expect(serialHex('256')).toBe('01:00')
+    expect(serialHex('4a8b01')).toBe('4A:8B:01')
+    expect(serialHex('4A:8B:1')).toBe('04:A8:B1')
+    expect(serialHex('')).toBe('')
+    expect(serialHex(null)).toBe('')
+  })
+})
+
+describe('signatureHashName', () => {
+  it('names the hash as the Atelier detail does', () => {
+    expect(signatureHashName('SHA256-RSA')).toBe('SHA-256')
+    expect(signatureHashName('SHA384-ECDSA')).toBe('SHA-384')
+    expect(signatureHashName('RSASSA-PSS-SHA256')).toBe('RSASSA-PSS')
+    expect(signatureHashName('ML-DSA-65')).toBe('ML-DSA-65')
   })
 })

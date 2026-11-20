@@ -7,6 +7,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X, CaretDown } from '@phosphor-icons/react'
 import { cn } from '../../lib/utils'
+import { StatusPill } from '../list/StatusPill'
+import { certificateState } from '../../pages/certificates/useCertificateColumns'
 import { INSPECTOR_TYPES } from './config'
 import { splitTabs, tabsThatFit } from './tabFit'
 import './inspector.css'
@@ -22,7 +24,8 @@ function arrowNav(e, count, current, select) {
 export function tabId(key) { return `inspector-tab-${key.replace(/[^a-z0-9_-]/gi, '_')}` }
 export function panelId(key) { return `inspector-panel-${key.replace(/[^a-z0-9_-]/gi, '_')}` }
 
-export function ObjectTabs({ opened, activeKey, titles, onSelect, onClose, tabMin = 120 }) {
+// `certificates`: every open object is a certificate, and the labels say so
+export function ObjectTabs({ opened, activeKey, titles, onSelect, onClose, tabMin = 120, certificates = false }) {
   const { t } = useTranslation()
   const zone = useRef(null)
   const strip = useRef(null)
@@ -100,7 +103,8 @@ export function ObjectTabs({ opened, activeKey, titles, onSelect, onClose, tabMi
 
   return (
     <div ref={zone} className="ins-tabs-zone">
-      <div ref={strip} role="tablist" aria-label={t('inspector.objectsLabel')} className="ins-open-tabs"
+      <div ref={strip} role="tablist" aria-label={t(certificates ? 'inspector.certificatesLabel' : 'inspector.objectsLabel')}
+        className={cn('ins-open-tabs', hidden.length > 0 && 'is-tight')}
         data-testid="inspector-object-tabs" style={{ '--tab-min': `${tabMin}px` }}>
         {shown.map((key) => {
           const o = byKey[key]
@@ -116,7 +120,7 @@ export function ObjectTabs({ opened, activeKey, titles, onSelect, onClose, tabMi
               </button>
               <button type="button" onClick={() => onClose(key)} aria-label={t('inspector.closeTab', { name: label(o) })}
                 className="ins-icon-btn is-tab-close">
-                <X size={12} aria-hidden="true" />
+                <X size={13} aria-hidden="true" />
               </button>
             </div>
           )
@@ -126,18 +130,18 @@ export function ObjectTabs({ opened, activeKey, titles, onSelect, onClose, tabMi
         <div className="ins-tabs-more">
           <button ref={moreBtn} type="button" className="ins-tabs-more-btn" data-testid="inspector-tabs-more"
             aria-haspopup="menu" aria-expanded={menu} aria-controls="inspector-tabs-menu"
-            title={t('inspector.moreOpen', { count: hidden.length })}
+            title={t(certificates ? 'inspector.moreOpenCertificates' : 'inspector.moreOpen', { count: hidden.length })}
             onClick={() => (menu ? closeMenu(false) : openMenu())}
             onKeyDown={(e) => {
               if (e.key === 'ArrowDown') { e.preventDefault(); openMenu('first') }
               else if (e.key === 'ArrowUp') { e.preventDefault(); openMenu('last') }
             }}>
             +{hidden.length}
-            <span className="sr-only"> {t('inspector.moreOpen', { count: hidden.length })}</span>
+            <span className="sr-only"> {t(certificates ? 'inspector.moreOpenCertificates' : 'inspector.moreOpen', { count: hidden.length })}</span>
             <CaretDown size={12} aria-hidden="true" />
           </button>
           {menu && (
-            <ul ref={menuRef} id="inspector-tabs-menu" role="menu" aria-label={t('inspector.hiddenObjects')}
+            <ul ref={menuRef} id="inspector-tabs-menu" role="menu" aria-label={t(certificates ? 'inspector.hiddenCertificatesMenu' : 'inspector.hiddenObjects')}
               className="ins-pop ins-tabs-menu" onKeyDown={onMenuKey}>
               {hidden.map((key) => {
                 const o = byKey[key]
@@ -148,10 +152,11 @@ export function ObjectTabs({ opened, activeKey, titles, onSelect, onClose, tabMi
                       className="ins-tabs-menu-open" onClick={() => { onSelect(key); setMenu(false); focusTab(key) }}>
                       {Icon && <Icon size={13} aria-hidden="true" />}
                       <span className="ins-pop-label">{label(o)}</span>
+                      {o.type === 'certificate' && o.data && <StatusPill {...certificateState(o.data, t)} />}
                     </button>
-                    <button type="button" role="menuitem" tabIndex={-1} className="ins-icon-btn"
+                    <button type="button" role="menuitem" tabIndex={-1} className="ins-icon-btn is-menu-close"
                       aria-label={t('inspector.closeTab', { name: label(o) })} onClick={() => onClose(key)}>
-                      <X size={12} aria-hidden="true" />
+                      <X size={13} aria-hidden="true" />
                     </button>
                   </li>
                 )
@@ -173,7 +178,7 @@ export function SectionTabs({ objectKey, sections, current, onSelect, labelOf })
     requestAnimationFrame(() => ref.current?.querySelectorAll('[role="tab"]')[i]?.focus())
   }
   return (
-    <div ref={ref} role="tablist" aria-label={t('inspector.sectionsLabel')} className="ins-detail-tabs">
+    <div ref={ref} role="tablist" aria-label={t(objectKey?.startsWith('certificate:') ? 'inspector.certificateSections' : 'inspector.sectionsLabel')} className="ins-detail-tabs">
       {sections.map((s) => (
         <button key={s} type="button" role="tab" id={`${tabId(objectKey)}-${s}`} aria-selected={s === current}
           aria-controls={`${panelId(objectKey)}-section`} tabIndex={s === current ? 0 : -1}

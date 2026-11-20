@@ -88,7 +88,7 @@ describe('CertificatesPage — filter survives an external action (#345)', () =>
     expect(lastParams().status).toBeUndefined()
 
     // A state tab sets the status filter
-    fireEvent.click(screen.getByRole('tab', { name: /certificates\.views\.valid/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^certificates\.views\.valid/ }))
     await waitFor(() => expect(lastParams().status).toEqual(['valid']))
 
     const before = getAll.mock.calls.length
@@ -119,8 +119,10 @@ describe('CertificatesPage — filter survives an external action (#345)', () =>
       id: 43, cn: 'phone.example.com', descr: 'Renamed on mobile', status: 'valid', caref: 'ca-1',
     }], meta: { total: 1 } })
     renderPage()
+    // The record shows the description on its own line, under the name
     const name = await screen.findByText('phone.example.com')
-    expect(name.parentElement).toHaveTextContent(/^phone\.example\.comRenamed on mobile$/)
+    const record = name.closest('[role="listitem"]')
+    expect(record.querySelector('.lv-mrecord-desc')).toHaveTextContent(/^Renamed on mobile$/)
   })
 
   it('exports the description in its own column, beside the Common Name', () => {

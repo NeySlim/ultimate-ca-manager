@@ -3,6 +3,7 @@
  * "revoke then delete" of the detail window must not delete either.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const authState = vi.hoisted(() => ({ permissions: [] }))
@@ -56,7 +57,7 @@ async function revokeThenDelete(revokeResult) {
   certificatesService.revoke = vi.fn().mockResolvedValue(revokeResult)
   certificatesService.delete.mockResolvedValue({})
   notify.showConfirm.mockResolvedValue(true)
-  render(<InspectorObject entry={WINDOW} onTitle={() => {}} />)
+  render(<InspectorObject entry={WINDOW} onTitle={() => {}} />, { wrapper: MemoryRouter })
   await screen.findAllByText('web.example.com')
   await chooseMoreAction('common.delete')
   fireEvent.submit(await screen.findByText('revocation.confirm').then(el => el.closest('form')))

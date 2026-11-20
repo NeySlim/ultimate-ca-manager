@@ -119,11 +119,19 @@ describe('relativeShort: the short expiry of a list', () => {
     [3, 'time.short.days', 3],
     [59, 'time.short.days', 59],
     [61, 'time.short.months', 2],
-    [493, 'time.short.months', 16],
-    [731, 'time.short.years', 2],
-    [3324, 'time.short.years', 9],
+    [365, 'time.short.months', 11],
   ])('reads %i days in the unit its size calls for', (days, key, count) => {
     expect(shortParts(at((days - 0.5) * DAY), { now: NOW })).toEqual({ key, count })
+  })
+
+  it.each([
+    [493, 'time.short.yearsMonths', 1, 4],
+    [731, 'time.short.years', 2, undefined],
+    [3324, 'time.short.yearsMonths', 9, 1],
+    [3290, 'time.short.years', 9, undefined],
+  ])('reads %i days in years and the months left beyond twelve months', (days, key, count, months) => {
+    const want = months === undefined ? { key, count } : { key, count, months }
+    expect(shortParts(at((days - 0.5) * DAY), { now: NOW })).toEqual(want)
   })
 
   it('says Expired once the date is past, and nothing without a date', () => {
@@ -132,21 +140,21 @@ describe('relativeShort: the short expiry of a list', () => {
   })
 
   it.each([
-    ['en', en, ['3 d', '16 mo', '9 y', 'Expired']],
-    ['fr', fr, ['3 j', '16 mois', '9 ans', 'Échu']],
+    ['en', en, ['3 d', '10 mo', '1 y 4 mo', '9 y', 'Expired']],
+    ['fr', fr, ['3 j', '10 mois', '1 a 4 mois', '9 ans', 'Échu']],
   ])('is translated in %s', async (lng, resources, expected) => {
     const i18n = i18next.createInstance()
     await i18n.init({ lng, resources: { [lng]: { translation: resources } } })
     const say = i18n.t.bind(i18n)
-    expect([2.5, 492.5, 3323.5, -1].map((d) => relativeShort(at(d * DAY), say, { now: NOW }))).toEqual(expected)
+    expect([2.5, 310, 492.5, 3289.5, -1].map((d) => relativeShort(at(d * DAY), say, { now: NOW }))).toEqual(expected)
   })
 
   it.each([['ru', ru], ['zh', zh]])('has its own words in %s', async (lng, resources) => {
     const i18n = i18next.createInstance()
     await i18n.init({ lng, resources: { [lng]: { translation: resources } } })
     const say = i18n.t.bind(i18n)
-    const words = [2.5, 492.5, 3323.5, -1].map((d) => relativeShort(at(d * DAY), say, { now: NOW }))
-    expect(new Set(words).size).toBe(4)
+    const words = [2.5, 310, 492.5, 3289.5, -1].map((d) => relativeShort(at(d * DAY), say, { now: NOW }))
+    expect(new Set(words).size).toBe(5)
     expect(words.join(' ')).not.toMatch(/time\.short|Expired|\bmo\b/)
   })
 })

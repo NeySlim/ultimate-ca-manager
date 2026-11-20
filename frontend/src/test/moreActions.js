@@ -1,13 +1,12 @@
-/** The « ⋯ » menu of an inspector heading: open it with the keyboard, pick an action. */
+/** The « ⋯ » of an inspector heading: open its actions dialog, pick an action. */
 import { fireEvent, screen, within } from '@testing-library/react'
 
 export async function openMoreActions() {
   const trigger = await screen.findByTestId('inspector-more-actions')
-  trigger.focus()
-  fireEvent.keyDown(trigger, { key: 'Enter' })
-  return screen.getByRole('menu')
+  fireEvent.click(trigger)
+  return screen.getByTestId('inspector-actions-dialog')
 }
 
 export async function chooseMoreAction(name) {
-  fireEvent.click(within(await openMoreActions()).getByRole('menuitem', { name }))
+  fireEvent.click(within(await openMoreActions()).getByRole('button', { name }))
 }

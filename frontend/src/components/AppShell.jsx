@@ -1,7 +1,7 @@
 /**
  * AppShell Component - Atelier layout: top bar, page, status bar
  */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Outlet, useLocation } from 'react-router-dom'
 import { TopBar } from './shell/TopBar'
@@ -15,9 +15,7 @@ import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
 import { FloatingHelpPanel } from './ui/FloatingHelpPanel'
 import { UpdatePopup } from './UpdatePopup'
 import { KofiSupportCard } from './KofiSupportCard'
-import { useNotification } from '../contexts/NotificationContext'
 import { usePermission } from '../hooks'
-import { certificatesService } from '../services'
 import { InspectorDock } from './inspector/InspectorDock'
 import { useDockPlacement } from './inspector/placement'
 
@@ -31,7 +29,6 @@ export function AppShell() {
   const [helpModalOpen, setHelpModalOpen] = useState(false)
   // Help key requested by the shell itself (navigation help); cleared on close
   const [helpOverride, setHelpOverride] = useState(null)
-  const { showWarning } = useNotification()
   // The inspector sits in the page flow: under the page, or beside it on the right
   const dockPlacement = useDockPlacement()
   // Cluster nodes, read from the service status (read:settings), from the bar or the HA banner
@@ -42,8 +39,6 @@ export function AppShell() {
   // Derive the active nav item from the URL (see resolveActivePageId)
   const activePage = resolveActivePageId(location.pathname)
   const onOverview = activePage === '' || activePage === 'dashboard'
-  const onOverviewNow = useRef(onOverview)
-  onOverviewNow.current = onOverview
   
   // Map URL paths to helpContent keys
   // Use full path for nested routes (e.g. /ssh/cas → sshCas)
@@ -74,52 +69,7 @@ export function AppShell() {
   ]
   const hasHelp = pagesWithHelp.includes(activePage) || activePage === ''
 
-  // Check for expiring certificates on mount (once per session)
-  useEffect(() => {
-    // Cancelling the timer was not enough: once the 2s delay had elapsed the
-    // request was already in flight, and its continuation raised the expiry
-    // warning after the shell had unmounted — i.e. a toast landing on the
-    // login screen, for a session that had just ended.
-    let cancelled = false
-    const checkExpiringCerts = async () => {
-      // Check if we already showed the alert this session
-      const alreadyShown = sessionStorage.getItem('ucm-expiring-alert-shown')
-      if (alreadyShown) return
-      // The overview's figures strip gives these counts: no toast over its cards, and none later in the session
-      if (onOverviewNow.current) {
-        sessionStorage.setItem('ucm-expiring-alert-shown', 'true')
-        return
-      }
-
-      try {
-        const stats = await certificatesService.getStats()
-        if (cancelled) return
-        const expiring = stats?.data?.expiring || 0
-        const expired = stats?.data?.expired || 0
-
-        if (expiring > 0 || expired > 0) {
-          sessionStorage.setItem('ucm-expiring-alert-shown', 'true')
-          
-          if (expired > 0 && expiring > 0) {
-            showWarning(t('notifications.certificatesExpiredAndExpiring', { expired, expiring }))
-          } else if (expired > 0) {
-            showWarning(t('notifications.certificatesExpired', { count: expired }))
-          } else {
-            showWarning(t('notifications.certificatesExpiringSoon', { count: expiring }))
-          }
-        }
-      } catch {
-        // Ignore errors
-      }
-    }
-    
-    // Delay check to let the app settle
-    const timer = setTimeout(checkExpiringCerts, 2000)
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
-    }
-  }, [showWarning, t])
+  // No arrival notice on expiries: the state counters and the bell already say them
 
   // Keyboard shortcuts
   useKeyboardShortcuts({

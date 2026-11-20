@@ -276,7 +276,7 @@ def frontend_components(frag, prefix):
             c['copyright'] = f['copyright']
             c['externalReferences'] = [{'type': 'website', 'url': f['source']}]
             c['properties'].append(prop('ucm:license-text', f"{prefix}/{f['license_file']}"))
-        comps.append(with_license(c, [f.get('license')], 'font name table (ID 13)'))
+        comps.append(with_license(c, [f.get('license')], f"font name table (ID {f.get('license_name_id', 13)})"))
     return comps
 
 

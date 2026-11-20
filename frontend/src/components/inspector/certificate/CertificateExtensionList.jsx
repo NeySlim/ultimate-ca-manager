@@ -1,4 +1,4 @@
-/** X.509 extensions of a certificate: name and OID on the left, value on the right. */
+/** X.509 extensions of a certificate: X.509 name and OID on the left, readable value on the right. */
 import { useTranslation } from 'react-i18next'
 import { extensionRows } from '../../../lib/certificateDetail'
 import { truncateHex } from '../../../lib/customExtensions'
@@ -12,7 +12,7 @@ export function CertificateExtensionList({ cert, columns }) {
       {rows.map((r) => (
         <div key={r.key} className="ins-extension">
           <dt>
-            {r.labelKey ? t(r.labelKey) : r.label}
+            {r.label}
             <small className="ins-mono">{r.oid}{r.critical ? ` · ${t('inspector.cert.critical')}` : ''}</small>
           </dt>
           <dd>

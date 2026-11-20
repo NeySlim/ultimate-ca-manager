@@ -2,7 +2,8 @@
  * How a certificate entered UCM: label key and icon per source. Unknown or legacy
  * values still show, humanized, so a filter option never disappears.
  */
-import { ArrowsClockwise, Globe, UploadSimple, Certificate, Buildings, SealCheck } from '@phosphor-icons/react'
+import { Globe, UploadSimple, Certificate, Buildings, SealCheck } from '@phosphor-icons/react'
+import { RefreshIcon } from '../../components/list/atelierIcons'
 
 export const SOURCE_LABEL_KEYS = {
   manual: 'sourceManual',
@@ -11,6 +12,8 @@ export const SOURCE_LABEL_KEYS = {
   upload: 'sourceUpload',
   acme: 'sourceAcme',
   acme_client: 'sourceAcmeClient',
+  'acme-renewal': 'sourceAcmeRenewal',
+  issued: 'sourceIssued',
   letsencrypt: 'sourceLetsencrypt',
   scep: 'sourceScep',
   est: 'sourceEst',
@@ -23,9 +26,10 @@ const SOURCE_ICONS = {
   import: UploadSimple,
   imported: UploadSimple,
   upload: UploadSimple,
-  acme: ArrowsClockwise,
-  acme_client: ArrowsClockwise,
-  letsencrypt: ArrowsClockwise,
+  acme: RefreshIcon,
+  acme_client: RefreshIcon,
+  'acme-renewal': RefreshIcon,
+  letsencrypt: RefreshIcon,
   scep: Globe,
   est: Globe,
   msca: Buildings,

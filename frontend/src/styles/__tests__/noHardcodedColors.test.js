@@ -40,7 +40,6 @@ export const EXCEPTIONS = [
   },
   { file: 'components/EmailTemplateWindow.jsx', values: ['#f4f5f7'], reason: 'email preview canvas imitates a mail client' },
   { file: 'index.css', values: ['#ff5e5b', '#d63b36', '#b8312c'], reason: 'Ko-fi brand colours' },
-  { file: 'index.css', values: ["stroke='white'"], reason: 'checkmark glyph inside a data URI, which cannot read a token' },
 ]
 
 // In-app help is prose (it quotes issue numbers such as "#221"), not styling.

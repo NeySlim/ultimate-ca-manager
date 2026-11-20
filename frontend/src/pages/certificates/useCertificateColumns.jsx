@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useCallback } from 'react'
 import {
-  Certificate, Info, CheckCircle, Clock, Warning, Prohibit, LinkBreak, Archive, LinkSimple, Key
+  Certificate, Info, Check, Clock, Warning, Prohibit, LinkBreak, Archive, LinkSimple, Key
 } from '@phosphor-icons/react'
 import { Badge } from '../../components'
 import { StatusPill, SourceLabel, EntityName, RowMark, DueDate } from '../../components/list'
@@ -16,7 +16,7 @@ const DUE_TONES = { expired: 'bad', expiring: 'warn', valid: '' }
 export function certificateState(row, t) {
   const status = row.revoked ? 'revoked' : row.status || 'unknown'
   return {
-    valid: { tone: 'good', icon: CheckCircle, label: t('common.valid') },
+    valid: { tone: 'good', icon: Check, label: t('common.valid') },
     expiring: { tone: 'warn', icon: Clock, label: t('certificates.views.expiring') },
     expired: { tone: 'bad', icon: Warning, label: t('common.expired') },
     revoked: { tone: 'muted', icon: Prohibit, label: t('common.revoked') },
@@ -52,22 +52,20 @@ export function useCertificateColumns(t) {
         header: t('common.commonName'),
         priority: 1,
         sortable: true,
-        // The name takes the room left by the other columns and shortens itself with an ellipsis
-        grow: true,
-        fill: true,
-        minWidth: 160,
-        // One line: the name opens the detail, quiet marks follow it
-        render: (val, row) => (
+        // Never hidden, never shortened: the name keeps 200 px at least and its whole text
+        alwaysVisible: true,
+        minWidth: 200,
+        skeletonWidth: (i, sk) => sk(i, 55, 35),
+        // One line: the name opens the detail (not while rows are ticked), quiet marks follow it
+        render: (val, row, ctx) => (
           <>
-            <EntityName icon={Certificate}>{val}</EntityName>
+            <EntityName icon={Certificate} disabled={ctx?.locked}>{val}</EntityName>
             {row.has_private_key && <RowMark icon={Key} label={t('certificates.keyHeld')} />}
             {row.related_certificate_id != null && <RowMark icon={LinkSimple} label={roleOf(row)} />}
             {row.isOrphan && (
               <RowMark icon={LinkBreak} tone="warn" label={t('certificates.orphanDescription')}>{t('certificates.orphan')}</RowMark>
             )}
-            {row.archived && (
-              <RowMark icon={Archive} label={t('certificates.archivedDescription')}>{t('certificates.archived')}</RowMark>
-            )}
+            {row.archived && <RowMark icon={Archive} label={t('certificates.archivedMark')} />}
           </>
         ),
         // Mobile card: name and description on the left, state on the right
@@ -92,10 +90,9 @@ export function useCertificateColumns(t) {
         sortable: true,
         hideOnMobile: true,
         muted: true,
-        // Content-sized up to a cap, the whole text on hover
-        maxWidth: 320,
-        narrowMaxWidth: 150,
-        skeletonWidth: 140,
+        // The column that absorbs the width left, shortened by an ellipsis, the whole text on hover
+        grow: true,
+        minWidth: 64,
         accessor: (row) => row.subtitle || '',
         title: (row) => row.subtitle || '',
         render: (val, row) => row.subtitle || ''
@@ -104,6 +101,7 @@ export function useCertificateColumns(t) {
         key: 'status',
         header: t('certificates.state'),
         priority: 2,
+        alwaysVisible: true,
         sortable: true, // Groups by status type, then alphabetically
         hideOnMobile: true, // Shown in the name's mobile card
         skeleton: 'pill',
@@ -116,9 +114,9 @@ export function useCertificateColumns(t) {
         priority: 3,
         sortable: true,
         muted: true,
-        // Capped so the name keeps its room; a longer issuer keeps its whole name on hover
+        // Capped so a long authority name does not push the table; its whole name on hover
         maxWidth: 260,
-        narrowMaxWidth: 150,
+        skeletonWidth: (i, sk) => sk(i, 50, 40),
         title: issuerOf,
         render: (val, row) => issuerOf(row) || '—',
         // Mobile card, under the name: who issued it and how, then when it is due
@@ -136,10 +134,10 @@ export function useCertificateColumns(t) {
       {
         key: 'source',
         header: t('certificates.source'),
+        // Not sortable: the list API has no order by source
         sortable: false,
         hideOnMobile: true,
-        maxWidth: 220,
-        narrowMaxWidth: 120,
+        skeletonWidth: 52,
         title: (row) => sourceLabel(sourceOf(row), t),
         accessor: (row) => sourceLabel(sourceOf(row), t),
         render: (val, row) => source(row)
@@ -149,7 +147,7 @@ export function useCertificateColumns(t) {
         header: t('certificates.expiry'),
         priority: 4,
         sortable: true,
-        skeletonWidth: 120,
+        skeletonWidth: 92,
         render: (val, row) => due(row)
       },
       {
@@ -159,11 +157,13 @@ export function useCertificateColumns(t) {
         sortable: true,
         muted: true,
         small: true,
+        skeletonWidth: 70,
         render: (val, row) => certificateKeyLabel(row, t) || '—'
       },
       {
         key: 'compliance_grade',
-        header: t('compliance.grade'),
+        header: t('certificates.complianceColumn'),
+        skeletonWidth: 20,
         sortable: true,
         hideOnMobile: true,
         defaultHidden: true,
@@ -204,3 +204,24 @@ export function useCertificateColumns(t) {
 
   return columns
 }
+
+/** A certificate as an Atelier record on a phone: description, issuer, source and key, state and expiry date. */
+export function useCertificateCard(t) {
+  return useCallback((row) => {
+    const value = sourceOf(row)
+    const issuer = extractCN(row.issuer) || row.issuer_name || ''
+    return {
+      icon: <Certificate size={16} aria-hidden="true" />,
+      description: row.descr && row.descr !== (row.cn || row.common_name) ? row.descr : '',
+      meta: [
+        issuer,
+        <SourceLabel key="source" icon={sourceIcon(value)} label={sourceLabel(value, t)} />,
+        row.has_private_key && <span key="key" className="lv-key-note"><Key size={12} aria-hidden="true" />{t('certificates.keyInUcm')}</span>,
+        row.isOrphan && <RowMark key="orphan" icon={LinkBreak} tone="warn" label={t('certificates.orphanDescription')}>{t('certificates.orphan')}</RowMark>,
+      ],
+      status: <StatusPill {...certificateState(row, t)} />,
+      end: row.valid_to ? <time dateTime={row.valid_to}>{formatDate(row.valid_to, { time: false })}</time> : null,
+    }
+  }, [t])
+}
+

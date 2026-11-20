@@ -73,6 +73,8 @@ export function ResponsiveLayout({
   viewsLabel, // accessible name of the tab list
   viewsAside, // ReactNode at the right end of the tab row
   beforeViews, // ReactNode between the page head and the state tabs (first-run card)
+  viewsPressed = false, // the states are toggle buttons, each a tab stop (the panel is then no tabpanel)
+  viewsBusy = false, // the counters are being read
   
   // Stats bar (optional - array of { icon, label, value, variant, filterValue })
   stats,
@@ -229,8 +231,10 @@ export function ResponsiveLayout({
           onChange={onViewChange}
           label={viewsLabel}
           baseId={viewsId}
-          controls={viewsPanelId}
+          controls={viewsPressed ? undefined : viewsPanelId}
           aside={viewsAside}
+          pressed={viewsPressed}
+          busy={viewsBusy}
         />
       )}
 
@@ -382,7 +386,7 @@ export function ResponsiveLayout({
             // The state tabs filter this panel; without tabs it is a plain column
             <div
               className="lv-panel"
-              {...(hasViews ? {
+              {...(hasViews && !viewsPressed ? {
                 role: 'tabpanel',
                 id: viewsPanelId,
                 'aria-labelledby': views.some(v => v.id === activeView) ? viewTabId(viewsId, activeView) : undefined,
