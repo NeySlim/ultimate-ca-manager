@@ -167,7 +167,9 @@
   text-align: left;
   cursor: pointer;
 }
-.ins-tabs-menu-open:hover, .ins-tabs-menu :focus { background: var(--hover); outline: none; }
+/* Marked on hover only, as the mockup: the item focused on opening keeps no fill */
+.ins-tabs-menu-open:hover { background: var(--hover); }
+.ins-tabs-menu :focus:not(:focus-visible) { outline: none; }
 .ins-tabs-menu-open svg { flex-shrink: 0; }
 .ins-pop-label { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ins-menu-item {

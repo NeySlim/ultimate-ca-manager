@@ -278,6 +278,9 @@
 /* A column with a floor and no ellipsis: the name keeps its whole text */
 .lv-table :is(th, td).lv-floor { min-width: var(--lv-min); }
 .lv-table th.lv-grow { overflow: hidden; text-overflow: ellipsis; }
+/* The absorbing column's sort button shortens its words with an ellipsis, as a plain heading does */
+.lv-table th.lv-grow .lv-sort { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.lv-table th.lv-grow .lv-sort > svg { margin-left: 8px; vertical-align: -1px; }
 .lv-table td.is-clipped { overflow: hidden; text-overflow: ellipsis; }
 .lv-table td.is-muted { color: var(--muted); }
 .lv-table td.is-small { font-size: 12px; }
@@ -481,7 +484,33 @@
 .lv-dialog-body > p.lv-dialog-lead { margin-bottom: 20px; }
 .lv-dialog-list > .lv-btn.is-danger { background: var(--badbg); border-color: var(--bad); color: var(--bad); }
 .lv-check-line { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 7px; border-bottom: 1px solid var(--line); font-size: 12px; cursor: pointer; }
-:root[data-theme="aurore"] .lv-dialog { border-radius: 8px; }
+/* Aurore: every dialog of the list is the mockup's frosted glass of radius 10 px */
+:root[data-theme="aurore"] .lv-dialog {
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border-color: color-mix(in srgb, var(--paper) 8%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--paper) 6%, transparent), 0 24px 60px -20px color-mix(in srgb, var(--ink) 70%, transparent);
+}
+:root[data-theme="aurore"][data-mode="light"] .lv-dialog {
+  background: color-mix(in srgb, var(--paper) 84%, transparent);
+  border-color: color-mix(in srgb, var(--text) 14%, transparent);
+  box-shadow: inset 0 1px 0 var(--paper), 0 24px 60px -20px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* Menus of the toolbar (presets, export): the mockup's pop menu, 8 px under its button */
+.ui-pop.lv-tool-menu { top: calc(100% + 8px); }
+.ui-pop.lv-tool-menu.is-wide { width: 260px; }
+.lv-tool-menu:focus-visible { outline: none; }
+.lv-tool-menu-line { display: flex; align-items: center; gap: 2px; border-radius: 4px; }
+.lv-tool-menu-line > .ui-pop-item:first-child { flex: 1; min-width: 0; }
+.lv-tool-menu-line .ui-pop-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-pop-item.lv-tool-menu-delete { width: 30px; min-height: 30px; padding: 6px; justify-content: center; color: var(--muted); }
+.ui-pop-item.lv-tool-menu-delete:hover { color: var(--bad); }
+.lv-tool-menu-form { display: grid; gap: 8px; padding: 4px; }
+.lv-tool-menu-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.lv-tool-menu-empty { margin: 0; padding: 10px; font-size: 12px; line-height: 1.6; color: var(--muted); }
 
 /* Narrower windows, as the mockup: one row action under 1250 px, 10 px cells under 1100 px,
    an 18 px gutter, tools by their icon and filters of 140 px at most under 1000 px */
@@ -526,10 +555,10 @@
   .lv-toolbar .lv-search { flex-basis: 100%; min-height: 42px; }
   .lv-toolbar .lv-search input { min-height: 40px; font-size: 13px; }
   .lv-main:has(.lv-table-box.is-cards) { padding: 0 var(--lv-gutter); }
-  /* Two filters share a line; a third one takes the next line whole */
+  /* Two filters share a line, as the mockup's (max-width:none); a third one takes the next line whole */
   .lv-toolbar .lv-tools { flex: 1 1 0; flex-wrap: wrap; min-width: 0; }
-  .lv-toolbar .lv-filter { flex: 1 1 120px; min-width: 0; }
-  .lv-toolbar .lv-filter > button { width: 100%; min-height: 40px; }
+  .lv-toolbar .lv-filter { flex: 1 1 calc(50% - 4px); min-width: 0; }
+  .lv-toolbar .lv-filter > button { width: 100%; max-width: none; min-height: 40px; }
   .lv-toolbar .lv-btn.is-icon { width: 40px; height: 40px; }
   .lv-footer { padding: 10px; gap: 8px; flex-wrap: wrap; }
   .lv-footer .lv-page-arrow { width: 38px; height: 38px; }
