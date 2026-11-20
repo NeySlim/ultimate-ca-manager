@@ -159,8 +159,9 @@ export function AppShell() {
         <div className="shell-content">
           <StateBanners onShowNodes={showNodes} onNotice={notice} />
           <div className="shell-page" id="shell-page" tabIndex={-1}>
-            {/* A page whose code is still loading waits here: the bars stay on screen */}
-            <Suspense fallback={<div className="shell-page-wait" role="status" aria-label={t('common.loading')}><LoadingSpinner size="lg" /></div>}>
+            {/* A page whose code is still loading waits here, the bars on screen. One boundary per page:
+                a navigation (a transition) then shows the wait and the link asked for at once */}
+            <Suspense key={activePage} fallback={<div className="shell-page-wait" role="status" aria-label={t('common.loading')}><LoadingSpinner size="lg" /></div>}>
               <Outlet />
             </Suspense>
           </div>

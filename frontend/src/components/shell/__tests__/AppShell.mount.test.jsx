@@ -242,6 +242,40 @@ describe('a page whose code is still loading', () => {
   })
 })
 
+describe('following a link to a page whose code is still loading', () => {
+  it('marks the link asked for and shows the wait in the page area at once, the bars kept', async () => {
+    let arrive
+    const Slow = lazy(() => new Promise((resolve) => { arrive = () => resolve({ default: () => <p>activity page</p> }) }))
+    const user = userEvent.setup()
+    render(
+      <InspectorProvider>
+        <MemoryRouter initialEntries={['/certificates']}>
+          <Routes>
+            <Route element={<AppShell />}>
+              <Route path="/audit" element={<Slow />} />
+              <Route path="*" element={<p>certificates page</p>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </InspectorProvider>
+    )
+    expect(await screen.findByText('certificates page')).toBeVisible()
+    const activity = () => document.querySelector('.shell-navlink[data-module="audit"]')
+    const before = document.title
+    await user.click(activity())
+    await waitFor(() => expect(activity()).toHaveAttribute('aria-current', 'page'))
+    expect(document.title).not.toBe(before)
+    const wait = within(document.getElementById('shell-page')).getByRole('status', { name: 'common.loading' })
+    expect(wait).toBeVisible()
+    expect(screen.queryByText('certificates page')).toBeNull()
+    expect(screen.getByRole('banner')).toBeVisible()
+    expect(screen.getByRole('contentinfo')).toBeVisible()
+    await act(async () => { arrive() })
+    expect(await screen.findByText('activity page')).toBeVisible()
+    expect(screen.queryByRole('status', { name: 'common.loading' })).toBeNull()
+  })
+})
+
 describe('no expiry notice on arrival', () => {
   afterEach(() => { vi.useRealTimers() })
 
