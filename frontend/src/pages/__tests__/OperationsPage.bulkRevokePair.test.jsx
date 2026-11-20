@@ -76,12 +76,7 @@ vi.mock('../../components/SmartImport', () => ({ SmartImportWidget: () => null }
 
 vi.mock('../../components', async (orig) => ({
   ...(await orig()),
-  ResponsiveLayout: ({ tabs = [], onTabChange, children }) => (
-    <div>
-      {tabs.map((tab) => <button key={tab.id} onClick={() => onTabChange(tab.id)}>{`tab-${tab.id}`}</button>)}
-      {children}
-    </div>
-  ),
+  ResponsiveLayout: ({ children }) => <div>{children}</div>,
   ResponsiveDataTable: ({ onSelectionChange, bulkActions }) => (
     <div>
       <button onClick={() => onSelectionChange(new Set(mocks.selection))}>select-certs</button>
@@ -94,7 +89,7 @@ import OperationsPage from '../OperationsPage'
 
 const openBulk = async (action) => {
   render(<MemoryRouter><OperationsPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByText('tab-bulk'))
+  fireEvent.click(await screen.findByRole('link', { name: 'operations.bulkActions' }))
   fireEvent.click(await screen.findByText('select-certs'))
   fireEvent.click(await screen.findByText(action))
   return screen.findByRole('dialog')

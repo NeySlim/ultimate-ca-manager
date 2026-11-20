@@ -5,6 +5,14 @@ export default {
     overview: '一套用于处理证书、CSR 和密钥的工具。解码证书以检查其内容、在不同格式间转换、检查远程 SSL 端点、以及验证密钥匹配。',
     sections: [
       {
+        title: '页面布局',
+        content: '左侧目录按组（分析、验证、转换）列出工具；所选工具显示在其框中，结果在下方。',
+        items: [
+          { label: '切换工具', text: '选择其他工具会清除上一个工具的结果' },
+          { label: '链接', text: '指向 /tools?tab=<工具>（ssl-checker、csr-decoder、cert-decoder、key-matcher、converter）的链接会打开该工具' },
+        ],
+      },
+      {
         title: '可用工具',
         items: [
           { label: 'SSL 检查器', text: '连接到远程主机并检查其出示的证书（仅叶证书，不含证书链）' },

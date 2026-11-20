@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import en from '../../i18n/locales/en.json'
 
 const i18n = vi.hoisted(() => ({ en: null }))
@@ -30,12 +31,7 @@ vi.mock('../../contexts', () => ({
 }))
 vi.mock('../../hooks', () => ({ useClipboard: () => ({ copy: vi.fn() }) }))
 vi.mock('../../components/ui/responsive', () => ({
-  ResponsiveLayout: ({ children, tabs, onTabChange }) => (
-    <div>
-      {tabs.map(tab => <button key={tab.id} type="button" onClick={() => onTabChange(tab.id)}>tab-{tab.id}</button>)}
-      {children}
-    </div>
-  ),
+  ResponsiveLayout: ({ children }) => <div>{children}</div>,
 }))
 
 // Radix Select renders its items in a portal; a native <select> exposes the same options
@@ -60,8 +56,8 @@ const PLAIN_KEY = '-----BEGIN PRIVATE KEY-----\nBBBB\n-----END PRIVATE KEY-----'
 
 const field = () => screen.queryByLabelText(new RegExp(en.tools.inputPassword))
 const open = () => {
-  render(<CertificateToolsPage />)
-  fireEvent.click(screen.getByText('tab-converter'))
+  render(<MemoryRouter><CertificateToolsPage /></MemoryRouter>)
+  fireEvent.click(screen.getByRole('link', { name: en.tools.converter }))
   fireEvent.change(screen.getByPlaceholderText(/BEGIN CERTIFICATE/), { target: { value: CERT } })
 }
 const toPkcs12 = () => fireEvent.change(screen.getByLabelText(en.tools.outputFormat), { target: { value: 'pkcs12' } })

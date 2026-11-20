@@ -5,7 +5,14 @@ export default {
     overview: 'Centre d\'opérations centralisé. Importez des certificats depuis des fichiers ou OPNsense, exportez des bundles aux formats PEM/P7B et effectuez des actions en masse sur tous les types de ressources avec recherche et filtres intégrés.',
     sections: [
       {
-        title: 'Onglets latéraux',
+        title: 'Disposition de la page',
+        content: 'Le sommaire à gauche liste Importer, Exporter et Actions en masse ; l’opération choisie s’affiche dans son cadre. Chacune garde ses boutons, la page n’a pas de barre d’enregistrement.',
+        items: [
+          { label: 'Liens', text: 'Un lien vers /operations?tab=export ou /operations?tab=bulk ouvre cette opération' },
+        ],
+      },
+      {
+        title: 'Opérations',
         items: [
           { label: 'Importation', text: 'Importation intelligente avec détection automatique du format, plus synchronisation OPNsense pour récupérer les certificats des pare-feu' },
           { label: 'Exportation', text: 'Télécharger des bundles de certificats par type de ressource au format PEM ou P7B via des cartes d\'action' },

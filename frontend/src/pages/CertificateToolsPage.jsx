@@ -5,14 +5,13 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Wrench, Globe, FileMagnifyingGlass, Key, ArrowsLeftRight,
+  Globe, FileMagnifyingGlass, Key, ArrowsLeftRight,
   CheckCircle, XCircle, Warning, Certificate,
   Copy, Download, Spinner
 } from '@phosphor-icons/react'
 import {
   Button, Badge, Textarea, Input, Select, FileUpload,
   CompactSection, CompactGrid, CompactField,
-  DetailHeader, DetailContent, DetailSection
 } from '../components'
 import { ResponsiveLayout } from '../components/ui/responsive'
 import { toolsService } from '../services'
@@ -20,6 +19,7 @@ import { useNotification } from '../contexts'
 import { useClipboard } from '../hooks'
 import { cn, formatDate , downloadBlob} from '../lib/utils'
 import { keyAlgorithmLabel } from '../lib/keyAlgorithms'
+import { FormLayout, SectionToc, SectionJump, FormSection, FormGroup, useSectionParam } from '../components/sectioned'
 
 // Tool definitions with tab-compatible format for sidebar layout
 // 'RSA 2048-bit', 'EC secp384r1', 'ML-DSA-65 (level 3)': no size for a key that has none
@@ -75,7 +75,8 @@ export default function CertificateToolsPage() {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
   const { copy: clipboardCopy } = useClipboard()
-  const [activeTool, setActiveTool] = useState('ssl-checker')
+  // The tool a link names (/tools?tab=converter) is the one shown
+  const [activeTool, setActiveTool] = useSectionParam(TOOLS.map((tool) => tool.id), 'ssl-checker')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
 
@@ -363,22 +364,23 @@ export default function CertificateToolsPage() {
     resetResult()
   }
 
-  const tabs = TOOLS.map(tool => ({
+  const sections = TOOLS.map(tool => ({
     id: tool.id,
     label: t(tool.labelKey),
+    description: t(tool.descKey),
     icon: tool.icon,
-    color: tool.color
   }))
+  const toolGroups = [
+    { id: 'analysis', label: t('tools.groups.analysis'), ids: ['ssl-checker', 'csr-decoder', 'cert-decoder'] },
+    { id: 'verification', label: t('tools.groups.verification'), ids: ['key-matcher'] },
+    { id: 'conversion', label: t('tools.groups.conversion'), ids: ['converter'] },
+  ]
+  const active = sections.find(section => section.id === activeTool)
 
   // Render SSL Checker
   const renderSSLChecker = () => (
-    <DetailContent>
-      <DetailHeader
-        icon={Globe}
-        title={t('tools.sslChecker')}
-        subtitle={t('tools.sslCheckerDesc')}
-      />
-      <DetailSection title={t('tools.sectionConnection')} icon={Globe} iconClass="icon-bg-emerald">
+    <>
+      <FormGroup title={t('tools.sectionConnection')}>
       <div className="space-y-4">
       <div className="flex gap-3">
         <div className="flex-1">
@@ -403,19 +405,14 @@ export default function CertificateToolsPage() {
         {t('tools.checkSSL')}
       </Button>
     </div>
-    </DetailSection>
-    </DetailContent>
+    </FormGroup>
+    </>
   )
 
   // Render CSR Decoder
   const renderCSRDecoder = () => (
-    <DetailContent>
-      <DetailHeader
-        icon={FileMagnifyingGlass}
-        title={t('tools.csrDecoder')}
-        subtitle={t('tools.csrDecoderDesc')}
-      />
-      <DetailSection title={t('tools.sectionPemInput')} icon={FileMagnifyingGlass} iconClass="icon-bg-blue">
+    <>
+      <FormGroup title={t('tools.sectionPemInput')}>
     <div className="space-y-4">
       <TextareaWithUpload
         label={t('tools.csrPemLabel')}
@@ -430,19 +427,14 @@ export default function CertificateToolsPage() {
         {t('tools.decodeCsr')}
       </Button>
     </div>
-    </DetailSection>
-    </DetailContent>
+    </FormGroup>
+    </>
   )
 
   // Render Certificate Decoder
   const renderCertDecoder = () => (
-    <DetailContent>
-      <DetailHeader
-        icon={Certificate}
-        title={t('tools.decoder')}
-        subtitle={t('tools.certDecoderDesc')}
-      />
-      <DetailSection title={t('tools.sectionCertificateInput')} icon={Certificate} iconClass="icon-bg-violet">
+    <>
+      <FormGroup title={t('tools.sectionCertificateInput')}>
     <div className="space-y-4">
       <TextareaWithUpload
         label={t('tools.certPemLabel')}
@@ -457,19 +449,14 @@ export default function CertificateToolsPage() {
         {t('tools.decodeCert')}
       </Button>
     </div>
-    </DetailSection>
-    </DetailContent>
+    </FormGroup>
+    </>
   )
 
   // Render Key Matcher
   const renderKeyMatcher = () => (
-    <DetailContent>
-      <DetailHeader
-        icon={Key}
-        title={t('tools.keyMatcher')}
-        subtitle={t('tools.keyMatcherDesc')}
-      />
-      <DetailSection title={t('tools.sectionKeyInput')} icon={Key} iconClass="icon-bg-orange">
+    <>
+      <FormGroup title={t('tools.sectionKeyInput')}>
     <div className="space-y-4">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <TextareaWithUpload
@@ -511,19 +498,14 @@ export default function CertificateToolsPage() {
         {t('tools.matchKeys')}
       </Button>
     </div>
-    </DetailSection>
-    </DetailContent>
+    </FormGroup>
+    </>
   )
 
   // Render Converter
   const renderConverter = () => (
-    <DetailContent>
-      <DetailHeader
-        icon={ArrowsLeftRight}
-        title={t('tools.converter')}
-        subtitle={t('tools.converterDesc')}
-      />
-      <DetailSection title={t('tools.sectionConversion')} icon={ArrowsLeftRight} iconClass="icon-bg-teal">
+    <>
+      <FormGroup title={t('tools.sectionConversion')}>
     <div className="space-y-4">
       {/* Input section */}
       <div className="p-4 border border-border rounded-lg bg-secondary-op50 space-y-4">
@@ -673,8 +655,8 @@ export default function CertificateToolsPage() {
         {t('tools.convert')}
       </Button>
     </div>
-    </DetailSection>
-    </DetailContent>
+    </FormGroup>
+    </>
   )
 
   // Render SSL result
@@ -1038,26 +1020,32 @@ export default function CertificateToolsPage() {
     }
   }
 
+  // One tool at a time in its frame; the table of contents picks it, its form keeps its own action
   return (
     <ResponsiveLayout
       title={t('common.tools')}
-      subtitle={t('tools.subtitle')}
-      icon={Wrench}
-      tabs={tabs}
-      activeTab={activeTool}
-      onTabChange={handleToolChange}
-      tabLayout="sidebar"
-      tabGroups={[
-        { labelKey: 'tools.groups.analysis', tabs: ['ssl-checker', 'csr-decoder', 'cert-decoder'], color: 'icon-bg-blue' },
-        { labelKey: 'tools.groups.verification', tabs: ['key-matcher'], color: 'icon-bg-orange' },
-        { labelKey: 'tools.groups.conversion', tabs: ['converter'], color: 'icon-bg-teal' },
-      ]}
+      total={t('tools.toolCount', { count: sections.length })}
+      intent={t('tools.intent')}
       helpPageKey="certTools"
     >
-      <div className="space-y-6">
-        {renderToolForm()}
-        {result && renderResult()}
-      </div>
+      <FormLayout
+        toc={(
+          <SectionToc
+            label={t('tools.tocLabel')}
+            sections={sections}
+            groups={toolGroups}
+            current={activeTool}
+            hrefFor={(id) => (id === 'ssl-checker' ? '/tools' : `/tools?tab=${id}`)}
+            onJump={handleToolChange}
+          />
+        )}
+      >
+        <SectionJump label={t('sectioned.jumpLabel')} sections={sections} value={activeTool} onJump={handleToolChange} />
+        <FormSection id={active.id} title={active.label} description={active.description}>
+          {renderToolForm()}
+          {result && renderResult()}
+        </FormSection>
+      </FormLayout>
     </ResponsiveLayout>
   )
 }

@@ -526,7 +526,9 @@
       "actions": "操作"
     },
     "selectResource": "资源类型",
-    "selectCA": "请选择一个CA"
+    "selectCA": "请选择一个CA",
+    "intent": "导入、导出以及一次对多个项目执行操作。",
+    "tocLabel": "操作"
   },
   "auth": {
     "login": "登录",
@@ -2738,7 +2740,11 @@
     "helpConverter": "在不同格式之间转换证书和密钥：PEM ↔ DER, PEM → PKCS12 (需要密钥), PEM → PKCS7。直接下载转换后的文件。",
     "pkcs12PasswordRequired": "PKCS12/PFX文件需要密码",
     "pkcs12OutputPasswordRequired": "PKCS12输出需要密码",
-    "pkcs12PasswordPlaceholder": "PKCS12/PFX文件密码"
+    "pkcs12PasswordPlaceholder": "PKCS12/PFX文件密码",
+    "intent": "检查服务器，解码、匹配和转换证书与密钥。",
+    "tocLabel": "工具",
+    "toolCount_one": "{{count}} 个工具",
+    "toolCount_other": "{{count}} 个工具"
   },
   "audit": {
     "event": "事件",
@@ -3825,7 +3831,10 @@
     "twoFaSetupFailed": "无法启动双重验证设置",
     "twoFaEnabled": "双重身份验证已启用",
     "backupCodesHint": "请将这些备份码保存在安全的地方。如果您无法访问身份验证器，每个备份码可使用一次。",
-    "backupCodesSaved": "我已保存备份码"
+    "backupCodesSaved": "我已保存备份码",
+    "intent": "您的个人资料、登录安全和 API 密钥。",
+    "tocLabel": "账户部分",
+    "apiKeysIntent": "以您的账户名义调用 API 的密钥。"
   },
   "rbac": {
     "title": "基于角色的访问控制",

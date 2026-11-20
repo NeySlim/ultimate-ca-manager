@@ -526,7 +526,9 @@
       "actions": "Acciones"
     },
     "selectResource": "Tipo de recurso",
-    "selectCA": "Seleccione una CA"
+    "selectCA": "Seleccione una CA",
+    "intent": "Import, export and act on many items at once.",
+    "tocLabel": "Operations"
   },
   "auth": {
     "login": "Iniciar sesión",
@@ -2738,7 +2740,11 @@
     "helpConverter": "Convierta certificados y claves entre formatos: PEM ↔ DER, PEM → PKCS12 (requiere la clave), PEM → PKCS7. Descargue directamente el archivo convertido.",
     "pkcs12PasswordRequired": "Se requiere contraseña para archivos PKCS12/PFX",
     "pkcs12OutputPasswordRequired": "Se requiere contraseña para la salida PKCS12",
-    "pkcs12PasswordPlaceholder": "Contraseña del archivo PKCS12/PFX"
+    "pkcs12PasswordPlaceholder": "Contraseña del archivo PKCS12/PFX",
+    "intent": "Check a server, decode, match and convert certificates and keys.",
+    "tocLabel": "Tools",
+    "toolCount_one": "{{count}} tool",
+    "toolCount_other": "{{count}} tools"
   },
   "audit": {
     "event": "Evento",
@@ -3825,7 +3831,10 @@
     "twoFaSetupFailed": "No se pudo iniciar la configuración de 2FA",
     "twoFaEnabled": "Autenticación de dos factores activada",
     "backupCodesHint": "Guarde estos códigos de respaldo en un lugar seguro. Cada uno puede usarse una vez si pierde el acceso a su autenticador.",
-    "backupCodesSaved": "He guardado mis códigos de respaldo"
+    "backupCodesSaved": "He guardado mis códigos de respaldo",
+    "intent": "Your profile, the security of your sign-in and your API keys.",
+    "tocLabel": "Account sections",
+    "apiKeysIntent": "Keys that call the API on behalf of your account."
   },
   "rbac": {
     "title": "Control de acceso basado en roles",

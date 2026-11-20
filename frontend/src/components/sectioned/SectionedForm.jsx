@@ -12,6 +12,14 @@ import './sectioned.css'
 export const sectionDomId = (id) => `sf-sec-${id}`
 export const sectionTitleId = (id) => `sf-title-${id}`
 
+/** Scrolls to a section's frame and gives its title the focus, as the Atelier jump does. */
+export function jumpToSection(id) {
+  const frame = document.getElementById(sectionDomId(id))
+  if (!frame) return
+  frame.scrollIntoView?.({ block: 'start' })
+  document.getElementById(sectionTitleId(id))?.focus({ preventScroll: true })
+}
+
 /** Layout: the table of contents beside the main column. */
 export function FormLayout({ toc, children, className }) {
   return (
@@ -119,7 +127,7 @@ function SectionFailed() {
 
 /** Frame of one section: heading and its sentence, an error when its save failed, the body. */
 export const FormSection = forwardRef(function FormSection(
-  { id, title, description, aside, error, children, className }, ref,
+  { id, title, description, aside, error, children, className, bodyClassName }, ref,
 ) {
   return (
     <section
@@ -141,7 +149,7 @@ export const FormSection = forwardRef(function FormSection(
         </div>
         {aside && <div className="sf-heading-aside">{aside}</div>}
       </header>
-      <div className="sf-body">
+      <div className={cn('sf-body', bodyClassName)}>
         <SectionBoundary fallback={<SectionFailed />}>{children}</SectionBoundary>
       </div>
     </section>

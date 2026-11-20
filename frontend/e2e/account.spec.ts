@@ -6,7 +6,7 @@ test('a password changed on screen is the one that signs in', async ({ api, sign
   const { page } = await signIn(user.username, user.password)
   const next = strongPassword()
   await page.goto('/account')
-  await page.getByRole('button', { name: 'Security', exact: true }).click()
+  await page.getByRole('navigation', { name: 'Account sections' }).getByRole('link', { name: 'Security', exact: true }).click()
   await page.getByRole('button', { name: 'Change Password' }).click()
   const dialog = page.getByRole('dialog', { name: 'Change Password' })
   await dialog.getByLabel('Current Password').fill(user.password)
@@ -23,7 +23,7 @@ test('TOTP enrolled on screen is asked at the next sign-in', async ({ api, signI
   const user = await createUser(api, 'viewer')
   const { page } = await signIn(user.username, user.password)
   await page.goto('/account')
-  await page.getByRole('button', { name: 'Security', exact: true }).click()
+  await page.getByRole('navigation', { name: 'Account sections' }).getByRole('link', { name: 'Security', exact: true }).click()
   const enrolment = page.waitForResponse(r => r.url().endsWith('/api/v2/account/2fa/enable'))
   await page.getByRole('button', { name: 'Enable 2FA' }).click()
   const { data } = await (await enrolment).json()
@@ -45,7 +45,7 @@ test('TOTP enrolled on screen is asked at the next sign-in', async ({ api, signI
 // sent with it is refused, and the page checks its current session and sends that request again.
 async function stalePageRequest(page: Page, request: APIRequestContext, renew: () => Promise<unknown>) {
   await page.goto('/account')
-  await expect(page.getByRole('button', { name: 'Security', exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Security', exact: true })).toBeVisible()
   const before = (await page.context().cookies()).find(c => c.name === 'session')!.value
   await renew()
   const after = (await page.context().cookies()).find(c => c.name === 'session')!.value
@@ -59,7 +59,7 @@ async function stalePageRequest(page: Page, request: APIRequestContext, renew: (
     await route.fulfill({ response: stale })
   }, { times: 1 })
   await page.reload()
-  await expect(page.getByRole('button', { name: 'Security', exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Security', exact: true })).toBeVisible()
   await expect.poll(() => statuses).toEqual([401, 200])
   await expect(page).toHaveURL(url => url.pathname.startsWith('/account'))
   expect((await (await page.request.get('/api/v2/auth/verify')).json()).data.authenticated).toBe(true)

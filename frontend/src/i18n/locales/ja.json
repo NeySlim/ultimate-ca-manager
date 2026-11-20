@@ -526,7 +526,9 @@
       "actions": "アクション"
     },
     "selectResource": "リソースタイプ",
-    "selectCA": "CAを選択してください"
+    "selectCA": "CAを選択してください",
+    "intent": "Import, export and act on many items at once.",
+    "tocLabel": "Operations"
   },
   "auth": {
     "login": "ログイン",
@@ -2738,7 +2740,11 @@
     "helpConverter": "証明書とキーの形式を変換します：PEM ↔ DER、PEM → PKCS12（キーが必要）、PEM → PKCS7。変換されたファイルを直接ダウンロードできます。",
     "pkcs12PasswordRequired": "PKCS12/PFXファイルにはパスワードが必要です",
     "pkcs12OutputPasswordRequired": "PKCS12出力にはパスワードが必要です",
-    "pkcs12PasswordPlaceholder": "PKCS12/PFXファイルのパスワード"
+    "pkcs12PasswordPlaceholder": "PKCS12/PFXファイルのパスワード",
+    "intent": "Check a server, decode, match and convert certificates and keys.",
+    "tocLabel": "Tools",
+    "toolCount_one": "{{count}} tool",
+    "toolCount_other": "{{count}} tools"
   },
   "audit": {
     "event": "イベント",
@@ -3826,7 +3832,10 @@
     "twoFaSetupFailed": "2FAのセットアップを開始できませんでした",
     "twoFaEnabled": "二要素認証が有効になりました",
     "backupCodesHint": "これらのバックアップコードを安全な場所に保管してください。認証アプリにアクセスできなくなった場合、各コードは一度だけ使用できます。",
-    "backupCodesSaved": "バックアップコードを保存しました"
+    "backupCodesSaved": "バックアップコードを保存しました",
+    "intent": "Your profile, the security of your sign-in and your API keys.",
+    "tocLabel": "Account sections",
+    "apiKeysIntent": "Keys that call the API on behalf of your account."
   },
   "rbac": {
     "title": "ロールベースアクセス制御",

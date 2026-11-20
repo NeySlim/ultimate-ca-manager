@@ -1,0 +1,65 @@
+/**
+ * The section of a sectioned page lives in ?tab=: a link opens on it, a choice writes it
+ * (the first section leaves the address bare), stacked frames scroll to it, and a page of
+ * one frame at a time gives the new frame's title the focus.
+ */
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { act, render, screen } from '@testing-library/react'
+import { MemoryRouter, useLocation } from 'react-router-dom'
+
+import { useSectionParam, FormSection } from '..'
+
+afterEach(() => { delete Element.prototype.scrollIntoView })
+
+function Page({ stacked, ready = true }) {
+  const [current, select] = useSectionParam(['a', 'b', 'c'], 'a', { stacked, ready })
+  const location = useLocation()
+  const ids = stacked ? ['a', 'b', 'c'] : [current]
+  return (
+    <>
+      <output data-testid="current">{current}</output>
+      <output data-testid="search">{location.search}</output>
+      <button type="button" onClick={() => select('c')}>to-c</button>
+      <button type="button" onClick={() => select('a')}>to-a</button>
+      {ids.map((id) => <FormSection key={id} id={id} title={`Title ${id}`}>{id}</FormSection>)}
+    </>
+  )
+}
+
+const mount = (entry, props) => render(<MemoryRouter initialEntries={[entry]}><Page {...props} /></MemoryRouter>)
+
+describe('useSectionParam', () => {
+  it('opens on the section the link names, and on the first one otherwise', () => {
+    mount('/x?tab=b', {})
+    expect(screen.getByTestId('current')).toHaveTextContent('b')
+  })
+
+  it('ignores a section that does not exist', () => {
+    mount('/x?tab=zzz', {})
+    expect(screen.getByTestId('current')).toHaveTextContent('a')
+  })
+
+  it('writes the choice in the address, bare for the first section', () => {
+    mount('/x?tab=b&keep=1', {})
+    act(() => screen.getByText('to-c').click())
+    expect(screen.getByTestId('search')).toHaveTextContent('?tab=c&keep=1')
+    act(() => screen.getByText('to-a').click())
+    expect(screen.getByTestId('search')).toHaveTextContent('?keep=1')
+  })
+
+  it('gives the title of the newly shown frame the focus', () => {
+    mount('/x', {})
+    act(() => screen.getByText('to-c').click())
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Title c' }))
+  })
+
+  it('scrolls stacked frames to the linked one once the page is ready', () => {
+    const scrolled = []
+    Element.prototype.scrollIntoView = vi.fn(function scroll() { scrolled.push(this.id) })
+    const { rerender } = mount('/x?tab=c', { stacked: true, ready: false })
+    expect(scrolled).toEqual([])
+    rerender(<MemoryRouter initialEntries={['/x?tab=c']}><Page stacked ready /></MemoryRouter>)
+    expect(scrolled).toContain('sf-sec-c')
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Title c' }))
+  })
+})

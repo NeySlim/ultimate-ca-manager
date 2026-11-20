@@ -69,6 +69,9 @@
 .sf-section-error { display: flex; align-items: flex-start; gap: 6px; margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--bad); }
 .sf-section-error svg { width: 13px; height: 13px; margin-top: 2px; flex-shrink: 0; }
 .sf-body { padding: 18px 20px; display: grid; gap: 20px; min-width: 0; color: var(--text); }
+/* A body that holds a working table fills the screen below the heading, the table scrolls inside */
+.sf-body.sf-body-fill { display: flex; flex-direction: column; height: calc(100dvh - 300px); min-height: 460px; padding: 12px 0 0; }
+.sf-body.sf-body-fill > * { flex: 1; min-height: 0; }
 
 /* A group of fields inside a section: the legend of the Atelier settings grid */
 .sf-group { min-width: 0; }
@@ -79,15 +82,17 @@
 .sf-group-body { min-width: 0; }
 
 /* Fields of the sections, at the geometry of the Atelier fields: label, 36 px control, hint */
-.sf-body label { font-size: 12px; font-weight: 400; color: var(--text); }
-.sf-body :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea) {
+.sf-body:not(.sf-body-fill) label { font-size: 12px; font-weight: 400; color: var(--text); }
+.sf-body:not(.sf-body-fill) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea) {
   font-size: 12px;
   border-radius: 4px;
   border-color: var(--control);
   background-color: var(--panel);
   color: var(--text);
 }
-.sf-body :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select) { height: 36px; padding: 8px 10px; }
+.sf-body :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select) { height: 36px; padding-block: 8px; padding-inline-end: 10px; }
+/* A field with a leading icon keeps the room its own padding gives the icon */
+.sf-body :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select):not([class*="pl-"]) { padding-inline-start: 10px; }
 .sf-body button[role="combobox"] { height: 36px; padding: 8px 10px; font-size: 12px; border-radius: 4px; border-color: var(--control); background-color: var(--panel); }
 .sf-body .space-y-1\.5 > label { line-height: normal; }
 .sf-body .space-y-1\.5 > label > span { height: auto; }

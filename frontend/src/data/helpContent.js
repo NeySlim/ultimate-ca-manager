@@ -1336,6 +1336,14 @@ export const helpContent = {
     overview: 'Manage your profile, security settings, and API keys. Enable two-factor authentication and register security keys for enhanced account protection.',
     sections: [
       {
+        title: 'Page layout',
+        content: 'Profile, security and API keys are on one page, each in its frame; the table of contents on the left jumps to them (on a phone, the Go to section list).',
+        items: [
+          { label: 'Own actions', text: 'Edit in the Profile frame opens the name and email, Cancel or Save act at once; Create key opens the key form; there is no save bar' },
+          { label: 'Links', text: 'A link to /account?tab=security or /account?tab=api-keys opens the page on that frame' },
+        ],
+      },
+      {
         title: 'Profile',
         icon: Users,
         items: [
@@ -1435,6 +1443,14 @@ export const helpContent = {
     overview: 'A suite of tools for working with certificates, CSRs, and keys. Decode certificates to inspect their contents, convert between formats, check remote SSL endpoints, and verify key matches.',
     sections: [
       {
+        title: 'Page layout',
+        content: 'The table of contents on the left lists the tools by group (Analysis, Verification, Conversion); the chosen tool shows in its frame with its result below.',
+        items: [
+          { label: 'Switching tool', text: 'Choosing another tool clears the result of the previous one' },
+          { label: 'Links', text: 'A link to /tools?tab=<tool> (ssl-checker, csr-decoder, cert-decoder, key-matcher, converter) opens that tool' },
+        ],
+      },
+      {
         title: 'Available Tools',
         icon: Wrench,
         items: [
@@ -1473,7 +1489,14 @@ export const helpContent = {
     overview: 'Centralized operations center. Import certificates from files or OPNsense, export bundles in PEM/P7B formats, and perform bulk actions across all resource types with inline search and filters.',
     sections: [
       {
-        title: 'Sidebar Tabs',
+        title: 'Page layout',
+        content: 'The table of contents on the left lists Import, Export and Bulk Actions; the chosen operation shows in its frame. Each keeps its own buttons, there is no save bar.',
+        items: [
+          { label: 'Links', text: 'A link to /operations?tab=export or /operations?tab=bulk opens that operation' },
+        ],
+      },
+      {
+        title: 'Operations',
         icon: Stack,
         items: [
           { label: 'Import', text: 'Smart Import with automatic format detection, plus OPNsense sync to pull certificates from firewalls' },
