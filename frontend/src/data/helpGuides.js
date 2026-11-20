@@ -2004,7 +2004,7 @@ System-wide configuration organized into tabs. Changes take effect immediately u
 - **Accent Color**: Primary color used for buttons, links, and highlights
 - **Force Desktop Mode**: Disable responsive mobile layout
 
-## Email (SMTP)
+## SMTP
 
 Configure SMTP for email notifications (expiry alerts, user invitations):
 - **SMTP Host** and **Port**
@@ -2245,7 +2245,7 @@ Settings › Backup enables automatic backups.
 
 - **Daily / weekly / monthly** cadence
 - **Retention**: backups older than the set number of days are pruned
-- **Size ceiling**: a ceiling in MiB for all archives (0 for none); the oldest are removed, each audited, until the total fits. Retention never removes, on a single node, the newest archive that matches its validation record, up to 2 archives with no validation record and the minimum kept, and in HA the minimum kept, so the total can stay above the ceiling, which is reported
+- **Size ceiling**: a ceiling in MB for all archives (0 for none); the oldest are removed, each audited, until the total fits. Retention never removes, on a single node, the newest archive that matches its validation record, up to 2 archives with no validation record and the minimum kept, and in HA the minimum kept, so the total can stay above the ceiling, which is reported
 - Backups are **encrypted** with the backup password
 - **High availability**: the archives are stored in PostgreSQL, so every node lists them, with the node that wrote them, and downloads them; retention runs on the leader. They are lost with the database: download the ones you keep out of the cluster, and back PostgreSQL up with its own tools
 

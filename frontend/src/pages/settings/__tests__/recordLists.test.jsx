@@ -78,4 +78,19 @@ describe('settings record lists', () => {
     expect(row.textContent).toMatch(/1[.,]5\s?(MB|Mo)/)
     expect(within(row).getByRole('button', { name: 'common.download' })).toBeInTheDocument()
   })
+
+  it('says the outcome of a Microsoft AC test and syncs in words, without check marks', () => {
+    render(
+      <MicrosoftCASection mscaConnections={[{ id: 3, name: 'adcs', server: 'dc.example.com', enabled: true, auth_method: 'basic',
+        default_template: 'User', last_test_at: '2026-11-20T10:00:00Z', last_test_result: 'success',
+        crl_sync_enabled: true, last_crl_sync_at: '2026-11-20T10:00:00Z', last_crl_sync_result: 'error: timeout' }]}
+        mscaLoading={false} handleMscaCreate={noop} handleMscaEdit={noop} handleMscaToggle={noop} handleMscaTest={noop}
+        handleMscaSyncCrl={noop} handleMscaPublishCrl={noop} handleMscaInventorySync={noop} handleMscaCaControl={noop}
+        setMscaConfirmDelete={noop} hasPermission={can('read:settings')} />,
+    )
+    const row = screen.getAllByRole('listitem')[0]
+    expect(row.textContent).not.toMatch(/[✓✗]/)
+    expect(row.textContent).toMatch(/Success|common\.success/)
+    expect(row.textContent).toMatch(/Failed|common\.failed/)
+  })
 })

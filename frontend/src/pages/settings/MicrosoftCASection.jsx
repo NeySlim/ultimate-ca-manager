@@ -6,6 +6,8 @@ import { formatDate } from '../../lib/utils'
 
 export default function MicrosoftCASection({ mscaConnections, mscaLoading, mscaTesting, handleMscaCreate, handleMscaEdit, handleMscaToggle, handleMscaTest, handleMscaSyncCrl, handleMscaPublishCrl, handleMscaInventorySync, handleMscaCaControl, setMscaConfirmDelete, hasPermission }) {
   const { t } = useTranslation()
+  // The outcome of a test or a sync in words, not a check mark
+  const outcome = (ok) => t(ok ? 'common.success' : 'common.failed')
   // Test, enable and edit write the connection (write:settings), deleting it is delete:settings
   const canWrite = hasPermission('write:settings')
   const canDelete = hasPermission('delete:settings')
@@ -62,12 +64,12 @@ export default function MicrosoftCASection({ mscaConnections, mscaLoading, mscaT
                   </span>
                   {conn.last_test_at && (
                     <span className="sf-record-meta">
-                      {t('msca.testConnection')}{t('work.sep')}{conn.last_test_result === 'success' ? '✓' : '✗'} {formatDate(conn.last_test_at)}
+                      {t('msca.testConnection')}{t('work.sep')}{outcome(conn.last_test_result === 'success')}, {formatDate(conn.last_test_at)}
                     </span>
                   )}
                   {conn.crl_sync_enabled && conn.last_crl_sync_at && (
                     <span className="sf-record-meta">
-                      {t('msca.lastCrlSync')}{t('work.sep')}{conn.last_crl_sync_result?.startsWith('success') ? '✓' : '✗'} {formatDate(conn.last_crl_sync_at)}
+                      {t('msca.lastCrlSync')}{t('work.sep')}{outcome(conn.last_crl_sync_result?.startsWith('success'))}, {formatDate(conn.last_crl_sync_at)}
                     </span>
                   )}
                   {conn.winrm_enabled && (
@@ -77,7 +79,7 @@ export default function MicrosoftCASection({ mscaConnections, mscaLoading, mscaT
                   )}
                   {conn.inventory_sync_enabled && conn.last_inventory_sync_at && (
                     <span className="sf-record-meta">
-                      {t('msca.lastInventorySync')}{t('work.sep')}{conn.last_inventory_sync_result?.startsWith('success') ? '✓' : '✗'} {formatDate(conn.last_inventory_sync_at)}
+                      {t('msca.lastInventorySync')}{t('work.sep')}{outcome(conn.last_inventory_sync_result?.startsWith('success'))}, {formatDate(conn.last_inventory_sync_at)}
                     </span>
                   )}
                 </div>

@@ -1143,8 +1143,8 @@ export const helpContent = {
         title: 'Page layout',
         content: 'Every section is on one page, in a frame of its own; the table of contents on the left lists them by group (on a phone, the Go to section list).',
         items: [
-          { label: 'Save bar', text: 'At the bottom of the page: No changes pending, with the date and the account of the last save of the settings when you can read the audit log (a renewal run or an OAuth consent is not a save); once a field changes, the count of changes and their sections, with Undo changes (back to the values loaded) and Save. Save, or Enter in a field, stores every changed section through its usual route' },
-          { label: 'Save in error', text: 'A port out of 1 to 65535 (SMTP, syslog, ACME public port) is marked on its field and nothing is sent until it is corrected. A section whose save fails is marked To correct in the table of contents and names the error in its frame; the other sections are saved and what you typed stays' },
+          { label: 'Save bar', text: 'At the bottom of the page: No changes pending, with the date and the account of the last save of the settings when you can read the audit log (a renewal run or an OAuth consent is not a save); once a field changes, the names of the changed fields (their sections when a field has no label), with Undo changes (back to the values loaded) and Save. Save, or Enter in a field, stores every changed section through its usual route' },
+          { label: 'Save in error', text: 'A value out of the bounds the page knows (a port out of 1 to 65535, a duration, a number, a required server, an address or a URL badly formed) is marked on its field with what it expects, and nothing is sent until it is corrected. A section whose save fails is marked To correct in the table of contents and names the error in its frame; the other sections are saved and what you typed stays' },
           { label: 'Own actions', text: 'A test, an import, a generation or a list (SSO providers, webhooks, connections, Windows profiles, backups) keeps its button in its section and acts at once. The result of a test (SMTP, syslog, renewal) shows beside its button; these tests read the saved values, so save your changes first' },
           { label: 'Links', text: 'A link to /settings?tab=<section> (overview, palette, other pages) opens the page on that section' },
           { label: 'Leaving', text: 'Leaving the page with changes pending asks nothing: the changes are kept in this tab and come back, still pending, when you return; reloading or closing the tab asks the browser first' },
@@ -1198,7 +1198,7 @@ export const helpContent = {
         items: [
           { label: "Cadence", text: "Daily / weekly / monthly" },
           { label: "Retention", text: "Backups older than the set number of days (30 by default) are pruned" },
-          { label: "Size ceiling", text: "A ceiling in MiB for all archives (0 for none): the oldest are removed, each audited, until the total fits. Retention never removes, on a single node, the newest archive that matches its validation record, up to 2 archives with no validation record and the minimum kept, and in HA the minimum kept: the total can stay above the ceiling, which is reported. A manual backup removes nothing. Settings > Backup shows the space used" },
+          { label: "Size ceiling", text: "A ceiling in MB for all archives (0 for none): the oldest are removed, each audited, until the total fits. Retention never removes, on a single node, the newest archive that matches its validation record, up to 2 archives with no validation record and the minimum kept, and in HA the minimum kept: the total can stay above the ceiling, which is reported. A manual backup removes nothing. Settings > Backup shows the space used" },
           { label: "Encryption", text: "Backups are encrypted with the configured backup password" },
           { label: "High availability", text: "In HA the archives are stored in PostgreSQL: every node lists them with the node that wrote them and downloads them, and retention runs on the leader. They are lost with the database: download the ones you keep out of the cluster, and back PostgreSQL up with its own tools" },
           { label: "Key derivation", text: "Automatic (Argon2id when available, PBKDF2 in FIPS mode), PBKDF2-HMAC-SHA256 or Argon2id. Archives written with Argon2id cannot be restored on an instance in FIPS mode" },
@@ -1257,7 +1257,7 @@ export const helpContent = {
         items: [
           { label: 'General', text: 'Syslog hostname (sent as HOSTNAME in forwarded syslog messages), base URLs, and system-wide defaults' },
           { label: 'Appearance', text: 'Theme selection (light/dark/system), accent color, desktop mode' },
-          { label: 'Email (SMTP)', text: 'SMTP server, credentials, email template editor, and expiry alert notifications. Supports OAuth2 (XOAUTH2) for Gmail, Outlook.com & Microsoft 365 in addition to legacy password auth' },
+          { label: 'SMTP', text: 'SMTP server, credentials, email template editor, and expiry alert notifications. Supports OAuth2 (XOAUTH2) for Gmail, Outlook.com & Microsoft 365 in addition to legacy password auth' },
           { label: 'Security', text: 'Password policy, session duration, admin access allowlist, mTLS, private key encryption; the inactivity timeout and account lockout are under General' },
           { label: 'SSO', text: 'SAML 2.0, OAuth2/OIDC, and LDAP single sign-on integration' },
           { label: 'Backup', text: 'Manual and scheduled database backups' },
