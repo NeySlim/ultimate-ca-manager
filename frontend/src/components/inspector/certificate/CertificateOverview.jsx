@@ -5,7 +5,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Clock, Warning, ShieldCheck, TreeStructure, Certificate, CaretRight, Prohibit } from '@phosphor-icons/react'
+import { Clock, Warning, ShieldCheck, TreeStructure, Certificate, CaretRight } from '@phosphor-icons/react'
 import { formatDate, extractCN, cn } from '../../../lib/utils'
 import { validityFacts, chainNodes, lastAcmeFailure, certificateKeyLabel, serialHex } from '../../../lib/certificateDetail'
 import { relativeAgo } from '../../../lib/relativeTime'
@@ -49,15 +49,16 @@ function Validity({ cert }) {
   const revoked = f.state === 'revoked'
   const expired = !revoked && f.days !== null && f.days < 0
   const big = revoked ? t('common.revoked') : f.days === null ? '—' : expired ? t('common.expired') : t('inspector.cert.days', { count: f.days })
-  const tone = revoked || expired ? 'bad' : f.short ? 'warn' : ''
+  // Amber under 30 days, expired and revoked included, as the mockup draws it
+  const amber = f.days !== null && f.days < 30
   return (
     <section aria-labelledby="ins-validity-title">
       <h3 id="ins-validity-title" className="ins-section-title">{t('inspector.cert.validity')}</h3>
       <div className="ins-validity-head">
-        <strong className={cn(tone && `is-${tone}`)}>{big}</strong>
+        <strong className={cn(amber && 'is-warn')}>{big}</strong>
         <span>{!revoked && !expired && f.days !== null ? t('inspector.cert.remaining') : ''}</span>
       </div>
-      <div className={cn('ins-progress', f.short && 'is-warn')} role="img"
+      <div className={cn('ins-progress', amber && 'is-warn')} role="img"
         aria-label={t('inspector.cert.validityLeft', { percent: Math.round(f.ratio) })}>
         <span style={{ width: `${f.ratio}%` }} />
       </div>
@@ -66,20 +67,9 @@ function Validity({ cert }) {
         <span>{formatDate(f.to, { time: false })}</span>
       </div>
       {revoked ? (
-        <p className="ins-notice is-bad">
-          <Prohibit size={13} aria-hidden="true" />
-          <span>
-            {t('inspector.cert.revokedNotice')}
-            {cert.revoked_at && <> {t('inspector.cert.revokedOn', {
-              date: formatDate(cert.revoked_at, { time: false }),
-              reason: cert.revoke_reason ? t(`revocation.reasons.${cert.revoke_reason}`, cert.revoke_reason) : t('details.unspecified'),
-            })}</>}
-          </span>
-        </p>
+        <p className="ins-notice">{t('inspector.cert.revokedNotice')}</p>
       ) : f.short ? (
         <p className="ins-notice"><Clock size={13} aria-hidden="true" />{t('inspector.cert.renewSoon', { count: f.days })}</p>
-      ) : expired ? (
-        <p className="ins-notice is-bad"><Warning size={13} aria-hidden="true" />{t('inspector.cert.expiredNotice', { count: -f.days })}</p>
       ) : null}
       {failure && (
         <dl className="ins-props ins-failure" data-testid="acme-last-failure">
@@ -198,6 +188,8 @@ function MoreDetails({ cert }) {
             {row(t('certificates.windowsProfile'), cert.windows_profile_id != null ? (cert.windows_profile_name || `#${cert.windows_profile_id}`) : null)}
             {row(t('common.validFrom'), cert.valid_from && formatDate(cert.valid_from, { time: true }))}
             {row(t('common.validUntil'), cert.valid_to && formatDate(cert.valid_to, { time: true }))}
+            {row(t('details.revokedAt'), cert.revoked && cert.revoked_at && formatDate(cert.revoked_at, { time: true }))}
+            {row(t('revocation.reasonLabel'), cert.revoked && (cert.revoke_reason ? t(`revocation.reasons.${cert.revoke_reason}`, cert.revoke_reason) : t('details.unspecified')))}
           </dl>
         </section>
         <section>

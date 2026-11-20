@@ -259,3 +259,33 @@ describe('CertificateDetail: ACME', () => {
     expect(screen.queryByTestId('acme-last-failure')).toBeNull()
   })
 })
+
+describe('CertificateDetail: validity of an expired or revoked certificate', () => {
+  const validity = () => screen.getByRole('heading', { name: 'inspector.cert.validity' }).closest('section')
+
+  it('says Expired in amber over an amber bar, with no notice', () => {
+    render(<Harness cert={{ ...CERT, status: 'expired', valid_from: at(-400), valid_to: at(-40) }} />)
+    const figure = within(validity()).getByText('common.expired')
+    expect(figure).toHaveClass('is-warn')
+    expect(figure).not.toHaveClass('is-bad')
+    expect(validity().querySelector('.ins-progress')).toHaveClass('is-warn')
+    expect(validity().querySelector('.ins-notice')).toBeNull()
+  })
+
+  it('says Revoked in the text colour while it has time left, with the amber notice and no icon', () => {
+    render(<Harness cert={{ ...CERT, revoked: true, status: 'revoked', revoked_at: at(-3), revoke_reason: 'keyCompromise' }} />)
+    const figure = within(validity()).getByText('common.revoked')
+    expect(figure.className).toBe('')
+    const notice = validity().querySelector('.ins-notice')
+    expect(notice).toHaveTextContent(/^inspector\.cert\.revokedNotice$/)
+    expect(notice).not.toHaveClass('is-bad')
+    expect(notice.querySelector('svg')).toBeNull()
+  })
+
+  it('keeps the revocation date and reason under More details', () => {
+    render(<Harness cert={{ ...CERT, revoked: true, status: 'revoked', revoked_at: at(-3), revoke_reason: 'keyCompromise' }} />)
+    const more = document.querySelector('.ins-more')
+    expect(within(more).getByText('details.revokedAt')).toBeInTheDocument()
+    expect(within(more).getByText('revocation.reasonLabel').nextElementSibling).toHaveTextContent('revocation.reasons.keyCompromise')
+  })
+})
