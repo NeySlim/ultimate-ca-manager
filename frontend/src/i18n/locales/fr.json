@@ -5483,13 +5483,13 @@
     "download": "Télécharger",
     "downloadCSV": "Télécharger CSV",
     "downloadJSON": "Télécharger JSON",
-    "testSend": "Envoyer un rapport test",
-    "testSendDesc": "Envoyer un rapport test \"{{type}}\" pour vérifier la livraison email.",
-    "recipientEmail": "Email du destinataire",
+    "testSend": "Envoyer un test",
+    "testSendDesc": "Envoyer un rapport test « {{type}} » pour vérifier la livraison par courriel.",
+    "recipientEmail": "Courriel du destinataire",
     "send": "Envoyer",
     "scheduleReports": "Planifier les rapports",
     "scheduledReports": "Rapports planifiés",
-    "expiryReport": "Rapport d'expiration",
+    "expiryReport": "Rapport d’expiration",
     "complianceReport": "Rapport de conformité",
     "daily": "Quotidien",
     "weekly": "Hebdomadaire",
@@ -5502,11 +5502,11 @@
     "downloaded": "Rapport téléchargé",
     "downloadFailed": "Échec du téléchargement du rapport",
     "testSent": "Rapport test envoyé",
-    "testFailed": "Échec de l'envoi du rapport test",
+    "testFailed": "Échec de l’envoi du rapport test",
     "scheduleUpdated": "Planification mise à jour",
     "scheduleFailed": "Échec de la mise à jour de la planification",
     "executiveReport": "Rapport exécutif",
-    "executiveDesc": "Rapport PDF complet avec graphiques, scores de conformité, certificats expirants et résumé d'audit.",
+    "executiveDesc": "Rapport PDF complet avec graphiques, scores de conformité, certificats expirants et résumé d’audit.",
     "downloadPDF": "Télécharger PDF",
     "pdfGenerated": "Rapport exécutif téléchargé",
     "pdfFailed": "Échec de la génération du rapport PDF",
@@ -5525,7 +5525,7 @@
         "description": "Structure des autorités de certification et chaîne de confiance"
       },
       "audit_summary": {
-        "name": "Résumé d'audit",
+        "name": "Résumé d’audit",
         "description": "Événements de sécurité et activité utilisateur des 30 derniers jours"
       },
       "compliance_status": {
@@ -5538,7 +5538,7 @@
       }
     },
     "available": "disponibles",
-    "exportFormats": "Formats d'export",
+    "exportFormats": "Formats d’export",
     "frequency": "Fréquence",
     "time": "Heure (UTC)",
     "dayOfWeek": "Jour de la semaine",
@@ -5572,7 +5572,7 @@
       "template": {
         "executive": {
           "name": "Résumé exécutif",
-          "description": "Vue d'ensemble complète avec toutes les sections"
+          "description": "Vue d’ensemble complète avec toutes les sections"
         },
         "certificate_inventory": {
           "name": "Inventaire des certificats",
@@ -5583,12 +5583,12 @@
           "description": "Scores de conformité, évaluation des risques et recommandations"
         },
         "ca_overview": {
-          "name": "Vue d'ensemble des AC",
+          "name": "Vue d’ensemble des AC",
           "description": "Hiérarchie des autorités de certification et chaîne de confiance"
         },
         "security_audit": {
           "name": "Sécurité et audit",
-          "description": "Résumé du journal d'audit, évaluation des risques et posture de sécurité"
+          "description": "Résumé du journal d’audit, évaluation des risques et posture de sécurité"
         }
       },
       "section": {
@@ -5607,7 +5607,7 @@
       "intent": "Inventaires et échéances planifiés.",
       "total_one": "{{count}} rapport planifié",
       "total_other": "{{count}} rapports planifiés",
-      "hint": "Cochez plusieurs rapports pour les télécharger ou suspendre leur planification ensemble ; les chiffres suivent l’inventaire, comme la vue d’ensemble.",
+      "hint": "Cochez plusieurs rapports pour les télécharger ensemble ; les chiffres suivent l’inventaire, comme la vue d’ensemble.",
       "hintRead": "Un nom ouvre le détail.",
       "emptyTitle": "Aucun rapport planifié",
       "emptyText": "Un rapport envoie l’inventaire, les échéances ou la conformité par courriel, à la fréquence choisie.",
@@ -5680,6 +5680,7 @@
         "timeUtc": "Heure d’envoi (UTC)",
         "timeHint": "Format HH:MM.",
         "timeHintUtc": "Format HH:MM, en heure UTC comme le planificateur.",
+        "timeDayShift": "À cette heure, le rapport partirait un autre jour du mois en UTC, hors des jours 1 à 28 : choisissez une autre heure ou un autre jour.",
         "timeInvalid": "Heure invalide : format HH:MM, de 00:00 à 23:59.",
         "recipientsHint": "Une ou plusieurs adresses séparées par des virgules.",
         "recipientsRequired": "Saisissez au moins une adresse.",
@@ -5990,7 +5991,7 @@
     "formatP7bDesc": "Bundle de chaîne de certificats",
     "formatP12Desc": "Certificat + clé dans un conteneur chiffré",
     "legacyPkcs12": "Mode compatibilité (3DES/SHA-1)",
-    "legacyPkcs12Desc": "Pour Android 15 et antérieur, macOS 14 et antérieur, Windows Server 2016 et antérieur, Java avant 8u301 / 11.0.1 : ils refusent l'archive AES-256 par défaut comme un mot de passe incorrect. Protège moins bien le fichier ; à choisir export par export.",
+    "legacyPkcs12Desc": "Pour Android 15 et antérieur, macOS 14 et antérieur, Windows Server 2016 et antérieur, Java avant 8u301 / 11.0.1 : ils refusent l’archive AES-256 par défaut comme un mot de passe incorrect. Protège moins bien le fichier ; à choisir export par export.",
     "formatKeyDesc": "Clé privée seule au format PEM",
     "formats": {
       "privateKey": "Clé privée",
@@ -7030,7 +7031,7 @@
     "reasonHint": "Pourquoi cette clé est-elle récupérée ? (audité)",
     "reasonRequired": "Un motif est requis",
     "requestedBy": "demandé par {{user}}",
-    "decidedBy": "décidé par {{user}}",
+    "decidedBy": "Décidée par {{user}}",
     "recoveredBy": "récupéré par {{user}}",
     "approve": "Approuver",
     "reject": "Refuser",
@@ -7044,8 +7045,8 @@
     "recoverTitle": "Récupérer la clé privée",
     "recoverWarning": "Ceci exporte le certificat et sa clé privée en PKCS#12 protégé par mot de passe. L’action est auditée.",
     "p12Password": "Mot de passe PKCS#12",
-    "p12PasswordHint": "Au moins 8 caractères",
-    "passwordTooShort": "Le mot de passe doit faire au moins 8 caractères",
+    "p12PasswordHint": "Au moins 8 caractères.",
+    "passwordTooShort": "Le mot de passe doit faire au moins 8 caractères.",
     "requestTitle": "Demander la récupération de clé",
     "requestTitleNamed": "Demander la récupération de clé : {{name}}",
     "requestInfo": "Ceci ouvre une demande sous double contrôle pour récupérer la clé privée archivée du certificat. Un administrateur doit l’approuver.",
@@ -7089,6 +7090,7 @@
         "rejectOne": "Refuser la récupération",
         "rejectMany": "Refuser les récupérations",
         "note": "Note",
+        "optional": "facultative",
         "noteHint": "Conservée avec la décision.",
         "approveNote": "Approuvée, la demande passe dans À récupérer : son demandeur ou un administrateur télécharge la clé une fois.",
         "approveNoteMany": "Approuvées, les demandes passent dans À récupérer : leur demandeur ou un administrateur télécharge chaque clé une fois.",

@@ -1952,7 +1952,7 @@ export const helpContent = {
         title: 'Scheduling',
         icon: CalendarBlank,
         items: [
-          { label: 'Schedule a report', text: 'Choose any data report or PDF template, then its frequency (daily, weekly or monthly), time (typed in UTC when your timezone is not UTC, shown in your timezone in the queue), format and recipients; the scheduled reports are grouped by next run' },
+          { label: 'Schedule a report', text: 'Choose any data report or PDF template, then its frequency (daily, weekly or monthly), time (typed and shown in your timezone; a weekly or monthly run that would fall on another day for you keeps its UTC time, said), format and recipients; the scheduled reports are grouped by next run' },
           { label: 'Attachment', text: 'The report is attached to the email in its format: CSV or JSON for data reports, PDF for the PDF templates' },
         ]
       },

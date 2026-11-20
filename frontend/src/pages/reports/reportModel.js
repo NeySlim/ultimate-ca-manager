@@ -2,6 +2,7 @@
  * The reports of the queue: every schedulable report (data reports, PDF templates),
  * their schedule and next run. The scheduler (services/report_service.py) runs on
  * UTC time: a weekly report on day_of_week (0 is Monday), a monthly one on day_of_month.
+ * The page reads and types those in the user's timezone, converted both ways.
  */
 import { ClockIcon, ChartIcon } from '../../components/work/workIcons'
 import { reportsService } from '../../services'
@@ -80,10 +81,12 @@ export function wallClock(date, tz) {
   }
 }
 
+const pad = (n) => String(n).padStart(2, '0')
+
 /**
  * The schedule's time and day as the user reads them: its next run (UTC on the server)
- * in the app's timezone. A monthly run moved to another day by the conversion is not a
- * fixed day of the month any more: that one stays in UTC, said so (`utc`).
+ * in the app's timezone. A weekly or monthly run the conversion moves to another day
+ * stays in UTC, said so (`utc`): its day is the scheduler's.
  */
 export function scheduleClock(schedule, { now = new Date(), tz = getAppTimezone() } = {}) {
   const asUtc = { time: schedule.time, weekday: Number(schedule.day_of_week ?? 1), day: Number(schedule.day_of_month ?? 1), utc: false }
@@ -92,14 +95,44 @@ export function scheduleClock(schedule, { now = new Date(), tz = getAppTimezone(
   try { clock = next && wallClock(next, tz) } catch { clock = null }
   if (!clock) return { ...asUtc, utc: true }
   if (clock.offset === 0) return asUtc
+  if (schedule.frequency === 'weekly' && clock.weekday !== asUtc.weekday) return { ...asUtc, utc: true }
   if (schedule.frequency === 'monthly' && clock.day !== asUtc.day) return { ...asUtc, utc: true }
-  const pad = (n) => String(n).padStart(2, '0')
   return { time: `${pad(clock.hour)}:${pad(clock.minute)}`, weekday: clock.weekday, day: clock.day, utc: false }
 }
 
-/** True when the user's clock is not UTC: a time typed for the scheduler is then said to be UTC. */
-export const typedInUtc = (now = new Date(), tz = getAppTimezone()) => {
-  try { return wallClock(now, tz).offset !== 0 } catch { return true }
+/** The dialog's copy of a schedule: the time and day its row reads, in UTC (`utc`) when the row says UTC. */
+export function scheduleForm(schedule, opts) {
+  const clock = scheduleClock(schedule, opts)
+  return {
+    utc: clock.utc,
+    time: clock.time,
+    day_of_week: schedule.frequency === 'weekly' ? clock.weekday : Number(schedule.day_of_week ?? 1),
+    day_of_month: schedule.frequency === 'monthly' ? clock.day : Number(schedule.day_of_month ?? 1),
+  }
+}
+
+/**
+ * A time and day typed on the user's clock, as the UTC scheduler stores them: the next
+ * such run, moved by the offset in force on its day; a weekly day follows the run. Null
+ * when it cannot be stored: a monthly run moved out of days 1 to 28, or an unknown timezone.
+ */
+export function toSchedulerClock({ frequency, time, day_of_week, day_of_month }, { now = new Date(), tz = getAppTimezone() } = {}) {
+  const offsetAt = (d) => wallClock(d, tz).offset * 60000
+  let local, at
+  try {
+    local = nextRun({ enabled: true, frequency, time, day_of_week, day_of_month }, new Date(now.getTime() + offsetAt(now)))
+    if (!local) return null
+    at = new Date(local.getTime() - offsetAt(new Date(local.getTime() - offsetAt(now))))
+  } catch { return null }
+  const dayOf = (d) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+  const shift = Math.round((dayOf(at) - dayOf(local)) / 86400000)
+  const out = { time: `${pad(at.getUTCHours())}:${pad(at.getUTCMinutes())}`, day_of_week: Number(day_of_week), day_of_month: Number(day_of_month) }
+  if (frequency === 'weekly') out.day_of_week = (out.day_of_week + shift + 7) % 7
+  if (frequency === 'monthly') {
+    out.day_of_month += shift
+    if (out.day_of_month < 1 || out.day_of_month > 28) return null
+  }
+  return out
 }
 
 const clockTime = (clock, t) => (clock.utc ? t('reports.work.utcTime', { time: clock.time }) : clock.time)

@@ -7,13 +7,13 @@
  */
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Clock, PaperPlaneTilt, FilePdf, Warning, Question } from '@phosphor-icons/react'
+import { PaperPlaneTilt, FilePdf, Warning, Question } from '@phosphor-icons/react'
 import { Modal } from '../../components/Modal'
-import { WorkButton, BulkOutcome, runEach, rememberFocus } from '../../components/work'
+import { WorkButton, BulkOutcome, runEach, rememberFocus, ClockIcon } from '../../components/work'
 import { reportsService } from '../../services'
 import { useNotification } from '../../contexts'
 import { downloadBlob } from '../../lib/utils'
-import { REPORT_KEYS, isPdf, reportName, scheduleOf, downloadReport, typedInUtc } from './reportModel'
+import { REPORT_KEYS, isPdf, reportName, scheduleOf, downloadReport, scheduleForm, toSchedulerClock } from './reportModel'
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/
@@ -51,20 +51,25 @@ export function useReportActions({ schedules, pdfSections = [], onDone } = {}) {
     return undefined
   }
 
+  // The dialog shows the time and day the row reads, in the user's timezone (or UTC, said)
+  const formOf = (key) => {
+    const s = scheduleOf(schedules, key)
+    return { key, editing: s.enabled, ...s, ...scheduleForm(s), recipients: (s.recipients || []).join(', ') }
+  }
   const openSchedule = (key, from) => {
     const first = key || REPORT_KEYS.find((k) => !scheduleOf(schedules, k).enabled) || REPORT_KEYS[0]
-    const s = scheduleOf(schedules, first)
-    setForm({ key: first, fixed: !!key, editing: s.enabled, ...s, recipients: (s.recipients || []).join(', ') })
+    setForm({ fixed: !!key, ...formOf(first) })
     show({ kind: 'schedule' }, from)
   }
-  const pick = (key) => {
-    const s = scheduleOf(schedules, key)
-    setForm((f) => ({ ...f, key, ...s, editing: s.enabled, recipients: (s.recipients || []).join(', ') }))
-  }
+  const pick = (key) => setForm((f) => ({ ...f, ...formOf(key) }))
   const saveSchedule = async () => {
     const recipients = String(form.recipients || '').split(/[,;\s]+/).map((r) => r.trim()).filter(Boolean)
     const errs = {}
-    if (!TIME.test(String(form.time || '').trim())) errs.time = t('reports.work.dialog.timeInvalid')
+    const typed = { frequency: form.frequency, time: String(form.time || '').trim(), day_of_week: form.day_of_week, day_of_month: form.day_of_month }
+    // Typed on the user's clock unless the dialog says UTC; stored on the scheduler's
+    const stored = TIME.test(typed.time) && (form.utc ? typed : toSchedulerClock(typed))
+    if (!TIME.test(typed.time)) errs.time = t('reports.work.dialog.timeInvalid')
+    else if (!stored) errs.time = t('reports.work.dialog.timeDayShift')
     if (!recipients.length) errs.recipients = t('reports.work.dialog.recipientsRequired')
     else if (recipients.some((r) => !EMAIL.test(r))) errs.recipients = t('reports.work.dialog.recipientsInvalid')
     setErrors(errs)
@@ -75,8 +80,8 @@ export function useReportActions({ schedules, pdfSections = [], onDone } = {}) {
     setBusy(true)
     try {
       await reportsService.updateSchedule({ [form.key]: {
-        enabled: true, frequency: form.frequency, time: String(form.time).trim(),
-        day_of_week: Number(form.day_of_week), day_of_month: Number(form.day_of_month),
+        enabled: true, frequency: form.frequency, time: stored.time,
+        day_of_week: Number(stored.day_of_week), day_of_month: Number(stored.day_of_month),
         recipients, format: isPdf(form.key) ? 'pdf' : form.format,
       } })
       showSuccess(t('reports.scheduleUpdated'))
@@ -139,7 +144,7 @@ export function useReportActions({ schedules, pdfSections = [], onDone } = {}) {
   )
   // The error comes first, then the hint, as the mockup reads them
   const describe = (hint, name) => [errors[name] && `err-${name}`, hint].filter(Boolean).join(' ')
-  const utc = typedInUtc()
+  const utc = !!form.utc
 
   const titles = {
     schedule: form.editing ? t('reports.work.dialog.editTitle') : t('reports.work.schedule'),
@@ -220,7 +225,7 @@ export function useReportActions({ schedules, pdfSections = [], onDone } = {}) {
           <p className="wk-notice"><Question aria-hidden="true" /><span>{t('reports.work.dialog.scheduleNote')}</span></p>
           <div className="lv-dialog-actions">
             <WorkButton onClick={leave}>{t('common.cancel')}</WorkButton>
-            <WorkButton type="submit" primary icon={Clock} disabled={busy}>{t('reports.work.dialog.save')}</WorkButton>
+            <WorkButton type="submit" primary icon={ClockIcon} disabled={busy}>{t('reports.work.dialog.save')}</WorkButton>
           </div>
         </form>
       )}
@@ -241,7 +246,6 @@ export function useReportActions({ schedules, pdfSections = [], onDone } = {}) {
       )}
       {dlg?.kind === 'pdf' && (
         <form className="wk-dialog" noValidate onSubmit={(e) => { e.preventDefault(); buildPdf() }}>
-          <p className="ui-dialog-message">{t('reports.pdf.customDesc')}</p>
           <fieldset className="wk-fields wk-pdf-sections">
             <legend className="sr-only">{t('reports.pdf.sections')}</legend>
             {pdfSections.map((id) => (
