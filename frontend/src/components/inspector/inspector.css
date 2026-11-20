@@ -410,8 +410,10 @@
   -webkit-text-fill-color: transparent;
 }
 :root[data-theme="aurore"] .ins-validity-head strong.is-warn { --fig-a: var(--warn); --fig-b: color-mix(in srgb, var(--warn) 55%, var(--paper)); }
-:root[data-theme="aurore"][data-mode="light"] .ins-validity-head strong.is-warn { --fig-b: color-mix(in srgb, var(--warn) 70%, var(--ink)); }
+:root[data-theme="aurore"][data-mode="light"] .ins-validity-head strong.is-warn { --fig-b: color-mix(in srgb, var(--warn) 78%, var(--ink)); }
 :root[data-theme="aurore"] .ins-validity-head strong.is-bad { --fig-a: var(--bad); --fig-b: color-mix(in srgb, var(--bad) 55%, var(--paper)); }
 :root[data-theme="aurore"] .ins-progress span { background: linear-gradient(90deg, var(--grad-a), var(--grad-b)); }
 :root[data-theme="aurore"] .ins-progress.is-warn span { background-color: var(--warn-fill); background-image: linear-gradient(0deg, var(--warn-fill), color-mix(in srgb, var(--warn-fill) 60%, var(--paper))); }
+/* Aurore light: the amber bar darkens toward its end, as the mockup (#8f5a00 from the warn fill) */
+:root[data-theme="aurore"][data-mode="light"] .ins-progress.is-warn span { background-image: linear-gradient(0deg, var(--warn-fill), color-mix(in srgb, var(--warn-fill) 77%, var(--ink))); }
 :root[data-theme="aurore"] .ins-icon-btn { border-radius: 6px; }

@@ -303,7 +303,7 @@ export const helpContent = {
           { label: 'Remove Hold', text: 'Unhold a certificate revoked with "Certificate Hold" reason, restores it to valid status' },
           { label: 'Revoke a held certificate', text: 'A certificate on hold can also be revoked for good with another reason, without passing through valid. The CRL and OCSP then give the new reason, and the invalidity date is the start of the hold unless one is given' },
           { label: 'Revocation at the ACME CA', text: 'Revoking a certificate obtained over ACME (by the client, or by the proxy under an upstream account UCM holds) also revokes it at that CA, whether it is revoked alone, in bulk, by an approved request, as a user certificate, with the enrolment or user it belongs to, as the related member of a pair, or by its key at UCM\'s own ACME server. If the CA does not confirm, the revocation is kept owed and sent again by the renewal task; a hold stays in UCM, ACME having none. If no account of UCM can speak for it, it stays local and a warning says to revoke it with the CA directly. The reason is sent when it is keyCompromise, affiliationChanged, superseded, cessationOfOperation or privilegeWithdrawn' },
-          { label: 'Export', text: 'Download in PEM, DER, PKCS#12, or JKS format' },
+          { label: 'Export', text: 'Choose PEM, DER, PKCS#7, PKCS#12, JKS or the private key alone; the dialog previews what the file will hold (chain, root CA, key) before the download' },
           { label: 'PKCS#12 compatibility mode (v2.222)', text: 'The export dialogs offer a 3DES/SHA-1 profile for importers that reject the default AES-256 archive as a wrong password: Android 15 and earlier, macOS 14 and earlier, Windows Server 2016 and earlier, old Java. Off by default, it protects the file less well' },
           { label: 'Compare', text: 'Side-by-side comparison of two certificates: tick one or two rows, then Compare in the selection bar' },
           { label: 'Other extensions (v2.251)', text: 'The certificate and CA details list the extensions UCM has no section for under Other extensions, with their OID, name when known, criticality and raw value. The issue form can add custom extensions on top of the template\'s' },
@@ -370,7 +370,8 @@ export const helpContent = {
       'Need a non-standard EKU (Microsoft RDP, smartcard logon, document signing)? Add it via "Extra EKUs" instead of editing templates',
       'When a policy or the issuing CA\'s expiry shortens the requested validity, the result says so: "Issued for N day(s) instead of the M requested", with the reason',
       'An RSA-PSS signature is shown with its hash and salt length, e.g. RSASSA-PSS SHA-256 (salt 32)',
-      'In a link view (opened from the overview), the filters of the link show as chips under the toolbar; removing a chip drops that filter, Clear all filters leaves the link view, and your saved filters are left untouched. When nothing matches, Reset the filters clears the search and the filters',
+      'In a link view (opened from the overview), the filters of the link show as chips under the toolbar; removing a chip drops that filter, Clear all filters leaves the link view, and your saved filters are left untouched. When nothing matches, Reset the filters clears the search and the filters; the weak-key link of the compliance card shows as one chip, Compliance: Weak key, RSA < 3072',
+      'Escape closes an open menu of the toolbar first (a filter, the presets, the export), then the inspector; the focus returns to the row that opened it',
     ],
     warnings: [
       'Revocation is generally permanent: except for "Certificate Hold" which can be removed (unhold) or made permanent with another reason',
