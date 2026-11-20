@@ -261,9 +261,9 @@ export const helpContent = {
         title: 'Actions',
         icon: Key,
         items: [
-          { label: 'Issue', text: 'Create a new certificate signed by one of your CAs' },
+          { label: 'Issue', text: 'Two steps. Configure: template, authority, common name, key source (generated in UCM, or a provided CSR that joins the CSR list and is then signed), key algorithm, validity in days or an end date, typed alternative names; Advanced holds the certificate type, the EKUs, the full subject, the hybrid pair and the custom extensions. The column on the right says what the template and the CA policies impose. Review shows exactly the request about to be sent and holds the only Issue button; when a policy requires an approval, that step says the request now waits for it. A form closed without issuing keeps its draft for its next opening, one per operation (issue, renewal of a given certificate), in memory only and never with a key or a password' },
           { label: 'Import', text: 'Import an existing certificate (PEM, DER, or PKCS#12)' },
-          { label: 'Renew', text: 'In-place since v2.214: same id/refid, new serial and validity, the superseded serial stays on the CRL until the old expiry. A revoked certificate cannot be renewed. Asks for the validity of the new certificate in days, prefilled with the current duration; policies and the CA\'s expiry still cap it' },
+          { label: 'Renew', text: 'In-place since v2.214: same id/refid, new serial and validity, the superseded serial stays on the CRL until the old expiry. A revoked certificate cannot be renewed. Opens the issue form in renewal mode: only the validity in days changes (left as is, the current duration is kept), then the Review step. A certificate from a Microsoft CA only asks for a confirmation, the CA sets the duration. Policies and the CA\'s expiry still cap it' },
           { label: 'Rename', text: 'Set a display name independent from the CN (defaults to CN or first SAN DNS name for CN-less certificates)' },
           { label: 'Revoke', text: 'Mark as revoked with a reason, will appear in CRL' },
           { label: 'Remove Hold', text: 'Unhold a certificate revoked with "Certificate Hold" reason, restores it to valid status' },
@@ -280,7 +280,7 @@ export const helpContent = {
       {
         title: 'Custom Extra EKUs (RFC 5280 §4.2.1.12)',
         icon: ShieldCheck,
-        content: 'The Issue Certificate form and the Sign CSR modal expose an "Extra EKUs" multi-select that lets you add Extended Key Usage OIDs on top of the cert type defaults:',
+        content: 'The Issue Certificate form (Advanced, as ticked usages and an Other OID field) and the Sign CSR modal (an "Extra EKUs" multi-select) add Extended Key Usage OIDs on top of the cert type defaults:',
         items: [
           { label: 'Catalog', text: '26 well-known EKUs in a dropdown: Microsoft RDP (1.3.6.1.4.1.311.54.1.2), smartcard logon, document signing, IPsec, Kerberos PKINIT, etc.' },
           { label: 'Free-text OIDs', text: 'Any well-formed dotted OID matching ^[0-2](?:\\.(?:0|[1-9]\\d*)){1,15}$' },
@@ -294,7 +294,7 @@ export const helpContent = {
         icon: Stack,
         content: 'A classical certificate (A) and an ML-DSA one (B) for the same subject, linked: B carries the relatedCertificate extension naming A by its hash. Clients that know ML-DSA check both; the others keep using A.',
         items: [
-          { label: 'Issue', text: 'Tick "Issue a hybrid pair" in the Issue Certificate form and choose the classical key and the ML-DSA level; both come from the same CA, with the same subject, names and validity, and B asserts no key usage or EKU that A lacks. Offered only when the policies of the CA allow both, never in FIPS mode. Under the ANSSI, BSI and EU ACM profiles, ML-DSA-65 and ML-DSA-87 are offered in the pair only. A policy that requires approval refuses the pair for now' },
+          { label: 'Issue', text: 'Tick "Issue a hybrid pair" under Advanced in the Issue Certificate form and choose the classical key and the ML-DSA level; both come from the same CA, with the same subject, names and validity, and B asserts no key usage or EKU that A lacks. Offered only when the policies of the CA allow both, never in FIPS mode. Under the ANSSI, BSI and EU ACM profiles, ML-DSA-65 and ML-DSA-87 are offered in the pair only. A policy that requires approval refuses the pair for now' },
           { label: 'Linked by request', text: 'A CSR carrying a relatedCertRequest signed by A\'s key (Sign CSR, ACME, EST, WSTEP) issues a B linked to A. A must be held here, valid, unrevoked and an end-entity certificate; a newer B naming the same A takes over the pair' },
           { label: 'Linked', text: 'Each member carries a link mark after its name in the list and a Linked badge in its details, with a link that opens the other member; the Columns button adds a Linked column to the list' },
           { label: 'Revoke', text: 'Revoking one member, alone or in a bulk operation, also revokes the other unless you untick "Also revoke the linked certificate", e.g. to keep A when only the ML-DSA key is compromised; under a policy that requires approval both go together. A warning names the other member when it could not be revoked. ACME revocation revokes only the certificate presented' },
