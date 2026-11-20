@@ -18,6 +18,6 @@ test('OCSP switched on for a CA on screen is stored', async ({ page, api }) => {
   await page.goto('/crl-ocsp')
   const row = page.getByRole('main').getByRole('row', { name: new RegExp(ca.common_name) })
   // Columns: auto-regeneration (CDP), delta CRL, OCSP, AIA
-  await row.getByRole('switch').nth(2).click()
+  await row.getByRole('checkbox').nth(2).click()
   await expect.poll(async () => (await api.get(`/cas/${ca.id}`)).ocsp_enabled).toBe(true)
 })

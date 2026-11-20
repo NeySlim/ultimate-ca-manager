@@ -349,10 +349,7 @@ Pages that ask for your current password (password change, turning off the secur
 
 ## Themes
 
-The sun or moon button in the top bar opens the theme menu:
-
-1. Pick a **Color Theme**
-2. Pick an **Appearance Mode**: Light, Dark, or **Follow System** to match your OS light/dark preference
+The theme button in the top bar opens the theme menu: **System** (follows your OS light/dark preference), **Dark**, **Light**, **Aurore dark** and **Aurore light**, the current choice checked. The other color themes are listed below them.
 
 The choice is saved with your account and follows you to every browser.
 
