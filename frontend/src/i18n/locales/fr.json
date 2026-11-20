@@ -841,7 +841,30 @@
     "maintenanceRestoring": "Une restauration de sauvegarde est en cours : ce serveur accepte de nouveau les connexions une fois celle-ci terminée.",
     "maintenanceActive": "Ce serveur est en maintenance : les connexions sont refusées jusqu'à sa fin.",
     "maintenanceRetryIn": "Nouvelle tentative de connexion dans {{seconds}} s.",
-    "retryNow": "Réessayer maintenant"
+    "retryNow": "Réessayer maintenant",
+    "page": {
+      "signInTitle": "Connexion",
+      "lead": "Console de gestion des certificats et des autorités.",
+      "username": "Identifiant",
+      "password": "Mot de passe",
+      "showPassword": "Afficher le mot de passe",
+      "hidePassword": "Masquer le mot de passe",
+      "submit": "Se connecter",
+      "or": "ou",
+      "ssoButton": "Se connecter avec SSO",
+      "resumeSso": "Reprendre avec SSO",
+      "ldapButton": "Se connecter avec LDAP",
+      "mtlsButton": "Certificat client (mTLS)",
+      "mtlsDetail": "Compte {{username}}",
+      "keyButton": "Clé de sécurité",
+      "keyDetail": "WebAuthn, pour l’identifiant saisi",
+      "usernameMissing": "Saisissez votre identifiant.",
+      "passwordMissing": "Saisissez votre mot de passe.",
+      "lockedTitle": "Session verrouillée",
+      "lockedLead": "Votre session a expiré après inactivité. Reconnectez-vous pour revenir à la page où vous étiez.",
+      "unlock": "Déverrouiller",
+      "switchAccount": "Se connecter avec un autre compte"
+    }
   },
   "cas": {
     "chainRevoked": "Révoquée en amont",
@@ -3056,7 +3079,11 @@
     "willExpireIn": "Votre session expirera dans",
     "clickToContinue": "Cliquez ci-dessous pour continuer à travailler, ou vous serez déconnecté automatiquement.",
     "logOutNow": "Se déconnecter maintenant",
-    "stayLoggedIn": "Rester connecté"
+    "stayLoggedIn": "Rester connecté",
+    "expiresIn": "Votre session expire dans {{time}}",
+    "lockNotice": "Sans action, l’écran se verrouille et la page en cours est conservée.",
+    "expiringSoon": "Votre session expire bientôt. Choisissez Prolonger pour la garder.",
+    "extend": "Prolonger"
   },
   "settings": {
     "appearance": {},

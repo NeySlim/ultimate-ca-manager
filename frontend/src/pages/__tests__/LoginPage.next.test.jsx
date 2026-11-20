@@ -48,10 +48,9 @@ async function signIn(entry) {
       <Routes><Route path="/login" element={<LoginPage />} /><Route path="*" element={<Where />} /></Routes>
     </MemoryRouter>
   )
-  fireEvent.change(await screen.findByPlaceholderText('auth.enterUsername'), { target: { value: 'alice' } })
-  fireEvent.click(screen.getByText('auth.continue'))
-  fireEvent.change(await screen.findByPlaceholderText('auth.enterPassword'), { target: { value: 'pw' } })
-  fireEvent.click(screen.getByText('auth.login'))
+  fireEvent.change(await screen.findByLabelText('auth.page.username'), { target: { value: 'alice' } })
+  fireEvent.change(await screen.findByLabelText('auth.page.password'), { target: { value: 'pw' } })
+  fireEvent.click(screen.getByText('auth.page.submit'))
 }
 
 describe('LoginPage return path', () => {

@@ -633,7 +633,30 @@
     "maintenanceRestoring": "Hay una restauración de copia de seguridad en curso: este servidor volverá a aceptar inicios de sesión cuando termine.",
     "maintenanceActive": "Este servidor está en mantenimiento: se rechazan los inicios de sesión hasta que termine.",
     "maintenanceRetryIn": "Se volverá a iniciar sesión en {{seconds}} s.",
-    "retryNow": "Reintentar ahora"
+    "retryNow": "Reintentar ahora",
+    "page": {
+      "signInTitle": "Inicio de sesión",
+      "lead": "Consola de gestión de certificados y autoridades.",
+      "username": "Usuario",
+      "password": "Contraseña",
+      "showPassword": "Mostrar la contraseña",
+      "hidePassword": "Ocultar la contraseña",
+      "submit": "Iniciar sesión",
+      "or": "o",
+      "ssoButton": "Iniciar sesión con SSO",
+      "resumeSso": "Continuar con SSO",
+      "ldapButton": "Iniciar sesión con LDAP",
+      "mtlsButton": "Certificado de cliente (mTLS)",
+      "mtlsDetail": "Cuenta {{username}}",
+      "keyButton": "Llave de seguridad",
+      "keyDetail": "WebAuthn, para el usuario introducido",
+      "usernameMissing": "Introduzca su usuario.",
+      "passwordMissing": "Introduzca su contraseña.",
+      "lockedTitle": "Sesión bloqueada",
+      "lockedLead": "Su sesión ha caducado por inactividad. Vuelva a iniciar sesión para regresar a la página en la que estaba.",
+      "unlock": "Desbloquear",
+      "switchAccount": "Iniciar sesión con otra cuenta"
+    }
   },
   "dashboard": {
     "goodMorning": "Buenos días",
@@ -4663,7 +4686,11 @@
     "willExpireIn": "Su sesión expirará en",
     "clickToContinue": "Haga clic abajo para seguir trabajando; de lo contrario, se cerrará la sesión automáticamente.",
     "logOutNow": "Cerrar sesión ahora",
-    "stayLoggedIn": "Permanecer conectado"
+    "stayLoggedIn": "Permanecer conectado",
+    "expiresIn": "Su sesión caduca en {{time}}",
+    "lockNotice": "Sin acción, la pantalla se bloquea y se conserva la página actual.",
+    "expiringSoon": "Su sesión caduca pronto. Elija Prolongar para mantenerla.",
+    "extend": "Prolongar"
   },
   "password": {
     "changeRequired": "Contraseña Change Requerido",

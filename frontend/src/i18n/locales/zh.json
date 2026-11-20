@@ -633,7 +633,30 @@
     "maintenanceRestoring": "备份恢复正在进行：恢复结束后，此服务器将再次接受登录。",
     "maintenanceActive": "服务器正在维护：维护结束前将拒绝登录。",
     "maintenanceRetryIn": "{{seconds}} 秒后重新登录。",
-    "retryNow": "立即重试"
+    "retryNow": "立即重试",
+    "page": {
+      "signInTitle": "登录",
+      "lead": "证书与证书颁发机构管理控制台。",
+      "username": "用户名",
+      "password": "密码",
+      "showPassword": "显示密码",
+      "hidePassword": "隐藏密码",
+      "submit": "登录",
+      "or": "或",
+      "ssoButton": "使用 SSO 登录",
+      "resumeSso": "通过 SSO 继续",
+      "ldapButton": "使用 LDAP 登录",
+      "mtlsButton": "客户端证书 (mTLS)",
+      "mtlsDetail": "账户 {{username}}",
+      "keyButton": "安全密钥",
+      "keyDetail": "WebAuthn，用于已输入的用户名",
+      "usernameMissing": "请输入用户名。",
+      "passwordMissing": "请输入密码。",
+      "lockedTitle": "会话已锁定",
+      "lockedLead": "您的会话因长时间未操作已过期。请重新登录以返回之前所在的页面。",
+      "unlock": "解锁",
+      "switchAccount": "使用其他账户登录"
+    }
   },
   "dashboard": {
     "goodMorning": "早上好",
@@ -4663,7 +4686,11 @@
     "willExpireIn": "您的会话将在",
     "clickToContinue": "点击下方继续工作，否则您将自动登出。",
     "logOutNow": "立即登出",
-    "stayLoggedIn": "保持登录"
+    "stayLoggedIn": "保持登录",
+    "expiresIn": "您的会话将在 {{time}} 后过期",
+    "lockNotice": "如无操作，屏幕将锁定，当前页面会被保留。",
+    "expiringSoon": "您的会话即将过期。选择“延长”以保持会话。",
+    "extend": "延长"
   },
   "password": {
     "changeRequired": "需要更改密码",

@@ -28,7 +28,7 @@ export default {
       {
         title: 'Session et accès',
         items: [
-          { label: 'Délai d\'expiration de session', text: 'Déconnexion automatique après une période d\'inactivité (Paramètres › Général)' },
+          { label: 'Délai d\'expiration de session', text: 'Après cette période d\'inactivité, l\'écran se verrouille ; une nouvelle connexion ramène à la page où vous étiez (Paramètres › Général)' },
           { label: 'Durée de session', text: 'Durée maximale d\'une session en heures, quelle que soit l\'activité' },
           { label: 'Verrouillage de compte', text: 'Max tentatives de connexion et Durée de verrouillage (Paramètres › Général) verrouillent un compte après des échecs répétés. Les limites de requêtes par IP sont fixées par les variables d\'environnement RATE_LIMIT_*, pas sur cette page' },
           { label: 'Liste d\'accès administrateur', text: 'Limiter l\'interface web et l\'API de gestion aux adresses IP et réseaux listés' },
@@ -107,7 +107,7 @@ UCM n'a ni expiration de mot de passe ni historique des mots de passe.
 ## Gestion de session
 
 ### Délai d'expiration de session
-Sous **Paramètres › Général** : déconnecter automatiquement les utilisateurs après N minutes d'inactivité. S'applique uniquement aux sessions de l'interface web, pas aux clés API.
+Sous **Paramètres › Général** : fermer la session des utilisateurs après N minutes d'inactivité. Cinq minutes avant, un bandeau propose de la prolonger ; à la fin l'écran se verrouille, et une nouvelle connexion du même compte ramène à la page où il était. S'applique uniquement aux sessions de l'interface web, pas aux clés API.
 
 ### Durée de session
 Durée maximale d'une session en heures, quelle que soit l'activité. Le nombre de sessions simultanées par utilisateur n'est pas limité.

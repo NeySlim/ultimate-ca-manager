@@ -633,7 +633,30 @@
     "maintenanceRestoring": "A backup restore is in progress: this server accepts sign-ins again once it is over.",
     "maintenanceActive": "This server is in maintenance: sign-ins are refused until it ends.",
     "maintenanceRetryIn": "Signing in again in {{seconds}} s.",
-    "retryNow": "Retry now"
+    "retryNow": "Retry now",
+    "page": {
+      "signInTitle": "Sign in",
+      "lead": "Console for managing certificates and authorities.",
+      "username": "Username",
+      "password": "Password",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password",
+      "submit": "Sign in",
+      "or": "or",
+      "ssoButton": "Sign in with SSO",
+      "resumeSso": "Resume with SSO",
+      "ldapButton": "Sign in with LDAP",
+      "mtlsButton": "Client certificate (mTLS)",
+      "mtlsDetail": "Account {{username}}",
+      "keyButton": "Security key",
+      "keyDetail": "WebAuthn, for the username entered",
+      "usernameMissing": "Enter your username.",
+      "passwordMissing": "Enter your password.",
+      "lockedTitle": "Session locked",
+      "lockedLead": "Your session expired after inactivity. Sign in again to return to the page you were on.",
+      "unlock": "Unlock",
+      "switchAccount": "Sign in with another account"
+    }
   },
   "dashboard": {
     "goodMorning": "Good morning",
@@ -4666,7 +4689,11 @@
     "willExpireIn": "Your session will expire in",
     "clickToContinue": "Click below to continue working, or you'll be logged out automatically.",
     "logOutNow": "Log Out Now",
-    "stayLoggedIn": "Stay Logged In"
+    "stayLoggedIn": "Stay Logged In",
+    "expiresIn": "Your session expires in {{time}}",
+    "lockNotice": "Without action, the screen locks and the current page is kept.",
+    "expiringSoon": "Your session expires soon. Choose Extend to keep it.",
+    "extend": "Extend"
   },
   "password": {
     "changeRequired": "Password Change Required",

@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle, Warning } from '@phosphor-icons/react'
-import { Card, Logo } from '../components'
+import { AuthFrame } from '../components/auth/AuthFrame'
 import { openChannel } from './settings/sso/signInTestChannel'
 
 export const CLOSE_DELAY_MS = 1500
@@ -42,22 +42,17 @@ export default function SsoTestCompletePage() {
     return () => clearTimeout(timer)
   }, [done])
 
+  // A window of its own: no theme, language or footer, the sign-in frame only
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg-primary p-4">
-      <Card className="w-full max-w-md p-6 space-y-4 text-center">
-        <Logo />
-        <div role="status" className="space-y-2">
-          {done
-            ? <CheckCircle size={32} className="mx-auto text-status-success" />
-            : <Warning size={32} className="mx-auto text-status-warning" />}
-          <h1 className="text-lg font-semibold text-text-primary">{t('sso.signInTestCompleteTitle')}</h1>
-          <p className="text-sm text-text-secondary">{t(RESULTS[result])}</p>
-          {stillOpen && <p className="text-sm text-text-secondary">{t('sso.signInTestCompleteClose')}</p>}
-        </div>
-        <Link to="/settings?tab=sso" className="text-sm text-accent-primary hover:underline">
-          {t('sso.signInTestCompleteBack')}
-        </Link>
-      </Card>
-    </div>
+    <AuthFrame title={t('sso.signInTestCompleteTitle')} tools={false} footer={false}>
+      <div role="status" className={`auth-result ${done ? 'is-good' : 'is-warn'}`}>
+        {done ? <CheckCircle size={20} aria-hidden="true" /> : <Warning size={20} aria-hidden="true" />}
+        <span className="auth-result-text">
+          <span>{t(RESULTS[result])}</span>
+          {stillOpen && <span>{t('sso.signInTestCompleteClose')}</span>}
+        </span>
+      </div>
+      <Link to="/settings?tab=sso" className="auth-link">{t('sso.signInTestCompleteBack')}</Link>
+    </AuthFrame>
   )
 }

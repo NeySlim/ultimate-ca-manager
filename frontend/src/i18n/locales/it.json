@@ -633,7 +633,30 @@
     "maintenanceRestoring": "Un ripristino di backup è in corso: questo server accetterà di nuovo gli accessi al termine.",
     "maintenanceActive": "Questo server è in manutenzione: gli accessi sono rifiutati fino al termine.",
     "maintenanceRetryIn": "Nuovo tentativo di accesso tra {{seconds}} s.",
-    "retryNow": "Riprova ora"
+    "retryNow": "Riprova ora",
+    "page": {
+      "signInTitle": "Accesso",
+      "lead": "Console di gestione di certificati e autorità.",
+      "username": "Nome utente",
+      "password": "Password",
+      "showPassword": "Mostra la password",
+      "hidePassword": "Nascondi la password",
+      "submit": "Accedi",
+      "or": "oppure",
+      "ssoButton": "Accedi con SSO",
+      "resumeSso": "Riprendi con SSO",
+      "ldapButton": "Accedi con LDAP",
+      "mtlsButton": "Certificato client (mTLS)",
+      "mtlsDetail": "Account {{username}}",
+      "keyButton": "Chiave di sicurezza",
+      "keyDetail": "WebAuthn, per il nome utente inserito",
+      "usernameMissing": "Inserisci il nome utente.",
+      "passwordMissing": "Inserisci la password.",
+      "lockedTitle": "Sessione bloccata",
+      "lockedLead": "La sessione è scaduta per inattività. Accedi di nuovo per tornare alla pagina in cui eri.",
+      "unlock": "Sblocca",
+      "switchAccount": "Accedi con un altro account"
+    }
   },
   "dashboard": {
     "goodMorning": "Buongiorno",
@@ -4663,7 +4686,11 @@
     "willExpireIn": "La tua sessione scadrà in",
     "clickToContinue": "Clicca qui sotto per continuare a lavorare, o verrai disconnesso automaticamente.",
     "logOutNow": "Disconnettiti Ora",
-    "stayLoggedIn": "Resta Connesso"
+    "stayLoggedIn": "Resta Connesso",
+    "expiresIn": "La sessione scade tra {{time}}",
+    "lockNotice": "Senza azioni, lo schermo si blocca e la pagina corrente viene conservata.",
+    "expiringSoon": "La sessione sta per scadere. Scegli Prolunga per mantenerla.",
+    "extend": "Prolunga"
   },
   "password": {
     "changeRequired": "Cambio Password Richiesto",
