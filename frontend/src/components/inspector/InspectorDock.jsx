@@ -22,6 +22,9 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
 // Another layer that answers Escape itself: a modal, a menu, a listbox, a popover
 const OWN_ESCAPE = '[role="dialog"][aria-modal="true"]:not([data-testid="inspector-dock"]), [role="alertdialog"], [role="menu"], [role="listbox"], [data-radix-popper-content-wrapper]'
 
+// A closed menu of the shell stays mounted under [hidden]: only a shown layer counts
+const ownLayerOpen = () => [...document.querySelectorAll(OWN_ESCAPE)].some((el) => !el.closest('[hidden]'))
+
 export function InspectorDock() {
   const { t } = useTranslation()
   const ins = useInspector()
@@ -45,7 +48,7 @@ export function InspectorDock() {
     if (!shown) return undefined
     const onKey = (e) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return
-      if (document.querySelector(OWN_ESCAPE)) return
+      if (ownLayerOpen()) return
       if (e.target.closest?.(OWN_ESCAPE)) return
       closeAll()
     }

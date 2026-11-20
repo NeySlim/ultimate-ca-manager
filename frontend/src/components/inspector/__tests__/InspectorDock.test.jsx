@@ -155,6 +155,25 @@ describe('InspectorDock', () => {
     expect(screen.getByTestId('inspector-dock')).toBeInTheDocument()
   })
 
+  it('still closes on Escape while a closed menu of the shell stays mounted, hidden', async () => {
+    renderDock()
+    await open(1)
+    const wrap = document.createElement('div')
+    wrap.hidden = true
+    wrap.innerHTML = '<div role="menu"></div>'
+    const menu = document.createElement('div')
+    menu.setAttribute('role', 'menu')
+    menu.hidden = true
+    document.body.append(menu, wrap)
+    try {
+      fireEvent.keyDown(document.body, { key: 'Escape' })
+      await waitFor(() => expect(screen.queryByTestId('inspector-dock')).toBeNull())
+    } finally {
+      menu.remove()
+      wrap.remove()
+    }
+  })
+
   it('closes the focused object tab with the Delete key', async () => {
     renderDock()
     await open(1)
