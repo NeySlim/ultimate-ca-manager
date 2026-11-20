@@ -64,7 +64,7 @@ export function CertificateHistory({ cert }) {
           return (
             <li key={e.id} className={cn(!e.ok && 'is-failed')}>
               <time dateTime={e.at}>{formatDate(e.at, { time: false })}</time>
-              <Icon size={14} aria-hidden="true" />
+              <Icon size={17} aria-hidden="true" />
               <span className="ins-what" title={[e.action, e.details].filter(Boolean).join(' · ') || undefined}>
                 {label(e)}{!e.ok && <span className="sr-only"> ({t('inspector.history.failed')})</span>}
               </span>

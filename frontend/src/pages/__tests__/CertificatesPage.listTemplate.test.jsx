@@ -61,6 +61,7 @@ vi.mock('../../services', () => ({
 }))
 
 import CertificatesPage from '../CertificatesPage'
+import { casService } from '../../services'
 
 const NOW = new Date('2026-11-08T12:00:00Z')
 const DAY = 86400000
@@ -303,6 +304,26 @@ describe('CertificatesPage on a phone', () => {
     expect(screen.getByTitle('table.exportData')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'table.columns' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'table.densityComfortable' })).toBeNull()
+  })
+})
+
+describe('CertificatesPage: nothing to list yet', () => {
+  const empty = async () => {
+    svc.getAll.mockResolvedValue({ data: [], meta: { total: 0 } })
+    render(<MemoryRouter><CertificatesPage /></MemoryRouter>)
+    return screen.findByTestId('list-empty')
+  }
+
+  it('says the issuing CA is ready, with Issue a certificate', async () => {
+    const block = await empty()
+    expect(block).toHaveTextContent('certificates.emptyHintReady')
+    expect(within(block).getByRole('button', { name: 'certificates.issueCertificate' })).toBeInTheDocument()
+  })
+
+  it('says the first issuance waits for an issuing CA when there is none', async () => {
+    casService.getAll.mockResolvedValueOnce({ data: [] })
+    const block = await empty()
+    await waitFor(() => expect(block).toHaveTextContent('certificates.emptyHintNoCa'))
   })
 })
 

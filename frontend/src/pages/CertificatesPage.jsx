@@ -648,7 +648,8 @@ export default function CertificatesPage() {
           }}
           emptyIcon={Certificate}
           emptyTitle={t('certificates.emptyTitle')}
-          emptyDescription={t('certificates.emptyHint')}
+          // As the mockup: the first issuance waits for an issuing CA, then the CA is ready
+          emptyDescription={t(cas.length || !hasPermission('read:cas') ? 'certificates.emptyHintReady' : 'certificates.emptyHintNoCa')}
           emptyAction={canWrite('certificates') && (
             <ListButton primary icon={Plus} onClick={() => setShowIssueModal(true)}>
               {t('certificates.issueCertificate')}

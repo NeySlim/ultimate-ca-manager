@@ -136,8 +136,8 @@ export function ObjectTabs({ opened, activeKey, titles, onSelect, onClose, tabMi
               if (e.key === 'ArrowDown') { e.preventDefault(); openMenu('first') }
               else if (e.key === 'ArrowUp') { e.preventDefault(); openMenu('last') }
             }}>
-            +{hidden.length}
-            <span className="sr-only"> {t(certificates ? 'inspector.moreOpenCertificates' : 'inspector.moreOpen', { count: hidden.length })}</span>
+            <span aria-hidden="true">+{hidden.length}</span>
+            <span className="sr-only">{t(certificates ? 'inspector.hiddenCertificatesCount' : 'inspector.hiddenObjectsCount', { count: hidden.length })}</span>
             <CaretDown size={12} aria-hidden="true" />
           </button>
           {menu && (

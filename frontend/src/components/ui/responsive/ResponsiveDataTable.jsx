@@ -838,6 +838,7 @@ export function ResponsiveDataTable({
 
       {/* TABLE / CARDS */}
       {cards ? (
+        <>
         <div className="lv-table-box is-cards">
           <ListCards
             data={paginatedData}
@@ -857,6 +858,9 @@ export function ResponsiveDataTable({
             <PaginationBar {...paginationProps} isMobile flat compact range={rangeOf} busy={loading && !sortedData.length} />
           )}
         </div>
+        {/* On a phone the caption keeps its first half, as the mockup */}
+        {footNote && <div className="lv-caption" data-testid="list-caption"><span>{footNote}</span></div>}
+        </>
       ) : isMobile ? (
         <MobileCardList
           data={paginatedData}
@@ -1303,7 +1307,8 @@ function SearchBar({
             <button
               type="button"
               onClick={() => setShowPresetsMenu?.(!showPresetsMenu)}
-              className={tool(showPresetsMenu)}
+              // A bare icon like its neighbours until presets are saved and counted
+              className={flat ? cn('lv-btn', !filterPresets?.length && 'is-icon is-bare') : tool(showPresetsMenu)}
               title={t('table.filterPresets')}
               aria-label={flat ? t('table.filterPresets') : undefined}
               aria-expanded={flat ? Boolean(showPresetsMenu) : undefined}

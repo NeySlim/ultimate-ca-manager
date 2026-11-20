@@ -12,11 +12,17 @@ const box = async (locator): Promise<Box> => {
   return b as Box
 }
 
+// Other tests issue certificates at the same time: the list is searched down to this one
+async function openListOn(page, name: string) {
+  await page.goto('/certificates')
+  await page.getByRole('main').getByRole('searchbox').fill(name)
+}
+
 test.use({ viewport: { width: W, height: H } })
 
 test('the list shows its seven columns whole and the inspector opens in the page flow', async ({ page, api }) => {
   const cert = await issueCert(api, (await createCA(api)).id)
-  await page.goto('/certificates')
+  await openListOn(page, cert.common_name)
   const main = page.getByRole('main')
   await expect(main.getByRole('button', { name: cert.common_name, exact: true })).toBeVisible()
 
@@ -76,7 +82,7 @@ test('the list shows its seven columns whole and the inspector opens in the page
 
 test('the inspector band grows to 420 px and Escape closes it from the list', async ({ page, api }) => {
   const cert = await issueCert(api, (await createCA(api)).id)
-  await page.goto('/certificates')
+  await openListOn(page, cert.common_name)
   const main = page.getByRole('main')
   await main.getByRole('button', { name: cert.common_name, exact: true }).click()
   const dock = page.getByTestId('inspector-dock')
@@ -85,17 +91,44 @@ test('the inspector band grows to 420 px and Escape closes it from the list', as
   await dock.getByRole('button', { name: 'Enlarge the inspector' }).click()
   expect(Math.round((await box(dock)).height)).toBe(420)
   // The focus back on the list, Escape still closes the inspector
+  await main.getByRole('searchbox').fill('')
   await main.getByRole('searchbox').focus()
   await page.keyboard.press('Escape')
   await expect(dock).toBeHidden()
 })
+
+// The page scrolls under a finger or a wheel until the pagination of the list is on screen
+async function footerReachedByScrolling(page, api, height: number) {
+  const ca = await createCA(api)
+  for (let i = 0; i < 8; i++) await issueCert(api, ca.id)
+  await page.goto('/certificates')
+  const main = page.getByRole('main')
+  await expect(main.getByRole('listitem').first()).toBeVisible()
+  const next = main.locator('.lv-footer').getByRole('button', { name: 'Next page' })
+  await expect(next).toBeAttached()
+  expect((await box(next)).y).toBeGreaterThan(height)
+  await page.mouse.move(195, height / 2)
+  for (let i = 0; i < 8; i++) await page.mouse.wheel(0, 500)
+  // Above the status bar, which stays on screen
+  const bar = (await box(page.getByRole('contentinfo'))).y
+  await expect.poll(async () => { const b = await box(next); return b.y >= 0 && b.y + b.height <= bar }).toBe(true)
+}
+
+for (const [w, h] of [[390, 844], [800, 1000]]) {
+  test.describe(`the list at ${w} x ${h}`, () => {
+    test.use({ viewport: { width: w, height: h } })
+    test('scrolls down to its pagination', async ({ page, api }) => {
+      await footerReachedByScrolling(page, api, h)
+    })
+  })
+}
 
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
   test('each certificate is a record inside the 16 px gutter, and the inspector takes the screen', async ({ page, api }) => {
     const cert = await issueCert(api, (await createCA(api)).id)
-    await page.goto('/certificates')
+    await openListOn(page, cert.common_name)
     const main = page.getByRole('main')
     await expect(main.getByRole('table')).toHaveCount(0)
     const record = main.getByRole('listitem').filter({ has: page.getByRole('button', { name: cert.common_name, exact: true }) })
@@ -116,3 +149,22 @@ test.describe('on a phone', () => {
   })
 })
 
+
+test.describe('at 1000 px', () => {
+  test.use({ viewport: { width: 1000, height: 1000 } })
+
+  test('keeps one row action, the columns tool by its icon, an overview in two columns', async ({ page, api }) => {
+    const cert = await issueCert(api, (await createCA(api)).id)
+    await openListOn(page, cert.common_name)
+    const main = page.getByRole('main')
+    const row = main.getByRole('row', { name: new RegExp(cert.common_name.replace(/\./g, '\\.')) })
+    await expect(row).toBeVisible()
+    await expect(row.locator('.lv-row-actions .lv-icon-btn:visible')).toHaveCount(1)
+    expect(Math.round((await box(main.getByRole('button', { name: 'Columns' }))).width)).toBe(41)
+    await main.getByRole('button', { name: cert.common_name, exact: true }).click()
+    const overview = page.getByTestId('certificate-overview')
+    await expect(overview).toBeVisible()
+    expect(await overview.evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(2)
+    await expect(overview.locator('.ins-overview-chain')).toBeHidden()
+  })
+})

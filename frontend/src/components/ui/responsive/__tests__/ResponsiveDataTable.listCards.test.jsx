@@ -62,6 +62,13 @@ const record = (name) => screen.getAllByRole('listitem').find((li) => within(li)
 beforeEach(() => { window.localStorage.clear() })
 
 describe('ResponsiveDataTable variant="list" on a phone', () => {
+  it('keeps the note of the caption under the records, without the row height', () => {
+    render(<Harness footNote="Open certificates stay in the inspector." />)
+    const caption = screen.getByTestId('list-caption')
+    expect(caption).toHaveTextContent(/^Open certificates stay in the inspector\.$/)
+    expect(caption.previousElementSibling).toHaveClass('lv-table-box', 'is-cards')
+  })
+
   it('draws one record per row, no table', () => {
     render(<Harness />)
     expect(screen.queryByRole('table')).toBeNull()
