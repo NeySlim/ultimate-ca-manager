@@ -4415,6 +4415,10 @@
       "years_few": "{{count}} y",
       "years_many": "{{count}} y",
       "years_other": "{{count}} y",
+      "yearsMonths_one": "{{count}} y {{months}} mo",
+      "yearsMonths_few": "{{count}} y {{months}} mo",
+      "yearsMonths_many": "{{count}} y {{months}} mo",
+      "yearsMonths_other": "{{count}} y {{months}} mo",
       "expired": "Expired"
     }
   },

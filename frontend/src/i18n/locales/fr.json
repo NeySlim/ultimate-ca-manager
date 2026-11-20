@@ -4253,6 +4253,8 @@
       "months_other": "{{count}} mois",
       "years_one": "{{count}} an",
       "years_other": "{{count}} ans",
+      "yearsMonths_one": "{{count}} a {{months}} mois",
+      "yearsMonths_other": "{{count}} a {{months}} mois",
       "expired": "Échu"
     }
   },

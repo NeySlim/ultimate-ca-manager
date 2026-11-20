@@ -4331,6 +4331,8 @@
       "months_other": "{{count}} 个月",
       "years_one": "{{count}} 年",
       "years_other": "{{count}} 年",
+      "yearsMonths_one": "{{count}} 年 {{months}} 个月",
+      "yearsMonths_other": "{{count}} 年 {{months}} 个月",
       "expired": "已过期"
     }
   },

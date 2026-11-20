@@ -4418,6 +4418,10 @@
       "years_few": "{{count}} г.",
       "years_many": "{{count}} л.",
       "years_other": "{{count}} г.",
+      "yearsMonths_one": "{{count}} г. {{months}} мес.",
+      "yearsMonths_few": "{{count}} г. {{months}} мес.",
+      "yearsMonths_many": "{{count}} л. {{months}} мес.",
+      "yearsMonths_other": "{{count}} г. {{months}} мес.",
       "expired": "Истёк"
     }
   },

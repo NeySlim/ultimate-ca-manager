@@ -203,8 +203,8 @@ describe('CertificatesPage: rows', () => {
     expect(due('soon.example.com')).toHaveClass('is-warn')
     expect(due('late.example.com').querySelector('.lv-due-rel')).toHaveTextContent(/^time\.short\.expired$/)
     expect(due('late.example.com')).toHaveClass('is-bad')
-    // The exact date and time, one level down
-    expect(due('web.example.com')).toHaveAttribute('tabindex', '0')
+    // The exact date and time, one level down, out of the tab order
+    expect(due('web.example.com')).not.toHaveAttribute('tabindex')
     expect(due('web.example.com').dataset.tip).toBeTruthy()
   })
 

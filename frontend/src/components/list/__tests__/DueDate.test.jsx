@@ -1,13 +1,13 @@
 /**
  * DueDate: the day, how far it is in a short form whose unit follows the size
  * (days, months, years, Expired), a tone by urgency, and the exact date, time and
- * long wording one level down, reachable with the keyboard.
+ * long wording one level down, on hover; the row's tab stops are its controls only.
  */
 import { describe, it, expect, vi } from 'vitest'
 import { render } from '@testing-library/react'
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key, opts) => (opts ? `${key}:${opts.count}` : key), i18n: { language: 'en' } }),
+  useTranslation: () => ({ t: (key, opts) => (opts ? `${key}:${opts.count}${opts.months ? `+${opts.months}` : ''}` : key), i18n: { language: 'en' } }),
 }))
 
 import { DueDate } from '../DueDate'
@@ -32,10 +32,11 @@ describe('DueDate', () => {
     [40, null, 'time.short.days:40'],
     [59, null, 'time.short.days:59'],
     [61, null, 'time.short.months:2'],
-    [493, null, 'time.short.months:16'],
-    [729, null, 'time.short.months:23'],
+    [364, null, 'time.short.months:11'],
+    [493, null, 'time.short.yearsMonths:1+4'],
+    [729, null, 'time.short.yearsMonths:1+11'],
     [731, null, 'time.short.years:2'],
-    [3324, null, 'time.short.years:9'],
+    [3324, null, 'time.short.yearsMonths:9+1'],
   ])('colours a date %i days away by urgency, the short words saying it too', (days, tone, words) => {
     const el = mount({ date: at(days) })
     expect(el.className.match(/is-\w+/)?.[0] ?? null).toBe(tone)
@@ -64,9 +65,9 @@ describe('DueDate', () => {
     expect(el.querySelector('time')).toBeInTheDocument()
   })
 
-  it('keeps the exact date and time one level down, reachable with the keyboard', () => {
+  it('keeps the exact date and time one level down, on hover, out of the tab order', () => {
     const el = mount({ date: at(3) })
-    expect(el).toHaveAttribute('tabindex', '0')
+    expect(el).not.toHaveAttribute('tabindex')
     expect(el).toHaveClass('lv-tip')
     expect(el.dataset.tip).toBe(`${formatDate(at(3), { time: true })} · time.inDays:3`)
     expect(el.dataset.tip).not.toBe(el.querySelector('time').textContent)
