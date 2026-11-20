@@ -239,6 +239,44 @@ describe('IssueCertificateForm steps', () => {
     for (const key of Object.keys(body)) expect(review.dataset.fields.split(' ')).toContain(key)
   })
 
+  it('shows a renewal as the issue form, every value read-only: SAN rows, Add a name, EKU and extensions', () => {
+    const certificate = {
+      id: 15, cn: 'web.example.com', issuer_name: 'Services CA', key_type: 'RSA 2048', signature_algorithm: 'SHA256-RSA',
+      valid_from: '2026-01-01T00:00:00Z', valid_to: '2026-04-01T00:00:00Z', san_dns: '["web.example.com","alt.example.com"]',
+      extensions: {
+        extended_key_usage: { usages: [{ name: 'serverAuth', oid: '1.3.6.1.5.5.7.3.1' }, { name: '1.3.6.1.4.1.311.20.2.2', oid: '1.3.6.1.4.1.311.20.2.2' }] },
+        other_extensions: [{ oid: '1.3.6.1.4.1.32473.1', name: null, critical: true, value_hex: '0c0161' }],
+      },
+    }
+    renderForm({ mode: 'renew', certificate })
+    // The name that equals the common name is not repeated as a row, as in the Atelier
+    const values = screen.getAllByLabelText(new RegExp(`${P}sanValue`))
+    expect(values.map((v) => v.value)).toEqual(['alt.example.com'])
+    expect(values[0].readOnly).toBe(true)
+    expect(screen.getByRole('button', { name: `${P}removeSan` })).toBeDisabled()
+    expect(screen.getByRole('button', { name: new RegExp(`${P}addSan`) })).toBeDisabled()
+    expect(screen.getByRole('button', { name: new RegExp(`${P}advanced`) }).textContent).toContain(`${P}advancedHintRenew`)
+    openAdvanced()
+    expect(field(`${P}hash`).value).toBe('SHA-256')
+    expect(field(`${P}hash`).readOnly).toBe(true)
+    const ekus = within(screen.getByRole('group', { name: `${P}ekus` })).getAllByRole('checkbox')
+    expect(ekus.filter((c) => c.checked).map((c) => c.value)).toEqual(['1.3.6.1.5.5.7.3.1', '1.3.6.1.4.1.311.20.2.2'])
+    expect(ekus.every((c) => c.getAttribute('aria-disabled') === 'true')).toBe(true)
+    fireEvent.click(ekus[1])
+    expect(ekus[1].checked).toBe(false)
+    const extensions = screen.getByRole('group', { name: 'customExtensions.title' })
+    expect(within(extensions).getByDisplayValue('1.3.6.1.4.1.32473.1').readOnly).toBe(true)
+    expect(within(extensions).getByDisplayValue('0c0161').readOnly).toBe(true)
+    expect(within(extensions).getByRole('button', { name: /customExtensions.add/ })).toBeDisabled()
+  })
+
+  it('keeps the empty SAN row of the Atelier when the only name is the common name', () => {
+    const certificate = { id: 16, cn: 'fw.lan', valid_from: '2026-01-01T00:00:00Z', valid_to: '2026-04-01T00:00:00Z', san_dns: '["fw.lan"]' }
+    renderForm({ mode: 'renew', certificate })
+    const values = screen.getAllByLabelText(new RegExp(`${P}sanValue`))
+    expect(values.map((v) => [v.value, v.readOnly])).toEqual([['', true]])
+  })
+
   it('names the key of a renewed certificate as the list and the inspector do', async () => {
     const certificate = {
       id: 14, cn: 'ec.example.com', issuer_name: 'Services CA', key_type: 'EC secp256r1', key_algorithm: 'EC',
@@ -251,6 +289,15 @@ describe('IssueCertificateForm steps', () => {
     expect(screen.getByTestId('issue-hint').textContent).toContain('ECDSA P-256')
     const review = await toReview()
     expect(review.querySelector('[data-row="key"] dd').textContent).toBe('ECDSA P-256')
+  })
+
+  it('counts the authorities once: the field hint and the column agree, hidden ones included', () => {
+    const cas = [...CAS, { id: 5, descr: 'Lab CA', has_private_key: true, issuance_hidden: true },
+      { id: 6, descr: 'Old CA', has_private_key: true }]
+    const tc = (key, o) => (o && 'count' in o ? `${key}:${o.count}` : key)
+    render(<IssueCertificateForm cas={cas} onCancel={() => {}} t={tc} onSubmit={vi.fn()} />)
+    expect(screen.getByText(`${P}caCount:4`)).toBeTruthy()
+    expect(screen.getByTestId('issue-hint').textContent).toContain(`${P}hintCaCount:4`)
   })
 
   it('offers no CSR card to an operator who may not upload one', () => {

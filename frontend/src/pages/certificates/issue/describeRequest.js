@@ -107,11 +107,14 @@ export function describeRequest(request, {
   const typeChanged = defaults.cert_type != null && body.cert_type !== defaults.cert_type
   const subjectChanged = kind === 'issue' && !sameSubject(body, defaults.subject)
   const changed = typeChanged || subjectChanged || body.extra_ekus?.length || body.ocsp_must_staple || body.custom_extensions?.length
+  // As in the Atelier, only what changed gets a line of its own; the rest is told by the Advanced line
+  const subjectFields = SUBJECT_FIELDS.map(([f]) => f)
+  const subjectShown = subject.length > 0 && (subjectChanged || kind !== 'issue')
   row('advanced', t(`${P}advanced`), {
     text: t(changed ? (template ? `${P}advancedChanged` : `${P}advancedChangedDefault`) : (template ? `${P}advancedTemplate` : `${P}advancedDefault`)),
-  }, typeChanged ? [] : ['cert_type'])
+  }, [...(typeChanged ? [] : ['cert_type']), ...(subjectShown ? [] : subjectFields)])
   if (typeChanged) row('certType', t(`${P}certType`), { text: t(`certificates.certType${CERT_TYPE_KEYS[body.cert_type] || 'Custom'}`) }, ['cert_type'])
-  if (subject.length) row('subject', t(`${P}subject`), { text: subject.join(', ') }, SUBJECT_FIELDS.map(([f]) => f))
+  if (subjectShown) row('subject', t(`${P}subject`), { text: subject.join(', ') }, subjectFields)
   if (body.extra_ekus?.length) {
     const all = [...new Set([...defaultEkus, ...body.extra_ekus])]
     row('ekus', t(`${P}ekuRow`), all.map((oid) => ({ text: ekuLabel(oid) })), ['extra_ekus'])
