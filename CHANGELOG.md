@@ -132,6 +132,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - In-app help is now maintained in English, French, Russian and Chinese only; the other interface languages show the English help with a notice.
 - Console: the sidebar gives way to the Atelier shell, a horizontal bar with a Modules menu (four groups, keyboard navigable), three pinnable modules kept in your preferences, a status bar fed by `/health` and a module picker on phones; the account menu now carries theme, language and sign out.
 - Console: the code, styles and tests of the pre-Atelier interface (old sidebar, grid dashboard, floating detail windows, light-theme legacy styles) are removed.
+- Console: Settings shows every section on one page, listed by group in a table of contents, with one save bar that stores the changed sections through their usual routes, names a section whose save failed while keeping its input, and asks before leaving with changes pending; `/settings?tab=<section>` links open on that section.
 - Dashboard: `GET /api/v2/dashboard/activity` answers 500 on a database error instead of an empty list, so the activity card tells an outage from no activity.
 - Encryption: disabling it while `KEY_ENCRYPTION_KEY` is set now succeeds and leaves the variable configured but unused, where it answered 409.
 - Configuration: the new `UCM_CONFIG_DIR` variable (default `/etc/ucm`) moves the directory from which `ucm.env` and `master.key` are read and where the master key is created.

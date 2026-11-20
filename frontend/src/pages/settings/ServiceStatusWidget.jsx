@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Power, ArrowClockwise } from '@phosphor-icons/react'
-import {
-  Button, LoadingSpinner, DetailSection, DetailGrid, DetailField,
-  ServiceReconnectOverlay
-} from '../../components'
+import { ArrowClockwise } from '@phosphor-icons/react'
+import { Button, LoadingSpinner, DetailGrid, DetailField, ServiceReconnectOverlay } from '../../components'
 import { systemService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useServiceReconnect } from '../../hooks'
 import { usePermission } from '../../hooks'
+import { FormGroup } from '../../components/sectioned'
 
 export default function ServiceStatusWidget() {
   const { t } = useTranslation()
@@ -69,7 +67,7 @@ export default function ServiceStatusWidget() {
       {reconnecting && (
         <ServiceReconnectOverlay status={reconnectStatus} attempt={attempt} countdown={countdown} onCancel={cancel} />
       )}
-      <DetailSection title={t('settings.serviceStatus')} icon={Power} iconClass="icon-bg-orange" className="mt-4">
+      <FormGroup title={t('settings.serviceStatus')} className="mt-4">
       {loading ? (
         <LoadingSpinner size="sm" />
       ) : status ? (
@@ -97,7 +95,7 @@ export default function ServiceStatusWidget() {
       ) : (
         <p className="text-secondary">{t('settings.serviceStatusUnavailable')}</p>
       )}
-    </DetailSection>
+    </FormGroup>
     </>
   )
 }

@@ -1,14 +1,15 @@
 import { useTranslation } from 'react-i18next'
-import { Copy, Database, Download, Trash, UploadSimple, FloppyDisk, MagnifyingGlass, CaretLeft, CaretRight, Broom, HardDrives, WarningCircle } from '@phosphor-icons/react'
-import { Button, Input, Select, FileUpload, Badge, DetailHeader, DetailSection, DetailContent } from '../../components'
+import { Copy, Database, Download, Trash, MagnifyingGlass, CaretLeft, CaretRight, Broom, HardDrives, WarningCircle } from '@phosphor-icons/react'
+import { Button, Input, Select, FileUpload, Badge } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import AdminLockLabel from './AdminLockLabel'
 import { useClipboard } from '../../hooks/useClipboard'
 import { formatSize } from '../../lib/fileSize'
 import { restoreMaxBytes, restoreLegacyCeilingExceeded } from './restoreLimits'
+import { FormGroup } from '../../components/sectioned'
 
 export default function BackupSection({
-  settings, updateSetting, handleSave, saving, hasPermission,
+  settings, updateSetting, saving, hasPermission,
   backups, backupMeta = {}, backupSchedule = {}, backupQuery = {}, updateBackupQuery,
   selectedBackups = [], toggleSelectBackup, toggleSelectAllBackups,
   handleBulkDeleteBackups, handleRunRetention, backupBusy,
@@ -41,14 +42,9 @@ export default function BackupSection({
   ]
 
   return (
-    <DetailContent>
-      <DetailHeader
-        icon={Database}
-        title={t('settings.helpBackup')}
-        subtitle={t('settings.backupSubtitle')}
-      />
+    <>
 
-      <DetailSection title={t('settings.automaticBackups')} icon={Database} iconClass="icon-bg-emerald">
+      <FormGroup title={t('settings.automaticBackups')}>
         <div className="space-y-4">
           <ToggleSwitch
             checked={settings.auto_backup_enabled || false}
@@ -116,10 +112,6 @@ export default function BackupSection({
 
           {canWriteSettings && (
             <div className="flex gap-2">
-              <Button type="button" onClick={() => handleSave('backup')} disabled={saving}>
-                <FloppyDisk size={16} />
-                {t('settings.saveSettings')}
-              </Button>
               <Button type="button" variant="secondary" onClick={() => setShowBackupModal(true)}>
                 <Database size={16} />
                 {backupRunning ? t('settings.backupInProgress') : t('settings.createBackup')}
@@ -127,10 +119,10 @@ export default function BackupSection({
             </div>
           )}
         </div>
-      </DetailSection>
+      </FormGroup>
 
       {/* Retention — applies to ALL backups, enforced daily (decoupled from auto-backup) */}
-      <DetailSection title={t('settings.retentionPeriod')} icon={Broom} iconClass="icon-bg-amber">
+      <FormGroup title={t('settings.retentionPeriod')}>
         <div className="space-y-3">
           <Input
             label={<AdminLockLabel text={t('settings.retentionPeriod')} locked={!canAdminSettings} />}
@@ -170,12 +162,6 @@ export default function BackupSection({
           )}
           {(canWriteSettings || isAdmin) && (
             <div className="flex gap-2">
-              {canWriteSettings && (
-                <Button type="button" onClick={() => handleSave('backup')} disabled={saving}>
-                  <FloppyDisk size={16} />
-                  {t('settings.saveSettings')}
-                </Button>
-              )}
               {isAdmin && (
                 <Button type="button" variant="secondary" onClick={handleRunRetention} disabled={backupBusy}>
                   <Broom size={16} />
@@ -185,9 +171,9 @@ export default function BackupSection({
             </div>
           )}
         </div>
-      </DetailSection>
+      </FormGroup>
 
-      <DetailSection title={t('settings.availableBackups')} icon={Download} iconClass="icon-bg-emerald">
+      <FormGroup title={t('settings.availableBackups')}>
         {/* Summary */}
         <div className="flex flex-wrap items-center gap-2 mb-4 text-xs">
           <Badge variant="secondary">{t('settings.backupCount', { count: backupMeta.total ?? backups.length })}</Badge>
@@ -317,9 +303,9 @@ export default function BackupSection({
             )}
           </>
         )}
-      </DetailSection>
+      </FormGroup>
 
-      <DetailSection title={t('settings.restoreFromBackup')} icon={UploadSimple} iconClass="icon-bg-orange">
+      <FormGroup title={t('settings.restoreFromBackup')}>
         <div>
           <p className="text-xs text-text-secondary mb-4">{t('settings.restoreFromBackupDesc')}</p>
           <FileUpload
@@ -333,7 +319,7 @@ export default function BackupSection({
             helperText={t('settings.selectBackupFile')}
           />
         </div>
-      </DetailSection>
-    </DetailContent>
+      </FormGroup>
+    </>
   )
 }

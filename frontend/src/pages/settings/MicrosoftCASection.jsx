@@ -1,19 +1,13 @@
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import { WindowsLogo, Plus, TestTube, ArrowsClockwise, ClockClockwise, Broadcast, Database, Pulse, Power, PencilSimple, Trash } from '@phosphor-icons/react'
-import { Button, Badge, HelpCard, DetailHeader, DetailContent, ExperimentalBadge } from '../../components'
+import { Button, Badge, HelpCard } from '../../components'
 import { formatDate } from '../../lib/utils'
 
 export default function MicrosoftCASection({ mscaConnections, mscaLoading, mscaTesting, handleMscaCreate, handleMscaEdit, handleMscaToggle, handleMscaTest, handleMscaSyncCrl, handleMscaPublishCrl, handleMscaInventorySync, handleMscaCaControl, setMscaConfirmDelete, hasPermission }) {
   const { t } = useTranslation()
   return (
-    <DetailContent>
-      <DetailHeader
-        icon={WindowsLogo}
-        title={t('msca.title')}
-        subtitle={t('msca.subtitle')}
-        badge={<ExperimentalBadge />}
-      />
+    <>
 
       <HelpCard variant="info" title={t('msca.helpTitle')} className="mb-4">
         <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:my-1 [&>ul]:my-1 [&>ul]:pl-4">
@@ -122,6 +116,6 @@ export default function MicrosoftCASection({ mscaConnections, mscaLoading, mscaT
           ))}
         </div>
       )}
-    </DetailContent>
+    </>
   )
 }

@@ -1,11 +1,10 @@
 import { useTranslation } from 'react-i18next'
-import { Palette, Desktop, Sun, Moon, Info } from '@phosphor-icons/react'
-import {
-  DetailContent, DetailHeader, DetailSection
-} from '../../components'
+import { Desktop, Sun, Moon, Info } from '@phosphor-icons/react'
+
 import LanguageSelector from '../../components/ui/LanguageSelector'
 import { useMobile } from '../../contexts'
 import { useTheme } from '../../contexts/ThemeContext'
+import { FormGroup } from '../../components/sectioned'
 
 export default function AppearanceSettings() {
   const { t } = useTranslation()
@@ -19,14 +18,9 @@ export default function AppearanceSettings() {
   ]
   
   return (
-    <DetailContent>
-      <DetailHeader
-        icon={Palette}
-        title={t('settings.tabs.appearance')}
-        subtitle={t('settings.appearanceSubtitle')}
-      />
+    <>
       
-      <DetailSection title={t('settings.colorTheme')}>
+      <FormGroup title={t('settings.colorTheme')}>
         <p className="text-sm text-text-secondary mb-4">
           {t('settings.colorThemeDesc')}
         </p>
@@ -60,9 +54,9 @@ export default function AppearanceSettings() {
             </button>
           ))}
         </div>
-      </DetailSection>
+      </FormGroup>
       
-      <DetailSection title={t('settings.appearanceMode')}>
+      <FormGroup title={t('settings.appearanceMode')}>
         <p className="text-sm text-text-secondary mb-4">
           {t('settings.appearanceModeDesc')}
         </p>
@@ -102,9 +96,9 @@ export default function AppearanceSettings() {
             )
           })}
         </div>
-      </DetailSection>
+      </FormGroup>
       
-      <DetailSection title={t('settings.layoutMode')}>
+      <FormGroup title={t('settings.layoutMode')}>
         <p className="text-sm text-text-secondary mb-4">
           {t('settings.layoutModeDesc')}
         </p>
@@ -152,16 +146,16 @@ export default function AppearanceSettings() {
             {t('settings.settingSavedInBrowser')}
           </p>
         )}
-      </DetailSection>
+      </FormGroup>
       
-      <DetailSection title={t('settings.language')}>
+      <FormGroup title={t('settings.language')}>
         <p className="text-sm text-text-secondary mb-4">
           {t('settings.languageDesc')}
         </p>
         <LanguageSelector />
-      </DetailSection>
+      </FormGroup>
       
-      <DetailSection title={t('settings.preview')}>
+      <FormGroup title={t('settings.preview')}>
         <div className="p-4 rounded-lg bg-bg-tertiary border border-border">
           <p className="text-sm text-text-secondary mb-2">{t('settings.currentSettings')}:</p>
           <p className="text-text-primary">
@@ -178,7 +172,7 @@ export default function AppearanceSettings() {
             )}
           </p>
         </div>
-      </DetailSection>
-    </DetailContent>
+      </FormGroup>
+    </>
   )
 }

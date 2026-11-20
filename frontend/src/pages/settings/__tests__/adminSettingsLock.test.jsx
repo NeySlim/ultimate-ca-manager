@@ -1,7 +1,7 @@
 /**
  * Settings reserved to admin:settings: without it the field keeps its value
- * but is disabled (padlock beside a text or number label), and the cards keep
- * a save button for the fields write:settings may change.
+ * but is disabled (padlock beside a text or number label); the page's save bar,
+ * not a card button, stores the fields write:settings may change.
  */
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
@@ -97,18 +97,10 @@ describe('GeneralSection', () => {
     expect(screen.getByText('settings.adminFieldsLocked')).toBeInTheDocument()
   })
 
-  it('keeps both save buttons for an operator', () => {
-    const handleSave = vi.fn()
-    renderGeneral({ hasPermission: granting(OPERATOR), handleSave })
-    expect(saveButtons()).toHaveLength(2)
-    fireEvent.click(saveButtons()[1])
-    expect(handleSave).toHaveBeenCalledWith('general')
-  })
-
-  it('puts the notice under the main card save button', () => {
+  it('leaves the save to the page bar: no card button for an operator', () => {
     renderGeneral({ hasPermission: granting(OPERATOR) })
-    const notice = screen.getByText('settings.adminFieldsLocked')
-    expect(notice.parentElement).toBe(saveButtons()[0].parentElement)
+    expect(saveButtons()).toHaveLength(0)
+    expect(field('settings.systemName').control.disabled).toBeFalsy()
   })
 
   it('treats a missing hasPermission as no admin:settings', () => {
@@ -164,38 +156,31 @@ describe('SecuritySection', () => {
     expect(field('settings.ocspResponseValidity').locked).toBe(false)
   })
 
-  it('keeps the save buttons of the mixed cards only', () => {
-    const handleSave = vi.fn()
+  it('has no card save button for an operator: the page bar saves', () => {
     render(
       <SecuritySection
-        settings={{ hsts_env_locked: [] }} updateSetting={vi.fn()} handleSave={handleSave} saving={false}
+        settings={{ hsts_env_locked: [] }} updateSetting={vi.fn()}
         hasPermission={granting(OPERATOR)} encryptionStatus={null}
         anomalies={[]} anomaliesLoading={false} loadAnomalies={vi.fn()}
-        mtlsSettings={{}} setMtlsSettings={vi.fn()} mtlsLoading={false} mtlsSaving={false}
-        handleMtlsSave={vi.fn()} cas={[]}
+        mtlsSettings={{}} setMtlsSettings={vi.fn()} mtlsLoading={false} cas={[]}
       />
     )
-    saveButtons().forEach((b) => fireEvent.click(b))
-    expect(handleSave.mock.calls.map((c) => c[0]).sort()).toEqual(['securityHsts', 'securitySession'])
+    expect(saveButtons()).toHaveLength(0)
+    expect(field('settings.ocspResponseValidity').control.disabled).toBeFalsy()
   })
 
-  it('gives a settings administrator every field and button', () => {
-    const handleSave = vi.fn()
+  it('gives a settings administrator every field', () => {
     render(
       <SecuritySection
-        settings={{ hsts_env_locked: [] }} updateSetting={vi.fn()} handleSave={handleSave} saving={false}
+        settings={{ hsts_env_locked: [] }} updateSetting={vi.fn()}
         hasPermission={granting(['read:settings', 'write:settings', 'admin:settings'])} encryptionStatus={null}
         anomalies={[]} anomaliesLoading={false} loadAnomalies={vi.fn()}
-        mtlsSettings={{}} setMtlsSettings={vi.fn()} mtlsLoading={false} mtlsSaving={false}
-        handleMtlsSave={vi.fn()} cas={[]}
+        mtlsSettings={{}} setMtlsSettings={vi.fn()} mtlsLoading={false} cas={[]}
       />
     )
     for (const key of LOCKED_SWITCHES) expect(toggle(key).disabled, key).toBeFalsy()
     for (const key of LOCKED_FIELDS) expect(field(key).locked, key).toBe(false)
-    saveButtons().forEach((b) => fireEvent.click(b))
-    expect(handleSave.mock.calls.map((c) => c[0]).sort()).toEqual([
-      'security2fa', 'securityAdminAllowlist', 'securityHsts', 'securityKeyRecovery',
-      'securityPassword', 'securitySession'])
+    expect(saveButtons()).toHaveLength(0)
   })
 
   it('keeps the environment locks for an administrator', () => {
@@ -216,7 +201,7 @@ describe('BackupSection', () => {
     />
   )
 
-  it('locks the whole schedule, and keeps the save and create buttons', () => {
+  it('locks the whole schedule, and keeps the create button (the page bar saves)', () => {
     renderBackup(OPERATOR)
     expect(field('settings.autoBackupPassword').control.disabled).toBe(true)
     expect(field('settings.autoBackupPassword').locked).toBe(true)
@@ -227,7 +212,7 @@ describe('BackupSection', () => {
       .map((n) => n.closest('[data-field]')).find(Boolean).querySelector('input')
     expect(retention.disabled).toBe(true)
     expect(retention.value).toBe('14')
-    expect(screen.getAllByText('settings.saveSettings')).toHaveLength(2)
+    expect(screen.queryAllByText('settings.saveSettings')).toHaveLength(0)
     expect(screen.getByText('settings.createBackup')).toBeInTheDocument()
     expect(screen.queryByText('settings.backupCleanupNow')).not.toBeInTheDocument()
   })
@@ -258,9 +243,9 @@ describe('AuditSection', () => {
     />
   )
 
-  it('keeps the save button for write:settings, retention locked', () => {
+  it('locks the retention for write:settings, no card save button', () => {
     renderAudit(OPERATOR)
-    expect(saveButtons().length).toBeGreaterThan(0)
+    expect(saveButtons()).toHaveLength(0)
     expect(field('settings.logRetention').control.disabled).toBe(true)
     expect(field('settings.logRetention').control.value).toBe('90')
   })

@@ -28,15 +28,15 @@ import { SmartImportModal } from '../components/SmartImport'
 import CertificatePickerModal from '../components/CertificatePickerModal'
 import CertificateInput from '../components/CertificateInput'
 import LanguageSelector from '../components/ui/LanguageSelector'
-import { settingsService, systemService, casService, ssoService, mtlsService, mscaService } from '../services'
+import { settingsService, systemService, casService, ssoService, mtlsService, mscaService, auditService } from '../services'
 import { holdSignOut } from '../services/apiClient'
 import { useAuth, useNotification, useMobile } from '../contexts'
 import { useServiceReconnect } from '../hooks'
 import { usePermission, useJob, isTransientError, jobPercent } from '../hooks'
 import { acceptedJob } from '../services/jobs.service'
 import { formatDate , downloadBlob} from '../lib/utils'
-import { useTheme } from '../contexts/ThemeContext'
-import { ToggleSwitch } from '../components/ui/ToggleSwitch'
+import {  } from '../contexts/ThemeContext'
+import {  } from '../components/ui/ToggleSwitch'
 import TagsInput from '../components/ui/TagsInput'
 import EmailTemplateWindow from '../components/EmailTemplateWindow'
 import DatabaseBackendSection from './settings/DatabaseBackendSection'
@@ -78,32 +78,61 @@ import { setDateFormat, setShowTime } from '../stores/dateFormatStore'
 import { reportSilentFailure } from '../lib/silentFailure'
 import { autoRenewalWaitingMessage } from '../lib/autoRenewalWaiting'
 import { secretRequiredForTarget, smtpSecretTargets } from '../lib/secretTarget'
+import {
+  FormLayout, SectionToc, SectionJump, FormSection, SaveBar, SavePartsContext,
+  useSavePartsRegistry, changedKeys, useLeaveGuard, sectionDomId, sectionTitleId,
+} from '../components/sectioned'
+import SettingsHistory from './settings/SettingsHistory'
 
-// Settings categories with colors for visual distinction
+// Sections: label, sentence of the frame, icon; `permission` hides one from other roles
 const BASE_SETTINGS_CATEGORIES = [
-  { id: 'general', labelKey: 'settings.tabs.general', icon: Gear, color: 'icon-bg-blue' },
-  { id: 'appearance', labelKey: 'settings.tabs.appearance', icon: Palette, color: 'icon-bg-violet' },
-  { id: 'email', labelKey: 'settings.tabs.email', icon: EnvelopeSimple, color: 'icon-bg-teal' },
-  { id: 'security', labelKey: 'settings.tabs.security', icon: ShieldCheck, color: 'icon-bg-amber' },
-  { id: 'sso', labelKey: 'settings.tabs.sso', icon: Key, color: 'icon-bg-purple' },
-  // Admin-only: listing, downloading and restoring an archive are
-  // admin:system on the API — the archive holds every key and secret.
-  { id: 'backup', labelKey: 'settings.tabs.backup', icon: Database, color: 'icon-bg-emerald', permission: 'admin:system' },
-  { id: 'audit', labelKey: 'settings.tabs.audit', icon: ListBullets, color: 'icon-bg-orange' },
-  { id: 'database', labelKey: 'settings.tabs.database', icon: HardDrives, color: 'icon-bg-teal' },
-  { id: 'https', labelKey: 'settings.tabs.https', icon: Lock, color: 'icon-bg-emerald' },
-  { id: 'updates', labelKey: 'settings.tabs.updates', icon: Rocket, color: 'icon-bg-violet' },
-  { id: 'scheduler', labelKey: 'settings.tabs.scheduler', icon: Timer, color: 'icon-bg-blue' },
-  { id: 'webhooks', labelKey: 'settings.tabs.webhooks', icon: Bell, color: 'icon-bg-orange' },
-  { id: 'ct', labelKey: 'settings.tabs.ct', icon: Eye, color: 'icon-bg-cyan' },
-  { id: 'autoRenewal', labelKey: 'settings.tabs.autoRenewal', icon: ClockClockwise, color: 'icon-bg-emerald' },
+  { id: 'general', labelKey: 'settings.tabs.general', descKey: 'settings.generalSubtitle', icon: Gear, color: 'icon-bg-blue' },
+  { id: 'appearance', labelKey: 'settings.tabs.appearance', descKey: 'settings.appearanceSubtitle', icon: Palette, color: 'icon-bg-violet' },
+  { id: 'email', labelKey: 'settings.tabs.email', descKey: 'settings.emailSubtitle', icon: EnvelopeSimple, color: 'icon-bg-teal' },
+  { id: 'security', labelKey: 'settings.tabs.security', descKey: 'settings.securitySubtitle', icon: ShieldCheck, color: 'icon-bg-amber' },
+  { id: 'sso', labelKey: 'settings.tabs.sso', descKey: 'sso.subtitle', icon: Key, color: 'icon-bg-purple' },
+  // Listing, downloading and restoring an archive are admin:system on the API (the archive
+  // holds every key and secret); the schedule inside is read:settings, its fields gated there.
+  { id: 'backup', labelKey: 'settings.tabs.backup', descKey: 'settings.backupSubtitle', icon: Database, color: 'icon-bg-emerald', permission: ['admin:system', 'read:settings'] },
+  { id: 'audit', labelKey: 'settings.tabs.audit', descKey: 'settings.auditSubtitle', icon: ListBullets, color: 'icon-bg-orange' },
+  { id: 'database', labelKey: 'settings.tabs.database', descKey: 'settings.databaseSubtitle', icon: HardDrives, color: 'icon-bg-teal' },
+  { id: 'https', labelKey: 'settings.tabs.https', descKey: 'settings.httpsSubtitle', icon: Lock, color: 'icon-bg-emerald' },
+  { id: 'updates', labelKey: 'settings.tabs.updates', descKey: 'settings.updatesSubtitle', icon: Rocket, color: 'icon-bg-violet' },
+  { id: 'scheduler', labelKey: 'settings.tabs.scheduler', descKey: 'scheduler.subtitle', icon: Timer, color: 'icon-bg-blue' },
+  { id: 'webhooks', labelKey: 'settings.tabs.webhooks', descKey: 'webhooks.subtitle', icon: Bell, color: 'icon-bg-orange' },
+  { id: 'ct', labelKey: 'settings.tabs.ct', descKey: 'settings.ctDescription', icon: Eye, color: 'icon-bg-cyan' },
+  { id: 'autoRenewal', labelKey: 'settings.tabs.autoRenewal', descKey: 'settings.autoRenewalDescription', icon: ClockClockwise, color: 'icon-bg-emerald' },
   // Admin-only (#299) — hidden from non-admin roles below
-  { id: 'deploy', labelKey: 'settings.tabs.deploy', icon: CloudArrowUp, color: 'icon-bg-emerald', permission: 'read:deploy' },
-  { id: 'microsoftCA', labelKey: 'settings.tabs.microsoftCA', icon: WindowsLogo, color: 'icon-bg-indigo' },
-  { id: 'adConnector', labelKey: 'settings.tabs.adConnector', icon: IdentificationBadge, color: 'icon-bg-blue' },
-  { id: 'xcepWstep', labelKey: 'settings.tabs.xcepWstep', icon: WindowsLogo, color: 'icon-bg-indigo' },
-  { id: 'about', labelKey: 'settings.tabs.about', icon: Info, color: 'icon-bg-gray' },
+  { id: 'deploy', labelKey: 'settings.tabs.deploy', descKey: 'deploy.subtitle', icon: CloudArrowUp, color: 'icon-bg-emerald', permission: 'read:deploy' },
+  { id: 'microsoftCA', labelKey: 'settings.tabs.microsoftCA', descKey: 'msca.subtitle', icon: WindowsLogo, color: 'icon-bg-indigo' },
+  { id: 'adConnector', labelKey: 'settings.tabs.adConnector', descKey: 'adConnector.subtitle', icon: IdentificationBadge, color: 'icon-bg-blue' },
+  { id: 'xcepWstep', labelKey: 'settings.tabs.xcepWstep', descKey: 'xcepWstep.subtitle', icon: WindowsLogo, color: 'icon-bg-indigo' },
+  { id: 'about', labelKey: 'settings.tabs.about', descKey: 'settings.about.subtitle', icon: Info, color: 'icon-bg-gray' },
 ]
+
+// Groups of the table of contents; the frames follow the same order
+const SETTINGS_GROUPS = [
+  { id: 'system', labelKey: 'settings.groups.system', ids: ['general', 'updates', 'scheduler', 'database', 'https', 'backup'] },
+  { id: 'security', labelKey: 'settings.groups.security', ids: ['security', 'sso', 'ct'] },
+  { id: 'notifications', labelKey: 'settings.groups.notifications', ids: ['email', 'webhooks'] },
+  { id: 'automation', labelKey: 'settings.groups.automation', ids: ['autoRenewal', 'deploy'] },
+  { id: 'integrations', labelKey: 'settings.groups.integrations', ids: ['microsoftCA', 'adConnector', 'xcepWstep'] },
+  { id: 'interface', labelKey: 'settings.groups.interface', ids: ['appearance', 'audit'] },
+  { id: 'about', labelKey: 'settings.groups.about', ids: ['about'] },
+]
+
+// Keys the email route stores (mapped names); the others go through the bulk route
+const EMAIL_KEYS = [
+  'smtp_host', 'smtp_port', 'smtp_username', 'smtp_password', 'smtp_security', 'smtp_from_email',
+  'smtp_from_name', 'smtp_auth', 'smtp_content_type', 'smtp_auth_method', 'smtp_oauth_provider',
+  'smtp_oauth_tenant_id', 'smtp_oauth_client_id', 'smtp_oauth_client_secret', 'smtp_oauth_authorize_url',
+  'smtp_oauth_token_url', 'smtp_oauth_scope', 'smtp_oauth_redirect_uri',
+]
+const EMAIL_STATE_KEYS = ['has_oauth_client_secret', 'has_oauth_refresh_token']
+const bulkKeys = (draft, saved) => [...new Set([...Object.keys(saved || {}), ...Object.keys(draft || {})])]
+  .filter((k) => !k.startsWith('_') && !EMAIL_KEYS.includes(k) && !EMAIL_STATE_KEYS.includes(k))
+const MTLS_KEYS = ['enabled', 'required', 'trusted_ca_id']
+const pick = (obj, keys) => Object.fromEntries(keys.filter((k) => k in (obj || {})).map((k) => [k, obj[k]]))
 
 // SSO Provider type icons
 const SSO_PROVIDER_ICONS = {
@@ -153,6 +182,16 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [settings, setSettings] = useState({})
+  // Values as last loaded or stored: the save bar counts the draft against them
+  const [savedSettings, setSavedSettings] = useState({})
+  // Section whose field last changed a key: a bulk save in error points at it
+  const keyOrigin = useRef({})
+  const [sectionErrors, setSectionErrors] = useState({})
+  const [savingAll, setSavingAll] = useState(false)
+  const [savedVersion, setSavedVersion] = useState(0)
+  const [settingsLog, setSettingsLog] = useState(null)
+  const saveState = useRef(null)
+  const parts = useSavePartsRegistry()
   const [emailTestResult, setEmailTestResult] = useState(null) // { success, message }
   const [emailTesting, setEmailTesting] = useState(false)
   const [oauthDirty, setOauthDirty] = useState(false)
@@ -176,6 +215,7 @@ export default function SettingsPage() {
   const [expiryAlerts, setExpiryAlerts] = useState({
     enabled: true, alert_days: [30, 14, 7, 1], include_revoked: false, exclude_acme: false, recipients: []
   })
+  const [savedExpiryAlerts, setSavedExpiryAlerts] = useState(expiryAlerts)
   
   // Selected category - read from URL param or default to 'general'
   const [selectedCategory, setSelectedCategory] = useState(
@@ -191,6 +231,14 @@ export default function SettingsPage() {
     setSelectedCategory(searchParams.get('tab') || 'general')
   }, [searchParams])
 
+  // Every section is on the page: a jump scrolls to its frame and gives its title the focus
+  const jumpToSection = useCallback((categoryId) => {
+    const frame = document.getElementById(sectionDomId(categoryId))
+    if (!frame) return
+    frame.scrollIntoView?.({ block: 'start' })
+    document.getElementById(sectionTitleId(categoryId))?.focus({ preventScroll: true })
+  }, [])
+
   // Update URL when category changes
   const handleCategoryChange = (categoryId) => {
     setSelectedCategory(categoryId)
@@ -200,7 +248,31 @@ export default function SettingsPage() {
       searchParams.set('tab', categoryId)
     }
     setSearchParams(searchParams, { replace: true })
+    jumpToSection(categoryId)
   }
+
+  // A link to /settings?tab=<id> (overview, palette, other pages) lands on that section's frame
+  const tabParam = searchParams.get('tab')
+  useEffect(() => {
+    if (loading || !tabParam) return undefined
+    jumpToSection(tabParam)
+    // Sections above still load and grow: the frame is held in place until the user moves
+    const form = document.querySelector('.sf-form')
+    if (!form || typeof ResizeObserver === 'undefined') return undefined
+    const observer = new ResizeObserver(() => {
+      document.getElementById(sectionDomId(tabParam))?.scrollIntoView?.({ block: 'start' })
+    })
+    const release = () => observer.disconnect()
+    observer.observe(form)
+    const timer = setTimeout(release, 5000)
+    const events = ['wheel', 'touchstart', 'keydown', 'pointerdown']
+    events.forEach((e) => window.addEventListener(e, release, { once: true, passive: true }))
+    return () => {
+      release()
+      clearTimeout(timer)
+      events.forEach((e) => window.removeEventListener(e, release))
+    }
+  }, [tabParam, loading, jumpToSection])
   
   // Backup modal states
   const [showBackupModal, setShowBackupModal] = useState(false)
@@ -322,17 +394,20 @@ export default function SettingsPage() {
   const [syslogConfig, setSyslogConfig] = useState({ enabled: false, host: '', port: 514, protocol: 'udp', tls: false, tls_verify: true, framing: 'line', categories: ['certificate', 'ca', 'csr', 'user', 'acme', 'scep', 'system'] })
   const [syslogTesting, setSyslogTesting] = useState(false)
   const [syslogSaving, setSyslogSaving] = useState(false)
+  const [savedSyslog, setSavedSyslog] = useState(syslogConfig)
 
   // mTLS state
   const [mtlsSettings, setMtlsSettings] = useState({ enabled: false, required: false, trusted_ca_id: '', trusted_ca: null })
   const [mtlsLoading, setMtlsLoading] = useState(false)
   const [mtlsSaving, setMtlsSaving] = useState(false)
+  const [savedMtls, setSavedMtls] = useState(mtlsSettings)
 
   // Certificate Transparency state
   const [ctSettings, setCtSettings] = useState({ enabled: false, auto_submit: false, log_urls: [] })
   const [ctLoading, setCtLoading] = useState(false)
   const [ctSaving, setCtSaving] = useState(false)
   const [ctNewLogUrl, setCtNewLogUrl] = useState('')
+  const [savedCt, setSavedCt] = useState(ctSettings)
 
   // Auto-renewal state
   const [arSettings, setArSettings] = useState({
@@ -346,12 +421,14 @@ export default function SettingsPage() {
   const [arLoading, setArLoading] = useState(false)
   const [arSaving, setArSaving] = useState(false)
   const [arRunning, setArRunning] = useState(false)
+  const [savedAr, setSavedAr] = useState(arSettings)
 
   // All settings categories (SSO now integrated directly)
   const SETTINGS_CATEGORIES = BASE_SETTINGS_CATEGORIES
 
   useEffect(() => {
-    loadSettings()
+    loadSettings({ initial: true })
+    loadSettingsLog()
     // Backup listing is admin:system now — don't fire a request every other
     // role is refused.
     if (hasPermission('admin:system')) loadBackups()
@@ -372,8 +449,9 @@ export default function SettingsPage() {
     systemService.getServiceStatus().then(r => setIsDocker(r.data?.is_docker || false)).catch(() => {})
   }, [])
 
-  const loadSettings = async () => {
-    setLoading(true)
+  // `keep`: keys whose draft survives the reload (a part whose save failed)
+  const loadSettings = async ({ initial = false, keep = [] } = {}) => {
+    if (initial) setLoading(true)
     try {
       const [generalRes, emailRes] = await Promise.all([
         settingsService.getAll(),
@@ -410,7 +488,8 @@ export default function SettingsPage() {
         smtp_oauth_scope: emailSettings.smtp_oauth_scope || '',
         smtp_oauth_redirect_uri: emailSettings.smtp_oauth_redirect_uri || '',
       }
-      setSettings(prev => ({ _testRecipient: prev._testRecipient, ...generalSettings, ...email }))
+      setSettings(prev => ({ _testRecipient: prev._testRecipient, ...generalSettings, ...email, ...pick(prev, keep) }))
+      setSavedSettings({ ...generalSettings, ...email })
       setSavedEmail(email)
       // Load OAuth provider presets in parallel (best-effort, non-blocking)
       settingsService.getSmtpOAuthProviders()
@@ -423,20 +502,33 @@ export default function SettingsPage() {
     }
   }
 
+  // The settings carry no date: the last saves are read from the audit log, when readable
+  const loadSettingsLog = async () => {
+    if (!hasPermission('read:audit')) return
+    try {
+      const res = await auditService.getLogs({ resource_type: 'settings', success: true, per_page: 5 })
+      setSettingsLog(Array.isArray(res?.data) ? res.data : [])
+    } catch (error) { reportSilentFailure('loadSettingsLog', error) }
+  }
+
   const loadExpiryAlerts = async () => {
     try {
       const res = await settingsService.getExpiryAlerts()
       setExpiryAlerts(res.data || res)
+      setSavedExpiryAlerts(res.data || res)
     } catch (error) { reportSilentFailure('loadExpiryAlerts', error) }
   }
 
-  const saveExpiryAlerts = async () => {
+  const saveExpiryAlerts = async ({ quiet = false } = {}) => {
     setSaving(true)
     try {
       await settingsService.updateExpiryAlerts(expiryAlerts)
-      showSuccess(t('common.saved'))
+      setSavedExpiryAlerts(expiryAlerts)
+      if (!quiet) showSuccess(t('common.saved'))
+      return { ok: true }
     } catch (e) {
-      showError(e.message || t('common.saveFailed'))
+      if (!quiet) showError(e.message || t('common.saveFailed'))
+      return { ok: false, message: e.message || t('common.saveFailed') }
     } finally {
       setSaving(false)
     }
@@ -1041,16 +1133,20 @@ export default function SettingsPage() {
     try {
       const response = await settingsService.getSyslogConfig()
       setSyslogConfig(response.data || response)
+      setSavedSyslog(response.data || response)
     } catch (error) { reportSilentFailure('loadSyslogConfig', error) }
   }
 
-  const handleSaveSyslog = async () => {
+  const handleSaveSyslog = async ({ quiet = false } = {}) => {
     setSyslogSaving(true)
     try {
       await settingsService.updateSyslogConfig(syslogConfig)
-      showSuccess(t('settings.syslogSaved'))
+      setSavedSyslog(syslogConfig)
+      if (!quiet) showSuccess(t('settings.syslogSaved'))
+      return { ok: true }
     } catch (error) {
-      showError(error.message || t('settings.syslogSaveFailed'))
+      if (!quiet) showError(error.message || t('settings.syslogSaveFailed'))
+      return { ok: false, message: error.message || t('settings.syslogSaveFailed') }
     } finally {
       setSyslogSaving(false)
     }
@@ -1077,12 +1173,13 @@ export default function SettingsPage() {
     try {
       const response = await mtlsService.getSettings()
       setMtlsSettings(response.data || {})
+      setSavedMtls(response.data || {})
     } catch (error) { reportSilentFailure('loadMtlsSettings', error) } finally {
       setMtlsLoading(false)
     }
   }
 
-  const handleMtlsSave = async () => {
+  const handleMtlsSave = async ({ quiet = false } = {}) => {
     setMtlsSaving(true)
     try {
       const response = await mtlsService.updateSettings({
@@ -1092,14 +1189,17 @@ export default function SettingsPage() {
       })
       const data = response.data || {}
       setMtlsSettings(prev => ({ ...prev, ...data }))
-      showSuccess(t('settings.mtls.saved'))
+      setSavedMtls({ ...mtlsSettings, ...data })
+      if (!quiet) showSuccess(t('settings.mtls.saved'))
       if (data.needs_restart && !isDocker) {
         waitForRestart()
       } else if (data.restart_message) {
         showWarning(data.restart_message)
       }
+      return { ok: true }
     } catch (error) {
-      showError(error.message || t('settings.mtls.saveFailed'))
+      if (!quiet) showError(error.message || t('settings.mtls.saveFailed'))
+      return { ok: false, message: error.message || t('settings.mtls.saveFailed') }
     } finally {
       setMtlsSaving(false)
     }
@@ -1111,18 +1211,22 @@ export default function SettingsPage() {
     try {
       const response = await settingsService.getCTSettings()
       setCtSettings(response.data || { enabled: false, auto_submit: false, log_urls: [] })
+      setSavedCt(response.data || { enabled: false, auto_submit: false, log_urls: [] })
     } catch (error) { reportSilentFailure('loadCtSettings', error) } finally {
       setCtLoading(false)
     }
   }
 
-  const handleCtSave = async () => {
+  const handleCtSave = async ({ quiet = false } = {}) => {
     setCtSaving(true)
     try {
       await settingsService.updateCTSettings(ctSettings)
-      showSuccess(t('settings.ctSettingsUpdated'))
+      setSavedCt(ctSettings)
+      if (!quiet) showSuccess(t('settings.ctSettingsUpdated'))
+      return { ok: true }
     } catch (error) {
-      showError(error.message || t('settings.ctSettingsFailed'))
+      if (!quiet) showError(error.message || t('settings.ctSettingsFailed'))
+      return { ok: false, message: error.message || t('settings.ctSettingsFailed') }
     } finally {
       setCtSaving(false)
     }
@@ -1144,7 +1248,10 @@ export default function SettingsPage() {
     setArLoading(true)
     try {
       const response = await settingsService.getAutoRenewalSettings()
-      if (response.data) setArSettings(response.data)
+      if (response.data) {
+        setArSettings(response.data)
+        setSavedAr(response.data)
+      }
     } catch {
       // keep defaults silently
     } finally {
@@ -1152,14 +1259,17 @@ export default function SettingsPage() {
     }
   }
 
-  const handleArSave = async () => {
+  const handleArSave = async ({ quiet = false } = {}) => {
     setArSaving(true)
     try {
       const response = await settingsService.updateAutoRenewalSettings(arSettings)
       if (response.data) setArSettings(response.data)
-      showSuccess(t('settings.autoRenewalSettingsUpdated'))
+      setSavedAr(response.data || arSettings)
+      if (!quiet) showSuccess(t('settings.autoRenewalSettingsUpdated'))
+      return { ok: true }
     } catch (error) {
-      showError(error.message || t('settings.autoRenewalSettingsFailed'))
+      if (!quiet) showError(error.message || t('settings.autoRenewalSettingsFailed'))
+      return { ok: false, message: error.message || t('settings.autoRenewalSettingsFailed') }
     } finally {
       setArSaving(false)
     }
@@ -1185,7 +1295,8 @@ export default function SettingsPage() {
     }
   }
 
-  const handleSave = async (section) => {
+  // `quiet`: the save bar reports; `reload: false`: the save bar reloads once at the end
+  const handleSave = async (section, { quiet = false, reload = true } = {}) => {
     setSaving(true)
     let restartMessage = null
     let ignoredKeys = []
@@ -1193,8 +1304,8 @@ export default function SettingsPage() {
       if (section === 'email') {
         const targets = smtpSecretTargets(savedEmail, settings)
         if (secretRequiredForTarget(targets.password) || secretRequiredForTarget(targets.oauth)) {
-          showError(t('common.secretRequiredForTarget'))
-          return
+          if (!quiet) showError(t('common.secretRequiredForTarget'))
+          return { ok: false, message: t('common.secretRequiredForTarget') }
         }
         // Email settings go to a different endpoint with mapped field names
         await settingsService.updateEmailSettings({
@@ -1224,7 +1335,7 @@ export default function SettingsPage() {
         restartMessage = response?.data?.restart_message
         ignoredKeys = response?.data?.ignored_keys || []
       }
-      showSuccess(t('messages.success.update.settings'))
+      if (!quiet) showSuccess(t('messages.success.update.settings'))
       if (ignoredKeys.length) {
         showWarning(t('settings.adminKeysIgnored', { keys: ignoredKeys.join(', ') }))
       }
@@ -1233,10 +1344,15 @@ export default function SettingsPage() {
       if (settings.timezone) setAppTimezone(settings.timezone)
       if (settings.date_format) setDateFormat(settings.date_format)
       if (settings.show_time !== undefined) setShowTime(settings.show_time !== 'false' && settings.show_time !== false)
-      await loadSettings()
-      if (section === 'backup') await loadBackupSchedule()
+      if (reload) {
+        await loadSettings()
+        if (section === 'backup') await loadBackupSchedule()
+        setSavedVersion((v) => v + 1)
+      }
+      return { ok: true }
     } catch (error) {
-      showError(error.message || t('messages.errors.updateFailed.settings'))
+      if (!quiet) showError(error.message || t('messages.errors.updateFailed.settings'))
+      return { ok: false, message: error.message || t('messages.errors.updateFailed.settings') }
     } finally {
       setSaving(false)
     }
@@ -1666,19 +1782,114 @@ export default function SettingsPage() {
   const updateSetting = (key, value) => {
     setSettings(prev => ({ ...prev, [key]: value }))
   }
+  // A section's fields record which section a key belongs to, for the marks and the errors
+  const updateSettingFrom = (sectionId) => (key, value) => {
+    keyOrigin.current[key] = sectionId
+    updateSetting(key, value)
+  }
+
+  // Parts of the save bar: one per route of today's API, each with its draft and its section
+  const bulkChanged = changedKeys(settings, savedSettings, bulkKeys(settings, savedSettings))
+  const emailChanged = changedKeys(settings, savedSettings, EMAIL_KEYS)
+  const pageParts = [
+    { key: 'email', section: 'email', count: emailChanged.length,
+      save: () => handleSave('email', { quiet: true, reload: false }) },
+    { key: 'expiry', section: 'email',
+      count: changedKeys(expiryAlerts, savedExpiryAlerts, Object.keys({ ...savedExpiryAlerts, ...expiryAlerts })).length,
+      save: () => saveExpiryAlerts({ quiet: true }), reset: () => setExpiryAlerts(savedExpiryAlerts) },
+    { key: 'syslog', section: 'audit',
+      count: changedKeys(syslogConfig, savedSyslog, Object.keys({ ...savedSyslog, ...syslogConfig })).length,
+      save: () => handleSaveSyslog({ quiet: true }), reset: () => setSyslogConfig(savedSyslog) },
+    { key: 'mtls', section: 'security', count: changedKeys(mtlsSettings, savedMtls, MTLS_KEYS).length,
+      save: () => handleMtlsSave({ quiet: true }), reset: () => setMtlsSettings(savedMtls) },
+    { key: 'ct', section: 'ct', count: changedKeys(ctSettings, savedCt, Object.keys({ ...savedCt, ...ctSettings })).length,
+      save: () => handleCtSave({ quiet: true }), reset: () => setCtSettings(savedCt) },
+    { key: 'ar', section: 'autoRenewal', count: changedKeys(arSettings, savedAr, Object.keys({ ...savedAr, ...arSettings })).length,
+      save: () => handleArSave({ quiet: true }), reset: () => setArSettings(savedAr) },
+  ]
+  // The bulk route stores every section's keys at once: its count goes to each origin section
+  const bulkBySection = {}
+  for (const key of bulkChanged) {
+    const sectionId = keyOrigin.current[key] || 'general'
+    bulkBySection[sectionId] = (bulkBySection[sectionId] || 0) + 1
+  }
+  const allParts = [
+    ...Object.entries(bulkBySection).map(([sectionId, count]) => ({ key: `bulk:${sectionId}`, section: sectionId, count, bulk: true })),
+    ...pageParts,
+    ...parts.list,
+  ].filter((part) => part.count > 0)
+  const pendingCount = allParts.reduce((sum, part) => sum + part.count, 0)
+  const pendingSections = [...new Set(allParts.map((part) => part.section))]
+
+  const resetAll = () => {
+    setSettings((prev) => ({ ...savedSettings, _testRecipient: prev._testRecipient }))
+    for (const part of [...pageParts, ...parts.list]) if (part.count > 0) part.reset?.()
+    keyOrigin.current = {}
+    setSectionErrors({})
+    setOauthDirty(false)
+    saveState.current?.focus()
+  }
+
+  // Each part goes to its own route; a failed one keeps its draft and names its section
+  const saveAll = async () => {
+    if (!pendingCount || savingAll) return
+    setSavingAll(true)
+    const errors = {}
+    const keep = []
+    try {
+      for (const part of allParts.filter((p) => !p.bulk)) {
+        const result = await part.save()
+        if (!result?.ok) {
+          errors[part.section] = result?.message || t('messages.errors.updateFailed.settings')
+          if (part.key === 'email') keep.push(...emailChanged)
+        }
+      }
+      if (bulkChanged.length) {
+        const result = await handleSave('bulk', { quiet: true, reload: false })
+        if (!result.ok) {
+          for (const sectionId of Object.keys(bulkBySection)) errors[sectionId] = result.message
+          keep.push(...bulkChanged)
+        } else if (bulkBySection.backup) {
+          await loadBackupSchedule()
+        }
+      }
+      if (bulkChanged.length || emailChanged.length) await loadSettings({ keep })
+      setSectionErrors(errors)
+      setSavedVersion((v) => v + 1)
+      loadSettingsLog()
+      const failed = Object.keys(errors)
+      if (failed.length) {
+        const labels = failed.map((id) => t(BASE_SETTINGS_CATEGORIES.find((c) => c.id === id)?.labelKey || id))
+        showError(t('sectioned.saveFailedToast', { sections: labels.join(', ') }))
+        jumpToSection(failed[0])
+      } else {
+        showSuccess(t('sectioned.savedToast'))
+        saveState.current?.focus()
+      }
+    } finally {
+      setSavingAll(false)
+    }
+  }
+
+  useLeaveGuard(pendingCount > 0, () => showConfirm(t('sectioned.leaveConfirm'), {
+    title: t('sectioned.leaveTitle'),
+    confirmText: t('sectioned.leave'),
+    variant: 'danger',
+  }))
 
   // Render content for each category
-  const renderCategoryContent = () => {
+  const renderCategoryContent = (selectedCategory) => {
     switch (selectedCategory) {
       case 'general':
         return (
           <GeneralSection
             settings={settings}
-            updateSetting={updateSetting}
+            updateSetting={updateSettingFrom('general')}
             handleSave={handleSave}
             saving={saving}
             canWrite={canWrite}
             hasPermission={hasPermission}
+            savedVersion={savedVersion}
           />
         )
 
@@ -1690,7 +1901,7 @@ export default function SettingsPage() {
           <EmailSection
             settings={settings}
             savedEmail={savedEmail}
-            updateSetting={updateSetting}
+            updateSetting={updateSettingFrom('email')}
             handleSave={handleSave}
             saving={saving}
             canWrite={canWrite}
@@ -1717,7 +1928,7 @@ export default function SettingsPage() {
         return (
           <SecuritySection
             settings={settings}
-            updateSetting={updateSetting}
+            updateSetting={updateSettingFrom('security')}
             handleSave={handleSave}
             saving={saving}
             hasPermission={hasPermission}
@@ -1760,7 +1971,7 @@ export default function SettingsPage() {
         return (
           <BackupSection
             settings={settings}
-            updateSetting={updateSetting}
+            updateSetting={updateSettingFrom('backup')}
             handleSave={handleSave}
             saving={saving}
             hasPermission={hasPermission}
@@ -1788,7 +1999,7 @@ export default function SettingsPage() {
         return (
           <AuditSection
             settings={settings}
-            updateSetting={updateSetting}
+            updateSetting={updateSettingFrom('audit')}
             handleSave={handleSave}
             saving={saving}
             hasPermission={hasPermission}
@@ -1950,15 +2161,27 @@ export default function SettingsPage() {
     )
   }
 
-  // Transform categories to tabs format with translations
-  // (permission-gated categories, e.g. deploy, are hidden from non-admins)
-  const tabs = SETTINGS_CATEGORIES.filter(cat => !cat.permission || hasPermission(cat.permission)).map(cat => ({
-    id: cat.id,
-    label: t(cat.labelKey),
-    icon: cat.icon,
-    color: cat.color,
-    badge: undefined  // All features now community
-  }))
+  // Sections in the order of the table of contents (permission-gated ones hidden from other roles)
+  const allowed = SETTINGS_CATEGORIES.filter(cat => !cat.permission || [].concat(cat.permission).some(hasPermission))
+  const sections = SETTINGS_GROUPS.flatMap(g => g.ids)
+    .map(id => allowed.find(cat => cat.id === id))
+    .filter(Boolean)
+    .map(cat => ({ id: cat.id, label: t(cat.labelKey), description: t(cat.descKey), icon: cat.icon }))
+  const groups = SETTINGS_GROUPS.map(g => ({ id: g.id, label: t(g.labelKey), ids: g.ids }))
+  const flags = {}
+  for (const id of pendingSections) flags[id] = 'modified'
+  for (const id of Object.keys(sectionErrors)) flags[id] = 'error'
+  const sectionLabel = (id) => sections.find(s => s.id === id)?.label || id
+  const lastSave = settingsLog?.[0]
+  // Badges the section headers carried: certificate type of HTTPS, experimental Microsoft CA
+  const sectionAside = {
+    https: httpsInfo?.type ? (
+      <Badge variant={httpsInfo.type === 'CA-Signed' ? 'success' : httpsInfo.type === 'Self-Signed' ? 'warning' : 'secondary'}>
+        {httpsInfo.type}
+      </Badge>
+    ) : null,
+    microsoftCA: <ExperimentalBadge />,
+  }
 
   return (
     <>
@@ -1967,24 +2190,53 @@ export default function SettingsPage() {
       )}
       <ResponsiveLayout
         title={t('common.settings')}
-        subtitle={t('settings.subtitle')}
-        icon={Gear}
-        tabs={tabs}
-        activeTab={selectedCategory}
-        onTabChange={handleCategoryChange}
-        tabLayout="sidebar"
-        tabGroups={[
-          { labelKey: 'settings.groups.system', tabs: ['general', 'updates', 'scheduler', 'database', 'https', 'backup'], color: 'icon-bg-blue' },
-          { labelKey: 'settings.groups.security', tabs: ['security', 'sso', 'ct'], color: 'icon-bg-amber' },
-          { labelKey: 'settings.groups.notifications', tabs: ['email', 'webhooks'], color: 'icon-bg-teal' },
-          { labelKey: 'settings.groups.automation', tabs: ['autoRenewal', 'deploy'], color: 'icon-bg-emerald' },
-          { labelKey: 'settings.groups.integrations', tabs: ['microsoftCA', 'adConnector', 'xcepWstep'], color: 'icon-bg-indigo' },
-          { labelKey: 'settings.groups.interface', tabs: ['appearance', 'audit'], color: 'icon-bg-violet' },
-          { labelKey: 'settings.groups.about', tabs: ['about'], color: 'icon-bg-gray' },
-        ]}
+        total={t('sectioned.sectionCount', { count: sections.length })}
+        intent={t('settings.intent')}
         helpPageKey="settings"
       >
-        {renderCategoryContent()}
+        <SavePartsContext.Provider value={parts.api}>
+          <FormLayout
+            toc={(
+              <SectionToc
+                label={t('settings.tocLabel')}
+                sections={sections}
+                groups={groups}
+                flags={flags}
+                hrefFor={(id) => (id === 'general' ? '/settings' : `/settings?tab=${id}`)}
+                onJump={handleCategoryChange}
+              />
+            )}
+          >
+            <SectionJump label={t('sectioned.jumpLabel')} sections={sections} value={selectedCategory} onJump={handleCategoryChange} />
+            <div className="sf-form">
+              {sections.map(section => (
+                <FormSection
+                  key={section.id}
+                  id={section.id}
+                  title={section.label}
+                  description={section.description}
+                  aside={sectionAside[section.id]}
+                  error={sectionErrors[section.id]}
+                >
+                  {renderCategoryContent(section.id)}
+                </FormSection>
+              ))}
+              {(canWrite('settings') || pendingCount > 0) && (
+                <SaveBar
+                  ref={saveState}
+                  count={pendingCount}
+                  sectionLabels={pendingSections.map(sectionLabel)}
+                  failed={pendingCount ? Object.keys(sectionErrors).map(sectionLabel) : []}
+                  lastSaved={lastSave ? { at: formatDate(lastSave.timestamp, { time: true }), by: lastSave.username } : null}
+                  saving={savingAll}
+                  onReset={resetAll}
+                  onSave={saveAll}
+                />
+              )}
+            </div>
+            {settingsLog && <SettingsHistory entries={settingsLog} />}
+          </FormLayout>
+        </SavePartsContext.Provider>
       </ResponsiveLayout>
 
       {/* Backup Password Modal; then the running backup, then its archive to download */}

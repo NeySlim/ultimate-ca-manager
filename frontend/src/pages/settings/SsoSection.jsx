@@ -1,16 +1,11 @@
 import { useTranslation } from 'react-i18next'
-import { Key, Database, Globe, Shield, TestTube, Power, PencilSimple, Trash, Plus, ArrowsClockwise } from '@phosphor-icons/react'
-import { Button, Badge, HelpCard, DetailHeader, DetailContent } from '../../components'
+import { Database, Globe, Shield, TestTube, Power, PencilSimple, Trash, Plus, ArrowsClockwise } from '@phosphor-icons/react'
+import { Button, Badge, HelpCard } from '../../components'
 
 export default function SsoSection({ ssoProviders, ssoLoading, ssoTesting, handleSsoCreate, handleSsoEdit, handleSsoToggle, handleSsoTest, setSsoConfirmDelete, hasPermission }) {
   const { t } = useTranslation()
   return (
-    <DetailContent>
-      <DetailHeader
-        icon={Key}
-        title={t('common.sso')}
-        subtitle={t('sso.subtitle')}
-      />
+    <>
 
       <HelpCard variant="info" title={t('sso.helpTitle')} className="mb-4">
         {t('sso.helpDescription')}
@@ -86,6 +81,6 @@ export default function SsoSection({ ssoProviders, ssoLoading, ssoTesting, handl
           })}
         </div>
       )}
-    </DetailContent>
+    </>
   )
 }

@@ -1,0 +1,164 @@
+/**
+ * Settings page on the sectioned template: every section on the page, a change counted
+ * in the save bar and marked in the table of contents, undo back to what was loaded,
+ * one save through today's routes, a failed route named on its section while the others
+ * are stored and its input kept, a link to ?tab= landing on its frame, and a question
+ * before leaving with changes pending.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { MemoryRouter, Link } from 'react-router-dom'
+
+vi.mock('../settings/GeneralSection', () => ({
+  default: ({ settings, updateSetting }) => (
+    <label>
+      name
+      <input aria-label="system-name" value={settings.system_name || ''} onChange={(e) => updateSetting('system_name', e.target.value)} />
+    </label>
+  ),
+}))
+vi.mock('../settings/EmailSection', () => ({
+  default: ({ settings, updateSetting }) => (
+    <input aria-label="smtp-host" value={settings.smtp_host || ''} onChange={(e) => updateSetting('smtp_host', e.target.value)} />
+  ),
+}))
+vi.mock('../settings/AuditSection', () => ({
+  default: ({ syslogConfig, updateSyslogConfig, updateSetting, settings }) => (
+    <>
+      <input aria-label="syslog-host" value={syslogConfig.host || ''} onChange={(e) => updateSyslogConfig('host', e.target.value)} />
+      <input aria-label="retention" value={settings.audit_retention_days ?? ''} onChange={(e) => updateSetting('audit_retention_days', e.target.value)} />
+    </>
+  ),
+}))
+
+vi.mock('../../hooks/usePermission', () => ({
+  usePermission: () => ({
+    hasPermission: () => true, canRead: () => true, canWrite: () => true, canDelete: () => true,
+    isAdmin: () => true, permissions: ['*'],
+  }),
+}))
+
+import { notificationSpies } from './pageRenderingSetup.jsx'
+
+import SettingsPage from '../SettingsPage'
+import { settingsService } from '../../services/settings.service'
+
+const renderPage = (entry = '/settings') => render(
+  <MemoryRouter initialEntries={[entry]}>
+    <Link to="/certificates">elsewhere</Link>
+    <SettingsPage />
+  </MemoryRouter>,
+)
+
+const bar = () => screen.getByTestId('sf-savebar')
+const saveButton = () => within(bar()).getByRole('button', { name: 'common.save' })
+const undoButton = () => within(bar()).getByRole('button', { name: 'sectioned.undo' })
+const tocLink = (label) => within(screen.getByRole('navigation', { name: 'settings.tocLabel' })).getByRole('link', { name: new RegExp(label) })
+
+beforeEach(() => {
+  settingsService.getAll = vi.fn().mockResolvedValue({ data: { system_name: 'PKI', audit_retention_days: 90 } })
+  settingsService.getEmailSettings = vi.fn().mockResolvedValue({ data: { smtp_host: 'smtp.example.com', smtp_port: 587 } })
+  settingsService.getSyslogConfig = vi.fn().mockResolvedValue({ data: { enabled: true, host: 'log.example.com', port: 514 } })
+  settingsService.updateBulk = vi.fn().mockResolvedValue({ data: {} })
+  settingsService.updateEmailSettings = vi.fn().mockResolvedValue({ data: {} })
+  settingsService.updateSyslogConfig = vi.fn().mockResolvedValue({ data: {} })
+  notificationSpies.showConfirm = vi.fn().mockResolvedValue(false)
+  window.history.replaceState(null, '', '/settings')
+})
+afterEach(() => vi.clearAllMocks())
+
+async function loaded(entry) {
+  renderPage(entry)
+  await screen.findByLabelText('system-name')
+  await waitFor(() => expect(screen.getByLabelText('syslog-host')).toHaveValue('log.example.com'))
+}
+
+describe('SettingsPage: one page, one save bar', () => {
+  it('shows every section in a frame of its own, listed by group', async () => {
+    await loaded()
+    for (const id of ['general', 'email', 'audit', 'security', 'backup', 'about']) {
+      expect(document.getElementById(`sf-sec-${id}`)).toBeInTheDocument()
+    }
+    expect(screen.getByLabelText('smtp-host')).toBeInTheDocument()
+    expect(tocLink('settings.tabs.email')).toHaveAttribute('href', '/settings?tab=email')
+    expect(saveButton()).toBeDisabled()
+  })
+
+  it('counts a change, marks its section, and undo brings back what was loaded', async () => {
+    await loaded()
+    fireEvent.change(screen.getByLabelText('system-name'), { target: { value: 'PKI 2' } })
+    fireEvent.change(screen.getByLabelText('syslog-host'), { target: { value: 'log2.example.com' } })
+    expect(bar()).toHaveTextContent('sectioned.pendingTitle')
+    expect(tocLink('settings.tabs.general')).toHaveTextContent('sectioned.flagModified')
+    expect(tocLink('settings.tabs.audit')).toHaveTextContent('sectioned.flagModified')
+    expect(tocLink('settings.tabs.email')).not.toHaveTextContent('sectioned.flagModified')
+    fireEvent.click(undoButton())
+    expect(screen.getByLabelText('system-name')).toHaveValue('PKI')
+    expect(screen.getByLabelText('syslog-host')).toHaveValue('log.example.com')
+    expect(saveButton()).toBeDisabled()
+  })
+
+  it('stores each changed part by its own route, once', async () => {
+    await loaded()
+    fireEvent.change(screen.getByLabelText('system-name'), { target: { value: 'PKI 2' } })
+    fireEvent.change(screen.getByLabelText('retention'), { target: { value: '30' } })
+    fireEvent.change(screen.getByLabelText('syslog-host'), { target: { value: 'log2.example.com' } })
+    await act(async () => { fireEvent.click(saveButton()) })
+    expect(settingsService.updateBulk).toHaveBeenCalledTimes(1)
+    expect(settingsService.updateBulk.mock.calls[0][0]).toMatchObject({ system_name: 'PKI 2', audit_retention_days: '30' })
+    expect(settingsService.updateSyslogConfig).toHaveBeenCalledWith(expect.objectContaining({ host: 'log2.example.com' }))
+    expect(settingsService.updateEmailSettings).not.toHaveBeenCalled()
+    expect(notificationSpies.showSuccess).toHaveBeenCalledWith('sectioned.savedToast')
+  })
+
+  it('names the section whose route failed, stores the others and keeps the input', async () => {
+    await loaded()
+    settingsService.updateEmailSettings = vi.fn().mockRejectedValue(new Error('SMTP refused'))
+    // What the server holds after the save: the stored name, the old SMTP host
+    settingsService.getAll = vi.fn().mockResolvedValue({ data: { system_name: 'PKI 2', audit_retention_days: 90 } })
+    fireEvent.change(screen.getByLabelText('system-name'), { target: { value: 'PKI 2' } })
+    fireEvent.change(screen.getByLabelText('smtp-host'), { target: { value: 'smtp2.example.com' } })
+    await act(async () => { fireEvent.click(saveButton()) })
+    await waitFor(() => expect(settingsService.getAll).toHaveBeenCalled())
+    expect(settingsService.updateBulk).toHaveBeenCalledTimes(1)
+    const email = document.getElementById('sf-sec-email')
+    expect(within(email).getByRole('alert')).toHaveTextContent('SMTP refused')
+    expect(within(document.getElementById('sf-sec-general')).queryByRole('alert')).toBeNull()
+    expect(screen.getByLabelText('smtp-host')).toHaveValue('smtp2.example.com')
+    expect(tocLink('settings.tabs.email')).toHaveTextContent('sectioned.flagError')
+    expect(bar()).toHaveTextContent('sectioned.saveFailedTitle')
+    expect(notificationSpies.showError).toHaveBeenCalledWith('sectioned.saveFailedToast')
+  })
+
+  it('lands a link to ?tab= on the frame of that section', async () => {
+    const scrolled = []
+    Element.prototype.scrollIntoView = vi.fn(function scroll() { scrolled.push(this.id) })
+    await loaded('/settings?tab=email')
+    await waitFor(() => expect(scrolled).toContain('sf-sec-email'))
+    expect(document.activeElement).toBe(document.getElementById('sf-title-email'))
+    delete Element.prototype.scrollIntoView
+  })
+
+  it('jumps from the table of contents and writes the section in the address', async () => {
+    const scrolled = []
+    Element.prototype.scrollIntoView = vi.fn(function scroll() { scrolled.push(this.id) })
+    await loaded()
+    fireEvent.click(tocLink('settings.tabs.audit'))
+    expect(scrolled).toContain('sf-sec-audit')
+    delete Element.prototype.scrollIntoView
+  })
+
+  it('asks before a link leaves the page with changes pending, and stays when refused', async () => {
+    await loaded()
+    fireEvent.change(screen.getByLabelText('system-name'), { target: { value: 'PKI 2' } })
+    await act(async () => { fireEvent.click(screen.getByText('elsewhere')) })
+    expect(notificationSpies.showConfirm).toHaveBeenCalledWith('sectioned.leaveConfirm', expect.anything())
+    expect(screen.getByLabelText('system-name')).toHaveValue('PKI 2')
+  })
+
+  it('lets a link go without asking when nothing is pending', async () => {
+    await loaded()
+    await act(async () => { fireEvent.click(screen.getByText('elsewhere')) })
+    expect(notificationSpies.showConfirm).not.toHaveBeenCalled()
+  })
+})

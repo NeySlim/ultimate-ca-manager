@@ -5,13 +5,12 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Database, CheckCircle, XCircle, Warning, Lightning, ArrowsClockwise, FloppyDisk
+  CheckCircle, XCircle, Warning, Lightning, ArrowsClockwise, FloppyDisk
 } from '@phosphor-icons/react'
-import {
-  Button, Input, Badge, DetailSection, DetailGrid, DetailField, ConfirmModal
-} from '../../components'
+import { Button, Input, Badge, DetailGrid, DetailField, ConfirmModal } from '../../components'
 import { databaseService } from '../../services'
 import { useNotification } from '../../contexts'
+import { FormGroup } from '../../components/sectioned'
 
 export default function DatabaseBackendSection() {
   const { t } = useTranslation()
@@ -114,10 +113,8 @@ export default function DatabaseBackendSection() {
 
   return (
     <>
-      <DetailSection
+      <FormGroup
         title={t('settings.backend.currentTitle')}
-        icon={Database}
-        iconClass="icon-bg-blue"
       >
         <DetailGrid>
           <DetailField
@@ -148,12 +145,10 @@ export default function DatabaseBackendSection() {
         {status?.error && (
           <p className="mt-3 text-xs text-status-danger">{status.error}</p>
         )}
-      </DetailSection>
+      </FormGroup>
 
-      <DetailSection
+      <FormGroup
         title={t('settings.backend.switchTitle')}
-        icon={ArrowsClockwise}
-        iconClass="icon-bg-violet"
         className="mt-4"
       >
         <div className="space-y-4">
@@ -232,7 +227,7 @@ export default function DatabaseBackendSection() {
             </div>
           </div>
         </div>
-      </DetailSection>
+      </FormGroup>
 
       {confirmAction && (
         <ConfirmModal

@@ -3,11 +3,12 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Globe, MagnifyingGlass, CheckCircle, XCircle, WarningCircle } from '@phosphor-icons/react'
-import { Button, Badge, DetailSection } from '../../components'
+import { MagnifyingGlass, CheckCircle, XCircle, WarningCircle } from '@phosphor-icons/react'
+import { Button, Badge } from '../../components'
 import { useNotification } from '../../contexts'
 import { settingsService } from '../../services'
 import CopyableUrl from './CopyableUrl'
+import { FormGroup } from '../../components/sectioned'
 
 function StatusBadge({ status }) {
   const { t } = useTranslation()
@@ -90,7 +91,7 @@ export default function PublicEndpointsPanel({ settings, updateSetting, refreshK
   const eff = effective || {}
 
   return (
-    <DetailSection title={t('settings.publicEndpoints.title')} icon={Globe} iconClass="icon-bg-cyan">
+    <FormGroup title={t('settings.publicEndpoints.title')}>
       <p className="text-sm text-text-secondary mb-4">{t('settings.publicEndpoints.subtitle')}</p>
 
       <div className="flex flex-wrap gap-2 mb-4">
@@ -192,6 +193,6 @@ export default function PublicEndpointsPanel({ settings, updateSetting, refreshK
           ))}
         </div>
       )}
-    </DetailSection>
+    </FormGroup>
   )
 }

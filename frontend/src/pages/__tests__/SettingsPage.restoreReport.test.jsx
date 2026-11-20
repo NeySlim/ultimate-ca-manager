@@ -14,6 +14,14 @@ vi.mock('../settings/BackupSection', () => ({
   ),
 }))
 
+// An administrator: the backup section, and its restore, are admin:system
+vi.mock('../../hooks/usePermission', () => ({
+  usePermission: () => ({
+    hasPermission: () => true, canRead: () => true, canWrite: () => true, canDelete: () => true,
+    isAdmin: () => true, permissions: ['*'],
+  }),
+}))
+
 import './pageRenderingSetup.jsx'
 
 import SettingsPage from '../SettingsPage'

@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ShieldCheck } from '@phosphor-icons/react'
-import { Button, DetailSection, Select } from '../../components'
+import { Button, Select } from '../../components'
 import PreflightReport from '../../components/PreflightReport'
 import { settingsService, systemService } from '../../services'
 import { useNotification } from '../../contexts'
 import { usePermission } from '../../hooks'
 import { extractData } from '../../lib/utils'
 import { COMPLIANCE_PROFILE_NAMES, useComplianceProfiles } from '../../lib/complianceProfiles'
+import { FormGroup } from '../../components/sectioned'
 
 const VERDICT = {
   ready: 'settings.compliancePreflight.ready',
@@ -73,7 +74,7 @@ export default function CompliancePreflightPanel() {
   }
 
   return (
-    <DetailSection title={t('settings.compliancePreflight.title')} icon={ShieldCheck} iconClass="icon-bg-violet" className="mt-4">
+    <FormGroup title={t('settings.compliancePreflight.title')} className="mt-4">
       <div className="space-y-3">
         <div className="p-3 bg-tertiary-50 border border-border rounded-lg space-y-2">
           <Select
@@ -106,6 +107,6 @@ export default function CompliancePreflightPanel() {
 
         {report && <PreflightReport report={report} testId="compliance-preflight-report" verdict={VERDICT} />}
       </div>
-    </DetailSection>
+    </FormGroup>
   )
 }

@@ -1,24 +1,20 @@
 import { useTranslation } from 'react-i18next'
-import { Eye, Trash, Plus, ArrowsClockwise, FloppyDisk } from '@phosphor-icons/react'
-import { Button, Input, DetailHeader, DetailSection, DetailContent } from '../../components'
+import { Trash, Plus } from '@phosphor-icons/react'
+import { Button, Input } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
+import { FormGroup } from '../../components/sectioned'
 
-export default function CTSection({ ctSettings, setCtSettings, ctLoading, ctSaving, ctNewLogUrl, setCtNewLogUrl, handleCtSave, handleCtAddLogUrl, handleCtRemoveLogUrl }) {
+export default function CTSection({ ctSettings, setCtSettings, ctLoading, ctNewLogUrl, setCtNewLogUrl, handleCtAddLogUrl, handleCtRemoveLogUrl }) {
   const { t } = useTranslation()
   return (
-    <DetailContent>
-      <DetailHeader
-        icon={Eye}
-        title={t('settings.ct')}
-        subtitle={t('settings.ctDescription')}
-      />
+    <>
 
       {ctLoading ? (
         <div className="flex items-center justify-center py-12">
           <div className="w-6 h-6 border-2 border-accent-primary-op30 border-t-accent-primary rounded-full animate-spin" />
         </div>
       ) : (
-        <DetailSection title={t('settings.ct')} icon={Eye} iconClass="icon-bg-cyan">
+        <FormGroup title={t('settings.ct')}>
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium text-text-primary mb-2 block">{t('settings.ctLogUrls')}</label>
@@ -82,15 +78,9 @@ export default function CTSection({ ctSettings, setCtSettings, ctLoading, ctSavi
               </>
             )}
 
-            <div className="flex justify-end pt-4 border-t border-border">
-              <Button type="button" onClick={handleCtSave} disabled={ctSaving}>
-                {ctSaving ? <ArrowsClockwise size={14} className="animate-spin mr-1" /> : <FloppyDisk size={14} className="mr-1" />}
-                {t('common.save')}
-              </Button>
-            </div>
           </div>
-        </DetailSection>
+        </FormGroup>
       )}
-    </DetailContent>
+    </>
   )
 }

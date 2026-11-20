@@ -4,10 +4,11 @@
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Card, Button, Select } from '../../components'
+import { Select } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { apiClient } from '../../services'
 import { useNotification } from '../../contexts'
+import { FormGroup, useSavePart } from '../../components/sectioned'
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
   value: h,
@@ -24,6 +25,8 @@ export default function AutoUpdateSettings() {
   const [autoInstall, setAutoInstall] = useState(false)
   const [hour, setHour] = useState(3)
   const [popupEnabled, setPopupEnabled] = useState(false)
+  // Values as loaded or last stored: the page's save bar counts the changes against them
+  const [saved, setSaved] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -36,13 +39,18 @@ export default function AutoUpdateSettings() {
         setPopupEnabled(!!data.popup_enabled)
         setHour(Number.isInteger(data.hour) ? data.hour : 3)
         setCanAutoUpdate(data.can_auto_update !== false)
+        setSaved({
+          channel: data.channel || 'stable', autoInstall: !!data.auto_install,
+          hour: Number.isInteger(data.hour) ? data.hour : 3, popupEnabled: !!data.popup_enabled,
+        })
       })
       .catch(() => {})
       .finally(() => !cancelled && setLoading(false))
     return () => { cancelled = true }
   }, [])
 
-  const handleSave = async () => {
+  // Stored by the page's save bar, through the same route as before
+  const handleSave = async ({ quiet = false } = {}) => {
     setSaving(true)
     try {
       await apiClient.patch('/system/updates/settings', {
@@ -51,22 +59,37 @@ export default function AutoUpdateSettings() {
         hour,
         popup_enabled: popupEnabled,
       })
-      showSuccess(t('settings.autoUpdateSaved'))
+      setSaved({ channel, autoInstall, hour, popupEnabled })
+      if (!quiet) showSuccess(t('settings.autoUpdateSaved'))
+      return { ok: true }
     } catch (err) {
-      showError(err?.message || t('settings.autoUpdateSaveFailed'))
+      if (!quiet) showError(err?.message || t('settings.autoUpdateSaveFailed'))
+      return { ok: false, message: err?.message || t('settings.autoUpdateSaveFailed') }
     } finally {
       setSaving(false)
     }
   }
 
+  const current = { channel, autoInstall, hour, popupEnabled }
+  const count = saved ? Object.keys(current).filter((k) => current[k] !== saved[k]).length : 0
+  useSavePart('updates:auto', {
+    section: 'updates',
+    count,
+    save: () => handleSave({ quiet: true }),
+    reset: () => {
+      if (!saved) return
+      setChannel(saved.channel)
+      setAutoInstall(saved.autoInstall)
+      setHour(saved.hour)
+      setPopupEnabled(saved.popupEnabled)
+    },
+  })
+
   if (loading) return null
 
   return (
-    <Card className="p-4 space-y-4">
-      <div>
-        <h3 className="font-medium text-text-primary">{t('settings.autoUpdateTitle')}</h3>
-        <p className="text-sm text-text-secondary mt-1">{t('settings.autoUpdateDesc')}</p>
-      </div>
+    <FormGroup title={t('settings.autoUpdateTitle')} description={t('settings.autoUpdateDesc')}>
+      <div className="space-y-4" aria-busy={saving || undefined}>
 
       <Select
         label={t('settings.autoUpdateChannel')}
@@ -103,12 +126,7 @@ export default function AutoUpdateSettings() {
           options={HOUR_OPTIONS}
         />
       )}
-
-      <div className="flex justify-end pt-2 border-t border-border">
-        <Button type="button" variant="primary" onClick={handleSave} loading={saving}>
-          {t('common.save')}
-        </Button>
       </div>
-    </Card>
+    </FormGroup>
   )
 }

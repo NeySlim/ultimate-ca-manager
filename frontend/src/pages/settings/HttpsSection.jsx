@@ -1,23 +1,14 @@
 import { useTranslation } from 'react-i18next'
-import { Lock, Certificate, MagnifyingGlass, ShieldCheck, ArrowsClockwise, Key, UploadSimple, Warning } from '@phosphor-icons/react'
-import { Button, Badge, DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent } from '../../components'
+import { Certificate, MagnifyingGlass, ShieldCheck, Key, UploadSimple, Warning } from '@phosphor-icons/react'
+import { Button, DetailGrid, DetailField } from '../../components'
 import { formatDate, certificateLabel } from '../../lib/utils'
+import { FormGroup } from '../../components/sectioned'
 
 export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelectedHttpsCert, setShowCertPicker, handleApplyUcmCert, handleRegenerateHttpsCert, setShowHttpsImportModal, onUnbindHttpsCert }) {
   const { t } = useTranslation()
   return (
-    <DetailContent>
-      <DetailHeader
-        icon={Lock}
-        title={t('settings.httpsTitle')}
-        subtitle={t('settings.httpsSubtitle')}
-        badge={httpsInfo?.type && (
-          <Badge variant={httpsInfo?.type === 'CA-Signed' ? 'success' : httpsInfo?.type === 'Self-Signed' ? 'warning' : 'secondary'}>
-            {httpsInfo?.type}
-          </Badge>
-        )}
-      />
-      <DetailSection title={t('settings.currentCertificate')} icon={Certificate} iconClass="icon-bg-emerald">
+    <>
+      <FormGroup title={t('settings.currentCertificate')}>
         <DetailGrid>
           <DetailField
             label={t('common.commonName')}
@@ -93,9 +84,9 @@ export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelected
             </div>
           )
         })()}
-      </DetailSection>
+      </FormGroup>
 
-      <DetailSection title={t('settings.useUCMCert')} icon={Certificate} iconClass="icon-bg-violet">
+      <FormGroup title={t('settings.useUCMCert')}>
         <div className="space-y-4">
           <p className="text-xs text-text-secondary">
             {t('settings.useUcmCertificateDesc')}
@@ -137,9 +128,9 @@ export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelected
             </Button>
           </div>
         </div>
-      </DetailSection>
+      </FormGroup>
 
-      <DetailSection title={t('settings.regenerateCert')} icon={ArrowsClockwise} iconClass="icon-bg-emerald">
+      <FormGroup title={t('settings.regenerateCert')}>
         <div className="space-y-3">
           <p className="text-xs text-text-secondary">
             {t('settings.regenerateCertificateDesc')}
@@ -149,9 +140,9 @@ export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelected
             {t('settings.regenerateSelfSigned')}
           </Button>
         </div>
-      </DetailSection>
+      </FormGroup>
 
-      <DetailSection title={t('settings.applyCustomCert')} icon={Lock} iconClass="icon-bg-amber">
+      <FormGroup title={t('settings.applyCustomCert')}>
         <div className="space-y-3">
           <p className="text-xs text-text-secondary">
             {t('settings.applyCustomCertificateDesc')}
@@ -164,7 +155,7 @@ export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelected
             {t('common.importCertificate')}
           </Button>
         </div>
-      </DetailSection>
-    </DetailContent>
+      </FormGroup>
+    </>
   )
 }

@@ -1,20 +1,16 @@
 import { useTranslation } from 'react-i18next'
-import { ListBullets, Globe, FloppyDisk, Lightning } from '@phosphor-icons/react'
-import { Button, Input, Select, DetailHeader, DetailSection, DetailContent } from '../../components'
+import {   Lightning } from '@phosphor-icons/react'
+import { Button, Input, Select } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
+import { FormGroup } from '../../components/sectioned'
 
-export default function AuditSection({ settings, updateSetting, handleSave, saving, hasPermission, syslogConfig, updateSyslogConfig, syslogSaving, syslogTesting, handleSaveSyslog, handleTestSyslog }) {
+export default function AuditSection({ settings, updateSetting, hasPermission, syslogConfig, updateSyslogConfig, syslogTesting, handleTestSyslog }) {
   const { t } = useTranslation()
   // The backend accepts a retention from admins only: shortening it deletes history.
   const canAdminSettings = Boolean(hasPermission('admin:settings'))
   return (
-    <DetailContent>
-      <DetailHeader
-        icon={ListBullets}
-        title={t('settings.auditTitle')}
-        subtitle={t('settings.auditSubtitle')}
-      />
-      <DetailSection title={t('settings.auditLogging')} icon={ListBullets} iconClass="icon-bg-orange">
+    <>
+      <FormGroup title={t('settings.auditLogging')}>
         <div className="space-y-4">
           <Input
             label={t('settings.logRetention')}
@@ -26,17 +22,9 @@ export default function AuditSection({ settings, updateSetting, handleSave, savi
             helperText={t('settings.logRetentionHelp')}
             disabled={canAdminSettings === false}
           />
-          {hasPermission('write:settings') && (
-            <div className="pt-4">
-              <Button type="button" onClick={() => handleSave('audit')} disabled={saving}>
-                <FloppyDisk size={16} />
-                {t('common.saveChanges')}
-              </Button>
-            </div>
-          )}
         </div>
-      </DetailSection>
-      <DetailSection title={t('settings.remoteSyslog')} icon={Globe} iconClass="icon-bg-purple">
+      </FormGroup>
+      <FormGroup title={t('settings.remoteSyslog')}>
         <div className="space-y-4">
           <p className="text-xs text-text-secondary">{t('settings.remoteSyslogDesc')}</p>
           <ToggleSwitch
@@ -134,10 +122,6 @@ export default function AuditSection({ settings, updateSetting, handleSave, savi
           )}
           {hasPermission('admin:system') && (
             <div className="flex gap-2">
-              <Button type="button" onClick={handleSaveSyslog} loading={syslogSaving}>
-                <FloppyDisk size={16} />
-                {t('common.saveChanges')}
-              </Button>
               {syslogConfig.enabled && syslogConfig.host && (
                 <Button type="button" variant="secondary" onClick={handleTestSyslog} loading={syslogTesting}>
                   <Lightning size={16} />
@@ -147,7 +131,7 @@ export default function AuditSection({ settings, updateSetting, handleSave, savi
             </div>
           )}
         </div>
-      </DetailSection>
-    </DetailContent>
+      </FormGroup>
+    </>
   )
 }
