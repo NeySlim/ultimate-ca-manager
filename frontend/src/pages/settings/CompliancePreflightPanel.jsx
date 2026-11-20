@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ShieldCheck } from '@phosphor-icons/react'
+import { ShieldCheck, Question } from '@phosphor-icons/react'
 import { Button, Select } from '../../components'
 import PreflightReport from '../../components/PreflightReport'
 import { settingsService, systemService } from '../../services'
@@ -76,34 +76,36 @@ export default function CompliancePreflightPanel() {
   return (
     <FormGroup title={t('settings.compliancePreflight.title')} className="mt-4">
       <div className="space-y-3">
-        <div className="p-3 bg-tertiary-50 border border-border rounded-lg space-y-2">
-          <Select
-            label={t('settings.compliancePreflight.defaultProfile')}
-            options={[{ value: '', label: t('cas.complianceProfileNone') }, ...options]}
-            value={defaultProfile}
-            onChange={saveDefault}
-            disabled={!canSetDefault || savingDefault}
-            helperText={t('settings.compliancePreflight.defaultHint')}
-          />
-        </div>
+        <Select
+          label={t('settings.compliancePreflight.defaultProfile')}
+          options={[{ value: '', label: t('cas.complianceProfileNone') }, ...options]}
+          value={defaultProfile}
+          onChange={saveDefault}
+          disabled={!canSetDefault || savingDefault}
+          helperText={t('settings.compliancePreflight.defaultHint')}
+        />
 
-        {canCheck && <div className="flex items-end justify-between gap-3 p-3 bg-tertiary-50 border border-border rounded-lg">
-          <div className="min-w-0 flex-1 space-y-1">
+        {/* The check as the mockup's test zone: the profile, then the button on its line */}
+        {canCheck && <div className="sf-test sf-wide">
+          <div className="sf-test-field">
             <Select
               label={t('settings.compliancePreflight.profile')}
               options={options}
               value={profile}
               onChange={(value) => { setProfile(value); setReport(null) }}
-              helperText={t('settings.compliancePreflight.hint')}
             />
           </div>
-          <Button type="button" size="sm" variant="secondary" onClick={runCheck} disabled={loading}>
-            <ShieldCheck size={14} />
+          <Button type="button" variant="secondary" onClick={runCheck} disabled={loading}>
+            <ShieldCheck size={16} />
             {loading ? t('settings.compliancePreflight.running') : t('settings.compliancePreflight.run')}
           </Button>
+          <p className="sf-test-result">
+            <Question aria-hidden="true" />
+            <span>{t('settings.compliancePreflight.hint')}</span>
+          </p>
         </div>}
 
-        {error && <p className="text-sm status-danger-text">{error}</p>}
+        {error && <p className="ui-error sf-wide" role="alert">{error}</p>}
 
         {report && <PreflightReport report={report} testId="compliance-preflight-report" verdict={VERDICT} />}
       </div>

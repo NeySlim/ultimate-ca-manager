@@ -364,10 +364,11 @@ export function UpdateChecker() {
       
       {/* Update channel */}
       <div className="mt-4 pt-4 border-t border-border-op50">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-text-secondary whitespace-nowrap">{t('settings.updateChannel')}</label>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
+            <label htmlFor="update-channel" className="text-xs text-text-secondary">{t('settings.updateChannel')}</label>
             <select
+              id="update-channel"
               value={includeChannel}
               onChange={(e) => setIncludeChannel(e.target.value)}
               className="ui-control w-auto"
@@ -383,9 +384,9 @@ export function UpdateChecker() {
               href={updateInfo.html_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-accent-primary hover:underline"
+              className="text-xs text-accent-primary hover:underline"
             >
-              View on GitHub →
+              {t('settings.viewOnGithub')}
             </a>
           )}
         </div>
