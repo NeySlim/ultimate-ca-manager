@@ -197,7 +197,7 @@ export function CertificateInput({
   return (
     <div className={cn('space-y-3', className)}>
       {/* Mode switcher */}
-      <div className="flex gap-1 p-0.5 rounded-lg bg-bg-secondary">
+      <div className="ui-segmented" role="group">
         {MODES.map(m => {
           const Icon = m.icon
           return (
@@ -205,14 +205,9 @@ export function CertificateInput({
               key={m.key}
               type="button"
               onClick={() => handleModeChange(m.key)}
-              className={cn(
-                'flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-all',
-                mode === m.key
-                  ? 'bg-bg-primary text-text-primary shadow-sm'
-                  : 'text-text-tertiary hover:text-text-secondary'
-              )}
+              aria-pressed={mode === m.key}
             >
-              <Icon size={14} />
+              <Icon size={14} aria-hidden="true" />
               {t(m.labelKey)}
             </button>
           )
@@ -280,17 +275,18 @@ export function CertificateInput({
           {/* Password prompt for encrypted files */}
           {needsPassword && (
             <div className="flex gap-2 items-end">
-              <div className="flex-1">
-                <label className="text-xs font-medium text-text-secondary mb-1 block">
-                  <LockSimple size={12} className="inline mr-1" />
+              <div className="ui-field flex-1">
+                <label className="ui-label" htmlFor="cert-input-file-password">
+                  <LockSimple size={12} aria-hidden="true" />
                   {t('certInput.filePassword')}
                 </label>
                 <input
+                  id="cert-input-file-password"
                   type="password"
                   value={filePassword}
                   onChange={(e) => setFilePassword(e.target.value)}
                   placeholder={t('certInput.enterPassword')}
-                  className="w-full h-8 px-3 text-sm rounded-md border border-border bg-bg-primary text-text-primary"
+                  className="ui-control"
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handlePasswordSubmit() } }}
                 />
               </div>

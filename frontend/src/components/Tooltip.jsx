@@ -1,8 +1,9 @@
 /**
- * Tooltip Component - Radix Tooltip wrapper with configurable delay
+ * Tooltip Component - Radix Tooltip wrapper: the mockup's tip, 12 px on the raised surface
  */
 import * as Tooltip from '@radix-ui/react-tooltip'
 import { Question } from '@phosphor-icons/react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
 
 export function TooltipComponent({ 
@@ -22,14 +23,9 @@ export function TooltipComponent({
           <Tooltip.Content
             side={side}
             sideOffset={5}
-            className={cn(
-              "bg-bg-tertiary border border-border-op50 px-3 py-2 rounded-lg text-xs text-text-primary shadow-xl z-50 max-w-xs",
-              "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
-              className
-            )}
+            className={cn('ui-tip', className)}
           >
             {content}
-            <Tooltip.Arrow className="fill-bg-tertiary" />
           </Tooltip.Content>
         </Tooltip.Portal>
       </Tooltip.Root>
@@ -39,10 +35,11 @@ export function TooltipComponent({
 
 // Helper icon with tooltip - for field labels
 export function HelpTooltip({ content, side = 'top' }) {
+  const { t } = useTranslation()
   return (
     <TooltipComponent content={content} side={side} delayDuration={300}>
-      <button type="button" className="inline-flex text-text-tertiary hover:text-accent-primary transition-colors ml-1">
-        <Question size={14} weight="duotone" />
+      <button type="button" className="ui-help-tip" aria-label={typeof content === 'string' ? content : t('common.help')}>
+        <Question aria-hidden="true" />
       </button>
     </TooltipComponent>
   )

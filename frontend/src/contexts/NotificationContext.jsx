@@ -3,14 +3,16 @@
  */
 import { createContext, useContext, useState, useCallback, useMemo } from 'react'
 import * as Toast from '@radix-ui/react-toast'
-import * as Dialog from '@radix-ui/react-dialog'
 import { CheckCircle, Warning, Info, XCircle, X } from '@phosphor-icons/react'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
+import { ListDialog } from '../components/list/ListDialog'
+import { useTranslation } from 'react-i18next'
 
 const NotificationContext = createContext()
 
 export function NotificationProvider({ children }) {
+  const { t } = useTranslation()
   const [toasts, setToasts] = useState([])
   const [confirmDialog, setConfirmDialog] = useState(null)
   const [promptDialog, setPromptDialog] = useState(null)
@@ -40,14 +42,11 @@ export function NotificationProvider({ children }) {
     return new Promise((resolve) => {
       setConfirmDialog({
         message,
-        title: options.title || 'Confirm',
-        confirmText: options.confirmText || 'Confirm',
-        // Only an OMITTED cancelText gets the default. The render guard below
-        // hides the Cancel button on an explicit `null` (acknowledge-only
-        // dialog), so that null has to survive — which rules out both `||` and
-        // `??`, since each maps null back to 'Cancel'. Every other value is
-        // stored as given, so the existing call sites are untouched.
-        cancelText: options.cancelText === undefined ? 'Cancel' : options.cancelText,
+        title: options.title,
+        confirmText: options.confirmText,
+        // An explicit `null` hides Cancel (acknowledge-only dialog); any other
+        // empty value shows the translated default at render time.
+        cancelText: options.cancelText,
         variant: options.variant || 'primary', // 'primary' | 'danger'
         resolve
       })
@@ -67,11 +66,11 @@ export function NotificationProvider({ children }) {
       setPromptValue(options.defaultValue || '')
       setPromptDialog({
         message,
-        title: options.title || 'Input Required',
+        title: options.title,
         placeholder: options.placeholder || '',
         type: options.type || 'text',
-        confirmText: options.confirmText || 'OK',
-        cancelText: options.cancelText || 'Cancel',
+        confirmText: options.confirmText,
+        cancelText: options.cancelText,
         resolve
       })
     })
@@ -147,65 +146,58 @@ export function NotificationProvider({ children }) {
         <Toast.Viewport className="fixed bottom-10 left-1/2 -translate-x-1/2 flex flex-col gap-3 w-96 max-w-[calc(100vw-2rem)] z-[300] outline-none" />
       </Toast.Provider>
 
-      {/* Confirm Dialog */}
-      <Dialog.Root open={!!confirmDialog} onOpenChange={(open) => !open && handleConfirm(false)}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-scrim-60 backdrop-blur-sm z-[300]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[301] w-full max-w-sm bg-bg-secondary border border-border rounded-lg shadow-xl p-4">
-            <Dialog.Title className="text-sm font-semibold text-text-primary mb-2">
-              {confirmDialog?.title}
-            </Dialog.Title>
-            <Dialog.Description className="text-xs text-text-secondary mb-4 whitespace-pre-wrap">
-              {confirmDialog?.message}
-            </Dialog.Description>
-            <div className="flex justify-end gap-2">
-              {confirmDialog?.cancelText !== null && (
-                <Button type="button" variant="secondary" size="sm" onClick={() => handleConfirm(false)}>
-                  {confirmDialog?.cancelText || 'Cancel'}
-                </Button>
-              )}
-              <Button 
-                variant={confirmDialog?.variant === 'danger' ? 'danger' : 'primary'} 
-                size="sm"
-                onClick={() => handleConfirm(true)}
-              >
-                {confirmDialog?.confirmText}
-              </Button>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+      {/* Confirmation and prompt: the narrow Atelier dialog, its buttons in the interface language */}
+      <ListDialog
+        open={!!confirmDialog}
+        onOpenChange={(open) => !open && handleConfirm(false)}
+        title={confirmDialog?.title || t('common.confirm')}
+        className="ui-modal"
+        testId="confirm-dialog"
+      >
+        <p className="ui-dialog-message">{confirmDialog?.message}</p>
+        <div className="ui-dialog-actions">
+          {confirmDialog?.cancelText !== null && (
+            <Button type="button" variant="secondary" onClick={() => handleConfirm(false)}>
+              {confirmDialog?.cancelText || t('common.cancel')}
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant={confirmDialog?.variant === 'danger' ? 'danger' : 'primary'}
+            onClick={() => handleConfirm(true)}
+          >
+            {confirmDialog?.confirmText || t('common.confirm')}
+          </Button>
+        </div>
+      </ListDialog>
 
-      {/* Prompt Dialog */}
-      <Dialog.Root open={!!promptDialog} onOpenChange={(open) => !open && handlePrompt(false)}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-scrim-60 backdrop-blur-sm z-[300]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[301] w-full max-w-sm bg-bg-secondary border border-border rounded-lg shadow-xl p-4">
-            <Dialog.Title className="text-sm font-semibold text-text-primary mb-2">
-              {promptDialog?.title}
-            </Dialog.Title>
-            <Dialog.Description className="text-xs text-text-secondary mb-3">
-              {promptDialog?.message}
-            </Dialog.Description>
-            <Input
-              type={promptDialog?.type || 'text'}
-              value={promptValue}
-              onChange={(e) => setPromptValue(e.target.value)}
-              placeholder={promptDialog?.placeholder}
-              autoFocus
-              onKeyDown={(e) => e.key === 'Enter' && handlePrompt(true)}
-            />
-            <div className="flex justify-end gap-2 mt-4">
-              <Button type="button" variant="secondary" size="sm" onClick={() => handlePrompt(false)}>
-                {promptDialog?.cancelText}
-              </Button>
-              <Button type="button" size="sm" onClick={() => handlePrompt(true)}>
-                {promptDialog?.confirmText}
-              </Button>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+      <ListDialog
+        open={!!promptDialog}
+        onOpenChange={(open) => !open && handlePrompt(false)}
+        title={promptDialog?.title || t('common.inputRequired')}
+        className="ui-modal"
+        testId="prompt-dialog"
+      >
+        <form onSubmit={(e) => { e.preventDefault(); handlePrompt(true) }}>
+          {promptDialog?.message && <p className="ui-dialog-message">{promptDialog.message}</p>}
+          <Input
+            type={promptDialog?.type || 'text'}
+            value={promptValue}
+            onChange={(e) => setPromptValue(e.target.value)}
+            placeholder={promptDialog?.placeholder}
+            aria-label={promptDialog?.message || promptDialog?.title}
+            autoFocus
+          />
+          <div className="ui-dialog-actions">
+            <Button type="button" variant="secondary" onClick={() => handlePrompt(false)}>
+              {promptDialog?.cancelText || t('common.cancel')}
+            </Button>
+            <Button type="submit">
+              {promptDialog?.confirmText || t('common.ok')}
+            </Button>
+          </div>
+        </form>
+      </ListDialog>
     </NotificationContext.Provider>
   )
 }

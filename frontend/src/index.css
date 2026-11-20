@@ -1,4 +1,5 @@
 @import './styles/tokens.css';
+@import './styles/primitives.css';
 
 @tailwind base;
 @tailwind components;
@@ -225,8 +226,10 @@ html {
   line-height: normal;
 }
 
+/* Body text of the mockup is 13 px; rem sizes keep the 16 px root */
 body {
   margin: 0;
+  font-size: 13px;
   font-family: 'IBM Plex Sans', system-ui, sans-serif;
   background-color: var(--bg-primary);
   color: var(--text-primary);
@@ -264,7 +267,7 @@ html, body, #root {
   }
   input[type="checkbox"]:focus-visible {
     outline: 2px solid var(--accent);
-    outline-offset: 2px;
+    outline-offset: 3px;
   }
   input[type="radio"] {
     accent-color: var(--accent-primary);
@@ -313,14 +316,10 @@ html, body, #root {
       box-shadow var(--duration-normal) var(--ease-smooth);
   }
   
-  input:hover, textarea:hover, select:hover {
-    background-color: color-mix(in srgb, var(--bg-secondary) 90%, var(--bg-tertiary)) !important;
-  }
-  
-  /* Better focus styles for accessibility */
+  /* Focus as the Atelier mockup draws it: a 2 px accent outline 3 px out, no halo */
   :focus-visible {
-    @apply outline-none ring-2 ring-offset-2 ring-offset-bg-primary;
-    --tw-ring-color: color-mix(in srgb, var(--accent-primary) 50%, transparent);
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
   }
   
   /* Smooth scrolling */
@@ -1152,16 +1151,10 @@ button, a, input, select, textarea {
   transition: all var(--duration-fast) var(--ease-smooth);
 }
 
-/* Better focus styles with subtle glow */
+/* Focus of the Atelier mockup: outline only, the field keeps its border */
 :focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
-}
-
-/* Input focus glow (subtle) */
-input:focus, select:focus, textarea:focus {
-  border-color: var(--accent-primary) !important;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 15%, transparent);
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 /* Force Tailwind to generate responsive grid classes */
@@ -1656,9 +1649,8 @@ input:focus, select:focus, textarea:focus {
 
 /* Enhanced focus for keyboard navigation */
 .focus-ring:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-primary) 20%, transparent);
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .focus-ring:focus:not(:focus-visible) {

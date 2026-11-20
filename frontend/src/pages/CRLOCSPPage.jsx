@@ -780,7 +780,7 @@ export default function CRLOCSPPage() {
                   </Button>
                 ) : eligibleResponders.length > 0 ? (
                   <select
-                    className="w-full rounded-md border border-border bg-bg-primary text-text-primary text-sm p-2"
+                    className="ui-control w-full"
                     onChange={(e) => e.target.value && handleAssignResponder(parseInt(e.target.value))}
                     defaultValue=""
                   >
@@ -1072,7 +1072,7 @@ export default function CRLOCSPPage() {
               <label htmlFor="crl-validity" className="text-xs text-text-secondary">{t('crlOcsp.crlValidity')}</label>
               <select
                 id="crl-validity"
-                className="text-xs bg-bg-tertiary border border-border rounded px-2 py-1 text-text-primary"
+                className="ui-control is-compact"
                 value={selectedCA?.crl_validity_days || 7}
                 onChange={(e) => handleCrlScheduleChange(selectedCA, 'validity_days', parseInt(e.target.value))}
                 disabled={!canWrite('crl')}
@@ -1099,7 +1099,7 @@ export default function CRLOCSPPage() {
               <label htmlFor="crl-publish-interval" className="text-xs text-text-secondary">{t('crlOcsp.crlPublishInterval')}</label>
               <select
                 id="crl-publish-interval"
-                className="text-xs bg-bg-tertiary border border-border rounded px-2 py-1 text-text-primary"
+                className="ui-control is-compact"
                 value={selectedCA?.crl_publish_interval_hours || ''}
                 onChange={(e) => handleCrlScheduleChange(selectedCA, 'publish_interval_hours', e.target.value ? parseInt(e.target.value) : null)}
                 disabled={!canWrite('crl')}
@@ -1118,7 +1118,7 @@ export default function CRLOCSPPage() {
               <label htmlFor="crl-digest" className="text-xs text-text-secondary">{t('crlOcsp.crlDigest')}</label>
               <select
                 id="crl-digest"
-                className="text-xs bg-bg-tertiary border border-border rounded px-2 py-1 text-text-primary"
+                className="ui-control is-compact"
                 value={selectedCA.crl_digest}
                 onChange={(e) => handleCrlScheduleChange(selectedCA, 'digest', e.target.value)}
                 disabled={!canWrite('crl')}
@@ -1179,7 +1179,7 @@ export default function CRLOCSPPage() {
             <label htmlFor="delta-interval" className="text-xs text-text-secondary">{t('crlOcsp.deltaInterval')}</label>
             <select
               id="delta-interval"
-              className="text-xs bg-bg-tertiary border border-border rounded px-2 py-1 text-text-primary"
+              className="ui-control is-compact"
               value={selectedCA?.delta_crl_interval || 4}
               onChange={(e) => handleDeltaIntervalChange(selectedCA, e.target.value)}
             >

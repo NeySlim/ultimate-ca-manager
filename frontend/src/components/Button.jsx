@@ -1,58 +1,53 @@
+import { Children, forwardRef, isValidElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
+import './list/list.css'
 
 /**
- * Button Component - Standardized sizes across the app
- * 
- * Size guidelines:
- * - xs: Very compact icon buttons
- * - sm: Default — content actions, headers, inline (default)
- * - default: Forms, modals, primary actions
- * - lg: Hero sections, prominent CTAs, icon-only header buttons
- * 
- * Enhanced with visual effects:
- * - Layered shadows
- * - Gradient shine on hover
- * - Smooth micro-interactions
+ * Button of the Atelier mockup (`.btn`): 32 px, radius 4, 12 px/500, on the list
+ * template's `.lv-btn` so every button of the application has one geometry.
+ * `primary`/`success` fill with the accent, `secondary`/`outline` are bordered,
+ * `ghost` is quiet, `danger`/`danger-soft` and `warning-soft` take the tone's colours.
+ * `xs` is the 26 px button of compact bars; `sm`, `default` and `lg` are all 32 px.
  */
+const VARIANTS = {
+  primary: 'is-primary',
+  success: 'is-primary',
+  secondary: '',
+  outline: '',
+  ghost: 'is-quiet',
+  danger: 'is-danger',
+  'danger-soft': 'is-danger',
+  'warning-soft': 'is-warn',
+}
+
+const SIZES = { xs: 'is-small', sm: '', default: '', lg: '' }
+
+// A lone icon with an accessible name is the mockup's 32 px square icon button.
+function isIconOnly(children, props) {
+  if (!props['aria-label'] && !props.title) return false
+  const kids = Children.toArray(children)
+  return kids.length === 1 && isValidElement(kids[0]) && typeof kids[0].type !== 'string'
+}
+
 // `type` defaults to 'button', not the HTML default of 'submit': every one of
 // the 91 buttons inside a form already passes one explicitly, and the first
 // omission would submit the form instead of opening a modal, silently.
-export function Button({ children, type = 'button', variant = 'primary', size = 'sm', loading = false, loadingText, className, ...props }) {
+export const Button = forwardRef(function Button({ children, type = 'button', variant = 'primary', size = 'sm', loading = false, loadingText, className, ...props }, ref) {
   const { t } = useTranslation()
-  const variants = {
-    primary: 'btn-gradient',
-    secondary: 'btn-soft text-text-primary',
-    danger: 'btn-gradient danger',
-    'danger-soft': 'btn-danger-soft',
-    'warning-soft': 'btn-warning-soft',
-    success: 'btn-gradient success',
-    ghost: 'hover:bg-tertiary-op80 text-text-primary hover:text-text-primary transition-colors',
-    outline: 'border border-border bg-transparent text-text-primary hover:bg-tertiary-op60 hover:border-border-strong transition-all',
-  }
-  
-  // Standardized sizes - sm is the default for content actions
-  const sizes = {
-    xs: 'px-2 py-1 text-2xs gap-1',      // Very compact (icon buttons)
-    sm: 'px-2.5 py-1.5 text-xs gap-1.5',    // Content headers, inline actions
-    default: 'px-3 py-1.5 text-sm gap-1.5',  // Forms, modals
-    lg: 'px-4 py-2 text-sm gap-2',          // Prominent actions
-  }
-  
-  // For non-gradient variants, add focus ring
-  const needsFocusRing = !['primary', 'danger', 'success'].includes(variant)
-  
+  const iconOnly = !loading && isIconOnly(children, props)
+
   return (
     <button
+      ref={ref}
       type={type}
       {...props}
       className={cn(
-        'inline-flex items-center justify-center rounded-md font-medium',
-        'disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none',
-        needsFocusRing && 'focus-ring',
-        variants[variant],
-        sizes[size],
-        loading && 'pointer-events-none opacity-70',
+        'lv-btn ui-btn',
+        VARIANTS[variant] ?? '',
+        SIZES[size] ?? '',
+        iconOnly && 'is-icon',
+        loading && 'is-loading',
         className
       )}
       // Must stay AFTER the spread: a caller passing both `loading` and an
@@ -62,13 +57,13 @@ export function Button({ children, type = 'button', variant = 'primary', size = 
     >
       {loading ? (
         <>
-          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          <svg className="ui-spin" viewBox="0 0 24 24" aria-hidden="true">
+            <circle opacity="0.25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+            <path opacity="0.75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
           <span>{loadingText || t('common.loading')}</span>
         </>
       ) : children}
     </button>
   )
-}
+})

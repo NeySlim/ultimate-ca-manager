@@ -34,7 +34,7 @@ const PROVIDER = {
   saml_sso_url: 'https://idp/sso', saml_certificate: 'MII...', saml_sign_requests: false,
 }
 
-const switchFor = (labelKey) => screen.getByText(labelKey).closest('label').querySelector('[role="switch"]')
+const switchFor = (labelKey) => screen.getByText(labelKey).closest('label').querySelector('input[type="checkbox"]')
 
 const submit = async (onSave) => {
   fireEvent.submit(document.querySelector('form'))
@@ -46,7 +46,7 @@ describe('SsoProviderForm SAML strict options', () => {
   it('keeps IdP-initiated login off unless the operator turns it on', async () => {
     const onSave = vi.fn()
     render(<SsoProviderForm provider={PROVIDER} onSave={onSave} onCancel={vi.fn()} />)
-    expect(switchFor('sso.allowIdpInitiated')).toHaveAttribute('aria-checked', 'false')
+    expect(switchFor('sso.allowIdpInitiated')).not.toBeChecked()
     fireEvent.click(switchFor('sso.allowIdpInitiated'))
     const payload = await submit(onSave)
     expect(payload.saml_allow_idp_initiated).toBe(true)
@@ -55,7 +55,7 @@ describe('SsoProviderForm SAML strict options', () => {
   it('round-trips a provider that already allows it', async () => {
     const onSave = vi.fn()
     render(<SsoProviderForm provider={{ ...PROVIDER, saml_allow_idp_initiated: true }} onSave={onSave} onCancel={vi.fn()} />)
-    expect(switchFor('sso.allowIdpInitiated')).toHaveAttribute('aria-checked', 'true')
+    expect(switchFor('sso.allowIdpInitiated')).toBeChecked()
     const payload = await submit(onSave)
     expect(payload.saml_allow_idp_initiated).toBe(true)
   })
@@ -63,7 +63,7 @@ describe('SsoProviderForm SAML strict options', () => {
   it('leaves request signing off for a new provider', async () => {
     const onSave = vi.fn()
     render(<SsoProviderForm forcedType="saml" onSave={onSave} onCancel={vi.fn()} />)
-    expect(switchFor('sso.signRequests')).toHaveAttribute('aria-checked', 'false')
+    expect(switchFor('sso.signRequests')).not.toBeChecked()
     const payload = await submit(onSave)
     expect(payload.saml_sign_requests).toBe(false)
   })

@@ -274,7 +274,7 @@ export function CRLDeploySection({ ca, hasCRL }) {
             </label>
             <select required value={form.target_id} disabled={Boolean(editing)}
               onChange={event => setForm({ ...form, target_id: event.target.value })}
-              className="w-full rounded-md border border-border bg-bg-primary text-text-primary text-sm p-2">
+              className="ui-control w-full">
               {editing ? (
                 <option value={editing.target_id}>{editing.target_name} ({editing.target_host})</option>
               ) : (
@@ -305,7 +305,7 @@ export function CRLDeploySection({ ca, hasCRL }) {
                 ...form, format: event.target.value,
                 include_parent_crls: event.target.value === 'pem' && form.include_parent_crls,
               })}
-              className="w-full rounded-md border border-border bg-bg-primary text-text-primary text-sm p-2">
+              className="ui-control w-full">
               <option value="pem">PEM</option>
               <option value="der">DER</option>
             </select>

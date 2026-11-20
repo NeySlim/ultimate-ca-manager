@@ -41,6 +41,11 @@ vi.mock('@radix-ui/react-dialog', () => ({
   Close: ({ children }) => <div>{children}</div>,
 }))
 
+// The default buttons are translated: English strings stand in for the catalogue.
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (k) => ({ 'common.cancel': 'Cancel', 'common.confirm': 'Confirm' }[k] ?? k) }),
+}))
+
 import { NotificationProvider, useNotification } from '../NotificationContext'
 
 let api
@@ -58,9 +63,9 @@ function renderProvider() {
   )
 }
 
-/** Text of every <button> currently on screen. */
+/** Text of every labelled <button> on screen (the close cross of the dialog has none). */
 function buttonLabels() {
-  return screen.queryAllByRole('button').map((b) => b.textContent.trim())
+  return screen.queryAllByRole('button').map((b) => b.textContent.trim()).filter(Boolean)
 }
 
 describe('showConfirm — cancelText: null hides the Cancel button', () => {

@@ -25,6 +25,7 @@
     "yes": "Ja",
     "no": "Nein",
     "ok": "OK",
+    "inputRequired": "Input required",
     "apply": "Anwenden",
     "reset": "Zurücksetzen",
     "back": "Zurück",
@@ -7175,9 +7176,14 @@
     "theme": {
       "menu": "Design",
       "label": "Design: {{theme}}",
-      "systemNow": "System ({{mode}})",
-      "auroreDark": "Aurore dunkel",
-      "auroreLight": "Aurore hell"
+      "current": "Theme: {{name}}",
+      "system": "System",
+      "systemNow": "{{mode}} currently",
+      "dark": "Dark",
+      "light": "Light",
+      "aurore": "Aurore dark",
+      "auroreLight": "Aurore light",
+      "more": "More themes"
     },
     "bell": {
       "title": "Benachrichtigungen",

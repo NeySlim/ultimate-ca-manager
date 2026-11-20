@@ -25,6 +25,7 @@
     "yes": "是",
     "no": "否",
     "ok": "确定",
+    "inputRequired": "需要输入",
     "apply": "应用",
     "reset": "重置",
     "back": "返回",
@@ -7175,9 +7176,14 @@
     "theme": {
       "menu": "主题",
       "label": "主题：{{theme}}",
-      "systemNow": "跟随系统（{{mode}}）",
-      "auroreDark": "Aurore 深色",
-      "auroreLight": "Aurore 浅色"
+      "current": "主题：{{name}}",
+      "system": "跟随系统",
+      "systemNow": "当前为{{mode}}",
+      "dark": "深色",
+      "light": "浅色",
+      "aurore": "极光深色",
+      "auroreLight": "极光浅色",
+      "more": "更多主题"
     },
     "bell": {
       "title": "通知",

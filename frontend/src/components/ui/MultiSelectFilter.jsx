@@ -131,25 +131,19 @@ export function MultiSelectFilter({
 
       {/* Dropdown */}
       {open && (
-        <div className={cn(
-          'absolute z-[300] mt-1 min-w-[200px] max-w-[280px]',
-          'bg-secondary-op95 backdrop-blur-md',
-          'border border-border-op50 rounded-lg',
-          'shadow-xl',
-          'overflow-hidden',
-          s.content
-        )}>
+        <div className="ui-pop absolute mt-1 max-w-[320px]">
           {/* Search within options */}
           {(searchable || options.length > 8) && (
-            <div className="p-1.5 border-b border-border-op30">
+            <div className="pb-1.5 mb-1 border-b border-border">
               <div className="relative">
-                <MagnifyingGlass size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary" />
+                <MagnifyingGlass size={14} aria-hidden="true" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder={t('common.search')}
-                  className="w-full h-6 pl-6 pr-2 text-xs bg-bg-primary border border-border rounded text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-primary"
+                  aria-label={t('common.search')}
+                  className="ui-control pl-7"
                   autoFocus
                 />
               </div>
@@ -157,11 +151,11 @@ export function MultiSelectFilter({
           )}
 
           {/* Select All / Clear */}
-          <div className="flex items-center justify-between px-2 py-1 border-b border-border-op30">
+          <div className="flex items-center justify-between px-2.5 pb-1 mb-1 border-b border-border">
             <button
               type="button"
               onClick={selectAll}
-              className="text-2xs text-accent-primary hover:underline"
+              className="lv-text-link"
             >
               {t('common.selectAll')}
             </button>
@@ -169,7 +163,7 @@ export function MultiSelectFilter({
               <button
                 type="button"
                 onClick={clearAll}
-                className="text-2xs text-text-tertiary hover:text-text-primary"
+                className="lv-text-link"
               >
                 {t('common.clear')}
               </button>
@@ -177,7 +171,7 @@ export function MultiSelectFilter({
           </div>
 
           {/* Options list */}
-          <div className="p-1 max-h-60 overflow-auto">
+          <div className="max-h-72 overflow-auto">
             {filteredOptions.map(option => {
               const checked = selectedSet.has(option.value)
               return (
@@ -185,29 +179,23 @@ export function MultiSelectFilter({
                   key={option.value}
                   type="button"
                   onClick={() => toggleOption(option.value)}
-                  className={cn(
-                    'flex items-center gap-2 w-full rounded-md cursor-pointer outline-none',
-                    'transition-colors duration-100',
-                    'text-text-primary text-left',
-                    'hover:bg-tertiary-op80',
-                    s.item
-                  )}
+                  aria-pressed={checked}
+                  className="ui-pop-item text-xs"
                 >
-                  <div className={cn(
-                    'w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0',
-                    'transition-colors duration-150',
-                    checked 
-                      ? 'bg-accent-primary border-accent-primary' 
-                      : 'border-border bg-bg-primary'
-                  )}>
-                    {checked && <Check size={10} weight="bold" className="text-on-accent" />}
-                  </div>
+                  <span className={cn(
+                    'w-4 h-4 rounded-[3px] border flex items-center justify-center shrink-0',
+                    checked
+                      ? 'bg-accent-primary border-accent-primary'
+                      : 'border-[color:var(--control)] bg-bg-secondary'
+                  )} aria-hidden="true">
+                    {checked && <Check size={11} weight="bold" className="text-on-accent" />}
+                  </span>
                   <span className="truncate">{option.label}</span>
                 </button>
               )
             })}
             {filteredOptions.length === 0 && (
-              <div className="px-2 py-3 text-center text-text-tertiary text-xs">
+              <div className="px-2.5 py-3 text-center text-text-tertiary text-xs">
                 {t('common.noResults')}
               </div>
             )}

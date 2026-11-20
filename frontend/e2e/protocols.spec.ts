@@ -16,8 +16,8 @@ test('SCEP: a configuration saved on screen is read back', async ({ page, api })
 
 test('EST: a configuration saved on screen is read back', async ({ page, api }) => {
   await page.goto('/est-config')
-  const enable = page.getByRole('switch', { name: /Enable EST Server/ })
-  if ((await enable.getAttribute('aria-checked')) !== 'true') await enable.click()
+  const enable = page.getByRole('checkbox', { name: /Enable EST Server/ })
+  if (!(await enable.isChecked())) await enable.click()
   const user = uid('est').replace(/-/g, '')
   await page.getByLabel('Username').fill(user)
   await page.getByRole('button', { name: 'Save Configuration' }).click()

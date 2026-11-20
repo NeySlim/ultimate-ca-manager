@@ -1664,6 +1664,7 @@
     "yes": "Oui",
     "no": "Non",
     "ok": "OK",
+    "inputRequired": "Saisie requise",
     "apply": "Appliquer",
     "reset": "Réinitialiser",
     "back": "Retour",
@@ -7178,9 +7179,14 @@
     "theme": {
       "menu": "Thème",
       "label": "Thème : {{theme}}",
-      "systemNow": "Système ({{mode}})",
-      "auroreDark": "Aurore sombre",
-      "auroreLight": "Aurore clair"
+      "current": "Thème : {{name}}",
+      "system": "Système",
+      "systemNow": "{{mode}} actuellement",
+      "dark": "Sombre",
+      "light": "Clair",
+      "aurore": "Aurore sombre",
+      "auroreLight": "Aurore clair",
+      "more": "Autres thèmes"
     },
     "bell": {
       "title": "Notifications",

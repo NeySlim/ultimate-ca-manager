@@ -103,6 +103,7 @@ export function DetailHeader({
   className
 }) {
   const { isMobile } = useMobile()
+  const { t } = useTranslation()
   const [menuOpen, setMenuOpen] = useState(false)
   // Use dropdown when: mobile with 2+ actions OR desktop with 3+ actions (narrow panels)
   const showDropdown = (isMobile && actions?.length > 1) || actions?.length > 2
@@ -137,32 +138,17 @@ export function DetailHeader({
   }
 
   return (
-    <div className={cn(
-      "relative overflow-hidden rounded-xl detail-header-gradient",
-      isMobile ? "p-4" : "p-5",
-      className
-    )}>
+    <div className={cn("ui-detail-head", className)}>
       {/* Main row */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3 md:gap-4 min-w-0">
-          {Icon && (
-            <div className={cn(
-              "rounded-xl detail-icon-gradient",
-              "flex items-center justify-center shrink-0",
-              isMobile ? "w-11 h-11" : "w-14 h-14"
-            )}>
-              <Icon size={isMobile ? 22 : 28} className="text-on-accent" weight="duotone" />
-            </div>
-          )}
+          {Icon && <Icon size={19} className="text-accent-primary shrink-0" aria-hidden="true" />}
           <div className="min-w-0">
-            <h2 className={cn(
-              "font-bold text-text-primary truncate",
-              isMobile ? "text-base" : "text-xl"
-            )}>
+            <h2 className="ui-detail-title truncate">
               {title}
             </h2>
             {subtitle && (
-              <p className="text-xs md:text-sm text-text-secondary mt-0.5 truncate">
+              <p className="text-xs text-text-secondary mt-0.5 truncate">
                 {subtitle}
               </p>
             )}
@@ -181,27 +167,24 @@ export function DetailHeader({
                   size="sm"
                   onClick={() => setMenuOpen(!menuOpen)}
                 >
-                  Actions
+                  {t('common.actions')}
                   <CaretDown size={12} className={cn("transition-transform", menuOpen && "rotate-180")} />
                 </Button>
                 
                 {menuOpen && (
                   <>
                     <div className="fixed inset-0 z-40" role="presentation" onClick={() => setMenuOpen(false)} />
-                    <div className="absolute right-0 top-full mt-1 w-40 bg-bg-secondary border border-border rounded-lg shadow-lg z-50 py-1">
+                    <div className="ui-pop absolute right-0 top-full mt-1 z-50" role="menu">
                       {actions.map((action, i) => (
                         <button
                           key={i}
                           onClick={() => { setMenuOpen(false); action.onClick?.() }}
                           disabled={action.disabled}
-                          className={cn(
-                            "w-full px-3 py-2 text-left text-sm flex items-center gap-2",
-                            "hover:bg-bg-tertiary transition-colors",
-                            action.variant === 'danger' && "status-danger-text",
-                            action.disabled && "opacity-50"
-                          )}
+                          type="button"
+                          role="menuitem"
+                          className={cn('ui-pop-item', action.variant === 'danger' && 'is-danger')}
                         >
-                          {action.icon && <action.icon size={14} />}
+                          {action.icon && <span className="ui-pop-icon" aria-hidden="true"><action.icon /></span>}
                           {action.label}
                         </button>
                       ))}
@@ -232,12 +215,12 @@ export function DetailHeader({
       {/* Stats row */}
       {stats && stats.length > 0 && (
         <div className={cn(
-          "flex flex-wrap gap-4 md:gap-6 mt-4 pt-4 border-t detail-stats-border",
+          "flex flex-wrap gap-4 md:gap-6 mt-3 pt-3 border-t border-border",
         )}>
           {stats.map((stat, i) => (
             <div key={i} className="flex items-center gap-2">
-              {stat.icon && <stat.icon size={16} className="text-accent-primary" />}
-              <span className="text-xs md:text-sm text-text-secondary">
+              {stat.icon && <stat.icon size={14} className="text-text-secondary" aria-hidden="true" />}
+              <span className="text-xs text-text-secondary">
                 {stat.label} <strong className="text-text-primary">{stat.value}</strong>
               </span>
             </div>
@@ -255,43 +238,32 @@ export function DetailHeader({
  * @param {Component} icon - Optional icon component
  * @param {string} iconClass - Optional icon background class (e.g., 'icon-bg-blue')
  */
+// eslint-disable-next-line no-unused-vars
 export function DetailSection({ title, description, subtitle, actions, children, className, noBorder = false, compact = false, icon: Icon, iconClass, badge }) {
-  const { isMobile } = useMobile()
   
   return (
     <section className={cn(compact ? "py-1.5" : "py-2.5", className)}>
       {title && (
-        <div className="mb-2 flex items-center gap-2">
-          {Icon && iconClass && (
-            <div className={cn("w-6 h-6 rounded-lg flex items-center justify-center shrink-0", iconClass)}>
-              <Icon size={12} weight="fill" />
-            </div>
-          )}
+        <div className="mb-2.5 flex items-center gap-2">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className={cn(
-                "font-semibold text-text-secondary tracking-wide",
-                isMobile ? "text-xs" : "text-sm"
-              )}>
+              <h2 className="ui-section-title !mb-0">
+                {Icon && <Icon aria-hidden="true" />}
                 {title}
               </h2>
               {badge}
             </div>
             {description && (
-              <p className="text-xs text-text-tertiary mt-0.5">{description}</p>
+              <p className="text-xs text-text-tertiary mt-1">{description}</p>
             )}
           </div>
         </div>
       )}
       {/* Content in a framed card - uses theme-aware class */}
-      <div className={cn(
-        "rounded-lg",
-        compact ? "p-2" : "p-2.5",
-        !noBorder && "detail-section-frame"
-      )}>
+      <div className={cn(!noBorder && 'ui-detail-frame', !noBorder && compact && 'is-compact')}>
         {(subtitle || actions) && (
           <div className="flex items-center justify-between gap-4 mb-3">
-            {subtitle && <p className="text-sm text-text-secondary">{subtitle}</p>}
+            {subtitle && <p className="text-xs text-text-secondary">{subtitle}</p>}
             {actions && <div className="flex gap-2 shrink-0">{actions}</div>}
           </div>
         )}
@@ -338,13 +310,12 @@ export function DetailField({
   mono = false, 
   copyable = false,
   fullWidth = false,
-  compact = false,
+  compact: _compact = false,
   className 
 }) {
   // useClipboard owns both the "did it work" answer and the reset timer.
   const { copy, isCopied } = useClipboard()
   const copied = isCopied()
-  const { isMobile } = useMobile()
   const { t } = useTranslation()
   
   const handleCopy = () => {
@@ -353,19 +324,14 @@ export function DetailField({
   
   return (
     <div className={cn(
-      "rounded-md detail-field-frame",
-      compact ? "p-1.5" : "p-2",
+      "ui-detail-field",
       fullWidth && "col-span-full",
       className
     )}>
-      <dt className={cn(
-        "text-text-tertiary uppercase tracking-wide",
-        compact ? "text-3xs mb-0.5" : "text-2xs mb-0.5"
-      )}>{label}</dt>
+      <dt>{label}</dt>
       <dd 
         className={cn(
-          "font-mono text-text-primary break-all",
-          compact ? "text-2xs" : "text-xs",
+          mono && "font-mono",
           copyable && "cursor-pointer hover:text-accent-primary transition-colors flex items-center gap-2"
         )}
         onClick={copyable ? handleCopy : undefined}
@@ -415,32 +381,23 @@ export function DetailTabs({ tabs, activeTab, onChange, className }) {
   const { isMobile } = useMobile()
   
   return (
-    <div className={cn("border-b border-border bg-secondary-op30", className)}>
+    <div className={className}>
       <div className={cn(
-        "flex",
-        isMobile ? "overflow-x-auto scrollbar-hide gap-0 px-4" : "gap-0 px-6"
+        "ui-tabs-list",
+        isMobile ? "overflow-x-auto scrollbar-hide px-4" : "px-6"
       )}>
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => onChange(tab.id)}
-            className={cn(
-              "flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap",
-              "border-b-2 transition-all -mb-px",
-              activeTab === tab.id
-                ? "border-accent-primary text-accent-primary bg-accent-primary-op5"
-                : "border-transparent text-text-secondary hover:text-text-primary hover:bg-tertiary-op50"
-            )}
+            type="button"
+            data-state={activeTab === tab.id ? 'active' : 'inactive'}
+            className="ui-tab whitespace-nowrap"
           >
-            {tab.icon && <tab.icon size={16} />}
+            {tab.icon && <tab.icon aria-hidden="true" />}
             {tab.label}
             {tab.count !== undefined && (
-              <span className={cn(
-                "ml-1 px-1.5 py-0.5 rounded text-xs",
-                activeTab === tab.id ? "bg-accent-primary-op20" : "bg-bg-tertiary"
-              )}>
-                {tab.count}
-              </span>
+              <span className="lv-counter">{tab.count}</span>
             )}
           </button>
         ))}
@@ -459,6 +416,7 @@ export function DetailTabs({ tabs, activeTab, onChange, className }) {
  * @param {boolean} collapsible - Allow expand/collapse
  * @param {boolean} defaultOpen - Initial state if collapsible
  */
+// eslint-disable-next-line no-unused-vars
 export function CompactSection({ title, children, className, collapsible = false, defaultOpen = true, icon: Icon, iconClass, onToggle }) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
   const rootRef = useRef(null)
@@ -477,37 +435,18 @@ export function CompactSection({ title, children, className, collapsible = false
   }, [collapsible, onToggle])
 
   return (
-    <div ref={rootRef} className={cn(
-      "border border-border rounded-lg overflow-hidden",
-      "shadow-sm hover:shadow transition-shadow duration-200",
-      className
-    )}>
+    <div ref={rootRef} className={cn("ui-compact", className)}>
       <button
         type="button"
         onClick={() => { if (collapsible) { setIsOpen(!isOpen); onToggle?.(!isOpen) } }}
-        className={cn(
-          "w-full px-3 py-2 flex items-center justify-between text-left relative",
-          "section-header-gradient",
-          "border-b border-border-op30",
-          collapsible && "cursor-pointer transition-all",
-          !collapsible && "cursor-default"
-        )}
+        className={cn("ui-compact-head", isOpen && "is-open", !collapsible && "is-static")}
         disabled={!collapsible}
         aria-expanded={collapsible ? isOpen : undefined}
       >
-        {/* Subtle accent line on left - uses theme accent */}
-        <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-accent-25" />
-        
-        <div className="flex items-center gap-2">
-          {Icon && (
-            <div className={cn("w-5 h-5 rounded flex items-center justify-center", iconClass || "bg-tertiary-60")}>
-              <Icon size={12} className={iconClass ? "" : "text-accent-70"} weight="bold" />
-            </div>
-          )}
-          <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
-            {title}
-          </h4>
-        </div>
+        <span className="flex items-center gap-2 min-w-0">
+          {Icon && <Icon size={15} className="text-text-secondary shrink-0" aria-hidden="true" />}
+          <h4>{title}</h4>
+        </span>
         {collapsible && (
           <CaretDown 
             size={14} 
@@ -523,7 +462,7 @@ export function CompactSection({ title, children, className, collapsible = false
         isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
       )}>
         <div className="overflow-hidden">
-          <div className="p-3">
+          <div className="ui-compact-body">
             {children}
           </div>
         </div>
@@ -598,12 +537,10 @@ export function CompactField({
         colSpan && `col-span-${colSpan}`,
         className
       )}>
-        <div className="w-5 h-5 rounded bg-tertiary-op50 flex items-center justify-center shrink-0 mt-0.5">
-          <Icon size={11} className="text-text-tertiary" />
-        </div>
+        <Icon size={14} className="text-text-tertiary shrink-0 mt-0.5" aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          <div className="text-2xs text-text-tertiary uppercase tracking-wider" title={hint}>{label}</div>
-          <div className="text-xs font-mono text-text-primary break-all">
+          <div className="text-xs text-text-tertiary" title={hint}>{label}</div>
+          <div className={cn("text-xs text-text-primary break-all", mono && "font-mono")}>
             {content}
           </div>
         </div>
@@ -636,7 +573,7 @@ export function CompactField({
       onClick={copyable ? handleCopy : undefined}
     >
       <span className="text-text-tertiary" title={hint}>{label}:</span>
-      <span className="ml-1 font-mono text-xs text-text-primary">
+      <span className={cn("ml-1 text-xs text-text-primary", mono && "font-mono")}>
         {content}
       </span>
       {copyable && (
@@ -659,7 +596,7 @@ export function CompactStats({ stats, className }) {
   return (
     <div className={cn(
       "flex items-center justify-between text-xs",
-      "bg-tertiary-op50 rounded-lg px-3 py-2 border border-border",
+      "rounded-[5px] px-3 py-2 border border-border",
       className
     )}>
       {stats.map((stat, i) => (
@@ -693,7 +630,7 @@ export function CompactActions({ children, className }) {
  */
 export function CompactHeader({ 
   icon: Icon, 
-  iconClass,
+  iconClass: _iconClass,
   title, 
   subtitle, 
   badge,
@@ -702,16 +639,11 @@ export function CompactHeader({
   return (
     <div className={cn("flex items-start gap-3 pb-3 border-b border-border", className)}>
       {Icon && (
-        <div className={cn(
-          "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
-          iconClass || "bg-accent-primary-op20"
-        )}>
-          <Icon size={20} className="text-accent-primary" />
-        </div>
+        <Icon size={19} className="text-accent-primary shrink-0 mt-0.5" aria-hidden="true" />
       )}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
-          <h3 className="font-semibold text-text-primary truncate">{title}</h3>
+          <h3 className="ui-detail-title truncate">{title}</h3>
           {badge}
         </div>
         {subtitle && (

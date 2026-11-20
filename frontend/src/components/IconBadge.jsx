@@ -28,38 +28,33 @@ const sizes = {
   xl: 'w-14 h-14',    // 56px
 }
 
+// The mockup draws an icon bare, in its tone: no tile behind it (the box keeps its room)
 const iconSizes = {
-  table: 14,  // Dense tables
+  table: 14,
   xs: 12,
   sm: 16,
-  md: 20,
-  lg: 24,
-  xl: 28,
+  md: 17,
+  lg: 20,
+  xl: 24,
 }
 
-// Color mappings using CSS variables (theme-aware)
 const colorStyles = {
-  // Primary colors
-  blue: 'icon-bg-blue icon-text-blue',
-  violet: 'icon-bg-violet icon-text-violet',
-  purple: 'icon-bg-violet icon-text-violet', // alias
-  emerald: 'icon-bg-emerald icon-text-emerald',
-  green: 'icon-bg-emerald icon-text-emerald', // alias
-  teal: 'icon-bg-teal icon-text-teal',
-  orange: 'icon-bg-orange icon-text-orange',
-  amber: 'icon-bg-amber icon-text-amber',
-  yellow: 'icon-bg-amber icon-text-amber', // alias
-  
-  // Semantic colors (use accent CSS vars)
-  primary: 'bg-accent-primary-op15 text-accent-primary',
-  success: 'bg-accent-success-op15 text-accent-success',
-  warning: 'bg-accent-warning-op15 text-accent-warning',
-  danger: 'bg-accent-danger-op15 text-accent-danger',
-  
-  // Neutral
-  slate: 'bg-bg-tertiary text-text-secondary',
-  neutral: 'bg-bg-tertiary text-text-secondary',
-  muted: 'bg-tertiary-op50 text-text-tertiary',
+  blue: 'is-accent',
+  violet: 'is-accent',
+  purple: 'is-accent',
+  emerald: 'is-good',
+  green: 'is-good',
+  teal: 'is-accent',
+  orange: 'is-warn',
+  amber: 'is-warn',
+  yellow: 'is-warn',
+  primary: 'is-accent',
+  success: 'is-good',
+  warning: 'is-warn',
+  danger: 'is-bad',
+  slate: '',
+  neutral: '',
+  muted: '',
 }
 
 export function IconBadge({
@@ -68,35 +63,22 @@ export function IconBadge({
   size = 'md',
   className,
   iconClassName,
-  rounded = 'xl', // 'full', 'xl', 'lg', 'md', 'sm', 'none'
-  weight = 'duotone',
+  // eslint-disable-next-line no-unused-vars
+  rounded,
+  weight = 'regular',
   ...props
 }) {
-  const roundedClasses = {
-    full: 'rounded-full',
-    xl: 'rounded-xl',
-    lg: 'rounded-lg',
-    md: 'rounded-md',
-    sm: 'rounded-sm',
-    none: 'rounded-none',
-  }
-
   return (
     <div
-      className={cn(
-        sizes[size],
-        roundedClasses[rounded],
-        'flex items-center justify-center shrink-0 transition-all duration-200',
-        colorStyles[color] || colorStyles.neutral,
-        className
-      )}
+      className={cn('ui-icon', sizes[size], colorStyles[color] ?? '', className)}
       {...props}
     >
       {Icon && (
-        <Icon 
-          size={iconSizes[size]} 
+        <Icon
+          size={iconSizes[size]}
           weight={weight}
-          className={cn('transition-colors', iconClassName)}
+          aria-hidden="true"
+          className={iconClassName}
         />
       )}
     </div>
@@ -116,24 +98,16 @@ export function IconAvatar({
     <div
       className={cn(
         sizes[size],
-        'rounded-full flex items-center justify-center shrink-0 font-medium',
-        colorStyles[color] || colorStyles.neutral,
+        'ui-icon rounded-full border border-border text-xs',
+        colorStyles[color] ?? '',
         className
       )}
       {...props}
     >
       {Icon ? (
-        <Icon size={iconSizes[size]} weight="duotone" />
+        <Icon size={iconSizes[size]} aria-hidden="true" />
       ) : initials ? (
-        <span className={cn(
-          size === 'xs' && 'text-2xs',
-          size === 'sm' && 'text-xs',
-          size === 'md' && 'text-sm',
-          size === 'lg' && 'text-base',
-          size === 'xl' && 'text-lg',
-        )}>
-          {initials}
-        </span>
+        <span>{initials}</span>
       ) : null}
     </div>
   )

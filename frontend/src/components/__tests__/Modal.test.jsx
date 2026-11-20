@@ -31,17 +31,22 @@ describe('Modal Component', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('applies size class', () => {
-    render(<Modal {...defaultProps} size="lg" />)
-    expect(screen.getByRole('dialog').className).toContain('max-w-4xl')
+  // Widths of the mockup's dialog: narrow 520 (sm), default 760 (md), wide 920 (lg, xl)
+  it('takes the mockup width for each size', () => {
+    const { rerender } = render(<Modal {...defaultProps} size="sm" />)
+    expect(screen.getByRole('dialog').className).toMatch(/\blv-dialog\b.*\bis-narrow\b/)
+    rerender(<Modal {...defaultProps} size="md" />)
+    expect(screen.getByRole('dialog').className).not.toMatch(/is-narrow|is-wide/)
+    for (const size of ['lg', 'xl']) {
+      rerender(<Modal {...defaultProps} size={size} />)
+      expect(screen.getByRole('dialog').className).toContain('is-wide')
+    }
   })
 
-  it('renders different sizes', () => {
-    const { rerender } = render(<Modal {...defaultProps} size="sm" />)
-    expect(screen.getByRole('dialog').className).toContain('max-w-md')
-    
-    rerender(<Modal {...defaultProps} size="xl" />)
-    expect(screen.getByRole('dialog').className).toContain('max-w-6xl')
+  it('names its close button and its title', () => {
+    render(<Modal {...defaultProps} />)
+    expect(screen.getByRole('dialog', { name: 'Test Modal' })).toBeInTheDocument()
+    expect(screen.getByRole('button').getAttribute('aria-label')).toBeTruthy()
   })
 
   it('hides close button when showClose is false', () => {

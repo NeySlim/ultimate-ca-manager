@@ -27,6 +27,7 @@
     "yes": "Да",
     "no": "Нет",
     "ok": "ОК",
+    "inputRequired": "Требуется ввод",
     "apply": "Применить",
     "reset": "Сбросить",
     "back": "Назад",
@@ -7350,9 +7351,14 @@
     "theme": {
       "menu": "Тема",
       "label": "Тема: {{theme}}",
-      "systemNow": "Системная ({{mode}})",
-      "auroreDark": "Aurore тёмная",
-      "auroreLight": "Aurore светлая"
+      "current": "Тема: {{name}}",
+      "system": "Системная",
+      "systemNow": "сейчас {{mode}}",
+      "dark": "Тёмная",
+      "light": "Светлая",
+      "aurore": "Аврора тёмная",
+      "auroreLight": "Аврора светлая",
+      "more": "Другие темы"
     },
     "bell": {
       "title": "Уведомления",

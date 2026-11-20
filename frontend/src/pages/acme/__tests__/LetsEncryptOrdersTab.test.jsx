@@ -98,8 +98,8 @@ describe('LetsEncryptOrdersTab', () => {
     const onToggleRenewal = vi.fn()
     const order = { id: 1, primary_domain: 'a.example.com', status: 'issued', environment: 'production', renewal_enabled: true }
     renderTab({ clientOrders: [order], selectedClientOrder: order, onToggleRenewal, canWrite: true })
-    const toggle = screen.getByRole('switch')
-    expect(toggle).toHaveAttribute('aria-checked', 'true')
+    const toggle = screen.getByRole('checkbox')
+    expect(toggle).toBeChecked()
     fireEvent.click(toggle)
     expect(onToggleRenewal).toHaveBeenCalledWith(order, false)
     expect(noop).not.toHaveBeenCalled()  // the card stays selected
@@ -108,8 +108,8 @@ describe('LetsEncryptOrdersTab', () => {
   it('keeps the switch read-only without write permission', () => {
     const order = { id: 1, primary_domain: 'a.example.com', status: 'issued', environment: 'production', renewal_enabled: false }
     renderTab({ clientOrders: [order], selectedClientOrder: order, onToggleRenewal: vi.fn() })
-    expect(screen.getByRole('switch')).toBeDisabled()
-    expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('checkbox')).toBeDisabled()
+    expect(screen.getByRole('checkbox')).not.toBeChecked()
   })
 
   it.each([
@@ -118,7 +118,7 @@ describe('LetsEncryptOrdersTab', () => {
   ])('offers no switch on %j', (fields) => {
     const order = { id: 1, primary_domain: 'a.example.com', status: 'issued', environment: 'production', ...fields }
     renderTab({ clientOrders: [order], selectedClientOrder: order, onToggleRenewal: vi.fn(), canWrite: true })
-    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
   })
 
   it('refreshes from the dedicated view', () => {

@@ -79,7 +79,7 @@ test.describe('preferences', () => {
     const { page } = await signIn(user.username, user.password)
     await page.goto('/')
     await page.getByRole('button', { name: /^Theme: / }).click()
-    await page.getByRole('radiogroup', { name: 'Appearance Mode' }).getByRole('radio', { name: 'Dark' }).click()
+    await page.getByRole('menu', { name: 'Theme' }).getByRole('menuitemradio', { name: 'Dark', exact: true }).click()
 
     await expect(page.locator('html')).toHaveAttribute('data-mode', 'dark')
     await page.reload()

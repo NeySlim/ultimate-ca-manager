@@ -43,7 +43,7 @@ describe('Select Component', () => {
 
   it('applies custom className', () => {
     render(<SelectComponent options={defaultOptions} className="custom-class" />)
-    const wrapper = screen.getByRole('combobox').closest('[class*="space-y"]')
+    const wrapper = screen.getByRole('combobox').closest('.ui-field')
     expect(wrapper.className).toContain('custom-class')
   })
 })

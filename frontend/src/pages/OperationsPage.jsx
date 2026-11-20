@@ -976,7 +976,7 @@ export default function OperationsPage() {
             <select
               value={bulkResourceType}
               onChange={(e) => { const v = e.target.value; setBulkResourceType(v); try { localStorage.setItem('ucm-ops-resource-type', v) } catch {}; setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()); setBulkSearch(''); setBulkPage(1); seenItemsRef.current.clear() }}
-              className="w-full appearance-none px-3 py-2.5 pr-10 rounded-lg border border-border bg-bg-primary text-text-primary text-sm font-medium focus:ring-2 focus:ring-accent-primary-op30 focus:border-accent-primary"
+              className="ui-control w-full appearance-none pr-10"
             >
               {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
                 const count = resourceCounts[key]
@@ -1032,7 +1032,7 @@ export default function OperationsPage() {
                   value={bulkSearch}
                   onChange={(e) => { setBulkSearch(e.target.value); setBulkPage(1) }}
                   placeholder={t('common.search')}
-                  className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-border bg-bg-primary text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary-op30 focus:border-accent-primary transition-all"
+                  className="ui-control pl-8"
                 />
               </div>
 
@@ -1042,7 +1042,7 @@ export default function OperationsPage() {
                   <select
                     value={statusFilter}
                     onChange={(e) => { setStatusFilter(e.target.value); setBulkPage(1) }}
-                    className="appearance-none shrink-0 px-2.5 py-1.5 pr-7 text-[13px] rounded-lg border border-border bg-bg-primary text-text-primary focus:ring-2 focus:ring-accent-primary-op30 focus:border-accent-primary"
+                    className="ui-control is-filter shrink-0"
                   >
                     <option value="">{t('common.allStatuses', 'All Statuses')}</option>
                     <option value="valid">{t('common.valid', 'Valid')}</option>
@@ -1052,7 +1052,7 @@ export default function OperationsPage() {
                   <select
                     value={caFilter}
                     onChange={(e) => { setCaFilter(e.target.value); setBulkPage(1) }}
-                    className="appearance-none shrink-0 px-2.5 py-1.5 pr-7 text-[13px] rounded-lg border border-border bg-bg-primary text-text-primary focus:ring-2 focus:ring-accent-primary-op30 focus:border-accent-primary max-w-[180px] truncate"
+                    className="ui-control is-filter shrink-0 truncate"
                   >
                     <option value="">{t('common.allCAs', 'All CAs')}</option>
                     {cas.map(ca => (
@@ -1063,26 +1063,24 @@ export default function OperationsPage() {
               )}
 
               {/* View mode toggle */}
-              <div className="flex items-center bg-bg-secondary rounded-lg p-0.5 border border-border shrink-0">
+              <div className="ui-segmented shrink-0" role="group">
                 <button
+                  type="button"
                   onClick={() => setBulkViewMode('table')}
-                  className={cn(
-                    "p-1.5 rounded-md transition-all",
-                    bulkViewMode === 'table' ? "bg-accent-primary text-on-accent shadow-sm" : "text-text-secondary hover:text-text-primary"
-                  )}
+                  aria-pressed={bulkViewMode === 'table'}
+                  aria-label={t('operations.tableView', 'Table View')}
                   title={t('operations.tableView', 'Table View')}
                 >
-                  <Table size={16} />
+                  <Table size={16} aria-hidden="true" />
                 </button>
                 <button
+                  type="button"
                   onClick={() => setBulkViewMode('basket')}
-                  className={cn(
-                    "p-1.5 rounded-md transition-all",
-                    bulkViewMode === 'basket' ? "bg-accent-primary text-on-accent shadow-sm" : "text-text-secondary hover:text-text-primary"
-                  )}
+                  aria-pressed={bulkViewMode === 'basket'}
+                  aria-label={t('operations.basketView', 'Basket View')}
                   title={t('operations.basketView', 'Basket View')}
                 >
-                  <ShoppingCart size={16} />
+                  <ShoppingCart size={16} aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -1203,7 +1201,7 @@ export default function OperationsPage() {
               <select
                 value={bulkRevokeReason}
                 onChange={(e) => setBulkRevokeReason(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-bg-primary text-text-primary"
+                className="ui-control w-full"
               >
                 {REVOCATION_REASONS.map(r => (
                   <option key={r} value={r}>{t(`revocation.reasons.${r}`)}</option>
@@ -1248,7 +1246,7 @@ export default function OperationsPage() {
               <select
                 value={bulkSignCaId}
                 onChange={(e) => setBulkSignCaId(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-bg-primary text-text-primary"
+                className="ui-control w-full"
               >
                 <option value="">{t('common.selectCA', 'Select CA...')}</option>
                 {listedForIssuance(signingCas(cas), showHiddenCas, bulkSignCaId).map(ca => (

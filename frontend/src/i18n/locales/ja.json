@@ -25,6 +25,7 @@
     "yes": "はい",
     "no": "いいえ",
     "ok": "OK",
+    "inputRequired": "Input required",
     "apply": "適用",
     "reset": "リセット",
     "back": "戻る",
@@ -7178,9 +7179,14 @@
     "theme": {
       "menu": "テーマ",
       "label": "テーマ: {{theme}}",
-      "systemNow": "システム（{{mode}}）",
-      "auroreDark": "Aurore ダーク",
-      "auroreLight": "Aurore ライト"
+      "current": "Theme: {{name}}",
+      "system": "System",
+      "systemNow": "{{mode}} currently",
+      "dark": "Dark",
+      "light": "Light",
+      "aurore": "Aurore dark",
+      "auroreLight": "Aurore light",
+      "more": "More themes"
     },
     "bell": {
       "title": "通知",

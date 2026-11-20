@@ -9,7 +9,7 @@ import { cn } from '../../lib/utils'
 import './list.css'
 
 /** narrow: 520 px (default); wide: 920 px, as the mockup's dialog.wide; neither: 760 px. */
-export function ListDialog({ open, onOpenChange, title, subtitle, narrow = true, wide = false, children, className, testId }) {
+export function ListDialog({ open, onOpenChange, title, subtitle, narrow = true, wide = false, closable = true, children, className, testId }) {
   const { t } = useTranslation()
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -22,9 +22,11 @@ export function ListDialog({ open, onOpenChange, title, subtitle, narrow = true,
               <Dialog.Title asChild><h2>{title}</h2></Dialog.Title>
               {subtitle && <p>{subtitle}</p>}
             </div>
-            <Dialog.Close className="lv-btn is-icon is-quiet" aria-label={t('common.closeWindow')}>
-              <X size={16} aria-hidden="true" />
-            </Dialog.Close>
+            {closable && (
+              <Dialog.Close className="lv-btn is-icon is-quiet" aria-label={t('common.closeWindow')}>
+                <X size={16} aria-hidden="true" />
+              </Dialog.Close>
+            )}
           </header>
           <div className="lv-dialog-body">{children}</div>
         </Dialog.Content>

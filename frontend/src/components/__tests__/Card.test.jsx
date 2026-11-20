@@ -23,49 +23,24 @@ describe('Card Component', () => {
     expect(handleClick).toHaveBeenCalledTimes(1)
   })
 
-  it('renders with default variant (card-soft)', () => {
-    const { container } = render(<Card>Content</Card>)
+  // Every variant is the mockup's panel: one frame, no elevation, gradient or double border
+  it.each(['default', 'elevated', 'bordered', 'soft'])('renders the %s variant as the Atelier panel', (variant) => {
+    const { container } = render(<Card variant={variant}>Content</Card>)
     const card = container.firstChild
-    expect(card.className).toContain('card-soft')
-  })
-
-  it('renders with elevated variant', () => {
-    const { container } = render(<Card variant="elevated">Content</Card>)
-    const card = container.firstChild
-    expect(card.className).toContain('elevation-2')
-  })
-
-  it('applies accent border', () => {
-    const { container } = render(<Card accent="primary">Accented</Card>)
-    const card = container.firstChild
-    expect(card.className).toContain('border-l-4')
-    expect(card.className).toContain('border-l-accent-primary')
+    expect(card.className).toContain('ui-panel')
+    expect(card.className).not.toMatch(/card-soft|elevation-|border-2|rounded-xl|card-interactive/)
   })
 
   it('renders interactive card', () => {
     const { container } = render(<Card interactive>Interactive</Card>)
-    const card = container.firstChild
-    expect(card.className).toContain('card-interactive')
+    expect(container.firstChild.className).toContain('is-interactive')
   })
 
-  it('renders with bordered variant', () => {
-    const { container } = render(<Card variant="bordered">Content</Card>)
-    const card = container.firstChild
-    expect(card.className).toContain('border-2')
-  })
-
-  it('renders with soft variant (same as default)', () => {
-    const { container } = render(<Card variant="soft">Content</Card>)
-    const card = container.firstChild
-    expect(card.className).toContain('card-soft')
-  })
-
-  it('applies different accent colors', () => {
-    const colors = ['success', 'warning', 'danger', 'info', 'purple']
+  it('keeps the accent rule in its tone', () => {
+    const colors = ['primary', 'success', 'warning', 'danger', 'info', 'purple']
     colors.forEach(color => {
       const { container } = render(<Card accent={color}>Content</Card>)
-      const card = container.firstChild
-      expect(card.className).toContain(`border-l-accent-${color === 'info' ? 'primary' : color}`)
+      expect(container.firstChild.className).toContain(`is-accent-${color}`)
     })
   })
 })
@@ -77,7 +52,7 @@ describe('Card.Header', () => {
         <Card.Header title="Test Title" subtitle="Test Subtitle" />
       </Card>
     )
-    expect(screen.getByText('Test Title')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Test Title' }).closest('.ui-panel-heading')).not.toBeNull()
     expect(screen.getByText('Test Subtitle')).toBeInTheDocument()
   })
 

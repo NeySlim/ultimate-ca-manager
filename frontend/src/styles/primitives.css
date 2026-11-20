@@ -1,0 +1,320 @@
+/*
+ * Base components at the geometry of the Atelier mockup: buttons (on .lv-btn), fields,
+ * check lines, dialogs, menus, tooltips, frames, badges, plain tables. Theme tokens only;
+ * Aurore effects sit under its family selector.
+ */
+
+/* Buttons: .lv-btn of the list template carries the geometry; these add what it lacks */
+.lv-btn.is-danger { color: var(--bad); border-color: var(--bad); background: var(--badbg); }
+.lv-btn.is-warn { color: var(--warn); border-color: var(--warn-fill); background: var(--warnbg); }
+.ui-btn { font-family: inherit; line-height: normal; text-decoration: none; }
+.ui-btn > svg { width: 17px; height: 17px; }
+.ui-btn.is-icon > svg { width: 16px; height: 16px; }
+.ui-btn.is-small > svg { width: 14px; height: 14px; }
+.ui-btn.is-loading { pointer-events: none; }
+.ui-btn .ui-spin { width: 16px; height: 16px; animation: ui-spin 0.9s linear infinite; }
+@keyframes ui-spin { to { transform: rotate(360deg); } }
+
+/* Fields: label 12 px, 36 px control, hint and error 12 px */
+.ui-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; font-size: 12px; color: var(--text); }
+.ui-label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 400; color: var(--text); }
+.ui-label-side { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ui-required { color: var(--bad); }
+.ui-set { display: inline-flex; align-items: center; gap: 4px; color: var(--good); }
+.ui-set svg { width: 12px; height: 12px; }
+.ui-control-wrap { position: relative; display: flex; min-width: 0; }
+.ui-control {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid var(--control);
+  border-radius: 4px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  line-height: normal;
+}
+textarea.ui-control { min-height: 80px; resize: vertical; }
+.ui-control::placeholder { color: var(--muted); opacity: 1; }
+.ui-control:disabled { opacity: 0.6; cursor: not-allowed; }
+.ui-control[readonly] { background-color: var(--raised) !important; color: var(--text); }
+.ui-control[aria-invalid="true"],
+.ui-select-trigger[aria-invalid="true"] { border-color: var(--bad); box-shadow: 0 0 0 1px var(--bad); }
+.ui-control.has-icon { padding-left: 34px; }
+.ui-control.has-reveal { padding-right: 46px; }
+.ui-control-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); display: flex; color: var(--muted); pointer-events: none; }
+.ui-control-icon svg { width: 16px; height: 16px; }
+.ui-reveal { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; justify-content: center; width: 36px; min-height: 30px; padding: 0; background: transparent; border: 0; border-radius: 4px; color: var(--muted); cursor: pointer; }
+.ui-reveal:hover { background: var(--hover); color: var(--text); }
+.ui-reveal svg { width: 16px; height: 16px; }
+.ui-help { margin: 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.ui-error { display: flex; align-items: flex-start; gap: 6px; margin: 0; font-size: 12px; line-height: 1.5; color: var(--bad); }
+.ui-error svg { width: 13px; height: 13px; margin-top: 2px; flex-shrink: 0; }
+.ui-meter { display: flex; gap: 4px; }
+.ui-meter span { flex: 1; height: 4px; border-radius: 2px; background: var(--line); }
+.ui-meter span.is-bad { background: var(--bad); }
+.ui-meter span.is-warn { background: var(--warn-fill); }
+.ui-meter span.is-good { background: var(--good); }
+.ui-meter-label { margin: 0; font-size: 12px; }
+.ui-meter-label.is-bad { color: var(--bad); }
+.ui-meter-label.is-warn { color: var(--warn); }
+.ui-meter-label.is-good { color: var(--good); }
+
+/* Select trigger of a form: the 36 px field; the menu is the mockup's pop menu */
+.ui-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid var(--control);
+  border-radius: 4px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  line-height: normal;
+  text-align: left;
+  cursor: pointer;
+}
+.ui-select-trigger[data-placeholder] { color: var(--muted); }
+.ui-select-trigger:disabled { opacity: 0.6; cursor: not-allowed; }
+.ui-select-trigger > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-select-trigger svg { width: 14px; height: 14px; flex-shrink: 0; color: var(--muted); }
+.ui-pop {
+  z-index: 300;
+  min-width: 220px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--control);
+  border-radius: 6px;
+  box-shadow: 0 18px 50px color-mix(in srgb, var(--ink) 40%, transparent);
+  color: var(--text);
+  font-size: 13px;
+}
+.ui-pop-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+}
+.ui-pop-item:hover, .ui-pop-item[data-highlighted] { background: var(--hover); }
+.ui-pop-item[data-disabled], .ui-pop-item:disabled { opacity: 0.42; cursor: not-allowed; }
+.ui-pop-item > svg { width: 17px; height: 17px; flex-shrink: 0; }
+.ui-pop-item.is-danger { color: var(--bad); }
+.ui-pop-item[aria-checked="true"], .ui-pop-item[data-state="checked"] { color: var(--accent); font-weight: 500; }
+.ui-pop-label { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.ui-pop-label small { font-size: 12px; font-weight: 400; color: var(--muted); }
+.ui-pop-check { display: flex; color: var(--accent); }
+.ui-pop-check svg { width: 17px; height: 17px; }
+.ui-pop-hint { margin-left: auto; font-size: 12px; color: var(--muted); }
+.ui-pop-sep { height: 1px; margin: 6px 4px; background: var(--line); }
+.ui-pop-heading { padding: 6px 10px 4px; font-size: 12px; font-weight: 500; color: var(--muted); }
+
+/* Check line: a 16 px native box and its label on one line */
+.ui-check-line { display: flex; align-items: center; gap: 10px; min-height: 36px; font-size: 12px; font-weight: 400; color: var(--text); cursor: pointer; }
+.ui-check-line.has-desc { align-items: flex-start; padding: 4px 0; }
+.ui-check-line.has-desc input { margin-top: 1px; }
+.ui-check-line.is-disabled { opacity: 0.6; cursor: not-allowed; }
+.ui-check-line.is-disabled input { cursor: not-allowed; }
+.ui-check-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ui-check-text small { display: block; font-size: 12px; color: var(--muted); }
+
+/* Dialogs on the frame of the list dialog: widths of the mockup and legacy bodies normalised */
+.lv-dialog.is-wide { width: min(920px, calc(100vw - 32px)); }
+.ui-modal .lv-dialog-body > :is(.p-2, .p-3, .p-4, .p-5, .p-6),
+.ui-modal .lv-dialog-body > form > :is(.p-2, .p-3, .p-4, .p-5, .p-6) { padding: 0; }
+.ui-modal .lv-dialog-body :is(.text-sm, .text-base) { font-size: 13px; }
+/* A footer row of buttons under a rule is the mockup's modal actions */
+.ui-modal :is(.ui-dialog-actions, .border-t.justify-end:last-child) {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 22px;
+  padding: 20px 0 0;
+  border-top: 1px solid var(--line);
+}
+.ui-modal :is(.ui-dialog-actions, .border-t.justify-end:last-child) .lv-btn { min-height: 36px; }
+.ui-dialog-message { margin: 0; font-size: 13px; line-height: 1.8; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ui-dialog-message + .ui-field { margin-top: 18px; }
+
+/* Tooltip */
+.ui-tip { z-index: 300; max-width: min(320px, calc(100vw - 32px)); padding: 4px 8px; background: var(--raised); border: 1px solid var(--control); border-radius: 4px; color: var(--text); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.ui-help-tip { display: inline-flex; align-items: center; justify-content: center; margin-left: 4px; padding: 0; background: none; border: 0; border-radius: 3px; color: var(--muted); cursor: help; }
+.ui-help-tip:hover { color: var(--accent); background: none; }
+.ui-help-tip svg { width: 13px; height: 13px; }
+
+/* Frames: the mockup panel, a heading in sentence case, no gradient or shadow */
+.ui-panel { min-width: 0; overflow: hidden; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; color: var(--text); font-size: 12px; }
+.ui-panel.is-interactive { cursor: pointer; }
+.ui-panel.is-interactive:hover { background: var(--hover); }
+.ui-panel.is-accent-primary, .ui-panel.is-accent-info { border-left: 4px solid var(--accent); }
+.ui-panel.is-accent-success { border-left: 4px solid var(--good); }
+.ui-panel.is-accent-warning { border-left: 4px solid var(--warn-fill); }
+.ui-panel.is-accent-danger { border-left: 4px solid var(--bad); }
+.ui-panel.is-accent-purple { border-left: 4px solid var(--control); }
+.ui-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 17px 19px; border-bottom: 1px solid var(--line); }
+.ui-panel-heading > div:first-child { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ui-panel-heading > div:first-child > svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--accent); }
+.ui-panel-heading h2, .ui-panel-heading h3 { margin: 0; font-size: 14px; font-weight: 600; color: var(--text); }
+.ui-panel-heading p { margin: 5px 0 0; font-size: 12px; color: var(--muted); }
+.ui-panel-content { padding: 18px 20px; }
+.ui-panel-foot { padding: 12px 20px; border-top: 1px solid var(--line); }
+.ui-section-title { display: flex; align-items: center; gap: 7px; margin: 0 0 12px; font-size: 12px; font-weight: 500; color: var(--muted); text-transform: none; letter-spacing: 0; }
+.ui-section-title svg { width: 14px; height: 14px; }
+
+/* Notice: the mockup's information band */
+.ui-notice { display: flex; align-items: flex-start; gap: 9px; padding: 11px 13px; background: var(--raised); border-radius: 4px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.ui-notice > svg { width: 14px; height: 14px; margin-top: 2px; flex-shrink: 0; }
+.ui-notice.is-warn { color: var(--warn); background: var(--warnbg); }
+.ui-notice.is-bad { color: var(--bad); background: var(--badbg); }
+.ui-notice.is-good { color: var(--good); background: var(--goodbg); }
+.ui-notice strong { color: inherit; font-weight: 600; }
+.ui-notice-body { flex: 1; min-width: 0; }
+.ui-notice ul { margin: 4px 0 0; padding-left: 17px; }
+
+/* Badges: text and icon in the tone's colour, nothing behind (pill in Aurore) */
+.lv-pill.is-accent { color: var(--accent); }
+.ui-badge { font-weight: 400; }
+.ui-badge.is-chip { padding: 3px 6px; border: 1px solid var(--line); border-radius: 4px; }
+.ui-badge .ui-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.ui-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--muted); }
+.ui-icon.is-accent { color: var(--accent); }
+.ui-icon.is-good { color: var(--good); }
+.ui-icon.is-warn { color: var(--warn); }
+.ui-icon.is-bad { color: var(--bad); }
+
+/* Tabs: the detail tabs of the mockup */
+.ui-tabs-list { display: flex; gap: 20px; border-bottom: 1px solid var(--line); }
+.ui-tab { display: inline-flex; align-items: center; gap: 7px; min-height: 33px; padding: 9px 0 8px; background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+.ui-tab:hover { color: var(--text); background: none; }
+.ui-tab[data-state="active"], .ui-tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.ui-tab svg { width: 14px; height: 14px; }
+.ui-tab-panel { flex: 1; padding: 14px 0 0; }
+
+/* A plain table outside the list template: the head and rows of the mockup's table view */
+.ui-table-box { overflow: hidden; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; }
+.ui-table { width: 100%; border-spacing: 0; border-collapse: separate; text-align: left; font-size: 13px; color: var(--text); }
+.ui-table th { height: 34px; padding: 0 14px; background: var(--raised); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; font-weight: 400; text-transform: none; letter-spacing: 0; white-space: nowrap; }
+.ui-table td { height: 36px; padding: 3px 14px; border-bottom: 1px solid var(--line); }
+.ui-table tbody tr:last-child td { border-bottom: 0; }
+.ui-table tbody tr:hover { background: var(--hover); }
+
+@media (max-width: 800px) {
+  .ui-field .ui-control, .ui-field .ui-select-trigger { min-height: 44px; font-size: 13px; }
+  .ui-check-line { min-height: 44px; }
+  .ui-modal .lv-dialog-head { padding: 17px 20px; }
+  .ui-modal .lv-dialog-body { padding: 20px; }
+  .ui-modal :is(.ui-dialog-actions, .border-t.justify-end:last-child) .lv-btn { min-height: 42px; }
+  .ui-panel-heading { padding: 17px 16px; }
+  .ui-panel-content { padding: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-btn .ui-spin { animation: none; }
+}
+
+/* Aurore family */
+:root[data-theme="aurore"] .lv-btn.is-danger:not(.is-primary):not(.is-quiet) { color: var(--bad); border-color: var(--bad); background: var(--badbg); }
+:root[data-theme="aurore"] .lv-btn.is-warn:not(.is-primary):not(.is-quiet) { color: var(--warn); border-color: var(--warn-fill); background: var(--warnbg); }
+:root[data-theme="aurore"] .lv-btn:is(.is-danger, .is-warn):not(.is-primary):not(.is-quiet):hover:not(:disabled) { background: var(--hover); }
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme="aurore"] .lv-btn.is-primary:hover:not(:disabled) { transform: translateY(-1px); }
+}
+:root[data-theme="aurore"] :is(.ui-control, .ui-select-trigger, .ui-panel) { border-radius: 6px; }
+:root[data-theme="aurore"] .ui-panel:not(.is-interactive):not([class*="is-accent-"]) {
+  border-color: transparent;
+  background:
+    linear-gradient(var(--panel), var(--panel)) padding-box,
+    linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 55%, transparent), color-mix(in srgb, var(--grad-b) 25%, transparent) 60%, color-mix(in srgb, var(--paper) 8%, transparent)) border-box;
+  background-color: var(--panel);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--paper) 7%, transparent), 0 20px 50px -30px color-mix(in srgb, var(--ink) 80%, transparent);
+}
+:root[data-theme="aurore"][data-mode="light"] .ui-panel:not(.is-interactive):not([class*="is-accent-"]) {
+  background:
+    linear-gradient(var(--panel), var(--panel)) padding-box,
+    linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 38%, transparent), color-mix(in srgb, var(--grad-b) 24%, transparent) 60%, color-mix(in srgb, var(--text) 8%, transparent)) border-box;
+  box-shadow: inset 0 1px 0 var(--paper), 0 18px 40px -28px color-mix(in srgb, var(--text) 35%, transparent);
+}
+/* Glass on the floating layers: dialogs, menus */
+:root[data-theme="aurore"] :is(.ui-modal.lv-dialog, .ui-pop) {
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border-color: color-mix(in srgb, var(--paper) 8%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--paper) 6%, transparent), 0 24px 60px -20px color-mix(in srgb, var(--ink) 70%, transparent);
+}
+:root[data-theme="aurore"] .ui-modal.lv-dialog { border-radius: 10px; }
+:root[data-theme="aurore"][data-mode="light"] :is(.ui-modal.lv-dialog, .ui-pop) {
+  background: color-mix(in srgb, var(--paper) 84%, transparent);
+  border-color: color-mix(in srgb, var(--text) 14%, transparent);
+  box-shadow: inset 0 1px 0 var(--paper), 0 24px 60px -20px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+:root[data-theme="aurore"] .ui-badge:not(.lv-pill) { padding: 1px 8px 1px 6px; border: 1px solid color-mix(in srgb, currentColor 35%, transparent); border-radius: 999px; background: color-mix(in srgb, currentColor 14%, transparent); }
+:root[data-theme="aurore"] .ui-badge .ui-dot { box-shadow: 0 0 8px currentColor; }
+:root[data-theme="aurore"] .ui-table thead tr { background: linear-gradient(90deg, var(--grad-a), var(--grad-b) 45%, transparent) left bottom / 100% 1px no-repeat, var(--raised); }
+:root[data-theme="aurore"] .ui-table th { background: transparent; border-bottom-color: transparent; }
+:root[data-theme="aurore"] .ui-tab[data-state="active"], :root[data-theme="aurore"] .ui-tab[aria-selected="true"] {
+  border-bottom-color: transparent;
+  background: linear-gradient(90deg, var(--grad-a), var(--grad-b)) left bottom / 100% 2px no-repeat;
+}
+
+/* Segmented choice: one bordered strip, the pressed segment in the selection colours */
+.ui-segmented { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 4px; }
+.ui-segmented > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 26px; min-width: 40px; padding: 2px 9px; background: none; border: 0; border-radius: 3px; color: var(--muted); font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; }
+.ui-segmented > button:hover:not(:disabled) { background: var(--hover); }
+.ui-segmented > button[aria-pressed="true"] { background: var(--selected); color: var(--accent); font-weight: 500; }
+.ui-segmented > button:disabled { opacity: 0.42; cursor: not-allowed; }
+
+/* Theme menu of the shell: the mockup's pop menu, 220 px, 8 px under its button on every width */
+.shell-pop.ui-theme-menu { width: 220px; min-width: 220px; box-shadow: 0 18px 50px color-mix(in srgb, var(--ink) 40%, transparent); }
+.ui-pop-item[aria-checked="false"] .ui-pop-check { visibility: hidden; }
+@media (max-width: 899px) {
+  .shell-pop.ui-theme-menu { position: absolute; top: calc(100% + 8px); right: 0; left: auto; width: 220px; }
+}
+.ui-pop-icon { display: inline-flex; flex-shrink: 0; color: var(--muted); }
+.ui-pop-item.is-danger .ui-pop-icon { color: inherit; }
+.ui-pop-icon svg { width: 15px; height: 15px; }
+
+/* Detail blocks of the older panels: plain heading, bordered frames, terms and values at 12 px */
+.ui-detail-head { position: relative; padding: 0 0 14px; }
+.ui-detail-title { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
+.ui-detail-frame { padding: 12px 14px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); font-size: 12px; }
+.ui-detail-frame.is-compact { padding: 8px 10px; }
+.ui-detail-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 4px 0; font-size: 12px; }
+.ui-detail-field dt { color: var(--muted); }
+.ui-detail-field dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+/* Collapsible section: the mockup's bordered block with a 13 px toggle line */
+.ui-compact { overflow: hidden; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; }
+.ui-compact-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 36px; padding: 6px 12px; background: none; border: 0; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.ui-compact-head.is-open { border-bottom: 1px solid var(--line); }
+.ui-compact-head.is-static { cursor: default; }
+.ui-compact-head:disabled { opacity: 1; }
+.ui-compact-head h4 { margin: 0; font-size: 13px; font-weight: 500; color: var(--text); text-transform: none; letter-spacing: 0; }
+.ui-compact-head > svg { width: 14px; height: 14px; color: var(--muted); }
+.ui-compact-body { padding: 14px; font-size: 12px; }
+.ui-table td { height: var(--ui-row, 36px); }
+.ui-table tbody tr:is(.is-opened, .is-checked) { background: var(--selected); }
+.ui-table tbody tr.is-opened td:first-child { box-shadow: inset 2px 0 var(--accent); }
+:root[data-theme="aurore"] .ui-table tbody tr:not(.is-opened):not(.is-checked):hover { background: linear-gradient(90deg, color-mix(in srgb, var(--grad-a) 14%, transparent), transparent 70%); }
+:root[data-theme="aurore"][data-mode="light"] .ui-table tbody tr:not(.is-opened):not(.is-checked):hover { background: linear-gradient(90deg, color-mix(in srgb, var(--grad-a) 8%, transparent), transparent 70%); }
+/* Toolbar filter (`.filter-select`) and compact control (`.table-footer select`) of the mockup */
+.ui-control.is-filter { width: auto; min-height: 34px; max-width: 170px; padding: 6px 9px; }
+.ui-control.is-compact { width: auto; min-height: 28px; padding: 3px 7px; }
