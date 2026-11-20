@@ -169,7 +169,7 @@ export function ExportModal({
   }
 
   return (
-    <Modal open={open} onClose={() => onClose()} title={t('export.title', 'Export')} size="sm">
+    <Modal open={open} onClose={() => onClose()} title={t('export.title', 'Export')} size="md">
       <form onSubmit={(e) => { e.preventDefault(); handleExport() }} className="p-4 space-y-4">
         {/* Entity name */}
         {entityName && (
