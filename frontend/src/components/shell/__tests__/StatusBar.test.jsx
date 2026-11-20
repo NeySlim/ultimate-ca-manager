@@ -7,9 +7,13 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('../../WebSocketIndicator', () => ({ WebSocketIndicator: () => <span data-testid="ws" /> }))
+const getStats = vi.hoisted(() => vi.fn())
+vi.mock('../../../services/approvals.service', () => ({ approvalsService: { getStats } }))
 
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { StatusBar } from '../StatusBar'
+import { canFor } from './shellTestUtils'
 
 const answer = (body, ok = true) => vi.fn().mockResolvedValue({ ok, json: async () => body })
 
@@ -17,17 +21,38 @@ beforeEach(() => { vi.useRealTimers() })
 afterEach(() => { vi.unstubAllGlobals() })
 
 describe('StatusBar', () => {
-  it('shows the version and a running service', async () => {
+  it('says the version and the service state in one sentence, as the mockup', async () => {
     vi.stubGlobal('fetch', answer({ status: 'ok', version: '3.0.0', ha: false }))
     render(<StatusBar />)
-    expect(await screen.findByText('shell.version|3.0.0')).toBeInTheDocument()
-    expect(screen.getByText('shell.statusRunning')).toBeInTheDocument()
+    const line = await screen.findByText('shell.version|3.0.0 · shell.statusRunning')
+    expect(line.tagName).toBe('SPAN')
+  })
+
+  it('links the pending approvals to their module, for who may read them', async () => {
+    vi.stubGlobal('fetch', answer({ status: 'ok', version: '3.0.0', ha: false }))
+    getStats.mockResolvedValue({ data: { pending: 2 } })
+    const { unmount } = render(<MemoryRouter><StatusBar can={canFor(['read:approvals'])} /></MemoryRouter>)
+    const link = await screen.findByRole('link', { name: 'shell.approvalsPending|2' })
+    expect(link).toHaveAttribute('href', '/approvals')
+    unmount()
+    getStats.mockResolvedValue({ data: { pending: 0 } })
+    render(<MemoryRouter><StatusBar can={canFor(['read:approvals'])} /></MemoryRouter>)
+    expect(await screen.findByRole('link', { name: 'shell.approvalsNone' })).toHaveAttribute('href', '/approvals')
+  })
+
+  it('has no approvals link without read:approvals, and does not ask', async () => {
+    vi.stubGlobal('fetch', answer({ status: 'ok', version: '3.0.0', ha: false }))
+    getStats.mockClear()
+    render(<MemoryRouter><StatusBar can={canFor(['read:certificates'])} /></MemoryRouter>)
+    await screen.findByText(/shell\.statusRunning/)
+    expect(screen.queryByRole('link')).toBeNull()
+    expect(getStats).not.toHaveBeenCalled()
   })
 
   it('reminds the shortcuts: Ctrl K searches, Escape closes the inspector', async () => {
     vi.stubGlobal('fetch', answer({ status: 'ok', version: '3.0.0', ha: false }))
     const { container } = render(<StatusBar />)
-    await screen.findByText('shell.statusRunning')
+    await screen.findByText(/shell\.statusRunning/)
     const keys = [...container.querySelectorAll('.shell-status-shortcut kbd')].map((k) => k.textContent)
     expect(keys).toEqual(['Ctrl K', 'shell.escapeKey'])
     expect(container.querySelector('.shell-status-escape')).toHaveTextContent('shell.escapeKey inspector.close')
@@ -36,7 +61,7 @@ describe('StatusBar', () => {
   it('shows no HA part outside HA mode', async () => {
     vi.stubGlobal('fetch', answer({ status: 'ok', version: '3.0.0', ha: false, node_id: 'n1', leader: true }))
     render(<StatusBar />)
-    await screen.findByText('shell.statusRunning')
+    await screen.findByText(/shell\.statusRunning/)
     expect(screen.queryByText(/shell\.haNode/)).toBeNull()
     expect(screen.queryByText('shell.haLeader')).toBeNull()
   })
@@ -88,7 +113,7 @@ describe('StatusBar', () => {
   it('keeps the live connection indicator in the bar', async () => {
     vi.stubGlobal('fetch', answer({ status: 'ok', version: '3.0.0', ha: false }))
     render(<StatusBar />)
-    await screen.findByText('shell.statusRunning')
+    await screen.findByText(/shell\.statusRunning/)
     expect(screen.getByTestId('ws')).toBeInTheDocument()
   })
 
@@ -104,8 +129,8 @@ describe('StatusBar', () => {
   it('reports safe mode as a warning, not as running', async () => {
     vi.stubGlobal('fetch', answer({ status: 'ok', version: '3.0.0', safe_mode: true }))
     render(<StatusBar />)
-    expect(await screen.findByText('shell.statusSafeMode')).toBeInTheDocument()
-    expect(screen.queryByText('shell.statusRunning')).toBeNull()
+    expect(await screen.findByText(/shell\.statusSafeMode/)).toBeInTheDocument()
+    expect(screen.queryByText(/shell\.statusRunning/)).toBeNull()
   })
 
   it.each([
@@ -128,7 +153,7 @@ describe('StatusBar', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(0) })
     expect(screen.getByText('shell.statusUnreachable')).toBeInTheDocument()
     await act(async () => { await vi.advanceTimersByTimeAsync(30000) })
-    expect(screen.getByText('shell.version|3.0.1')).toBeInTheDocument()
+    expect(screen.getByText(/shell\.version\|3\.0\.1/)).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 

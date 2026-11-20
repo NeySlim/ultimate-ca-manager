@@ -10,7 +10,7 @@ const m = vi.hoisted(() => ({
 }))
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k, o) => (o && o.count != null ? `${k}|${o.count}` : o && o.step ? `${k}|${o.step}` : k), i18n: { language: 'en' } }),
+  useTranslation: () => ({ t: (k, o) => (o && o.count != null ? `${k}|${o.count}` : o && o.step ? `${k}|${o.step}` : o && (o.what || o.protocol) ? [k, o.what, o.root, o.protocol].filter(Boolean).join('|') : k), i18n: { language: 'en' } }),
 }))
 vi.mock('../../../services', () => ({
   dashboardService: { getStats: async () => ({ data: { total_certificates: m.stats.total, total_cas: m.cas.length } }) },
@@ -130,20 +130,25 @@ describe('SetupCard', () => {
     expect(card()).not.toBeNull()
   })
 
-  it('closes for good from its folded line, and is never shown again', async () => {
-    const { user, unmount } = setup()
+  it('puts the focus on Resume once folded, then on the current step once unfolded; the line has no Hide', async () => {
+    const { user } = setup()
     await waitFor(() => expect(card()).not.toBeNull())
     await user.click(screen.getByRole('button', { name: 'shell.setup.later' }))
-    await user.click(screen.getByRole('button', { name: 'shell.setup.hide' }))
-    expect(m.persistPreference).toHaveBeenLastCalledWith(SETUP_PREF, 'closed')
-    expect(screen.queryByText(/shell\.setup\.laterLine/)).toBeNull()
-    unmount()
-    // Even when the server dropped the key, this browser remembers it
-    m.prefs = {}
+    expect(screen.getByRole('button', { name: 'shell.setup.resume' })).toHaveFocus()
+    expect(screen.queryByRole('button', { name: 'shell.setup.hide' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'shell.setup.resume' }))
+    expect(screen.getByRole('link', { name: 'shell.setup.steps.root.action' })).toHaveFocus()
+  })
+
+  it('says what exists for a step done, as the mockup: name and key of the CAs, the protocol', async () => {
+    m.prefs = { [SETUP_PREF]: 'started' }
+    m.cas = [{ ...ROOT, common_name: 'Example Root CA', key_type: 'RSA 4096' }, { ...ISSUING, common_name: 'Services CA', key_type: 'EC P-384' }]
+    m.acme = { enabled: true, issuing_ca_id: 2 }
     setup()
-    await act(async () => {})
-    expect(card()).toBeNull()
-    expect(screen.queryByText(/shell\.setup\.laterLine/)).toBeNull()
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'shell.setup.doneTitle' })).toBeInTheDocument())
+    expect(screen.getByText('shell.setup.doneWhat|Example Root CA, RSA 4096')).toBeInTheDocument()
+    expect(screen.getByText('shell.setup.steps.issuing.doneWith|Services CA, ECDSA P-384|Example Root CA')).toBeInTheDocument()
+    expect(screen.getByText('shell.setup.steps.protocol.doneWith|ACME')).toBeInTheDocument()
   })
 
   it('finished, offers the first issuance and Hide, and is not shown on the next visit', async () => {

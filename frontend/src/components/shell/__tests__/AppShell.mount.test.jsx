@@ -1,6 +1,6 @@
 /** The shell around the page: bar, status bar, search entries, help, and the overlays it keeps mounted. */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, within, act } from '@testing-library/react'
+import { render, screen, within, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { ROLES, tStub } from './shellTestUtils'
@@ -29,7 +29,11 @@ vi.mock('../../CommandPalette', async () => {
   const actual = await vi.importActual('../../CommandPalette')
   return {
     ...actual,
-    CommandPalette: ({ open }) => <div data-testid="palette" data-open={String(open)} />,
+    CommandPalette: ({ open, onOpenChange }) => (
+      <div data-testid="palette" data-open={String(open)}>
+        {open && <button type="button" onClick={() => onOpenChange(false)}>close palette</button>}
+      </div>
+    ),
   }
 })
 vi.mock('../../ui/FloatingHelpPanel', () => ({
@@ -55,7 +59,7 @@ function setup(path = '/') {
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route element={<AppShell />}>
-            <Route path="*" element={<p>page body</p>} />
+            <Route path="*" element={<p>page body <button type="button" className="lv-btn is-primary">Issue</button></p>} />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -73,11 +77,49 @@ beforeEach(() => {
 })
 
 describe('AppShell', () => {
+  it('starts with a skip link to the page, as the mockup', async () => {
+    const user = setup('/certificates')
+    await user.tab()
+    const skip = screen.getByRole('link', { name: 'shell.skipToContent' })
+    expect(skip).toHaveFocus()
+    await user.keyboard('{Enter}')
+    expect(document.getElementById('shell-page')).toHaveFocus()
+    expect(document.getElementById('shell-page')).toContainElement(screen.getByText(/page body/))
+  })
+
+  it('names the page in the tab title and paints the browser chrome with the theme background', async () => {
+    document.documentElement.style.setProperty('--bg', '#141b24')
+    try {
+      setup('/certificates')
+      await waitFor(() => expect(document.title).toBe('shell.bar.certificates · UCM'))
+      expect(document.querySelector('meta[name="theme-color"]')).toHaveAttribute('content', '#141b24')
+    } finally {
+      document.documentElement.style.removeProperty('--bg')
+      document.querySelector('meta[name="theme-color"]')?.remove()
+    }
+  })
+
+  it('gives the focus back to the search button when the palette closes and nothing else took it', async () => {
+    const user = setup()
+    await user.click(screen.getByRole('button', { name: 'shell.search' }))
+    await user.click(screen.getByRole('button', { name: 'close palette' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'shell.search' })).toHaveFocus())
+  })
+
+  it('suspends the write controls of every page during a cluster maintenance, and gives them back after', async () => {
+    const maintenance = { status: 'ok', version: '3.0.0', ha: true, node_id: 'n1', leader: true,
+      cluster: { leader_node_id: 'n1', nodes: 2, stale: 0 }, maintenance: { reason: 'manual' } }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => maintenance }))
+    setup('/certificates')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Issue' })).toBeDisabled())
+    expect(screen.getByRole('button', { name: 'Issue' })).toHaveAttribute('aria-describedby', 'shell-writes-note')
+  })
+
   it('renders the bar, the page and the status bar, and no sidebar', async () => {
     setup('/certificates')
     expect(screen.getByRole('banner')).toBeInTheDocument()
     expect(screen.getByText('page body')).toBeInTheDocument()
-    expect(await screen.findByText('shell.version')).toBeInTheDocument()
+    expect(await screen.findByText(/shell\.version/)).toBeInTheDocument()
     expect(screen.getByRole('contentinfo')).toBeInTheDocument()
     expect(screen.queryByText('Certificate Manager')).toBeNull()
   })
@@ -163,7 +205,8 @@ describe('AppShell', () => {
   it.each(['/certificates', '/'])('has one bottom bar on %s', (path) => {
     setup(path)
     const content = document.querySelector('.shell-content')
-    expect(content.children).toHaveLength(1)
+    // The banners' live region reads nothing aloud in the nominal state and draws nothing
+    expect([...content.children].filter(c => !c.matches('.sr-only[role="status"]'))).toHaveLength(1)
     // The notification panel's own foot is not a bar of the page
     expect(document.querySelectorAll('footer:not(.shell-notif-foot)')).toHaveLength(1)
     expect(screen.queryByText(/^windows\./)).toBeNull()

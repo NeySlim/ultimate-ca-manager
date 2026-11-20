@@ -45,6 +45,7 @@ import {
   moduleForPath, paletteCommands, isVisible, MAIN_IDS, menuGroupsFor, menuLabelKey, moduleById,
 } from '../registry'
 import { PERMISSION_RESOURCES } from '../../lib/rbacPermissions'
+import * as Phosphor from '@phosphor-icons/react'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const localesDir = join(here, '../../i18n/locales')
@@ -200,6 +201,17 @@ describe('registry shape (b)', () => {
     for (const m of MODULES) {
       if (m.group) expect(GROUPS.map(g => g.id), m.id).toContain(m.group)
     }
+  })
+})
+
+describe('module icons', () => {
+  // The mockup's data.js: refresh, globe, plug, stamp, balance, approve, radar, users, chip, sliders, template, anchor
+  it.each([
+    ['acme', 'ArrowClockwise'], ['scep', 'Globe'], ['est', 'Plug'], ['tsa', 'Stamp'], ['policies', 'Scales'],
+    ['approvals', 'CheckCircle'], ['discovery', 'Target'], ['users', 'Users'], ['hsm', 'Cpu'],
+    ['settings', 'SlidersHorizontal'], ['templates', 'Layout'], ['truststore', 'Anchor'],
+  ])('%s is drawn with the icon of the mockup (%s)', (id, name) => {
+    expect(moduleById(id).icon).toBe(Phosphor[name])
   })
 })
 

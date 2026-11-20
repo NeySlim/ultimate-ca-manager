@@ -1,86 +1,83 @@
-/** Account menu: identity, method, rights-gated settings, theme, language, sign out. */
+/** Account menu of the mockup: identity, method and lock, My account, Sign out; no language, no Settings. */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
-import { ROLES, canFor, tStub } from './shellTestUtils'
 
 const logout = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
-const changeLanguage = vi.hoisted(() => vi.fn())
-const persistPreference = vi.hoisted(() => vi.fn())
+const getCurrentUser = vi.hoisted(() => vi.fn())
 const auth = vi.hoisted(() => ({ method: 'password' }))
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: tStub, i18n: { language: 'fr-FR', changeLanguage } }),
+  useTranslation: () => ({ t: (k, o) => { const { defaultValue: _defaultValue, ...v } = o || {}; return Object.keys(v).length ? `${k}|${Object.values(v).join(',')}` : k }, i18n: { language: 'fr-FR' } }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { username: 'probe', role: 'operator' }, logout, authMethod: auth.method }),
 }))
-vi.mock('../../../stores/userPreferencesStore', () => ({ persistPreference }))
+vi.mock('../../../services/auth.service', () => ({ authService: { getCurrentUser } }))
 
 import { UserMenu } from '../UserMenu'
 
 function Where() { return <output data-testid="where">{useLocation().pathname}</output> }
 
-function setup(permissions = ROLES.admin) {
+function setup() {
   const user = userEvent.setup()
   render(
     <MemoryRouter initialEntries={['/certificates']}>
-      <UserMenu can={canFor(permissions)} />
+      <UserMenu />
       <Routes><Route path="*" element={<Where />} /></Routes>
     </MemoryRouter>
   )
   return user
 }
-const trigger = () => screen.getByRole('button', { name: 'common.account: probe' })
+const trigger = () => screen.getByRole('button', { name: 'shell.accountLabel|probe,common.operator' })
 
-beforeEach(() => { vi.clearAllMocks(); auth.method = 'password' })
+beforeEach(() => {
+  vi.clearAllMocks()
+  auth.method = 'password'
+  getCurrentUser.mockResolvedValue({ data: { session_timeout: 1800 } })
+})
 
 describe('UserMenu', () => {
-  it('opens with the identity and the sign-in method', async () => {
-    const user = setup()
+  it('names the account and its role on the button, the name in its tooltip', () => {
+    setup()
+    expect(trigger()).toHaveAttribute('title', 'probe')
     expect(trigger()).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('opens with the name, the role and login, the method and the inactivity lock', async () => {
+    const user = setup()
     await user.click(trigger())
     expect(trigger()).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByText('probe')).toBeVisible()
-    expect(screen.getByText('operator')).toBeVisible()
-    expect(screen.getByText('shell.signedInWith')).toBeVisible()
+    const id = document.querySelector('.shell-user-id')
+    expect(id.querySelector('strong')).toHaveTextContent('probe')
+    expect(id.querySelector('.shell-mono')).toHaveTextContent('probe')
+    expect(id).toHaveTextContent('common.operator · probe')
+    expect(await screen.findByText(/shell\.lockAfter\|30/)).toBeVisible()
+    expect(screen.getByText(/shell\.signedInWith\|shell\.method\.password/)).toBeVisible()
   })
 
   it('says nothing about a method the session does not know', async () => {
     auth.method = null
     const user = setup()
     await user.click(trigger())
-    expect(screen.queryByText('shell.signedInWith')).toBeNull()
+    expect(screen.queryByText(/shell\.signedInWith/)).toBeNull()
   })
 
-  it('offers Settings to an administrator', async () => {
-    const user = setup(ROLES.admin)
-    await user.click(trigger())
-    expect(screen.getByRole('link', { name: 'common.settings' })).toBeVisible()
-  })
-
-  it('hides Settings from an operator without the settings right', async () => {
-    const user = setup(ROLES.operator)
-    await user.click(trigger())
-    expect(screen.queryByRole('link', { name: 'common.settings' })).toBeNull()
-    expect(screen.getByRole('link', { name: 'common.account' })).toBeVisible()
-  })
-
-  it('changes the language and saves it with the preferences', async () => {
+  it('has My account and Sign out only: the language and Settings live elsewhere', async () => {
     const user = setup()
     await user.click(trigger())
-    await user.click(screen.getByRole('button', { name: /Deutsch/ }))
-    expect(changeLanguage).toHaveBeenCalledWith('de')
-    expect(persistPreference).toHaveBeenCalledWith('language', 'de')
-    expect(screen.getByRole('button', { name: /Français/ })).toHaveAttribute('aria-pressed', 'true')
+    const menu = document.getElementById('shell-user-menu')
+    const items = [...menu.querySelectorAll('a, button')].map(el => el.textContent)
+    expect(items).toEqual(['common.account', 'shell.signOut'])
+    expect(screen.queryByRole('group')).toBeNull()
   })
 
   it('signs out then goes to the login page', async () => {
     const user = setup()
     await user.click(trigger())
-    await user.click(screen.getByRole('button', { name: 'auth.logout' }))
+    await user.click(screen.getByRole('button', { name: 'shell.signOut' }))
     expect(logout).toHaveBeenCalledTimes(1)
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/login'))
   })

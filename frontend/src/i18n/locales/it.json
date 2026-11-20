@@ -7065,6 +7065,7 @@
   },
   "shell": {
     "mainNav": "Navigazione principale",
+    "skipToContent": "Vai al contenuto",
     "modules": "Moduli",
     "modulesMenuLabel": "Moduli del prodotto",
     "pinCount": "{{count}} / {{max}} fissati nella barra",
@@ -7079,14 +7080,19 @@
     "searchPlaceholder": "Cerca…",
     "navigate": "Vai a",
     "signedInWith": "Accesso eseguito con {{method}}",
+    "accountLabel": "Account: {{name}}, {{role}}",
+    "accountLabelName": "Account: {{name}}",
+    "lockAfter_one": "Blocco dopo {{count}} min di inattività.",
+    "lockAfter_other": "Blocco dopo {{count}} min di inattività.",
+    "signOut": "Esci",
     "method": {
       "password": "password",
       "mtls": "certificato client",
       "webauthn": "chiave di sicurezza",
       "session": "sessione del browser"
     },
-    "expiringBadge_one": "{{count}} certificato in scadenza o scaduto. Ignora.",
-    "expiringBadge_other": "{{count}} certificati in scadenza o scaduti. Ignora.",
+    "expiringCount_one": "{{count}} certificato in scadenza o scaduto",
+    "expiringCount_other": "{{count}} certificati in scadenza o scaduti",
     "statusRunning": "Servizio in esecuzione",
     "statusUnreachable": "Servizio non raggiungibile",
     "statusSafeMode": "Modalità provvisoria",
@@ -7098,12 +7104,21 @@
     "haNodes_other": "{{count}} nodi · tutti aggiornati",
     "haLate_one": "{{count}} nodo in ritardo",
     "haLate_other": "{{count}} nodi in ritardo",
+    "approvalsPending_one": "{{count}} approvazione in attesa",
+    "approvalsPending_other": "{{count}} approvazioni in attesa",
+    "approvalsNone": "Nessuna approvazione in attesa",
     "theme": {
-      "menu": "Tema"
+      "menu": "Tema",
+      "label": "Tema: {{theme}}",
+      "systemNow": "Sistema ({{mode}})",
+      "auroreDark": "Aurore scuro",
+      "auroreLight": "Aurore chiaro"
     },
     "bell": {
       "title": "Notifiche",
+      "label": "Notifiche: {{state}}",
       "allRead": "Tutte lette",
+      "noneUnread": "nessuna non letta",
       "markAllRead": "Segna tutto come letto",
       "markRead": "Segna come letto",
       "open": "Apri",
@@ -7141,6 +7156,7 @@
       "retryLabel": "Riprova il rinnovo ACME di {{name}}",
       "publish": "Pubblica",
       "publishLabel": "Pubblica ora la CRL di {{name}}",
+      "crlTitle": "CRL di {{name}}",
       "close": "Chiudi le notifiche",
       "mailOn": "Notifica e-mail attivata.",
       "mailOff": "Notifica e-mail disattivata.",
@@ -7248,6 +7264,7 @@
       "stateDone": "Fatto",
       "stateTodo": "Da fare",
       "stateAfter": "Dopo il passaggio {{step}}",
+      "doneWhat": "{{what}}.",
       "steps": {
         "root": {
           "title": "Creare la radice offline o importare una CA",
@@ -7259,15 +7276,23 @@
           "title": "Creare la prima CA emittente",
           "todo": "Firma i certificati dei servizi, sotto la radice.",
           "done": "È presente una CA emittente sotto la radice.",
+          "doneWith": "{{what}}, sotto {{root}}.",
           "action": "Crea la CA emittente"
         },
         "protocol": {
           "title": "Attivare un primo protocollo",
           "todo": "ACME per i server, SCEP per i dispositivi di rete.",
           "done": "Un protocollo di registrazione è attivo su una CA emittente.",
+          "doneWith": "{{protocol}} attivo.",
           "action": "Scegli un protocollo"
         }
       }
+    },
+    "offline": {
+      "title": "Offline.",
+      "text": "La consultazione continua con i dati già caricati; le azioni sono sospese e riprenderanno da sole al ritorno della rete.",
+      "said": "Offline: la consultazione continua, le azioni sono sospese.",
+      "back": "Connessione ristabilita: le azioni sono di nuovo disponibili."
     }
   },
   "overview": {

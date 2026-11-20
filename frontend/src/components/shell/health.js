@@ -2,7 +2,7 @@
  * One poll of /api/v2/health shared by the status bar, the HA banner and the write guard:
  * started by the first subscriber, stopped with the last. What the API omits stays unknown.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 
 export const HEALTH_URL = '/api/v2/health'
 export const POLL_MS = 30000
@@ -84,12 +84,33 @@ export function haState(health) {
 
 // Ids of the banner sentences that say why a control is disabled
 export const WRITES_NOTE_ID = 'shell-writes-note'
+export const OFFLINE_NOTE_ID = 'shell-offline-note'
 
-/** Writes suspended while the cluster is in maintenance: { suspended, noteId }. */
+const subscribeNetwork = (cb) => {
+  window.addEventListener('online', cb)
+  window.addEventListener('offline', cb)
+  return () => {
+    window.removeEventListener('online', cb)
+    window.removeEventListener('offline', cb)
+  }
+}
+const readOnline = () => typeof navigator === 'undefined' || navigator.onLine !== false
+
+/** The browser's network state, followed through its online and offline events. */
+export function useOnline() {
+  return useSyncExternalStore(subscribeNetwork, readOnline, () => true)
+}
+
+/**
+ * Writes suspended offline (the network is gone) or while the cluster is in maintenance:
+ * { suspended, reason, noteId }, noteId being the banner sentence that says why.
+ */
 export function useWriteGuard() {
+  const online = useOnline()
   const ha = haState(useHealth())
-  const suspended = !!ha?.maintenance
-  return { suspended, noteId: suspended ? WRITES_NOTE_ID : undefined }
+  if (!online) return { suspended: true, reason: 'offline', noteId: OFFLINE_NOTE_ID }
+  if (ha?.maintenance) return { suspended: true, reason: 'maintenance', noteId: WRITES_NOTE_ID }
+  return { suspended: false, reason: null, noteId: undefined }
 }
 
 /** Props of a write control under the guard: disabled with the banner's reason, else unchanged. */

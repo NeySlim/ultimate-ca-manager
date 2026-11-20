@@ -1901,7 +1901,7 @@
     "imported": "Importé",
     "acme": "ACME",
     "scep": "SCEP",
-    "rbac": "Contrôle d'accès",
+    "rbac": "Contrôle d’accès",
     "operations": "Opérations",
     "policies": "Politiques",
     "approvals": "Approbations",
@@ -3128,7 +3128,7 @@
       "purple": "Nuit pourpre",
       "sunset": "Coucher de soleil orangé"
     },
-    "appearanceMode": "Mode d'apparence",
+    "appearanceMode": "Mode d’apparence",
     "followSystem": "Suivre le système",
     "followSystemDesc": "Basculer automatiquement selon les paramètres de votre OS",
     "dark": "Sombre",
@@ -5890,7 +5890,7 @@
     "bundleRelatedHasNoKey": "Le certificat lié n'a pas de clé privée : le lot ne contient que les certificats"
   },
   "userCertificates": {
-    "title": "Certificats Utilisateurs",
+    "title": "Certificats utilisateurs",
     "description": "Gérer les certificats clients émis pour l'authentification mTLS",
     "searchPlaceholder": "Rechercher par nom, sujet ou numéro de série...",
     "columns": {
@@ -6534,7 +6534,7 @@
   "websocket": {
     "status": {
       "active": "Mises à jour en temps réel actives",
-      "connecting": "Connexion...",
+      "connecting": "Connexion…",
       "disabled": "Mises à jour en temps réel désactivées",
       "error": "Erreur de connexion",
       "live": "En direct",
@@ -7068,6 +7068,7 @@
   },
   "shell": {
     "mainNav": "Navigation principale",
+    "skipToContent": "Aller au contenu",
     "modules": "Modules",
     "modulesMenuLabel": "Modules du produit",
     "pinCount": "{{count}} / {{max}} épinglés dans la barre",
@@ -7081,16 +7082,21 @@
     "escapeKey": "Échap",
     "searchPlaceholder": "Rechercher…",
     "navigate": "Naviguer",
-    "signedInWith": "Connecté par {{method}}",
+    "signedInWith": "Connexion par {{method}}.",
+    "accountLabel": "Compte : {{name}}, {{role}}",
+    "accountLabelName": "Compte : {{name}}",
+    "lockAfter_one": "Verrouillage après {{count}} min d’inactivité.",
+    "lockAfter_other": "Verrouillage après {{count}} min d’inactivité.",
+    "signOut": "Se déconnecter",
     "method": {
       "password": "mot de passe",
       "mtls": "certificat client",
       "webauthn": "clé de sécurité",
       "session": "session du navigateur"
     },
-    "expiringBadge_one": "{{count}} certificat expire ou a expiré. Fermer.",
-    "expiringBadge_other": "{{count}} certificats expirent ou ont expiré. Fermer.",
-    "statusRunning": "Service en cours d'exécution",
+    "expiringCount_one": "{{count}} certificat expire ou a expiré",
+    "expiringCount_other": "{{count}} certificats expirent ou ont expiré",
+    "statusRunning": "Service en cours d’exécution",
     "statusUnreachable": "Service injoignable",
     "statusSafeMode": "Mode sans échec",
     "version": "UCM {{version}}",
@@ -7101,20 +7107,29 @@
     "haNodes_other": "{{count}} nœuds · tous à jour",
     "haLate_one": "{{count}} nœud en retard",
     "haLate_other": "{{count}} nœuds en retard",
+    "approvalsPending_one": "{{count}} approbation en attente",
+    "approvalsPending_other": "{{count}} approbations en attente",
+    "approvalsNone": "Aucune approbation en attente",
     "theme": {
-      "menu": "Thème"
+      "menu": "Thème",
+      "label": "Thème : {{theme}}",
+      "systemNow": "Système ({{mode}})",
+      "auroreDark": "Aurore sombre",
+      "auroreLight": "Aurore clair"
     },
     "bell": {
       "title": "Notifications",
+      "label": "Notifications : {{state}}",
       "allRead": "Tout est lu",
+      "noneUnread": "aucune non lue",
       "markAllRead": "Tout marquer lu",
       "markRead": "Marquer lu",
       "open": "Ouvrir",
       "new": "Non lu",
       "empty": "Aucune notification : rien n’attend d’intervention.",
       "kinds": {
-        "acme_order_failed": "Commande ACME échouée",
-        "acme_client_renewal_failed": "Renouvellement ACME échoué",
+        "acme_order_failed": "Échec ACME",
+        "acme_client_renewal_failed": "Échec ACME",
         "approval_pending": "Approbation en attente",
         "scep_request_pending": "Requête SCEP en attente",
         "key_recovery_pending": "Récupération de clé en attente",
@@ -7125,12 +7140,12 @@
         "auto_renewal_blocked": "Renouvellement automatique bloqué",
         "renewal_declined": "Renouvellement refusé",
         "ca_expiring": "AC bientôt expirée",
-        "system_backup": "Échec de la sauvegarde",
-        "system_restore": "Échec de la restauration",
+        "system_backup": "Sauvegarde échouée",
+        "system_restore": "Restauration échouée",
         "session_revoke": "Session révoquée",
         "session_revoke_all": "Sessions révoquées",
-        "deploy_binding_left_behind": "Déploiement resté sur l'ancien certificat",
-        "https_binding_left_behind": "HTTPS resté sur l'ancien certificat",
+        "deploy_binding_left_behind": "Déploiement resté sur l’ancien certificat",
+        "https_binding_left_behind": "HTTPS resté sur l’ancien certificat",
         "truststore_expiring": "Certificat du magasin de confiance expirant ou expiré"
       },
       "unread_one": "{{count}} non lue",
@@ -7144,6 +7159,7 @@
       "retryLabel": "Relancer le renouvellement ACME de {{name}}",
       "publish": "Publier",
       "publishLabel": "Publier maintenant la CRL de {{name}}",
+      "crlTitle": "CRL de {{name}}",
       "close": "Fermer les notifications",
       "mailOn": "Notification par e-mail activée.",
       "mailOff": "Notification par e-mail désactivée.",
@@ -7251,6 +7267,7 @@
       "stateDone": "Fait",
       "stateTodo": "À faire",
       "stateAfter": "Après l’étape {{step}}",
+      "doneWhat": "{{what}}.",
       "steps": {
         "root": {
           "title": "Créer la racine hors ligne ou importer une AC",
@@ -7262,15 +7279,23 @@
           "title": "Créer la première AC émettrice",
           "todo": "Elle signe les certificats des services, sous la racine.",
           "done": "Une AC émettrice est en place sous la racine.",
+          "doneWith": "{{what}}, sous {{root}}.",
           "action": "Créer l’AC émettrice"
         },
         "protocol": {
           "title": "Activer un premier protocole",
           "todo": "ACME pour les serveurs, SCEP pour les équipements réseau.",
           "done": "Un protocole d’enrôlement est actif sur une AC émettrice.",
+          "doneWith": "{{protocol}} actif.",
           "action": "Choisir un protocole"
         }
       }
+    },
+    "offline": {
+      "title": "Hors ligne.",
+      "text": "La consultation continue avec les données déjà chargées ; les actions sont suspendues et reprendront d’elles-mêmes au retour du réseau.",
+      "said": "Hors ligne : la consultation continue, les actions sont suspendues.",
+      "back": "Connexion rétablie : les actions sont de nouveau disponibles."
     }
   },
   "overview": {
@@ -7541,20 +7566,20 @@
       "failuresSub": "ACME, SCEP et EST, jour UTC"
     },
     "cause": {
-      "acme_order_failed": "Une commande ACME s'est terminée invalide dans les 7 derniers jours",
-      "acme_client_renewal_failed": "Le client ACME n'a pas pu renouveler ce certificat",
+      "acme_order_failed": "Une commande ACME s’est terminée invalide dans les 7 derniers jours",
+      "acme_client_renewal_failed": "Le client ACME n’a pas pu renouveler ce certificat",
       "approval_pending": "Une demande attend une décision",
       "scep_request_pending": "Un enrôlement SCEP attend une approbation",
       "key_recovery_pending": "Une demande de récupération de clé attend une approbation",
       "crl_due": "La CRL en cours atteint sa prochaine mise à jour",
-      "crl_missing": "Le point de distribution est activé et aucune CRL n'existe",
+      "crl_missing": "Le point de distribution est activé et aucune CRL n’existe",
       "manual_renewal_due": "Aucune automatisation ne renouvelle ce certificat",
       "client_renewal_overdue": "Son client aurait déjà dû le renouveler",
-      "auto_renewal_blocked": "Renouvellement automatique impossible : l'AC émettrice ne peut pas signer",
+      "auto_renewal_blocked": "Renouvellement automatique impossible : l’AC émettrice ne peut pas signer",
       "renewal_declined": "Le renouvellement automatique a été refusé pour ce certificat",
-      "ca_expiring": "Les certificats qu'elle a émis sont à migrer avant son expiration",
-      "deploy_binding_left_behind": "Un déploiement sert encore l'ancien certificat",
-      "https_binding_left_behind": "L'écoute HTTPS sert encore l'ancien certificat",
+      "ca_expiring": "Les certificats qu’elle a émis sont à migrer avant son expiration",
+      "deploy_binding_left_behind": "Un déploiement sert encore l’ancien certificat",
+      "https_binding_left_behind": "L’écoute HTTPS sert encore l’ancien certificat",
       "truststore_expiring": "Une ancre de confiance à remplacer dans le magasin de confiance"
     },
     "trend": {

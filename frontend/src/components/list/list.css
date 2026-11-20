@@ -404,7 +404,8 @@
 .lv-error p { margin: 6px 0 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
 .lv-error-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 14px; }
 .lv-text-link { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 0; background: none; border: 0; color: var(--accent); font: inherit; font-size: 12px; font-weight: 500; text-decoration: none; cursor: pointer; }
-.lv-error .lv-text-link { font-size: 13px; }
+.lv-error .lv-text-link { padding: 3px 0; font-size: 13px; }
+.lv-error-actions svg { width: 14px; height: 14px; }
 .lv-views-aside .lv-text-link { min-height: 0; padding: 3px 0; }
 .lv-text-link:hover { text-decoration: underline; }
 /* Nothing to list: icon, title, what to do; in the table it stands at the top of the frame */
@@ -463,6 +464,7 @@
   overscroll-behavior: contain;
 }
 .lv-dialog.is-narrow { width: min(520px, calc(100vw - 32px)); }
+.lv-dialog.is-wide { width: min(920px, calc(100vw - 32px)); }
 .lv-dialog:focus-visible { outline: none; }
 .lv-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 23px; border-bottom: 1px solid var(--line); }
 .lv-dialog-head h2 { margin: 0; font-size: 18px; font-weight: 600; }

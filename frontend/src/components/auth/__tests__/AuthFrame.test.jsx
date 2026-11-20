@@ -69,7 +69,7 @@ describe('AuthFrame', () => {
 
   it('offers the theme menu too', () => {
     renderFrame()
-    expect(screen.getByRole('button', { name: 'shell.theme.menu' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'shell.theme.label' })).toBeInTheDocument()
   })
 
   it('leaves the tools and footer out of a window of its own', () => {

@@ -7,8 +7,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import {
-  Archive, ArrowsClockwise, Bell, CaretRight, Check, CheckCircle, FileX, PaperPlaneTilt, RocketLaunch,
-  ShieldWarning, UsersThree, Vault, Warning, X,
+  Archive, ArrowClockwise, ArrowsClockwise, Bell, CaretRight, Check, CheckCircle, FileX, PaperPlaneTilt, RocketLaunch,
+  ShieldWarning, Users, Vault, Warning, X,
 } from '@phosphor-icons/react'
 import { formatDate } from '../../lib/utils'
 import { getAppTimezone } from '../../stores/timezoneStore'
@@ -22,12 +22,19 @@ const KIND_ICON = {
   crl_due: FileX, crl_missing: FileX, manual_renewal_due: ArrowsClockwise, auto_renewal_blocked: ArrowsClockwise,
   ca_expiring: ShieldWarning, deploy_binding_left_behind: RocketLaunch, https_binding_left_behind: RocketLaunch,
   truststore_expiring: Vault, system_backup: Archive, system_restore: Archive,
-  session_revoke: UsersThree, session_revoke_all: UsersThree,
+  session_revoke: Users, session_revoke_all: Users,
 }
 // Tones of the mockup: approvals in the accent, CRLs and sessions a warning, failures and the rest by their tier
 const toneOf = (item) => item.kind === 'approval_pending' ? 'accent'
   : item.kind.startsWith('session_') || item.kind.startsWith('crl_') ? 'warn'
     : item.tier === 'critical' ? 'bad' : 'warn'
+
+// A CRL line is named after its authority, as the mockup's "CRL de <autorité>"
+const titleOf = (item, t) => (item.kind.startsWith('crl_') && item.title ? t('shell.bell.crlTitle', { name: item.title }) : item.title)
+
+// Behind the full-screen panel of a phone, the rest of the shell leaves the tab order and the reading
+const COVERED = '.shell-skip, .shell-brand, .shell-mobile-nav, .shell-main-nav, .shell-tools > :not(.shell-bell-wrap), .shell-main, .shell-statusbar'
+const PHONE = '(max-width: 800px)'
 
 // A future due date (a CRL to publish) is shown at the time of reading
 const whenOf = (item, now) => {
@@ -54,7 +61,8 @@ function useMailState(canSettings) {
 export function NotificationBell({ can }) {
   const { t, i18n } = useTranslation()
   const { items, unread, refresh, markRead, markAllRead } = useNotifications(can)
-  const { open, setOpen, close, buttonRef, rootProps } = useDisclosure()
+  // A side panel, not a popover: a click outside or a focus leaving it does not close it
+  const { open, setOpen, close, buttonRef, rootProps } = useDisclosure({ light: false })
   const guard = useWriteGuard()
   const [busy, setBusy] = useState(null)
   const [said, setSaid] = useState('')
@@ -71,13 +79,43 @@ export function NotificationBell({ can }) {
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Escape closes the panel wherever the focus is, and gives it back to the bell
+  useEffect(() => {
+    if (!open) return undefined
+    const onEscape = (e) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      e.preventDefault()
+      close(true)
+    }
+    document.addEventListener('keydown', onEscape)
+    return () => document.removeEventListener('keydown', onEscape)
+  }, [open, close])
+
+  // Full screen on a phone: the page behind it is inert while it is open
+  useEffect(() => {
+    if (!open || !window.matchMedia?.(PHONE).matches) return undefined
+    const covered = [...document.querySelectorAll(COVERED)].filter(el => !el.hasAttribute('inert'))
+    covered.forEach(el => el.setAttribute('inert', ''))
+    return () => covered.forEach(el => el.removeAttribute('inert'))
+  }, [open])
+
   const onKeyDown = (e) => {
-    rootProps.onKeyDown(e)
-    if (e.defaultPrevented) return
     if (open && panelRef.current?.contains(e.target)) moveFocus(e, focusables())
   }
 
+  // After "Mark read" the focus goes to the first action left on the line, else to the title
+  const [focusAfter, setFocusAfter] = useState(null)
+  useEffect(() => {
+    if (!focusAfter) return
+    const line = panelRef.current?.querySelector(`[data-notification="${CSS.escape(focusAfter)}"] .shell-notif-actions`)
+    ;(line?.querySelector('a, button:not([disabled])') || titleRef.current)?.focus()
+    setFocusAfter(null)
+  }, [focusAfter])
+  const readOne = (key) => { markRead(key); setFocusAfter(key) }
+  const readAll = () => { markAllRead(); titleRef.current?.focus() }
+
   const summary = unread > 0 ? t('shell.bell.unread', { count: unread }) : t('shell.bell.allRead')
+  const buttonState = unread > 0 ? t('shell.bell.unread', { count: unread }) : t('shell.bell.noneUnread')
   const kindLabel = (item) => t(`shell.bell.kinds.${item.kind}`, { defaultValue: item.kind })
   const lang = i18n?.language || 'en'
   const timeZone = getAppTimezone()
@@ -95,7 +133,7 @@ export function NotificationBell({ can }) {
   const actionOf = (item) => {
     if (item.source !== 'queue') return null
     if (item.kind === 'acme_client_renewal_failed' && can?.hasPermission?.('write:acme')) {
-      return { icon: ArrowsClockwise, label: t('shell.bell.retry'), aria: t('shell.bell.retryLabel', { name: item.title }),
+      return { icon: ArrowClockwise, label: t('shell.bell.retry'), aria: t('shell.bell.retryLabel', { name: item.title }),
         run: () => acmeService.renewOrder(item.id), done: t('overview.queue.retried') }
     }
     if ((item.kind === 'crl_due' || item.kind === 'crl_missing') && can?.hasPermission?.('write:crl')) {
@@ -130,18 +168,18 @@ export function NotificationBell({ can }) {
   }
 
   return (
-    <div className="shell-pop-wrap" {...rootProps} onKeyDown={onKeyDown}>
+    <div className="shell-pop-wrap shell-bell-wrap" ref={rootProps.ref} onKeyDown={onKeyDown}>
       <button
         type="button"
         ref={buttonRef}
         className="shell-icon-btn shell-bell"
         aria-expanded={open}
         aria-controls="shell-bell-panel"
-        aria-label={`${t('shell.bell.title')}: ${summary}`}
+        aria-label={t('shell.bell.label', { state: buttonState })}
         onClick={() => setOpen(!open)}
       >
         <Bell size={16} aria-hidden="true" />
-        {unread > 0 && <span className="shell-bell-count" aria-hidden="true">{unread > 9 ? '9+' : unread}</span>}
+        {unread > 0 && <span className="shell-bell-count" aria-hidden="true">{unread}</span>}
       </button>
       <aside id="shell-bell-panel" ref={panelRef} className="shell-notif-panel"
         aria-labelledby="shell-bell-title" hidden={!open}>
@@ -150,8 +188,8 @@ export function NotificationBell({ can }) {
             <h2 id="shell-bell-title" ref={titleRef} tabIndex={-1}>{t('shell.bell.title')}</h2>
             <p role="status">{t('shell.bell.summary', { state: summary, count: items.length })}</p>
           </div>
-          <button type="button" className="shell-btn is-quiet" disabled={unread === 0} onClick={markAllRead}>
-            <Check size={14} aria-hidden="true" />{t('shell.bell.markAllRead')}
+          <button type="button" className="shell-btn is-quiet" disabled={unread === 0} onClick={readAll}>
+            <Check size={17} aria-hidden="true" />{t('shell.bell.markAllRead')}
           </button>
           <button type="button" className="shell-icon-btn" aria-label={t('shell.bell.close')} onClick={() => close(true)}>
             <X size={16} aria-hidden="true" />
@@ -167,7 +205,8 @@ export function NotificationBell({ can }) {
                 {g.items.map(item => {
                   const tone = toneOf(item)
                   const Icon = KIND_ICON[item.kind] || Warning
-                  const name = item.title || kindLabel(item)
+                  const title = titleOf(item, t)
+                  const name = title || kindLabel(item)
                   const detail = item.detail || t(`overview.cause.${item.kind}`, { defaultValue: '' })
                   const action = actionOf(item)
                   return (
@@ -179,7 +218,7 @@ export function NotificationBell({ can }) {
                           {item.unread && <span className="shell-notif-new">{t('shell.bell.new')}</span>}
                           {item.when !== null && <time dateTime={new Date(item.when).toISOString()}>{hm(item.when)}</time>}
                         </p>
-                        {item.title && <p className="shell-notif-title">{item.title}</p>}
+                        {title && <p className="shell-notif-title">{title}</p>}
                         {detail && <p className="shell-notif-detail">{detail}</p>}
                         <div className="shell-notif-actions">
                           {action && (
@@ -187,20 +226,20 @@ export function NotificationBell({ can }) {
                               aria-busy={busy === item.key || undefined}
                               {...guardProps(guard, !!busy)}
                               onClick={() => act(item, action)}>
-                              <action.icon size={16} aria-hidden="true" />{action.label}
+                              <action.icon size={17} aria-hidden="true" />{action.label}
                             </button>
                           )}
                           {item.href && (
                             <Link to={item.href} className="shell-btn"
                               aria-label={`${t('shell.bell.open')}: ${name}`}
                               onClick={() => { markRead(item.key); close() }}>
-                              <CaretRight size={16} aria-hidden="true" />{t('shell.bell.open')}
+                              <CaretRight size={17} aria-hidden="true" />{t('shell.bell.open')}
                             </Link>
                           )}
                           {item.unread && (
                             <button type="button" className="shell-btn is-quiet"
                               aria-label={`${t('shell.bell.markRead')}: ${name}`}
-                              onClick={() => markRead(item.key)}>
+                              onClick={() => readOne(item.key)}>
                               {t('shell.bell.markRead')}
                             </button>
                           )}

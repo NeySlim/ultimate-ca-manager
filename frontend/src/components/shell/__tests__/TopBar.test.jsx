@@ -1,6 +1,6 @@
 /** The bar's landmarks, names, tab order, search entry, expiry badge and phone picker. */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { readFileSync } from 'node:fs'
@@ -98,8 +98,8 @@ describe('TopBar', () => {
     // The phone picker is display:none on desktop (CSS, not applied in jsdom)
     expect(seen.filter(l => l !== 'shell.navigate')).toEqual([
       'UCM', 'dashboard', 'certificates', 'cas', 'audit', 'users',
-      'shell.modules', 'shell.search', 'shell.theme.menu', 'shell.bell.title: shell.bell.allRead', 'common.help',
-      'common.account: probe',
+      'shell.modules', 'shell.search', 'shell.theme.label', 'shell.bell.label', 'common.help',
+      'shell.accountLabel|probe',
     ])
   })
 
@@ -145,35 +145,43 @@ describe('TopBar', () => {
 })
 
 describe('TopBar expiry badge', () => {
-  it('shows the count on Certificates and hides it once dismissed', async () => {
+  const certLink = () => screen.getAllByRole('link').find(a => a.getAttribute('data-module') === 'certificates')
+
+  it('shows the count on the Certificates link, says it, and dismisses it once the link is followed', async () => {
     getStats.mockResolvedValue({ data: { expiring: 3, expired: 2 } })
     const { user } = setup()
-    const badge = await screen.findByRole('button', { name: /shell\.expiringBadge/ })
-    expect(badge).toHaveTextContent('5')
-    await user.click(badge)
-    expect(screen.queryByRole('button', { name: /shell\.expiringBadge/ })).toBeNull()
+    await waitFor(() => expect(document.querySelector('.shell-badge')).toHaveTextContent('5'))
+    expect(certLink()).toContainElement(document.querySelector('.shell-badge'))
+    expect(certLink()).toHaveTextContent('shell.expiringCount')
+    await user.click(certLink())
+    expect(document.querySelector('.shell-badge')).toBeNull()
     expect(JSON.parse(localStorage.getItem('ucm_badge_dismissed')).count).toBe(5)
   })
 
+  it('adds no tab stop: the count is part of its link', async () => {
+    getStats.mockResolvedValue({ data: { expiring: 1, expired: 0 } })
+    setup()
+    await waitFor(() => expect(document.querySelector('.shell-badge')).toHaveTextContent('1'))
+    expect(screen.queryByRole('button', { name: /expiring/ })).toBeNull()
+    expect(document.querySelector('.shell-badge')).toHaveAttribute('aria-hidden', 'true')
+  })
+
   // jsdom has no layout: the cascade of the real stylesheet is what it can check
-  it('keeps the badge clear of its link and of the next one', async () => {
+  it('keeps the count out of the link geometry: drawn over the icon, no margin, no pointer', async () => {
     const sheet = document.createElement('style')
     sheet.textContent = readFileSync(resolve(process.cwd(), 'src/components/shell/shell.css'), 'utf8')
     document.head.appendChild(sheet)
     try {
       getStats.mockResolvedValue({ data: { expiring: 30, expired: 2 } })
       setup({ activeId: 'certificates' })
-      const badge = await screen.findByRole('button', { name: /shell\.expiringBadge/ })
-      const link = badge.previousElementSibling
-      expect(link).toHaveAttribute('data-module', 'certificates')
-      expect(link).not.toContainElement(badge)
+      await waitFor(() => expect(document.querySelector('.shell-badge')).toHaveTextContent('32'))
+      const badge = document.querySelector('.shell-badge')
       const style = getComputedStyle(badge)
-      expect(parseFloat(style.marginLeft)).toBeGreaterThanOrEqual(0)
-      expect(parseFloat(style.marginRight)).toBeGreaterThan(0)
-      // Neither the badge nor its link gives way when the bar is short of room
-      expect(style.flexShrink).toBe('0')
-      expect(style.whiteSpace).toBe('nowrap')
-      expect(getComputedStyle(badge.parentElement).flexShrink).toBe('0')
+      expect(style.position).toBe('absolute')
+      expect(style.pointerEvents).toBe('none')
+      expect(getComputedStyle(badge.parentElement).position).toBe('relative')
+      // The link keeps the padding of every bar link, the underline its symmetric insets
+      expect(getComputedStyle(certLink()).paddingRight).toBe(getComputedStyle(certLink()).paddingLeft)
     } finally {
       sheet.remove()
     }
@@ -182,6 +190,6 @@ describe('TopBar expiry badge', () => {
   it('has no badge when nothing expires', async () => {
     setup()
     await Promise.resolve()
-    expect(screen.queryByRole('button', { name: /shell\.expiringBadge/ })).toBeNull()
+    expect(document.querySelector('.shell-badge')).toBeNull()
   })
 })

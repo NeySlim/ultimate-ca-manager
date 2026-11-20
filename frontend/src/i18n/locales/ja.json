@@ -7068,6 +7068,7 @@
   },
   "shell": {
     "mainNav": "メインナビゲーション",
+    "skipToContent": "コンテンツへ移動",
     "modules": "モジュール",
     "modulesMenuLabel": "製品モジュール",
     "pinCount": "バーに固定済み: {{count}} / {{max}}",
@@ -7081,15 +7082,20 @@
     "escapeKey": "Esc",
     "searchPlaceholder": "検索…",
     "navigate": "移動",
-    "signedInWith": "{{method}}でサインイン中",
+    "signedInWith": "{{method}}でサインイン中。",
+    "accountLabel": "アカウント: {{name}}、{{role}}",
+    "accountLabelName": "アカウント: {{name}}",
+    "lockAfter_one": "{{count}} 分間操作がないとロックされます。",
+    "lockAfter_other": "{{count}} 分間操作がないとロックされます。",
+    "signOut": "サインアウト",
     "method": {
       "password": "パスワード",
       "mtls": "クライアント証明書",
       "webauthn": "セキュリティキー",
       "session": "ブラウザセッション"
     },
-    "expiringBadge_one": "期限切れ間近または期限切れの証明書が{{count}}件あります。閉じる。",
-    "expiringBadge_other": "期限切れ間近または期限切れの証明書が{{count}}件あります。閉じる。",
+    "expiringCount_one": "期限切れ間近または期限切れの証明書が{{count}}件",
+    "expiringCount_other": "期限切れ間近または期限切れの証明書が{{count}}件",
     "statusRunning": "サービス稼働中",
     "statusUnreachable": "サービスに接続できません",
     "statusSafeMode": "セーフモード",
@@ -7101,12 +7107,21 @@
     "haNodes_other": "{{count}} ノード · すべて最新",
     "haLate_one": "{{count}} ノードが遅延",
     "haLate_other": "{{count}} ノードが遅延",
+    "approvalsPending_one": "承認待ち {{count}} 件",
+    "approvalsPending_other": "承認待ち {{count}} 件",
+    "approvalsNone": "承認待ちはありません",
     "theme": {
-      "menu": "テーマ"
+      "menu": "テーマ",
+      "label": "テーマ: {{theme}}",
+      "systemNow": "システム（{{mode}}）",
+      "auroreDark": "Aurore ダーク",
+      "auroreLight": "Aurore ライト"
     },
     "bell": {
       "title": "通知",
+      "label": "通知: {{state}}",
       "allRead": "すべて既読",
+      "noneUnread": "未読なし",
       "markAllRead": "すべて既読にする",
       "markRead": "既読にする",
       "open": "開く",
@@ -7144,6 +7159,7 @@
       "retryLabel": "{{name}} の ACME 更新を再試行",
       "publish": "公開",
       "publishLabel": "{{name}} の CRL を今すぐ公開",
+      "crlTitle": "{{name}} の CRL",
       "close": "通知を閉じる",
       "mailOn": "メール通知は有効です。",
       "mailOff": "メール通知は無効です。",
@@ -7251,6 +7267,7 @@
       "stateDone": "完了",
       "stateTodo": "未完了",
       "stateAfter": "手順 {{step}} の後",
+      "doneWhat": "{{what}}。",
       "steps": {
         "root": {
           "title": "オフラインのルートを作成するか CA をインポート",
@@ -7262,15 +7279,23 @@
           "title": "最初の発行 CA を作成",
           "todo": "ルートの下でサービスの証明書に署名します。",
           "done": "ルートの下に発行 CA があります。",
+          "doneWith": "{{what}}（{{root}} の配下）。",
           "action": "発行 CA を作成"
         },
         "protocol": {
           "title": "最初のプロトコルを有効化",
           "todo": "サーバーには ACME、ネットワーク機器には SCEP。",
           "done": "発行 CA で登録プロトコルが有効です。",
+          "doneWith": "{{protocol}} 有効。",
           "action": "プロトコルを選択"
         }
       }
+    },
+    "offline": {
+      "title": "オフライン。",
+      "text": "読み込み済みのデータで閲覧を続けられます。操作は一時停止中で、ネットワークが戻ると自動的に再開します。",
+      "said": "オフライン: 閲覧は続けられますが、操作は一時停止中です。",
+      "back": "接続が回復しました。操作を再び利用できます。"
     }
   },
   "overview": {

@@ -6678,7 +6678,7 @@
   "websocket": {
     "status": {
       "active": "Обновления в реальном времени включены",
-      "connecting": "Подключение...",
+      "connecting": "Подключение…",
       "disabled": "Обновления в реальном времени отключены",
       "error": "Ошибка подключения",
       "live": "Онлайн",
@@ -7220,6 +7220,7 @@
   },
   "shell": {
     "mainNav": "Главная навигация",
+    "skipToContent": "Перейти к содержимому",
     "modules": "Модули",
     "modulesMenuLabel": "Модули продукта",
     "pinCount": "Закреплено на панели: {{count}} из {{max}}",
@@ -7233,17 +7234,24 @@
     "escapeKey": "Esc",
     "searchPlaceholder": "Поиск…",
     "navigate": "Перейти",
-    "signedInWith": "Вход выполнен: {{method}}",
+    "signedInWith": "Вход выполнен: {{method}}.",
+    "accountLabel": "Учётная запись: {{name}}, {{role}}",
+    "accountLabelName": "Учётная запись: {{name}}",
+    "lockAfter_one": "Блокировка после {{count}} мин бездействия.",
+    "lockAfter_few": "Блокировка после {{count}} мин бездействия.",
+    "lockAfter_many": "Блокировка после {{count}} мин бездействия.",
+    "lockAfter_other": "Блокировка после {{count}} мин бездействия.",
+    "signOut": "Выйти",
     "method": {
       "password": "пароль",
       "mtls": "клиентский сертификат",
       "webauthn": "ключ безопасности",
       "session": "сеанс браузера"
     },
-    "expiringBadge_one": "{{count}} сертификат истекает или истёк. Скрыть.",
-    "expiringBadge_few": "{{count}} сертификата истекают или истекли. Скрыть.",
-    "expiringBadge_many": "{{count}} сертификатов истекают или истекли. Скрыть.",
-    "expiringBadge_other": "{{count}} сертификата истекают или истекли. Скрыть.",
+    "expiringCount_one": "{{count}} сертификат истекает или истёк",
+    "expiringCount_few": "{{count}} сертификата истекают или истекли",
+    "expiringCount_many": "{{count}} сертификатов истекают или истекли",
+    "expiringCount_other": "{{count}} сертификата истекают или истекли",
     "statusRunning": "Служба работает",
     "statusUnreachable": "Служба недоступна",
     "statusSafeMode": "Безопасный режим",
@@ -7259,20 +7267,31 @@
     "haLate_few": "{{count}} узла отстают",
     "haLate_many": "{{count}} узлов отстают",
     "haLate_other": "{{count}} узлов отстают",
+    "approvalsPending_one": "{{count}} одобрение ожидает",
+    "approvalsPending_few": "{{count}} одобрения ожидают",
+    "approvalsPending_many": "{{count}} одобрений ожидают",
+    "approvalsPending_other": "{{count}} одобрения ожидают",
+    "approvalsNone": "Нет ожидающих одобрений",
     "theme": {
-      "menu": "Тема"
+      "menu": "Тема",
+      "label": "Тема: {{theme}}",
+      "systemNow": "Системная ({{mode}})",
+      "auroreDark": "Aurore тёмная",
+      "auroreLight": "Aurore светлая"
     },
     "bell": {
       "title": "Уведомления",
+      "label": "Уведомления: {{state}}",
       "allRead": "Всё прочитано",
+      "noneUnread": "нет непрочитанных",
       "markAllRead": "Отметить все прочитанными",
       "markRead": "Отметить прочитанным",
       "open": "Открыть",
       "new": "Не прочитано",
       "empty": "Уведомлений нет: ничто не требует вмешательства.",
       "kinds": {
-        "acme_order_failed": "Заказ ACME не выполнен",
-        "acme_client_renewal_failed": "Продление ACME не удалось",
+        "acme_order_failed": "Сбой ACME",
+        "acme_client_renewal_failed": "Сбой ACME",
         "approval_pending": "Ожидает утверждения",
         "scep_request_pending": "Запрос SCEP ожидает",
         "key_recovery_pending": "Восстановление ключа ожидает",
@@ -7306,6 +7325,7 @@
       "retryLabel": "Повторить продление ACME для {{name}}",
       "publish": "Опубликовать",
       "publishLabel": "Опубликовать CRL {{name}} сейчас",
+      "crlTitle": "CRL {{name}}",
       "close": "Закрыть уведомления",
       "mailOn": "Уведомление по электронной почте включено.",
       "mailOff": "Уведомление по электронной почте выключено.",
@@ -7429,6 +7449,7 @@
       "stateDone": "Готово",
       "stateTodo": "Сделать",
       "stateAfter": "После шага {{step}}",
+      "doneWhat": "{{what}}.",
       "steps": {
         "root": {
           "title": "Создать автономный корневой центр или импортировать центр",
@@ -7440,15 +7461,23 @@
           "title": "Создать первый выдающий центр",
           "todo": "Он подписывает сертификаты служб, под корневым центром.",
           "done": "Выдающий центр создан под корневым.",
+          "doneWith": "{{what}}, под {{root}}.",
           "action": "Создать выдающий центр"
         },
         "protocol": {
           "title": "Включить первый протокол",
           "todo": "ACME для серверов, SCEP для сетевого оборудования.",
           "done": "Протокол регистрации активен на выдающем центре.",
+          "doneWith": "{{protocol}} активен.",
           "action": "Выбрать протокол"
         }
       }
+    },
+    "offline": {
+      "title": "Нет сети.",
+      "text": "Просмотр продолжается с уже загруженными данными; действия приостановлены и возобновятся сами при восстановлении сети.",
+      "said": "Нет сети: просмотр продолжается, действия приостановлены.",
+      "back": "Соединение восстановлено: действия снова доступны."
     }
   },
   "overview": {

@@ -19,7 +19,7 @@ export function PinnedModules({ pins, activeId }) {
         className={`shell-navlink shell-pinned${active ? ' is-active' : ''}`}
         aria-current={active ? 'page' : undefined}
       >
-        <Icon size={16} weight={active ? 'fill' : 'regular'} aria-hidden="true" />
+        <Icon size={16} aria-hidden="true" />
         <span className="shell-pin-label">{label}</span>
       </Link>
     )

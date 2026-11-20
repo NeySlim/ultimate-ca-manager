@@ -14,8 +14,10 @@ const make = async (lng, shell) => {
 describe('shell counters', () => {
   it('english uses the singular for one', async () => {
     const t = await make('en', en.shell)
-    expect(t('shell.expiringBadge', { count: 1 })).toMatch(/^1 certificate expiring/)
-    expect(t('shell.expiringBadge', { count: 2 })).toMatch(/^2 certificates expiring/)
+    expect(t('shell.expiringCount', { count: 1 })).toBe('1 certificate expiring or expired')
+    expect(t('shell.expiringCount', { count: 2 })).toBe('2 certificates expiring or expired')
+    expect(t('shell.approvalsPending', { count: 1 })).toBe('1 approval pending')
+    expect(t('shell.approvalsPending', { count: 2 })).toBe('2 approvals pending')
     expect(t('shell.haNodes', { count: 1 })).toBe('1 node · up to date')
     expect(t('shell.haNodes', { count: 3 })).toBe('3 nodes · all up to date')
     expect(t('shell.haLate', { count: 1 })).toBe('1 node late')
@@ -27,11 +29,13 @@ describe('shell counters', () => {
     expect(t('shell.haNodes', { count: 1 })).toBe('1 nœud · à jour')
     expect(t('shell.haNodes', { count: 3 })).toBe('3 nœuds · tous à jour')
     expect(t('shell.haLate', { count: 2 })).toBe('2 nœuds en retard')
-    expect(t('shell.expiringBadge', { count: 1 })).toMatch(/^1 certificat expire/)
+    expect(t('shell.expiringCount', { count: 1 })).toBe('1 certificat expire ou a expiré')
+    expect(t('shell.approvalsPending', { count: 2 })).toBe('2 approbations en attente')
+    expect(t('shell.lockAfter', { count: 30 })).toBe('Verrouillage après 30 min d’inactivité.')
   })
 
   it('ukrainian carries the few and many forms for every counter', () => {
-    for (const k of ['expiringBadge', 'haNodes', 'haLate']) {
+    for (const k of ['expiringCount', 'approvalsPending', 'lockAfter', 'haNodes', 'haLate']) {
       for (const f of ['one', 'few', 'many', 'other']) expect(uk.shell[`${k}_${f}`]).toBeTruthy()
     }
   })

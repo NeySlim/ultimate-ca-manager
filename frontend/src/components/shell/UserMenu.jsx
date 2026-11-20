@@ -1,15 +1,14 @@
 /**
- * Account menu: identity, sign-in method, account and settings, the language
- * choice the old sidebar menu carried, and sign out. The theme lives in ThemeMenu.
+ * Account menu, as the mockup draws it: identity (name, role and login), the sign-in method with
+ * the inactivity lock, then My account and Sign out. The language is chosen in the account
+ * preferences and on the sign-in page; Settings is reached from the Modules menu and the palette.
  */
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
-import { UserCircle, Gear, SignOut, Check } from '@phosphor-icons/react'
+import { Users, SignOut } from '@phosphor-icons/react'
 import { useAuth } from '../../contexts/AuthContext'
-import { persistPreference } from '../../stores/userPreferencesStore'
-import { isVisible, moduleById } from '../../navigation/registry'
-import { languages } from '../../i18n'
+import { authService } from '../../services/auth.service'
 import { useDisclosure, moveFocus } from './useDisclosure'
 
 const METHOD_KEYS = {
@@ -20,20 +19,35 @@ const METHOD_KEYS = {
 }
 
 const initialsOf = (name) => (name || '?').slice(0, 2).toUpperCase()
+const roleKey = (role) => (role === 'admin' ? 'users.admin' : `common.${role}`)
 
-export function UserMenu({ can }) {
-  const { t, i18n } = useTranslation()
+// The inactivity timeout of the server (seconds), read once per page load
+let timeoutRead = null
+const readTimeout = () => {
+  timeoutRead ||= authService.getCurrentUser()
+    .then(res => Number((res?.data ?? res)?.session_timeout) || null)
+    .catch(() => { timeoutRead = null; return null })
+  return timeoutRead
+}
+
+export function UserMenu() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { user, logout, authMethod } = useAuth()
   const { open, setOpen, close, buttonRef, rootProps } = useDisclosure()
   const panelRef = useRef(null)
+  const [minutes, setMinutes] = useState(null)
   const username = user?.username || 'User'
-  const lang = i18n.language?.split('-')[0] || 'en'
-  const showSettings = isVisible(moduleById('settings'), can)
+  const name = user?.full_name || username
+  const role = user?.role ? t(roleKey(user.role), { defaultValue: user.role }) : ''
   const items = () => [...(panelRef.current?.querySelectorAll('a, button') || [])]
 
   useEffect(() => {
-    if (open) items()[0]?.focus()
+    if (!open) return undefined
+    items()[0]?.focus()
+    let alive = true
+    readTimeout().then(s => { if (alive && s) setMinutes(Math.round(s / 60)) })
+    return () => { alive = false }
   }, [open])
 
   const onKeyDown = (e) => {
@@ -48,11 +62,7 @@ export function UserMenu({ can }) {
     navigate('/login')
   }
 
-  const pickLanguage = (code) => {
-    i18n.changeLanguage(code)
-    try { localStorage.setItem('i18nextLng', code) } catch { /* storage is optional */ }
-    persistPreference('language', code)
-  }
+  const method = authMethod ? (METHOD_KEYS[authMethod] ? t(METHOD_KEYS[authMethod]) : authMethod) : null
 
   return (
     <div className="shell-pop-wrap" {...rootProps} onKeyDown={onKeyDown}>
@@ -62,44 +72,28 @@ export function UserMenu({ can }) {
         className="shell-avatar"
         aria-expanded={open}
         aria-controls="shell-user-menu"
-        aria-label={`${t('common.account')}: ${username}`}
+        aria-label={role ? t('shell.accountLabel', { name, role }) : t('shell.accountLabelName', { name })}
+        title={name}
         onClick={() => setOpen(!open)}
       >
         {initialsOf(username)}
       </button>
-      <div id="shell-user-menu" ref={panelRef} className="shell-pop" hidden={!open}>
+      <div id="shell-user-menu" ref={panelRef} className="shell-pop shell-user-menu" hidden={!open}>
         <div className="shell-user-id">
-          <strong>{username}</strong>
-          <span>{user?.role || ''}</span>
-          {authMethod && (
+          <strong>{name}</strong>
+          <span>{role && <>{role} · </>}<span className="shell-mono">{username}</span></span>
+          {method && (
             <span className="shell-muted">
-              {t('shell.signedInWith', { method: METHOD_KEYS[authMethod] ? t(METHOD_KEYS[authMethod]) : authMethod })}
+              {t('shell.signedInWith', { method })}
+              {minutes ? <> {t('shell.lockAfter', { count: minutes })}</> : null}
             </span>
           )}
         </div>
         <Link to="/account" className="shell-pop-item" onClick={() => close()}>
-          <UserCircle size={16} aria-hidden="true" />{t('common.account')}
+          <Users size={17} aria-hidden="true" />{t('common.account')}
         </Link>
-        {showSettings && (
-          <Link to="/settings" className="shell-pop-item" onClick={() => close()}>
-            <Gear size={16} aria-hidden="true" />{t('common.settings')}
-          </Link>
-        )}
-
-        <div role="group" aria-label={t('settings.language')} className="shell-pop-group">
-          <span className="shell-pop-label">{t('settings.language')}</span>
-          {languages.map(l => (
-            <button key={l.code} type="button" className="shell-pop-item" aria-pressed={lang === l.code}
-              onClick={() => pickLanguage(l.code)}>
-              <span aria-hidden="true">{l.flag}</span>
-              <span className="shell-grow">{l.name}</span>
-              {lang === l.code && <Check size={14} weight="bold" aria-hidden="true" />}
-            </button>
-          ))}
-        </div>
-
-        <button type="button" className="shell-pop-item shell-danger" onClick={handleLogout}>
-          <SignOut size={16} aria-hidden="true" />{t('auth.logout')}
+        <button type="button" className="shell-pop-item" onClick={handleLogout}>
+          <SignOut size={17} aria-hidden="true" />{t('shell.signOut')}
         </button>
       </div>
     </div>

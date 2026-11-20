@@ -26,6 +26,7 @@ import { reportSilentFailure } from '../lib/silentFailure'
 import { localOnlyRevocationWarning } from '../lib/revocationOutcome'
 import { apiKeyScopePermissions } from '../lib/apiKeyScopes'
 import { FormLayout, SectionToc, SectionJump, FormSection, FormGroup, useSectionParam } from '../components/sectioned'
+import LanguageSelector from '../components/ui/LanguageSelector'
 
 export default function AccountPage() {
   const { t } = useTranslation()
@@ -567,6 +568,11 @@ export default function AccountPage() {
             />
           </DetailGrid>
         )}
+      </FormGroup>
+
+      {/* The account's language, saved with its preferences (the account menu no longer carries it) */}
+      <FormGroup title={t('settings.language')}>
+        <LanguageSelector />
       </FormGroup>
       
       <FormGroup title={t('account.accountActivity')}>

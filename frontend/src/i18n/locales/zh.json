@@ -6531,7 +6531,7 @@
   "websocket": {
     "status": {
       "active": "实时更新已激活",
-      "connecting": "连接中...",
+      "connecting": "连接中…",
       "disabled": "实时更新已禁用",
       "error": "连接错误",
       "live": "实时",
@@ -7065,6 +7065,7 @@
   },
   "shell": {
     "mainNav": "主导航",
+    "skipToContent": "跳到主要内容",
     "modules": "模块",
     "modulesMenuLabel": "产品模块",
     "pinCount": "已在栏中固定 {{count}} / {{max}}",
@@ -7078,15 +7079,20 @@
     "escapeKey": "Esc",
     "searchPlaceholder": "搜索…",
     "navigate": "导航",
-    "signedInWith": "通过{{method}}登录",
+    "signedInWith": "通过{{method}}登录。",
+    "accountLabel": "账户：{{name}}，{{role}}",
+    "accountLabelName": "账户：{{name}}",
+    "lockAfter_one": "闲置 {{count}} 分钟后锁定。",
+    "lockAfter_other": "闲置 {{count}} 分钟后锁定。",
+    "signOut": "退出登录",
     "method": {
       "password": "密码",
       "mtls": "客户端证书",
       "webauthn": "安全密钥",
       "session": "浏览器会话"
     },
-    "expiringBadge_one": "{{count}} 张证书即将到期或已过期。关闭。",
-    "expiringBadge_other": "{{count}} 张证书即将到期或已过期。关闭。",
+    "expiringCount_one": "{{count}} 张证书即将到期或已过期",
+    "expiringCount_other": "{{count}} 张证书即将到期或已过期",
     "statusRunning": "服务运行中",
     "statusUnreachable": "服务无法访问",
     "statusSafeMode": "安全模式",
@@ -7098,20 +7104,29 @@
     "haNodes_other": "{{count}} 个节点 · 全部已同步",
     "haLate_one": "{{count}} 个节点滞后",
     "haLate_other": "{{count}} 个节点滞后",
+    "approvalsPending_one": "{{count}} 项审批待处理",
+    "approvalsPending_other": "{{count}} 项审批待处理",
+    "approvalsNone": "没有待处理的审批",
     "theme": {
-      "menu": "主题"
+      "menu": "主题",
+      "label": "主题：{{theme}}",
+      "systemNow": "跟随系统（{{mode}}）",
+      "auroreDark": "Aurore 深色",
+      "auroreLight": "Aurore 浅色"
     },
     "bell": {
       "title": "通知",
+      "label": "通知：{{state}}",
       "allRead": "全部已读",
+      "noneUnread": "没有未读",
       "markAllRead": "全部标为已读",
       "markRead": "标为已读",
       "open": "打开",
       "new": "未读",
       "empty": "没有通知：没有需要处理的事项。",
       "kinds": {
-        "acme_order_failed": "ACME 订单失败",
-        "acme_client_renewal_failed": "ACME 续期失败",
+        "acme_order_failed": "ACME 失败",
+        "acme_client_renewal_failed": "ACME 失败",
         "approval_pending": "待审批",
         "scep_request_pending": "SCEP 请求待处理",
         "key_recovery_pending": "密钥恢复待处理",
@@ -7141,6 +7156,7 @@
       "retryLabel": "重试 {{name}} 的 ACME 续订",
       "publish": "发布",
       "publishLabel": "立即发布 {{name}} 的 CRL",
+      "crlTitle": "{{name}} 的 CRL",
       "close": "关闭通知",
       "mailOn": "电子邮件通知已启用。",
       "mailOff": "电子邮件通知已停用。",
@@ -7248,6 +7264,7 @@
       "stateDone": "已完成",
       "stateTodo": "待办",
       "stateAfter": "第 {{step}} 步之后",
+      "doneWhat": "{{what}}。",
       "steps": {
         "root": {
           "title": "创建离线根 CA 或导入 CA",
@@ -7259,15 +7276,23 @@
           "title": "创建第一个签发 CA",
           "todo": "它在根 CA 之下签署服务证书。",
           "done": "根 CA 之下已有签发 CA。",
+          "doneWith": "{{what}}，隶属于 {{root}}。",
           "action": "创建签发 CA"
         },
         "protocol": {
           "title": "启用第一个协议",
           "todo": "ACME 用于服务器，SCEP 用于网络设备。",
           "done": "签发 CA 上已启用一个注册协议。",
+          "doneWith": "{{protocol}} 已启用。",
           "action": "选择协议"
         }
       }
+    },
+    "offline": {
+      "title": "离线。",
+      "text": "可继续浏览已加载的数据；操作已暂停，网络恢复后将自动恢复。",
+      "said": "离线：可继续浏览，操作已暂停。",
+      "back": "连接已恢复：操作重新可用。"
     }
   },
   "overview": {

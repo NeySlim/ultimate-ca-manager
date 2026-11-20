@@ -12,6 +12,7 @@ import { ROLES, canFor, tStub } from './shellTestUtils'
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: tStub, i18n: { language: 'en' } }),
 }))
+const showInfo = vi.hoisted(() => vi.fn())
 
 import { ModulesMenu } from '../ModulesMenu'
 import { togglePinList } from '../pins'
@@ -26,7 +27,7 @@ function Host({ permissions, initialPins = [], activeId = 'dashboard', onHelp })
     setPins(next)
     return true
   }
-  return <ModulesMenu can={canFor(permissions)} pins={pins} onTogglePin={toggle} activeId={activeId} onOpenHelp={onHelp} />
+  return <ModulesMenu can={canFor(permissions)} pins={pins} onTogglePin={toggle} activeId={activeId} onOpenHelp={onHelp} onNotice={showInfo} />
 }
 
 function setup(props = {}, path = '/') {
@@ -214,14 +215,16 @@ describe('Modules menu: pins', () => {
     expect(within(menu()).getByText(/shell\.pinCount/)).toBeInTheDocument()
   })
 
-  it('refuses a fourth pin with an explanation, and pins nothing', async () => {
+  it('refuses a fourth pin with a message, as the mockup, keeps the foot hint, and pins nothing', async () => {
+    showInfo.mockClear()
     const user = setup({ initialPins: ['reports', 'users', 'hsm'] })
     await user.click(button())
     const fourth = pinButton('common.rbac')
     expect(fourth).toHaveAttribute('aria-disabled', 'true')
     await user.click(fourth)
     expect(fourth).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.getByRole('status')).toHaveTextContent('shell.pinFull')
+    expect(showInfo).toHaveBeenCalledWith('shell.pinFull')
+    expect(within(menu()).getByText('shell.pinHint')).toBeInTheDocument()
     expect(fourth).toHaveAttribute('title', 'shell.pinFullTitle')
   })
 
