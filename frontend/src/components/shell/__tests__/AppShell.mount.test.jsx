@@ -169,31 +169,14 @@ describe('AppShell', () => {
   })
 })
 
-describe('expiry notice on arrival', () => {
-  const arrive = async (path) => {
+describe('no expiry notice on arrival', () => {
+  afterEach(() => { vi.useRealTimers() })
+
+  it.each(['/certificates', '/', '/dashboard', '/cas'])('raises none on %s: the state counters and the bell say it', async (path) => {
     vi.useFakeTimers()
     probe.getStats.mockResolvedValue({ data: { expired: 55, expiring: 11 } })
     setup(path)
     await act(async () => { await vi.advanceTimersByTimeAsync(2500) })
-  }
-  afterEach(() => { vi.useRealTimers() })
-
-  it('warns once per session on a page that does not show the figures', async () => {
-    await arrive('/certificates')
-    expect(probe.showWarning).toHaveBeenCalledTimes(1)
-    expect(probe.showWarning).toHaveBeenCalledWith('notifications.certificatesExpiredAndExpiring')
-    expect(sessionStorage.getItem('ucm-expiring-alert-shown')).toBe('true')
-  })
-
-  it.each([
-    ['/', { expired: 55, expiring: 11 }], ['/dashboard', { expired: 55, expiring: 11 }],
-    ['/', { expired: 3, expiring: 0 }], ['/', { expired: 0, expiring: 2 }],
-  ])('stays silent on the overview (%s, %o): its figures strip already says it', async (path, data) => {
-    vi.useFakeTimers()
-    probe.getStats.mockResolvedValue({ data })
-    setup(path)
-    await act(async () => { await vi.advanceTimersByTimeAsync(2500) })
     expect(probe.showWarning).not.toHaveBeenCalled()
-    expect(sessionStorage.getItem('ucm-expiring-alert-shown')).toBe('true')
   })
 })

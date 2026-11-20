@@ -254,6 +254,7 @@
 .shell-status-live, .shell-status-ha { display: inline-flex; align-items: center; gap: 8px; }
 .shell-status-ha.is-warn { color: var(--warn); }
 .shell-status-shortcut { margin-left: auto; }
+.shell-status-escape { margin-left: 10px; }
 .shell-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .shell-dot.is-good { background: var(--good); }
 .shell-dot.is-warn { background: var(--warn); }

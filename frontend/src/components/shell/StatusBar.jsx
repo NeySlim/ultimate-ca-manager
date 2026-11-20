@@ -1,6 +1,6 @@
 /**
  * Bottom bar: only what /health reports (version, service state, HA node and
- * cluster) and the search shortcut. Nothing is shown for a field the API omits.
+ * cluster) and the shortcuts (search, close the inspector). Nothing is shown for a field the API omits.
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -58,7 +58,10 @@ export function StatusBar() {
           {late > 0 && <span>{t('shell.haLate', { count: late })}</span>}
         </span>
       )}
-      <span className="shell-status-shortcut"><kbd>Ctrl K</kbd> {t('common.search')}</span>
+      <span className="shell-status-shortcut">
+        <kbd>Ctrl K</kbd> {t('common.search')}
+        <span className="shell-status-escape"><kbd>{t('shell.escapeKey')}</kbd> {t('inspector.close')}</span>
+      </span>
     </footer>
   )
 }
