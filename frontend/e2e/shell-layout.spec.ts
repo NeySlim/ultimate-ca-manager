@@ -62,7 +62,8 @@ test('the expiry count sits on its own link: no other link covered, the link kee
       const own = nav.locator('a.shell-navlink[data-module="certificates"]')
       await expect(own).toContainText(/certificates? expir/)
       const b = await box(badge)
-      for (const link of await nav.locator('a.shell-navlink:not([data-module="certificates"])').all()) {
+      // A link folded away at this width (a pin another test set) covers nothing
+      for (const link of await nav.locator('a.shell-navlink:not([data-module="certificates"]):visible').all()) {
         expect(apart(b, await box(link)), `${path} at ${width}: ${await link.getAttribute('data-module')}`).toBe(true)
       }
       // The count adds no tab stop and is not clipped by its own pill

@@ -1,9 +1,11 @@
-import { test, expect } from './support/fixtures'
+import { test, expect, createUser } from './support/fixtures'
 
 // Geometry of the Atelier shell: bars, Modules menu and notification panel, measured in the browser
 const EPS = 1
 type Box = { x: number; y: number; width: number; height: number }
 const box = async (locator): Promise<Box> => {
+  // The first paint of the bar comes before the rights: a measure waits for its element
+  await expect(locator).toBeVisible()
   const b = await locator.boundingBox()
   expect(b).not.toBeNull()
   return b as Box
@@ -35,6 +37,8 @@ test('the top bar, its links and the status bar keep the mockup heights', async 
 test('the Modules menu opens under its button, inside the window', async ({ page, api }) => {
   await page.setViewportSize({ width: 1600, height: 1000 })
   await page.goto('/')
+  // The bar is complete once the rights are in: the last fixed link is there
+  await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Activity' })).toBeVisible()
   const button = page.getByRole('button', { name: 'Modules' })
   await button.click()
   const menu = page.getByRole('navigation', { name: 'Product modules' })
@@ -79,27 +83,25 @@ for (const width of [1600, 390]) {
 
 // Intermediate widths fold the bar as the mockup: pins leave at 1100 px, icons and help at 1000 px
 for (const width of [1250, 1100, 1000, 900, 801]) {
-  test(`the top bar folds without overlap or empty box at ${width}px`, async ({ page, api }) => {
-    const prefs = (await api.get('/account/preferences')) || {}
-    await api.put('/account/preferences', { ...prefs, pins: ['reports', 'users', 'hsm'] })
-    try {
-      await page.setViewportSize({ width, height: 900 })
-      await page.goto('/certificates')
-      const nav = page.getByRole('navigation', { name: 'Main navigation' })
-      if (width <= 1100) for (const pin of await nav.locator('.shell-pinned').all()) await expect(pin).toBeHidden()
-      else await expect(nav.locator('.shell-pinned')).toHaveCount(3)
-      // Every visible item of the bar shows something, and none runs over the search
-      const search = await box(page.locator('.shell-search'))
-      for (const item of await nav.locator('.shell-navlink').all()) {
-        if (!(await item.isVisible())) continue
-        const b = await box(item)
-        expect(b.x + b.width).toBeLessThanOrEqual(search.x + EPS)
-        expect(b.width).toBeGreaterThan(30)
-      }
-      if (width <= 1000) for (const help of await page.locator('.shell-help').all()) await expect(help).toBeHidden()
-    } finally {
-      await api.put('/account/preferences', prefs)
+  test(`the top bar folds without overlap or empty box at ${width}px`, async ({ api: admin, signIn }) => {
+    // Its own administrator: pins are a preference of the account, and the other tests share one
+    const user = await createUser(admin, 'admin')
+    const { page, api } = await signIn(user.username, user.password)
+    await api.put('/account/preferences', { ...((await api.get('/account/preferences')) || {}), pins: ['reports', 'users', 'hsm'] })
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto('/certificates')
+    const nav = page.getByRole('navigation', { name: 'Main navigation' })
+    if (width <= 1100) for (const pin of await nav.locator('.shell-pinned').all()) await expect(pin).toBeHidden()
+    else await expect(nav.locator('.shell-pinned')).toHaveCount(3)
+    // Every visible item of the bar shows something, and none runs over the search
+    const search = await box(page.locator('.shell-search'))
+    for (const item of await nav.locator('.shell-navlink').all()) {
+      if (!(await item.isVisible())) continue
+      const b = await box(item)
+      expect(b.x + b.width).toBeLessThanOrEqual(search.x + EPS)
+      expect(b.width).toBeGreaterThan(30)
     }
+    if (width <= 1000) for (const help of await page.locator('.shell-help').all()) await expect(help).toBeHidden()
   })
 }
 
