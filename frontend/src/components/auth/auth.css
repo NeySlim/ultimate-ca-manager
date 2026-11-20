@@ -32,6 +32,7 @@
 .auth-tools .shell-icon-btn { width: 32px; height: 32px; border-radius: 4px; color: var(--text); }
 .auth-tools .shell-icon-btn svg { width: 16px; height: 16px; }
 .auth-tools .shell-pop { max-height: calc(100dvh - 64px); }
+.auth-lang-flag { width: 17px; flex-shrink: 0; text-align: center; }
 .auth-card {
   position: relative;
   width: min(420px, 100%);
@@ -184,7 +185,7 @@
   .auth-tools { right: 12px; }
   .auth-tools .shell-icon-btn { width: 40px; height: 40px; min-width: 40px; min-height: 40px; }
   /* Under the button that opened it, as on a desktop: the console's phone sheet hangs from its bar */
-  .auth-tools .shell-pop { position: absolute; top: calc(100% + 8px); right: 0; left: auto; width: 260px; max-width: calc(100vw - 24px); }
+  .auth-tools .shell-pop { position: absolute; top: calc(100% + 8px); right: 0; left: auto; width: 220px; max-width: calc(100vw - 24px); }
   .auth-password .auth-icon-btn { width: 40px; min-height: 40px; }
   .session-banner { top: auto; bottom: 12px; flex-wrap: wrap; }
   .session-banner .auth-btn { min-height: 40px; }
