@@ -338,7 +338,9 @@
 .shell-status-live, .shell-status-text, .shell-status-ha { display: inline-flex; align-items: center; gap: 6px; }
 .shell-status-shortcut { display: inline-flex; align-items: center; gap: 5px; }
 .shell-status-ha { gap: 9px; }
-.shell-ws { padding: 0 2px; }
+/* The live indicator keeps the 15 px line of the bar: no padding of its own, a 14 px icon */
+.shell-status-live .shell-ws { padding: 0 2px; }
+.shell-status-live .shell-ws svg { width: 14px; height: 14px; }
 .shell-ha-link { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 8px; border: 0; border-radius: 3px; background: none; font: inherit; font-size: 12px; color: inherit; }
 button.shell-ha-link { cursor: pointer; }
 .shell-approvals-link { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 8px; border-radius: 3px; color: var(--accent); font-weight: 500; text-decoration: none; }
@@ -469,12 +471,15 @@ button.shell-ha-link:hover { background: var(--hover); }
     font: inherit;
     font-size: 12px;
   }
-  .shell-topbar { gap: 8px; padding: 0 10px; }
+  /* The mockup's 14 px margins: the brand mark alone, the picker 133 px beside four 44 px targets */
+  .shell-topbar { gap: 8px; padding: 0 14px; }
   .shell-tools { gap: 2px; margin-left: 0; }
   .shell-search, .shell-icon-btn, .shell-avatar { min-width: 44px; min-height: 44px; justify-content: center; }
   .shell-avatar { width: 44px; height: 44px; }
   .shell-search { padding: 0; }
   .shell-pop { position: fixed; right: 8px; left: 8px; width: auto; top: var(--shell-bar-h); }
+  /* The account menu stays the mockup's 270 px panel under its avatar */
+  .shell-pop.shell-user-menu { position: absolute; top: calc(100% + 8px); right: 0; left: auto; width: 270px; }
   .shell-pop-item { min-height: 44px; }
   .shell-status-shortcut { display: none; }
   .shell-statusbar { height: auto; min-height: 34px; margin-top: auto; padding: 7px 16px; font-size: 12px; flex-wrap: wrap; row-gap: 2px; }
@@ -581,7 +586,7 @@ button.shell-ha-link:hover { background: var(--hover); }
 :root[data-theme="aurore"] .shell-navlink:not(.is-active):hover { background: color-mix(in srgb, var(--grad-a) 10%, transparent); }
 :root[data-theme="aurore"][data-mode="light"] .shell-navlink:not(.is-active):hover { background: color-mix(in srgb, var(--grad-a) 8%, transparent); }
 @media (max-width: 800px) {
-  :root[data-theme="aurore"] :is(.shell-pop, .shell-notif-panel) { background: var(--panel); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  :root[data-theme="aurore"] :is(.shell-pop:not(.shell-user-menu):not(.ui-theme-menu), .shell-notif-panel) { background: var(--panel); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -500,6 +500,12 @@
 }
 
 @media (max-width: 800px) {
+  /* Dialogs on a phone, as the mockup: 20 px margins, a 40 px close button, 42 px actions */
+  .lv-dialog-head { padding: 17px 20px; }
+  .lv-dialog-head .lv-btn.is-icon { width: 40px; min-height: 40px; }
+  .lv-dialog-body { padding: 20px; }
+  .lv-dialog-actions { flex-wrap: wrap; }
+  .lv-dialog-actions .lv-btn { min-height: 42px; }
   /* A secondary page action keeps its icon only (its name stays readable by assistive technology) */
   .lv-btn.lv-hide-mobile { width: 40px; padding: 6px; gap: 0; font-size: 0; }
   .lv-stage { --lv-gutter: 16px; }
