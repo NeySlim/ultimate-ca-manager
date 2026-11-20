@@ -74,7 +74,7 @@ test.describe('desktop', () => {
 test.describe('phone', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
-  test('the issue dialog keeps 16 px margins, one column and no sideways scroll', async ({ page }) => {
+  test('the issue dialog keeps 16 px margins, one column and no sideways scroll', async ({ page, api }) => {
     await page.goto('/certificates?action=create')
     const dialog = page.getByRole('dialog', { name: 'Issue a certificate' })
     await expect(dialog).toBeVisible()

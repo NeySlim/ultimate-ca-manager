@@ -24,7 +24,7 @@ const PAGES = [
 ]
 
 for (const { path, toc, first } of PAGES) {
-  test(`${path} puts its contents left of full-width frames`, async ({ page }) => {
+  test(`${path} puts its contents left of full-width frames`, async ({ page, api }) => {
     await page.goto(path)
     const nav = page.getByRole('navigation', { name: toc, exact: true })
     const frame = page.getByRole('region', { name: first, exact: true })
@@ -39,7 +39,7 @@ for (const { path, toc, first } of PAGES) {
   })
 }
 
-test('the settings save bar stays above the status bar and counts a change', async ({ page }) => {
+test('the settings save bar stays above the status bar and counts a change', async ({ page, api }) => {
   await page.goto('/settings')
   const bar = page.getByTestId('sf-savebar')
   await expect(bar).toBeVisible()
@@ -54,7 +54,7 @@ test('the settings save bar stays above the status bar and counts a change', asy
   await expect(bar.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
 })
 
-test('a link to ?tab= lands the settings page on that frame', async ({ page }) => {
+test('a link to ?tab= lands the settings page on that frame', async ({ page, api }) => {
   await page.goto('/settings?tab=email')
   const title = page.locator('#sf-title-email')
   await expect(title).toBeFocused()

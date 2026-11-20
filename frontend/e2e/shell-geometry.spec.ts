@@ -9,7 +9,7 @@ const box = async (locator): Promise<Box> => {
   return b as Box
 }
 
-test('the top bar, its links and the status bar keep the mockup heights', async ({ page }) => {
+test('the top bar, its links and the status bar keep the mockup heights', async ({ page, api }) => {
   await page.setViewportSize({ width: 1600, height: 1000 })
   await page.goto('/certificates')
   const top = await box(page.locator('.shell-topbar'))
@@ -32,7 +32,7 @@ test('the top bar, its links and the status bar keep the mockup heights', async 
   await expect(page.locator('.shell-statusbar .shell-ws')).toHaveCount(1)
 })
 
-test('the Modules menu opens under its button, inside the window', async ({ page }) => {
+test('the Modules menu opens under its button, inside the window', async ({ page, api }) => {
   await page.setViewportSize({ width: 1600, height: 1000 })
   await page.goto('/')
   const button = page.getByRole('button', { name: 'Modules' })
@@ -53,7 +53,7 @@ test('the Modules menu opens under its button, inside the window', async ({ page
 })
 
 for (const width of [1600, 390]) {
-  test(`the notification panel holds its place at ${width}px`, async ({ page }) => {
+  test(`the notification panel holds its place at ${width}px`, async ({ page, api }) => {
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/certificates')
     await page.getByRole('button', { name: /^Notifications/ }).click()
