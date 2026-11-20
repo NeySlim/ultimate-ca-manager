@@ -1,6 +1,6 @@
 /** What the certificate inspector derives from the API detail. */
 import { describe, it, expect } from 'vitest'
-import { validityFacts, chainNodes, extensionRows, historyEntries, lastAcmeFailure, certificateKeyLabel, serialHex } from '../certificateDetail'
+import { validityFacts, chainNodes, extensionRows, historyEntries, lastAcmeFailure, certificateKeyLabel, keyLabel, serialHex } from '../certificateDetail'
 import { signatureHashName } from '../signatureName'
 
 const NOW = new Date('2026-11-20T12:00:00Z')
@@ -14,6 +14,14 @@ describe('certificateKeyLabel', () => {
     expect(certificateKeyLabel({ key_type: 'EC secp256r1', key_algorithm: 'EC' }, t)).toBe('ECDSA P-256')
     expect(certificateKeyLabel({ key_type: 'EC secp384r1' }, t)).toBe('ECDSA P-384')
     expect(certificateKeyLabel({ key_type: 'EC brainpoolP256r1' }, t)).toBe('ECDSA brainpoolP256r1')
+  })
+
+  it('reads every spelling of a key the same: a decoded CSR, a registry label', () => {
+    expect(certificateKeyLabel({ key_type: 'ECDSA secp256r1' }, t)).toBe('ECDSA P-256')
+    expect(keyLabel('EC-P256', t)).toBe('ECDSA P-256')
+    expect(keyLabel('EC-P384', t)).toBe('ECDSA P-384')
+    expect(keyLabel('RSA-2048', t)).toBe('RSA 2048')
+    expect(keyLabel('RSA 4096', t)).toBe('RSA 4096')
   })
 })
 

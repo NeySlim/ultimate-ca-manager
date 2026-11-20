@@ -19,8 +19,9 @@ import { customExtensionsPayload, emptyExtensionRow } from '../../lib/customExte
 import { VALIDITY } from '../../constants/config'
 import { DRAFT_FIELDS, draftOp, dropDraft, keepDraft, takeDraft } from './issue/issueDrafts'
 import {
-  CERT_TYPE_KEYS, certificateHash, certificateKey, certificateType, describeRequest, keyDisplay, listOf, SAN_FIELDS,
+  CERT_TYPE_KEYS, certificateHash, certificateType, describeRequest, listOf, SAN_FIELDS,
 } from './issue/describeRequest'
+import { certificateKeyLabel, keyLabel } from '../../lib/certificateDetail'
 import './issue/issue.css'
 
 const P = 'certificates.issueForm.'
@@ -542,7 +543,7 @@ export function IssueCertificateForm({
         const key = info.public_key
         next.csrInfo = {
           subject: info.subject, cn: extractCN(info.subject) || info.subject,
-          key: key ? [key.type, key.curve || key.size].filter(Boolean).join(' ') : '',
+          key: key ? keyLabel([key.type, key.curve || key.size].filter(Boolean).join(' '), t) : '',
         }
       } catch (err) {
         setErrors({ csr: t(`${P}csrUnreadable`, { message: err?.message || '' }) })
@@ -647,8 +648,8 @@ export function IssueCertificateForm({
   const keyHint = () => {
     if (csrMode) return t(`${P}keyHintCsr`)
     if (isHybrid) return t(`${P}keyHintHybrid`)
-    if (d.keyBy === 'template' && template?.key_type) return t(`${P}keyHintTemplate`, { key: keyDisplay(template.key_type) })
-    if (defaultKeyType) return t(d.ca_id ? `${P}keyHintServer` : `${P}keyHintServerAny`, { key: keyDisplay(defaultKeyType) })
+    if (d.keyBy === 'template' && template?.key_type) return t(`${P}keyHintTemplate`, { key: keyLabel(template.key_type, t) })
+    if (defaultKeyType) return t(d.ca_id ? `${P}keyHintServer` : `${P}keyHintServerAny`, { key: keyLabel(defaultKeyType, t) })
     return t(`${P}keyHintNone`)
   }
 
@@ -670,7 +671,7 @@ export function IssueCertificateForm({
           <p>{withName(t, `${P}hintRenew`, certificate?.cn || certificate?.common_name || '')}</p>
           <dl>
             <dt>{t(`${P}hintAuthorities`)}</dt><dd>{certificate?.issuer_name || ''}</dd>
-            <dt>{t(`${P}hintAlgorithms`)}</dt><dd>{certificateKey(certificate)}</dd>
+            <dt>{t(`${P}hintAlgorithms`)}</dt><dd>{certificateKeyLabel(certificate, t)}</dd>
             <dt>{t(`${P}hintValidity`)}</dt><dd>{t(`${P}hintRenewValidity`, { max: num(MAX_DAYS) })}</dd>
             <dt>{t(`${P}hintSans`)}</dt><dd>{types.length ? types.join(', ') : t(`${P}noneMasc`)}</dd>
             <dt>{t(`${P}hintCsr`)}</dt><dd>{t(`${P}hintCsrRenew`)}</dd>
@@ -694,7 +695,7 @@ export function IssueCertificateForm({
           </dd>
           <dt>{t(`${P}hintAlgorithms`)}</dt>
           <dd data-testid="hint-algorithms">
-            {singleLabels.length ? singleLabels.map(keyDisplay).join(', ') : t(`${P}hintAlgorithmsNone`)}
+            {singleLabels.length ? singleLabels.map((l) => keyLabel(l, t)).join(', ') : t(`${P}hintAlgorithmsNone`)}
             {pqStandalone && hybridPq.length > 0 && <><br /><span className="iss-muted">{t(`${P}hintPqPairOnly`)}</span></>}
           </dd>
           <dt>{t(`${P}hintValidity`)}</dt>
@@ -896,13 +897,13 @@ export function IssueCertificateForm({
 
           <div className="iss-field">
             <label htmlFor={id('key')}>{t(`${P}keyAlgorithm`)}</label>
-            {renew ? fixed('key', certificateKey(certificate), 'hint-key') : (
+            {renew ? fixed('key', certificateKeyLabel(certificate, t) || '', 'hint-key') : (
               <select id={id('key')} value={csrMode ? '' : (isHybrid ? hybridChoice.classical : d.key)} disabled={csrMode || isHybrid}
                 {...errorProps('key', 'hint-key')}
                 onChange={(e) => set({ key: e.target.value, keyBy: 'user' })}>
                 {(csrMode || (!d.key && !isHybrid)) && <option value="">{t(csrMode ? `${P}keyFromCsr` : `${P}keyServerDefault`)}</option>}
-                {!csrMode && (isHybrid ? hybridClassical : singleLabels).map((l) => <option key={l} value={l}>{keyDisplay(l)}</option>)}
-                {!csrMode && d.key && !isHybrid && !singleLabels.includes(d.key) && <option value={d.key}>{keyDisplay(d.key)}</option>}
+                {!csrMode && (isHybrid ? hybridClassical : singleLabels).map((l) => <option key={l} value={l}>{keyLabel(l, t)}</option>)}
+                {!csrMode && d.key && !isHybrid && !singleLabels.includes(d.key) && <option value={d.key}>{keyLabel(d.key, t)}</option>}
               </select>
             )}
             <small id={id('hint-key')}>{renew ? t(`${P}keyHintRenew`) : keyHint()}</small>
@@ -1048,13 +1049,13 @@ export function IssueCertificateForm({
                       <div className="iss-field">
                         <label htmlFor={id('hybrid-classical')}>{t('certificates.hybrid.classical')}</label>
                         <select id={id('hybrid-classical')} value={hybridChoice.classical} onChange={(e) => set({ hybrid_classical: e.target.value })}>
-                          {hybridClassical.map((l) => <option key={l} value={l}>{keyDisplay(l)}</option>)}
+                          {hybridClassical.map((l) => <option key={l} value={l}>{keyLabel(l, t)}</option>)}
                         </select>
                       </div>
                       <div className="iss-field">
                         <label htmlFor={id('hybrid-pq')}>{t('certificates.hybrid.pq')}</label>
                         <select id={id('hybrid-pq')} value={hybridChoice.pq} onChange={(e) => set({ hybrid_pq: e.target.value })}>
-                          {hybridPq.map((l) => <option key={l} value={l}>{keyDisplay(l)}</option>)}
+                          {hybridPq.map((l) => <option key={l} value={l}>{keyLabel(l, t)}</option>)}
                         </select>
                       </div>
                     </div>

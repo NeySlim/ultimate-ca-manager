@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { LABEL, P, choose, field, openAdvanced, reviewAndIssue, toReview, type } from './issueFormTestUtils'
 import { DRAFT_FIELDS, keepDraft, takeDraft } from '../issue/issueDrafts'
+import { certificateKeyLabel } from '../../../lib/certificateDetail'
 
 const mocks = vi.hoisted(() => ({ getEffective: vi.fn(), decodeCsr: vi.fn(), templates: [] }))
 
@@ -227,6 +228,8 @@ describe('IssueCertificateForm steps', () => {
     type(`${P}csr`, '-----BEGIN CERTIFICATE REQUEST-----\nMIIB\n-----END CERTIFICATE REQUEST-----')
     const review = await toReview()
     expect(within(review).getByRole('heading').textContent).toBe('device.example.com')
+    // The key of the CSR is named as the list and the inspector name a key
+    expect(review.querySelector('[data-row="key"] dd').textContent).toBe('ECDSA P-256')
     fireEvent.click(screen.getByTestId('issue-submit'))
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
     const [body, info] = onSubmit.mock.calls[0]
@@ -234,6 +237,20 @@ describe('IssueCertificateForm steps', () => {
     expect(body).not.toHaveProperty('key_type')
     expect(body).not.toHaveProperty('cn')
     for (const key of Object.keys(body)) expect(review.dataset.fields.split(' ')).toContain(key)
+  })
+
+  it('names the key of a renewed certificate as the list and the inspector do', async () => {
+    const certificate = {
+      id: 14, cn: 'ec.example.com', issuer_name: 'Services CA', key_type: 'EC secp256r1', key_algorithm: 'EC',
+      valid_from: '2026-01-01T00:00:00Z', valid_to: '2026-04-01T00:00:00Z',
+    }
+    const onSubmit = vi.fn().mockResolvedValue(undefined)
+    renderForm({ mode: 'renew', certificate, onSubmit })
+    expect(field(LABEL.key).value).toBe(certificateKeyLabel(certificate, t))
+    expect(field(LABEL.key).value).toBe('ECDSA P-256')
+    expect(screen.getByTestId('issue-hint').textContent).toContain('ECDSA P-256')
+    const review = await toReview()
+    expect(review.querySelector('[data-row="key"] dd').textContent).toBe('ECDSA P-256')
   })
 
   it('offers no CSR card to an operator who may not upload one', () => {
