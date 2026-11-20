@@ -1,11 +1,10 @@
 /**
- * Relative wording of a due date and its urgency tone: hours inside 48 h, days
- * beyond on the product's rounding (time left rounds up, time past rounds down).
+ * Relative wording of a due date and its urgency tone: hours inside 48 h, whole
+ * days beyond, truncated both ways as the mockup counts them ("dans 4 j" at 4 d 22 h).
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import i18next from 'i18next'
 import { dueTone, relativeParts, relativeDue, relativeAgo, shortParts, relativeShort } from '../relativeTime'
-import { daysRemaining } from '../utils'
 import en from '../../i18n/locales/en.json'
 import fr from '../../i18n/locales/fr.json'
 import ru from '../../i18n/locales/ru.json'
@@ -26,24 +25,26 @@ describe('relativeParts', () => {
     expect(relativeParts(at(47.4 * HOUR), { now: NOW })).toEqual({ key: 'time.inHours', count: 47 })
   })
 
-  it('counts days from 48 h on, rounded up like days_remaining', () => {
+  it('counts whole days from 48 h on, the part of a day left out', () => {
     expect(relativeParts(at(48 * HOUR), { now: NOW })).toEqual({ key: 'time.inDays', count: 2 })
-    expect(relativeParts(at(2.2 * DAY), { now: NOW })).toEqual({ key: 'time.inDays', count: 3 })
+    expect(relativeParts(at(2.2 * DAY), { now: NOW })).toEqual({ key: 'time.inDays', count: 2 })
+    expect(relativeParts(at(4 * DAY + 22 * HOUR), { now: NOW })).toEqual({ key: 'time.inDays', count: 4 })
+    expect(relativeParts(at(10 * DAY + 21 * HOUR), { now: NOW })).toEqual({ key: 'time.inDays', count: 10 })
     expect(relativeParts(at(30 * DAY), { now: NOW })).toEqual({ key: 'time.inDays', count: 30 })
   })
 
-  it('says overdue in days once the date is past, one day at least', () => {
+  it('says overdue in whole days once the date is past, one day at least', () => {
     expect(relativeParts(at(-2 * HOUR), { now: NOW })).toEqual({ key: 'time.overdueDays', count: 1 })
-    expect(relativeParts(at(-5.5 * DAY), { now: NOW })).toEqual({ key: 'time.overdueDays', count: 6 })
+    expect(relativeParts(at(-(2 * DAY + 3 * HOUR)), { now: NOW })).toEqual({ key: 'time.overdueDays', count: 2 })
+    expect(relativeParts(at(-5.5 * DAY), { now: NOW })).toEqual({ key: 'time.overdueDays', count: 5 })
     expect(relativeParts(at(0), { now: NOW })).toEqual({ key: 'time.overdueDays', count: 1 })
   })
 
-  it('agrees with daysRemaining on both sides of now', () => {
+  it('reads the clock when no now is given', () => {
     vi.useFakeTimers()
     vi.setSystemTime(NOW)
-    for (const days of [2.2, 9, 400, -0.1, -5.5, -90]) {
-      const date = at(days * DAY)
-      expect(relativeParts(date).count).toBe(Math.abs(daysRemaining(date)))
+    for (const [days, count] of [[2.2, 2], [9.9, 9], [400.5, 400], [-0.1, 1], [-5.5, 5], [-90.2, 90]]) {
+      expect(relativeParts(at(days * DAY)).count).toBe(count)
     }
   })
 
@@ -69,8 +70,8 @@ describe('relativeDue and relativeAgo', () => {
   })
 
   it.each([
-    ['en', en, ['in 3 days', 'expired 1 day ago', 'expired 5 days ago', 'in 1 hour', 'in 28 hours', '20 hours ago']],
-    ['fr', fr, ['dans 3 jours', 'échu depuis 1 jour', 'échu depuis 5 jours', 'dans 1 heure', 'dans 28 heures', 'il y a 20 heures']],
+    ['en', en, ['in 2 days', 'expired 1 day ago', 'expired 4 days ago', 'in 1 hour', 'in 28 hours', '20 hours ago']],
+    ['fr', fr, ['dans 2 jours', 'échu depuis 1 jour', 'échu depuis 4 jours', 'dans 1 heure', 'dans 28 heures', 'il y a 20 heures']],
   ])('reads in %s with its plurals', async (lng, resources, expected) => {
     const i18n = i18next.createInstance()
     await i18n.init({ lng, resources: { [lng]: { translation: resources } } })
@@ -89,7 +90,7 @@ describe('relativeDue and relativeAgo', () => {
     const i18n = i18next.createInstance()
     await i18n.init({ lng: 'ru', resources: { ru: { translation: ru } } })
     const say = i18n.t.bind(i18n)
-    const forms = [3, 5, 21].map((d) => relativeDue(at((d - 0.5) * DAY), say, { now: NOW }))
+    const forms = [3, 5, 21].map((d) => relativeDue(at((d + 0.5) * DAY), say, { now: NOW }))
     expect(new Set(forms).size).toBe(3)
     forms.forEach((text, i) => expect(text).toContain(String([3, 5, 21][i])))
     expect(forms.join(' ')).not.toMatch(/\bin\b|days?/)

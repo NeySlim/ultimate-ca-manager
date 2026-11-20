@@ -1,7 +1,7 @@
 /**
  * Relative wording of a date ("in 3 days", "expired 5 days ago", "20 hours ago")
- * and the urgency tone of a due date. Days follow daysRemaining (lib/utils):
- * time left rounds up, time past rounds down, as the server counts them.
+ * and the urgency tone of a due date. Beyond 48 h the days are whole days, the
+ * part of a day left out both ways, as the mockup counts them ("in 4 d" at 4 d 22 h).
  */
 import { daysRemaining } from './utils'
 
@@ -27,14 +27,14 @@ export function relativeParts(date, { now = new Date(), mode = 'due' } = {}) {
   if (left > 0) {
     return left < HOURS_WINDOW
       ? { key: 'time.inHours', count: Math.max(1, Math.round(left / HOUR)) }
-      : { key: 'time.inDays', count: daysRemaining(date, now) }
+      : { key: 'time.inDays', count: Math.floor(left / DAY) }
   }
   if (mode === 'event') {
     return -left < HOURS_WINDOW
       ? { key: 'time.hoursAgo', count: Math.max(1, Math.round(-left / HOUR)) }
       : { key: 'time.daysAgo', count: Math.floor(-left / DAY) }
   }
-  return { key: 'time.overdueDays', count: Math.max(1, Math.abs(daysRemaining(date, now))) }
+  return { key: 'time.overdueDays', count: Math.max(1, Math.floor(-left / DAY)) }
 }
 
 const say = (parts, t) => (parts ? t(parts.key, { count: parts.count }) : '')
