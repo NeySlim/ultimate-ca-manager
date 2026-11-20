@@ -50,12 +50,6 @@ function useResourceTypes(t) {
             const name = val || row.common_name || extractCN(row.subject) || row.descr || t('common.certificate')
             return (
               <div className="flex items-center gap-2">
-                <div className={cn(
-                  "w-6 h-6 rounded-lg flex items-center justify-center shrink-0",
-                  row.has_private_key ? "icon-bg-emerald" : "icon-bg-blue"
-                )}>
-                  <Certificate size={14} weight="duotone" />
-                </div>
                 <span className="font-medium truncate">{name}</span>
                 <KeyIndicator hasKey={row.has_private_key} size={14} />
               </div>
@@ -69,15 +63,16 @@ function useResourceTypes(t) {
           render: (val, row) => {
             const isRevoked = row.revoked
             const status = isRevoked ? 'revoked' : val || 'unknown'
+            // The mockup's badge: an icon and the word, no dot
             const config = {
-              valid: { variant: 'success', icon: CheckCircle, label: t('common.valid'), pulse: true },
-              expiring: { variant: 'warning', icon: Clock, label: t('common.expiring'), pulse: true },
-              expired: { variant: 'danger', icon: XCircle, label: t('common.expired'), pulse: false },
-              revoked: { variant: 'danger', icon: X, label: t('common.revoked'), pulse: false },
-              unknown: { variant: 'secondary', icon: Info, label: t('common.status'), pulse: false }
+              valid: { variant: 'success', icon: CheckCircle, label: t('common.valid') },
+              expiring: { variant: 'warning', icon: Clock, label: t('common.expiring') },
+              expired: { variant: 'danger', icon: XCircle, label: t('common.expired') },
+              revoked: { variant: 'danger', icon: X, label: t('common.revoked') },
+              unknown: { variant: 'secondary', icon: Info, label: t('common.status') }
             }
-            const { variant, icon, label, pulse } = config[status] || config.unknown
-            return <Badge variant={variant} size="sm" icon={icon} dot pulse={pulse}>{label}</Badge>
+            const { variant, icon, label } = config[status] || config.unknown
+            return <Badge variant={variant} size="sm" icon={icon}>{label}</Badge>
           }
         },
         {
@@ -109,12 +104,7 @@ function useResourceTypes(t) {
           header: t('common.name'),
           sortable: true, priority: 1,
           render: (val, row) => (
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 icon-bg-green">
-                <ShieldCheck size={14} weight="duotone" />
-              </div>
-              <span className="font-medium truncate">{val || extractCN(row.subject) || '—'}</span>
-            </div>
+            <span className="font-medium truncate">{val || extractCN(row.subject) || '—'}</span>
           )
         },
         {
@@ -144,12 +134,7 @@ function useResourceTypes(t) {
           header: t('common.name'),
           sortable: true, priority: 1,
           render: (val, row) => (
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 icon-bg-amber">
-                <FileText size={14} weight="duotone" />
-              </div>
-              <span className="font-medium truncate">{val || extractCN(row.subject) || '—'}</span>
-            </div>
+            <span className="font-medium truncate">{val || extractCN(row.subject) || '—'}</span>
           )
         },
         {
@@ -179,12 +164,7 @@ function useResourceTypes(t) {
           header: t('common.name'),
           sortable: true, priority: 1,
           render: (val) => (
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 icon-bg-violet">
-                <PencilSimple size={14} weight="duotone" />
-              </div>
-              <span className="font-medium truncate">{val || '—'}</span>
-            </div>
+            <span className="font-medium truncate">{val || '—'}</span>
           )
         },
         {
@@ -212,20 +192,10 @@ function useResourceTypes(t) {
           header: t('common.user'),
           sortable: true, priority: 1,
           render: (val, row) => {
-            const avatarColors = { admin: 'icon-bg-violet', operator: 'icon-bg-blue', auditor: 'icon-bg-orange', viewer: 'icon-bg-teal' }
-            const colorClass = row.active ? (avatarColors[row.role] || avatarColors.viewer) : 'icon-bg-orange'
             return (
-              <div className="flex items-center gap-2">
-                <div className={cn(
-                  "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
-                  colorClass
-                )}>
-                  {val?.charAt(0)?.toUpperCase() || '?'}
-                </div>
-                <div className="min-w-0">
-                  <div className="font-medium text-text-primary truncate">{val || '—'}</div>
-                  <div className="text-xs text-text-secondary truncate">{row.email || '—'}</div>
-                </div>
+              <div className="min-w-0">
+                <div className="font-medium text-text-primary truncate">{val || '—'}</div>
+                <div className="text-xs text-text-secondary truncate">{row.email || '—'}</div>
               </div>
             )
           }
@@ -235,11 +205,11 @@ function useResourceTypes(t) {
           header: t('common.role'),
           sortable: true, priority: 2,
           render: (val) => {
-            const roleConfig = { admin: { variant: 'violet', dot: true }, operator: { variant: 'primary', dot: false }, auditor: { variant: 'orange', dot: false }, viewer: { variant: 'teal', dot: false } }
+            const roleConfig = { admin: { variant: 'violet' }, operator: { variant: 'primary' }, auditor: { variant: 'orange' }, viewer: { variant: 'teal' } }
             const config = roleConfig[val] || roleConfig.viewer
             const roleLabels = { admin: t('users.admin', 'Admin'), operator: t('common.operator', 'Operator'), auditor: t('common.auditor', 'Auditor'), viewer: t('common.viewer', 'Viewer') }
             return (
-              <Badge variant={config.variant} size="sm" dot={config.dot}>
+              <Badge variant={config.variant} size="sm">
                 {val === 'admin' && <Crown weight="fill" className="h-3 w-3 mr-1" />}
                 {roleLabels[val] || t('common.viewer')}
               </Badge>
@@ -251,8 +221,8 @@ function useResourceTypes(t) {
           header: t('common.status'),
           priority: 3, sortable: true,
           render: (v) => v 
-            ? <Badge variant="success" size="sm" dot>{t('common.active')}</Badge>
-            : <Badge variant="orange" size="sm" dot>{t('common.disabled')}</Badge>
+            ? <Badge variant="success" size="sm">{t('common.active')}</Badge>
+            : <Badge variant="orange" size="sm">{t('common.disabled')}</Badge>
         }
       ],
       filterFields: []
@@ -877,22 +847,17 @@ export default function OperationsPage() {
       const name = item.cn || item.common_name || extractCN(item.subject) || item.descr || '?'
       const status = item.revoked ? 'revoked' : item.status || 'unknown'
       const statusColors = { valid: 'text-accent-success', expiring: 'text-accent-warning', expired: 'text-accent-danger', revoked: 'text-accent-danger' }
+      const statusLabels = { valid: t('common.valid'), expiring: t('common.expiring'), expired: t('common.expired'), revoked: t('common.revoked') }
       return (
         <div className="flex items-center gap-2">
-          <div className={cn("w-6 h-6 rounded-md flex items-center justify-center shrink-0", item.has_private_key ? "icon-bg-emerald" : "icon-bg-blue")}>
-            <Certificate size={12} weight="duotone" />
-          </div>
           <span className="text-sm font-medium truncate flex-1">{name}</span>
-          <span className={cn("text-xs font-medium uppercase", statusColors[status] || 'text-text-tertiary')}>{status}</span>
+          <span className={cn("text-xs", statusColors[status] || 'text-text-tertiary')}>{statusLabels[status] || t('common.status')}</span>
         </div>
       )
     }
     if (type === 'cas') {
       return (
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 icon-bg-green">
-            <ShieldCheck size={12} weight="duotone" />
-          </div>
           <span className="text-sm font-medium truncate">{item.descr || extractCN(item.subject) || '—'}</span>
         </div>
       )
@@ -900,9 +865,6 @@ export default function OperationsPage() {
     if (type === 'csrs') {
       return (
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 icon-bg-amber">
-            <FileText size={12} weight="duotone" />
-          </div>
           <span className="text-sm font-medium truncate">{item.descr || extractCN(item.subject) || '—'}</span>
         </div>
       )
@@ -910,33 +872,26 @@ export default function OperationsPage() {
     if (type === 'templates') {
       return (
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 icon-bg-violet">
-            <PencilSimple size={12} weight="duotone" />
-          </div>
           <span className="text-sm font-medium truncate flex-1">{item.name || '—'}</span>
           <span className="text-xs text-text-tertiary">{item.key_type}</span>
         </div>
       )
     }
     if (type === 'users') {
-      const avatarColors = { admin: 'icon-bg-violet', operator: 'icon-bg-blue', auditor: 'icon-bg-orange', viewer: 'icon-bg-teal' }
       return (
         <div className="flex items-center gap-2">
-          <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0", avatarColors[item.role] || 'icon-bg-teal')}>
-            {item.username?.charAt(0)?.toUpperCase() || '?'}
-          </div>
           <span className="text-sm font-medium truncate flex-1">{item.username || '—'}</span>
           <span className="text-xs text-text-tertiary">{item.role}</span>
         </div>
       )
     }
     return <span className="text-sm truncate">{item.name || item.descr || item.username || '—'}</span>
-  }, [bulkResourceType])
+  }, [bulkResourceType, t])
 
   const renderBulkTab = () => (
     <div className="flex flex-col h-full min-h-0">
-      {/* Resource type selector */}
-      <div className="shrink-0 px-4 md:px-6 pb-1">
+      {/* Resource type selector, at the 20 px content edge of the other frames */}
+      <div className="shrink-0 px-4 md:px-5 pb-1">
         {isMobile ? (
           /* Mobile: dropdown select */
           <div className="relative">
@@ -1046,7 +1001,7 @@ export default function OperationsPage() {
       </div>
 
       {/* Content area — table on mobile, table or basket on desktop */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 md:px-5 md:pb-5">
         {(isMobile || bulkViewMode === 'table') ? (
           <ResponsiveDataTable
             data={bulkData}
@@ -1081,7 +1036,7 @@ export default function OperationsPage() {
             emptyDescription={t('operations.noDataDesc', 'Try adjusting your filters')}
           />
         ) : (
-          <div className="h-full px-4 md:px-6 pb-2">
+          <div className="h-full px-4 md:px-0 pb-2">
             <TransferPanel
               items={basketItems}
               selectedIds={selectedIds}
