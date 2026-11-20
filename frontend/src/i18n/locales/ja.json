@@ -7426,7 +7426,7 @@
       "introLate_other": "{{count}} ノードがハートビートを送信していません。読み取りと発行は他のノードで継続します。",
       "introMaintenance": "メンテナンス中: すべてのノードで書き込みが停止されています。",
       "loadFailed": "ノード一覧を読み取れませんでした。",
-      "leader": "リーダー",
+      "leader": "アクティブ",
       "secondary": "セカンダリ",
       "heartbeat": "最終ハートビート",
       "state": "状態",

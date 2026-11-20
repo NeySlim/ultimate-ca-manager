@@ -7423,7 +7423,7 @@
       "introLate_other": "{{count}} Knoten senden keinen Heartbeat mehr: Lesen und Ausstellen gehen auf den anderen weiter.",
       "introMaintenance": "Wartung läuft: Schreibvorgänge sind auf allen Knoten ausgesetzt.",
       "loadFailed": "Die Knotenliste konnte nicht gelesen werden.",
-      "leader": "Leader",
+      "leader": "Aktiv",
       "secondary": "Sekundär",
       "heartbeat": "Letzter Heartbeat",
       "state": "Zustand",

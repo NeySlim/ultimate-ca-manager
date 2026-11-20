@@ -7423,7 +7423,7 @@
       "introLate_other": "{{count}} nós deixaram de enviar sinais: a leitura e a emissão continuam nos outros.",
       "introMaintenance": "Manutenção em curso: as escritas estão suspensas em todos os nós.",
       "loadFailed": "Não foi possível ler a lista de nós.",
-      "leader": "Líder",
+      "leader": "Ativo",
       "secondary": "Secundário",
       "heartbeat": "Último sinal",
       "state": "Estado",

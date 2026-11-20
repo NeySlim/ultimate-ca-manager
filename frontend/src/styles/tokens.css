@@ -1,5 +1,6 @@
 /*
- * Theme tokens: 18 colours + 3 extras (grad-a, grad-b, glow) + 3 constants (ink, paper, scrim), one block
+ * Theme tokens: 18 colours + 3 extras (grad-a, grad-b, glow) + 3 constants (ink, paper, scrim), the shadow
+ * tint (shade) and the Aurore glows (glow-rose, glow-b; transparent elsewhere), one block
  * per family x mode, selected by data-theme / data-mode on <html>.
  * Bare :root is the fallback (Atelier, dark). Changing a value here means
  * updating tokens.baseline.json in the same commit.
@@ -31,7 +32,10 @@
   --glow: rgba(148, 191, 255, 0.30);
   --ink: #000000;
   --paper: #ffffff;
-  --scrim: var(--ink);
+  --scrim: #070e19;
+  --shade: #000000;
+  --glow-rose: transparent;
+  --glow-b: transparent;
 }
 
 :root[data-theme="atelier"][data-mode="light"] {
@@ -59,7 +63,10 @@
   --glow: rgba(36, 91, 177, 0.30);
   --ink: #000000;
   --paper: #ffffff;
-  --scrim: var(--ink);
+  --scrim: #070e19;
+  --shade: #000000;
+  --glow-rose: transparent;
+  --glow-b: transparent;
 }
 
 :root[data-theme="aurore"][data-mode="dark"] {
@@ -87,7 +94,10 @@
   --glow: rgba(107, 120, 224, 0.30);
   --ink: #000000;
   --paper: #ffffff;
-  --scrim: var(--ink);
+  --scrim: #070e19;
+  --shade: #000000;
+  --glow-rose: rgba(236, 72, 153, 0.10);
+  --glow-b: rgba(95, 167, 220, 0.22);
 }
 
 :root[data-theme="aurore"][data-mode="light"] {
@@ -115,7 +125,10 @@
   --glow: rgba(79, 91, 213, 0.28);
   --ink: #000000;
   --paper: #ffffff;
-  --scrim: var(--ink);
+  --scrim: #070e19;
+  --shade: #1e2864;
+  --glow-rose: rgba(219, 39, 119, 0.06);
+  --glow-b: rgba(34, 170, 220, 0.14);
 }
 
 :root[data-theme="purple"][data-mode="dark"] {
@@ -143,7 +156,10 @@
   --glow: rgba(168, 85, 247, 0.30);
   --ink: #000000;
   --paper: #ffffff;
-  --scrim: var(--ink);
+  --scrim: #070e19;
+  --shade: #000000;
+  --glow-rose: transparent;
+  --glow-b: transparent;
 }
 
 :root[data-theme="purple"][data-mode="light"] {
@@ -171,7 +187,10 @@
   --glow: rgba(154, 63, 240, 0.30);
   --ink: #000000;
   --paper: #ffffff;
-  --scrim: var(--ink);
+  --scrim: #070e19;
+  --shade: #000000;
+  --glow-rose: transparent;
+  --glow-b: transparent;
 }
 
 :root[data-theme="sunset"][data-mode="dark"] {
@@ -199,7 +218,10 @@
   --glow: rgba(249, 115, 22, 0.30);
   --ink: #000000;
   --paper: #ffffff;
-  --scrim: var(--ink);
+  --scrim: #070e19;
+  --shade: #000000;
+  --glow-rose: transparent;
+  --glow-b: transparent;
 }
 
 :root[data-theme="sunset"][data-mode="light"] {
@@ -227,7 +249,10 @@
   --glow: rgba(205, 77, 11, 0.30);
   --ink: #000000;
   --paper: #ffffff;
-  --scrim: var(--ink);
+  --scrim: #070e19;
+  --shade: #000000;
+  --glow-rose: transparent;
+  --glow-b: transparent;
 }
 
 /*

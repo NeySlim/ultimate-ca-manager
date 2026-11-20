@@ -7423,7 +7423,7 @@
       "introLate_other": "{{count}} nodi non inviano più heartbeat: lettura ed emissione proseguono sugli altri.",
       "introMaintenance": "Manutenzione in corso: le scritture sono sospese su tutti i nodi.",
       "loadFailed": "Impossibile leggere l’elenco dei nodi.",
-      "leader": "Leader",
+      "leader": "Attivo",
       "secondary": "Secondario",
       "heartbeat": "Ultimo heartbeat",
       "state": "Stato",

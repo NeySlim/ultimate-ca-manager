@@ -7423,7 +7423,7 @@
       "introLate_other": "{{count}} 个节点已停止发送心跳：读取和签发在其他节点上继续。",
       "introMaintenance": "正在维护：所有节点的写入均已暂停。",
       "loadFailed": "无法读取节点列表。",
-      "leader": "主节点",
+      "leader": "活动节点",
       "secondary": "从节点",
       "heartbeat": "最后心跳",
       "state": "状态",

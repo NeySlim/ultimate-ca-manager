@@ -7426,7 +7426,7 @@
       "introLate_other": "{{count}} nodes have stopped sending heartbeats: reading and issuing continue on the others.",
       "introMaintenance": "Maintenance in progress: writes are suspended on every node.",
       "loadFailed": "The node list could not be read.",
-      "leader": "Leader",
+      "leader": "Active",
       "secondary": "Secondary",
       "heartbeat": "Last heartbeat",
       "state": "State",

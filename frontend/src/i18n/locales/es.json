@@ -7423,7 +7423,7 @@
       "introLate_other": "{{count}} nodos ya no envían latidos: la lectura y la emisión continúan en los demás.",
       "introMaintenance": "Mantenimiento en curso: las escrituras están suspendidas en todos los nodos.",
       "loadFailed": "No se pudo leer la lista de nodos.",
-      "leader": "Líder",
+      "leader": "Activo",
       "secondary": "Secundario",
       "heartbeat": "Último latido",
       "state": "Estado",

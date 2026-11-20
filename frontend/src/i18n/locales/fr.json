@@ -7426,7 +7426,7 @@
       "introLate_other": "{{count}} nœuds ne donnent plus de battement : la lecture et l’émission continuent sur les autres.",
       "introMaintenance": "Maintenance en cours : les écritures sont suspendues sur tous les nœuds.",
       "loadFailed": "Impossible de lire la liste des nœuds.",
-      "leader": "Leader",
+      "leader": "Actif",
       "secondary": "Secondaire",
       "heartbeat": "Dernier battement",
       "state": "État",
