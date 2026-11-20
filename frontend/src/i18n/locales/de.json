@@ -633,7 +633,30 @@
     "maintenanceRestoring": "Eine Wiederherstellung der Sicherung läuft: Dieser Server nimmt Anmeldungen wieder an, sobald sie beendet ist.",
     "maintenanceActive": "Dieser Server befindet sich in Wartung: Anmeldungen werden abgelehnt, bis sie beendet ist.",
     "maintenanceRetryIn": "Erneute Anmeldung in {{seconds}} s.",
-    "retryNow": "Jetzt erneut versuchen"
+    "retryNow": "Jetzt erneut versuchen",
+    "page": {
+      "signInTitle": "Anmeldung",
+      "lead": "Konsole zur Verwaltung von Zertifikaten und Zertifizierungsstellen.",
+      "username": "Benutzername",
+      "password": "Passwort",
+      "showPassword": "Passwort anzeigen",
+      "hidePassword": "Passwort verbergen",
+      "submit": "Anmelden",
+      "or": "oder",
+      "ssoButton": "Mit SSO anmelden",
+      "resumeSso": "Mit SSO fortfahren",
+      "ldapButton": "Mit LDAP anmelden",
+      "mtlsButton": "Client-Zertifikat (mTLS)",
+      "mtlsDetail": "Konto {{username}}",
+      "keyButton": "Sicherheitsschlüssel",
+      "keyDetail": "WebAuthn, für den eingegebenen Benutzernamen",
+      "usernameMissing": "Geben Sie Ihren Benutzernamen ein.",
+      "passwordMissing": "Geben Sie Ihr Passwort ein.",
+      "lockedTitle": "Sitzung gesperrt",
+      "lockedLead": "Ihre Sitzung ist wegen Inaktivität abgelaufen. Melden Sie sich erneut an, um zur vorherigen Seite zurückzukehren.",
+      "unlock": "Entsperren",
+      "switchAccount": "Mit einem anderen Konto anmelden"
+    }
   },
   "dashboard": {
     "goodMorning": "Guten Morgen",
@@ -4501,7 +4524,11 @@
     "willExpireIn": "Ihre Session läuft ab in",
     "clickToContinue": "Klicken Sie unten, um weiter zu arbeiten, oder Sie werden automatisch abgemeldet.",
     "logOutNow": "Jetzt abmelden",
-    "stayLoggedIn": "Angemeldet bleiben"
+    "stayLoggedIn": "Angemeldet bleiben",
+    "expiresIn": "Ihre Sitzung läuft in {{time}} ab",
+    "lockNotice": "Ohne Aktion wird der Bildschirm gesperrt und die aktuelle Seite bleibt erhalten.",
+    "expiringSoon": "Ihre Sitzung läuft bald ab. Wählen Sie Verlängern, um sie zu behalten.",
+    "extend": "Verlängern"
   },
   "password": {
     "changeRequired": "Passwort-Änderung erforderlich",

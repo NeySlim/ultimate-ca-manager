@@ -633,7 +633,30 @@
     "maintenanceRestoring": "Está em curso a restauração de um backup: este servidor volta a aceitar inícios de sessão quando terminar.",
     "maintenanceActive": "Este servidor está em manutenção: os inícios de sessão são recusados até ao fim da manutenção.",
     "maintenanceRetryIn": "Nova tentativa de início de sessão dentro de {{seconds}} s.",
-    "retryNow": "Tentar agora"
+    "retryNow": "Tentar agora",
+    "page": {
+      "signInTitle": "Início de sessão",
+      "lead": "Consola de gestão de certificados e autoridades.",
+      "username": "Nome de utilizador",
+      "password": "Palavra-passe",
+      "showPassword": "Mostrar a palavra-passe",
+      "hidePassword": "Ocultar a palavra-passe",
+      "submit": "Iniciar sessão",
+      "or": "ou",
+      "ssoButton": "Iniciar sessão com SSO",
+      "resumeSso": "Continuar com SSO",
+      "ldapButton": "Iniciar sessão com LDAP",
+      "mtlsButton": "Certificado de cliente (mTLS)",
+      "mtlsDetail": "Conta {{username}}",
+      "keyButton": "Chave de segurança",
+      "keyDetail": "WebAuthn, para o nome de utilizador indicado",
+      "usernameMissing": "Indique o seu nome de utilizador.",
+      "passwordMissing": "Indique a sua palavra-passe.",
+      "lockedTitle": "Sessão bloqueada",
+      "lockedLead": "A sua sessão expirou por inatividade. Inicie sessão de novo para voltar à página onde estava.",
+      "unlock": "Desbloquear",
+      "switchAccount": "Iniciar sessão com outra conta"
+    }
   },
   "dashboard": {
     "goodMorning": "Bom dia",
@@ -4501,7 +4524,11 @@
     "willExpireIn": "Your session irá expire em",
     "clickToContinue": "Clique abaixo para continuar a trabalhar, caso contrário a sessão será terminada automaticamente.",
     "logOutNow": "Registo Out Now",
-    "stayLoggedIn": "Stay Logged em"
+    "stayLoggedIn": "Stay Logged em",
+    "expiresIn": "A sua sessão expira dentro de {{time}}",
+    "lockNotice": "Sem ação, o ecrã é bloqueado e a página atual é mantida.",
+    "expiringSoon": "A sua sessão expira em breve. Escolha Prolongar para a manter.",
+    "extend": "Prolongar"
   },
   "password": {
     "changeRequired": "Palavra-passe Change Obrigatório",

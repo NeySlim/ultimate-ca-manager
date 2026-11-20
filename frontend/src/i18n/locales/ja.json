@@ -633,7 +633,30 @@
     "maintenanceRestoring": "バックアップの復元を実行中です。完了すると、このサーバーで再びサインインできるようになります。",
     "maintenanceActive": "サーバーはメンテナンス中です。終了するまでサインインできません。",
     "maintenanceRetryIn": "{{seconds}}秒後に再度サインインします。",
-    "retryNow": "今すぐ再試行"
+    "retryNow": "今すぐ再試行",
+    "page": {
+      "signInTitle": "サインイン",
+      "lead": "証明書と認証局を管理するコンソールです。",
+      "username": "ユーザー名",
+      "password": "パスワード",
+      "showPassword": "パスワードを表示",
+      "hidePassword": "パスワードを隠す",
+      "submit": "サインイン",
+      "or": "または",
+      "ssoButton": "SSO でサインイン",
+      "resumeSso": "SSO で再開",
+      "ldapButton": "LDAP でサインイン",
+      "mtlsButton": "クライアント証明書 (mTLS)",
+      "mtlsDetail": "アカウント {{username}}",
+      "keyButton": "セキュリティキー",
+      "keyDetail": "WebAuthn（入力したユーザー名）",
+      "usernameMissing": "ユーザー名を入力してください。",
+      "passwordMissing": "パスワードを入力してください。",
+      "lockedTitle": "セッションはロックされています",
+      "lockedLead": "操作がなかったためセッションの有効期限が切れました。再度サインインすると、元のページに戻ります。",
+      "unlock": "ロック解除",
+      "switchAccount": "別のアカウントでサインイン"
+    }
   },
   "dashboard": {
     "goodMorning": "おはようございます",
@@ -4504,7 +4527,11 @@
     "willExpireIn": "セッションはあとで期限切れになります：",
     "clickToContinue": "作業を続けるには以下をクリックしてください。そうでない場合、自動的にログアウトされます。",
     "logOutNow": "今すぐログアウト",
-    "stayLoggedIn": "ログインしたままにする"
+    "stayLoggedIn": "ログインしたままにする",
+    "expiresIn": "セッションはあと {{time}} で期限切れになります",
+    "lockNotice": "操作がない場合、画面がロックされ、現在のページは保持されます。",
+    "expiringSoon": "セッションがまもなく期限切れになります。維持するには「延長」を選んでください。",
+    "extend": "延長"
   },
   "password": {
     "changeRequired": "パスワードの変更が必要です",
