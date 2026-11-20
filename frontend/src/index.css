@@ -7,33 +7,34 @@
 /* ============================================
    SELF-HOSTED FONTS
    ============================================ */
+/* IBM Plex Sans of the Atelier mockup; its files hold TrueType data, hence the format hint */
 @font-face {
-  font-family: 'Inter';
+  font-family: 'IBM Plex Sans';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('/fonts/Inter-Regular.woff2') format('woff2');
+  src: url('/fonts/plex-0.woff2') format('truetype');
 }
 @font-face {
-  font-family: 'Inter';
+  font-family: 'IBM Plex Sans';
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url('/fonts/Inter-Medium.woff2') format('woff2');
+  src: url('/fonts/plex-1.woff2') format('truetype');
 }
 @font-face {
-  font-family: 'Inter';
+  font-family: 'IBM Plex Sans';
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url('/fonts/Inter-SemiBold.woff2') format('woff2');
+  src: url('/fonts/plex-2.woff2') format('truetype');
 }
 @font-face {
-  font-family: 'Inter';
+  font-family: 'IBM Plex Sans';
   font-style: normal;
   font-weight: 700;
   font-display: swap;
-  src: url('/fonts/Inter-Bold.woff2') format('woff2');
+  src: url('/fonts/plex-3.woff2') format('truetype');
 }
 @font-face {
   font-family: 'Fira Code';
@@ -219,9 +220,14 @@
   border: 1px solid var(--detail-field-border);
 }
 
+/* The interface reads at the font's own line height, as the Atelier mockup does */
+html {
+  line-height: normal;
+}
+
 body {
   margin: 0;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   overflow: hidden;

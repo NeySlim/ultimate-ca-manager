@@ -1,7 +1,7 @@
 {
   "format": "ucm-font-registry",
   "version": 1,
-  "note": "Read from each file: OpenType name table IDs 0 (copyright), 5 (version), 6 (PostScript name), 13 (license)",
+  "note": "Read from each file: OpenType name table IDs 0 (copyright), 5 (version), 6 (PostScript name), 13 (license) or 14 (license URL) as license_name_id says",
   "fonts": [
     {
       "file": "fonts/FiraCode-Medium.woff2",
@@ -37,48 +37,52 @@
       "license_file": "fonts/LICENSE-FiraCode.txt"
     },
     {
-      "file": "fonts/Inter-Bold.woff2",
-      "sha256": "fa888127b6da015b65569f0351f3b5c391ad928904951f1c20e9f8462a8d95ea",
-      "family": "Inter",
-      "postscript_name": "Inter-Bold",
-      "version": "4.001",
+      "file": "fonts/plex-0.woff2",
+      "sha256": "6dbe082463cf749cfa057d45c3048c90f4df031496498e5b5bdfd0b6babb9d16",
+      "family": "IBM Plex Sans",
+      "postscript_name": "IBMPlexSans-Regular",
+      "version": "3.201",
       "license": "OFL-1.1",
-      "copyright": "Copyright 2016 The Inter Project Authors",
-      "source": "https://github.com/rsms/inter",
-      "license_file": "fonts/LICENSE-Inter.txt"
+      "copyright": "Copyright 2019 IBM Corp. All rights reserved.",
+      "source": "https://github.com/IBM/plex",
+      "license_file": "fonts/LICENSE-IBMPlexSans.txt",
+      "license_name_id": 14
     },
     {
-      "file": "fonts/Inter-Medium.woff2",
-      "sha256": "0ff3e94614e1493eb556314fd247ae6c4a85a7783b4cc86be539940cf83f2a48",
-      "family": "Inter",
-      "postscript_name": "Inter-Medium",
-      "version": "4.001",
+      "file": "fonts/plex-1.woff2",
+      "sha256": "6f7a8c4219e021ff7c9131bc5f1f7af97bcd1436a59578d444a8cb92e9791742",
+      "family": "IBM Plex Sans",
+      "postscript_name": "IBMPlexSans-Medium",
+      "version": "3.201",
       "license": "OFL-1.1",
-      "copyright": "Copyright 2016 The Inter Project Authors",
-      "source": "https://github.com/rsms/inter",
-      "license_file": "fonts/LICENSE-Inter.txt"
+      "copyright": "Copyright 2019 IBM Corp. All rights reserved.",
+      "source": "https://github.com/IBM/plex",
+      "license_file": "fonts/LICENSE-IBMPlexSans.txt",
+      "license_name_id": 14
     },
     {
-      "file": "fonts/Inter-Regular.woff2",
-      "sha256": "e06f6b1bc553aaea4e4668023ed0ab0a147129c3107f511bc7d03d361b0ae085",
-      "family": "Inter",
-      "postscript_name": "Inter-Regular",
-      "version": "4.001",
+      "file": "fonts/plex-2.woff2",
+      "sha256": "5311c66fd6d04ae45671236f7eae667b671c06c1dc7e88d52c206e5fadd0fb21",
+      "family": "IBM Plex Sans",
+      "postscript_name": "IBMPlexSans-SemiBold",
+      "version": "3.201",
       "license": "OFL-1.1",
-      "copyright": "Copyright 2016 The Inter Project Authors",
-      "source": "https://github.com/rsms/inter",
-      "license_file": "fonts/LICENSE-Inter.txt"
+      "copyright": "Copyright 2019 IBM Corp. All rights reserved.",
+      "source": "https://github.com/IBM/plex",
+      "license_file": "fonts/LICENSE-IBMPlexSans.txt",
+      "license_name_id": 14
     },
     {
-      "file": "fonts/Inter-SemiBold.woff2",
-      "sha256": "5cb7103e4e605989afebc03d989c79201e54b21b5183db33981f70db9178a301",
-      "family": "Inter",
-      "postscript_name": "Inter-SemiBold",
-      "version": "4.001",
+      "file": "fonts/plex-3.woff2",
+      "sha256": "e129a20e8ff7c907ffd07124b573e88c323b7b18afc934d4aa539a3e0f2fe100",
+      "family": "IBM Plex Sans",
+      "postscript_name": "IBMPlexSans-Bold",
+      "version": "3.201",
       "license": "OFL-1.1",
-      "copyright": "Copyright 2016 The Inter Project Authors",
-      "source": "https://github.com/rsms/inter",
-      "license_file": "fonts/LICENSE-Inter.txt"
+      "copyright": "Copyright 2019 IBM Corp. All rights reserved.",
+      "source": "https://github.com/IBM/plex",
+      "license_file": "fonts/LICENSE-IBMPlexSans.txt",
+      "license_name_id": 14
     }
   ]
 }

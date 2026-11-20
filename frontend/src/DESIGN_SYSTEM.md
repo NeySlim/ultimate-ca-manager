@@ -88,7 +88,7 @@ declare a size below 12px, or if a component uses an arbitrary `text-[N]` class
 below 12px. Inline `fontSize` styles are not covered.
 
 ### Font Families
-- `font-sans` — Inter (UI text), self-hosted (`/fonts/Inter-*.woff2`)
+- `font-sans` — IBM Plex Sans (UI text, line height `normal`), self-hosted (`/fonts/plex-*.woff2`)
 - `font-mono` — Fira Code (code, serials, hashes), self-hosted. `.font-mono`
   also applies `font-size: 0.92em; letter-spacing: -0.01em` (Fira runs wide).
 

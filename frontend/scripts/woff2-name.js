@@ -18,6 +18,42 @@ function base128(buf, pos) {
   throw new Error('bad UIntBase128')
 }
 
+// Windows en-US records of a raw `name` table
+function nameRecords(name) {
+  const count = name.readUInt16BE(2)
+  const strings = name.readUInt16BE(4)
+  const out = {}
+  for (let i = 0; i < count; i++) {
+    const r = 6 + i * 12
+    if (name.readUInt16BE(r) !== 3 || name.readUInt16BE(r + 4) !== 0x409) continue
+    const len = name.readUInt16BE(r + 8)
+    const at = strings + name.readUInt16BE(r + 10)
+    let s = ''
+    for (let k = 0; k < len; k += 2) s += String.fromCharCode(name.readUInt16BE(at + k))
+    out[name.readUInt16BE(r + 6)] = s
+  }
+  return out
+}
+
+/** Name records of an uncompressed TrueType or OpenType file (sfnt table directory). */
+export function sfntNames(buf) {
+  const magic = buf.readUInt32BE(0)
+  if (magic !== 0x00010000 && buf.toString('latin1', 0, 4) !== 'OTTO' && buf.toString('latin1', 0, 4) !== 'true') throw new Error('not an sfnt file')
+  const numTables = buf.readUInt16BE(4)
+  for (let i = 0; i < numTables; i++) {
+    const r = 12 + i * 16
+    if (buf.toString('latin1', r, r + 4) !== 'name') continue
+    const offset = buf.readUInt32BE(r + 8)
+    return nameRecords(buf.subarray(offset, offset + buf.readUInt32BE(r + 12)))
+  }
+  throw new Error('no name table')
+}
+
+/** Name records of a shipped font, whatever its container. */
+export function fontNames(buf) {
+  return buf.toString('latin1', 0, 4) === 'wOF2' ? woff2Names(buf) : sfntNames(buf)
+}
+
 export function woff2Names(buf) {
   if (buf.toString('latin1', 0, 4) !== 'wOF2') throw new Error('not a WOFF2 file')
   const numTables = buf.readUInt16BE(12)
@@ -43,17 +79,5 @@ export function woff2Names(buf) {
     offset += t.length
   }
   if (!name) throw new Error('no name table')
-  const count = name.readUInt16BE(2)
-  const strings = name.readUInt16BE(4)
-  const out = {}
-  for (let i = 0; i < count; i++) {
-    const r = 6 + i * 12
-    if (name.readUInt16BE(r) !== 3 || name.readUInt16BE(r + 4) !== 0x409) continue
-    const len = name.readUInt16BE(r + 8)
-    const at = strings + name.readUInt16BE(r + 10)
-    let s = ''
-    for (let k = 0; k < len; k += 2) s += String.fromCharCode(name.readUInt16BE(at + k))
-    out[name.readUInt16BE(r + 6)] = s
-  }
-  return out
+  return nameRecords(name)
 }
