@@ -137,7 +137,7 @@
 .sf-record-title { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; }
 .sf-record-meta { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .sf-record-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.sf-records-empty { margin: 0; padding: 9px 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.sf-records-empty { margin: 0; padding: 9px 0; font-size: 12px; color: var(--muted); }
 .sf-records > li > input[type="checkbox"] { flex: 0 0 auto; }
 /* A long list of records to choose from scrolls inside its own height */
 .sf-records-scroll { max-height: 288px; overflow-y: auto; scrollbar-width: thin; }

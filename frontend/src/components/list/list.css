@@ -531,6 +531,7 @@
   .lv-toolbar .lv-btn > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
   /* 140 px each, giving way together where the product's third filter and presets leave less room */
   .lv-toolbar .lv-tools { flex-shrink: 1; min-width: 0; }
+  .lv-toolbar > .lv-btn { flex-shrink: 0; }
   .lv-toolbar .lv-filter { flex: 0 1 auto; min-width: 0; }
   .lv-toolbar .lv-filter > button { width: 140px; max-width: 100%; }
 }
