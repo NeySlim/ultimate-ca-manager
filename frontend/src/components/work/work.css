@@ -3,7 +3,7 @@
  * bulk actions, folded history. Tokens only (styles/tokens.css).
  */
 .wk-scroll { position: relative; flex: 1; min-height: 0; overflow: auto; padding-bottom: 24px; scrollbar-width: thin; }
-.wk-view { display: grid; gap: 16px; align-content: start; color: var(--text); font-size: 13px; line-height: normal; }
+.wk-view { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-content: start; color: var(--text); font-size: 13px; line-height: normal; }
 .wk-view h2, .wk-view h3, .wk-view p { margin: 0; }
 .wk-view :is(button, a, input, [tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 /* No transition on the queue's controls, as the Atelier themes (Aurore animates its own, below) */
@@ -180,6 +180,8 @@
 /* Skeleton: the mockup's fixed bars at the height of the rows they stand for */
 .wk-skel-bar { display: inline-block; flex-shrink: 0; max-width: 100%; height: 10px; border-radius: 3px; background: color-mix(in srgb, var(--muted) 26%, transparent); vertical-align: middle; }
 .wk-skel-bar.is-thin { height: 8px; }
+/* The long bar of the hint line gives way on a narrow screen */
+.wk-skel-bar.is-fluid { flex-shrink: 1; min-width: 0; }
 .wk-skel .wk-row { min-height: 61px; }
 .wk-skel .wk-main { gap: 10px; }
 .wk-skel .wk-group-head { min-height: 47px; }

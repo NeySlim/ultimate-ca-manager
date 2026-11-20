@@ -124,7 +124,7 @@ function WorkSkeleton({ history }) {
   return (
     <div className="wk-view wk-skel" role="status" aria-live="polite" aria-busy="true">
       <span className="sr-only">{t('work.loading')}</span>
-      <p className="wk-hint" aria-hidden="true">{bar({ width: 14, height: 14 })}{bar({ width: 420 })}</p>
+      <p className="wk-hint" aria-hidden="true">{bar({ width: 14, height: 14 })}{bar({ width: 420 }, 'fluid')}</p>
       {[2, 1].map((n, g) => (
         <section key={g} className="wk-panel" aria-hidden="true">
           <header className="wk-group-head">
