@@ -101,6 +101,7 @@
   justify-content: center;
   gap: 3px;
   width: 52px;
+  min-height: 17px;
   padding: 0;
   background: none;
   border: 0;
@@ -146,7 +147,8 @@
   color: var(--text);
   font-size: 12px;
 }
-.ins-tabs-menu { position: absolute; top: calc(100% + 13px); right: 0; width: max-content; min-width: 0; max-width: min(340px, calc(100vw - 24px)); max-height: min(320px, calc(100dvh - 120px)); padding: 6px; border-radius: 6px; overflow-y: auto; }
+/* 8 px under the « +N » button of 17 px, centred in the strip */
+.ins-tabs-menu { position: absolute; top: calc(50% + 16.5px); right: 0; width: max-content; min-width: 0; max-width: min(340px, calc(100vw - 24px)); max-height: min(320px, calc(100dvh - 120px)); padding: 6px; border-radius: 6px; overflow-y: auto; }
 .ins-tabs-menu .lv-pill { flex-shrink: 0; margin-left: auto; padding-left: 10px; }
 .ins-tabs-menu li { display: flex; align-items: center; gap: 2px; }
 .ins-tabs-menu-open {
@@ -167,8 +169,6 @@
 }
 .ins-tabs-menu-open:hover, .ins-tabs-menu :focus { background: var(--hover); outline: none; }
 .ins-tabs-menu-open svg { flex-shrink: 0; }
-/* Full screen on a phone: the menu spans the window instead of hanging off its trigger */
-.ins-dock.is-mobile .ins-tabs-menu { position: fixed; top: 40px; left: 8px; right: 8px; width: auto; max-width: none; }
 .ins-pop-label { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ins-menu-item {
   display: flex;
@@ -334,6 +334,30 @@
   .ins-overview:not([data-columns="1"]) > section + section { border-left: 0; border-top: 1px solid var(--line); padding: 18px 0 0; }
   .ins-extensions { grid-template-columns: 1fr; }
 }
+/* Full screen on a phone: the touch metrics of the mockup (strip, heading, actions, section tabs, panel) */
+.ins-dock.is-mobile .ins-bar { height: 47px; min-height: 47px; }
+.ins-dock.is-mobile .ins-tabs-zone { height: 47px; }
+.ins-dock.is-mobile .ins-open-tab { padding-left: 12px; }
+.ins-dock.is-mobile .ins-open-tab-label { min-height: 40px; max-width: 205px; overflow: hidden; }
+.ins-dock.is-mobile .ins-icon-btn.is-tab-close { width: 28px; height: 34px; padding: 4px; }
+.ins-dock.is-mobile .ins-tools { margin-left: 5px; }
+.ins-dock.is-mobile .ins-tools .ins-icon-btn { width: 40px; height: 40px; }
+/* The menu hangs from « +N » and stays 12 px inside the screen whatever the names */
+.ins-dock.is-mobile .ins-tabs-menu { max-width: min(340px, calc(100vw - 66px)); }
+.ins-dock.is-mobile .ins-heading { display: block; padding: 20px 17px 12px; }
+.ins-dock.is-mobile .ins-title { gap: 9px; flex-wrap: wrap; }
+.ins-dock.is-mobile .ins-title h2 { font-size: 20px; }
+.ins-dock.is-mobile .ins-title .lv-pill { margin-top: 4px; }
+.ins-dock.is-mobile .ins-actions { margin-top: 15px; gap: 8px; }
+.ins-dock.is-mobile .ins-actions .lv-btn { min-height: 40px; }
+.ins-dock.is-mobile .ins-detail-tabs { gap: 0; justify-content: space-between; margin: 0 17px; padding-top: 0; }
+.ins-dock.is-mobile .ins-detail-tabs [role="tab"] { min-height: 45px; margin-bottom: 0; }
+.ins-dock.is-mobile .ins-panel { padding: 22px 18px; }
+.ins-dock.is-mobile .ins-overview[data-columns] { gap: 25px; }
+.ins-dock.is-mobile .ins-overview[data-columns] > section + section { padding-top: 22px; }
+.ins-dock.is-mobile .ins-props { grid-template-columns: 105px minmax(0, 1fr); gap: 15px; }
+.ins-dock.is-mobile .ins-validity-head strong { font-size: 26px; }
+.ins-dock.is-mobile .ins-chain-mini { gap: 4px; }
 @media (prefers-reduced-motion: reduce) {
   .ins-grip::after { transition: none; }
 }
