@@ -8,6 +8,19 @@ import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/utils'
 import './list.css'
 
+// Initial focus, as the mockup: an element marked data-autofocus (the safe action of a confirmation),
+// else the first field of the body, else Radix's default (the close button)
+const FIELDS = 'input:not([type="hidden"]):not([disabled]):not([readonly]):not([tabindex="-1"]), select:not([disabled]), textarea:not([disabled]):not([readonly])'
+function focusFirstField(event) {
+  const body = event.currentTarget?.querySelector('.lv-dialog-body')
+  if (!body || body.contains(document.activeElement)) return
+  for (const el of [...body.querySelectorAll('[data-autofocus]'), ...body.querySelectorAll(FIELDS)]) {
+    if (el.closest('[hidden], .hidden, .sr-only')) continue
+    el.focus()
+    if (document.activeElement === el) { event.preventDefault(); return }
+  }
+}
+
 /** narrow: 520 px (default); wide: 920 px, as the mockup's dialog.wide; neither: 760 px. */
 export function ListDialog({ open, onOpenChange, title, subtitle, narrow = true, wide = false, closable = true, children, className, testId }) {
   const { t } = useTranslation()
@@ -16,7 +29,7 @@ export function ListDialog({ open, onOpenChange, title, subtitle, narrow = true,
       <Dialog.Portal>
         <Dialog.Overlay className="lv-dialog-backdrop" />
         <Dialog.Content className={cn('lv-dialog', wide ? 'is-wide' : narrow && 'is-narrow', className)} data-testid={testId}
-          aria-describedby={undefined}>
+          aria-describedby={undefined} onOpenAutoFocus={focusFirstField}>
           <header className="lv-dialog-head">
             <div>
               <Dialog.Title asChild><h2>{title}</h2></Dialog.Title>

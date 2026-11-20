@@ -3,13 +3,14 @@
  */
 import { createContext, useContext, useState, useCallback, useMemo } from 'react'
 import * as Toast from '@radix-ui/react-toast'
-import { CheckCircle, Warning, Info, XCircle, X } from '@phosphor-icons/react'
+import { CheckCircle, Warning, Info, X } from '@phosphor-icons/react'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
 import { ListDialog } from '../components/list/ListDialog'
 import { useTranslation } from 'react-i18next'
 
 const NotificationContext = createContext()
+const TOAST_ICONS = { success: CheckCircle, error: Warning, warning: Warning, info: Info }
 
 export function NotificationProvider({ children }) {
   const { t } = useTranslation()
@@ -22,20 +23,24 @@ export function NotificationProvider({ children }) {
     setToasts(prev => prev.filter(toast => toast.id !== id))
   }, [])
 
-  const addToast = useCallback((type, message, duration = 5000) => {
+  // options: a duration in ms (0 keeps the toast until it is closed) or { duration, action: { label, onClick } };
+  // a toast that carries an action stays until it is used or closed, as the mockup's failure toast
+  const addToast = useCallback((type, message, options) => {
+    const opts = options !== null && typeof options === 'object' ? options : { duration: options }
+    const action = opts.action && opts.action.label && typeof opts.action.onClick === 'function' ? opts.action : null
+    const duration = opts.duration ?? (action ? 0 : 5000)
     const id = Date.now() + Math.random() // unique even when called in a tight loop
-    setToasts(prev => [...prev, { id, type, message, duration }])
-    
+    setToasts(prev => [...prev, { id, type, message, duration, action }])
+
     if (duration > 0) {
       setTimeout(() => removeToast(id), duration)
     }
   }, [removeToast])
 
-  // duration 0: the toast stays until the user closes it
-  const showSuccess = useCallback((message, duration) => addToast('success', message, duration), [addToast])
-  const showError = useCallback((message, duration) => addToast('error', message, duration), [addToast])
-  const showWarning = useCallback((message, duration) => addToast('warning', message, duration), [addToast])
-  const showInfo = useCallback((message, duration) => addToast('info', message, duration), [addToast])
+  const showSuccess = useCallback((message, options) => addToast('success', message, options), [addToast])
+  const showError = useCallback((message, options) => addToast('error', message, options), [addToast])
+  const showWarning = useCallback((message, options) => addToast('warning', message, options), [addToast])
+  const showInfo = useCallback((message, options) => addToast('info', message, options), [addToast])
 
   // Confirmation dialog
   const showConfirm = useCallback((message, options = {}) => {
@@ -84,26 +89,6 @@ export function NotificationProvider({ children }) {
     }
   }
 
-  const getIcon = (type) => {
-    switch (type) {
-      case 'success': return <CheckCircle size={20} weight="fill" className="status-success-text" />
-      case 'error': return <XCircle size={20} weight="fill" className="status-danger-text" />
-      case 'warning': return <Warning size={20} weight="fill" className="status-warning-text" />
-      case 'info': return <Info size={20} weight="fill" className="status-primary-text" />
-      default: return <Info size={20} weight="fill" />
-    }
-  }
-
-  const getColors = (type) => {
-    switch (type) {
-      case 'success': return 'status-success-border status-success-bg border'
-      case 'error': return 'status-danger-border status-danger-bg border'
-      case 'warning': return 'status-warning-border status-warning-bg border'
-      case 'info': return 'status-primary-border status-primary-bg border'
-      default: return 'border-border bg-bg-secondary'
-    }
-  }
-
   const value = useMemo(() => ({
     showSuccess,
     showError,
@@ -118,32 +103,40 @@ export function NotificationProvider({ children }) {
       <Toast.Provider swipeDirection="down">
         {children}
         
-        {toasts.map(toast => (
-          <Toast.Root
-            key={toast.id}
-            className={`rounded-xl border p-4 shadow-2xl backdrop-blur-sm transition-all ${getColors(toast.type)}`}
-            open={true}
-            duration={toast.duration > 0 ? toast.duration : Infinity}
-            onOpenChange={() => removeToast(toast.id)}
-          >
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 mt-0.5">
-                {getIcon(toast.type)}
-              </div>
-              <Toast.Description className="flex-1 min-w-0 text-sm text-text-primary break-words whitespace-pre-line">
-                {toast.message}
-              </Toast.Description>
-              <Toast.Close className="flex-shrink-0">
-                <button className="text-text-secondary hover:text-text-primary transition-colors">
-                  <X size={16} />
-                </button>
-              </Toast.Close>
-            </div>
-          </Toast.Root>
-        ))}
+        {/* The mockup's inverted pill; a toast that stays or carries an action is its failure toast:
+            a framed line with the tone's rule and icon, the action, and a close button */}
+        {toasts.map(toast => {
+          const held = toast.duration === 0 || !!toast.action
+          const Icon = TOAST_ICONS[toast.type] || Info
+          return (
+            <Toast.Root
+              key={toast.id}
+              className={`ui-toast${held ? ` is-held is-${toast.type}` : ''}`}
+              type={toast.type === 'error' ? 'foreground' : 'background'}
+              open={true}
+              duration={toast.duration > 0 ? toast.duration : Infinity}
+              onOpenChange={() => removeToast(toast.id)}
+            >
+              {held && <Icon className="ui-toast-icon" aria-hidden="true" />}
+              <Toast.Description className="ui-toast-text">{toast.message}</Toast.Description>
+              {toast.action && (
+                <Toast.Action asChild altText={toast.action.label}>
+                  <button type="button" className="lv-btn" onClick={() => toast.action.onClick()}>{toast.action.label}</button>
+                </Toast.Action>
+              )}
+              {held && (
+                <Toast.Close asChild>
+                  <button type="button" className="lv-btn is-icon" aria-label={t('common.closeMessage')}>
+                    <X size={16} aria-hidden="true" />
+                  </button>
+                </Toast.Close>
+              )}
+            </Toast.Root>
+          )
+        })}
 
-        {/* Bottom centre, above the status bar: a toast never covers a page header's commands */}
-        <Toast.Viewport className="fixed bottom-10 left-1/2 -translate-x-1/2 flex flex-col gap-3 w-96 max-w-[calc(100vw-2rem)] z-[300] outline-none" />
+        {/* Bottom centre, 40 px above the window's edge: a toast never covers a page header's commands */}
+        <Toast.Viewport className="ui-toast-viewport fixed bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-[300] outline-none" />
       </Toast.Provider>
 
       {/* Confirmation and prompt: the narrow Atelier dialog, its buttons in the interface language */}
@@ -154,10 +147,18 @@ export function NotificationProvider({ children }) {
         className="ui-modal"
         testId="confirm-dialog"
       >
-        <p className="ui-dialog-message">{confirmDialog?.message}</p>
+        {/* A destructive action is announced in the mockup's warning notice; the safe action takes the focus */}
+        {confirmDialog?.variant === 'danger' ? (
+          <div className="ui-notice is-warn ui-dialog-notice">
+            <Warning aria-hidden="true" />
+            <p className="ui-notice-body">{confirmDialog?.message}</p>
+          </div>
+        ) : (
+          <p className="ui-dialog-message">{confirmDialog?.message}</p>
+        )}
         <div className="ui-dialog-actions">
           {confirmDialog?.cancelText !== null && (
-            <Button type="button" variant="secondary" onClick={() => handleConfirm(false)}>
+            <Button type="button" variant="secondary" onClick={() => handleConfirm(false)} data-autofocus>
               {confirmDialog?.cancelText || t('common.cancel')}
             </Button>
           )}
@@ -165,6 +166,7 @@ export function NotificationProvider({ children }) {
             type="button"
             variant={confirmDialog?.variant === 'danger' ? 'danger' : 'primary'}
             onClick={() => handleConfirm(true)}
+            data-autofocus={confirmDialog?.cancelText === null ? true : undefined}
           >
             {confirmDialog?.confirmText || t('common.confirm')}
           </Button>
