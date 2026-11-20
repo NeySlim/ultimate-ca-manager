@@ -286,6 +286,8 @@
  * (icon hues, violet) are the documented exceptions: they do not vary by family.
  */
 :root {
+  /* Row height of the Atelier mockup's tables (its :root --row), read by the copied rules */
+  --row: 36px;
   --bg-primary: var(--bg);
   --bg-secondary: var(--panel);
   --bg-tertiary: var(--raised);
