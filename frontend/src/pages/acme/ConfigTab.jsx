@@ -263,7 +263,7 @@ export default function ConfigTab({ acmeSettings, savedProfiles = {}, cas, templ
             <p className="text-xs text-text-tertiary">{t('acme.termsOfServiceHelper')}</p>
           )}
           {canWrite && (
-            <Button type="button" variant="ghost" size="sm" onClick={handleOpenEdit}>
+            <Button type="button" variant="ghost" size="sm" onClick={handleOpenEdit} data-write>
               <PencilSimple size={14} />
               {t('common.edit')}
             </Button>

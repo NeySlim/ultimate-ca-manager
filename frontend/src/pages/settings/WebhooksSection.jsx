@@ -30,7 +30,7 @@ export default function WebhooksSection({ webhooks, webhooksLoading, webhookTest
         <FormGroup
           title={t('webhooks.configuredWebhooks')}
           actions={hasPermission('admin:system') ? (
-            <Button type="button" variant="secondary" onClick={handleWebhookCreate}>
+            <Button type="button" variant="secondary" onClick={handleWebhookCreate} data-write>
               <Plus size={16} />
               {t('webhooks.addWebhook')}
             </Button>

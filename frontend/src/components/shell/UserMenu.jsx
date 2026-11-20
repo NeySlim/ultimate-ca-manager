@@ -11,11 +11,12 @@ import { useAuth } from '../../contexts/AuthContext'
 import { authService } from '../../services/auth.service'
 import { useDisclosure, moveFocus } from './useDisclosure'
 
+// The mockup's methods; a session restored from the browser ('session') no longer knows its own,
+// so the menu then says the lock alone
 const METHOD_KEYS = {
   password: 'shell.method.password',
   mtls: 'shell.method.mtls',
   webauthn: 'shell.method.webauthn',
-  session: 'shell.method.session',
 }
 
 const initialsOf = (name) => (name || '?').slice(0, 2).toUpperCase()
@@ -62,7 +63,7 @@ export function UserMenu() {
     navigate('/login')
   }
 
-  const method = authMethod ? (METHOD_KEYS[authMethod] ? t(METHOD_KEYS[authMethod]) : authMethod) : null
+  const method = !authMethod || authMethod === 'session' ? null : METHOD_KEYS[authMethod] ? t(METHOD_KEYS[authMethod]) : authMethod
 
   return (
     <div className="shell-pop-wrap" {...rootProps} onKeyDown={onKeyDown}>
@@ -82,12 +83,13 @@ export function UserMenu() {
         <div className="shell-user-id">
           <strong>{name}</strong>
           <span>{role && <>{role} · </>}<span className="shell-mono">{username}</span></span>
-          {method && (
+          {method || minutes ? (
             <span className="shell-muted">
-              {t('shell.signedInWith', { method })}
-              {minutes ? <> {t('shell.lockAfter', { count: minutes })}</> : null}
+              {method && t('shell.signedInWith', { method })}
+              {method && minutes ? ' ' : null}
+              {minutes ? t('shell.lockAfter', { count: minutes }) : null}
             </span>
-          )}
+          ) : null}
         </div>
         <Link to="/account" className="shell-pop-item" onClick={() => close()}>
           <Users size={17} aria-hidden="true" />{t('common.account')}

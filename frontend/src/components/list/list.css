@@ -461,7 +461,7 @@
   background: var(--panel);
   border: 1px solid var(--control);
   border-radius: 8px;
-  box-shadow: 0 24px 100px color-mix(in srgb, var(--ink) 44%, transparent);
+  box-shadow: 0 24px 100px color-mix(in srgb, var(--shade) 46.7%, transparent);
   color: var(--text);
   font-size: 13px;
   overscroll-behavior: contain;
@@ -500,6 +500,12 @@
 }
 
 @media (max-width: 800px) {
+  /* Dialogs on a phone, as the mockup: 20 px margins, a 40 px close button, 42 px actions */
+  .lv-dialog-head { padding: 17px 20px; }
+  .lv-dialog-head .lv-btn.is-icon { width: 40px; min-height: 40px; }
+  .lv-dialog-body { padding: 20px; }
+  .lv-dialog-actions { flex-wrap: wrap; }
+  .lv-dialog-actions .lv-btn { min-height: 42px; }
   /* A secondary page action keeps its icon only (its name stays readable by assistive technology) */
   .lv-btn.lv-hide-mobile { width: 40px; padding: 6px; gap: 0; font-size: 0; }
   .lv-stage { --lv-gutter: 16px; }
@@ -578,8 +584,9 @@
 :root[data-theme="aurore"] .lv-btn.is-primary:hover:not(:disabled) { filter: brightness(1.07); box-shadow: 0 0 0 1px var(--glow), 0 10px 30px -8px var(--glow); }
 :root[data-theme="aurore"] .lv-btn:not(.is-primary):not(.is-quiet):not(.is-bare) { background: color-mix(in srgb, var(--paper) 3%, transparent); border-color: color-mix(in srgb, var(--paper) 10%, transparent); }
 :root[data-theme="aurore"] .lv-btn:not(.is-primary):not(.is-quiet):not(.is-bare):hover:not(:disabled) { background: color-mix(in srgb, var(--grad-a) 12%, transparent); }
-:root[data-theme="aurore"][data-mode="light"] .lv-btn:not(.is-primary):not(.is-quiet):not(.is-bare) { background: color-mix(in srgb, var(--paper) 70%, transparent); border-color: var(--control); }
-:root[data-theme="aurore"][data-mode="light"] .lv-btn:not(.is-primary):not(.is-quiet):not(.is-bare):hover:not(:disabled) { background: color-mix(in srgb, var(--grad-a) 8%, transparent); }
+/* A danger or warning button keeps its tone fill and border, as the mockup excludes .btn.danger */
+:root[data-theme="aurore"][data-mode="light"] .lv-btn:not(.is-primary):not(.is-quiet):not(.is-bare):not(.is-danger):not(.is-warn) { background: color-mix(in srgb, var(--paper) 70%, transparent); border-color: var(--control); }
+:root[data-theme="aurore"][data-mode="light"] .lv-btn:not(.is-primary):not(.is-quiet):not(.is-bare):not(.is-danger):not(.is-warn):hover:not(:disabled) { background: color-mix(in srgb, var(--grad-a) 8%, transparent); }
 :root[data-theme="aurore"] :is(.lv-btn, .lv-icon-btn, .lv-page-arrow, .lv-search, .lv-filter > button, .lv-page-size, .lv-page-jump input, .lv-table-box) { border-radius: 6px; }
 :root[data-theme="aurore"] .lv-table-box {
   border-color: transparent;

@@ -2,6 +2,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 const getServiceStatus = vi.hoisted(() => vi.fn())
 
@@ -205,6 +207,26 @@ describe('NodesDialog', () => {
     expect(close).toHaveAttribute('data-write', 'false')
     await userEvent.click(close)
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  // jsdom has no layout and no specificity: the line and the intro spacing are measured in a browser
+  it('draws the role as a bare badge in the text colour', async () => {
+    const sheets = ['src/components/shell/shell.css'].map(f => {
+      const el = document.createElement('style')
+      el.textContent = readFileSync(resolve(process.cwd(), f), 'utf8')
+      document.head.appendChild(el)
+      return el
+    })
+    try {
+      getServiceStatus.mockResolvedValue({ data: { cluster: { nodes: [
+        { node_id: 'n2', leader: false, stopped: false, stale: false, version: '3.0', heartbeat_at: new Date().toISOString() }] } } })
+      render(<NodesDialog open onClose={() => {}} ha={{ stale: 0 }} />)
+      const badge = (await screen.findByText('shell.nodes.secondary')).closest('.shell-node-badge')
+      expect(getComputedStyle(badge).paddingLeft).toBe('0px')
+      expect(getComputedStyle(badge).color).toBe('var(--text)')
+    } finally {
+      sheets.forEach(el => el.remove())
+    }
   })
 
   it('says when the list cannot be read', async () => {

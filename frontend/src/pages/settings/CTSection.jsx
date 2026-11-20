@@ -43,7 +43,7 @@ export default function CTSection({ ctSettings, setCtSettings, ctLoading, ctNewL
                 />
               </div>
               <div className="sf-actions-row">
-                <Button type="button" variant="secondary" onClick={handleCtAddLogUrl}>
+                <Button type="button" variant="secondary" onClick={handleCtAddLogUrl} data-write>
                   <Plus size={16} />
                   {t('settings.ctAddLogUrl')}
                 </Button>

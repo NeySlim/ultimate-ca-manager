@@ -249,7 +249,7 @@ export default function DeploySection() {
                 </div>
               </div>
             ))}
-            <Button type="button" variant="secondary" onClick={openCreate}>
+            <Button type="button" variant="secondary" onClick={openCreate} data-write>
               <Plus size={16} /> {t('deploy.addTarget')}
             </Button>
           </div>

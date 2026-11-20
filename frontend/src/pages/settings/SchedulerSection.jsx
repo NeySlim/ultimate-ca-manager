@@ -51,7 +51,7 @@ function RunButton({ busy, onRun, children }) {
   const ref = useRef(null)
   useRefocusAfter(busy, ref)
   return (
-    <Button ref={ref} type="button" variant="secondary" onClick={onRun} disabled={busy}>
+    <Button ref={ref} type="button" variant="secondary" onClick={onRun} disabled={busy} data-write>
       <Play size={13} weight="fill" />
       {children}
     </Button>

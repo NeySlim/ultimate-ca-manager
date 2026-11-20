@@ -180,6 +180,8 @@ describe('TopBar expiry badge', () => {
       expect(style.position).toBe('absolute')
       expect(style.pointerEvents).toBe('none')
       expect(getComputedStyle(badge.parentElement).position).toBe('relative')
+      // Its bottom stays above the 16 px icon: it covers neither the icon nor the label beside it
+      expect(parseFloat(style.top) + parseFloat(style.height)).toBeLessThanOrEqual(-2)
       // The link keeps the padding of every bar link, the underline its symmetric insets
       expect(getComputedStyle(certLink()).paddingRight).toBe(getComputedStyle(certLink()).paddingLeft)
     } finally {

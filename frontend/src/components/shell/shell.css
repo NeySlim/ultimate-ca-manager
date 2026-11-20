@@ -80,11 +80,11 @@
 }
 .shell-pin-label { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
 .shell-navicon { position: relative; display: inline-flex; }
-/* Expiry count on the Certificates icon, drawn as the bell's count: outside the link's layout */
+/* Expiry count above the Certificates icon, out of the link's layout: it covers neither the icon nor the label */
 .shell-badge {
   position: absolute;
-  top: -8px;
-  left: 9px;
+  top: -18px;
+  left: 8px;
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
@@ -338,7 +338,9 @@
 .shell-status-live, .shell-status-text, .shell-status-ha { display: inline-flex; align-items: center; gap: 6px; }
 .shell-status-shortcut { display: inline-flex; align-items: center; gap: 5px; }
 .shell-status-ha { gap: 9px; }
-.shell-ws { padding: 0 2px; }
+/* The live indicator keeps the 15 px line of the bar: no padding of its own, a 14 px icon */
+.shell-status-live .shell-ws { padding: 0 2px; }
+.shell-status-live .shell-ws svg { width: 14px; height: 14px; }
 .shell-ha-link { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 8px; border: 0; border-radius: 3px; background: none; font: inherit; font-size: 12px; color: inherit; }
 button.shell-ha-link { cursor: pointer; }
 .shell-approvals-link { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 8px; border-radius: 3px; color: var(--accent); font-weight: 500; text-decoration: none; }
@@ -364,19 +366,20 @@ button.shell-ha-link:hover { background: var(--hover); }
 .shell-ha-can svg { flex-shrink: 0; color: var(--text); }
 
 /* Cluster nodes dialog (inside the list template's dialog) */
-.shell-nodes-intro { margin: 0 0 14px; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.shell-nodes-intro, .lv-dialog-body > p.shell-nodes-intro { margin: 0 0 14px; font-size: 12px; line-height: 1.5; color: var(--muted); }
 .shell-node-list { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; }
 .shell-node-card { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 5px; background: var(--raised); }
 .shell-node-card.is-late { border-left: 4px solid var(--warn-fill); }
 .shell-node-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .shell-mono { font-family: 'Fira Code', monospace; font-size: 12px; }
-.shell-node-badge { display: inline-flex; align-items: center; gap: 6px; padding: 1px 8px 1px 6px; font-size: 12px; white-space: nowrap; color: var(--muted); }
+.shell-node-badge { display: inline-flex; align-items: center; gap: 6px; padding: 0; font-size: 12px; white-space: nowrap; color: var(--text); }
+:root[data-theme="aurore"] .shell-node-badge { padding: 1px 8px 1px 6px; border: 1px solid color-mix(in srgb, currentColor 35%, transparent); border-radius: 999px; background: color-mix(in srgb, currentColor 14%, transparent); }
 .shell-node-badge.is-good, .shell-node-props .is-good { color: var(--good); }
 .shell-node-props .is-warn { color: var(--warn); }
 .shell-node-props { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; margin: 0; font-size: 12px; }
 .shell-node-props dt { color: var(--muted); }
 .shell-node-props dd { margin: 0; }
-.shell-node-props svg { vertical-align: -2px; margin-right: 4px; }
+.shell-node-props svg { display: inline; vertical-align: -2px; margin-right: 4px; }
 
 /* First run: the "Initial setup" card, its folded line */
 .shell-setup { flex-shrink: 0; margin: 0 0 18px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); overflow: hidden; font-size: 13px; line-height: normal; color: var(--text); }
@@ -440,7 +443,8 @@ button.shell-ha-link:hover { background: var(--hover); }
   .shell-navlink { padding: 0 9px; }
   .shell-navlink.is-active::after { left: 9px; right: 9px; }
   .shell-main-nav .shell-navlink svg { display: none; }
-  .shell-badge { position: static; margin-left: 2px; }
+  /* The icon's box leaves the flow with its icon: the label starts at the padding, the count stays above it */
+  .shell-main-nav .shell-navicon { position: absolute; left: 9px; top: 50%; width: 16px; height: 16px; margin-top: -8px; }
   .shell-search { min-width: 64px; }
 }
 
@@ -467,12 +471,15 @@ button.shell-ha-link:hover { background: var(--hover); }
     font: inherit;
     font-size: 12px;
   }
-  .shell-topbar { gap: 8px; padding: 0 10px; }
+  /* The mockup's 14 px margins: the brand mark alone, the picker 133 px beside four 44 px targets */
+  .shell-topbar { gap: 8px; padding: 0 14px; }
   .shell-tools { gap: 2px; margin-left: 0; }
   .shell-search, .shell-icon-btn, .shell-avatar { min-width: 44px; min-height: 44px; justify-content: center; }
   .shell-avatar { width: 44px; height: 44px; }
   .shell-search { padding: 0; }
   .shell-pop { position: fixed; right: 8px; left: 8px; width: auto; top: var(--shell-bar-h); }
+  /* The account menu stays the mockup's 270 px panel under its avatar */
+  .shell-pop.shell-user-menu { position: absolute; top: calc(100% + 8px); right: 0; left: auto; width: 270px; }
   .shell-pop-item { min-height: 44px; }
   .shell-status-shortcut { display: none; }
   .shell-statusbar { height: auto; min-height: 34px; margin-top: auto; padding: 7px 16px; font-size: 12px; flex-wrap: wrap; row-gap: 2px; }
@@ -512,13 +519,15 @@ button.shell-ha-link:hover { background: var(--hover); }
   pointer-events: none;
   background:
     radial-gradient(1100px 700px at 16% 2%, color-mix(in srgb, var(--grad-a) 36%, transparent), transparent 60%),
-    radial-gradient(800px 600px at 90% 98%, color-mix(in srgb, var(--grad-b) 22%, transparent), transparent 60%);
+    radial-gradient(700px 500px at 58% 42%, var(--glow-rose), transparent 60%),
+    radial-gradient(800px 600px at 90% 98%, var(--glow-b), transparent 60%);
   animation: shell-aurore-drift 90s ease-in-out infinite alternate;
 }
 :root[data-theme="aurore"][data-mode="light"] body::before {
   background:
     radial-gradient(1100px 700px at 16% 2%, color-mix(in srgb, var(--grad-a) 16%, transparent), transparent 60%),
-    radial-gradient(800px 600px at 90% 98%, color-mix(in srgb, var(--grad-b) 14%, transparent), transparent 60%);
+    radial-gradient(700px 500px at 58% 42%, var(--glow-rose), transparent 60%),
+    radial-gradient(800px 600px at 90% 98%, var(--glow-b), transparent 60%);
 }
 @keyframes shell-aurore-drift {
   from { transform: translate3d(-2%, -1.5%, 0) scale(1); }
@@ -552,19 +561,19 @@ button.shell-ha-link:hover { background: var(--hover); }
 :root[data-theme="aurore"][data-mode="light"] :is(.shell-menu, .shell-pop, .shell-notif-panel) {
   background: color-mix(in srgb, var(--paper) 84%, transparent);
   border-color: color-mix(in srgb, var(--text) 14%, transparent);
-  box-shadow: inset 0 1px 0 var(--paper), 0 24px 60px -20px color-mix(in srgb, var(--text) 35%, transparent);
+  box-shadow: inset 0 1px 0 var(--paper), 0 24px 60px -20px color-mix(in srgb, var(--shade) 35%, transparent);
 }
 :root[data-theme="aurore"][data-mode="light"] :is(.shell-topbar, .shell-statusbar)::before { background: color-mix(in srgb, var(--paper) 66%, transparent); }
 :root[data-theme="aurore"][data-mode="light"] .shell-navlink.is-active { background: linear-gradient(180deg, color-mix(in srgb, var(--grad-a) 10%, transparent), transparent), var(--selected); }
 /* Shell buttons in Aurore: 6 px corners; plain ones on a faint glass, as the mockup's .btn */
-:root[data-theme="aurore"] :is(.shell-search, .shell-icon-btn, .shell-btn) { border-radius: 6px; }
+:root[data-theme="aurore"] :is(.shell-search, .shell-icon-btn, .shell-btn, .shell-pin) { border-radius: 6px; }
 :root[data-theme="aurore"] :is(.shell-search, .shell-btn:not(.is-primary):not(.is-quiet)) { background: color-mix(in srgb, var(--paper) 3%, transparent); border-color: color-mix(in srgb, var(--paper) 10%, transparent); }
 :root[data-theme="aurore"] :is(.shell-search, .shell-btn:not(.is-primary):not(.is-quiet)):hover:not(:disabled) { background: color-mix(in srgb, var(--grad-a) 12%, transparent); }
 :root[data-theme="aurore"][data-mode="light"] :is(.shell-search, .shell-btn:not(.is-primary):not(.is-quiet)) { background: color-mix(in srgb, var(--paper) 70%, transparent); border-color: var(--control); }
 :root[data-theme="aurore"][data-mode="light"] :is(.shell-search, .shell-btn:not(.is-primary):not(.is-quiet)):hover:not(:disabled) { background: color-mix(in srgb, var(--grad-a) 8%, transparent); }
 :root[data-theme="aurore"] .shell-dot { box-shadow: 0 0 8px currentColor; }
 :root[data-theme="aurore"] :is(.shell-topbar, .shell-pop, .shell-menu, .shell-statusbar, .shell-notif-panel, .shell-state-banner, .shell-setup, .shell-setup-later) :focus-visible {
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent);
+  box-shadow: 0 0 0 5px var(--halo);
 }
 :root[data-theme="aurore"] .shell-navlink.is-active { background: linear-gradient(180deg, color-mix(in srgb, var(--grad-a) 18%, transparent), transparent), var(--selected); }
 :root[data-theme="aurore"] .shell-navlink.is-active::after { background: linear-gradient(90deg, var(--grad-a), var(--grad-b)); }
@@ -577,7 +586,7 @@ button.shell-ha-link:hover { background: var(--hover); }
 :root[data-theme="aurore"] .shell-navlink:not(.is-active):hover { background: color-mix(in srgb, var(--grad-a) 10%, transparent); }
 :root[data-theme="aurore"][data-mode="light"] .shell-navlink:not(.is-active):hover { background: color-mix(in srgb, var(--grad-a) 8%, transparent); }
 @media (max-width: 800px) {
-  :root[data-theme="aurore"] :is(.shell-pop, .shell-notif-panel) { background: var(--panel); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  :root[data-theme="aurore"] :is(.shell-pop:not(.shell-user-menu):not(.ui-theme-menu), .shell-notif-panel) { background: var(--panel); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

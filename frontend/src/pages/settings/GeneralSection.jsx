@@ -274,7 +274,7 @@ export default function GeneralSection({ settings, fieldErrors = {}, updateSetti
             />
           </div>
           <div className="sf-actions-row">
-            <Button type="button" variant="secondary" onClick={generateToken} disabled={!canWrite('settings')}>
+            <Button type="button" variant="secondary" onClick={generateToken} disabled={!canWrite('settings')} data-write>
               <ArrowsClockwise size={16} />
               {t('settings.metrics.generate')}
             </Button>

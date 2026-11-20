@@ -2023,7 +2023,8 @@ function PageJump({ page, totalPages, onChange }) {
           aria-label={t('table.pageNumber')} onChange={(e) => setValue(e.target.value)} />
       </label>
       <span>{t('table.pageOf', { total: totalPages })}</span>
-      <button type="submit" className="lv-btn">{t('table.goToPage')}</button>
+      {/* Going to a page reads: the write guard leaves it enabled */}
+      <button type="submit" className="lv-btn" data-write="false">{t('table.goToPage')}</button>
     </form>
   )
 }

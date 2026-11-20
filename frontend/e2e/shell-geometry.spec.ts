@@ -162,4 +162,27 @@ test('offline, the banner says so and the write buttons wait for the network', a
   }
   await expect(page.locator('#shell-offline-banner')).toHaveCount(0)
   await expect(issue).toBeEnabled()
+  // The message of the return is the mockup's pill: 41 px high, 40 px above the window's edge, inverted colours
+  const toast = page.locator('.ui-toast').filter({ hasText: /./ }).last()
+  const t = await box(toast)
+  expect(Math.abs(t.height - 41)).toBeLessThanOrEqual(EPS)
+  expect(Math.abs(1000 - (t.y + t.height) - 40)).toBeLessThanOrEqual(EPS)
+  const colours = await toast.evaluate(el => {
+    const c = getComputedStyle(el), body = getComputedStyle(document.body)
+    return { bg: c.backgroundColor, fg: c.color, text: body.color, radius: c.borderTopLeftRadius }
+  })
+  expect(colours.bg).toBe(colours.text)
+  expect(colours.radius).toBe('5px')
+  await expect(toast.locator('button')).toHaveCount(0)
+})
+
+test('a dialog opens over the mockup veil, on its first field', async ({ page, api }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  await page.goto('/users')
+  await page.getByRole('button', { name: 'Create User' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  const veil = await page.locator('.lv-dialog-backdrop').evaluate(el => getComputedStyle(el).backgroundColor)
+  expect(veil.replace(/\s/g, '')).toMatch(/^(rgba\(7,14,25,0\.66\)|color\(srgb0\.027\d*0\.054\d*0\.098\d*\/0\.66\))$/)
+  await expect(dialog.locator('.lv-dialog-body input:not([type="checkbox"]), .lv-dialog-body select').first()).toBeFocused()
 })

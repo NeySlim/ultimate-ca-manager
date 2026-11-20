@@ -24,6 +24,7 @@ vi.mock('../ProfilesEditor', () => ({
 }))
 
 import ConfigTab from '../ConfigTab'
+import { blockedWhileSuspended } from '../../../components/shell/__tests__/writeGuardProbe'
 
 const settings = (extra) => ({
   enabled: true,
@@ -70,5 +71,12 @@ describe('ConfigTab default profile', () => {
       updateSetting={vi.fn()} canWrite />)
     expect(screen.getByText('acme.defaultProfile')).toBeInTheDocument()
     expect(screen.getByText('acme.defaultProfileDesc')).toBeInTheDocument()
+  })
+})
+
+describe('ConfigTab write guard', () => {
+  it('suspends Edit (terms of service) with the other writes', () => {
+    render(<ConfigTab acmeSettings={settings({})} cas={[]} updateSetting={vi.fn()} canWrite />)
+    expect(blockedWhileSuspended(screen.getByRole('button', { name: /common.edit/ }))).toBe(true)
   })
 })

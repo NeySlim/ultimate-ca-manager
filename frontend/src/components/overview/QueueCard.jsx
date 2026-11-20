@@ -116,7 +116,7 @@ function Row({ item, lang, actions }) {
       <Due item={item} lang={lang} />
       <div className="ov-queue-action">
         {action ? (
-          <button type="button" className="ov-btn" disabled={actions.busy !== null} onClick={action.run}
+          <button type="button" className="ov-btn" disabled={actions.busy !== null} onClick={action.run} data-write
             aria-label={`${action.label}: ${item.label || kind}`} aria-busy={actions.busy === key}>
             <action.icon size={14} aria-hidden="true" />{action.label}
           </button>

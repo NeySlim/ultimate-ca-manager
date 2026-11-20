@@ -30,7 +30,7 @@ export default function MicrosoftCASection({ mscaConnections, mscaLoading, mscaT
           <p className="text-text-secondary mb-1">{t('msca.noConnections')}</p>
           <p className="text-xs text-text-tertiary mb-4">{t('msca.noConnectionsDesc')}</p>
           {hasPermission('admin:system') && (
-            <Button type="button" onClick={handleMscaCreate}>
+            <Button type="button" onClick={handleMscaCreate} data-write>
               <Plus size={14} /> {t('msca.addConnection')}
             </Button>
           )}
@@ -41,7 +41,7 @@ export default function MicrosoftCASection({ mscaConnections, mscaLoading, mscaT
             <div className="sf-group-head">
               <span />
               <div className="sf-group-actions">
-                <Button type="button" variant="secondary" onClick={handleMscaCreate}>
+                <Button type="button" variant="secondary" onClick={handleMscaCreate} data-write>
                   <Plus size={16} /> {t('msca.addConnection')}
                 </Button>
               </div>

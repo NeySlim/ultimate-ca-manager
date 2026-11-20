@@ -58,6 +58,14 @@ describe('UserMenu', () => {
     expect(screen.getByText(/shell\.signedInWith\|shell\.method\.password/)).toBeVisible()
   })
 
+  it('says only the lock for a session restored from the browser: the server no longer knows the method', async () => {
+    auth.method = 'session'
+    const user = setup()
+    await user.click(trigger())
+    expect(await screen.findByText(/shell\.lockAfter\|30/)).toBeVisible()
+    expect(screen.queryByText(/shell\.signedInWith/)).toBeNull()
+  })
+
   it('says nothing about a method the session does not know', async () => {
     auth.method = null
     const user = setup()

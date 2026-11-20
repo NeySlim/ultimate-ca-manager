@@ -110,7 +110,7 @@ export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelected
 
       <FormGroup title={t('settings.applyCustomCert')} description={t('settings.applyCustomCertificateDesc')}>
         <div className="sf-actions-row">
-          <Button variant="secondary" onClick={() => setShowHttpsImportModal(true)}>
+          <Button variant="secondary" onClick={() => setShowHttpsImportModal(true)} data-write>
             <UploadSimple size={16} />
             {t('common.importCertificate')}
           </Button>

@@ -7,6 +7,7 @@ import { render, screen } from '@testing-library/react'
 import '../../__tests__/pageRenderingSetup.jsx'
 import AuditSection from '../AuditSection'
 import AutoRenewalSection from '../AutoRenewalSection'
+import { blockedWhileSuspended } from '../../../components/shell/__tests__/writeGuardProbe'
 
 const syslog = { enabled: false, host: '', port: 514, protocol: 'udp', categories: [] }
 const audit = (props) => render(
@@ -37,5 +38,12 @@ describe('section test zones', () => {
     expect(result).toHaveClass('is-good')
     expect(screen.getByRole('button', { name: /settings.autoRenewalSource_acme/ })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: /settings.autoRenewalSource_est/ })).toHaveAttribute('aria-pressed', 'false')
+  })
+})
+
+describe('AutoRenewalSection write guard', () => {
+  it('suspends Run now with the other writes', () => {
+    render(<AutoRenewalSection arSettings={ar} setArSettings={vi.fn()} arRunResult={null} handleArRunNow={vi.fn()} />)
+    expect(blockedWhileSuspended(screen.getByText('settings.autoRenewalRunNow').closest('button'))).toBe(true)
   })
 })

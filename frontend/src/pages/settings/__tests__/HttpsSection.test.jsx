@@ -16,6 +16,7 @@ vi.mock('../../../components', () => ({
 }))
 
 import HttpsSection from '../HttpsSection'
+import { blockedWhileSuspended } from '../../../components/shell/__tests__/writeGuardProbe'
 
 const renderSection = (httpsInfo, onUnbindHttpsCert = vi.fn()) => {
   render(
@@ -96,5 +97,12 @@ describe('HttpsSection bound certificate indicator (#303 follow-up)', () => {
     })
     expect(screen.getByText('settings.httpsLeftBehindSuperseded')).toBeInTheDocument()
     expect(screen.queryByText('settings.httpsSelectRenewed')).not.toBeInTheDocument()
+  })
+})
+
+describe('HttpsSection write guard', () => {
+  it('suspends Import a certificate with the other writes', () => {
+    renderSection({ common_name: 'ucm.example.com', issuer: 'UCM', valid_to: '2027-01-01T00:00:00Z', fingerprint: 'AA', type: 'self_signed' })
+    expect(blockedWhileSuspended(screen.getByText('common.importCertificate').closest('button'))).toBe(true)
   })
 })
