@@ -1115,6 +1115,18 @@ export const helpContent = {
     overview: 'Configure all aspects of the UCM system. Settings are organized by category: general, appearance, email, security, SSO, backup, audit, database, HTTPS, updates, and webhooks.',
     sections: [
       {
+        title: 'Page layout',
+        content: 'Every section is on one page, in a frame of its own; the table of contents on the left lists them by group (on a phone, the Go to section list).',
+        items: [
+          { label: 'Save bar', text: 'At the bottom of the page: No changes pending, with the date and the account of the last save when you can read the audit log; once a field changes, the count of changes and their sections, with Undo changes (back to the values loaded) and Save. Save stores every changed section through its usual route' },
+          { label: 'Save in error', text: 'A section whose save fails is marked To correct in the table of contents and names the error in its frame; the other sections are saved and what you typed stays' },
+          { label: 'Own actions', text: 'A test, an import, a generation or a list (SSO providers, webhooks, connections, Windows profiles, backups) keeps its button in its section and acts at once' },
+          { label: 'Links', text: 'A link to /settings?tab=<section> (overview, palette, other pages) opens the page on that section' },
+          { label: 'Leaving', text: 'Leaving the page with changes pending asks first' },
+          { label: 'Change history', text: 'Under the sections, the last saves of the settings as the audit log records them (with read:audit)' },
+        ]
+      },
+      {
         title: "Prometheus metrics",
         content: "Opt-in /metrics endpoint exposing certificate, CA, scheduler, webhook and ACME counters in Prometheus format.",
         items: [
@@ -1333,6 +1345,14 @@ export const helpContent = {
     overview: 'Manage your profile, security settings, and API keys. Enable two-factor authentication and register security keys for enhanced account protection.',
     sections: [
       {
+        title: 'Page layout',
+        content: 'Profile, security and API keys are on one page, each in its frame; the table of contents on the left jumps to them (on a phone, the Go to section list).',
+        items: [
+          { label: 'Own actions', text: 'Edit in the Profile frame opens the name and email, Cancel or Save act at once; Create key opens the key form; there is no save bar' },
+          { label: 'Links', text: 'A link to /account?tab=security or /account?tab=api-keys opens the page on that frame' },
+        ],
+      },
+      {
         title: 'Profile',
         icon: Users,
         items: [
@@ -1432,6 +1452,14 @@ export const helpContent = {
     overview: 'A suite of tools for working with certificates, CSRs, and keys. Decode certificates to inspect their contents, convert between formats, check remote SSL endpoints, and verify key matches.',
     sections: [
       {
+        title: 'Page layout',
+        content: 'The table of contents on the left lists the tools by group (Analysis, Verification, Conversion); the chosen tool shows in its frame with its result below.',
+        items: [
+          { label: 'Switching tool', text: 'Choosing another tool clears the result of the previous one' },
+          { label: 'Links', text: 'A link to /tools?tab=<tool> (ssl-checker, csr-decoder, cert-decoder, key-matcher, converter) opens that tool' },
+        ],
+      },
+      {
         title: 'Available Tools',
         icon: Wrench,
         items: [
@@ -1470,7 +1498,14 @@ export const helpContent = {
     overview: 'Centralized operations center. Import certificates from files or OPNsense, export bundles in PEM/P7B formats, and perform bulk actions across all resource types with inline search and filters.',
     sections: [
       {
-        title: 'Sidebar Tabs',
+        title: 'Page layout',
+        content: 'The table of contents on the left lists Import, Export and Bulk Actions; the chosen operation shows in its frame. Each keeps its own buttons, there is no save bar.',
+        items: [
+          { label: 'Links', text: 'A link to /operations?tab=export or /operations?tab=bulk opens that operation' },
+        ],
+      },
+      {
+        title: 'Operations',
         icon: Stack,
         items: [
           { label: 'Import', text: 'Smart Import with automatic format detection, plus OPNsense sync to pull certificates from firewalls' },

@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowsClockwise, FloppyDisk, ClockClockwise, Plus, X, Lightning } from '@phosphor-icons/react'
-import { Button, Input, DetailHeader, DetailSection, DetailContent } from '../../components'
+import { ArrowsClockwise, Plus, X, Lightning } from '@phosphor-icons/react'
+import { Button, Input } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
+import { FormGroup } from '../../components/sectioned'
 
 const SOURCES = ['manual', 'scep', 'acme', 'est']
 
@@ -10,9 +11,7 @@ export default function AutoRenewalSection({
   arSettings,
   setArSettings,
   arLoading,
-  arSaving,
   arRunning,
-  handleArSave,
   handleArRunNow,
 }) {
   const { t } = useTranslation()
@@ -46,22 +45,15 @@ export default function AutoRenewalSection({
   }
 
   return (
-    <DetailContent>
-      <DetailHeader
-        icon={ClockClockwise}
-        title={t('settings.autoRenewal')}
-        subtitle={t('settings.autoRenewalDescription')}
-      />
+    <>
 
       {arLoading ? (
         <div className="flex items-center justify-center py-12">
           <div className="w-6 h-6 border-2 border-accent-primary-op30 border-t-accent-primary rounded-full animate-spin" />
         </div>
       ) : (
-        <DetailSection
+        <FormGroup
           title={t('settings.autoRenewal')}
-          icon={ClockClockwise}
-          iconClass="icon-bg-emerald"
         >
           <div className="space-y-5">
             <ToggleSwitch
@@ -211,18 +203,10 @@ export default function AutoRenewalSection({
                 {t('settings.autoRenewalRunNow')}
               </Button>
 
-              <Button type="button" onClick={handleArSave} disabled={arSaving}>
-                {arSaving ? (
-                  <ArrowsClockwise size={14} className="animate-spin mr-1" />
-                ) : (
-                  <FloppyDisk size={14} className="mr-1" />
-                )}
-                {t('common.save')}
-              </Button>
             </div>
           </div>
-        </DetailSection>
+        </FormGroup>
       )}
-    </DetailContent>
+    </>
   )
 }

@@ -5,7 +5,14 @@ export default {
     overview: '集中式运维中心。从文件或 OPNsense 导入证书、以 PEM/P7B 格式导出捆绑包，以及跨所有资源类型执行批量操作，支持内联搜索和筛选。',
     sections: [
       {
-        title: '侧边栏选项卡',
+        title: '页面布局',
+        content: '左侧目录列出导入、导出和批量操作；所选操作显示在其框中。每项保留自己的按钮，没有保存栏。',
+        items: [
+          { label: '链接', text: '指向 /operations?tab=export 或 /operations?tab=bulk 的链接会打开该操作' },
+        ],
+      },
+      {
+        title: '操作',
         items: [
           { label: '导入', text: '智能导入自动检测格式，以及 OPNsense 同步从防火墙拉取证书' },
           { label: '导出', text: '通过操作卡片按资源类型下载 PEM 或 P7B 格式的证书捆绑包' },

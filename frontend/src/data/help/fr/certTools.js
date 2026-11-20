@@ -5,6 +5,14 @@ export default {
     overview: 'Une suite d\'outils pour travailler avec les certificats, CSR et clés. Décodez les certificats pour inspecter leur contenu, convertissez entre formats, vérifiez les points de terminaison SSL distants et vérifiez les correspondances de clés.',
     sections: [
       {
+        title: 'Disposition de la page',
+        content: 'Le sommaire à gauche range les outils par groupes (Analyse, Vérification, Conversion) ; l’outil choisi s’affiche dans son cadre, son résultat en dessous.',
+        items: [
+          { label: 'Changer d’outil', text: 'Choisir un autre outil efface le résultat du précédent' },
+          { label: 'Liens', text: 'Un lien vers /tools?tab=<outil> (ssl-checker, csr-decoder, cert-decoder, key-matcher, converter) ouvre cet outil' },
+        ],
+      },
+      {
         title: 'Outils disponibles',
         items: [
           { label: 'Vérificateur SSL', text: 'Se connecter à un hôte distant et inspecter le certificat qu\'il présente (le certificat final seulement, pas la chaîne)' },

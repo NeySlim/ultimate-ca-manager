@@ -22,7 +22,7 @@ vi.mock('../../../components/ui/ToggleSwitch', () => ({ ToggleSwitch: ({ label }
 import AuditSection from '../AuditSection'
 
 describe('AuditSection offers only what the backend applies', () => {
-  it('has no on/off switch and no per-event checkboxes, and keeps the retention save', () => {
+  it('has no on/off switch and no per-event checkboxes, and keeps the retention field', () => {
     render(
       <AuditSection
         settings={{}}
@@ -42,6 +42,5 @@ describe('AuditSection offers only what the backend applies', () => {
     expect(screen.queryByText('settings.eventsToLog')).toBeNull()
     expect(screen.queryByText('settings.eventUserLoginLogout')).toBeNull()
     expect(screen.getByLabelText('settings.logRetention')).toBeTruthy()
-    expect(screen.getAllByText('common.saveChanges').length).toBeGreaterThan(0)
   })
 })

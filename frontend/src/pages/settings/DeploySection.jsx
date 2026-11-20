@@ -8,13 +8,14 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CloudArrowUp, Globe, Plus, TestTube, PencilSimple, Trash, ArrowsClockwise, Copy, Check } from '@phosphor-icons/react'
-import { Button, Badge, HelpCard, DetailSection, DetailContent, DetailHeader, EmptyState } from '../../components'
+import { Button, Badge, HelpCard, EmptyState } from '../../components'
 import { Modal } from '../../components/Modal'
 import { deployService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks/useClipboard'
 import { extractData, formatDate } from '../../lib/utils'
 import { useFipsMode } from '../../lib/policyAlgorithms'
+import { FormGroup } from '../../components/sectioned'
 
 const EMPTY_FORM = {
   kind: 'ssh', name: '', host: '', port: 22, username: '', private_key: '', enabled: true,
@@ -177,12 +178,7 @@ export default function DeploySection() {
   }))
 
   return (
-    <DetailContent>
-      <DetailHeader
-        icon={CloudArrowUp}
-        title={t('deploy.title')}
-        subtitle={t('deploy.subtitle')}
-      />
+    <>
 
       <HelpCard variant="info" title={t('deploy.helpTitle')} className="mb-4">
         {t('deploy.helpDescription')}
@@ -200,7 +196,7 @@ export default function DeploySection() {
           action={{ label: t('deploy.addTarget'), onClick: openCreate }}
         />
       ) : (
-        <DetailSection title={t('deploy.targets')} icon={CloudArrowUp} iconClass="icon-bg-emerald">
+        <FormGroup title={t('deploy.targets')}>
           <div className="space-y-3">
             {targets.map(target => (
               <div key={target.id} className="flex items-center justify-between p-4 bg-tertiary-50 border border-border rounded-lg">
@@ -257,7 +253,7 @@ export default function DeploySection() {
               <Plus size={16} /> {t('deploy.addTarget')}
             </Button>
           </div>
-        </DetailSection>
+        </FormGroup>
       )}
 
       {/* Create / edit modal */}
@@ -436,6 +432,6 @@ export default function DeploySection() {
           </div>
         </div>
       </Modal>
-    </DetailContent>
+    </>
   )
 }

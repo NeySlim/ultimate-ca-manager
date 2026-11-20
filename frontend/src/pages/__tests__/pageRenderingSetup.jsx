@@ -51,16 +51,14 @@ vi.mock('../../services/apiClient', () => ({
 }))
 
 // Mock i18next
+// One `t` and one `i18n` for every render, as react-i18next gives: a hook that lists `t`
+// in its dependencies does not run again at each render
+const stableTranslation = vi.hoisted(() => ({
+  t: (key) => key,
+  i18n: { language: 'en', changeLanguage: () => {}, on: () => {}, off: () => {} },
+}))
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key) => key,
-    i18n: {
-      language: 'en',
-      changeLanguage: vi.fn(),
-      on: vi.fn(),
-      off: vi.fn(),
-    }
-  }),
+  useTranslation: () => stableTranslation,
   Trans: ({ children }) => children,
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
@@ -249,7 +247,7 @@ vi.mock('../../contexts', () => ({
     theme: 'dark',
     setTheme: vi.fn(),
     resolvedTheme: 'dark',
-    themes: ['light', 'dark'],
+    themes: [],
   }),
   useMobile: () => ({
     isMobile: false,
@@ -282,7 +280,7 @@ vi.mock('../../contexts/ThemeContext', () => ({
     theme: 'dark',
     setTheme: vi.fn(),
     resolvedTheme: 'dark',
-    themes: ['light', 'dark'],
+    themes: [],
     colors: {},
   }),
   ThemeProvider: ({ children }) => children,

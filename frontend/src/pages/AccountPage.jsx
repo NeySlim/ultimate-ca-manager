@@ -11,7 +11,7 @@ import {
 import {
   ResponsiveLayout,
   Button, Input, Select, Badge, Modal, FormModal, HelpCard, ExperimentalBadge,
-  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
+  DetailGrid, DetailField, ListButton,
   LoadingSpinner, ExportModal
 } from '../components'
 import { accountService, casService, userCertificatesService } from '../services'
@@ -25,6 +25,7 @@ import { downloadExport } from '../lib/exportDownload'
 import { reportSilentFailure } from '../lib/silentFailure'
 import { localOnlyRevocationWarning } from '../lib/revocationOutcome'
 import { apiKeyScopePermissions } from '../lib/apiKeyScopes'
+import { FormLayout, SectionToc, SectionJump, FormSection, FormGroup, useSectionParam } from '../components/sectioned'
 
 export default function AccountPage() {
   const { t } = useTranslation()
@@ -34,17 +35,11 @@ export default function AccountPage() {
   const { copy } = useClipboard()
   const { hasPermission } = usePermission()
 
-  // Tab configuration - inside component to use translations
-  const TABS = [
-    { id: 'profile', label: t('account.profile'), icon: User },
-    { id: 'security', label: t('common.security'), icon: ShieldCheck },
-    { id: 'api-keys', label: t('account.apiKeys'), icon: Key },
-  ]
-  
   // State
   const [loading, setLoading] = useState(true)
+  // The section a link names (/account?tab=security) is the one the page lands on
+  const [activeTab, setActiveTab] = useSectionParam(['profile', 'security', 'api-keys'], 'profile', { stacked: true, ready: !loading })
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState('profile')
   const [accountData, setAccountData] = useState({})
   const [editMode, setEditMode] = useState(false)
   const [formData, setFormData] = useState({ full_name: '', email: '' })
@@ -527,21 +522,21 @@ export default function AccountPage() {
 
   // ============ RENDER TAB CONTENT ============
 
+  // Editing the profile is its own action: Edit, then Cancel or Save in the frame heading
+  const profileActions = editMode ? (
+    <>
+      <ListButton onClick={() => setEditMode(false)}>{t('common.cancel')}</ListButton>
+      <ListButton primary icon={FloppyDisk} onClick={handleSaveProfile} disabled={saving}>
+        {saving ? t('common.saving') : t('common.save')}
+      </ListButton>
+    </>
+  ) : (
+    <ListButton icon={PencilSimple} onClick={() => setEditMode(true)}>{t('common.edit')}</ListButton>
+  )
+
   const renderProfileContent = () => (
-    <DetailContent>
-      <DetailHeader
-        icon={User}
-        title={t('account.profileInfo')}
-        subtitle={t('account.personalDetails')}
-        actions={editMode ? [
-          { label: t('common.cancel'), variant: 'secondary', onClick: () => setEditMode(false) },
-          { label: saving ? t('common.saving') : t('common.save'), icon: FloppyDisk, onClick: handleSaveProfile, disabled: saving }
-        ] : [
-          { label: t('common.edit'), icon: PencilSimple, variant: 'secondary', onClick: () => setEditMode(true) }
-        ]}
-      />
-      
-      <DetailSection title={t('common.accountInformation')}>
+    <>
+      <FormGroup title={t('common.accountInformation')}>
         {editMode ? (
           <div className="space-y-4">
             <Input
@@ -572,9 +567,9 @@ export default function AccountPage() {
             />
           </DetailGrid>
         )}
-      </DetailSection>
+      </FormGroup>
       
-      <DetailSection title={t('account.accountActivity')}>
+      <FormGroup title={t('account.accountActivity')}>
         <DetailGrid>
           <DetailField 
             label={t('account.accountCreated')} 
@@ -597,20 +592,14 @@ export default function AccountPage() {
             } 
           />
         </DetailGrid>
-      </DetailSection>
-    </DetailContent>
+      </FormGroup>
+    </>
   )
 
   const renderSecurityContent = () => (
-    <DetailContent>
-      <DetailHeader
-        icon={ShieldCheck}
-        title={t('common.securitySettings')}
-        subtitle={t('account.manageAccountSecurity')}
-      />
-      
+    <>
       {/* Password */}
-      <DetailSection title={t('common.password')}>
+      <FormGroup title={t('common.password')}>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-text-primary">{t('account.changeYourPassword')}</p>
@@ -624,10 +613,10 @@ export default function AccountPage() {
             {t('common.changePassword')}
           </Button>
         </div>
-      </DetailSection>
+      </FormGroup>
 
       {/* 2FA */}
-      <DetailSection title={t('common.twoFactorAuth')}>
+      <FormGroup title={t('common.twoFactorAuth')}>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-text-primary">{t('account.authenticatorApp')}</p>
@@ -672,10 +661,10 @@ export default function AccountPage() {
             : t('account.noSecondFactor')}
           {accountData.two_factor_enforced && ` (${t('account.twoFactorEnforced')})`}
         </p>
-      </DetailSection>
+      </FormGroup>
 
       {/* WebAuthn */}
-      <DetailSection 
+      <FormGroup 
         title={t('account.securityKeys')}
         subtitle={t('account.webauthnDescription')}
         actions={
@@ -714,10 +703,10 @@ export default function AccountPage() {
             ))}
           </div>
         )}
-      </DetailSection>
+      </FormGroup>
 
       {/* mTLS Certificates */}
-      <DetailSection 
+      <FormGroup 
         title={t('account.clientCertificates')}
         badge={<ExperimentalBadge />}
         actions={
@@ -769,28 +758,23 @@ export default function AccountPage() {
           </div>
         )}
 
-      </DetailSection>
-    </DetailContent>
+      </FormGroup>
+    </>
+  )
+
+  const apiKeyActions = (
+    <ListButton primary icon={Plus} onClick={() => setShowApiKeyModal(true)}>{t('account.createKey')}</ListButton>
   )
 
   const renderApiKeysContent = () => (
-    <DetailContent>
-      <DetailHeader
-        icon={Key}
-        title={t('account.apiKeys')}
-        subtitle={t('common.aboutAPIKeys')}
-        actions={[
-          { label: t('account.createKey'), icon: Plus, onClick: () => setShowApiKeyModal(true) }
-        ]}
-      />
-      
+    <>
       <HelpCard 
         variant="tip" 
         title={t('common.aboutAPIKeys')} 
         items={t('account.apiKeyTips', { returnObjects: true })} 
       />
 
-      <DetailSection title={t('account.yourAPIKeys')}>
+      <FormGroup title={t('account.yourAPIKeys')}>
         {apiKeys.length === 0 ? (
           <div className="p-4 bg-tertiary-50 border border-border rounded-lg text-center">
             <Key size={28} className="mx-auto mb-2 text-text-tertiary" />
@@ -859,23 +843,19 @@ export default function AccountPage() {
             })}
           </div>
         )}
-      </DetailSection>
-    </DetailContent>
+      </FormGroup>
+    </>
   )
 
-  // Render content based on active tab
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'profile':
-        return renderProfileContent()
-      case 'security':
-        return renderSecurityContent()
-      case 'api-keys':
-        return renderApiKeysContent()
-      default:
-        return renderProfileContent()
-    }
-  }
+  // Every section on the page, each in its frame, in the order of the table of contents
+  const SECTIONS = [
+    { id: 'profile', label: t('account.profile'), description: t('account.personalDetails'), icon: User,
+      aside: profileActions, render: renderProfileContent },
+    { id: 'security', label: t('common.security'), description: t('account.manageAccountSecurity'), icon: ShieldCheck,
+      render: renderSecurityContent },
+    { id: 'api-keys', label: t('account.apiKeys'), description: t('account.apiKeysIntent'), icon: Key,
+      aside: apiKeyActions, render: renderApiKeysContent },
+  ]
 
   if (loading) {
     return (
@@ -889,15 +869,22 @@ export default function AccountPage() {
     <>
       <ResponsiveLayout
         title={t('common.account')}
-        subtitle={accountData.email || user?.username}
-        icon={User}
-        tabs={TABS}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        tabLayout="sidebar"
+        total={accountData.username || user?.username}
+        intent={t('account.intent')}
         helpPageKey="account"
       >
-        {renderContent()}
+        <FormLayout
+          toc={<SectionToc label={t('account.tocLabel')} sections={SECTIONS} hrefFor={(id) => (id === 'profile' ? '/account' : `/account?tab=${id}`)} onJump={setActiveTab} />}
+        >
+          <SectionJump label={t('sectioned.jumpLabel')} sections={SECTIONS} value={activeTab} onJump={setActiveTab} />
+          <div className="sf-form">
+            {SECTIONS.map(section => (
+              <FormSection key={section.id} id={section.id} title={section.label} description={section.description} aside={section.aside}>
+                {section.render()}
+              </FormSection>
+            ))}
+          </div>
+        </FormLayout>
       </ResponsiveLayout>
 
       {/* ============ MODALS ============ */}

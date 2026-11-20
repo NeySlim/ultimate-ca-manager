@@ -72,6 +72,7 @@ describe('SettingsPage: SMTP transport security', () => {
     settingsService.getEmailSettings = vi.fn().mockRejectedValue(new Error('boom'))
     renderSettings()
     await waitFor(() => expect(settingsService.getEmailSettings).toHaveBeenCalled())
+    await screen.findByText('save-email')
     await act(async () => { screen.getByText('save-email').click() })
     await waitFor(() => expect(settingsService.updateEmailSettings).toHaveBeenCalled())
     expect(settingsService.updateEmailSettings.mock.calls[0][0].smtp_security).toBeUndefined()

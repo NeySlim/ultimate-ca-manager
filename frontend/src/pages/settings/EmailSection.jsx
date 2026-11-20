@@ -1,15 +1,16 @@
 import { useTranslation } from 'react-i18next'
 import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks/useClipboard'
-import { EnvelopeSimple, Envelope, Bell, Warning, ArrowsClockwise, FloppyDisk, CheckCircle, XCircle, Key, Copy, Info, PencilSimple } from '@phosphor-icons/react'
-import { Button, Input, HelpCard, DetailHeader, DetailSection, DetailGrid, DetailContent } from '../../components'
+import { Envelope, Bell, Warning, ArrowsClockwise, CheckCircle, XCircle, Key, Copy, Info, PencilSimple } from '@phosphor-icons/react'
+import { Button, Input, DetailGrid } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import TagsInput from '../../components/ui/TagsInput'
 import EmailTemplateWindow from '../../components/EmailTemplateWindow'
 import { WarningCircle } from '@phosphor-icons/react'
 import { secretInputProps, smtpSecretTargets } from '../../lib/secretTarget'
+import { FormGroup } from '../../components/sectioned'
 
-export default function EmailSection({ settings, savedEmail, updateSetting, handleSave, saving, canWrite, isMobile, emailTestResult, emailTesting, handleTestEmail, defaultTestRecipient, oauthDirty, setOauthDirty, oauthPresets, applyOAuthProviderPreset, handleSmtpOAuthAuthorize, handleSmtpOAuthRevoke, expiryAlerts, setExpiryAlerts, saveExpiryAlerts, triggerExpiryCheck, showTemplateEditor, setShowTemplateEditor }) {
+export default function EmailSection({ settings, savedEmail, updateSetting, saving, canWrite, isMobile, emailTestResult, emailTesting, handleTestEmail, defaultTestRecipient, oauthDirty, setOauthDirty, oauthPresets, applyOAuthProviderPreset, handleSmtpOAuthAuthorize, handleSmtpOAuthRevoke, expiryAlerts, setExpiryAlerts, triggerExpiryCheck, showTemplateEditor, setShowTemplateEditor }) {
   const { t } = useTranslation()
   const secretTargets = smtpSecretTargets(savedEmail, settings)
   const { showSuccess } = useNotification()
@@ -29,13 +30,8 @@ export default function EmailSection({ settings, savedEmail, updateSetting, hand
     },
   }
   return (
-    <DetailContent>
-      <DetailHeader
-        icon={EnvelopeSimple}
-        title={t('settings.emailTitle')}
-        subtitle={t('settings.emailSubtitle')}
-      />
-      <DetailSection title={t('settings.smtpConfig')} icon={Envelope} iconClass="icon-bg-violet">
+    <>
+      <FormGroup title={t('settings.smtpConfig')}>
         <div className="space-y-5">
           {/* Server */}
           <DetailGrid>
@@ -404,19 +400,15 @@ export default function EmailSection({ settings, savedEmail, updateSetting, hand
                     {emailTesting ? <ArrowsClockwise size={16} className="animate-spin" /> : <Envelope size={16} />}
                     {t('settings.testEmail')}
                   </Button>
-                  <Button type="button" onClick={() => handleSave('email')} disabled={saving}>
-                    <FloppyDisk size={16} />
-                    {t('common.save')}
-                  </Button>
                 </div>
               </DetailGrid>
             </div>
           )}
         </div>
-      </DetailSection>
+      </FormGroup>
 
       {/* Email Template */}
-      <DetailSection title={t('settings.emailTemplate')} icon={EnvelopeSimple} iconClass="icon-bg-indigo">
+      <FormGroup title={t('settings.emailTemplate')}>
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-text-secondary">{t('settings.templateDescription')}</p>
           <div className="relative group shrink-0">
@@ -431,13 +423,13 @@ export default function EmailSection({ settings, savedEmail, updateSetting, hand
             )}
           </div>
         </div>
-      </DetailSection>
+      </FormGroup>
 
       {showTemplateEditor && (
         <EmailTemplateWindow onClose={() => setShowTemplateEditor(false)} />
       )}
 
-      <DetailSection title={t('settings.expiryAlerts')} icon={Bell} iconClass="icon-bg-orange">
+      <FormGroup title={t('settings.expiryAlerts')}>
         {!settings.smtp_host ? (
           <div className="flex items-center gap-3 p-3 rounded-lg bg-bg-tertiary text-text-secondary text-sm">
             <Warning size={20} className="text-status-warning shrink-0" />
@@ -507,15 +499,11 @@ export default function EmailSection({ settings, savedEmail, updateSetting, hand
                 <Bell size={16} />
                 {t('settings.checkNow')}
               </Button>
-              <Button type="button" onClick={saveExpiryAlerts} disabled={saving}>
-                <FloppyDisk size={16} />
-                {t('common.saveChanges')}
-              </Button>
             </div>
           )}
         </div>
         )}
-      </DetailSection>
-    </DetailContent>
+      </FormGroup>
+    </>
   )
 }

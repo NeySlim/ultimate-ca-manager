@@ -18,7 +18,7 @@ test('a managed CA added on screen enters the trust store', async ({ page, api }
 test('the certificate decoder reads a pasted certificate', async ({ page, api }) => {
   const cert = await issueCert(api, (await createCA(api)).id)
   await page.goto('/tools')
-  await page.getByRole('button', { name: 'Certificate Decoder' }).click()
+  await page.getByRole('navigation', { name: 'Tools', exact: true }).getByRole('link', { name: 'Certificate Decoder' }).click()
   await page.getByLabel('Certificate (PEM or DER)').fill(cert.pem)
   await page.getByRole('button', { name: 'Decode Certificate' }).click()
   const main = page.getByRole('main')

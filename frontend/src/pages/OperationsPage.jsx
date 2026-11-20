@@ -5,14 +5,14 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { 
-  UploadSimple, DownloadSimple, CloudArrowUp, Lightning,
-  CheckCircle, XCircle, Clock, X, Certificate, ShieldCheck, Key, Trash, 
-  ArrowsClockwise, Prohibit, PencilSimple, FileText, Warning, User, Crown, Info,
+  UploadSimple, DownloadSimple, Lightning,
+  CheckCircle, XCircle, Clock, X, Certificate, ShieldCheck, Trash, 
+  ArrowsClockwise, Prohibit, PencilSimple, FileText, User, Crown, Info,
   Table, ShoppingCart, Package, CaretDown, MagnifyingGlass
 } from '@phosphor-icons/react'
 import { 
   ResponsiveLayout, ResponsiveDataTable, Button, Input, 
-  DetailSection, DetailHeader, DetailContent, ConfirmModal, Badge, KeyIndicator, TransferPanel
+  ConfirmModal, Badge, KeyIndicator, TransferPanel
 } from '../components'
 import { SmartImportWidget } from '../components/SmartImport'
 import { 
@@ -28,6 +28,7 @@ import { bulkLocalOnlyRevocationWarning } from '../lib/revocationOutcome'
 import { hiddenFromIssuance, listedForIssuance, signingCas, unlistedSigningCas } from '../lib/caSelection'
 import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
 import { useOpenEntity } from '../hooks/useOpenEntity'
+import { FormLayout, SectionToc, SectionJump, FormSection, FormGroup, useSectionParam } from '../components/sectioned'
 
 const STORAGE_KEY = 'opnsense_config'
 
@@ -266,14 +267,12 @@ export default function OperationsPage() {
   const RESOURCE_TYPES = useResourceTypes(t)
   
   const TABS = [
-    { id: 'import', label: t('common.import'), icon: UploadSimple },
-    { id: 'export', label: t('common.export'), icon: DownloadSimple },
-    { id: 'bulk', label: t('operations.bulkActions', 'Bulk Actions'), icon: Lightning },
+    { id: 'import', label: t('common.import'), description: t('operations.importHeaderDesc'), icon: UploadSimple },
+    { id: 'export', label: t('common.export'), description: t('operations.exportHeaderDesc'), icon: DownloadSimple },
+    { id: 'bulk', label: t('operations.bulkActions', 'Bulk Actions'), description: t('operations.bulkHeaderDesc'), icon: Lightning },
   ]
-  const TAB_GROUPS = [
-    { labelKey: 'operations.groups.actions', tabs: ['import', 'export', 'bulk'], color: 'icon-bg-orange' }
-  ]
-  const [activeTab, setActiveTab] = useState('import')
+  // The operation a link names (/operations?tab=bulk) is the one shown
+  const [activeTab, setActiveTab] = useSectionParam(['import', 'export', 'bulk'], 'import')
 
   // ===== IMPORT STATE (from ImportExportPage) =====
   const [processing, setProcessing] = useState(false)
@@ -742,22 +741,15 @@ export default function OperationsPage() {
 
   // ===== TAB CONTENT =====
   const renderImportTab = () => (
-    <DetailContent>
-      <DetailHeader
-        icon={UploadSimple}
-        title={t('operations.importHeader')}
-        subtitle={t('operations.importHeaderDesc')}
-      />
-      <DetailSection 
-        title={t('importExport.smartImport.title')}
-        icon={UploadSimple} 
-        iconClass="icon-bg-violet" 
+    <>
+      <FormGroup 
+        title={t('importExport.smartImport.title')} 
         description={t('importExport.smartImport.description')}
       >
         <SmartImportWidget onImportComplete={handleImportComplete} />
-      </DetailSection>
+      </FormGroup>
 
-      <DetailSection title={t('importExport.opnsense.title')} icon={CloudArrowUp} iconClass="icon-bg-orange" description={t('importExport.opnsense.description')}>
+      <FormGroup title={t('importExport.opnsense.title')} description={t('importExport.opnsense.description')}>
         <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label={t('importExport.opnsense.hostLabel')} value={opnsenseHost} onChange={(e) => setOpnsenseHost(e.target.value)} placeholder={t('importExport.opnsense.hostPlaceholder')} />
@@ -833,18 +825,13 @@ export default function OperationsPage() {
             )}
           </div>
         </form>
-      </DetailSection>
-    </DetailContent>
+      </FormGroup>
+    </>
   )
 
   const renderExportTab = () => (
-    <DetailContent>
-      <DetailHeader
-        icon={DownloadSimple}
-        title={t('operations.exportHeader')}
-        subtitle={t('operations.exportHeaderDesc')}
-      />
-      <DetailSection title={t('importExport.export.allCertsTitle')} icon={Certificate} iconClass="icon-bg-blue" description={t('importExport.export.allCertsDesc')}>
+    <>
+      <FormGroup title={t('importExport.export.allCertsTitle')} description={t('importExport.export.allCertsDesc')}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
             onClick={() => handleExport(certificatesService.exportAll, 'pem', 'certificates')}
@@ -877,9 +864,9 @@ export default function OperationsPage() {
             </span>
           </button>
         </div>
-      </DetailSection>
+      </FormGroup>
 
-      <DetailSection title={t('importExport.export.allCAsTitle')} icon={ShieldCheck} iconClass="icon-bg-green" description={t('importExport.export.allCAsDesc', { count: cas.length })}>
+      <FormGroup title={t('importExport.export.allCAsTitle')} description={t('importExport.export.allCAsDesc', { count: cas.length })}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
             onClick={() => handleExport(casService.exportAll, 'pem', 'ca-certificates')}
@@ -912,8 +899,8 @@ export default function OperationsPage() {
             </span>
           </button>
         </div>
-      </DetailSection>
-    </DetailContent>
+      </FormGroup>
+    </>
   )
 
   // Render item for basket/transfer view — compact row per resource type
@@ -981,14 +968,6 @@ export default function OperationsPage() {
 
   const renderBulkTab = () => (
     <div className="flex flex-col h-full min-h-0">
-      <div className="px-4 md:px-6 pt-4 pb-2">
-        <DetailHeader
-          icon={Lightning}
-          title={t('operations.bulkHeader')}
-          subtitle={t('operations.bulkHeaderDesc')}
-        />
-      </div>
-
       {/* Resource type selector */}
       <div className="shrink-0 px-4 md:px-6 pb-1">
         {isMobile ? (
@@ -1176,20 +1155,37 @@ export default function OperationsPage() {
     }
   }
 
+  const active = TABS.find(tab => tab.id === activeTab)
+
+  // One operation at a time in its frame; import and export keep their own actions, no save bar
   return (
     <ResponsiveLayout
       title={t('operations.title', 'Operations')}
-      subtitle={t('operations.subtitle', 'Import, export & bulk actions')}
-      icon={Lightning}
-      tabs={TABS}
-      activeTab={activeTab}
-      onTabChange={setActiveTab}
-      tabLayout="sidebar"
-      tabGroups={TAB_GROUPS}
-      sidebarContentClass={activeTab === 'bulk' ? '' : undefined}
+      total={t('sectioned.sectionCount', { count: TABS.length })}
+      intent={t('operations.intent')}
       helpPageKey="operations"
     >
-      {renderContent()}
+      <FormLayout
+        toc={(
+          <SectionToc
+            label={t('operations.tocLabel')}
+            sections={TABS}
+            current={activeTab}
+            hrefFor={(id) => (id === 'import' ? '/operations' : `/operations?tab=${id}`)}
+            onJump={setActiveTab}
+          />
+        )}
+      >
+        <SectionJump label={t('sectioned.jumpLabel')} sections={TABS} value={activeTab} onJump={setActiveTab} />
+        <FormSection
+          id={active.id}
+          title={active.label}
+          description={active.description}
+          bodyClassName={activeTab === 'bulk' ? 'sf-body-fill' : undefined}
+        >
+          {renderContent()}
+        </FormSection>
+      </FormLayout>
 
       {/* Confirm modal for bulk actions (not export/sign — they have their own) */}
       <ConfirmModal

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { IdentificationBadge, TestTube, Power, PencilSimple, Plus, Trash, ArrowsClockwise } from '@phosphor-icons/react'
-import { Button, Badge, HelpCard, DetailHeader, DetailContent, Modal, ResponsiveDataTable } from '../../components'
+import { Button, Badge, HelpCard, Modal, ResponsiveDataTable } from '../../components'
 import { adConnectorsService } from '../../services'
 import { useNotification } from '../../contexts'
 import { formatDate } from '../../lib/utils'
@@ -180,12 +180,7 @@ export default function AdConnectorSection({ hasPermission }) {
   }
 
   return (
-    <DetailContent>
-      <DetailHeader
-        icon={IdentificationBadge}
-        title={t('adConnector.title')}
-        subtitle={t('adConnector.subtitle')}
-      />
+    <>
 
       <HelpCard variant="info" title={t('adConnector.helpTitle')} className="mb-4">
         {t('adConnector.helpDescription')}
@@ -249,6 +244,6 @@ export default function AdConnectorSection({ hasPermission }) {
           </div>
         )}
       </Modal>
-    </DetailContent>
+    </>
   )
 }

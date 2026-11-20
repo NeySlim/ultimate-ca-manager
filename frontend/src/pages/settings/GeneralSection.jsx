@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Gear, Clock, FloppyDisk, ChartBar, ArrowsClockwise } from '@phosphor-icons/react'
-import { Button, Input, Select, Badge, DetailHeader, DetailSection, DetailGrid, DetailContent } from '../../components'
-import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
+import {  FloppyDisk, ArrowsClockwise } from '@phosphor-icons/react'
+import { Button, Input, Select, Badge } from '../../components'
 import { useNotification } from '../../contexts'
 import { certificatesService, settingsService } from '../../services'
 import { certificateLabel } from '../../lib/utils'
@@ -10,14 +9,14 @@ import { fetchAllPages } from '../../lib/fetchAllPages'
 import ServiceStatusWidget from './ServiceStatusWidget'
 import PublicEndpointsPanel from './PublicEndpointsPanel'
 import AdminLockLabel from './AdminLockLabel'
+import { FormGroup } from '../../components/sectioned'
 
-export default function GeneralSection({ settings, updateSetting, handleSave, saving, canWrite, hasPermission }) {
+export default function GeneralSection({ settings, updateSetting, canWrite, hasPermission, savedVersion = 0 }) {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
   const [metricsToken, setMetricsToken] = useState('')
   const [metricsBusy, setMetricsBusy] = useState(false)
   const [tlsCertOptions, setTlsCertOptions] = useState([])
-  const [endpointsRefresh, setEndpointsRefresh] = useState(0)
 
   // The API drops these keys without admin:settings; the other fields still save.
   const adminLocked = !(typeof hasPermission === 'function' && hasPermission('admin:settings'))
@@ -74,13 +73,8 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
   }
 
   return (
-    <DetailContent>
-      <DetailHeader
-        icon={Gear}
-        title={t('settings.helpGeneral')}
-        subtitle={t('settings.generalSubtitle')}
-      />
-      <DetailSection title={t('settings.subtitle')} icon={Gear} iconClass="icon-bg-blue">
+    <>
+      <FormGroup title={t('settings.subtitle')}>
         <div className="space-y-4">
           <Input
             label={t('settings.systemName')}
@@ -152,33 +146,18 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
             ]}
             helperText={t('settings.acmePublicTlsCertIdHelper')}
           />
-          {canWrite('settings') && (
-            <div className="pt-2">
-              <Button
-                type="button"
-                onClick={async () => {
-                  await handleSave('general')
-                  setEndpointsRefresh((k) => k + 1)
-                }}
-                disabled={saving}
-              >
-                <FloppyDisk size={16} />
-                {t('common.saveChanges')}
-              </Button>
-              {adminLocked && (
-                <p className="text-xs text-text-tertiary mt-2">{t('settings.adminFieldsLocked')}</p>
-              )}
-            </div>
+          {canWrite('settings') && adminLocked && (
+            <p className="text-xs text-text-tertiary">{t('settings.adminFieldsLocked')}</p>
           )}
         </div>
-      </DetailSection>
+      </FormGroup>
       <PublicEndpointsPanel
         settings={settings}
         updateSetting={updateSetting}
-        refreshKey={endpointsRefresh}
+        refreshKey={savedVersion}
         adminLocked={adminLocked}
       />
-      <DetailSection title={t('settings.sessionTimezone')} icon={Clock} iconClass="icon-bg-teal">
+      <FormGroup title={t('settings.sessionTimezone')}>
         <div className="space-y-4">
           <Input
             label={lockedLabel('settings.sessionTimeout')}
@@ -264,17 +243,9 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
             />
             {t('settings.showTime')}
           </label>
-          {canWrite('settings') && (
-            <div className="pt-2">
-              <Button type="button" onClick={() => handleSave('general')} disabled={saving}>
-                <FloppyDisk size={16} />
-                {t('common.saveChanges')}
-              </Button>
-            </div>
-          )}
         </div>
-      </DetailSection>
-      <DetailSection title={t('settings.metrics.title')} icon={ChartBar} iconClass="icon-bg-violet">
+      </FormGroup>
+      <FormGroup title={t('settings.metrics.title')}>
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Badge variant={settings.metrics_enabled ? 'success' : 'secondary'} size="sm">
@@ -312,8 +283,8 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
             </div>
           )}
         </div>
-      </DetailSection>
+      </FormGroup>
       <ServiceStatusWidget />
-    </DetailContent>
+    </>
   )
 }

@@ -1,10 +1,11 @@
 import { useTranslation } from 'react-i18next'
-import { ShieldCheck, Lock, LockKey, Warning, Timer, Globe, Clock, CheckCircle, ArrowsClockwise, WarningCircle, FloppyDisk, User, Download, Key, Network } from '@phosphor-icons/react'
-import { Button, Input, Select, Textarea, Badge, LoadingSpinner, ExperimentalBadge, DetailHeader, DetailSection, DetailGrid, DetailContent } from '../../components'
+import { Lock, LockKey, Warning, Globe, Clock, CheckCircle, ArrowsClockwise, WarningCircle, User, Download } from '@phosphor-icons/react'
+import { Button, Input, Select, Textarea, Badge, LoadingSpinner, ExperimentalBadge, DetailGrid } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { formatDate } from '../../lib/utils'
 import { anchorPickerCas } from '../../lib/caSelection'
 import AdminLockLabel from './AdminLockLabel'
+import { FormGroup } from '../../components/sectioned'
 
 // The API sends a list; the textarea edits one entry per line.
 function networksText(value) {
@@ -15,20 +16,14 @@ function networksList(value) {
   return networksText(value).split(/[\s,;]+/).filter(Boolean)
 }
 
-export default function SecuritySection({ settings, updateSetting, handleSave, saving, hasPermission, encryptionStatus, setShowEnableEncryptionModal, setShowDisableEncryptionModal, handleDownloadExistingMasterKey, handleEncryptRemainingKeys, handleRotateDataKey, encryptionLoading, secretsStatus, handleRotateSessionKey, sessionKeyLoading, anomalies, anomaliesLoading, loadAnomalies, mtlsSettings, setMtlsSettings, mtlsLoading, mtlsSaving, handleMtlsSave, cas }) {
+export default function SecuritySection({ settings, updateSetting, hasPermission, encryptionStatus, setShowEnableEncryptionModal, setShowDisableEncryptionModal, handleDownloadExistingMasterKey, handleEncryptRemainingKeys, handleRotateDataKey, encryptionLoading, secretsStatus, handleRotateSessionKey, sessionKeyLoading, anomalies, anomaliesLoading, loadAnomalies, mtlsSettings, setMtlsSettings, mtlsLoading, cas }) {
   const { t } = useTranslation()
   // Fields the API writes for admin:settings only are shown, but disabled.
   const canAdminSettings = Boolean(hasPermission('admin:settings'))
   const adminLocked = !canAdminSettings
-  const canWriteSettings = Boolean(hasPermission('write:settings'))
   return (
-    <DetailContent>
-      <DetailHeader
-        icon={ShieldCheck}
-        title={t('common.securitySettings')}
-        subtitle={t('settings.securitySubtitle')}
-      />
-      <DetailSection title={t('settings.keyEncryption')} icon={LockKey} iconClass="icon-bg-orange">
+    <>
+      <FormGroup title={t('settings.keyEncryption')}>
         {encryptionStatus ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
@@ -178,9 +173,9 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
         ) : (
           <LoadingSpinner size="sm" />
         )}
-      </DetailSection>
+      </FormGroup>
       {secretsStatus?.session_secret && (
-        <DetailSection title={t('settings.sessionKeyTitle')} icon={Key} iconClass="icon-bg-violet">
+        <FormGroup title={t('settings.sessionKeyTitle')}>
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={secretsStatus.session_secret.source === 'database' ? 'success' : 'secondary'}>
@@ -218,9 +213,9 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
               </Button>
             )}
           </div>
-        </DetailSection>
+        </FormGroup>
       )}
-      <DetailSection title={t('common.twoFactorAuth')} icon={ShieldCheck} iconClass="icon-bg-emerald">
+      <FormGroup title={t('common.twoFactorAuth')}>
         <div className="space-y-4">
           <ToggleSwitch
             checked={settings.enforce_2fa || false}
@@ -229,18 +224,10 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
             description={t('settings.enforce2faDesc')}
             disabled={adminLocked}
           />
-          {canAdminSettings && (
-            <Button type="button" onClick={() => handleSave('security2fa')} disabled={saving}>
-              <FloppyDisk size={16} />
-              {t('common.saveChanges')}
-            </Button>
-          )}
         </div>
-      </DetailSection>
-      <DetailSection
+      </FormGroup>
+      <FormGroup
         title={t('settings.adminAllowlistTitle')}
-        icon={Network}
-        iconClass="icon-bg-indigo"
         badge={settings.admin_allowlist_disabled
           ? <Badge variant="warning">{t('settings.adminAllowlistDisabled')}</Badge>
           : (networksList(settings.admin_allowed_networks).length > 0
@@ -275,15 +262,9 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
               <span>{t('settings.adminAllowlistDisabledNote')}</span>
             </div>
           )}
-          {canAdminSettings && !settings.admin_allowed_networks_env_locked && (
-            <Button type="button" onClick={() => handleSave('securityAdminAllowlist')} disabled={saving}>
-              <FloppyDisk size={16} />
-              {t('common.saveChanges')}
-            </Button>
-          )}
         </div>
-      </DetailSection>
-      <DetailSection title={t('settings.hstsTitle')} icon={Globe} iconClass="icon-bg-blue">
+      </FormGroup>
+      <FormGroup title={t('settings.hstsTitle')}>
         <div className="space-y-4">
           <ToggleSwitch
             checked={settings.hsts_enabled !== false}
@@ -367,15 +348,9 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
             description={t('settings.crlAutoPurgeStaleSerialsDesc')}
             disabled={adminLocked}
           />
-          {canWriteSettings && (
-            <Button type="button" onClick={() => handleSave('securityHsts')} disabled={saving}>
-              <FloppyDisk size={16} />
-              {t('common.saveChanges')}
-            </Button>
-          )}
         </div>
-      </DetailSection>
-      <DetailSection title={t('settings.keyRecoveryTitle')} icon={Key} iconClass="icon-bg-amber">
+      </FormGroup>
+      <FormGroup title={t('settings.keyRecoveryTitle')}>
         <div className="space-y-3">
           <ToggleSwitch
             checked={settings.key_recovery_dual_control !== false}
@@ -390,15 +365,9 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
               <span>{t('settings.keyRecoveryDualControlLocked')}</span>
             </div>
           )}
-          {canAdminSettings && !settings.key_recovery_dual_control_locked && (
-            <Button type="button" onClick={() => handleSave('securityKeyRecovery')} disabled={saving}>
-              <FloppyDisk size={16} />
-              {t('common.saveChanges')}
-            </Button>
-          )}
         </div>
-      </DetailSection>
-      <DetailSection title={t('settings.passwordPolicy')} icon={Lock} iconClass="icon-bg-violet">
+      </FormGroup>
+      <FormGroup title={t('settings.passwordPolicy')}>
         <div className="space-y-4">
           <Input
             label={<AdminLockLabel text={t('settings.minPasswordLength')} locked={adminLocked} />}
@@ -432,15 +401,9 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
               disabled={adminLocked}
             />
           </div>
-          {canAdminSettings && (
-            <Button type="button" onClick={() => handleSave('securityPassword')} disabled={saving}>
-              <FloppyDisk size={16} />
-              {t('common.saveChanges')}
-            </Button>
-          )}
         </div>
-      </DetailSection>
-      <DetailSection title={t('settings.anomalyDetection')} icon={Warning} iconClass="icon-bg-orange"
+      </FormGroup>
+      <FormGroup title={t('settings.anomalyDetection')}
         badge={anomalies.length > 0 ? anomalies.length : null}
         badgeColor={anomalies.length > 0 ? 'warning' : undefined}
       >
@@ -489,8 +452,8 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
             {t('common.refresh')}
           </Button>
         </div>
-      </DetailSection>
-      <DetailSection title={t('settings.sessionRateLimits')} icon={Timer} iconClass="icon-bg-teal">
+      </FormGroup>
+      <FormGroup title={t('settings.sessionRateLimits')}>
         <DetailGrid>
           <div className="col-span-full md:col-span-1">
             <Input
@@ -505,16 +468,8 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
             />
           </div>
         </DetailGrid>
-        {canWriteSettings && (
-          <div className="pt-4">
-            <Button type="button" onClick={() => handleSave('securitySession')} disabled={saving}>
-              <FloppyDisk size={16} />
-              {t('common.saveChanges')}
-            </Button>
-          </div>
-        )}
-      </DetailSection>
-      <DetailSection title={t('settings.mtls.title')} icon={ShieldCheck} iconClass="icon-bg-violet" badge={<ExperimentalBadge />}>
+      </FormGroup>
+      <FormGroup title={t('settings.mtls.title')} badge={<ExperimentalBadge />}>
         {mtlsLoading ? (
           <LoadingSpinner size="sm" />
         ) : (
@@ -552,15 +507,9 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                 <p className="text-xs text-text-tertiary">{t('settings.mtls.restartNote')}</p>
               </>
             )}
-            {hasPermission('admin:system') && (
-              <Button type="button" onClick={handleMtlsSave} disabled={mtlsSaving} loading={mtlsSaving}>
-                <FloppyDisk size={16} />
-                {t('common.saveChanges')}
-              </Button>
-            )}
           </div>
         )}
-      </DetailSection>
-    </DetailContent>
+      </FormGroup>
+    </>
   )
 }

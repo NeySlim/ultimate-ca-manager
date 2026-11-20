@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import en from '../../i18n/locales/en.json'
 
 const i18n = vi.hoisted(() => ({ en: null }))
@@ -29,12 +30,7 @@ vi.mock('../../contexts', () => ({
 }))
 vi.mock('../../hooks', () => ({ useClipboard: () => ({ copy: vi.fn() }) }))
 vi.mock('../../components/ui/responsive', () => ({
-  ResponsiveLayout: ({ children, tabs, onTabChange }) => (
-    <div>
-      {tabs.map(tab => <button key={tab.id} type="button" onClick={() => onTabChange(tab.id)}>tab-{tab.id}</button>)}
-      {children}
-    </div>
-  ),
+  ResponsiveLayout: ({ children }) => <div>{children}</div>,
 }))
 
 const decoded = vi.hoisted(() => ({ data: null }))
@@ -53,12 +49,12 @@ const SUBJECT = { commonName: 'tool.example.com' }
 
 async function run(tool, publicKey) {
   decoded.data = { public_key: publicKey, subject: SUBJECT, issuer: SUBJECT, extensions: {} }
-  render(<CertificateToolsPage />)
+  render(<MemoryRouter><CertificateToolsPage /></MemoryRouter>)
   if (tool === 'ssl-checker') {
     fireEvent.change(screen.getByPlaceholderText(en.common.commonNamePlaceholder), { target: { value: 'tool.example.com' } })
     fireEvent.click(screen.getByText(en.tools.checkSSL))
   } else {
-    fireEvent.click(screen.getByText(`tab-${tool}`))
+    fireEvent.click(screen.getByRole('link', { name: en.tools[tool === 'csr-decoder' ? 'csrDecoder' : 'decoder'] }))
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '-----BEGIN-----' } })
     fireEvent.click(screen.getByText(tool === 'csr-decoder' ? en.tools.decodeCsr : en.tools.decodeCert))
   }

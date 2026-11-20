@@ -8,7 +8,7 @@ test('a backup created on screen is restored on screen and the report says what 
   const password = 'Backup-pass-12345'
 
   await page.goto('/settings?tab=backup')
-  await page.getByRole('button', { name: 'Create Backup' }).click()
+  await page.locator('#sf-sec-backup').getByRole('button', { name: 'Create Backup' }).click()
   const create = page.getByRole('dialog', { name: 'Create Encrypted Backup' })
   await create.getByLabel('Encryption Password').fill(password)
   const download = page.waitForEvent('download')
@@ -19,7 +19,7 @@ test('a backup created on screen is restored on screen and the report says what 
   // Made after the backup: the restore removes it
   const later = await createCA(api)
 
-  await page.locator('input[type="file"]').last().setInputFiles({
+  await page.locator('#sf-sec-backup input[type="file"]').last().setInputFiles({
     name: 'e2e.ucmbkp', mimeType: 'application/octet-stream', buffer: readFileSync(archive),
   })
   const restore = page.getByRole('dialog', { name: 'Restore from Backup' })
@@ -47,7 +47,7 @@ test('a restore that runs as a job signs the page out and shows its report after
   await page.route('**/api/v2/system/restore', route =>
     route.continue({ headers: { ...route.request().headers(), prefer: 'respond-async' } }))
   await page.goto('/settings?tab=backup')
-  await page.locator('input[type="file"]').last().setInputFiles({
+  await page.locator('#sf-sec-backup input[type="file"]').last().setInputFiles({
     name: 'e2e-job.ucmbkp', mimeType: 'application/octet-stream', buffer: blob,
   })
   const restore = page.getByRole('dialog', { name: 'Restore from Backup' })

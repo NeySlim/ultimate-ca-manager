@@ -2999,7 +2999,7 @@ Let users log in with a client certificate instead of a password:
 
 ## Required Permissions
 
-Security-sensitive settings: session, lockout, HSTS, public URL, and password policy, require the **admin:settings** permission. For operators (write:settings only), those fields are shown locked; the rest of the card still saves normally.
+Security-sensitive settings: session, lockout, HSTS, public URL, and password policy, require the **admin:settings** permission. For operators (write:settings only), those fields are shown locked; the rest saves through the page's save bar.
 `
   },
 

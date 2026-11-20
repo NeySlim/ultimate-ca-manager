@@ -1,20 +1,16 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Bell, TestTube, ArrowsClockwise, Lightning, PencilSimple, Trash, Plus, ClockCounterClockwise } from '@phosphor-icons/react'
-import { Button, Badge, HelpCard, DetailSection, DetailContent, DetailHeader, EmptyState } from '../../components'
+import { Button, Badge, HelpCard, EmptyState } from '../../components'
 import { webhookEventLabel } from './WebhookForm'
 import WebhookDeliveriesModal from './WebhookDeliveriesModal'
+import { FormGroup } from '../../components/sectioned'
 
 export default function WebhooksSection({ webhooks, webhooksLoading, webhookTesting, handleWebhookCreate, handleWebhookEdit, handleWebhookToggle, handleWebhookTest, setWebhookConfirmDelete, hasPermission }) {
   const { t } = useTranslation()
   const [deliveriesFor, setDeliveriesFor] = useState(null)
   return (
-    <DetailContent>
-      <DetailHeader
-        icon={Bell}
-        title={t('webhooks.title')}
-        subtitle={t('webhooks.subtitle')}
-      />
+    <>
 
       <HelpCard variant="info" title={t('webhooks.helpTitle')} className="mb-4">
         {t('webhooks.helpDescription')}
@@ -32,7 +28,7 @@ export default function WebhooksSection({ webhooks, webhooksLoading, webhookTest
           action={{ label: t('webhooks.addWebhook'), onClick: handleWebhookCreate }}
         />
       ) : (
-        <DetailSection title={t('webhooks.configuredWebhooks')} icon={Bell} iconClass="icon-bg-orange">
+        <FormGroup title={t('webhooks.configuredWebhooks')}>
           <div className="space-y-3">
             {webhooks.map(webhook => (
               <div key={webhook.id} className="flex items-center justify-between p-4 bg-tertiary-50 border border-border rounded-lg">
@@ -86,7 +82,7 @@ export default function WebhooksSection({ webhooks, webhooksLoading, webhookTest
               </div>
             )}
           </div>
-        </DetailSection>
+        </FormGroup>
       )}
 
       <WebhookDeliveriesModal
@@ -94,6 +90,6 @@ export default function WebhooksSection({ webhooks, webhooksLoading, webhookTest
         onClose={() => setDeliveriesFor(null)}
         canRetry={hasPermission('write:settings') || hasPermission('admin:system')}
       />
-    </DetailContent>
+    </>
   )
 }

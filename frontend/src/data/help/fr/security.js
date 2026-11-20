@@ -164,7 +164,7 @@ Permettre aux utilisateurs de se connecter avec un certificat client au lieu d'u
 
 ## Permissions requises
 
-Les paramètres sensibles : session, verrouillage, HSTS, URL publique et politique de mot de passe, exigent la permission **admin:settings**. Pour les opérateurs (write:settings uniquement), ces champs apparaissent verrouillés ; le reste de la carte s'enregistre normalement.
+Les paramètres sensibles : session, verrouillage, HSTS, URL publique et politique de mot de passe, exigent la permission **admin:settings**. Pour les opérateurs (write:settings uniquement), ces champs apparaissent verrouillés ; le reste s'enregistre par la barre d'enregistrement de la page.
 `
   }
 }

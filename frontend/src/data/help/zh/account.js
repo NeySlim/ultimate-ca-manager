@@ -5,6 +5,14 @@ export default {
     overview: '管理您的个人资料、安全设置和 API 密钥。启用双因素认证并注册安全密钥以增强账户保护。',
     sections: [
       {
+        title: '页面布局',
+        content: '个人资料、安全和 API 密钥都在同一页面上，各自位于一个框中；左侧目录可跳转到它们（手机上为“转到部分”列表）。',
+        items: [
+          { label: '独立操作', text: '个人资料框中的“编辑”打开姓名和电子邮件，“取消”或“保存”立即生效；“创建密钥”打开密钥表单；没有保存栏' },
+          { label: '链接', text: '指向 /account?tab=security 或 /account?tab=api-keys 的链接会在该框处打开页面' },
+        ],
+      },
+      {
         title: '个人资料',
         items: [
           { label: '姓名', text: '在整个应用中显示的名称' },

@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Timer, Play, CheckCircle, WarningCircle, MinusCircle, ArrowsClockwise } from '@phosphor-icons/react'
-import { Button, Badge, DetailHeader, DetailContent, DetailSection } from '../../components'
+import { Play, CheckCircle, WarningCircle, MinusCircle, ArrowsClockwise } from '@phosphor-icons/react'
+import { Button, Badge } from '../../components'
 import { useNotification } from '../../contexts'
 import { systemService } from '../../services'
+import { FormGroup } from '../../components/sectioned'
 
 const POLL_MS = 15000
 
@@ -101,22 +102,7 @@ export default function SchedulerSection({ hasPermission }) {
   }
 
   return (
-    <DetailContent>
-      <DetailHeader
-        icon={Timer}
-        title={t('scheduler.title')}
-        subtitle={t('scheduler.subtitle')}
-        badge={meta.warnings > 0 ? (
-          <Badge variant="warning" size="sm">
-            <WarningCircle size={12} weight="bold" className="mr-1" />
-            {t('scheduler.warningsCount', { count: meta.warnings })}
-          </Badge>
-        ) : null}
-        actions={[
-          { label: t('common.refresh'), icon: ArrowsClockwise, onClick: () => load(), variant: 'secondary' },
-        ]}
-      />
-
+    <>
       {meta.stale && (
         <p className="mb-3 flex items-center gap-1.5 text-xs text-status-warning">
           <WarningCircle size={14} className="shrink-0" />
@@ -124,7 +110,21 @@ export default function SchedulerSection({ hasPermission }) {
         </p>
       )}
 
-      <DetailSection title={t('scheduler.tasksTitle')} icon={Timer} iconClass="icon-bg-blue">
+      <FormGroup
+        title={t('scheduler.tasksTitle')}
+        badge={meta.warnings > 0 ? (
+          <Badge variant="warning" size="sm">
+            <WarningCircle size={12} weight="bold" className="mr-1" />
+            {t('scheduler.warningsCount', { count: meta.warnings })}
+          </Badge>
+        ) : null}
+        actions={(
+          <Button type="button" variant="secondary" size="sm" onClick={() => load()}>
+            <ArrowsClockwise size={14} />
+            {t('common.refresh')}
+          </Button>
+        )}
+      >
         {loading ? (
           <div className="p-6 text-center text-sm text-text-secondary">{t('common.loading')}</div>
         ) : tasks.length === 0 ? (
@@ -195,7 +195,7 @@ export default function SchedulerSection({ hasPermission }) {
             </table>
           </div>
         )}
-      </DetailSection>
-    </DetailContent>
+      </FormGroup>
+    </>
   )
 }

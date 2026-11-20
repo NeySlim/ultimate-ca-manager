@@ -63,12 +63,7 @@ vi.mock('../../components/SmartImport', () => ({ SmartImportWidget: () => null }
 
 vi.mock('../../components', async (orig) => ({
   ...(await orig()),
-  ResponsiveLayout: ({ tabs = [], onTabChange, children }) => (
-    <div>
-      {tabs.map((tab) => <button key={tab.id} onClick={() => onTabChange(tab.id)}>{`tab-${tab.id}`}</button>)}
-      {children}
-    </div>
-  ),
+  ResponsiveLayout: ({ children }) => <div>{children}</div>,
   ResponsiveDataTable: ({ onSelectionChange, bulkActions }) => (
     <div>
       <button onClick={() => onSelectionChange(new Set([1]))}>select-certs</button>
@@ -88,7 +83,7 @@ const blob = (skipped, exported) => {
 
 const openTab = async (tab) => {
   render(<MemoryRouter><OperationsPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByText(`tab-${tab}`))
+  fireEvent.click(await screen.findByRole('link', { name: { export: 'common.export', bulk: 'operations.bulkActions' }[tab] }))
 }
 
 describe('OperationsPage export of everything', () => {

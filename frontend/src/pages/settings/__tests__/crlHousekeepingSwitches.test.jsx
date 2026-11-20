@@ -84,22 +84,21 @@ describe('CRL housekeeping switches', () => {
     expect(updateSetting).toHaveBeenCalledWith('crl_auto_purge_stale_serials', false)
   })
 
-  it('are read-only for an operator, values shown, save button kept', () => {
+  it('are read-only for an operator, values shown', () => {
     const updateSetting = renderSecurity(OPERATOR, { crl_auto_delete_expired_revoked: true })
     expect(toggle(DELETE).disabled).toBe(true)
     expect(toggle(PURGE).disabled).toBe(true)
     expect(toggle(DELETE).getAttribute('aria-checked')).toBe('true')
     fireEvent.click(toggle(DELETE))
     expect(updateSetting).not.toHaveBeenCalled()
-    expect(screen.getAllByText('common.saveChanges').length).toBeGreaterThan(0)
   })
 
-  it('sit after the OCSP responder settings and before the card save button', () => {
+  it('sit after the OCSP responder settings, in the same card', () => {
     renderSecurity(ADMIN)
     const card = toggle(DELETE).closest('section')
     const ocsp = screen.getByRole('switch', { name: 'settings.ocspResponderAutoRenew' })
-    const save = [...card.querySelectorAll('button')].find((b) => b.textContent === 'common.saveChanges')
-    const order = [ocsp, toggle(DELETE), toggle(PURGE), save]
+    expect(card.contains(ocsp)).toBe(true)
+    const order = [ocsp, toggle(DELETE), toggle(PURGE)]
     for (let i = 1; i < order.length; i++) {
       expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     }

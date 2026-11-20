@@ -526,7 +526,9 @@
       "actions": "Aktionen"
     },
     "selectResource": "Ressourcentyp",
-    "selectCA": "Bitte wählen Sie eine CA"
+    "selectCA": "Bitte wählen Sie eine CA",
+    "intent": "Import, export and act on many items at once.",
+    "tocLabel": "Operations"
   },
   "auth": {
     "login": "Anmelden",
@@ -2923,7 +2925,11 @@
     "helpConverter": "Zertifikate und Schlüssel zwischen Formaten konvertieren: PEM ↔ DER, PEM → PKCS12 (erfordert Schlüssel), PEM → PKCS7. Die konvertierte Datei direkt herunterladen.",
     "pkcs12PasswordRequired": "Passwort ist für PKCS12/PFX-Dateien erforderlich",
     "pkcs12OutputPasswordRequired": "Passwort ist für PKCS12-Ausgabe erforderlich",
-    "pkcs12PasswordPlaceholder": "PKCS12/PFX-Dateipasswort"
+    "pkcs12PasswordPlaceholder": "PKCS12/PFX-Dateipasswort",
+    "intent": "Check a server, decode, match and convert certificates and keys.",
+    "tocLabel": "Tools",
+    "toolCount_one": "{{count}} tool",
+    "toolCount_other": "{{count}} tools"
   },
   "audit": {
     "event": "Ereignis",
@@ -3864,7 +3870,12 @@
     "restoreLost": "Die Wiederherstellung wurde beendet, bevor sie festgeschrieben wurde: Es wurde nichts wiederhergestellt. Starten Sie sie erneut.",
     "restoreSignInAgain": "Die Wiederherstellung wurde wahrscheinlich festgeschrieben: Sie hat diese Sitzung beendet. Melden Sie sich erneut an, um den Bericht zu lesen.",
     "restoreSignIn": "Erneut anmelden",
-    "restoreContactLost": "Der Server antwortet während der Wiederherstellung nicht mehr. Laden Sie die Seite später neu, um zu sehen, wie sie geendet hat."
+    "restoreContactLost": "Der Server antwortet während der Wiederherstellung nicht mehr. Laden Sie die Seite später neu, um zu sehen, wie sie geendet hat.",
+    "intent": "General configuration of the instance.",
+    "tocLabel": "Settings sections",
+    "historyTitle": "Change history",
+    "historyIntent": "The latest saves of the settings, as the audit log records them.",
+    "historyEmpty": "No changes."
   },
   "account": {
     "profile": "Profil",
@@ -4005,7 +4016,10 @@
     "twoFaSetupFailed": "2FA-Einrichtung konnte nicht gestartet werden",
     "twoFaEnabled": "Zwei-Faktor-Authentifizierung aktiviert",
     "backupCodesHint": "Bewahren Sie diese Backup-Codes sicher auf. Jeder kann einmal verwendet werden, falls Sie den Zugriff auf Ihre Authentifizierungs-App verlieren.",
-    "backupCodesSaved": "Ich habe meine Backup-Codes gespeichert"
+    "backupCodesSaved": "Ich habe meine Backup-Codes gespeichert",
+    "intent": "Your profile, the security of your sign-in and your API keys.",
+    "tocLabel": "Account sections",
+    "apiKeysIntent": "Keys that call the API on behalf of your account."
   },
   "rbac": {
     "title": "Rollenbasierte Zugriffskontrolle",
@@ -7119,5 +7133,28 @@
       "sub": "Certificates by state. Each line opens its list.",
       "alt": "{{total}} certificates: {{valid}} valid, {{expiring}} expiring, {{expired}} expired, {{revoked}} revoked."
     }
+  },
+  "sectioned": {
+    "flagModified": "Modified",
+    "flagError": "To correct",
+    "pendingTitle": "Modified, not saved",
+    "pendingCount_one": ": {{count}} change in {{sections}}.",
+    "pendingCount_other": ": {{count}} changes in {{sections}}.",
+    "nothingPending": "No changes pending.",
+    "lastSavedBy": "Last saved on {{date}} by {{user}}.",
+    "lastSaved": "Last saved on {{date}}.",
+    "saveFailedTitle": "Not saved",
+    "saveFailedIn": ": to correct in {{sections}}; the other sections are saved and your input is kept.",
+    "saveFailedToast": "Not saved: {{sections}}.",
+    "savedToast": "Settings saved.",
+    "undo": "Undo changes",
+    "saving": "Saving…",
+    "leaveTitle": "Leave without saving?",
+    "leaveConfirm": "Some changes are not saved. Leaving the page discards them.",
+    "leave": "Leave the page",
+    "jumpLabel": "Go to section",
+    "sectionCount_one": "{{count}} section",
+    "sectionCount_other": "{{count}} sections",
+    "sectionFailed": "This section could not be shown. Reload the page to try again."
   }
 }

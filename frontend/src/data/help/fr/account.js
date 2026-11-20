@@ -5,6 +5,14 @@ export default {
     overview: 'Gérez votre profil, vos paramètres de sécurité et vos clés API. Activez l\'authentification à deux facteurs et enregistrez des clés de sécurité pour une protection renforcée du compte.',
     sections: [
       {
+        title: 'Disposition de la page',
+        content: 'Profil, sécurité et clés d’API sont sur une seule page, chacun dans son cadre ; le sommaire à gauche y mène (sur un téléphone, la liste Aller à la section).',
+        items: [
+          { label: 'Actions propres', text: 'Modifier, dans le cadre Profil, ouvre le nom et l’e-mail, Annuler ou Enregistrer agissent aussitôt ; Créer une clé ouvre le formulaire de clé ; la page n’a pas de barre d’enregistrement' },
+          { label: 'Liens', text: 'Un lien vers /account?tab=security ou /account?tab=api-keys ouvre la page sur ce cadre' },
+        ],
+      },
+      {
         title: 'Profil',
         items: [
           { label: 'Nom complet', text: 'Votre nom d\'affichage affiché dans toute l\'application' },

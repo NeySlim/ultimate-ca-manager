@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Info, HardDrives, Globe, GithubLogo, WarningCircle, Shield, Archive, Coffee,
+  Globe, GithubLogo, WarningCircle, Archive, Coffee,
 } from '@phosphor-icons/react'
-import {
-  Badge, Logo, DetailContent, DetailHeader, DetailSection, DetailGrid, DetailField, Button,
-} from '../../components'
+import { Badge, Logo, DetailGrid, DetailField, Button } from '../../components'
 import { systemService } from '../../services'
 import { useNotification } from '../../contexts'
 import { usePermission } from '../../hooks'
@@ -13,6 +11,7 @@ import { downloadBlob } from '../../lib/utils'
 import FipsPreflightPanel from './FipsPreflightPanel'
 import CompliancePreflightPanel from './CompliancePreflightPanel'
 import { KOFI_URL } from '../../lib/support'
+import { FormGroup } from '../../components/sectioned'
 
 export default function AboutSection() {
   const { t } = useTranslation()
@@ -61,12 +60,7 @@ export default function AboutSection() {
   }
 
   return (
-    <DetailContent>
-      <DetailHeader
-        icon={Info}
-        title={t('settings.about.title')}
-        subtitle={t('settings.about.subtitle')}
-      />
+    <>
 
       {/* Logo & branding */}
       <div className="flex flex-col items-center py-6 mb-4">
@@ -79,7 +73,7 @@ export default function AboutSection() {
       </div>
 
       {/* System info */}
-      <DetailSection title={t('settings.about.systemInfo')} icon={HardDrives} iconClass="icon-bg-teal">
+      <FormGroup title={t('settings.about.systemInfo')}>
         <DetailGrid>
           <DetailField label={t('settings.about.version')} value={info?.version || '—'} />
           <DetailField label={t('settings.about.pythonVersion')} value={info?.python_version || '—'} />
@@ -87,11 +81,11 @@ export default function AboutSection() {
           <DetailField label={t('settings.about.memory')} value={info?.memory_mb ? `${info.memory_mb} MB` : '—'} />
           <DetailField label={t('settings.about.environment')} value={info?.is_docker ? 'Docker' : 'Native'} />
         </DetailGrid>
-      </DetailSection>
+      </FormGroup>
 
       {/* Diagnostic bundle — admin only */}
       {isAdmin() && (
-        <DetailSection title={t('settings.about.diagnostic')} icon={Archive} iconClass="icon-bg-orange" className="mt-4">
+        <FormGroup title={t('settings.about.diagnostic')} className="mt-4">
           <div className="flex items-center justify-between gap-3 p-3 bg-tertiary-50 border border-border rounded-lg">
             <div className="min-w-0">
               <div className="text-sm font-medium text-text-primary">{t('settings.about.logBundle')}</div>
@@ -108,14 +102,14 @@ export default function AboutSection() {
               {bundleLoading ? t('common.preparing') : t('common.download')}
             </Button>
           </div>
-        </DetailSection>
+        </FormGroup>
       )}
 
       {hasPermission('admin:system') && <FipsPreflightPanel />}
       {(hasPermission('admin:system') || hasPermission('admin:settings')) && <CompliancePreflightPanel />}
 
       {/* Links */}
-      <DetailSection title={t('settings.about.links')} icon={Globe} iconClass="icon-bg-teal" className="mt-4">
+      <FormGroup title={t('settings.about.links')} className="mt-4">
         <div className="space-y-2">
           <a
             href="https://github.com/NeySlim/ultimate-ca-manager"
@@ -166,17 +160,17 @@ export default function AboutSection() {
             </div>
           </a>
         </div>
-      </DetailSection>
+      </FormGroup>
 
       {/* License */}
-      <DetailSection title={t('settings.about.license')} icon={Shield} iconClass="icon-bg-emerald" className="mt-4">
+      <FormGroup title={t('settings.about.license')} className="mt-4">
         <div className="p-3 bg-tertiary-50 border border-border rounded-lg">
           <p className="text-sm text-text-primary font-medium">GNU AGPL v3.0 only</p>
           <p className="text-xs text-text-secondary mt-1">
             © 2025-2026 Lionel Alarcon: {t('settings.about.licenseDesc')}
           </p>
         </div>
-      </DetailSection>
-    </DetailContent>
+      </FormGroup>
+    </>
   )
 }

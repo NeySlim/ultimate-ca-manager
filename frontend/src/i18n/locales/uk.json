@@ -528,7 +528,9 @@
       "actions": "Дії"
     },
     "selectResource": "Тип ресурсу",
-    "selectCA": "Виберіть CA"
+    "selectCA": "Виберіть CA",
+    "intent": "Import, export and act on many items at once.",
+    "tocLabel": "Operations"
   },
   "auth": {
     "login": "Увійти",
@@ -2981,7 +2983,13 @@
     "helpConverter": "Конвертуйте сертифікати та ключі між форматами: PEM ↔ DER, PEM → PKCS12 (потрібен ключ), PEM → PKCS7. Завантажуйте конвертований файл безпосередньо.",
     "pkcs12PasswordRequired": "Пароль обов'язковий для файлів PKCS12/PFX",
     "pkcs12OutputPasswordRequired": "Пароль обов'язковий для виводу PKCS12",
-    "pkcs12PasswordPlaceholder": "Пароль файлу PKCS12/PFX"
+    "pkcs12PasswordPlaceholder": "Пароль файлу PKCS12/PFX",
+    "intent": "Check a server, decode, match and convert certificates and keys.",
+    "tocLabel": "Tools",
+    "toolCount_one": "{{count}} tool",
+    "toolCount_other": "{{count}} tools",
+    "toolCount_few": "{{count}} tools",
+    "toolCount_many": "{{count}} tools"
   },
   "audit": {
     "event": "Подія",
@@ -3928,7 +3936,12 @@
     "restoreLost": "Відновлення зупинилося до остаточного застосування: нічого не відновлено. Запустіть його знову.",
     "restoreSignInAgain": "Відновлення, імовірно, остаточно застосовано: воно завершило цю сесію. Увійдіть знову, щоб прочитати його звіт.",
     "restoreSignIn": "Увійти знову",
-    "restoreContactLost": "Сервер перестав відповідати під час відновлення. Перезавантажте сторінку трохи згодом, щоб побачити, чим воно завершилося."
+    "restoreContactLost": "Сервер перестав відповідати під час відновлення. Перезавантажте сторінку трохи згодом, щоб побачити, чим воно завершилося.",
+    "intent": "General configuration of the instance.",
+    "tocLabel": "Settings sections",
+    "historyTitle": "Change history",
+    "historyIntent": "The latest saves of the settings, as the audit log records them.",
+    "historyEmpty": "No changes."
   },
   "account": {
     "profile": "Профіль",
@@ -4069,7 +4082,10 @@
     "twoFaSetupFailed": "Не вдалося розпочати налаштування 2FA",
     "twoFaEnabled": "Двофакторну автентифікацію увімкнено",
     "backupCodesHint": "Зберігайте ці резервні коди в безпечному місці. Кожен можна використати один раз, якщо ви втратите доступ до автентифікатора.",
-    "backupCodesSaved": "Я зберіг свої резервні коди"
+    "backupCodesSaved": "Я зберіг свої резервні коди",
+    "intent": "Your profile, the security of your sign-in and your API keys.",
+    "tocLabel": "Account sections",
+    "apiKeysIntent": "Keys that call the API on behalf of your account."
   },
   "rbac": {
     "title": "Контроль доступу на основі ролей",
@@ -7289,5 +7305,32 @@
       "sub": "Certificates by state. Each line opens its list.",
       "alt": "{{total}} certificates: {{valid}} valid, {{expiring}} expiring, {{expired}} expired, {{revoked}} revoked."
     }
+  },
+  "sectioned": {
+    "flagModified": "Modified",
+    "flagError": "To correct",
+    "pendingTitle": "Modified, not saved",
+    "pendingCount_one": ": {{count}} change in {{sections}}.",
+    "pendingCount_other": ": {{count}} changes in {{sections}}.",
+    "pendingCount_few": ": {{count}} changes in {{sections}}.",
+    "pendingCount_many": ": {{count}} changes in {{sections}}.",
+    "nothingPending": "No changes pending.",
+    "lastSavedBy": "Last saved on {{date}} by {{user}}.",
+    "lastSaved": "Last saved on {{date}}.",
+    "saveFailedTitle": "Not saved",
+    "saveFailedIn": ": to correct in {{sections}}; the other sections are saved and your input is kept.",
+    "saveFailedToast": "Not saved: {{sections}}.",
+    "savedToast": "Settings saved.",
+    "undo": "Undo changes",
+    "saving": "Saving…",
+    "leaveTitle": "Leave without saving?",
+    "leaveConfirm": "Some changes are not saved. Leaving the page discards them.",
+    "leave": "Leave the page",
+    "jumpLabel": "Go to section",
+    "sectionCount_one": "{{count}} section",
+    "sectionCount_other": "{{count}} sections",
+    "sectionCount_few": "{{count}} sections",
+    "sectionCount_many": "{{count}} sections",
+    "sectionFailed": "This section could not be shown. Reload the page to try again."
   }
 }

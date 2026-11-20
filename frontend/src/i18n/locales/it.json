@@ -526,7 +526,9 @@
       "actions": "Azioni"
     },
     "selectResource": "Tipo di risorsa",
-    "selectCA": "Selezionare una CA"
+    "selectCA": "Selezionare una CA",
+    "intent": "Import, export and act on many items at once.",
+    "tocLabel": "Operations"
   },
   "auth": {
     "login": "Accedi",
@@ -2923,7 +2925,11 @@
     "helpConverter": "Converti certificati e chiavi tra formati: PEM ↔ DER, PEM → PKCS12 (richiede chiave), PEM → PKCS7. Scarica direttamente il file convertito.",
     "pkcs12PasswordRequired": "La password è richiesta per i file PKCS12/PFX",
     "pkcs12OutputPasswordRequired": "La password è richiesta per l'output PKCS12",
-    "pkcs12PasswordPlaceholder": "Password del file PKCS12/PFX"
+    "pkcs12PasswordPlaceholder": "Password del file PKCS12/PFX",
+    "intent": "Check a server, decode, match and convert certificates and keys.",
+    "tocLabel": "Tools",
+    "toolCount_one": "{{count}} tool",
+    "toolCount_other": "{{count}} tools"
   },
   "audit": {
     "event": "Evento",
@@ -3864,7 +3870,12 @@
     "restoreLost": "Il ripristino si è interrotto prima di essere confermato: nulla è stato ripristinato. Riavvialo.",
     "restoreSignInAgain": "Il ripristino è probabilmente stato confermato: ha disconnesso questa sessione. Accedi di nuovo per leggerne il report.",
     "restoreSignIn": "Accedi di nuovo",
-    "restoreContactLost": "Il server ha smesso di rispondere durante il ripristino. Ricarica la pagina più tardi per vedere come è andato a finire."
+    "restoreContactLost": "Il server ha smesso di rispondere durante il ripristino. Ricarica la pagina più tardi per vedere come è andato a finire.",
+    "intent": "General configuration of the instance.",
+    "tocLabel": "Settings sections",
+    "historyTitle": "Change history",
+    "historyIntent": "The latest saves of the settings, as the audit log records them.",
+    "historyEmpty": "No changes."
   },
   "account": {
     "profile": "Profilo",
@@ -4005,7 +4016,10 @@
     "twoFaSetupFailed": "Impossibile avviare la configurazione 2FA",
     "twoFaEnabled": "Autenticazione a due fattori attivata",
     "backupCodesHint": "Conserva questi codici di backup in un luogo sicuro. Ognuno può essere usato una volta se perdi l'accesso all'app di autenticazione.",
-    "backupCodesSaved": "Ho salvato i miei codici di backup"
+    "backupCodesSaved": "Ho salvato i miei codici di backup",
+    "intent": "Your profile, the security of your sign-in and your API keys.",
+    "tocLabel": "Account sections",
+    "apiKeysIntent": "Keys that call the API on behalf of your account."
   },
   "rbac": {
     "title": "Controllo accessi basato su ruoli",
@@ -7119,5 +7133,28 @@
       "sub": "Certificates by state. Each line opens its list.",
       "alt": "{{total}} certificates: {{valid}} valid, {{expiring}} expiring, {{expired}} expired, {{revoked}} revoked."
     }
+  },
+  "sectioned": {
+    "flagModified": "Modified",
+    "flagError": "To correct",
+    "pendingTitle": "Modified, not saved",
+    "pendingCount_one": ": {{count}} change in {{sections}}.",
+    "pendingCount_other": ": {{count}} changes in {{sections}}.",
+    "nothingPending": "No changes pending.",
+    "lastSavedBy": "Last saved on {{date}} by {{user}}.",
+    "lastSaved": "Last saved on {{date}}.",
+    "saveFailedTitle": "Not saved",
+    "saveFailedIn": ": to correct in {{sections}}; the other sections are saved and your input is kept.",
+    "saveFailedToast": "Not saved: {{sections}}.",
+    "savedToast": "Settings saved.",
+    "undo": "Undo changes",
+    "saving": "Saving…",
+    "leaveTitle": "Leave without saving?",
+    "leaveConfirm": "Some changes are not saved. Leaving the page discards them.",
+    "leave": "Leave the page",
+    "jumpLabel": "Go to section",
+    "sectionCount_one": "{{count}} section",
+    "sectionCount_other": "{{count}} sections",
+    "sectionFailed": "This section could not be shown. Reload the page to try again."
   }
 }

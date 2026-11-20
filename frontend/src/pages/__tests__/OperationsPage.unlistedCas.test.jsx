@@ -59,12 +59,7 @@ vi.mock('../../components/SmartImport', () => ({ SmartImportWidget: () => null }
 // Stubs for the layout and the table: a tab button, and a selection button that shows the bulk actions.
 vi.mock('../../components', async (orig) => ({
   ...(await orig()),
-  ResponsiveLayout: ({ tabs = [], onTabChange, children }) => (
-    <div>
-      {tabs.map((tab) => <button key={tab.id} onClick={() => onTabChange(tab.id)}>{`tab-${tab.id}`}</button>)}
-      {children}
-    </div>
-  ),
+  ResponsiveLayout: ({ children }) => <div>{children}</div>,
   ResponsiveDataTable: ({ onSelectionChange, bulkActions }) => (
     <div>
       <button onClick={() => onSelectionChange(new Set([7]))}>select-csr</button>
@@ -83,7 +78,7 @@ describe('OperationsPage bulk CSR signing CA picker (#426)', () => {
 
   it('offers only the CA that can sign and counts the others', async () => {
     render(<MemoryRouter><OperationsPage /></MemoryRouter>)
-    fireEvent.click(await screen.findByText('tab-bulk'))
+    fireEvent.click(await screen.findByRole('link', { name: 'operations.bulkActions' }))
     fireEvent.click(await screen.findByText('select-csr'))
     fireEvent.click(await screen.findByText('common.sign'))
     const dialog = await screen.findByRole('dialog')

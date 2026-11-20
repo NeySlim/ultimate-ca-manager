@@ -138,7 +138,10 @@
     "twoFaSetupFailed": "Échec du démarrage de la configuration 2FA",
     "twoFaEnabled": "Authentification à deux facteurs activée",
     "backupCodesHint": "Conservez ces codes de secours en lieu sûr. Chacun est utilisable une seule fois en cas de perte de votre authentificateur.",
-    "backupCodesSaved": "J'ai sauvegardé mes codes de secours"
+    "backupCodesSaved": "J'ai sauvegardé mes codes de secours",
+    "intent": "Votre profil, la sécurité de votre connexion et vos clés d’API.",
+    "tocLabel": "Sections du compte",
+    "apiKeysIntent": "Clés qui appellent l’API au nom de votre compte."
   },
   "acme": {
     "title": "Protocole ACME",
@@ -2854,7 +2857,9 @@
       "actions": "Actions"
     },
     "selectResource": "Type de ressource",
-    "selectCA": "Veuillez sélectionner une AC"
+    "selectCA": "Veuillez sélectionner une AC",
+    "intent": "Importer, exporter et agir sur plusieurs éléments à la fois.",
+    "tocLabel": "Opérations"
   },
   "notifications": {
     "certificateIssued": "Certificat émis : {{name}}",
@@ -3992,7 +3997,12 @@
     "restoreLost": "La restauration s’est arrêtée avant d’être validée : rien n’a été restauré. Relancez-la.",
     "restoreSignInAgain": "La restauration a probablement été validée : elle a fermé cette session. Reconnectez-vous pour lire son compte rendu.",
     "restoreSignIn": "Se reconnecter",
-    "restoreContactLost": "Le serveur ne répond plus pendant la restauration. Rechargez la page plus tard pour voir comment elle s’est terminée."
+    "restoreContactLost": "Le serveur ne répond plus pendant la restauration. Rechargez la page plus tard pour voir comment elle s’est terminée.",
+    "intent": "Configuration générale de l’instance.",
+    "tocLabel": "Sections des paramètres",
+    "historyTitle": "Historique des modifications",
+    "historyIntent": "Les derniers enregistrements des paramètres, tels que le journal d’audit les consigne.",
+    "historyEmpty": "Aucune modification."
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée",
@@ -4557,7 +4567,11 @@
     "helpConverter": "Convertissez des certificats et des clés entre les formats : PEM ↔ DER, PEM → PKCS12 (nécessite une clé), PEM → PKCS7.",
     "pkcs12PasswordRequired": "Le mot de passe est requis pour les fichiers PKCS12/PFX",
     "pkcs12OutputPasswordRequired": "Le mot de passe est requis pour la sortie PKCS12",
-    "pkcs12PasswordPlaceholder": "Mot de passe du fichier PKCS12/PFX"
+    "pkcs12PasswordPlaceholder": "Mot de passe du fichier PKCS12/PFX",
+    "intent": "Vérifier un serveur, décoder, comparer et convertir certificats et clés.",
+    "tocLabel": "Outils",
+    "toolCount_one": "{{count}} outil",
+    "toolCount_other": "{{count}} outils"
   },
   "crlDeploy": {
     "title": "Déploiement de CRL",
@@ -7122,5 +7136,28 @@
       "sub": "Les certificats par état. Chaque ligne ouvre sa liste.",
       "alt": "{{total}} certificats : {{valid}} valides, {{expiring}} expirent bientôt, {{expired}} expirés, {{revoked}} révoqués."
     }
+  },
+  "sectioned": {
+    "flagModified": "Modifié",
+    "flagError": "À corriger",
+    "pendingTitle": "Modifié, non enregistré",
+    "pendingCount_one": " : {{count}} modification dans {{sections}}.",
+    "pendingCount_other": " : {{count}} modifications dans {{sections}}.",
+    "nothingPending": "Aucune modification en attente.",
+    "lastSavedBy": "Dernier enregistrement le {{date}} par {{user}}.",
+    "lastSaved": "Dernier enregistrement le {{date}}.",
+    "saveFailedTitle": "Non enregistré",
+    "saveFailedIn": " : à corriger dans {{sections}} ; les autres sections sont enregistrées et la saisie est gardée.",
+    "saveFailedToast": "Non enregistré : {{sections}}.",
+    "savedToast": "Paramètres enregistrés.",
+    "undo": "Annuler les modifications",
+    "saving": "Enregistrement…",
+    "leaveTitle": "Quitter sans enregistrer ?",
+    "leaveConfirm": "Des modifications ne sont pas enregistrées. Quitter la page les abandonne.",
+    "leave": "Quitter la page",
+    "jumpLabel": "Aller à la section",
+    "sectionCount_one": "{{count}} section",
+    "sectionCount_other": "{{count}} sections",
+    "sectionFailed": "Cette section n’a pas pu s’afficher. Rechargez la page pour réessayer."
   }
 }

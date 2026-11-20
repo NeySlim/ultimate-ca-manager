@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ShieldCheck } from '@phosphor-icons/react'
-import { Button, DetailSection } from '../../components'
+import { Button } from '../../components'
 import PreflightReport from '../../components/PreflightReport'
 import { systemService } from '../../services'
+import { FormGroup } from '../../components/sectioned'
 
 export default function FipsPreflightPanel() {
   const { t } = useTranslation()
@@ -26,7 +27,7 @@ export default function FipsPreflightPanel() {
   }
 
   return (
-    <DetailSection title={t('settings.fipsPreflight.title')} icon={ShieldCheck} iconClass="icon-bg-violet" className="mt-4">
+    <FormGroup title={t('settings.fipsPreflight.title')} className="mt-4">
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3 p-3 bg-tertiary-50 border border-border rounded-lg">
           <div className="min-w-0 text-xs text-text-secondary">{t('settings.fipsPreflight.hint')}</div>
@@ -44,6 +45,6 @@ export default function FipsPreflightPanel() {
 
         {report && <PreflightReport report={report} testId="fips-preflight-report" checkBase="settings.fipsPreflight.checks" />}
       </div>
-    </DetailSection>
+    </FormGroup>
   )
 }
