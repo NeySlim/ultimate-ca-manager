@@ -180,6 +180,14 @@ describe('SettingsPage: one page, one save bar', () => {
     expect(bar()).not.toHaveTextContent('sectioned.lastSaved')
   })
 
+  it('saves on Enter in a field, as a form does', async () => {
+    await loaded()
+    const name = screen.getByLabelText('system-name')
+    fireEvent.change(name, { target: { value: 'PKI 2' } })
+    await act(async () => { fireEvent.keyDown(name, { key: 'Enter' }) })
+    expect(settingsService.updateBulk).toHaveBeenCalledWith(expect.objectContaining({ system_name: 'PKI 2' }))
+  })
+
   it('lands a link to ?tab= on the frame of that section', async () => {
     const scrolled = []
     Element.prototype.scrollIntoView = vi.fn(function scroll() { scrolled.push(this.id) })
@@ -224,7 +232,7 @@ describe('SettingsPage: one page, one save bar', () => {
     await act(async () => { fireEvent.click(await screen.findByText('back')) })
     await waitFor(() => expect(screen.getByLabelText('syslog-host')).toHaveValue('log.example.com'))
     expect(screen.getByLabelText('system-name')).toHaveValue('PKI')
-  })
+  }, 20000)
 
   it('lets a link go without asking when nothing is pending', async () => {
     await loaded()

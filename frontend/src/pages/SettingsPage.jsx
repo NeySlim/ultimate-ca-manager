@@ -1916,6 +1916,17 @@ export default function SettingsPage() {
     }
   }
 
+  // Enter in a field of a section saves, as in a form; a field that takes Enter for itself
+  // (tags, a list to add to) prevents it first, and a dialog's fields are not on the page
+  const NO_ENTER_SAVE = ['checkbox', 'radio', 'button', 'submit', 'reset', 'file', 'range', 'search', 'color']
+  const saveOnEnter = (e) => {
+    const field = e.target
+    if (e.key !== 'Enter' || e.defaultPrevented || e.isComposing || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return
+    if (field.tagName !== 'INPUT' || NO_ENTER_SAVE.includes(field.type) || !e.currentTarget.contains(field)) return
+    e.preventDefault()
+    saveAll()
+  }
+
   // A save stopped by a field out of bounds: the first such field takes the focus
   useEffect(() => {
     if (!invalidFocus) return
@@ -2280,7 +2291,7 @@ export default function SettingsPage() {
             )}
           >
             <SectionJump label={t('sectioned.jumpLabel')} sections={sections} value={selectedCategory} onJump={handleCategoryChange} />
-            <div className="sf-form">
+            <div className="sf-form" onKeyDown={saveOnEnter}>
               {sections.map(section => (
                 <FormSection
                   key={section.id}
