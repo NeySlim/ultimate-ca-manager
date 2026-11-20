@@ -89,7 +89,7 @@ export function CertificateDetail({ cert, objectKey, title, actions, section, on
         </div>
         <div className="ins-actions">
           {exportAction && (
-            <button type="button" className={cn('lv-btn', !renewAction && 'is-primary')} onClick={exportAction.onClick}>
+            <button type="button" className={cn('lv-btn', !renewAction && 'is-primary')} data-write="false" onClick={exportAction.onClick}>
               <DownloadSimple size={17} aria-hidden="true" />{exportAction.label}
             </button>
           )}

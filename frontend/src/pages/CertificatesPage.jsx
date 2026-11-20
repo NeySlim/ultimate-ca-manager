@@ -23,7 +23,6 @@ import { usePermission, useRecentHistory, useWebSocket, usePersistedState } from
 import { extractCN, certificateNames, downloadBlob, warnSkippedExport } from '../lib/utils'
 import { CERT_STATUSES, parseOverviewFilters, toListParams, toSearch, withoutFilter } from '../lib/overviewFilters'
 import { SetupCard } from '../components/shell/SetupCard'
-import { guardProps, useWriteGuard } from '../components/shell/health'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { IssueCertificateDialog } from './certificates/IssueCertificateDialog'
@@ -162,8 +161,6 @@ export default function CertificatesPage() {
   }, [navigate, location.pathname])
   
   const { showSuccess, showError, showWarning } = useNotification()
-  // A cluster maintenance suspends issuing and importing, as the server refuses them
-  const writeGuard = useWriteGuard()
   const { canWrite, hasPermission } = usePermission()
   const failed = Boolean(loadError) && certificates.length === 0
   // One rule for every export surface on this page — the server's own (see
@@ -537,10 +534,10 @@ export default function CertificatesPage() {
         intent={t('certificates.intent')}
         actions={canWrite('certificates') && (
           <>
-            <ListButton quiet icon={UploadSimple} {...guardProps(writeGuard)} onClick={() => setShowImportModal(true)} className="lv-hide-mobile">
+            <ListButton quiet icon={UploadSimple} data-write onClick={() => setShowImportModal(true)} className="lv-hide-mobile">
               {t('common.import')}
             </ListButton>
-            <ListButton primary icon={Plus} title={t('certificates.issueCertificate')} {...guardProps(writeGuard)} onClick={() => setShowIssueModal(true)}>
+            <ListButton primary icon={Plus} title={t('certificates.issueCertificate')} onClick={() => setShowIssueModal(true)}>
               {t('certificates.issue')}
             </ListButton>
           </>
@@ -565,7 +562,7 @@ export default function CertificatesPage() {
               <h2>{t('certificates.loadFailed')}</h2>
               <p>{cause}</p>
               <div className="lv-error-actions">
-                <ListButton primary icon={RefreshIcon} onClick={() => loadData()}>{t('table.retry')}</ListButton>
+                <ListButton primary data-write="false" icon={RefreshIcon} onClick={() => loadData()}>{t('table.retry')}</ListButton>
                 {hasPermission('read:audit') && (
                   <Link className="lv-text-link" to="/audit">{t('certificates.viewLog')}<CaretRight size={14} aria-hidden="true" /></Link>
                 )}
