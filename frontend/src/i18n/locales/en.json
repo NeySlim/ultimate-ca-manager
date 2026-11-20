@@ -934,6 +934,7 @@
     "issue": "Issue",
     "total_one": "{{count, number}} identity",
     "total_other": "{{count, number}} identities",
+    "total_zero": "{{count, number}} identities",
     "range_one": "{{start}}–{{end}} of {{count, number}} certificate",
     "range_other": "{{start}}–{{end}} of {{count, number}} certificates",
     "range_zero": "{{start}}–{{end}} of {{count, number}} certificates",

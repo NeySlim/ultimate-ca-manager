@@ -934,6 +934,7 @@
     "issue": "発行",
     "total_one": "{{count, number}} identity",
     "total_other": "{{count, number}} identities",
+    "total_zero": "{{count, number}} identities",
     "range_one": "証明書 {{count, number}} 件中 {{start}}–{{end}}",
     "range_other": "証明書 {{count, number}} 件中 {{start}}–{{end}}",
     "range_zero": "証明書 {{count, number}} 件中 {{start}}–{{end}}",

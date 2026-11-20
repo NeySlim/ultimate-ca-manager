@@ -934,6 +934,7 @@
     "issue": "Emetti",
     "total_one": "{{count, number}} identity",
     "total_other": "{{count, number}} identities",
+    "total_zero": "{{count, number}} identities",
     "range_one": "{{start}}–{{end}} di {{count, number}} certificato",
     "range_other": "{{start}}–{{end}} di {{count, number}} certificati",
     "range_zero": "{{start}}–{{end}} di {{count, number}} certificati",

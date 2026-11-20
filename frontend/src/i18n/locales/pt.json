@@ -934,6 +934,7 @@
     "issue": "Emitir",
     "total_one": "{{count, number}} identity",
     "total_other": "{{count, number}} identities",
+    "total_zero": "{{count, number}} identities",
     "range_one": "{{start}}–{{end}} de {{count, number}} certificado",
     "range_other": "{{start}}–{{end}} de {{count, number}} certificados",
     "range_zero": "{{start}}–{{end}} de {{count, number}} certificados",

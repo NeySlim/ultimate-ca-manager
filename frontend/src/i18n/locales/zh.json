@@ -934,6 +934,7 @@
     "issue": "颁发",
     "total_one": "{{count, number}} 个身份",
     "total_other": "{{count, number}} 个身份",
+    "total_zero": "{{count, number}} 个身份",
     "range_one": "第 {{start}}–{{end}} 个，共 {{count, number}} 个证书",
     "range_other": "第 {{start}}–{{end}} 个，共 {{count, number}} 个证书",
     "range_zero": "第 {{start}}–{{end}} 个，共 {{count, number}} 个证书",

@@ -942,6 +942,7 @@
     "total_few": "{{count, number}} identities",
     "total_many": "{{count, number}} identities",
     "total_other": "{{count, number}} identities",
+    "total_zero": "{{count, number}} identities",
     "range_one": "{{start}}–{{end}} з {{count, number}} сертифіката",
     "range_few": "{{start}}–{{end}} з {{count, number}} сертифікатів",
     "range_many": "{{start}}–{{end}} з {{count, number}} сертифікатів",

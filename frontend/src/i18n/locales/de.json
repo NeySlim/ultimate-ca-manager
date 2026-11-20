@@ -934,6 +934,7 @@
     "issue": "Ausstellen",
     "total_one": "{{count, number}} identity",
     "total_other": "{{count, number}} identities",
+    "total_zero": "{{count, number}} identities",
     "range_one": "{{start}}–{{end}} von {{count, number}} Zertifikat",
     "range_other": "{{start}}–{{end}} von {{count, number}} Zertifikaten",
     "range_zero": "{{start}}–{{end}} von {{count, number}} Zertifikaten",

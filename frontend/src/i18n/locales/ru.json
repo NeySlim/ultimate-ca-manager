@@ -942,6 +942,7 @@
     "total_few": "{{count, number}} субъекта",
     "total_many": "{{count, number}} субъектов",
     "total_other": "{{count, number}} субъекта",
+    "total_zero": "{{count, number}} субъектов",
     "range_one": "{{start}}–{{end}} из {{count, number}} сертификата",
     "range_few": "{{start}}–{{end}} из {{count, number}} сертификатов",
     "range_many": "{{start}}–{{end}} из {{count, number}} сертификатов",
