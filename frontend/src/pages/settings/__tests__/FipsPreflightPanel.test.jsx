@@ -7,11 +7,14 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
-vi.mock('../../../components', () => ({
-  Button: ({ children, ...props }) => <button {...props}>{children}</button>,
+vi.mock('../../../components', async () => {
+  const { forwardRef } = await import('react')
+  return {
+  Button: forwardRef(({ children, ...props }, ref) => <button ref={ref} {...props}>{children}</button>),
   Badge: ({ children, variant }) => <span data-variant={variant}>{children}</span>,
   DetailSection: ({ title, children }) => <section><h2>{title}</h2>{children}</section>,
-}))
+  }
+})
 
 const getFipsPreflight = vi.fn()
 vi.mock('../../../services', () => ({
@@ -27,6 +30,21 @@ const finding = (id, severity, extra = {}) => ({
 
 describe('FipsPreflightPanel', () => {
   beforeEach(() => getFipsPreflight.mockReset())
+
+  it('gives the focus back to its button once the check ends', async () => {
+    let answer
+    getFipsPreflight.mockReturnValue(new Promise((resolve) => { answer = resolve }))
+    render(<FipsPreflightPanel />)
+    const run = screen.getByText('settings.fipsPreflight.run').closest('button')
+    // Disabled while it runs: the browser drops the focus to the page (jsdom cannot blur a disabled button)
+    run.focus()
+    run.blur()
+    fireEvent.click(run)
+    await waitFor(() => expect(run).toBeDisabled())
+    answer({ data: { ready: true, summary: {}, findings: [], errors: [] } })
+    await screen.findByTestId('fips-preflight-report')
+    expect(document.activeElement).toBe(run)
+  })
 
   it('runs the check only when asked, then shows the findings grouped by severity', async () => {
     getFipsPreflight.mockResolvedValue({ data: {

@@ -342,10 +342,10 @@
 }
 /* Aurore family: the keyboard focus wears the mockup's halo around its outline, the primary keeps its glow */
 :root[data-theme="aurore"] :is(.wk-view, .lv-dialog:has(.wk-dialog), .ins-heading:has(.wk-btn)) :focus-visible {
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent);
+  box-shadow: 0 0 0 5px var(--halo);
 }
 :root[data-theme="aurore"] :is(.wk-view, .lv-dialog:has(.wk-dialog), .ins-heading:has(.wk-btn)) .wk-btn.is-primary:focus-visible {
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent), 0 8px 24px -8px var(--glow);
+  box-shadow: 0 0 0 5px var(--halo), 0 8px 24px -8px var(--glow);
 }
 /* Aurore family: rounder dialog fields */
 :root[data-theme="aurore"] .wk-dialog .wk-field :is(input, select, textarea) { border-radius: 6px; }

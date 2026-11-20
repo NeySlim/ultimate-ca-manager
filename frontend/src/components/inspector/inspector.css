@@ -23,7 +23,7 @@
 .ins-dock.is-right { align-self: stretch; height: auto; margin: 14px 24px 14px -8px; border-radius: 5px; }
 .ins-dock.is-mobile { position: fixed; inset: 0; z-index: 40; border: 0; border-radius: 0; }
 .ins-dock :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-:root[data-theme="aurore"] .ins-dock :focus-visible { box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent); }
+:root[data-theme="aurore"] .ins-dock :focus-visible { box-shadow: 0 0 0 5px var(--halo); }
 
 /* Resize grip centred on the edge the dock grows from */
 .ins-grip {

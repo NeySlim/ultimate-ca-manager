@@ -270,8 +270,18 @@ describe('IssueCertificateForm steps', () => {
     expect(within(extensions).getByRole('button', { name: /customExtensions.add/ })).toBeDisabled()
   })
 
-  it('keeps the empty SAN row of the Atelier when the only name is the common name', () => {
+  it('shows the common name as its row when it is the only name, as the review does', async () => {
     const certificate = { id: 16, cn: 'fw.lan', valid_from: '2026-01-01T00:00:00Z', valid_to: '2026-04-01T00:00:00Z', san_dns: '["fw.lan"]' }
+    renderForm({ mode: 'renew', certificate, onSubmit: vi.fn().mockResolvedValue(undefined) })
+    const values = screen.getAllByLabelText(new RegExp(`${P}sanValue`))
+    expect(values.map((v) => [v.value, v.readOnly])).toEqual([['fw.lan', true]])
+    expect(screen.getAllByLabelText(new RegExp(`${P}sanType`)).map((v) => v.value)).toEqual(['DNS'])
+    const review = await toReview()
+    expect(review.querySelector('[data-row="sans"] dd').textContent).toBe('DNS : fw.lan')
+  })
+
+  it('keeps the empty SAN row of the Atelier for a certificate without any name', () => {
+    const certificate = { id: 17, cn: 'bare', valid_from: '2026-01-01T00:00:00Z', valid_to: '2026-04-01T00:00:00Z' }
     renderForm({ mode: 'renew', certificate })
     const values = screen.getAllByLabelText(new RegExp(`${P}sanValue`))
     expect(values.map((v) => [v.value, v.readOnly])).toEqual([['', true]])

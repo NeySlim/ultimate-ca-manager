@@ -122,6 +122,27 @@ test('a field out of its bounds takes the error border, is named in the bar and 
   await bar.getByRole('button', { name: 'Undo changes' }).click()
 })
 
+test('in Aurore a field in error keeps its red ring once focused, not the focus halo', async ({ page, api }) => {
+  await page.goto('/settings')
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'aurore'))
+  const general = page.getByRole('region', { name: 'General', exact: true })
+  const field = general.getByLabel('Sign-out after inactivity (minutes)')
+  await field.fill('99999')
+  const bar = page.getByTestId('sf-savebar')
+  await bar.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(field).toBeFocused()
+  // Asked until it holds: the ring eases in
+  await expect.poll(() => field.evaluate((el) => {
+    const probe = document.createElement('span')
+    probe.style.color = 'var(--bad)'
+    document.body.append(probe)
+    const bad = getComputedStyle(probe).color
+    probe.remove()
+    return getComputedStyle(el).boxShadow === `${bad} 0px 0px 0px 1px`
+  })).toBe(true)
+  await bar.getByRole('button', { name: 'Undo changes' }).click()
+})
+
 test('the scheduler keeps 36 px rows around 32 px run buttons', async ({ page, api }) => {
   await page.goto('/settings?tab=scheduler')
   const rows = page.locator('.sf-task-table tbody tr')
