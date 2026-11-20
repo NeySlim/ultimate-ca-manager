@@ -74,6 +74,21 @@ test.describe('preferences', () => {
     expect((await own.get('/auth/verify')).preferences.language).toBe('fr')
   })
 
+  test('an account set to a retired theme opens in Atelier, its mode kept and its preference untouched', async ({ api, signIn }) => {
+    const user = await createUser(api, 'viewer')
+    const { page, api: own } = await signIn(user.username, user.password)
+    const prefs = (await own.get('/account/preferences')) || {}
+    await own.put('/account/preferences', { ...prefs, theme_family: 'purple', theme_mode: 'light' })
+    await page.goto('/')
+    await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'atelier')
+    await expect(page.locator('html')).toHaveAttribute('data-mode', 'light')
+    await page.getByRole('button', { name: /^Theme: / }).click()
+    await expect(page.getByRole('menu', { name: 'Theme' }).getByRole('menuitemradio', { name: 'Light', exact: true }))
+      .toHaveAttribute('aria-checked', 'true')
+    expect((await own.get('/account/preferences')).theme_family).toBe('purple')
+  })
+
   test('dark mode chosen in the theme menu applies and survives a reload', async ({ api, signIn }) => {
     const user = await createUser(api, 'viewer')
     const { page } = await signIn(user.username, user.password)

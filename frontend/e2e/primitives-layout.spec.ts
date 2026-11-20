@@ -57,4 +57,8 @@ test('the theme menu is 220 px and lists the five choices of the mockup', async 
   }
   const item = await box(menu.getByRole('menuitemradio', { name: 'Dark', exact: true }))
   near(item.height, 36)
+  // Those five only, as the mockup: no other family below them, the mockup's 202 px
+  await expect(menu.getByRole('menuitemradio')).toHaveCount(5)
+  await expect(menu.getByRole('group')).toHaveCount(0)
+  near((await box(menu)).height, 202)
 })
