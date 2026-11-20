@@ -50,6 +50,12 @@ describe('ResponsiveLayout as a list page', () => {
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
   })
 
+  it('puts what it is given before the views between the page head and the tabs', () => {
+    const { container } = list({ beforeViews: <section data-testid="setup">setup</section> })
+    const order = [...container.querySelectorAll('header.lv-head, [data-testid="setup"], [role="tablist"]')]
+    expect(order.map(el => el.dataset.testid || el.tagName.toLowerCase())).toEqual(['header', 'setup', 'div'])
+  })
+
   it('carries no Help button of its own, even with a help page', () => {
     list({ helpPageKey: 'certificates' })
     expect(screen.queryByRole('button', { name: 'common.help' })).toBeNull()

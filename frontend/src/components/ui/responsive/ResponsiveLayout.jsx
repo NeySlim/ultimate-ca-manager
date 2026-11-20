@@ -72,6 +72,7 @@ export function ResponsiveLayout({
   onViewChange, // (id) => void
   viewsLabel, // accessible name of the tab list
   viewsAside, // ReactNode at the right end of the tab row
+  beforeViews, // ReactNode between the page head and the state tabs (first-run card)
   
   // Stats bar (optional - array of { icon, label, value, variant, filterValue })
   stats,
@@ -220,6 +221,7 @@ export function ResponsiveLayout({
     )}>
       {/* LIST TEMPLATE: page head at every width, then the state tabs */}
       {listPage && <PageHead title={title} total={total} intent={intent} actions={actions} />}
+      {listPage && beforeViews && <div className="lv-before-views">{beforeViews}</div>}
       {listPage && hasViews && (
         <StateTabs
           views={views}

@@ -72,6 +72,9 @@
 .lv-btn[aria-expanded="true"] { background: var(--selected); border-color: var(--accent); color: var(--accent); }
 
 /* State tabs with counters */
+/* What a page shows between its head and its tabs (first-run card), on the page gutter */
+.lv-before-views { padding: 0 var(--lv-gutter); flex-shrink: 0; }
+.lv-before-views:empty { display: none; }
 .lv-views-row {
   display: flex;
   align-items: center;
@@ -284,6 +287,9 @@
 .lv-sk { display: inline-block; height: 10px; max-width: 100%; border-radius: 3px; background: color-mix(in srgb, var(--muted) 26%, transparent); }
 .lv-sk.is-box { width: 16px; height: 16px; }
 .lv-sk.is-pill { height: 18px; border-radius: 999px; }
+.lv-sk.is-thin { height: 8px; }
+/* Phone list skeleton: cards at the height of the records they stand for */
+.lv-sk-record { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
 .lv-table tbody tr.lv-sk-row:hover { background: var(--panel); }
 
 /* The name that opens the detail, and what follows it on the line */
@@ -377,7 +383,7 @@
 /* Under the table: what stays open, the density and the columns on screen */
 .lv-caption { display: flex; justify-content: space-between; gap: 12px; padding-top: 7px; flex-shrink: 0; font-size: 12px; color: var(--muted); }
 /* Read error of the list: cause, Retry */
-.lv-error { display: flex; align-items: flex-start; gap: 14px; margin: 4px 0 18px; padding: 18px 20px; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--bad); border-radius: 5px; }
+.lv-error { display: flex; align-items: flex-start; gap: 14px; margin: 4px 0 18px; padding: 18px 20px; font-size: 13px; line-height: normal; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--bad); border-radius: 5px; }
 .lv-error > svg { width: 22px; height: 22px; flex-shrink: 0; color: var(--bad); }
 .lv-error h2 { margin: 0; font-size: 15px; font-weight: 600; color: var(--text); }
 .lv-error p { margin: 6px 0 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
@@ -389,6 +395,7 @@
 .lv-empty > svg { width: 32px; height: 32px; margin-bottom: 14px; color: var(--muted); }
 .lv-empty h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); }
 .lv-empty p { margin: 9px 0 20px; font-size: 12px; color: var(--muted); }
+.lv-empty .lv-btn { text-decoration: none; }
 .lv-page-jump { display: inline-flex; align-items: center; gap: 6px; }
 .lv-page-jump input { width: 72px; min-height: 28px; padding: 2px 6px; background: var(--panel); border: 1px solid var(--control); border-radius: 4px; color: var(--text); font: inherit; font-size: 12px; }
 
