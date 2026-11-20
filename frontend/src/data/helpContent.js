@@ -1147,7 +1147,7 @@ export const helpContent = {
           { label: 'Save in error', text: 'A section whose save fails is marked To correct in the table of contents and names the error in its frame; the other sections are saved and what you typed stays' },
           { label: 'Own actions', text: 'A test, an import, a generation or a list (SSO providers, webhooks, connections, Windows profiles, backups) keeps its button in its section and acts at once' },
           { label: 'Links', text: 'A link to /settings?tab=<section> (overview, palette, other pages) opens the page on that section' },
-          { label: 'Leaving', text: 'Leaving the page with changes pending asks first' },
+          { label: 'Leaving', text: 'Leaving the page with changes pending asks nothing: the changes are kept in this tab and come back, still pending, when you return; reloading or closing the tab asks the browser first' },
           { label: 'Change history', text: 'Under the sections, the last saves of the settings as the audit log records them (with read:audit)' },
         ]
       },
@@ -1375,6 +1375,8 @@ export const helpContent = {
         items: [
           { label: 'Own actions', text: 'Edit in the Profile frame opens the name and email, Cancel or Save act at once; Create key opens the key form; there is no save bar' },
           { label: 'Links', text: 'A link to /account?tab=security or /account?tab=api-keys opens the page on that frame' },
+          { label: 'Edit kept', text: 'A profile edit not yet saved is kept in this tab when you leave the page and comes back, still in edit mode, on your return; Cancel forgets it' },
+          { label: 'Preferences', text: 'Close the inspector when navigating: the objects open in the inspector close when you go to another page. The choice is kept in this browser' },
         ],
       },
       {

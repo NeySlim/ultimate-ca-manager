@@ -12,7 +12,7 @@ export default {
           { label: 'Enregistrement en échec', text: 'Une section dont l’enregistrement échoue est marquée À corriger dans le sommaire et nomme l’erreur dans son cadre ; les autres sections sont enregistrées et la saisie reste' },
           { label: 'Actions propres', text: 'Un test, un import, une génération ou une liste (fournisseurs SSO, webhooks, connexions, profils Windows, sauvegardes) garde son bouton dans sa section et agit aussitôt' },
           { label: 'Liens', text: 'Un lien vers /settings?tab=<section> (vue d’ensemble, palette, autres pages) ouvre la page sur cette section' },
-          { label: 'Quitter la page', text: 'Quitter la page avec des modifications en attente demande confirmation' },
+          { label: 'Quitter la page', text: 'Quitter la page avec des modifications en attente ne demande rien : elles sont gardées dans cet onglet et reviennent, toujours en attente, au retour sur la page ; recharger ou fermer l’onglet fait d’abord demander le navigateur' },
           { label: 'Historique des modifications', text: 'Sous les sections, les derniers enregistrements des paramètres tels que le journal d’audit les consigne (avec read:audit)' },
         ]
       },

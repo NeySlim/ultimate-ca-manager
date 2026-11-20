@@ -14,6 +14,7 @@ import { saveLock, markJustLocked } from '../lib/sessionLock'
 import { setDateFormat, setShowTime } from '../stores/dateFormatStore'
 import { applyServerPreferences, getPreferences, setAuthenticated as setPrefsAuthenticated } from '../stores/userPreferencesStore'
 import i18n from '../i18n'
+import { setDraftOwner, signOutDrafts } from '../components/sectioned/draftMemory'
 
 const AuthContext = createContext()
 
@@ -170,6 +171,8 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     setLoading(true)
+    // Unsaved drafts of the pages never outlive the session
+    signOutDrafts()
     try {
       debug('🔓 Logging out...')
       await authService.logout()
@@ -209,6 +212,9 @@ export function AuthProvider({ children }) {
   }
 
   const clearForcePasswordChange = () => setForcePasswordChange(false)
+
+  // Drafts kept for the tab belong to one account: another one signing in drops them
+  useEffect(() => { setDraftOwner(user?.username) }, [user?.username])
 
   const value = {
     user,

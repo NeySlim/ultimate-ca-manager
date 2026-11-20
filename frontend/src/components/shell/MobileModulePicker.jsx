@@ -2,7 +2,6 @@
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { isVisible, menuGroupsFor, menuLabelKey, moduleById, MAIN_IDS } from '../../navigation/registry'
-import { whenLeaving } from '../../navigation/leaveGuard'
 
 export function MobileModulePicker({ can, activeId }) {
   const { t } = useTranslation()
@@ -18,7 +17,7 @@ export function MobileModulePicker({ can, activeId }) {
       value={listed ? current : ''}
       onChange={(e) => {
         const mod = moduleById(e.target.value)
-        if (mod) whenLeaving(() => navigate(mod.path))
+        if (mod) navigate(mod.path)
       }}
     >
       {!listed && <option value="" disabled>{t('shell.navigate')}</option>}

@@ -8,7 +8,7 @@ import { Select } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { apiClient } from '../../services'
 import { useNotification } from '../../contexts'
-import { FormGroup, useSavePart } from '../../components/sectioned'
+import { FormGroup, useSavePart, keptPartDraft } from '../../components/sectioned'
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
   value: h,
@@ -34,15 +34,18 @@ export default function AutoUpdateSettings() {
       .then((response) => {
         if (cancelled) return
         const data = response?.data || response || {}
-        setChannel(data.channel || 'stable')
-        setAutoInstall(!!data.auto_install)
-        setPopupEnabled(!!data.popup_enabled)
-        setHour(Number.isInteger(data.hour) ? data.hour : 3)
-        setCanAutoUpdate(data.can_auto_update !== false)
-        setSaved({
+        const loaded = {
           channel: data.channel || 'stable', autoInstall: !!data.auto_install,
           hour: Number.isInteger(data.hour) ? data.hour : 3, popupEnabled: !!data.popup_enabled,
-        })
+        }
+        // A draft left pending on this tab comes back over what the server holds
+        const shown = { ...loaded, ...keptPartDraft('updates:auto') }
+        setChannel(shown.channel)
+        setAutoInstall(shown.autoInstall)
+        setPopupEnabled(shown.popupEnabled)
+        setHour(shown.hour)
+        setCanAutoUpdate(data.can_auto_update !== false)
+        setSaved(loaded)
       })
       .catch(() => {})
       .finally(() => !cancelled && setLoading(false))
@@ -75,6 +78,7 @@ export default function AutoUpdateSettings() {
   useSavePart('updates:auto', {
     section: 'updates',
     count,
+    draft: saved ? current : undefined,
     save: () => handleSave({ quiet: true }),
     reset: () => {
       if (!saved) return

@@ -2,12 +2,12 @@
  * Settings page on the sectioned template: every section on the page, a change counted
  * in the save bar and marked in the table of contents, undo back to what was loaded,
  * one save through today's routes, a failed route named on its section while the others
- * are stored and its input kept, a link to ?tab= landing on its frame, and a question
- * before leaving with changes pending.
+ * are stored and its input kept, a link to ?tab= landing on its frame, and leaving with
+ * changes pending: no question, the draft found again on the return.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter, Link } from 'react-router-dom'
+import { MemoryRouter, Link, Routes, Route } from 'react-router-dom'
 
 vi.mock('../settings/GeneralSection', () => ({
   default: ({ settings, updateSetting }) => (
@@ -42,6 +42,7 @@ import { notificationSpies } from './pageRenderingSetup.jsx'
 
 import SettingsPage from '../SettingsPage'
 import { settingsService } from '../../services/settings.service'
+import { dropAllDrafts } from '../../components/sectioned/draftMemory'
 
 const renderPage = (entry = '/settings') => render(
   <MemoryRouter initialEntries={[entry]}>
@@ -65,7 +66,7 @@ beforeEach(() => {
   notificationSpies.showConfirm = vi.fn().mockResolvedValue(false)
   window.history.replaceState(null, '', '/settings')
 })
-afterEach(() => vi.clearAllMocks())
+afterEach(() => { vi.clearAllMocks(); dropAllDrafts() })
 
 async function loaded(entry) {
   renderPage(entry)
@@ -148,12 +149,32 @@ describe('SettingsPage: one page, one save bar', () => {
     delete Element.prototype.scrollIntoView
   })
 
-  it('asks before a link leaves the page with changes pending, and stays when refused', async () => {
-    await loaded()
+  it('leaves without a question and finds the draft again on the return', async () => {
+    render(
+      <MemoryRouter initialEntries={['/settings']}>
+        <Routes>
+          <Route path="/settings" element={<><Link to="/certificates">elsewhere</Link><SettingsPage /></>} />
+          <Route path="/certificates" element={<Link to="/settings">back</Link>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await screen.findByLabelText('system-name')
+    await waitFor(() => expect(screen.getByLabelText('syslog-host')).toHaveValue('log.example.com'))
     fireEvent.change(screen.getByLabelText('system-name'), { target: { value: 'PKI 2' } })
+    fireEvent.change(screen.getByLabelText('syslog-host'), { target: { value: 'log2.example.com' } })
     await act(async () => { fireEvent.click(screen.getByText('elsewhere')) })
-    expect(notificationSpies.showConfirm).toHaveBeenCalledWith('sectioned.leaveConfirm', expect.anything())
-    expect(screen.getByLabelText('system-name')).toHaveValue('PKI 2')
+    expect(notificationSpies.showConfirm).not.toHaveBeenCalled()
+    await act(async () => { fireEvent.click(await screen.findByText('back')) })
+    await waitFor(() => expect(screen.getByLabelText('system-name')).toHaveValue('PKI 2'))
+    await waitFor(() => expect(screen.getByLabelText('syslog-host')).toHaveValue('log2.example.com'))
+    expect(bar()).toHaveTextContent('sectioned.pendingTitle')
+    expect(tocLink('settings.tabs.general')).toHaveTextContent('sectioned.flagModified')
+    // Undo forgets the draft: the next visit shows what the server holds
+    fireEvent.click(undoButton())
+    await act(async () => { fireEvent.click(screen.getByText('elsewhere')) })
+    await act(async () => { fireEvent.click(await screen.findByText('back')) })
+    await waitFor(() => expect(screen.getByLabelText('syslog-host')).toHaveValue('log.example.com'))
+    expect(screen.getByLabelText('system-name')).toHaveValue('PKI')
   })
 
   it('lets a link go without asking when nothing is pending', async () => {

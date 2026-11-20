@@ -2,7 +2,7 @@
  * Account Page - User Profile & Security Settings
  * Uses DetailCard design system like SettingsPage
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   User, Key, FloppyDisk, Fingerprint, Certificate,
@@ -17,7 +17,7 @@ import {
 import { accountService, casService, userCertificatesService } from '../services'
 import { hiddenFromIssuance, listedForIssuance, pickerCas, unlistedPickerCas } from '../lib/caSelection'
 import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
-import { useAuth, useNotification, useMobile } from '../contexts'
+import { useAuth, useNotification, useMobile, useInspector } from '../contexts'
 import { useClipboard, usePermission } from '../hooks'
 import { formatDate , downloadBlob} from '../lib/utils'
 import { canExportPrivateKey } from '../lib/exportPermissions'
@@ -25,7 +25,13 @@ import { downloadExport } from '../lib/exportDownload'
 import { reportSilentFailure } from '../lib/silentFailure'
 import { localOnlyRevocationWarning } from '../lib/revocationOutcome'
 import { apiKeyScopePermissions } from '../lib/apiKeyScopes'
-import { FormLayout, SectionToc, SectionJump, FormSection, FormGroup, useSectionParam } from '../components/sectioned'
+import {
+  FormLayout, SectionToc, SectionJump, FormSection, FormGroup, useSectionParam, keepDraft, readDraft, useUnloadGuard,
+} from '../components/sectioned'
+import { ToggleSwitch } from '../components/ui/ToggleSwitch'
+
+// Profile edit left pending, kept for the tab (components/sectioned/draftMemory)
+const PROFILE_DRAFT = 'account:profile'
 import LanguageSelector from '../components/ui/LanguageSelector'
 
 export default function AccountPage() {
@@ -35,6 +41,7 @@ export default function AccountPage() {
   const { showSuccess, showError, showWarning, showConfirm, showPrompt } = useNotification()
   const { copy } = useClipboard()
   const { hasPermission } = usePermission()
+  const { closeOnNav, toggleCloseOnNav } = useInspector()
 
   // State
   const [loading, setLoading] = useState(true)
@@ -44,6 +51,7 @@ export default function AccountPage() {
   const [accountData, setAccountData] = useState({})
   const [editMode, setEditMode] = useState(false)
   const [formData, setFormData] = useState({ full_name: '', email: '' })
+  const keptProfile = useRef(readDraft(PROFILE_DRAFT))
   
   // Security state
   const [apiKeys, setApiKeys] = useState([])
@@ -128,7 +136,11 @@ export default function AccountPage() {
       const response = await accountService.getProfile()
       const data = response.data || response
       setAccountData(data)
-      setFormData({ full_name: data.full_name || '', email: data.email || '' })
+      // An edit left pending on this tab comes back, still in edit mode, once
+      const kept = keptProfile.current
+      keptProfile.current = null
+      setFormData(kept || { full_name: data.full_name || '', email: data.email || '' })
+      if (kept) setEditMode(true)
     } catch (error) {
       showError(error.message || t('messages.errors.loadFailed.generic'))
     }
@@ -521,12 +533,24 @@ export default function AccountPage() {
     }
   }
 
+  // An edit with changes is kept for the return to the page; a reload or a close asks the browser
+  const profileChanged = editMode && (formData.full_name !== (accountData.full_name || '')
+    || formData.email !== (accountData.email || ''))
+  useUnloadGuard(profileChanged)
+  useEffect(() => {
+    if (!loading) keepDraft(PROFILE_DRAFT, profileChanged ? formData : null)
+  }, [loading, profileChanged, formData])
+  const cancelProfileEdit = () => {
+    setFormData({ full_name: accountData.full_name || '', email: accountData.email || '' })
+    setEditMode(false)
+  }
+
   // ============ RENDER TAB CONTENT ============
 
   // Editing the profile is its own action: Edit, then Cancel or Save in the frame heading
   const profileActions = editMode ? (
     <>
-      <ListButton onClick={() => setEditMode(false)}>{t('common.cancel')}</ListButton>
+      <ListButton onClick={cancelProfileEdit}>{t('common.cancel')}</ListButton>
       <ListButton primary icon={FloppyDisk} onClick={handleSaveProfile} disabled={saving}>
         {saving ? t('common.saving') : t('common.save')}
       </ListButton>
@@ -573,6 +597,16 @@ export default function AccountPage() {
       {/* The account's language, saved with its preferences (the account menu no longer carries it) */}
       <FormGroup title={t('settings.language')}>
         <LanguageSelector />
+      </FormGroup>
+
+      {/* Preferences of this browser; the inspector reads this one when the page changes */}
+      <FormGroup title={t('account.preferences')}>
+        <ToggleSwitch
+          checked={closeOnNav}
+          onChange={(on) => { if (on !== closeOnNav) toggleCloseOnNav() }}
+          label={t('account.closeInspectorOnNav')}
+          description={t('account.closeInspectorOnNavHint')}
+        />
       </FormGroup>
       
       <FormGroup title={t('account.accountActivity')}>

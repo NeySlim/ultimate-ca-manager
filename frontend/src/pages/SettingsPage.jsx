@@ -80,7 +80,7 @@ import { autoRenewalWaitingMessage } from '../lib/autoRenewalWaiting'
 import { secretRequiredForTarget, smtpSecretTargets } from '../lib/secretTarget'
 import {
   FormLayout, SectionToc, SectionJump, FormSection, SaveBar, SavePartsContext,
-  useSavePartsRegistry, changedKeys, useLeaveGuard, sectionDomId, sectionTitleId,
+  useSavePartsRegistry, changedKeys, useUnloadGuard, sectionDomId, sectionTitleId, keepDraft, readDraft,
 } from '../components/sectioned'
 import SettingsHistory from './settings/SettingsHistory'
 
@@ -120,6 +120,9 @@ const SETTINGS_GROUPS = [
   { id: 'interface', labelKey: 'settings.groups.interface', ids: ['appearance', 'audit'] },
   { id: 'about', labelKey: 'settings.groups.about', ids: ['about'] },
 ]
+
+// Draft of the page kept for the tab (components/sectioned/draftMemory)
+const SETTINGS_DRAFT = 'settings'
 
 // Keys the email route stores (mapped names); the others go through the bulk route
 const EMAIL_KEYS = [
@@ -192,6 +195,13 @@ export default function SettingsPage() {
   const [settingsLog, setSettingsLog] = useState(null)
   const saveState = useRef(null)
   const parts = useSavePartsRegistry()
+  // What was left pending when the page was last left, taken back part by part as each loads
+  const kept = useRef(readDraft(SETTINGS_DRAFT))
+  const takeKept = (name) => {
+    const value = kept.current?.[name]
+    if (kept.current) delete kept.current[name]
+    return value
+  }
   const [emailTestResult, setEmailTestResult] = useState(null) // { success, message }
   const [emailTesting, setEmailTesting] = useState(false)
   const [oauthDirty, setOauthDirty] = useState(false)
@@ -488,7 +498,12 @@ export default function SettingsPage() {
         smtp_oauth_scope: emailSettings.smtp_oauth_scope || '',
         smtp_oauth_redirect_uri: emailSettings.smtp_oauth_redirect_uri || '',
       }
-      setSettings(prev => ({ _testRecipient: prev._testRecipient, ...generalSettings, ...email, ...pick(prev, keep) }))
+      const keptSettings = initial ? takeKept('settings') : undefined
+      if (initial) {
+        Object.assign(keyOrigin.current, takeKept('keyOrigin') || {})
+        if (takeKept('oauthDirty')) setOauthDirty(true)
+      }
+      setSettings(prev => ({ _testRecipient: prev._testRecipient, ...generalSettings, ...email, ...pick(prev, keep), ...keptSettings }))
       setSavedSettings({ ...generalSettings, ...email })
       setSavedEmail(email)
       // Load OAuth provider presets in parallel (best-effort, non-blocking)
@@ -514,7 +529,7 @@ export default function SettingsPage() {
   const loadExpiryAlerts = async () => {
     try {
       const res = await settingsService.getExpiryAlerts()
-      setExpiryAlerts(res.data || res)
+      setExpiryAlerts(takeKept('expiry') ?? (res.data || res))
       setSavedExpiryAlerts(res.data || res)
     } catch (error) { reportSilentFailure('loadExpiryAlerts', error) }
   }
@@ -1132,7 +1147,7 @@ export default function SettingsPage() {
   const loadSyslogConfig = async () => {
     try {
       const response = await settingsService.getSyslogConfig()
-      setSyslogConfig(response.data || response)
+      setSyslogConfig(takeKept('syslog') ?? (response.data || response))
       setSavedSyslog(response.data || response)
     } catch (error) { reportSilentFailure('loadSyslogConfig', error) }
   }
@@ -1172,7 +1187,7 @@ export default function SettingsPage() {
     setMtlsLoading(true)
     try {
       const response = await mtlsService.getSettings()
-      setMtlsSettings(response.data || {})
+      setMtlsSettings(takeKept('mtls') ?? (response.data || {}))
       setSavedMtls(response.data || {})
     } catch (error) { reportSilentFailure('loadMtlsSettings', error) } finally {
       setMtlsLoading(false)
@@ -1210,7 +1225,7 @@ export default function SettingsPage() {
     setCtLoading(true)
     try {
       const response = await settingsService.getCTSettings()
-      setCtSettings(response.data || { enabled: false, auto_submit: false, log_urls: [] })
+      setCtSettings(takeKept('ct') ?? (response.data || { enabled: false, auto_submit: false, log_urls: [] }))
       setSavedCt(response.data || { enabled: false, auto_submit: false, log_urls: [] })
     } catch (error) { reportSilentFailure('loadCtSettings', error) } finally {
       setCtLoading(false)
@@ -1249,7 +1264,7 @@ export default function SettingsPage() {
     try {
       const response = await settingsService.getAutoRenewalSettings()
       if (response.data) {
-        setArSettings(response.data)
+        setArSettings(takeKept('ar') ?? response.data)
         setSavedAr(response.data)
       }
     } catch {
@@ -1871,11 +1886,26 @@ export default function SettingsPage() {
     }
   }
 
-  useLeaveGuard(pendingCount > 0, () => showConfirm(t('sectioned.leaveConfirm'), {
-    title: t('sectioned.leaveTitle'),
-    confirmText: t('sectioned.leave'),
-    variant: 'danger',
-  }))
+  // Leaving keeps the draft for the return (no question); a reload or a close asks the browser
+  useUnloadGuard(pendingCount > 0)
+  const pageCounts = Object.fromEntries(pageParts.map((part) => [part.key, part.count]))
+  useEffect(() => {
+    if (loading) return
+    const draft = {
+      settings: pick(settings, [...bulkChanged, ...emailChanged]),
+      keyOrigin: pick(keyOrigin.current, bulkChanged),
+      oauthDirty: oauthDirty || undefined,
+      expiry: pageCounts.expiry ? expiryAlerts : undefined,
+      syslog: pageCounts.syslog ? syslogConfig : undefined,
+      mtls: pageCounts.mtls ? mtlsSettings : undefined,
+      ct: pageCounts.ct ? ctSettings : undefined,
+      ar: pageCounts.ar ? arSettings : undefined,
+    }
+    // A part whose route has not answered yet keeps what it had left
+    for (const [name, value] of Object.entries(kept.current || {})) if (draft[name] === undefined) draft[name] = value
+    const pending = bulkChanged.length + emailChanged.length + Object.values(pageCounts).reduce((a, b) => a + b, 0)
+    keepDraft(SETTINGS_DRAFT, pending || Object.keys(kept.current || {}).length ? draft : null)
+  })
 
   // Render content for each category
   const renderCategoryContent = (selectedCategory) => {

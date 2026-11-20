@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle, WarningCircle, XCircle } from '@phosphor-icons/react'
 import { Badge, Input, HelpCard } from '../../components'
@@ -7,7 +7,7 @@ import { windowsProfilesService } from '../../services'
 import { useNotification } from '../../contexts'
 import { groupEntriesByRealm } from '../../lib/windowsProfile'
 import CopyableUrl from './CopyableUrl'
-import { FormGroup, useSavePart } from '../../components/sectioned'
+import { FormGroup, useSavePart, keptPartDraft } from '../../components/sectioned'
 
 function KeytabStatus({ settings, t }) {
   if (!settings.keytab_set) return null
@@ -29,18 +29,22 @@ export default function WindowsSettingsPanel({ hasPermission, onLoaded }) {
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
   const [settings, setSettings] = useState(null)
   const [draft, setDraft] = useState({})
+  const restored = useRef(false)
   const canWrite = hasPermission('write:xcep')
 
   const load = useCallback(async () => {
     try {
       const response = await windowsProfilesService.getSettings()
       setSettings(response.data)
+      // A draft left pending on this tab comes back over what the server holds, once
       setDraft({
         xcep_enabled: Boolean(response.data.xcep_enabled),
         wstep_enabled: Boolean(response.data.wstep_enabled),
         kerberos_enabled: Boolean(response.data.kerberos_enabled),
         kerberos_spn: response.data.kerberos_spn || '',
+        ...(restored.current ? {} : keptPartDraft('xcepWstep:shared')),
       })
+      restored.current = true
       onLoaded?.(response.data)
     } catch (error) {
       showError(error.message || t('messages.errors.loadFailed.generic'))
@@ -80,6 +84,7 @@ export default function WindowsSettingsPanel({ hasPermission, onLoaded }) {
   useSavePart('xcepWstep:shared', {
     section: 'xcepWstep',
     count: settings ? Object.keys(loaded).filter((k) => draft[k] !== loaded[k]).length : 0,
+    draft: settings ? draft : undefined,
     save: handleSave,
     reset: () => setDraft(loaded),
   })
