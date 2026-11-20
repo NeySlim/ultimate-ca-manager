@@ -945,6 +945,7 @@
     "state": "Stato",
     "expiry": "Scadenza",
     "keyHeld": "Private key present in UCM",
+    "keyInUcm": "Private key in UCM",
     "compareHint": "Selezionare uno o due certificati da confrontare",
     "exportSelectedPem": "Esporta come PEM",
     "bulkExported_one": "{{count}} certificato esportato",

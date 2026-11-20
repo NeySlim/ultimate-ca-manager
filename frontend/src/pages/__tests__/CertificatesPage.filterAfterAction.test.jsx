@@ -119,8 +119,10 @@ describe('CertificatesPage — filter survives an external action (#345)', () =>
       id: 43, cn: 'phone.example.com', descr: 'Renamed on mobile', status: 'valid', caref: 'ca-1',
     }], meta: { total: 1 } })
     renderPage()
+    // The record shows the description on its own line, under the name
     const name = await screen.findByText('phone.example.com')
-    expect(name.parentElement).toHaveTextContent(/^phone\.example\.comRenamed on mobile$/)
+    const record = name.closest('[role="listitem"]')
+    expect(record.querySelector('.lv-mrecord-desc')).toHaveTextContent(/^Renamed on mobile$/)
   })
 
   it('exports the description in its own column, beside the Common Name', () => {

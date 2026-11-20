@@ -953,6 +953,7 @@
     "state": "Стан",
     "expiry": "Термін дії",
     "keyHeld": "Private key present in UCM",
+    "keyInUcm": "Private key in UCM",
     "compareHint": "Виберіть один або два сертифікати для порівняння",
     "exportSelectedPem": "Експортувати в PEM",
     "bulkExported_one": "Експортовано {{count}} сертифікат",

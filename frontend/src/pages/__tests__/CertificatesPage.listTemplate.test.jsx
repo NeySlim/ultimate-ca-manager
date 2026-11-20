@@ -281,17 +281,28 @@ describe('CertificatesPage on a phone', () => {
     expect(screen.getByRole('button', { name: 'common.import' })).toBeInTheDocument()
   })
 
-  it('shows on a card the name, its description, the state, the issuer, the source and the expiry', async () => {
+  it('shows an Atelier record: the name, its description, issuer, source and key, the state and the expiry date', async () => {
     await mount([WEB])
-    const name = screen.getByText('web.example.com')
-    expect(name.parentElement).toHaveTextContent(/^web\.example\.comFront door$/)
-    // One card on screen: its second line says who issued it, how, and when it is due
-    const list = screen.getByRole('main')
-    expect(list.querySelectorAll('.lv-pill')).toHaveLength(1)
-    expect(list.querySelector('.lv-pill')).toHaveTextContent('common.valid')
-    expect(within(list).getByText('Issuing CA 1')).toBeInTheDocument()
-    expect(within(list).getByText('certificates.sourceAcme')).toBeInTheDocument()
-    expect(list.querySelector('.lv-due-rel')).toHaveTextContent('time.short.months:6')
+    const record = screen.getByRole('listitem')
+    expect(within(record).getByRole('button', { name: 'web.example.com' })).toBeInTheDocument()
+    expect(within(record).getByRole('checkbox', { name: 'table.selectRow' })).toBeInTheDocument()
+    expect(record.querySelector('.lv-mrecord-desc')).toHaveTextContent('Front door')
+    const meta = [...record.querySelectorAll('.lv-mrecord-meta > span')].map((s) => s.textContent)
+    expect(meta).toEqual(['Issuing CA 1', 'certificates.sourceAcme', 'certificates.keyInUcm'])
+    const status = record.querySelector('.lv-mrecord-status')
+    expect(status.querySelectorAll('.lv-pill')).toHaveLength(1)
+    expect(status.querySelector('.lv-pill')).toHaveTextContent('common.valid')
+    expect(status.querySelector('time')).toHaveAttribute('dateTime', WEB.valid_to)
+  })
+
+  it('keeps the filters and the export on a phone, not the columns or the density', async () => {
+    await mount([WEB])
+    for (const filter of ['common.allCAs', 'certificates.allSources']) {
+      expect(screen.getByRole('button', { name: filter })).toBeInTheDocument()
+    }
+    expect(screen.getByTitle('table.exportData')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'table.columns' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'table.densityComfortable' })).toBeNull()
   })
 })
 

@@ -945,6 +945,7 @@
     "state": "状态",
     "expiry": "到期",
     "keyHeld": "UCM 中存在私钥",
+    "keyInUcm": "私钥在 UCM 中",
     "compareHint": "请选择一个或两个证书进行比较",
     "exportSelectedPem": "导出为 PEM",
     "bulkExported_one": "已导出 {{count}} 个证书",

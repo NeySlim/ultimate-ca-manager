@@ -19,6 +19,7 @@ import { MultiSelectFilter } from '../MultiSelectFilter'
 import { FilterChips } from '../FilterChips'
 import { ListTable } from './ListTable'
 import { ListDialog } from '../../list/ListDialog'
+import { ListCards } from './ListCards'
 import { ColumnsIcon, RowsIcon } from '../../list/atelierIcons'
 import '../../list/list.css'
 
@@ -117,6 +118,7 @@ export function ResponsiveDataTable({
   belowToolbar, // ReactNode under the toolbar (active filters), list template
   openFromName = false, // list template: only the name and the chevron open a row
   lockRowsOnSelect = false, // list template: names and row actions wait while rows are ticked
+  card, // list template on a phone: row => { description, meta, status, end } draws Atelier records
   noMatch, // list template, nothing matches the filters: { title, description, action }
   columnsNote, // list template: the sentence of the columns dialog
 
@@ -126,8 +128,10 @@ export function ResponsiveDataTable({
   const { isMobile, isDesktop, isTouch } = useMobile()
   const { t } = useTranslation()
   const list = variant === 'list'
-  // The list template draws the desktop; phones keep the card list
-  const flat = list && !isMobile
+  // The list template draws the desktop, and phones too when the page gives its records
+  // (`card`); a list without them keeps the older card list on a phone
+  const cards = list && isMobile && typeof card === 'function'
+  const flat = list && (!isMobile || cards)
   
   // Density state (persisted if key provided); the list template has two, compact and comfortable
   const [density, setDensity] = useState(() => {
@@ -848,7 +852,27 @@ export function ResponsiveDataTable({
       )}
 
       {/* TABLE / CARDS */}
-      {isMobile ? (
+      {cards ? (
+        <div className="lv-table-box is-cards">
+          <ListCards
+            data={paginatedData}
+            card={card}
+            rowLabel={rowLabel}
+            label={tableLabel}
+            onRowClick={onRowClick}
+            multiSelect={multiSelect}
+            selectedIds={selectedIds}
+            onToggleRow={handleToggleRow}
+            selectedId={selectedId}
+            locked={lockRowsOnSelect && selectionCount > 0}
+            loading={loading}
+            emptyContent={emptyContent}
+          />
+          {paginationProps && (
+            <PaginationBar {...paginationProps} isMobile flat compact range={rangeOf} busy={loading && !sortedData.length} />
+          )}
+        </div>
+      ) : isMobile ? (
         <MobileCardList
           data={paginatedData}
           primaryCol={primaryCol}
@@ -1078,7 +1102,7 @@ function SearchBar({
         )}
         
         {/* Filters (desktop only) */}
-        {!isMobile && shownFilters.length > 0 && (
+        {(flat || !isMobile) && shownFilters.length > 0 && (
           <div className={flat ? 'lv-tools' : 'flex items-center gap-2 shrink-0'}>
             {shownFilters.map((filter) => {
               // Boolean toggle filter -- a checkbox-style pill for the
@@ -1177,10 +1201,10 @@ function SearchBar({
           </div>
         )}
         
-        {flat && <span className="lv-divider" aria-hidden="true" />}
+        {flat && !isMobile && <span className="lv-divider" aria-hidden="true" />}
 
         {/* List template: the columns dialog; the columns that always show are not offered */}
-        {flat && columns && columns.length > 0 && (
+        {flat && !isMobile && columns && columns.length > 0 && (
           <>
             <button type="button" className="lv-btn" onClick={() => setShowColumnMenu?.(true)} aria-haspopup="dialog">
               <ColumnsIcon size={17} />
@@ -1267,7 +1291,7 @@ function SearchBar({
         )}
         
         {/* Density toggle (desktop only): in the list template a switch to the comfortable rows */}
-        {flat && densityStorageKey && (
+        {flat && !isMobile && densityStorageKey && (
           <button type="button" onClick={cycleDensity} className="lv-btn is-icon is-bare"
             aria-label={t('table.densityComfortable')} aria-pressed={density === 'comfortable'} title={t('table.changeDensity')}>
             <RowsIcon size={16} />
@@ -1399,12 +1423,12 @@ function SearchBar({
         )}
         
         {/* Export Button (desktop only) */}
-        {!isMobile && exportNotice && (
+        {(flat || !isMobile) && exportNotice && (
           <span role="status" className="text-2xs text-status-warning shrink-0">
             {t(exportNotice.key, exportNotice.values)}
           </span>
         )}
-        {!isMobile && exportEnabled && (flat || dataCount > 0) && (
+        {(flat || !isMobile) && exportEnabled && (flat || dataCount > 0) && (
           <div className="relative shrink-0" ref={exportMenuRef}>
             <button
               type="button"
@@ -2018,7 +2042,8 @@ function PageJump({ page, totalPages, onChange }) {
   )
 }
 
-function PaginationBar({ page, total, perPage, onChange, onPerPageChange, pageSizes = PAGE_SIZES, perPageLabel, isMobile, flat = false, range, busy = false }) {
+// `compact`: a phone footer, « page / pages » without the page number field
+function PaginationBar({ page, total, perPage, onChange, onPerPageChange, pageSizes = PAGE_SIZES, perPageLabel, isMobile, flat = false, compact = false, range, busy = false }) {
   const { t } = useTranslation()
   const totalPages = Math.ceil(total / perPage)
   const start = (page - 1) * perPage + 1
@@ -2051,7 +2076,7 @@ function PaginationBar({ page, total, perPage, onChange, onPerPageChange, pageSi
             onClick={() => onChange(page - 1)} disabled={page <= 1}>
             <CaretLeft aria-hidden="true" />
           </button>
-          {pages > PAGE_JUMP_ABOVE
+          {pages > PAGE_JUMP_ABOVE && !compact
             ? <PageJump page={page} totalPages={pages} onChange={onChange} />
             : <span>{page} / {pages}</span>}
           <button type="button" className="lv-page-arrow" aria-label={t('table.nextPage')}

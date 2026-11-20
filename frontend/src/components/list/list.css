@@ -476,10 +476,39 @@
   .lv-stage { --lv-gutter: 16px; }
   .lv-main { padding: 0; }
   .lv-head { flex-wrap: wrap; gap: 12px; padding-top: 14px; padding-bottom: 10px; }
-  .lv-title-line h1 { font-size: 20px; }
+  .lv-title-line h1 { font-size: 24px; }
+  .lv-title-line .lv-total { display: none; }
   .lv-views-row { margin-bottom: 0; }
   .lv-workspace { padding-bottom: 0; }
+  /* Phone toolbar, as the mockup: the search on its own line, the filters sharing the next */
+  .lv-toolbar { flex-wrap: wrap; gap: 8px; }
+  .lv-toolbar .lv-search { flex-basis: 100%; min-height: 42px; }
+  .lv-toolbar .lv-search input { min-height: 40px; font-size: 13px; }
+  .lv-main:has(.lv-table-box.is-cards) { padding: 0 var(--lv-gutter); }
+  .lv-toolbar .lv-tools { flex: 1 1 0; min-width: 0; }
+  .lv-toolbar .lv-filter { flex: 1 1 0; min-width: 0; }
+  .lv-toolbar .lv-filter > button { width: 100%; min-height: 40px; }
+  .lv-toolbar .lv-btn.is-icon { width: 40px; height: 40px; }
+  .lv-footer { padding: 10px; gap: 8px; flex-wrap: wrap; }
+  .lv-footer .lv-page-arrow { width: 38px; height: 38px; }
+  .lv-footer .lv-page-size { min-height: 38px; }
 }
+
+/* The list template on a phone: one record per row (the Atelier mobile list) */
+.lv-mlist { display: block; }
+.lv-mrecord { padding: 13px 14px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.lv-mrecord:last-child { border-bottom: 0; }
+.lv-mrecord.is-checked { background: var(--selected); }
+.lv-mrecord-top { display: flex; align-items: center; gap: 9px; }
+.lv-mrecord .lv-check-hit { display: flex; align-items: center; justify-content: center; width: 32px; min-height: 42px; flex-shrink: 0; cursor: pointer; }
+.lv-mrecord .lv-entity { flex: 1; min-width: 0; min-height: 42px; font-size: 13px; font-weight: 500; text-align: left; }
+.lv-mrecord .lv-entity .lv-entity-text { overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
+.lv-mrecord-desc { margin: 0 0 4px 41px; font-size: 12px; color: var(--text); }
+.lv-mrecord-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-left: 41px; font-size: 12px; color: var(--muted); }
+.lv-key-note { display: inline-flex; align-items: center; gap: 5px; }
+.lv-mrecord-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 12px 0 0 41px; font-size: 12px; }
+.lv-mrecord-end { color: var(--muted); font-size: 12px; }
+.lv-table-box.is-cards .lv-empty { margin: 24px 14px; }
 
 @media (prefers-reduced-motion: reduce) {
   .lv-btn,

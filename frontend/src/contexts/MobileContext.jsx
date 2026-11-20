@@ -3,8 +3,8 @@
  * 
  * Breakpoints:
  * - Mobile: < 640px (phones)
- * - Tablet: 640px - 899px (tablets, small windows)
- * - Desktop: >= 900px (laptops, desktops)
+ * - Tablet: 640px - 800px (tablets, small windows)
+ * - Desktop: >= 801px (laptops, desktops)
  * - Large: >= 1280px (large monitors)
  * 
  * Touch detection for input method
@@ -18,7 +18,7 @@ const MobileContext = createContext(null)
 const BREAKPOINTS = {
   sm: 640,   // Mobile threshold
   md: 768,   // Tailwind md
-  lg: 900,   // Desktop threshold (lowered from 1024)
+  lg: 801,   // Desktop from 801 px: the mockup and the CSS switch at max-width 800px
   xl: 1280,
   '2xl': 1536
 }
@@ -89,9 +89,9 @@ export function MobileProvider({ children }) {
   }, [forceDesktop])
 
   // Computed values - forceDesktop overrides responsive behavior
-  const isMobile = forceDesktop ? false : screenSize.width < BREAKPOINTS.lg  // < 900px
-  const isTablet = forceDesktop ? false : screenSize.width >= BREAKPOINTS.sm && screenSize.width < BREAKPOINTS.lg  // 640-899px
-  const isDesktop = forceDesktop ? true : screenSize.width >= BREAKPOINTS.lg  // >= 900px
+  const isMobile = forceDesktop ? false : screenSize.width < BREAKPOINTS.lg  // <= 800px
+  const isTablet = forceDesktop ? false : screenSize.width >= BREAKPOINTS.sm && screenSize.width < BREAKPOINTS.lg  // 640-800px
+  const isDesktop = forceDesktop ? true : screenSize.width >= BREAKPOINTS.lg  // >= 801px
   const isLargeScreen = screenSize.width >= BREAKPOINTS.xl  // >= 1280px
   const isExtraLarge = screenSize.width >= BREAKPOINTS['2xl']  // >= 1536px
 
@@ -122,9 +122,9 @@ export function MobileProvider({ children }) {
     screenHeight: screenSize.height,
     
     // Device type flags
-    isMobile,       // < 900px (phones + tablets) - unless forceDesktop
-    isTablet,       // 640px - 899px - unless forceDesktop
-    isDesktop,      // >= 900px OR forceDesktop
+    isMobile,       // <= 800px (phones + tablets) - unless forceDesktop
+    isTablet,       // 640px - 800px - unless forceDesktop
+    isDesktop,      // >= 801px OR forceDesktop
     isLargeScreen,  // >= 1280px
     isExtraLarge,   // >= 1536px
     isTouch,        // Touch-capable device

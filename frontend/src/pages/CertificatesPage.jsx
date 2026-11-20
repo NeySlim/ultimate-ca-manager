@@ -26,7 +26,7 @@ import { CERT_STATUSES, parseOverviewFilters, toListParams, toSearch, withoutFil
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { IssueCertificateForm } from './certificates/IssueCertificateForm'
-import { useCertificateColumns } from './certificates/useCertificateColumns'
+import { useCertificateColumns, useCertificateCard } from './certificates/useCertificateColumns'
 import { soleImported } from '../lib/importResult'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 import { issueWithSubjectOverride } from '../lib/uniqueSubject'
@@ -400,6 +400,7 @@ export default function CertificatesPage() {
 
   // Column definitions (extracted to sub-module)
   const columns = useCertificateColumns(t)
+  const card = useCertificateCard(t)
 
   // One action on the row; rename, renew, revoke and delete live in the inspector
   const rowActions = (row) => [
@@ -576,6 +577,7 @@ export default function CertificatesPage() {
           loading={loading}
           onRowClick={handleSelectCert}
           openFromName
+          card={card}
           lockRowsOnSelect
           selectedId={dockedId}
           rowLabel={(row) => row.cn}

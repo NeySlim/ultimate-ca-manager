@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useCallback } from 'react'
 import {
   Certificate, Info, Check, Clock, Warning, Prohibit, LinkBreak, Archive, LinkSimple, Key
 } from '@phosphor-icons/react'
@@ -204,3 +204,24 @@ export function useCertificateColumns(t) {
 
   return columns
 }
+
+/** A certificate as an Atelier record on a phone: description, issuer, source and key, state and expiry date. */
+export function useCertificateCard(t) {
+  return useCallback((row) => {
+    const value = sourceOf(row)
+    const issuer = extractCN(row.issuer) || row.issuer_name || ''
+    return {
+      icon: <Certificate size={16} aria-hidden="true" />,
+      description: row.descr && row.descr !== (row.cn || row.common_name) ? row.descr : '',
+      meta: [
+        issuer,
+        <SourceLabel key="source" icon={sourceIcon(value)} label={sourceLabel(value, t)} />,
+        row.has_private_key && <span key="key" className="lv-key-note"><Key size={12} aria-hidden="true" />{t('certificates.keyInUcm')}</span>,
+        row.isOrphan && <RowMark key="orphan" icon={LinkBreak} tone="warn" label={t('certificates.orphanDescription')}>{t('certificates.orphan')}</RowMark>,
+      ],
+      status: <StatusPill {...certificateState(row, t)} />,
+      end: row.valid_to ? <time dateTime={row.valid_to}>{formatDate(row.valid_to, { time: false })}</time> : null,
+    }
+  }, [t])
+}
+

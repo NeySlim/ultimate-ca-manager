@@ -953,6 +953,7 @@
     "state": "Состояние",
     "expiry": "Срок действия",
     "keyHeld": "Закрытый ключ есть в UCM",
+    "keyInUcm": "Закрытый ключ в UCM",
     "compareHint": "Выберите один или два сертификата для сравнения",
     "exportSelectedPem": "Экспорт в PEM",
     "bulkExported_one": "Экспортирован {{count}} сертификат",

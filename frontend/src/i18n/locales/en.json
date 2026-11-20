@@ -945,6 +945,7 @@
     "state": "State",
     "expiry": "Expiry",
     "keyHeld": "Private key present in UCM",
+    "keyInUcm": "Private key in UCM",
     "compareHint": "Select one or two certificates to compare",
     "exportSelectedPem": "Export as PEM",
     "bulkExported_one": "{{count}} certificate exported",

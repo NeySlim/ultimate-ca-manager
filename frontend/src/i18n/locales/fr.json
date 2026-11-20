@@ -1373,6 +1373,7 @@
     "state": "État",
     "expiry": "Expiration",
     "keyHeld": "Clé privée présente dans UCM",
+    "keyInUcm": "Clé privée dans UCM",
     "compareHint": "Sélectionnez un ou deux certificats à comparer",
     "exportSelectedPem": "Exporter en PEM",
     "bulkExported_one": "{{count}} certificat exporté",

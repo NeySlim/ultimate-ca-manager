@@ -945,6 +945,7 @@
     "state": "状態",
     "expiry": "有効期限",
     "keyHeld": "Private key present in UCM",
+    "keyInUcm": "Private key in UCM",
     "compareHint": "比較する証明書を 1 件または 2 件選択してください",
     "exportSelectedPem": "PEM でエクスポート",
     "bulkExported_one": "証明書 {{count}} 件をエクスポートしました",
