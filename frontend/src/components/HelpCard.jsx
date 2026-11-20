@@ -5,37 +5,13 @@
 import { Info, Lightbulb, Warning, Question, CheckCircle } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
 
+// The mockup's `.notice`: 12 px text on the raised surface, radius 4, no border; warnings in their tone
 const variants = {
-  info: {
-    icon: Info,
-    color: 'text-accent-primary',
-    bg: 'bg-accent-primary-op5',
-    border: 'border-accent-primary-op20',
-  },
-  tip: {
-    icon: Lightbulb,
-    color: 'status-warning-text',
-    bg: 'status-warning-bg',
-    border: 'status-warning-border',
-  },
-  warning: {
-    icon: Warning,
-    color: 'text-accent-danger',
-    bg: 'bg-accent-danger-op5',
-    border: 'border-accent-danger-op20',
-  },
-  help: {
-    icon: Question,
-    color: 'status-purple-text',
-    bg: 'status-purple-bg',
-    border: 'status-purple-border',
-  },
-  success: {
-    icon: CheckCircle,
-    color: 'text-accent-success',
-    bg: 'bg-accent-success-op5',
-    border: 'border-accent-success-op20',
-  },
+  info: { icon: Info, tone: '' },
+  tip: { icon: Lightbulb, tone: '' },
+  warning: { icon: Warning, tone: 'is-warn' },
+  help: { icon: Question, tone: '' },
+  success: { icon: CheckCircle, tone: 'is-good' },
 }
 
 export function HelpCard({ 
@@ -44,45 +20,24 @@ export function HelpCard({
   children, 
   items = [],
   className,
+  // eslint-disable-next-line no-unused-vars
   compact = false 
 }) {
-  const config = variants[variant]
+  const config = variants[variant] || variants.info
   const Icon = config.icon
 
   return (
-    <div className={cn(
-      'rounded-lg border',
-      config.bg,
-      config.border,
-      compact ? 'p-2' : 'p-3',
-      className
-    )}>
-      <div className="flex gap-2">
-        <div className={cn('flex-shrink-0 mt-0.5', config.color)}>
-          <Icon size={compact ? 14 : 16} weight="fill" />
-        </div>
-        <div className="flex-1 min-w-0 text-xs">
-          {title && (
-            <p className={cn('font-semibold mb-1', config.color)}>
-              {title}
-            </p>
-          )}
-          {children && (
-            <div className="text-text-secondary leading-relaxed">
-              {children}
-            </div>
-          )}
-          {items.length > 0 && (
-            <ul className="text-text-secondary space-y-0.5 mt-1">
-              {items.map((item, i) => (
-                <li key={i} className="flex items-start gap-1.5">
-                  <span className={cn('mt-1.5 w-1 h-1 rounded-full flex-shrink-0', config.color.replace('text-', 'bg-'))} />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+    <div className={cn('ui-notice', config.tone, className)}>
+      <Icon aria-hidden="true" />
+      <div className="ui-notice-body">
+        {title && <strong>{title}</strong>}
+        {title && (children || items.length > 0) && ' '}
+        {children}
+        {items.length > 0 && (
+          <ul>
+            {items.map((item, i) => <li key={i}>{item}</li>)}
+          </ul>
+        )}
       </div>
     </div>
   )

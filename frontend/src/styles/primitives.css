@@ -289,3 +289,24 @@ textarea.ui-control { min-height: 80px; resize: vertical; }
 @media (max-width: 899px) {
   .shell-pop.ui-theme-menu { position: absolute; top: calc(100% + 8px); right: 0; left: auto; width: 220px; }
 }
+.ui-pop-icon { display: inline-flex; flex-shrink: 0; color: var(--muted); }
+.ui-pop-item.is-danger .ui-pop-icon { color: inherit; }
+.ui-pop-icon svg { width: 15px; height: 15px; }
+
+/* Detail blocks of the older panels: plain heading, bordered frames, terms and values at 12 px */
+.ui-detail-head { position: relative; padding: 0 0 14px; }
+.ui-detail-title { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
+.ui-detail-frame { padding: 12px 14px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); font-size: 12px; }
+.ui-detail-frame.is-compact { padding: 8px 10px; }
+.ui-detail-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 4px 0; font-size: 12px; }
+.ui-detail-field dt { color: var(--muted); }
+.ui-detail-field dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+/* Collapsible section: the mockup's bordered block with a 13 px toggle line */
+.ui-compact { overflow: hidden; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; }
+.ui-compact-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 36px; padding: 6px 12px; background: none; border: 0; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.ui-compact-head.is-open { border-bottom: 1px solid var(--line); }
+.ui-compact-head.is-static { cursor: default; }
+.ui-compact-head:disabled { opacity: 1; }
+.ui-compact-head h4 { margin: 0; font-size: 13px; font-weight: 500; color: var(--text); text-transform: none; letter-spacing: 0; }
+.ui-compact-head > svg { width: 14px; height: 14px; color: var(--muted); }
+.ui-compact-body { padding: 14px; font-size: 12px; }

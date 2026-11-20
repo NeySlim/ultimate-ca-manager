@@ -1,43 +1,15 @@
 import { cn } from '../lib/utils'
-import { IconBadge } from './IconBadge'
 
-export function Card({ 
-  children, 
-  className, 
-  hover = true, 
-  interactive = false, // clickable card with lift effect
-  variant = 'default',  // default, elevated, bordered, soft
-  accent,  // left border color: 'primary', 'success', 'warning', 'danger', 'info'
-  ...props 
-}) {
-  const variants = {
-    default: 'card-soft',
-    elevated: cn(
-      'bg-bg-secondary border border-border-op40 rounded-xl',
-      'elevation-2',
-    ),
-    bordered: cn(
-      'bg-secondary-op50 border-2 border-border rounded-xl',
-    ),
-    soft: 'card-soft',
-  }
-  
-  const accentColors = {
-    primary: 'border-l-accent-primary',
-    success: 'border-l-accent-success',
-    warning: 'border-l-accent-warning',
-    danger: 'border-l-accent-danger',
-    info: 'border-l-accent-primary',
-    purple: 'border-l-accent-purple',
-  }
-  
+/**
+ * Card - the mockup's panel: one bordered frame on the panel surface, radius 5, no gradient
+ * or shadow (Aurore adds its gradient border). `interactive` frames hover; `accent` keeps a
+ * 4 px left rule in the tone. `variant` and `hover` are accepted for compatibility.
+ */
+// eslint-disable-next-line no-unused-vars
+export function Card({ children, className, hover, interactive = false, variant, accent, ...props }) {
   return (
     <div
-      className={cn(
-        interactive ? 'card-interactive' : variants[variant],
-        accent && `border-l-4 ${accentColors[accent]}`,
-        className
-      )}
+      className={cn('ui-panel', interactive && 'is-interactive', accent && `is-accent-${accent}`, className)}
       {...props}
     >
       {children}
@@ -45,35 +17,30 @@ export function Card({
   )
 }
 
-// Card sub-components for structured content
-Card.Header = function CardHeader({ children, className, icon: Icon, iconColor = 'primary', title, subtitle, action }) {
+// Heading of the panel: title 14 px/600 in sentence case, its sentence 12 px under it, action on the right.
+// eslint-disable-next-line no-unused-vars
+Card.Header = function CardHeader({ children, className, icon: Icon, iconColor, title, subtitle, action }) {
   if (Icon || title) {
     return (
-      <div className={cn('flex items-start justify-between gap-3 p-3 pb-2 border-b border-border-op30 section-header-gradient', className)}>
-        <div className="flex items-center gap-3">
-          {Icon && (
-            <IconBadge icon={Icon} color={iconColor} size="sm" rounded="lg" />
-          )}
+      <div className={cn('ui-panel-heading', className)}>
+        <div>
+          {Icon && <Icon aria-hidden="true" />}
           <div>
-            {title && <h3 className="text-sm font-semibold text-text-primary">{title}</h3>}
-            {subtitle && <p className="text-xs text-text-secondary mt-0.5">{subtitle}</p>}
+            {title && <h3>{title}</h3>}
+            {subtitle && <p>{subtitle}</p>}
           </div>
         </div>
         {action}
       </div>
     )
   }
-  return <div className={cn('p-3 pb-2 border-b border-border-op30', className)}>{children}</div>
+  return <div className={cn('ui-panel-heading', className)}>{children}</div>
 }
 
 Card.Body = function CardBody({ children, className }) {
-  return <div className={cn('px-3 py-2.5', className)}>{children}</div>
+  return <div className={cn('ui-panel-content', className)}>{children}</div>
 }
 
 Card.Footer = function CardFooter({ children, className }) {
-  return (
-    <div className={cn('px-3 py-2.5 border-t border-border-op50 bg-tertiary-op30 rounded-b-xl', className)}>
-      {children}
-    </div>
-  )
+  return <div className={cn('ui-panel-foot', className)}>{children}</div>
 }

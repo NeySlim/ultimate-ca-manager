@@ -1,4 +1,4 @@
-import { Children, isValidElement } from 'react'
+import { Children, forwardRef, isValidElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
 import './list/list.css'
@@ -33,12 +33,13 @@ function isIconOnly(children, props) {
 // `type` defaults to 'button', not the HTML default of 'submit': every one of
 // the 91 buttons inside a form already passes one explicitly, and the first
 // omission would submit the form instead of opening a modal, silently.
-export function Button({ children, type = 'button', variant = 'primary', size = 'sm', loading = false, loadingText, className, ...props }) {
+export const Button = forwardRef(function Button({ children, type = 'button', variant = 'primary', size = 'sm', loading = false, loadingText, className, ...props }, ref) {
   const { t } = useTranslation()
   const iconOnly = !loading && isIconOnly(children, props)
 
   return (
     <button
+      ref={ref}
       type={type}
       {...props}
       className={cn(
@@ -65,4 +66,4 @@ export function Button({ children, type = 'button', variant = 'primary', size = 
       ) : children}
     </button>
   )
-}
+})

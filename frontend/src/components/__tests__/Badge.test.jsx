@@ -8,38 +8,16 @@ describe('Badge Component', () => {
     expect(screen.getByText('Active')).toBeInTheDocument()
   })
 
-  it('renders default variant', () => {
-    render(<Badge>Default</Badge>)
-    const badge = screen.getByText('Default')
-    expect(badge.className).toContain('bg-tertiary-op80')
-  })
-
-  it('renders success variant', () => {
-    render(<Badge variant="success">Valid</Badge>)
-    const badge = screen.getByText('Valid')
-    expect(badge.className).toContain('status-success-bg')
-    expect(badge.className).toContain('status-success-text')
-  })
-
-  it('renders warning variant', () => {
-    render(<Badge variant="warning">Expiring</Badge>)
-    const badge = screen.getByText('Expiring')
-    expect(badge.className).toContain('status-warning-bg')
-    expect(badge.className).toContain('status-warning-text')
-  })
-
-  it('renders danger variant', () => {
-    render(<Badge variant="danger">Revoked</Badge>)
-    const badge = screen.getByText('Revoked')
-    expect(badge.className).toContain('status-danger-bg')
-    expect(badge.className).toContain('status-danger-text')
-  })
-
-  it('renders info variant', () => {
-    render(<Badge variant="info">Pending</Badge>)
-    const badge = screen.getByText('Pending')
-    expect(badge.className).toContain('status-primary-bg')
-    expect(badge.className).toContain('status-primary-text')
+  // A badge is the mockup's .badge: the tone colours its text and icon, nothing fills it
+  it.each([
+    ['default', null], ['success', 'is-good'], ['warning', 'is-warn'], ['danger', 'is-bad'],
+    ['info', 'is-accent'], ['secondary', 'is-muted'], ['outline', 'is-chip'],
+  ])('renders the %s variant in its tone, without a fill', (variant, tone) => {
+    render(<Badge variant={variant}>Label</Badge>)
+    const cls = screen.getByText('Label').className
+    expect(cls).toContain('lv-pill')
+    if (tone) expect(cls).toContain(tone)
+    expect(cls).not.toMatch(/status-\w+-bg|bg-tertiary|font-semibold|rounded-full/)
   })
 
   it('renders with icon', () => {
@@ -51,18 +29,12 @@ describe('Badge Component', () => {
     expect(screen.getByTestId('icon')).toBeInTheDocument()
   })
 
-  it('renders small size correctly', () => {
-    render(<Badge size="sm">Small</Badge>)
-    const badge = screen.getByText('Small')
-    expect(badge.className).toContain('px-2')
-    expect(badge.className).toContain('text-2xs')
-  })
-
-  it('renders large size correctly', () => {
-    render(<Badge size="lg">Large</Badge>)
-    const badge = screen.getByText('Large')
-    expect(badge.className).toContain('px-3')
-    expect(badge.className).toContain('text-sm')
+  it('keeps one 12 px size whatever size is asked', () => {
+    for (const size of ['sm', 'default', 'lg']) {
+      const { unmount } = render(<Badge size={size}>S</Badge>)
+      expect(screen.getByText('S').className).not.toMatch(/text-(2xs|xs|sm)|px-/)
+      unmount()
+    }
   })
 
   it('applies custom className', () => {

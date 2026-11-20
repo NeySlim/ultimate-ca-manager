@@ -14,9 +14,10 @@ describe('IconBadge Component', () => {
     expect(container.querySelector('svg')).not.toBeInTheDocument()
   })
 
-  it('applies default color (primary)', () => {
+  it('applies default color (primary): the accent icon, no tile', () => {
     const { container } = render(<IconBadge icon={ShieldCheck} />)
-    expect(container.firstChild.className).toContain('bg-accent-primary')
+    expect(container.firstChild.className).toContain('is-accent')
+    expect(container.firstChild.className).not.toMatch(/bg-|rounded-xl/)
   })
 
   it('applies default size (md)', () => {
@@ -44,66 +45,24 @@ describe('IconBadge Component', () => {
     })
   })
 
-  it('applies different colors', () => {
-    const colors = ['blue', 'violet', 'emerald', 'teal', 'orange', 'amber']
-    colors.forEach(color => {
+  // Bare icons in the tone of the mockup: accent, good, warn, bad, muted
+  it.each([
+    ['blue', 'is-accent'], ['violet', 'is-accent'], ['purple', 'is-accent'], ['teal', 'is-accent'], ['primary', 'is-accent'],
+    ['emerald', 'is-good'], ['green', 'is-good'], ['success', 'is-good'],
+    ['orange', 'is-warn'], ['amber', 'is-warn'], ['yellow', 'is-warn'], ['warning', 'is-warn'],
+    ['danger', 'is-bad'],
+  ])('draws %s in the %s tone, without a tile', (color, tone) => {
+    const { container } = render(<IconBadge icon={ShieldCheck} color={color} />)
+    expect(container.firstChild.className).toContain(tone)
+    expect(container.firstChild.className).not.toMatch(/icon-bg-|bg-accent-|bg-bg-/)
+  })
+
+  it('draws neutral and unknown colours muted', () => {
+    for (const color of ['slate', 'neutral', 'muted', 'unknown-color']) {
       const { container } = render(<IconBadge icon={ShieldCheck} color={color} />)
-      expect(container.firstChild.className).toContain(`icon-bg-${color}`)
-    })
-  })
-
-  it('applies color aliases', () => {
-    // purple -> violet
-    const { container: c1 } = render(<IconBadge icon={ShieldCheck} color="purple" />)
-    expect(c1.firstChild.className).toContain('icon-bg-violet')
-    
-    // green -> emerald
-    const { container: c2 } = render(<IconBadge icon={ShieldCheck} color="green" />)
-    expect(c2.firstChild.className).toContain('icon-bg-emerald')
-    
-    // yellow -> amber
-    const { container: c3 } = render(<IconBadge icon={ShieldCheck} color="yellow" />)
-    expect(c3.firstChild.className).toContain('icon-bg-amber')
-  })
-
-  it('applies semantic colors', () => {
-    const semanticColors = ['primary', 'success', 'warning', 'danger']
-    semanticColors.forEach(color => {
-      const { container } = render(<IconBadge icon={ShieldCheck} color={color} />)
-      expect(container.firstChild.className).toContain(`bg-accent-${color}`)
-    })
-  })
-
-  it('applies neutral colors', () => {
-    const neutralColors = ['slate', 'neutral']
-    neutralColors.forEach(color => {
-      const { container } = render(<IconBadge icon={ShieldCheck} color={color} />)
-      expect(container.firstChild.className).toContain('bg-bg-tertiary')
-    })
-    // muted uses opacity variant
-    const { container } = render(<IconBadge icon={ShieldCheck} color="muted" />)
-    expect(container.firstChild.className).toContain('bg-tertiary-op50')
-  })
-
-  it('falls back to neutral for unknown color', () => {
-    const { container } = render(<IconBadge icon={ShieldCheck} color="unknown-color" />)
-    expect(container.firstChild.className).toContain('bg-bg-tertiary')
-  })
-
-  it('applies different rounded values', () => {
-    const roundedMap = {
-      full: 'rounded-full',
-      xl: 'rounded-xl',
-      lg: 'rounded-lg',
-      md: 'rounded-md',
-      sm: 'rounded-sm',
-      none: 'rounded-none',
+      expect(container.firstChild.className).not.toMatch(/is-(accent|good|warn|bad)/)
+      expect(container.firstChild.className).toContain('ui-icon')
     }
-
-    Object.entries(roundedMap).forEach(([rounded, expected]) => {
-      const { container } = render(<IconBadge icon={ShieldCheck} rounded={rounded} />)
-      expect(container.firstChild.className).toContain(expected)
-    })
   })
 
   it('applies custom className', () => {
@@ -146,9 +105,9 @@ describe('IconAvatar Component', () => {
     expect(container.firstChild.textContent).toBe('')
   })
 
-  it('applies default color (violet)', () => {
+  it('applies default color (violet) as the accent tone', () => {
     const { container } = render(<IconAvatar icon={User} />)
-    expect(container.firstChild.className).toContain('icon-bg-violet')
+    expect(container.firstChild.className).toContain('is-accent')
   })
 
   it('is always rounded-full', () => {
@@ -162,21 +121,9 @@ describe('IconAvatar Component', () => {
     expect(container.firstChild.className).toContain('h-12')
   })
 
-  it('applies initials text size based on size prop', () => {
-    const sizeMap = {
-      xs: 'text-2xs',
-      sm: 'text-xs',
-      md: 'text-sm',
-      lg: 'text-base',
-      xl: 'text-lg',
-    }
-
-    Object.entries(sizeMap).forEach(([size, expected]) => {
-      render(<IconAvatar initials="JD" size={size} data-testid={`avatar-${size}`} />)
-      const avatar = screen.getByTestId(`avatar-${size}`)
-      const span = avatar.querySelector('span')
-      expect(span.className).toContain(expected)
-    })
+  it('writes initials at 12 px whatever the size', () => {
+    render(<IconAvatar initials="JD" size="xl" data-testid="avatar" />)
+    expect(screen.getByTestId('avatar').className).toContain('text-xs')
   })
 
   it('applies custom className', () => {

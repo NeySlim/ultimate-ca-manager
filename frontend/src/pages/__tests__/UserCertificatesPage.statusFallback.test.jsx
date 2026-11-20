@@ -75,7 +75,7 @@ const row = (status) => ({
 })
 
 const badgesWithText = (text) =>
-  screen.queryAllByText(text).filter((el) => /badge-enhanced/.test(el.className || ''))
+  screen.queryAllByText(text).filter((el) => /\bui-badge\b/.test(el.className || ''))
 
 async function renderWith(status) {
   getAll.mockResolvedValue({ data: { items: [row(status)], total: 1 } })
@@ -95,7 +95,7 @@ describe('DUP-FE-013a — user certificate status badge fallback', () => {
     await waitFor(() => expect(badgesWithText('common.status').length).toBeGreaterThan(0))
     expect(badgesWithText('common.valid')).toHaveLength(0)
     badgesWithText('common.status').forEach((b) => {
-      expect(b.className).not.toMatch(/status-success-bg/)
+      expect(b.className).not.toMatch(/\bis-good\b/)
     })
   })
 
@@ -108,12 +108,12 @@ describe('DUP-FE-013a — user certificate status badge fallback', () => {
   it('still badges the statuses it knows', async () => {
     await renderWith('valid')
     await waitFor(() => expect(badgesWithText('common.valid').length).toBeGreaterThan(0))
-    expect(badgesWithText('common.valid')[0].className).toMatch(/status-success-bg/)
+    expect(badgesWithText('common.valid')[0].className).toMatch(/\bis-good\b/)
   })
 
   it('still badges a revoked certificate danger', async () => {
     await renderWith('revoked')
     await waitFor(() => expect(badgesWithText('common.revoked').length).toBeGreaterThan(0))
-    expect(badgesWithText('common.revoked')[0].className).toMatch(/status-danger-bg/)
+    expect(badgesWithText('common.revoked')[0].className).toMatch(/\bis-bad\b/)
   })
 })
