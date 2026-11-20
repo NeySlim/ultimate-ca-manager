@@ -19,9 +19,9 @@ test('the status bar keeps the bottom of the window under the open dock', async 
   const view = page.viewportSize()!
   const bar = page.getByRole('contentinfo')
   await expect(bar).toHaveCount(1)
-  // The bar of the 2.x window manager is gone
+  // The bar of the 2.x window manager is gone, and the dock leaves close-on-navigate to the account preferences
   await expect(page.getByText('Close on navigate')).toHaveCount(0)
-  await expect(dock.getByRole('button', { name: 'Close on navigate' })).toBeVisible()
+  await expect(dock.getByRole('button', { name: 'Close on navigate' })).toHaveCount(0)
 
   const check = async () => {
     const b = await box(bar)

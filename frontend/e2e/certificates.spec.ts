@@ -15,10 +15,17 @@ async function openInInspector(page, cn: string) {
   return panel
 }
 
-// Actions other than Export and Renew sit in the « ⋯ » menu of the heading, rendered in a portal
+// Actions other than Export and Renew sit in the Certificate actions dialog of the heading's « ⋯ »
 async function moreAction(page, panel, cn: string, name: string) {
   await panel.getByRole('button', { name: `Other actions for ${cn}` }).click()
-  await page.getByRole('menuitem', { name, exact: true }).click()
+  await page.getByRole('dialog', { name: 'Certificate actions' }).getByRole('button', { name, exact: true }).click()
+}
+
+// The inspector writes a serial number as octets in hexadecimal; the API gives it in decimal
+const serialHex = (serial: string) => {
+  let hex = BigInt(serial).toString(16).toUpperCase()
+  if (hex.length % 2) hex = `0${hex}`
+  return hex.match(/../g)!.join(':')
 }
 
 test('a certificate issued on screen is signed by the chosen CA', async ({ page, api }) => {
@@ -41,7 +48,7 @@ test('a certificate issued on screen is signed by the chosen CA', async ({ page,
 test('the inspector shows the certificate the row names', async ({ page, api }) => {
   const cert = await issueCert(api, (await createCA(api)).id)
   const panel = await openInInspector(page, cert.common_name)
-  await expect(panel.getByText(cert.serial_number, { exact: false }).first()).toBeVisible()
+  await expect(panel.getByText(serialHex(cert.serial_number), { exact: false }).first()).toBeVisible()
   await panel.getByRole('tab', { name: 'Extensions', exact: true }).click()
   await expect(panel).toContainText(new RegExp(`DNS:\\s*${cert.common_name.replace(/\./g, '\\.')}`))
 })
@@ -63,7 +70,7 @@ test('a certificate revoked from the inspector is listed by the next CRL', async
   const ca = await createCA(api)
   const cert = await issueCert(api, ca.id)
   const panel = await openInInspector(page, cert.common_name)
-  await moreAction(page, panel, cert.common_name, 'Revoke')
+  await moreAction(page, panel, cert.common_name, 'Revoke the certificate…')
   const dialog = page.getByRole('dialog', { name: 'Revoke certificate' })
   await dialog.getByRole('button', { name: 'Revoke', exact: true }).click()
   await expect(dialog).toBeHidden()
