@@ -49,7 +49,9 @@ describe('IssueCertificateForm custom extensions', () => {
     type(`${P}extValue`, '050')
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`${P}toReview`) }))
     expect(await screen.findByText('customExtensions.invalidHex')).toBeTruthy()
-    expect(screen.getByLabelText(`${P}extOid`).getAttribute('aria-invalid')).toBe('true')
+    // A wrong value is marked on the value, its OID being right
+    expect(screen.getByLabelText(`${P}extValue`).getAttribute('aria-invalid')).toBe('true')
+    expect(screen.getByLabelText(`${P}extOid`).getAttribute('aria-invalid')).toBeNull()
     expect(screen.queryByTestId('issue-review')).toBeNull()
     expect(onSubmit).not.toHaveBeenCalled()
   })

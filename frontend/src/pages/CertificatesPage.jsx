@@ -671,12 +671,12 @@ export default function CertificatesPage() {
         cas={cas}
         initialData={issueInitialData}
         onMutate={muteToasts}
-        onIssued={(issued) => {
+        onIssued={() => {
           setIssueInitialData(null)
           loadData()
-          // Straight to what was just issued
-          if (issued?.id) handleSelectCert(issued)
         }}
+        // "View the certificate" of the result screen
+        onOpen={(issued) => { if (issued?.id) handleSelectCert(issued) }}
       />
 
       {/* Certificate Compare Modal */}

@@ -36,9 +36,9 @@ describe('IssueCertificateForm CAs that cannot sign (#426)', () => {
       { id: 3, descr: 'Issuing CA', has_private_key: true },
       { id: 4, descr: 'Imported root', is_root: true, certificate_only: true, has_private_key: false },
     ])
-    // The placeholder leads the list until a CA is chosen
-    expect(optionValues(LABEL.ca)).toEqual(['', '3'])
-    expect(screen.getByTestId('unlisted-cas')).toHaveTextContent('cas.notListedForSigning:1')
+    // The only CA that can sign is the choice: nothing to pick
+    expect(optionValues(LABEL.ca)).toEqual(['3'])
+    expect(screen.getByTestId('unlisted-cas')).toHaveTextContent('certificates.issueForm.hintExcluded:1')
   })
 
   it('says nothing when every CA can sign', () => {

@@ -66,10 +66,10 @@ vi.mock('../../../services', () => ({
 }))
 
 vi.mock('../IssueCertificateForm', () => ({
-  IssueCertificateForm: ({ onSubmit, mode }) => (
-    <button type="button" onClick={() => onSubmit(mode === 'renew' ? {} : {
+  IssueCertificateForm: ({ onSubmit, onSent, mode }) => (
+    <button type="button" onClick={async () => onSent(await onSubmit(mode === 'renew' ? {} : {
       cn: 'pair.example.com', hybrid: { classical: 'EC-P256', pq: 'ML-DSA-65' },
-    })}>{mode === 'renew' ? 'submit-renew' : 'submit-issue'}</button>
+    }))}>{mode === 'renew' ? 'submit-renew' : 'submit-issue'}</button>
   ),
 }))
 
@@ -115,6 +115,8 @@ describe('CertificatesPage and a hybrid pair', () => {
 
   it('opens the classical member of the pair it has just issued', async () => {
     await issuePair()
+    expect(mocks.openEntity).not.toHaveBeenCalledWith('certificate', 11)
+    fireEvent.click(await screen.findByRole('button', { name: 'certificates.issueForm.resultViewCertificate' }))
     await waitFor(() => expect(mocks.openEntity).toHaveBeenCalledWith('certificate', 11))
   })
 

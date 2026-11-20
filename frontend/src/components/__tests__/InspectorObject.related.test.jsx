@@ -40,7 +40,9 @@ vi.mock('../../services', () => ({
 vi.mock('../deploy/CertDeploySection', () => ({ CertDeploySection: () => null }))
 // Renewal goes through the issue form, stubbed here: its Review step sends an unchanged duration
 vi.mock('../../pages/certificates/IssueCertificateForm', () => ({
-  IssueCertificateForm: ({ onSubmit }) => <button type="button" onClick={() => onSubmit({})}>submit-renew</button>,
+  IssueCertificateForm: ({ onSubmit, onSent }) => (
+    <button type="button" onClick={async () => onSent(await onSubmit({}))}>submit-renew</button>
+  ),
 }))
 
 import { InspectorObject } from '../inspector/InspectorObject'
@@ -99,8 +101,8 @@ describe('InspectorObject of a hybrid pair member', () => {
 
   it.each([
     [{ id: 4, related_renewed: [5] }, 'certificates.hybrid.renewedWithRelated'],
-    [{ id: 4 }, 'certificates.renewed'],
-  ])('names the linked certificate renewed with it (%o)', async (answer, toast) => {
+    [{ id: 4 }, 'certificates.issueForm.result.renewed.copy'],
+  ])('names the linked certificate renewed with it (%o)', async (answer, said) => {
     mocks.certificatesService.getById.mockImplementation((id) =>
       Promise.resolve({ data: id === 5 ? PARTNER : { ...MEMBER, has_private_key: true } }))
     mocks.certificatesService.renew.mockResolvedValue({ data: answer })
@@ -109,7 +111,8 @@ describe('InspectorObject of a hybrid pair member', () => {
     fireEvent.click(screen.getByText('Renew'))
     fireEvent.click(await screen.findByText('submit-renew'))
     await waitFor(() => expect(mocks.certificatesService.renew).toHaveBeenCalledWith(4, {}))
-    await waitFor(() => expect(mocks.notify.showSuccess).toHaveBeenCalledWith(toast))
+    // The result screen says it, in place of a toast
+    expect((await screen.findByTestId('issue-result')).textContent).toContain(said)
   })
 
   it('says the linked certificate could not be revoked', async () => {

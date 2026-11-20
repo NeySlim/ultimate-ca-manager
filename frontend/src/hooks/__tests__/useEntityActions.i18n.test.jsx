@@ -91,9 +91,11 @@ describe('translated messages of the entity actions', () => {
   it('reports a renewed certificate in the locale', async () => {
     svc.certs.renew.mockResolvedValue({ data: { id: 5 } })
     await renewThroughForm()
-    await waitFor(() => expect(notify.showSuccess).toHaveBeenCalled())
-    expect(fr.certificates.renewed).toEqual(expect.any(String))
-    expect(notify.showSuccess).toHaveBeenCalledWith(fr.certificates.renewed)
+    // The result screen of the dialog says it, in the locale
+    const said = fr.certificates.issueForm.result.renewed
+    expect(said.title).toEqual(expect.any(String))
+    expect((await screen.findByTestId('issue-result')).textContent).toContain(said.title)
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(said.head)
   })
 
   it('reports a failed renewal in the locale, in the Review step', async () => {

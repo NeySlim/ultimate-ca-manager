@@ -41,7 +41,11 @@ test('a certificate issued on screen is signed by the chosen CA', async ({ page,
   const review = page.getByRole('dialog', { name: 'Review the request' })
   await expect(review.getByRole('heading', { name: cn })).toBeVisible()
   await review.getByRole('button', { name: 'Issue the certificate' }).click()
-  await expect(review).toBeHidden()
+  // The result screen of the Atelier, then the certificate on demand
+  const result = page.getByRole('dialog', { name: 'Issuance complete' })
+  await expect(result.getByRole('heading', { name: 'Certificate issued' })).toBeVisible()
+  await result.getByRole('button', { name: 'View the certificate' }).click()
+  await expect(result).toBeHidden()
 
   await expect(page.getByRole('main').getByRole('button', { name: cn, exact: true })).toBeVisible()
   const [cert] = await findCerts(api, cn)
@@ -65,7 +69,9 @@ test('renewing from the inspector issues a new certificate for the same name', a
   await dialog.getByRole('button', { name: 'Review the request' }).click()
   const review = page.getByRole('dialog', { name: 'Review the request' })
   await review.getByRole('button', { name: 'Renew the certificate' }).click()
-  await expect(review).toBeHidden()
+  const result = page.getByRole('dialog', { name: 'Renewal complete' })
+  await result.getByRole('button', { name: 'Close', exact: true }).click()
+  await expect(result).toBeHidden()
 
   // A new serial for the same name, the old one superseded or kept beside it
   await expect.poll(async () => (await findCerts(api, cert.common_name))

@@ -7,7 +7,7 @@ const drafts = new Map()
 // The only fields a draft keeps: form entries, never a private key nor a password
 export const DRAFT_FIELDS = [
   'template', 'ca_id', 'cn', 'description', 'keySource', 'csr', 'key', 'keyBy',
-  'validityMode', 'validity_days', 'expiry_date', 'sans', 'advanced', 'cert_type', 'extra_ekus',
+  'validityMode', 'validity_days', 'daysBy', 'expiry_date', 'sans', 'advanced', 'cert_type', 'extra_ekus',
   'ocsp_must_staple', 'subject', 'customExt', 'hybrid', 'hybrid_classical', 'hybrid_pq',
   'showAllTemplates', 'showHiddenCas',
 ]
