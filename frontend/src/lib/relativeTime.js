@@ -18,12 +18,16 @@ const toTime = (date) => {
 
 /**
  * The i18n key and count that word a date against now, or null without a date.
- * mode 'due' (default) words a past date as overdue, 'event' as "ago".
+ * mode 'due' (default) words a past date as overdue, 'event' as "ago"; `minutes`
+ * counts minutes under one hour (a task run every few minutes), one at least.
  */
-export function relativeParts(date, { now = new Date(), mode = 'due' } = {}) {
+export function relativeParts(date, { now = new Date(), mode = 'due', minutes = false } = {}) {
   const ms = toTime(date)
   if (ms === null) return null
   const left = ms - new Date(now).getTime()
+  if (minutes && Math.abs(left) < HOUR && (left > 0 || mode === 'event')) {
+    return { key: left > 0 ? 'time.inMinutes' : 'time.minutesAgo', count: Math.max(1, Math.round(Math.abs(left) / 60000)) }
+  }
   if (left > 0) {
     return left < HOURS_WINDOW
       ? { key: 'time.inHours', count: Math.max(1, Math.round(left / HOUR)) }
@@ -53,6 +57,14 @@ export const compactDue = (date, t, opts) => say(compact(relativeParts(date, { .
 
 /** "20 h ago", "3 d ago"; '' without a date. */
 export const compactAgo = (date, t, opts) => say(compact(relativeParts(date, { ...opts, mode: 'event' })), t)
+
+/** A run of a task: "56 min ago", "in 5 h", a past due date as "ago"; '' without a date. */
+export const compactRun = (date, t, opts) => {
+  const ms = toTime(date)
+  if (ms === null) return ''
+  const past = ms <= new Date(opts?.now ?? new Date()).getTime()
+  return say(compact(relativeParts(date, { ...opts, minutes: true, mode: past ? 'event' : 'due' })), t)
+}
 
 /** 'bad' once the date is past, 'warn' inside warnDays, '' beyond or without a date. */
 export function dueTone(date, { now = new Date(), warnDays = 7 } = {}) {
