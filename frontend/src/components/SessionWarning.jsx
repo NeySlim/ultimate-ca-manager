@@ -7,8 +7,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Clock, ArrowClockwise } from '@phosphor-icons/react'
-import { useAuth } from '../contexts'
+import { useAuth, useNotification } from '../contexts'
 import { authService } from '../services'
+import { focusPageTitle } from '../lib/focusPageTitle'
 import './auth/auth.css'
 
 const WARNING_BEFORE = 5 * 60 * 1000 // Show warning 5 minutes before expiry
@@ -16,10 +17,15 @@ const UNKNOWN_RECHECK = 30 * 1000 // Server unreachable: ask again after this
 const UNKNOWN_MAX = 5 * 60 * 1000 // ...and lock the tab locally after this long
 const FALLBACK_TIMEOUT = 8 * 60 * 60 * 1000 // 8h fallback (matches backend default)
 
+const formatTime = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+
 export function SessionWarning() {
   const { t } = useTranslation()
   const { user, lock, checkSession } = useAuth()
+  const { showSuccess } = useNotification()
   const [showWarning, setShowWarning] = useState(false)
+  // Announced once: the time left when the banner appears, then what Extend did
+  const [announce, setAnnounce] = useState('')
   const [secondsLeft, setSecondsLeft] = useState(0)
   const [lastActivity, setLastActivity] = useState(Date.now())
   const sessionTimeoutRef = useRef(FALLBACK_TIMEOUT)
@@ -78,6 +84,7 @@ export function SessionWarning() {
       if (timeUntilExpiry <= WARNING_BEFORE && !showWarning) {
         setShowWarning(true)
         setSecondsLeft(Math.floor(timeUntilExpiry / 1000))
+        setAnnounce(t('session.announceLeft', { time: formatTime(Math.floor(timeUntilExpiry / 1000)) }))
       }
 
       if (showWarning) {
@@ -127,18 +134,20 @@ export function SessionWarning() {
       unknownSinceRef.current = null
       setLastActivity(Date.now())
       setShowWarning(false)
+      const extended = t('session.extended', { minutes: Math.round(sessionTimeoutRef.current / 60000) })
+      setAnnounce(extended)
+      showSuccess(extended)
+      // The button goes with the banner: the focus goes to the page's title, not to the body
+      focusPageTitle()
     } else if (stillValid === false) {
       lock()
     }
-  }, [checkSession, lock])
+  }, [checkSession, lock, showSuccess, t])
 
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
-
-  if (!user || !showWarning) return null
+  // The region stays mounted so its announcement is read, the banner shown or not
+  const live = <span className="sr-only" aria-live="polite">{announce}</span>
+  if (!user) return null
+  if (!showWarning) return live
 
   return (
     <div className="session-banner" role="region" aria-labelledby="session-banner-title">
@@ -148,9 +157,9 @@ export function SessionWarning() {
         <span>{t('session.lockNotice')}</span>
       </p>
       {/* Announced once, not at every tick of the countdown */}
-      <span className="sr-only" aria-live="polite">{t('session.expiringSoon')}</span>
+      {live}
       <button type="button" className="auth-btn is-primary" onClick={extendSession}>
-        <ArrowClockwise size={16} aria-hidden="true" />{t('session.extend')}
+        <ArrowClockwise size={17} aria-hidden="true" />{t('session.extend')}
       </button>
     </div>
   )

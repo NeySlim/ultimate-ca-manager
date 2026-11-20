@@ -73,19 +73,18 @@ describe('LoginPage return path', () => {
     expect(await screen.findByTestId('where')).toHaveTextContent('/dashboard')
   })
 
-  it('shows the server 429 without a countdown, with the wait when it is given', async () => {
+  it('shows the server 429 in the card, with the wait when it is given', async () => {
     const err = Object.assign(new Error('Too many failed attempts. Try again later.'), { status: 429, retryAfter: 30 })
     services.loginPassword.mockRejectedValue(err)
     await signIn('/login')
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('auth.tooManyAttempts')
-    expect(alert).toHaveTextContent('auth.retryAfterSeconds|30')
+    expect(alert).toHaveTextContent('auth.page.tooManyWait|30')
     expect(services.showError).not.toHaveBeenCalled()
   })
 
   it('says only "later" when the server gives no wait, and keeps toasts for other errors', async () => {
     services.loginPassword.mockRejectedValueOnce(Object.assign(new Error('x'), { status: 429 }))
     await signIn('/login')
-    expect(await screen.findByRole('alert')).toHaveTextContent('auth.retryLater')
+    expect(await screen.findByRole('alert')).toHaveTextContent('auth.page.tooManyNoDelay')
   })
 })

@@ -565,12 +565,10 @@
     "waitingForSecurityKey": "Очікування ключа безпеки...",
     "touchSecurityKey": "Доторкніться до ключа безпеки...",
     "securityKeyCancelled": "Ключ безпеки скасовано. Використовуйте пароль.",
-    "welcomeBackUser": "З поверненням, {{username}}!",
     "usePasswordInstead": "Використовуйте пароль замість цього",
     "orContinueWith": "або продовжити з",
     "signingInWith": "Вхід через",
     "ldapUsername": "Ваше ім'я користувача LDAP",
-    "ldapFailed": "LDAP authentication невдало",
     "enterCredentials": "Будь ласка, введіть ім'я користувача та пароль",
     "authenticating": "Автентифікація...",
     "ssoProviderDisabled": "Постачальника SSO вимкнено",
@@ -632,9 +630,6 @@
     "ssoNoDefaultRole": "Доступ заборонено: у цього постачальника входу немає ролі за замовчуванням і правила зіставлення ролей. Зверніться до адміністратора.",
     "ssoEmailConflict": "Вхід відхилено: інший обліковий запис уже використовує адресу електронної пошти цього входу. Зверніться до адміністратора.",
     "samlLogoutRejected": "Не вдалося перевірити запит на вихід від постачальника ідентичності; ви досі в системі.",
-    "tooManyAttempts": "Забагато невдалих спроб",
-    "retryAfterSeconds": "Повторіть спробу через {{seconds}} с.",
-    "retryLater": "Повторіть спробу пізніше.",
     "maintenanceRestoring": "Відновлення з резервної копії триває: цей сервер знову прийматиме вхід, щойно воно завершиться.",
     "maintenanceActive": "Цей сервер на обслуговуванні: вхід відхиляється до його завершення.",
     "maintenanceRetryIn": "Повторний вхід через {{seconds}} с.",
@@ -645,7 +640,6 @@
       "username": "Ім’я користувача",
       "password": "Пароль",
       "showPassword": "Показати пароль",
-      "hidePassword": "Сховати пароль",
       "submit": "Увійти",
       "or": "або",
       "ssoButton": "Увійти через SSO",
@@ -660,7 +654,15 @@
       "lockedTitle": "Сеанс заблоковано",
       "lockedLead": "Ваш сеанс завершився через бездіяльність. Увійдіть знову, щоб повернутися на сторінку, де ви були.",
       "unlock": "Розблокувати",
-      "switchAccount": "Увійти з іншим обліковим записом"
+      "switchAccount": "Увійти з іншим обліковим записом",
+      "skipToContent": "Skip to content",
+      "tooManyWait": "Too many attempts: wait {{seconds}} seconds before trying again.",
+      "tooManyNoDelay": "Too many attempts: wait before trying again.",
+      "retryIn": "Next attempt possible in {{seconds}} s.",
+      "canRetry": "You can try again.",
+      "lockedAnnounce": "Session expired: the screen is locked, the current page is kept.",
+      "signedIn": "Signed in: {{name}}, {{role}}.",
+      "signedInNoRole": "Signed in: {{name}}."
     }
   },
   "dashboard": {
@@ -4848,7 +4850,8 @@
     "stayLoggedIn": "Залишатися в системі",
     "expiresIn": "Ваш сеанс завершиться через {{time}}",
     "lockNotice": "Без дій екран заблокується, поточну сторінку буде збережено.",
-    "expiringSoon": "Ваш сеанс скоро завершиться. Виберіть «Продовжити», щоб зберегти його.",
+    "announceLeft": "Your session expires in {{time}}. Choose Extend to keep it.",
+    "extended": "Session extended by {{minutes}} minutes.",
     "extend": "Продовжити"
   },
   "password": {

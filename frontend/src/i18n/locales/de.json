@@ -563,12 +563,10 @@
     "waitingForSecurityKey": "Warte auf Sicherheitsschlüssel...",
     "touchSecurityKey": "Berühren Sie Ihren Sicherheitsschlüssel...",
     "securityKeyCancelled": "Sicherheitsschlüssel abgebrochen. Verwenden Sie stattdessen das Passwort.",
-    "welcomeBackUser": "Willkommen zurück, {{username}}!",
     "usePasswordInstead": "Stattdessen Passwort verwenden",
     "orContinueWith": "oder fortfahren mit",
     "signingInWith": "Anmeldung mit",
     "ldapUsername": "Ihr LDAP-Benutzername",
-    "ldapFailed": "LDAP-Authentifizierung fehlgeschlagen",
     "enterCredentials": "Bitte geben Sie Benutzername und Passwort ein",
     "authenticating": "Authentifizierung...",
     "ssoProviderDisabled": "SSO-Anbieter ist deaktiviert",
@@ -630,9 +628,6 @@
     "ssoNoDefaultRole": "Zugriff verweigert: Dieser Anmeldeanbieter hat weder eine Standardrolle noch eine Rollenzuordnungsregel. Wenden Sie sich an Ihren Administrator.",
     "ssoEmailConflict": "Anmeldung abgelehnt: Ein anderes Konto verwendet bereits die E-Mail-Adresse dieser Anmeldung. Wenden Sie sich an Ihren Administrator.",
     "samlLogoutRejected": "Die Abmeldeanforderung des Identitätsanbieters konnte nicht überprüft werden; Sie sind weiterhin angemeldet.",
-    "tooManyAttempts": "Zu viele fehlgeschlagene Versuche",
-    "retryAfterSeconds": "Versuchen Sie es in {{seconds}} Sekunden erneut.",
-    "retryLater": "Versuchen Sie es später erneut.",
     "maintenanceRestoring": "Eine Wiederherstellung der Sicherung läuft: Dieser Server nimmt Anmeldungen wieder an, sobald sie beendet ist.",
     "maintenanceActive": "Dieser Server befindet sich in Wartung: Anmeldungen werden abgelehnt, bis sie beendet ist.",
     "maintenanceRetryIn": "Erneute Anmeldung in {{seconds}} s.",
@@ -643,7 +638,6 @@
       "username": "Benutzername",
       "password": "Passwort",
       "showPassword": "Passwort anzeigen",
-      "hidePassword": "Passwort verbergen",
       "submit": "Anmelden",
       "or": "oder",
       "ssoButton": "Mit SSO anmelden",
@@ -658,7 +652,15 @@
       "lockedTitle": "Sitzung gesperrt",
       "lockedLead": "Ihre Sitzung ist wegen Inaktivität abgelaufen. Melden Sie sich erneut an, um zur vorherigen Seite zurückzukehren.",
       "unlock": "Entsperren",
-      "switchAccount": "Mit einem anderen Konto anmelden"
+      "switchAccount": "Mit einem anderen Konto anmelden",
+      "skipToContent": "Skip to content",
+      "tooManyWait": "Too many attempts: wait {{seconds}} seconds before trying again.",
+      "tooManyNoDelay": "Too many attempts: wait before trying again.",
+      "retryIn": "Next attempt possible in {{seconds}} s.",
+      "canRetry": "You can try again.",
+      "lockedAnnounce": "Session expired: the screen is locked, the current page is kept.",
+      "signedIn": "Signed in: {{name}}, {{role}}.",
+      "signedInNoRole": "Signed in: {{name}}."
     }
   },
   "dashboard": {
@@ -4744,7 +4746,8 @@
     "stayLoggedIn": "Angemeldet bleiben",
     "expiresIn": "Ihre Sitzung läuft in {{time}} ab",
     "lockNotice": "Ohne Aktion wird der Bildschirm gesperrt und die aktuelle Seite bleibt erhalten.",
-    "expiringSoon": "Ihre Sitzung läuft bald ab. Wählen Sie Verlängern, um sie zu behalten.",
+    "announceLeft": "Your session expires in {{time}}. Choose Extend to keep it.",
+    "extended": "Session extended by {{minutes}} minutes.",
     "extend": "Verlängern"
   },
   "password": {

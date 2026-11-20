@@ -20,19 +20,29 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+  // A field's error sits under it, as in the design; the server's refusal stays in the card
+  const [fieldErrors, setFieldErrors] = useState({})
   const titleRef = useRef(null)
+  const newRef = useRef(null)
+  const confirmRef = useRef(null)
+
+  const fieldError = (name, message, ref) => {
+    setFieldErrors({ [name]: message })
+    ref.current?.focus()
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    setFieldErrors({})
 
     if (password.length < 8) {
-      setError(t('auth.passwordMinLength'))
+      fieldError('password', t('auth.passwordMinLength'), newRef)
       return
     }
 
     if (password !== confirmPassword) {
-      setError(t('common.passwordMismatch'))
+      fieldError('confirm', t('common.passwordMismatch'), confirmRef)
       return
     }
 
@@ -52,7 +62,7 @@ export default function ResetPasswordPage() {
     return (
       <AuthFrame ref={titleRef} title={t('auth.passwordReset')} lead={t('auth.passwordResetSuccess')}>
         <button type="button" className="auth-btn is-primary auth-submit" onClick={() => navigate('/login')}>
-          <CaretRight size={16} aria-hidden="true" />{t('auth.goToLogin')}
+          <CaretRight size={17} aria-hidden="true" />{t('auth.goToLogin')}
         </button>
       </AuthFrame>
     )
@@ -62,7 +72,7 @@ export default function ResetPasswordPage() {
     return (
       <AuthFrame ref={titleRef} title={t('auth.invalidLink')} lead={t('auth.invalidLinkDesc')}>
         <Link to="/forgot-password" className="auth-btn is-primary auth-submit">
-          <CaretRight size={16} aria-hidden="true" />{t('auth.requestNewResetLink')}
+          <CaretRight size={17} aria-hidden="true" />{t('auth.requestNewResetLink')}
         </Link>
         <Link to="/login" className="auth-link">{t('auth.backToLogin')}</Link>
       </AuthFrame>
@@ -72,35 +82,39 @@ export default function ResetPasswordPage() {
   return (
     <AuthFrame ref={titleRef} title={t('auth.resetPasswordTitle')} lead={t('auth.resetPasswordDesc')}>
       <form className="auth-form" onSubmit={handleSubmit} noValidate aria-busy={loading || undefined}>
-        <AuthField id="reset-new" label={t('common.newPassword')}>
+        <AuthField id="reset-new" label={t('common.newPassword')} error={fieldErrors.password}>
           <input
+            ref={newRef}
             id="reset-new"
             name="new-password"
             type="password"
             autoComplete="new-password"
-            autoFocus
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            aria-describedby="reset-new-hint"
+            onChange={(e) => { setPassword(e.target.value); if (fieldErrors.password) setFieldErrors({}) }}
+            aria-invalid={fieldErrors.password ? 'true' : undefined}
+            aria-describedby={fieldErrors.password ? 'reset-new-hint reset-new-error' : 'reset-new-hint'}
           />
           <PasswordMeter password={password} />
           <small id="reset-new-hint" className="auth-wait">{t('auth.minCharacters')}</small>
         </AuthField>
-        <AuthField id="reset-confirm" label={t('common.confirmPassword')}>
+        <AuthField id="reset-confirm" label={t('common.confirmPassword')} error={fieldErrors.confirm}>
           <input
+            ref={confirmRef}
             id="reset-confirm"
             name="confirm-password"
             type="password"
             autoComplete="new-password"
             value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
+            onChange={(e) => { setConfirmPassword(e.target.value); if (fieldErrors.confirm) setFieldErrors({}) }}
+            aria-invalid={fieldErrors.confirm ? 'true' : undefined}
+            aria-describedby={fieldErrors.confirm ? 'reset-confirm-error' : undefined}
           />
         </AuthField>
         {error && (
           <div className="auth-error" role="alert"><Warning size={14} aria-hidden="true" /><span>{error}</span></div>
         )}
         <button type="submit" className="auth-btn is-primary auth-submit" disabled={loading}>
-          <CaretRight size={16} aria-hidden="true" />{loading ? t('auth.resetting') : t('auth.resetPasswordTitle')}
+          <CaretRight size={17} aria-hidden="true" />{loading ? t('auth.resetting') : t('auth.resetPasswordTitle')}
         </button>
       </form>
       <Link to="/login" className="auth-link">{t('auth.backToLogin')}</Link>

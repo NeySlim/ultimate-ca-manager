@@ -71,8 +71,7 @@ describe('LoginPage 429 banner across methods', () => {
     renderLogin()
     await submitLdap()
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('auth.tooManyAttempts')
-    expect(alert).toHaveTextContent('auth.retryAfterSeconds|30')
+    expect(alert).toHaveTextContent('auth.page.tooManyWait|30')
     expect(s.showError).not.toHaveBeenCalled()
   })
 
@@ -85,7 +84,7 @@ describe('LoginPage 429 banner across methods', () => {
     await screen.findByRole('alert')
     await submitLdap()
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Invalid LDAP credentials'))
-    expect(screen.getByRole('alert')).not.toHaveTextContent('auth.tooManyAttempts')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('auth.page.tooManyWait')
   })
 
   it('drops a password 429 banner when an LDAP login reaches the second factor', async () => {
@@ -112,7 +111,7 @@ describe('LoginPage 429 banner across methods', () => {
     s.login2FAWebAuthn.mockRejectedValue(tooMany())
     await reachKeyStep()
     fireEvent.click(screen.getByText('auth.twoFactorUseSecurityKey'))
-    expect(await screen.findByRole('alert')).toHaveTextContent('auth.tooManyAttempts')
+    expect(await screen.findByRole('alert')).toHaveTextContent('auth.page.tooManyWait')
     expect(s.showError).not.toHaveBeenCalled()
   })
 
@@ -132,15 +131,16 @@ describe('LoginPage 429 banner across methods', () => {
     renderLogin()
     await typeUsername()
     fireEvent.click(await screen.findByText('auth.page.keyButton'))
-    expect(await screen.findByRole('alert')).toHaveTextContent('auth.tooManyAttempts')
+    expect(await screen.findByRole('alert')).toHaveTextContent('auth.page.tooManyWait')
     fireEvent.click(await screen.findByText('auth.page.keyButton'))
     await waitFor(() => expect(s.authenticateWebAuthn).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('no'))
-    expect(screen.getByRole('alert')).not.toHaveTextContent('auth.tooManyAttempts')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('auth.page.tooManyWait')
   })
 
   it('drops a password 429 banner when the next attempt reaches the second factor', async () => {
-    s.loginPassword.mockRejectedValueOnce(tooMany()).mockResolvedValue({ requires_2fa: true, methods: ['totp'] })
+    // Without a delay, so the next attempt is not held
+    s.loginPassword.mockRejectedValueOnce(Object.assign(new Error('x'), { status: 429 })).mockResolvedValue({ requires_2fa: true, methods: ['totp'] })
     renderLogin()
     await typeUsername()
     await submitPassword()

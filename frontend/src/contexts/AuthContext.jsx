@@ -10,7 +10,7 @@ import { authService } from '../services/auth.service'
 import { accountService } from '../services/account.service'
 import { apiClient } from '../services/apiClient'
 import { setAppTimezone } from '../stores/timezoneStore'
-import { saveLock } from '../lib/sessionLock'
+import { saveLock, markJustLocked } from '../lib/sessionLock'
 import { setDateFormat, setShowTime } from '../stores/dateFormatStore'
 import { applyServerPreferences, getPreferences, setAuthenticated as setPrefsAuthenticated } from '../stores/userPreferencesStore'
 import i18n from '../i18n'
@@ -194,7 +194,9 @@ export function AuthProvider({ children }) {
   // Inactivity lock: the console goes at once, the server session is closed after
   // (it may not answer), and the account is kept for the lock screen.
   const lock = () => {
-    saveLock({ username: user?.username, name: user?.full_name, role: user?.role, method: authMethod })
+    // A custom role is kept by its name; a built-in one by its code, named on the lock screen
+    saveLock({ username: user?.username, name: user?.full_name, role: user?.custom_role_name || user?.role, method: authMethod })
+    markJustLocked()
     setUser(null)
     setIsAuthenticated(false)
     setPermissions([])

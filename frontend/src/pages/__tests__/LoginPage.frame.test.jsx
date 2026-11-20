@@ -59,7 +59,8 @@ describe('LoginPage form', () => {
     expect(screen.getByText('auth.page.lead')).toBeInTheDocument()
     expect(screen.getByLabelText('auth.page.username')).toHaveAttribute('autocomplete', 'username')
     expect(screen.getByLabelText('auth.page.password')).toHaveAttribute('autocomplete', 'current-password')
-    expect(document.activeElement).toBe(screen.getByLabelText('auth.page.username'))
+    // Nothing is focused when the page opens, as in the design
+    expect(document.activeElement).toBe(document.body)
   })
 
   it('names each empty field beside it and focuses the first', async () => {
@@ -73,11 +74,10 @@ describe('LoginPage form', () => {
     expect(s.loginPassword).not.toHaveBeenCalled()
   })
 
-  it('fills in the last username and starts on the password', async () => {
+  it('fills in the last username', async () => {
     localStorage.setItem('ucm_last_username', 'alice')
     renderLogin()
     expect(await screen.findByLabelText('auth.page.username')).toHaveValue('alice')
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('auth.page.password')))
   })
 
   it('shows and hides the password', async () => {
@@ -87,11 +87,11 @@ describe('LoginPage form', () => {
     expect(pass).toHaveAttribute('type', 'password')
     fireEvent.click(reveal)
     expect(pass).toHaveAttribute('type', 'text')
-    expect(screen.getByRole('button', { name: 'auth.page.hidePassword' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'auth.page.showPassword' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('shows a refused sign-in in the card, as the server says it, and empties the password', async () => {
-    s.loginPassword.mockRejectedValue(new Error('Invalid username or password'))
+    s.loginPassword.mockRejectedValue(Object.assign(new Error('Invalid username or password'), { status: 500 }))
     renderLogin()
     fireEvent.change(await screen.findByLabelText('auth.page.username'), { target: { value: 'alice' } })
     fireEvent.change(screen.getByLabelText('auth.page.password'), { target: { value: 'bad' } })
@@ -107,7 +107,7 @@ describe('LoginPage form', () => {
       { id: 3, name: 'ad', display_name: 'Corporate LDAP', provider_type: 'ldap' },
     ] })
     s.detectMethods.mockResolvedValue({ password: true, webauthn: true, mtls: true, mtls_status: 'enrolled', mtls_user: 'alice' })
-    s.isEmailConfigured.mockResolvedValue({ configured: true })
+    s.isEmailConfigured.mockResolvedValue({ success: true, data: { configured: true } })
     renderLogin()
     expect(await screen.findByText('auth.page.or')).toBeInTheDocument()
     expect(screen.getAllByText('auth.page.ssoButton')).toHaveLength(2)

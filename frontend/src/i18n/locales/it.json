@@ -563,12 +563,10 @@
     "waitingForSecurityKey": "In attesa della chiave di sicurezza...",
     "touchSecurityKey": "Tocca la tua chiave di sicurezza...",
     "securityKeyCancelled": "Chiave di sicurezza annullata. Usa la password.",
-    "welcomeBackUser": "Bentornato, {{username}}!",
     "usePasswordInstead": "Usa password invece",
     "orContinueWith": "o continua con",
     "signingInWith": "Accesso con",
     "ldapUsername": "Il tuo nome utente LDAP",
-    "ldapFailed": "Autenticazione LDAP fallita",
     "enterCredentials": "Per favore inserisci nome utente e password",
     "authenticating": "Autenticazione...",
     "ssoProviderDisabled": "Provider SSO disabilitato",
@@ -630,9 +628,6 @@
     "ssoNoDefaultRole": "Accesso negato: questo provider di accesso non ha un ruolo predefinito né una regola di mappatura dei ruoli. Contatta l'amministratore.",
     "ssoEmailConflict": "Accesso rifiutato: un altro account usa già l'indirizzo email di questo accesso. Contatta l'amministratore.",
     "samlLogoutRejected": "Non è stato possibile verificare la richiesta di disconnessione del provider di identità; sei ancora connesso.",
-    "tooManyAttempts": "Troppi tentativi falliti",
-    "retryAfterSeconds": "Riprova tra {{seconds}} secondi.",
-    "retryLater": "Riprova più tardi.",
     "maintenanceRestoring": "Un ripristino di backup è in corso: questo server accetterà di nuovo gli accessi al termine.",
     "maintenanceActive": "Questo server è in manutenzione: gli accessi sono rifiutati fino al termine.",
     "maintenanceRetryIn": "Nuovo tentativo di accesso tra {{seconds}} s.",
@@ -643,7 +638,6 @@
       "username": "Nome utente",
       "password": "Password",
       "showPassword": "Mostra la password",
-      "hidePassword": "Nascondi la password",
       "submit": "Accedi",
       "or": "oppure",
       "ssoButton": "Accedi con SSO",
@@ -658,7 +652,15 @@
       "lockedTitle": "Sessione bloccata",
       "lockedLead": "La sessione è scaduta per inattività. Accedi di nuovo per tornare alla pagina in cui eri.",
       "unlock": "Sblocca",
-      "switchAccount": "Accedi con un altro account"
+      "switchAccount": "Accedi con un altro account",
+      "skipToContent": "Skip to content",
+      "tooManyWait": "Too many attempts: wait {{seconds}} seconds before trying again.",
+      "tooManyNoDelay": "Too many attempts: wait before trying again.",
+      "retryIn": "Next attempt possible in {{seconds}} s.",
+      "canRetry": "You can try again.",
+      "lockedAnnounce": "Session expired: the screen is locked, the current page is kept.",
+      "signedIn": "Signed in: {{name}}, {{role}}.",
+      "signedInNoRole": "Signed in: {{name}}."
     }
   },
   "dashboard": {
@@ -4744,7 +4746,8 @@
     "stayLoggedIn": "Resta Connesso",
     "expiresIn": "La sessione scade tra {{time}}",
     "lockNotice": "Senza azioni, lo schermo si blocca e la pagina corrente viene conservata.",
-    "expiringSoon": "La sessione sta per scadere. Scegli Prolunga per mantenerla.",
+    "announceLeft": "Your session expires in {{time}}. Choose Extend to keep it.",
+    "extended": "Session extended by {{minutes}} minutes.",
     "extend": "Prolunga"
   },
   "password": {

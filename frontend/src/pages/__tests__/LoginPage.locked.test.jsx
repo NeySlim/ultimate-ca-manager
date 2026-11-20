@@ -28,7 +28,7 @@ vi.mock('../../contexts/ThemeContext', () => ({
 vi.mock('../../services/auth.service', () => ({
   authService: {
     getSsoProviders: s.getSsoProviders, verifySession: s.verifySession, ldapLogin: s.ldapLogin,
-    isEmailConfigured: vi.fn().mockResolvedValue({ configured: true }),
+    isEmailConfigured: vi.fn().mockResolvedValue({ data: { configured: true } }),
   },
 }))
 vi.mock('../../services/auth-methods.service', () => ({

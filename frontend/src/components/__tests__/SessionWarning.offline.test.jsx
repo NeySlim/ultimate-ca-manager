@@ -11,6 +11,7 @@ const auth = vi.hoisted(() => ({ checkSession: vi.fn(), lock: vi.fn() }))
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key) => key }) }))
 vi.mock('../../contexts', () => ({
   useAuth: () => ({ user: { username: 'admin' }, ...auth }),
+  useNotification: () => ({ showSuccess: vi.fn() }),
 }))
 const timeout = vi.hoisted(() => ({ seconds: 1 }))
 vi.mock('../../services', () => ({

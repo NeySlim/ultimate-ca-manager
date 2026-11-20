@@ -5,11 +5,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, act, screen, fireEvent } from '@testing-library/react'
 
-const auth = vi.hoisted(() => ({ checkSession: vi.fn(), lock: vi.fn() }))
+const auth = vi.hoisted(() => ({ checkSession: vi.fn(), lock: vi.fn(), showSuccess: vi.fn() }))
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key, o) => (o?.time ? `${key}|${o.time}` : key) }) }))
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key, o) => (o?.time ? `${key}|${o.time}` : o?.minutes != null ? `${key}|${o.minutes}` : key) }) }))
 vi.mock('../../contexts', () => ({
-  useAuth: () => ({ user: { username: 'admin' }, ...auth }),
+  useAuth: () => ({ user: { username: 'admin' }, checkSession: auth.checkSession, lock: auth.lock }),
+  useNotification: () => ({ showSuccess: auth.showSuccess }),
 }))
 vi.mock('../../services', () => ({
   authService: { getCurrentUser: vi.fn(async () => ({ data: { session_timeout: 400 } })) },
@@ -24,6 +25,7 @@ describe('SessionWarning banner', () => {
     vi.useFakeTimers()
     auth.checkSession.mockReset()
     auth.lock.mockReset()
+    auth.showSuccess.mockReset()
   })
   afterEach(() => vi.useRealTimers())
 
@@ -56,6 +58,25 @@ describe('SessionWarning banner', () => {
     await tick(0)
     expect(auth.checkSession).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('region')).toBeNull()
+  })
+
+  it('announces the time left once, when it appears', async () => {
+    renderWithFocus()
+    await tick(105 * 1000)
+    expect(screen.getByText('session.announceLeft|4:55')).toBeInTheDocument()
+    await tick(3000)
+    expect(screen.getByText('session.announceLeft|4:55')).toBeInTheDocument()
+  })
+
+  it('Extend says how long the session was extended, aloud and in a toast', async () => {
+    auth.checkSession.mockResolvedValue(true)
+    renderWithFocus()
+    await tick(110 * 1000)
+    fireEvent.click(screen.getByRole('button', { name: 'session.extend' }))
+    await tick(0)
+    // 400 s of inactivity timeout, in whole minutes
+    expect(auth.showSuccess).toHaveBeenCalledWith('session.extended|7')
+    expect(screen.getByText('session.extended|7')).toBeInTheDocument()
   })
 
   it('locks when Extend finds the session already gone', async () => {
