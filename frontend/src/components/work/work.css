@@ -6,9 +6,10 @@
 .wk-view { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-content: start; color: var(--text); font-size: 13px; line-height: normal; }
 .wk-view h2, .wk-view h3, .wk-view p { margin: 0; }
 .wk-view :is(button, a, input, [tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-/* No transition on the queue's controls, its dialogs' fields and close button, as the Atelier themes (Aurore animates its buttons, below) */
+/* No transition on the queue's controls, its dialogs' fields and close button, as the Atelier themes
+   (Aurore animates its buttons below, and the close button through the list's rule) */
 :is(.wk-view, .lv-dialog, .ins-heading) :is(.wk-btn, .wk-subject, .wk-history-toggle, .wk-check input),
-.wk-dialog .wk-field :is(input, select, textarea), .lv-dialog:has(.wk-dialog) .lv-dialog-head .lv-btn { transition: none; }
+.wk-dialog .wk-field :is(input, select, textarea), :root:not([data-theme="aurore"]) .lv-dialog:has(.wk-dialog) .lv-dialog-head .lv-btn { transition: none; }
 /* Shown on one side of the phone width only */
 .wk-phone-only { display: none; }
 

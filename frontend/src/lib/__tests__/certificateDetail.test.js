@@ -23,6 +23,14 @@ describe('certificateKeyLabel', () => {
     expect(keyLabel('RSA-2048', t)).toBe('RSA 2048')
     expect(keyLabel('RSA 4096', t)).toBe('RSA 4096')
   })
+
+  it('names a post-quantum key as the mockup, without its level', () => {
+    const tl = (k, o) => (o ? `${k}:${o.name}:${o.level}` : k)
+    expect(keyLabel('ML-DSA-65', tl)).toBe('ML-DSA-65')
+    expect(keyLabel('ML-DSA-87', tl)).toBe('ML-DSA-87')
+    expect(certificateKeyLabel({ key_type: 'ML-DSA-44', key_algorithm: 'ML-DSA-44', security_level: 2 }, tl)).toBe('ML-DSA-44')
+    expect(certificateKeyLabel({ key_type: 'SLH-DSA-SHA2-128s', security_level: 1 }, tl)).toBe('SLH-DSA-SHA2-128s')
+  })
 })
 
 describe('validityFacts', () => {

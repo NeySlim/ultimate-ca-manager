@@ -164,7 +164,8 @@ describe('CertificatesPage selection and batch bar', () => {
     expect(screen.queryByRole('group', { name: 'table.selection' })).toBeNull()
     fireEvent.click(rowBox('web.example.com'))
     const bar = screen.getByRole('group', { name: 'table.selection' })
-    expect(bar).toHaveTextContent('certificates.selectedOnPage:1')
+    // Part of the page: the mockup's short count
+    expect(bar).toHaveTextContent(/^table\.selectedCount:1/)
     expect(rowBox('web.example.com')).toBeChecked()
     expect(rowBox('api.example.com')).not.toBeChecked()
     expect(windows.openEntity).not.toHaveBeenCalled()
@@ -192,14 +193,16 @@ describe('CertificatesPage selection and batch bar', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'table.selectPage' }))
     expect(rowBox('web.example.com')).toBeChecked()
     expect(rowBox('api.example.com')).toBeChecked()
+    // The whole page: the count says so
+    expect(screen.getByRole('group', { name: 'table.selection' })).toHaveTextContent(/^certificates\.selectedOnPage:2/)
   })
 
   it('hands the two ticked certificates to the comparison', async () => {
     await renderRows([VALID, OTHER, THIRD])
     fireEvent.click(rowBox('web.example.com'))
     fireEvent.click(rowBox('db.example.com'))
-    // The bar counts the ticked rows of the page in the mockup's words
-    expect(within(screen.getByRole('group', { name: 'table.selection' })).getByText('certificates.selectedOnPage:2')).toBeInTheDocument()
+    // Two rows of three: the mockup's short count
+    expect(within(screen.getByRole('group', { name: 'table.selection' })).getByText('table.selectedCount:2')).toBeInTheDocument()
     fireEvent.click(within(screen.getByRole('group', { name: 'table.selection' })).getByText('common.compare'))
     expect(screen.getByTestId('compare')).toHaveTextContent('7|9')
   })
@@ -248,7 +251,7 @@ describe('CertificatesPage selection and batch bar', () => {
       window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: 'certificate' } }))
     })
     await waitFor(() => expect(screen.queryByRole('row', { name: /web\.example\.com/ })).toBeNull())
-    // The bar counts what is still on screen
+    // The bar counts what is still on screen, the whole page now
     expect(screen.getByRole('group', { name: 'table.selection' })).toHaveTextContent('certificates.selectedOnPage:1')
     svc.bulkExport.mockResolvedValue(new Blob(['pem']))
     fireEvent.click(within(screen.getByRole('group', { name: 'table.selection' })).getByTitle('certificates.exportSelectedPem'))

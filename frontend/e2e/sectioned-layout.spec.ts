@@ -122,6 +122,17 @@ test('a field out of its bounds takes the error border, is named in the bar and 
   await bar.getByRole('button', { name: 'Undo changes' }).click()
 })
 
+test('the scheduler keeps 36 px rows around 32 px run buttons', async ({ page, api }) => {
+  await page.goto('/settings?tab=scheduler')
+  const rows = page.locator('.sf-task-table tbody tr')
+  await expect(rows.first()).toBeVisible()
+  const run = rows.first().getByRole('button', { name: 'Run now' })
+  expect(Math.abs((await box(run)).height - 32)).toBeLessThanOrEqual(EPS)
+  // A row with a reason under the task name grows, a plain one keeps the mockup height
+  const heights = await rows.evaluateAll((els) => els.filter((el) => !el.querySelector('td p + p')).map((el) => el.getBoundingClientRect().height))
+  expect(Math.min(...heights)).toBeLessThanOrEqual(36 + EPS)
+})
+
 test('groups of a frame stand 20 px apart', async ({ page, api }) => {
   await page.goto('/settings')
   const groups = page.locator('#sf-sec-general .sf-group')

@@ -565,9 +565,10 @@
   .lv-toolbar .lv-search { flex-basis: 100%; min-height: 42px; }
   .lv-toolbar .lv-search input { min-height: 40px; font-size: 13px; }
   .lv-main:has(.lv-table-box.is-cards) { padding: 0 var(--lv-gutter); }
-  /* Two filters share a line, as the mockup's (max-width:none); a third one takes the next line whole */
-  .lv-toolbar .lv-tools { flex: 1 1 0; flex-wrap: wrap; min-width: 0; }
-  .lv-toolbar .lv-filter { flex: 1 1 calc(50% - 4px); min-width: 0; }
+  /* The filters share the mockup's one line beside the export button (max-width:none):
+     a third filter of the product splits that line, it never adds one */
+  .lv-toolbar .lv-tools { flex: 1 1 0; flex-wrap: nowrap; min-width: 0; }
+  .lv-toolbar .lv-filter { flex: 1 1 0; min-width: 0; }
   .lv-toolbar .lv-filter > button { width: 100%; max-width: none; min-height: 40px; }
   .lv-toolbar .lv-btn.is-icon { width: 40px; height: 40px; }
   .lv-footer { padding: 10px; gap: 8px; flex-wrap: wrap; }
@@ -646,5 +647,5 @@
 :root[data-theme="aurore"] :is(.lv-stage, .lv-dialog) :is(button, a, input, select, [tabindex]):focus-visible { box-shadow: 0 0 0 5px var(--halo); }
 :root[data-theme="aurore"] :is(.lv-stage, .lv-dialog) .lv-btn.is-primary:focus-visible { box-shadow: 0 0 0 5px var(--halo), 0 8px 24px -8px var(--glow); }
 @media (prefers-reduced-motion: no-preference) {
-  :root[data-theme="aurore"] :is(.lv-btn, .lv-icon-btn, .lv-table tbody tr) { transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease; }
+  :root[data-theme="aurore"] :is(.lv-btn, .lv-icon-btn, .lv-table tbody tr) { transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease; }
 }
