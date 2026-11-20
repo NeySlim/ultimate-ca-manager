@@ -29,7 +29,7 @@ export function queueItems(data) {
   return rows
     .filter(i => i && (i.tier === 'critical' || i.kind === 'approval_pending'))
     .map(i => ({
-      key: keyOf(i.kind, i.id), source: 'queue', kind: i.kind, tier: i.tier, title: i.label || '',
+      key: keyOf(i.kind, i.id), source: 'queue', kind: i.kind, tier: i.tier, id: i.id, title: i.label || '',
       at: i.due_at || null, href: typeof i.href_hint === 'string' && i.href_hint.startsWith('/') ? i.href_hint : null,
     }))
 }
@@ -46,7 +46,7 @@ export function auditItems(rows) {
       && !(e.action === 'system_restore' && requestRefused(e.details || '')))
     .map(e => ({
       key: keyOf('audit', e.id), source: 'audit', kind: e.action, tier: e.success === false ? 'critical' : 'warning',
-      title: e.resource_name || e.username || '', at: e.timestamp || null,
+      title: e.resource_name || e.username || '', detail: typeof e.details === 'string' ? e.details : '', at: e.timestamp || null,
       href: `/audit`,
     }))
 }
@@ -110,7 +110,9 @@ export function useNotifications(can) {
     return () => clearTimeout(timer)
   }, [lastEvent, refresh])
 
-  const items = [...parts.queue, ...[...parts.audit, ...parts.failures].sort((x, y) => (y.at || '').localeCompare(x.at || ''))]
+  // Newest first across the sources (the panel groups them by day), undated items last
+  const items = [...parts.queue, ...parts.audit, ...parts.failures]
+    .sort((x, y) => (Date.parse(y.at) || 0) - (Date.parse(x.at) || 0))
     .filter((item, i, all) => all.findIndex(o => o.key === item.key) === i)
     .map(item => ({ ...item, unread: !marks.includes(item.key) }))
   const unread = items.filter(i => i.unread).length

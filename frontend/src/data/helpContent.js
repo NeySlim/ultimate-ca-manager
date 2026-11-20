@@ -49,7 +49,7 @@ export const helpContent = {
   navigation: {
     title: 'Navigation',
     subtitle: 'The top bar, the Modules menu and pinned modules',
-    overview: 'The top bar holds the main pages, up to three modules you pin, the Modules menu, search and your account. The Modules menu lists every page you may open, in four groups; pages you have no right to are not shown.',
+    overview: 'The top bar holds the main pages (Overview, Certificates, Authorities and Activity, the audit log for who may read it), up to three modules you pin, the Modules menu, search and your account. The Modules menu lists every other page you may open, in four groups with their count, each with one line saying what it is for; pages you have no right to are not shown.',
     sections: [
       {
         title: 'Modules menu',
@@ -58,6 +58,7 @@ export const helpContent = {
           { label: 'Open', text: 'Select Modules, or press Down Arrow on the button; focus moves to the first page' },
           { label: 'Move', text: 'Up Arrow, Down Arrow, Home and End move between pages; Escape closes the menu and returns to the button' },
           { label: 'Pin', text: 'The pin button next to a page keeps it in the top bar; three at most, and the menu says so when you try a fourth' },
+          { label: 'Pinned', text: 'Pinned modules appear after Activity in the main bar; the head of the menu counts its pages and your pins' },
         ]
       },
       {
@@ -99,10 +100,31 @@ export const helpContent = {
         icon: Stack,
         items: [
           { label: 'Bell', text: 'The count is the number of unread items in the panel: critical items and approvals from the overview queue, and failed scheduled backups, failed restores or revoked sessions from the audit log' },
-          { label: 'Order', text: 'The queue items come first, then the audit log items, newest first' },
+          { label: 'Order', text: 'The panel groups the items by day, newest first: today, yesterday, then the date' },
+          { label: 'Actions', text: 'A failed ACME renewal offers Retry and a CRL to publish offers Publish, for who may do it; the other items only open their page' },
           { label: 'Rights', text: 'You only see items from sources you may read; a source you have no right on shows nothing' },
           { label: 'Read', text: 'Mark an item or all of them read; the marks are saved with your preferences, and an item that resolves leaves the panel' },
-          { label: 'Open', text: 'Open goes to the page of the item; nothing is approved or retried from the panel' },
+          { label: 'Open', text: 'Open goes to the page of the item and marks it read; approvals are decided on their own page' },
+          { label: 'Email', text: 'For who may read the settings, the foot says whether email notification is on and links to its settings' },
+        ]
+      },
+      {
+        title: 'High availability',
+        icon: Stack,
+        items: [
+          { label: 'Status bar', text: 'In high availability mode the status bar shows the nodes, or how many stopped sending heartbeats, and the node you are on; select it to list the nodes' },
+          { label: 'Degraded', text: 'When a node stops sending heartbeats, a banner says so and what still works: reading and issuing on the nodes that answer, scheduled tasks on the leader node' },
+          { label: 'Maintenance', text: 'During a cluster maintenance, a restore for instance, the server refuses every write: the banner says until when, and the write buttons are disabled with that reason' },
+          { label: 'Live connection', text: 'The icon after the service state in the status bar is the live connection to the server; select it to reconnect' },
+        ]
+      },
+      {
+        title: 'First run',
+        icon: Stack,
+        items: [
+          { label: 'Initial setup', text: 'On an instance without any CA nor certificate, administrators see the Initial setup card on the overview and on the certificate list: a root, an issuing CA, a protocol' },
+          { label: 'Steps', text: 'Each step opens the screen that does it, and is ticked once what it creates exists' },
+          { label: 'Later and Hide', text: 'Later folds the card into one line; Hide closes it, and a finished setup is not shown again' },
         ]
       },
     ],

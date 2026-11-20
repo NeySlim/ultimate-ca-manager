@@ -1,15 +1,16 @@
-/** Phone-width module picker: one native select over the same visible modules as the mega-menu. */
+/** Phone-width picker: one native select over the main pages, then the groups of the mega-menu. */
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { groupsFor, moduleById } from '../../navigation/registry'
+import { isVisible, menuGroupsFor, menuLabelKey, moduleById, MAIN_IDS } from '../../navigation/registry'
 import { whenLeaving } from '../../navigation/leaveGuard'
 
 export function MobileModulePicker({ can, activeId }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const groups = groupsFor(can)
+  const groups = menuGroupsFor(can)
+  const main = MAIN_IDS.map(moduleById).filter(m => m && isVisible(m, can))
   const current = activeId === '' ? 'dashboard' : activeId
-  const listed = current === 'dashboard' || groups.some(g => g.modules.some(m => m.id === current))
+  const listed = main.some(m => m.id === current) || groups.some(g => g.modules.some(m => m.id === current))
   return (
     <select
       className="shell-mobile-nav"
@@ -21,10 +22,10 @@ export function MobileModulePicker({ can, activeId }) {
       }}
     >
       {!listed && <option value="" disabled>{t('shell.navigate')}</option>}
-      <option value="dashboard">{t('common.dashboard')}</option>
+      {main.map(m => <option key={m.id} value={m.id}>{t(m.barKey)}</option>)}
       {groups.map(g => (
         <optgroup key={g.id} label={t(g.labelKey)}>
-          {g.modules.map(m => <option key={m.id} value={m.id}>{t(m.labelKey)}</option>)}
+          {g.modules.map(m => <option key={m.id} value={m.id}>{t(menuLabelKey(m))}</option>)}
         </optgroup>
       ))}
     </select>

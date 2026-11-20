@@ -15,7 +15,7 @@ vi.mock('react-i18next', () => ({
 
 import { ModulesMenu } from '../ModulesMenu'
 import { togglePinList } from '../pins'
-import { groupsFor } from '../../../navigation/registry'
+import { groupsFor, menuGroupsFor, MAIN_IDS } from '../../../navigation/registry'
 
 // Stateful host so a toggle re-renders the menu like the shell does
 function Host({ permissions, initialPins = [], activeId = 'dashboard', onHelp }) {
@@ -44,13 +44,40 @@ describe('Modules menu: what each role sees', () => {
     const user = setup({ permissions: ROLES[role] })
     await user.click(button())
     const ids = linkIds(menu()).sort()
-    expect(ids).toEqual(groupsFor(canFor(ROLES[role])).flatMap(g => g.modules.map(m => m.id)).sort())
+    const expected = groupsFor(canFor(ROLES[role])).flatMap(g => g.modules.map(m => m.id)).filter(id => !MAIN_IDS.includes(id))
+    expect(ids).toEqual(expected.sort())
   })
 
-  it('shows a viewer the five signed-in modules and nothing guarded', async () => {
+  it('leaves out the pages of the main bar, Activity included', async () => {
+    const user = setup({ permissions: ROLES.admin })
+    await user.click(button())
+    for (const id of MAIN_IDS) expect(linkIds(menu())).not.toContain(id)
+  })
+
+  it('shows a viewer the three signed-in modules and nothing guarded', async () => {
     const user = setup({ permissions: ROLES.viewer })
     await user.click(button())
-    expect(linkIds(menu()).sort()).toEqual(['cas', 'certificates', 'csrs', 'templates', 'tools'])
+    expect(linkIds(menu()).sort()).toEqual(['csrs', 'templates', 'tools'])
+  })
+
+  it('counts the modules of each group and of the menu', async () => {
+    const user = setup({ permissions: ROLES.admin })
+    await user.click(button())
+    const groups = menuGroupsFor(canFor(ROLES.admin))
+    const counters = within(menu()).getAllByRole('heading', { level: 2 }).map(h => h.querySelector('.shell-count').textContent)
+    expect(counters).toEqual(groups.map(g => String(g.modules.length)))
+    const pages = groups.reduce((n, g) => n + g.modules.length, 0)
+    expect(within(menu()).getByText(new RegExp(`shell\\.modulePages`)).textContent).toContain('shell.pinCount')
+    expect(pages).toBe(linkIds(menu()).length)
+  })
+
+  it('puts one line of description under every module', async () => {
+    const user = setup({ permissions: ROLES.admin })
+    await user.click(button())
+    for (const link of within(menu()).getAllByRole('link')) {
+      const small = link.querySelector('small')
+      expect(small?.textContent).toMatch(/^shell\.moduleDesc\./)
+    }
   })
 
   it('gives an administrator the four groups', async () => {
@@ -77,20 +104,20 @@ describe('Modules menu: what each role sees', () => {
   })
 
   it('marks the current module with aria-current and leaves the others unmarked', async () => {
-    const user = setup({ activeId: 'cas' })
+    const user = setup({ activeId: 'acme' })
     await user.click(button())
     const current = within(menu()).getAllByRole('link').filter(a => a.getAttribute('aria-current') === 'page')
-    expect(current.map(a => a.getAttribute('data-module'))).toEqual(['cas'])
+    expect(current.map(a => a.getAttribute('data-module'))).toEqual(['acme'])
   })
 
   it('highlights the Modules button for a module view, not for a fixed link or a pinned module', () => {
-    setup({ activeId: 'audit' })
+    setup({ activeId: 'reports' })
     expect(button().className).toContain('is-active')
     cleanup()
-    setup({ activeId: 'cas' })
+    setup({ activeId: 'audit' })
     expect(button().className).not.toContain('is-active')
     cleanup()
-    setup({ activeId: 'audit', initialPins: ['audit'] })
+    setup({ activeId: 'reports', initialPins: ['reports'] })
     expect(button().className).not.toContain('is-active')
   })
 })
@@ -182,28 +209,29 @@ describe('Modules menu: pins', () => {
   it('pins a module, reflects it with aria-pressed, and counts it', async () => {
     const user = setup()
     await user.click(button())
-    await user.click(pinButton('common.audit'))
-    expect(pinButton('common.audit')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByText('shell.pinCount')).toBeInTheDocument()
+    await user.click(pinButton('common.reports'))
+    expect(pinButton('common.reports')).toHaveAttribute('aria-pressed', 'true')
+    expect(within(menu()).getByText(/shell\.pinCount/)).toBeInTheDocument()
   })
 
   it('refuses a fourth pin with an explanation, and pins nothing', async () => {
-    const user = setup({ initialPins: ['audit', 'users', 'hsm'] })
+    const user = setup({ initialPins: ['reports', 'users', 'hsm'] })
     await user.click(button())
     const fourth = pinButton('common.rbac')
     expect(fourth).toHaveAttribute('aria-disabled', 'true')
     await user.click(fourth)
     expect(fourth).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByRole('status')).toHaveTextContent('shell.pinFull')
+    expect(fourth).toHaveAttribute('title', 'shell.pinFullTitle')
   })
 
   it('unpins to make room, then accepts the new pin', async () => {
-    const user = setup({ initialPins: ['audit', 'users', 'hsm'] })
+    const user = setup({ initialPins: ['reports', 'users', 'hsm'] })
     await user.click(button())
-    await user.click(pinButton('common.audit'))
+    await user.click(pinButton('common.reports'))
     await user.click(pinButton('common.rbac'))
     expect(pinButton('common.rbac')).toHaveAttribute('aria-pressed', 'true')
-    expect(pinButton('common.audit')).toHaveAttribute('aria-pressed', 'false')
+    expect(pinButton('common.reports')).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('offers no pin on the pages the bar always shows', async () => {
@@ -211,5 +239,6 @@ describe('Modules menu: pins', () => {
     await user.click(button())
     expect(screen.queryByRole('button', { name: 'shell.pinModule|common.certificates' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'shell.pinModule|common.cas' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'shell.pinModule|common.audit' })).toBeNull()
   })
 })

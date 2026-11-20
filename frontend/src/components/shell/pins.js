@@ -4,11 +4,11 @@
  */
 import { useEffect, useState } from 'react'
 import { getPreferences, subscribePreferences, persistPreference } from '../../stores/userPreferencesStore'
-import { isVisible, moduleById } from '../../navigation/registry'
+import { isVisible, moduleById, MAIN_IDS } from '../../navigation/registry'
 
 export const MAX_PINS = 3
 // Always present in the bar: never pinned twice
-export const FIXED_IDS = ['dashboard', 'certificates', 'cas']
+export const FIXED_IDS = MAIN_IDS
 
 export const canPinModule = (mod) => !!mod && mod.pinnable && !FIXED_IDS.includes(mod.id)
 

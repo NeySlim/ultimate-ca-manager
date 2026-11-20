@@ -9,11 +9,11 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CaretUp, CaretDown, CaretRight } from '@phosphor-icons/react'
 import { cn } from '../../../lib/utils'
+import { SkeletonBar, skWidth } from '../../list/StateBlocks'
 import '../../list/list.css'
 
 const SORT = { asc: 'ascending', desc: 'descending' }
 const SKELETON_ROWS = 12
-const skWidth = (i, base, spread) => `${base + ((i * 37) % spread)}%`
 
 export function ListTable({
   data,
@@ -133,13 +133,13 @@ export function ListTable({
         <tbody>
           {loading ? Array.from({ length: SKELETON_ROWS }, (_, i) => (
             <tr key={`sk-${i}`} className="lv-sk-row" aria-hidden={i > 0 || undefined}>
-              {multiSelect && <td className="lv-col-check"><div className="lv-cell"><span className="lv-sk is-box" /></div></td>}
+              {multiSelect && <td className="lv-col-check"><div className="lv-cell"><SkeletonBar kind="box" /></div></td>}
               {columns.map((col) => (
                 <td key={col.key} className={cn(col.grow && !columnWidths[col.key] && 'lv-grow')}>
                   <div className="lv-cell">
                     {i === 0 && col === columns[0] && <span className="sr-only" role="status">{t('table.loadingRows')}</span>}
-                    <span className={cn('lv-sk', col.skeleton === 'pill' && 'is-pill')}
-                      style={{ width: col.grow ? skWidth(i, 45, 40) : (col.skeletonWidth || 64) }} />
+                    <SkeletonBar kind={col.skeleton === 'pill' ? 'pill' : undefined}
+                      width={col.grow ? skWidth(i, 45, 40) : (col.skeletonWidth || 64)} />
                   </div>
                 </td>
               ))}

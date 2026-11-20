@@ -1,5 +1,5 @@
 import { test, expect, createCA, issueCert, uid, type Api } from './support/fixtures'
-import { MODULES, REDIRECTS } from '../src/navigation/registry.js'
+import { MODULES, REDIRECTS, MAIN_IDS, menuLabelKey } from '../src/navigation/registry.js'
 import { readFileSync } from 'node:fs'
 
 const en = JSON.parse(readFileSync(new URL('../src/i18n/locales/en.json', import.meta.url), 'utf8'))
@@ -69,19 +69,26 @@ for (const redirect of REDIRECTS) {
   })
 }
 
-test('the Modules menu offers every grouped module under its translated label', async ({ page, api }) => {
+test('the Modules menu offers every grouped module but the main pages, under its translated label', async ({ page, api }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Modules' }).click()
   const menu = page.getByRole('navigation', { name: translate('shell.modulesMenuLabel') })
-  const grouped = MODULES.filter(m => m.group)
+  const grouped = MODULES.filter(m => m.group && !MAIN_IDS.includes(m.id))
   for (const m of grouped) {
-    const label = translate(m.labelKey)
-    expect(label, `${m.labelKey} has an English text`).toBeTruthy()
-    await expect(menu.getByRole('link', { name: label, exact: true })).toHaveAttribute('href', m.path)
+    const label = translate(menuLabelKey(m))
+    expect(label, `${menuLabelKey(m)} has an English text`).toBeTruthy()
+    expect(translate(m.descKey), `${m.descKey} has an English text`).toBeTruthy()
+    // The link reads its label then the line that says what the page is for
+    await expect(menu.locator(`a[data-module="${m.id}"] strong`)).toHaveText(label!)
+    await expect(menu.locator(`a[data-module="${m.id}"]`)).toHaveAttribute('href', m.path)
   }
+  // The main pages are links of the bar, not of the menu
+  for (const id of MAIN_IDS) await expect(menu.locator(`a[data-module="${id}"]`)).toHaveCount(0)
+  const bar = page.getByRole('navigation', { name: 'Main navigation' })
+  await expect(bar.getByRole('link', { name: translate('shell.bar.activity'), exact: true })).toHaveAttribute('href', '/audit')
   // A module opens from the menu
   const target = grouped.find(m => m.id === 'templates')!
-  await menu.getByRole('link', { name: translate(target.labelKey), exact: true }).click()
+  await menu.locator(`a[data-module="${target.id}"]`).click()
   await expect(page).toHaveURL(new RegExp(`${target.path}$`))
   await expect(page.getByRole('heading', { level: 1, name: translate('common.templates') })).toBeVisible()
 })

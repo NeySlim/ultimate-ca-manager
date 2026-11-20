@@ -690,30 +690,15 @@ export function ResponsiveDataTable({
             </div>
           </div>
         ) : (
-        <div className="flex-1 flex flex-col items-center justify-center py-16 px-4">
-          {EmptyIcon && (
-            <div className="w-16 h-16 rounded-2xl bg-bg-tertiary flex items-center justify-center mb-4">
-              <EmptyIcon size={32} className="text-text-secondary" />
-            </div>
-          )}
-          <h3 className="text-lg font-medium text-text-primary mb-1">
-            {hasActiveFilters ? t('table.noResults') : emptyTitle}
-          </h3>
-          <p className="text-sm text-text-secondary text-center max-w-sm mb-4">
-            {hasActiveFilters 
-              ? t('table.adjustFilters')
-              : emptyDescription
-            }
-          </p>
-          {hasActiveFilters ? (
-            <button
-              onClick={handleClearAllChips}
-              className="text-sm text-accent-primary hover:text-accent-primary-op80 font-medium"
-            >
-              {t('table.clearFilters')}
-            </button>
-          ) : emptyAction}
-        </div>
+          // The same empty block outside the list template, without its table box
+          <div className="lv-empty" data-testid="list-empty">
+            {EmptyIcon && <EmptyIcon aria-hidden="true" />}
+            <h3>{hasActiveFilters ? t('table.noResults') : emptyTitle}</h3>
+            <p>{hasActiveFilters ? t('table.adjustFilters') : emptyDescription}</p>
+            {hasActiveFilters ? (
+              <button type="button" className="lv-btn" onClick={handleClearAllChips}>{t('table.clearFilters')}</button>
+            ) : emptyAction}
+          </div>
         )}
       </div>
     )

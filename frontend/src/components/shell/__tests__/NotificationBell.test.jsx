@@ -11,7 +11,7 @@ const m = vi.hoisted(() => ({
 }))
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k, o) => (o && o.count != null ? `${k}|${o.count}` : tStub(k, o)), i18n: { language: 'en' } }),
+  useTranslation: () => ({ t: (k, o) => (o && o.count != null ? `${k}|${o.count}${o.state ? `|${o.state}` : ''}` : tStub(k, o)), i18n: { language: 'en' } }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 vi.mock('../../../services/dashboard.service', () => ({ dashboardService: { getQueue: m.getQueue } }))
@@ -74,9 +74,10 @@ describe('NotificationBell', () => {
     const user = setup()
     await waitFor(() => expect(bell()).toHaveAccessibleName(/shell\.bell\.unread\|4/))
     await user.click(bell())
-    const panel = screen.getByRole('region', { name: 'shell.bell.title' })
+    const panel = screen.getByRole('complementary', { name: 'shell.bell.title' })
     const rows = within(panel).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
-    expect(rows).toEqual(['acme_order_failed:7', 'approval_pending:3', 'audit:41', 'audit:43'])
+    // Newest first, the undated approval last
+    expect(rows).toEqual(['acme_order_failed:7', 'audit:41', 'audit:43', 'approval_pending:3'])
     expect(m.getQueue).toHaveBeenCalledWith(expect.arrayContaining(['acme_order_failed', 'approval_pending', 'truststore_expiring']))
   })
 
@@ -92,7 +93,7 @@ describe('NotificationBell', () => {
     expect(m.getQueue.mock.calls[0][0]).toEqual(
       expect.arrayContaining(['deploy_binding_left_behind', 'https_binding_left_behind']))
     await user.click(bell())
-    const panel = screen.getByRole('region', { name: 'shell.bell.title' })
+    const panel = screen.getByRole('complementary', { name: 'shell.bell.title' })
     const links = within(panel).getAllByRole('link').map(a => a.getAttribute('href'))
     expect(links).toEqual(expect.arrayContaining(['/certificates/12?binding=5', '/settings?tab=https']))
   })
@@ -107,7 +108,7 @@ describe('NotificationBell', () => {
     await waitFor(() => expect(bell()).toHaveAccessibleName(/shell\.bell\.unread\|1/))
     expect(m.getQueue.mock.calls[0][0]).toContain('truststore_expiring')
     await user.click(bell())
-    const panel = screen.getByRole('region', { name: 'shell.bell.title' })
+    const panel = screen.getByRole('complementary', { name: 'shell.bell.title' })
     expect(within(panel).getByText('Old Root')).toBeTruthy()
     expect(within(panel).queryByText('Next Root')).toBeNull()
     expect(within(panel).getByRole('link', { name: /Old Root/ }).getAttribute('href')).toBe('/truststore/4')
@@ -117,10 +118,10 @@ describe('NotificationBell', () => {
     const user = setup()
     await waitFor(() => expect(bell()).toHaveAccessibleName(/\|4/))
     await user.click(bell())
-    const unread = document.querySelectorAll('.shell-bell-item.is-unread').length
+    const unread = document.querySelectorAll('.shell-notif-item.is-unread').length
     expect(bell()).toHaveAccessibleName(`shell.bell.title: shell.bell.unread|${unread}`)
     await user.click(screen.getByRole('button', { name: /shell\.bell\.markRead: web\.example/ }))
-    expect(document.querySelectorAll('.shell-bell-item.is-unread').length).toBe(unread - 1)
+    expect(document.querySelectorAll('.shell-notif-item.is-unread').length).toBe(unread - 1)
     expect(bell()).toHaveAccessibleName(`shell.bell.title: shell.bell.unread|${unread - 1}`)
     expect(m.persistPreference).toHaveBeenLastCalledWith('notifications_read', ['acme_order_failed:7'])
   })
@@ -133,7 +134,7 @@ describe('NotificationBell', () => {
     expect(m.persistPreference).toHaveBeenCalledTimes(1)
     expect(m.persistPreference.mock.calls[0][1]).toHaveLength(4)
     expect(bell()).toHaveAccessibleName('shell.bell.title: shell.bell.allRead')
-    expect(screen.getByRole('status')).toHaveTextContent('shell.bell.allRead')
+    expect(document.querySelector('.shell-notif-head [role="status"]')).toHaveTextContent('shell.bell.summary|4|shell.bell.allRead')
   })
 
   it('reads the marks from the user preferences and drops marks of items that left', async () => {
@@ -218,7 +219,7 @@ describe('NotificationBell', () => {
     const user = userEvent.setup()
     await waitFor(() => expect(bell()).toHaveAccessibleName(/\|5/))
     await user.click(bell())
-    const rows = within(screen.getByRole('region', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
+    const rows = within(screen.getByRole('complementary', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
     expect(rows).toContain('audit:60')
     expect(rows).not.toContain('audit:61')
   })
@@ -237,7 +238,7 @@ describe('NotificationBell', () => {
     const user = userEvent.setup()
     await waitFor(() => expect(bell()).toHaveAccessibleName(/\|5/))
     await user.click(bell())
-    const rows = within(screen.getByRole('region', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
+    const rows = within(screen.getByRole('complementary', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
     expect(rows).toContain('audit:80')
     for (let i = 0; i < refused.length; i++) expect(rows).not.toContain(`audit:${70 + i}`)
   })
@@ -251,7 +252,7 @@ describe('NotificationBell', () => {
     await waitFor(() => expect(bell()).toHaveAccessibleName(/\|4/))
     const user = userEvent.setup()
     await user.click(bell())
-    const rows = within(screen.getByRole('region', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
+    const rows = within(screen.getByRole('complementary', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
     expect(rows).toContain('audit:41')
     expect(rows).not.toContain('audit:100')
   })
@@ -276,7 +277,7 @@ describe('NotificationBell', () => {
     const user = userEvent.setup()
     await waitFor(() => expect(bell()).toHaveAccessibleName(/\|5/))
     await user.click(bell())
-    const rows = within(screen.getByRole('region', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
+    const rows = within(screen.getByRole('complementary', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
     expect(rows).toContain('audit:300')
     expect(rows.some(r => r.startsWith('audit:2'))).toBe(false)
   })

@@ -1,10 +1,9 @@
-/** Horizontal bar: brand, main pages, pinned modules, Modules menu, search, help, live link, account. */
+/** Horizontal bar: brand, main pages (Activity included), pinned modules, Modules menu, search, theme, bell, help, account. */
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { MagnifyingGlass, Question } from '@phosphor-icons/react'
+import { MagnifyingGlass, Question, SquaresFour, Pulse } from '@phosphor-icons/react'
 import { isVisible, moduleById } from '../../navigation/registry'
 import { Logo } from '../Logo'
-import { WebSocketIndicator } from '../WebSocketIndicator'
 import { FIXED_IDS } from './pins'
 import { ModulesMenu } from './ModulesMenu'
 import { PinnedModules } from './PinnedModules'
@@ -15,6 +14,9 @@ import { MobileModulePicker } from './MobileModulePicker'
 import { useExpiringBadge } from './useExpiringBadge'
 import './shell.css'
 
+// Icons of the main bar where they differ from the module's own
+const BAR_ICONS = { dashboard: SquaresFour, audit: Pulse }
+
 export function TopBar({ can, pins, onTogglePin, activeId, onOpenSearch, onOpenHelp, hasHelp }) {
   const { t } = useTranslation()
   const { count: expiring, dismiss } = useExpiringBadge()
@@ -24,13 +26,13 @@ export function TopBar({ can, pins, onTogglePin, activeId, onOpenSearch, onOpenH
   return (
     <header className="shell-topbar">
       <Link to="/" className="shell-brand" title={t('common.dashboard')}>
-        <Logo variant="icon" withText={false} size="xs" />
+        <Logo variant="icon" withText={false} size="sm" className="shell-brand-mark" />
         <strong>UCM</strong>
       </Link>
 
       <nav className="shell-main-nav" aria-label={t('shell.mainNav')}>
         {fixed.map(m => {
-          const Icon = m.icon
+          const Icon = BAR_ICONS[m.id] || m.icon
           const active = current === m.id
           const badged = m.id === 'certificates' && expiring > 0
           return (
@@ -41,8 +43,8 @@ export function TopBar({ can, pins, onTogglePin, activeId, onOpenSearch, onOpenH
                 className={`shell-navlink${active ? ' is-active' : ''}`}
                 aria-current={active ? 'page' : undefined}
               >
-                <Icon size={16} weight={active ? 'fill' : 'regular'} aria-hidden="true" />
-                <span>{t(m.labelKey)}</span>
+                <Icon size={16} aria-hidden="true" />
+                <span>{t(m.barKey)}</span>
               </Link>
               {badged && (
                 <button type="button" className="shell-badge" onClick={dismiss}
@@ -66,14 +68,13 @@ export function TopBar({ can, pins, onTogglePin, activeId, onOpenSearch, onOpenH
           <span>{t('shell.searchPlaceholder')}</span>
           <kbd>Ctrl K</kbd>
         </button>
-        {hasHelp && (
-          <button type="button" className="shell-icon-btn" onClick={() => onOpenHelp()} aria-label={t('common.help')}>
-            <Question size={18} aria-hidden="true" />
-          </button>
-        )}
-        <WebSocketIndicator className="shell-ws" />
         <ThemeMenu />
         <NotificationBell can={can} />
+        {hasHelp && (
+          <button type="button" className="shell-icon-btn" onClick={() => onOpenHelp()} aria-label={t('common.help')}>
+            <Question size={16} aria-hidden="true" />
+          </button>
+        )}
         <UserMenu can={can} />
       </div>
     </header>
