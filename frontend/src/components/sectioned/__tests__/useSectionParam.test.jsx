@@ -62,4 +62,17 @@ describe('useSectionParam', () => {
     expect(scrolled).toContain('sf-sec-c')
     expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Title c' }))
   })
+
+  it('lands a link without the keyboard outline, which a later jump keeps', () => {
+    Element.prototype.scrollIntoView = vi.fn()
+    mount('/x?tab=b', { stacked: true })
+    const landed = screen.getByRole('heading', { name: 'Title b' })
+    expect(document.activeElement).toBe(landed)
+    expect(landed).toHaveAttribute('data-quiet-focus')
+    act(() => screen.getByText('to-c').click())
+    expect(landed).not.toHaveAttribute('data-quiet-focus')
+    const jumped = screen.getByRole('heading', { name: 'Title c' })
+    expect(document.activeElement).toBe(jumped)
+    expect(jumped).not.toHaveAttribute('data-quiet-focus')
+  })
 })

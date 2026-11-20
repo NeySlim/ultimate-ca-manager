@@ -81,7 +81,7 @@ import { autoRenewalWaitingMessage } from '../lib/autoRenewalWaiting'
 import { secretRequiredForTarget, smtpSecretTargets } from '../lib/secretTarget'
 import {
   FormLayout, SectionToc, SectionJump, FormSection, SaveBar, SavePartsContext,
-  useSavePartsRegistry, changedKeys, useUnloadGuard, sectionDomId, sectionTitleId, keepDraft, readDraft,
+  useSavePartsRegistry, changedKeys, useUnloadGuard, sectionDomId, sectionTitleId, focusSectionTitle, keepDraft, readDraft,
 } from '../components/sectioned'
 import SettingsHistory from './settings/SettingsHistory'
 import { fieldProblems, fieldSection } from './settings/fieldChecks'
@@ -253,11 +253,11 @@ export default function SettingsPage() {
   }, [searchParams])
 
   // Every section is on the page: a jump scrolls to its frame and gives its title the focus
-  const jumpToSection = useCallback((categoryId) => {
+  const jumpToSection = useCallback((categoryId, options) => {
     const frame = document.getElementById(sectionDomId(categoryId))
     if (!frame) return
     frame.scrollIntoView?.({ block: 'start' })
-    document.getElementById(sectionTitleId(categoryId))?.focus({ preventScroll: true })
+    focusSectionTitle(categoryId, options)
   }, [])
 
   // Update URL when category changes
@@ -276,7 +276,7 @@ export default function SettingsPage() {
   const tabParam = searchParams.get('tab')
   useEffect(() => {
     if (loading || !tabParam) return undefined
-    jumpToSection(tabParam)
+    jumpToSection(tabParam, { quiet: true })
     // Sections above still load and grow: the frame is held in place until the user moves
     const form = document.querySelector('.sf-form')
     if (!form || typeof ResizeObserver === 'undefined') return undefined
@@ -2373,7 +2373,7 @@ export default function SettingsPage() {
           <div className="space-y-4" data-testid="backup-job">
             <p className="text-sm text-text-primary">{backupProgress}</p>
             <p className="text-sm text-text-secondary">{t('settings.backupRunsInBackground')}</p>
-            <div className="flex gap-3 justify-end pt-4">
+            <div className="ui-dialog-actions">
               <Button type="button" variant="secondary" onClick={closeBackupModal}>
                 {t('common.close')}
               </Button>
@@ -2386,7 +2386,7 @@ export default function SettingsPage() {
         ) : backupReady ? (
           <div className="space-y-4" data-testid="backup-ready">
             <p className="text-sm text-text-primary">{t('settings.backupReady', { filename: backupReady.filename })}</p>
-            <div className="flex gap-3 justify-end pt-4">
+            <div className="ui-dialog-actions">
               <Button type="button" variant="secondary" onClick={closeBackupModal}>
                 {t('common.close')}
               </Button>
@@ -2412,7 +2412,7 @@ export default function SettingsPage() {
             autoFocus
             showStrength
           />
-          <div className="flex gap-3 justify-end pt-4">
+          <div className="ui-dialog-actions">
             <Button type="button" variant="secondary" onClick={closeBackupModal}>
               {t('common.cancel')}
             </Button>
@@ -2440,7 +2440,7 @@ export default function SettingsPage() {
         {restoreJob.signInNeeded ? (
           <div className="space-y-4" data-testid="restore-sign-in">
             <p className="text-sm text-text-primary" role="status">{t('settings.restoreSignInAgain')}</p>
-            <div className="flex gap-3 justify-end pt-4">
+            <div className="ui-dialog-actions">
               <Button type="button" autoFocus onClick={() => {
                 // Back to this tab after the sign-in: its report is shown there
                 releaseSignOut(); window.location.href = loginUrl('/settings', '?tab=backup')
@@ -2456,7 +2456,7 @@ export default function SettingsPage() {
               {restoreJobProgress}
             </p>
             <p className="text-sm text-text-secondary">{t('settings.restoreRunsInBackground')}</p>
-            <div className="flex gap-3 justify-end pt-4">
+            <div className="ui-dialog-actions">
               <Button type="button" variant="secondary" onClick={() => setShowRestoreModal(false)}>
                 {t('common.close')}
               </Button>
@@ -2491,7 +2491,7 @@ export default function SettingsPage() {
             placeholder={t('settings.enterBackupPassword')}
             autoFocus
           />
-          <div className="flex gap-3 justify-end pt-4">
+          <div className="ui-dialog-actions">
             <Button type="button" variant="secondary" onClick={() => { setShowRestoreModal(false); setRestorePassword(''); setRestoreFile(null) }}>
               {t('common.cancel')}
             </Button>

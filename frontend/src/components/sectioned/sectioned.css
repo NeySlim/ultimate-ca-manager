@@ -65,6 +65,8 @@
 .sf-heading h2 { margin: 0; font-size: 14px; font-weight: 600; color: var(--text); }
 .sf-heading h2:focus { outline: none; }
 .sf-heading h2:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* A link landing focuses the title without a key pressed: no outline (keyboard only) */
+.sf-heading h2[data-quiet-focus]:focus-visible { outline: none; }
 .sf-heading p { margin: 5px 0 0; font-size: 12px; color: var(--muted); }
 .sf-heading-aside { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 /* A save the server refused: its message under the sentence, in the error colour; the frame does not change */
@@ -93,7 +95,7 @@
   color: var(--text);
 }
 /* A field out of bounds: the mockup's error border and ring (`.field [aria-invalid=true]`) */
-.sf-body:not(.sf-body-fill) :is(input, select, textarea, button[role="combobox"])[aria-invalid="true"] { border-color: var(--bad); box-shadow: 0 0 0 1px var(--bad); }
+.sf-body:not(.sf-body-fill) :is(input, select, textarea, button[role="combobox"])[aria-invalid="true"] { border-color: var(--bad) !important; box-shadow: 0 0 0 1px var(--bad); }
 /* A field that cannot be changed reads as the mockup's read-only field: raised, plain text */
 .sf-body:not(.sf-body-fill) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea):is(:disabled, [readonly]) {
   background-color: var(--raised) !important;
@@ -240,6 +242,11 @@
 .sf-state strong { font-weight: 600; }
 .sf-state:focus { outline: none; }
 .sf-state:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* A frame saved by its own buttons says what waits, in the tone of the save bar */
+.sf-pending { display: flex; align-items: flex-start; gap: 7px; margin: 0 0 12px; font-size: 12px; line-height: 1.5; color: var(--warn); }
+.sf-pending > svg { width: 14px; height: 14px; margin-top: 1px; flex-shrink: 0; }
+.sf-pending strong { font-weight: 600; }
 
 /* History of the saves, read from the audit log */
 .sf-history { border: 1px solid var(--line); border-radius: 5px; background: var(--panel); min-width: 0; }

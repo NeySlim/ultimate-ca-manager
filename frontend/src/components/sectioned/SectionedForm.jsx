@@ -12,12 +12,26 @@ import './sectioned.css'
 export const sectionDomId = (id) => `sf-sec-${id}`
 export const sectionTitleId = (id) => `sf-title-${id}`
 
+/**
+ * Gives a section title the focus. `quiet` (a link landing, no key pressed) keeps it without
+ * the keyboard outline until the title loses the focus: the mockup draws it for the keyboard only.
+ */
+export function focusSectionTitle(id, { quiet = false } = {}) {
+  const title = document.getElementById(sectionTitleId(id))
+  if (!title) return
+  if (quiet) {
+    title.setAttribute('data-quiet-focus', '')
+    title.addEventListener('blur', () => title.removeAttribute('data-quiet-focus'), { once: true })
+  }
+  title.focus({ preventScroll: true })
+}
+
 /** Scrolls to a section's frame and gives its title the focus, as the Atelier jump does. */
-export function jumpToSection(id) {
+export function jumpToSection(id, options) {
   const frame = document.getElementById(sectionDomId(id))
   if (!frame) return
   frame.scrollIntoView?.({ block: 'start' })
-  document.getElementById(sectionTitleId(id))?.focus({ preventScroll: true })
+  focusSectionTitle(id, options)
 }
 
 /** Layout: the table of contents beside the main column. */
