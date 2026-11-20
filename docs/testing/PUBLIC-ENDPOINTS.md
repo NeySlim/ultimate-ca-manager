@@ -81,7 +81,7 @@ UCM_TRUSTED_PROXIES=10.0.0.5         # the reverse-proxy IP, not entire RFC1918
 # UCM_TRUSTED_PROXIES=10.42.0.0/16
 ```
 
-## GUI — Settings → General → Public endpoints
+## GUI — Settings → General → Public addresses
 
 - **Effective URLs** after save (canonical admin, protocol, ACME directory/proxy).
 - **Check DNS and TLS** runs preflight (requires `write:settings`).

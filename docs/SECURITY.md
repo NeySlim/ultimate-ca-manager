@@ -252,7 +252,7 @@ GET /api/v2/dashboard/expiring-certs?limit=10
 POST /api/v2/system/alerts/expiry/check
 ```
 
-Requires SMTP configuration in Settings > Email.
+Requires SMTP configuration in Settings > SMTP.
 
 ---
 

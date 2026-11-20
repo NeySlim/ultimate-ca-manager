@@ -303,8 +303,7 @@
 }
 :root[data-theme="aurore"][data-mode="light"] :is(.sf-section, .sf-history) {
   background: linear-gradient(var(--panel), var(--panel)) padding-box,
-    linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 38%, transparent), rgba(34, 170, 220, .24) 60%, color-mix(in srgb, var(--text) 8%, transparent)) border-box;
-  /* The mockup's light panel stops and shadow, written as it writes them (no theme token holds them) */
-  box-shadow: inset 0 1px 0 var(--paper), 0 18px 40px -28px rgba(40, 50, 120, .35);
+    linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 38%, transparent), color-mix(in srgb, var(--grad-b) 24%, transparent) 60%, color-mix(in srgb, var(--text) 8%, transparent)) border-box;
+  box-shadow: inset 0 1px 0 var(--paper), 0 18px 40px -28px color-mix(in srgb, var(--text) 35%, transparent);
 }
 :root[data-theme="aurore"] .sf-body:not(.sf-body-fill) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea, button[role="combobox"]) { border-radius: 6px; }
