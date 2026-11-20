@@ -482,11 +482,16 @@
   .lv-btn.lv-hide-mobile { width: 32px; padding: 6px; gap: 0; font-size: 0; }
   .lv-stage { --lv-gutter: 16px; }
   .lv-main { padding: 0; }
+  /* On a phone the whole page scrolls, as the mockup: no box of the list keeps a fixed height */
+  div.lv-stage { height: auto; overflow: visible; }
+  .lv-stage > .lv-main, .lv-main > main { display: block; flex: none; overflow: visible; }
+  .lv-stage .lv-panel { display: block; height: auto; }
+  .lv-stage .lv-workspace { display: block; padding-bottom: 20px; }
+  .lv-stage .lv-table-box { display: block; }
   .lv-head { flex-wrap: wrap; gap: 12px; padding-top: 14px; padding-bottom: 10px; }
   .lv-title-line h1 { font-size: 24px; }
   .lv-title-line .lv-total { display: none; }
   .lv-views-row { margin-bottom: 0; }
-  .lv-workspace { padding-bottom: 0; }
   /* Phone toolbar, as the mockup: the search on its own line, the filters sharing the next */
   .lv-toolbar { flex-wrap: wrap; gap: 8px; }
   .lv-toolbar .lv-search { flex-basis: 100%; min-height: 42px; }
