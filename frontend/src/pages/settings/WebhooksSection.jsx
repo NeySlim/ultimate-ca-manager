@@ -24,7 +24,7 @@ export default function WebhooksSection({ webhooks, webhooksLoading, webhookTest
           icon={Bell}
           title={t('webhooks.noWebhooks')}
           description={t('webhooks.noWebhooksDescription')}
-          action={{ label: t('webhooks.addWebhook'), onClick: handleWebhookCreate }}
+          action={{ label: t('webhooks.addWebhook'), onClick: handleWebhookCreate, write: true }}
         />
       ) : (
         <FormGroup

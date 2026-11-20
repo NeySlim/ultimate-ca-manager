@@ -643,8 +643,8 @@
 :root[data-theme="aurore"] .lv-table tbody tr.is-opened td:first-child { position: relative; box-shadow: none; }
 :root[data-theme="aurore"] .lv-table tbody tr.is-opened td:first-child::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: linear-gradient(180deg, var(--grad-a), var(--grad-b)); pointer-events: none; }
 /* Aurore: the focus ring wears the mockup's 5 px halo */
-:root[data-theme="aurore"] :is(.lv-stage, .lv-dialog) :is(button, a, input, select, [tabindex]):focus-visible { box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent); }
-:root[data-theme="aurore"] :is(.lv-stage, .lv-dialog) .lv-btn.is-primary:focus-visible { box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent), 0 8px 24px -8px var(--glow); }
+:root[data-theme="aurore"] :is(.lv-stage, .lv-dialog) :is(button, a, input, select, [tabindex]):focus-visible { box-shadow: 0 0 0 5px var(--halo); }
+:root[data-theme="aurore"] :is(.lv-stage, .lv-dialog) .lv-btn.is-primary:focus-visible { box-shadow: 0 0 0 5px var(--halo), 0 8px 24px -8px var(--glow); }
 @media (prefers-reduced-motion: no-preference) {
   :root[data-theme="aurore"] :is(.lv-btn, .lv-icon-btn, .lv-table tbody tr) { transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease; }
 }

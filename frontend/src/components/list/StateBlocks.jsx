@@ -81,7 +81,8 @@ export function LoadError({ title, cause, onRetry, journal, journalLabel, classN
 }
 
 /**
- * Nothing to show: icon, why, the next useful action. `action` = { label, onClick | to, icon, primary }.
+ * Nothing to show: icon, why, the next useful action. `action` = { label, onClick | to, icon, primary, write }
+ * (`write`: an action that writes, held by the write guard offline or in maintenance).
  */
 export function EmptyBlock({ icon: Icon = FileX, title, description, action, className, ...props }) {
   return (
@@ -94,7 +95,7 @@ export function EmptyBlock({ icon: Icon = FileX, title, description, action, cla
           {action.icon && <action.icon size={16} aria-hidden="true" />}{action.label}
         </Link>
       ) : (
-        <ListButton primary={!!action.primary} icon={action.icon} onClick={action.onClick}>{action.label}</ListButton>
+        <ListButton primary={!!action.primary} icon={action.icon} onClick={action.onClick} data-write={action.write ? '' : undefined}>{action.label}</ListButton>
       ))}
     </div>
   )

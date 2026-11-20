@@ -193,7 +193,7 @@ export default function DeploySection() {
           icon={CloudArrowUp}
           title={t('deploy.noTargets')}
           description={t('deploy.noTargetsDescription')}
-          action={{ label: t('deploy.addTarget'), onClick: openCreate }}
+          action={{ label: t('deploy.addTarget'), onClick: openCreate, write: true }}
         />
       ) : (
         <FormGroup title={t('deploy.targets')}>

@@ -62,6 +62,13 @@ describe('LoadError', () => {
 })
 
 describe('EmptyBlock and EmptyState', () => {
+  it('marks a writing next action for the write guard, and leaves a reading one alone', () => {
+    const { rerender } = render(<EmptyBlock title="None" action={{ label: 'Add', onClick: () => {}, write: true }} />)
+    expect(screen.getByRole('button', { name: 'Add' })).toHaveAttribute('data-write')
+    rerender(<EmptyBlock title="None" action={{ label: 'Reload', onClick: () => {} }} />)
+    expect(screen.getByRole('button', { name: 'Reload' })).not.toHaveAttribute('data-write')
+  })
+
   it('shows icon, why and the next action as a button', async () => {
     const onClick = vi.fn()
     const { container } = render(<EmptyBlock icon={ShieldCheck} title="No CA" description="Create a root." action={{ label: 'Create', onClick, primary: true, icon: Plus }} />)
