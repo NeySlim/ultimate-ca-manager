@@ -6,7 +6,8 @@ import * as Toast from '@radix-ui/react-toast'
 import { CheckCircle, Warning, Info, X } from '@phosphor-icons/react'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
-import { ListDialog, yieldEscapeToDialog } from '../components/list/ListDialog'
+import { ListDialog } from '../components/list/ListDialog'
+import { yieldEscapeToDialog } from '../components/list/dialogEscape'
 import { useTranslation } from 'react-i18next'
 
 const NotificationContext = createContext()

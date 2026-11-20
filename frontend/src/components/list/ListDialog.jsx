@@ -6,6 +6,7 @@ import * as Dialog from '@radix-ui/react-dialog'
 import { X } from '@phosphor-icons/react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/utils'
+import { escapeYielded } from './dialogEscape'
 import './list.css'
 
 // Initial focus, as the mockup: an element marked data-autofocus (the safe action of a confirmation),
@@ -21,15 +22,6 @@ function focusFirstField(event) {
   }
 }
 
-// A toast opened over a dialog is Radix's highest layer and takes Escape from it: the toast
-// yields an Escape typed inside a dialog (marked here), which the dialog then closes on
-const YIELDED = new WeakSet()
-export function yieldEscapeToDialog(event) {
-  if (!event.target?.closest?.('[role="dialog"]')) return
-  event.preventDefault()
-  YIELDED.add(event)
-}
-
 /** narrow: 520 px (default); wide: 920 px, as the mockup's dialog.wide; neither: 760 px. */
 export function ListDialog({ open, onOpenChange, title, subtitle, narrow = true, wide = false, closable = true, children, className, testId }) {
   const { t } = useTranslation()
@@ -39,7 +31,7 @@ export function ListDialog({ open, onOpenChange, title, subtitle, narrow = true,
         <Dialog.Overlay className="lv-dialog-backdrop" />
         <Dialog.Content className={cn('lv-dialog', wide ? 'is-wide' : narrow && 'is-narrow', className)} data-testid={testId}
           aria-describedby={undefined} onOpenAutoFocus={focusFirstField}
-          onKeyDown={(e) => { if (e.key === 'Escape' && YIELDED.has(e.nativeEvent)) onOpenChange?.(false) }}>
+          onKeyDown={(e) => { if (e.key === 'Escape' && escapeYielded(e.nativeEvent)) onOpenChange?.(false) }}>
           <header className="lv-dialog-head">
             <div>
               <Dialog.Title asChild><h2>{title}</h2></Dialog.Title>
