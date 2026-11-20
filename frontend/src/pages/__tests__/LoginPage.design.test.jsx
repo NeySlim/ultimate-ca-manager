@@ -4,7 +4,7 @@
  * messages chosen by the response's status, and the wait of a 429 counted down.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { saveLock, markJustLocked } from '../../lib/sessionLock'
 
@@ -223,6 +223,19 @@ describe('LoginPage, as designed', () => {
     renderLogin()
     await submit('alice', 'right')
     await waitFor(() => expect(s.showSuccess).toHaveBeenCalledWith('auth.page.signedIn|Alice Martin|common.operator'))
+  })
+
+  it('draws the design chevron on "Sign in" and its padlock on "Unlock"', async () => {
+    const drawing = (name) => [...screen.getByRole('button', { name }).querySelectorAll('svg path, svg rect')]
+      .map(el => el.getAttribute('d') || `rect ${el.getAttribute('width')}x${el.getAttribute('height')}`)
+    renderLogin()
+    await screen.findByLabelText('auth.page.username')
+    expect(drawing('auth.page.submit')).toEqual(['m9 5 7 7-7 7'])
+    cleanup()
+    saveLock({ username: 'alice', name: 'Alice Martin', role: 'operator', method: 'password' })
+    renderLogin()
+    await screen.findByLabelText('auth.page.username')
+    expect(drawing('auth.page.unlock')).toEqual(['rect 14x11', 'M8 10V7a4 4 0 0 1 8 0v3m-4 5v2'])
   })
 
   it('names the screen in the tab title', async () => {
