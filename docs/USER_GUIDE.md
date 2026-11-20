@@ -278,7 +278,7 @@ Creating a CA on an HSM key, an existing one or one generated for it, needs the 
 
 ### Audit Logs
 
-Open **Modules** > **Administration** > **Audit Logs**. Every operation is recorded: who did what, when and from where. Filter by action, user, status and date, search the text, export as JSON or CSV, purge old entries with a retention, and **Verify Integrity** checks the log chain for tampering.
+Open **Modules** > **Administration** > **Audit Logs** (**Activity** in the main bar). Every operation is recorded: who did what, when and from where. Search the text, choose an operation type, and open **Filters** for the dates, the user, the result and the action codes. **Export the log** downloads CSV or JSON; in the « ⋯ » menu, **Verify integrity** checks the log chain for tampering and **Clean up old logs…** purges old entries with a retention.
 
 ### System Logs
 

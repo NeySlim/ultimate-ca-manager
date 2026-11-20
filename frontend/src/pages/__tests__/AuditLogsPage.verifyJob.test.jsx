@@ -73,12 +73,17 @@ beforeEach(() => {
 })
 
 const renderPage = () => render(<MemoryRouter><AuditLogsPage /></MemoryRouter>)
+// The check lives in the journal's actions (the page head's « ⋯ »)
+const startVerification = async () => {
+  fireEvent.click(await screen.findByRole('button', { name: 'audit.moreActions' }))
+  fireEvent.click(await screen.findByText('audit.verifyIntegrity'))
+}
 
 describe('AuditLogsPage verification job', () => {
   it('shows a result answered within the wait as before', async () => {
     auditService.verifyIntegrity.mockResolvedValueOnce({ data: intact })
     renderPage()
-    fireEvent.click(await screen.findByText('audit.verifyIntegrity'))
+    await startVerification()
     await waitFor(() => expect(notify.showSuccess).toHaveBeenCalled())
     expect(jobsService.get).not.toHaveBeenCalled()
   })
@@ -87,7 +92,7 @@ describe('AuditLogsPage verification job', () => {
     auditService.verifyIntegrity.mockResolvedValueOnce({ data: { job: running } })
     jobsService.get.mockResolvedValueOnce({ data: { ...running, state: 'succeeded', result: { code: 200, data: intact } } })
     renderPage()
-    fireEvent.click(await screen.findByText('audit.verifyIntegrity'))
+    await startVerification()
     expect(await screen.findByText(/audit\.verifyProgress.*"done":2000.*"total":9000/)).toBeInTheDocument()
     expect(screen.getByTestId('audit-verify-cancel')).toBeInTheDocument()
     await waitFor(() => expect(notify.showSuccess).toHaveBeenCalled(), { timeout: 3000 })
@@ -99,7 +104,7 @@ describe('AuditLogsPage verification job', () => {
     jobsService.cancel.mockResolvedValueOnce({ data: { ...running, cancel_requested: true } })
     jobsService.get.mockResolvedValue({ data: { ...running, state: 'cancelled', reason: 'cancelled' } })
     renderPage()
-    fireEvent.click(await screen.findByText('audit.verifyIntegrity'))
+    await startVerification()
     fireEvent.click(await screen.findByTestId('audit-verify-cancel'))
     await waitFor(() => expect(jobsService.cancel).toHaveBeenCalledWith('j1'))
     await waitFor(() => expect(notify.showWarning).toHaveBeenCalledWith('audit.verifyCancelled'), { timeout: 3000 })

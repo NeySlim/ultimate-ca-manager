@@ -1,0 +1,12 @@
+/*
+ * Scope of the rules copied from the Atelier mockup (styles/atelier/<zone>.css): `.atl` is the root
+ * of a zone drawn with them. Nothing here is a copy. The scope sits in the shell's page slot as the
+ * mockup's stage sits in its grid row, gives its content what the mockup's :root and body pass
+ * down, and takes every descendant back to the browser's own styles (an icon keeps its
+ * presentation attributes; zero added specificity, so every copied rule wins), so the product's global
+ * rules (Tailwind's reset, transitions, border colours) do not reach under the copied rules.
+ */
+.atl{flex:1;min-width:0;min-height:0;display:grid;grid-template-rows:minmax(0,1fr);grid-template-columns:minmax(0,1fr);font-family:'IBM Plex Sans',sans-serif;font-size:13px;line-height:normal;color:var(--text);-webkit-font-smoothing:auto;-moz-osx-font-smoothing:auto}
+.atl :where(:not(svg,svg *)),.atl :where(:not(svg,svg *))::before,.atl :where(:not(svg,svg *))::after{all:revert}
+.atl svg{display:revert;vertical-align:revert}
+@media(max-width:800px){.atl{display:block}}

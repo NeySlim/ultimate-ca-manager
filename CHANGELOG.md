@@ -92,6 +92,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- **The Activity page is the Atelier journal.** The audit log shows the mockup's toolbar, summary, rows and entry detail, with the operation type as a filter, the dates, user, result, action codes and saved filters under Filters, CSV or JSON export under Export the log, and the integrity check and clean-up in its « ⋯ » menu. Its rows keep the mockup's height: the density switch is gone.
 - **Settings, Account, Tools and Operations read as the Atelier frames.** Read-only facts are term and value lines, lists are record lists and notes are plain notices, with no cards, tiles or emoji; every bound the page knows (ports, durations, counts, a required server, an address, a URL) is checked before a save, and the save bar names the changed fields.
 - **Messages and dialogs as the Atelier design draws them.** A passing message is the design's inverted pill at the bottom of the window; one that stays or carries an action is a framed line with its button and a close button. A dialog opens on its first field, a confirmation on Cancel, a destructive one with a warning notice, over the design's blue-black veil.
 - **Following a link to a page that is still loading marks the link at once** and shows the wait in the page area; offline or in maintenance, the import, edit, publish and run buttons left active wait too, while going to a page of a list stays possible.

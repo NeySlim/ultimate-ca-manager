@@ -1,910 +1,497 @@
 /**
- * Audit Logs Page - Migrated to ResponsiveLayout
- * View and filter audit logs with real-time updates
+ * Activité: the audit journal, as the mockup's activity() draws it (page head, toolbar, summary,
+ * event rows, detail dialog, empty state), on the server's entries. What the mockup has not and
+ * the product keeps (filters, server pages, export formats, integrity check, clean-up, saved
+ * filters) borrows the mockup's own gabarits: filter selects, applied filters, table footer, dialogs.
  */
-import { useLocation } from 'react-router-dom';
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
-import { 
-  ClockCounterClockwise, 
-  User, 
-  ShieldCheck, 
-  Warning, 
-  MagnifyingGlass,
-  FunnelSimple,
-  ArrowsClockwise,
-  DownloadSimple,
-  Trash,
-  CheckCircle,
-  XCircle,
-  Key,
-  Certificate,
-  Users,
-  Gear,
-  Database,
-  SignIn,
-  SignOut,
-  ListBullets,
-  Export,
-  Calendar
-} from '@phosphor-icons/react';
-import { 
-  ResponsiveLayout,
-  ResponsiveDataTable,
-  MobileCard,
-  Card, 
-  Button, 
-  Badge, 
-  Input,
-  Modal,
-  LoadingSpinner,
-  HelpCard,
-  CompactHeader,
-  CompactSection,
-  CompactGrid,
-  CompactField,
-  CompactStats
-} from '../components';
-import { useNotification } from '../contexts';
-import { integrityMessage } from '../lib/auditIntegrity';
-import { usePermission, usePersistedState, useJob } from '../hooks';
-import { acceptedJob } from '../services/jobs.service';
-import auditService from '../services/audit.service';
-import { formatRelativeTime, formatDate, downloadBlob } from '../lib/utils';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { Link, useLocation } from 'react-router-dom'
+import { useTranslation, Trans } from 'react-i18next'
+import { Icon } from '../components/atelier/Icon'
+import { useNotification, useInspector } from '../contexts'
+import { integrityMessage } from '../lib/auditIntegrity'
+import { usePermission, usePersistedState, useJob } from '../hooks'
+import { acceptedJob } from '../services/jobs.service'
+import auditService from '../services/audit.service'
+import { downloadBlob } from '../lib/utils'
 import { reportSilentFailure } from '../lib/silentFailure'
-// Action icons mapping
-const actionIcons = {
-  login_success: SignIn,
-  login_failure: SignIn,
-  logout: SignOut,
-  create: CheckCircle,
-  update: ArrowsClockwise,
-  delete: Trash,
-  issue: Certificate,
-  revoke: XCircle,
-  renew: ArrowsClockwise,
-  sign: Certificate,
-  import: DownloadSimple,
-  export: DownloadSimple,
-  audit_cleanup: Trash,
-  default: ClockCounterClockwise
-};
+import { typeOf, typeIcon, presentTypes, effectiveActions, actionLabel } from './activity/activityTypes'
+import { rowTime, eventDate } from './activity/activityDates'
+import { EventDialog } from './activity/EventDialog'
+import { ExportDialog, ActionsDialog, CleanupDialog } from './activity/JournalDialogs'
+import { FiltersDialog } from './activity/FiltersDialog'
+import '../styles/atelier/scope.css'
+import '../styles/atelier/activity.css'
 
-// Category colors
-const categoryColors = {
-  auth: 'blue',
-  certificates: 'emerald',
-  cas: 'purple',
-  csrs: 'orange',
-  users: 'cyan',
-  settings: 'gray',
-  system: 'red',
-  audit: 'yellow',
-  default: 'gray'
-};
+const PAGE_SIZES = [10, 25, 50, 100]
+const PRESETS_KEY = 'ucm-audit-presets'
+const skWidth = (i, base, spread) => `${base + ((i * 37) % spread)}%`
+const Bar = ({ width, cls = '' }) => <span className={`sk ${cls}`.trim()} style={{ width }} />
 
-// Action category mapping
-const getActionCategory = (action) => {
-  if (action.includes('login') || action.includes('logout')) return 'auth';
-  if (action.includes('cert') || action.includes('issue') || action.includes('revoke')) return 'certificates';
-  if (action.includes('ca_')) return 'cas';
-  if (action.includes('csr')) return 'csrs';
-  if (action.includes('user')) return 'users';
-  if (action.includes('setting')) return 'settings';
-  if (action.includes('audit')) return 'audit';
-  return 'system';
-};
+function readPresets() {
+  try { const saved = localStorage.getItem(PRESETS_KEY); return saved ? JSON.parse(saved) : [] } catch { return [] }
+}
 
 export default function AuditLogsPage() {
-  const { t } = useTranslation();
-  const { showError, showSuccess, showWarning } = useNotification();
-  const { canDelete } = usePermission();
-  
-  // State
-  const [logs, setLogs] = useState([]);
-  const [stats, setStats] = useState(null);
-  const [actions, setActions] = useState({ actions: [], categories: {} });
-  const [loading, setLoading] = useState(true);
-  const [selectedLog, setSelectedLog] = useState(null);
-  
-  // Pagination
-  const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState(50);
-  const [total, setTotal] = useState(0);
-  
-  // Search & Filters
-  // A link may open the log on a search (an inspector's « View its activity »)
-  const location = useLocation();
-  const [search, setSearch] = useState(() => new URLSearchParams(location.search).get('search') || '');
-  const [filterUsername, setFilterUsername] = usePersistedState('ucm-filter-audit-username', '');
-  const [filterAction, setFilterAction] = usePersistedState('ucm-filter-audit-action', []);
-  const [filterSuccess, setFilterSuccess] = usePersistedState('ucm-filter-audit-success', '');
-  const [filterDateFrom, setFilterDateFrom] = usePersistedState('ucm-filter-audit-datefrom', '');
-  const [filterDateTo, setFilterDateTo] = usePersistedState('ucm-filter-audit-dateto', '');
-  
-  // Modals
-  const [showCleanupModal, setShowCleanupModal] = useState(false);
-  const [cleanupDays, setCleanupDays] = useState(90);
-  const [cleanupLoading, setCleanupLoading] = useState(false);
-  
-  // Slide-over states
-  const [showHelp, setShowHelp] = useState(false);
-  const [showDateFilters, setShowDateFilters] = useState(false);
-  const [verifyingIntegrity, setVerifyingIntegrity] = useState(false);
-  const { job: verifyJob, running: verifyRunning, follow: followJob, resume: resumeJob, cancel: cancelJob } = useJob();
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language || 'en'
+  const { showError, showSuccess, showWarning } = useNotification()
+  const { openEntity } = useInspector()
+  const { canDelete, canWrite, hasPermission } = usePermission()
 
-  // Load initial data
-  useEffect(() => {
-    loadData();
-  }, []);
+  const [logs, setLogs] = useState([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
+  const [journalTotal, setJournalTotal] = useState(null)
+  const [oldest, setOldest] = useState(null)
+  const [stats, setStats] = useState(null)
+  const [actions, setActions] = useState([])
 
-  // Reload logs when filters or page change
-  useEffect(() => {
-    loadLogs();
-  }, [page, perPage, filterUsername, JSON.stringify(filterAction), filterSuccess, filterDateFrom, filterDateTo, search]);
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(50)
+  const [pageInput, setPageInput] = useState('1')
 
-  const loadData = async () => {
+  // A link may open the journal on a search (an inspector's « View its activity »)
+  const location = useLocation()
+  const [search, setSearch] = useState(() => new URLSearchParams(location.search).get('search') || '')
+  const [filterType, setFilterType] = usePersistedState('ucm-filter-audit-type', '')
+  const [filterUsername, setFilterUsername] = usePersistedState('ucm-filter-audit-username', '')
+  const [filterAction, setFilterAction] = usePersistedState('ucm-filter-audit-action', [])
+  const [filterSuccess, setFilterSuccess] = usePersistedState('ucm-filter-audit-success', '')
+  const [filterDateFrom, setFilterDateFrom] = usePersistedState('ucm-filter-audit-datefrom', '')
+  const [filterDateTo, setFilterDateTo] = usePersistedState('ucm-filter-audit-dateto', '')
+  const [presets, setPresets] = useState(readPresets)
+
+  const [dialog, setDialog] = useState(null)
+  const [cleanupLoading, setCleanupLoading] = useState(false)
+  const [verifyingIntegrity, setVerifyingIntegrity] = useState(false)
+  const { job: verifyJob, running: verifyRunning, follow: followJob, resume: resumeJob, cancel: cancelJob } = useJob()
+
+  const chosenActions = Array.isArray(filterAction) ? filterAction : []
+  const sentActions = useMemo(() => effectiveActions(actions, filterType, chosenActions),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [actions, filterType, JSON.stringify(chosenActions)])
+
+  // The filters of the list, shared with the export so both select the same entries
+  const filterParams = useMemo(() => ({
+    search: search || undefined,
+    username: filterUsername || undefined,
+    action: sentActions && sentActions.length ? sentActions : undefined,
+    success: filterSuccess !== '' ? filterSuccess : undefined,
+    date_from: filterDateFrom || undefined,
+    date_to: filterDateTo || undefined,
+  }), [search, filterUsername, sentActions, filterSuccess, filterDateFrom, filterDateTo])
+  // A type whose actions do not meet the chosen ones selects nothing: nothing is read
+  const impossible = Array.isArray(sentActions) && sentActions.length === 0 && (Boolean(filterType) || chosenActions.length > 0)
+  const typeWaits = Boolean(filterType) && actions.length === 0
+
+  const seq = useRef(0)
+  const loadLogs = useCallback(async () => {
+    const mine = ++seq.current
+    if (typeWaits) return
+    if (impossible) { setLogs([]); setTotal(0); setLoading(false); setLoadError(null); return }
     try {
-      setLoading(true);
-      const [logsRes, statsRes, actionsRes] = await Promise.all([
-        auditService.getLogs({ page: 1, per_page: perPage }),
-        auditService.getStats(30),
-        auditService.getActions()
-      ]);
-      
-      setLogs(logsRes.data || []);
-      setTotal(logsRes.meta?.total || 0);
-      setStats(statsRes.data || null);
-      setActions(actionsRes.data || { actions: [], categories: {} });
-    } catch (err) {
-      showError(err.message || t('messages.errors.loadFailed.auditLogs'));
+      const res = await auditService.getLogs({ page, per_page: perPage, ...filterParams })
+      if (mine !== seq.current) return
+      setLogs(res.data || [])
+      setTotal(res.meta?.total || 0)
+      setLoadError(null)
+    } catch (error) {
+      if (mine !== seq.current) return
+      setLoadError({ status: error?.status, request: error?.request, message: error?.message })
+      reportSilentFailure('loadLogs', error)
     } finally {
-      setLoading(false);
+      if (mine === seq.current) setLoading(false)
     }
-  };
+  }, [page, perPage, filterParams, impossible, typeWaits])
 
-  const loadLogs = async () => {
+  // The journal as a whole: its size, its oldest entry, the last 30 days, the action codes
+  const loadJournal = useCallback(async () => {
     try {
-      const params = {
-        page,
-        per_page: perPage,
-        search: search || undefined,
-        username: filterUsername || undefined,
-        action: filterAction.length > 0 ? filterAction : undefined,
-        success: filterSuccess !== '' ? filterSuccess : undefined,
-        date_from: filterDateFrom || undefined,
-        date_to: filterDateTo || undefined
-      };
-      
-      const res = await auditService.getLogs(params);
-      setLogs(res.data || []);
-      setTotal(res.meta?.total || 0);
-    } catch (error) { reportSilentFailure('loadLogs', error) }
-  };
+      const [head, statsRes, actionsRes] = await Promise.all([
+        auditService.getLogs({ page: 1, per_page: 1 }),
+        auditService.getStats(30),
+        auditService.getActions(),
+      ])
+      const count = head?.meta?.total || 0
+      setJournalTotal(count)
+      setStats(statsRes?.data || null)
+      setActions(actionsRes?.data?.actions || [])
+      if (count > 0) {
+        const last = await auditService.getLogs({ page: count, per_page: 1 })
+        setOldest(last?.data?.[0]?.timestamp || null)
+      } else setOldest(null)
+    } catch (error) { reportSilentFailure('loadJournal', error) }
+  }, [])
+
+  useEffect(() => { loadJournal() }, [loadJournal])
+  useEffect(() => { loadLogs() }, [loadLogs])
+  useEffect(() => { setPageInput(String(page)) }, [page])
+  useEffect(() => { try { localStorage.setItem(PRESETS_KEY, JSON.stringify(presets)) } catch { /* private mode */ } }, [presets])
+
+  const refresh = () => { loadLogs(); loadJournal() }
+  const retry = () => { setLoading(true); setLoadError(null); loadLogs() }
 
   const handleExport = async (format) => {
     try {
-      const res = await auditService.exportLogs({
-        format,
-        search: search || undefined,
-        username: filterUsername || undefined,
-        action: filterAction.length > 0 ? filterAction : undefined,
-        success: filterSuccess !== '' ? filterSuccess : undefined,
-        date_from: filterDateFrom || undefined,
-        date_to: filterDateTo || undefined,
-        limit: 10000
-      });
-      
-      // Create download
+      const res = await auditService.exportLogs({ format, ...filterParams, limit: 10000 })
       const blob = new Blob([typeof res === 'string' ? res : JSON.stringify(res, null, 2)], {
-        type: format === 'csv' ? 'text/csv' : 'application/json'
-      });
-      downloadBlob(blob, `audit_logs_${new Date().toISOString().slice(0, 10)}.${format}`);
-      
-      showSuccess(t('common.exportedFormat', { format: format.toUpperCase() }));
-    } catch (err) {
-      showError(t('audit.exportLogs') + ' ' + t('common.failed').toLowerCase());
+        type: format === 'csv' ? 'text/csv' : 'application/json',
+      })
+      downloadBlob(blob, `audit_logs_${new Date().toISOString().slice(0, 10)}.${format}`)
+      showSuccess(t('common.exportedFormat', { format: format.toUpperCase() }))
+      setDialog(null)
+    } catch {
+      showError(t('audit.exportLogs') + ' ' + t('common.failed').toLowerCase())
     }
-  };
+  }
 
-  const handleCleanup = async () => {
+  const handleCleanup = async (days) => {
     try {
-      setCleanupLoading(true);
-      const res = await auditService.cleanupLogs(cleanupDays);
-      showSuccess(res.message || t('audit.cleanedUpLogs', { count: res.data?.deleted || 0 }));
-      setShowCleanupModal(false);
-      loadData();
-    } catch (err) {
-      showError(t('audit.cleanupFailed'));
+      setCleanupLoading(true)
+      const res = await auditService.cleanupLogs(days)
+      showSuccess(res.message || t('audit.cleanedUpLogs', { count: res.data?.deleted || 0 }))
+      setDialog(null)
+      refresh()
+    } catch {
+      showError(t('audit.cleanupFailed'))
     } finally {
-      setCleanupLoading(false);
+      setCleanupLoading(false)
     }
-  };
+  }
 
   const showIntegrity = useCallback((data) => {
-    const { level, key, params } = integrityMessage(data);
-    const show = { error: showError, warning: showWarning, success: showSuccess }[level];
-    show(t(key, params));
-  }, [showError, showWarning, showSuccess, t]);
+    const { level, key, params } = integrityMessage(data)
+    const show = { error: showError, warning: showWarning, success: showSuccess }[level]
+    show(t(key, params))
+  }, [showError, showWarning, showSuccess, t])
 
   // A verification that outlasts the request runs as a job: its end is shown once it comes
   const showVerificationEnd = useCallback((job) => {
-    if (job.state === 'succeeded' && job.result?.data) {
-      showIntegrity(job.result.data);
-    } else if (job.state === 'cancelled') {
-      showWarning(t('audit.verifyCancelled'));
-    } else if (job.reason === 'executor_lost' || job.reason === 'not_taken') {
-      showError(t('audit.verifyLost'));
-    } else {
-      showError(t('audit.integrityError'));
-    }
-  }, [showIntegrity, showWarning, showError, t]);
+    if (job.state === 'succeeded' && job.result?.data) showIntegrity(job.result.data)
+    else if (job.state === 'cancelled') showWarning(t('audit.verifyCancelled'))
+    else if (job.reason === 'executor_lost' || job.reason === 'not_taken') showError(t('audit.verifyLost'))
+    else showError(t('audit.integrityError'))
+  }, [showIntegrity, showWarning, showError, t])
 
   const followVerification = useCallback(async (job) => {
-    setVerifyingIntegrity(true);
+    setVerifyingIntegrity(true)
     try {
-      showVerificationEnd(await followJob(job));
+      showVerificationEnd(await followJob(job))
     } catch {
-      showError(t('audit.integrityError'));
+      showError(t('audit.integrityError'))
     } finally {
-      setVerifyingIntegrity(false);
+      setVerifyingIntegrity(false)
     }
-  }, [followJob, showVerificationEnd, showError, t]);
+  }, [followJob, showVerificationEnd, showError, t])
 
   // After a reload: a verification still running is followed again, once per mount
-  const verificationEnd = useRef(showVerificationEnd);
-  verificationEnd.current = showVerificationEnd;
+  const verificationEnd = useRef(showVerificationEnd)
+  verificationEnd.current = showVerificationEnd
   useEffect(() => {
-    let gone = false;
+    let gone = false
     resumeJob('audit_verify').then((job) => {
-      if (!gone && job) verificationEnd.current(job);
-    }).catch(() => {});
-    return () => { gone = true; };
-  }, [resumeJob]);
+      if (!gone && job) verificationEnd.current(job)
+    }).catch(() => {})
+    return () => { gone = true }
+  }, [resumeJob])
 
   const handleVerifyIntegrity = async () => {
-    setVerifyingIntegrity(true);
+    setDialog(null)
+    setVerifyingIntegrity(true)
     try {
-      const response = await auditService.verifyIntegrity();
-      const job = acceptedJob(response);
+      const response = await auditService.verifyIntegrity()
+      const job = acceptedJob(response)
       if (job) {
-        await followVerification(job);
-        return;
+        await followVerification(job)
+        return
       }
-      showIntegrity(response.data || response);
+      showIntegrity(response.data || response)
     } catch {
-      showError(t('audit.integrityError'));
+      showError(t('audit.integrityError'))
     } finally {
-      setVerifyingIntegrity(false);
+      setVerifyingIntegrity(false)
     }
-  };
-
-  const handleCancelVerification = async () => {
-    try {
-      await cancelJob();
-    } catch {
-      showError(t('audit.verifyCancelFailed'));
-    }
-  };
-
-  const verifyProgress = verifyRunning && verifyJob?.progress?.total
-    ? t('audit.verifyProgress', {
-      done: verifyJob.progress.done || 0, total: verifyJob.progress.total,
-    })
-    : null;
-
-  const clearFilters = useCallback(() => {
-    setSearch('');
-    setFilterUsername('');
-    setFilterAction([]);
-    setFilterSuccess('');
-    setFilterDateFrom('');
-    setFilterDateTo('');
-    setPage(1);
-  }, []);
-
-  const handleApplyFilterPreset = useCallback((filters) => {
-    setPage(1);
-    if (filters.action) setFilterAction(Array.isArray(filters.action) ? filters.action : [filters.action]);
-    else setFilterAction([]);
-    if (filters.status) setFilterSuccess(filters.status);
-    else setFilterSuccess('');
-    if (filters.username) setFilterUsername(filters.username);
-    else setFilterUsername('');
-  }, []);
-
-  // Format timestamp — use shared utility for relative time, with UTC-safe parsing
-  const formatTime = (timestamp) => {
-    return formatRelativeTime(timestamp, t);
-  };
-
-  // Get unique usernames for filter
-  const uniqueUsernames = useMemo(() => {
-    const names = new Set(logs.map(l => l.username).filter(Boolean));
-    return Array.from(names).sort();
-  }, [logs]);
-
-  // Table columns - standardized with header, priority, mobileRender
-  const columns = useMemo(() => [
-    {
-      key: 'action',
-      header: t('audit.action'),
-      priority: 1,
-      render: (value, row) => {
-        const category = getActionCategory(value);
-        const color = categoryColors[category] || 'gray';
-        const Icon = actionIcons[value] || actionIcons.default;
-        return (
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg icon-bg-violet flex items-center justify-center shrink-0">
-              <Icon size={14} weight="duotone" />
-            </div>
-            <Badge variant={color} size="sm">
-              {value.replace(/_/g, ' ')}
-            </Badge>
-          </div>
-        );
-      },
-      // Mobile: Action + status badge
-      mobileRender: (value, row) => {
-        const Icon = actionIcons[value] || actionIcons.default;
-        return (
-          <div className="flex items-center justify-between gap-2 w-full">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <div className="w-6 h-6 rounded-lg icon-bg-violet flex items-center justify-center shrink-0">
-                <Icon size={14} weight="duotone" />
-              </div>
-              <span className="font-medium truncate">{value?.replace(/_/g, ' ')}</span>
-            </div>
-            <div className="shrink-0">
-              {row.success ? (
-                <Badge variant="emerald" size="sm"><CheckCircle size={12} weight="fill" /> OK</Badge>
-              ) : (
-                <Badge variant="red" size="sm"><XCircle size={12} weight="fill" /> Fail</Badge>
-              )}
-            </div>
-          </div>
-        );
-      }
-    },
-    {
-      key: 'success',
-      header: t('common.status'),
-      priority: 2,
-      width: '80px',
-      hideOnMobile: true, // Status shown in action mobileRender
-      render: (value) => (
-        value ? (
-          <Badge variant="emerald" size="sm">
-            <CheckCircle size={12} weight="fill" />
-            OK
-          </Badge>
-        ) : (
-          <Badge variant="red" size="sm">
-            <XCircle size={12} weight="fill" />
-            Fail
-          </Badge>
-        )
-      )
-    },
-    {
-      key: 'username',
-      header: t('common.user'),
-      priority: 3,
-      width: '120px',
-      hideOnMobile: true,
-      render: (value) => (
-        <div className="flex items-center gap-1">
-          <User size={12} className="text-text-secondary" />
-          <span className="text-sm font-medium">{value || 'system'}</span>
-        </div>
-      )
-    },
-    {
-      key: 'resource_type',
-      header: t('audit.target'),
-      priority: 4,
-      hideOnMobile: true,
-      render: (value, row) => (
-        <span className="text-sm text-text-secondary truncate">
-          {value}{row.resource_name ? `: ${row.resource_name}` : (row.resource_id ? ` #${row.resource_id}` : '')}
-        </span>
-      )
-    },
-    {
-      key: 'timestamp',
-      header: t('audit.timestamp'),
-      priority: 5,
-      sortable: true,
-      width: '100px',
-      mono: true,
-      render: (value) => (
-        <span className="text-xs text-text-secondary whitespace-nowrap">
-          {formatTime(value)}
-        </span>
-      ),
-      // Mobile: User + resource + time
-      mobileRender: (value, row) => (
-        <div className="flex items-center gap-2 flex-wrap text-xs">
-          <span><span className="text-text-tertiary">User:</span> <span className="text-text-secondary">{row.username || 'system'}</span></span>
-          {row.resource_type && (
-            <span><span className="text-text-tertiary">Resource:</span> <span className="text-text-secondary">{row.resource_type}</span></span>
-          )}
-          <span><span className="text-text-tertiary">Time:</span> <span className="text-text-secondary font-mono">{formatTime(value)}</span></span>
-        </div>
-      )
-    },
-    {
-      key: 'ip_address',
-      header: t('audit.ipAddress'),
-      priority: 6,
-      width: '120px',
-      hideOnMobile: true,
-      mono: true,
-      render: (value) => (
-        <span className="text-xs text-text-secondary">{value || '-'}</span>
-      )
-    }
-  ], [t]);
-
-  // Stats for header
-  const headerStats = useMemo(() => {
-    if (!stats) return [];
-    return [
-      { icon: Database, label: t('common.total'), value: stats.total_logs || 0, variant: 'default' },
-      { icon: CheckCircle, label: t('common.success'), value: stats.success_count || 0, variant: 'success' },
-      { icon: XCircle, label: t('common.failed'), value: stats.failure_count || 0, variant: 'danger' },
-      { icon: Users, label: t('common.users'), value: stats.unique_users || 0, variant: 'info' }
-    ];
-  }, [stats]);
-
-  // Filters config for ResponsiveLayout
-  const filters = useMemo(() => [
-    {
-      key: 'action',
-      label: t('audit.action'),
-      type: 'multiSelect',
-      value: filterAction,
-      onChange: (v) => { setFilterAction(v); setPage(1); },
-      placeholder: t('common.allActions'),
-      options: (actions.actions || []).map(a => ({ value: a, label: a.replace(/_/g, ' ') }))
-    },
-    {
-      key: 'status',
-      label: t('common.status'),
-      type: 'select',
-      value: filterSuccess,
-      onChange: (v) => { setFilterSuccess(v); setPage(1); },
-      placeholder: t('common.allStatus'),
-      options: [
-        { value: 'true', label: t('common.success') },
-        { value: 'false', label: t('common.failed') }
-      ]
-    },
-    {
-      key: 'username',
-      label: t('common.user'),
-      type: 'select',
-      value: filterUsername,
-      onChange: (v) => { setFilterUsername(v); setPage(1); },
-      placeholder: t('common.allUsers'),
-      options: uniqueUsernames.map(u => ({ value: u, label: u }))
-    }
-  ], [filterAction, filterSuccess, filterUsername, actions.actions, uniqueUsernames, t]);
-
-  // Count active filters
-  const activeFilters = useMemo(() => {
-    let count = 0;
-    if (filterAction.length > 0) count++;
-    if (filterSuccess) count++;
-    if (filterUsername) count++;
-    if (filterDateFrom) count++;
-    if (filterDateTo) count++;
-    return count;
-  }, [filterAction, filterSuccess, filterUsername, filterDateFrom, filterDateTo]);
-
-  // Help content
-  const helpContent = (
-    <div className="p-4 space-y-4">
-      {/* Statistics */}
-      {stats && (
-        <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary-op5 to-transparent">
-          <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-            <Database size={16} className="text-accent-primary" />
-            {t('common.last30DaysStats')}
-          </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-              <p className="text-2xl font-bold text-text-primary">{stats.total_logs || 0}</p>
-              <p className="text-xs text-text-secondary">{t('common.totalEvents')}</p>
-            </div>
-            <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-              <p className="text-2xl font-bold status-success-text">{stats.success_count || 0}</p>
-              <p className="text-xs text-text-secondary">{t('common.successful')}</p>
-            </div>
-            <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-              <p className="text-2xl font-bold status-danger-text">{stats.failure_count || 0}</p>
-              <p className="text-xs text-text-secondary">{t('common.failed')}</p>
-            </div>
-            <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-              <p className="text-2xl font-bold text-text-primary">{stats.unique_users || 0}</p>
-              <p className="text-xs text-text-secondary">{t('common.activeUsers')}</p>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Help Cards */}
-      <div className="space-y-3">
-        <HelpCard variant="info" title={t('common.aboutAuditLogs')}>
-          All user actions are logged for security and compliance purposes.
-          Logs include timestamps, users, actions, resources, and IP addresses.
-        </HelpCard>
-        
-        <HelpCard variant="tip" title={t('audit.filteringSearch')}>
-          Use filters to narrow down logs by date range, user, action type, or status.
-          The search box supports full-text search across all log fields.
-        </HelpCard>
-
-        <HelpCard variant="warning" title={t('audit.dataRetention')}>
-          Old logs can be cleaned up to save storage space.
-          The minimum retention period is 30 days for compliance requirements.
-        </HelpCard>
-
-        <HelpCard variant="info" title={t('audit.exportOptions')}>
-          Export logs in JSON or CSV format for external analysis,
-          compliance reporting, or integration with SIEM systems.
-        </HelpCard>
-      </div>
-    </div>
-  );
-
-  // Date range filter slide-over content
-  const dateFilterContent = (
-    <div className="p-4 space-y-4">
-      <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-        <Calendar size={16} />
-        {t('audit.dateRange')}
-      </h3>
-      
-      <div className="space-y-3">
-        <div>
-          <label className="block text-xs font-medium text-text-secondary mb-1">{t('common.fromDate')}</label>
-          <Input
-            type="date"
-            value={filterDateFrom}
-            onChange={(e) => { setFilterDateFrom(e.target.value); setPage(1); }}
-            className="w-full"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-text-secondary mb-1">{t('common.toDate')}</label>
-          <Input
-            type="date"
-            value={filterDateTo}
-            onChange={(e) => { setFilterDateTo(e.target.value); setPage(1); }}
-            className="w-full"
-          />
-        </div>
-      </div>
-
-      {/* Quick Filters */}
-      <div className="space-y-2 pt-4 border-t border-border">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-          {t('common.quickFilters')}
-        </h4>
-        <div className="space-y-2">
-          <Button 
-            variant={filterAction.includes('login_failure') ? 'primary' : 'ghost'} 
-            size="sm" 
-            className="w-full justify-start"
-            onClick={() => { setFilterAction(['login_failure']); setShowDateFilters(false); setPage(1); }}
-          >
-            <XCircle size={14} />
-            {t('common.failedLogins')}
-          </Button>
-          <Button 
-            variant={filterSuccess === 'false' && filterAction.length === 0 ? 'primary' : 'ghost'} 
-            size="sm" 
-            className="w-full justify-start"
-            onClick={() => { setFilterSuccess('false'); setFilterAction([]); setShowDateFilters(false); setPage(1); }}
-          >
-            <Warning size={14} />
-            {t('common.allFailures')}
-          </Button>
-        </div>
-      </div>
-
-      {/* Clear Filters */}
-      {activeFilters > 0 && (
-        <Button 
-          variant="secondary" 
-          size="sm" 
-          className="w-full" 
-          onClick={() => { clearFilters(); setShowDateFilters(false); }}
-        >
-          <ArrowsClockwise size={14} />
-          {t('common.clearAllFilters')}
-        </Button>
-      )}
-
-      {/* Export Section */}
-      <div className="space-y-2 pt-4 border-t border-border">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-          {t('audit.exportLogs')}
-        </h4>
-        <div className="flex gap-2">
-          <Button 
-            variant="secondary" 
-            size="sm" 
-            onClick={() => handleExport('json')}
-            className="flex-1"
-          >
-            <Export size={14} />
-            JSON
-          </Button>
-          <Button 
-            variant="secondary" 
-            size="sm" 
-            onClick={() => handleExport('csv')}
-            className="flex-1"
-          >
-            <Export size={14} />
-            CSV
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Log detail slide-over content
-  const logDetailContent = selectedLog && (
-    <div className="p-3 space-y-3">
-      <CompactHeader
-        icon={actionIcons[selectedLog.action] || actionIcons.default}
-        iconClass={selectedLog.success ? "bg-status-success-op20" : "bg-status-danger-op20"}
-        title={selectedLog.action?.replace(/_/g, ' ') || t('audit.event')}
-        subtitle={`${selectedLog.resource_type || t('common.system')}${selectedLog.resource_name ? `: ${selectedLog.resource_name}` : (selectedLog.resource_id ? ` #${selectedLog.resource_id}` : '')}`}
-        badge={
-          <Badge variant={selectedLog.success ? 'emerald' : 'red'} size="sm">
-            {selectedLog.success ? (
-              <><CheckCircle size={12} weight="fill" /> {t('common.success')}</>
-            ) : (
-              <><XCircle size={12} weight="fill" /> {t('common.failed')}</>
-            )}
-          </Badge>
-        }
-      />
-
-      <CompactStats stats={[
-        { icon: User, value: selectedLog.username || t('common.system') },
-        { icon: ClockCounterClockwise, value: formatTime(selectedLog.timestamp) }
-      ]} />
-
-      <CompactSection title={t('common.details')}>
-        <CompactGrid>
-          <CompactField 
-            autoIcon="created" label={t('audit.timestamp')} 
-            value={formatDate(selectedLog.timestamp)} 
-          />
-          <CompactField 
-            autoIcon="user" label={t('common.user')} 
-            value={selectedLog.username || t('common.system')} 
-          />
-          <CompactField 
-            autoIcon="status" label={t('audit.action')} 
-            value={selectedLog.action?.replace(/_/g, ' ')} 
-          />
-          <CompactField 
-            autoIcon="subject" label={t('audit.target')} 
-            value={`${selectedLog.resource_type || '-'}${selectedLog.resource_name ? `: ${selectedLog.resource_name}` : (selectedLog.resource_id ? ` #${selectedLog.resource_id}` : '')}`} 
-          />
-          <CompactField 
-            autoIcon="environment" label={t('audit.ipAddress')} 
-            value={selectedLog.ip_address} 
-            mono 
-            copyable 
-          />
-          <CompactField 
-            autoIcon="status" label={t('common.status')} 
-            value={selectedLog.success ? t('common.success') : t('common.failed')} 
-          />
-        </CompactGrid>
-      </CompactSection>
-
-      {selectedLog.details && (
-        <CompactSection title={t('common.details')} collapsible>
-          <pre className="text-2xs font-mono text-text-secondary bg-tertiary-op50 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto whitespace-pre-wrap">
-            {selectedLog.details}
-          </pre>
-        </CompactSection>
-      )}
-
-      {selectedLog.user_agent && (
-        <CompactSection title={t('common.clientInfo')} collapsible defaultOpen={false}>
-          <pre className="text-2xs font-mono text-text-secondary bg-tertiary-op50 p-2 rounded overflow-x-auto whitespace-pre-wrap">
-            {selectedLog.user_agent}
-          </pre>
-        </CompactSection>
-      )}
-    </div>
-  );
-
-  // Header actions
-  const headerActions = (
-    <>
-      {/* Desktop: Date filter button */}
-      <Button 
-        variant="secondary" 
-        size="sm" 
-        onClick={() => setShowDateFilters(true)}
-        className="hidden md:inline-flex"
-      >
-        <Calendar size={14} />
-        {t('common.date')}
-        {(filterDateFrom || filterDateTo) && (
-          <Badge variant="primary" size="sm" className="ml-1">1</Badge>
-        )}
-      </Button>
-      <Button type="button" variant="secondary" size="sm" onClick={loadLogs} className="hidden md:inline-flex">
-        <ArrowsClockwise size={14} />
-      </Button>
-      {canDelete('audit') && (
-      <Button type="button" variant="secondary" size="sm" onClick={() => setShowCleanupModal(true)}>
-        <Trash size={14} className="text-status-danger" />
-        <span className="hidden md:inline">{t('audit.cleanupLogs')}</span>
-      </Button>
-      )}
-      <Button type="button" variant="secondary" size="sm" onClick={handleVerifyIntegrity} loading={verifyingIntegrity || verifyRunning} loadingText={verifyProgress || undefined} className="hidden md:inline-flex">
-        <ShieldCheck size={14} />
-        <span>{verifyProgress || t('audit.verifyIntegrity')}</span>
-      </Button>
-      {verifyRunning && (
-      <Button type="button" variant="secondary" size="sm" onClick={handleCancelVerification} className="hidden md:inline-flex" data-testid="audit-verify-cancel">
-        <span>{t('audit.verifyCancel')}</span>
-      </Button>
-      )}
-      {/* Mobile: More filters */}
-      <Button 
-        variant="secondary" 
-        size="lg" 
-        onClick={() => setShowDateFilters(true)}
-        className="md:hidden h-11 w-11 p-0"
-      >
-        <FunnelSimple size={22} />
-      </Button>
-    </>
-  );
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full w-full">
-        <LoadingSpinner />
-      </div>
-    );
   }
 
-  return (
-    <>
-      <ResponsiveLayout
-        title={t('common.audit')}
-        icon={ClockCounterClockwise}
-        subtitle={t('common.countEntries', { count: total })}
-        stats={headerStats}
-        helpPageKey="auditLogs"
-        splitView={true}
-        splitEmptyContent={
-          <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
-              <ClockCounterClockwise size={24} className="text-text-tertiary" />
-            </div>
-            <p className="text-sm text-text-secondary">{t('common.selectToView')}</p>
-          </div>
-        }
-        slideOverOpen={!!selectedLog || showDateFilters}
-        onSlideOverClose={() => { setSelectedLog(null); setShowDateFilters(false); }}
-        slideOverTitle={selectedLog ? t('common.details') : t('common.filtersExport')}
-        slideOverContent={selectedLog ? logDetailContent : dateFilterContent}
-        slideOverWidth={selectedLog ? 'md' : 'sm'}
-      >
-        <ResponsiveDataTable
-          data={logs}
-          columns={columns}
-          keyField="id"
-          searchable
-          externalSearch={search}
-          onSearchChange={setSearch}
-          searchPlaceholder={t('common.searchLogs')}
-          toolbarFilters={[
-            {
-              key: 'action',
-              type: 'multiSelect',
-              label: t('audit.action'),
-              value: filterAction,
-              onChange: (v) => { setFilterAction(v); setPage(1); },
-              placeholder: t('common.allActions'),
-              options: (actions.actions || []).map(a => ({ value: a, label: a.replace(/_/g, ' ') }))
-            },
-            {
-              key: 'status',
-              value: filterSuccess,
-              onChange: (v) => { setFilterSuccess(v); setPage(1); },
-              placeholder: t('common.allStatus'),
-              options: [
-                { value: 'true', label: t('common.success') },
-                { value: 'false', label: t('common.failed') }
-              ]
-            },
-            {
-              key: 'username',
-              value: filterUsername,
-              onChange: (v) => { setFilterUsername(v); setPage(1); },
-              placeholder: t('common.allUsers'),
-              options: uniqueUsernames.map(u => ({ value: u, label: u }))
-            }
-          ]}
-          filterPresetsKey="ucm-audit-presets"
-          densityStorageKey="ucm-audit-density"
-          onApplyFilterPreset={handleApplyFilterPreset}
-          toolbarActions={headerActions}
-          selectedId={selectedLog?.id}
-          onRowClick={setSelectedLog}
-          pagination={{
-            page,
-            perPage,
-            total,
-            onPageChange: setPage,
-            onPerPageChange: (newPerPage) => { setPerPage(newPerPage); setPage(1); }
-          }}
-          emptyState={{
-            icon: ClockCounterClockwise,
-            title: t('audit.noLogs'),
-            description: search || activeFilters > 0 ? t('common.tryAdjustFilters') : t('common.activityWillAppear')
-          }}
-        />
-      </ResponsiveLayout>
+  const handleCancelVerification = async () => {
+    try { await cancelJob() } catch { showError(t('audit.verifyCancelFailed')) }
+  }
 
-      {/* Cleanup Modal */}
-      <Modal
-        open={showCleanupModal}
-        onOpenChange={setShowCleanupModal}
-        title={t('audit.cleanupLogs')}
-        size="sm"
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-text-secondary">
-            {t('common.deleteOlderThanDays')}
-          </p>
-          
-          <div>
-            <label className="block text-xs font-medium mb-1">{t('common.retentionDays')}</label>
-            <Input
-              type="number"
-              min={30}
-              max={365}
-              value={cleanupDays}
-              onChange={(e) => setCleanupDays(Math.max(30, parseInt(e.target.value) || 90))}
-            />
-            <p className="text-xs text-text-secondary mt-1">
-              {t('common.minimum')}: 30 {t('common.days')}
-            </p>
+  const verifying = verifyingIntegrity || verifyRunning
+  const verifyProgress = verifyRunning && verifyJob?.progress?.total
+    ? t('audit.verifyProgress', { done: verifyJob.progress.done || 0, total: verifyJob.progress.total })
+    : null
+
+  // Every filter change goes back to the first page
+  const changeFilter = (set) => (value) => { set(value); setPage(1) }
+  const clearFilters = useCallback(() => {
+    setSearch(''); setFilterType(''); setFilterUsername(''); setFilterAction([])
+    setFilterSuccess(''); setFilterDateFrom(''); setFilterDateTo(''); setPage(1)
+  }, [setFilterType, setFilterUsername, setFilterAction, setFilterSuccess, setFilterDateFrom, setFilterDateTo])
+
+  const applyPreset = (filters = {}) => {
+    setPage(1)
+    setFilterAction(filters.action ? (Array.isArray(filters.action) ? filters.action : [filters.action]) : [])
+    setFilterSuccess(filters.status || '')
+    setFilterUsername(filters.username || '')
+    setFilterType(filters.type || '')
+    setFilterDateFrom(filters.date_from || '')
+    setFilterDateTo(filters.date_to || '')
+    if (filters._search !== undefined) setSearch(filters._search || '')
+  }
+  const savePreset = (name) => {
+    const filters = {}
+    if (chosenActions.length) filters.action = chosenActions
+    if (filterSuccess) filters.status = filterSuccess
+    if (filterUsername) filters.username = filterUsername
+    if (filterType) filters.type = filterType
+    if (filterDateFrom) filters.date_from = filterDateFrom
+    if (filterDateTo) filters.date_to = filterDateTo
+    if (search) filters._search = search
+    setPresets((prev) => [...prev, { id: Date.now(), name, filters }])
+  }
+
+  const usernames = useMemo(() => {
+    const names = new Set(logs.map((l) => l.username).filter(Boolean))
+    if (filterUsername) names.add(filterUsername)
+    return [...names].sort()
+  }, [logs, filterUsername])
+  const types = useMemo(() => {
+    const list = presentTypes(actions)
+    return filterType && !list.includes(filterType) ? [...list, filterType] : list
+  }, [actions, filterType])
+
+  const pages = Math.max(1, Math.ceil(total / perPage))
+  const goTo = (n) => setPage(Math.min(pages, Math.max(1, n)))
+  const narrowed = Boolean(search || filterType || filterUsername || chosenActions.length || filterSuccess || filterDateFrom || filterDateTo)
+  const journalEmpty = journalTotal === 0 && !narrowed && !loading && !loadError
+
+  const resourceOf = (log) => log.resource_name
+    || (log.resource_type ? `${log.resource_type}${log.resource_id ? ` #${log.resource_id}` : ''}` : '—')
+  const openEvent = (log) => setDialog({ kind: 'event', log })
+
+  // Chips of the filters the toolbar does not show
+  const chips = []
+  if (filterUsername) chips.push(['user', t('audit.chipUser', { user: filterUsername }), () => changeFilter(setFilterUsername)('')])
+  if (filterSuccess) chips.push(['result', filterSuccess === 'true' ? t('audit.resultsOk') : t('audit.resultsFailed'), () => changeFilter(setFilterSuccess)('')])
+  if (filterDateFrom) chips.push(['from', t('audit.chipFrom', { date: eventDate(`${filterDateFrom}T12:00:00`, locale) }), () => changeFilter(setFilterDateFrom)('')])
+  if (filterDateTo) chips.push(['to', t('audit.chipTo', { date: eventDate(`${filterDateTo}T12:00:00`, locale) }), () => changeFilter(setFilterDateTo)('')])
+  for (const a of chosenActions) chips.push([`action-${a}`, t('audit.chipAction', { action: actionLabel(a) }), () => changeFilter(setFilterAction)(chosenActions.filter((x) => x !== a))])
+
+  const cause = loadError?.status && loadError.request ? (
+    <Trans i18nKey="work.cause.status"
+      values={{ status: loadError.status, reason: t(`certificates.httpStatus${loadError.status}`, { defaultValue: '' }), request: loadError.request }}
+      components={{ mono: <span className="mono" /> }} />
+  ) : loadError?.request ? (
+    <Trans i18nKey="work.cause.noAnswer" values={{ request: loadError.request }} components={{ mono: <span className="mono" /> }} />
+  ) : t('work.cause.message', { message: loadError?.message || t('messages.errors.loadFailed.auditLogs') })
+
+  const firstRead = loading && !loadError
+  const shown = firstRead ? [] : logs
+
+  return (
+    <div className="atl" data-testid="audit-page">
+      <main className="stage" id="main">
+        <div className="page-content">
+          <header className="page-head">
+            <div>
+              <div className="title-line">
+                <h1 id="main-title" tabIndex={-1}>{t('audit.pageTitle')}</h1>
+                <span className="total">{journalTotal === null ? '' : t('audit.events', { count: journalTotal })}</span>
+              </div>
+              <p>{t('audit.intent')}</p>
+            </div>
+            <div className="actions">
+              <button type="button" className="btn" data-action="export-events" onClick={() => setDialog('export')}>
+                <Icon name="download" />{t('audit.exportJournal')}
+              </button>
+              <button type="button" className="icon-btn quiet" data-action="journal-menu" aria-label={t('audit.moreActions')} title={t('audit.moreActions')} onClick={() => setDialog('actions')}>
+                <Icon name="more" />
+              </button>
+            </div>
+          </header>
+
+          <div className="toolbar">
+            <label className="search">
+              <Icon name="search" />
+              <span className="sr-only">{t('audit.searchLabel')}</span>
+              <input type="search" id="event-search" name="eventSearch" value={search} placeholder={t('audit.searchPlaceholder')} autoComplete="off"
+                onChange={(e) => changeFilter(setSearch)(e.target.value)} />
+            </label>
+            <select className="filter-select" id="event-type" aria-label={t('audit.typeLabel')} value={filterType} onChange={(e) => changeFilter(setFilterType)(e.target.value)}>
+              <option value="">{t('audit.allTypes')}</option>
+              {types.map((k) => <option key={k} value={k}>{t(`audit.types.${k}`)}</option>)}
+            </select>
+            <span className="tools-divider" />
+            <button type="button" className="btn" data-action="filters" onClick={() => setDialog('filters')}>
+              <Icon name="filter" /><span>{t('audit.filters')}</span>
+            </button>
+            <button type="button" className="icon-btn" data-action="refresh" aria-label={t('audit.refresh')} title={t('audit.refresh')} onClick={refresh}>
+              <Icon name="refresh" />
+            </button>
           </div>
-          
-          <div className="flex justify-end gap-2">
-            <Button type="button" size="sm" variant="secondary" onClick={() => setShowCleanupModal(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button 
-              variant="danger" 
-              onClick={handleCleanup}
-              loading={cleanupLoading}
-            >
-              <Trash size={14} />
-              {t('common.deleteOldLogs')}
-            </Button>
-          </div>
+
+          {chips.length > 0 && (
+            <div className="applied-filters" role="group" aria-label={t('audit.activeFilters')}>
+              <span className="applied-label"><Icon name="filter" />{t('audit.activeFilters')}</span>
+              {chips.map(([key, label, remove]) => (
+                <span key={key} className="chip filter-chip">{label}
+                  <button type="button" className="icon-btn" id={`clear-${key}`} aria-label={t('audit.removeFilter', { label })} title={t('audit.removeFilterShort')} onClick={remove}>
+                    <Icon name="close" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {loadError ? (
+            <div className="load-error" id="load-error-activity" role="alert">
+              <Icon name="warning" />
+              <div>
+                <h2>{t('audit.loadErrorTitle')}</h2>
+                <p>{cause}</p>
+                <div className="load-error-actions">
+                  <button type="button" className="btn primary" id="retry-activity" onClick={retry}><Icon name="refresh" />{t('table.retry')}</button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="audit-summary">
+                <span>{firstRead ? '' : t('audit.events', { count: total })}</span>
+                {oldest && <span>{t('audit.since', { date: eventDate(oldest, locale) })}</span>}
+                {stats && <span>{t('audit.last30', { success: (stats.success_count || 0).toLocaleString(locale), failed: (stats.failure_count || 0).toLocaleString(locale), users: (stats.unique_users || 0).toLocaleString(locale) })}</span>}
+                {verifying && (
+                  <span role="status">{verifyProgress || t('audit.verifying')}
+                    {verifyRunning && <> <button type="button" className="text-link" data-testid="audit-verify-cancel" onClick={handleCancelVerification}>{t('audit.verifyCancel')}</button></>}
+                  </span>
+                )}
+              </div>
+              <div className="table-container audit-container" style={{ marginBottom: 20 }} aria-busy={firstRead || undefined}>
+                <div className="table-scroll" id="audit-scroll" role="region" tabIndex={0} aria-label={t('audit.regionLabel')}>
+                  <table className="audit-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">{t('audit.colTime')}</th>
+                        <th scope="col">{t('audit.colOperation')}</th>
+                        <th scope="col">{t('audit.colResource')}</th>
+                        <th scope="col">{t('audit.colUser')}</th>
+                        <th scope="col">{t('audit.colResult')}</th>
+                        <th scope="col"><span className="sr-only">{t('audit.colDetail')}</span></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {firstRead ? Array.from({ length: 12 }, (_, i) => (
+                        <tr key={`sk-${i}`} className="sk-row" aria-hidden={i > 0 || undefined}>
+                          <td>{i === 0 && <span className="sr-only" role="status">{t('table.loadingRows')}</span>}<Bar width="64px" /></td>
+                          <td><Bar width={skWidth(i, 45, 35)} /></td>
+                          <td><Bar width={skWidth(i, 50, 40)} /></td>
+                          <td><Bar width="70px" /></td>
+                          <td><Bar width="74px" cls="sk-pill" /></td>
+                          <td />
+                        </tr>
+                      )) : shown.length ? shown.map((e) => {
+                        const type = typeOf(e.action)
+                        const label = actionLabel(e.action)
+                        return (
+                          <tr key={e.id}>
+                            <td className="mono muted">{rowTime(e.timestamp, locale)}</td>
+                            <td><span className="audit-type"><Icon name={typeIcon(type)} />{label}</span></td>
+                            <td><button type="button" className="resource" data-event={e.id} onClick={() => openEvent(e)}>{resourceOf(e)}</button></td>
+                            <td className="muted small">{e.username || t('common.system')}</td>
+                            <td>{e.success
+                              ? <span className="badge good"><Icon name="check" />{t('audit.badgeOk')}</span>
+                              : <span className="badge bad"><Icon name="warning" />{t('audit.badgeFailed')}</span>}</td>
+                            <td><button type="button" className="icon-btn quiet" data-event={e.id} aria-label={t('audit.detailOf', { id: e.id })} onClick={() => openEvent(e)}><Icon name="right" /></button></td>
+                          </tr>
+                        )
+                      }) : (
+                        <tr><td colSpan={6}>{journalEmpty ? (
+                          <div className="empty empty-hint" id="empty-activity">
+                            <Icon name="activity" />
+                            <h3>{t('audit.emptyTitle')}</h3>
+                            <p>{t('audit.emptyText')}</p>
+                            {canWrite('certificates') && (
+                              <Link className="btn primary" to="/certificates?action=create" data-write=""><Icon name="plus" />{t('audit.emptyAction')}</Link>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="empty">
+                            <h3>{t('audit.noMatchTitle')}</h3>
+                            <p>{t('audit.noMatchText')}</p>
+                            {narrowed && <button type="button" className="btn" data-action="reset-filters" onClick={clearFilters}>{t('audit.resetFilters')}</button>}
+                          </div>
+                        )}</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                {!firstRead && total > 0 && (
+                  <footer className="table-footer">
+                    <span id="page-range">{t('audit.pageRange', {
+                      from: ((page - 1) * perPage + 1).toLocaleString(locale),
+                      to: Math.min(page * perPage, total).toLocaleString(locale),
+                      count: total,
+                    })}</span>
+                    <div className="controls">
+                      <select id="page-size" aria-label={t('audit.perPageLabel')} value={perPage} onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1) }}>
+                        {PAGE_SIZES.map((n) => <option key={n} value={n}>{t('audit.perPage', { n })}</option>)}
+                      </select>
+                      <button type="button" className="icon-btn" data-page="prev" aria-label={t('audit.prevPage')} disabled={page === 1} onClick={() => goTo(page - 1)}><Icon name="left" /></button>
+                      <label className="page-jump"><span>{t('audit.pageWord')}</span>
+                        <input id="page-jump" type="number" min="1" max={pages} value={pageInput} inputMode="numeric" aria-describedby="page-total"
+                          onChange={(e) => setPageInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') goTo(parseInt(pageInput, 10) || 1) }} />
+                      </label>
+                      <span id="page-total">{t('audit.pageTotal', { total: pages.toLocaleString(locale) })}</span>
+                      <button type="button" className="btn" id="page-go" data-action="page-go" onClick={() => goTo(parseInt(pageInput, 10) || 1)}>{t('audit.pageGo')}</button>
+                      <button type="button" className="icon-btn" data-page="next" aria-label={t('audit.nextPage')} disabled={page >= pages} onClick={() => goTo(page + 1)}><Icon name="right" /></button>
+                    </div>
+                  </footer>
+                )}
+              </div>
+            </>
+          )}
         </div>
-      </Modal>
-    </>
-  );
+
+        {dialog?.kind === 'event' && (
+          <EventDialog log={dialog.log} locale={locale} resource={resourceOf(dialog.log)} onClose={() => setDialog(null)}
+            canInspect={(type) => hasPermission(type === 'ca' ? 'read:cas' : 'read:certificates')}
+            onInspect={(type, id) => { setDialog(null); openEntity(type, id) }} />
+        )}
+        {dialog === 'export' && (
+          <ExportDialog count={total} onExport={handleExport} onClose={() => setDialog(null)} />
+        )}
+        {dialog === 'actions' && (
+          <ActionsDialog canClean={canDelete('audit')} verifying={verifying} onExport={() => setDialog('export')}
+            onVerify={handleVerifyIntegrity} onClean={() => setDialog('cleanup')} onClose={() => setDialog(null)} />
+        )}
+        {dialog === 'cleanup' && canDelete('audit') && (
+          <CleanupDialog loading={cleanupLoading} onConfirm={handleCleanup} onClose={() => setDialog(null)} />
+        )}
+        {dialog === 'filters' && (
+          <FiltersDialog
+            actions={actions} type={filterType} chosen={chosenActions}
+            usernames={usernames} username={filterUsername} onUsername={changeFilter(setFilterUsername)}
+            result={filterSuccess} onResult={changeFilter(setFilterSuccess)}
+            dateFrom={filterDateFrom} dateTo={filterDateTo}
+            onDateFrom={changeFilter(setFilterDateFrom)} onDateTo={changeFilter(setFilterDateTo)}
+            onActions={changeFilter(setFilterAction)}
+            onQuick={(kind) => {
+              setPage(1)
+              if (kind === 'failedLogins') { setFilterAction(['login_failure']); setFilterSuccess('') }
+              else { setFilterSuccess('false'); setFilterAction([]) }
+              setDialog(null)
+            }}
+            quick={{ failedLogins: chosenActions.length === 1 && chosenActions[0] === 'login_failure', failures: filterSuccess === 'false' && !chosenActions.length }}
+            presets={presets} onApplyPreset={(p) => { applyPreset(p.filters); setDialog(null) }}
+            onDeletePreset={(id) => setPresets((prev) => prev.filter((p) => p.id !== id))}
+            onSavePreset={savePreset} canSave={narrowed}
+            narrowed={narrowed} onClear={() => { clearFilters(); setDialog(null) }}
+            onClose={() => setDialog(null)} />
+        )}
+      </main>
+    </div>
+  )
 }

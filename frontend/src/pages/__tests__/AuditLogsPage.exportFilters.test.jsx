@@ -49,7 +49,7 @@ vi.mock('../../services/audit.service', () => ({
   default: {
     getLogs: vi.fn().mockResolvedValue({ data: [], meta: { total: 0 } }),
     getStats: vi.fn().mockResolvedValue({ data: {} }),
-    getActions: vi.fn().mockResolvedValue({ data: [] }),
+    getActions: vi.fn().mockResolvedValue({ data: { actions: ['login'] } }),
     verifyIntegrity: vi.fn(),
     exportLogs: vi.fn().mockResolvedValue('[]'),
   },
@@ -81,8 +81,8 @@ describe('AuditLogsPage export', () => {
     localStorage.setItem('ucm-filter-audit-success', JSON.stringify('false'))
     render(<MemoryRouter><AuditLogsPage /></MemoryRouter>)
     await waitFor(() => expect(auditService.getLogs).toHaveBeenCalled())
-    fireEvent.click((await screen.findAllByText('common.date'))[0])
-    fireEvent.click((await screen.findAllByText('CSV'))[0])
+    fireEvent.click(await screen.findByRole('button', { name: 'audit.exportJournal' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'audit.download' }))
     await waitFor(() => expect(auditService.exportLogs).toHaveBeenCalled())
     expect(auditService.exportLogs.mock.calls[0][0]).toMatchObject({
       format: 'csv', username: 'alice', action: ['login'], success: 'false',

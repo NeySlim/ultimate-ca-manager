@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'fs'
 import path from 'path'
+import { checkCopy } from './atelierCopy'
 
 const SRC = path.resolve(__dirname, '../..')
 
@@ -23,9 +24,11 @@ const FORBIDDEN = [
 const NAMED_CSS = new RegExp(`(?:color|background|border|fill|stroke|outline|shadow)[a-z-]*\\s*[:=]\\s*\\\\?['"]?(?:${NAMED})['"]?(?![\\w-])|\\b(?:solid|dashed|dotted)\\s+(?:${NAMED})(?![\\w-])`, 'gi')
 const NAMED_JS = new RegExp(`\\b(?:fill|stroke|stop-color|flood-color|backgroundColor|borderColor|stopColor)\\s*[:=]\\s*\\{?\\\\?['"](?:${NAMED})['"]`, 'g')
 
-// Exact literals a file may keep (lower case). No file is exempt as a whole except the token file.
+// Exact literals a file may keep (lower case). No file is exempt as a whole except the token file and the
+// rules copied from the Atelier mockup, which atelierLiteral.test.js holds to the mockup's own values.
 export const EXCEPTIONS = [
   { file: 'styles/tokens.css', all: true, reason: 'the token definitions themselves' },
+  { file: 'styles/atelier/activity.css', all: true, reason: 'literal copy of the mockup\'s style.css (atelierLiteral.test.js)' },
   { file: 'components/ProviderIcons.jsx', all: true, reason: 'third-party brand colours' },
   {
     file: 'contexts/ThemeContext.jsx',
@@ -104,9 +107,12 @@ describe('no hardcoded colours', () => {
     expect(offenders).toEqual([])
   })
 
-  it('exempts no source file as a whole except the token file and the brand icons', () => {
-    expect(EXCEPTIONS.filter((e) => e.all).map((e) => e.file).sort())
-      .toEqual(['components/ProviderIcons.jsx', 'styles/tokens.css'])
+  it('exempts no source file as a whole except the token file, the brand icons and literal copies of the mockup', () => {
+    const whole = EXCEPTIONS.filter((e) => e.all).map((e) => e.file)
+    const copies = whole.filter((f) => f.startsWith('styles/atelier/'))
+    expect(whole.filter((f) => !copies.includes(f)).sort()).toEqual(['components/ProviderIcons.jsx', 'styles/tokens.css'])
+    // a copy keeps the mockup's literals only: every one of its rules is the mockup's
+    for (const f of copies) expect(checkCopy(fs.readFileSync(path.join(SRC, f), 'utf8')), f).toEqual([])
   })
 
   it('has no unused exception value', () => {

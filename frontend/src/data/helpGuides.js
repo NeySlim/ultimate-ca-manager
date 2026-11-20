@@ -1915,64 +1915,57 @@ Reading this log requires administrator rights. It is deliberately not audited: 
   },
 
   auditLogs: {
-    title: 'Audit Logs',
+    title: 'Activity',
     content: `
 ## Overview
 
-Complete audit trail of all operations in UCM. Every action: certificate issuance, revocation, user login, setting change, is logged with details about who, what, when, and where.
+Every operation in UCM is recorded in the audit log: certificate issuance, revocation, sign-in, setting change. The Activity page lists it, newest first, with who, what, when and the result. The head counts the entries of the whole log; the summary line under the toolbar counts those the filters keep, says since when the log goes back, and sums up the last 30 days.
 
-## Log Entry Details
+## An entry
 
-Each log entry records:
-- **Timestamp**: When the action occurred
-- **User**: Who performed the action
-- **Action**: What was done (create, update, delete, login, etc.)
-- **Resource**: What was affected (certificate, CA, user, etc.)
-- **Status**: Success or failure
-- **IP Address**: Source IP of the request
-- **User Agent**: Client application identifier
-- **Details**: Additional context (error messages, changed values)
+Each row shows the time (the day too when it is not today), the operation (its type pictogram and the action code), the resource, the user and the result (Succeeded or Failed, in words). The resource name or the arrow opens the detail of the entry:
+- **Text**: what the server recorded (error messages, values)
+- **Resource**, **User**, **Date / time**, **Result**
+- **Action**: the code as the server stores it
+- **IP address** and **Client** (user agent), when they were recorded
 
-## Filtering
+When the entry names a certificate or an authority, **Inspect the certificate** (or **View the authority**) opens it in the inspector.
 
-### By Action
-Select one or more action names, for example \`certificate_issued\` or \`login_success\`.
+## Finding entries
 
-### By User
-Show only actions performed by a specific user.
+### Search
+Free text in the user name, action code, details, resource type and IP address; the resource name itself is not searched.
 
-### By Status
-- **Success**: Operations that completed successfully
-- **Failed**: Operations that failed (authentication failures, permission denied, errors)
+### Operation type
+The select of the toolbar groups the action codes by type: issuances, renewals, revocations, exports, certificates and CSRs, approvals, CRL publications, ACME, SCEP, sign-ins, users, backups, settings, configuration, system. Only the types the log contains are offered.
 
-### By Date Range
-Set **From** and **To** dates to narrow the time window.
+### Filters
+The **Filters** button opens the dates (**From**, **To**), the **User**, the **Result** and the individual action codes (narrowed to the chosen type). Two shortcuts set **Failed logins** or **All failures**. The current filters can be saved under a name and applied again later; they are kept in this browser. Every active filter shows as a chip under the toolbar, and **Reset the filters** clears them all.
 
-### Text Search
-Free-text search in the username, action, details, resource type and IP address; the resource name and id are not searched.
+The list is read page by page from the server: 25, 50 or 100 entries per page, previous and next, or a page number and **Go**.
 
 ## Export
 
-Export filtered logs in:
-- **JSON**: Machine-readable, includes all fields
-- **CSV**: Spreadsheet-compatible, includes key fields
+**Export the log** downloads the entries the search and the filters keep, at most 10,000:
+- **CSV**: one row per entry, for a spreadsheet
+- **JSON**: structured data, every field
 
-Exports follow the filters of the page (search, user, action, status and date range) and contain at most 10,000 entries.
+On a phone the head button is hidden: the export is in the « ⋯ » menu.
 
 ## Cleanup
 
-Purge old logs based on retention period:
-1. Click **Cleanup Old Logs**
-2. Set the retention period in days
-3. Click **Delete Old Logs**
+In the « ⋯ » menu, with the right to delete the log:
+1. Choose **Clean up old logs…**
+2. Set the retention in days (30 to 365)
+3. Choose **Delete old logs**
 
-> ⚠ Log cleanup is irreversible. Export important logs before purging.
+> ⚠ Cleaning up is irreversible. Export the entries you need first.
 
 ## Integrity Verification
 
-Click **Verify Integrity** to check the audit log chain. UCM uses hash chaining to detect an entry modified or removed inside the chain; removing the latest entries leaves no trace in the chain itself, which is why syslog forwarding keeps a copy elsewhere.
+**Verify integrity**, in the « ⋯ » menu, checks the audit log chain. UCM uses hash chaining to detect an entry modified or removed inside the chain; removing the latest entries leaves no trace in the chain itself, which is why syslog forwarding keeps a copy elsewhere.
 
-On a large ledger the verification runs in the background: the button shows how many entries are checked so far, **Cancel verification** stops it, and leaving or reloading the page does not stop it (the page picks it up again). One verification runs at a time.
+On a large log the verification runs in the background: the summary line shows how many entries are checked so far, **Cancel verification** stops it, and leaving or reloading the page does not stop it (the page picks it up again). One verification runs at a time.
 
 ## Syslog Forwarding
 

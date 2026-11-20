@@ -3,7 +3,7 @@ import { test, expect, createCA } from './support/fixtures'
 test('an action of the test appears in the audit log', async ({ page, api }) => {
   const ca = await createCA(api)
   await page.goto('/audit')
-  await page.getByRole('main').getByRole('textbox').first().fill(ca.common_name)
+  await page.getByRole('main').getByRole('searchbox').fill(ca.common_name)
   const row = page.getByRole('main').getByRole('row', { name: new RegExp(ca.common_name) }).first()
   await expect(row).toBeVisible()
   await expect(row).toContainText('admin')

@@ -1,96 +1,89 @@
 export default {
   helpContent: {
-    title: 'Journaux d’audit',
-    subtitle: 'Suivi des activités et conformité',
-    overview: 'Piste d’audit complète de toutes les opérations effectuées dans UCM. Suivez qui a fait quoi, quand et d’où. Prend en charge le filtrage, la recherche, l’exportation et la vérification d’intégrité.',
+    title: 'Activité',
+    subtitle: 'Le journal d’audit de chaque opération',
+    overview: 'Chaque opération effectuée dans UCM, du certificat au journal : qui a fait quoi, quand, d’où, avec quel résultat. La liste lit le serveur page par page ; les filtres, l’export, la vérification d’intégrité et le nettoyage portent sur tout le journal.',
     sections: [
       {
-        title: 'Filtres',
+        title: 'Trouver une entrée',
         items: [
-          { label: 'Type d’action', text: 'Filtrer par type d’opération (créer, mettre à jour, supprimer, connexion, etc.)' },
-          { label: 'Utilisateur', text: 'Filtrer par l’utilisateur qui a effectué l’action' },
-          { label: 'Statut', text: 'Afficher uniquement les opérations réussies ou échouées' },
-          { label: 'Plage de dates', text: 'Définir des dates de/à pour restreindre la fenêtre temporelle' },
-          { label: 'Recherche', text: 'Recherche textuelle libre dans toutes les entrées du journal' },
+          { label: 'Recherche', text: 'Texte libre dans le nom d’utilisateur, le code d’action, les détails, le type de ressource et l’adresse IP ; le nom de la ressource lui-même n’est pas recherché' },
+          { label: 'Type d’opération', text: 'Émissions, renouvellements, révocations, connexions, utilisateurs, paramètres et les autres types regroupent chacun des codes d’action du serveur' },
+          { label: 'Filtres', text: 'Dates, utilisateur, résultat et codes d’action un par un ; chaque filtre actif apparaît en pastille sous la barre d’outils, avec son bouton pour le retirer' },
+          { label: 'Raccourcis et filtres enregistrés', text: 'Connexions échouées ou tous les échecs en un clic ; les filtres en cours s’enregistrent sous un nom et se réappliquent (gardés dans ce navigateur)' },
+          { label: 'Détail', text: 'Le nom de la ressource ou la flèche d’une ligne ouvre l’entrée : son texte, l’utilisateur, la date et l’heure, le résultat, le code d’action, l’adresse IP et le client ; Inspecter le certificat (ou Voir l’autorité) ouvre ce que l’entrée nomme' },
         ]
       },
       {
-        title: 'Actions',
+        title: 'Actions du journal',
         items: [
-          { label: 'Exporter', text: 'Télécharger les journaux au format JSON ou CSV' },
-          { label: 'Nettoyer les anciens journaux', text: 'Purger les anciens journaux avec une rétention configurable (jours)' },
-          { label: 'Vérifier l’intégrité', text: 'Vérifier l’intégrité de la chaîne de journaux pour détecter les altérations ; sur un gros journal, elle tourne en tâche de fond, avec son avancement et un bouton d’annulation' },
+          { label: 'Exporter le journal', text: 'CSV ou JSON, avec la recherche et les filtres en cours, 10 000 entrées au plus ; sur un téléphone, dans le menu « ⋯ »' },
+          { label: 'Vérifier l’intégrité', text: 'Dans le menu « ⋯ » : contrôle la chaîne d’empreintes du journal ; sur un gros journal, elle tourne en tâche de fond, son avancement et Annuler la vérification s’affichent dans la ligne de résumé' },
+          { label: 'Nettoyer les anciens journaux', text: 'Dans le menu « ⋯ », avec le droit de supprimer le journal : supprime les entrées plus anciennes qu’une durée de conservation de 30 à 365 jours' },
         ]
       },
     ],
     tips: [
-      'Exportez régulièrement les journaux à des fins de conformité et d’archivage',
-      'Les tentatives de connexion échouées sont enregistrées avec l’adresse IP source pour la surveillance de sécurité',
-      'Les entrées de journal incluent le User Agent pour identifier les applications clientes',
+      'Exportez régulièrement le journal à des fins de conformité et d’archivage',
+      'Les connexions échouées sont enregistrées avec leur adresse IP source, et chaque entrée avec son client (user agent)',
+      'Le « Voir son activité » d’un certificat ouvre cette page sur une recherche de son nom',
     ],
     warnings: [
-      'Le nettoyage des journaux est irréversible : les données exportées ne peuvent pas être réimportées',
+      'Le nettoyage est irréversible : un journal exporté ne peut pas être réimporté',
     ],
   },
   helpGuides: {
-    title: 'Journaux d’audit',
+    title: 'Activité',
     content: `
 ## Vue d’ensemble
 
-Piste d’audit complète de toutes les opérations dans UCM. Chaque action : émission de certificat, révocation, connexion utilisateur, modification de paramètre, est enregistrée avec des détails sur qui, quoi, quand et d’où.
+Chaque opération d’UCM s’inscrit au journal d’audit : émission de certificat, révocation, connexion, modification de paramètre. La page Activité le liste, du plus récent au plus ancien, avec qui, quoi, quand et le résultat. L’en-tête compte les entrées de tout le journal ; la ligne de résumé sous la barre d’outils compte celles que gardent les filtres, dit depuis quand remonte le journal et résume les 30 derniers jours.
 
-## Détails des entrées de journal
+## Une entrée
 
-Chaque entrée de journal enregistre :
-- **Horodatage** : Quand l’action a eu lieu
-- **Utilisateur** : Qui a effectué l’action
-- **Action** : Ce qui a été fait (créer, mettre à jour, supprimer, connexion, etc.)
-- **Ressource** : Ce qui a été affecté (certificat, AC, utilisateur, etc.)
-- **Statut** : Succès ou échec
-- **Adresse IP** : IP source de la requête
-- **User Agent** : Identifiant de l’application cliente
-- **Détails** : Contexte supplémentaire (messages d’erreur, valeurs modifiées)
+Chaque ligne montre l’heure (et le jour quand ce n’est pas aujourd’hui), l’opération (le pictogramme de son type et le code d’action), la ressource, l’utilisateur et le résultat (Réussi ou Échec, en toutes lettres). Le nom de la ressource ou la flèche ouvre le détail de l’entrée :
+- **Texte** : ce que le serveur a enregistré (messages d’erreur, valeurs)
+- **Ressource**, **Utilisateur**, **Date / heure**, **Résultat**
+- **Action** : le code tel que le serveur le stocke
+- **Adresse IP** et **Client** (user agent), quand ils ont été enregistrés
 
-## Filtrage
+Quand l’entrée nomme un certificat ou une autorité, **Inspecter le certificat** (ou **Voir l’autorité**) l’ouvre dans l’inspecteur.
 
-### Par action
-Sélectionnez un ou plusieurs noms d’action, par exemple \`certificate_issued\` ou \`login_success\`.
+## Trouver des entrées
 
-### Par utilisateur
-Afficher uniquement les actions effectuées par un utilisateur spécifique.
+### Recherche
+Texte libre dans le nom d’utilisateur, le code d’action, les détails, le type de ressource et l’adresse IP ; le nom de la ressource lui-même n’est pas recherché.
 
-### Par statut
-- **Succès** : Opérations terminées avec succès
-- **Échec** : Opérations ayant échoué (échecs d’authentification, permission refusée, erreurs)
+### Type d’opération
+La liste de la barre d’outils regroupe les codes d’action par type : émissions, renouvellements, révocations, exports, certificats et CSR, approbations, publications CRL, ACME, SCEP, connexions, utilisateurs, sauvegardes, paramètres, configuration, système. Seuls les types présents dans le journal sont proposés.
 
-### Par plage de dates
-Définissez des dates **De** et **À** pour restreindre la fenêtre temporelle.
+### Filtres
+Le bouton **Filtres** ouvre les dates (**Du**, **Au**), l’**Utilisateur**, le **Résultat** et les codes d’action un par un (restreints au type choisi). Deux raccourcis posent **Connexions échouées** ou **Tous les échecs**. Les filtres en cours s’enregistrent sous un nom et se réappliquent plus tard ; ils sont gardés dans ce navigateur. Chaque filtre actif apparaît en pastille sous la barre d’outils, et **Réinitialiser les filtres** les retire tous.
 
-### Recherche textuelle
-Recherche textuelle libre dans le nom d’utilisateur, l’action, les détails, le type de ressource et l’adresse IP ; le nom et l’id de la ressource ne sont pas recherchés.
+La liste est lue page par page sur le serveur : 25, 50 ou 100 entrées par page, précédente et suivante, ou un numéro de page et **Aller**.
 
 ## Exportation
 
-Exportez les journaux filtrés en :
-- **JSON** : Lisible par machine, inclut tous les champs
-- **CSV** : Compatible avec les tableurs, inclut les champs clés
+**Exporter le journal** télécharge les entrées que gardent la recherche et les filtres, 10 000 au plus :
+- **CSV** : une ligne par entrée, pour un tableur
+- **JSON** : données structurées, tous les champs
 
-Les exportations suivent les filtres de la page (recherche, utilisateur, action, statut et plage de dates) et contiennent au plus 10 000 entrées.
+Sur un téléphone, le bouton de l’en-tête est masqué : l’export est dans le menu « ⋯ ».
 
 ## Nettoyage
 
-Purgez les anciens journaux selon la période de rétention :
-1. Cliquez sur **Nettoyer les anciens journaux**
-2. Définissez la période de rétention en jours
-3. Cliquez sur **Supprimer les anciens journaux**
+Dans le menu « ⋯ », avec le droit de supprimer le journal :
+1. Choisissez **Nettoyer les anciens journaux…**
+2. Indiquez la durée de conservation en jours (30 à 365)
+3. Choisissez **Supprimer les anciens journaux**
 
-> ⚠ Le nettoyage des journaux est irréversible. Exportez les journaux importants avant la purge.
+> ⚠ Le nettoyage est irréversible. Exportez d’abord les entrées utiles.
 
 ## Vérification d’intégrité
 
-Cliquez sur **Vérifier l’intégrité** pour contrôler la chaîne de journaux d’audit. UCM utilise le chaînage de hachages pour détecter une entrée modifiée ou supprimée à l’intérieur de la chaîne ; la suppression des dernières entrées ne laisse aucune trace dans la chaîne elle-même, c’est pourquoi le transfert syslog en garde une copie ailleurs.
+**Vérifier l’intégrité**, dans le menu « ⋯ », contrôle la chaîne du journal d’audit. UCM utilise le chaînage de hachages pour détecter une entrée modifiée ou supprimée à l’intérieur de la chaîne ; la suppression des dernières entrées ne laisse aucune trace dans la chaîne elle-même, c’est pourquoi le transfert syslog en garde une copie ailleurs.
 
-Sur un gros journal, la vérification tourne en tâche de fond : le bouton indique combien d’entrées sont déjà contrôlées, **Annuler la vérification** l’arrête, et quitter ou recharger la page ne l’arrête pas (la page la reprend). Une seule vérification tourne à la fois.
+Sur un gros journal, la vérification tourne en tâche de fond : la ligne de résumé indique combien d’entrées sont déjà contrôlées, **Annuler la vérification** l’arrête, et quitter ou recharger la page ne l’arrête pas (la page la reprend). Une seule vérification tourne à la fois.
 
 ## Transfert Syslog
 
