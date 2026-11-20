@@ -3737,6 +3737,7 @@
     "sessionTimeoutHelper": "Délai d'inactivité en minutes. Les sessions expirent après cette période sans activité.",
     "sessionDurationHelper": "Durée maximale de session en heures, indépendamment de l'activité.",
     "updateChannel": "Canal de mise à jour",
+    "viewOnGithub": "Voir sur GitHub",
     "channelStable": "Versions stables uniquement",
     "channelPrerelease": "Inclure les pré-versions (alpha, beta, rc)",
     "channelDev": "Versions de développement (instables)",
@@ -4942,6 +4943,7 @@
     "toggleFailed": "Échec du basculement du webhook",
     "testSuccess": "Événement de test envoyé avec succès",
     "testFailed": "Échec de l'envoi de l'événement de test",
+    "test": "Envoyer un événement de test",
     "auth": {
       "title": "Authentification",
       "type": {

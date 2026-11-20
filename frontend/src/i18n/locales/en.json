@@ -3606,6 +3606,7 @@
     "sessionTimeoutHelper": "Inactivity timeout in minutes. Sessions expire after this period of no activity.",
     "sessionDurationHelper": "Maximum session duration in hours, regardless of activity.",
     "updateChannel": "Update channel",
+    "viewOnGithub": "View on GitHub",
     "channelStable": "Stable releases only",
     "channelPrerelease": "Include pre-releases (alpha, beta, rc)",
     "channelDev": "Development versions (unstable)",
@@ -4942,6 +4943,7 @@
     "toggleFailed": "Failed to toggle webhook",
     "testSuccess": "Test event sent successfully",
     "testFailed": "Failed to send test event",
+    "test": "Send a test event",
     "auth": {
       "title": "Authentication",
       "type": {

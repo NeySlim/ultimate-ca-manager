@@ -3605,6 +3605,7 @@
     "sessionTimeoutHelper": "非アクティブタイムアウト（分）。この期間操作がないとセッションが期限切れになります。",
     "sessionDurationHelper": "セッションの最大持続時間（時間）。アクティビティに関係なく適用されます。",
     "updateChannel": "更新チャンネル",
+    "viewOnGithub": "View on GitHub",
     "channelStable": "安定版のみ",
     "channelPrerelease": "プレリリースを含む（alpha、beta、rc）",
     "channelDev": "開発版（不安定）",
@@ -4942,6 +4943,7 @@
     "toggleFailed": "Webhookの切り替えに失敗しました",
     "testSuccess": "テストイベントを送信しました",
     "testFailed": "テストイベントの送信に失敗しました",
+    "test": "Send a test event",
     "auth": {
       "title": "認証",
       "type": {

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key, opts) => (opts ? `${key} ${JSON.stringify(opts)}` : key) }),
+  useTranslation: () => ({ t: (key, opts) => (opts ? `${key} ${JSON.stringify(opts)}` : key), i18n: { language: 'en' } }),
 }))
 
 vi.mock('../../../components', () => ({
@@ -43,7 +43,7 @@ const renderSection = ({ settings = {}, backupMeta = {}, backupSchedule, updateS
 )
 
 describe('BackupSection size ceiling', () => {
-  it('shows the ceiling and writes a whole number of MiB', () => {
+  it('shows the ceiling and writes the stored size in the reader units', () => {
     const updateSetting = vi.fn()
     renderSection({ settings: { backup_max_total_mb: 512 }, updateSetting })
     const field = screen.getByLabelText('settings.backupMaxTotalMb')
@@ -60,7 +60,7 @@ describe('BackupSection size ceiling', () => {
       backupSchedule: { stored_bytes: 5 * MiB / 2, stored_count: 3, max_total_mb: 0, over_ceiling: false },
     })
     const line = screen.getByTestId('backup-space-used').textContent
-    expect(line).toContain('"size":"2.5 MiB"')
+    expect(line).toContain('"size":"2.5 MB"')
     expect(line).toContain('"count":3')
   })
 

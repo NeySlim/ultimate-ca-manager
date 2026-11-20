@@ -3605,6 +3605,7 @@
     "sessionTimeoutHelper": "不活动超时（分钟）。在此期间没有活动后，会话将过期。",
     "sessionDurationHelper": "最大会话持续时间（小时），与活动无关。",
     "updateChannel": "更新渠道",
+    "viewOnGithub": "在 GitHub 上查看",
     "channelStable": "仅稳定版本",
     "channelPrerelease": "包含预发布版本（alpha、beta、rc）",
     "channelDev": "开发版本（不稳定）",
@@ -4939,6 +4940,7 @@
     "toggleFailed": "Webhook 状态切换失败",
     "testSuccess": "测试事件发送成功",
     "testFailed": "测试事件发送失败",
+    "test": "发送测试事件",
     "auth": {
       "title": "身份验证",
       "type": {

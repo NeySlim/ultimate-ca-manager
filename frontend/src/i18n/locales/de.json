@@ -3605,6 +3605,7 @@
     "sessionTimeoutHelper": "Inaktivitäts-Timeout in Minuten. Sitzungen laufen nach dieser Zeit ohne Aktivität ab.",
     "sessionDurationHelper": "Maximale Sitzungsdauer in Stunden, unabhängig von Aktivität.",
     "updateChannel": "Update-Kanal",
+    "viewOnGithub": "View on GitHub",
     "channelStable": "Nur stabile Versionen",
     "channelPrerelease": "Vorabversionen einschließen (Alpha, Beta, RC)",
     "channelDev": "Entwicklungsversionen (instabil)",
@@ -4939,6 +4940,7 @@
     "toggleFailed": "Webhook konnte nicht umgeschaltet werden",
     "testSuccess": "Testereignis erfolgreich gesendet",
     "testFailed": "Testereignis konnte nicht gesendet werden",
+    "test": "Send a test event",
     "auth": {
       "title": "Authentifizierung",
       "type": {

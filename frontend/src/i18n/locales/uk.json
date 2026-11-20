@@ -3673,6 +3673,7 @@
     "sessionTimeoutHelper": "Таймаут неактивності в хвилинах. Сесії закінчуються після цього періоду без активності.",
     "sessionDurationHelper": "Максимальна тривалість сесії в годинах, незалежно від активності.",
     "updateChannel": "Канал оновлення",
+    "viewOnGithub": "View on GitHub",
     "channelStable": "Тільки стабільні версії",
     "channelPrerelease": "Включати попередні версії (alpha, beta, rc)",
     "channelDev": "Версії розробки (нестабільні)",
@@ -5063,6 +5064,7 @@
     "toggleFailed": "Не вдалося перемкнути вебхук",
     "testSuccess": "Тестову подію успішно надіслано",
     "testFailed": "Не вдалося надіслати тестову подію",
+    "test": "Send a test event",
     "auth": {
       "title": "Автентифікація",
       "type": {
