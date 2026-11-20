@@ -886,7 +886,8 @@
       "emailSmime": "Эл. почта / S/MIME",
       "ca": "ЦС",
       "selfSigned": "Самоподписанный",
-      "timestamping": "Метки времени TSA"
+      "timestamping": "Метки времени TSA",
+      "combined": "Сервер и клиент"
     },
     "approvalRequired": "Запрос на сертификат отправлен на утверждение (политика: {{policy}})",
     "ocspMustStaple": "OCSP Must-Staple (RFC 6066)",
@@ -960,6 +961,10 @@
     "liveScope": "Без отозванных и истёкших сертификатов.",
     "columnsNote": "Общее имя и состояние всегда остаются видимыми.",
     "perPageLabel": "Сертификатов на странице",
+    "selectedOnPage_one": "{{count}} сертификат выбран на этой странице",
+    "selectedOnPage_few": "{{count}} сертификата выбрано на этой странице",
+    "selectedOnPage_many": "{{count}} сертификатов выбрано на этой странице",
+    "selectedOnPage_other": "{{count}} сертификата выбрано на этой странице",
     "exportSelected": "Экспорт",
     "complianceColumn": "Соответствие",
     "archivedMark": "В архиве: заменён при продлении или повторной регистрации, хранится для истории",
@@ -4842,7 +4847,10 @@
   "revocation": {
     "reasonHelpNoHold": "Причина публикуется в CRL родительского ЦС и не может быть изменена; отзыв ЦС необратим.",
     "title": "Отзыв сертификата",
+    "dialogTitle": "Отозвать этот сертификат?",
+    "notice": "Это действие делает сертификат непригодным.",
     "reasonLabel": "Причина отзыва",
+    "reason": "Причина",
     "reasonHelp": "Записывается в сертификат и публикуется в CRL (код причины RFC 5280). Отзыв нельзя отменить, кроме приостановки сертификата.",
     "bulkReasonHelp": "Применяется ко всем выбранным сертификатам.",
     "confirm": "Отозвать",
@@ -5365,6 +5373,7 @@
     "presetName": "Название набора...",
     "noPresets": "Нет сохранённых наборов.",
     "applyAndSave": "Примените фильтры и сохраните их здесь.",
+    "deletePreset": "Удалить набор фильтров {{name}}",
     "exportData": "Экспорт данных",
     "exportItems": "Экспортировать элементов: {{count}}",
     "exportCSV": "Экспорт в CSV",
@@ -6207,6 +6216,8 @@
   },
   "export": {
     "title": "Экспорт",
+    "titleCertificate": "Экспорт сертификата",
+    "titleCa": "Экспорт УЦ",
     "skippedUnreadable": "Нечитаемые сертификаты не экспортированы: {{count}}",
     "format": "Формат",
     "options": "Параметры",
@@ -6214,7 +6225,7 @@
     "passwordPlaceholder": "Не менее 8 символов",
     "passwordLengthHint": "От {{min}} до {{max}} символов",
     "download": "Скачать",
-    "includeChain": "Включить цепочку ЦС",
+    "includeChain": "Включить цепочку сертификации",
     "includeChainDesc": "Включить сертификаты издающих ЦС",
     "includeRoot": "Включить корневой ЦС",
     "includeRootDesc": "Обычно не нужно для серверов TLS",
@@ -6222,13 +6233,13 @@
     "includeKeyDesc": "Приложить закрытый ключ к экспорту",
     "pkcs12Note": "PKCS#12 всегда включает закрытый ключ",
     "noKeyPermission": "Экспорт закрытого ключа требует повышенных прав",
-    "formatPemDesc": "Кодировка Base64, широко поддерживается",
-    "formatDerDesc": "Двоичный формат, компактный",
-    "formatP7bDesc": "Набор цепочки сертификатов",
-    "formatP12Desc": "Сертификат и ключ в зашифрованном контейнере",
+    "formatPemDesc": "Текст Base64",
+    "formatDerDesc": "Двоичный ASN.1",
+    "formatP7bDesc": "Только сертификаты",
+    "formatP12Desc": "Сертификат и ключ",
     "legacyPkcs12": "Режим совместимости (3DES/SHA-1)",
     "legacyPkcs12Desc": "Для Android 15 и старше, macOS 14 и старше, Windows Server 2016 и старше, Java до 8u301 / 11.0.1: они отклоняют стандартный архив AES-256 как неверный пароль. Защищает файл хуже; выбирайте при каждом экспорте.",
-    "formatKeyDesc": "Только закрытый ключ в формате PEM",
+    "formatKeyDesc": "Только закрытый ключ, PEM",
     "formats": {
       "privateKey": "Закрытый ключ",
       "hybridBundle": "Гибридный набор"
@@ -6242,13 +6253,19 @@
       "pkcs12": "PKCS#12 (.p12)",
       "jks": "JKS (Java KeyStore)"
     },
-    "formatJksDesc": "Java KeyStore, сертификат и ключ",
+    "formatJksDesc": "Хранилище Java, сертификат и ключ",
     "unavailableForKeyAlgorithm": "Недоступно для ключей {{algorithm}}: UCM пока не может записать постквантовый ключ в PKCS#12 или JKS. Вместо этого экспортируйте PEM с закрытым ключом.",
     "jksNote": "JKS всегда включает закрытый ключ",
     "pkcs12Title": "Экспорт PKCS#12",
     "pkcs12PasswordPrompt": "Введите пароль для файла PKCS#12",
     "formatHybridBundleDesc": "ZIP с обоими сертификатами пары",
-    "bundleRelatedHasNoKey": "У связанного сертификата нет закрытого ключа: набор содержит только сертификаты"
+    "bundleRelatedHasNoKey": "У связанного сертификата нет закрытого ключа: набор содержит только сертификаты",
+    "previewTitle": "Предпросмотр структуры ({{format}})",
+    "previewChain": "цепочка выпускающего УЦ",
+    "previewRoot": "корневой УЦ",
+    "previewKey": "закрытый ключ",
+    "previewKeyEncrypted": "закрытый ключ, зашифрованный паролем",
+    "previewRelated": "связанный сертификат гибридной пары"
   },
   "userCertificates": {
     "title": "Сертификаты пользователей",
@@ -6545,7 +6562,9 @@
       "ca_exempt": "ЦС освобождён",
       "short": "≤ 398 дней",
       "moderate": "≤ 825 дней",
-      "long": "> 825 дней"
+      "long": "> 825 дней",
+      "weak": "слабый",
+      "critical": "критический"
     }
   },
   "msca": {
@@ -7983,7 +8002,8 @@
       "lifetime_over_days": "Срок жизни больше (дни)",
       "no_key": "Нет закрытого ключа",
       "incomplete_chain": "Неполная цепочка",
-      "renewal": "Продление"
+      "renewal": "Продление",
+      "weak_key": "Соответствие"
     },
     "filterValue": {
       "true": "да",
@@ -7996,7 +8016,8 @@
       "expired": "Истёк",
       "revoked": "Отозван",
       "orphan": "Без издателя",
-      "archived": "В архиве"
+      "archived": "В архиве",
+      "weakKey": "Слабый ключ, {{algo}} < {{bits}}"
     },
     "hierarchy": {
       "crlOn": "CRL включён",

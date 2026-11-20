@@ -880,7 +880,8 @@
       "emailSmime": "メール / S/MIME",
       "ca": "CA",
       "selfSigned": "自己署名",
-      "timestamping": "TSA タイムスタンプ"
+      "timestamping": "TSA タイムスタンプ",
+      "combined": "Server and client"
     },
     "approvalRequired": "証明書リクエストが承認待ちです（ポリシー: {{policy}}）",
     "ocspMustStaple": "OCSP Must-Staple (RFC 6066)",
@@ -950,6 +951,8 @@
     "liveScope": "Revoked and expired certificates left out.",
     "columnsNote": "The common name and the state always stay visible.",
     "perPageLabel": "Certificates per page",
+    "selectedOnPage_one": "{{count}} certificate selected on this page",
+    "selectedOnPage_other": "{{count}} certificates selected on this page",
     "exportSelected": "Export",
     "complianceColumn": "Compliance",
     "archivedMark": "Archived: superseded by a renewal or re-enrolment, kept for history",
@@ -4724,7 +4727,10 @@
   "revocation": {
     "reasonHelpNoHold": "理由は親 CA の CRL に公開され、変更できません。CA の失効は恒久的です。",
     "title": "証明書を失効",
+    "dialogTitle": "Revoke this certificate?",
+    "notice": "This action makes the certificate unusable.",
     "reasonLabel": "失効理由",
+    "reason": "Reason",
     "reasonHelp": "証明書に記録され、CRL に公開されます（RFC 5280 の理由コード）。失効は一時停止を除いて取り消せません。",
     "bulkReasonHelp": "選択したすべての証明書に適用されます。",
     "confirm": "失効",
@@ -5223,6 +5229,7 @@
     "presetName": "プリセット名...",
     "noPresets": "保存済みプリセットなし",
     "applyAndSave": "フィルターを適用してここに保存",
+    "deletePreset": "プリセット {{name}} を削除",
     "exportData": "データをエクスポート",
     "exportItems": "{{count}}件をエクスポート",
     "exportCSV": "CSVでエクスポート",
@@ -6033,6 +6040,8 @@
   },
   "export": {
     "title": "エクスポート",
+    "titleCertificate": "Export the certificate",
+    "titleCa": "Export the CA",
     "skippedUnreadable": "読み取れない証明書 {{count}} 件はエクスポートされませんでした",
     "format": "フォーマット",
     "options": "オプション",
@@ -6074,7 +6083,13 @@
     "pkcs12Title": "PKCS#12をエクスポート",
     "pkcs12PasswordPrompt": "PKCS#12 ファイルのパスワードを入力してください",
     "formatHybridBundleDesc": "ペアの両方の証明書を含む ZIP",
-    "bundleRelatedHasNoKey": "関連証明書には秘密鍵がありません：バンドルには証明書のみが含まれます"
+    "bundleRelatedHasNoKey": "関連証明書には秘密鍵がありません：バンドルには証明書のみが含まれます",
+    "previewTitle": "Structure preview ({{format}})",
+    "previewChain": "chain of the issuing CA",
+    "previewRoot": "root CA",
+    "previewKey": "private key",
+    "previewKeyEncrypted": "private key, encrypted with the password",
+    "previewRelated": "related certificate of the hybrid pair"
   },
   "userCertificates": {
     "title": "ユーザー証明書",
@@ -6371,7 +6386,9 @@
       "ca_exempt": "CA免除",
       "short": "≤ 398日",
       "moderate": "≤ 825日",
-      "long": "> 825日"
+      "long": "> 825日",
+      "weak": "weak",
+      "critical": "critical"
     }
   },
   "msca": {
@@ -7729,7 +7746,8 @@
       "lifetime_over_days": "有効期間（日）超",
       "no_key": "秘密鍵なし",
       "incomplete_chain": "不完全なチェーン",
-      "renewal": "更新"
+      "renewal": "更新",
+      "weak_key": "Compliance"
     },
     "filterValue": {
       "true": "はい",
@@ -7742,7 +7760,8 @@
       "expired": "期限切れ",
       "revoked": "失効済み",
       "orphan": "孤立",
-      "archived": "アーカイブ済み"
+      "archived": "アーカイブ済み",
+      "weakKey": "Weak key, {{algo}} < {{bits}}"
     },
     "hierarchy": {
       "crlOn": "CRL有効",

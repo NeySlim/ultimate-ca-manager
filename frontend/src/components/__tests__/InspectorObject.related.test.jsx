@@ -141,7 +141,7 @@ describe('InspectorObject of a hybrid pair member', () => {
     mocks.certificatesService.export.mockRejectedValue(error)
     await open()
     fireEvent.click(screen.getByText('Export'))
-    fireEvent.click(screen.getByText('export.formats.hybridBundle').closest('button'))
+    fireEvent.click(screen.getByText('export.formats.hybridBundle').closest('label').querySelector('input'))
     fireEvent.submit(screen.getByText('PEM').closest('form'))
     await waitFor(() => expect(mocks.notify.showError).toHaveBeenCalledWith(toast))
   })

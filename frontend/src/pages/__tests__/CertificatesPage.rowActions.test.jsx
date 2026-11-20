@@ -164,7 +164,7 @@ describe('CertificatesPage selection and batch bar', () => {
     expect(screen.queryByRole('group', { name: 'table.selection' })).toBeNull()
     fireEvent.click(rowBox('web.example.com'))
     const bar = screen.getByRole('group', { name: 'table.selection' })
-    expect(bar).toHaveTextContent('table.selectedCount:1')
+    expect(bar).toHaveTextContent('certificates.selectedOnPage:1')
     expect(rowBox('web.example.com')).toBeChecked()
     expect(rowBox('api.example.com')).not.toBeChecked()
     expect(windows.openEntity).not.toHaveBeenCalled()
@@ -198,6 +198,8 @@ describe('CertificatesPage selection and batch bar', () => {
     await renderRows([VALID, OTHER, THIRD])
     fireEvent.click(rowBox('web.example.com'))
     fireEvent.click(rowBox('db.example.com'))
+    // The bar counts the ticked rows of the page in the mockup's words
+    expect(within(screen.getByRole('group', { name: 'table.selection' })).getByText('certificates.selectedOnPage:2')).toBeInTheDocument()
     fireEvent.click(within(screen.getByRole('group', { name: 'table.selection' })).getByText('common.compare'))
     expect(screen.getByTestId('compare')).toHaveTextContent('7|9')
   })
@@ -247,7 +249,7 @@ describe('CertificatesPage selection and batch bar', () => {
     })
     await waitFor(() => expect(screen.queryByRole('row', { name: /web\.example\.com/ })).toBeNull())
     // The bar counts what is still on screen
-    expect(screen.getByRole('group', { name: 'table.selection' })).toHaveTextContent('table.selectedCount:1')
+    expect(screen.getByRole('group', { name: 'table.selection' })).toHaveTextContent('certificates.selectedOnPage:1')
     svc.bulkExport.mockResolvedValue(new Blob(['pem']))
     fireEvent.click(within(screen.getByRole('group', { name: 'table.selection' })).getByTitle('certificates.exportSelectedPem'))
     await waitFor(() => expect(svc.bulkExport).toHaveBeenCalledWith([8], 'pem'))

@@ -105,7 +105,7 @@
   cursor: pointer;
 }
 .lv-view:first-child { padding-left: 2px; }
-.lv-view:hover { color: var(--text); background: var(--hover); }
+.lv-view:hover { background: var(--hover); }
 .lv-view:focus-visible { outline-offset: -2px; }
 .lv-view:is([aria-selected="true"], [aria-pressed="true"]) { color: var(--accent); border-bottom-color: var(--accent); }
 .lv-counter {
@@ -137,18 +137,18 @@
   border-radius: 4px;
   color: var(--muted);
 }
-.lv-search:focus-within { border-color: var(--accent); }
 .lv-search input {
   width: 100%;
   min-height: 32px;
   padding: 6px 0;
   background: transparent;
   border: 0;
+  border-radius: 4px;
   color: var(--text);
   font-size: 12px;
 }
+/* The field takes the page's focus ring, the frame keeps its border, as the mockup */
 .lv-search input:focus { outline: none; }
-.lv-search input:focus-visible { outline: none; }
 .lv-search input::placeholder { color: var(--muted); opacity: 1; }
 .lv-search input::-webkit-search-cancel-button { display: none; }
 .lv-search-clear {
@@ -172,6 +172,10 @@
   color: var(--text);
   line-height: normal;
 }
+/* A filter keeps its look on hover and takes the focus ring of the page, as the mockup's select */
+.lv-filter > button:hover { background: var(--panel); border-color: var(--control); }
+.lv-filter > button:focus { box-shadow: none; border-color: var(--control); }
+.lv-filter > button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .lv-divider { width: 1px; height: 20px; margin: 0 3px; background: var(--line); }
 /* Active filters under the toolbar: a label, square chips, a note */
 .lv-applied { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: -2px 0 12px; font-size: 12px; color: var(--muted); flex-shrink: 0; }
@@ -278,6 +282,9 @@
 /* A column with a floor and no ellipsis: the name keeps its whole text */
 .lv-table :is(th, td).lv-floor { min-width: var(--lv-min); }
 .lv-table th.lv-grow { overflow: hidden; text-overflow: ellipsis; }
+/* The absorbing column's sort button shortens its words with an ellipsis, as a plain heading does */
+.lv-table th.lv-grow .lv-sort { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.lv-table th.lv-grow .lv-sort > svg { margin-left: 8px; vertical-align: -1px; }
 .lv-table td.is-clipped { overflow: hidden; text-overflow: ellipsis; }
 .lv-table td.is-muted { color: var(--muted); }
 .lv-table td.is-small { font-size: 12px; }
@@ -344,7 +351,7 @@
   overflow-wrap: anywhere;
   pointer-events: none;
 }
-.lv-entity:hover:not(:disabled) { color: var(--accent); background: var(--hover); }
+.lv-entity:hover:not(:disabled) { background: var(--hover); }
 .lv-mark { display: inline-flex; align-items: center; gap: 5px; margin-left: 8px; color: var(--muted); font-size: 12px; }
 .lv-mark svg { width: 12px; height: 12px; flex-shrink: 0; }
 .lv-mark.is-warn { color: var(--warn); }
@@ -481,7 +488,33 @@
 .lv-dialog-body > p.lv-dialog-lead { margin-bottom: 20px; }
 .lv-dialog-list > .lv-btn.is-danger { background: var(--badbg); border-color: var(--bad); color: var(--bad); }
 .lv-check-line { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 7px; border-bottom: 1px solid var(--line); font-size: 12px; cursor: pointer; }
-:root[data-theme="aurore"] .lv-dialog { border-radius: 8px; }
+/* Aurore: every dialog of the list is the mockup's frosted glass of radius 10 px */
+:root[data-theme="aurore"] .lv-dialog {
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border-color: color-mix(in srgb, var(--paper) 8%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--paper) 6%, transparent), 0 24px 60px -20px color-mix(in srgb, var(--ink) 70%, transparent);
+}
+:root[data-theme="aurore"][data-mode="light"] .lv-dialog {
+  background: color-mix(in srgb, var(--paper) 84%, transparent);
+  border-color: color-mix(in srgb, var(--text) 14%, transparent);
+  box-shadow: inset 0 1px 0 var(--paper), 0 24px 60px -20px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* Menus of the toolbar (presets, export): the mockup's pop menu, 8 px under its button */
+.ui-pop.lv-tool-menu { top: calc(100% + 8px); }
+.ui-pop.lv-tool-menu.is-wide { width: 260px; }
+.lv-tool-menu:focus-visible { outline: none; }
+.lv-tool-menu-line { display: flex; align-items: center; gap: 2px; border-radius: 4px; }
+.lv-tool-menu-line > .ui-pop-item:first-child { flex: 1; min-width: 0; }
+.lv-tool-menu-line .ui-pop-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-pop-item.lv-tool-menu-delete { width: 30px; min-height: 30px; padding: 6px; justify-content: center; color: var(--muted); }
+.ui-pop-item.lv-tool-menu-delete:hover { color: var(--bad); }
+.lv-tool-menu-form { display: grid; gap: 8px; padding: 4px; }
+.lv-tool-menu-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.lv-tool-menu-empty { margin: 0; padding: 10px; font-size: 12px; line-height: 1.6; color: var(--muted); }
 
 /* Narrower windows, as the mockup: one row action under 1250 px, 10 px cells under 1100 px,
    an 18 px gutter, tools by their icon and filters of 140 px at most under 1000 px */
@@ -532,10 +565,10 @@
   .lv-toolbar .lv-search { flex-basis: 100%; min-height: 42px; }
   .lv-toolbar .lv-search input { min-height: 40px; font-size: 13px; }
   .lv-main:has(.lv-table-box.is-cards) { padding: 0 var(--lv-gutter); }
-  /* Two filters share a line; a third one takes the next line whole */
+  /* Two filters share a line, as the mockup's (max-width:none); a third one takes the next line whole */
   .lv-toolbar .lv-tools { flex: 1 1 0; flex-wrap: wrap; min-width: 0; }
-  .lv-toolbar .lv-filter { flex: 1 1 120px; min-width: 0; }
-  .lv-toolbar .lv-filter > button { width: 100%; min-height: 40px; }
+  .lv-toolbar .lv-filter { flex: 1 1 calc(50% - 4px); min-width: 0; }
+  .lv-toolbar .lv-filter > button { width: 100%; max-width: none; min-height: 40px; }
   .lv-toolbar .lv-btn.is-icon { width: 40px; height: 40px; }
   .lv-footer { padding: 10px; gap: 8px; flex-wrap: wrap; }
   .lv-footer .lv-page-arrow { width: 38px; height: 38px; }
@@ -609,6 +642,9 @@
 :root[data-theme="aurore"] .lv-table tbody tr.is-opened { background: linear-gradient(90deg, var(--selected), color-mix(in srgb, var(--selected) 55%, var(--panel))); background-color: var(--selected); }
 :root[data-theme="aurore"] .lv-table tbody tr.is-opened td:first-child { position: relative; box-shadow: none; }
 :root[data-theme="aurore"] .lv-table tbody tr.is-opened td:first-child::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: linear-gradient(180deg, var(--grad-a), var(--grad-b)); pointer-events: none; }
+/* Aurore: the focus ring wears the mockup's 5 px halo */
+:root[data-theme="aurore"] :is(.lv-stage, .lv-dialog) :is(button, a, input, select, [tabindex]):focus-visible { box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent); }
+:root[data-theme="aurore"] :is(.lv-stage, .lv-dialog) .lv-btn.is-primary:focus-visible { box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent), 0 8px 24px -8px var(--glow); }
 @media (prefers-reduced-motion: no-preference) {
   :root[data-theme="aurore"] :is(.lv-btn, .lv-icon-btn, .lv-table tbody tr) { transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease; }
 }

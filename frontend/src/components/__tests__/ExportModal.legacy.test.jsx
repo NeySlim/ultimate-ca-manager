@@ -59,13 +59,13 @@ describe('ExportModal PKCS#12 compatibility mode', () => {
   it('hides the checkbox for PEM and shows it for PKCS#12', () => {
     renderModal()
     expect(screen.queryByTestId('export-legacy-pkcs12')).toBeNull()
-    fireEvent.click(screen.getByText('P12 / PKCS#12'))
+    fireEvent.click(screen.getByText('PKCS#12'))
     expect(screen.getByTestId('export-legacy-pkcs12')).not.toBeChecked()
   })
 
   it('sends legacy: true only when ticked', async () => {
     const onExport = renderModal(vi.fn().mockResolvedValue(undefined))
-    fireEvent.click(screen.getByText('P12 / PKCS#12'))
+    fireEvent.click(screen.getByText('PKCS#12'))
     fireEvent.change(screen.getByPlaceholderText(/characters|caract/i), { target: { value: 'compat-password-123' } })
     fireEvent.click(screen.getByTestId('export-legacy-pkcs12'))
     fireEvent.submit(screen.getByTestId('export-legacy-pkcs12').closest('form'))
@@ -78,7 +78,7 @@ describe('ExportModal PKCS#12 compatibility mode', () => {
 
   it('defaults to the modern profile', async () => {
     const onExport = renderModal(vi.fn().mockResolvedValue(undefined))
-    fireEvent.click(screen.getByText('P12 / PKCS#12'))
+    fireEvent.click(screen.getByText('PKCS#12'))
     fireEvent.change(screen.getByPlaceholderText(/characters|caract/i), { target: { value: 'compat-password-123' } })
     fireEvent.submit(screen.getByTestId('export-legacy-pkcs12').closest('form'))
     await waitFor(() => expect(onExport).toHaveBeenCalledTimes(1))

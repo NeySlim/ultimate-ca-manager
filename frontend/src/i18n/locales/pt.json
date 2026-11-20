@@ -880,7 +880,8 @@
       "emailSmime": "E-mail / S/MIME",
       "ca": "CA",
       "selfSigned": "Autoassinado",
-      "timestamping": "Carimbo de data/hora TSA"
+      "timestamping": "Carimbo de data/hora TSA",
+      "combined": "Server and client"
     },
     "approvalRequired": "Solicitação de certificado enviada para aprovação (política: {{policy}})",
     "ocspMustStaple": "OCSP Must-Staple (RFC 6066)",
@@ -950,6 +951,8 @@
     "liveScope": "Revoked and expired certificates left out.",
     "columnsNote": "The common name and the state always stay visible.",
     "perPageLabel": "Certificates per page",
+    "selectedOnPage_one": "{{count}} certificate selected on this page",
+    "selectedOnPage_other": "{{count}} certificates selected on this page",
     "exportSelected": "Export",
     "complianceColumn": "Compliance",
     "archivedMark": "Archived: superseded by a renewal or re-enrolment, kept for history",
@@ -4721,7 +4724,10 @@
   "revocation": {
     "reasonHelpNoHold": "O motivo é publicado na CRL da CA pai e não pode ser alterado; a revogação de uma CA é permanente.",
     "title": "Revogar certificado",
+    "dialogTitle": "Revoke this certificate?",
+    "notice": "This action makes the certificate unusable.",
     "reasonLabel": "Motivo da revogação",
+    "reason": "Reason",
     "reasonHelp": "Registado no certificado e publicado na CRL (código de motivo RFC 5280). A revogação é irreversível, exceto a suspensão.",
     "bulkReasonHelp": "Aplicado a cada certificado selecionado.",
     "confirm": "Revogar",
@@ -5220,6 +5226,7 @@
     "presetName": "Nome do preset...",
     "noPresets": "Sem presets salvos",
     "applyAndSave": "Aplique filtros e salve aqui",
+    "deletePreset": "Excluir a predefinição {{name}}",
     "exportData": "Exportar dados",
     "exportItems": "Exportar {{count}} itens",
     "exportCSV": "Exportar como CSV",
@@ -6030,6 +6037,8 @@
   },
   "export": {
     "title": "Exportar",
+    "titleCertificate": "Export the certificate",
+    "titleCa": "Export the CA",
     "skippedUnreadable": "Não foram exportados {{count}} certificado(s) ilegível(is)",
     "format": "Formato",
     "options": "Opções",
@@ -6071,7 +6080,13 @@
     "pkcs12Title": "Exportar PKCS#12",
     "pkcs12PasswordPrompt": "Digite a senha para o arquivo PKCS#12",
     "formatHybridBundleDesc": "ZIP com os dois certificados do par",
-    "bundleRelatedHasNoKey": "O certificado relacionado não tem chave privada: o pacote contém apenas os certificados"
+    "bundleRelatedHasNoKey": "O certificado relacionado não tem chave privada: o pacote contém apenas os certificados",
+    "previewTitle": "Structure preview ({{format}})",
+    "previewChain": "chain of the issuing CA",
+    "previewRoot": "root CA",
+    "previewKey": "private key",
+    "previewKeyEncrypted": "private key, encrypted with the password",
+    "previewRelated": "related certificate of the hybrid pair"
   },
   "userCertificates": {
     "title": "Certificados de Utilizador",
@@ -6368,7 +6383,9 @@
       "ca_exempt": "CA isento",
       "short": "≤ 398 dias",
       "moderate": "≤ 825 dias",
-      "long": "> 825 dias"
+      "long": "> 825 dias",
+      "weak": "weak",
+      "critical": "critical"
     }
   },
   "msca": {
@@ -7726,7 +7743,8 @@
       "lifetime_over_days": "Validade superior a (dias)",
       "no_key": "Sem chave privada",
       "incomplete_chain": "Cadeia incompleta",
-      "renewal": "Renovação"
+      "renewal": "Renovação",
+      "weak_key": "Compliance"
     },
     "filterValue": {
       "true": "sim",
@@ -7739,7 +7757,8 @@
       "expired": "Expirado",
       "revoked": "Revogado",
       "orphan": "Órfão",
-      "archived": "Arquivado"
+      "archived": "Arquivado",
+      "weakKey": "Weak key, {{algo}} < {{bits}}"
     },
     "hierarchy": {
       "crlOn": "CRL ativa",

@@ -58,7 +58,7 @@ export function InspectorObject({ entry, onTitle }) {
   const Icon = config.icon
 
   let body
-  if (loading) body = <DetailSkeleton />
+  if (loading) body = <DetailSkeleton sections={type === 'certificate' ? config.sections : null} />
   else if (!data) body = <div className="ins-empty">{failed ? t('inspector.loadFailed') : t('common.notFound', 'Not found')}</div>
   else if (type === 'certificate') {
     body = (

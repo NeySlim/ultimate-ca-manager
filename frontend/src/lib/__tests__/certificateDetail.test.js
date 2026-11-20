@@ -1,6 +1,6 @@
 /** What the certificate inspector derives from the API detail. */
 import { describe, it, expect } from 'vitest'
-import { validityFacts, chainNodes, extensionRows, historyEntries, lastAcmeFailure, certificateKeyLabel, serialHex } from '../certificateDetail'
+import { validityFacts, chainNodes, extensionRows, historyEntries, lastAcmeFailure, certificateKeyLabel, serialHex, certTypeLabel, originLabel, complianceReasonLabel } from '../certificateDetail'
 import { signatureHashName } from '../signatureName'
 
 const NOW = new Date('2026-11-20T12:00:00Z')
@@ -139,5 +139,33 @@ describe('signatureHashName', () => {
     expect(signatureHashName('SHA384-ECDSA')).toBe('SHA-384')
     expect(signatureHashName('RSASSA-PSS-SHA256')).toBe('RSASSA-PSS')
     expect(signatureHashName('ML-DSA-65')).toBe('ML-DSA-65')
+  })
+})
+
+describe('values of « Plus de détails » in words', () => {
+  const t = (key, fallback) => ({
+    'certificates.sourceTypes.server': 'Serveur',
+    'certificates.sourceImport': 'Import',
+    'compliance.reasons.critical': 'critique',
+    'compliance.reasons.unknown': 'Inconnu',
+  }[key] ?? (typeof fallback === 'string' ? fallback : key))
+  const sources = { keys: { import: 'sourceImport' }, label: (v) => t(`certificates.${sources.keys[v]}`) }
+
+  it('names a stored type, and humanizes one it does not know', () => {
+    expect(certTypeLabel('server_cert', t)).toBe('Serveur')
+    expect(certTypeLabel('odd_type', t)).toBe('Odd type')
+    expect(certTypeLabel(null, t)).toBeNull()
+  })
+
+  it('names a source and a product, and keeps a user name as sent', () => {
+    expect(originLabel('import', sources, t)).toBe('Import')
+    expect(originLabel('opnsense', sources, t)).toBe('OPNsense')
+    expect(originLabel('jane_doe', sources, t)).toBe('jane_doe')
+  })
+
+  it('translates the flag of a compliance reason and a known code', () => {
+    expect(complianceReasonLabel('RSA 512 (critical)', t)).toBe('RSA 512 (critique)')
+    expect(complianceReasonLabel('Unknown', t)).toBe('Inconnu')
+    expect(complianceReasonLabel('ECDSA P-256', t)).toBe('ECDSA P-256')
   })
 })

@@ -42,7 +42,7 @@ describe('ExportModal options per format', () => {
   })
 
   it('P7B offers the chain but not the key', async () => {
-    const onExport = open('P7B / PKCS#7')
+    const onExport = open('PKCS#7')
     expect(screen.getByText('Include CA chain')).toBeInTheDocument()
     expect(screen.queryByText('Include private key')).toBeNull()
     const opts = await submit(onExport)

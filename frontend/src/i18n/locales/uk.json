@@ -886,7 +886,8 @@
       "emailSmime": "Ел. пошта / S/MIME",
       "ca": "ЦС",
       "selfSigned": "Самопідписаний",
-      "timestamping": "Часові позначки TSA"
+      "timestamping": "Часові позначки TSA",
+      "combined": "Server and client"
     },
     "approvalRequired": "Запит на сертифікат надіслано на затвердження (політика: {{policy}})",
     "ocspMustStaple": "OCSP Must-Staple (RFC 6066)",
@@ -960,6 +961,10 @@
     "liveScope": "Revoked and expired certificates left out.",
     "columnsNote": "The common name and the state always stay visible.",
     "perPageLabel": "Certificates per page",
+    "selectedOnPage_one": "{{count}} certificate selected on this page",
+    "selectedOnPage_few": "{{count}} certificates selected on this page",
+    "selectedOnPage_many": "{{count}} certificates selected on this page",
+    "selectedOnPage_other": "{{count}} certificates selected on this page",
     "exportSelected": "Export",
     "complianceColumn": "Compliance",
     "archivedMark": "Archived: superseded by a renewal or re-enrolment, kept for history",
@@ -4839,7 +4844,10 @@
   "revocation": {
     "reasonHelpNoHold": "Причина публікується в CRL батьківського ЦС і не може бути змінена; відкликання ЦС є остаточним.",
     "title": "Відкликати сертифікат",
+    "dialogTitle": "Revoke this certificate?",
+    "notice": "This action makes the certificate unusable.",
     "reasonLabel": "Причина відкликання",
+    "reason": "Reason",
     "reasonHelp": "Записується в сертифікат і публікується в CRL (код причини RFC 5280). Відкликання незворотне, крім призупинення.",
     "bulkReasonHelp": "Застосовується до кожного вибраного сертифіката.",
     "confirm": "Відкликати",
@@ -5362,6 +5370,7 @@
     "presetName": "Назва набору...",
     "noPresets": "Немає збережених наборів",
     "applyAndSave": "Застосуйте фільтри та збережіть тут",
+    "deletePreset": "Видалити набір фільтрів {{name}}",
     "exportData": "Експортувати дані",
     "exportItems": "Експортувати {{count}} записів",
     "exportCSV": "Експортувати як CSV",
@@ -6204,6 +6213,8 @@
   },
   "export": {
     "title": "Експортувати",
+    "titleCertificate": "Export the certificate",
+    "titleCa": "Export the CA",
     "skippedUnreadable": "Нечитабельних сертифікатів не експортовано: {{count}}",
     "format": "Формат",
     "options": "Параметри",
@@ -6245,7 +6256,13 @@
     "pkcs12Title": "Експорт PKCS#12",
     "pkcs12PasswordPrompt": "Введіть пароль для файла PKCS#12",
     "formatHybridBundleDesc": "ZIP з обома сертифікатами пари",
-    "bundleRelatedHasNoKey": "Пов'язаний сертифікат не має закритого ключа: пакет міститиме лише сертифікати"
+    "bundleRelatedHasNoKey": "Пов'язаний сертифікат не має закритого ключа: пакет міститиме лише сертифікати",
+    "previewTitle": "Structure preview ({{format}})",
+    "previewChain": "chain of the issuing CA",
+    "previewRoot": "root CA",
+    "previewKey": "private key",
+    "previewKeyEncrypted": "private key, encrypted with the password",
+    "previewRelated": "related certificate of the hybrid pair"
   },
   "userCertificates": {
     "title": "Сертифікати користувачів",
@@ -6542,7 +6559,9 @@
       "ca_exempt": "CA звільнено",
       "short": "≤ 398 днів",
       "moderate": "≤ 825 днів",
-      "long": "> 825 днів"
+      "long": "> 825 днів",
+      "weak": "weak",
+      "critical": "critical"
     }
   },
   "msca": {
@@ -7980,7 +7999,8 @@
       "lifetime_over_days": "Строк дії понад (днів)",
       "no_key": "Без приватного ключа",
       "incomplete_chain": "Неповний ланцюжок",
-      "renewal": "Оновлення"
+      "renewal": "Оновлення",
+      "weak_key": "Compliance"
     },
     "filterValue": {
       "true": "так",
@@ -7993,7 +8013,8 @@
       "expired": "Прострочений",
       "revoked": "Відкликаний",
       "orphan": "Сирота",
-      "archived": "Заархівовано"
+      "archived": "Заархівовано",
+      "weakKey": "Weak key, {{algo}} < {{bits}}"
     },
     "hierarchy": {
       "crlOn": "CRL увімк.",

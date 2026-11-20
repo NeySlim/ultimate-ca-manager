@@ -29,6 +29,7 @@ export function MultiSelectFilter({
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const ref = useRef(null)
+  const triggerRef = useRef(null)
 
   // Close on outside click
   useEffect(() => {
@@ -43,13 +44,15 @@ export function MultiSelectFilter({
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
-  // Close on Escape
+  // Escape closes this layer alone, back on its button; the key is marked handled for the layers under it
   useEffect(() => {
     if (!open) return
     const handler = (e) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && !e.defaultPrevented) {
+        e.preventDefault()
         setOpen(false)
         setSearch('')
+        triggerRef.current?.focus()
       }
     }
     document.addEventListener('keydown', handler)
@@ -102,7 +105,9 @@ export function MultiSelectFilter({
       {/* Trigger */}
       <button
         type="button"
+        ref={triggerRef}
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
         className={cn(
           'flex items-center justify-between rounded-md border',
           'focus:outline-none focus:ring-2 focus:ring-accent-primary-op30 focus:border-accent-primary',
@@ -131,7 +136,7 @@ export function MultiSelectFilter({
 
       {/* Dropdown */}
       {open && (
-        <div className="ui-pop absolute mt-1 max-w-[320px]">
+        <div className="ui-pop absolute mt-1 max-w-[320px]" role="group" aria-label={placeholder}>
           {/* Search within options */}
           {(searchable || options.length > 8) && (
             <div className="pb-1.5 mb-1 border-b border-border">

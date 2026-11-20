@@ -194,13 +194,13 @@ describe('key export', () => {
 
   it('hides key formats without read:private_keys', () => {
     open(rights(['write:certificates']))
-    expect(screen.queryByText('P12 / PKCS#12')).toBeNull()
+    expect(screen.queryByText('PKCS#12')).toBeNull()
     expect(screen.getByText('PEM')).toBeInTheDocument()
   })
 
   it('offers them with read:private_keys', () => {
     open(rights(['write:certificates'], ['read:private_keys']))
-    expect(screen.getByText('P12 / PKCS#12')).toBeInTheDocument()
+    expect(screen.getByText('PKCS#12')).toBeInTheDocument()
   })
 })
 

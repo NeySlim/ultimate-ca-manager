@@ -880,7 +880,8 @@
       "emailSmime": "Email / S/MIME",
       "ca": "CA",
       "selfSigned": "Self-Signed",
-      "timestamping": "TSA Timestamping"
+      "timestamping": "TSA Timestamping",
+      "combined": "Server and client"
     },
     "approvalRequired": "Certificate request submitted for approval (policy: {{policy}})",
     "ocspMustStaple": "OCSP Must-Staple (RFC 6066)",
@@ -950,6 +951,8 @@
     "liveScope": "Revoked and expired certificates left out.",
     "columnsNote": "The common name and the state always stay visible.",
     "perPageLabel": "Certificates per page",
+    "selectedOnPage_one": "{{count}} certificate selected on this page",
+    "selectedOnPage_other": "{{count}} certificates selected on this page",
     "exportSelected": "Export",
     "complianceColumn": "Compliance",
     "archivedMark": "Archived: superseded by a renewal or re-enrolment, kept for history",
@@ -4724,7 +4727,10 @@
   "revocation": {
     "reasonHelpNoHold": "The reason is published on the parent's CRL and cannot be changed; a CA revocation is permanent.",
     "title": "Revoke certificate",
+    "dialogTitle": "Revoke this certificate?",
+    "notice": "This action makes the certificate unusable.",
     "reasonLabel": "Revocation reason",
+    "reason": "Reason",
     "reasonHelp": "Recorded on the certificate and published on the CRL (RFC 5280 reason code). Revocation cannot be undone, except a certificate hold.",
     "bulkReasonHelp": "Applied to every selected certificate.",
     "confirm": "Revoke",
@@ -5223,6 +5229,7 @@
     "presetName": "Preset name...",
     "noPresets": "No saved presets.",
     "applyAndSave": "Apply filters and save them here.",
+    "deletePreset": "Delete the preset {{name}}",
     "exportData": "Export data",
     "exportItems": "Export {{count}} items",
     "exportCSV": "Export as CSV",
@@ -6033,6 +6040,8 @@
   },
   "export": {
     "title": "Export",
+    "titleCertificate": "Export the certificate",
+    "titleCa": "Export the CA",
     "skippedUnreadable": "{{count}} unreadable certificate(s) were not exported",
     "format": "Format",
     "options": "Options",
@@ -6040,7 +6049,7 @@
     "passwordPlaceholder": "Min. 8 characters",
     "passwordLengthHint": "Between {{min}} and {{max}} characters",
     "download": "Download",
-    "includeChain": "Include CA chain",
+    "includeChain": "Include the certification chain",
     "includeChainDesc": "Include issuing CA certificates",
     "includeRoot": "Include Root CA",
     "includeRootDesc": "Usually unnecessary for TLS servers",
@@ -6048,13 +6057,13 @@
     "includeKeyDesc": "Attach the private key to the export",
     "pkcs12Note": "PKCS#12 always includes the private key",
     "noKeyPermission": "Private key export requires elevated permissions",
-    "formatPemDesc": "Base64 encoded, widely supported",
-    "formatDerDesc": "Binary format, compact",
-    "formatP7bDesc": "Certificate chain bundle",
-    "formatP12Desc": "Certificate + key in encrypted container",
+    "formatPemDesc": "Base64 text",
+    "formatDerDesc": "Binary ASN.1",
+    "formatP7bDesc": "Certificates only",
+    "formatP12Desc": "Certificate and key",
     "legacyPkcs12": "Compatibility mode (3DES/SHA-1)",
     "legacyPkcs12Desc": "For Android 15 and earlier, macOS 14 and earlier, Windows Server 2016 and earlier, Java before 8u301 / 11.0.1: they reject the default AES-256 archive as a wrong password. Protects the file less well; choose it per export.",
-    "formatKeyDesc": "PEM-encoded private key only",
+    "formatKeyDesc": "Private key only, PEM",
     "formats": {
       "privateKey": "Private Key",
       "hybridBundle": "Hybrid bundle"
@@ -6068,13 +6077,19 @@
       "pkcs12": "PKCS#12 (.p12)",
       "jks": "JKS (Java KeyStore)"
     },
-    "formatJksDesc": "Java KeyStore, certificate + key",
+    "formatJksDesc": "Java keystore, certificate and key",
     "unavailableForKeyAlgorithm": "Not available for {{algorithm}} keys: UCM cannot yet write a post-quantum key into PKCS#12 or JKS. Export PEM with the private key instead.",
     "jksNote": "JKS always includes the private key",
     "pkcs12Title": "Export PKCS#12",
     "pkcs12PasswordPrompt": "Enter password for PKCS#12 file",
     "formatHybridBundleDesc": "ZIP with both certificates of the pair",
-    "bundleRelatedHasNoKey": "The related certificate has no private key: the bundle holds the certificates only"
+    "bundleRelatedHasNoKey": "The related certificate has no private key: the bundle holds the certificates only",
+    "previewTitle": "Structure preview ({{format}})",
+    "previewChain": "chain of the issuing CA",
+    "previewRoot": "root CA",
+    "previewKey": "private key",
+    "previewKeyEncrypted": "private key, encrypted with the password",
+    "previewRelated": "related certificate of the hybrid pair"
   },
   "userCertificates": {
     "title": "User Certificates",
@@ -6371,7 +6386,9 @@
       "ca_exempt": "CA exempt",
       "short": "≤ 398 days",
       "moderate": "≤ 825 days",
-      "long": "> 825 days"
+      "long": "> 825 days",
+      "weak": "weak",
+      "critical": "critical"
     }
   },
   "msca": {
@@ -7729,7 +7746,8 @@
       "lifetime_over_days": "Lifetime over (days)",
       "no_key": "No private key",
       "incomplete_chain": "Incomplete chain",
-      "renewal": "Renewal"
+      "renewal": "Renewal",
+      "weak_key": "Compliance"
     },
     "filterValue": {
       "true": "yes",
@@ -7742,7 +7760,8 @@
       "expired": "Expired",
       "revoked": "Revoked",
       "orphan": "Orphan",
-      "archived": "Archived"
+      "archived": "Archived",
+      "weakKey": "Weak key, {{algo}} < {{bits}}"
     },
     "hierarchy": {
       "crlOn": "CRL on",

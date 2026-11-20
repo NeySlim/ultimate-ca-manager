@@ -169,7 +169,7 @@ describe('AccountPage mTLS modal — backend authorization gates', () => {
     fireEvent.click(securityTabs[0])
     await screen.findByText('Account mTLS certificate')
     fireEvent.click(screen.getByLabelText('common.export'))
-    fireEvent.click(screen.getByText('P12 / PKCS#12'))
+    fireEvent.click(screen.getByText('PKCS#12'))
     fireEvent.click(screen.getByText('export.includeRoot'))
     fireEvent.change(screen.getByPlaceholderText('export.passwordLengthHint'), {
       target: { value: 'account-export-password' },
@@ -209,8 +209,8 @@ describe('AccountPage mTLS export of a post-quantum certificate', () => {
     fireEvent.click((await screen.findAllByText('common.security'))[0])
     await screen.findByText('Account mTLS certificate')
     fireEvent.click(screen.getByLabelText('common.export'))
-    expect(screen.getByText('P12 / PKCS#12').closest('button').disabled).toBe(!offered)
-    expect(screen.getByText('JKS').closest('button').disabled).toBe(!offered)
-    expect(screen.getByText('PEM').closest('button')).toBeEnabled()
+    expect(screen.getByText('PKCS#12').closest('label').querySelector('input').disabled).toBe(!offered)
+    expect(screen.getByText('JKS').closest('label').querySelector('input').disabled).toBe(!offered)
+    expect(screen.getByText('PEM').closest('label').querySelector('input')).toBeEnabled()
   })
 })

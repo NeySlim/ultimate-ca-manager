@@ -52,7 +52,7 @@ const row = (keyAlgorithm) => ({
   id: 21, name: 'pq-user@example.test', cert_subject: 'CN=pq-user@example.test', status: 'valid',
   has_private_key: true, key_algorithm: keyAlgorithm, valid_to: '2030-01-01T00:00:00Z',
 })
-const formatButton = (label) => screen.getByText(label).closest('button')
+const formatButton = (label) => screen.getByText(label).closest('label').querySelector('input')
 
 function serve(keyAlgorithm) {
   serviceMocks.getAll.mockResolvedValue({ data: { items: [row(keyAlgorithm)], total: 1 } })
@@ -68,7 +68,7 @@ describe('user certificate with a post-quantum key', () => {
     render(<UserCertificatesPage />)
     fireEvent.click(await screen.findByTitle('common.export'))
     await screen.findByText('PEM')
-    expect(formatButton('P12 / PKCS#12')).toBeDisabled()
+    expect(formatButton('PKCS#12')).toBeDisabled()
     expect(formatButton('JKS')).toBeDisabled()
     expect(formatButton('PEM')).toBeEnabled()
   })

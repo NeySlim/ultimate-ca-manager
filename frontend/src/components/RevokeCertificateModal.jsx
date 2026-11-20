@@ -17,6 +17,7 @@ import { Warning } from '@phosphor-icons/react'
 import { Modal } from './Modal'
 import { Button } from './Button'
 import { certificatesService } from '../services'
+import './certificateDialogs.css'
 
 export const REVOCATION_REASONS = [
   'unspecified',
@@ -65,8 +66,11 @@ export function RevokeCertificateModal({ open, onClose, onConfirm, certificate, 
 
   const name = certificate?.name || certificate?.common_name || certificate?.cn || certificate?.descr || ''
 
+  // The reason's hint and what the choice commits to, in one muted note as the mockup
+  const help = count > 1 ? t('revocation.bulkReasonHelp') : (allowHold ? t('revocation.reasonHelp') : t('revocation.reasonHelpNoHold'))
+
   return (
-    <Modal open={open} onClose={onClose} title={title || t('revocation.title')} size="sm">
+    <Modal open={open} onClose={onClose} title={title || t('revocation.dialogTitle')} size="sm" className="ui-revoke-dialog">
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -74,59 +78,48 @@ export function RevokeCertificateModal({ open, onClose, onConfirm, certificate, 
           if (hasRelated) onConfirm(reason, { revokeRelated })
           else onConfirm(reason)
         }}
-        className="p-4 space-y-4"
         data-testid="revoke-form"
       >
-        <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-bg-secondary text-sm text-text-secondary">
-          <Warning size={16} className="mt-0.5 shrink-0 text-status-warning" />
-          <div className="space-y-1">
-            {name && <div className="font-medium text-text-primary truncate">{name}</div>}
-            <div>{warning || t('certificates.revokeWarning')}</div>
-            {certificate?.source === 'msca' && <div>{t('certificates.revokeMscaWarning')}</div>}
+        <div className="ui-notice is-warn">
+          <Warning size={14} aria-hidden="true" />
+          <div className="ui-notice-body">
+            <p>{warning || t('revocation.notice')}</p>
+            {certificate?.source === 'msca' && <p>{t('certificates.revokeMscaWarning')}</p>}
           </div>
         </div>
+        {name && <p className="ui-revoke-name">{name}</p>}
 
-        <div className="space-y-1.5">
-          <label htmlFor="revoke-reason" className="text-xs font-medium text-text-secondary uppercase tracking-wide">
-            {t('revocation.reasonLabel')}
-          </label>
+        <div className="ui-field">
+          <label htmlFor="revoke-reason" className="ui-label">{t('revocation.reason')}</label>
           <select
             id="revoke-reason"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-border bg-bg-primary text-sm text-text-primary"
+            className="ui-control"
             data-testid="revoke-reason"
           >
             {REVOCATION_REASONS.filter(r => allowHold || r !== 'certificateHold').map(r => (
               <option key={r} value={r}>{t(`revocation.reasons.${r}`)}</option>
             ))}
           </select>
-          <p className="text-xs text-text-tertiary">{t(`revocation.hints.${reason}`)}</p>
-          <p className="text-xs text-text-tertiary">
-            {count > 1 ? t('revocation.bulkReasonHelp') : (allowHold ? t('revocation.reasonHelp') : t('revocation.reasonHelpNoHold'))}
-          </p>
         </div>
+        <p className="ui-revoke-note">
+          <span>{t(`revocation.hints.${reason}`)}</span> <span>{help}</span>
+        </p>
 
         {/* Other member of a hybrid pair (RFC 9763): revoked too unless unchecked */}
         {hasRelated && (
-          <div className="flex items-start gap-2.5">
-            <input
-              type="checkbox"
-              id="revoke-related"
-              checked={revokeRelated}
-              onChange={(e) => setRevokeRelated(e.target.checked)}
-              className="w-4 h-4 mt-0.5 rounded accent-accent-primary"
-            />
-            <div>
-              <label htmlFor="revoke-related" className="text-sm text-text-primary cursor-pointer">
-                {t('revocation.revokeRelated')}
-              </label>
-              <p className="text-xs text-text-tertiary">{t('revocation.revokeRelatedHint')}</p>
-            </div>
-          </div>
+          <label className="ui-check-line has-desc" htmlFor="revoke-related">
+            <input type="checkbox" id="revoke-related" checked={revokeRelated} onChange={(e) => setRevokeRelated(e.target.checked)}
+              aria-labelledby="revoke-related-label" aria-describedby="revoke-related-hint" />
+            <span className="ui-check-text">
+              <span id="revoke-related-label">{t('revocation.revokeRelated')}</span>
+              <small id="revoke-related-hint">{t('revocation.revokeRelatedHint')}</small>
+            </span>
+          </label>
         )}
 
-        <div className="flex justify-end gap-2 pt-2 border-t border-border">
+        <div className="ui-dialog-actions">
           <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
             {t('common.cancel')}
           </Button>

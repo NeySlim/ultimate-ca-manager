@@ -106,7 +106,8 @@ export function InspectorProvider({ children }) {
     else if (next.length && (key === activeRef.current || focusInDock)) setFocusToken((n) => n + 1)
   }, [])
 
-  const closeAll = useCallback(() => {
+  // refocus: Escape and the close button always give the focus back to the opener, as the mockup
+  const closeAll = useCallback(({ refocus = false } = {}) => {
     // The opener of the active object, else the latest one still in the page, gets the focus back
     const cands = [origins.current.get(activeRef.current), ...[...origins.current.values()].reverse()]
     const origin = cands.find((o) => o?.isConnected)
@@ -116,7 +117,7 @@ export function InspectorProvider({ children }) {
     const focused = document.activeElement
     const free = !focused || focused === document.body || !focused.isConnected
       || !!focused.closest?.('[data-testid="inspector-dock"]')
-    if (origin && free) queueMicrotask(() => origin.focus())
+    if (origin && (free || refocus)) queueMicrotask(() => origin.focus())
     openedRef.current = []
     setOpened([])
     setActiveKey(null)

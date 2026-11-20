@@ -49,6 +49,9 @@ function normalizeCertificate(cert) {
   }
 }
 
+// One chip for the two filters of the weak-key link
+const WEAK_KEY = 'weak_key'
+
 export default function CertificatesPage() {
   const { t } = useTranslation()
   const { id: urlCertId } = useParams()
@@ -103,14 +106,26 @@ export default function CertificatesPage() {
   const overviewChips = useMemo(() => {
     const byKey = {}
     for (const [key, value] of urlFilters) (byKey[key] = byKey[key] || []).push(value)
-    return Object.entries(byKey).map(([key, value]) => ({
+    const chips = Object.entries(byKey).map(([key, value]) => ({
       key, value, label: t(`overview.filter.${key}`),
       optionLabels: Object.fromEntries(value.map((v) => [v, t(`overview.filterValue.${v}`, { defaultValue: v })])),
     }))
+    // The weak-key link of the compliance card reads as one chip, « Conformité : Clé faible, RSA < 3072 »
+    if (!byKey.key_algo_prefix || !byKey.key_bits_below) return chips
+    const [algo] = byKey.key_algo_prefix
+    const [bits] = byKey.key_bits_below
+    const weak = { key: WEAK_KEY, value: 'on', label: t('overview.filter.weak_key'), optionLabels: { on: t('overview.filterValue.weakKey', { algo, bits }) } }
+    const at = chips.findIndex((c) => c.key === 'key_algo_prefix' || c.key === 'key_bits_below')
+    const rest = chips.filter((c) => c.key !== 'key_algo_prefix' && c.key !== 'key_bits_below')
+    rest.splice(at, 0, weak)
+    return rest
   }, [urlFilters, t])
   const removeUrlFilter = useCallback((key, value) => {
     setPage(1)
-    navigate({ pathname: location.pathname, search: withoutFilter(location.search, key, value) }, { replace: true })
+    const search = key === WEAK_KEY
+      ? withoutFilter(withoutFilter(location.search, 'key_algo_prefix'), 'key_bits_below')
+      : withoutFilter(location.search, key, value)
+    navigate({ pathname: location.pathname, search }, { replace: true })
   }, [location.pathname, location.search, navigate])
   // An overview link shows exactly what its counter counts: the saved filters step aside
   // while it is open, unapplied but kept in storage, and return once its filters are gone
@@ -611,6 +626,7 @@ export default function CertificatesPage() {
           multiSelect
           selectedIds={selectedIds}
           onSelectionChange={setSelectedIds}
+          selectionLabel={(count) => t('certificates.selectedOnPage', { count })}
           bulkActions={
             <>
               <ListButton

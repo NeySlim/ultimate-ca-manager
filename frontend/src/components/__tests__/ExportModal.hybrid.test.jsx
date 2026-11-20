@@ -37,7 +37,7 @@ const submit = () => fireEvent.submit(screen.getByText('PEM').closest('form'))
 describe('ExportModal hybrid bundle', () => {
   it('offers the bundle for a pair member and sends hybrid-bundle', async () => {
     const onExport = renderModal({ relatedCertificateId: 12, keyAlgorithm: 'EC-P256' })
-    fireEvent.click(screen.getByText(bundleLabel).closest('button'))
+    fireEvent.click(screen.getByText(bundleLabel).closest('label').querySelector('input'))
     submit()
     await waitFor(() => expect(onExport).toHaveBeenCalledTimes(1))
     expect(onExport.mock.calls[0][0]).toBe('hybrid-bundle')
@@ -46,13 +46,13 @@ describe('ExportModal hybrid bundle', () => {
 
   it('stays available on the ML-DSA member', () => {
     renderModal({ relatedCertificateId: 11, keyAlgorithm: 'ML-DSA-65' })
-    expect(screen.getByText(bundleLabel).closest('button')).toBeEnabled()
+    expect(screen.getByText(bundleLabel).closest('label').querySelector('input')).toBeEnabled()
   })
 
   it('carries both keys only when the operator may export keys', async () => {
     related.getById.mockResolvedValue({ data: { id: 12, has_private_key: true } })
     const onExport = renderModal({ relatedCertificateId: 12, hasPrivateKey: true, canExportKey: true })
-    fireEvent.click(screen.getByText(bundleLabel).closest('button'))
+    fireEvent.click(screen.getByText(bundleLabel).closest('label').querySelector('input'))
     fireEvent.click((await screen.findByText(en.export.includeKey)).closest('label').querySelector('input'))
     submit()
     await waitFor(() => expect(onExport).toHaveBeenCalledTimes(1))
@@ -64,7 +64,7 @@ describe('ExportModal hybrid bundle', () => {
     const onExport = renderModal({ relatedCertificateId: 12, hasPrivateKey: true, canExportKey: true })
     expect(screen.getByText(en.export.includeKey)).toBeInTheDocument()
     fireEvent.click(screen.getByText(en.export.includeKey).closest('label').querySelector('input'))
-    fireEvent.click(screen.getByText(bundleLabel).closest('button'))
+    fireEvent.click(screen.getByText(bundleLabel).closest('label').querySelector('input'))
     await waitFor(() => expect(related.getById).toHaveBeenCalledWith(12))
     expect(await screen.findByText(en.export.bundleRelatedHasNoKey)).toBeInTheDocument()
     expect(screen.queryByText(en.export.includeKey)).toBeNull()
@@ -76,7 +76,7 @@ describe('ExportModal hybrid bundle', () => {
   it('keeps the key option when the related certificate cannot be read: the server decides', async () => {
     related.getById.mockRejectedValue(new Error('403'))
     const onExport = renderModal({ relatedCertificateId: 12, hasPrivateKey: true, canExportKey: true })
-    fireEvent.click(screen.getByText(bundleLabel).closest('button'))
+    fireEvent.click(screen.getByText(bundleLabel).closest('label').querySelector('input'))
     await waitFor(() => expect(related.getById).toHaveBeenCalledWith(12))
     fireEvent.click((await screen.findByText(en.export.includeKey)).closest('label').querySelector('input'))
     expect(screen.queryByText(en.export.bundleRelatedHasNoKey)).toBeNull()
@@ -88,7 +88,7 @@ describe('ExportModal hybrid bundle', () => {
   it('promises no CA chain the bundle does not carry', async () => {
     const onExport = renderModal({ relatedCertificateId: 12 })
     expect(screen.getByText(en.export.includeChain)).toBeInTheDocument()
-    fireEvent.click(screen.getByText(bundleLabel).closest('button'))
+    fireEvent.click(screen.getByText(bundleLabel).closest('label').querySelector('input'))
     expect(screen.queryByText(en.export.includeChain)).toBeNull()
     submit()
     await waitFor(() => expect(onExport).toHaveBeenCalledTimes(1))
