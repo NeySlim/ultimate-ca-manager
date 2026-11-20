@@ -49,6 +49,10 @@ Un administrateur examine la demande et l'approuve. Avec le double contrôle act
 ### 3. Téléchargement
 Une fois approuvée, la clé archivée est délivrée sous forme d'archive **PKCS#12 protégée par mot de passe**. Le téléchargement est consigné dans la piste d'audit.
 
+## La file
+
+La page donne les demandes **à approuver** (avec le double contrôle, **à approuver par un autre administrateur**), puis les clés **à récupérer** ; les demandes closes (récupérées, rejetées, annulées) sont repliées sous **Traitées récemment**. Une ligne n'offre que ce que le serveur accepterait de vous : **Approuver…** et **Refuser…** avec admin:key_recovery, jamais l'approbation de votre propre demande tant que le double contrôle est actif ; **Récupérer…** pour le demandeur ou un administrateur de la récupération de clés. Plusieurs demandes peuvent être approuvées ou refusées ensemble : chacune est traitée à son tour et le bilan les reprend une par une. Le nom d'un certificat ouvre la demande dans l'inspecteur, avec ses sections **Demande** et **Journal**.
+
 ## Prérequis
 
 - **Clé archivée** : la clé privée du certificat doit être présente dans la base de données. Les certificats dont la clé n'a jamais été archivée ne peuvent pas être récupérés.

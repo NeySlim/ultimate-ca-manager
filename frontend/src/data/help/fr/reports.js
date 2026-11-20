@@ -18,7 +18,7 @@ export default {
       {
         title: 'Rapport PDF exécutif',
         items: [
-          { label: 'Télécharger PDF', text: 'Rapport PDF professionnel en un clic pour la direction et les auditeurs' },
+          { label: 'Télécharger', text: 'Chaque modèle PDF est un rapport de la page : Télécharger le génère ; Composer un PDF… en assemble un à partir des sections choisies' },
           { label: 'Contenu', text: 'Résumé exécutif, évaluation des risques, inventaire des certificats, scores de conformité, infrastructure AC, activité d\'audit et recommandations' },
           { label: 'Graphiques et visuels', text: 'Inclut jauge de risque, distribution des statuts, chronologie d\'expiration et répartition de la conformité' },
         ]
@@ -26,7 +26,7 @@ export default {
       {
         title: 'Programmation',
         items: [
-          { label: 'Onglet Planification', text: 'Cochez n\'importe quel rapport de données ou modèle PDF, puis réglez sa fréquence (quotidienne, hebdomadaire ou mensuelle), son heure (UTC), son format et ses destinataires' },
+          { label: 'Planifier un rapport', text: 'Choisissez n\'importe quel rapport de données ou modèle PDF, puis sa fréquence (quotidienne, hebdomadaire ou mensuelle), son heure (UTC), son format et ses destinataires ; les rapports planifiés sont groupés par prochaine exécution' },
           { label: 'Pièce jointe', text: 'Le rapport est joint à l\'e-mail dans son format : CSV ou JSON pour les rapports de données, PDF pour les modèles PDF' },
         ]
       },
@@ -66,7 +66,7 @@ Certificats révoqués sur la période choisie (30 jours par défaut), avec la d
 
 ## Rapport PDF exécutif
 
-Ouvrez l'onglet **Rapports PDF** et cliquez sur **Télécharger PDF** sur le modèle **Résumé exécutif** pour générer un rapport exécutif professionnel adapté aux revues de direction, présentations et audits de conformité.
+Le modèle **Résumé exécutif** est l'un des rapports de la page : son bouton **Télécharger** génère le PDF, adapté aux revues de direction, présentations et audits de conformité. **Composer un PDF…** dans l'en-tête de la page en assemble un à partir des sections choisies.
 
 ### Contenu
 Le rapport PDF comprend 9 sections :
@@ -85,18 +85,20 @@ Le rapport inclut des éléments visuels : barre de jauge de risque, distributio
 
 > 💡 Le rapport PDF est généré à partir des données en direct. Téléchargez-le avant les réunions pour l'instantané le plus récent.
 
-## Générer des rapports
+## La file
 
-1. Trouvez le rapport souhaité dans la liste
-2. Cliquez sur **▶ Générer** pour créer un aperçu
-3. L'aperçu apparaît ci-dessous sous forme de tableau formaté
-4. Cliquez sur **Fermer** pour fermer l'aperçu
+Les rapports planifiés sont groupés par prochaine exécution : **Prochaine exécution sous 24 h**, puis **Planifiés**. Une ligne donne le rapport, sa fréquence et son heure UTC dans une pastille, son format et ses destinataires, et la prochaine exécution en forme courte au-dessus de sa date exacte. Les rapports sans planification sont repliés sous **Non planifiés**, chacun avec **Télécharger** et **Planifier…**.
+
+## Consulter un rapport
+
+Le nom d'un rapport l'ouvre dans l'inspecteur :
+- **Rapport** : sa planification et, pour un rapport de données, **Calculer** pour le chiffre actuel ; l'inventaire, les certificats expirants et les certificats révoqués offrent **Voir ces certificats**
+- **Exécutions** : le serveur ne fournit pas d'historique des exécutions ; la planification et la prochaine exécution sont ce qui est connu
+- **Aperçu** : **Générer** produit le rapport maintenant et montre ses lignes (les 200 premières ; le téléchargement les contient toutes)
 
 ## Télécharger des rapports
 
-Chaque ligne de rapport a des boutons de téléchargement :
-- **CSV** : Format tableur pour Excel, Google Sheets ou LibreOffice
-- **JSON** : Données structurées pour l'automatisation et l'intégration
+**Télécharger** sur une ligne, ou dans l'inspecteur, génère le rapport maintenant dans le format de sa planification : CSV par défaut, JSON s'il est choisi, PDF pour un modèle. Cocher plusieurs lignes les télécharge l'une après l'autre, et le bilan dit lesquelles ont échoué.
 
 > 💡 Les rapports CSV sont plus faciles pour les parties prenantes non techniques. JSON est mieux adapté pour les scripts et les intégrations API.
 
@@ -109,16 +111,15 @@ Chaque rapport de données et chaque modèle PDF peut être planifié, avec sa p
 **Quotidienne**, **Hebdomadaire** (choisissez le jour de la semaine) ou **Mensuelle** (choisissez le jour du mois), à une heure donnée en UTC.
 
 ### Configuration
-1. Ouvrez l'onglet **Planification**
-2. Cochez les rapports que vous souhaitez planifier
-3. Réglez la fréquence, l'heure et, pour les rapports de données, le format (CSV ou JSON)
-4. Ajoutez les adresses e-mail des destinataires (appuyez sur Entrée ou cliquez sur Ajouter)
-5. Cliquez sur Enregistrer
+1. Cliquez sur **Planifier un rapport**, ou sur **Planifier…** sur un rapport replié sous **Non planifiés**
+2. Choisissez le contenu, la fréquence et son jour, l'heure d'envoi (UTC) et, pour un rapport de données, le format (CSV ou JSON)
+3. Indiquez un ou plusieurs destinataires, séparés par des virgules : sans destinataire, rien n'est envoyé
+4. Cliquez sur **Planifier**
 
-Chaque rapport programmé est joint à l'e-mail dans son format : CSV ou JSON pour les rapports de données, PDF pour les modèles PDF.
+Chaque rapport programmé est joint à l'e-mail dans son format : CSV ou JSON pour les rapports de données, PDF pour les modèles PDF. **Modifier la planification…** et **Suspendre la planification** sont dans le menu « ⋯ » de l'inspecteur ; cocher plusieurs lignes les suspend ensemble, en une seule mise à jour.
 
 ### Envoi test
-Avant d'activer les programmations, utilisez le bouton ✈️ sur n'importe quelle ligne de rapport pour envoyer un rapport test à une adresse e-mail spécifique. Cela vérifie que SMTP est correctement configuré et que le format du rapport répond à vos besoins.
+Avant de compter sur une planification, utilisez **Envoyer un test…** dans le menu « ⋯ » de l'inspecteur d'un rapport pour l'envoyer à une adresse e-mail. Cela vérifie que SMTP est correctement configuré et que le format du rapport répond à vos besoins.
 
 > ⚠ Les rapports programmés nécessitent que SMTP soit configuré dans **Paramètres → E-mail**. L'envoi test échouera si SMTP n'est pas configuré.
 

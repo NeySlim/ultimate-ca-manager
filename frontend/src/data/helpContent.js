@@ -1872,7 +1872,7 @@ export const helpContent = {
         title: 'Executive PDF Report',
         icon: FilePdf,
         items: [
-          { label: 'Download PDF', text: 'One-click professional PDF report for management and auditors' },
+          { label: 'Download', text: 'Each PDF template is a report of the page: Download generates it; Build a PDF… composes one from chosen sections' },
           { label: 'Contents', text: 'Executive summary, risk assessment, certificate inventory, compliance scores, CA infrastructure, audit activity, and recommendations' },
           { label: 'Charts & Visuals', text: 'Includes risk gauge, status distribution, expiration timeline, and compliance breakdown' },
         ]
@@ -1881,7 +1881,7 @@ export const helpContent = {
         title: 'Scheduling',
         icon: CalendarBlank,
         items: [
-          { label: 'Schedule tab', text: 'Tick any data report or PDF template, then set its frequency (daily, weekly or monthly), time (UTC), format and recipients' },
+          { label: 'Schedule a report', text: 'Choose any data report or PDF template, then its frequency (daily, weekly or monthly), time (UTC), format and recipients; the scheduled reports are grouped by next run' },
           { label: 'Attachment', text: 'The report is attached to the email in its format: CSV or JSON for data reports, PDF for the PDF templates' },
         ]
       },
