@@ -81,10 +81,11 @@ import { autoRenewalWaitingMessage } from '../lib/autoRenewalWaiting'
 import { secretRequiredForTarget, smtpSecretTargets } from '../lib/secretTarget'
 import {
   FormLayout, SectionToc, SectionJump, FormSection, SaveBar, SavePartsContext,
-  useSavePartsRegistry, changedKeys, useUnloadGuard, sectionDomId, sectionTitleId, keepDraft, readDraft,
+  useSavePartsRegistry, changedKeys, useUnloadGuard, sectionDomId, sectionTitleId, focusSectionTitle, keepDraft, readDraft,
 } from '../components/sectioned'
 import SettingsHistory from './settings/SettingsHistory'
 import { fieldProblems, fieldSection } from './settings/fieldChecks'
+import { changedLabels } from './settings/fieldLabels'
 
 // Sections: label, sentence of the frame, icon; `permission` hides one from other roles
 const BASE_SETTINGS_CATEGORIES = [
@@ -123,6 +124,9 @@ const SETTINGS_GROUPS = [
 
 // Audit actions a save of these sections writes (resource_type settings)
 const SETTINGS_SAVE_ACTIONS = ['settings_update', 'syslog_config_updated', 'mtls_settings_update', 'ct_settings_updated']
+
+// Type of the HTTPS certificate the server names, in the reader's language
+const HTTPS_TYPES = { 'CA-Signed': 'settings.httpsType.caSigned', 'Self-Signed': 'settings.httpsType.selfSigned' }
 
 // Draft of the page kept for the tab (components/sectioned/draftMemory)
 const SETTINGS_DRAFT = 'settings'
@@ -249,11 +253,11 @@ export default function SettingsPage() {
   }, [searchParams])
 
   // Every section is on the page: a jump scrolls to its frame and gives its title the focus
-  const jumpToSection = useCallback((categoryId) => {
+  const jumpToSection = useCallback((categoryId, options) => {
     const frame = document.getElementById(sectionDomId(categoryId))
     if (!frame) return
     frame.scrollIntoView?.({ block: 'start' })
-    document.getElementById(sectionTitleId(categoryId))?.focus({ preventScroll: true })
+    focusSectionTitle(categoryId, options)
   }, [])
 
   // Update URL when category changes
@@ -272,7 +276,7 @@ export default function SettingsPage() {
   const tabParam = searchParams.get('tab')
   useEffect(() => {
     if (loading || !tabParam) return undefined
-    jumpToSection(tabParam)
+    jumpToSection(tabParam, { quiet: true })
     // Sections above still load and grow: the frame is held in place until the user moves
     const form = document.querySelector('.sf-form')
     if (!form || typeof ResizeObserver === 'undefined') return undefined
@@ -692,7 +696,7 @@ export default function SettingsPage() {
       setDbStats({
         certificates: stats.counts?.certificates || 0,
         cas: stats.counts?.cas || 0,
-        size: stats.size_mb ? `${stats.size_mb} MB` : '-',
+        size_mb: stats.size_mb || null,
         last_optimized: stats.last_vacuum || null
       })
     } catch (error) { reportSilentFailure('loadDbStats', error) }
@@ -1866,6 +1870,18 @@ export default function SettingsPage() {
   ].filter((part) => part.count > 0)
   const pendingCount = allParts.reduce((sum, part) => sum + part.count, 0)
   const pendingSections = [...new Set(allParts.map((part) => part.section))]
+  // Each changed field with its section, for the save bar to name it
+  const changedOf = (prefix, now, saved, keys) => changedKeys(now, saved, keys).map((k) => `${prefix}.${k}`)
+  const pendingFields = [
+    ...bulkChanged.map((key) => ({ key, section: keyOrigin.current[key] || 'general' })),
+    ...emailChanged.map((key) => ({ key, section: 'email' })),
+    ...changedOf('expiry', expiryAlerts, savedExpiryAlerts, Object.keys({ ...savedExpiryAlerts, ...expiryAlerts })).map((key) => ({ key, section: 'email' })),
+    ...changedOf('syslog', syslogConfig, savedSyslog, Object.keys({ ...savedSyslog, ...syslogConfig })).map((key) => ({ key, section: 'audit' })),
+    ...changedOf('mtls', mtlsSettings, savedMtls, MTLS_KEYS).map((key) => ({ key, section: 'security' })),
+    ...changedOf('ct', ctSettings, savedCt, Object.keys({ ...savedCt, ...ctSettings })).map((key) => ({ key, section: 'ct' })),
+    ...changedOf('ar', arSettings, savedAr, Object.keys({ ...savedAr, ...arSettings })).map((key) => ({ key, section: 'autoRenewal' })),
+    ...parts.list.filter((part) => part.count > 0).map((part) => ({ key: part.key, section: part.section })),
+  ]
 
   const resetAll = () => {
     setSettings((prev) => ({ ...savedSettings, _testRecipient: prev._testRecipient }))
@@ -1881,11 +1897,16 @@ export default function SettingsPage() {
   const saveAll = async () => {
     if (!pendingCount || savingAll) return
     const syslogChanged = changedKeys(syslogConfig, savedSyslog, Object.keys({ ...savedSyslog, ...syslogConfig }))
-    const problems = fieldProblems({ settings, syslog: syslogConfig },
-      [...bulkChanged, ...emailChanged, ...syslogChanged.map((k) => `syslog.${k}`)])
+    const arChanged = changedKeys(arSettings, savedAr, Object.keys({ ...savedAr, ...arSettings }))
+    // A changed syslog part checks its server and port together: turning it on needs both
+    const problems = fieldProblems({ settings, syslog: syslogConfig, ar: arSettings }, [
+      ...bulkChanged, ...emailChanged,
+      ...(syslogChanged.length ? ['syslog.host', 'syslog.port'] : []),
+      ...arChanged.map((k) => `ar.${k}`),
+    ])
     const bad = Object.keys(problems)
     if (bad.length) {
-      setFieldErrors(Object.fromEntries(bad.map((k) => [k, t(problems[k])])))
+      setFieldErrors(Object.fromEntries(bad.map((k) => [k, t(problems[k].key, problems[k].values)])))
       setAnnounce(t('sectioned.fieldsToCorrect', { count: bad.length }))
       setInvalidFocus((n) => n + 1)
       return
@@ -2022,6 +2043,7 @@ export default function SettingsPage() {
         return (
           <SecuritySection
             settings={settings}
+            fieldErrors={fieldErrors}
             updateSetting={updateSettingFrom('security')}
             handleSave={handleSave}
             saving={saving}
@@ -2065,6 +2087,7 @@ export default function SettingsPage() {
         return (
           <BackupSection
             settings={settings}
+            fieldErrors={fieldErrors}
             updateSetting={updateSettingFrom('backup')}
             handleSave={handleSave}
             saving={saving}
@@ -2176,7 +2199,8 @@ export default function SettingsPage() {
         return (
           <AutoRenewalSection
             arSettings={arSettings}
-            setArSettings={setArSettings}
+            setArSettings={(next) => { clearFieldError('ar.days_before_expiry'); setArSettings(next) }}
+            fieldErrors={fieldErrors}
             arLoading={arLoading}
             arSaving={arSaving}
             arRunning={arRunning}
@@ -2275,7 +2299,7 @@ export default function SettingsPage() {
   const sectionAside = {
     https: httpsInfo?.type ? (
       <Badge variant={httpsInfo.type === 'CA-Signed' ? 'success' : httpsInfo.type === 'Self-Signed' ? 'warning' : 'secondary'}>
-        {httpsInfo.type}
+        {HTTPS_TYPES[httpsInfo.type] ? t(HTTPS_TYPES[httpsInfo.type]) : httpsInfo.type}
       </Badge>
     ) : null,
     microsoftCA: <ExperimentalBadge />,
@@ -2324,6 +2348,7 @@ export default function SettingsPage() {
                   ref={saveState}
                   count={pendingCount}
                   sectionLabels={pendingSections.map(sectionLabel)}
+                  fieldLabels={changedLabels(pendingFields, t, sectionLabel)}
                   failed={pendingCount ? Object.keys(sectionErrors).map(sectionLabel) : []}
                   lastSaved={lastSave ? { at: formatDate(lastSave.timestamp, { time: true }), by: lastSave.username } : null}
                   saving={savingAll}
@@ -2348,7 +2373,7 @@ export default function SettingsPage() {
           <div className="space-y-4" data-testid="backup-job">
             <p className="text-sm text-text-primary">{backupProgress}</p>
             <p className="text-sm text-text-secondary">{t('settings.backupRunsInBackground')}</p>
-            <div className="flex gap-3 justify-end pt-4">
+            <div className="ui-dialog-actions">
               <Button type="button" variant="secondary" onClick={closeBackupModal}>
                 {t('common.close')}
               </Button>
@@ -2361,7 +2386,7 @@ export default function SettingsPage() {
         ) : backupReady ? (
           <div className="space-y-4" data-testid="backup-ready">
             <p className="text-sm text-text-primary">{t('settings.backupReady', { filename: backupReady.filename })}</p>
-            <div className="flex gap-3 justify-end pt-4">
+            <div className="ui-dialog-actions">
               <Button type="button" variant="secondary" onClick={closeBackupModal}>
                 {t('common.close')}
               </Button>
@@ -2387,7 +2412,7 @@ export default function SettingsPage() {
             autoFocus
             showStrength
           />
-          <div className="flex gap-3 justify-end pt-4">
+          <div className="ui-dialog-actions">
             <Button type="button" variant="secondary" onClick={closeBackupModal}>
               {t('common.cancel')}
             </Button>
@@ -2415,7 +2440,7 @@ export default function SettingsPage() {
         {restoreJob.signInNeeded ? (
           <div className="space-y-4" data-testid="restore-sign-in">
             <p className="text-sm text-text-primary" role="status">{t('settings.restoreSignInAgain')}</p>
-            <div className="flex gap-3 justify-end pt-4">
+            <div className="ui-dialog-actions">
               <Button type="button" autoFocus onClick={() => {
                 // Back to this tab after the sign-in: its report is shown there
                 releaseSignOut(); window.location.href = loginUrl('/settings', '?tab=backup')
@@ -2431,7 +2456,7 @@ export default function SettingsPage() {
               {restoreJobProgress}
             </p>
             <p className="text-sm text-text-secondary">{t('settings.restoreRunsInBackground')}</p>
-            <div className="flex gap-3 justify-end pt-4">
+            <div className="ui-dialog-actions">
               <Button type="button" variant="secondary" onClick={() => setShowRestoreModal(false)}>
                 {t('common.close')}
               </Button>
@@ -2466,7 +2491,7 @@ export default function SettingsPage() {
             placeholder={t('settings.enterBackupPassword')}
             autoFocus
           />
-          <div className="flex gap-3 justify-end pt-4">
+          <div className="ui-dialog-actions">
             <Button type="button" variant="secondary" onClick={() => { setShowRestoreModal(false); setRestorePassword(''); setRestoreFile(null) }}>
               {t('common.cancel')}
             </Button>

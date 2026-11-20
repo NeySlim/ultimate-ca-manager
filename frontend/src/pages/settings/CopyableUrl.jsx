@@ -4,6 +4,7 @@ import { Button } from '../../components'
 import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks/useClipboard'
 
+// One row of the mockup's record list: the name, the URL and its description under it, copy on the right
 export default function CopyableUrl({ label, value, description }) {
   const { showInfo } = useNotification()
   const { t } = useTranslation()
@@ -14,13 +15,15 @@ export default function CopyableUrl({ label, value, description }) {
     if (await copy(value)) showInfo(t('common.copiedToClipboard'))
   }
   return (
-    <div className="p-3 bg-bg-tertiary rounded-lg">
-      <p className="text-xs text-text-secondary mb-1">{label}</p>
-      {description && <p className="text-xs text-text-tertiary mb-1.5">{description}</p>}
-      <div className="flex items-center gap-2">
-        <code className="text-sm font-mono text-text-primary flex-1 break-all select-all">{value}</code>
-        <Button size="sm" variant="ghost" onClick={handleCopy} type="button" title={t('common.copy')} aria-label={t('common.copy')}>
-          <Copy size={14} />
+    <div className="sf-copy">
+      <div className="sf-record-main">
+        <strong>{label}</strong>
+        <span className="sf-copy-value">{value}</span>
+        {description && <span className="sf-record-meta">{description}</span>}
+      </div>
+      <div className="sf-record-actions">
+        <Button variant="secondary" onClick={handleCopy} type="button" title={t('common.copy')} aria-label={t('common.copy')}>
+          <Copy size={16} />
         </Button>
       </div>
     </div>

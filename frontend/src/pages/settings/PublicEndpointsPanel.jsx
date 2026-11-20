@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MagnifyingGlass, CheckCircle, XCircle, WarningCircle } from '@phosphor-icons/react'
 import { Button, Badge } from '../../components'
+import { HelpCard } from '../../components/HelpCard'
 import { useNotification } from '../../contexts'
 import { settingsService } from '../../services'
 import CopyableUrl from './CopyableUrl'
@@ -91,108 +92,109 @@ export default function PublicEndpointsPanel({ settings, updateSetting, refreshK
   const eff = effective || {}
 
   return (
-    <FormGroup title={t('settings.publicEndpoints.title')}>
-      <p className="text-sm text-text-secondary mb-4">{t('settings.publicEndpoints.subtitle')}</p>
-
-      <div className="flex flex-wrap gap-2 mb-4">
-        <Button type="button" variant="secondary" size="sm" onClick={detectFromBrowser} disabled={adminLocked}>
-          {t('settings.publicEndpoints.detectFromBrowser')}
-        </Button>
-        <Button type="button" variant="secondary" size="sm" onClick={runPreflight} disabled={checking}>
-          <MagnifyingGlass size={14} />
-          {checking ? t('common.loading') : t('settings.publicEndpoints.runPreflight')}
-        </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={loadEffective} disabled={loading}>
-          {t('settings.publicEndpoints.refresh')}
-        </Button>
-      </div>
-
-      {eff.env_locked?.fqdn_env && (
-        <p className="text-xs text-status-warning mb-3 flex items-center gap-1">
-          <WarningCircle size={14} />
-          {t('settings.publicEndpoints.fqdnEnvLocked')}
-        </p>
-      )}
-
-      {eff.host_role_ok === false && (
-        <p className="text-xs text-status-warning mb-3 flex items-center gap-1">
-          <WarningCircle size={14} />
-          {t('settings.publicEndpoints.wrongHost', { host: eff.request_host, admin: eff.admin?.host })}
-        </p>
-      )}
-
-      <div className="space-y-3 mb-4">
-        {eff.admin?.canonical_origin && (
-          <CopyableUrl
-            label={t('settings.publicEndpoints.adminCanonical')}
-            value={eff.admin.canonical_origin}
-            description={t('settings.publicEndpoints.adminCanonicalDesc')}
-          />
-        )}
-        {eff.protocol?.effective_url && (
-          <CopyableUrl
-            label={t('settings.publicEndpoints.protocolEffective')}
-            value={eff.protocol.effective_url}
-            description={t('settings.publicEndpoints.protocolEffectiveDesc')}
-          />
-        )}
-        {eff.acme?.directory_url && (
-          <CopyableUrl
-            label={t('settings.publicEndpoints.acmeDirectory')}
-            value={eff.acme.directory_url}
-          />
-        )}
-        {eff.acme?.proxy_url && (
-          <CopyableUrl
-            label={t('settings.publicEndpoints.acmeProxy')}
-            value={eff.acme.proxy_url}
-          />
-        )}
-        {eff.acme?.split_topology && (
-          <Badge variant="info" size="sm">{t('settings.publicEndpoints.splitTopology')}</Badge>
-        )}
-      </div>
-
-      {preflight?.checks?.length > 0 && (
-        <div className="rounded-lg border border-border p-3 space-y-2">
-          <p className="text-xs font-medium text-text-secondary">{t('settings.publicEndpoints.preflightResults')}</p>
-          {preflight.corporate_dns_servers?.length > 0 && (
-            <p className="text-xs text-text-tertiary">
-              {t('settings.publicEndpoints.corporateDnsServers', {
-                servers: preflight.corporate_dns_servers.join(', '),
-              })}
-            </p>
-          )}
-          {preflight.checks.map((c) => (
-            <div key={c.label} className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="font-mono text-text-primary">{c.label}</span>
-              <span className="text-text-tertiary">{c.host || '—'}</span>
-              {c.dns_local != null && c.dns_local !== 'skip' ? (
-                <>
-                  <span className="text-xs text-text-tertiary">{t('settings.publicEndpoints.dnsLocal')}</span>
-                  <StatusBadge status={c.dns_local} />
-                </>
-              ) : null}
-              {c.dns_internal != null && c.dns_internal !== 'skip' ? (
-                <>
-                  <span className="text-xs text-text-tertiary">{t('settings.publicEndpoints.dnsInternal')}</span>
-                  <StatusBadge status={c.dns_internal} />
-                </>
-              ) : null}
-              {c.dns_public != null && c.dns_public !== 'skip' ? (
-                <>
-                  <span className="text-xs text-text-tertiary">{t('settings.publicEndpoints.dnsPublic')}</span>
-                  <StatusBadge status={c.dns_public} />
-                </>
-              ) : (
-                <StatusBadge status={c.dns} />
-              )}
-              {c.tls !== 'skip' && <StatusBadge status={c.tls} />}
-              {c.detail && <span className="text-xs text-text-tertiary truncate max-w-full">{c.detail}</span>}
-            </div>
-          ))}
+    <FormGroup title={t('settings.publicEndpoints.title')} description={t('settings.publicEndpoints.subtitle')}>
+      <div className="sf-stack">
+        <div className="sf-actions-row">
+          <Button type="button" variant="secondary" onClick={detectFromBrowser} disabled={adminLocked}>
+            {t('settings.publicEndpoints.detectFromBrowser')}
+          </Button>
+          <Button type="button" variant="secondary" onClick={runPreflight} disabled={checking}>
+            <MagnifyingGlass size={16} />
+            {checking ? t('common.loading') : t('settings.publicEndpoints.runPreflight')}
+          </Button>
+          <Button type="button" variant="ghost" onClick={loadEffective} disabled={loading}>
+            {t('settings.publicEndpoints.refresh')}
+          </Button>
         </div>
-      )}
+
+        {eff.env_locked?.fqdn_env && (
+          <HelpCard variant="warning">{t('settings.publicEndpoints.fqdnEnvLocked')}</HelpCard>
+        )}
+
+        {eff.host_role_ok === false && (
+          <HelpCard variant="warning">
+            {t('settings.publicEndpoints.wrongHost', { host: eff.request_host, admin: eff.admin?.host })}
+          </HelpCard>
+        )}
+
+        <div>
+          {eff.admin?.canonical_origin && (
+            <CopyableUrl
+              label={t('settings.publicEndpoints.adminCanonical')}
+              value={eff.admin.canonical_origin}
+              description={t('settings.publicEndpoints.adminCanonicalDesc')}
+            />
+          )}
+          {eff.protocol?.effective_url && (
+            <CopyableUrl
+              label={t('settings.publicEndpoints.protocolEffective')}
+              value={eff.protocol.effective_url}
+              description={t('settings.publicEndpoints.protocolEffectiveDesc')}
+            />
+          )}
+          {eff.acme?.directory_url && (
+            <CopyableUrl
+              label={t('settings.publicEndpoints.acmeDirectory')}
+              value={eff.acme.directory_url}
+            />
+          )}
+          {eff.acme?.proxy_url && (
+            <CopyableUrl
+              label={t('settings.publicEndpoints.acmeProxy')}
+              value={eff.acme.proxy_url}
+            />
+          )}
+        </div>
+        {eff.acme?.split_topology && (
+          <p className="sf-hint"><Badge variant="info" size="sm">{t('settings.publicEndpoints.splitTopology')}</Badge></p>
+        )}
+
+        {preflight?.checks?.length > 0 && (
+          <div>
+            <h4>{t('settings.publicEndpoints.preflightResults')}</h4>
+            {preflight.corporate_dns_servers?.length > 0 && (
+              <p className="sf-hint">
+                {t('settings.publicEndpoints.corporateDnsServers', {
+                  servers: preflight.corporate_dns_servers.join(', '),
+                })}
+              </p>
+            )}
+            <ul className="sf-records">
+              {preflight.checks.map((c) => (
+                <li key={c.label}>
+                  <div className="sf-record-main">
+                    <strong>{c.label}</strong>
+                    <span className="sf-record-meta">{[c.host || '—', c.detail].filter(Boolean).join(' · ')}</span>
+                  </div>
+                  <div className="sf-record-actions">
+                    {c.dns_local != null && c.dns_local !== 'skip' ? (
+                      <>
+                        <span className="sf-record-meta">{t('settings.publicEndpoints.dnsLocal')}</span>
+                        <StatusBadge status={c.dns_local} />
+                      </>
+                    ) : null}
+                    {c.dns_internal != null && c.dns_internal !== 'skip' ? (
+                      <>
+                        <span className="sf-record-meta">{t('settings.publicEndpoints.dnsInternal')}</span>
+                        <StatusBadge status={c.dns_internal} />
+                      </>
+                    ) : null}
+                    {c.dns_public != null && c.dns_public !== 'skip' ? (
+                      <>
+                        <span className="sf-record-meta">{t('settings.publicEndpoints.dnsPublic')}</span>
+                        <StatusBadge status={c.dns_public} />
+                      </>
+                    ) : (
+                      <StatusBadge status={c.dns} />
+                    )}
+                    {c.tls !== 'skip' && <StatusBadge status={c.tls} />}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </FormGroup>
   )
 }

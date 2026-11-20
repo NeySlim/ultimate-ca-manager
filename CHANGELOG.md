@@ -92,6 +92,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- **Settings, Account, Tools and Operations read as the Atelier frames.** Read-only facts are term and value lines, lists are record lists and notes are plain notices, with no cards, tiles or emoji; every bound the page knows (ports, durations, counts, a required server, an address, a URL) is checked before a save, and the save bar names the changed fields.
 - **Buttons, fields, dialogs and menus follow the Atelier design everywhere.** Every button is 32 px with one radius, fields are 36 px with their hint or error under them, on/off settings are check boxes with their label, every dialog (confirmations included, with translated buttons) takes the 520, 760 or 920 px frame, and the theme menu offers System, Dark, Light, Aurore dark and Aurore light; body text is 13 px in all four themes.
 - **A certificate is issued in two steps, Configure then Review.** The column beside the form says what the template and the CA policies impose, Review shows the exact request and alone issues it, and a form closed unsent keeps its draft (in memory, never a key or a password); renewal opens the same form with the validity alone to change.
 - **The issue dialog ends on a result screen.** After sending, it shows the certificate issued or renewed with View the certificate, or the request held for approval with a link to it; a renewal shows every block of the issue form, what it cannot change read-only, and an authority or template is preselected only when it is the only choice.

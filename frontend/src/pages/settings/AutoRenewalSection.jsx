@@ -8,6 +8,7 @@ import { Button, Input } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import TagsInput from '../../components/ui/TagsInput'
 import { FormGroup } from '../../components/sectioned'
+import { fieldBounds } from './fieldChecks'
 
 const SOURCES = ['manual', 'scep', 'acme', 'est']
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -15,6 +16,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export default function AutoRenewalSection({
   arSettings,
   setArSettings,
+  fieldErrors = {},
   arLoading,
   arRunning,
   arRunResult,
@@ -57,10 +59,10 @@ export default function AutoRenewalSection({
             label={t('settings.autoRenewalDays')}
             type="number"
             inputMode="numeric"
-            min={1}
-            max={365}
+            {...fieldBounds('ar.days_before_expiry')}
+            error={fieldErrors['ar.days_before_expiry']}
             value={arSettings.days_before_expiry}
-            onChange={(e) => setArSettings((prev) => ({ ...prev, days_before_expiry: parseInt(e.target.value, 10) || 0 }))}
+            onChange={(e) => setArSettings((prev) => ({ ...prev, days_before_expiry: e.target.value === '' ? '' : parseInt(e.target.value, 10) }))}
             helperText={t('settings.autoRenewalDaysHelp')}
           />
           <div className="ui-field">

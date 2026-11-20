@@ -141,6 +141,15 @@ describe('SaveBar', () => {
     expect(onSave).toHaveBeenCalledTimes(1)
   })
 
+  it('names the changed fields when their labels are known, as the mockup does', () => {
+    render(<SaveBar count={2} sectionLabels={['General']} fieldLabels={['Instance name', 'Port']} onReset={vi.fn()} onSave={vi.fn()} />)
+    const bar = screen.getByTestId('sf-savebar')
+    expect(bar).toHaveTextContent('sectioned.pendingTitle')
+    expect(bar).toHaveTextContent('sectioned.pendingFields')
+    expect(bar).toHaveTextContent('"fields":"Instance name, Port"')
+    expect(bar).not.toHaveTextContent('"count":2')
+  })
+
   it('names the sections whose save failed, buttons still there', () => {
     render(<SaveBar count={1} sectionLabels={['Email']} failed={['Email']} onReset={vi.fn()} onSave={vi.fn()} />)
     const bar = screen.getByTestId('sf-savebar')

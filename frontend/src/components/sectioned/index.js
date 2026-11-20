@@ -1,5 +1,5 @@
 export {
-  FormLayout, SectionToc, SectionJump, FormSection, FormGroup, SaveBar, sectionDomId, sectionTitleId, jumpToSection,
+  FormLayout, SectionToc, SectionJump, FormSection, FormGroup, FormProps, SaveBar, sectionDomId, sectionTitleId, jumpToSection, focusSectionTitle,
 } from './SectionedForm'
 export {
   SavePartsContext, useSavePartsRegistry, useSavePart, changedKeys, useUnloadGuard, keptPartDraft,

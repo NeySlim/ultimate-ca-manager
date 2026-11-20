@@ -318,7 +318,7 @@ A test signs nobody in: no session, no account created or updated, no identity b
 
 ### SMTP Configuration
 
-Configure SMTP settings under **Settings → Email** to enable email notifications:
+Configure SMTP settings under **Settings → SMTP** to enable email notifications:
 
 - **SMTP Host/Port**: Mail server address and port
 - **Credentials**: Username and password (if required)
@@ -333,7 +333,7 @@ Use the **Test** button to send a test email and verify connectivity.
 
 Customize the notification email template via the built-in editor:
 
-1. Navigate to **Settings → Email → Email Template**
+1. Navigate to **Settings → SMTP → Email Template**
 2. Click **Edit Template** to open the floating editor window
 3. Switch between **HTML** and **Plain Text** tabs
 4. Edit the template source on the left, see the live preview on the right
@@ -1120,7 +1120,7 @@ All actions are logged:
 
 UCM includes a full report scheduler that can automatically generate and email reports on a recurring basis.
 
-> **Prerequisite:** Email delivery must be configured first. Go to **Settings** > **Email** and configure your SMTP server before enabling scheduled reports.
+> **Prerequisite:** Email delivery must be configured first. Go to **Settings** > **SMTP** and configure your SMTP server before enabling scheduled reports.
 
 ### Available Report Types
 
@@ -1171,7 +1171,7 @@ Before relying on a schedule, send a test report:
 
 ### Troubleshooting Schedules
 
-- **Reports not sending**: Check SMTP configuration in Settings > Email
+- **Reports not sending**: Check SMTP configuration in Settings > SMTP
 - **Empty reports**: Verify the report type has data (e.g., no expiring certs if all are valid)
 - **Wrong timezone**: Report time uses server timezone; check system clock
 - **Recipient limit**: Maximum 50 email addresses per report schedule

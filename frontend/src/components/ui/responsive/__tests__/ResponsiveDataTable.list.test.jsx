@@ -376,7 +376,7 @@ describe('ResponsiveDataTable without the variant', () => {
     fireEvent.click(screen.getByText('api.example.com'))
     expect(onRowClick).not.toHaveBeenCalled()
     expect([...onSelectionChange.mock.lastCall[0]]).toEqual([2])
-    expect(screen.getByText('Select all')).toBeInTheDocument()
+    expect(screen.getByText('common.selectAll')).toBeInTheDocument()
   })
 
   it('says its range through the translations', () => {

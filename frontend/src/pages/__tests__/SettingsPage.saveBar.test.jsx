@@ -82,7 +82,17 @@ async function loaded(entry) {
   await waitFor(() => expect(screen.getByLabelText('syslog-host')).toHaveValue('log.example.com'))
 }
 
-describe('SettingsPage: one page, one save bar', () => {
+// The whole page is mounted with its 19 sections: a loaded machine takes seconds per test
+describe('SettingsPage: one page, one save bar', { timeout: 20000 }, () => {
+  it('lands a link to ?tab= on its frame title without the keyboard outline', async () => {
+    Element.prototype.scrollIntoView = vi.fn()
+    await loaded('/settings?tab=email')
+    const title = document.getElementById('sf-title-email')
+    await waitFor(() => expect(document.activeElement).toBe(title))
+    expect(title).toHaveAttribute('data-quiet-focus')
+    delete Element.prototype.scrollIntoView
+  })
+
   it('shows every section in a frame of its own, listed by group', async () => {
     await loaded()
     for (const id of ['general', 'email', 'audit', 'security', 'backup', 'about']) {
@@ -167,7 +177,7 @@ describe('SettingsPage: one page, one save bar', () => {
     await loaded()
     await waitFor(() => expect(bar()).toHaveTextContent('sectioned.lastSavedBy'))
     const history = screen.getByRole('region', { name: 'settings.historyTitle' })
-    expect(within(history).getByText('General Settings')).toBeInTheDocument()
+    expect(within(history).getByText('settings.history.general')).toBeInTheDocument()
     expect(within(history).queryByText('Auto-Renewal')).toBeNull()
   })
 

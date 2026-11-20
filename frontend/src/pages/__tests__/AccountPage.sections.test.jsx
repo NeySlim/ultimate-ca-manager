@@ -146,6 +146,18 @@ describe('AccountPage sections', () => {
     expect(screen.queryByLabelText('account.fullName')).toBeNull()
   })
 
+  it('says a profile edit waits, naming the changed field, and says nothing once cancelled', async () => {
+    open()
+    const profile = await screen.findByRole('region', { name: 'account.profile' })
+    fireEvent.click(within(profile).getByRole('button', { name: 'common.edit' }))
+    expect(within(profile).queryByText('sectioned.pendingTitle')).toBeNull()
+    fireEvent.change(screen.getByLabelText('account.fullName'), { target: { value: 'Alice B.' } })
+    const pending = within(profile).getByText('sectioned.pendingTitle').closest('[role="status"]')
+    expect(pending).toHaveTextContent('sectioned.pendingFields')
+    fireEvent.click(within(profile).getByRole('button', { name: 'common.cancel' }))
+    expect(within(profile).queryByText('sectioned.pendingTitle')).toBeNull()
+  })
+
   it('offers the inspector preference "close on navigate" as a check box with its hint', async () => {
     open()
     const box = await screen.findByRole('checkbox', { name: 'account.closeInspectorOnNav' })

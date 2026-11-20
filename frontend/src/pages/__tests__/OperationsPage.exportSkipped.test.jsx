@@ -101,7 +101,7 @@ describe('OperationsPage export of everything', () => {
   ])('warns when %s were left out', async (_n, index, svc) => {
     mocks[svc].mockResolvedValue(blob(2))
     await openTab('export')
-    fireEvent.click((await screen.findAllByText('importExport.export.pemBundle'))[index])
+    fireEvent.click((await screen.findAllByRole('button', { name: 'common.download importExport.export.pemBundle' }))[index])
     await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith('export.skippedUnreadable:2'))
     expect(mocks.showSuccess).toHaveBeenCalled()
   })
@@ -112,7 +112,7 @@ describe('OperationsPage export of everything', () => {
   ])('says nothing more when no %s were left out', async (_n, index, svc) => {
     mocks[svc].mockResolvedValue(blob(0))
     await openTab('export')
-    fireEvent.click((await screen.findAllByText('importExport.export.pemBundle'))[index])
+    fireEvent.click((await screen.findAllByRole('button', { name: 'common.download importExport.export.pemBundle' }))[index])
     await waitFor(() => expect(mocks.showSuccess).toHaveBeenCalled())
     expect(mocks.showWarning).not.toHaveBeenCalled()
   })

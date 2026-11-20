@@ -1,11 +1,13 @@
 import { useTranslation } from 'react-i18next'
-import { Lock, LockKey, Warning, Globe, Clock, CheckCircle, ArrowsClockwise, WarningCircle, User, Download } from '@phosphor-icons/react'
-import { Button, Input, Select, Textarea, Badge, LoadingSpinner, ExperimentalBadge, DetailGrid } from '../../components'
+import { Lock, LockKey, ArrowsClockwise, Download } from '@phosphor-icons/react'
+import { Button, Input, Select, Textarea, Badge, LoadingSpinner, ExperimentalBadge } from '../../components'
+import { HelpCard } from '../../components/HelpCard'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { formatDate } from '../../lib/utils'
 import { anchorPickerCas } from '../../lib/caSelection'
 import AdminLockLabel from './AdminLockLabel'
-import { FormGroup } from '../../components/sectioned'
+import { fieldBounds } from './fieldChecks'
+import { FormGroup, FormProps } from '../../components/sectioned'
 
 // The API sends a list; the textarea edits one entry per line.
 function networksText(value) {
@@ -16,7 +18,7 @@ function networksList(value) {
   return networksText(value).split(/[\s,;]+/).filter(Boolean)
 }
 
-export default function SecuritySection({ settings, updateSetting, hasPermission, encryptionStatus, setShowEnableEncryptionModal, setShowDisableEncryptionModal, handleDownloadExistingMasterKey, handleEncryptRemainingKeys, handleRotateDataKey, encryptionLoading, secretsStatus, handleRotateSessionKey, sessionKeyLoading, anomalies, anomaliesLoading, loadAnomalies, mtlsSettings, setMtlsSettings, mtlsLoading, cas }) {
+export default function SecuritySection({ settings, fieldErrors = {}, updateSetting, hasPermission, encryptionStatus, setShowEnableEncryptionModal, setShowDisableEncryptionModal, handleDownloadExistingMasterKey, handleEncryptRemainingKeys, handleRotateDataKey, encryptionLoading, secretsStatus, handleRotateSessionKey, sessionKeyLoading, anomalies, anomaliesLoading, loadAnomalies, mtlsSettings, setMtlsSettings, mtlsLoading, cas }) {
   const { t } = useTranslation()
   // Fields the API writes for admin:settings only are shown, but disabled.
   const canAdminSettings = Boolean(hasPermission('admin:settings'))
@@ -25,47 +27,50 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
     <>
       <FormGroup title={t('settings.keyEncryption')}>
         {encryptionStatus ? (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              {encryptionStatus.disabling ? (
+          <div className="sf-stack">
+            <FormProps items={[
+              [t('common.status'), encryptionStatus.disabling ? (
                 <Badge variant="warning">{t('settings.encryptionDisabling')}</Badge>
               ) : (
                 <Badge variant={encryptionStatus.enabled ? 'success' : 'warning'}>
                   {encryptionStatus.enabled ? t('common.enabled') : t('common.disabled')}
                 </Badge>
-              )}
-              {encryptionStatus.enabled && encryptionStatus.key_source && (
-                <span className="text-xs text-text-tertiary">
-                  {t('settings.keySource')}{t('work.sep')}{encryptionStatus.key_file_path}
+              )],
+              encryptionStatus.enabled && encryptionStatus.key_source
+                && [t('settings.keySource'), encryptionStatus.key_file_path],
+              encryptionStatus.enabled && encryptionStatus.kek_fingerprint
+                && [t('settings.kekFingerprint'), encryptionStatus.kek_fingerprint],
+              encryptionStatus.enabled && encryptionStatus.kek_fingerprint && [t('settings.dekVersion'), (
+                <span className="sf-record-title">
+                  <span>{encryptionStatus.dek_version}</span>
+                  {encryptionStatus.rotation_in_progress && (
+                    <Badge variant="warning">{t('settings.dekRotationInProgress')}</Badge>
+                  )}
+                  {encryptionStatus.rotation_available_after ? (
+                    <Badge variant="secondary">
+                      {t('settings.rotationAvailableAfter', { date: formatDate(encryptionStatus.rotation_available_after, { hour: '2-digit', minute: '2-digit' }) })}
+                    </Badge>
+                  ) : encryptionStatus.rotation_waits_for_nodes ? (
+                    <Badge variant="secondary">{t('settings.rotationAvailableAfterNodesReload')}</Badge>
+                  ) : encryptionStatus.rotation_available && !encryptionStatus.rotation_in_progress && (
+                    <Badge variant="success">{t('settings.rotationAvailable')}</Badge>
+                  )}
                 </span>
-              )}
-            </div>
-
-            {encryptionStatus.enabled && encryptionStatus.kek_fingerprint && (
-              <div className="flex items-center gap-3 flex-wrap text-xs text-text-secondary">
-                <span>
-                  {t('settings.kekFingerprint')}{t('work.sep')}<code className="text-text-primary">{encryptionStatus.kek_fingerprint}</code>
+              )],
+              encryptionStatus.total_keys > 0 && [t('settings.encryptedKeys'), encryptionStatus.encrypted_count],
+              encryptionStatus.total_keys > 0 && [t('settings.unencryptedKeys'), encryptionStatus.unencrypted_count],
+              [t('settings.keyFilesOnDisk'), (
+                <span className="sf-record-title">
+                  <span>{encryptionStatus.key_files_on_disk ?? 0}</span>
+                  {encryptionStatus.enabled && encryptionStatus.key_files_on_disk > 0 && (
+                    <Badge variant="warning">{t('settings.keyFilesRemovalPending')}</Badge>
+                  )}
                 </span>
-                <span>
-                  {t('settings.dekVersion')}{t('work.sep')}<strong className="text-text-primary">{encryptionStatus.dek_version}</strong>
-                </span>
-                {encryptionStatus.rotation_in_progress && (
-                  <Badge variant="warning">{t('settings.dekRotationInProgress')}</Badge>
-                )}
-                {encryptionStatus.rotation_available_after ? (
-                  <Badge variant="secondary">
-                    {t('settings.rotationAvailableAfter', { date: formatDate(encryptionStatus.rotation_available_after, { hour: '2-digit', minute: '2-digit' }) })}
-                  </Badge>
-                ) : encryptionStatus.rotation_waits_for_nodes ? (
-                  <Badge variant="secondary">{t('settings.rotationAvailableAfterNodesReload')}</Badge>
-                ) : encryptionStatus.rotation_available && !encryptionStatus.rotation_in_progress && (
-                  <Badge variant="success">{t('settings.rotationAvailable')}</Badge>
-                )}
-              </div>
-            )}
+              )],
+            ]} />
 
             {encryptionStatus.retained_keys?.length > 0 && (
-              <div className="text-xs text-text-secondary space-y-1">
+              <div className="sf-hint">
                 <p>{t('settings.retainedDataKeys')}</p>
                 <ul className="list-disc pl-5">
                   {encryptionStatus.retained_keys.map((key) => (
@@ -79,38 +84,19 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
                 )}
               </div>
             )}
-            
-            {encryptionStatus.total_keys > 0 && (
-              <div className="flex gap-4 text-sm">
-                <span className="text-text-secondary">
-                  {t('settings.encryptedKeys')}{t('work.sep')}<strong className="text-text-primary">{encryptionStatus.encrypted_count}</strong>
-                </span>
-                <span className="text-text-secondary">
-                  {t('settings.unencryptedKeys')}{t('work.sep')}<strong className="text-text-primary">{encryptionStatus.unencrypted_count}</strong>
-                </span>
-              </div>
-            )}
 
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-text-secondary">{t('settings.keyFilesOnDisk')}{t('work.sep')}</span>
-              <strong className="text-text-primary">{encryptionStatus.key_files_on_disk ?? 0}</strong>
-              {encryptionStatus.enabled && encryptionStatus.key_files_on_disk > 0 && (
-                <Badge variant="warning">{t('settings.keyFilesRemovalPending')}</Badge>
-              )}
-            </div>
-
-            <p className="text-xs text-text-secondary">{t('settings.encryptionDesc')}</p>
+            <p className="sf-hint">{t('settings.encryptionDesc')}</p>
 
             {encryptionStatus.disabling && (
-              <p className="text-sm text-status-warning">{t('settings.encryptionDisablingHint')}</p>
+              <HelpCard variant="warning">{t('settings.encryptionDisablingHint')}</HelpCard>
             )}
 
             {encryptionStatus.enable_available_after ? (
-              <p className="text-sm text-text-secondary">
+              <p className="sf-hint">
                 {t('settings.enableAvailableAfter', { date: formatDate(encryptionStatus.enable_available_after, { hour: '2-digit', minute: '2-digit' }) })}
               </p>
             ) : encryptionStatus.enable_waits_for_nodes && (
-              <p className="text-sm text-text-secondary">{t('settings.enableAvailableAfterNodesReload')}</p>
+              <p className="sf-hint">{t('settings.enableAvailableAfterNodesReload')}</p>
             )}
 
             {hasPermission('admin:system') && (
@@ -125,7 +111,7 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
                     {t('settings.enableEncryption')}
                   </Button>
                 ) : (
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="sf-actions-row">
                     {encryptionStatus.key_source === 'file' && handleDownloadExistingMasterKey && (
                       <Button
                         onClick={handleDownloadExistingMasterKey}
@@ -176,8 +162,8 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
       </FormGroup>
       {secretsStatus?.session_secret && (
         <FormGroup title={t('settings.sessionKeyTitle')}>
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="sf-stack">
+            <div className="sf-record-title">
               <Badge variant={secretsStatus.session_secret.source === 'database' ? 'success' : 'secondary'}>
                 {secretsStatus.session_secret.source === 'database'
                   ? t('settings.sessionKeyFromDatabase')
@@ -191,7 +177,7 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
             </div>
             {/* What a rotation really does depends on whether the key can be stored encrypted;
                 in HA the environment-file rotation is refused (409 ha_mode) */}
-            <p className="text-sm text-text-secondary">
+            <p className="sf-hint">
               {secretsStatus.session_secret.rotation === 'database'
                 ? t('settings.sessionKeyRotateStoredDesc')
                 : secretsStatus.session_secret.rotation === 'blocked'
@@ -215,7 +201,7 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
           </div>
         </FormGroup>
       )}
-      <FormGroup title={t('common.twoFactorAuth')}>
+      <FormGroup title={t('settings.mfaGroup')}>
         <div className="space-y-4">
           <ToggleSwitch
             checked={settings.enforce_2fa || false}
@@ -235,11 +221,8 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
             : null)}
       >
         <div className="space-y-4">
-          <p className="text-xs text-text-secondary">{t('settings.adminAllowlistDesc')}</p>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-text-secondary">{t('settings.adminAllowlistYourIp')}{t('work.sep')}</span>
-            <strong className="text-text-primary font-mono">{settings.admin_client_ip || '-'}</strong>
-          </div>
+          <p className="sf-hint">{t('settings.adminAllowlistDesc')}</p>
+          <FormProps items={[[t('settings.adminAllowlistYourIp'), settings.admin_client_ip || '—']]} />
           <Textarea
             label={t('settings.adminAllowlistNetworks')}
             value={networksText(settings.admin_allowed_networks)}
@@ -251,16 +234,10 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
             spellCheck={false}
           />
           {settings.admin_allowed_networks_env_locked && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-status-warning-op10 text-xs text-status-warning">
-              <WarningCircle size={16} weight="fill" className="flex-shrink-0 mt-0.5" />
-              <span>{t('settings.adminAllowlistEnvLocked')}</span>
-            </div>
+            <HelpCard variant="warning">{t('settings.adminAllowlistEnvLocked')}</HelpCard>
           )}
           {settings.admin_allowlist_disabled && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-status-warning-op10 text-xs text-status-warning">
-              <WarningCircle size={16} weight="fill" className="flex-shrink-0 mt-0.5" />
-              <span>{t('settings.adminAllowlistDisabledNote')}</span>
-            </div>
+            <HelpCard variant="warning">{t('settings.adminAllowlistDisabledNote')}</HelpCard>
           )}
         </div>
       </FormGroup>
@@ -288,23 +265,18 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
                 type="number"
                 value={settings.hsts_max_age ?? 31536000}
                 onChange={(e) => updateSetting('hsts_max_age', parseInt(e.target.value))}
-                min="0"
                 helperText={t('settings.hstsMaxAgeDesc')}
                 disabled={adminLocked || settings.hsts_env_locked?.includes('hsts_max_age')}
+                {...fieldBounds('hsts_max_age')}
+                error={fieldErrors['hsts_max_age']}
               />
             </>
           )}
           {settings.hsts_env_locked?.length > 0 && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-status-warning-op10 text-xs text-status-warning">
-              <WarningCircle size={16} weight="fill" className="flex-shrink-0 mt-0.5" />
-              <span>{t('settings.hstsEnvLocked')}</span>
-            </div>
+            <HelpCard variant="warning">{t('settings.hstsEnvLocked')}</HelpCard>
           )}
           {settings.hsts_env_locked?.length === 0 && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-status-info-op10 text-xs text-status-info">
-              <WarningCircle size={16} weight="fill" className="flex-shrink-0 mt-0.5" />
-              <span>{t('settings.hstsNote')}</span>
-            </div>
+            <HelpCard variant="info">{t('settings.hstsNote')}</HelpCard>
           )}
 
           <Input
@@ -313,9 +285,9 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
             type="number"
             value={settings.ocsp_response_validity_hours ?? 24}
             onChange={(e) => updateSetting('ocsp_response_validity_hours', parseInt(e.target.value))}
-            min="1"
-            max="168"
             helperText={t('settings.ocspResponseValidityDesc')}
+            {...fieldBounds('ocsp_response_validity_hours')}
+            error={fieldErrors['ocsp_response_validity_hours']}
           />
           <ToggleSwitch
             checked={settings.ocsp_responder_auto_renew ?? true}
@@ -331,10 +303,10 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
               type="number"
               value={settings.ocsp_responder_renew_days ?? 30}
               onChange={(e) => updateSetting('ocsp_responder_renew_days', parseInt(e.target.value))}
-              min="1"
-              max="365"
               helperText={t('settings.ocspResponderRenewDaysDesc')}
               disabled={canAdminSettings === false}
+              {...fieldBounds('ocsp_responder_renew_days')}
+              error={fieldErrors['ocsp_responder_renew_days']}
             />
           )}
           <ToggleSwitch
@@ -363,10 +335,7 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
             disabled={adminLocked || settings.key_recovery_dual_control_locked}
           />
           {settings.key_recovery_dual_control_locked && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-status-warning-op10 text-xs text-status-warning">
-              <WarningCircle size={16} weight="fill" className="flex-shrink-0 mt-0.5" />
-              <span>{t('settings.keyRecoveryDualControlLocked')}</span>
-            </div>
+            <HelpCard variant="warning">{t('settings.keyRecoveryDualControlLocked')}</HelpCard>
           )}
         </div>
       </FormGroup>
@@ -379,8 +348,8 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
             type="number"
             value={settings.min_password_length || 8}
             onChange={(e) => updateSetting('min_password_length', parseInt(e.target.value))}
-            min="6"
-            max="32"
+            {...fieldBounds('min_password_length')}
+            error={fieldErrors['min_password_length']}
           />
           <div className="space-y-2">
             <ToggleSwitch
@@ -415,51 +384,36 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
           {anomaliesLoading ? (
             <LoadingSpinner size="sm" />
           ) : anomalies.length === 0 ? (
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-status-success-op10">
-              <CheckCircle size={20} weight="fill" className="text-status-success" />
-              <div>
-                <div className="text-sm font-medium text-text-primary">{t('settings.noAnomalies')}</div>
-                <div className="text-xs text-text-secondary">{t('settings.noAnomaliesDesc')}</div>
-              </div>
-            </div>
+            <p className="sf-records-empty">{t('settings.noAnomalies')}. {t('settings.noAnomaliesDesc')}</p>
           ) : (
-            anomalies.map((anomaly, i) => (
-              <div key={i} className={`p-3 rounded-lg flex items-start gap-3 ${anomaly.details?.severity === 'high' ? 'bg-status-danger-op10' : 'bg-status-warning-op10'}`}>
-                <Warning size={18} weight="fill" className={anomaly.details?.severity === 'high' ? 'text-status-danger' : 'text-status-warning'} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-text-primary">{anomaly.details?.type || t('settings.unknownAnomaly')}</div>
-                  <div className="text-xs text-text-secondary">{anomaly.details?.message}</div>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-text-tertiary">
-                    <span className="flex items-center gap-1">
-                      <Clock size={12} />
-                      {formatDate(anomaly.timestamp)}
+            <ul className="sf-records">
+              {anomalies.map((anomaly, i) => (
+                <li key={i}>
+                  <div className="sf-record-main">
+                    <span className="sf-record-title">
+                      <strong>{anomaly.details?.type || t('settings.unknownAnomaly')}</strong>
+                      <Badge variant={anomaly.details?.severity === 'high' ? 'danger' : 'warning'}>
+                        {anomaly.details?.severity === 'high' ? t('settings.anomalyHigh') : t('settings.anomalyWarn')}
+                      </Badge>
                     </span>
-                    {anomaly.details?.ip && (
-                      <span className="flex items-center gap-1">
-                        <Globe size={12} />
-                        {anomaly.details.ip}
-                      </span>
-                    )}
-                    {anomaly.details?.user_id && (
-                      <span className="flex items-center gap-1">
-                        <User size={12} />
-                        #{anomaly.details.user_id}
-                      </span>
-                    )}
+                    {anomaly.details?.message && <span className="sf-record-meta">{anomaly.details.message}</span>}
+                    <span className="sf-record-meta">
+                      {[formatDate(anomaly.timestamp), anomaly.details?.ip, anomaly.details?.user_id && `#${anomaly.details.user_id}`]
+                        .filter(Boolean).join(' · ')}
+                    </span>
                   </div>
-                </div>
-              </div>
-            ))
+                </li>
+              ))}
+            </ul>
           )}
-          <Button type="button" variant="secondary" size="sm" onClick={loadAnomalies} loading={anomaliesLoading}>
-            <ArrowsClockwise size={14} />
+          <Button type="button" variant="secondary" onClick={loadAnomalies} loading={anomaliesLoading}>
+            <ArrowsClockwise size={16} />
             {t('common.refresh')}
           </Button>
         </div>
       </FormGroup>
       <FormGroup title={t('settings.sessionRateLimits')}>
-        <DetailGrid>
-          <div className="col-span-full md:col-span-1">
+        <div className="sf-grid">
             <Input
             className="sf-short"
               label={<AdminLockLabel text={t('settings.sessionDuration')} locked={adminLocked} />}
@@ -467,12 +421,11 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
               type="number"
               value={Math.round((settings.session_max_lifetime || 86400) / 3600)}
               onChange={(e) => updateSetting('session_max_lifetime', parseInt(e.target.value) * 3600)}
-              min="1"
-              max="720"
               helperText={t('settings.sessionDurationHelper')}
+              {...fieldBounds('session_max_lifetime')}
+              error={fieldErrors['session_max_lifetime']}
             />
-          </div>
-        </DetailGrid>
+        </div>
       </FormGroup>
       <FormGroup title={t('settings.mtls.title')} badge={<ExperimentalBadge />}>
         {mtlsLoading ? (
@@ -504,12 +457,9 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
                   size="sm"
                 />
                 {mtlsSettings.required && (
-                  <div className="flex items-start gap-2 p-3 rounded-lg bg-status-warning-op10 text-xs text-status-warning">
-                    <WarningCircle size={16} weight="fill" className="flex-shrink-0 mt-0.5" />
-                    <span>{t('settings.mtls.requiredWarning')}</span>
-                  </div>
+                  <HelpCard variant="warning">{t('settings.mtls.requiredWarning')}</HelpCard>
                 )}
-                <p className="text-xs text-text-tertiary">{t('settings.mtls.restartNote')}</p>
+                <p className="sf-hint">{t('settings.mtls.restartNote')}</p>
               </>
             )}
           </div>

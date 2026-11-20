@@ -1,16 +1,18 @@
 import { useTranslation } from 'react-i18next'
 import { Copy, Database, Download, Trash, MagnifyingGlass, CaretLeft, CaretRight, Broom, HardDrives, WarningCircle } from '@phosphor-icons/react'
 import { Button, Input, Select, FileUpload, Badge } from '../../components'
+import { HelpCard } from '../../components/HelpCard'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import AdminLockLabel from './AdminLockLabel'
 import { useClipboard } from '../../hooks/useClipboard'
 import { formatSize, formatBytes, formatPercent, serverUtcToIso } from '../../lib/fileSize'
 import { formatDate } from '../../lib/utils'
 import { restoreMaxBytes, restoreLegacyCeilingExceeded } from './restoreLimits'
+import { fieldBounds } from './fieldChecks'
 import { FormGroup } from '../../components/sectioned'
 
 export default function BackupSection({
-  settings, updateSetting, saving, hasPermission,
+  settings, fieldErrors = {}, updateSetting, saving, hasPermission,
   backups, backupMeta = {}, backupSchedule = {}, backupQuery = {}, updateBackupQuery,
   selectedBackups = [], toggleSelectBackup, toggleSelectAllBackups,
   handleBulkDeleteBackups, handleRunRetention, backupBusy,
@@ -123,7 +125,7 @@ export default function BackupSection({
       </FormGroup>
 
       {/* Retention — applies to ALL backups, enforced daily (decoupled from auto-backup) */}
-      <FormGroup title={t('settings.retentionPeriod')}>
+      <FormGroup title={t('settings.backupRetentionGroup')}>
         <div className="space-y-3">
           <Input
             className="sf-short"
@@ -132,9 +134,9 @@ export default function BackupSection({
             type="number"
             value={settings.backup_retention_days || 30}
             onChange={(e) => updateSetting('backup_retention_days', parseInt(e.target.value))}
-            min="1"
-            max="3650"
             helperText={t('settings.retentionHelper')}
+            {...fieldBounds('backup_retention_days')}
+            error={fieldErrors['backup_retention_days']}
           />
           <Input
             className="sf-short"
@@ -143,25 +145,24 @@ export default function BackupSection({
             type="number"
             value={settings.backup_max_total_mb ?? 0}
             onChange={(e) => updateSetting('backup_max_total_mb', parseInt(e.target.value, 10) || 0)}
-            min="0"
-            max="1048576"
             helperText={t('settings.backupMaxTotalMbHelper')}
+            {...fieldBounds('backup_max_total_mb')}
+            error={fieldErrors['backup_max_total_mb']}
           />
           {storedMiB && (
-            <p className="text-xs text-text-secondary" data-testid="backup-space-used">
+            <p className="sf-hint" data-testid="backup-space-used">
               {t('settings.backupSpaceUsed', { size: storedMiB, count: backupSchedule.stored_count ?? 0 })}
             </p>
           )}
           {backupSchedule.uncounted_count > 0 && (
-            <p className="text-xs text-text-secondary" data-testid="backup-uncounted">
+            <p className="sf-hint" data-testid="backup-uncounted">
               {t('settings.backupUncountedFiles', { count: backupSchedule.uncounted_count })}
             </p>
           )}
           {overCeiling && (
-            <p className="flex items-start gap-2 text-xs text-status-warning" role="alert">
-              <WarningCircle size={14} className="flex-shrink-0 mt-0.5" />
-              <span>{t('settings.backupOverCeiling', { ceiling: backupSchedule.max_total_mb ?? 0 })}</span>
-            </p>
+            <div role="alert">
+              <HelpCard variant="warning">{t('settings.backupOverCeiling', { ceiling: backupSchedule.max_total_mb ?? 0 })}</HelpCard>
+            </div>
           )}
           {(canWriteSettings || isAdmin) && (
             <div className="flex gap-2">
@@ -192,10 +193,7 @@ export default function BackupSection({
           )}
         </p>
         {sharedStore && (
-          <p className="flex items-start gap-2 mb-4 text-xs text-text-secondary">
-            <WarningCircle size={14} className="flex-shrink-0 mt-0.5" />
-            <span>{t('settings.backupSharedStoreNote')}</span>
-          </p>
+          <HelpCard className="sf-records-lead">{t('settings.backupSharedStoreNote')}</HelpCard>
         )}
 
         {/* Toolbar */}
@@ -249,7 +247,7 @@ export default function BackupSection({
                     />
                   )}
                   <div className="sf-record-main">
-                    <strong className="font-mono">{backup.filename}</strong>
+                    <strong>{backup.filename}</strong>
                     <span className="sf-record-meta">
                       {typeof backup.size_bytes === 'number' ? size(backup.size_bytes) : backup.size}
                       {' · '}
@@ -258,7 +256,7 @@ export default function BackupSection({
                     </span>
                     {backup.sha256 && (
                       <span className="sf-record-meta sf-record-digest">
-                        {t('settings.backupSha256')}{t('work.sep')}<code className="font-mono">{backup.sha256.slice(0, 12)}</code>
+                        {t('settings.backupSha256')}{t('work.sep')}<span>{backup.sha256.slice(0, 12)}</span>
                         <button
                           type="button"
                           className="sf-inline-icon"
@@ -310,9 +308,8 @@ export default function BackupSection({
         )}
       </FormGroup>
 
-      <FormGroup title={t('settings.restoreFromBackup')}>
+      <FormGroup title={t('settings.restoreFromBackup')} description={t('settings.restoreFromBackupDesc')}>
         <div>
-          <p className="text-xs text-text-secondary mb-4">{t('settings.restoreFromBackupDesc')}</p>
           <FileUpload
             accept=".ucmbkp,.tar.gz"
             maxSize={restoreMaxBytes(backupMeta.restore_limits)}

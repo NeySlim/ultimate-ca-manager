@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { PaperPlaneTilt, CheckCircle, WarningCircle, Question } from '@phosphor-icons/react'
 import { Button, Input, Select } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
+import { fieldBounds } from './fieldChecks'
 import { FormGroup } from '../../components/sectioned'
 
 export default function AuditSection({ settings, fieldErrors = {}, updateSetting, hasPermission, syslogConfig, updateSyslogConfig, syslogTesting, syslogTestResult, handleTestSyslog }) {
@@ -18,10 +19,10 @@ export default function AuditSection({ settings, fieldErrors = {}, updateSetting
             type="number"
             value={settings.audit_retention_days ?? 0}
             onChange={(e) => updateSetting('audit_retention_days', parseInt(e.target.value, 10) || 0)}
-            min="0"
-            max="1825"
             helperText={t('settings.logRetentionHelp')}
             disabled={canAdminSettings === false}
+            {...fieldBounds('audit_retention_days')}
+            error={fieldErrors['audit_retention_days']}
           />
         </div>
       </FormGroup>
@@ -36,6 +37,7 @@ export default function AuditSection({ settings, fieldErrors = {}, updateSetting
             label={t('settings.syslogHost')}
             value={syslogConfig.host}
             onChange={(e) => updateSyslogConfig('host', e.target.value)}
+            error={fieldErrors['syslog.host']}
             placeholder="syslog.example.com"
           />
           <Input

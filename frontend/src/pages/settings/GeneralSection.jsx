@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {  FloppyDisk, ArrowsClockwise } from '@phosphor-icons/react'
 import { Button, Input, Select, Badge } from '../../components'
+import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { useNotification } from '../../contexts'
 import { certificatesService, settingsService } from '../../services'
 import { certificateLabel } from '../../lib/utils'
@@ -9,6 +10,7 @@ import { fetchAllPages } from '../../lib/fetchAllPages'
 import ServiceStatusWidget from './ServiceStatusWidget'
 import PublicEndpointsPanel from './PublicEndpointsPanel'
 import AdminLockLabel from './AdminLockLabel'
+import { fieldBounds } from './fieldChecks'
 import { FormGroup } from '../../components/sectioned'
 
 export default function GeneralSection({ settings, fieldErrors = {}, updateSetting, canWrite, hasPermission, savedVersion = 0 }) {
@@ -90,6 +92,7 @@ export default function GeneralSection({ settings, fieldErrors = {}, updateSetti
             label={lockedLabel('settings.baseUrl')}
             disabled={adminLocked}
             value={settings.base_url || ''}
+            error={fieldErrors.base_url}
             onChange={(e) => updateSetting('base_url', e.target.value)}
             placeholder={t('settings.baseUrlPlaceholder')}
             helperText={t('settings.baseUrlHelper')}
@@ -98,6 +101,7 @@ export default function GeneralSection({ settings, fieldErrors = {}, updateSetti
             label={lockedLabel('settings.protocolBaseUrl')}
             disabled={adminLocked}
             value={settings.protocol_base_url || ''}
+            error={fieldErrors.protocol_base_url}
             onChange={(e) => updateSetting('protocol_base_url', e.target.value)}
             placeholder="http://admin.ucm.example.com:8080"
             helperText={t('settings.protocolBaseUrlHelper')}
@@ -171,9 +175,9 @@ export default function GeneralSection({ settings, fieldErrors = {}, updateSetti
             type="number"
             value={Math.round((settings.session_timeout || 28800) / 60)}
             onChange={(e) => updateSetting('session_timeout', parseInt(e.target.value) * 60)}
-            min="5"
-            max="1440"
             helperText={t('settings.sessionTimeoutHelper')}
+            {...fieldBounds('session_timeout')}
+            error={fieldErrors['session_timeout']}
           />
           <Input
             className="sf-short"
@@ -182,9 +186,9 @@ export default function GeneralSection({ settings, fieldErrors = {}, updateSetti
             type="number"
             value={settings.max_login_attempts || 5}
             onChange={(e) => updateSetting('max_login_attempts', parseInt(e.target.value))}
-            min="3"
-            max="20"
             helperText={t('settings.maxLoginAttemptsHelper')}
+            {...fieldBounds('max_login_attempts')}
+            error={fieldErrors['max_login_attempts']}
           />
           <Input
             className="sf-short"
@@ -193,9 +197,9 @@ export default function GeneralSection({ settings, fieldErrors = {}, updateSetti
             type="number"
             value={Math.round((settings.lockout_duration || 900) / 60)}
             onChange={(e) => updateSetting('lockout_duration', parseInt(e.target.value) * 60)}
-            min="1"
-            max="60"
             helperText={t('settings.lockoutDurationHelper')}
+            {...fieldBounds('lockout_duration')}
+            error={fieldErrors['lockout_duration']}
           />
           <Select
             label={t('settings.timezone')}
@@ -242,54 +246,50 @@ export default function GeneralSection({ settings, fieldErrors = {}, updateSetti
             value={settings.date_format || 'short'}
             onChange={(val) => updateSetting('date_format', val)}
           />
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={settings.show_time !== 'false' && settings.show_time !== false}
-              onChange={(e) => updateSetting('show_time', e.target.checked)}
-              className="rounded"
-            />
-            {t('settings.showTime')}
-          </label>
+          <ToggleSwitch
+            checked={settings.show_time !== 'false' && settings.show_time !== false}
+            onChange={(on) => updateSetting('show_time', on)}
+            label={t('settings.showTime')}
+          />
         </div>
       </FormGroup>
-      <FormGroup title={t('settings.metrics.title')}>
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Badge variant={settings.metrics_enabled ? 'success' : 'secondary'} size="sm">
-              {settings.metrics_enabled ? t('common.enabled') : t('common.disabled')}
-            </Badge>
-            <span className="text-xs text-text-secondary">{t('settings.metrics.subtitle')}</span>
+      <FormGroup
+        title={t('settings.metrics.title')}
+        description={t('settings.metrics.subtitle')}
+        badge={(
+          <Badge variant={settings.metrics_enabled ? 'success' : 'secondary'} size="sm">
+            {settings.metrics_enabled ? t('common.enabled') : t('common.disabled')}
+          </Badge>
+        )}
+      >
+        <div className="sf-stack">
+          <div className="sf-grid">
+            <Input
+              label={t('settings.metrics.token')}
+              type="text"
+              value={metricsToken}
+              onChange={(e) => setMetricsToken(e.target.value)}
+              placeholder={settings.metrics_enabled ? t('settings.metrics.tokenRotatePlaceholder') : t('settings.metrics.tokenPlaceholder')}
+              helperText={t('settings.metrics.tokenHelper')}
+            />
           </div>
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
-              <Input
-                label={t('settings.metrics.token')}
-                type="text"
-                value={metricsToken}
-                onChange={(e) => setMetricsToken(e.target.value)}
-                placeholder={settings.metrics_enabled ? t('settings.metrics.tokenRotatePlaceholder') : t('settings.metrics.tokenPlaceholder')}
-                helperText={t('settings.metrics.tokenHelper')}
-              />
-            </div>
+          <div className="sf-actions-row">
             <Button type="button" variant="secondary" onClick={generateToken} disabled={!canWrite('settings')}>
               <ArrowsClockwise size={16} />
               {t('settings.metrics.generate')}
             </Button>
-          </div>
-          {canWrite('settings') && (
-            <div className="flex items-center gap-2 pt-1">
+            {canWrite('settings') && (
               <Button type="button" onClick={saveMetricsToken} disabled={metricsBusy || !metricsToken}>
                 <FloppyDisk size={16} />
                 {settings.metrics_enabled ? t('settings.metrics.rotate') : t('settings.metrics.enable')}
               </Button>
-              {settings.metrics_enabled && (
-                <Button type="button" variant="danger-soft" onClick={disableMetrics} disabled={metricsBusy}>
-                  {t('settings.metrics.disable')}
-                </Button>
-              )}
-            </div>
-          )}
+            )}
+            {canWrite('settings') && settings.metrics_enabled && (
+              <Button type="button" variant="danger" onClick={disableMetrics} disabled={metricsBusy}>
+                {t('settings.metrics.disable')}
+              </Button>
+            )}
+          </div>
         </div>
       </FormGroup>
       <ServiceStatusWidget />

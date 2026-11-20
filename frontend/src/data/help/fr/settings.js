@@ -8,8 +8,8 @@ export default {
         title: 'Disposition de la page',
         content: 'Toutes les sections sont sur une seule page, chacune dans son cadre ; le sommaire à gauche les range par groupes (sur un téléphone, la liste Aller à la section).',
         items: [
-          { label: 'Barre d’enregistrement', text: 'En bas de la page : Aucune modification en attente, avec la date et le compte du dernier enregistrement des paramètres quand vous pouvez lire le journal d’audit (un lancement du renouvellement ou un consentement OAuth n’est pas un enregistrement) ; dès qu’un champ change, le compte des modifications et leurs sections, avec Annuler les modifications (retour aux valeurs chargées) et Enregistrer. Enregistrer, ou Entrée dans un champ, envoie chaque section modifiée par sa route habituelle' },
-          { label: 'Enregistrement en échec', text: 'Un port hors de 1 à 65535 (SMTP, syslog, port public ACME) est marqué sur son champ et rien ne part tant qu’il n’est pas corrigé. Une section dont l’enregistrement échoue est marquée À corriger dans le sommaire et nomme l’erreur dans son cadre ; les autres sections sont enregistrées et la saisie reste' },
+          { label: 'Barre d’enregistrement', text: 'En bas de la page : Aucune modification en attente, avec la date et le compte du dernier enregistrement des paramètres quand vous pouvez lire le journal d’audit (un lancement du renouvellement ou un consentement OAuth n’est pas un enregistrement) ; dès qu’un champ change, le nom des champs modifiés (leur section quand un champ n’a pas de libellé), avec Annuler les modifications (retour aux valeurs chargées) et Enregistrer. Enregistrer, ou Entrée dans un champ, envoie chaque section modifiée par sa route habituelle' },
+          { label: 'Enregistrement en échec', text: 'Une valeur hors des bornes que la page connaît (port hors de 1 à 65535, durée, nombre, serveur requis, adresse ou URL mal formée) est marquée sur son champ avec ce qui est attendu, et rien ne part tant qu’elle n’est pas corrigée. Une section dont l’enregistrement échoue est marquée À corriger dans le sommaire et nomme l’erreur dans son cadre ; les autres sections sont enregistrées et la saisie reste' },
           { label: 'Actions propres', text: 'Un test, un import, une génération ou une liste (fournisseurs SSO, webhooks, connexions, profils Windows, sauvegardes) garde son bouton dans sa section et agit aussitôt. Le résultat d’un test (SMTP, syslog, renouvellement) s’affiche à côté du bouton ; ces tests lisent les valeurs enregistrées, enregistrez d’abord vos modifications' },
           { label: 'Liens', text: 'Un lien vers /settings?tab=<section> (vue d’ensemble, palette, autres pages) ouvre la page sur cette section' },
           { label: 'Quitter la page', text: 'Quitter la page avec des modifications en attente ne demande rien : elles sont gardées dans cet onglet et reviennent, toujours en attente, au retour sur la page ; recharger ou fermer l’onglet fait d’abord demander le navigateur' },
@@ -63,7 +63,7 @@ export default {
         items: [
           { label: "Cadence", text: "Quotidienne / hebdomadaire / mensuelle" },
           { label: "Rétention", text: "Les sauvegardes plus anciennes que le nombre de jours défini (30 par défaut) sont purgées" },
-          { label: "Plafond de taille", text: "Un plafond en Mio pour toutes les archives (0 pour aucun) : les plus anciennes sont supprimées, chacune auditée, jusqu'à ce que le total passe dessous. La rétention ne supprime jamais, sur un nœud seul, l'archive la plus récente qui correspond à son enregistrement de validation, jusqu'à 2 archives sans enregistrement de validation et le minimum conservé, et en HA le minimum conservé : le total peut rester au-dessus du plafond, ce qui est signalé. Une sauvegarde manuelle ne supprime rien. Réglages > Sauvegarde affiche la place occupée" },
+          { label: "Plafond de taille", text: "Un plafond en Mo pour toutes les archives (0 pour aucun) : les plus anciennes sont supprimées, chacune auditée, jusqu'à ce que le total passe dessous. La rétention ne supprime jamais, sur un nœud seul, l'archive la plus récente qui correspond à son enregistrement de validation, jusqu'à 2 archives sans enregistrement de validation et le minimum conservé, et en HA le minimum conservé : le total peut rester au-dessus du plafond, ce qui est signalé. Une sauvegarde manuelle ne supprime rien. Réglages > Sauvegarde affiche la place occupée" },
           { label: "Chiffrement", text: "Les sauvegardes sont chiffrées avec le mot de passe de sauvegarde configuré" },
           { label: "Haute disponibilité", text: "En HA, les archives sont stockées dans PostgreSQL : chaque nœud les liste, avec le nœud qui les a écrites, et les télécharge, et la rétention s'exécute sur le leader. Elles disparaissent avec la base : téléchargez celles que vous gardez hors du cluster, et sauvegardez PostgreSQL avec ses propres outils" },
           { label: "Dérivation de clé", text: "Automatique (Argon2id si disponible, PBKDF2 en mode FIPS), PBKDF2-HMAC-SHA256 ou Argon2id. Les archives écrites avec Argon2id ne peuvent pas être restaurées sur une instance en mode FIPS" },
@@ -120,7 +120,7 @@ export default {
         items: [
           { label: 'Général', text: 'Nom d\'hôte syslog (envoyé comme HOSTNAME dans les messages syslog transmis), URL de base et valeurs par défaut à l\'échelle du système' },
           { label: 'Apparence', text: 'Sélection du thème (clair/sombre/système), couleur d\'accentuation, mode bureau' },
-          { label: 'E-mail (SMTP)', text: 'Serveur SMTP, identifiants, éditeur de modèle d\'e-mail et notifications d\'alerte d\'expiration. Prend en charge OAuth2 (XOAUTH2) pour Gmail, Outlook.com et Microsoft 365 en plus de l\'authentification historique par mot de passe' },
+          { label: 'SMTP', text: 'Serveur SMTP, identifiants, éditeur de modèle d\'e-mail et notifications d\'alerte d\'expiration. Prend en charge OAuth2 (XOAUTH2) pour Gmail, Outlook.com et Microsoft 365 en plus de l\'authentification historique par mot de passe' },
           { label: 'Sécurité', text: 'Politique de mot de passe, durée de session, liste d\'accès administrateur, mTLS, chiffrement des clés privées ; le délai d\'inactivité et le verrouillage de compte sont sous Général' },
           { label: 'SSO', text: 'Intégration d\'authentification unique SAML 2.0, OAuth2/OIDC et LDAP' },
           { label: 'Sauvegarde', text: 'Sauvegardes de base de données manuelles et programmées' },
@@ -241,7 +241,7 @@ Configuration à l'échelle du système organisée en onglets. Les modifications
 - **Couleur d'accentuation** : Couleur principale utilisée pour les boutons, liens et mises en évidence
 - **Forcer le mode bureau** : Désactiver la disposition mobile responsive
 
-## E-mail (SMTP)
+## SMTP
 
 Configurez SMTP pour les notifications par e-mail (alertes d'expiration, invitations d'utilisateurs) :
 - **Hôte SMTP** et **Port**
@@ -484,7 +484,7 @@ Paramètres › Sauvegarde permet des sauvegardes automatiques.
 
 - Cadence **quotidienne / hebdomadaire / mensuelle**
 - **Rétention** : les sauvegardes plus anciennes que le nombre de jours défini sont purgées
-- **Plafond de taille** : un plafond en Mio pour toutes les archives (0 pour aucun) ; les plus anciennes sont supprimées, chacune auditée, jusqu'à ce que le total passe dessous. La rétention ne supprime jamais, sur un nœud seul, l'archive la plus récente qui correspond à son enregistrement de validation, jusqu'à 2 archives sans enregistrement de validation et le minimum conservé, et en HA le minimum conservé : le total peut donc rester au-dessus du plafond, ce qui est signalé
+- **Plafond de taille** : un plafond en Mo pour toutes les archives (0 pour aucun) ; les plus anciennes sont supprimées, chacune auditée, jusqu'à ce que le total passe dessous. La rétention ne supprime jamais, sur un nœud seul, l'archive la plus récente qui correspond à son enregistrement de validation, jusqu'à 2 archives sans enregistrement de validation et le minimum conservé, et en HA le minimum conservé : le total peut donc rester au-dessus du plafond, ce qui est signalé
 - Sauvegardes **chiffrées** avec le mot de passe de sauvegarde
 - **Haute disponibilité** : les archives sont stockées dans PostgreSQL, si bien que chaque nœud les liste, avec le nœud qui les a écrites, et les télécharge ; la rétention s'exécute sur le leader. Elles disparaissent avec la base : téléchargez celles que vous gardez hors du cluster, et sauvegardez PostgreSQL avec ses propres outils
 

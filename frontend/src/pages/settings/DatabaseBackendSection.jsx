@@ -2,19 +2,27 @@
  * Database Backend Section - manage SQLite ↔ PostgreSQL backend switching/migration.
  * Embedded in SettingsPage 'database' tab.
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  CheckCircle, XCircle, Warning, Lightning, ArrowsClockwise, FloppyDisk
+  CheckCircle, WarningCircle, Question, Copy, Lightning, ArrowsClockwise, FloppyDisk
 } from '@phosphor-icons/react'
-import { Button, Input, Badge, DetailGrid, DetailField, ConfirmModal } from '../../components'
+import { Button, Input, Badge, ConfirmModal } from '../../components'
+import { HelpCard } from '../../components/HelpCard'
+import { useClipboard } from '../../hooks/useClipboard'
+import { formatBytes } from '../../lib/fileSize'
 import { databaseService } from '../../services'
 import { useNotification } from '../../contexts'
-import { FormGroup } from '../../components/sectioned'
+import { FormGroup, FormProps } from '../../components/sectioned'
 
 export default function DatabaseBackendSection() {
-  const { t } = useTranslation()
-  const { showError, showSuccess, showWarning } = useNotification()
+  const { t, i18n } = useTranslation()
+  const { showError, showSuccess, showWarning, showInfo } = useNotification()
+  const { copy } = useClipboard()
+  const testButton = useRef(null)
+  const copyUri = async () => {
+    if (await copy(status.uri_redacted)) showInfo(t('common.copiedToClipboard'))
+  }
 
   const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -53,6 +61,8 @@ export default function DatabaseBackendSection() {
       setTestResult({ success: false, message: e.message })
     } finally {
       setTesting(false)
+      // The button was disabled during the test: the focus goes back to it, as in the mockup
+      requestAnimationFrame(() => testButton.current?.focus())
     }
   }
 
@@ -113,88 +123,68 @@ export default function DatabaseBackendSection() {
 
   return (
     <>
-      <FormGroup
-        title={t('settings.backend.currentTitle')}
-      >
-        <DetailGrid>
-          <DetailField
-            label={t('settings.backend.type')}
-            value={
-              <Badge variant={isPg ? 'success' : 'secondary'}>
-                {isPg ? 'PostgreSQL' : 'SQLite'}
-              </Badge>
-            }
-          />
-          <DetailField label={t('settings.backend.version')} value={status?.version || '-'} />
-          <DetailField label={t('settings.backend.tableCount')} value={status?.table_count} />
-          <DetailField label={t('settings.backend.size')} value={status?.size_human || '-'} />
-          <DetailField
-            label={t('settings.backend.uri')}
-            value={status?.uri_redacted || '-'}
-            mono fullWidth copyable
-          />
-          <DetailField
-            label={t('settings.backend.health')}
-            value={
-              <Badge variant={status?.healthy ? 'success' : 'danger'}>
-                {status?.healthy ? t('settings.backend.healthy') : t('settings.backend.unhealthy')}
-              </Badge>
-            }
-          />
-        </DetailGrid>
-        {status?.error && (
-          <p className="mt-3 text-xs text-status-danger">{status.error}</p>
-        )}
+      <FormGroup title={t('settings.backend.currentTitle')}>
+        <FormProps items={[
+          [t('settings.backend.type'), isPg ? 'PostgreSQL' : 'SQLite'],
+          [t('settings.backend.version'), status?.version || '—'],
+          [t('settings.backend.tableCount'), status?.table_count ?? '—'],
+          [t('settings.backend.size'), status ? formatBytes(status.size_bytes, i18n?.language) : '—'],
+          [t('settings.backend.uri'), (
+            <span className="sf-record-digest">
+              <span>{status?.uri_redacted || '—'}</span>
+              {status?.uri_redacted && (
+                <button type="button" className="sf-inline-icon" onClick={copyUri}
+                  title={t('common.copy')} aria-label={t('common.copy')}>
+                  <Copy size={14} aria-hidden="true" />
+                </button>
+              )}
+            </span>
+          )],
+          [t('settings.backend.health'), (
+            <Badge variant={status?.healthy ? 'success' : 'danger'}>
+              {status?.healthy ? t('settings.backend.healthy') : t('settings.backend.unhealthy')}
+            </Badge>
+          )],
+        ]} />
+        {status?.error && <p className="ui-error sf-under" role="alert">{status.error}</p>}
       </FormGroup>
 
       <FormGroup
         title={t('settings.backend.switchTitle')}
-        className="mt-4"
+        description={inDocker ? t('settings.backend.dockerHint') : t('settings.backend.switchHint')}
       >
-        <div className="space-y-4">
-          <p className="text-xs text-text-secondary">
-            {inDocker
-              ? t('settings.backend.dockerHint')
-              : t('settings.backend.switchHint')}
-          </p>
+        <div className="sf-stack">
+          <Input
+            label={t('settings.backend.targetUrl')}
+            type="text"
+            placeholder="postgresql://user:password@host:5432/dbname"
+            value={targetUrl}
+            onChange={(e) => { setTargetUrl(e.target.value); setTestResult(null) }}
+            autoComplete="off"
+            spellCheck={false}
+            helperText={`${t('settings.backend.urlExample')}${t('work.sep')}postgresql://ucm:secret@db.example.com:5432/ucm`}
+          />
 
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-text-secondary">
-              {t('settings.backend.targetUrl')}
-            </label>
-            <div className="flex gap-2">
-              <Input
-                type="text"
-                placeholder="postgresql://user:password@host:5432/dbname"
-                value={targetUrl}
-                onChange={(e) => { setTargetUrl(e.target.value); setTestResult(null) }}
-                className="flex-1"
-                autoComplete="off"
-              />
-              <Button type="button" variant="secondary" onClick={handleTest} disabled={testing || !targetUrl.trim()}>
-                {testing ? <Lightning size={16} className="animate-pulse" /> : <Lightning size={16} />}
-                {t('settings.backend.test')}
-              </Button>
-            </div>
-            <p className="text-xs text-text-tertiary">
-              {t('settings.backend.urlExample')}{t('work.sep')}<span className="font-mono">postgresql://ucm:secret@db.example.com:5432/ucm</span>
-            </p>
+          {/* The test as the mockup's test zone: the button, then its result on the line */}
+          <div className="sf-test">
+            <Button ref={testButton} type="button" variant="secondary" onClick={handleTest} disabled={testing || !targetUrl.trim()}>
+              <Lightning size={16} className={testing ? 'animate-pulse' : undefined} />
+              {t('settings.backend.test')}
+            </Button>
+            {testResult ? (
+              <p className={testResult.success ? 'sf-test-result is-good' : 'sf-test-result is-bad'} role="status">
+                {testResult.success ? <CheckCircle aria-hidden="true" /> : <WarningCircle aria-hidden="true" />}
+                <span>{testResult.message}</span>
+              </p>
+            ) : (
+              <p className="sf-test-result">
+                <Question aria-hidden="true" />
+                <span>{t('settings.backend.testHint')}</span>
+              </p>
+            )}
           </div>
 
-          {testResult && (
-            <div className={`flex items-start gap-2 p-3 rounded-md text-xs ${
-              testResult.success
-                ? 'status-success-bg status-success-border border'
-                : 'status-danger-bg status-danger-border border'
-            }`}>
-              {testResult.success
-                ? <CheckCircle size={16} className="text-status-success shrink-0 mt-0.5" />
-                : <XCircle size={16} className="text-status-danger shrink-0 mt-0.5" />}
-              <span>{testResult.message}</span>
-            </div>
-          )}
-
-          <div className="flex flex-wrap gap-2 pt-2">
+          <div className="sf-actions-row">
             <Button
               type="button"
               variant="secondary"
@@ -217,15 +207,9 @@ export default function DatabaseBackendSection() {
             )}
           </div>
 
-          <div className="p-3 status-warning-bg status-warning-border border rounded-md">
-            <div className="flex items-start gap-2 text-xs">
-              <Warning size={16} className="text-status-warning shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="font-semibold text-status-warning">{t('settings.backend.warningTitle')}</p>
-                <p className="text-text-secondary">{t('settings.backend.warningBody')}</p>
-              </div>
-            </div>
-          </div>
+          <HelpCard variant="warning" title={t('settings.backend.warningTitle')}>
+            {t('settings.backend.warningBody')}
+          </HelpCard>
         </div>
       </FormGroup>
 

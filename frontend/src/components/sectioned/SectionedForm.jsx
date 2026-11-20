@@ -2,7 +2,7 @@
  * Sectioned form template (Atelier settings page): table of contents, a select to jump on
  * a phone, one full-width frame per section, groups of fields, a sticky save bar.
  */
-import { Component, forwardRef, useId } from 'react'
+import { Component, Fragment, forwardRef, useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check, Warning, WarningCircle } from '@phosphor-icons/react'
 import { cn } from '../../lib/utils'
@@ -12,12 +12,26 @@ import './sectioned.css'
 export const sectionDomId = (id) => `sf-sec-${id}`
 export const sectionTitleId = (id) => `sf-title-${id}`
 
+/**
+ * Gives a section title the focus. `quiet` (a link landing, no key pressed) keeps it without
+ * the keyboard outline until the title loses the focus: the mockup draws it for the keyboard only.
+ */
+export function focusSectionTitle(id, { quiet = false } = {}) {
+  const title = document.getElementById(sectionTitleId(id))
+  if (!title) return
+  if (quiet) {
+    title.setAttribute('data-quiet-focus', '')
+    title.addEventListener('blur', () => title.removeAttribute('data-quiet-focus'), { once: true })
+  }
+  title.focus({ preventScroll: true })
+}
+
 /** Scrolls to a section's frame and gives its title the focus, as the Atelier jump does. */
-export function jumpToSection(id) {
+export function jumpToSection(id, options) {
   const frame = document.getElementById(sectionDomId(id))
   if (!frame) return
   frame.scrollIntoView?.({ block: 'start' })
-  document.getElementById(sectionTitleId(id))?.focus({ preventScroll: true })
+  focusSectionTitle(id, options)
 }
 
 /** Layout: the table of contents beside the main column. */
@@ -156,6 +170,17 @@ export const FormSection = forwardRef(function FormSection(
   )
 })
 
+/** Properties read in a frame (the mockup's `.props`): a term and its value per line; a falsy item is skipped. */
+export function FormProps({ items, className }) {
+  return (
+    <dl className={cn('sf-props', className)}>
+      {items.filter(Boolean).map(([term, value]) => (
+        <Fragment key={term}><dt>{term}</dt><dd>{value}</dd></Fragment>
+      ))}
+    </dl>
+  )
+}
+
 /** A group of fields inside a section, with its legend; same props as the former detail section. */
 export function FormGroup({ title, description, subtitle, actions, badge, children, className }) {
   const id = useId()
@@ -177,11 +202,11 @@ export function FormGroup({ title, description, subtitle, actions, badge, childr
 }
 
 /**
- * Save bar: nothing pending (with the last save when known), or what is pending, with
+ * Save bar: nothing pending (with the last save when known), or the fields pending, with
  * « Undo changes » and « Save ». `stateRef` takes the focus after a save or an undo.
  */
 export const SaveBar = forwardRef(function SaveBar(
-  { count, sectionLabels = [], lastSaved, saving, failed = [], onReset, onSave, disabled }, stateRef,
+  { count, sectionLabels = [], fieldLabels = [], lastSaved, saving, failed = [], onReset, onSave, disabled }, stateRef,
 ) {
   const { t } = useTranslation()
   const dirty = count > 0
@@ -198,7 +223,10 @@ export const SaveBar = forwardRef(function SaveBar(
       <Warning aria-hidden="true" />
       <span>
         <strong>{t('sectioned.pendingTitle')}</strong>
-        {t('sectioned.pendingCount', { count, sections: sectionLabels.join(', ') })}
+        {/* The changed fields by name when the page knows them, else a count per section */}
+        {fieldLabels.length
+          ? t('sectioned.pendingFields', { fields: fieldLabels.join(', ') })
+          : t('sectioned.pendingCount', { count, sections: sectionLabels.join(', ') })}
       </span>
     </>
   ) : (

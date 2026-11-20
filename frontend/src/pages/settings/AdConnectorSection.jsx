@@ -182,7 +182,7 @@ export default function AdConnectorSection({ hasPermission }) {
   return (
     <>
 
-      <HelpCard variant="info" title={t('adConnector.helpTitle')} className="mb-4">
+      <HelpCard variant="info" title={t('adConnector.helpTitle')}>
         {t('adConnector.helpDescription')}
       </HelpCard>
 

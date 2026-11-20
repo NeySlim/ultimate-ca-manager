@@ -1,78 +1,60 @@
 import { useTranslation } from 'react-i18next'
-import { Certificate, MagnifyingGlass, ShieldCheck, Key, UploadSimple, Warning } from '@phosphor-icons/react'
-import { Button, DetailGrid, DetailField } from '../../components'
+import { MagnifyingGlass, ShieldCheck, Key, UploadSimple, Warning, X } from '@phosphor-icons/react'
+import { Button } from '../../components'
 import { formatDate, certificateLabel } from '../../lib/utils'
-import { FormGroup } from '../../components/sectioned'
+import { FormGroup, FormProps } from '../../components/sectioned'
 
 export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelectedHttpsCert, setShowCertPicker, handleApplyUcmCert, handleRegenerateHttpsCert, setShowHttpsImportModal, onUnbindHttpsCert }) {
   const { t } = useTranslation()
   return (
     <>
       <FormGroup title={t('settings.currentCertificate')}>
-        <DetailGrid>
-          <DetailField
-            label={t('common.commonName')}
-            value={httpsInfo?.common_name || window.location.hostname}
-          />
-          <DetailField
-            label={t('common.issuer')}
-            value={httpsInfo?.issuer || '-'}
-          />
-          <DetailField
-            label={t('common.validFrom')}
-            value={formatDate(httpsInfo?.valid_from)}
-          />
-          <DetailField
-            label={t('common.validUntil')}
-            value={formatDate(httpsInfo?.valid_to)}
-          />
-          <DetailField
-            label={t('settings.fingerprintSha256')}
-            value={httpsInfo?.fingerprint || '-'}
-            mono
-            copyable
-            fullWidth
-          />
-        </DetailGrid>
+        <FormProps items={[
+          [t('common.commonName'), httpsInfo?.common_name || window.location.hostname],
+          [t('common.issuer'), httpsInfo?.issuer || '—'],
+          [t('common.validFrom'), formatDate(httpsInfo?.valid_from)],
+          [t('common.validUntil'), formatDate(httpsInfo?.valid_to)],
+          [t('settings.fingerprintSha256'), httpsInfo?.fingerprint || '—'],
+        ]} />
         {httpsInfo?.bound_certificate ? (
-          <div className="mt-3 p-3 rounded-lg border border-border bg-bg-tertiary flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-text-primary truncate">
-                {t('settings.httpsBound')}{t('work.sep')}{certificateLabel(httpsInfo.bound_certificate) || httpsInfo.bound_certificate.refid}
-              </p>
-              <p className="text-xs text-text-secondary mt-0.5">{t('settings.httpsBoundDesc')}</p>
-            </div>
-            {onUnbindHttpsCert && (
-              <Button type="button" variant="ghost" size="sm" onClick={onUnbindHttpsCert}>
-                {t('settings.httpsUnbind')}
-              </Button>
-            )}
-          </div>
+          <ul className="sf-records sf-under">
+            <li>
+              <div className="sf-record-main">
+                <strong>
+                  {t('settings.httpsBound')}{t('work.sep')}{certificateLabel(httpsInfo.bound_certificate) || httpsInfo.bound_certificate.refid}
+                </strong>
+                <span className="sf-record-meta">{t('settings.httpsBoundDesc')}</span>
+              </div>
+              {onUnbindHttpsCert && (
+                <div className="sf-record-actions">
+                  <Button type="button" variant="secondary" onClick={onUnbindHttpsCert}>
+                    {t('settings.httpsUnbind')}
+                  </Button>
+                </div>
+              )}
+            </li>
+          </ul>
         ) : (
-          <div className="mt-3 p-3 rounded-lg border border-border bg-bg-tertiary">
-            <p className="text-xs text-text-secondary">{t('settings.httpsNotBound')}</p>
-          </div>
+          <p className="sf-hint sf-under">{t('settings.httpsNotBound')}</p>
         )}
         {httpsInfo?.bound_certificate?.needs_attention && (() => {
           const attention = httpsInfo.bound_certificate.needs_attention
           return (
-            <div className="mt-3 p-3 rounded-lg status-danger-bg flex items-start gap-2" data-testid="https-left-behind">
-              <Warning size={16} className="status-danger-text shrink-0 mt-0.5" aria-hidden="true" />
-              <div className="min-w-0 space-y-1">
-                <p className="text-sm font-medium text-text-primary">{t('settings.httpsLeftBehind')}</p>
-                <p className="text-xs text-text-secondary">
-                  {attention.successor_archived
-                    ? t('settings.httpsLeftBehindSuperseded')
-                    : attention.successor_has_key ? t('settings.httpsLeftBehindKeyed') : t('settings.httpsLeftBehindNoKey')}
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
+            <div className="ui-notice is-bad sf-under" data-testid="https-left-behind">
+              <Warning aria-hidden="true" />
+              <div className="ui-notice-body">
+                <strong>{t('settings.httpsLeftBehind')}</strong>{' '}
+                {attention.successor_archived
+                  ? t('settings.httpsLeftBehindSuperseded')
+                  : attention.successor_has_key ? t('settings.httpsLeftBehindKeyed') : t('settings.httpsLeftBehindNoKey')}
+                <div className="sf-actions-row sf-under">
                   {attention.successor_id && (
-                    <a className="text-xs underline text-accent-primary" href={`/certificates/${attention.successor_id}`}>
+                    <a className="sf-link" href={`/certificates/${attention.successor_id}`}>
                       {t('settings.httpsOpenRenewed')}
                     </a>
                   )}
                   {attention.successor_has_key && !attention.successor_archived && attention.successor_id && (
-                    <Button type="button" variant="secondary" size="sm"
+                    <Button type="button" variant="secondary"
                       onClick={() => setSelectedHttpsCert({
                         id: attention.successor_id, common_name: attention.successor_descr || attention.successor_refid,
                       })}>
@@ -86,43 +68,30 @@ export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelected
         })()}
       </FormGroup>
 
-      <FormGroup title={t('settings.useUCMCert')}>
-        <div className="space-y-4">
-          <p className="text-xs text-text-secondary">
-            {t('settings.useUcmCertificateDesc')}
-          </p>
+      <FormGroup title={t('settings.useUCMCert')} description={t('settings.useUcmCertificateDesc')}>
+        <div className="sf-stack">
           {selectedHttpsCert ? (
-            <div className="flex items-center gap-3 p-3 rounded-lg border border-accent-primary-op30 bg-accent-primary-op5">
-              <Certificate size={20} className="text-accent-primary shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-text-primary truncate">
-                  {selectedHttpsCert.common_name || t('common.certificate')}
+            <ul className="sf-records">
+              <li>
+                <div className="sf-record-main">
+                  <strong>{selectedHttpsCert.common_name || t('common.certificate')}</strong>
+                  <span className="sf-record-meta">{t('common.expires')} {formatDate(selectedHttpsCert.valid_to)}</span>
                 </div>
-                <div className="text-xs text-text-secondary">
-                  {t('common.expires')} {formatDate(selectedHttpsCert.valid_to)}
+                <div className="sf-record-actions">
+                  <Button type="button" variant="secondary" onClick={() => setSelectedHttpsCert(null)}
+                    aria-label={t('common.clear')} title={t('common.clear')}>
+                    <X size={16} />
+                  </Button>
                 </div>
-              </div>
-              <Button type="button" variant="ghost" size="xs" onClick={() => setSelectedHttpsCert(null)} aria-label={t('common.clear')}>
-                ×
-              </Button>
-            </div>
+              </li>
+            </ul>
           ) : null}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowCertPicker(true)}
-            >
+          <div className="sf-actions-row">
+            <Button type="button" variant="secondary" onClick={() => setShowCertPicker(true)}>
               <MagnifyingGlass size={16} />
               {t('settings.chooseCertificate')}
             </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleApplyUcmCert}
-              disabled={!selectedHttpsCert}
-            >
+            <Button variant="primary" onClick={handleApplyUcmCert} disabled={!selectedHttpsCert}>
               <ShieldCheck size={16} />
               {t('settings.applySelectedCertificate')}
             </Button>
@@ -130,28 +99,19 @@ export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelected
         </div>
       </FormGroup>
 
-      <FormGroup title={t('settings.regenerateCert')}>
-        <div className="space-y-3">
-          <p className="text-xs text-text-secondary">
-            {t('settings.regenerateCertificateDesc')}
-          </p>
-          <Button type="button" variant="secondary" size="sm" onClick={handleRegenerateHttpsCert}>
+      <FormGroup title={t('settings.regenerateCert')} description={t('settings.regenerateCertificateDesc')}>
+        <div className="sf-actions-row">
+          <Button type="button" variant="secondary" onClick={handleRegenerateHttpsCert}>
             <Key size={16} />
             {t('settings.regenerateSelfSigned')}
           </Button>
         </div>
       </FormGroup>
 
-      <FormGroup title={t('settings.applyCustomCert')}>
-        <div className="space-y-3">
-          <p className="text-xs text-text-secondary">
-            {t('settings.applyCustomCertificateDesc')}
-          </p>
-          <Button
-            variant="secondary"
-            onClick={() => setShowHttpsImportModal(true)}
-          >
-            <UploadSimple size={16} className="mr-2" />
+      <FormGroup title={t('settings.applyCustomCert')} description={t('settings.applyCustomCertificateDesc')}>
+        <div className="sf-actions-row">
+          <Button variant="secondary" onClick={() => setShowHttpsImportModal(true)}>
+            <UploadSimple size={16} />
             {t('common.importCertificate')}
           </Button>
         </div>

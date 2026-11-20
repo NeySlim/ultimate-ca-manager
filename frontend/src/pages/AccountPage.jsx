@@ -562,6 +562,19 @@ export default function AccountPage() {
   const renderProfileContent = () => (
     <>
       <FormGroup title={t('common.accountInformation')}>
+        {/* A pending edit says so, as the settings save bar does: the changed fields by name */}
+        {profileChanged && (
+          <p className="sf-pending" role="status">
+            <Warning aria-hidden="true" />
+            <span>
+              <strong>{t('sectioned.pendingTitle')}</strong>
+              {t('sectioned.pendingFields', { fields: [
+                formData.full_name !== (accountData.full_name || '') && t('account.fullName'),
+                formData.email !== (accountData.email || '') && t('common.email'),
+              ].filter(Boolean).join(', ') })}
+            </span>
+          </p>
+        )}
         {editMode ? (
           <div className="space-y-4">
             <Input
@@ -594,7 +607,7 @@ export default function AccountPage() {
 
       {/* The account's language, saved with its preferences (the account menu no longer carries it) */}
       <FormGroup title={t('settings.language')}>
-        <LanguageSelector />
+        <div className="sf-grid"><LanguageSelector /></div>
       </FormGroup>
 
       {/* Preferences of this browser; the inspector reads this one when the page changes */}
@@ -890,7 +903,7 @@ export default function AccountPage() {
         helpPageKey="account"
       >
         <FormLayout
-          toc={<SectionToc label={t('account.tocLabel')} sections={SECTIONS} hrefFor={(id) => (id === 'profile' ? '/account' : `/account?tab=${id}`)} onJump={setActiveTab} />}
+          toc={<SectionToc label={t('account.tocLabel')} sections={SECTIONS} flags={profileChanged ? { profile: 'modified' } : {}} hrefFor={(id) => (id === 'profile' ? '/account' : `/account?tab=${id}`)} onJump={setActiveTab} />}
         >
           <SectionJump label={t('sectioned.jumpLabel')} sections={SECTIONS} value={activeTab} onJump={setActiveTab} />
           <div className="sf-form">

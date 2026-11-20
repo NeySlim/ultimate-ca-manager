@@ -1,10 +1,12 @@
+import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { languages } from '../../i18n'
-import { Globe } from '@phosphor-icons/react'
 import { persistPreference } from '../../stores/userPreferencesStore'
 
+// The language as a field of a form: its label above, the 36 px list, names without flags
 export default function LanguageSelector({ className = '' }) {
   const { t, i18n } = useTranslation()
+  const id = useId()
 
   const handleChange = (e) => {
     const newLang = e.target.value
@@ -19,18 +21,16 @@ export default function LanguageSelector({ className = '' }) {
   }
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
-      <Globe className="w-4 h-4 text-text-secondary" />
+    <div className={`ui-field ${className}`.trim()}>
+      <label htmlFor={id} className="ui-label">{t('settings.language')}</label>
       <select
+        id={id}
         value={i18n.language?.split('-')[0] || 'en'}
         onChange={handleChange}
-        aria-label={t('settings.language')}
-        className="bg-bg-secondary border border-border rounded-md px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
+        className="ui-control"
       >
         {languages.map((lang) => (
-          <option key={lang.code} value={lang.code}>
-            {lang.flag} {lang.name}
-          </option>
+          <option key={lang.code} value={lang.code}>{lang.name}</option>
         ))}
       </select>
     </div>

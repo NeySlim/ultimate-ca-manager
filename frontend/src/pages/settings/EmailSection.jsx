@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks/useClipboard'
@@ -9,9 +10,12 @@ import EmailTemplateWindow from '../../components/EmailTemplateWindow'
 import { WarningCircle } from '@phosphor-icons/react'
 import { secretInputProps, smtpSecretTargets } from '../../lib/secretTarget'
 import { FormGroup } from '../../components/sectioned'
+import { useRefocusAfter } from '../../components/sectioned/useRefocus'
 
 export default function EmailSection({ settings, fieldErrors = {}, savedEmail, updateSetting, saving, canWrite, isMobile, emailTestResult, emailTesting, handleTestEmail, defaultTestRecipient, oauthDirty, setOauthDirty, oauthPresets, applyOAuthProviderPreset, handleSmtpOAuthAuthorize, handleSmtpOAuthRevoke, expiryAlerts, setExpiryAlerts, triggerExpiryCheck, showTemplateEditor, setShowTemplateEditor }) {
   const { t } = useTranslation()
+  const testButton = useRef(null)
+  useRefocusAfter(emailTesting, testButton)
   const secretTargets = smtpSecretTargets(savedEmail, settings)
   const { showSuccess } = useNotification()
   const { copy } = useClipboard()
@@ -49,6 +53,7 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
               value={settings.smtp_port ?? 587}
               onChange={(e) => updateSetting('smtp_port', e.target.value === '' ? '' : Number(e.target.value))}
               error={fieldErrors.smtp_port}
+              helperText={t('settings.smtpSecurityHint')}
             />
             <Select
               className="sf-short"
@@ -63,6 +68,7 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
               type="email"
               value={settings.smtp_from_email || ''}
               onChange={(e) => updateSetting('smtp_from_email', e.target.value)}
+              error={fieldErrors.smtp_from_email}
               placeholder={t('settings.fromEmailPlaceholder')}
             />
             <Select
@@ -79,21 +85,30 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
               value={settings.smtp_content_type || 'html'}
               onChange={(fmt) => updateSetting('smtp_content_type', fmt)}
               options={['html', 'text', 'both'].map((value) => ({ value, label: t(`settings.emailFormat_${value}`) }))}
-              helperText={t('settings.smtpSecurityHint')}
             />
+            {/* Where the test of the relay sends its message */}
+            {canWrite('settings') && (
+              <Input
+                label={t('settings.testRecipient')}
+                type="email"
+                value={settings._testRecipient || ''}
+                onChange={(e) => updateSetting('_testRecipient', e.target.value)}
+                placeholder={defaultTestRecipient || 'admin@example.com'}
+              />
+            )}
           </div>
 
           {/* Authentication: what the chosen method asks */}
           <div className="space-y-3">
             {(settings.smtp_auth_method || 'password') === 'none' && (
-              <p className="text-xs text-text-tertiary">{t('settings.smtpNoAuthHint')}</p>
+              <p className="sf-hint">{t('settings.smtpNoAuthHint')}</p>
             )}
             {/* Saving without authentication deletes the stored OAuth2 credentials (api/v2/settings/email) */}
             {(settings.smtp_auth_method || 'password') === 'none' &&
               (settings.has_oauth_client_secret || settings.has_oauth_refresh_token) && (
-              <p className="flex items-start gap-1.5 text-xs text-status-warning">
-                <Warning size={14} className="mt-0.5 shrink-0" />
-                {t('settings.smtpNoAuthClearsOauth')}
+              <p className="ui-notice is-warn">
+                <Warning aria-hidden="true" />
+                <span className="ui-notice-body">{t('settings.smtpNoAuthClearsOauth')}</span>
               </p>
             )}
 
@@ -316,53 +331,25 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
             )}
           </div>
 
-          {/* Test of the saved relay: the recipient, the button and its result on one line */}
-          {canWrite('settings') && (
-            <div className="sf-test">
-              <Input
-                className="sf-test-field"
-                label={t('settings.testRecipient')}
-                type="email"
-                value={settings._testRecipient || ''}
-                onChange={(e) => updateSetting('_testRecipient', e.target.value)}
-                placeholder={defaultTestRecipient || 'admin@example.com'}
-              />
-              <Button type="button" variant="secondary" onClick={handleTestEmail} disabled={emailTesting}>
-                {emailTesting ? <ArrowsClockwise size={16} className="animate-spin" /> : <PaperPlaneTilt size={16} />}
-                {t('settings.testEmail')}
-              </Button>
-              {emailTestResult ? (
-                <p className={`sf-test-result ${emailTestResult.success ? 'is-good' : 'is-bad'}`} role="status">
-                  {emailTestResult.success ? <CheckCircle aria-hidden="true" /> : <WarningCircle aria-hidden="true" />}
-                  <span className="break-all">{emailTestResult.message}</span>
-                </p>
-              ) : (
-                <p className="sf-test-result">
-                  <Question aria-hidden="true" />
-                  <span>{t('settings.testEmailSavedHint')}</span>
-                </p>
-              )}
-            </div>
-          )}
         </div>
       </FormGroup>
 
       {/* Email Template */}
       <FormGroup title={t('settings.emailTemplate')}>
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-text-secondary">{t('settings.templateDescription')}</p>
-          <div className="relative group shrink-0">
-            <Button type="button" variant="secondary" size="sm" onClick={() => setShowTemplateEditor(true)} disabled={isMobile}>
-              <PencilSimple size={16} />
-              {t('settings.editTemplate')}
-            </Button>
-            {isMobile && (
-              <div className="absolute bottom-full right-0 mb-1 px-2 py-1 rounded bg-bg-tertiary border border-border text-xs text-text-secondary whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
-                {t('settings.templateDesktopOnly')}
-              </div>
-            )}
-          </div>
-        </div>
+        <ul className="sf-records">
+          <li>
+            <div className="sf-record-main">
+              <strong>{t('settings.emailTemplate')}</strong>
+              <span className="sf-record-meta">{isMobile ? t('settings.templateDesktopOnly') : t('settings.templateDescription')}</span>
+            </div>
+            <div className="sf-record-actions">
+              <Button type="button" variant="secondary" onClick={() => setShowTemplateEditor(true)} disabled={isMobile}>
+                <PencilSimple size={16} />
+                {t('settings.editTemplate')}
+              </Button>
+            </div>
+          </li>
+        </ul>
       </FormGroup>
 
       {showTemplateEditor && (
@@ -428,7 +415,7 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
             size="sm"
           />
           {canWrite('settings') && (
-            <div className="flex gap-2 pt-2">
+            <div className="sf-actions-row">
               <Button type="button" variant="secondary" onClick={triggerExpiryCheck}>
                 <Bell size={16} />
                 {t('settings.checkNow')}
@@ -438,6 +425,26 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
         </div>
         )}
       </FormGroup>
+      {/* Test of the saved relay, last in the frame as in the mockup: the button and its result */}
+      {canWrite('settings') && (
+        <div className="sf-test">
+          <Button ref={testButton} type="button" variant="secondary" onClick={handleTestEmail} disabled={emailTesting}>
+            {emailTesting ? <ArrowsClockwise size={16} className="animate-spin" /> : <PaperPlaneTilt size={16} />}
+            {t('settings.testEmail')}
+          </Button>
+          {emailTestResult ? (
+            <p className={`sf-test-result ${emailTestResult.success ? 'is-good' : 'is-bad'}`} role="status">
+              {emailTestResult.success ? <CheckCircle aria-hidden="true" /> : <WarningCircle aria-hidden="true" />}
+              <span className="break-all">{emailTestResult.message}</span>
+            </p>
+          ) : (
+            <p className="sf-test-result">
+              <Question aria-hidden="true" />
+              <span>{t('settings.testEmailSavedHint')}</span>
+            </p>
+          )}
+        </div>
+      )}
     </>
   )
 }

@@ -63,7 +63,7 @@ export default function AppearanceSettings() {
       </FormGroup>
 
       <FormGroup title={t('settings.language')} description={t('settings.languageDesc')}>
-        <LanguageSelector />
+        <div className="sf-grid"><LanguageSelector /></div>
       </FormGroup>
 
       <FormGroup title={t('settings.preview')}>

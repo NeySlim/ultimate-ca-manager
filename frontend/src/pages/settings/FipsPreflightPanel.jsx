@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ShieldCheck } from '@phosphor-icons/react'
+import { ShieldCheck, Question, WarningCircle } from '@phosphor-icons/react'
 import { Button } from '../../components'
 import PreflightReport from '../../components/PreflightReport'
 import { systemService } from '../../services'
@@ -29,18 +29,20 @@ export default function FipsPreflightPanel() {
   return (
     <FormGroup title={t('settings.fipsPreflight.title')}>
       <div className="space-y-3">
-        <div className="flex items-center justify-between gap-3 p-3 bg-tertiary-50 border border-border rounded-lg">
-          <div className="min-w-0 text-xs text-text-secondary">{t('settings.fipsPreflight.hint')}</div>
-          <Button type="button" size="sm" variant="secondary" onClick={runCheck} disabled={loading}>
-            <ShieldCheck size={14} />
+        {/* The check as the mockup's test zone: the button, its hint or its failure beside it */}
+        <div className="sf-test">
+          <Button type="button" variant="secondary" onClick={runCheck} disabled={loading}>
+            <ShieldCheck size={16} />
             {loading ? t('settings.fipsPreflight.running') : t('settings.fipsPreflight.run')}
           </Button>
+          <p className={error ? 'sf-test-result is-bad' : 'sf-test-result'} role={error ? 'alert' : undefined}>
+            {error ? <WarningCircle aria-hidden="true" /> : <Question aria-hidden="true" />}
+            <span>{error || t('settings.fipsPreflight.hint')}</span>
+          </p>
         </div>
 
-        {error && <p className="text-sm status-danger-text">{error}</p>}
-
         {report?.module_known === false && (
-          <p className="text-xs text-text-secondary">{t('settings.fipsPreflight.withoutModule')}</p>
+          <p className="sf-hint">{t('settings.fipsPreflight.withoutModule')}</p>
         )}
 
         {report && <PreflightReport report={report} testId="fips-preflight-report" checkBase="settings.fipsPreflight.checks" />}

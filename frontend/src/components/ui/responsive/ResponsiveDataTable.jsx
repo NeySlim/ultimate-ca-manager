@@ -1852,7 +1852,7 @@ function MobileCardList({
             onChange={onToggleAll}
             className="w-4 h-4 rounded border-border text-accent-primary cursor-pointer"
           />
-          <span className="text-xs text-text-secondary">{rowClickOpens ? t('table.selectPage') : 'Select all'}</span>
+          <span className="text-xs text-text-secondary">{rowClickOpens ? t('table.selectPage') : t('common.selectAll')}</span>
         </div>
       )}
       {/* Gradient dividers instead of flat lines */}

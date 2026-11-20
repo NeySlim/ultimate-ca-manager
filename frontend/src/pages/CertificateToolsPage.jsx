@@ -318,7 +318,7 @@ export default function CertificateToolsPage() {
     const isBinary = value?.startsWith('BASE64:')
     
     return (
-      <div className="space-y-3">
+      <div className="space-y-3 sf-cell">
         <FileUpload
           compact
           accept={accept}
@@ -460,7 +460,7 @@ export default function CertificateToolsPage() {
     <>
       <FormGroup title={t('tools.sectionKeyInput')}>
     <div className="space-y-4">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="sf-grid">
         <TextareaWithUpload
           label={t('tools.certificateOptional')}
           placeholder="-----BEGIN CERTIFICATE-----"
@@ -493,7 +493,7 @@ export default function CertificateToolsPage() {
         placeholder={t('tools.keyPasswordPlaceholder')}
         value={matchPassword}
         onChange={(e) => setMatchPassword(e.target.value)}
-        className="max-w-xs"
+        className="sf-short"
       />
       <div className="sf-test">
         <Button type="button" onClick={handleMatchKeys} disabled={loading}>
@@ -511,9 +511,9 @@ export default function CertificateToolsPage() {
     <>
       <FormGroup title={t('tools.sectionConversion')}>
     <div className="space-y-4">
-      {/* Input section */}
-      <div className="p-4 border border-border rounded-lg bg-secondary-op50 space-y-4">
-        <div className="text-sm font-medium text-text-primary">{t('tools.inputAnyFormat')}</div>
+      {/* Input: any format, by file or pasted */}
+      <div className="space-y-4">
+        <h4>{t('tools.inputAnyFormat')}</h4>
         
         {/* File upload drop zone */}
         <FileUpload
@@ -577,7 +577,7 @@ export default function CertificateToolsPage() {
       </div>
 
       {/* Output format */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+      <div className="sf-grid">
         <Select
           label={t('tools.outputFormat')}
           value={convertFormat}
@@ -606,8 +606,8 @@ export default function CertificateToolsPage() {
 
       {/* Additional inputs for PKCS12/JKS output */}
       {(convertFormat === 'pkcs12' || convertFormat === 'jks') && (
-        <div className="p-4 border border-border rounded-lg bg-secondary-op50 space-y-4">
-          <div className="text-sm font-medium text-text-primary">{t('tools.pkcs12RequiresKey')}</div>
+        <div className="space-y-4">
+          <h4>{t('tools.pkcs12RequiresKey')}</h4>
           
           <FileUpload
             compact
