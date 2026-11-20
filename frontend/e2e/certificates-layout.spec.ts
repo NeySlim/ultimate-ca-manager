@@ -1,4 +1,4 @@
-import { test, expect, createCA, issueCert } from './support/fixtures'
+import { test, expect, createCA, issueCert, createUser } from './support/fixtures'
 
 // Real geometry of the certificates page at 1600 px: jsdom measures nothing
 const EPS = 1
@@ -20,8 +20,15 @@ async function openListOn(page, name: string) {
 
 test.use({ viewport: { width: W, height: H } })
 
-test('the list shows its seven columns whole and the inspector opens in the page flow', async ({ page, api }) => {
+// The inspector's size and fold are preferences of the account: tests that change them take their own
+async function ownSession(api, signIn) {
+  const user = await createUser(api, 'viewer')
+  return (await signIn(user.username, user.password)).page
+}
+
+test('the list shows its seven columns whole and the inspector opens in the page flow', async ({ api, signIn }) => {
   const cert = await issueCert(api, (await createCA(api)).id)
+  const page = await ownSession(api, signIn)
   await openListOn(page, cert.common_name)
   const main = page.getByRole('main')
   await expect(main.getByRole('button', { name: cert.common_name, exact: true })).toBeVisible()
@@ -80,8 +87,9 @@ test('the list shows its seven columns whole and the inspector opens in the page
   await dock.getByRole('button', { name: 'Unfold the inspector' }).click()
 })
 
-test('the inspector band grows to 420 px and Escape closes it from the list', async ({ page, api }) => {
+test('the inspector band grows to 420 px and Escape closes it from the list', async ({ api, signIn }) => {
   const cert = await issueCert(api, (await createCA(api)).id)
+  const page = await ownSession(api, signIn)
   await openListOn(page, cert.common_name)
   const main = page.getByRole('main')
   await main.getByRole('button', { name: cert.common_name, exact: true }).click()
