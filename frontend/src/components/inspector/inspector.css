@@ -329,10 +329,20 @@
 .ins-dock.is-right .ins-sk-panel, .ins-dock.is-mobile .ins-sk-panel { grid-template-columns: 1fr; }
 .ins-sk-col { display: flex; flex-direction: column; gap: 12px; }
 
+/* Narrower windows, as the mockup: tighter overview under 1250 px; under 1000 px two columns
+   without the mini-chain (the Chain tab keeps it), closer tabs, an 18 px page gutter */
+@media (max-width: 1250px) {
+  .ins-overview:not([data-columns="1"]) { grid-template-columns: 1fr 1.2fr 1fr; gap: 20px; }
+  .ins-overview:not([data-columns="1"]) > section + section { padding-left: 20px; }
+  .ins-props { grid-template-columns: 100px minmax(0, 1fr); gap: 10px; }
+}
 @media (max-width: 1000px) {
-  .ins-overview:not([data-columns="1"]) { display: flex; flex-direction: column; gap: 20px; }
-  .ins-overview:not([data-columns="1"]) > section + section { border-left: 0; border-top: 1px solid var(--line); padding: 18px 0 0; }
-  .ins-extensions { grid-template-columns: 1fr; }
+  .ins-overview:not([data-columns="1"]) { grid-template-columns: 1fr 1.2fr; }
+  .ins-overview:not([data-columns="1"]) > .ins-overview-chain { display: none; }
+  .ins-detail-tabs { gap: 17px; }
+  .ins-title h2 { font-size: 14px; }
+  .ins-dock.is-bottom { margin: 0 18px; }
+  .ins-dock.is-right { margin-right: 18px; }
 }
 /* Full screen on a phone: the touch metrics of the mockup (strip, heading, actions, section tabs, panel) */
 .ins-dock.is-mobile .ins-bar { height: 47px; min-height: 47px; }

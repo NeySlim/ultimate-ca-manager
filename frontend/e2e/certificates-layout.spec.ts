@@ -142,3 +142,22 @@ test.describe('on a phone', () => {
   })
 })
 
+
+test.describe('at 1000 px', () => {
+  test.use({ viewport: { width: 1000, height: 1000 } })
+
+  test('keeps one row action, the columns tool by its icon, an overview in two columns', async ({ page, api }) => {
+    const cert = await issueCert(api, (await createCA(api)).id)
+    await page.goto('/certificates')
+    const main = page.getByRole('main')
+    const row = main.getByRole('row', { name: new RegExp(cert.common_name.replace(/\./g, '\\.')) })
+    await expect(row).toBeVisible()
+    await expect(row.locator('.lv-row-actions .lv-icon-btn:visible')).toHaveCount(1)
+    expect(Math.round((await box(main.getByRole('button', { name: 'Columns' }))).width)).toBe(41)
+    await main.getByRole('button', { name: cert.common_name, exact: true }).click()
+    const overview = page.getByTestId('certificate-overview')
+    await expect(overview).toBeVisible()
+    expect(await overview.evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(2)
+    await expect(overview.locator('.ins-overview-chain')).toBeHidden()
+  })
+})

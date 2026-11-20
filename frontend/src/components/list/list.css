@@ -259,7 +259,7 @@
 .has-dock-right .lv-due { gap: 8px; }
 .has-dock-right .lv-row-actions .lv-icon-btn:first-child:not(:last-child) { display: none; }
 .lv-table th:last-child,
-.lv-table td:last-child { padding-right: 12px; }
+.lv-table td:last-child { padding-right: 14px; }
 .lv-table tbody tr { transition: background-color 120ms ease; }
 .lv-table tbody tr.is-clickable { cursor: pointer; }
 .lv-table tbody tr:hover { background: var(--hover); }
@@ -476,6 +476,22 @@
 .lv-dialog-list > .lv-btn.is-danger { background: var(--badbg); border-color: var(--bad); color: var(--bad); }
 .lv-check-line { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 7px; border-bottom: 1px solid var(--line); font-size: 12px; cursor: pointer; }
 :root[data-theme="aurore"] .lv-dialog { border-radius: 8px; }
+
+/* Narrower windows, as the mockup: one row action under 1250 px, 10 px cells under 1100 px,
+   an 18 px gutter, tools by their icon and filters of 140 px at most under 1000 px */
+@media (max-width: 1250px) {
+  .lv-row-actions .lv-icon-btn:first-child:not(:last-child) { display: none; }
+}
+@media (max-width: 1100px) {
+  .lv-table :is(th, td):not(:first-child) { padding-left: 10px; padding-right: 10px; }
+}
+@media (max-width: 1000px) {
+  .lv-stage { --lv-gutter: 18px; }
+  .lv-views-row { flex-wrap: wrap; gap: 0; }
+  .lv-views-aside { display: none; }
+  .lv-toolbar .lv-btn > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .lv-toolbar .lv-filter > button { max-width: 140px; }
+}
 
 @media (max-width: 800px) {
   /* A secondary page action keeps its icon only (its name stays readable by assistive technology) */

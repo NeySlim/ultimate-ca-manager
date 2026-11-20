@@ -236,7 +236,7 @@ export function CertificateOverview({ cert, title, columns, openCa, onOpenRelate
       <div className="ins-overview" data-columns={columns} data-testid="certificate-overview">
         <Validity cert={cert} />
         <Identity cert={cert} onOpenRelated={onOpenRelated} />
-        <section aria-labelledby="ins-chain-title">
+        <section className="ins-overview-chain" aria-labelledby="ins-chain-title">
           <h3 id="ins-chain-title" className="ins-section-title">{t('inspector.cert.chainOfTrust')}</h3>
           <MiniChain cert={cert} title={title} openCa={openCa} />
           {cert.chain_status?.status === 'incomplete' && (
