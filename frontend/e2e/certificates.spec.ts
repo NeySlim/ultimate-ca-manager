@@ -86,7 +86,7 @@ test('a certificate revoked from the inspector is listed by the next CRL', async
   const cert = await issueCert(api, ca.id)
   const panel = await openInInspector(page, cert.common_name)
   await moreAction(page, panel, cert.common_name, 'Revoke the certificate…')
-  const dialog = page.getByRole('dialog', { name: 'Revoke certificate' })
+  const dialog = page.getByRole('dialog', { name: 'Revoke this certificate?' })
   await dialog.getByRole('button', { name: 'Revoke', exact: true }).click()
   await expect(dialog).toBeHidden()
 

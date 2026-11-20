@@ -109,15 +109,15 @@ test('a field out of its bounds takes the error border, is named in the bar and 
   await expect(field).toHaveAttribute('aria-invalid', 'true')
   await expect(general.getByText('Duration out of range: a whole number from 5 to 1440 minutes.')).toBeVisible()
   // The border itself turns to the error colour, not only the ring
-  const colours = await field.evaluate((el) => {
+  // Asked until it holds: the border colour eases in
+  await expect.poll(() => field.evaluate((el) => {
     const probe = document.createElement('span')
     probe.style.color = 'var(--bad)'
     document.body.append(probe)
     const bad = getComputedStyle(probe).color
     probe.remove()
-    return { border: getComputedStyle(el).borderTopColor, bad }
-  })
-  expect(colours.border).toBe(colours.bad)
+    return getComputedStyle(el).borderTopColor === bad
+  })).toBe(true)
   expect(sent).toBe(false)
   await bar.getByRole('button', { name: 'Undo changes' }).click()
 })
