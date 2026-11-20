@@ -6,6 +6,7 @@ import * as Dialog from '@radix-ui/react-dialog'
 import { X } from '@phosphor-icons/react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/utils'
+import { escapeYielded } from './dialogEscape'
 import './list.css'
 
 // Initial focus, as the mockup: an element marked data-autofocus (the safe action of a confirmation),
@@ -29,7 +30,8 @@ export function ListDialog({ open, onOpenChange, title, subtitle, narrow = true,
       <Dialog.Portal>
         <Dialog.Overlay className="lv-dialog-backdrop" />
         <Dialog.Content className={cn('lv-dialog', wide ? 'is-wide' : narrow && 'is-narrow', className)} data-testid={testId}
-          aria-describedby={undefined} onOpenAutoFocus={focusFirstField}>
+          aria-describedby={undefined} onOpenAutoFocus={focusFirstField}
+          onKeyDown={(e) => { if (e.key === 'Escape' && escapeYielded(e.nativeEvent)) onOpenChange?.(false) }}>
           <header className="lv-dialog-head">
             <div>
               <Dialog.Title asChild><h2>{title}</h2></Dialog.Title>

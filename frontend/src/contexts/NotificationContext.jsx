@@ -7,6 +7,7 @@ import { CheckCircle, Warning, Info, X } from '@phosphor-icons/react'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
 import { ListDialog } from '../components/list/ListDialog'
+import { yieldEscapeToDialog } from '../components/list/dialogEscape'
 import { useTranslation } from 'react-i18next'
 
 const NotificationContext = createContext()
@@ -116,6 +117,7 @@ export function NotificationProvider({ children }) {
               open={true}
               duration={toast.duration > 0 ? toast.duration : Infinity}
               onOpenChange={() => removeToast(toast.id)}
+              onEscapeKeyDown={yieldEscapeToDialog}
             >
               {held && <Icon className="ui-toast-icon" aria-hidden="true" />}
               <Toast.Description className="ui-toast-text">{toast.message}</Toast.Description>
