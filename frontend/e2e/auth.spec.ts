@@ -8,7 +8,7 @@ test.describe('sign-in and session', () => {
     await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 
     await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible()
-    await expect(page.getByRole('button', { name: `My Account: ${ADMIN_USER}` })).toBeVisible()
+    await expect(page.getByRole('button', { name: new RegExp(`^Account: ${ADMIN_USER}, `) })).toBeVisible()
     const verify = await (await page.request.get('/api/v2/auth/verify')).json()
     expect(verify.data).toMatchObject({ authenticated: true, user: { username: ADMIN_USER } })
   })
@@ -29,8 +29,8 @@ test.describe('sign-in and session', () => {
 
   test('sign out from the account menu ends the session', async ({ page, api }) => {
     await page.goto('/')
-    await page.getByRole('button', { name: `My Account: ${ADMIN_USER}` }).click()
-    await page.getByRole('button', { name: 'Sign Out' }).click()
+    await page.getByRole('button', { name: new RegExp(`^Account: ${ADMIN_USER}, `) }).click()
+    await page.getByRole('button', { name: 'Sign out' }).click()
 
     await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible()
     expect(await api.status('GET', '/certificates')).toBe(401)
@@ -55,14 +55,17 @@ test.describe('sign-in and session', () => {
 })
 
 test.describe('preferences', () => {
-  test('French chosen in the account menu applies, survives a reload and is stored', async ({ api, signIn }) => {
+  test('French chosen on My account applies, survives a reload and is stored', async ({ api, signIn }) => {
     const user = await createUser(api, 'viewer')
     const { page, api: own } = await signIn(user.username, user.password)
+    // The account menu leads to My account, which carries the language
     await page.goto('/')
-    await page.getByRole('button', { name: `My Account: ${user.username}` }).click()
+    await page.getByRole('button', { name: new RegExp(`^Account: ${user.username}, `) }).click()
+    await page.getByRole('link', { name: 'My Account' }).click()
     const stored = page.waitForResponse(r => r.url().endsWith('/api/v2/account/preferences') && r.request().method() === 'PUT')
-    await page.getByRole('group', { name: 'Language' }).getByRole('button', { name: 'Français' }).click()
+    await page.getByRole('combobox', { name: 'Language' }).selectOption('fr')
     expect((await stored).status()).toBe(200)
+    await page.goto('/')
 
     await expect(page.getByRole('heading', { level: 1, name: "Vue d'ensemble" })).toBeVisible()
     await expect(page.locator('html')).toHaveAttribute('lang', 'fr')
@@ -75,7 +78,7 @@ test.describe('preferences', () => {
     const user = await createUser(api, 'viewer')
     const { page } = await signIn(user.username, user.password)
     await page.goto('/')
-    await page.getByRole('button', { name: 'Theme', exact: true }).click()
+    await page.getByRole('button', { name: /^Theme: / }).click()
     await page.getByRole('radiogroup', { name: 'Appearance Mode' }).getByRole('radio', { name: 'Dark' }).click()
 
     await expect(page.locator('html')).toHaveAttribute('data-mode', 'dark')

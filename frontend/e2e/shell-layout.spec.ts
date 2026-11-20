@@ -49,7 +49,7 @@ test('the status bar keeps the bottom of the window under the open dock', async 
   }
 })
 
-test('the expiry badge overlaps no link of the bar, its own included', async ({ page, api }) => {
+test('the expiry count sits on its own link: no other link covered, the link keeps its width', async ({ page, api }) => {
   await issueCert(api, (await createCA(api)).id, { validity_days: 3 })
   for (const width of [1440, 1280, 1100, 900]) {
     await page.setViewportSize({ width, height: 900 })
@@ -58,12 +58,14 @@ test('the expiry badge overlaps no link of the bar, its own included', async ({ 
       const nav = page.getByRole('navigation', { name: 'Main navigation' })
       const badge = nav.locator('.shell-badge')
       await expect(badge).toBeVisible()
+      const own = nav.locator('a.shell-navlink[data-module="certificates"]')
+      await expect(own).toContainText(/certificates? expir/)
       const b = await box(badge)
-      // Its own link too: an active link paints its background over what it covers
-      for (const link of await nav.locator('a.shell-navlink').all()) {
+      for (const link of await nav.locator('a.shell-navlink:not([data-module="certificates"])').all()) {
         expect(apart(b, await box(link)), `${path} at ${width}: ${await link.getAttribute('data-module')}`).toBe(true)
       }
-      // The count is not clipped by its own pill
+      // The count adds no tab stop and is not clipped by its own pill
+      await expect(nav.locator('button.shell-badge')).toHaveCount(0)
       expect(await badge.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
     }
   }

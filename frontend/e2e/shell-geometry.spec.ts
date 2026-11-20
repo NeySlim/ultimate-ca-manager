@@ -76,3 +76,85 @@ for (const width of [1600, 390]) {
     await expect(panel).toBeHidden()
   })
 }
+
+// Intermediate widths fold the bar as the mockup: pins leave at 1100 px, icons and help at 1000 px
+for (const width of [1250, 1100, 1000, 900, 801]) {
+  test(`the top bar folds without overlap or empty box at ${width}px`, async ({ page, api }) => {
+    const prefs = (await api.get('/account/preferences')) || {}
+    await api.put('/account/preferences', { ...prefs, pins: ['reports', 'users', 'hsm'] })
+    try {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/certificates')
+      const nav = page.getByRole('navigation', { name: 'Main navigation' })
+      if (width <= 1100) for (const pin of await nav.locator('.shell-pinned').all()) await expect(pin).toBeHidden()
+      else await expect(nav.locator('.shell-pinned')).toHaveCount(3)
+      // Every visible item of the bar shows something, and none runs over the search
+      const search = await box(page.locator('.shell-search'))
+      for (const item of await nav.locator('.shell-navlink').all()) {
+        if (!(await item.isVisible())) continue
+        const b = await box(item)
+        expect(b.x + b.width).toBeLessThanOrEqual(search.x + EPS)
+        expect(b.width).toBeGreaterThan(30)
+      }
+      if (width <= 1000) for (const help of await page.locator('.shell-help').all()) await expect(help).toBeHidden()
+    } finally {
+      await api.put('/account/preferences', prefs)
+    }
+  })
+}
+
+test('the search field, its key and the status dot keep the mockup sizes', async ({ page, api }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  await page.goto('/certificates')
+  const search = await box(page.locator('.shell-search'))
+  expect(Math.abs(search.width - 177)).toBeLessThanOrEqual(EPS)
+  expect(Math.abs(search.height - 35)).toBeLessThanOrEqual(EPS)
+  expect(Math.abs((await box(page.locator('.shell-search kbd'))).height - 21)).toBeLessThanOrEqual(EPS)
+  const dot = await box(page.locator('.shell-statusbar .shell-dot'))
+  expect(Math.abs(dot.width - 6)).toBeLessThanOrEqual(0.5)
+})
+
+test('wide screens give the bars and the page 34 px margins', async ({ page, api }) => {
+  await page.setViewportSize({ width: 1920, height: 1000 })
+  await page.goto('/certificates')
+  expect(Math.abs((await box(page.locator('.shell-brand'))).x - 34)).toBeLessThanOrEqual(EPS)
+  expect(Math.abs((await box(page.locator('.shell-statusbar .shell-dot'))).x - 34)).toBeLessThanOrEqual(EPS)
+})
+
+test('a phone reads the whole page name in the picker, keeps 44 px targets and scrolls the whole document', async ({ page, api }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/certificates')
+  const picker = page.getByRole('combobox', { name: 'Navigate' })
+  const p = await box(picker)
+  expect(p.width).toBeGreaterThanOrEqual(133)
+  expect(await picker.evaluate(el => getComputedStyle(el).fontSize)).toBe('12px')
+  for (const target of await page.locator('.shell-tools > *:visible, .shell-tools .shell-pop-wrap > button').all()) {
+    if (!(await target.isVisible())) continue
+    const b = await box(target)
+    expect(b.height).toBeGreaterThanOrEqual(44 - EPS)
+  }
+  await expect(page.locator('.shell-help')).toBeHidden()
+  // The status bar ends the document; the top bar sticks while it scrolls
+  const docHeight = await page.evaluate(() => document.documentElement.scrollHeight)
+  const status = await box(page.getByRole('contentinfo'))
+  if (docHeight > 844) expect(status.y).toBeGreaterThan(844)
+  await page.evaluate(() => window.scrollTo({ top: 400, behavior: 'instant' }))
+  expect(Math.abs((await box(page.locator('.shell-topbar'))).y)).toBeLessThanOrEqual(EPS)
+})
+
+test('offline, the banner says so and the write buttons wait for the network', async ({ page, context, api }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  await page.goto('/certificates')
+  const issue = page.locator('.lv-head .lv-btn.is-primary')
+  await expect(issue).toBeEnabled()
+  await context.setOffline(true)
+  try {
+    await expect(page.locator('#shell-offline-banner')).toBeVisible()
+    await expect(issue).toBeDisabled()
+    await expect(issue).toHaveAttribute('aria-describedby', 'shell-offline-note')
+  } finally {
+    await context.setOffline(false)
+  }
+  await expect(page.locator('#shell-offline-banner')).toHaveCount(0)
+  await expect(issue).toBeEnabled()
+})
