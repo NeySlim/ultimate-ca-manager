@@ -4,9 +4,9 @@
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CheckCircle, Check, Prohibit } from '@phosphor-icons/react'
+import { CheckCircle, Prohibit } from '@phosphor-icons/react'
 import { StatusPill } from '../../components/list'
-import { WorkButton, WorkRecord, WorkRecords } from '../../components/work'
+import { WorkButton, WorkRecord, WorkRecords, CheckIcon } from '../../components/work'
 import { SectionTabs, tabId, panelId } from '../../components/inspector/InspectorTabs'
 import { usePermission } from '../../hooks'
 import { useOpenEntity } from '../../hooks/useOpenEntity'
@@ -53,8 +53,8 @@ export function ApprovalRequestPanel({ req }) {
   const pending = req.status === 'pending'
   const vote = lastVote(req)
   const ca = useCaLabel(s.ca_id || s.target_ca_id)
-  const link = (type, id, text) => (
-    <button type="button" className="ins-link" onClick={() => openEntity(type, id)}>{text}</button>
+  const link = (type, id, text, quiet) => (
+    <button type="button" className={quiet ? 'ins-link wk-quiet-link' : 'ins-link'} onClick={() => openEntity(type, id)}>{text}</button>
   )
   const caText = (id) => (ca?.name
     ? <>{ca.name} <span className="ins-muted">· {t('cas.tree.level', { level: ca.level })}</span></>
@@ -80,8 +80,9 @@ export function ApprovalRequestPanel({ req }) {
       <Section title={signing ? t('approvals.work.detail.csr') : t('approvals.work.detail.object')}>
         <Props rows={[
           s.cn && [t('approvals.work.detail.subject'), req.request_type === 'csr' ? `CN=${s.cn}` : s.cn],
-          s.ca_id && [t('approvals.work.detail.ca'), link('ca', s.ca_id, caText(s.ca_id))],
-          s.target_ca_id && [t('approvals.work.detail.ca'), link('ca', s.target_ca_id, caText(s.target_ca_id))],
+          // The authority reads as the mockup's plain text, still opening the CA
+          s.ca_id && [t('approvals.work.detail.ca'), link('ca', s.ca_id, caText(s.ca_id), true)],
+          s.target_ca_id && [t('approvals.work.detail.ca'), link('ca', s.target_ca_id, caText(s.target_ca_id), true)],
           s.csr_id && [t('approvals.work.detail.csrId'), `#${s.csr_id}`],
           target && [t('approvals.certificateId'), link('certificate', target, `#${target}`)],
           s.serial_number && [t('approvals.summarySerial'), <span className="ins-mono">{s.serial_number}</span>],
@@ -159,7 +160,7 @@ export function ApprovalDetail({ data: req, objectKey, title, section, onSection
         </div>
         {pending && canWrite('approvals') && (
           <div className="ins-actions">
-            <WorkButton icon={Check} onClick={() => decision.open('approve', [req])}
+            <WorkButton icon={CheckIcon} onClick={() => decision.open('approve', [req])}
               aria-label={t('approvals.work.approveNamed', { name: title })}>{t('approvals.work.approveAsk')}</WorkButton>
             <WorkButton quiet icon={Prohibit} onClick={() => decision.open('reject', [req])}
               aria-label={t('approvals.work.rejectNamed', { name: title })}>{t('approvals.work.rejectAsk')}</WorkButton>

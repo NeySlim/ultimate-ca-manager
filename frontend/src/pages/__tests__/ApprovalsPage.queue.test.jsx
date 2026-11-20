@@ -86,11 +86,22 @@ describe('ApprovalsPage queue', () => {
     expect(within(li).getByText('dans 28 h')).toBeInTheDocument()
   })
 
+  it('draws the mockup\'s simple check on Approve…, in the row and in the dialog', async () => {
+    renderPage()
+    const button = await screen.findByRole('button', { name: 'Approuver CSR à signer : payments.example.com' })
+    expect(button.querySelector('svg path')).toHaveAttribute('d', 'm5 12 4 4L19 6')
+    fireEvent.click(button)
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByTestId('decision-confirm').querySelector('svg path')).toHaveAttribute('d', 'm5 12 4 4L19 6')
+  })
+
   it('refuses a rejection without a reason, as the server would', async () => {
     renderPage()
     fireEvent.click(await screen.findByRole('button', { name: 'Refuser CSR à signer : payments.example.com' }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('Refuser la demande')).toBeInTheDocument()
+    // The mockup's field: 200 characters at most
+    expect(within(dialog).getByLabelText('Motif')).toHaveAttribute('maxlength', '200')
     fireEvent.click(within(dialog).getByTestId('decision-confirm'))
     expect(await within(dialog).findByText('Indiquez le motif du refus, 5 caractères au moins.')).toBeInTheDocument()
     expect(within(dialog).getByLabelText('Motif')).toHaveAttribute('aria-invalid', 'true')
@@ -152,6 +163,8 @@ describe('ApprovalsPage queue', () => {
     fireEvent.click(within(screen.getByRole('group', { name: 'Actions groupées' })).getByRole('button', { name: /Refuser…/ }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('2 demandes')).toBeInTheDocument()
+    // The notice is the one sentence of the decision, as the mockup's
+    expect(dialog.querySelector('.wk-notice')).toHaveTextContent(/^Les demandes quittent la file, la barre d’état et la carte À traiter\.$/)
     fireEvent.change(within(dialog).getByLabelText('Motif'), { target: { value: 'Mauvais modèle' } })
     fireEvent.click(within(dialog).getByTestId('decision-confirm'))
     await waitFor(() => expect(success).toHaveBeenCalledWith('2 demandes refusées'))

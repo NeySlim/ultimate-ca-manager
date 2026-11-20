@@ -3,9 +3,9 @@
  * may take on it), then the Request and Log sections.
  */
 import { useTranslation } from 'react-i18next'
-import { Vault, Check, Prohibit, DownloadSimple } from '@phosphor-icons/react'
+import { Vault, Prohibit, DownloadSimple } from '@phosphor-icons/react'
 import { StatusPill } from '../../components/list'
-import { WorkButton, WorkRecord, WorkRecords } from '../../components/work'
+import { WorkButton, WorkRecord, WorkRecords, CheckIcon } from '../../components/work'
 import { SectionTabs, tabId, panelId } from '../../components/inspector/InspectorTabs'
 import { usePermission } from '../../hooks'
 import { useOpenEntity } from '../../hooks/useOpenEntity'
@@ -57,7 +57,7 @@ export function KeyRecoveryDetail({ data: req, objectKey, title, section, onSect
           <StatusPill {...recoveryState(req, t)} />
         </div>
         <div className="ins-actions">
-          {rights.approve && <WorkButton icon={Check} onClick={() => actions.open('approve', [req])}>{t('keyRecovery.work.approveAsk')}</WorkButton>}
+          {rights.approve && <WorkButton icon={CheckIcon} onClick={() => actions.open('approve', [req])}>{t('keyRecovery.work.approveAsk')}</WorkButton>}
           {rights.reject && <WorkButton quiet icon={Prohibit} onClick={() => actions.open('reject', [req])}>{t('keyRecovery.work.rejectAsk')}</WorkButton>}
           {rights.recover && <WorkButton primary icon={DownloadSimple} onClick={() => actions.open('recover', [req])}>{t('keyRecovery.work.recoverAsk')}</WorkButton>}
         </div>

@@ -6,10 +6,10 @@
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, Prohibit, DownloadSimple } from '@phosphor-icons/react'
+import { Prohibit, DownloadSimple } from '@phosphor-icons/react'
 import { ResponsiveLayout } from '../components'
 import { StatusPill } from '../components/list'
-import { WorkQueue, WorkButton, WorkRecord, WorkRecords, workSpot, focusWork, loadCause } from '../components/work'
+import { WorkQueue, WorkButton, WorkRecord, WorkRecords, workSpot, focusWork, loadCause, CheckIcon } from '../components/work'
 import { keyRecoveryService } from '../services'
 import { useNotification, useInspector } from '../contexts'
 import { usePermission } from '../hooks'
@@ -110,10 +110,10 @@ export default function KeyRecoveryPage() {
     return (
       <>
         {rights.approve ? (
-          <WorkButton icon={Check} disabled={disabled} onClick={() => ask('approve', [req])}
+          <WorkButton icon={CheckIcon} disabled={disabled} onClick={() => ask('approve', [req])}
             aria-label={t('keyRecovery.work.approveNamed', { name })}>{t('keyRecovery.work.approveAsk')}</WorkButton>
         ) : approveSlot && (
-          <span className="wk-btn is-placeholder" aria-hidden="true"><Check aria-hidden="true" />{t('keyRecovery.work.approveAsk')}</span>
+          <span className="wk-btn is-placeholder" aria-hidden="true"><CheckIcon aria-hidden="true" />{t('keyRecovery.work.approveAsk')}</span>
         )}
         {rights.reject && (
           <WorkButton quiet icon={Prohibit} disabled={disabled} onClick={() => ask('reject', [req])}
@@ -161,7 +161,7 @@ export default function KeyRecoveryPage() {
     const reqs = ids.map((id) => pendingById.get(id)).filter(Boolean)
     return (
       <>
-        <WorkButton icon={Check} onClick={() => ask('approve', reqs)}>{t('keyRecovery.work.approveAsk')}</WorkButton>
+        <WorkButton icon={CheckIcon} onClick={() => ask('approve', reqs)}>{t('keyRecovery.work.approveAsk')}</WorkButton>
         <WorkButton quiet icon={Prohibit} onClick={() => ask('reject', reqs)}>{t('keyRecovery.work.rejectAsk')}</WorkButton>
       </>
     )

@@ -56,6 +56,20 @@ test.describe('desktop', () => {
     }
   })
 
+  test('the figure link of a report is the mockup text link, 13 px on a 24 px line', async ({ page, api }) => {
+    await page.goto('/reports')
+    const main = page.getByRole('main')
+    // The inventory is queued or folded, as other tests leave the schedule
+    const folded = main.getByRole('button', { name: /^Not scheduled/ })
+    if ((await folded.getAttribute('aria-expanded')) === 'false') await folded.click()
+    await main.getByRole('button', { name: 'Certificate Inventory', exact: true }).first().click()
+    const link = page.getByRole('link', { name: 'See these certificates' })
+    await expect(link).toBeVisible()
+    expect(Math.round((await box(link)).height)).toBe(24)
+    expect(await css(link, 'font-size')).toBe('13px')
+    expect(Math.round((await box(link.locator('svg'))).width)).toBe(17)
+  })
+
   test('an empty approvals queue says so in the mockup panel', async ({ page, api }) => {
     await page.goto('/approvals')
     const main = page.getByRole('main')
@@ -82,5 +96,26 @@ test.describe('phone', () => {
     expect(Math.round(390 - (p.x + p.width))).toBe(16)
     // Asked at once: the loading skeleton fits the screen too
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  })
+
+  test('the reports head keeps the mockup one action; the PDF composer is under the queue, 40 px', async ({ page, api }) => {
+    await page.goto('/reports')
+    const head = page.locator('.lv-head')
+    await expect(head.getByRole('button', { name: 'Schedule a report' })).toBeVisible()
+    await expect(head.getByRole('button', { name: 'Build a PDF…' })).toBeHidden()
+    const pdf = page.getByRole('main').locator('.wk-phone-only').getByRole('button', { name: 'Build a PDF…' })
+    await expect(pdf).toBeVisible()
+    expect(Math.round((await box(pdf)).height)).toBe(40)
+  })
+
+  test('the buttons of a report inspector heading are 40 px, as the mockup dock', async ({ page, api }) => {
+    await page.goto('/reports')
+    const main = page.getByRole('main')
+    const folded = main.getByRole('button', { name: /^Not scheduled/ })
+    if ((await folded.getAttribute('aria-expanded')) === 'false') await folded.click()
+    await main.getByRole('button', { name: 'Certificate Inventory', exact: true }).first().click()
+    const download = page.locator('.ins-actions').getByRole('button', { name: 'Download' })
+    await expect(download).toBeVisible()
+    expect(Math.round((await box(download)).height)).toBe(40)
   })
 })

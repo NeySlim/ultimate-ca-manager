@@ -84,16 +84,59 @@ describe('KeyRecoveryPage queue', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Refuser la récupération de cn-one' }))
     let dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByTestId('recovery-confirm')).toHaveTextContent('Refuser')
+    fireEvent.change(within(dialog).getByLabelText('Motif'), { target: { value: 'Clé encore utilisée' } })
     fireEvent.click(within(dialog).getByTestId('recovery-confirm'))
     await waitFor(() => expect(success).toHaveBeenCalledWith('Demande #1 refusée'))
+    expect(api.reject).toHaveBeenCalledWith(1, 'Clé encore utilisée')
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     fireEvent.click(screen.getByRole('checkbox', { name: 'Tout sélectionner : À approuver par un autre administrateur' }))
     fireEvent.click(within(screen.getByRole('group', { name: 'Actions groupées' })).getByRole('button', { name: /Refuser/ }))
     dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('Motif'), { target: { value: 'Clé encore utilisée' } })
     fireEvent.click(within(dialog).getByTestId('recovery-confirm'))
     await waitFor(() => expect(success).toHaveBeenCalledWith('2 demandes refusées'))
     expect(screen.queryByTestId('bulk-outcome')).toBeNull()
     success.mockRestore()
+  })
+
+  it('refuses a rejection without a reason of five characters, as every refusal of the queues', async () => {
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Refuser la récupération de cn-one' }))
+    const dialog = await screen.findByRole('dialog')
+    const reason = within(dialog).getByLabelText('Motif')
+    expect(reason).toHaveAttribute('maxlength', '200')
+    expect(within(dialog).getByText('Obligatoire pour un refus : ajouté au journal avec la décision.')).toBeInTheDocument()
+    fireEvent.change(reason, { target: { value: 'non' } })
+    fireEvent.click(within(dialog).getByTestId('recovery-confirm'))
+    expect(await within(dialog).findByText('Indiquez le motif du refus, 5 caractères au moins.')).toBeInTheDocument()
+    expect(reason).toHaveAttribute('aria-invalid', 'true')
+    expect(reason).toHaveFocus()
+    expect(api.reject).not.toHaveBeenCalled()
+  })
+
+  it('puts the password error between the field and its hint, as the mockup\'s fields', async () => {
+    rows = [{ ...req(2, 'approved', 'cn-two'), decided_by: 'carol' }]
+    renderPage()
+    // The facts of the row name who decided, as the request reads
+    expect(await screen.findByText(/· Décidée par carol$/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Récupérer la clé de cn-two' }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('Mot de passe PKCS#12'), { target: { value: 'court' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Télécharger .p12' }))
+    const error = await within(dialog).findByText('Le mot de passe doit faire au moins 8 caractères.')
+    const field = error.closest('.wk-field')
+    expect([...field.children].map((el) => el.tagName)).toEqual(['LABEL', 'INPUT', 'P', 'SMALL'])
+    expect(within(field).getByText('Au moins 8 caractères.')).toBeInTheDocument()
+    expect(api.recover).not.toHaveBeenCalled()
+  })
+
+  it('names the approval note in the feminine, optional', async () => {
+    dual = false
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Approuver la récupération de cn-one' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('facultative').closest('label')).toHaveTextContent('Note facultative')
+    expect(within(dialog).getByText('Conservée avec la décision.')).toBeInTheDocument()
   })
 
   it('gives the focus back to the row button when a decision is left with Escape', async () => {
@@ -180,6 +223,7 @@ describe('KeyRecoveryPage queue', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Tout sélectionner : À approuver par un autre administrateur' }))
     fireEvent.click(within(screen.getByRole('group', { name: 'Actions groupées' })).getByRole('button', { name: /Refuser/ }))
     const dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('Motif'), { target: { value: 'Clé encore utilisée' } })
     fireEvent.click(within(dialog).getByTestId('recovery-confirm'))
     const outcome = await within(dialog).findByTestId('bulk-outcome')
     expect(within(outcome).getByRole('status')).toHaveTextContent('1 réussie, 1 échouée')
