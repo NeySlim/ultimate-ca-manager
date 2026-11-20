@@ -109,6 +109,7 @@ export function IssueCertificateDialog({
   useEffect(() => { if (!open) { setStep(1); setResult(null) } }, [open])
 
   const close = () => onOpenChange(false)
+  // Escape and the close button both go through here: neither closes while the request is out
   const changeOpen = (next) => { if (next || !sendingRef.current) onOpenChange(next) }
   const busy = (on) => { sendingRef.current = on; setSending(on) }
 
@@ -193,8 +194,7 @@ export function IssueCertificateDialog({
           }}
           // A modal of the Atelier closes by its buttons or Escape, never by a click beside it
           onPointerDownOutside={(e) => e.preventDefault()}
-          onInteractOutside={(e) => e.preventDefault()}
-          onEscapeKeyDown={(e) => { if (sendingRef.current) e.preventDefault() }}>
+          onInteractOutside={(e) => e.preventDefault()}>
           <header className="iss-head">
             <div>
               <Dialog.Title asChild><h2>{title}</h2></Dialog.Title>

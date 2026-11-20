@@ -93,6 +93,21 @@ test.describe('desktop, errors', () => {
     // Advanced stays folded: nothing of it is in error
     await expect(dialog.getByRole('button', { name: /Advanced/ })).toHaveAttribute('aria-expanded', 'false')
   })
+
+  test('placeholders take the muted text colour of the theme', async ({ page, api }) => {
+    await page.goto('/certificates?action=create')
+    const dialog = page.getByRole('dialog', { name: 'Issue a certificate' })
+    await expect(dialog).toBeVisible()
+    const colours = await dialog.getByLabel('Common name').evaluate((el) => {
+      const probe = document.createElement('span')
+      probe.style.color = 'var(--muted)'
+      el.parentElement.appendChild(probe)
+      const muted = getComputedStyle(probe).color
+      probe.remove()
+      return { muted, placeholder: getComputedStyle(el, '::placeholder').color }
+    })
+    expect(colours.placeholder).toBe(colours.muted)
+  })
 })
 
 test.describe('narrow phone', () => {

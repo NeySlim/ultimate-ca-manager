@@ -15,7 +15,7 @@ const EC_CURVES = { secp256r1: 'P-256', prime256v1: 'P-256', secp384r1: 'P-384',
  */
 export function certificateKeyLabel(cert, t) {
   const type = String(cert?.key_type || '').trim()
-  const ec = /^EC(?:DSA)?\s+(\S+)$/i.exec(type)
+  const ec = /^EC\s+(\S+)$/i.exec(type)
   if (ec) return `ECDSA ${EC_CURVES[ec[1].toLowerCase()] || ec[1]}`
   if (/^RSA\s+\d+$/i.test(type)) return type
   const row = algorithmForKeyType(type)
