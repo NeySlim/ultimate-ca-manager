@@ -49,7 +49,8 @@ describe('#386 test email recipient', () => {
   it('keeps a typed recipient after saving', async () => {
     settingsService.updateEmailSettings = vi.fn().mockResolvedValue({})
     renderSettings()
-    await waitFor(() => expect(settingsService.getEmailSettings).toHaveBeenCalled())
+    // The sections show once every first load has answered, not when the email one is sent
+    await screen.findByText('set-recipient')
     await click('set-recipient')
     const loads = settingsService.getEmailSettings.mock.calls.length
     await click('save')
