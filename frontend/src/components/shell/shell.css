@@ -80,11 +80,11 @@
 }
 .shell-pin-label { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
 .shell-navicon { position: relative; display: inline-flex; }
-/* Expiry count on the Certificates icon, drawn as the bell's count: outside the link's layout */
+/* Expiry count above the Certificates icon, out of the link's layout: it covers neither the icon nor the label */
 .shell-badge {
   position: absolute;
-  top: -8px;
-  left: 9px;
+  top: -18px;
+  left: 8px;
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
@@ -440,7 +440,8 @@ button.shell-ha-link:hover { background: var(--hover); }
   .shell-navlink { padding: 0 9px; }
   .shell-navlink.is-active::after { left: 9px; right: 9px; }
   .shell-main-nav .shell-navlink svg { display: none; }
-  .shell-badge { position: static; margin-left: 2px; }
+  /* The icon's box leaves the flow with its icon: the label starts at the padding, the count stays above it */
+  .shell-main-nav .shell-navicon { position: absolute; left: 9px; top: 50%; width: 16px; height: 16px; margin-top: -8px; }
   .shell-search { min-width: 64px; }
 }
 
