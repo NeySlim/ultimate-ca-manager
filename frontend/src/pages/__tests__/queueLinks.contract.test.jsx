@@ -56,7 +56,7 @@ const PAGES = {
 
 // What the API holds for object 7, by the path the page must ask for, and what the open page then shows
 const OBJECTS = {
-  approval_pending: { path: '/approvals/7', body: { id: ID, request_type: 'certificate', status: 'pending', requester_username: 'linked-requester' }, shows: 'linked-requester' },
+  approval_pending: { path: '/approvals/7', body: { id: ID, request_type: 'certificate', status: 'pending', requester_username: 'linked-requester', request_summary: { cn: 'linked-approval.example.com' } }, shows: 'linked-approval.example.com' },
   scep_request_pending: { path: '/scep/requests/7', body: { id: ID, status: 'pending', subject: 'CN=linked-scep', transaction_id: 'txn-linked' }, shows: 'txn-linked' },
   key_recovery_pending: { path: '/key-recovery/7', body: { id: ID, status: 'pending', cert_cn: 'linked-escrow.example.com', reason: 'r' }, shows: 'linked-escrow.example.com' },
   acme_order_failed: { path: '/acme/orders/7', body: { id: ID, domain: 'linked-local.example.com', status: 'Invalid', account: 'a', method: 'DNS', expires: '2026-01-01' }, shows: 'linked-local.example.com' },
@@ -97,7 +97,7 @@ describe('work-queue links open their object', () => {
 
   it('keeps the e-mail link /approvals?id=N working', async () => {
     render(<MemoryRouter initialEntries={['/approvals?id=7']}><ApprovalsPage /></MemoryRouter>)
-    expect((await screen.findAllByText('linked-requester')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('linked-approval.example.com')).length).toBeGreaterThan(0)
   })
 
   it.each([
@@ -118,7 +118,7 @@ describe('work-queue links open their object', () => {
     const done = { ...OBJECTS.approval_pending.body, status: 'approved' }
     api.get.mockImplementation(async (url) => (url === '/approvals/7' ? { data: done } : answer(url)))
     render(<MemoryRouter initialEntries={['/approvals?request=7']}><ApprovalsPage /></MemoryRouter>)
-    expect((await screen.findAllByText('linked-requester')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('linked-approval.example.com')).length).toBeGreaterThan(0)
     expect(notify.showInfo).toHaveBeenCalledWith('overview.link.handled')
   })
 

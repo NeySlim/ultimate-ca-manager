@@ -1,112 +1,93 @@
 /**
- * ApprovalsPage — Approval Request Management
- * View, approve, and reject certificate approval requests.
+ * ApprovalsPage: the open approval requests of every source (issue form, CSR
+ * signing, renewals, revocations, ACME, EST, SCEP, WSTEP) as a work queue grouped
+ * by deadline, approved or rejected one by one or together; the decided ones in
+ * the folded history. A subject opens the request in the inspector.
  */
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  Stamp, CheckCircle, XCircle, Clock, Warning, User,
-  ChatText, Gavel, Certificate, Funnel
-} from '@phosphor-icons/react'
-import {
-  ResponsiveLayout, ResponsiveDataTable, Card, Button, Badge,
-  Input, Modal, LoadingSpinner, Textarea
-} from '../components'
-import { approvalsService } from '../services'
-import { useNotification } from '../contexts'
+import { Link } from 'react-router-dom'
+import { Check, Prohibit, Gavel } from '@phosphor-icons/react'
+import { ResponsiveLayout } from '../components'
+import { StatusPill } from '../components/list'
+import { WorkQueue, WorkButton, WorkRecord, WorkRecords, workSpot, focusWork } from '../components/work'
+import { approvalsService, casService } from '../services'
+import { useNotification, useInspector } from '../contexts'
 import { usePermission } from '../hooks'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 import { useLinkedId } from '../hooks/useLinkedId'
-import { formatDate, cn } from '../lib/utils'
+import { formatDate } from '../lib/utils'
 import { stateLabel } from '../lib/stateLabel'
-import { showNotices } from '../lib/notices'
-import { approvedLocalOnlyRevocationWarning } from '../lib/revocationOutcome'
+import {
+  approvalGroups, requestTitle, typeLabel, subjectOf, requestKind, requestFacts, requestDeadline,
+  stateOf, decisionMeta,
+} from './approvals/approvalModel'
+import { useApprovalDecision } from './approvals/useApprovalDecision'
 
-// What a request asks for: labels resolved via t() inside component
-const REQUEST_TYPES = {
-  certificate: { labelKey: 'approvals.requestType.certificate', variant: 'info' },
-  csr: { labelKey: 'approvals.requestType.csr', variant: 'info' },
-  renewal: { labelKey: 'approvals.requestType.renewal', variant: 'success' },
-  revocation: { labelKey: 'approvals.requestType.revocation', variant: 'danger' },
-  ca_revocation: { labelKey: 'approvals.requestType.ca_revocation', variant: 'danger' },
-  cross_revocation: { labelKey: 'approvals.requestType.cross_revocation', variant: 'danger' },
-  // Held by a policy on an enrolment protocol; the approval issues through that protocol
-  acme_order: { labelKey: 'approvals.requestType.acme_order', variant: 'primary' },
-  est_enroll: { labelKey: 'approvals.requestType.est_enroll', variant: 'primary' },
-  scep_request: { labelKey: 'approvals.requestType.scep_request', variant: 'primary' },
-  wstep_request: { labelKey: 'approvals.requestType.wstep_request', variant: 'primary' },
-}
-
-function RequestTypeBadge({ type, t }) {
-  const known = REQUEST_TYPES[type]
-  return <Badge variant={known?.variant || 'default'}>{known ? t(known.labelKey) : type}</Badge>
-}
-
-const STATUS_VARIANTS = {
-  pending: 'warning',
-  approved: 'success',
-  rejected: 'danger',
-  expired: 'default',
-  cancelled: 'default',
-}
-
-const STATUS_ICONS = {
-  pending: Clock,
-  approved: CheckCircle,
-  rejected: XCircle,
-  expired: Warning,
-  cancelled: XCircle,
-}
+// The decided requests the history shows, newest first
+const HISTORY_SIZE = 100
 
 export default function ApprovalsPage() {
   const { t } = useTranslation()
-  const { showSuccess, showError, showWarning, showInfo } = useNotification()
-  const { canWrite } = usePermission()
+  const { showError, showInfo } = useNotification()
+  const { canWrite, canRead } = usePermission()
+  const inspector = useInspector()
   const openEntity = useOpenEntity()
+  const root = useRef(null)
+  const spot = useRef(-1)
 
-  // Data
   const [requests, setRequests] = useState([])
-  const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0, total: 0 })
-  const [loading, setLoading] = useState(true)
+  const [state, setState] = useState('loading')
+  const [failure, setFailure] = useState('')
+  const [linked, setLinked] = useState(null)
+  const [caNames, setCaNames] = useState({})
 
-  // Filters
-  const [statusFilter, setStatusFilter] = useState('pending')
-
-  // Detail
-  const [selectedRequest, setSelectedRequest] = useState(null)
-
-  // Action modals
-  const [actionModal, setActionModal] = useState(null) // { type: 'approve'|'reject', request }
-  const [comment, setComment] = useState('')
-  const [actionLoading, setActionLoading] = useState(false)
-
-  const loadData = useCallback(async () => {
+  const load = useCallback(async ({ quiet = false } = {}) => {
+    if (!quiet) setState((s) => (s === 'ready' ? s : 'loading'))
     try {
-      setLoading(true)
-      const [reqRes, statsRes] = await Promise.all([
-        approvalsService.list(statusFilter),
-        approvalsService.getStats(),
-      ])
-      setRequests(reqRes.data || [])
-      setStats(statsRes.data || { pending: 0, approved: 0, rejected: 0, total: 0 })
+      const res = await approvalsService.list('all')
+      setRequests(Array.isArray(res?.data) ? res.data : [])
+      setState('ready')
     } catch (err) {
-      showError(t('approvals.loadFailed'))
-    } finally {
-      setLoading(false)
+      setFailure(err?.message || '')
+      setState('error')
     }
-  }, [statusFilter, showError, t])
+  }, [])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => { load() }, [load])
+
+  // A decision taken in the inspector or elsewhere reloads the queue
+  useEffect(() => {
+    const onChange = (e) => { if (e.detail?.type === 'approval') load({ quiet: true }) }
+    window.addEventListener('ucm:data-changed', onChange)
+    return () => window.removeEventListener('ucm:data-changed', onChange)
+  }, [load])
+
+  // Authority names of the facts line, for a reader of the CAs
+  const needCas = canRead('cas') && requests.some((r) => r.status === 'pending' && r.request_summary?.ca_id)
+  useEffect(() => {
+    if (!needCas) return undefined
+    let cancelled = false
+    casService.getAll()
+      .then((res) => {
+        if (cancelled) return
+        const list = Array.isArray(res?.data) ? res.data : []
+        setCaNames(Object.fromEntries(list.map((ca) => [ca.id, ca.common_name || ca.descr || ca.name])))
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [needCas])
 
   // /approvals?request=N (work queue) and ?id=N (e-mails already sent) open that request
   const linkedId = useLinkedId('request', 'id')
   useEffect(() => {
-    if (!linkedId) return
+    if (!linkedId) return undefined
     let cancelled = false
     approvalsService.getById(linkedId)
-      .then(res => {
+      .then((res) => {
         if (cancelled || !res?.data) return
-        setSelectedRequest(res.data)
+        setLinked(res.data)
+        openEntity('approval', res.data.id, { data: res.data })
         if (res.data.status !== 'pending') {
           showInfo(t('overview.link.handled', { id: res.data.id, status: stateLabel(t, res.data.status) }))
         }
@@ -117,446 +98,97 @@ export default function ApprovalsPage() {
         else showError(t('approvals.loadFailed'))
       })
     return () => { cancelled = true }
-  }, [linkedId, showError, showInfo, t])
+  }, [linkedId, showError, showInfo, t]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Stats bar
-  const statItems = useMemo(() => [
-    {
-      icon: Clock,
-      label: t('approvals.pending'),
-      value: stats.pending,
-      variant: 'warning',
-      filterValue: 'pending',
-    },
-    {
-      icon: CheckCircle,
-      label: t('approvals.approved'),
-      value: stats.approved,
-      variant: 'success',
-      filterValue: 'approved',
-    },
-    {
-      icon: XCircle,
-      label: t('approvals.rejected'),
-      value: stats.rejected,
-      variant: 'danger',
-      filterValue: 'rejected',
-    },
-    {
-      icon: Stamp,
-      label: t('approvals.total'),
-      value: stats.total,
-      variant: 'default',
-      filterValue: 'all',
-    },
-  ], [stats, t])
+  // The linked request is shown even when the list does not hold it; the listed copy wins
+  const all = useMemo(() => {
+    if (!linked || requests.some((r) => r.id === linked.id)) return requests
+    return [linked, ...requests]
+  }, [requests, linked])
+  const pending = all.filter((r) => r.status === 'pending')
+  const decided = all.filter((r) => r.status !== 'pending')
+    .sort((a, b) => new Date(b.resolved_at || b.created_at) - new Date(a.resolved_at || a.created_at))
 
-  // Columns
-  const columns = useMemo(() => [
-    {
-      key: 'id',
-      header: '#',
-      priority: 2,
-      sortable: true,
-      render: (val) => <span className="font-mono text-text-tertiary text-sm">#{val}</span>,
-    },
-    {
-      key: 'request_type',
-      header: t('common.type'),
-      priority: 1,
-      sortable: true,
-      render: (val, row) => (
-        <div>
-          <RequestTypeBadge type={val} t={t} />
-          {row.request_summary?.cn && (
-            <div className="text-xs text-text-tertiary mt-0.5 font-mono truncate max-w-48">{row.request_summary.cn}</div>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'requester_username',
-      header: t('approvals.requester'),
-      priority: 1,
-      sortable: true,
-      render: (val) => (
-        <div className="flex items-center gap-1.5">
-          <User size={14} className="text-text-tertiary" />
-          <span className="text-text-primary">{val || '—'}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'policy_name',
-      header: t('approvals.policy'),
-      priority: 2,
-      render: (val) => val ? (
-        <div className="flex items-center gap-1.5">
-          <Gavel size={14} className="text-text-tertiary" />
-          <span className="text-text-secondary text-sm">{val}</span>
-        </div>
-      ) : <span className="text-text-tertiary">—</span>,
-    },
-    {
-      key: 'status',
-      header: t('common.status'),
-      priority: 1,
-      sortable: true,
-      render: (val) => {
-        const Icon = STATUS_ICONS[val] || Clock
-        return (
-          <Badge variant={STATUS_VARIANTS[val] || 'default'}>
-            <Icon size={12} weight="fill" className="mr-1" />
-            {stateLabel(t, val)}
-          </Badge>
-        )
-      },
-    },
-    {
-      key: 'created_at',
-      header: t('common.createdAt'),
-      priority: 2,
-      sortable: true,
-      render: (val) => <span className="text-text-secondary text-sm">{formatDate(val)}</span>,
-    },
-  ], [t])
-
-  // Row actions
-  const rowActions = useCallback((row) => {
-    if (row.status !== 'pending' || !canWrite('approvals')) return []
-    return [
-      {
-        label: t('approvals.approve'),
-        icon: CheckCircle,
-        onClick: () => { setActionModal({ type: 'approve', request: row }); setComment('') },
-      },
-      {
-        label: t('approvals.reject'),
-        icon: XCircle,
-        variant: 'danger',
-        onClick: () => { setActionModal({ type: 'reject', request: row }); setComment('') },
-      },
-    ]
-  }, [canWrite, t])
-
-  // Handle approve/reject
-  const handleAction = async () => {
-    if (!actionModal) return
-    const { type, request: req } = actionModal
-
-    if (type === 'reject' && !comment.trim()) {
-      showError(t('approvals.commentRequired'))
-      return
-    }
-
-    try {
-      setActionLoading(true)
-      let result
-      if (type === 'approve') {
-        result = await approvalsService.approve(req.id, comment || undefined)
-        if (result?.data?.certificate_issued && result.data.certificate?.revoked) {
-          showSuccess(t('approvals.revocationPerformed'))
-          const localOnly = approvedLocalOnlyRevocationWarning(result.data.certificate, t)
-          if (localOnly) showWarning(localOnly)
-        } else if (result?.data?.certificate_issued) {
-          showSuccess(t('approvals.certificateIssued'))
-          showNotices(result, showWarning)
-        } else if (result?.data?.deferred) {
-          // Approved: the protocol issues when its client comes back
-          showSuccess(t('approvals.approvedSuccess'))
-        } else if (result?.data?.request_closed) {
-          // Nothing can satisfy the request any more: it was closed
-          showError(t('approvals.requestClosed', { reason: result.data.issue_error || '' }))
-        } else if (result?.data?.certificate_issued === false) {
-          // The vote was not kept: the request stays pending for a retry
-          showError(t('approvals.issuanceFailed', { reason: result.data.issue_error || '' }))
-        } else {
-          showSuccess(t('approvals.approvedSuccess'))
-        }
-      } else {
-        await approvalsService.reject(req.id, comment)
-        showSuccess(t('approvals.rejectedSuccess'))
-      }
-      setActionModal(null)
-      setComment('')
-      loadData()
-      // What the approval issued: a certificate, or a CA for an intermediate request
-      const issued = type === 'approve' && result?.data?.certificate_issued ? result.data.certificate : null
-      if (issued?.id) openEntity('certificate', issued.id)
-      else if (issued?.ca_id) openEntity('ca', issued.ca_id)
-    } catch (err) {
-      // The server says why (already closed by someone else, expired...);
-      // the list is reloaded so the request shows its real state
-      showError(err?.message || t('approvals.actionFailed'))
-      loadData()
-    } finally {
-      setActionLoading(false)
-    }
+  // After a decision the focus goes to the action of the row now at the same place
+  const decision = useApprovalDecision({
+    onDone: () => load({ quiet: true }).then(() => requestAnimationFrame(() => focusWork(root.current, spot.current))),
+  })
+  const ask = (kind, reqs) => {
+    spot.current = workSpot(root.current, reqs.map((r) => r.id))
+    decision.open(kind, reqs)
   }
+  const mayDecide = canWrite('approvals')
+  const open = (req) => openEntity('approval', req.id, { data: req })
+  const activeKey = inspector?.activeKey || ''
+  const openedId = activeKey.startsWith('approval:') ? Number(activeKey.slice(9)) : linked?.id
 
-  // Slide-over detail
-  const slideOverContent = selectedRequest ? (
-    <div className="p-4 space-y-4">
-      {/* Status */}
-      <div className="flex items-center gap-2">
-        <Badge variant={STATUS_VARIANTS[selectedRequest.status]} size="lg">
-          {stateLabel(t, selectedRequest.status)}
-        </Badge>
-        <RequestTypeBadge type={selectedRequest.request_type} t={t} />
-      </div>
+  const title = (req) => <>{typeLabel(req, t)}{t('work.sep')}<span>{subjectOf(req)}</span></>
+  const decisionButtons = (reqs, disabled, name) => (
+    <>
+      <WorkButton icon={Check} disabled={disabled} onClick={() => ask('approve', reqs)}
+        aria-label={name ? t('approvals.work.approveNamed', { name }) : undefined}>{t('approvals.work.approveAsk')}</WorkButton>
+      <WorkButton quiet icon={Prohibit} disabled={disabled} onClick={() => ask('reject', reqs)}
+        aria-label={name ? t('approvals.work.rejectNamed', { name }) : undefined}>{t('approvals.work.rejectAsk')}</WorkButton>
+    </>
+  )
 
-      {/* Request Info */}
-      <div className="border-t border-border pt-3">
-        <h4 className="text-sm font-semibold text-text-primary mb-2">{t('approvals.requestDetails')}</h4>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div className="text-text-tertiary">{t('approvals.requester')}</div>
-          <div className="text-text-primary">{selectedRequest.requester_username || '—'}</div>
-          <div className="text-text-tertiary">{t('approvals.policy')}</div>
-          <div className="text-text-primary">{selectedRequest.policy_name || '—'}</div>
-          {selectedRequest.request_summary && (
-            <>
-              <div className="text-text-tertiary">{t('approvals.summaryTarget')}</div>
-              <div className="text-text-primary font-mono">
-                {selectedRequest.request_summary.csr_id
-                  ? `CSR #${selectedRequest.request_summary.csr_id}`
-                  : selectedRequest.request_summary.target_ca_id
-                    ? `CA #${selectedRequest.request_summary.target_ca_id}`
-                    : selectedRequest.request_summary.certificate_id
-                    ? `#${selectedRequest.request_summary.certificate_id}`
-                    : (selectedRequest.request_summary.cn || '—')}
-                {selectedRequest.request_summary.cn && (selectedRequest.request_summary.csr_id || selectedRequest.request_summary.certificate_id || selectedRequest.request_summary.target_ca_id)
-                  ? ` (${selectedRequest.request_summary.cn})` : ''}
-              </div>
-              {selectedRequest.request_summary.serial_number && (
-                <>
-                  <div className="text-text-tertiary">{t('approvals.summarySerial')}</div>
-                  <div className="text-text-primary font-mono break-all">{selectedRequest.request_summary.serial_number}</div>
-                </>
-              )}
-              {selectedRequest.request_summary.reason && (
-                <>
-                  <div className="text-text-tertiary">{t('revocation.reasonLabel')}</div>
-                  <div className="text-text-primary">
-                    {t(`revocation.reasons.${selectedRequest.request_summary.reason}`, selectedRequest.request_summary.reason)}
-                  </div>
-                </>
-              )}
-              {selectedRequest.request_summary.invalidity_at && (
-                <>
-                  <div className="text-text-tertiary">{t('approvals.summaryInvalidity')}</div>
-                  <div className="text-text-primary">{formatDate(selectedRequest.request_summary.invalidity_at)}</div>
-                </>
-              )}
-              {selectedRequest.request_summary.trigger === 'auto' && (
-                <>
-                  <div className="text-text-tertiary">{t('approvals.summaryTrigger')}</div>
-                  <div className="text-text-primary">{t('approvals.triggerScheduler')}</div>
-                </>
-              )}
-              {selectedRequest.request_summary.protocol && (
-                <>
-                  <div className="text-text-tertiary">{t('approvals.summaryProtocol')}</div>
-                  <div className="text-text-primary">
-                    {selectedRequest.request_summary.protocol.toUpperCase()}
-                    {selectedRequest.request_summary.operation ? ` (${selectedRequest.request_summary.operation})` : ''}
-                  </div>
-                  <div className="text-text-tertiary">{t('approvals.summaryIdentity')}</div>
-                  <div className="text-text-primary font-mono break-all">{selectedRequest.request_summary.identity || '—'}</div>
-                </>
-              )}
-              {selectedRequest.request_summary.validity_days && (
-                <>
-                  <div className="text-text-tertiary">{t('approvals.summaryValidity')}</div>
-                  <div className="text-text-primary">{selectedRequest.request_summary.validity_days}</div>
-                </>
-              )}
-              {selectedRequest.request_summary.extra_ekus?.length > 0 && (
-                <>
-                  <div className="text-text-tertiary">{t('approvals.summaryExtraEkus')}</div>
-                  <div className="text-text-primary font-mono break-all">{selectedRequest.request_summary.extra_ekus.join(', ')}</div>
-                </>
-              )}
-              {selectedRequest.request_summary.extra_san?.length > 0 && (
-                <>
-                  <div className="text-text-tertiary">{t('approvals.summaryExtraSan')}</div>
-                  <div className="text-text-primary font-mono break-all">{selectedRequest.request_summary.extra_san.join(', ')}</div>
-                </>
-              )}
-            </>
-          )}
-          {selectedRequest.certificate_id && (
-            <>
-              <div className="text-text-tertiary">{t('approvals.certificateId')}</div>
-              <div className="text-text-primary font-mono">#{selectedRequest.certificate_id}</div>
-            </>
-          )}
-          <div className="text-text-tertiary">{t('common.createdAt')}</div>
-          <div className="text-text-primary">{formatDate(selectedRequest.created_at)}</div>
-          {selectedRequest.expires_at && (
-            <>
-              <div className="text-text-tertiary">{t('approvals.expiresAt')}</div>
-              <div className="text-text-primary">{formatDate(selectedRequest.expires_at)}</div>
-            </>
-          )}
-          {selectedRequest.resolved_at && (
-            <>
-              <div className="text-text-tertiary">{t('approvals.resolvedAt')}</div>
-              <div className="text-text-primary">{formatDate(selectedRequest.resolved_at)}</div>
-            </>
-          )}
-        </div>
-      </div>
+  const groups = approvalGroups(pending, t).map((g) => ({
+    ...g,
+    items: g.requests.map((req) => ({
+      id: req.id,
+      title: requestTitle(req, t),
+      titleNode: title(req),
+      kind: requestKind(req, t),
+      facts: requestFacts(req, t, { caName: caNames[req.request_summary?.ca_id] }),
+      due: requestDeadline(req),
+      dueDate: formatDate(requestDeadline(req), { time: true }),
+      onOpen: () => open(req),
+      actions: mayDecide ? (disabled) => decisionButtons([req], disabled, requestTitle(req, t)) : undefined,
+    })),
+  }))
 
-      {/* The CSR a protocol request carries */}
-      {selectedRequest.request_summary?.csr && (
-        <div className="border-t border-border pt-3">
-          <h4 className="text-sm font-semibold text-text-primary mb-2">{t('approvals.summaryCsr')}</h4>
-          <pre className="text-xs font-mono text-text-secondary bg-bg-tertiary rounded-lg p-3 overflow-x-auto whitespace-pre">
-            {selectedRequest.request_summary.csr}
-          </pre>
-        </div>
-      )}
+  const byId = new Map(pending.map((r) => [r.id, r]))
+  const bulkActions = mayDecide ? (ids) => decisionButtons(ids.map((id) => byId.get(id)).filter(Boolean), false) : undefined
 
-      {/* Requester Comment */}
-      {selectedRequest.requester_comment && (
-        <div className="border-t border-border pt-3">
-          <h4 className="text-sm font-semibold text-text-primary mb-2">{t('approvals.requesterComment')}</h4>
-          <p className="text-sm text-text-secondary bg-bg-tertiary rounded-lg p-3">
-            {selectedRequest.requester_comment}
-          </p>
-        </div>
-      )}
-
-      {/* Approval History */}
-      {selectedRequest.approvals?.length > 0 && (
-        <div className="border-t border-border pt-3">
-          <h4 className="text-sm font-semibold text-text-primary mb-2">{t('approvals.approvalHistory')}</h4>
-          <div className="space-y-2">
-            {selectedRequest.approvals.map((approval, idx) => (
-              <div key={idx} className="flex items-start gap-2 text-sm bg-bg-tertiary rounded-lg p-3">
-                {approval.action === 'approve'
-                  ? <CheckCircle size={16} className="text-status-success mt-0.5 shrink-0" weight="fill" />
-                  : <XCircle size={16} className="text-status-danger mt-0.5 shrink-0" weight="fill" />
-                }
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-text-primary">{approval.username}</span>
-                    <span className="text-text-tertiary text-xs">{formatDate(approval.timestamp)}</span>
-                  </div>
-                  {approval.comment && (
-                    <p className="text-text-secondary mt-0.5">{approval.comment}</p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Actions */}
-      {selectedRequest.status === 'pending' && canWrite('approvals') && (
-        <div className="border-t border-border pt-3 flex gap-2">
-          <Button
-            size="sm"
-            onClick={() => { setActionModal({ type: 'approve', request: selectedRequest }); setComment('') }}
-          >
-            <CheckCircle size={14} className="mr-1" /> {t('approvals.approve')}
-          </Button>
-          <Button
-            size="sm"
-            variant="danger"
-            onClick={() => { setActionModal({ type: 'reject', request: selectedRequest }); setComment('') }}
-          >
-            <XCircle size={14} className="mr-1" /> {t('approvals.reject')}
-          </Button>
-        </div>
-      )}
-    </div>
-  ) : null
+  const policiesLink = canRead('policies') && (
+    <Link className="wk-btn" to="/policies"><Gavel aria-hidden="true" />{t('approvals.work.seePolicies')}</Link>
+  )
 
   return (
     <>
       <ResponsiveLayout
-        title={t('approvals.title')}
-        subtitle={t('approvals.subtitle')}
-        icon={Stamp}
-        stats={statItems}
-        activeStatFilter={statusFilter}
-        onStatClick={(stat) => setStatusFilter(stat.filterValue || 'pending')}
+        title={t('common.approvals')}
+        total={state === 'ready' ? t('approvals.work.total', { count: pending.length }) : ''}
+        intent={t('approvals.work.intent')}
         helpPageKey="approvals"
-        slideOverOpen={!!selectedRequest}
-        slideOverTitle={selectedRequest ? `#${selectedRequest.id}: ${REQUEST_TYPES[selectedRequest.request_type] ? t(REQUEST_TYPES[selectedRequest.request_type].labelKey) : selectedRequest.request_type}` : ''}
-        slideOverContent={slideOverContent}
-        onSlideOverClose={() => setSelectedRequest(null)}
-        loading={loading}
       >
-        <ResponsiveDataTable
-          data={requests}
-          columns={columns}
-          loading={loading}
-          selectedId={selectedRequest?.id}
-          onRowClick={setSelectedRequest}
-          rowActions={rowActions}
-          searchable
-          searchPlaceholder={t('approvals.searchPlaceholder')}
-          searchKeys={['requester_username', 'policy_name', 'request_type', 'status']}
-          sortable
-          defaultSort={{ key: 'created_at', direction: 'desc' }}
-          emptyIcon={Stamp}
-          emptyTitle={t('approvals.noRequests')}
-          emptyDescription={t('approvals.noRequestsDesc')}
+        <WorkQueue
+          rootRef={root}
+          label={t('common.approvals')}
+          state={state}
+          error={{ title: t('approvals.loadFailed'), text: failure, onRetry: () => load() }}
+          hint={mayDecide ? t('approvals.work.hint') : t('approvals.work.hintRead')}
+          groups={groups}
+          bulkActions={bulkActions}
+          openedId={openedId}
+          empty={{ title: t('approvals.work.emptyTitle'), text: t('approvals.work.emptyText'), action: policiesLink }}
+          history={{
+            label: t('approvals.work.history'),
+            count: decided.length,
+            children: (
+              <WorkRecords empty={t('work.historyEmpty')}>
+                {decided.slice(0, HISTORY_SIZE).map((req) => (
+                  <WorkRecord key={req.id}
+                    title={<button type="button" className="wk-subject" onClick={() => open(req)}>#{req.id} · <span>{subjectOf(req)}</span></button>}
+                    meta={decisionMeta(req) || formatDate(req.created_at, { time: true })}
+                    badge={<StatusPill {...stateOf(req, t)} />} />
+                ))}
+              </WorkRecords>
+            ),
+          }}
         />
       </ResponsiveLayout>
-
-      {/* Approve/Reject Modal */}
-      <Modal
-        open={!!actionModal}
-        onOpenChange={(open) => { if (!open) { setActionModal(null); setComment('') } }}
-        title={actionModal?.type === 'approve' ? t('approvals.approveRequest') : t('approvals.rejectRequest')}
-        size="sm"
-      >
-        <div className="p-4 space-y-4">
-          <div className="flex items-center gap-2 text-sm">
-            {actionModal?.type === 'approve'
-              ? <CheckCircle size={20} className="text-status-success" weight="fill" />
-              : <XCircle size={20} className="text-status-danger" weight="fill" />
-            }
-            <span className="text-text-primary">
-              {actionModal?.type === 'approve'
-                ? t('approvals.approveConfirm', { id: actionModal?.request?.id })
-                : t('approvals.rejectConfirm', { id: actionModal?.request?.id })
-              }
-            </span>
-          </div>
-
-          <Textarea
-            label={t('approvals.comment')}
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder={actionModal?.type === 'reject'
-              ? t('approvals.rejectReasonPlaceholder')
-              : t('approvals.commentPlaceholder')
-            }
-            rows={3}
-            required={actionModal?.type === 'reject'}
-          />
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" onClick={() => { setActionModal(null); setComment('') }}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              variant={actionModal?.type === 'approve' ? 'primary' : 'danger'}
-              onClick={handleAction}
-              disabled={actionLoading || (actionModal?.type === 'reject' && !comment.trim())}
-            >
-              {actionLoading ? <LoadingSpinner size="sm" /> : (
-                actionModal?.type === 'approve' ? t('approvals.approve') : t('approvals.reject')
-              )}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      {decision.dialog}
     </>
   )
 }

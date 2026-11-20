@@ -1,0 +1,253 @@
+/**
+ * What can be done with a report, from the queue or the inspector: download it
+ * now, schedule it (or change its schedule), suspend its schedule, send a test
+ * e-mail, build a PDF from chosen sections. Several downloads run one after the
+ * other and end on a line-by-line outcome; a suspension of several is one update.
+ */
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { Clock, PaperPlaneTilt, FilePdf, Warning } from '@phosphor-icons/react'
+import { Modal } from '../../components/Modal'
+import { WorkButton, BulkOutcome, runEach } from '../../components/work'
+import { reportsService } from '../../services'
+import { useNotification } from '../../contexts'
+import { downloadBlob } from '../../lib/utils'
+import { REPORT_KEYS, isPdf, reportName, scheduleOf, downloadReport } from './reportModel'
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/
+const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+export const reportsChanged = () => window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: 'report' } }))
+
+export function useReportActions({ schedules, pdfSections = [], onDone } = {}) {
+  const { t } = useTranslation()
+  const { showSuccess, showError } = useNotification()
+  const [dlg, setDlg] = useState(null) // { kind: 'schedule'|'test'|'pdf'|'outcome', ... }
+  const [form, setForm] = useState({})
+  const [errors, setErrors] = useState({})
+  const [busy, setBusy] = useState(false)
+  const close = () => { setDlg(null); setErrors({}) }
+
+  const done = async () => { reportsChanged(); await onDone?.() }
+
+  const download = async (key) => {
+    try {
+      await downloadReport(key, scheduleOf(schedules, key).format, downloadBlob)
+      showSuccess(t(isPdf(key) ? 'reports.pdfGenerated' : 'reports.downloaded'))
+    } catch {
+      showError(t(isPdf(key) ? 'reports.pdfFailed' : 'reports.downloadFailed'))
+    }
+  }
+  const downloadMany = async (keys) => {
+    if (keys.length === 1) return download(keys[0])
+    const outcome = await runEach(keys, (key) => downloadReport(key, scheduleOf(schedules, key).format, downloadBlob))
+    setDlg({ kind: 'outcome', outcome })
+    return undefined
+  }
+
+  const openSchedule = (key) => {
+    const first = key || REPORT_KEYS.find((k) => !scheduleOf(schedules, k).enabled) || REPORT_KEYS[0]
+    const s = scheduleOf(schedules, first)
+    setForm({ key: first, fixed: !!key, editing: s.enabled, ...s, recipients: (s.recipients || []).join(', ') })
+    setErrors({})
+    setDlg({ kind: 'schedule' })
+  }
+  const pick = (key) => {
+    const s = scheduleOf(schedules, key)
+    setForm((f) => ({ ...f, key, ...s, editing: s.enabled, recipients: (s.recipients || []).join(', ') }))
+  }
+  const saveSchedule = async () => {
+    const recipients = String(form.recipients || '').split(/[,;\s]+/).map((r) => r.trim()).filter(Boolean)
+    const errs = {}
+    if (!TIME.test(form.time || '')) errs.time = t('reports.work.dialog.timeInvalid')
+    if (!recipients.length) errs.recipients = t('reports.work.dialog.recipientsRequired')
+    else if (recipients.some((r) => !EMAIL.test(r))) errs.recipients = t('reports.invalidEmail')
+    setErrors(errs)
+    if (Object.keys(errs).length) {
+      document.getElementById(errs.time ? 'sch-time' : 'sch-to')?.focus()
+      return
+    }
+    setBusy(true)
+    try {
+      await reportsService.updateSchedule({ [form.key]: {
+        enabled: true, frequency: form.frequency, time: form.time,
+        day_of_week: Number(form.day_of_week), day_of_month: Number(form.day_of_month),
+        recipients, format: isPdf(form.key) ? 'pdf' : form.format,
+      } })
+      showSuccess(t('reports.scheduleUpdated'))
+      close()
+      await done()
+    } catch {
+      showError(t('reports.scheduleFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // The schedule route takes several reports at once: one update suspends them all
+  const suspend = async (keys) => {
+    const body = Object.fromEntries(keys.map((k) => [k, { ...scheduleOf(schedules, k), enabled: false }]))
+    try {
+      await reportsService.updateSchedule(body)
+      showSuccess(t('reports.work.suspended', { count: keys.length }))
+      await done()
+    } catch {
+      showError(t('reports.scheduleFailed'))
+    }
+  }
+
+  const openTest = (key) => { setForm({ key, email: '' }); setErrors({}); setDlg({ kind: 'test' }) }
+  const sendTest = async () => {
+    const email = String(form.email || '').trim()
+    if (!EMAIL.test(email)) { setErrors({ email: t('reports.invalidEmail') }); document.getElementById('test-email')?.focus(); return }
+    setBusy(true)
+    try {
+      await reportsService.sendTest(form.key, email)
+      showSuccess(t('reports.testSent'))
+      close()
+    } catch {
+      showError(t('reports.testFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const openPdf = () => { setForm({ sections: [] }); setErrors({}); setDlg({ kind: 'pdf' }) }
+  const buildPdf = async () => {
+    setBusy(true)
+    try {
+      const response = await reportsService.generateCustomPDF({ sections: form.sections })
+      const blob = response instanceof Blob ? response : new Blob([response], { type: 'application/pdf' })
+      downloadBlob(blob, `ucm-report-custom-${new Date().toISOString().slice(0, 10)}.pdf`)
+      showSuccess(t('reports.pdfGenerated'))
+      close()
+    } catch {
+      showError(t('reports.pdfFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }))
+  const fieldError = (name) => errors[name] && (
+    <p className="wk-field-error" id={`err-${name}`}><Warning aria-hidden="true" /><span>{errors[name]}</span></p>
+  )
+  const describe = (hint, name) => [hint, errors[name] && `err-${name}`].filter(Boolean).join(' ')
+
+  const titles = {
+    schedule: form.editing ? t('reports.work.dialog.editTitle') : t('reports.work.schedule'),
+    test: t('reports.testSend'),
+    pdf: t('reports.pdf.customBuilder'),
+    outcome: t('work.bulk.title'),
+  }
+
+  const dialog = (
+    <Modal open={!!dlg} onOpenChange={(v) => { if (!v) close() }} title={dlg ? titles[dlg.kind] : ''} size="md">
+      {dlg?.kind === 'outcome' && (
+        <BulkOutcome outcome={dlg.outcome} nameOf={(key) => reportName(key, t)} onClose={close} />
+      )}
+      {dlg?.kind === 'schedule' && (
+        <form className="wk-dialog" noValidate onSubmit={(e) => { e.preventDefault(); saveSchedule() }} data-testid="schedule-form">
+          <div className="wk-fields">
+            <div className="wk-field is-full">
+              <label htmlFor="sch-kind">{t('reports.work.dialog.content')}</label>
+              <select id="sch-kind" value={form.key} disabled={form.fixed} onChange={(e) => pick(e.target.value)}>
+                {REPORT_KEYS.map((k) => <option key={k} value={k}>{reportName(k, t)}</option>)}
+              </select>
+            </div>
+            <div className="wk-field">
+              <label htmlFor="sch-freq">{t('reports.frequency')}</label>
+              <select id="sch-freq" value={form.frequency} onChange={set('frequency')}>
+                <option value="daily">{t('reports.daily')}</option>
+                <option value="weekly">{t('reports.weekly')}</option>
+                <option value="monthly">{t('reports.monthly')}</option>
+              </select>
+            </div>
+            {form.frequency === 'weekly' && (
+              <div className="wk-field">
+                <label htmlFor="sch-dow">{t('reports.dayOfWeek')}</label>
+                <select id="sch-dow" value={form.day_of_week} onChange={set('day_of_week')}>
+                  {DAYS.map((d, i) => <option key={d} value={i}>{t(`reports.days.${d}`)}</option>)}
+                </select>
+              </div>
+            )}
+            {form.frequency === 'monthly' && (
+              <div className="wk-field">
+                <label htmlFor="sch-dom">{t('reports.dayOfMonth')}</label>
+                <select id="sch-dom" value={form.day_of_month} onChange={set('day_of_month')}>
+                  {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+            )}
+            <div className="wk-field">
+              <label htmlFor="sch-time">{t('reports.work.dialog.time')}</label>
+              <input id="sch-time" value={form.time || ''} onChange={set('time')} inputMode="numeric" autoComplete="off"
+                aria-invalid={!!errors.time || undefined} aria-describedby={describe('hint-sch-time', 'time')} />
+              <small id="hint-sch-time">{t('reports.work.dialog.timeHint')}</small>
+              {fieldError('time')}
+            </div>
+            {!isPdf(form.key) && (
+              <div className="wk-field">
+                <label htmlFor="sch-format">{t('reports.format')}</label>
+                <select id="sch-format" value={form.format} onChange={set('format')}>
+                  <option value="csv">CSV</option>
+                  <option value="json">JSON</option>
+                </select>
+              </div>
+            )}
+            <div className="wk-field is-full">
+              <label htmlFor="sch-to">{t('reports.recipients')}</label>
+              <input id="sch-to" value={form.recipients || ''} onChange={set('recipients')} autoComplete="off" spellCheck={false}
+                placeholder="pki@example.com" aria-invalid={!!errors.recipients || undefined} aria-describedby={describe('hint-sch-to', 'recipients')} />
+              <small id="hint-sch-to">{t('reports.work.dialog.recipientsHint')}</small>
+              {fieldError('recipients')}
+            </div>
+          </div>
+          <div className="wk-dialog-actions">
+            <WorkButton onClick={close}>{t('common.cancel')}</WorkButton>
+            <WorkButton type="submit" primary icon={Clock} disabled={busy}>{t('reports.work.dialog.save')}</WorkButton>
+          </div>
+        </form>
+      )}
+      {dlg?.kind === 'test' && (
+        <form className="wk-dialog" noValidate onSubmit={(e) => { e.preventDefault(); sendTest() }}>
+          <p>{t('reports.testSendDesc', { type: reportName(form.key, t) })}</p>
+          <div className="wk-field">
+            <label htmlFor="test-email">{t('reports.recipientEmail')}</label>
+            <input id="test-email" type="email" value={form.email || ''} onChange={set('email')} autoFocus placeholder="admin@example.com"
+              aria-invalid={!!errors.email || undefined} aria-describedby={errors.email ? 'err-email' : undefined} />
+            {fieldError('email')}
+          </div>
+          <div className="wk-dialog-actions">
+            <WorkButton onClick={close}>{t('common.cancel')}</WorkButton>
+            <WorkButton type="submit" primary icon={PaperPlaneTilt} disabled={busy}>{t('reports.send')}</WorkButton>
+          </div>
+        </form>
+      )}
+      {dlg?.kind === 'pdf' && (
+        <form className="wk-dialog" noValidate onSubmit={(e) => { e.preventDefault(); buildPdf() }}>
+          <p className="wk-muted">{t('reports.pdf.customDesc')}</p>
+          <fieldset className="wk-fields" style={{ border: 0, margin: 0, padding: 0 }}>
+            <legend className="sr-only">{t('reports.pdf.sections')}</legend>
+            {pdfSections.map((id) => (
+              <label key={id} className="wk-check-line">
+                <input type="checkbox" checked={form.sections?.includes(id) || false}
+                  onChange={() => setForm((f) => ({ ...f, sections: f.sections.includes(id) ? f.sections.filter((s) => s !== id) : [...f.sections, id] }))} />
+                <span>{t(`reports.pdf.section.${id}`, { defaultValue: id.replace(/_/g, ' ') })}</span>
+              </label>
+            ))}
+          </fieldset>
+          <div className="wk-dialog-actions">
+            <WorkButton quiet onClick={() => setForm((f) => ({ ...f, sections: [...pdfSections] }))}>{t('common.selectAll')}</WorkButton>
+            <WorkButton quiet onClick={() => setForm((f) => ({ ...f, sections: [] }))}>{t('common.deselectAll')}</WorkButton>
+            <span className="wk-spacer" />
+            <WorkButton onClick={close}>{t('common.cancel')}</WorkButton>
+            <WorkButton type="submit" primary icon={FilePdf} disabled={busy || !form.sections?.length}>{t('reports.pdf.generateCustom')}</WorkButton>
+          </div>
+        </form>
+      )}
+    </Modal>
+  )
+
+  return { download, downloadMany, openSchedule, suspend, openTest, openPdf, dialog }
+}

@@ -1,67 +1,76 @@
 /**
- * KeyRecoveryPage — dual-control private-key recovery (escrow).
- * Review recovery requests, approve/reject (admin), and download the recovered
- * key as PKCS#12 after approval.
+ * KeyRecoveryPage: dual-control private-key recovery (escrow) as a work queue.
+ * Requests wait for an administrator's decision (another one than the requester
+ * while dual control is on), then for their recovery as a PKCS#12; the closed
+ * ones are in the folded history. A subject opens the request in the inspector.
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Vault, CheckCircle, XCircle, Clock, DownloadSimple, Warning } from '@phosphor-icons/react'
-import {
-  ResponsiveLayout, Card, Button, Badge, Input, Modal, LoadingSpinner, EmptyState,
-} from '../components'
+import { Check, Prohibit, DownloadSimple } from '@phosphor-icons/react'
+import { ResponsiveLayout } from '../components'
+import { StatusPill } from '../components/list'
+import { WorkQueue, WorkButton, WorkRecord, WorkRecords, workSpot, focusWork } from '../components/work'
 import { keyRecoveryService } from '../services'
-import { useNotification } from '../contexts'
+import { useNotification, useInspector } from '../contexts'
 import { usePermission } from '../hooks'
+import { useOpenEntity } from '../hooks/useOpenEntity'
 import { useLinkedId } from '../hooks/useLinkedId'
 import { stateLabel } from '../lib/stateLabel'
-import { formatDate, downloadBlob } from '../lib/utils'
+import { formatDate } from '../lib/utils'
+import { compactAgo } from '../lib/relativeTime'
+import { recoveryRights, recoveryState, recoveryGroups } from './keyRecovery/recoveryRules'
+import { useRecoveryActions } from './keyRecovery/useRecoveryActions'
 
-const STATUS_VARIANTS = { pending: 'warning', approved: 'success', rejected: 'danger', recovered: 'info', cancelled: 'default' }
-const FILTERS = ['', 'pending', 'approved', 'recovered', 'rejected']
+const nameOf = (r) => r.cert_cn || r.cert_refid || `#${r.cert_id}`
+const when = (d) => formatDate(d, { time: true })
 
 export default function KeyRecoveryPage() {
   const { t } = useTranslation()
-  const { showSuccess, showError, showInfo } = useNotification()
-  const { hasPermission } = usePermission()
-  const isAdmin = hasPermission('admin:key_recovery')
-  const canRecover = hasPermission('write:key_recovery')
+  const { showError, showInfo } = useNotification()
+  const { hasPermission, username } = usePermission()
+  const inspector = useInspector()
+  const openEntity = useOpenEntity()
+  const root = useRef(null)
+  const spot = useRef(-1)
 
   const [requests, setRequests] = useState([])
   const [dualControl, setDualControl] = useState(true)
-  const [loading, setLoading] = useState(false)
-  const [statusFilter, setStatusFilter] = useState('')
-  const [busy, setBusy] = useState(null)
-  const [recoverFor, setRecoverFor] = useState(null)
-  const [password, setPassword] = useState('')
-  const [legacy, setLegacy] = useState(false)  // PKCS#12 3DES/SHA-1 profile (#331)
+  const [state, setState] = useState('loading')
+  const [failure, setFailure] = useState('')
+  const [linked, setLinked] = useState(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async ({ quiet = false } = {}) => {
+    if (!quiet) setState((s) => (s === 'ready' ? s : 'loading'))
     try {
-      const res = await keyRecoveryService.list(statusFilter || undefined)
-      const data = res.data || res
+      const res = await keyRecoveryService.list()
+      const data = res?.data || res || {}
       setRequests(data.requests || [])
       setDualControl(data.dual_control !== false)
+      setState('ready')
     } catch (e) {
-      showError(e.message || t('keyRecovery.loadFailed'))
-    } finally {
-      setLoading(false)
+      setFailure(e?.message || '')
+      setState('error')
     }
-  }, [statusFilter, showError, t])
+  }, [])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const onChange = (e) => { if (e.detail?.type === 'key_recovery') load({ quiet: true }) }
+    window.addEventListener('ucm:data-changed', onChange)
+    return () => window.removeEventListener('ucm:data-changed', onChange)
+  }, [load])
 
   // /key-recovery?request=N shows that request, even past the 500 the list holds
   const linkedId = useLinkedId('request')
-  const [linked, setLinked] = useState(null)
   useEffect(() => {
-    if (!linkedId) return
+    if (!linkedId) return undefined
     let cancelled = false
     keyRecoveryService.get(linkedId)
       .then((res) => {
         if (cancelled) return
-        const row = res.data || res
+        const row = res?.data || res
         setLinked(row)
+        openEntity('key_recovery', row.id, { data: row })
         if (row.status !== 'pending') {
           showInfo(t('overview.link.handled', { id: row.id, status: stateLabel(t, row.status) }))
         }
@@ -69,157 +78,126 @@ export default function KeyRecoveryPage() {
       .catch((e) => {
         if (cancelled) return
         if (e?.status === 404) showInfo(t('overview.link.gone', { id: linkedId }))
-        else showError(e.message || t('keyRecovery.loadFailed'))
+        else showError(e?.message || t('keyRecovery.loadFailed'))
       })
     return () => { cancelled = true }
-  }, [linkedId, showError, showInfo, t])
-  // The linked request comes first, in its listed copy when there is one, and only while the filter keeps its state
-  const current = linked && (requests.find((r) => r.id === linked.id) || linked)
-  const rest = current ? requests.filter((r) => r.id !== current.id) : requests
-  const shown = current && (!statusFilter || current.status === statusFilter) ? [current, ...rest] : rest
+  }, [linkedId, showError, showInfo, t]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // A decision on the linked request re-reads it: the filtered list may no longer hold it
-  const refreshLinked = async (id) => {
-    if (linked?.id !== id) return
-    try {
-      const res = await keyRecoveryService.get(id)
-      setLinked(res.data || res)
-    } catch {
-      setLinked(null)
-    }
+  // The linked request is shown even when the list does not hold it; the listed copy wins
+  const all = useMemo(() => {
+    const list = requests.map((r) => ({ ...r, dual_control: dualControl }))
+    if (!linked || list.some((r) => r.id === linked.id)) return list
+    return [{ ...linked, dual_control: dualControl }, ...list]
+  }, [requests, linked, dualControl])
+
+  const actions = useRecoveryActions({
+    onDone: () => load({ quiet: true }).then(() => requestAnimationFrame(() => focusWork(root.current, spot.current))),
+  })
+  const ask = (kind, reqs) => {
+    spot.current = workSpot(root.current, reqs.map((r) => r.id))
+    actions.open(kind, reqs)
+  }
+  const who = { hasPermission, username, dualControl }
+  const open = (req) => openEntity('key_recovery', req.id, { data: req })
+  const activeKey = inspector?.activeKey || ''
+  const openedId = activeKey.startsWith('key_recovery:') ? Number(activeKey.slice(13)) : linked?.id
+
+  const rowActions = (req) => (disabled) => {
+    const rights = recoveryRights(req, who)
+    const name = nameOf(req)
+    return (
+      <>
+        {rights.approve && (
+          <WorkButton icon={Check} disabled={disabled} onClick={() => ask('approve', [req])}
+            aria-label={t('keyRecovery.work.approveNamed', { name })}>{t('keyRecovery.work.approveAsk')}</WorkButton>
+        )}
+        {rights.reject && (
+          <WorkButton quiet icon={Prohibit} disabled={disabled} onClick={() => ask('reject', [req])}
+            aria-label={t('keyRecovery.work.rejectNamed', { name })}>{t('keyRecovery.work.rejectAsk')}</WorkButton>
+        )}
+        {rights.recover && (
+          <WorkButton icon={DownloadSimple} disabled={disabled} onClick={() => ask('recover', [req])}
+            aria-label={t('keyRecovery.work.recoverNamed', { name })}>{t('keyRecovery.work.recoverAsk')}</WorkButton>
+        )}
+      </>
+    )
   }
 
-  const decide = async (req, action) => {
-    const toastKey = action === 'approve' ? 'approved' : 'rejected'
-    setBusy(req.id)
-    try {
-      await keyRecoveryService[action](req.id)
-      showSuccess(t(`keyRecovery.${toastKey}`))
-      await refreshLinked(req.id)
-      await load()
-    } catch (e) {
-      showError(e.message || t('keyRecovery.actionFailed'))
-    } finally {
-      setBusy(null)
-    }
-  }
+  const groups = recoveryGroups(all, t, dualControl).map((g) => ({
+    ...g,
+    items: g.requests.map((req) => {
+      const at = req.status === 'approved' ? req.decided_at || req.requested_at : req.requested_at
+      return {
+        id: req.id,
+        title: nameOf(req),
+        kind: t('keyRecovery.work.kind'),
+        facts: [
+          t('keyRecovery.work.requestedBy', { user: req.requested_by, ago: compactAgo(req.requested_at, t) }),
+          req.reason && t('keyRecovery.work.reason', { reason: req.reason }),
+          req.status === 'approved' && req.decided_by && t('keyRecovery.decidedBy', { user: req.decided_by }),
+        ].filter(Boolean),
+        // No deadline: the date the request reached this step
+        due: at,
+        dueLabel: compactAgo(at, t),
+        dueDate: when(at),
+        tone: '',
+        onOpen: () => open(req),
+        // Only a request the user may decide on goes into a bulk decision
+        selectable: recoveryRights(req, who).reject,
+        actions: rowActions(req),
+      }
+    }),
+  }))
 
-  const doRecover = async () => {
-    if (password.length < 8) { showError(t('keyRecovery.passwordTooShort')); return }
-    setBusy(recoverFor.id)
-    try {
-      const blob = await keyRecoveryService.recover(recoverFor.id, password, legacy)
-      downloadBlob(blob, `${recoverFor.cert_cn || recoverFor.cert_refid || 'recovered'}.p12`)
-      showSuccess(t('keyRecovery.recovered'))
-      setRecoverFor(null); setPassword(''); setLegacy(false)
-      await refreshLinked(recoverFor.id)
-      await load()
-    } catch (e) {
-      showError(e.message || t('keyRecovery.actionFailed'))
-    } finally {
-      setBusy(null)
-    }
-  }
+  const pendingById = new Map(all.filter((r) => r.status === 'pending').map((r) => [r.id, r]))
+  const bulkActions = hasPermission('admin:key_recovery') ? (ids) => {
+    const reqs = ids.map((id) => pendingById.get(id)).filter(Boolean)
+    return (
+      <>
+        <WorkButton icon={Check} onClick={() => ask('approve', reqs)}>{t('keyRecovery.work.approveAsk')}</WorkButton>
+        <WorkButton quiet icon={Prohibit} onClick={() => ask('reject', reqs)}>{t('keyRecovery.work.rejectAsk')}</WorkButton>
+      </>
+    )
+  } : undefined
+
+  const closed = all.filter((r) => !['pending', 'approved'].includes(r.status))
+  const open_ = all.filter((r) => ['pending', 'approved'].includes(r.status)).length
 
   return (
-    <ResponsiveLayout title={t('keyRecovery.title')} subtitle={t('keyRecovery.subtitle')} icon={Vault} helpPageKey="keyRecovery">
-      <div className="p-3 sm:p-4 space-y-3">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex gap-1">
-            {FILTERS.map((s) => (
-              <Button key={s || 'all'} type="button" size="sm"
-                      variant={statusFilter === s ? 'primary' : 'secondary'}
-                      onClick={() => setStatusFilter(s)}>
-                {s ? t(`keyRecovery.status.${s}`) : t('common.all')}
-              </Button>
-            ))}
-          </div>
-          {dualControl && (
-            <Badge variant="info" size="sm">{t('keyRecovery.dualControlOn')}</Badge>
-          )}
-        </div>
-
-        {loading ? (
-          <div className="flex justify-center py-12"><LoadingSpinner /></div>
-        ) : shown.length === 0 ? (
-          <EmptyState icon={Vault} title={t('keyRecovery.empty')} description={t('keyRecovery.emptyDesc')} />
-        ) : (
-          <div className="space-y-2">
-            {shown.map((r) => (
-              <Card key={r.id} className={`p-4 ${linked?.id === r.id ? 'ring-2 ring-accent-primary' : ''}`}
-                    aria-current={linked?.id === r.id ? 'true' : undefined}>
-                <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-text-primary truncate">{r.cert_cn || r.cert_refid || `#${r.cert_id}`}</span>
-                      <Badge variant={STATUS_VARIANTS[r.status] || 'default'} size="sm">{t(`keyRecovery.status.${r.status}`, stateLabel(t, r.status))}</Badge>
-                    </div>
-                    <p className="text-xs text-text-secondary mt-1">{t('keyRecovery.reason')}: {r.reason}</p>
-                    <p className="text-2xs text-text-tertiary mt-1">
-                      {t('keyRecovery.requestedBy', { user: r.requested_by })} · {formatDate(r.requested_at)}
-                      {r.decided_by && <> · {t('keyRecovery.decidedBy', { user: r.decided_by })}</>}
-                      {r.recovered_by && <> · {t('keyRecovery.recoveredBy', { user: r.recovered_by })}</>}
-                    </p>
-                    {r.decision_note && <p className="text-2xs text-text-tertiary mt-0.5 italic">“{r.decision_note}”</p>}
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {r.status === 'pending' && isAdmin && (
-                      <>
-                        <Button type="button" size="sm" variant="success-soft" disabled={busy === r.id} onClick={() => decide(r, 'approve')}>
-                          <CheckCircle size={14} /> {t('keyRecovery.approve')}
-                        </Button>
-                        <Button type="button" size="sm" variant="danger-soft" disabled={busy === r.id} onClick={() => decide(r, 'reject')}>
-                          <XCircle size={14} /> {t('keyRecovery.reject')}
-                        </Button>
-                      </>
-                    )}
-                    {r.status === 'approved' && canRecover && (
-                      <Button type="button" size="sm" variant="primary" disabled={busy === r.id} onClick={() => { setRecoverFor(r); setPassword(''); setLegacy(false) }}>
-                        <DownloadSimple size={14} /> {t('keyRecovery.recover')}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <Modal open={!!recoverFor} onClose={() => { setRecoverFor(null); setPassword(''); setLegacy(false) }} title={t('keyRecovery.recoverTitle')}>
-        <div className="p-4 space-y-3">
-          <p className="flex items-start gap-1.5 text-xs text-text-secondary">
-            <Warning size={14} className="mt-0.5 shrink-0 text-status-warning" />
-            {t('keyRecovery.recoverWarning')}
-          </p>
-          <Input
-            type="password"
-            label={t('keyRecovery.p12Password')}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder={t('keyRecovery.p12PasswordHint')}
-            autoFocus
-          />
-          <label className="flex items-center gap-2.5 px-1 py-1 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={legacy}
-              onChange={(e) => setLegacy(e.target.checked)}
-              className="w-4 h-4 rounded accent-accent-primary"
-            />
-            <div>
-              <div className="text-sm text-text-primary">{t('export.legacyPkcs12')}</div>
-              <div className="text-xs text-text-tertiary">{t('export.legacyPkcs12Desc')}</div>
-            </div>
-          </label>
-          <div className="flex justify-end gap-2 pt-1">
-            <Button type="button" variant="secondary" onClick={() => { setRecoverFor(null); setPassword(''); setLegacy(false) }}>{t('common.cancel')}</Button>
-            <Button type="button" variant="primary" disabled={busy === recoverFor?.id || password.length < 8} onClick={doRecover}>
-              <DownloadSimple size={16} /> {t('keyRecovery.download')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-    </ResponsiveLayout>
+    <>
+      <ResponsiveLayout
+        title={t('keyRecovery.title')}
+        total={state === 'ready' ? t('keyRecovery.work.total', { count: open_ }) : ''}
+        intent={t('keyRecovery.work.intent')}
+        helpPageKey="keyRecovery"
+      >
+        <WorkQueue
+          rootRef={root}
+          label={t('keyRecovery.title')}
+          state={state}
+          error={{ title: t('keyRecovery.loadFailed'), text: failure, onRetry: () => load() }}
+          hint={t(dualControl ? 'keyRecovery.work.hintDual' : 'keyRecovery.work.hint')}
+          groups={groups}
+          bulkActions={bulkActions}
+          openedId={openedId}
+          empty={{ title: t('keyRecovery.empty'), text: t('keyRecovery.work.emptyText') }}
+          history={{
+            label: t('approvals.work.history'),
+            count: closed.length,
+            children: (
+              <WorkRecords empty={t('work.historyEmpty')}>
+                {closed.map((req) => (
+                  <WorkRecord key={req.id}
+                    title={<button type="button" className="wk-subject" onClick={() => open(req)}>#{req.id} · <span>{nameOf(req)}</span></button>}
+                    meta={[req.recovered_by || req.decided_by || req.requested_by, when(req.recovered_at || req.decided_at || req.requested_at), req.decision_note].filter(Boolean).join(' · ')}
+                    badge={<StatusPill {...recoveryState(req, t)} />} />
+                ))}
+              </WorkRecords>
+            ),
+          }}
+        />
+      </ResponsiveLayout>
+      {actions.dialog}
+    </>
   )
 }

@@ -20,6 +20,7 @@ import { INSPECTOR_TYPES } from './config'
 import { SectionTabs, tabId, panelId } from './InspectorTabs'
 import { CertificateDetail } from './certificate/CertificateDetail'
 import { DetailSkeleton } from './certificate/DetailSkeleton'
+import { QUEUE_DETAILS } from './queueDetails'
 
 export function InspectorObject({ entry, onTitle }) {
   const { t } = useTranslation()
@@ -46,7 +47,7 @@ export function InspectorObject({ entry, onTitle }) {
   // The loaded entity is kept in the context so switching tabs does not reload it
   useEffect(() => { if (data && data !== entry.data) setEntityData(key, data) }, [data]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const title = data ? entityTitle(type, data, t) : ''
+  const title = data ? (config?.title ? config.title(data, t) : entityTitle(type, data, t)) : ''
   useEffect(() => { if (title) onTitle(key, title) }, [title, key]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { actions, modals, handler } = useEntityActions({
@@ -65,6 +66,11 @@ export function InspectorObject({ entry, onTitle }) {
         onSection={setSection} onChanged={setData} onOpenRelated={(id) => openEntity('certificate', id)}
         onOpenCa={(id) => openEntity('ca', id)} />
     )
+  } else if (QUEUE_DETAILS[type]) {
+    // A work queue object (approval, key recovery, report) draws its own heading and sections
+    const Detail = QUEUE_DETAILS[type]
+    const current = config.sections.includes(section) ? section : config.sections[0]
+    body = <Detail data={data} objectKey={key} title={title} section={current} onSection={setSection} onChanged={setData} />
   } else {
     body = (
       <>

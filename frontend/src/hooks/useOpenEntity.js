@@ -7,6 +7,9 @@ const RESOURCES = {
   certificate: 'certificates',
   ca: 'cas',
   truststore: 'truststore',
+  approval: 'approvals',
+  key_recovery: 'key_recovery',
+  report: 'audit',
 }
 
 /** Open an entity's detail in the inspector, from any page. */
