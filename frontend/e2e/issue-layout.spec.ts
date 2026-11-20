@@ -71,6 +71,45 @@ test.describe('desktop', () => {
   })
 })
 
+test.describe('desktop, errors', () => {
+  test.use({ viewport: { width: 1600, height: 1000 } })
+
+  test('a field in error takes the bad colour on its border, focused or not', async ({ page }) => {
+    await page.goto('/certificates?action=create')
+    const dialog = page.getByRole('dialog', { name: 'Issue a certificate' })
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole('button', { name: 'Review the request' }).click()
+    const cn = dialog.getByLabel('Common name')
+    await expect(cn).toHaveAttribute('aria-invalid', 'true')
+    const colours = await cn.evaluate((el) => {
+      const probe = document.createElement('span')
+      probe.style.color = 'var(--bad)'
+      el.parentElement.appendChild(probe)
+      const bad = getComputedStyle(probe).color
+      probe.remove()
+      return { bad, border: getComputedStyle(el).borderTopColor }
+    })
+    expect(colours.border).toBe(colours.bad)
+    // Advanced stays folded: nothing of it is in error
+    await expect(dialog.getByRole('button', { name: /Advanced/ })).toHaveAttribute('aria-expanded', 'false')
+  })
+})
+
+test.describe('narrow phone', () => {
+  test.use({ viewport: { width: 360, height: 780 } })
+
+  test('the fields stack in one column under 380 px, as the Atelier', async ({ page }) => {
+    await page.goto('/certificates?action=create')
+    const dialog = page.getByRole('dialog', { name: 'Issue a certificate' })
+    await expect(dialog).toBeVisible()
+    const tpl = await box(dialog.getByLabel('Template'))
+    const auth = await box(dialog.getByLabel('Authority'))
+    expect(Math.abs(tpl.x - auth.x)).toBeLessThanOrEqual(EPS)
+    expect(auth.y).toBeGreaterThan(tpl.y + tpl.height)
+    expect(Math.abs(tpl.width - auth.width)).toBeLessThanOrEqual(EPS)
+  })
+})
+
 test.describe('phone', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
