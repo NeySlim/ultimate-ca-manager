@@ -310,3 +310,11 @@ textarea.ui-control { min-height: 80px; resize: vertical; }
 .ui-compact-head h4 { margin: 0; font-size: 13px; font-weight: 500; color: var(--text); text-transform: none; letter-spacing: 0; }
 .ui-compact-head > svg { width: 14px; height: 14px; color: var(--muted); }
 .ui-compact-body { padding: 14px; font-size: 12px; }
+.ui-table td { height: var(--ui-row, 36px); }
+.ui-table tbody tr:is(.is-opened, .is-checked) { background: var(--selected); }
+.ui-table tbody tr.is-opened td:first-child { box-shadow: inset 2px 0 var(--accent); }
+:root[data-theme="aurore"] .ui-table tbody tr:not(.is-opened):not(.is-checked):hover { background: linear-gradient(90deg, color-mix(in srgb, var(--grad-a) 14%, transparent), transparent 70%); }
+:root[data-theme="aurore"][data-mode="light"] .ui-table tbody tr:not(.is-opened):not(.is-checked):hover { background: linear-gradient(90deg, color-mix(in srgb, var(--grad-a) 8%, transparent), transparent 70%); }
+/* Toolbar filter (`.filter-select`) and compact control (`.table-footer select`) of the mockup */
+.ui-control.is-filter { width: auto; min-height: 34px; max-width: 170px; padding: 6px 9px; }
+.ui-control.is-compact { width: auto; min-height: 28px; padding: 3px 7px; }

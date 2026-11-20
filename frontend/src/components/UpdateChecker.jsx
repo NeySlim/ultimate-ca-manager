@@ -370,7 +370,7 @@ export function UpdateChecker() {
             <select
               value={includeChannel}
               onChange={(e) => setIncludeChannel(e.target.value)}
-              className="text-sm bg-bg-secondary border border-border rounded-md px-2.5 py-1.5 text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
+              className="ui-control w-auto"
             >
               <option value="stable">{t('settings.channelStable')}</option>
               <option value="prerelease">{t('settings.channelPrerelease')}</option>

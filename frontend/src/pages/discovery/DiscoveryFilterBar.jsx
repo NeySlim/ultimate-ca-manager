@@ -46,7 +46,7 @@ export default function DiscoveryFilterBar({ statusFilter, setStatusFilter, prof
           <select
             value={profileFilter ?? ''}
             onChange={(e) => { handleProfileFilter(e.target.value ? parseInt(e.target.value) : null) }}
-            className="text-xs bg-bg-secondary border border-border rounded-lg px-2 py-1 text-text-secondary focus:border-accent-primary focus:outline-none"
+            className="ui-control is-filter"
           >
             <option value="">{t('discovery.allProfiles')}</option>
             {profiles.map(p => (

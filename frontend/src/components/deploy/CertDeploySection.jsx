@@ -305,7 +305,7 @@ export function CertDeploySection({ certificate }) {
         <form onSubmit={handleAdd} className="p-4 space-y-3">
           <div className="space-y-1">
             <label className="block text-xs font-medium text-text-secondary">{t('deploy.target')}</label>
-            <select className="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm text-text-primary focus:outline-none focus:border-accent-primary"
+            <select className="ui-control w-full"
                     value={form.target_id} onChange={field('target_id')} required disabled={Boolean(editing)}>
               {editing ? (
                 <option value={editing.target_id}>{editing.target_name} ({editing.target_host})</option>

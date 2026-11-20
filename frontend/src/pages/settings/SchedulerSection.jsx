@@ -130,23 +130,23 @@ export default function SchedulerSection({ hasPermission }) {
         ) : tasks.length === 0 ? (
           <div className="p-6 text-center text-sm text-text-secondary">{t('scheduler.noTasks')}</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="ui-table-box overflow-x-auto">
+            <table className="ui-table">
               <thead>
-                <tr className="text-left text-xs text-text-tertiary border-b border-border-op30">
-                  <th className="py-2 pr-3 font-medium">{t('scheduler.colTask')}</th>
-                  <th className="py-2 px-3 font-medium">{t('scheduler.colSchedule')}</th>
-                  <th className="py-2 px-3 font-medium">{t('scheduler.colLastRun')}</th>
-                  <th className="py-2 px-3 font-medium">{t('scheduler.colNextRun')}</th>
-                  <th className="py-2 px-3 font-medium">{t('scheduler.colDuration')}</th>
-                  <th className="py-2 px-3 font-medium text-right">{t('scheduler.colRuns')}</th>
-                  {canRun && <th className="py-2 pl-3" />}
+                <tr>
+                  <th>{t('scheduler.colTask')}</th>
+                  <th>{t('scheduler.colSchedule')}</th>
+                  <th>{t('scheduler.colLastRun')}</th>
+                  <th>{t('scheduler.colNextRun')}</th>
+                  <th>{t('scheduler.colDuration')}</th>
+                  <th className="text-right">{t('scheduler.colRuns')}</th>
+                  {canRun && <th />}
                 </tr>
               </thead>
               <tbody>
                 {tasks.map((task) => (
-                  <tr key={task.name} className="border-b border-border-op30 last:border-0">
-                    <td className="py-2.5 pr-3">
+                  <tr key={task.name}>
+                    <td>
                       <div className="flex items-center gap-2">
                         {task.last_error || task.last_status === 'warning' ? (
                           <WarningCircle size={16} className="text-status-warning shrink-0" weight="fill" />
@@ -156,7 +156,7 @@ export default function SchedulerSection({ hasPermission }) {
                           <CheckCircle size={16} className="text-status-success shrink-0" weight="fill" />
                         )}
                         <div>
-                          <p className="font-medium text-text-primary">{task.label}</p>
+                          <p className="font-medium text-text-primary text-[13px]">{task.label}</p>
                           {task.last_error && (
                             <p className="text-xs text-status-warning mt-0.5 font-mono">{task.last_error}</p>
                           )}
@@ -171,18 +171,17 @@ export default function SchedulerSection({ hasPermission }) {
                         </div>
                       </div>
                     </td>
-                    <td className="py-2.5 px-3 text-text-secondary">{humanizeInterval(task.interval)}</td>
-                    <td className="py-2.5 px-3 text-text-secondary">{relativeTime(task.last_run)}</td>
-                    <td className="py-2.5 px-3 text-text-secondary">{relativeTime(task.next_run)}</td>
-                    <td className="py-2.5 px-3 text-text-secondary font-mono">{fmtDuration(task.last_duration_ms)}</td>
-                    <td className="py-2.5 px-3 text-right text-text-secondary tabular-nums">{task.run_count}</td>
+                    <td className="text-text-secondary">{humanizeInterval(task.interval)}</td>
+                    <td className="text-text-secondary">{relativeTime(task.last_run)}</td>
+                    <td className="text-text-secondary">{relativeTime(task.next_run)}</td>
+                    <td className="text-text-secondary font-mono">{fmtDuration(task.last_duration_ms)}</td>
+                    <td className="text-right text-text-secondary tabular-nums">{task.run_count}</td>
                     {canRun && (
-                      <td className="py-2.5 pl-3 text-right">
+                      <td className="text-right">
                         <Button
                           type="button" size="sm" variant="secondary"
                           onClick={() => handleRun(task.name)}
                           disabled={!!running[task.name]}
-                          className="gap-1 whitespace-nowrap"
                         >
                           <Play size={13} weight="fill" />
                           {t('scheduler.runNow')}

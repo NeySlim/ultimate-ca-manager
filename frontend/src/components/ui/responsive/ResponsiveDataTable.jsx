@@ -1505,9 +1505,10 @@ function DesktopTable({
   
   // Density-based padding for rows
   const densityStyles = {
-    compact: { cell: 'px-3 py-0.5', header: 'px-3 py-1.5' },
-    default: { cell: 'px-3 py-1', header: 'px-3 py-2' },
-    comfortable: { cell: 'px-3 py-2', header: 'px-3 py-2.5' }
+    // Row heights of the mockup's table view: 36, 40 and 44 px (`--ui-row`)
+    compact: { cell: '', header: '', row: '36px' },
+    default: { cell: '', header: '', row: '40px' },
+    comfortable: { cell: '', header: '', row: '44px' }
   }
   const dStyle = densityStyles[density] || densityStyles.compact
   
@@ -1619,14 +1620,14 @@ function DesktopTable({
   return (
     <div className="flex-1 overflow-auto" ref={tableRef}>
       <table 
-        className={cn("w-full text-[13px]", resizingColumn && "select-none")} 
-        style={{ tableLayout: 'fixed', borderCollapse: 'separate', borderSpacing: 0 }}
+        className={cn("ui-table", resizingColumn && "select-none")} 
+        style={{ tableLayout: 'fixed', borderCollapse: 'separate', borderSpacing: 0, '--ui-row': dStyle.row }}
       >
-        {/* Header */}
-        <thead className="sticky top-0 z-10 table-header-gradient backdrop-blur-sm border-b border-border shadow-sm">
+        {/* Header: the mockup's table view, 34 px on the raised surface */}
+        <thead className="sticky top-0 z-10">
           <tr>
             {multiSelect && (
-              <th className="w-10 min-w-[40px] px-2 py-1.5">
+              <th className="w-10 min-w-[40px] !px-1.5">
                 <input
                   type="checkbox"
                   checked={data.length > 0 && data.every(r => selectedIds?.has(r.id))}
@@ -1644,13 +1645,10 @@ function DesktopTable({
                   onClick={() => sortable && col.sortable !== false && onSort(col.key)}
                   style={style}
                   className={cn(
-                    'text-left text-xs font-medium text-text-tertiary tracking-wide',
-                    'relative group',
-                    col.compact ? 'px-1 py-1.5' : dStyle.header,
-                    'transition-colors duration-200',
-                    sortable && col.sortable !== false && 'cursor-pointer hover:text-text-secondary',
-                    sort?.key === col.key && 'text-accent-primary',
-                    !isLast && 'table-col-separator'
+                    'text-left relative group',
+                    col.compact && '!px-1',
+                    sortable && col.sortable !== false && 'cursor-pointer hover:text-text-primary',
+                    sort?.key === col.key && '!text-text-primary'
                   )}
                 >
                   <div className={cn("flex items-center gap-1.5 truncate", col.compact ? 'justify-center pr-0' : 'pr-3')}>
@@ -1703,14 +1701,14 @@ function DesktopTable({
                 key={row.id || idx}
                 onClick={() => multiSelect ? onToggleRow(row.id) : onRowClick?.(row)}
                 className={cn(
-                  'group group/row transition-all duration-200 table-row-hover',
+                  'group group/row',
                   (onRowClick || multiSelect) && 'cursor-pointer',
-                  // Selected state - uses theme-aware CSS class
-                  selectedId === row.id && 'row-selected',
-                  multiSelect && selectedIds?.has(row.id) && 'row-selected'
+                  // Opened row: selected surface and the accent edge; checked rows the surface only
+                  selectedId === row.id && 'is-opened',
+                  multiSelect && selectedIds?.has(row.id) && 'is-checked'
                 )}>
                 {multiSelect && (
-                  <td className="w-10 min-w-[40px] px-2 py-1">
+                  <td className="w-10 min-w-[40px] !px-1.5">
                     <input
                       type="checkbox"
                       checked={selectedIds?.has(row.id) || false}
@@ -1722,18 +1720,16 @@ function DesktopTable({
                 )}
                 {columns.map((col, colIdx) => {
                   const style = getColStyle(col)
+                  // eslint-disable-next-line no-unused-vars
                   const isLast = colIdx === columns.length - 1 && !rowActions
                   return (
                     <td 
                       key={col.key}
                       style={style}
                       className={cn(
-                        col.compact ? 'px-1 py-0.5' : dStyle.cell,
-                        "transition-colors duration-200",
+                        col.compact && '!px-1',
                         col.mono && "font-mono",
-                        col.className,
-                        // Subtle column separator
-                        !isLast && 'table-col-separator-subtle'
+                        col.className
                       )}
                     >
                       <div 
@@ -1752,7 +1748,7 @@ function DesktopTable({
                   )
                 })}
                 {rowActions && (
-                  <td className={cn("px-2 relative", density === 'compact' ? 'py-1' : density === 'comfortable' ? 'py-2.5' : 'py-1.5')}>
+                  <td className="relative !px-2">
                     <RowActionMenu
                       row={row}
                       idx={idx}
