@@ -276,6 +276,8 @@ describe('InspectorDock', () => {
     expect(within(strip).getByRole('tab', { name: 'c6.example.com' })).toHaveAttribute('aria-selected', 'true')
     const more = screen.getByTestId('inspector-tabs-more')
     expect(more).toHaveTextContent('+4')
+    // Read out as the mockup: « +4 certificats ouverts non affichés »
+    expect(more.querySelector('.sr-only')).toHaveTextContent('inspector.hiddenCertificatesCount')
     expect(more).toHaveAttribute('aria-haspopup', 'menu')
     fireEvent.click(more)
     const menu = screen.getByRole('menu', { name: 'inspector.hiddenCertificatesMenu' })

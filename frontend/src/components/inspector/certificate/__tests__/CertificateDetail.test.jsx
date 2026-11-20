@@ -250,6 +250,13 @@ describe('CertificateDetail: ACME', () => {
     expect(failure).toHaveTextContent('DNS problem: NXDOMAIN')
   })
 
+  it('words the order as the mockup: its number, the challenge in capitals, the short time ago', async () => {
+    svc.orders.mockResolvedValue({ data: [{ id: 4097, certificate_id: 7, status: 'invalid', error_message: 'DNS problem', last_error_at: at(-0.3), primary_domain: 'web.example.com', challenge_type: 'dns-01' }] })
+    render(<Harness />)
+    const failure = await screen.findByTestId('acme-last-failure')
+    expect(failure.querySelector('.ins-muted')).toHaveTextContent(/^inspector\.cert\.order · web\.example\.com · DNS-01 · time\.compact\.hoursAgo:7$/)
+  })
+
   it('asks nothing for a certificate of another source, or without read:acme', () => {
     render(<Harness cert={{ ...CERT, source: 'manual' }} />)
     expect(svc.orders).not.toHaveBeenCalled()

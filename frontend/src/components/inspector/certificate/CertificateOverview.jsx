@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next'
 import { Clock, Warning, ShieldCheck, TreeStructure, Certificate, CaretRight } from '@phosphor-icons/react'
 import { formatDate, extractCN, cn } from '../../../lib/utils'
 import { validityFacts, chainNodes, lastAcmeFailure, certificateKeyLabel, serialHex } from '../../../lib/certificateDetail'
-import { relativeAgo } from '../../../lib/relativeTime'
+import { compactAgo } from '../../../lib/relativeTime'
 import { signatureHashName } from '../../../lib/signatureName'
 import { sourceLabel, sourceOf } from '../../../pages/certificates/certificateSources'
 import { usePermission } from '../../../hooks'
@@ -78,8 +78,8 @@ function Validity({ cert }) {
             <strong>{failure.error_message}</strong>
             <br />
             <span className="ins-muted">
-              {[t('inspector.cert.order', { id: failure.id }), failure.primary_domain, failure.challenge_type,
-                failure.last_error_at && relativeAgo(failure.last_error_at, t)].filter(Boolean).join(' · ')}
+              {[t('inspector.cert.order', { id: failure.id }), failure.primary_domain, failure.challenge_type?.toUpperCase(),
+                failure.last_error_at && compactAgo(failure.last_error_at, t)].filter(Boolean).join(' · ')}
             </span>
           </dd>
         </dl>
