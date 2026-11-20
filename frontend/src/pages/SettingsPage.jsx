@@ -83,6 +83,7 @@ import {
   useSavePartsRegistry, changedKeys, useUnloadGuard, sectionDomId, sectionTitleId, keepDraft, readDraft,
 } from '../components/sectioned'
 import SettingsHistory from './settings/SettingsHistory'
+import { fieldProblems, fieldSection } from './settings/fieldChecks'
 
 // Sections: label, sentence of the frame, icon; `permission` hides one from other roles
 const BASE_SETTINGS_CATEGORIES = [
@@ -190,6 +191,10 @@ export default function SettingsPage() {
   // Section whose field last changed a key: a bulk save in error points at it
   const keyOrigin = useRef({})
   const [sectionErrors, setSectionErrors] = useState({})
+  // Fields out of the bounds the interface knows: marked on the field, nothing sent
+  const [fieldErrors, setFieldErrors] = useState({})
+  const [announce, setAnnounce] = useState('')
+  const [invalidFocus, setInvalidFocus] = useState(0)
   const [savingAll, setSavingAll] = useState(false)
   const [savedVersion, setSavedVersion] = useState(0)
   const [settingsLog, setSettingsLog] = useState(null)
@@ -1180,6 +1185,7 @@ export default function SettingsPage() {
   }
 
   const updateSyslogConfig = (key, value) => {
+    clearFieldError(`syslog.${key}`)
     setSyslogConfig(prev => ({ ...prev, [key]: value }))
   }
 
@@ -1798,8 +1804,15 @@ export default function SettingsPage() {
     setSettings(prev => ({ ...prev, [key]: value }))
   }
   // A section's fields record which section a key belongs to, for the marks and the errors
+  const clearFieldError = (key) => setFieldErrors((prev) => {
+    if (!(key in prev)) return prev
+    const next = { ...prev }
+    delete next[key]
+    return next
+  })
   const updateSettingFrom = (sectionId) => (key, value) => {
     keyOrigin.current[key] = sectionId
+    clearFieldError(key)
     updateSetting(key, value)
   }
 
@@ -1841,6 +1854,7 @@ export default function SettingsPage() {
     for (const part of [...pageParts, ...parts.list]) if (part.count > 0) part.reset?.()
     keyOrigin.current = {}
     setSectionErrors({})
+    setFieldErrors({})
     setOauthDirty(false)
     saveState.current?.focus()
   }
@@ -1848,6 +1862,17 @@ export default function SettingsPage() {
   // Each part goes to its own route; a failed one keeps its draft and names its section
   const saveAll = async () => {
     if (!pendingCount || savingAll) return
+    const syslogChanged = changedKeys(syslogConfig, savedSyslog, Object.keys({ ...savedSyslog, ...syslogConfig }))
+    const problems = fieldProblems({ settings, syslog: syslogConfig },
+      [...bulkChanged, ...emailChanged, ...syslogChanged.map((k) => `syslog.${k}`)])
+    const bad = Object.keys(problems)
+    if (bad.length) {
+      setFieldErrors(Object.fromEntries(bad.map((k) => [k, t(problems[k])])))
+      setAnnounce(t('sectioned.fieldsToCorrect', { count: bad.length }))
+      setInvalidFocus((n) => n + 1)
+      return
+    }
+    setAnnounce('')
     setSavingAll(true)
     const errors = {}
     const keep = []
@@ -1886,6 +1911,14 @@ export default function SettingsPage() {
     }
   }
 
+  // A save stopped by a field out of bounds: the first such field takes the focus
+  useEffect(() => {
+    if (!invalidFocus) return
+    const field = document.querySelector('.sf-form [aria-invalid="true"]')
+    field?.scrollIntoView?.({ block: 'center' })
+    field?.focus({ preventScroll: true })
+  }, [invalidFocus])
+
   // Leaving keeps the draft for the return (no question); a reload or a close asks the browser
   useUnloadGuard(pendingCount > 0)
   const pageCounts = Object.fromEntries(pageParts.map((part) => [part.key, part.count]))
@@ -1914,6 +1947,7 @@ export default function SettingsPage() {
         return (
           <GeneralSection
             settings={settings}
+            fieldErrors={fieldErrors}
             updateSetting={updateSettingFrom('general')}
             handleSave={handleSave}
             saving={saving}
@@ -1930,6 +1964,7 @@ export default function SettingsPage() {
         return (
           <EmailSection
             settings={settings}
+            fieldErrors={fieldErrors}
             savedEmail={savedEmail}
             updateSetting={updateSettingFrom('email')}
             handleSave={handleSave}
@@ -2029,6 +2064,7 @@ export default function SettingsPage() {
         return (
           <AuditSection
             settings={settings}
+            fieldErrors={fieldErrors}
             updateSetting={updateSettingFrom('audit')}
             handleSave={handleSave}
             saving={saving}
@@ -2201,6 +2237,7 @@ export default function SettingsPage() {
   const flags = {}
   for (const id of pendingSections) flags[id] = 'modified'
   for (const id of Object.keys(sectionErrors)) flags[id] = 'error'
+  for (const key of Object.keys(fieldErrors)) flags[fieldSection(key)] = 'error'
   const sectionLabel = (id) => sections.find(s => s.id === id)?.label || id
   const lastSave = settingsLog?.[0]
   // Badges the section headers carried: certificate type of HTTPS, experimental Microsoft CA
@@ -2263,6 +2300,7 @@ export default function SettingsPage() {
                   onSave={saveAll}
                 />
               )}
+              <p className="sr-only-sf" role="status" aria-live="polite">{announce}</p>
             </div>
             {settingsLog && <SettingsHistory entries={settingsLog} />}
           </FormLayout>

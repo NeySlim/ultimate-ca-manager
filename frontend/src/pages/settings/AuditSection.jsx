@@ -4,7 +4,7 @@ import { Button, Input, Select } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { FormGroup } from '../../components/sectioned'
 
-export default function AuditSection({ settings, updateSetting, hasPermission, syslogConfig, updateSyslogConfig, syslogTesting, handleTestSyslog }) {
+export default function AuditSection({ settings, fieldErrors = {}, updateSetting, hasPermission, syslogConfig, updateSyslogConfig, syslogTesting, handleTestSyslog }) {
   const { t } = useTranslation()
   // The backend accepts a retention from admins only: shortening it deletes history.
   const canAdminSettings = Boolean(hasPermission('admin:settings'))
@@ -42,10 +42,12 @@ export default function AuditSection({ settings, updateSetting, hasPermission, s
             <Input
               label={t('settings.syslogPort')}
               type="number"
-              value={syslogConfig.port}
-              onChange={(e) => updateSyslogConfig('port', parseInt(e.target.value) || 514)}
+              inputMode="numeric"
+              value={syslogConfig.port ?? ''}
+              onChange={(e) => updateSyslogConfig('port', e.target.value === '' ? '' : Number(e.target.value))}
               min="1"
               max="65535"
+              error={fieldErrors['syslog.port']}
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

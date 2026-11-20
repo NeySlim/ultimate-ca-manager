@@ -11,7 +11,7 @@ import PublicEndpointsPanel from './PublicEndpointsPanel'
 import AdminLockLabel from './AdminLockLabel'
 import { FormGroup } from '../../components/sectioned'
 
-export default function GeneralSection({ settings, updateSetting, canWrite, hasPermission, savedVersion = 0 }) {
+export default function GeneralSection({ settings, fieldErrors = {}, updateSetting, canWrite, hasPermission, savedVersion = 0 }) {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
   const [metricsToken, setMetricsToken] = useState('')
@@ -128,11 +128,10 @@ export default function GeneralSection({ settings, updateSetting, canWrite, hasP
             type="number"
             min={1}
             max={65535}
+            inputMode="numeric"
             value={settings.acme_public_port ?? 443}
-            onChange={(e) => {
-              const val = parseInt(e.target.value, 10) || 443
-              updateSetting('acme_public_port', Math.min(65535, Math.max(1, val)))
-            }}
+            onChange={(e) => updateSetting('acme_public_port', e.target.value === '' ? '' : Number(e.target.value))}
+            error={fieldErrors.acme_public_port}
             helperText={t('settings.acmePublicPortHelper')}
           />
           <Select

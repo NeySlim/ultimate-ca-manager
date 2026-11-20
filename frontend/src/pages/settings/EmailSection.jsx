@@ -10,7 +10,7 @@ import { WarningCircle } from '@phosphor-icons/react'
 import { secretInputProps, smtpSecretTargets } from '../../lib/secretTarget'
 import { FormGroup } from '../../components/sectioned'
 
-export default function EmailSection({ settings, savedEmail, updateSetting, saving, canWrite, isMobile, emailTestResult, emailTesting, handleTestEmail, defaultTestRecipient, oauthDirty, setOauthDirty, oauthPresets, applyOAuthProviderPreset, handleSmtpOAuthAuthorize, handleSmtpOAuthRevoke, expiryAlerts, setExpiryAlerts, triggerExpiryCheck, showTemplateEditor, setShowTemplateEditor }) {
+export default function EmailSection({ settings, fieldErrors = {}, savedEmail, updateSetting, saving, canWrite, isMobile, emailTestResult, emailTesting, handleTestEmail, defaultTestRecipient, oauthDirty, setOauthDirty, oauthPresets, applyOAuthProviderPreset, handleSmtpOAuthAuthorize, handleSmtpOAuthRevoke, expiryAlerts, setExpiryAlerts, triggerExpiryCheck, showTemplateEditor, setShowTemplateEditor }) {
   const { t } = useTranslation()
   const secretTargets = smtpSecretTargets(savedEmail, settings)
   const { showSuccess } = useNotification()
@@ -47,8 +47,10 @@ export default function EmailSection({ settings, savedEmail, updateSetting, savi
               <Input
                 label={t('settings.smtpPort')}
                 type="number"
-                value={settings.smtp_port || 587}
-                onChange={(e) => updateSetting('smtp_port', parseInt(e.target.value))}
+                inputMode="numeric"
+                value={settings.smtp_port ?? 587}
+                onChange={(e) => updateSetting('smtp_port', e.target.value === '' ? '' : Number(e.target.value))}
+                error={fieldErrors.smtp_port}
               />
             </div>
           </DetailGrid>

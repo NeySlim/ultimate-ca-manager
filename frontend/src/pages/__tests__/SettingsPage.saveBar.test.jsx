@@ -18,8 +18,13 @@ vi.mock('../settings/GeneralSection', () => ({
   ),
 }))
 vi.mock('../settings/EmailSection', () => ({
-  default: ({ settings, updateSetting }) => (
-    <input aria-label="smtp-host" value={settings.smtp_host || ''} onChange={(e) => updateSetting('smtp_host', e.target.value)} />
+  default: ({ settings, updateSetting, fieldErrors = {} }) => (
+    <>
+      <input aria-label="smtp-host" value={settings.smtp_host || ''} onChange={(e) => updateSetting('smtp_host', e.target.value)} />
+      <input aria-label="smtp-port" value={settings.smtp_port ?? ''} aria-invalid={fieldErrors.smtp_port ? true : undefined}
+        onChange={(e) => updateSetting('smtp_port', e.target.value === '' ? '' : Number(e.target.value))} />
+      {fieldErrors.smtp_port && <p>{fieldErrors.smtp_port}</p>}
+    </>
   ),
 }))
 vi.mock('../settings/AuditSection', () => ({
@@ -129,6 +134,26 @@ describe('SettingsPage: one page, one save bar', () => {
     expect(tocLink('settings.tabs.email')).toHaveTextContent('sectioned.flagError')
     expect(bar()).toHaveTextContent('sectioned.saveFailedTitle')
     expect(notificationSpies.showError).toHaveBeenCalledWith('sectioned.saveFailedToast')
+  })
+
+  it('sends nothing while a port is out of range, marks the field and focuses it', async () => {
+    await loaded()
+    fireEvent.change(screen.getByLabelText('smtp-port'), { target: { value: '99999' } })
+    fireEvent.change(screen.getByLabelText('system-name'), { target: { value: 'PKI 2' } })
+    await act(async () => { fireEvent.click(saveButton()) })
+    expect(settingsService.updateEmailSettings).not.toHaveBeenCalled()
+    expect(settingsService.updateBulk).not.toHaveBeenCalled()
+    const port = screen.getByLabelText('smtp-port')
+    expect(port).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByText('settings.portOutOfRange')).toBeInTheDocument()
+    expect(document.activeElement).toBe(port)
+    expect(tocLink('settings.tabs.email')).toHaveTextContent('sectioned.flagError')
+    expect(screen.getByRole('status')).toHaveTextContent('sectioned.fieldsToCorrect')
+    // Typing in the field clears its mark; a valid port is then sent
+    fireEvent.change(port, { target: { value: '2525' } })
+    expect(port).not.toHaveAttribute('aria-invalid')
+    await act(async () => { fireEvent.click(saveButton()) })
+    expect(settingsService.updateEmailSettings).toHaveBeenCalledWith(expect.objectContaining({ smtp_port: 2525 }))
   })
 
   it('lands a link to ?tab= on the frame of that section', async () => {

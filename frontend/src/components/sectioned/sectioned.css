@@ -51,7 +51,6 @@
   min-width: 0;
   container-type: inline-size;
 }
-.sf-section.is-error { border-color: var(--bad); }
 .sf-heading {
   display: flex;
   align-items: center;
@@ -66,7 +65,8 @@
 .sf-heading h2:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .sf-heading p { margin: 5px 0 0; font-size: 12px; color: var(--muted); }
 .sf-heading-aside { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.sf-section-error { display: flex; align-items: flex-start; gap: 6px; margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--bad); }
+/* A save the server refused: its message under the sentence, in the error colour; the frame does not change */
+.sf-section-error, .sf-heading p.sf-section-error { display: flex; align-items: flex-start; gap: 6px; margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--bad); }
 .sf-section-error svg { width: 13px; height: 13px; margin-top: 2px; flex-shrink: 0; }
 .sf-body { padding: 18px 20px; display: grid; gap: 20px; min-width: 0; color: var(--text); }
 /* A body that holds a working table fills the screen below the heading, the table scrolls inside */
@@ -167,7 +167,7 @@
 
 /* Aurore family: frames keep the gradient border of its panels */
 :root[data-theme="aurore"] :is(.sf-section, .sf-savebar, .sf-history) { border-radius: 6px; }
-:root[data-theme="aurore"] :is(.sf-section, .sf-history):not(.is-error) {
+:root[data-theme="aurore"] :is(.sf-section, .sf-history) {
   border-color: transparent;
   background: linear-gradient(var(--panel), var(--panel)) padding-box,
     linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 55%, transparent), color-mix(in srgb, var(--grad-b) 25%, transparent) 60%, var(--line)) border-box;
