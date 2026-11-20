@@ -209,7 +209,7 @@ Open **Modules** > **Governance** > **Policies**. A policy governs issuance, ren
 
 ### Approvals
 
-Open **Modules** > **Governance** > **Approvals**. When a policy requires approval, the operation waits until the required approvers have decided: an issue form, CSR signing, a renewal, a revocation, a renewal queued by the scheduler or a protocol enrollment. One rejection stops the request, a request not decided within seven days expires, and nobody approves their own request. Administrators bypass the queue.
+Open **Modules** > **Governance** > **Approvals**. When a policy requires approval, the operation waits until the required approvers have decided: an issue form, CSR signing, a renewal, a revocation, a renewal queued by the scheduler or a protocol enrollment. One rejection stops the request, a request not decided within seven days expires, and nobody approves their own request. Administrators bypass the queue. Open requests are grouped by deadline; several can be approved or rejected together, each in turn, with the outcome of each, and a rejection needs a reason.
 
 ### Key Recovery
 
@@ -217,7 +217,7 @@ Open **Modules** > **Governance** > **Key Recovery**. It recovers the archived p
 
 ### Reports
 
-Open **Modules** > **Governance** > **Reports**. The **Data Reports** tab generates, as CSV or JSON:
+Open **Modules** > **Governance** > **Reports**. The scheduled reports are grouped by their next run, and those without a schedule are folded below. A report downloads at once (CSV or JSON for a data report), and its detail shows its schedule, the current figure and a preview. The data reports are:
 
 - **Certificate Inventory**: every certificate with its status
 - **Expiring Certificates**: certificates expiring within a time window
@@ -226,7 +226,7 @@ Open **Modules** > **Governance** > **Reports**. The **Data Reports** tab genera
 - **Audit Summary**: the most frequent actions and the most active users
 - **Compliance Status**: three checks (active certificates, expired CAs, certificates expiring within 30 days); certificate policies are not read
 
-The **PDF Reports** tab downloads the executive PDF report for management review, and **Schedule** sends any report by e-mail daily, weekly or monthly.
+The PDF templates, the executive report among them, download the same way, **Build a PDF…** composes one from chosen sections, and **Schedule a report** sends any report by e-mail daily, weekly or monthly.
 
 ### Certificate Discovery
 

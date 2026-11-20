@@ -318,7 +318,7 @@ Several fixes change what an existing installation does once upgraded. The CHANG
 - Back up `audit-chain.keys` with `master.key` from now on (same directory), and on Docker Compose follow the `ucm-config` volume steps below.
 - Review custom roles and their assignments, and the members of the default Certificate Operators and Auditors groups: they now grant their permissions.
 - SAML: set the admin Base URL and check that the IdP matches `/api/v2/sso/saml/metadata` and that its clock is within five minutes.
-- Check policies (notification e-mails, 50-name maximum now applied to ACME and the other protocols), ACME "Allow wildcard" per domain, discovery profile notifications and Reports > Schedule.
+- Check policies (notification e-mails, 50-name maximum now applied to ACME and the other protocols), ACME "Allow wildcard" per domain, discovery profile notifications and the scheduled reports in Reports.
 - Integrations whose server or account changes ask for their secret again; SMTP OAuth needs a new consent after such a change.
 - API clients: a failing key is refused even with a session, and `Authorization: Bearer` is read as a key only for `ucm_ak_` tokens; exporting a CA private key needs `read:private_keys`.
 
