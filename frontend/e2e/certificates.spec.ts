@@ -26,12 +26,15 @@ test('a certificate issued on screen is signed by the chosen CA', async ({ page,
   const cn = `${uid('web')}.example.com`
   await page.goto('/certificates')
   await page.getByRole('button', { name: 'Issue', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: 'Issue Certificate' })
-  await dialog.getByLabel('Certificate Authority').click()
-  await page.getByRole('option', { name: new RegExp(ca.common_name) }).click()
-  await dialog.getByLabel('Common Name').fill(cn)
-  await dialog.getByRole('button', { name: 'Issue Certificate' }).click()
-  await expect(dialog).toBeHidden()
+  const dialog = page.getByRole('dialog', { name: 'Issue a certificate' })
+  await dialog.getByLabel('Authority').selectOption(String(ca.id))
+  await dialog.getByLabel('Common name').fill(cn)
+  // Two steps: Configure, then Review, where alone the certificate is issued
+  await dialog.getByRole('button', { name: 'Review the request' }).click()
+  const review = page.getByRole('dialog', { name: 'Review the request' })
+  await expect(review.getByRole('heading', { name: cn })).toBeVisible()
+  await review.getByRole('button', { name: 'Issue the certificate' }).click()
+  await expect(review).toBeHidden()
 
   await expect(page.getByRole('main').getByRole('button', { name: cn, exact: true })).toBeVisible()
   const [cert] = await findCerts(api, cn)
@@ -50,9 +53,12 @@ test('renewing from the inspector issues a new certificate for the same name', a
   const cert = await issueCert(api, (await createCA(api)).id)
   const panel = await openInInspector(page, cert.common_name)
   await panel.getByRole('button', { name: 'Renew', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: 'Renew Certificate' })
-  await dialog.getByRole('button', { name: 'Renew', exact: true }).click()
-  await expect(dialog).toBeHidden()
+  // The issue form in renewal mode: the duration only, then the Review step
+  const dialog = page.getByRole('dialog', { name: 'Renew the certificate' })
+  await dialog.getByRole('button', { name: 'Review the request' }).click()
+  const review = page.getByRole('dialog', { name: 'Review the request' })
+  await review.getByRole('button', { name: 'Renew the certificate' }).click()
+  await expect(review).toBeHidden()
 
   // A new serial for the same name, the old one superseded or kept beside it
   await expect.poll(async () => (await findCerts(api, cert.common_name))
