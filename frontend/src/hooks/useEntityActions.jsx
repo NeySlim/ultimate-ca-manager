@@ -7,7 +7,7 @@
  * list { id, label, icon, onClick, visible, disabled, danger }; `modals` is a
  * fragment to render once; `handler(id)` gives a visible action's callback.
  */
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Certificate, ShieldCheck, Trash, X, ArrowsClockwise, ShieldWarning, PushPin,
@@ -48,6 +48,7 @@ const definedOnly = (obj) => Object.fromEntries(Object.entries(obj || {}).filter
  * @param {object} p.entity  the loaded entity
  * @param {*} [p.entityId]  id the routes take when it differs from entity.id
  * @param {(updated: object) => void} [p.onChanged]  entity replaced in place
+ * @param {(type: string, id: number) => void} [p.onOpenEntity]  opens another object, as a renewed certificate
  * @param {() => void} [p.onClose]  the surface showing the entity should go away
  * @param {'close'|'refresh'} [p.afterMutation]  what a surface does once an action went through:
  *   'close' (default) or 'refresh' (stay open, reload the entity via onChanged). Deleting always closes.
@@ -55,7 +56,7 @@ const definedOnly = (obj) => Object.fromEntries(Object.entries(obj || {}).filter
  * @param {object} [p.permissions]  { canWrite, canDelete, hasPermission } override
  * @param {Function} [p.t]  translator override
  */
-export function useEntityActions({ type, entity, entityId, onChanged, onClose, onMutate, afterMutation = 'close', permissions, t: tOverride }) {
+export function useEntityActions({ type, entity, entityId, onChanged, onClose, onOpenEntity, onMutate, afterMutation = 'close', permissions, t: tOverride }) {
   const { t: hookT } = useTranslation()
   const t = tOverride || hookT
   const { showSuccess, showError, showConfirm, showPrompt, showWarning } = useNotification()
@@ -73,6 +74,7 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
   const [uploadCertOpen, setUploadCertOpen] = useState(false)
   const [uploadKeyOpen, setUploadKeyOpen] = useState(false)
   const [renewOpen, setRenewOpen] = useState(false)
+  const renewed = useRef(false)
   // The operator asked to delete a still-valid certificate and accepted to
   // revoke it first; the deletion resumes once the revocation is through.
   const [deleteAfterRevoke, setDeleteAfterRevoke] = useState(false)
@@ -402,8 +404,11 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
         />
       )}
       {isCert && renewOpen && (
-        <IssueCertificateDialog open={renewOpen} onOpenChange={setRenewOpen} mode="renew" certificate={data}
-          onMutate={onMutate} onIssued={() => { refresh(); settle() }} />
+        <IssueCertificateDialog open={renewOpen} mode="renew" certificate={data} onMutate={onMutate}
+          // The result screen stays on its surface: the surface settles once that screen is closed
+          onOpenChange={(next) => { setRenewOpen(next); if (!next && renewed.current) { renewed.current = false; settle() } }}
+          onIssued={() => { renewed.current = true; refresh() }}
+          onOpen={(issued) => { if (issued?.id) onOpenEntity?.('certificate', issued.id) }} />
       )}
       {isCert && (
         <UploadKeyModal open={uploadKeyOpen} onOpenChange={setUploadKeyOpen} selectedCert={data} t={t}

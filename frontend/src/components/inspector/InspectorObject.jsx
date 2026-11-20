@@ -51,7 +51,7 @@ export function InspectorObject({ entry, onTitle }) {
   useEffect(() => { if (title) onTitle(key, title) }, [title, key]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { actions, modals, handler } = useEntityActions({
-    type, entity: data, entityId, onChanged: setData, onClose: () => closeEntity(key),
+    type, entity: data, entityId, onChanged: setData, onClose: () => closeEntity(key), onOpenEntity: openEntity,
   })
 
   if (!config) return null

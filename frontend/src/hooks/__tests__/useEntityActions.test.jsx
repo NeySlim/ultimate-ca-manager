@@ -2,7 +2,7 @@
  * useEntityActions: which actions an entity offers, to whom, and what the
  * guarded ones do when a surface calls them anyway.
  */
-import { renderHook, act, render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { renderHook, act, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const notify = vi.hoisted(() => ({
@@ -144,6 +144,33 @@ describe('what a list row leaves to the detail', () => {
     fireEvent.click(screen.getByRole('button', { name: /issueForm.toReview/ }))
     fireEvent.click(await screen.findByTestId('issue-submit'))
     await waitFor(() => expect(svc.certs.renew).toHaveBeenCalledWith(4, {}))
+  })
+
+  it('keeps its surface under the result screen of a renewal, and settles when that screen closes', async () => {
+    svc.certs.renew.mockResolvedValue({ data: { id: 7, common_name: 'web.example.com' } })
+    const onClose = vi.fn()
+    const onOpenEntity = vi.fn()
+    function Harness() {
+      const r = useEntityActions({ type: 'certificate', entity: CERT, permissions: ALL, onClose, onOpenEntity })
+      return <>{r.actions.map(a => <button key={a.id} type="button" onClick={a.onClick}>{`action-${a.id}`}</button>)}{r.modals}</>
+    }
+    const renewOnce = async () => {
+      fireEvent.click(screen.getByText('action-renew'))
+      fireEvent.click(await screen.findByRole('button', { name: /issueForm.toReview/ }))
+      fireEvent.click(await screen.findByTestId('issue-submit'))
+      return screen.findByTestId('issue-result')
+    }
+    render(<Harness />)
+    const result = await renewOnce()
+    expect(onClose).not.toHaveBeenCalled()
+    fireEvent.click(within(result).getByRole('button', { name: 'common.close' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+    expect(onOpenEntity).not.toHaveBeenCalled()
+    // "View the certificate" settles the same way, then opens the renewed certificate
+    const again = await renewOnce()
+    fireEvent.click(within(again).getByRole('button', { name: /resultViewCertificate/ }))
+    await waitFor(() => expect(onOpenEntity).toHaveBeenCalledWith('certificate', 7))
+    expect(onClose).toHaveBeenCalledTimes(2)
   })
 
   it('sends a still-valid certificate to the revocation dialog before deleting it', async () => {
