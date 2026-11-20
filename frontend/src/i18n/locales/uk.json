@@ -651,6 +651,7 @@
       "keyDetail": "WebAuthn, для введеного імені користувача",
       "usernameMissing": "Введіть ім’я користувача.",
       "passwordMissing": "Введіть пароль.",
+      "refused": "Incorrect username or password. After several failures, a delay applies.",
       "lockedTitle": "Сеанс заблоковано",
       "lockedLead": "Ваш сеанс завершився через бездіяльність. Увійдіть знову, щоб повернутися на сторінку, де ви були.",
       "unlock": "Розблокувати",

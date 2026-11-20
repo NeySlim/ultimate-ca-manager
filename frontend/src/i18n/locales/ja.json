@@ -649,6 +649,7 @@
       "keyDetail": "WebAuthn（入力したユーザー名）",
       "usernameMissing": "ユーザー名を入力してください。",
       "passwordMissing": "パスワードを入力してください。",
+      "refused": "Incorrect username or password. After several failures, a delay applies.",
       "lockedTitle": "セッションはロックされています",
       "lockedLead": "操作がなかったためセッションの有効期限が切れました。再度サインインすると、元のページに戻ります。",
       "unlock": "ロック解除",

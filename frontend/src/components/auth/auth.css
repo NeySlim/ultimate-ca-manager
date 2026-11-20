@@ -25,11 +25,12 @@
 .auth :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; box-shadow: none; }
 .auth:focus { outline: none; }
 /* Skip link: the first tab stop, shown while focused */
-.auth-skip { position: fixed; left: 16px; top: -60px; z-index: 100; padding: 14px; background: var(--panel); color: var(--text); font-size: 13px; text-decoration: none; }
+.auth-skip { position: fixed; left: 16px; top: -60px; z-index: 100; padding: 14px; background: var(--panel); color: var(--text); font-size: 13px; text-decoration: none; transition: none; }
 .auth-skip:focus { top: 12px; }
-.auth-skip:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.auth-skip:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; box-shadow: none; }
 .auth-tools { position: absolute; top: 12px; right: 16px; display: flex; align-items: center; gap: 4px; }
 .auth-tools .shell-icon-btn { width: 32px; height: 32px; border-radius: 4px; color: var(--text); }
+.auth-tools .shell-icon-btn svg { width: 16px; height: 16px; }
 .auth-tools .shell-pop { max-height: calc(100dvh - 64px); }
 .auth-card {
   position: relative;
@@ -232,7 +233,7 @@
 :root[data-theme="aurore"] .auth-btn:not(.is-primary):hover:not(:disabled) { background: color-mix(in srgb, var(--grad-a) 12%, transparent); }
 :root[data-theme="aurore"][data-mode="light"] .auth-btn:not(.is-primary) { background: color-mix(in srgb, var(--paper) 70%, transparent); border-color: var(--control); }
 :root[data-theme="aurore"][data-mode="light"] .auth-btn:not(.is-primary):hover:not(:disabled) { background: color-mix(in srgb, var(--grad-a) 8%, transparent); }
-:root[data-theme="aurore"] .auth :focus-visible { box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent); }
+:root[data-theme="aurore"] :is(.auth :focus-visible, .auth-skip:focus-visible) { box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent); }
 /* The halo gives way to the red ring of a field in error; the primary button keeps its glow */
 :root[data-theme="aurore"] .auth-field input[aria-invalid="true"]:focus-visible { box-shadow: 0 0 0 1px var(--bad); }
 :root[data-theme="aurore"] .auth-btn.is-primary:focus-visible { box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent), 0 8px 24px -8px var(--glow); }

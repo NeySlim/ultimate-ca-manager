@@ -857,6 +857,7 @@
       "keyDetail": "WebAuthn, pour l’identifiant saisi",
       "usernameMissing": "Saisissez votre identifiant.",
       "passwordMissing": "Saisissez votre mot de passe.",
+      "refused": "Identifiant ou mot de passe incorrect. Après plusieurs échecs, un délai s’applique.",
       "lockedTitle": "Session verrouillée",
       "lockedLead": "Votre session a expiré après inactivité. Reconnectez-vous pour revenir à la page où vous étiez.",
       "unlock": "Déverrouiller",

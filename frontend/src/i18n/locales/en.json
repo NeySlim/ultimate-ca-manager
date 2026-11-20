@@ -649,6 +649,7 @@
       "keyDetail": "WebAuthn, for the username entered",
       "usernameMissing": "Enter your username.",
       "passwordMissing": "Enter your password.",
+      "refused": "Incorrect username or password. After several failures, a delay applies.",
       "lockedTitle": "Session locked",
       "lockedLead": "Your session expired after inactivity. Sign in again to return to the page you were on.",
       "unlock": "Unlock",

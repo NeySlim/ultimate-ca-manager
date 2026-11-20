@@ -649,6 +649,7 @@
       "keyDetail": "WebAuthn, per il nome utente inserito",
       "usernameMissing": "Inserisci il nome utente.",
       "passwordMissing": "Inserisci la password.",
+      "refused": "Incorrect username or password. After several failures, a delay applies.",
       "lockedTitle": "Sessione bloccata",
       "lockedLead": "La sessione è scaduta per inattività. Accedi di nuovo per tornare alla pagina in cui eri.",
       "unlock": "Sblocca",

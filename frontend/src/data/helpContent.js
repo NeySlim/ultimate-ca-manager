@@ -81,7 +81,7 @@ export const helpContent = {
         title: 'Session',
         icon: Clock,
         items: [
-          { label: 'Warning', text: 'Five minutes before the inactivity timeout, a banner shows the time left; Extend keeps the session, other activity no longer does' },
+          { label: 'Warning', text: 'Five minutes before the inactivity timeout, a banner shows the time left; Extend keeps the session and says for how long, other activity no longer does' },
           { label: 'Lock', text: 'At the end the session closes and the screen locks: nothing of the console stays open behind it' },
           { label: 'Return', text: 'Sign in again with the same account to come back to the page that was open; Sign in with another account starts afresh' },
         ]

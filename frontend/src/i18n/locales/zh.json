@@ -649,6 +649,7 @@
       "keyDetail": "WebAuthn，用于已输入的用户名",
       "usernameMissing": "请输入用户名。",
       "passwordMissing": "请输入密码。",
+      "refused": "用户名或密码错误。多次失败后将需要等待。",
       "lockedTitle": "会话已锁定",
       "lockedLead": "您的会话因长时间未操作已过期。请重新登录以返回之前所在的页面。",
       "unlock": "解锁",

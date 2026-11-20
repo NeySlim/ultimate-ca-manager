@@ -103,7 +103,7 @@ describe('LoginPage, as designed', () => {
     s.loginPassword.mockRejectedValue(refusal(401, 'Invalid credentials'))
     renderLogin()
     await submit()
-    expect(await screen.findByRole('alert')).toHaveTextContent('auth.invalidCredentials')
+    expect(await screen.findByRole('alert')).toHaveTextContent('auth.page.refused')
     const pass = screen.getByLabelText('auth.page.password')
     expect(pass).toHaveValue('')
     await waitFor(() => expect(document.activeElement).toBe(pass))
@@ -115,7 +115,7 @@ describe('LoginPage, as designed', () => {
     renderLogin()
     await submit()
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('auth.invalidCredentials')
+    expect(alert).toHaveTextContent('auth.page.refused')
     expect(alert).not.toHaveTextContent('Invalid credentials')
   })
 

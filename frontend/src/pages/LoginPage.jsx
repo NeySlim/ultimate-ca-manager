@@ -496,7 +496,7 @@ export default function LoginPage() {
       if (!userData.requires_2fa_enrollment) welcome(userData, username)
       finish(username)
     } catch (error) {
-      refuse(error, 'password', t('auth.invalidCredentials'))
+      refuse(error, 'password', t('auth.page.refused'))
       if (!maintenanceRetry.current) setPassword('')  // kept while a maintenance is waited out
       setFocusNext('password')
     } finally {
