@@ -123,6 +123,7 @@ export function ResponsiveDataTable({
   noMatch, // list template, nothing matches the filters: { title, description, action }
   columnsNote, // list template: the sentence of the columns dialog
   selectionLabel, // list template: (count, { pageAll }) => words of the selection bar; pageAll: the selection is the page
+  mobileFilterStrip = false, // list template on a phone: the filters scroll in one strip, each half its width
 
   // Custom class
   className
@@ -692,6 +693,7 @@ export function ResponsiveDataTable({
             applyPreset={applyPreset}
             // Export - disabled in empty state
             exportEnabled={false}
+            filterStrip={mobileFilterStrip}
           />
         )}
         
@@ -794,6 +796,7 @@ export function ResponsiveDataTable({
           searchLabel={searchLabel}
           searchStatus={searchStatus}
           columnsNote={columnsNote}
+          filterStrip={mobileFilterStrip}
         />
       )}
       {flat && belowToolbar}
@@ -1012,6 +1015,7 @@ function SearchBar({
   searchLabel,
   searchStatus,
   columnsNote,
+  filterStrip = false,
 }) {
   const { t } = useTranslation()
   // Toolbar button: flat and labelled in the list template, the compact square elsewhere
@@ -1103,7 +1107,7 @@ function SearchBar({
         
         {/* Filters (desktop only) */}
         {(flat || !isMobile) && shownFilters.length > 0 && (
-          <div className={flat ? 'lv-tools' : 'flex items-center gap-2 shrink-0'}>
+          <div className={flat ? cn('lv-tools', filterStrip && isMobile && 'is-strip') : 'flex items-center gap-2 shrink-0'}>
             {shownFilters.map((filter) => {
               // Boolean toggle filter -- a checkbox-style pill for the
               // "show/hide this class of row" case, where a multiSelect with

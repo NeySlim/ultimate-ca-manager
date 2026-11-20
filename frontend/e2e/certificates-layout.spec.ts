@@ -123,26 +123,53 @@ for (const [w, h] of [[390, 844], [800, 1000]]) {
   })
 }
 
-// The filters share the mockup's one line beside the export button: the toolbar keeps its 90 px
+// The mockup's two filters keep its widths beside the export button (151 px at 390, 356 at 800) and the
+// toolbar its 90 px; the product's template filter follows them in the strip, reached by Tab or a swipe
 for (const w of [390, 800]) {
   test.describe(`the filters at ${w} px`, () => {
     test.use({ viewport: { width: w, height: 1000 } })
-    test('share the mockup line, with no 140 px cap and no line added', async ({ page, api }) => {
+    test('keep the mockup widths, with no line added, the third one in the strip', async ({ page, api }) => {
       await createCA(api)
       await page.goto('/certificates')
       const main = page.getByRole('main')
       const filters = main.locator('.lv-toolbar .lv-filter > button')
       await expect(filters.first()).toBeVisible()
-      const [a, b, c] = [await box(filters.nth(0)), await box(filters.nth(1)), await box(filters.nth(2))]
+      await expect(filters).toHaveCount(3)
+      const half = (w - 32 - 8 - 40 - 8) / 2
+      const [a, b] = [await box(filters.nth(0)), await box(filters.nth(1))]
       expect(Math.round(a.x)).toBe(16)
-      for (const f of [b, c]) {
-        expect(Math.round(f.y)).toBe(Math.round(a.y))
-        expect(Math.round(f.width)).toBe(Math.round(a.width))
-      }
+      expect(Math.round(a.width)).toBe(Math.round(half))
+      expect(Math.round(b.width)).toBe(Math.round(half))
+      expect(Math.round(b.y)).toBe(Math.round(a.y))
       expect(Math.round(b.x)).toBe(Math.round(a.x + a.width + 8))
-      expect(Math.round(c.x + c.width + 8 + 40)).toBe(w - 16)
+      const exportButton = await box(main.getByRole('button', { name: 'Export data' }))
+      expect(Math.round(exportButton.x)).toBe(w - 16 - 40)
       expect(Math.round((await box(main.locator('.lv-toolbar'))).height)).toBe(90)
-      expect(await filters.nth(0).evaluate((el) => getComputedStyle(el).maxWidth)).toBe('none')
+      // The labels are whole: no ellipsis on the mockup's two
+      for (const i of [0, 1]) {
+        expect(await filters.nth(i).locator('span').evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
+      }
+      // Tab from the second filter brings the third one whole into the strip, the export button in place
+      await filters.nth(1).focus()
+      await page.keyboard.press('Tab')
+      await expect(filters.nth(2)).toBeFocused()
+      await expect.poll(async () => {
+        const c = await box(filters.nth(2))
+        return Math.round(c.x + c.width) <= w - 16 - 40 - 8 + 1 && c.x >= 16 - 1
+      }).toBe(true)
+      expect(Math.round((await box(main.getByRole('button', { name: 'Export data' }))).x)).toBe(w - 16 - 40)
+      // Its menu opens whole inside the window, not clipped by the strip
+      await page.keyboard.press('Enter')
+      const menu = main.locator('.lv-toolbar .lv-filter .ui-pop')
+      await expect(menu).toBeVisible()
+      const m = await box(menu)
+      expect(m.x).toBeGreaterThanOrEqual(0)
+      expect(m.x + m.width).toBeLessThanOrEqual(w + EPS)
+      const hit = await menu.evaluate((el) => {
+        const r = el.getBoundingClientRect()
+        return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2))
+      })
+      expect(hit).toBe(true)
     })
   })
 }

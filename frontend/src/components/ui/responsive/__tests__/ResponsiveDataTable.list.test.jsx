@@ -398,3 +398,32 @@ describe('ResponsiveDataTable page jump and the write guard', () => {
     expect(blockedWhileSuspended(screen.getByRole('button', { name: 'table.goToPage' }))).toBe(false)
   })
 })
+
+describe('ResponsiveDataTable phone filter strip', () => {
+  const FILTERS = ['All CAs', 'All sources', 'All templates'].map((placeholder, i) => ({
+    key: `f${i}`, type: 'multiSelect', value: [], onChange: () => {}, placeholder, options: [{ value: 'a', label: 'A' }],
+  }))
+  const phone = (props) => render(<Harness searchable searchLabel="Search" toolbarFilters={FILTERS}
+    card={(r) => ({ description: r.note })} exportEnabled {...props} />)
+  beforeEach(() => { device.mobile = true })
+
+  it('on a phone, an opted-in toolbar lines its filters in a strip that keeps every one of them', () => {
+    phone({ mobileFilterStrip: true })
+    const tools = document.querySelector('.lv-toolbar .lv-tools')
+    expect(tools).toHaveClass('is-strip')
+    expect(within(tools).getAllByRole('button').map((b) => b.textContent)).toEqual(['All CAs', 'All sources', 'All templates'])
+    // The export button stays outside the strip, after it: the mockup's place
+    const exportButton = screen.getByRole('button', { name: 'table.exportData' })
+    expect(tools.contains(exportButton)).toBe(false)
+    expect(tools.compareDocumentPosition(exportButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('keeps the shared behaviour elsewhere: no strip without the option, nor on a wide screen', () => {
+    const { unmount } = phone()
+    expect(document.querySelector('.lv-toolbar .lv-tools')).not.toHaveClass('is-strip')
+    unmount()
+    device.mobile = false
+    phone({ mobileFilterStrip: true })
+    expect(document.querySelector('.lv-toolbar .lv-tools')).not.toHaveClass('is-strip')
+  })
+})
