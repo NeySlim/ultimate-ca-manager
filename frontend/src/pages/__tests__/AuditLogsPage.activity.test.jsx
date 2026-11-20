@@ -125,6 +125,8 @@ describe('the journal as the mockup draws it', () => {
     renderPage()
     await ready()
     expect(screen.getByText(/audit\.pageRange.*"from":"1".*"to":"50"/)).toBeInTheDocument()
+    // the sizes the former list offered
+    expect(within(screen.getByRole('combobox', { name: 'audit.perPageLabel' })).getAllByRole('option').map((o) => o.value)).toEqual(['10', '25', '50', '100'])
     fireEvent.click(screen.getByRole('button', { name: 'audit.nextPage' }))
     await waitFor(() => expect(lastList()).toMatchObject({ page: 2, per_page: 50 }))
     fireEvent.change(screen.getByRole('combobox', { name: 'audit.perPageLabel' }), { target: { value: '25' } })
@@ -159,6 +161,18 @@ describe('the detail of an entry', () => {
     fireEvent.click(within(d).getByRole('button', { name: 'audit.inspectCertificate' }))
     expect(inspector.openEntity).toHaveBeenCalledWith('certificate', 23)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('copies the IP address, as the former detail did', async () => {
+    const writeText = vi.fn().mockResolvedValue()
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true })
+    renderPage()
+    await ready()
+    fireEvent.click(screen.getByRole('button', { name: 'device-05.example.com' }))
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'audit.copyIp' }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('192.0.2.10'))
+    expect(await within(dialog()).findByRole('button', { name: 'audit.ipCopied' })).toBeInTheDocument()
   })
 
   it('offers no inspection without the right to read certificates', async () => {

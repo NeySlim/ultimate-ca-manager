@@ -3192,6 +3192,8 @@
     "pageGo": "Перейти",
     "dateTime": "Дата / время",
     "client": "Клиент",
+    "copyIp": "Скопировать IP-адрес",
+    "ipCopied": "IP-адрес скопирован",
     "inspectCertificate": "Открыть сертификат",
     "viewAuthority": "Открыть центр сертификации",
     "exportScope_one": "{{count, number}} событие с текущим поиском и фильтрами (не более 10 000).",

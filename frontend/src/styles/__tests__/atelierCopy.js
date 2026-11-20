@@ -86,7 +86,10 @@ export function unscope(sel) {
   if (!m || !m[0]) return null
   const rest = s.slice(m[0].length)
   if (rest !== ' .atl' && !/^ \.atl[ >+~]/.test(rest)) return null
-  const mockRoot = m[0].startsWith(':where(') ? `:where(${toMockRoot(m[0].slice(7, -1))})` : toMockRoot(m[0])
+  const inner = m[0].startsWith(':where(') ? m[0].slice(7, -1) : m[0]
+  // a mockup theme root left as it is would never match the product's <html>
+  if (THEME_ROOTS.some(([mock]) => mock === inner)) return null
+  const mockRoot = m[0].startsWith(':where(') ? `:where(${toMockRoot(inner)})` : toMockRoot(inner)
   return mockRoot + rest.slice(5)
 }
 

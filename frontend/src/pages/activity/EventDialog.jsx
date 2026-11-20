@@ -1,9 +1,11 @@
 /**
  * Detail of a journal entry, as the mockup's eventDialog(): the entry's text, its properties,
  * Fermer and, when the entry names a certificate or an authority, the way to inspect it.
- * The product adds what the server records besides: action code, IP address, client.
+ * The product adds what the server records besides: action code, IP address (with its copy
+ * button), client.
  */
 import { useTranslation } from 'react-i18next'
+import { useClipboard } from '../../hooks/useClipboard'
 import { AtelierDialog } from '../../components/atelier/AtelierDialog'
 import { Icon } from '../../components/atelier/Icon'
 import { actionLabel } from './activityTypes'
@@ -13,6 +15,7 @@ const INSPECTABLE = { certificate: 'certificate', ca: 'ca' }
 
 export function EventDialog({ log, locale, resource, onClose, onInspect, canInspect }) {
   const { t } = useTranslation()
+  const { copy, isCopied } = useClipboard()
   const target = INSPECTABLE[log.resource_type]
   const id = Number(log.resource_id)
   const inspect = target && Number.isInteger(id) && id > 0 && canInspect(target)
@@ -28,7 +31,9 @@ export function EventDialog({ log, locale, resource, onClose, onInspect, canInsp
             ? <span className="badge good"><Icon name="check" />{t('audit.badgeOk')}</span>
             : <span className="badge bad"><Icon name="warning" />{t('audit.badgeFailed')}</span>}</dd>
           <dt>{t('audit.action')}</dt><dd className="mono">{log.action}</dd>
-          {log.ip_address && <><dt>{t('audit.ipAddress')}</dt><dd className="mono">{log.ip_address}</dd></>}
+          {log.ip_address && <><dt>{t('audit.ipAddress')}</dt><dd><span className="mono">{log.ip_address}</span>{' '}
+            <button type="button" className="icon-btn quiet" aria-label={isCopied() ? t('audit.ipCopied') : t('audit.copyIp')} title={t('audit.copyIp')}
+              onClick={() => copy(log.ip_address)}><Icon name={isCopied() ? 'check' : 'copy'} /></button></dd></>}
           {log.user_agent && <><dt>{t('audit.client')}</dt><dd>{log.user_agent}</dd></>}
         </dl>
       </div>

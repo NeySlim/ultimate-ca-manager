@@ -47,6 +47,8 @@ describe('the Atelier mockup, copied literally', () => {
     expect(checkCopy('.audit-summary{display:flex;align-items:center;gap:20px;font-size:12px;color:var(--muted);margin-bottom:17px}')).toHaveLength(1)
     expect(checkCopy('.atl .audit-type{display:flex;align-items:center;gap:10px}\n.atl .audit-summary{display:flex;align-items:center;gap:20px;font-size:12px;color:var(--muted);margin-bottom:17px}')).toHaveLength(1)
     expect(checkCopy(':root[data-theme="atelier"][data-mode="light"] .atl .btn.primary{color:#fff}')).toEqual([])
+    expect(checkCopy(':where(:root[data-theme|=aurore]) .atl :focus-visible{outline:2px solid var(--accent);box-shadow:0 0 0 5px rgba(107,120,224,.25)}')).toEqual([])
+    expect(checkCopy(':root[data-theme=light] .atl .btn.primary{color:#fff}')).toHaveLength(1)
   })
 
   it('draws the mockup\'s icons with its paths, verbatim', () => {

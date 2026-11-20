@@ -23,7 +23,7 @@ import { FiltersDialog } from './activity/FiltersDialog'
 import '../styles/atelier/scope.css'
 import '../styles/atelier/activity.css'
 
-const PAGE_SIZES = [25, 50, 100]
+const PAGE_SIZES = [10, 25, 50, 100]
 const PRESETS_KEY = 'ucm-audit-presets'
 const skWidth = (i, base, spread) => `${base + ((i * 37) % spread)}%`
 const Bar = ({ width, cls = '' }) => <span className={`sk ${cls}`.trim()} style={{ width }} />

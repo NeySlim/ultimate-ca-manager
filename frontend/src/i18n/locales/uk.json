@@ -3192,6 +3192,8 @@
     "pageGo": "Go",
     "dateTime": "Date / time",
     "client": "Client",
+    "copyIp": "Copy the IP address",
+    "ipCopied": "IP address copied",
     "inspectCertificate": "Inspect the certificate",
     "viewAuthority": "View the authority",
     "exportScope_one": "{{count, number}} event, with the current search and filters (10,000 at most).",
