@@ -83,6 +83,9 @@ export function IssueCertificateDialog({
   const inRouter = useInRouterContext()
   const [step, setStep] = useState(1)
   const [result, setResult] = useState(null)
+  // While the request is out the dialog stays: its answer always reaches the result screen
+  const [sending, setSending] = useState(false)
+  const sendingRef = useRef(false)
   const [loadedCas, setLoadedCas] = useState([])
   // One upload per CSR text: a retry after a refused signature signs the request already uploaded
   const [uploaded, setUploaded] = useState({ pem: null, id: null })
@@ -105,6 +108,8 @@ export function IssueCertificateDialog({
   useEffect(() => { if (!open) { setStep(1); setResult(null) } }, [open])
 
   const close = () => onOpenChange(false)
+  const changeOpen = (next) => { if (next || !sendingRef.current) onOpenChange(next) }
+  const busy = (on) => { sendingRef.current = on; setSending(on) }
 
   // The form names its operation; without it, the dialog's mode decides
   const submit = useCallback(async (body, { kind = renew ? 'renew' : 'issue', csr } = {}) => {
@@ -169,7 +174,7 @@ export function IssueCertificateDialog({
   const title = result ? t(`${P}result.${result.kind}.head`)
     : step === 2 ? t(`${P}titleReview`) : t(renew ? `${P}titleRenew` : `${P}titleIssue`)
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root open={open} onOpenChange={changeOpen}>
       <Dialog.Portal>
         <Dialog.Overlay className="iss-overlay" />
         <Dialog.Content className={`iss-dialog${result ? ' is-narrow' : ''}`}
@@ -187,13 +192,15 @@ export function IssueCertificateDialog({
           }}
           // A modal of the Atelier closes by its buttons or Escape, never by a click beside it
           onPointerDownOutside={(e) => e.preventDefault()}
-          onInteractOutside={(e) => e.preventDefault()}>
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => { if (sendingRef.current) e.preventDefault() }}>
           <header className="iss-head">
             <div>
               <Dialog.Title asChild><h2>{title}</h2></Dialog.Title>
               {step === 1 && !result && <p id="iss-subtitle">{t(renew ? `${P}subtitleRenew` : `${P}subtitleIssue`)}</p>}
             </div>
-            <Dialog.Close ref={closeButton} className="iss-icon-btn is-quiet" aria-label={t(`${P}close`)}>
+            <Dialog.Close ref={closeButton} className="iss-icon-btn is-quiet" aria-label={t(`${P}close`)}
+              aria-disabled={sending ? 'true' : undefined}>
               <X aria-hidden="true" />
             </Dialog.Close>
           </header>
@@ -209,7 +216,7 @@ export function IssueCertificateDialog({
                 cas={cas || loadedCas}
                 initialData={initialData}
                 canUseCsr={!renew && hasPermission('write:csrs')}
-                onSubmit={submit}
+                onSubmit={async (...args) => { busy(true); try { return await submit(...args) } finally { busy(false) } }}
                 onSent={sent}
                 onCancel={close}
                 onStepChange={setStep}

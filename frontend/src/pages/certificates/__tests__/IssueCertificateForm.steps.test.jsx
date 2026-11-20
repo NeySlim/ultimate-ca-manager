@@ -126,6 +126,24 @@ describe('IssueCertificateForm steps', () => {
     expect(onSubmit).toHaveBeenCalledTimes(2)
   })
 
+  it('keeps its buttons in place while sending and gives the focus back to Issue after a refusal', async () => {
+    let refuse
+    const onSubmit = vi.fn(() => new Promise((_, reject) => { refuse = reject }))
+    renderForm({ onSubmit })
+    fill()
+    await toReview()
+    const submit = screen.getByTestId('issue-submit')
+    const label = submit.textContent
+    fireEvent.click(submit)
+    await waitFor(() => expect(submit).toBeDisabled())
+    // Same words, so the same width: Modify does not slide while the request is out
+    expect(submit.textContent).toBe(label)
+    expect(submit.getAttribute('aria-busy')).toBe('true')
+    refuse(new Error('CA is offline'))
+    expect((await screen.findByRole('alert')).textContent).toContain('CA is offline')
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('issue-submit')))
+  })
+
   it('says in the Review step that the request now waits for approval', async () => {
     const onSubmit = vi.fn().mockResolvedValue({ approval: 'Four eyes' })
     renderForm({ onSubmit })

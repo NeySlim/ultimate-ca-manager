@@ -188,6 +188,7 @@ export function IssueCertificateForm({
   dRef.current = d
   const reviewTitle = useRef(null)
   const firstField = useRef(null)
+  const submitButton = useRef(null)
   const focusLater = (target) => setTimeout(() => (typeof target === 'string' ? document.getElementById(id(target)) : target?.current)?.focus())
 
   // Closed without issuing: the draft waits for the next opening of the same operation
@@ -423,8 +424,10 @@ export function IssueCertificateForm({
   function validate() {
     const e = {}
     if (renew) {
+      // The original duration is not sent and the server keeps it whatever its length; a typed one is bounded
       const text = String(d.validity_days ?? '').trim()
-      if (text) { const err = daysError(text, MAX_DAYS, false); if (err) e.days = err }
+      const original = originalDurationDays(certificate)
+      if (text && !(original && text === String(original))) { const err = daysError(text, MAX_DAYS, false); if (err) e.days = err }
       return e
     }
     // In the order of the fields on screen: the first one in error takes the focus
@@ -575,8 +578,9 @@ export function IssueCertificateForm({
       if (onSent) onSent(outcome)
       else if (outcome?.approval !== undefined) setApproval(outcome.approval || '')
     } catch (err) {
-      // The refusal stays in the step; the entry is kept for a correction
+      // The refusal stays in the step; the entry is kept for a correction and Issue takes the focus back
       setSubmitError(err?.message || t('common.operationFailed'))
+      focusLater(submitButton)
     } finally {
       issuingRef.current = false
       setIssuing(false)
@@ -929,7 +933,7 @@ export function IssueCertificateForm({
             )}
             <small id={id('hint-days')}>
               {renew
-                ? t(`${P}validityRenewHint`, { max: num(MAX_DAYS), days: originalDurationDays(certificate) ?? '' })
+                ? t(`${P}validityRenewHint`, { max: num(MAX_DAYS), days: originalDurationDays(certificate) ? num(originalDurationDays(certificate)) : '' })
                 : limit.bound
                   ? t(`${P}validityHintCa`, { max: num(maxDays), date: formatDate(caExpiry, { time: false }) })
                   : t(`${P}validityHint`, { max: num(maxDays) })}
@@ -1176,6 +1180,7 @@ export function IssueCertificateForm({
             <Warning aria-hidden="true" /><span>{submitError}</span>
           </p>
         )}
+        <span className="iss-sr-only" role="status">{issuing ? t(`${P}issuing`) : ''}</span>
         <div className="iss-actions">
           {approval !== null ? (
             <button type="button" className="iss-btn is-primary" onClick={onCancel}>{t('common.close')}</button>
@@ -1184,8 +1189,10 @@ export function IssueCertificateForm({
               <button type="button" className="iss-btn" onClick={back} disabled={issuing}>
                 <CaretLeft aria-hidden="true" />{t(`${P}back`)}
               </button>
-              <button type="button" className="iss-btn is-primary" onClick={issue} disabled={issuing} data-testid="issue-submit">
-                <Check aria-hidden="true" />{issuing ? t(`${P}issuing`) : t(action)}
+              {/* Its words stay while the request is out, so Modify does not slide; the wait is told aloud */}
+              <button type="button" ref={submitButton} className="iss-btn is-primary" onClick={issue} disabled={issuing}
+                aria-busy={issuing ? 'true' : undefined} data-testid="issue-submit">
+                <Check aria-hidden="true" />{t(action)}
               </button>
             </>
           )}

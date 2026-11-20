@@ -142,4 +142,41 @@ describe('IssueCertificateDialog', () => {
     await screen.findByTestId('issue-result')
     expect(heading()).toBe(`${P}result.renewed.head`)
   })
+
+  it('renews a certificate longer than the bound of a typed duration when its duration is left as is', async () => {
+    mocks.renew.mockResolvedValue({ data: { id: 12 } })
+    // 3 969 days: the server keeps an original duration it would refuse as a typed one
+    const certificate = { id: 12, cn: 'ad.example.com', valid_from: '2016-01-01T00:00:00Z', valid_to: '2026-11-13T00:00:00Z' }
+    renderDialog({ mode: 'renew', certificate, cas: undefined })
+    expect(screen.getByLabelText(LABEL.days).value).toBe('3969')
+    await reviewAndIssue(mocks.renew)
+    expect(mocks.renew).toHaveBeenCalledWith(12, {})
+  })
+
+  it('refuses a typed renewal duration beyond the bound, even under a longer original one', async () => {
+    const certificate = { id: 12, cn: 'ad.example.com', valid_from: '2016-01-01T00:00:00Z', valid_to: '2026-11-13T00:00:00Z' }
+    renderDialog({ mode: 'renew', certificate, cas: undefined })
+    type(LABEL.days, '3971')
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`${P}toReview`) }))
+    expect(await screen.findByText(`${P}validityTooLong`)).toBeTruthy()
+    expect(screen.queryByTestId('issue-review')).toBeNull()
+  })
+
+  it('does not close while the request is out: Escape and the close button wait for the answer', async () => {
+    let answer
+    mocks.create.mockReturnValue(new Promise((resolve) => { answer = resolve }))
+    const { onOpenChange } = renderDialog()
+    type(LABEL.cn, 'service.example.com')
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`${P}toReview`) }))
+    fireEvent.click(await screen.findByTestId('issue-submit'))
+    await waitFor(() => expect(mocks.create).toHaveBeenCalled())
+    fireEvent.keyDown(document.activeElement || document.body, { key: 'Escape' })
+    fireEvent.click(button(`${P}close`))
+    expect(onOpenChange).not.toHaveBeenCalled()
+    answer({ data: { id: 41, cn: 'service.example.com' } })
+    await screen.findByTestId('issue-result')
+    // Once the answer is shown, Escape closes again
+    fireEvent.keyDown(document.activeElement || document.body, { key: 'Escape' })
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
 })
