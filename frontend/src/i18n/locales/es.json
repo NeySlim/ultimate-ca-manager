@@ -5158,6 +5158,7 @@
     "presetName": "Nombre del preset...",
     "noPresets": "Sin filtros guardados",
     "applyAndSave": "Aplique filtros y guárdelos aquí",
+    "deletePreset": "Eliminar el preajuste {{name}}",
     "exportData": "Exportar datos",
     "exportItems": "Exportar {{count}} elementos",
     "exportCSV": "Exportar como CSV",

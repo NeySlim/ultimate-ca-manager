@@ -5158,6 +5158,7 @@
     "presetName": "预设名称...",
     "noPresets": "没有保存的预设",
     "applyAndSave": "应用筛选并保存到这里",
+    "deletePreset": "删除预设 {{name}}",
     "exportData": "导出数据",
     "exportItems": "导出{{count}}项",
     "exportCSV": "导出为CSV",

@@ -139,6 +139,23 @@ describe('InspectorDock', () => {
     await waitFor(() => expect(opener).toHaveFocus())
   })
 
+  it('gives the focus back to the opener on Escape from a field of the page, as the mockup', async () => {
+    renderDock()
+    const opener = screen.getByText('open-1')
+    opener.focus()
+    await open(1)
+    const field = document.createElement('input')
+    document.body.appendChild(field)
+    try {
+      field.focus()
+      fireEvent.keyDown(field, { key: 'Escape' })
+      await waitFor(() => expect(screen.queryByTestId('inspector-dock')).toBeNull())
+      await waitFor(() => expect(opener).toHaveFocus())
+    } finally {
+      field.remove()
+    }
+  })
+
   it('leaves Escape to an open dialog or to a key already handled', async () => {
     renderDock()
     await open(1)

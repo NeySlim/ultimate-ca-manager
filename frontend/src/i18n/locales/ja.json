@@ -5161,6 +5161,7 @@
     "presetName": "プリセット名...",
     "noPresets": "保存済みプリセットなし",
     "applyAndSave": "フィルターを適用してここに保存",
+    "deletePreset": "プリセット {{name}} を削除",
     "exportData": "データをエクスポート",
     "exportItems": "{{count}}件をエクスポート",
     "exportCSV": "CSVでエクスポート",

@@ -5158,6 +5158,7 @@
     "presetName": "Name der Voreinstellung...",
     "noPresets": "Keine gespeicherten Voreinstellungen",
     "applyAndSave": "Filter anwenden und hier speichern",
+    "deletePreset": "Voreinstellung {{name}} löschen",
     "exportData": "Daten exportieren",
     "exportItems": "{{count}} Einträge exportieren",
     "exportCSV": "Als CSV exportieren",

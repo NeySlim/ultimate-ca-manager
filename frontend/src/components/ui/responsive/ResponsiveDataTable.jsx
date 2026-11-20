@@ -21,6 +21,7 @@ import { ListTable } from './ListTable'
 import { ListDialog } from '../../list/ListDialog'
 import { ListCards } from './ListCards'
 import { ColumnsIcon, RowsIcon } from '../../list/atelierIcons'
+import { useToolbarMenu } from '../../list/useToolbarMenu'
 import '../../list/list.css'
 
 const EXPORT_MAX_ROWS = 10000
@@ -1018,6 +1019,13 @@ function SearchBar({
       : 'border-border bg-bg-primary text-text-secondary hover:text-text-primary hover:border-border-hover'
   ))
   const shownFilters = (filters || []).filter(f => !f.hideControl)
+  // Closing the presets menu also leaves the naming form
+  const setPresetsOpen = useCallback((next) => {
+    setShowPresetsMenu?.(next)
+    if (!next) setShowSavePresetModal?.(false)
+  }, [setShowPresetsMenu, setShowSavePresetModal])
+  const presetsMenu = useToolbarMenu(Boolean(showPresetsMenu), setPresetsOpen)
+  const exportMenu = useToolbarMenu(Boolean(showExportMenu), setShowExportMenu)
   return (
     <div className={flat ? 'shrink-0' : cn(
       'shrink-0 border-b border-border-op30',
@@ -1306,112 +1314,110 @@ function SearchBar({
           <div className="relative shrink-0" ref={presetsMenuRef}>
             <button
               type="button"
-              onClick={() => setShowPresetsMenu?.(!showPresetsMenu)}
+              ref={presetsMenu.buttonRef}
+              onClick={() => setPresetsOpen(!showPresetsMenu)}
+              onKeyDown={presetsMenu.onButtonKeyDown}
               // A bare icon like its neighbours until presets are saved and counted
               className={flat ? cn('lv-btn', !filterPresets?.length && 'is-icon is-bare') : tool(showPresetsMenu)}
               title={t('table.filterPresets')}
-              aria-label={flat ? t('table.filterPresets') : undefined}
-              aria-expanded={flat ? Boolean(showPresetsMenu) : undefined}
+              aria-label={t('table.filterPresets')}
+              aria-haspopup="menu"
+              aria-expanded={Boolean(showPresetsMenu)}
             >
-              <BookmarkSimple size={flat ? 16 : 14} />
+              <BookmarkSimple size={flat ? 16 : 14} aria-hidden="true" />
               {filterPresets?.length > 0 && (
-                <span className="text-2xs bg-accent-primary-op20 text-accent-primary px-1 rounded">
+                <span className="text-2xs bg-accent-primary-op20 text-accent-primary px-1 rounded" aria-hidden="true">
                   {filterPresets.length}
                 </span>
               )}
             </button>
-            
-            {/* Presets dropdown */}
+
+            {/* Presets: the mockup's pop menu; naming a new preset turns it into a small form */}
             {showPresetsMenu && (
-              <div className="absolute right-0 top-full mt-1 z-50 w-56 rounded-lg border border-border bg-bg-primary shadow-lg py-1">
-                <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider border-b border-border mb-1">
-                  {t('table.filterPresets')}
-                </div>
-                
+              <div ref={presetsMenu.menuRef} tabIndex={-1}
+                role={showSavePresetModal ? 'dialog' : 'menu'} aria-label={t('table.filterPresets')}
+                className="ui-pop lv-tool-menu is-wide absolute right-0 z-50">
+                <p className="ui-pop-heading" aria-hidden="true">{t('table.filterPresets')}</p>
+
                 {/* Save current filter button */}
                 {hasActiveFilters && !showSavePresetModal && (
-                  <button
-                    onClick={() => setShowSavePresetModal?.(true)}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-bg-hover transition-colors text-accent-primary"
-                  >
-                    <FloppyDisk size={14} />
+                  <button type="button" role="menuitem" className="ui-pop-item" onClick={() => setShowSavePresetModal?.(true)}>
+                    <span className="ui-pop-icon"><FloppyDisk size={15} aria-hidden="true" /></span>
                     {t('table.saveFilters')}
                   </button>
                 )}
-                
+
                 {/* Save preset input */}
                 {showSavePresetModal && (
-                  <div className="px-3 py-2 border-b border-border">
+                  <div className="lv-tool-menu-form">
                     <input
                       type="text"
                       value={presetName}
                       onChange={(e) => setPresetName?.(e.target.value)}
                       placeholder={t('table.presetName')}
-                      className="w-full h-7 px-2 text-xs rounded border border-border bg-bg-secondary text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary"
+                      aria-label={t('table.presetName')}
+                      className="ui-control"
                       autoFocus
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') savePreset?.()
-                        if (e.key === 'Escape') setShowSavePresetModal?.(false)
+                        // Escape leaves the form only; the menu answers the next one
+                        if (e.key === 'Escape') { e.preventDefault(); setShowSavePresetModal?.(false) }
                       }}
                     />
-                    <div className="flex gap-2 mt-2">
-                      <button
-                        onClick={savePreset}
-                        disabled={!presetName?.trim()}
-                        className="flex-1 h-6 text-xs rounded bg-accent-primary text-on-accent hover:bg-accent-primary-op90 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {t('common.save')}
-                      </button>
-                      <button
-                        onClick={() => setShowSavePresetModal?.(false)}
-                        className="h-6 px-2 text-xs rounded border border-border hover:bg-bg-hover"
-                      >
+                    <div className="lv-tool-menu-actions">
+                      <button type="button" className="lv-btn" onClick={() => setShowSavePresetModal?.(false)}>
                         {t('common.cancel')}
+                      </button>
+                      <button type="button" className="lv-btn is-primary" onClick={savePreset} disabled={!presetName?.trim()}>
+                        {t('common.save')}
                       </button>
                     </div>
                   </div>
                 )}
-                
-                {/* Preset list */}
+
+                {/* Preset list: apply, and delete beside it (Left and Right move between the two) */}
                 {filterPresets?.length > 0 ? (
                   <>
-                    {hasActiveFilters && <div className="border-t border-border my-1" />}
-                    {filterPresets.map(preset => (
-                      <div
-                        key={preset.id}
-                        className="group flex items-center gap-2 px-3 py-1.5 hover:bg-bg-hover transition-colors"
-                      >
+                    {hasActiveFilters && !showSavePresetModal && <div className="ui-pop-sep" role="separator" />}
+                    {!showSavePresetModal && filterPresets.map(preset => (
+                      <div key={preset.id} className="lv-tool-menu-line" role="none">
                         <button
+                          type="button"
+                          role="menuitem"
                           onClick={() => applyPreset?.(preset)}
-                          className="flex-1 text-xs text-left text-text-primary truncate"
+                          className="ui-pop-item"
                           title={Object.entries(preset.filters || {}).map(([k, v]) => `${k}: ${v}`).join(', ')}
                         >
-                          {preset.name}
+                          <span className="ui-pop-icon"><BookmarkSimple size={15} aria-hidden="true" /></span>
+                          <span className="ui-pop-label">{preset.name}</span>
                         </button>
                         <button
+                          type="button"
+                          role="menuitem"
                           onClick={(e) => {
                             e.stopPropagation()
                             deletePreset?.(preset.id)
                           }}
-                          className="opacity-0 group-hover:opacity-100 p-1 text-text-tertiary hover:text-status-danger transition-all"
-                          title="Delete preset"
+                          className="ui-pop-item lv-tool-menu-delete"
+                          aria-label={t('table.deletePreset', { name: preset.name })}
+                          title={t('table.deletePreset', { name: preset.name })}
                         >
-                          <Trash size={12} />
+                          <Trash size={14} aria-hidden="true" />
                         </button>
                       </div>
                     ))}
                   </>
                 ) : !hasActiveFilters && (
-                  <div className="px-3 py-4 text-xs text-text-tertiary text-center">
+                  <p className="lv-tool-menu-empty">
                     {t('table.noPresets')}<br/>
                     {t('table.applyAndSave')}
-                  </div>
+                  </p>
                 )}
               </div>
             )}
           </div>
         )}
-        
+
         {/* Export Button (desktop only) */}
         {(flat || !isMobile) && exportNotice && (
           <span role="status" className="text-2xs text-status-warning shrink-0">
@@ -1422,42 +1428,38 @@ function SearchBar({
           <div className="relative shrink-0" ref={exportMenuRef}>
             <button
               type="button"
+              ref={exportMenu.buttonRef}
               onClick={() => setShowExportMenu?.(!showExportMenu)}
+              onKeyDown={exportMenu.onButtonKeyDown}
               className={flat ? 'lv-btn is-icon is-bare' : tool(showExportMenu)}
               title={t('table.exportData')}
-              aria-label={flat ? t('table.exportData') : undefined}
-              aria-expanded={flat ? Boolean(showExportMenu) : undefined}
+              aria-label={t('table.exportData')}
+              aria-haspopup="menu"
+              aria-expanded={Boolean(showExportMenu)}
             >
-              {flat ? <DownloadSimple size={16} aria-hidden="true" /> : <Export size={14} />}
+              {flat ? <DownloadSimple size={16} aria-hidden="true" /> : <Export size={14} aria-hidden="true" />}
             </button>
-            
-            {/* Export dropdown */}
+
+            {/* Export: the mockup's pop menu, the count in its heading */}
             {showExportMenu && (
-              <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-lg border border-border bg-bg-primary shadow-lg py-1">
-                <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider border-b border-border mb-1">
+              <div ref={exportMenu.menuRef} tabIndex={-1} role="menu" aria-label={t('table.exportData')}
+                className="ui-pop lv-tool-menu absolute right-0 z-50">
+                <p className="ui-pop-heading" aria-hidden="true">
                   {exportBusy ? t('table.exporting') : t('table.exportItems', { count: dataCount })}
-                </div>
-                <button
-                  onClick={handleExportCSV}
-                  disabled={exportBusy}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-bg-hover transition-colors"
-                >
-                  <Export size={14} />
+                </p>
+                <button type="button" role="menuitem" onClick={handleExportCSV} disabled={exportBusy} className="ui-pop-item">
+                  <span className="ui-pop-icon"><Export size={15} aria-hidden="true" /></span>
                   {t('table.exportCSV')}
                 </button>
-                <button
-                  onClick={handleExportJSON}
-                  disabled={exportBusy}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-bg-hover transition-colors"
-                >
-                  <Export size={14} />
+                <button type="button" role="menuitem" onClick={handleExportJSON} disabled={exportBusy} className="ui-pop-item">
+                  <span className="ui-pop-icon"><Export size={15} aria-hidden="true" /></span>
                   {t('table.exportJSON')}
                 </button>
               </div>
             )}
           </div>
         )}
-        
+
         {/* Actions - same height as search bar on mobile. Wraps when the
             available width is too narrow (e.g. split-view with detail panel)
             instead of forcing a horizontal scrollbar. */}

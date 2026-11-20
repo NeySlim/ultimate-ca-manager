@@ -5161,6 +5161,7 @@
     "presetName": "Nom du filtre...",
     "noPresets": "Aucun filtre enregistré.",
     "applyAndSave": "Appliquez des filtres et enregistrez-les ici.",
+    "deletePreset": "Supprimer le préréglage {{name}}",
     "exportData": "Exporter les données",
     "exportItems": "Exporter {{count}} éléments",
     "exportCSV": "Exporter en CSV",

@@ -50,7 +50,7 @@ export function InspectorDock() {
       if (e.key !== 'Escape' || e.defaultPrevented) return
       if (ownLayerOpen()) return
       if (e.target.closest?.(OWN_ESCAPE)) return
-      closeAll()
+      closeAll({ refocus: true })
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -144,7 +144,7 @@ export function InspectorDock() {
               {folded ? <CaretUp size={16} aria-hidden="true" /> : <Minus size={16} aria-hidden="true" />}
             </button>
           )}
-          <button type="button" className="ins-icon-btn" onClick={closeAll} aria-label={t('inspector.close')} title={t('inspector.close')}>
+          <button type="button" className="ins-icon-btn" onClick={() => closeAll({ refocus: true })} aria-label={t('inspector.close')} title={t('inspector.close')}>
             <X size={16} aria-hidden="true" />
           </button>
         </div>
