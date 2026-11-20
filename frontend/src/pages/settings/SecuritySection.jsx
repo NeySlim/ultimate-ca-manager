@@ -283,6 +283,7 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
                 disabled={adminLocked || settings.hsts_env_locked?.includes('hsts_include_subdomains')}
               />
               <Input
+            className="sf-short"
                 label={<AdminLockLabel text={t('settings.hstsMaxAge')} locked={adminLocked} />}
                 type="number"
                 value={settings.hsts_max_age ?? 31536000}
@@ -307,6 +308,7 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
           )}
 
           <Input
+            className="sf-short"
             label={t('settings.ocspResponseValidity')}
             type="number"
             value={settings.ocsp_response_validity_hours ?? 24}
@@ -324,6 +326,7 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
           />
           {(settings.ocsp_responder_auto_renew ?? true) && (
             <Input
+            className="sf-short"
               label={t('settings.ocspResponderRenewDays')}
               type="number"
               value={settings.ocsp_responder_renew_days ?? 30}
@@ -370,6 +373,7 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
       <FormGroup title={t('settings.passwordPolicy')}>
         <div className="space-y-4">
           <Input
+            className="sf-short"
             label={<AdminLockLabel text={t('settings.minPasswordLength')} locked={adminLocked} />}
             disabled={adminLocked}
             type="number"
@@ -457,6 +461,7 @@ export default function SecuritySection({ settings, updateSetting, hasPermission
         <DetailGrid>
           <div className="col-span-full md:col-span-1">
             <Input
+            className="sf-short"
               label={<AdminLockLabel text={t('settings.sessionDuration')} locked={adminLocked} />}
               disabled={adminLocked}
               type="number"

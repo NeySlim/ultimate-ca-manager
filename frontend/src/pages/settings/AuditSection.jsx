@@ -13,6 +13,7 @@ export default function AuditSection({ settings, fieldErrors = {}, updateSetting
       <FormGroup title={t('settings.auditLogging')}>
         <div className="space-y-4">
           <Input
+            className="sf-short"
             label={t('settings.logRetention')}
             type="number"
             value={settings.audit_retention_days ?? 0}

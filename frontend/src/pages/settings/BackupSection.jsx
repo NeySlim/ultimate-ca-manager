@@ -126,6 +126,7 @@ export default function BackupSection({
       <FormGroup title={t('settings.retentionPeriod')}>
         <div className="space-y-3">
           <Input
+            className="sf-short"
             label={<AdminLockLabel text={t('settings.retentionPeriod')} locked={!canAdminSettings} />}
             disabled={!canAdminSettings}
             type="number"
@@ -136,6 +137,7 @@ export default function BackupSection({
             helperText={t('settings.retentionHelper')}
           />
           <Input
+            className="sf-short"
             label={<AdminLockLabel text={t('settings.backupMaxTotalMb')} locked={!canAdminSettings} />}
             disabled={!canAdminSettings}
             type="number"

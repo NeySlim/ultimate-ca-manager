@@ -77,3 +77,51 @@ test('every settings section is in view in the table of contents, no title cut',
   }
   expect(await nav.evaluate((el) => el.scrollHeight <= el.clientHeight)).toBe(true)
 })
+
+test('a short field takes one column of four, a button the width of its text', async ({ page, api }) => {
+  await page.goto('/settings')
+  const general = page.getByRole('region', { name: 'General', exact: true })
+  await expect(general).toBeVisible()
+  const port = await box(general.getByLabel('ACME public port'))
+  const base = await box(general.getByLabel('Base URL'))
+  // 1286 px of fields: 4 columns of 309.5 (short) and 2 of 635 (normal), 16 px gaps
+  expect(Math.abs(port.width - 309.5)).toBeLessThanOrEqual(2)
+  expect(Math.abs(base.width - 635)).toBeLessThanOrEqual(2)
+
+  await page.goto('/tools')
+  const run = page.getByRole('button', { name: 'Check SSL', exact: true })
+  const r = await box(run)
+  expect(r.width).toBeLessThan(200)
+  expect(Math.abs(r.height - 32)).toBeLessThanOrEqual(EPS)
+})
+
+test('groups of a frame stand 20 px apart', async ({ page, api }) => {
+  await page.goto('/settings')
+  const groups = page.locator('#sf-sec-general .sf-group')
+  await expect(groups.first()).toBeVisible()
+  const boxes = await groups.evaluateAll((els) => els.map((el) => el.getBoundingClientRect()).map((r) => ({ top: r.top, bottom: r.bottom })))
+  for (let i = 1; i < boxes.length; i++) expect(Math.abs(boxes[i].top - boxes[i - 1].bottom - 20)).toBeLessThanOrEqual(EPS)
+})
+
+test.describe('on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
+  for (const path of ['/settings', '/account', '/tools', '/operations']) {
+    test(`${path} is no wider than the phone`, async ({ page, api }) => {
+      await page.goto(path)
+      await expect(page.locator('.sf-layout')).toBeVisible()
+      const wide = await page.evaluate(() => {
+        const W = window.innerWidth
+        return [...document.querySelectorAll('.sf-layout *')].filter((el) => {
+          const r = el.getBoundingClientRect()
+          if (!r.width || r.right <= W + 1) return false
+          // content scrolling in its own box (tables, code) is not an overflow of the page
+          for (let a = el.parentElement; a; a = a.parentElement) {
+            if (['auto', 'scroll'].includes(getComputedStyle(a).overflowX)) return false
+          }
+          return true
+        }).length
+      })
+      expect(wide).toBe(0)
+    })
+  }
+})
