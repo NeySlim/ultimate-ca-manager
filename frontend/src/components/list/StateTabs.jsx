@@ -1,7 +1,7 @@
 /**
  * State tabs with counters: one view of the list per state, replacing stat tiles
- * and a status dropdown. Arrow keys, Home and End move between tabs; Enter or
- * Space selects the focused one.
+ * and a status dropdown. As a tab list, arrow keys, Home and End move between tabs;
+ * with `pressed` they are toggle buttons, each its own tab stop, as in the mockup.
  */
 import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -15,8 +15,10 @@ import './list.css'
  * @param {(id: string) => void} onChange
  * @param {string} label  accessible name of the tab list
  * @param {string} [baseId]  prefix of the tab ids; `controls` is the id of the panel they filter
+ * @param {boolean} [pressed]  a group of toggle buttons (aria-pressed) instead of a tab list
+ * @param {boolean} [busy]  the counters are being read: a bar stands in for each
  */
-export function StateTabs({ views = [], active, onChange, label, baseId = 'lv-view', controls, aside, className }) {
+export function StateTabs({ views = [], active, onChange, label, baseId = 'lv-view', controls, aside, className, pressed = false, busy = false }) {
   const { i18n } = useTranslation()
   const refs = useRef([])
   const number = new Intl.NumberFormat(i18n?.language || undefined)
@@ -34,24 +36,24 @@ export function StateTabs({ views = [], active, onChange, label, baseId = 'lv-vi
 
   return (
     <div className={cn('lv-views-row', className)}>
-      <div className="lv-views" role="tablist" aria-label={label}>
+      <div className="lv-views" role={pressed ? 'group' : 'tablist'} aria-label={label}>
         {views.map((view, index) => (
           <button
             key={view.id}
             ref={(el) => { refs.current[index] = el }}
             type="button"
-            role="tab"
             id={viewTabId(baseId, view.id)}
-            aria-selected={index === selected}
-            aria-controls={controls}
-            tabIndex={index === stop ? 0 : -1}
+            {...(pressed
+              ? { 'aria-pressed': index === selected }
+              : { role: 'tab', 'aria-selected': index === selected, 'aria-controls': controls, tabIndex: index === stop ? 0 : -1, onKeyDown: (e) => onKeyDown(e, index) })}
             className="lv-view"
             onClick={() => onChange?.(view.id)}
-            onKeyDown={(e) => onKeyDown(e, index)}
           >
             {view.tone === 'warn' && <span className="lv-dot" aria-hidden="true" />}
             {view.label}
-            {typeof view.count === 'number' && <span className="lv-counter">{number.format(view.count)}</span>}
+            {busy && view.count !== undefined
+              ? <span className="lv-counter"><span className="lv-sk is-num" /></span>
+              : typeof view.count === 'number' && <span className="lv-counter">{number.format(view.count)}</span>}
           </button>
         ))}
       </div>

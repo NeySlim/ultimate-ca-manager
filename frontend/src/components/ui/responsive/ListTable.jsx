@@ -2,8 +2,11 @@
  * ListTable: the desktop table of the list template (ResponsiveDataTable variant="list").
  * Columns take the width of their content and the `grow` column absorbs the rest, its
  * content shortened by an ellipsis when the room runs out (a `fill` cell lets its own
- * content do it); every row keeps one height; a row carries its checkbox, its own
- * actions and a chevron that opens the detail. Loading draws skeleton rows.
+ * content do it); a `minWidth` column without `grow` keeps its whole text; every row
+ * keeps one height; a row carries its checkbox, its own actions and a chevron that
+ * opens the detail (with `openFromName`, only the name and the chevron open it; while
+ * `locked`, a selection being made, they are disabled). Loading draws skeleton rows,
+ * an empty list its `emptyContent` under the header.
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -14,6 +17,12 @@ import '../../list/list.css'
 const SORT = { asc: 'ascending', desc: 'descending' }
 const SKELETON_ROWS = 12
 const skWidth = (i, base, spread) => `${base + ((i * 37) % spread)}%`
+// A column's skeleton bar: its own width (px, CSS length, or per row), else a varying share
+const skBar = (col, i) => {
+  const w = typeof col.skeletonWidth === 'function' ? col.skeletonWidth(i, skWidth) : col.skeletonWidth
+  if (w !== undefined) return w
+  return col.grow ? skWidth(i, 45, 40) : 64
+}
 
 export function ListTable({
   data,
@@ -35,6 +44,10 @@ export function ListTable({
   selectedIds,
   onToggleRow,
   onToggleAll,
+  openFromName = false,
+  locked = false,
+  emptyContent,
+  skeletonRows = SKELETON_ROWS,
 }) {
   const { t } = useTranslation()
   const [resizing, setResizing] = useState(null)
@@ -67,6 +80,7 @@ export function ListTable({
     const px = columnWidths[col.key]
     if (px) return { clip: true, style: { width: px, minWidth: px, maxWidth: px } }
     if (col.grow) return { clip: true, style: col.minWidth ? { '--lv-min': `${col.minWidth}px` } : undefined }
+    if (col.minWidth && !col.maxWidth) return { clip: false, floor: true, style: { '--lv-min': `${col.minWidth}px` } }
     if (col.maxWidth) {
       return {
         clip: true, capped: true,
@@ -98,7 +112,7 @@ export function ListTable({
               </th>
             )}
             {columns.map((col) => {
-              const { style, capped } = sizing(col)
+              const { style, capped, floor } = sizing(col)
               const canSort = sortable && col.sortable !== false
               const sorted = sort?.key === col.key ? sort.direction : null
               return (
@@ -106,7 +120,7 @@ export function ListTable({
                   key={col.key}
                   scope="col"
                   style={style}
-                  className={cn(col.grow && !columnWidths[col.key] && 'lv-grow', capped && 'lv-capped')}
+                  className={cn(col.grow && !columnWidths[col.key] && 'lv-grow', capped && 'lv-capped', floor && 'lv-floor')}
                   aria-sort={canSort ? (SORT[sorted] || 'none') : undefined}
                 >
                   {canSort ? (
@@ -131,29 +145,40 @@ export function ListTable({
           </tr>
         </thead>
         <tbody>
-          {loading ? Array.from({ length: SKELETON_ROWS }, (_, i) => (
+          {loading ? Array.from({ length: skeletonRows }, (_, i) => (
             <tr key={`sk-${i}`} className="lv-sk-row" aria-hidden={i > 0 || undefined}>
               {multiSelect && <td className="lv-col-check"><div className="lv-cell"><span className="lv-sk is-box" /></div></td>}
-              {columns.map((col) => (
-                <td key={col.key} className={cn(col.grow && !columnWidths[col.key] && 'lv-grow')}>
-                  <div className="lv-cell">
-                    {i === 0 && col === columns[0] && <span className="sr-only" role="status">{t('table.loadingRows')}</span>}
-                    <span className={cn('lv-sk', col.skeleton === 'pill' && 'is-pill')}
-                      style={{ width: col.grow ? skWidth(i, 45, 40) : (col.skeletonWidth || 64) }} />
-                  </div>
-                </td>
-              ))}
+              {columns.map((col) => {
+                const { style, capped, floor } = sizing(col)
+                return (
+                  <td key={col.key} style={style}
+                    className={cn(col.grow && !columnWidths[col.key] && 'lv-grow', capped && 'lv-capped', floor && 'lv-floor')}>
+                    <div className="lv-cell">
+                      {i === 0 && col === columns[0] && <span className="sr-only" role="status">{t('table.loadingRows')}</span>}
+                      <span className={cn('lv-sk', col.skeleton === 'pill' && 'is-pill')} style={{ width: skBar(col, i) }} />
+                    </div>
+                  </td>
+                )
+              })}
               {hasActions && <td className="lv-col-actions" />}
             </tr>
-          )) : data.map((row, idx) => {
+          )) : !data.length && emptyContent ? (
+            <tr className="lv-empty-row">
+              <td className="lv-empty-cell" colSpan={columns.length + (multiSelect ? 1 : 0) + (hasActions ? 1 : 0)}>{emptyContent}</td>
+            </tr>
+          ) : data.map((row, idx) => {
             const name = nameOf(row)
             const checked = multiSelect && (selectedIds?.has(row.id) || false)
             const actions = rowActions?.(row) || []
             return (
               <tr
                 key={row.id || idx}
-                onClick={onRowClick ? () => onRowClick(row) : undefined}
-                className={cn(onRowClick && 'is-clickable', selectedId === row.id && 'is-opened', checked && 'is-checked')}
+                onClick={onRowClick ? (e) => {
+                  // From the name only, when the name and the chevron are what opens the row
+                  if (openFromName && !e.target.closest?.('.lv-entity')) return
+                  if (!locked) onRowClick(row)
+                } : undefined}
+                className={cn(onRowClick && !openFromName && 'is-clickable', selectedId === row.id && 'is-opened', checked && 'is-checked')}
               >
                 {multiSelect && (
                   <td className="lv-col-check" onClick={(e) => e.stopPropagation()}>
@@ -168,9 +193,9 @@ export function ListTable({
                   </td>
                 )}
                 {columns.map((col) => {
-                  const { clip, capped, style } = sizing(col)
+                  const { clip, capped, floor, style } = sizing(col)
                   const raw = row[col.key]
-                  const content = col.render ? col.render(raw, row) : (raw ?? '—')
+                  const content = col.render ? col.render(raw, row, { locked }) : (raw ?? '—')
                   const tip = col.title ? col.title(row) : raw
                   return (
                     <td
@@ -179,6 +204,7 @@ export function ListTable({
                       className={cn(
                         col.grow && !columnWidths[col.key] && 'lv-grow',
                         capped && 'lv-capped',
+                        floor && 'lv-floor',
                         clip && 'is-clipped',
                         col.muted && 'is-muted',
                         col.small && 'is-small',
@@ -206,9 +232,10 @@ export function ListTable({
                             className="lv-icon-btn"
                             title={action.label}
                             aria-label={t('table.rowAction', { action: action.label, name })}
+                            disabled={locked}
                             onClick={(e) => { e.stopPropagation(); action.onClick?.() }}
                           >
-                            {Icon && <Icon size={15} aria-hidden="true" />}
+                            {Icon && <Icon size={14} aria-hidden="true" />}
                           </button>
                         )
                       })}
@@ -218,6 +245,7 @@ export function ListTable({
                           className="lv-icon-btn"
                           title={t('table.open')}
                           aria-label={t('table.openRow', { name })}
+                          disabled={locked}
                           onClick={(e) => { e.stopPropagation(); onRowClick(row) }}
                         >
                           <CaretRight size={14} aria-hidden="true" />

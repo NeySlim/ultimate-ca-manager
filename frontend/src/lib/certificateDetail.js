@@ -17,6 +17,20 @@ export function certificateKeyLabel(cert, t) {
   return keyAlgorithmLabel(cert?.key_algorithm || cert?.key_algo || type, t, cert?.security_level) || type || null
 }
 
+/** A serial number as octets in hexadecimal, "04:8A:01:9F"; a decimal string from the API is converted. */
+export function serialHex(serial) {
+  const raw = String(serial ?? '').trim()
+  if (!raw) return ''
+  if (/^[0-9]+$/.test(raw)) {
+    let hex = BigInt(raw).toString(16).toUpperCase()
+    if (hex.length % 2) hex = `0${hex}`
+    return hex.match(/../g).join(':')
+  }
+  const hex = raw.replace(/[:\s]/g, '').toUpperCase()
+  if (!/^[0-9A-F]+$/.test(hex)) return raw
+  return (hex.length % 2 ? `0${hex}` : hex).match(/../g).join(':')
+}
+
 const toMs = (d) => {
   if (!d) return null
   const ms = new Date(d).getTime()
@@ -71,12 +85,42 @@ const OID = {
   qc_statements: '1.3.6.1.5.5.7.1.3',
 }
 
-/** One row per extension: i18n label key (or name), OID, criticality and value lines. */
+// X.509 names of the extensions, as RFC 5280 and the usual tools write them, in every language
+const EXT_NAMES = {
+  subject_alt_names: 'Subject Alternative Name',
+  basic_constraints: 'Basic Constraints',
+  key_usage: 'Key Usage',
+  extended_key_usage: 'Extended Key Usage',
+  subject_key_identifier: 'Subject Key Identifier',
+  authority_key_identifier: 'Authority Key Identifier',
+  authority_info_access: 'Authority Information Access',
+  crl_distribution_points: 'CRL Distribution Points',
+  certificate_policies: 'Certificate Policies',
+  name_constraints: 'Name Constraints',
+  qc_statements: 'Qualified Certificate Statements',
+  signed_certificate_timestamps: 'CT Precertificate SCTs',
+}
+// Key usage bits (RFC 5280 4.2.1.3) and extended key usages (4.2.1.12) in their readable form
+const KEY_USAGES = {
+  digitalSignature: 'Digital Signature', nonRepudiation: 'Non Repudiation', contentCommitment: 'Non Repudiation',
+  keyEncipherment: 'Key Encipherment', dataEncipherment: 'Data Encipherment', keyAgreement: 'Key Agreement',
+  keyCertSign: 'Certificate Sign', cRLSign: 'CRL Sign', encipherOnly: 'Encipher Only', decipherOnly: 'Decipher Only',
+}
+const EXT_KEY_USAGES = {
+  serverAuth: 'TLS Web Server Authentication', clientAuth: 'TLS Web Client Authentication', codeSigning: 'Code Signing',
+  emailProtection: 'E-mail Protection', timeStamping: 'Time Stamping', OCSPSigning: 'OCSP Signing',
+  ipsecIKE: 'IPSec Internet Key Exchange', smartcardLogon: 'Microsoft Smartcard Login', msSmartcardLogin: 'Microsoft Smartcard Login',
+  msEFS: 'Microsoft Encrypted File System', anyExtendedKeyUsage: 'Any Extended Key Usage',
+}
+export const keyUsageName = (u) => KEY_USAGES[u] || u
+export const extKeyUsageName = (u) => EXT_KEY_USAGES[u] || u
+
+/** One row per extension: X.509 name, OID, criticality and value lines. */
 export function extensionRows(ext, sanCombined) {
   const rows = []
-  const add = (key, labelKey, lines, critical) => {
+  const add = (key, _legacyKey, lines, critical) => {
     const values = [].concat(lines).filter((v) => v !== null && v !== undefined && v !== '')
-    if (values.length) rows.push({ key, labelKey, oid: OID[key], critical: !!critical, values })
+    if (values.length) rows.push({ key, label: EXT_NAMES[key], oid: OID[key], critical: !!critical, values })
   }
   const e = ext || {}
   const sans = e.subject_alt_names?.entries
@@ -87,8 +131,8 @@ export function extensionRows(ext, sanCombined) {
     add('basic_constraints', 'details.ext.basicConstraints',
       `CA: ${bc.ca ? 'TRUE' : 'FALSE'}${bc.path_length !== null && bc.path_length !== undefined ? `, pathLen: ${bc.path_length}` : ''}`, bc.critical)
   }
-  if (e.key_usage) add('key_usage', 'details.ext.keyUsage', (e.key_usage.usages || []).join(', '), e.key_usage.critical)
-  if (e.extended_key_usage) add('extended_key_usage', 'details.ext.extKeyUsage', (e.extended_key_usage.usages || []).map((u) => u.name || u.oid), e.extended_key_usage.critical)
+  if (e.key_usage) add('key_usage', 'details.ext.keyUsage', (e.key_usage.usages || []).map(keyUsageName).join(', '), e.key_usage.critical)
+  if (e.extended_key_usage) add('extended_key_usage', 'details.ext.extKeyUsage', (e.extended_key_usage.usages || []).map((u) => (u.name ? extKeyUsageName(u.name) : u.oid)), e.extended_key_usage.critical)
   if (e.subject_key_identifier) add('subject_key_identifier', 'details.ext.ski', e.subject_key_identifier.value)
   if (e.authority_key_identifier) add('authority_key_identifier', 'details.ext.aki', e.authority_key_identifier.key_id)
   if (e.authority_info_access) {

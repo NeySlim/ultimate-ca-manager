@@ -67,9 +67,11 @@ const Where = () => <output data-testid="where">{useLocation().search}</output>
 const renderAt = (url) => render(<MemoryRouter initialEntries={[url]}><CertificatesPage /><Where /></MemoryRouter>)
 const lastParams = () => getAll.mock.calls[getAll.mock.calls.length - 1][0]
 const settle = () => new Promise((r) => setTimeout(r, 400)) // past the debounce of usePersistedState
-const tab = (id) => screen.getByRole('tab', { name: new RegExp(`^certificates\\.views\\.${id}`) })
+// The state tabs are toggle buttons in a named group, as in the mockup
+const views = () => within(screen.getByRole('group', { name: 'certificates.viewsLabel' })).getAllByRole('button')
+const tab = (id) => within(screen.getByRole('group', { name: 'certificates.viewsLabel' })).getByRole('button', { name: new RegExp(`^certificates\\.views\\.${id}`) })
 const viewOf = (el) => el.id.split('-tab-')[1]
-const selectedTabs = () => screen.getAllByRole('tab').filter((el) => el.getAttribute('aria-selected') === 'true').map(viewOf)
+const selectedTabs = () => views().filter((el) => el.getAttribute('aria-pressed') === 'true').map(viewOf)
 const where = () => screen.getByTestId('where').textContent
 
 beforeEach(() => {
@@ -89,13 +91,13 @@ describe('CertificatesPage: state tabs', () => {
     expect(tab('valid')).toHaveTextContent(/^certificates\.views\.valid3$/)
     expect(tab('expired')).toHaveTextContent(/^certificates\.views\.expired0$/)
     expect(tab('revoked')).toHaveTextContent(/^certificates\.views\.revoked1$/)
-    expect(screen.getAllByRole('tab').map(viewOf)).toEqual(['all', 'expiring', 'valid', 'expired', 'revoked', 'archived'])
+    expect(views().map(viewOf)).toEqual(['all', 'expiring', 'valid', 'expired', 'revoked', 'archived'])
   })
 
   it('shows the orphan tab only when there are orphans, and no counter on archived', async () => {
     renderAt('/certificates')
     await waitFor(() => expect(tab('valid')).toHaveTextContent(/3$/))
-    expect(screen.queryByRole('tab', { name: /views\.orphan/ })).toBeNull()
+    expect(within(screen.getByRole('group', { name: 'certificates.viewsLabel' })).queryByRole('button', { name: /views\.orphan/ })).toBeNull()
     // The stats endpoint does not count archived certificates
     expect(tab('archived')).toHaveTextContent(/^certificates\.views\.archived$/)
     cleanup()
@@ -107,7 +109,7 @@ describe('CertificatesPage: state tabs', () => {
   it('replaces the stat tiles and the status dropdown', async () => {
     renderAt('/certificates')
     await waitFor(() => expect(tab('valid')).toHaveTextContent(/3$/))
-    expect(screen.getByRole('tablist', { name: 'certificates.viewsLabel' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'certificates.viewsLabel' })).toBeInTheDocument()
     expect(screen.queryByText('common.total')).toBeNull()
     expect(screen.queryByText('common.allStatus')).toBeNull()
     // The other filters keep their control, named by what they filter
@@ -196,8 +198,8 @@ describe('CertificatesPage: state tabs in a link view', () => {
     renderAt('/certificates?status=expiring&status=expired&live=true')
     await waitFor(() => expect(lastParams().status).toEqual(['expiring', 'expired']))
     expect(selectedTabs()).toEqual([])
-    // The first tab stays the one tab stop
-    expect(screen.getAllByRole('tab').filter((el) => el.tabIndex === 0)).toEqual([tab('all')])
+    // Every state is its own tab stop, none pressed
+    expect(views().every((el) => el.tabIndex === 0 && el.getAttribute('aria-pressed') === 'false')).toBe(true)
   })
 
   it('saves a preset with the filters of the link, not empty ones', async () => {
@@ -211,18 +213,27 @@ describe('CertificatesPage: state tabs in a link view', () => {
     expect(presets[0].filters.status).toEqual(['expiring'])
   })
 
-  it('Clear filters of the table in a link view leaves the stored filters alone', async () => {
+  it('clearing a link view leaves the stored filters alone', async () => {
     window.localStorage.setItem('ucm-filter-certs-ca', JSON.stringify(['1']))
     renderAt('/certificates?status=expiring&status=expired&key_algo_prefix=RSA')
     await waitFor(() => expect(lastParams().status).toEqual(['expiring', 'expired']))
-    // The page's own chip row has a Clear filters too (it drops the whole link); this is the table's
-    const overview = screen.getByTestId('overview-chips')
-    const own = screen.getAllByText('table.clearFilters').filter((b) => !overview.contains(b))
-    expect(own).toHaveLength(1)
-    fireEvent.click(own[0])
+    fireEvent.change(screen.getByPlaceholderText('certificates.searchPlaceholder'), { target: { value: 'web' } })
+    await waitFor(() => expect(lastParams().search).toBe('web'))
+    fireEvent.click(screen.getByTestId('clear-filters-link'))
     await settle()
     expect(JSON.parse(window.localStorage.getItem('ucm-filter-certs-ca'))).toEqual(['1'])
-    expect(where()).toBe('?key_algo_prefix=RSA')
+    expect(where()).toBe('')
+    expect(lastParams().search).toBeUndefined()
+  })
+
+  it('the chips row clears the whole link at once, the stored filters kept', async () => {
+    window.localStorage.setItem('ucm-filter-certs-ca', JSON.stringify(['1']))
+    renderAt('/certificates?status=expiring&status=expired&key_algo_prefix=RSA')
+    await waitFor(() => expect(lastParams().status).toEqual(['expiring', 'expired']))
+    fireEvent.click(within(screen.getByTestId('applied-filters')).getByText('table.clearFilters'))
+    await settle()
+    expect(where()).toBe('')
+    expect(JSON.parse(window.localStorage.getItem('ucm-filter-certs-ca'))).toEqual(['1'])
   })
 
   it('keeps the search when a tab rewrites the link', async () => {
@@ -240,8 +251,10 @@ describe('CertificatesPage: state tabs in a link view', () => {
     await waitFor(() => expect(lastParams().status).toEqual(['expiring']))
     fireEvent.change(screen.getByPlaceholderText('certificates.searchPlaceholder'), { target: { value: 'web' } })
     await waitFor(() => expect(lastParams().search).toBe('web'))
-    const chip = screen.getByText('overview.filter.live:').parentElement
-    fireEvent.click(chip.querySelector('button'))
+    // The live scope is said in words under the toolbar, and removed like a chip
+    const note = document.querySelector('[data-testid="applied-filters"] [data-filter="note"]')
+    expect(note).toHaveTextContent('certificates.liveScope')
+    fireEvent.click(within(note).getByRole('button', { name: 'table.removeFilter' }))
     await waitFor(() => expect(lastParams().search).toBeUndefined())
   })
 
@@ -253,7 +266,9 @@ describe('CertificatesPage: state tabs in a link view', () => {
     })
     renderAt('/certificates?status=expiring&live=true')
     await waitFor(() => expect(lastParams().status).toEqual(['expiring']))
-    expect(screen.getByText('overview.filter.status:')).toBeTruthy()
+    const applied = screen.getByTestId('applied-filters')
+    expect(applied.querySelectorAll('[data-filter="status"]')).toHaveLength(1)
+    expect(document.querySelectorAll('[data-filter="status"]')).toHaveLength(1)
     expect(screen.queryByText('certificates.state:')).toBeNull()
   })
 })

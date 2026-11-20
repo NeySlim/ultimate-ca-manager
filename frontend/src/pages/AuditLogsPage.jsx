@@ -112,7 +112,8 @@ export default function AuditLogsPage() {
   const [total, setTotal] = useState(0);
   
   // Search & Filters
-  const [search, setSearch] = useState('');
+  // A link may open the log on a search (an inspector's « View its activity »)
+  const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('search') || '');
   const [filterUsername, setFilterUsername] = usePersistedState('ucm-filter-audit-username', '');
   const [filterAction, setFilterAction] = usePersistedState('ucm-filter-audit-action', []);
   const [filterSuccess, setFilterSuccess] = usePersistedState('ucm-filter-audit-success', '');

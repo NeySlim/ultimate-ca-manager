@@ -88,7 +88,7 @@ describe('CertificatesPage — filter survives an external action (#345)', () =>
     expect(lastParams().status).toBeUndefined()
 
     // A state tab sets the status filter
-    fireEvent.click(screen.getByRole('tab', { name: /certificates\.views\.valid/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^certificates\.views\.valid/ }))
     await waitFor(() => expect(lastParams().status).toEqual(['valid']))
 
     const before = getAll.mock.calls.length

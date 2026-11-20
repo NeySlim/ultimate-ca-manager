@@ -3,6 +3,7 @@
  * the action bar of the page slide-over, both on write:certificates.
  */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const authState = vi.hoisted(() => ({ permissions: [] }))
@@ -65,7 +66,7 @@ describe('rename in the floating detail window', () => {
     certs.rename.mockResolvedValue({ data: { ...CERT, descr: 'Back door' } })
     const changed = vi.fn()
     window.addEventListener('ucm:data-changed', changed)
-    render(<InspectorObject entry={WINDOW} onTitle={() => {}} />)
+    render(<InspectorObject entry={WINDOW} onTitle={() => {}} />, { wrapper: MemoryRouter })
     await chooseMoreAction('certificates.rename')
     await waitFor(() => expect(certs.rename).toHaveBeenCalledWith(4, 'Back door'))
     await waitFor(() => expect(changed).toHaveBeenCalled())
@@ -76,7 +77,7 @@ describe('rename in the floating detail window', () => {
   it('does not call the route when the name is unchanged', async () => {
     authState.permissions = ['read:certificates', 'write:certificates']
     notify.showPrompt.mockResolvedValueOnce('Front door ')
-    render(<InspectorObject entry={WINDOW} onTitle={() => {}} />)
+    render(<InspectorObject entry={WINDOW} onTitle={() => {}} />, { wrapper: MemoryRouter })
     await chooseMoreAction('certificates.rename')
     await waitFor(() => expect(notify.showPrompt).toHaveBeenCalled())
     expect(certs.rename).not.toHaveBeenCalled()
@@ -84,9 +85,9 @@ describe('rename in the floating detail window', () => {
 
   it('is absent for a read-only operator', async () => {
     authState.permissions = ['read:certificates']
-    render(<InspectorObject entry={WINDOW} onTitle={() => {}} />)
+    render(<InspectorObject entry={WINDOW} onTitle={() => {}} />, { wrapper: MemoryRouter })
     await screen.findByText('export.title')
-    expect(within(await openMoreActions()).queryByRole('menuitem', { name: 'certificates.rename' })).toBeNull()
+    expect(within(await openMoreActions()).queryByRole('button', { name: 'certificates.rename' })).toBeNull()
   })
 })
 

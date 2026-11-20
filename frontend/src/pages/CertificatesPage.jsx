@@ -1,33 +1,31 @@
 /**
  * CertificatesPage: the list template (page head, state tabs, flat table) over
- * ResponsiveLayout and ResponsiveDataTable.
- *
- * DESKTOP: a row opens the certificate in the inspector dock, where its actions live
- * MOBILE: card list with a full-screen slide-over
+ * ResponsiveLayout and ResponsiveDataTable. A certificate's name opens it in the
+ * inspector, where its actions live: in the page flow, full screen on a phone.
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
+import { Trans } from 'react-i18next'
 import {
-  Certificate, DownloadSimple, Plus, UploadSimple, Star, ArrowsLeftRight, Warning, ArrowsClockwise, CaretRight
+  Certificate, DownloadSimple, Plus, UploadSimple, ArrowsLeftRight, Warning, CaretRight, X
 } from '@phosphor-icons/react'
 import {
-  ResponsiveLayout, ResponsiveDataTable, Button, Modal, ListButton,
+  ResponsiveLayout, ResponsiveDataTable, Modal, ListButton,
   CertificateCompareModal
 } from '../components'
+import { AppliedFilters, RefreshIcon } from '../components/list'
 import { ExportModal } from '../components/ExportModal'
 import { SmartImportModal } from '../components/SmartImport'
 import { showNotices } from '../lib/notices'
-import { certificatesService, casService, truststoreService } from '../services'
-import { useNotification, useMobile, useInspector } from '../contexts'
-import { usePermission, useRecentHistory, useFavorites, useWebSocket, usePersistedState } from '../hooks'
-import { extractCN, cn, certificateNames, downloadBlob, warnSkippedExport } from '../lib/utils'
+import { certificatesService, casService } from '../services'
+import { useNotification, useInspector } from '../contexts'
+import { usePermission, useRecentHistory, useWebSocket, usePersistedState } from '../hooks'
+import { extractCN, certificateNames, downloadBlob, warnSkippedExport } from '../lib/utils'
 import { CERT_STATUSES, parseOverviewFilters, toListParams, toSearch, withoutFilter } from '../lib/overviewFilters'
-import { FilterChips } from '../components/ui/FilterChips'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { IssueCertificateForm } from './certificates/IssueCertificateForm'
-import { CertificateSlideOver } from './certificates/CertificateSlideOver'
 import { useCertificateColumns } from './certificates/useCertificateColumns'
 import { soleImported } from '../lib/importResult'
 import { useOpenEntity } from '../hooks/useOpenEntity'
@@ -35,8 +33,11 @@ import { issueWithSubjectOverride } from '../lib/uniqueSubject'
 import { sourceLabel } from './certificates/certificateSources'
 
 const NONE = []
-// The state tabs, in order; orphan shows when there are some, archived has no counter
+// The state tabs, in order; orphan shows when there are some, archived (no counter) comes last
 const STATE_VIEWS = ['expiring', 'valid', 'expired', 'revoked']
+// Page sizes of the footer; 12 as the mockup, the choice is kept
+const PAGE_SIZES = [12, 25, 50, 100]
+const DEFAULT_SORT = { key: 'valid_to', direction: 'asc' }
 
 // The row as the table shows it; the export uses the same one
 function normalizeCertificate(cert) {
@@ -54,25 +55,24 @@ export default function CertificatesPage() {
   const { id: urlCertId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const { isMobile } = useMobile()
   const openEntity = useOpenEntity()
   // The certificate on top in the dock marks its row
   const { opened = [], activeKey } = useInspector()
   const docked = opened.find((o) => o.key === activeKey)
   const dockedId = docked?.type === 'certificate' ? Number(docked.entityId) : undefined
   const { addToHistory } = useRecentHistory('certificates')
-  const { isFavorite, toggleFavorite } = useFavorites('certificates')
   
   // Data
   const [certificates, setCertificates] = useState([])
   const [cas, setCas] = useState([])
   const [loading, setLoading] = useState(true)
-  // Why the last read failed; the banner replaces an empty list until a read succeeds
+  // Why the last read failed ({ status, request, message }); the banner replaces an empty list until a read succeeds
   const [loadError, setLoadError] = useState(null)
+  // Until the first read answers, the counters are bars, not zeros
+  const [counted, setCounted] = useState(false)
   const [certStats, setCertStats] = useState({ valid: 0, expiring: 0, expired: 0, revoked: 0, orphan: 0, total: 0 })
   
   // Selection
-  const [selectedCert, setSelectedCert] = useState(null)
   const [showIssueModal, setShowIssueModal] = useState(false)
   const [issueInitialData, setIssueInitialData] = useState(null)
   const [showImportModal, setShowImportModal] = useState(false)
@@ -84,11 +84,12 @@ export default function CertificatesPage() {
   
   // Pagination
   const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(25)
+  const [savedPerPage, setPerPage] = usePersistedState('ucm-certs-per-page', PAGE_SIZES[0])
+  const perPage = PAGE_SIZES.includes(savedPerPage) ? savedPerPage : PAGE_SIZES[0]
   const [total, setTotal] = useState(0)
   
-  // Sorting (server-side)
-  const [sortBy, setSortBy] = useState('subject')
+  // Sorting (server-side): the nearest expiry first, as the mockup opens
+  const [sortBy, setSortBy] = useState('valid_to')
   const [sortOrder, setSortOrder] = useState('asc')
   
   // Filters
@@ -232,9 +233,12 @@ export default function CertificatesPage() {
       if (page > lastPage) setPage(lastPage)
       setCas(caList)
       setCertStats(statsRes.data || { valid: 0, expiring: 0, expired: 0, revoked: 0, orphan: 0, total: 0 })
+      setCounted(true)
     } catch (error) {
       if (seq !== requestSeq.current) return
-      setLoadError(error?.message || t('messages.errors.loadFailed.certificates'))
+      // The same failure again keeps the same object: a reload must not re-render in a loop
+      const next = { status: error?.status, request: error?.request, message: error?.message || t('messages.errors.loadFailed.certificates') }
+      setLoadError((prev) => (prev && prev.status === next.status && prev.request === next.request && prev.message === next.message ? prev : next))
       showError(error.message || t('messages.errors.loadFailed.certificates'))
     } finally {
       if (seq === requestSeq.current) setLoading(false)
@@ -281,39 +285,18 @@ export default function CertificatesPage() {
   }, [location.state])
 
 
-  // Load cert details — inspector on desktop, slide-over on mobile
-  const handleSelectCert = useCallback(async (cert) => {
-    if (!cert) {
-      setSelectedCert(null)
-      return
-    }
-
-    // Desktop: open floating detail window
-    if (!isMobile) {
-      openEntity('certificate', cert.id)
-      // Add to recent history
+  // A certificate opens in the inspector (full screen on a phone), and joins the recent history
+  const handleSelectCert = useCallback((cert) => {
+    if (!cert) return
+    openEntity('certificate', cert.id)
+    if (cert.common_name || cert.subject) {
       addToHistory({
         id: cert.id,
         name: cert.common_name || extractCN(cert.subject) || `Certificate ${cert.id}`,
         subtitle: cert.issuer ? extractCN(cert.issuer) : ''
       })
-      return
     }
-
-    // Mobile: slide-over
-    try {
-      const res = await certificatesService.getById(cert.id)
-      const fullCert = res.data || cert
-      setSelectedCert(fullCert)
-      addToHistory({
-        id: fullCert.id,
-        name: fullCert.common_name || extractCN(fullCert.subject) || `Certificate ${fullCert.id}`,
-        subtitle: fullCert.issuer ? extractCN(fullCert.issuer) : ''
-      })
-    } catch {
-      setSelectedCert(cert)
-    }
-  }, [addToHistory, isMobile, openEntity])
+  }, [addToHistory, openEntity])
 
   // Deep-link: auto-select certificate from URL param
   useEffect(() => {
@@ -321,27 +304,11 @@ export default function CertificatesPage() {
     if (urlCertId && !loading) {
       const id = parseInt(urlCertId, 10)
       if (!isNaN(id)) {
-        if (!isMobile) {
-          openEntity('certificate', id)
-        } else {
-          handleSelectCert({ id })
-        }
+        openEntity('certificate', id)
         navigate('/certificates', { replace: true })
       }
     }
   }, [urlCertId, loading])
-
-  const handleAddToTrustStore = async (caRefid) => {
-    try {
-      await truststoreService.addFromCA(caRefid)
-      showSuccess(t('details.addedToTrustStore'))
-      // Refresh cert detail to update chain_status
-      const res = await certificatesService.getById(selectedCert.id)
-      setSelectedCert(res.data)
-    } catch (error) {
-      showError(error.message || t('details.addToTrustStoreFailed'))
-    }
-  }
 
   // Normalize and filter data - detect orphans (cert without existing CA)
   const filteredCerts = useMemo(() => {
@@ -393,7 +360,7 @@ export default function CertificatesPage() {
     { id: '', label: t('certificates.views.all'), count: certStats.total },
     ...STATE_VIEWS.map((id) => ({
       id, label: t(`certificates.views.${id}`), count: certStats[id],
-      tone: id === 'expiring' && certStats.expiring > 0 ? 'warn' : undefined,
+      tone: id === 'expiring' ? 'warn' : undefined,
     })),
     ...(orphanCount > 0 || activeStatus.includes('orphan')
       ? [{ id: 'orphan', label: t('certificates.views.orphan'), count: orphanCount }] : []),
@@ -426,7 +393,7 @@ export default function CertificatesPage() {
         setSortOrder(newSort.direction)
       }
     } else {
-      setSortBy('subject')
+      setSortBy('valid_to')
       setSortOrder('asc')
     }
   }, [])
@@ -434,7 +401,7 @@ export default function CertificatesPage() {
   // Column definitions (extracted to sub-module)
   const columns = useCertificateColumns(t)
 
-  // One action on the row; rename, renew, revoke and delete live in the detail (dock, slide-over)
+  // One action on the row; rename, renew, revoke and delete live in the inspector
   const rowActions = (row) => [
     { label: t('export.title'), icon: DownloadSimple, onClick: () => setExportRowCert(row) },
   ]
@@ -531,28 +498,43 @@ export default function CertificatesPage() {
     }
   ], [linkView, activeStatus, setStatus, savedCA, savedSource, savedTemplate, leaveLink, certStats.sources, cas, t])
 
-  // Slide-over content
-  const slideOverContent = selectedCert ? (
-    <CertificateSlideOver
-      cert={selectedCert}
-      onChanged={setSelectedCert}
-      onClose={() => setSelectedCert(null)}
-      onMutate={muteToasts}
-      onOpenRelated={(id) => handleSelectCert({ id })}
-      onAddToTrustStore={handleAddToTrustStore}
-    />
-  ) : null
+  // Everything the toolbar and the link set, back to the whole list; in a link view the
+  // stored filters are not applied, so they stay stored for when the link is gone
+  const resetFilters = useCallback(() => {
+    setSearchValue('')
+    if (!linkView) {
+      setFilterCA([])
+      setFilterSource([])
+      setFilterTemplate([])
+    }
+    setPage(1)
+    navigate({ pathname: location.pathname, search: '' }, { replace: true })
+  }, [linkView, location.pathname, navigate])
+  const narrowed = Boolean(searchValue) || savedCA.length > 0 || savedSource.length > 0 || savedTemplate.length > 0
+  // `live` (an overview counter's scope) is said in words; the other link filters are chips
+  const liveScope = urlFilters.some(([k]) => k === 'live')
+  const linkChips = overviewChips.filter((c) => c.key !== 'live')
+
+  // Cause of a failed read: the status and the request when the server answered, else the message
+  const cause = loadError?.status && loadError.request ? (
+    <Trans i18nKey="certificates.loadFailedStatus"
+      values={{ status: loadError.status, reason: t(`certificates.httpStatus${loadError.status}`, { defaultValue: '' }), request: loadError.request }}
+      components={{ mono: <span className="font-mono" /> }} />
+  ) : loadError?.request ? (
+    <Trans i18nKey="certificates.loadFailedNoAnswer" values={{ request: loadError.request }}
+      components={{ mono: <span className="font-mono" /> }} />
+  ) : t('certificates.loadFailedCause', { message: loadError?.message })
 
   return (
     <>
       <ResponsiveLayout
         title={t('common.certificates')}
         // No count before the first read succeeds: a zero there would be a claim
-        total={failed || (loading && !certificates.length) ? '' : t('certificates.total', { count: certStats.total })}
+        total={failed || !counted ? '' : t('certificates.total', { count: certStats.total })}
         intent={t('certificates.intent')}
         actions={canWrite('certificates') && (
           <>
-            <ListButton quiet icon={UploadSimple} onClick={() => setShowImportModal(true)}>
+            <ListButton quiet icon={UploadSimple} onClick={() => setShowImportModal(true)} className="lv-hide-mobile">
               {t('common.import')}
             </ListButton>
             <ListButton primary icon={Plus} title={t('certificates.issueCertificate')} onClick={() => setShowIssueModal(true)}>
@@ -564,77 +546,58 @@ export default function CertificatesPage() {
         activeView={activeView}
         onViewChange={(id) => setStatus(id ? [id] : [])}
         viewsLabel={t('certificates.viewsLabel')}
-        splitView={isMobile}
-        splitEmptyContent={isMobile ? (
-          <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
-              <Certificate size={24} className="text-text-tertiary" />
-            </div>
-            <p className="text-sm text-text-secondary">{t('certificates.noCertificates')}</p>
-          </div>
-        ) : undefined}
-        slideOverOpen={isMobile && !!selectedCert}
-        slideOverTitle={selectedCert?.cn || selectedCert?.common_name || t('common.certificate')}
-        slideOverContent={isMobile ? slideOverContent : null}
-        slideOverWidth="wide"
-        slideOverActions={selectedCert && (
-          <button
-            onClick={() => toggleFavorite({
-              id: selectedCert.id,
-              name: selectedCert.common_name || extractCN(selectedCert.subject),
-              subtitle: selectedCert.issuer ? extractCN(selectedCert.issuer) : ''
-            })}
-            className={cn(
-              'p-1.5 rounded-md transition-colors',
-              isFavorite(selectedCert.id)
-                ? 'text-status-warning hover:text-status-warning bg-status-warning-op10'
-                : 'text-text-tertiary hover:text-status-warning hover:bg-status-warning-op10'
-            )}
-          >
-            <Star size={16} weight={isFavorite(selectedCert.id) ? 'fill' : 'regular'} />
+        viewsPressed
+        viewsBusy={!counted}
+        viewsAside={narrowed && (
+          <button type="button" className="lv-text-link" onClick={resetFilters} data-testid="clear-filters-link">
+            <X size={14} aria-hidden="true" /> {t('certificates.clearSearchAndFilters')}
           </button>
         )}
-        onSlideOverClose={() => setSelectedCert(null)}
       >
         {failed ? (
           <div className="lv-error" role="alert" data-testid="certificates-load-error">
             <Warning aria-hidden="true" />
             <div>
               <h2>{t('certificates.loadFailed')}</h2>
-              <p>{t('certificates.loadFailedCause', { message: loadError })}</p>
+              <p>{cause}</p>
               <div className="lv-error-actions">
-                <ListButton primary icon={ArrowsClockwise} onClick={() => loadData()}>{t('table.retry')}</ListButton>
+                <ListButton primary icon={RefreshIcon} onClick={() => loadData()}>{t('table.retry')}</ListButton>
                 {hasPermission('read:audit') && (
                   <Link className="lv-text-link" to="/audit">{t('certificates.viewLog')}<CaretRight size={14} aria-hidden="true" /></Link>
                 )}
               </div>
             </div>
           </div>
-        ) : (<>
-        <div data-testid="overview-chips" className="shrink-0">
-          <FilterChips
-            filters={overviewChips}
-            onRemove={removeUrlFilter}
-            onClearAll={() => navigate({ pathname: location.pathname, search: '' }, { replace: true })}
-            className={isMobile ? undefined : 'lv-chips'}
-          />
-        </div>
+        ) : (
         <ResponsiveDataTable
           variant="list"
           data={filteredCerts}
           columns={columns}
           loading={loading}
           onRowClick={handleSelectCert}
-          selectedId={isMobile ? selectedCert?.id : dockedId}
+          openFromName
+          lockRowsOnSelect
+          selectedId={dockedId}
           rowLabel={(row) => row.cn}
           tableLabel={t('certificates.listLabel')}
           rangeLabel={({ start, end, total: count }) => t('certificates.range', { start, end, count })}
           footNote={t('certificates.listNote')}
           searchable
+          searchLabel={t('certificates.searchLabel')}
           searchPlaceholder={t('certificates.searchPlaceholder')}
           externalSearch={searchValue}
           onSearchChange={(v) => { setSearchValue(v); setPage(1) }}
+          belowToolbar={(linkChips.length > 0 || liveScope) && (
+            <AppliedFilters
+              filters={linkChips}
+              onRemove={removeUrlFilter}
+              onClearAll={() => navigate({ pathname: location.pathname, search: '' }, { replace: true })}
+              note={liveScope ? t('certificates.liveScope') : undefined}
+              onRemoveNote={liveScope ? () => removeUrlFilter('live') : undefined}
+            />
+          )}
           columnStorageKey="ucm-certs-columns-v2"
+          columnsNote={t('certificates.columnsNote')}
           filterPresetsKey="ucm-certs-presets"
           densityStorageKey="ucm-certs-density"
           onApplyFilterPreset={handleApplyFilterPreset}
@@ -657,32 +620,40 @@ export default function CertificatesPage() {
               >
                 {t('common.compare')}
               </ListButton>
-              <ListButton small icon={DownloadSimple} onClick={handleExportSelected}>
-                {t('certificates.exportSelectedPem')}
+              <ListButton small icon={DownloadSimple} onClick={handleExportSelected} title={t('certificates.exportSelectedPem')}>
+                {t('certificates.exportSelected')}
               </ListButton>
             </>
           }
           sortable
-          defaultSort={{ key: 'cn', direction: 'asc' }}
+          defaultSort={DEFAULT_SORT}
           onSortChange={handleSortChange}
           rowActions={rowActions}
           pagination={{
             page,
             total,
             perPage,
+            pageSizes: PAGE_SIZES,
+            perPageLabel: t('certificates.perPageLabel'),
             onChange: setPage,
             onPerPageChange: (v) => { setPerPage(v); setPage(1) }
           }}
+          noMatch={{
+            title: t('certificates.noMatchTitle'),
+            description: t('certificates.noMatchHint'),
+            action: t('certificates.resetFilters'),
+            onReset: resetFilters,
+          }}
           emptyIcon={Certificate}
-          emptyTitle={t('certificates.noCertificates')}
-          emptyDescription={t('certificates.issueCertificate')}
+          emptyTitle={t('certificates.emptyTitle')}
+          emptyDescription={t('certificates.emptyHint')}
           emptyAction={canWrite('certificates') && (
-            <Button type="button" onClick={() => setShowIssueModal(true)}>
-              <Plus size={16} /> {t('certificates.issueCertificate')}
-            </Button>
+            <ListButton primary icon={Plus} onClick={() => setShowIssueModal(true)}>
+              {t('certificates.issueCertificate')}
+            </ListButton>
           )}
         />
-        </>)}
+        )}
       </ResponsiveLayout>
 
       {/* Issue Certificate Modal */}
@@ -736,7 +707,7 @@ export default function CertificatesPage() {
         open={showCompareModal}
         onClose={() => setShowCompareModal(false)}
         certificates={certificates}
-        initialCert={comparePair[0] || selectedCert}
+        initialCert={comparePair[0]}
         secondCert={comparePair[1]}
       />
 

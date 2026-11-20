@@ -85,7 +85,8 @@ describe('InspectorDock', () => {
     renderDock()
     await open(1)
     const dock = screen.getByTestId('inspector-dock')
-    expect(dock).toHaveAttribute('aria-label', 'inspector.region')
+    // Certificates only: the region says so
+    expect(dock).toHaveAttribute('aria-label', 'inspector.regionCertificate')
     expect(dock).toHaveAttribute('role', 'region')
     const objectTab = screen.getByRole('tab', { name: 'c1.example.com' })
     expect(objectTab).toHaveAttribute('aria-selected', 'true')
@@ -126,14 +127,32 @@ describe('InspectorDock', () => {
     await waitFor(() => expect(opener).toHaveFocus())
   })
 
-  it('closes only the active object on Escape and opens many', async () => {
+  it('closes the whole inspector on Escape from anywhere on the page, and gives the focus back', async () => {
     renderDock()
+    const opener = screen.getByText('open-1')
+    opener.focus()
     await open(1)
     await open(2)
     expect(screen.getByRole('tab', { name: 'c2.example.com' })).toHaveAttribute('aria-selected', 'true')
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'c2.example.com' }), { key: 'Escape' })
-    await screen.findByText('c1.example.com:overview')
-    expect(screen.queryByRole('tab', { name: 'c2.example.com' })).toBeNull()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByTestId('inspector-dock')).toBeNull())
+    await waitFor(() => expect(opener).toHaveFocus())
+  })
+
+  it('leaves Escape to an open dialog or to a key already handled', async () => {
+    renderDock()
+    await open(1)
+    const modal = document.createElement('div')
+    modal.setAttribute('role', 'dialog')
+    modal.setAttribute('aria-modal', 'true')
+    document.body.appendChild(modal)
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.getByTestId('inspector-dock')).toBeInTheDocument()
+    modal.remove()
+    const handled = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    handled.preventDefault()
+    document.body.dispatchEvent(handled)
+    expect(screen.getByTestId('inspector-dock')).toBeInTheDocument()
   })
 
   it('closes the focused object tab with the Delete key', async () => {
@@ -164,9 +183,9 @@ describe('InspectorDock', () => {
     second.focus()
     await open(2)
     await waitFor(() => expect(screen.getByRole('tab', { name: 'c2.example.com' })).toHaveFocus())
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'c2.example.com' }), { key: 'Escape' })
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'c2.example.com' }), { key: 'Delete' })
     await waitFor(() => expect(screen.getByRole('tab', { name: 'c1.example.com' })).toHaveFocus())
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'c1.example.com' }), { key: 'Escape' })
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'c1.example.com' }), { key: 'Delete' })
     await waitFor(() => expect(screen.queryByTestId('inspector-dock')).toBeNull())
     await waitFor(() => expect(opener).toHaveFocus())
   })
@@ -200,25 +219,30 @@ describe('InspectorDock', () => {
     expect(dock).not.toHaveClass('is-collapsed')
   })
 
-  it('grows to the most the window allows, then back to the band', async () => {
+  it('grows to 420 px, then back to the band', async () => {
     renderDock()
     await open(1)
     const dock = screen.getByTestId('inspector-dock')
-    fireEvent.click(screen.getByRole('button', { name: 'inspector.grow' }))
-    expect(dock.style.height).toBe('600px')
+    const grow = screen.getByRole('button', { name: 'inspector.grow' })
+    expect(grow).toHaveAttribute('title', 'inspector.changeHeight')
+    fireEvent.click(grow)
+    expect(dock.style.height).toBe('420px')
     fireEvent.click(screen.getByRole('button', { name: 'inspector.shrink' }))
     expect(dock.style.height).toBe('278px')
   })
 
-  it('switches close on navigate from its header and remembers it', async () => {
+  it('never shows more than 60 % of a short window', async () => {
+    window.innerHeight = 600
     renderDock()
     await open(1)
-    const toggle = screen.getByRole('button', { name: 'inspector.closeOnNav' })
-    expect(toggle).toHaveAttribute('aria-pressed', 'true')
-    fireEvent.click(toggle)
-    expect(toggle).toHaveAttribute('aria-pressed', 'false')
-    expect(JSON.parse(localStorage.getItem('ucm-inspector-prefs')).closeOnNav).toBe(false)
-    expect(screen.getByTestId('inspector-dock')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'inspector.grow' }))
+    expect(screen.getByTestId('inspector-dock').style.height).toBe('360px')
+  })
+
+  it('keeps the close-on-navigate switch out of its header', async () => {
+    renderDock()
+    await open(1)
+    expect(screen.queryByRole('button', { name: 'inspector.closeOnNav' })).toBeNull()
   })
 
   it('closes an object from its own close button', async () => {
@@ -254,8 +278,10 @@ describe('InspectorDock', () => {
     expect(more).toHaveTextContent('+4')
     expect(more).toHaveAttribute('aria-haspopup', 'menu')
     fireEvent.click(more)
-    const menu = screen.getByRole('menu', { name: 'inspector.hiddenObjects' })
-    const item = within(menu).getByRole('menuitem', { name: 'c3.example.com' })
+    const menu = screen.getByRole('menu', { name: 'inspector.hiddenCertificatesMenu' })
+    // Each hidden certificate says its state beside its name, as in the mockup
+    const item = within(menu).getByRole('menuitem', { name: /^c3\.example\.com/ })
+    expect(item.querySelector('.lv-pill')).not.toBeNull()
     fireEvent.click(item)
     await screen.findByText('c3.example.com:overview')
     expect(within(strip).getByRole('tab', { name: 'c3.example.com' })).toHaveAttribute('aria-selected', 'true')
@@ -287,12 +313,13 @@ describe('InspectorDock', () => {
     const grip = screen.getByTestId('inspector-grip')
     const before = Number(grip.getAttribute('aria-valuenow'))
     fireEvent.keyDown(grip, { key: 'ArrowUp' })
-    expect(Number(grip.getAttribute('aria-valuenow'))).toBe(before + 24)
-    expect(JSON.parse(localStorage.getItem('ucm-inspector-prefs')).height).toBe(before + 24)
+    expect(Number(grip.getAttribute('aria-valuenow'))).toBe(before + 20)
+    expect(JSON.parse(localStorage.getItem('ucm-inspector-prefs')).height).toBe(before + 20)
     for (let i = 0; i < 100; i++) fireEvent.keyDown(grip, { key: 'ArrowDown' })
-    expect(Number(grip.getAttribute('aria-valuenow'))).toBe(Number(grip.getAttribute('aria-valuemin')))
+    expect(grip).toHaveAttribute('aria-valuemin', '210')
+    expect(Number(grip.getAttribute('aria-valuenow'))).toBe(210)
     fireEvent.keyDown(grip, { key: 'End' })
-    expect(Number(grip.getAttribute('aria-valuenow'))).toBe(600)
+    expect(Number(grip.getAttribute('aria-valuenow'))).toBe(450)
   })
 
   it('is a full-screen modal dialog on mobile', async () => {

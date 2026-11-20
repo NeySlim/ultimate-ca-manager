@@ -131,7 +131,7 @@ describe('locale file guards', () => {
   "acme.sh", "cert-manager", "certbot", "lego", "member (OpenLDAP / RFC 2307)",
   "memberOf (Active Directory)", "permit-X11-forwarding", "permit-agent-forwarding",
   "permit-port-forwarding", "permit-pty", "permit-user-rc", "ssh-certificate",
-  "uniqueMember (OpenLDAP groupOfUniqueNames)", "win-acme", "{{action}}: {{name}}", "⚫ GitHub", "🔵 Google",
+  "uniqueMember (OpenLDAP groupOfUniqueNames)", "win-acme", "{{action}}: {{name}}", "{{action}} {{name}}", "{{label}}: {{value}}", "Esc", "⚫ GitHub", "🔵 Google",
   "🟦 Microsoft Entra"
   ])
 

@@ -174,12 +174,12 @@ describe('CertificatesPage — finding a new certificate (#368)', () => {
   it('a deep link opens the certificate even when filters hide its row', async () => {
     // Mobile follows /certificates/:id after a creation made on another page
     mockIsMobile = true
-    getById.mockResolvedValue({ data: { id: 401, subject: 'CN=hidden' } })
     render(
       <MemoryRouter initialEntries={['/certificates/401']}>
         <Routes><Route path="/certificates/:id" element={<CertificatesPage />} /></Routes>
       </MemoryRouter>
     )
-    await waitFor(() => expect(getById).toHaveBeenCalledWith(401))
+    // The inspector, full screen on a phone, reads and shows it
+    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('certificate', 401))
   })
 })

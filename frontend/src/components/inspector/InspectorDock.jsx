@@ -1,27 +1,31 @@
 /**
  * InspectorDock: the bordered frame, in the page flow, that shows the objects
  * opened through the inspector context: under the list at the page margins, or
- * beside it on the right; full screen on mobile. Escape closes the active object;
- * the focus moves to the dock on opening and returns to the opening control when
- * the last object closes.
+ * beside it on the right; full screen on mobile. Escape closes the inspector from
+ * anywhere on the page, unless a dialog or menu is open; the focus moves to the dock
+ * on opening and returns to the opening control when it closes.
  */
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, CornersOut, CornersIn, SidebarSimple, Rows, Signpost, Minus, CaretUp } from '@phosphor-icons/react'
-import { useInspector, SIZE_LIMITS } from '../../contexts/InspectorContext'
+import { X, SidebarSimple, Rows, Minus, CaretUp } from '@phosphor-icons/react'
+import { useInspector, SIZE_LIMITS, DOCK_HEIGHT } from '../../contexts/InspectorContext'
+import { ExpandIcon } from '../list/atelierIcons'
 import { cn } from '../../lib/utils'
 import { ObjectTabs } from './InspectorTabs'
 import { InspectorObject } from './InspectorObject'
 import { DockPlacementContext, RIGHT_MIN_VIEWPORT, useDockPlacement, useViewport } from './placement'
 import './inspector.css'
 
-const STEP = 24
+// Arrow keys on the grip move the edge by 20 px, as the mockup does
+const STEP = 20
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
+// Another layer that answers Escape itself: a modal, a menu, a listbox, a popover
+const OWN_ESCAPE = '[role="dialog"][aria-modal="true"]:not([data-testid="inspector-dock"]), [role="alertdialog"], [role="menu"], [role="listbox"], [data-radix-popper-content-wrapper]'
 
 export function InspectorDock() {
   const { t } = useTranslation()
   const ins = useInspector()
-  const { opened, activeKey, setActiveKey, closeEntity, closeAll, focusToken, height, width, setGeometry, closeOnNav, toggleCloseOnNav, collapsed, setCollapsed } = ins
+  const { opened, activeKey, setActiveKey, closeEntity, closeAll, focusToken, height, width, setGeometry, collapsed, setCollapsed } = ins
   const placement = useDockPlacement()
   const viewport = useViewport()
   const [titles, setTitles] = useState({})
@@ -35,21 +39,36 @@ export function InspectorDock() {
 
   const onTitle = useCallback((key, title) => setTitles((prev) => (prev[key] === title ? prev : { ...prev, [key]: title })), [])
 
-  if (!opened.length || !placement) return null
+  // Escape closes the whole inspector wherever the focus is; a layer that answers Escape itself keeps it
+  const shown = opened.length > 0 && !!placement
+  useEffect(() => {
+    if (!shown) return undefined
+    const onKey = (e) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      if (document.querySelector(OWN_ESCAPE)) return
+      if (e.target.closest?.(OWN_ESCAPE)) return
+      closeAll()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [shown, closeAll])
+
+  if (!shown) return null
   const entry = opened.find((o) => o.key === activeKey) || opened[0]
 
   const mobile = placement === 'mobile'
   const right = placement === 'right'
-  // The bottom dock never takes more than 60 % of the window height
-  const maxH = Math.max(SIZE_LIMITS.height[0], Math.floor(viewport.h * 0.6))
-  const shownH = clamp(height, SIZE_LIMITS.height[0], maxH)
+  // The bottom dock keeps 210 to 450 px, and never more than 60 % of the window height
+  const maxH = Math.min(DOCK_HEIGHT.max, Math.floor(viewport.h * 0.6))
+  const minH = Math.min(DOCK_HEIGHT.min, maxH)
+  const shownH = clamp(height, minH, maxH)
   const shownW = clamp(width, SIZE_LIMITS.width[0], SIZE_LIMITS.width[1])
   const folded = collapsed && !mobile && !right
-  const grown = right ? shownW >= 600 : shownH >= Math.min(maxH, 360)
+  const grown = right ? shownW >= 600 : shownH >= 360
 
   const resizeTo = (v, opts) => setGeometry(right
     ? { width: Math.round(clamp(v, ...SIZE_LIMITS.width)) }
-    : { height: Math.round(clamp(v, SIZE_LIMITS.height[0], maxH)) }, opts)
+    : { height: Math.round(clamp(v, minH, maxH)) }, opts)
   // The dock edge follows the pointer: its distance to the window edge, less the margins of the frame
   const edge = (ev) => (right ? window.innerWidth - ev.clientX - 24 : dock.current.getBoundingClientRect().bottom - ev.clientY)
   const startDrag = (e) => {
@@ -69,19 +88,10 @@ export function InspectorDock() {
     const cur = right ? shownW : shownH
     if (e.key === grow) resizeTo(cur + STEP)
     else if (e.key === shrink) resizeTo(cur - STEP)
-    else if (e.key === 'Home') resizeTo(right ? SIZE_LIMITS.width[0] : SIZE_LIMITS.height[0])
+    else if (e.key === 'Home') resizeTo(right ? SIZE_LIMITS.width[0] : minH)
     else if (e.key === 'End') resizeTo(right ? SIZE_LIMITS.width[1] : maxH)
     else return
     e.preventDefault()
-  }
-
-  // Escape closes the active object; an action modal keeps its own Escape
-  const onKeyDown = (e) => {
-    if (e.key !== 'Escape' || e.defaultPrevented || !dock.current?.contains(e.target)) return
-    const inner = e.target.closest?.('[role="dialog"],[role="alertdialog"],[role="menu"]')
-    if (inner && inner !== dock.current) return
-    e.stopPropagation()
-    closeEntity(entry.key)
   }
 
   const selectObject = (key) => {
@@ -94,47 +104,45 @@ export function InspectorDock() {
     <div role="separator" tabIndex={0} data-testid="inspector-grip" className="ins-grip"
       aria-label={t(right ? 'inspector.resizeWidth' : 'inspector.resizeHeight')}
       aria-orientation={right ? 'vertical' : 'horizontal'}
-      aria-valuemin={right ? SIZE_LIMITS.width[0] : SIZE_LIMITS.height[0]}
+      aria-valuemin={right ? SIZE_LIMITS.width[0] : minH}
       aria-valuemax={right ? SIZE_LIMITS.width[1] : maxH}
       aria-valuenow={right ? shownW : shownH}
       onPointerDown={startDrag} onKeyDown={onGripKey} />
   )
 
+  // All certificates: the names say so (« Inspecteur de certificat », « Certificats ouverts »)
+  const certs = opened.every((o) => o.type === 'certificate')
   return (
-    <aside ref={dock} data-testid="inspector-dock" aria-label={t('inspector.region')}
+    <aside ref={dock} data-testid="inspector-dock" aria-label={t(certs ? 'inspector.regionCertificate' : 'inspector.region')}
       {...(mobile ? { role: 'dialog', 'aria-modal': 'true' } : { role: 'region' })}
-      onKeyDown={onKeyDown} style={style}
+      style={style}
       className={cn('ins-dock', `is-${placement}`, folded && 'is-collapsed')}>
       {grip}
       <div className="ins-bar">
         <ObjectTabs opened={opened} activeKey={entry.key} titles={titles} onSelect={selectObject}
-          onClose={closeEntity} tabMin={right ? 96 : 120} />
+          onClose={closeEntity} tabMin={right ? 96 : 120} certificates={certs} />
         <div className="ins-tools">
-          <button type="button" className={cn('ins-icon-btn', closeOnNav && 'is-on')} onClick={toggleCloseOnNav}
-            aria-pressed={closeOnNav} aria-label={t('inspector.closeOnNav')} title={t('inspector.closeOnNav')}>
-            <Signpost size={15} weight={closeOnNav ? 'fill' : 'regular'} aria-hidden="true" />
-          </button>
           {!mobile && viewport.w >= RIGHT_MIN_VIEWPORT && (
             <button type="button" className="ins-icon-btn" onClick={() => { setGeometry({ position: right ? 'bottom' : 'right' }); setCollapsed(false) }}
               aria-label={t(right ? 'inspector.dockBottom' : 'inspector.dockRight')} title={t(right ? 'inspector.dockBottom' : 'inspector.dockRight')}>
-              {right ? <Rows size={15} aria-hidden="true" /> : <SidebarSimple size={15} weight="bold" aria-hidden="true" mirrored />}
+              {right ? <Rows size={16} aria-hidden="true" /> : <SidebarSimple size={16} weight="bold" aria-hidden="true" mirrored />}
             </button>
           )}
           {!mobile && (
             <button type="button" className="ins-icon-btn"
-              onClick={() => { resizeTo(right ? (grown ? 460 : 640) : (grown ? 278 : maxH)); setCollapsed(false) }}
-              aria-label={t(grown ? 'inspector.shrink' : 'inspector.grow')} title={t(grown ? 'inspector.shrink' : 'inspector.grow')}>
-              {grown ? <CornersIn size={15} aria-hidden="true" /> : <CornersOut size={15} aria-hidden="true" />}
+              onClick={() => { resizeTo(right ? (grown ? 460 : 640) : (grown ? 278 : DOCK_HEIGHT.grown)); setCollapsed(false) }}
+              aria-label={t(grown ? 'inspector.shrink' : 'inspector.grow')} title={t(right ? 'inspector.changeWidth' : 'inspector.changeHeight')}>
+              <ExpandIcon size={16} />
             </button>
           )}
           {!mobile && !right && (
             <button type="button" className="ins-icon-btn" onClick={() => setCollapsed(!collapsed)} aria-expanded={!folded}
               aria-label={t(folded ? 'inspector.expand' : 'inspector.collapse')} title={t(folded ? 'inspector.expand' : 'inspector.collapse')}>
-              {folded ? <CaretUp size={15} aria-hidden="true" /> : <Minus size={15} aria-hidden="true" />}
+              {folded ? <CaretUp size={16} aria-hidden="true" /> : <Minus size={16} aria-hidden="true" />}
             </button>
           )}
           <button type="button" className="ins-icon-btn" onClick={closeAll} aria-label={t('inspector.close')} title={t('inspector.close')}>
-            <X size={15} aria-hidden="true" />
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
       </div>

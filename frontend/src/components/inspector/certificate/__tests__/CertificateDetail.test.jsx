@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
 import { useState } from 'react'
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key, opts) => (opts && typeof opts === 'object' && opts.count !== undefined ? `${key}:${opts.count}` : key), i18n: { language: 'en' } }),
@@ -54,18 +55,28 @@ const ACTIONS = () => [act('export'), act('rename'), act('renew'), act('uploadKe
 function Harness({ placement = 'bottom', cert = CERT, actions = ACTIONS(), onOpenCa }) {
   const [section, setSection] = useState('overview')
   return (
-    <DockPlacementContext.Provider value={placement}>
-      <CertificateDetail cert={cert} objectKey="certificate:7" title={cert.common_name} actions={actions}
-        section={section} onSection={setSection} onOpenCa={onOpenCa} />
-    </DockPlacementContext.Provider>
+    <MemoryRouter initialEntries={['/certificates']}>
+      <Routes>
+        <Route path="/certificates" element={(
+          <DockPlacementContext.Provider value={placement}>
+            <CertificateDetail cert={cert} objectKey="certificate:7" title={cert.common_name} actions={actions}
+              section={section} onSection={setSection} onOpenCa={onOpenCa} />
+          </DockPlacementContext.Provider>
+        )} />
+        <Route path="/audit" element={<AuditProbe />} />
+      </Routes>
+    </MemoryRouter>
   )
 }
 
+function AuditProbe() {
+  const { search } = useLocation()
+  return <p data-testid="audit-page">{search}</p>
+}
+
 const openMenu = () => {
-  const trigger = screen.getByTestId('inspector-more-actions')
-  trigger.focus()
-  fireEvent.keyDown(trigger, { key: 'Enter' })
-  return screen.getByRole('menu')
+  fireEvent.click(screen.getByTestId('inspector-more-actions'))
+  return screen.getByRole('dialog', { name: 'inspector.cert.actionsTitle' })
 }
 
 beforeEach(() => {
@@ -97,22 +108,55 @@ describe('CertificateDetail: heading', () => {
     expect(screen.queryByRole('button', { name: 'action.renew' })).toBeNull()
   })
 
-  it('puts every other visible action in the « ⋯ » menu, favorite included, destructive ones last', () => {
+  it('lists the mockup actions first, then the product ones, deletion last, in a dialog', () => {
     const actions = ACTIONS()
     render(<Harness actions={actions} />)
-    const menu = openMenu()
-    const items = within(menu).getAllByRole('menuitem').map((i) => i.textContent)
-    expect(items).toEqual(['action.rename', 'action.uploadKey', 'action.lint', 'inspector.cert.favorite', 'action.revoke', 'action.delete'])
-    expect(within(menu).getAllByRole('separator')).toHaveLength(1)
-    fireEvent.click(within(menu).getByRole('menuitem', { name: 'action.revoke' }))
+    const trigger = screen.getByTestId('inspector-more-actions')
+    expect(trigger).toHaveAttribute('aria-haspopup', 'dialog')
+    const dialog = openMenu()
+    const items = within(dialog).getAllByRole('button').filter((b) => !b.closest('.lv-dialog-head')).map((i) => i.textContent)
+    expect(items).toEqual(['inspector.cert.copyName', 'inspector.cert.viewActivity', 'inspector.cert.revokeAction',
+      'action.lint', 'action.uploadKey', 'action.rename', 'inspector.cert.favorite', 'action.delete'])
+    expect(within(dialog).getByRole('button', { name: 'inspector.cert.revokeAction' })).toHaveClass('is-danger')
+    expect(within(dialog).getByRole('button', { name: 'action.delete' })).toHaveClass('is-danger')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'inspector.cert.revokeAction' }))
     expect(actions[5].onClick).toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('toggles the favorite from the menu', () => {
+  it('toggles the favorite from the dialog', () => {
     fav.on = true
     render(<Harness />)
-    fireEvent.click(within(openMenu()).getByRole('menuitem', { name: 'inspector.cert.unfavorite' }))
+    fireEvent.click(within(openMenu()).getByRole('button', { name: 'inspector.cert.unfavorite' }))
     expect(fav.toggle).toHaveBeenCalledWith(expect.objectContaining({ id: 7, name: 'web.example.com' }))
+  })
+
+  it('copies the common name', async () => {
+    const writeText = vi.fn().mockResolvedValue()
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    render(<Harness />)
+    fireEvent.click(within(openMenu()).getByRole('button', { name: 'inspector.cert.copyName' }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('web.example.com'))
+  })
+
+  it('opens the audit log on this certificate, for a user who may read it', () => {
+    render(<Harness />)
+    fireEvent.click(within(openMenu()).getByRole('button', { name: 'inspector.cert.viewActivity' }))
+    expect(screen.getByTestId('audit-page')).toHaveTextContent('?search=web.example.com')
+  })
+
+  it('offers no activity without read:audit, and no revoke the actions do not give', () => {
+    perm.scopes = ['read:certificates']
+    render(<Harness actions={ACTIONS().filter((a) => a.id !== 'revoke')} />)
+    const dialog = openMenu()
+    expect(within(dialog).queryByRole('button', { name: 'inspector.cert.viewActivity' })).toBeNull()
+    expect(within(dialog).queryByRole('button', { name: 'inspector.cert.revokeAction' })).toBeNull()
+  })
+
+  it('offers to trust the issuing CA of an incomplete chain, before deletion', () => {
+    render(<Harness cert={{ ...CERT, chain_status: { status: 'incomplete', chain: [{ name: 'Issuing CA', type: 'managed_ca' }] } }} />)
+    const items = within(openMenu()).getAllByRole('button').map((i) => i.textContent)
+    expect(items.slice(-2)).toEqual(['details.addIssuerToTrustStore', 'action.delete'])
   })
 })
 
@@ -177,8 +221,10 @@ describe('CertificateDetail: history', () => {
     render(<Harness />)
     fireEvent.click(screen.getByRole('tab', { name: 'inspector.sections.history' }))
     const history = screen.getByTestId('certificate-history')
-    await waitFor(() => expect(history).toHaveTextContent('Certificate exported'))
-    expect(history).not.toHaveTextContent('Certificate deleted')
+    // One sentence per action, never the raw action name
+    await waitFor(() => expect(history).toHaveTextContent('inspector.history.exported'))
+    expect(history).not.toHaveTextContent('certificate_exported')
+    expect(history).not.toHaveTextContent('inspector.history.deleted')
     expect(history).toHaveTextContent('inspector.history.issued')
     expect(history).toHaveTextContent('inspector.history.scope:100')
     expect(svc.logs).toHaveBeenCalledWith({ resource_type: 'certificate', per_page: 100 })

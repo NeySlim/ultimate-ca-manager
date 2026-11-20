@@ -1,7 +1,8 @@
 /**
- * CertificatesPage and a hybrid pair (RFC 9763): the classical member opens after
- * issuance, the linked one opens from its details, and the revocation dialog's
- * answer about the linked certificate reaches the service.
+ * CertificatesPage and a hybrid pair (RFC 9763): the classical member opens in the
+ * inspector after issuance, and a link to a member opens it there on a phone too.
+ * Revoking, renewing and opening the linked member from the inspector are covered
+ * by InspectorObject.related.test.jsx.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
@@ -72,20 +73,6 @@ vi.mock('../IssueCertificateForm', () => ({
   ),
 }))
 
-// The panel stub exposes the callbacks the page hands it; actions come from the real action bar
-vi.mock('../../../components/detail/CertificatePanel', () => ({
-  CertificatePanel: ({ certificate, onOpenRelated }) => (
-    <div>
-      <span>details-{certificate.id}</span>
-      <button type="button" onClick={() => onOpenRelated?.(certificate.related_certificate_id)}>details-open-related</button>
-    </div>
-  ),
-}))
-vi.mock('../../../components/RevokeCertificateModal', () => ({
-  RevokeCertificateModal: ({ open, onConfirm }) => (open
-    ? <button type="button" onClick={() => onConfirm('keyCompromise', mocks.revokeOptions)}>confirm-revoke</button>
-    : null),
-}))
 
 import CertificatesPage from '../../CertificatesPage'
 
@@ -100,7 +87,7 @@ const issuePair = async () => {
   await waitFor(() => expect(mocks.create).toHaveBeenCalled())
 }
 
-// Mobile: the deep link opens the classical member in the slide-over
+// Mobile: the deep link opens the classical member in the full-screen inspector, no slide-over
 const openMemberOnMobile = async () => {
   mocks.isMobile = true
   render(
@@ -111,7 +98,7 @@ const openMemberOnMobile = async () => {
       </Routes>
     </MemoryRouter>
   )
-  expect(await screen.findByText('details-11')).toBeInTheDocument()
+  await waitFor(() => expect(mocks.openEntity).toHaveBeenCalledWith('certificate', 11))
 }
 
 describe('CertificatesPage and a hybrid pair', () => {
@@ -131,58 +118,9 @@ describe('CertificatesPage and a hybrid pair', () => {
     await waitFor(() => expect(mocks.openEntity).toHaveBeenCalledWith('certificate', 11))
   })
 
-  it('forwards the revocation answer about the linked certificate', async () => {
+  it('opens a linked member in the inspector on a phone too', async () => {
     await openMemberOnMobile()
-    fireEvent.click(screen.getByText('common.revoke'))
-    fireEvent.click(await screen.findByText('confirm-revoke'))
-    await waitFor(() => expect(mocks.revoke).toHaveBeenCalledWith(11, 'keyCompromise', { revokeRelated: false }))
-  })
-
-  it('names the linked certificate the server revoked too', async () => {
-    mocks.revokeOptions = { revokeRelated: true }
-    mocks.revoke.mockResolvedValue({ data: { id: 11, revoked: true, related_revoked: 12 } })
-    await openMemberOnMobile()
-    fireEvent.click(screen.getByText('common.revoke'))
-    fireEvent.click(await screen.findByText('confirm-revoke'))
-    await waitFor(() => expect(mocks.showSuccess).toHaveBeenCalledWith('revocation.revokedWithRelated'))
-    expect(mocks.showWarning).not.toHaveBeenCalledWith('revocation.relatedNotRevoked')
-  })
-
-  it('says the linked certificate could not be revoked', async () => {
-    mocks.revokeOptions = { revokeRelated: true }
-    mocks.revoke.mockResolvedValue({ data: { id: 11, revoked: true, related_not_revoked: 12 } })
-    await openMemberOnMobile()
-    fireEvent.click(screen.getByText('common.revoke'))
-    fireEvent.click(await screen.findByText('confirm-revoke'))
-    await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith('revocation.relatedRevokeFailed'))
-    expect(mocks.showWarning).not.toHaveBeenCalledWith('revocation.relatedNotRevoked')
-  })
-
-  it('warns when the linked certificate asked for was not revoked', async () => {
-    mocks.revokeOptions = { revokeRelated: true }
-    mocks.revoke.mockResolvedValue({ data: { id: 11, revoked: true } })
-    await openMemberOnMobile()
-    fireEvent.click(screen.getByText('common.revoke'))
-    fireEvent.click(await screen.findByText('confirm-revoke'))
-    await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith('revocation.relatedNotRevoked'))
-    expect(mocks.showSuccess).toHaveBeenCalledWith('messages.success.other.revoked')
-  })
-
-  it.each([
-    [{ id: 11, related_renewed: [12] }, 'certificates.hybrid.renewedWithRelated'],
-    [{ id: 11 }, 'certificates.renewed'],
-  ])('names the linked certificate renewed with it (%o)', async (answer, toast) => {
-    mocks.getById.mockImplementation((id) => Promise.resolve({ data: id === 12 ? B : { ...A, has_private_key: true } }))
-    mocks.renew.mockResolvedValue({ data: answer })
-    await openMemberOnMobile()
-    fireEvent.click(screen.getByText('common.renew'))
-    await waitFor(() => expect(mocks.renew).toHaveBeenCalledWith(11, {}))
-    await waitFor(() => expect(mocks.showSuccess).toHaveBeenCalledWith(toast))
-  })
-
-  it('opens the linked member from the details', async () => {
-    await openMemberOnMobile()
-    fireEvent.click(await screen.findByText('details-open-related'))
-    expect(await screen.findByText('details-12')).toBeInTheDocument()
+    // The page draws no detail of its own: the inspector shows it
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 })

@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next'
 import { 
   MagnifyingGlass, CaretUp, CaretDown, DotsThreeVertical,
   CaretLeft, CaretRight, X, Columns, Check,
-  BookmarkSimple, FloppyDisk, Trash, Export, Rows
+  BookmarkSimple, FloppyDisk, Trash, Export, Rows, DownloadSimple
 } from '@phosphor-icons/react'
 import { useMobile } from '../../../contexts'
 import { cn, exportToCSV, exportToJSON } from '../../../lib/utils'
@@ -18,13 +18,16 @@ import { FilterSelect } from '../Select'
 import { MultiSelectFilter } from '../MultiSelectFilter'
 import { FilterChips } from '../FilterChips'
 import { ListTable } from './ListTable'
+import { ListDialog } from '../../list/ListDialog'
+import { ColumnsIcon, RowsIcon } from '../../list/atelierIcons'
 import '../../list/list.css'
 
 const EXPORT_MAX_ROWS = 10000
 // Row height of each density in the list template (list.css --lv-row)
 const ROW_PX = { compact: 36, default: 40, comfortable: 44 }
-// From this many pages the list footer offers to jump to a page by its number
-const PAGE_JUMP_FROM = 10
+// Beyond this many pages the list footer offers to jump to a page by its number
+const PAGE_JUMP_ABOVE = 20
+const PAGE_SIZES = [10, 25, 50, 100]
 const EXPORT_PAGE_SIZE = 100
 
 export function ResponsiveDataTable({
@@ -110,6 +113,12 @@ export function ResponsiveDataTable({
   rangeLabel, // ({ start, end, total }) => string: "1–25 of 276 certificates"
   tableLabel, // accessible name of the table
   footNote, // text under the table, left of the density and column count
+  searchLabel, // accessible name of the search field (list template)
+  belowToolbar, // ReactNode under the toolbar (active filters), list template
+  openFromName = false, // list template: only the name and the chevron open a row
+  lockRowsOnSelect = false, // list template: names and row actions wait while rows are ticked
+  noMatch, // list template, nothing matches the filters: { title, description, action }
+  columnsNote, // list template: the sentence of the columns dialog
 
   // Custom class
   className
@@ -120,23 +129,24 @@ export function ResponsiveDataTable({
   // The list template draws the desktop; phones keep the card list
   const flat = list && !isMobile
   
-  // Density state (persisted if key provided)
+  // Density state (persisted if key provided); the list template has two, compact and comfortable
   const [density, setDensity] = useState(() => {
+    let saved = densityProp
     if (densityStorageKey) {
-      try {
-        return localStorage.getItem(densityStorageKey) || densityProp
-      } catch { return densityProp }
+      try { saved = localStorage.getItem(densityStorageKey) || densityProp } catch { /* storage unavailable */ }
     }
-    return densityProp
+    return list && saved !== 'comfortable' ? 'compact' : saved
   })
   
   const cycleDensity = useCallback(() => {
-    const next = density === 'compact' ? 'default' : density === 'default' ? 'comfortable' : 'compact'
+    const next = list
+      ? (density === 'comfortable' ? 'compact' : 'comfortable')
+      : density === 'compact' ? 'default' : density === 'default' ? 'comfortable' : 'compact'
     setDensity(next)
     if (densityStorageKey) {
       try { localStorage.setItem(densityStorageKey, next) } catch {}
     }
-  }, [density, densityStorageKey])
+  }, [density, densityStorageKey, list])
   
   // Support both individual props and emptyState object
   const EmptyIcon = emptyState?.icon || EmptyIconProp
@@ -555,7 +565,8 @@ export function ResponsiveDataTable({
       } else if (prev.direction === 'asc') {
         newSort = { key, direction: 'desc' }
       } else {
-        newSort = null // Remove sort
+        // The list template toggles between two directions; elsewhere a third click removes the sort
+        newSort = list ? { key, direction: 'asc' } : null
       }
       
       // Notify parent for server-side sorting
@@ -565,7 +576,7 @@ export function ResponsiveDataTable({
       
       return newSort
     })
-  }, [sortable, onSortChange])
+  }, [sortable, onSortChange, list])
   
   // Get visible columns based on device + user preferences
   const visibleColumns = useMemo(() => {
@@ -637,8 +648,9 @@ export function ResponsiveDataTable({
     return { primaryCol: primary, secondaryCol: secondary, tertiaryCol: tertiary }
   }, [columns])
   
-  // Empty state - but ALWAYS show toolbar if there are filters to clear
-  if (!loading && sortedData.length === 0) {
+  // Empty state - but ALWAYS show toolbar if there are filters to clear; the list
+  // template keeps its toolbar, header and footer and draws the empty block in its table
+  if (!flat && !loading && sortedData.length === 0) {
     return (
       <div className={cn(flat ? 'lv-workspace' : 'flex flex-col h-full', className)}>
         {/* Always show toolbar when there are filters or actions */}
@@ -722,6 +734,25 @@ export function ResponsiveDataTable({
   const rangeOf = ({ start, end, total }) => (
     rangeLabel ? rangeLabel({ start, end, total }) : t('table.range', { start, end, total })
   )
+  // List template, nothing to show: the block stands in the table, under its header
+  const nothing = flat && !loading && sortedData.length === 0
+  const emptyContent = nothing ? (
+    <div className="lv-empty" data-testid="list-empty">
+      {hasActiveFilters ? <MagnifyingGlass aria-hidden="true" /> : EmptyIcon && <EmptyIcon aria-hidden="true" />}
+      <h3>{hasActiveFilters ? (noMatch?.title || t('table.noResults')) : emptyTitle}</h3>
+      <p>{hasActiveFilters ? (noMatch?.description || t('table.adjustFilters')) : emptyDescription}</p>
+      {hasActiveFilters ? (
+        <button type="button" className="lv-btn" onClick={noMatch?.onReset || handleClearAllChips}>
+          {noMatch?.action || t('table.clearFilters')}
+        </button>
+      ) : emptyAction}
+    </div>
+  ) : null
+  const totalPages = paginationProps ? Math.max(1, Math.ceil((paginationProps.total || 0) / paginationProps.perPage)) : 1
+  // A long list says how many results its search found, or that it is still searching
+  const searchStatus = flat && paginationProps && searchValue && totalPages > PAGE_JUMP_ABOVE
+    ? (loading ? t('table.searching') : t('table.results', { count: paginationProps.total || 0 }))
+    : null
 
   return (
     <div className={cn(flat ? 'lv-workspace' : 'flex flex-col h-full', className)}>
@@ -769,8 +800,12 @@ export function ResponsiveDataTable({
           densityStorageKey={densityStorageKey}
           density={density}
           cycleDensity={cycleDensity}
+          searchLabel={searchLabel}
+          searchStatus={searchStatus}
+          columnsNote={columnsNote}
         />
       )}
+      {flat && belowToolbar}
 
       {/* ACTIVE FILTER CHIPS */}
       {hasActiveFilters && filterChipsArray.length > 0 && (
@@ -853,12 +888,17 @@ export function ResponsiveDataTable({
             selectedIds={selectedIds}
             onToggleRow={handleToggleRow}
             onToggleAll={() => handleToggleAll(paginatedData)}
+            openFromName={openFromName}
+            locked={lockRowsOnSelect && selectionCount > 0}
+            emptyContent={emptyContent}
+            skeletonRows={Math.max(1, Math.min(paginationProps?.perPage || 12, 12))}
           />
-          {paginationProps && sortedData.length > 0 ? (
-            <PaginationBar {...paginationProps} isMobile={false} flat range={rangeOf} />
-          ) : sortedData.length > 0 && (
+          {/* The footer stays, loading and empty included */}
+          {paginationProps ? (
+            <PaginationBar {...paginationProps} isMobile={false} flat range={rangeOf} busy={loading && !sortedData.length} />
+          ) : (
             <footer className="lv-footer">
-              <span>{rangeOf({ start: 1, end: sortedData.length, total: sortedData.length })}</span>
+              <span>{rangeOf({ start: sortedData.length ? 1 : 0, end: sortedData.length, total: sortedData.length })}</span>
             </footer>
           )}
         </div>
@@ -951,7 +991,10 @@ function SearchBar({
   // Density toggle
   densityStorageKey,
   density,
-  cycleDensity
+  cycleDensity,
+  searchLabel,
+  searchStatus,
+  columnsNote,
 }) {
   const { t } = useTranslation()
   // Toolbar button: flat and labelled in the list template, the compact square elsewhere
@@ -972,7 +1015,7 @@ function SearchBar({
         {searchable && flat && (
           <label className="lv-search">
             <MagnifyingGlass size={16} aria-hidden="true" />
-            <span className="sr-only">{t('common.search')}</span>
+            <span className="sr-only">{searchLabel || t('common.search')}</span>
             <input
               type="search"
               value={value}
@@ -988,6 +1031,7 @@ function SearchBar({
             )}
           </label>
         )}
+        {flat && searchStatus && <span className="lv-search-status" role="status">{searchStatus}</span>}
         {/* Search input - premium styling on mobile */}
         {searchable && !flat && (
           <div className={cn(
@@ -1135,8 +1179,32 @@ function SearchBar({
         
         {flat && <span className="lv-divider" aria-hidden="true" />}
 
+        {/* List template: the columns dialog; the columns that always show are not offered */}
+        {flat && columns && columns.length > 0 && (
+          <>
+            <button type="button" className="lv-btn" onClick={() => setShowColumnMenu?.(true)} aria-haspopup="dialog">
+              <ColumnsIcon size={17} />
+              <span>{t('table.columns')}</span>
+            </button>
+            <ListDialog open={Boolean(showColumnMenu)} onOpenChange={(open) => setShowColumnMenu?.(open)}
+              title={t('table.columnsDialogTitle')} testId="columns-dialog">
+              {columnsNote && <p className="lv-dialog-note">{columnsNote}</p>}
+              <div className="lv-dialog-list">
+                {columns.filter((col) => !col.alwaysVisible).map((col) => (
+                  <label key={col.key} className="lv-check-line">
+                    <input type="checkbox" checked={!hiddenColumns?.includes(col.key)} onChange={() => toggleColumn?.(col.key)} />
+                    {col.columnLabel || col.header || col.key}
+                  </label>
+                ))}
+              </div>
+              <div className="lv-dialog-actions">
+                <button type="button" className="lv-btn is-primary" onClick={() => setShowColumnMenu?.(false)}>{t('table.done')}</button>
+              </div>
+            </ListDialog>
+          </>
+        )}
         {/* Column Selector (desktop only) */}
-        {!isMobile && columns && columns.length > 0 && (
+        {!flat && !isMobile && columns && columns.length > 0 && (
           <div className="relative shrink-0" ref={columnMenuRef}>
             <button
               type="button"
@@ -1198,8 +1266,14 @@ function SearchBar({
           </div>
         )}
         
-        {/* Density toggle (desktop only) */}
-        {!isMobile && densityStorageKey && (
+        {/* Density toggle (desktop only): in the list template a switch to the comfortable rows */}
+        {flat && densityStorageKey && (
+          <button type="button" onClick={cycleDensity} className="lv-btn is-icon is-bare"
+            aria-label={t('table.densityComfortable')} aria-pressed={density === 'comfortable'} title={t('table.changeDensity')}>
+            <RowsIcon size={16} />
+          </button>
+        )}
+        {!flat && !isMobile && densityStorageKey && (
           <button
             type="button"
             onClick={cycleDensity}
@@ -1330,17 +1404,17 @@ function SearchBar({
             {t(exportNotice.key, exportNotice.values)}
           </span>
         )}
-        {!isMobile && exportEnabled && dataCount > 0 && (
+        {!isMobile && exportEnabled && (flat || dataCount > 0) && (
           <div className="relative shrink-0" ref={exportMenuRef}>
             <button
               type="button"
               onClick={() => setShowExportMenu?.(!showExportMenu)}
-              className={flat ? 'lv-btn is-icon' : tool(showExportMenu)}
+              className={flat ? 'lv-btn is-icon is-bare' : tool(showExportMenu)}
               title={t('table.exportData')}
               aria-label={flat ? t('table.exportData') : undefined}
               aria-expanded={flat ? Boolean(showExportMenu) : undefined}
             >
-              <Export size={flat ? 16 : 14} />
+              {flat ? <DownloadSimple size={16} aria-hidden="true" /> : <Export size={14} />}
             </button>
             
             {/* Export dropdown */}
@@ -1939,43 +2013,50 @@ function PageJump({ page, totalPages, onChange }) {
           aria-label={t('table.pageNumber')} onChange={(e) => setValue(e.target.value)} />
       </label>
       <span>{t('table.pageOf', { total: totalPages })}</span>
-      <button type="submit" className="lv-btn is-small">{t('table.goToPage')}</button>
+      <button type="submit" className="lv-btn">{t('table.goToPage')}</button>
     </form>
   )
 }
 
-function PaginationBar({ page, total, perPage, onChange, onPerPageChange, isMobile, flat = false, range }) {
+function PaginationBar({ page, total, perPage, onChange, onPerPageChange, pageSizes = PAGE_SIZES, perPageLabel, isMobile, flat = false, range, busy = false }) {
   const { t } = useTranslation()
   const totalPages = Math.ceil(total / perPage)
   const start = (page - 1) * perPage + 1
   const end = Math.min(page * perPage, total)
+  const sizes = pageSizes.includes(perPage) ? pageSizes : [...pageSizes, perPage].sort((a, b) => a - b)
   const perPageSelect = onPerPageChange && (
     <FilterSelect
       value={String(perPage)}
       onChange={(val) => onPerPageChange(Number(val))}
-      options={[10, 25, 50, 100].map(n => ({ value: String(n), label: t('table.perPage', { size: n }) }))}
+      options={sizes.map(n => ({ value: String(n), label: t('table.perPage', { size: n }) }))}
       placeholder={t('table.perPage', { size: perPage })}
       size="sm"
     />
   )
 
-  // List template: the range in words, the page size, the pages (a page number to jump to on a long list)
+  // List template: the range in words, a native page size, the pages (a page number to jump to beyond 20 pages)
   if (flat) {
+    const pages = Math.max(1, totalPages)
     return (
-      <footer className="lv-footer">
-        <span>{range({ start, end, total })}</span>
+      <footer className="lv-footer" aria-busy={busy || undefined}>
+        <span>{busy ? <span className="lv-sk" style={{ width: 120 }} /> : range({ start: total ? start : 0, end, total })}</span>
         <div className="lv-footer-controls">
-          {perPageSelect}
-          <button type="button" className="lv-btn is-small is-icon" aria-label={t('table.previousPage')}
+          {onPerPageChange && (
+            <select className="lv-page-size" value={String(perPage)} aria-label={perPageLabel || t('table.perPageLabel')}
+              onChange={(e) => onPerPageChange(Number(e.target.value))}>
+              {sizes.map((n) => <option key={n} value={String(n)}>{t('table.perPage', { size: n })}</option>)}
+            </select>
+          )}
+          <button type="button" className="lv-page-arrow" aria-label={t('table.previousPage')}
             onClick={() => onChange(page - 1)} disabled={page <= 1}>
-            <CaretLeft size={14} aria-hidden="true" />
+            <CaretLeft aria-hidden="true" />
           </button>
-          {totalPages >= PAGE_JUMP_FROM
-            ? <PageJump page={page} totalPages={totalPages} onChange={onChange} />
-            : <span>{page} / {totalPages}</span>}
-          <button type="button" className="lv-btn is-small is-icon" aria-label={t('table.nextPage')}
-            onClick={() => onChange(page + 1)} disabled={page >= totalPages}>
-            <CaretRight size={14} aria-hidden="true" />
+          {pages > PAGE_JUMP_ABOVE
+            ? <PageJump page={page} totalPages={pages} onChange={onChange} />
+            : <span>{page} / {pages}</span>}
+          <button type="button" className="lv-page-arrow" aria-label={t('table.nextPage')}
+            onClick={() => onChange(page + 1)} disabled={page >= pages}>
+            <CaretRight aria-hidden="true" />
           </button>
         </div>
       </footer>

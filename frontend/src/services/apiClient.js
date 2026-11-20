@@ -221,6 +221,8 @@ class APIClient {
         const msg = buildErrorMessage(response.status, data)
         const error = new Error(msg)
         error.status = response.status
+        // What was asked, for a cause the page can show ("GET /api/v2/certificates")
+        error.request = `${config.method} ${url.split('?')[0]}`
         error.data = data
         error.retryAfter = parseRetryAfter(response.headers.get('retry-after'))
         if (import.meta.env.DEV) {
@@ -257,6 +259,7 @@ class APIClient {
       if (!error.status) {
         error.message = 'Network error. Please check your connection.'
         error.status = 0
+        error.request = error.request || `${config.method} ${url.split('?')[0]}`
       }
       throw error
     }

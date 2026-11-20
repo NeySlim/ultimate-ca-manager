@@ -135,12 +135,18 @@ describe('CertificatesPage row actions', () => {
   it.each([
     ['the chevron', (row) => within(row).getByTitle('table.open')],
     ['the name', (row) => within(row).getByRole('button', { name: 'web.example.com' })],
-    ['the row', (row) => row],
   ])('opens the detail from %s', async (_, target) => {
     const row = await renderWith(VALID)
     fireEvent.click(target(row))
     expect(windows.openEntity).toHaveBeenCalledTimes(1)
     expect(windows.openEntity).toHaveBeenCalledWith('certificate', 7)
+  })
+
+  it('opens nothing from the rest of the row: only the name and the chevron open', async () => {
+    const row = await renderWith(VALID)
+    fireEvent.click(row)
+    fireEvent.click(within(row).getByText('Front door'))
+    expect(windows.openEntity).not.toHaveBeenCalled()
   })
 
   it('opens the export dialog for that row, not the detail', async () => {
@@ -165,6 +171,20 @@ describe('CertificatesPage selection and batch bar', () => {
     fireEvent.click(within(bar).getByText('table.clearSelection'))
     expect(screen.queryByRole('group', { name: 'table.selection' })).toBeNull()
     expect(rowBox('web.example.com')).not.toBeChecked()
+  })
+
+  it('disables the names and the row actions while a selection is on, and gives them back after', async () => {
+    await renderRows([VALID, OTHER])
+    const row = () => screen.getByRole('row', { name: /web\.example\.com/ })
+    fireEvent.click(rowBox('api.example.com'))
+    expect(within(row()).getByRole('button', { name: 'web.example.com' })).toBeDisabled()
+    expect(within(row()).getByTitle('export.title')).toBeDisabled()
+    expect(within(row()).getByTitle('table.open')).toBeDisabled()
+    expect(rowBox('web.example.com')).toBeEnabled()
+    fireEvent.click(within(screen.getByRole('group', { name: 'table.selection' })).getByText('table.clearSelection'))
+    expect(within(row()).getByRole('button', { name: 'web.example.com' })).toBeEnabled()
+    fireEvent.click(within(row()).getByRole('button', { name: 'web.example.com' }))
+    expect(windows.openEntity).toHaveBeenCalledWith('certificate', 7)
   })
 
   it('selects the page from the header checkbox', async () => {
@@ -201,7 +221,7 @@ describe('CertificatesPage selection and batch bar', () => {
     await renderRows([VALID, OTHER, THIRD])
     fireEvent.click(rowBox('web.example.com'))
     fireEvent.click(rowBox('db.example.com'))
-    fireEvent.click(within(screen.getByRole('group', { name: 'table.selection' })).getByText('certificates.exportSelectedPem'))
+    fireEvent.click(within(screen.getByRole('group', { name: 'table.selection' })).getByTitle('certificates.exportSelectedPem'))
     await waitFor(() => expect(svc.bulkExport).toHaveBeenCalledWith([7, 9], 'pem'))
     await waitFor(() => expect(download).toHaveBeenCalledWith(blob, 'certificates_export.pem'))
     expect(notify.showSuccess).toHaveBeenCalledWith('certificates.bulkExported:1')
@@ -212,7 +232,7 @@ describe('CertificatesPage selection and batch bar', () => {
     svc.bulkExport.mockRejectedValue(Object.assign(new Error('refused by policy'), { status: 403 }))
     await renderRows([VALID])
     fireEvent.click(rowBox('web.example.com'))
-    fireEvent.click(within(screen.getByRole('group', { name: 'table.selection' })).getByText('certificates.exportSelectedPem'))
+    fireEvent.click(within(screen.getByRole('group', { name: 'table.selection' })).getByTitle('certificates.exportSelectedPem'))
     await waitFor(() => expect(notify.showError).toHaveBeenCalledWith('refused by policy'))
     expect(download).not.toHaveBeenCalled()
   })
@@ -229,7 +249,7 @@ describe('CertificatesPage selection and batch bar', () => {
     // The bar counts what is still on screen
     expect(screen.getByRole('group', { name: 'table.selection' })).toHaveTextContent('table.selectedCount:1')
     svc.bulkExport.mockResolvedValue(new Blob(['pem']))
-    fireEvent.click(within(screen.getByRole('group', { name: 'table.selection' })).getByText('certificates.exportSelectedPem'))
+    fireEvent.click(within(screen.getByRole('group', { name: 'table.selection' })).getByTitle('certificates.exportSelectedPem'))
     await waitFor(() => expect(svc.bulkExport).toHaveBeenCalledWith([8], 'pem'))
   })
 })

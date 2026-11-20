@@ -17,6 +17,7 @@
  * wires the button up anyway still cannot reach the API.
  */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -73,7 +74,7 @@ const ENTRY = {
 const WINDOW = { key: 'truststore:9', type: 'truststore', entityId: 9, data: null }
 
 const renderWindow = async () => {
-  render(<InspectorObject entry={WINDOW} onTitle={() => {}} />)
+  render(<InspectorObject entry={WINDOW} onTitle={() => {}} />, { wrapper: MemoryRouter })
   await screen.findByText(ENTRY.name)
 }
 
@@ -116,7 +117,7 @@ describe('deleting a trust store entry from the inspector', () => {
     userCertificatesService.revoke = vi.fn().mockResolvedValue({})
     certificatesService.revoke = vi.fn().mockResolvedValue({})
 
-    render(<InspectorObject entry={{ ...WINDOW, id: 'w3', type: 'user_certificate', entityId: 11 }} onTitle={() => {}} />)
+    render(<InspectorObject entry={{ ...WINDOW, id: 'w3', type: 'user_certificate', entityId: 11 }} onTitle={() => {}} />, { wrapper: MemoryRouter })
     await screen.findAllByText('alice@example.test')
     fireEvent.click(screen.getByText('Revoke'))
     fireEvent.submit(await screen.findByText('revocation.confirm').then(el => el.closest('form')))
@@ -130,9 +131,9 @@ describe('deleting a trust store entry from the inspector', () => {
     authState.permissions = ['read:certificates', 'delete:certificates']
     const { certificatesService } = await import('../../services')
     certificatesService.getById.mockResolvedValue({ data: { id: 4, common_name: 'web.example.com' } })
-    render(<InspectorObject entry={{ ...WINDOW, id: 'w2', type: 'certificate', entityId: 4 }} onTitle={() => {}} />)
+    render(<InspectorObject entry={{ ...WINDOW, id: 'w2', type: 'certificate', entityId: 4 }} onTitle={() => {}} />, { wrapper: MemoryRouter })
     await screen.findAllByText('web.example.com')
-    expect(within(await openMoreActions()).getByRole('menuitem', { name: 'common.delete' })).toBeInTheDocument()
+    expect(within(await openMoreActions()).getByRole('button', { name: 'common.delete' })).toBeInTheDocument()
   })
 })
 

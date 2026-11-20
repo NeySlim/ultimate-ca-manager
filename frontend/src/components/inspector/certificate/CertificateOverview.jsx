@@ -7,9 +7,9 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Clock, Warning, ShieldCheck, TreeStructure, Certificate, CaretRight, Prohibit } from '@phosphor-icons/react'
 import { formatDate, extractCN, cn } from '../../../lib/utils'
-import { validityFacts, chainNodes, lastAcmeFailure, certificateKeyLabel } from '../../../lib/certificateDetail'
+import { validityFacts, chainNodes, lastAcmeFailure, certificateKeyLabel, serialHex } from '../../../lib/certificateDetail'
 import { relativeAgo } from '../../../lib/relativeTime'
-import { signatureShortName } from '../../../lib/signatureName'
+import { signatureHashName } from '../../../lib/signatureName'
 import { sourceLabel, sourceOf } from '../../../pages/certificates/certificateSources'
 import { usePermission } from '../../../hooks'
 import { acmeService } from '../../../services/acme.service'
@@ -102,7 +102,7 @@ function Identity({ cert, onOpenRelated }) {
   const { t } = useTranslation()
   const sans = sanLines(cert)
   const keyName = certificateKeyLabel(cert, t)
-  const sig = cert.signature_algorithm ? signatureShortName(cert.signature_algorithm) : null
+  const sig = cert.signature_algorithm ? signatureHashName(cert.signature_algorithm) : null
   const weakSig = /sha-?1|md5/i.test(cert.signature_algorithm || '')
   const template = cert.template_name
     ? (cert.template_overrides?.length
@@ -129,8 +129,8 @@ function Identity({ cert, onOpenRelated }) {
         </dd>
         <dt>{t('inspector.cert.origin')}</dt>
         <dd>{[sourceLabel(sourceOf(cert), t), template].filter(Boolean).join(' / ')}</dd>
-        <dt>{t('common.serial')}</dt>
-        <dd className="ins-mono">{cert.serial_number || '—'}</dd>
+        <dt>{t('inspector.cert.serial')}</dt>
+        <dd className="ins-mono" title={cert.serial_number || undefined}>{serialHex(cert.serial_number) || '—'}</dd>
         <dt>{t('common.privateKey')}</dt>
         <dd>{cert.has_private_key ? t('inspector.cert.keyHeld') : <span className="ins-muted">{t('inspector.cert.keyNotHeld')}</span>}</dd>
         {relatedId != null && (

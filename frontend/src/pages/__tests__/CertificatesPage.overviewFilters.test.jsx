@@ -3,7 +3,7 @@
  * sent to the list as they are, shown as removable chips.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 
 // Stable across renders: t and showError are loader dependencies, a fresh one reloads in a loop
@@ -65,6 +65,12 @@ const Where = () => <output data-testid="where">{useLocation().search}</output>
 const renderAt = (url) => render(<MemoryRouter initialEntries={[url]}><CertificatesPage /><Where /></MemoryRouter>)
 const lastParams = () => getAll.mock.calls[getAll.mock.calls.length - 1][0]
 
+// Each applied filter is a chip under the toolbar, with its own remove button
+const removeChip = (key) => {
+  const chip = document.querySelector(`[data-testid="applied-filters"] [data-filter="${key}"]`)
+  fireEvent.click(within(chip).getByRole('button', { name: 'table.removeFilter' }))
+}
+
 describe('CertificatesPage: overview filters in the URL', () => {
   beforeEach(() => {
     window.localStorage.clear()
@@ -84,7 +90,7 @@ describe('CertificatesPage: overview filters in the URL', () => {
   it('removes a chip: the URL and the next request lose that filter only', async () => {
     renderAt('/certificates?live=true&no_key=true')
     await waitFor(() => expect(lastParams().no_key).toBe('true'))
-    fireEvent.click(screen.getByLabelText(/Remove overview.filter.no_key/))
+    removeChip('no_key')
     await waitFor(() => expect(lastParams().no_key).toBeUndefined())
     expect(lastParams().live).toBe('true')
     expect(screen.getByTestId('where').textContent).toBe('?live=true')
@@ -93,7 +99,7 @@ describe('CertificatesPage: overview filters in the URL', () => {
   it('applies the status of a horizon link as a removable filter', async () => {
     renderAt('/certificates?status=expiring')
     await waitFor(() => expect(lastParams().status).toEqual(['expiring']))
-    fireEvent.click(screen.getByLabelText(/Remove overview.filter.status/))
+    removeChip('status')
     await waitFor(() => expect(lastParams().status).toBeUndefined())
     expect(screen.getByTestId('where').textContent).toBe('')
   })
@@ -121,7 +127,7 @@ describe('CertificatesPage: overview filters in the URL', () => {
     window.localStorage.setItem('ucm-filter-certs-ca', JSON.stringify(['1']))
     renderAt('/certificates?no_key=true')
     await waitFor(() => expect(lastParams().no_key).toBe('true'))
-    fireEvent.click(screen.getByLabelText(/Remove overview.filter.no_key/))
+    removeChip('no_key')
     await waitFor(() => expect(lastParams().ca_id).toEqual(['1']))
   })
 
