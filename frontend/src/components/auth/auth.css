@@ -3,7 +3,7 @@
  * Tokens only (styles/tokens.css); Aurore effects sit under its family selector.
  */
 .auth-page {
-  min-height: 100dvh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: auto;

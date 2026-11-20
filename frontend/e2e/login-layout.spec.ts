@@ -49,6 +49,23 @@ test.describe('sign-in card at 1600 px', () => {
   })
 })
 
+test('a window shorter than the sign-in card scrolls down to the foot', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 420 })
+  await page.context().clearCookies()
+  await page.goto('/login')
+  const foot = page.locator('.auth-foot')
+  await expect(foot).toBeAttached()
+  // By the wheel, as a reader does: a script could scroll a clipped page, a hand cannot
+  await page.mouse.move(640, 210)
+  await page.mouse.wheel(0, 3000)
+  await expect.poll(async () => {
+    const f = await foot.boundingBox()
+    return f ? f.y + f.height : Infinity
+  }).toBeLessThanOrEqual(420)
+  await page.mouse.wheel(0, -3000)
+  await expect.poll(async () => (await page.locator('.auth-tools').boundingBox())?.y).toBeGreaterThanOrEqual(0)
+})
+
 test.describe('sign-in card at phone width', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
