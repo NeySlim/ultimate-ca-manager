@@ -117,7 +117,7 @@ describe('user certificate export sends what was actually asked for', () => {
 
   it('offers the same formats as every other export surface', async () => {
     await openRowExport()
-    ;['PEM', 'DER', 'P7B / PKCS#7', 'P12 / PKCS#12', 'JKS'].forEach(label =>
+    ;['PEM', 'DER', 'PKCS#7', 'PKCS#12', 'JKS'].forEach(label =>
       expect(screen.getByText(label)).toBeInTheDocument()
     )
   })

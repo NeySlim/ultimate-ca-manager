@@ -879,7 +879,8 @@
       "emailSmime": "邮件 / S/MIME",
       "ca": "CA",
       "selfSigned": "自签名",
-      "timestamping": "TSA 时间戳"
+      "timestamping": "TSA 时间戳",
+      "combined": "服务器和客户端"
     },
     "approvalRequired": "证书请求已提交审批（策略：{{policy}}）",
     "ocspMustStaple": "OCSP Must-Staple (RFC 6066)",
@@ -4660,7 +4661,10 @@
   "revocation": {
     "reasonHelpNoHold": "原因将发布在父 CA 的 CRL 中且无法更改；CA 的吊销是永久性的。",
     "title": "吊销证书",
+    "dialogTitle": "吊销此证书？",
+    "notice": "此操作将使证书无法使用。",
     "reasonLabel": "吊销原因",
+    "reason": "原因",
     "reasonHelp": "记录在证书上并发布到 CRL（RFC 5280 原因代码）。除证书挂起外，吊销无法撤销。",
     "bulkReasonHelp": "应用于每个选中的证书。",
     "confirm": "吊销",
@@ -5969,6 +5973,8 @@
   },
   "export": {
     "title": "导出",
+    "titleCertificate": "导出证书",
+    "titleCa": "导出 CA",
     "skippedUnreadable": "有 {{count}} 个无法读取的证书未导出",
     "format": "格式",
     "options": "选项",
@@ -5976,7 +5982,7 @@
     "passwordPlaceholder": "最少8个字符",
     "passwordLengthHint": "{{min}} 至 {{max}} 个字符",
     "download": "下载",
-    "includeChain": "包含CA链",
+    "includeChain": "包含证书链",
     "includeChainDesc": "包含签发CA证书",
     "includeRoot": "包含根CA",
     "includeRootDesc": "TLS服务器通常不需要",
@@ -5984,13 +5990,13 @@
     "includeKeyDesc": "将私钥附加到导出",
     "pkcs12Note": "PKCS#12始终包含私钥",
     "noKeyPermission": "导出私钥需要更高权限",
-    "formatPemDesc": "Base64编码，广泛支持",
-    "formatDerDesc": "二进制格式，紧凑",
-    "formatP7bDesc": "证书链捆绑包",
-    "formatP12Desc": "证书+密钥加密容器",
+    "formatPemDesc": "Base64 文本",
+    "formatDerDesc": "二进制 ASN.1",
+    "formatP7bDesc": "仅证书",
+    "formatP12Desc": "证书和密钥",
     "legacyPkcs12": "兼容模式（3DES/SHA-1）",
     "legacyPkcs12Desc": "适用于 Android 15 及更早版本、macOS 14 及更早版本、Windows Server 2016 及更早版本、8u301 / 11.0.1 之前的 Java：它们会把默认的 AES-256 归档当作密码错误而拒绝。对文件的保护较弱，请按需在每次导出时选择。",
-    "formatKeyDesc": "仅PEM编码的私钥",
+    "formatKeyDesc": "仅私钥，PEM",
     "formats": {
       "privateKey": "私钥",
       "hybridBundle": "混合包"
@@ -6004,13 +6010,19 @@
       "pkcs12": "PKCS#12 (.p12)",
       "jks": "JKS (Java KeyStore)"
     },
-    "formatJksDesc": "Java KeyStore，证书 + 密钥",
+    "formatJksDesc": "Java 密钥库，证书和密钥",
     "unavailableForKeyAlgorithm": "不适用于 {{algorithm}} 密钥：UCM 暂不支持将后量子密钥写入 PKCS#12 或 JKS。请改为导出带私钥的 PEM。",
     "jksNote": "JKS 始终包含私钥",
     "pkcs12Title": "导出 PKCS#12",
     "pkcs12PasswordPrompt": "请输入 PKCS#12 文件的密码",
     "formatHybridBundleDesc": "包含该证书对中两张证书的 ZIP",
-    "bundleRelatedHasNoKey": "关联证书没有私钥：该包仅包含证书"
+    "bundleRelatedHasNoKey": "关联证书没有私钥：该包仅包含证书",
+    "previewTitle": "结构预览（{{format}}）",
+    "previewChain": "签发 CA 的证书链",
+    "previewRoot": "根 CA",
+    "previewKey": "私钥",
+    "previewKeyEncrypted": "私钥，以密码加密",
+    "previewRelated": "混合证书对中的关联证书"
   },
   "userCertificates": {
     "title": "用户证书",
@@ -6307,7 +6319,9 @@
       "ca_exempt": "CA 豁免",
       "short": "≤ 398 天",
       "moderate": "≤ 825 天",
-      "long": "> 825 天"
+      "long": "> 825 天",
+      "weak": "弱",
+      "critical": "严重"
     }
   },
   "msca": {

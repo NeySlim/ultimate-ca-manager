@@ -51,4 +51,23 @@ describe('RevokeCertificateModal', () => {
     rerender(<RevokeCertificateModal open onClose={() => {}} onConfirm={() => {}} certificate={{ name: 'x' }} />)
     expect(screen.getByTestId('revoke-reason').value).toBe('unspecified')
   })
+
+  it('is the mockup dialog: its question, an amber notice, the name, « Motif » and one note', () => {
+    render(<RevokeCertificateModal open onClose={() => {}} onConfirm={() => {}} certificate={{ name: 'web.example.com' }} />)
+    expect(screen.getByRole('heading', { name: 'revocation.dialogTitle' })).toBeInTheDocument()
+    expect(screen.getByText('revocation.notice').closest('.ui-notice')).toHaveClass('is-warn')
+    expect(screen.getByLabelText('revocation.reason')).toHaveClass('ui-control')
+    const note = screen.getByText('revocation.hints.unspecified').closest('p')
+    expect(note).toHaveClass('ui-revoke-note')
+    expect(note).toHaveTextContent('revocation.reasonHelp')
+    expect(document.querySelector('.uppercase')).toBeNull()
+  })
+
+  it('keeps the title and notice a CA revocation passes', () => {
+    render(<RevokeCertificateModal open onClose={() => {}} onConfirm={() => {}} certificate={{ name: 'Sub CA' }}
+      title="Revoke CA" warning="CA warning" allowHold={false} />)
+    expect(screen.getByRole('heading', { name: 'Revoke CA' })).toBeInTheDocument()
+    expect(screen.getByText('CA warning').closest('.ui-notice')).toHaveClass('is-warn')
+    expect(screen.getByText('revocation.reasonHelpNoHold', { exact: false })).toBeInTheDocument()
+  })
 })

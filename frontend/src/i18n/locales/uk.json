@@ -885,7 +885,8 @@
       "emailSmime": "Ел. пошта / S/MIME",
       "ca": "ЦС",
       "selfSigned": "Самопідписаний",
-      "timestamping": "Часові позначки TSA"
+      "timestamping": "Часові позначки TSA",
+      "combined": "Server and client"
     },
     "approvalRequired": "Запит на сертифікат надіслано на затвердження (політика: {{policy}})",
     "ocspMustStaple": "OCSP Must-Staple (RFC 6066)",
@@ -4774,7 +4775,10 @@
   "revocation": {
     "reasonHelpNoHold": "Причина публікується в CRL батьківського ЦС і не може бути змінена; відкликання ЦС є остаточним.",
     "title": "Відкликати сертифікат",
+    "dialogTitle": "Revoke this certificate?",
+    "notice": "This action makes the certificate unusable.",
     "reasonLabel": "Причина відкликання",
+    "reason": "Reason",
     "reasonHelp": "Записується в сертифікат і публікується в CRL (код причини RFC 5280). Відкликання незворотне, крім призупинення.",
     "bulkReasonHelp": "Застосовується до кожного вибраного сертифіката.",
     "confirm": "Відкликати",
@@ -6139,6 +6143,8 @@
   },
   "export": {
     "title": "Експортувати",
+    "titleCertificate": "Export the certificate",
+    "titleCa": "Export the CA",
     "skippedUnreadable": "Нечитабельних сертифікатів не експортовано: {{count}}",
     "format": "Формат",
     "options": "Параметри",
@@ -6180,7 +6186,13 @@
     "pkcs12Title": "Експорт PKCS#12",
     "pkcs12PasswordPrompt": "Введіть пароль для файла PKCS#12",
     "formatHybridBundleDesc": "ZIP з обома сертифікатами пари",
-    "bundleRelatedHasNoKey": "Пов'язаний сертифікат не має закритого ключа: пакет міститиме лише сертифікати"
+    "bundleRelatedHasNoKey": "Пов'язаний сертифікат не має закритого ключа: пакет міститиме лише сертифікати",
+    "previewTitle": "Structure preview ({{format}})",
+    "previewChain": "chain of the issuing CA",
+    "previewRoot": "root CA",
+    "previewKey": "private key",
+    "previewKeyEncrypted": "private key, encrypted with the password",
+    "previewRelated": "related certificate of the hybrid pair"
   },
   "userCertificates": {
     "title": "Сертифікати користувачів",
@@ -6477,7 +6489,9 @@
       "ca_exempt": "CA звільнено",
       "short": "≤ 398 днів",
       "moderate": "≤ 825 днів",
-      "long": "> 825 днів"
+      "long": "> 825 днів",
+      "weak": "weak",
+      "critical": "critical"
     }
   },
   "msca": {

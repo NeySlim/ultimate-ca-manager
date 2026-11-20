@@ -1311,7 +1311,8 @@
       "emailSmime": "Email / S/MIME",
       "ca": "AC",
       "selfSigned": "Auto-signé",
-      "timestamping": "Horodatage TSA"
+      "timestamping": "Horodatage TSA",
+      "combined": "Serveur et client"
     },
     "approvalRequired": "Demande de certificat soumise pour approbation (politique : {{policy}})",
     "ocspMustStaple": "OCSP Must-Staple (RFC 6066)",
@@ -2504,7 +2505,10 @@
   "revocation": {
     "reasonHelpNoHold": "Le motif est publié dans la CRL du parent et ne peut plus être modifié ; la révocation d'une AC est définitive.",
     "title": "Révoquer le certificat",
+    "dialogTitle": "Révoquer ce certificat ?",
+    "notice": "Cette action rend le certificat inutilisable.",
     "reasonLabel": "Motif de révocation",
+    "reason": "Motif",
     "reasonHelp": "Enregistré sur le certificat et publié dans la CRL (code de motif RFC 5280). Une révocation est irréversible, sauf la suspension.",
     "bulkReasonHelp": "Appliqué à chaque certificat sélectionné.",
     "confirm": "Révoquer",
@@ -5972,6 +5976,8 @@
   },
   "export": {
     "title": "Exporter",
+    "titleCertificate": "Exporter le certificat",
+    "titleCa": "Exporter l’AC",
     "skippedUnreadable": "{{count}} certificat(s) illisible(s) n'ont pas été exportés",
     "format": "Format",
     "options": "Options",
@@ -5979,7 +5985,7 @@
     "passwordPlaceholder": "Min. 8 caractères",
     "passwordLengthHint": "Entre {{min}} et {{max}} caractères",
     "download": "Télécharger",
-    "includeChain": "Inclure la chaîne AC",
+    "includeChain": "Inclure la chaîne de certification",
     "includeChainDesc": "Inclure les certificats AC émetteurs",
     "includeRoot": "Inclure l’AC racine",
     "includeRootDesc": "Généralement inutile pour les serveurs TLS",
@@ -5987,13 +5993,13 @@
     "includeKeyDesc": "Joindre la clé privée à l’export",
     "pkcs12Note": "PKCS#12 inclut toujours la clé privée",
     "noKeyPermission": "L'export de la clé privée nécessite des permissions élevées",
-    "formatPemDesc": "Encodage Base64, largement supporté",
-    "formatDerDesc": "Format binaire, compact",
-    "formatP7bDesc": "Bundle de chaîne de certificats",
-    "formatP12Desc": "Certificat + clé dans un conteneur chiffré",
+    "formatPemDesc": "Texte Base64",
+    "formatDerDesc": "Binaire ASN.1",
+    "formatP7bDesc": "Certificats seuls",
+    "formatP12Desc": "Certificat et clé",
     "legacyPkcs12": "Mode compatibilité (3DES/SHA-1)",
     "legacyPkcs12Desc": "Pour Android 15 et antérieur, macOS 14 et antérieur, Windows Server 2016 et antérieur, Java avant 8u301 / 11.0.1 : ils refusent l’archive AES-256 par défaut comme un mot de passe incorrect. Protège moins bien le fichier ; à choisir export par export.",
-    "formatKeyDesc": "Clé privée seule au format PEM",
+    "formatKeyDesc": "Clé privée seule, PEM",
     "formats": {
       "privateKey": "Clé privée",
       "hybridBundle": "Lot hybride"
@@ -6007,13 +6013,19 @@
       "pkcs12": "PKCS#12 (.p12)",
       "jks": "JKS (Java KeyStore)"
     },
-    "formatJksDesc": "Java KeyStore, certificat + clé",
+    "formatJksDesc": "Magasin Java, certificat et clé",
     "unavailableForKeyAlgorithm": "Indisponible pour les clés {{algorithm}} : UCM ne sait pas encore écrire une clé post-quantique dans un PKCS#12 ou un JKS. Exportez plutôt en PEM avec la clé privée.",
     "jksNote": "JKS inclut toujours la clé privée",
     "pkcs12Title": "Exporter PKCS#12",
     "pkcs12PasswordPrompt": "Entrez le mot de passe pour le fichier PKCS#12",
     "formatHybridBundleDesc": "ZIP avec les deux certificats de la paire",
-    "bundleRelatedHasNoKey": "Le certificat lié n'a pas de clé privée : le lot ne contient que les certificats"
+    "bundleRelatedHasNoKey": "Le certificat lié n'a pas de clé privée : le lot ne contient que les certificats",
+    "previewTitle": "Aperçu de structure ({{format}})",
+    "previewChain": "chaîne de l’AC émettrice",
+    "previewRoot": "AC racine",
+    "previewKey": "clé privée",
+    "previewKeyEncrypted": "clé privée, chiffrée par le mot de passe",
+    "previewRelated": "certificat lié de la paire hybride"
   },
   "userCertificates": {
     "title": "Certificats utilisateurs",
@@ -6310,7 +6322,9 @@
       "ca_exempt": "AC exemptée",
       "short": "≤ 398 jours",
       "moderate": "≤ 825 jours",
-      "long": "> 825 jours"
+      "long": "> 825 jours",
+      "weak": "faible",
+      "critical": "critique"
     }
   },
   "msca": {

@@ -1,7 +1,6 @@
 /**
- * ExportModal — Unified export dialog for certificates and CAs
- * 
- * Provides format selection, optional chain/key inclusion, and password for PKCS12.
+ * ExportModal: the mockup's export dialog for certificates and CAs: formats with a radio
+ * button, one-line options, the password of PKCS#12 and JKS, a structure preview, notices.
  * Private key options are hidden when user lacks write permission.
  * 
  * Usage:
@@ -19,7 +18,7 @@
  */
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Download, Lock, Certificate, ShieldCheck } from '@phosphor-icons/react'
+import { Download, Lock } from '@phosphor-icons/react'
 import { Modal } from './Modal'
 import { Button } from './Button'
 import { ChainVariantSelect } from './ChainVariantSelect'
@@ -28,12 +27,13 @@ import { certificatesService } from '../services'
 import { fetchChainVariants } from '../lib/crossCertificates'
 import { exportPasswordPolicy, isExportPasswordValid, loadExportPasswordPolicy } from '../lib/exportPassword'
 import { isExportFormatAllowed } from '../lib/keyAlgorithms'
+import './certificateDialogs.css'
 
 const FORMATS = [
   { key: 'pem', label: 'PEM', description: 'export.formatPemDesc', ext: '.pem' },
   { key: 'der', label: 'DER', description: 'export.formatDerDesc', ext: '.der' },
-  { key: 'pkcs7', label: 'P7B / PKCS#7', description: 'export.formatP7bDesc', ext: '.p7b' },
-  { key: 'pkcs12', label: 'P12 / PKCS#12', description: 'export.formatP12Desc', ext: '.p12', requiresKey: true },
+  { key: 'pkcs7', label: 'PKCS#7', description: 'export.formatP7bDesc', ext: '.p7b' },
+  { key: 'pkcs12', label: 'PKCS#12', description: 'export.formatP12Desc', ext: '.p12', requiresKey: true },
   { key: 'jks', label: 'JKS', description: 'export.formatJksDesc', ext: '.jks', requiresKey: true },
   { key: 'key', labelKey: 'export.formats.privateKey', description: 'export.formatKeyDesc', ext: '.key', requiresKey: true, keyOnly: true },
   // Both certificates of a hybrid pair (RFC 9763), and both keys when included
@@ -168,225 +168,114 @@ export function ExportModal({
     if (e.key === 'Enter' && !exporting) handleExport()
   }
 
+  // What the file will hold, line by line, as the mockup's structure preview
+  const formatLabel = (f) => (f.labelKey ? t(f.labelKey) : f.label)
+  const current = availableFormats.find(f => f.key === format) || FORMATS[0]
+  const previewLines = [
+    entityName || null,
+    isBundle ? `  ${t('export.previewRelated')}` : null,
+    includeChain && carriesChain && !isKeyOnly ? `  ${t('export.previewChain')}` : null,
+    includeChain && carriesChain && includeRoot && !isKeyOnly && entityType === 'certificate' ? `  ${t('export.previewRoot')}` : null,
+    effectiveIncludeKey ? `  ${t(needsPassword ? 'export.previewKeyEncrypted' : 'export.previewKey')}` : null,
+  ].filter(Boolean)
+  const preview = [t('export.previewTitle', { format: formatLabel(current) }), '', ...previewLines].join('\n')
+  const check = (checked, onChange, label, desc, extra = {}) => (
+    <label className={cn('ui-check-line', desc && 'has-desc')}>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} {...extra} />
+      {desc ? <span className="ui-check-text">{label}<small>{desc}</small></span> : label}
+    </label>
+  )
+
   return (
-    <Modal open={open} onClose={() => onClose()} title={t('export.title', 'Export')} size="md">
-      <form onSubmit={(e) => { e.preventDefault(); handleExport() }} className="p-4 space-y-4">
-        {/* Entity name */}
-        {entityName && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-secondary text-sm">
-            {entityType === 'ca' ? (
-              <ShieldCheck size={16} className="text-accent-primary shrink-0" />
-            ) : (
-              <Certificate size={16} className="text-accent-primary shrink-0" />
-            )}
-            <span className="text-text-primary font-medium truncate">{entityName}</span>
-          </div>
-        )}
+    <Modal open={open} onClose={() => onClose()} title={t(entityType === 'ca' ? 'export.titleCa' : 'export.titleCertificate')} size="md"
+      className="ui-export-dialog">
+      <form onSubmit={(e) => { e.preventDefault(); handleExport() }}>
+        {entityName && <p className="ui-export-name">{entityName}</p>}
 
-        {/* Format selection */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">
-            {t('export.format', 'Format')}
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            {availableFormats.map(f => (
-              <button
-                type="button"
-                key={f.key}
-                onClick={() => setFormat(f.key)}
-                disabled={!isAllowed(f.key)}
-                title={isAllowed(f.key) ? undefined : unavailableReason}
-                className={cn(
-                  'flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-all',
-                  !isAllowed(f.key) ? 'border-border opacity-50 cursor-not-allowed'
-                  : format === f.key
-                    ? 'border-accent-primary bg-accent-primary-op10 ring-1 ring-accent-primary-op30'
-                    : 'border-border hover:border-border-hover hover:bg-bg-secondary'
-                )}
-              >
-                <span className={cn(
-                  'text-sm font-semibold',
-                  format === f.key ? 'text-accent-primary' : 'text-text-primary'
-                )}>
-                  {f.labelKey ? t(f.labelKey) : f.label}
-                </span>
-                <span className="text-xs text-text-tertiary mt-0.5">
-                  {t(f.description)}
-                </span>
-              </button>
-            ))}
-          </div>
-          {hasUnavailable && (
-            <div className="flex items-start gap-2 px-1 text-xs text-text-tertiary">
-              <Lock size={14} className="shrink-0 mt-0.5" />
-              {unavailableReason}
-            </div>
-          )}
+        {/* Formats: labels with a radio button, three columns */}
+        <div className="ui-format-grid" role="radiogroup" aria-label={t('export.format', 'Format')}>
+          {availableFormats.map(f => (
+            <label key={f.key} className="ui-format-option" title={isAllowed(f.key) ? undefined : unavailableReason}>
+              <input type="radio" name="export-format" value={f.key} checked={format === f.key}
+                disabled={!isAllowed(f.key)} onChange={() => { if (isAllowed(f.key)) setFormat(f.key) }} />
+              <span>{formatLabel(f)}<small>{t(f.description)}</small></span>
+            </label>
+          ))}
         </div>
 
-        {/* Options — hidden for key-only export */}
+        {/* Options: one line each; key-only and DER carry none */}
         {!isKeyOnly && format !== 'der' && (
-        <div className="space-y-2">
-          <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">
-            {t('export.options', 'Options')}
-          </label>
-
-          {/* Include chain; the hybrid bundle holds the pair only */}
-          {carriesChain && (<>
-          <label className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-bg-secondary transition-colors cursor-pointer">
-            <input
-              type="checkbox"
-              checked={includeChain}
-              onChange={(e) => setIncludeChain(e.target.checked)}
-              className="w-4 h-4 rounded accent-accent-primary"
-            />
-            <div>
-              <div className="text-sm text-text-primary">{t('export.includeChain', 'Include CA chain')}</div>
-              <div className="text-xs text-text-tertiary">{t('export.includeChainDesc', 'Include issuing CA certificates')}</div>
-            </div>
-          </label>
-
-          {/* Which chain to present when a cross-certificate offers another path (#400) */}
-          {includeChain && chainVariants.length > 1 && (
-            <div className="ml-6 px-3 py-2 space-y-1">
-              <label htmlFor="export-chain-variant" className="text-sm text-text-primary">
-                {t('chainVariant.label')}
-              </label>
-              <ChainVariantSelect
-                id="export-chain-variant"
-                variants={chainVariants}
-                value={chainVariant}
-                onChange={setChainVariant}
-              />
-              <div className="text-xs text-text-tertiary">{t('chainVariant.exportHint')}</div>
-            </div>
-          )}
-
-          {/* Root trust anchors are normally installed on clients, not served. */}
-          {entityType === 'certificate' && includeChain && (
-            <label className="flex items-center gap-2.5 px-3 py-2 ml-6 rounded-lg hover:bg-bg-secondary transition-colors cursor-pointer">
-              <input
-                type="checkbox"
-                checked={includeRoot}
-                onChange={(e) => setIncludeRoot(e.target.checked)}
-                className="w-4 h-4 rounded accent-accent-primary"
-              />
-              <div>
-                <div className="text-sm text-text-primary">{t('export.includeRoot', 'Include Root CA')}</div>
-                <div className="text-xs text-text-tertiary">{t('export.includeRootDesc', 'Usually unnecessary for TLS servers')}</div>
+          <div className="ui-export-options">
+            {carriesChain && check(includeChain, setIncludeChain, t('export.includeChain', 'Include CA chain'))}
+            {/* Which chain to present when a cross-certificate offers another path (#400) */}
+            {carriesChain && includeChain && chainVariants.length > 1 && (
+              <div className="ui-export-variant">
+                <label htmlFor="export-chain-variant" className="ui-label">{t('chainVariant.label')}</label>
+                <ChainVariantSelect id="export-chain-variant" variants={chainVariants} value={chainVariant} onChange={setChainVariant} />
+                <p className="ui-help">{t('chainVariant.exportHint')}</p>
               </div>
-            </label>
-          )}
-
-          </>)}
-
-          {/* Include private key — only if key exists AND user has permission */}
-          {keyOffered && carriesKey && !isPkcs12 && !isJks && (
-            <label className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-bg-secondary transition-colors cursor-pointer">
-              <input
-                type="checkbox"
-                checked={includeKey}
-                onChange={(e) => setIncludeKey(e.target.checked)}
-                className="w-4 h-4 rounded accent-accent-primary"
-              />
-              <div>
-                <div className="text-sm text-text-primary">{t('export.includeKey', 'Include private key')}</div>
-                <div className="text-xs text-text-tertiary">{t('export.includeKeyDesc', 'Attach the private key to the export')}</div>
+            )}
+            {/* Root trust anchors are normally installed on clients, not served. */}
+            {carriesChain && entityType === 'certificate' && includeChain && (
+              <div className="ui-export-sub">
+                {check(includeRoot, setIncludeRoot, t('export.includeRoot', 'Include Root CA'), t('export.includeRootDesc', 'Usually unnecessary for TLS servers'))}
               </div>
-            </label>
-          )}
-
-          {isBundle && hasPrivateKey && canExportKey && relatedHasKey === false && (
-            <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-text-secondary">
-              <Lock size={14} className="shrink-0" />
-              {t('export.bundleRelatedHasNoKey')}
-            </div>
-          )}
-
-          {/* PKCS12 note */}
-          {(isPkcs12 || isJks) && (
-            <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-text-secondary">
-              <Lock size={14} className="shrink-0" />
-              {isPkcs12
-                ? t('export.pkcs12Note', 'PKCS#12 always includes the private key')
-                : t('export.jksNote', 'JKS always includes the private key')}
-            </div>
-          )}
-
-          {/* PKCS12 compatibility profile (#331) */}
-          {isPkcs12 && (
-            <label className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-bg-secondary transition-colors cursor-pointer">
-              <input
-                type="checkbox"
-                checked={legacy}
-                onChange={(e) => setLegacy(e.target.checked)}
-                className="w-4 h-4 rounded accent-accent-primary"
-                data-testid="export-legacy-pkcs12"
-              />
-              <div>
-                <div className="text-sm text-text-primary">{t('export.legacyPkcs12')}</div>
-                <div className="text-xs text-text-tertiary">{t('export.legacyPkcs12Desc')}</div>
-              </div>
-            </label>
-          )}
-
-          {/* No key notice for viewers */}
-          {hasPrivateKey && !canExportKey && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-secondary text-xs text-text-tertiary">
-              <Lock size={14} className="shrink-0" />
-              {t('export.noKeyPermission', 'Private key export requires elevated permissions')}
-            </div>
-          )}
-
-          {/* HSM-backed key notice */}
-          {isHsmBacked && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-secondary text-xs text-text-tertiary">
-              <Lock size={14} className="shrink-0" />
-              {t('cas.detail.exportBlockedHsm', 'HSM-backed key cannot be exported')}
-            </div>
-          )}
-        </div>
-        )}
-
-        {/* Password field — required for PKCS12 only */}
-        {showPasswordField && (
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">
-              {t('export.password', 'Password')}
-              {!needsPassword && <span className="ml-1 text-text-tertiary font-normal normal-case">({t('common.optional', 'optional')})</span>}
-            </label>
-            <div className="relative">
-              <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={t('export.passwordLengthHint', {
-                  defaultValue: 'Between {{min}} and {{max}} characters',
-                  min: passwordPolicy.min_length,
-                  max: passwordPolicy.max_length,
-                })}
-                autoFocus
-                className={cn(
-                  'w-full h-9 pl-9 pr-3 text-sm rounded-lg border border-border bg-bg-primary text-text-primary',
-                  'placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-primary-op50 focus:border-accent-primary'
-                )}
-              />
-            </div>
+            )}
+            {/* Include private key: only if key exists AND user has permission */}
+            {keyOffered && carriesKey && !isPkcs12 && !isJks && check(includeKey, setIncludeKey, t('export.includeKey', 'Include private key'))}
+            {/* PKCS12 compatibility profile (#331) */}
+            {isPkcs12 && check(legacy, setLegacy, t('export.legacyPkcs12'), t('export.legacyPkcs12Desc'), { 'data-testid': 'export-legacy-pkcs12' })}
           </div>
         )}
 
-        {/* Actions */}
-        <div className="flex justify-end gap-2 pt-4 border-t border-border">
+        {/* Password field: required for PKCS12 and JKS */}
+        {showPasswordField && (
+          <div className="ui-field">
+            <label htmlFor="export-password" className="ui-label">{t('export.password', 'Password')}</label>
+            <input
+              id="export-password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={t('export.passwordLengthHint', {
+                defaultValue: 'Between {{min}} and {{max}} characters',
+                min: passwordPolicy.min_length,
+                max: passwordPolicy.max_length,
+              })}
+              autoComplete="new-password"
+              autoFocus
+              className="ui-control"
+            />
+          </div>
+        )}
+
+        <pre className="ui-code-preview" data-testid="export-preview">{preview}</pre>
+
+        {/* Notices of the mockup: why a format is greyed, what the file always holds, what is withheld */}
+        {hasUnavailable && <div className="ui-notice"><Lock size={14} aria-hidden="true" />{unavailableReason}</div>}
+        {!isKeyOnly && format !== 'der' && isBundle && hasPrivateKey && canExportKey && relatedHasKey === false && (
+          <div className="ui-notice"><Lock size={14} aria-hidden="true" />{t('export.bundleRelatedHasNoKey')}</div>
+        )}
+        {(isPkcs12 || isJks) && (
+          <div className="ui-notice">
+            <Lock size={14} aria-hidden="true" />
+            {isPkcs12 ? t('export.pkcs12Note', 'PKCS#12 always includes the private key') : t('export.jksNote', 'JKS always includes the private key')}
+          </div>
+        )}
+        {!isKeyOnly && format !== 'der' && hasPrivateKey && !canExportKey && (
+          <div className="ui-notice"><Lock size={14} aria-hidden="true" />{t('export.noKeyPermission', 'Private key export requires elevated permissions')}</div>
+        )}
+        {!isKeyOnly && format !== 'der' && isHsmBacked && (
+          <div className="ui-notice"><Lock size={14} aria-hidden="true" />{t('cas.detail.exportBlockedHsm', 'HSM-backed key cannot be exported')}</div>
+        )}
+
+        <div className="ui-dialog-actions">
           <Button type="button" variant="secondary" onClick={onClose}>
             {t('common.cancel', 'Cancel')}
           </Button>
-          <Button
-            type="submit"
-            disabled={exporting || (needsPassword && !isExportPasswordValid(password, passwordPolicy))}
-          >
-            <Download size={16} />
+          <Button type="submit" disabled={exporting || (needsPassword && !isExportPasswordValid(password, passwordPolicy))}>
+            <Download size={16} aria-hidden="true" />
             {exporting ? t('common.exporting', 'Exporting...') : t('export.download', 'Download')}
           </Button>
         </div>

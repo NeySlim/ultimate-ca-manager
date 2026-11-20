@@ -95,7 +95,7 @@ const CERT = {
   valid_to: '2030-01-01T00:00:00Z',
 }
 
-const KEY_FORMATS = ['P12 / PKCS#12', 'JKS']
+const KEY_FORMATS = ['PKCS#12', 'JKS']
 
 describe('canExportPrivateKey mirrors the server gate', () => {
   it('requires read:private_keys for a managed certificate', () => {

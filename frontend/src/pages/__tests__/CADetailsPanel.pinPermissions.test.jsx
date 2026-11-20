@@ -69,12 +69,12 @@ describe('CADetailsPanel — CA key export needs read:private_keys', () => {
   it('hides key formats from a holder of write:cas alone', () => {
     renderPanel(['cas'])
     fireEvent.click(screen.getByText('export.title'))
-    expect(screen.queryByText('P12 / PKCS#12')).not.toBeInTheDocument()
+    expect(screen.queryByText('PKCS#12')).not.toBeInTheDocument()
   })
 
   it('offers them with read:private_keys', () => {
     renderPanel(['cas'], ['read:private_keys'])
     fireEvent.click(screen.getByText('export.title'))
-    expect(screen.getByText('P12 / PKCS#12')).toBeInTheDocument()
+    expect(screen.getByText('PKCS#12')).toBeInTheDocument()
   })
 })

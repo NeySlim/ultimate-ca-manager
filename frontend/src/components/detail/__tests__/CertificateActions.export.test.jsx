@@ -34,9 +34,9 @@ describe('export dialog of the action bar', () => {
     render(<ActionsHarness entity={mldsa} permissions={ALLOW} />)
     openExport()
     const dialog = screen.getByRole('dialog')
-    expect(within(dialog).getByText('P12 / PKCS#12').closest('button')).toBeDisabled()
-    expect(within(dialog).getByText('JKS').closest('button')).toBeDisabled()
-    expect(within(dialog).getByText('PEM').closest('button')).toBeEnabled()
+    expect(within(dialog).getByText('PKCS#12').closest('label').querySelector('input')).toBeDisabled()
+    expect(within(dialog).getByText('JKS').closest('label').querySelector('input')).toBeDisabled()
+    expect(within(dialog).getByText('PEM').closest('label').querySelector('input')).toBeEnabled()
   })
 
   it('offers the hybrid bundle for a pair member only', () => {

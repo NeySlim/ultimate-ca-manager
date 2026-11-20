@@ -23,10 +23,10 @@ vi.mock('react-i18next', () => ({
 
 import { ExportModal } from '../ExportModal'
 
-const FORMAT_LABELS = { pem: 'PEM', der: 'DER', pkcs7: 'P7B / PKCS#7', pkcs12: 'P12 / PKCS#12', jks: 'JKS', key: en.export.formats.privateKey }
-const formatButton = (key) => screen.getByText(FORMAT_LABELS[key]).closest('button')
+const FORMAT_LABELS = { pem: 'PEM', der: 'DER', pkcs7: 'PKCS#7', pkcs12: 'PKCS#12', jks: 'JKS', key: en.export.formats.privateKey }
+const formatButton = (key) => screen.getByText(FORMAT_LABELS[key]).closest('label').querySelector('input')
 // Every format tile the dialog renders, whatever its list holds
-const renderedFormatButtons = () => [...screen.getByText(en.export.format).parentElement.querySelectorAll('button')]
+const renderedFormatButtons = () => [...screen.getByRole('radiogroup', { name: en.export.format }).querySelectorAll('input')]
 
 const renderModal = (props = {}) => {
   const onExport = vi.fn().mockResolvedValue(undefined)
@@ -44,7 +44,7 @@ describe('ExportModal with a post-quantum key', () => {
     const excluded = PQ_EXPORT_EXCLUDED.map(formatButton)
     for (const button of excluded) {
       expect(button).toBeDisabled()
-      expect(button).toHaveAttribute('title', expect.stringContaining(name))
+      expect(button.closest('label')).toHaveAttribute('title', expect.stringContaining(name))
     }
     const others = renderedFormatButtons().filter(b => !excluded.includes(b))
     expect(others.length).toBeGreaterThan(0)

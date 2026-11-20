@@ -879,7 +879,8 @@
       "emailSmime": "E-Mail / S/MIME",
       "ca": "CA",
       "selfSigned": "Selbstsigniert",
-      "timestamping": "TSA-Zeitstempelung"
+      "timestamping": "TSA-Zeitstempelung",
+      "combined": "Server and client"
     },
     "approvalRequired": "Zertifikatsanfrage zur Genehmigung eingereicht (Richtlinie: {{policy}})",
     "ocspMustStaple": "OCSP Must-Staple (RFC 6066)",
@@ -4660,7 +4661,10 @@
   "revocation": {
     "reasonHelpNoHold": "Der Grund wird in der CRL der übergeordneten CA veröffentlicht und kann nicht geändert werden; die Sperrung einer CA ist endgültig.",
     "title": "Zertifikat widerrufen",
+    "dialogTitle": "Revoke this certificate?",
+    "notice": "This action makes the certificate unusable.",
     "reasonLabel": "Widerrufsgrund",
+    "reason": "Reason",
     "reasonHelp": "Wird am Zertifikat gespeichert und in der CRL veröffentlicht (RFC-5280-Grundcode). Ein Widerruf ist unumkehrbar, außer bei einer Sperre.",
     "bulkReasonHelp": "Gilt für jedes ausgewählte Zertifikat.",
     "confirm": "Widerrufen",
@@ -5969,6 +5973,8 @@
   },
   "export": {
     "title": "Exportieren",
+    "titleCertificate": "Export the certificate",
+    "titleCa": "Export the CA",
     "skippedUnreadable": "{{count}} nicht lesbare(s) Zertifikat(e) wurde(n) nicht exportiert",
     "format": "Format",
     "options": "Optionen",
@@ -6010,7 +6016,13 @@
     "pkcs12Title": "PKCS#12 exportieren",
     "pkcs12PasswordPrompt": "Passwort für PKCS#12-Datei eingeben",
     "formatHybridBundleDesc": "ZIP mit beiden Zertifikaten des Paars",
-    "bundleRelatedHasNoKey": "Das verknüpfte Zertifikat hat keinen privaten Schlüssel: Das Bundle enthält nur die Zertifikate"
+    "bundleRelatedHasNoKey": "Das verknüpfte Zertifikat hat keinen privaten Schlüssel: Das Bundle enthält nur die Zertifikate",
+    "previewTitle": "Structure preview ({{format}})",
+    "previewChain": "chain of the issuing CA",
+    "previewRoot": "root CA",
+    "previewKey": "private key",
+    "previewKeyEncrypted": "private key, encrypted with the password",
+    "previewRelated": "related certificate of the hybrid pair"
   },
   "userCertificates": {
     "title": "Benutzerzertifikate",
@@ -6307,7 +6319,9 @@
       "ca_exempt": "CA ausgenommen",
       "short": "≤ 398 Tage",
       "moderate": "≤ 825 Tage",
-      "long": "> 825 Tage"
+      "long": "> 825 Tage",
+      "weak": "weak",
+      "critical": "critical"
     }
   },
   "msca": {
