@@ -62,29 +62,50 @@ describe('TopBar', () => {
     expect(current.map(a => a.getAttribute('data-module'))).toEqual(['dashboard'])
   })
 
-  it('shows pinned modules after the fixed pages and before Modules, in stored order', () => {
-    setup({ pins: ['users', 'audit'], activeId: 'audit' })
+  it('shows pinned modules after Activity and before Modules, in stored order', () => {
+    setup({ pins: ['users', 'reports'], activeId: 'reports' })
     const nav = screen.getByRole('navigation', { name: 'shell.mainNav' })
     const order = within(nav).getAllByRole('link').map(a => a.getAttribute('data-module'))
-    expect(order.slice(0, 5)).toEqual(['dashboard', 'certificates', 'cas', 'users', 'audit'])
-    const audit = within(nav).getAllByRole('link').find(a => a.getAttribute('data-module') === 'audit')
-    expect(audit).toHaveAttribute('aria-current', 'page')
+    expect(order.slice(0, 6)).toEqual(['dashboard', 'certificates', 'cas', 'audit', 'users', 'reports'])
+    const reports = within(nav).getAllByRole('link').find(a => a.getAttribute('data-module') === 'reports')
+    expect(reports).toHaveAttribute('aria-current', 'page')
   })
 
-  it('tabs through the bar in reading order: brand, pages, pins, Modules, search, help, theme, bell, account', async () => {
+  it('names the main pages with the bar words, Activity leading to the audit journal', () => {
+    setup({ activeId: 'audit' })
+    const nav = screen.getByRole('navigation', { name: 'shell.mainNav' })
+    const links = within(nav).getAllByRole('link')
+    expect(links.slice(0, 4).map(a => a.textContent)).toEqual(['shell.bar.dashboard', 'shell.bar.certificates', 'shell.bar.cas', 'shell.bar.activity'])
+    const activity = links.find(a => a.getAttribute('data-module') === 'audit')
+    expect(activity).toHaveAttribute('href', '/audit')
+    expect(activity).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('shows Activity only to who may read the journal', () => {
+    setup({ permissions: ROLES.operator })
+    const nav = screen.getByRole('navigation', { name: 'shell.mainNav' })
+    expect(within(nav).getAllByRole('link').map(a => a.getAttribute('data-module'))).not.toContain('audit')
+  })
+
+  it('tabs through the bar in reading order: brand, pages, pins, Modules, search, theme, bell, help, account', async () => {
     const { user } = setup({ pins: ['users'] })
     const seen = []
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 13; i++) {
       await user.tab()
       const el = document.activeElement
       seen.push(el.getAttribute('data-module') || el.getAttribute('aria-label') || el.textContent)
     }
     // The phone picker is display:none on desktop (CSS, not applied in jsdom)
     expect(seen.filter(l => l !== 'shell.navigate')).toEqual([
-      'UCM', 'dashboard', 'certificates', 'cas', 'users',
-      'shell.modules', 'shell.search', 'common.help', 'shell.theme.menu', 'shell.bell.title: shell.bell.allRead',
+      'UCM', 'dashboard', 'certificates', 'cas', 'audit', 'users',
+      'shell.modules', 'shell.search', 'shell.theme.menu', 'shell.bell.title: shell.bell.allRead', 'common.help',
       'common.account: probe',
     ])
+  })
+
+  it('has no live connection indicator: it sits in the status bar', () => {
+    setup()
+    expect(screen.queryByTestId('ws')).toBeNull()
   })
 
   it('opens the search from the bar', async () => {
@@ -104,16 +125,16 @@ describe('TopBar', () => {
     expect(screen.queryByRole('button', { name: 'common.help' })).toBeNull()
   })
 
-  it('lists on the phone picker the same modules as the menu', async () => {
+  it('lists on the phone picker the main pages, then the same modules as the menu', async () => {
     setup({ permissions: ROLES.auditor })
     const picker = screen.getByRole('combobox', { name: 'shell.navigate' })
     const optionIds = within(picker).getAllByRole('option', { hidden: true }).map(o => o.getAttribute('value'))
-    expect(optionIds[0]).toBe('dashboard')
+    expect(optionIds.slice(0, 4)).toEqual(['dashboard', 'certificates', 'cas', 'audit'])
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: /shell\.modules$/ }))
     const menuIds = within(screen.getByRole('navigation', { name: 'shell.modulesMenuLabel' }))
       .getAllByRole('link').map(a => a.getAttribute('data-module'))
-    expect(optionIds.slice(1).sort()).toEqual(menuIds.sort())
+    expect(optionIds.slice(4).sort()).toEqual(menuIds.sort())
   })
 
   it('navigates from the phone picker', async () => {

@@ -164,7 +164,8 @@ describe('AppShell', () => {
     setup(path)
     const content = document.querySelector('.shell-content')
     expect(content.children).toHaveLength(1)
-    expect(document.querySelectorAll('footer')).toHaveLength(1)
+    // The notification panel's own foot is not a bar of the page
+    expect(document.querySelectorAll('footer:not(.shell-notif-foot)')).toHaveLength(1)
     expect(screen.queryByText(/^windows\./)).toBeNull()
   })
 })

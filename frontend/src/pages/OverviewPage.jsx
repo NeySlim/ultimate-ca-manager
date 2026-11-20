@@ -13,6 +13,7 @@ import {
 } from '../components/overview'
 import { OverviewContext } from '../components/overview/shared'
 import { KeyEncryptionBanner } from '../components/overview/KeyEncryptionBanner'
+import { SetupCard } from '../components/shell/SetupCard'
 import { KofiSupportCard } from '../components/KofiSupportCard'
 import { useNotification } from '../contexts/NotificationContext'
 import { usePermission } from '../hooks/usePermission'
@@ -189,6 +190,7 @@ export default function OverviewPage() {
             )}
           </div>
         </header>
+        <SetupCard admin={isAdmin()} share={page.share} />
         <KeyEncryptionBanner />
         <MetricStrip go={go} />
         {shown.length === 0 && (

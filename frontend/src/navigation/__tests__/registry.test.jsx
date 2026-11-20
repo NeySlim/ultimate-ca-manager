@@ -42,7 +42,7 @@ import { Routes, Route } from 'react-router-dom'
 import { pages } from '../pages'
 import {
   MODULES, GROUPS, REDIRECTS, visibleModules, groupsFor,
-  moduleForPath, paletteCommands, isVisible,
+  moduleForPath, paletteCommands, isVisible, MAIN_IDS, menuGroupsFor, menuLabelKey, moduleById,
 } from '../registry'
 import { PERMISSION_RESOURCES } from '../../lib/rbacPermissions'
 
@@ -205,7 +205,7 @@ describe('registry shape (b)', () => {
 
 describe('labels (c)', () => {
   const keys = [
-    ...MODULES.flatMap(m => [m.labelKey, m.shortKey, m.palette?.labelKey]),
+    ...MODULES.flatMap(m => [m.labelKey, m.shortKey, m.palette?.labelKey, m.barKey, m.descKey, m.menuKey]),
     ...GROUPS.map(g => g.labelKey),
     ...REDIRECTS.map(r => r.palette?.labelKey),
     ...paletteCommands().flatMap(c => [c.labelKey, c.categoryKey]),
@@ -243,6 +243,19 @@ describe('visibility (e)', () => {
   it('shows a permission module once granted, an admin sees all', () => {
     expect(visibleModules(makeCan(['read:acme'])).map(m => m.id)).toContain('acme')
     expect(visibleModules(adminCan)).toHaveLength(MODULES.length)
+  })
+
+  it('the main bar pages carry a bar label, every menu module a description', () => {
+    for (const id of MAIN_IDS) expect(moduleById(id).barKey, id).toBeTruthy()
+    for (const m of menuGroupsFor(adminCan).flatMap(g => g.modules)) expect(m.descKey, m.id).toBeTruthy()
+  })
+
+  it('menuGroupsFor leaves the main bar pages out, Activity included', () => {
+    const ids = menuGroupsFor(adminCan).flatMap(g => g.modules.map(m => m.id))
+    for (const id of MAIN_IDS) expect(ids).not.toContain(id)
+    expect(ids).toContain('reports')
+    expect(menuLabelKey(moduleById('crl-ocsp'))).toBe('shell.moduleLabel.crlOcsp')
+    expect(menuLabelKey(moduleById('acme'))).toBe('common.acme')
   })
 
   it('groupsFor drops empty groups', () => {

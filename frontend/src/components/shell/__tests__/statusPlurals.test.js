@@ -16,15 +16,17 @@ describe('shell counters', () => {
     const t = await make('en', en.shell)
     expect(t('shell.expiringBadge', { count: 1 })).toMatch(/^1 certificate expiring/)
     expect(t('shell.expiringBadge', { count: 2 })).toMatch(/^2 certificates expiring/)
-    expect(t('shell.haNodes', { count: 1 })).toBe('1 node')
-    expect(t('shell.haNodes', { count: 3 })).toBe('3 nodes')
-    expect(t('shell.haLate', { count: 2 })).toBe('2 late')
+    expect(t('shell.haNodes', { count: 1 })).toBe('1 node · up to date')
+    expect(t('shell.haNodes', { count: 3 })).toBe('3 nodes · all up to date')
+    expect(t('shell.haLate', { count: 1 })).toBe('1 node late')
+    expect(t('shell.haLate', { count: 2 })).toBe('2 nodes late')
   })
 
   it('french is translated and agrees in number', async () => {
     const t = await make('fr', fr.shell)
-    expect(t('shell.haNodes', { count: 1 })).toBe('1 nœud')
-    expect(t('shell.haNodes', { count: 3 })).toBe('3 nœuds')
+    expect(t('shell.haNodes', { count: 1 })).toBe('1 nœud · à jour')
+    expect(t('shell.haNodes', { count: 3 })).toBe('3 nœuds · tous à jour')
+    expect(t('shell.haLate', { count: 2 })).toBe('2 nœuds en retard')
     expect(t('shell.expiringBadge', { count: 1 })).toMatch(/^1 certificat expire/)
   })
 

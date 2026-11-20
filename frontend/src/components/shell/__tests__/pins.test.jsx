@@ -13,20 +13,24 @@ const admin = canFor(['*'])
 
 describe('visiblePins', () => {
   it('keeps order and drops unknown, unpinnable, duplicate and non-string ids', () => {
-    expect(visiblePins(['audit', 'nope', 'dashboard', 'certificates', 'audit', 7, 'users'], admin))
-      .toEqual(['audit', 'users'])
+    expect(visiblePins(['reports', 'nope', 'dashboard', 'certificates', 'reports', 7, 'users'], admin))
+      .toEqual(['reports', 'users'])
   })
 
   it('hides a pin whose right was withdrawn, without an error', () => {
     const viewer = canFor([])
-    expect(visiblePins(['audit', 'templates'], viewer)).toEqual(['templates'])
-    expect(visiblePins(['audit', 'templates'], canFor(['read:audit']))).toEqual(['audit', 'templates'])
+    expect(visiblePins(['reports', 'templates'], viewer)).toEqual(['templates'])
+    expect(visiblePins(['reports', 'templates'], canFor(['read:audit']))).toEqual(['reports', 'templates'])
+  })
+
+  it('drops a stored pin of a page the main bar shows, Activity included', () => {
+    expect(visiblePins(['audit', 'cas', 'reports'], admin)).toEqual(['reports'])
   })
 
   it('never shows more than three, and tolerates a missing or malformed value', () => {
-    expect(visiblePins(['audit', 'users', 'hsm', 'rbac'], admin)).toHaveLength(MAX_PINS)
+    expect(visiblePins(['reports', 'users', 'hsm', 'rbac'], admin)).toHaveLength(MAX_PINS)
     expect(visiblePins(undefined, admin)).toEqual([])
-    expect(visiblePins('audit', admin)).toEqual([])
+    expect(visiblePins('reports', admin)).toEqual([])
   })
 })
 
@@ -46,9 +50,9 @@ describe('usePins against the server preferences', () => {
   })
 
   it('reads the pins the server sent', () => {
-    applyServerPreferences({ pins: ['audit', 'users'], language: 'fr' })
+    applyServerPreferences({ pins: ['reports', 'users'], language: 'fr' })
     const { result } = renderHook(() => usePins(admin))
-    expect(result.current.pins).toEqual(['audit', 'users'])
+    expect(result.current.pins).toEqual(['reports', 'users'])
   })
 
   it('follows a later server copy', () => {
@@ -59,27 +63,27 @@ describe('usePins against the server preferences', () => {
   })
 
   it('persists a new pin with the other preferences in one PUT', async () => {
-    applyServerPreferences({ pins: ['audit'], language: 'fr' })
+    applyServerPreferences({ pins: ['reports'], language: 'fr' })
     const { result } = renderHook(() => usePins(admin))
     let ok
     await act(async () => { ok = result.current.toggle('users') })
     expect(ok).toBe(true)
-    expect(updatePreferences).toHaveBeenCalledWith({ pins: ['audit', 'users'], language: 'fr' })
-    expect(result.current.pins).toEqual(['audit', 'users'])
+    expect(updatePreferences).toHaveBeenCalledWith({ pins: ['reports', 'users'], language: 'fr' })
+    expect(result.current.pins).toEqual(['reports', 'users'])
   })
 
   it('refuses a fourth pin without writing', async () => {
-    applyServerPreferences({ pins: ['audit', 'users', 'hsm'] })
+    applyServerPreferences({ pins: ['reports', 'users', 'hsm'] })
     const { result } = renderHook(() => usePins(admin))
     let ok
     await act(async () => { ok = result.current.toggle('rbac') })
     expect(ok).toBe(false)
     expect(updatePreferences).not.toHaveBeenCalled()
-    expect(result.current.pins).toEqual(['audit', 'users', 'hsm'])
+    expect(result.current.pins).toEqual(['reports', 'users', 'hsm'])
   })
 
   it('writes only visible pins, so a withdrawn right never blocks a slot', async () => {
-    applyServerPreferences({ pins: ['audit', 'users', 'hsm'] })
+    applyServerPreferences({ pins: ['reports', 'users', 'hsm'] })
     const { result } = renderHook(() => usePins(canFor(['read:hsm'])))
     expect(result.current.pins).toEqual(['hsm'])
     await act(async () => { result.current.toggle('tsa') })

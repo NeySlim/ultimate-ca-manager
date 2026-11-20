@@ -7,9 +7,9 @@
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
-  Certificate, DownloadSimple, Plus, UploadSimple, Star, ArrowsLeftRight, Warning, ArrowsClockwise, CaretRight
+  Certificate, DownloadSimple, Plus, UploadSimple, Star, ArrowsLeftRight
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Button, Modal, ListButton,
@@ -24,6 +24,9 @@ import { usePermission, useRecentHistory, useFavorites, useWebSocket, usePersist
 import { extractCN, cn, certificateNames, downloadBlob, warnSkippedExport } from '../lib/utils'
 import { CERT_STATUSES, parseOverviewFilters, toListParams, toSearch, withoutFilter } from '../lib/overviewFilters'
 import { FilterChips } from '../components/ui/FilterChips'
+import { LoadError } from '../components/list/StateBlocks'
+import { SetupCard } from '../components/shell/SetupCard'
+import { guardProps, useWriteGuard } from '../components/shell/health'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { IssueCertificateForm } from './certificates/IssueCertificateForm'
@@ -161,6 +164,8 @@ export default function CertificatesPage() {
   }, [navigate, location.pathname])
   
   const { showSuccess, showError, showConfirm, showWarning } = useNotification()
+  // A cluster maintenance suspends issuing and importing, as the server refuses them
+  const writeGuard = useWriteGuard()
   const { canWrite, hasPermission } = usePermission()
   const failed = Boolean(loadError) && certificates.length === 0
   // One rule for every export surface on this page — the server's own (see
@@ -552,14 +557,15 @@ export default function CertificatesPage() {
         intent={t('certificates.intent')}
         actions={canWrite('certificates') && (
           <>
-            <ListButton quiet icon={UploadSimple} onClick={() => setShowImportModal(true)}>
+            <ListButton quiet icon={UploadSimple} {...guardProps(writeGuard)} onClick={() => setShowImportModal(true)}>
               {t('common.import')}
             </ListButton>
-            <ListButton primary icon={Plus} title={t('certificates.issueCertificate')} onClick={() => setShowIssueModal(true)}>
+            <ListButton primary icon={Plus} title={t('certificates.issueCertificate')} {...guardProps(writeGuard)} onClick={() => setShowIssueModal(true)}>
               {t('certificates.issue')}
             </ListButton>
           </>
         )}
+        beforeViews={<SetupCard admin={hasPermission('*')} />}
         views={failed ? [] : views}
         activeView={activeView}
         onViewChange={(id) => setStatus(id ? [id] : [])}
@@ -597,19 +603,9 @@ export default function CertificatesPage() {
         onSlideOverClose={() => setSelectedCert(null)}
       >
         {failed ? (
-          <div className="lv-error" role="alert" data-testid="certificates-load-error">
-            <Warning aria-hidden="true" />
-            <div>
-              <h2>{t('certificates.loadFailed')}</h2>
-              <p>{t('certificates.loadFailedCause', { message: loadError })}</p>
-              <div className="lv-error-actions">
-                <ListButton primary icon={ArrowsClockwise} onClick={() => loadData()}>{t('table.retry')}</ListButton>
-                {hasPermission('read:audit') && (
-                  <Link className="lv-text-link" to="/audit">{t('certificates.viewLog')}<CaretRight size={14} aria-hidden="true" /></Link>
-                )}
-              </div>
-            </div>
-          </div>
+          <LoadError data-testid="certificates-load-error" title={t('certificates.loadFailed')}
+            cause={t('certificates.loadFailedCause', { message: loadError })} onRetry={() => loadData()}
+            journal={hasPermission('read:audit') ? '/audit' : undefined} />
         ) : (<>
         <div data-testid="overview-chips" className="shrink-0">
           <FilterChips

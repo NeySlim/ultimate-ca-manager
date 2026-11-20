@@ -6,6 +6,9 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k, o) => (o ? `${k}|${Object.values(o).join(',')}` : k) }),
 }))
 
+vi.mock('../../WebSocketIndicator', () => ({ WebSocketIndicator: () => <span data-testid="ws" /> }))
+
+import userEvent from '@testing-library/user-event'
 import { StatusBar } from '../StatusBar'
 
 const answer = (body, ok = true) => vi.fn().mockResolvedValue({ ok, json: async () => body })
@@ -32,13 +35,52 @@ describe('StatusBar', () => {
   it('shows the node, its role and the cluster in HA mode', async () => {
     vi.stubGlobal('fetch', answer({
       status: 'ok', version: '3.0.0', ha: true, node_id: 'n2', leader: false,
-      cluster: { leader_node_id: 'n1', nodes: 3, stale: 1 },
+      cluster: { leader_node_id: 'n1', nodes: 3, stale: 0 },
     }))
     render(<StatusBar />)
     expect(await screen.findByText('shell.haNode|n2')).toBeInTheDocument()
     expect(screen.getByText('shell.haFollower')).toBeInTheDocument()
-    expect(screen.getByText('shell.haNodes|3')).toBeInTheDocument()
-    expect(screen.getByText('shell.haLate|1')).toBeInTheDocument()
+    expect(screen.getByText('shell.haNodes|3').closest('.shell-ha-link')).toHaveClass('is-good')
+  })
+
+  it('says how many nodes are late, as a warning, in place of the node count', async () => {
+    vi.stubGlobal('fetch', answer({
+      status: 'ok', version: '3.0.0', ha: true, node_id: 'n2', leader: false,
+      cluster: { leader_node_id: 'n1', nodes: 3, stale: 1 },
+    }))
+    render(<StatusBar />)
+    expect((await screen.findByText('shell.haLate|1')).closest('.shell-ha-link')).toHaveClass('is-warn')
+    expect(screen.queryByText('shell.haNodes|3')).toBeNull()
+  })
+
+  it('says a maintenance is in progress', async () => {
+    vi.stubGlobal('fetch', answer({
+      status: 'ok', version: '3.0.0', ha: true, node_id: 'n1', leader: true,
+      cluster: { leader_node_id: 'n1', nodes: 2, stale: 0 }, maintenance: { reason: 'restore', phase: 'draining' },
+    }))
+    render(<StatusBar />)
+    expect((await screen.findByText('shell.haMaintenanceShort')).closest('.shell-ha-link')).toHaveClass('is-warn')
+  })
+
+  it('opens the node list from the indicator when it may, and is plain text otherwise', async () => {
+    vi.stubGlobal('fetch', answer({ status: 'ok', version: '3.0.0', ha: true, node_id: 'n1', leader: true,
+      cluster: { leader_node_id: 'n1', nodes: 2, stale: 0 } }))
+    const onShowNodes = vi.fn()
+    const { unmount } = render(<StatusBar onShowNodes={onShowNodes} />)
+    const button = await screen.findByRole('button', { name: /shell\.haIndicatorLabel/ })
+    await userEvent.click(button)
+    expect(onShowNodes).toHaveBeenCalledTimes(1)
+    unmount()
+    render(<StatusBar />)
+    await screen.findByText('shell.haNodes|2')
+    expect(screen.queryByRole('button', { name: /shell\.haIndicatorLabel/ })).toBeNull()
+  })
+
+  it('keeps the live connection indicator in the bar', async () => {
+    vi.stubGlobal('fetch', answer({ status: 'ok', version: '3.0.0', ha: false }))
+    render(<StatusBar />)
+    await screen.findByText('shell.statusRunning')
+    expect(screen.getByTestId('ws')).toBeInTheDocument()
   })
 
   it('leaves the role out when the node does not know it', async () => {

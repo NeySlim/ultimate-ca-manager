@@ -6,6 +6,9 @@ import { useTranslation } from 'react-i18next'
 import { Outlet, useLocation } from 'react-router-dom'
 import { TopBar } from './shell/TopBar'
 import { StatusBar } from './shell/StatusBar'
+import { StateBanners } from './shell/StateBanners'
+import { NodesDialog } from './shell/NodesDialog'
+import { haState, useHealth } from './shell/health'
 import { usePins } from './shell/pins'
 import { resolveActivePageId } from './shell/activePage'
 import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
@@ -31,6 +34,10 @@ export function AppShell() {
   const { showWarning } = useNotification()
   // The inspector sits in the page flow: under the page, or beside it on the right
   const dockPlacement = useDockPlacement()
+  // Cluster nodes, read from the service status (read:settings), from the bar or the HA banner
+  const [nodesOpen, setNodesOpen] = useState(false)
+  const ha = haState(useHealth())
+  const showNodes = hasPermission('read:settings') ? () => setNodesOpen(true) : undefined
 
   // Derive the active nav item from the URL (see resolveActivePageId)
   const activePage = resolveActivePageId(location.pathname)
@@ -152,6 +159,7 @@ export function AppShell() {
 
       <div className={`shell-main${dockPlacement === 'right' ? ' has-dock-right' : ''}`}>
         <div className="shell-content">
+          <StateBanners onShowNodes={showNodes} />
           <div className="flex-1 flex min-h-0 min-w-0 overflow-auto">
             <Outlet />
           </div>
@@ -160,7 +168,8 @@ export function AppShell() {
       </div>
       </div>
 
-      <StatusBar />
+      <StatusBar onShowNodes={showNodes} />
+      {showNodes && <NodesDialog open={nodesOpen} onClose={() => setNodesOpen(false)} ha={ha} />}
 
       <CommandPalette
         open={commandPaletteOpen}
