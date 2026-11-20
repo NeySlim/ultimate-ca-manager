@@ -210,12 +210,12 @@ export function useCertificateCard(t) {
   return useCallback((row) => {
     const value = sourceOf(row)
     const issuer = extractCN(row.issuer) || row.issuer_name || ''
+    // As the mockup record: no icon before the name, the source in words
     return {
-      icon: <Certificate size={16} aria-hidden="true" />,
       description: row.descr && row.descr !== (row.cn || row.common_name) ? row.descr : '',
       meta: [
         issuer,
-        <SourceLabel key="source" icon={sourceIcon(value)} label={sourceLabel(value, t)} />,
+        sourceLabel(value, t),
         row.has_private_key && <span key="key" className="lv-key-note"><Key size={12} aria-hidden="true" />{t('certificates.keyInUcm')}</span>,
         row.isOrphan && <RowMark key="orphan" icon={LinkBreak} tone="warn" label={t('certificates.orphanDescription')}>{t('certificates.orphan')}</RowMark>,
       ],

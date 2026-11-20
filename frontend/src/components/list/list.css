@@ -479,7 +479,7 @@
 
 @media (max-width: 800px) {
   /* A secondary page action keeps its icon only (its name stays readable by assistive technology) */
-  .lv-btn.lv-hide-mobile { width: 32px; padding: 6px; gap: 0; font-size: 0; }
+  .lv-btn.lv-hide-mobile { width: 40px; padding: 6px; gap: 0; font-size: 0; }
   .lv-stage { --lv-gutter: 16px; }
   .lv-main { padding: 0; }
   /* On a phone the whole page scrolls, as the mockup: no box of the list keeps a fixed height */
@@ -488,17 +488,25 @@
   .lv-stage .lv-panel { display: block; height: auto; }
   .lv-stage .lv-workspace { display: block; padding-bottom: 20px; }
   .lv-stage .lv-table-box { display: block; }
-  .lv-head { flex-wrap: wrap; gap: 12px; padding-top: 14px; padding-bottom: 10px; }
+  /* Phone head as the mockup: the words on the left, the page actions of 40 px on their right */
+  .lv-head { align-items: flex-start; gap: 10px; padding-top: 22px; padding-bottom: 18px; }
+  .lv-head-text { flex: 1; }
+  .lv-intent { line-height: 1.6; }
+  .lv-actions { flex-wrap: nowrap; }
+  .lv-actions .lv-btn { min-height: 40px; }
   .lv-title-line h1 { font-size: 24px; }
   .lv-title-line .lv-total { display: none; }
-  .lv-views-row { margin-bottom: 0; }
+  .lv-views-row { margin-bottom: 12px; }
+  .lv-views { gap: 4px; }
+  .lv-view { min-height: 44px; padding: 9px 10px; }
   /* Phone toolbar, as the mockup: the search on its own line, the filters sharing the next */
-  .lv-toolbar { flex-wrap: wrap; gap: 8px; }
+  .lv-toolbar { flex-wrap: wrap; align-items: flex-start; gap: 8px; }
   .lv-toolbar .lv-search { flex-basis: 100%; min-height: 42px; }
   .lv-toolbar .lv-search input { min-height: 40px; font-size: 13px; }
   .lv-main:has(.lv-table-box.is-cards) { padding: 0 var(--lv-gutter); }
-  .lv-toolbar .lv-tools { flex: 1 1 0; min-width: 0; }
-  .lv-toolbar .lv-filter { flex: 1 1 0; min-width: 0; }
+  /* Two filters share a line; a third one takes the next line whole */
+  .lv-toolbar .lv-tools { flex: 1 1 0; flex-wrap: wrap; min-width: 0; }
+  .lv-toolbar .lv-filter { flex: 1 1 120px; min-width: 0; }
   .lv-toolbar .lv-filter > button { width: 100%; min-height: 40px; }
   .lv-toolbar .lv-btn.is-icon { width: 40px; height: 40px; }
   .lv-footer { padding: 10px; gap: 8px; flex-wrap: wrap; }
@@ -517,6 +525,7 @@
 .lv-mrecord .lv-entity .lv-entity-text { overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
 .lv-mrecord-desc { margin: 0 0 4px 41px; font-size: 12px; color: var(--text); }
 .lv-mrecord-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-left: 41px; font-size: 12px; color: var(--muted); }
+.lv-mrecord-meta > span { display: flex; align-items: center; }
 .lv-key-note { display: inline-flex; align-items: center; gap: 5px; }
 .lv-mrecord-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 12px 0 0 41px; font-size: 12px; }
 .lv-mrecord-end { color: var(--muted); font-size: 12px; }
