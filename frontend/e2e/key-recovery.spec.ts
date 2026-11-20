@@ -21,9 +21,9 @@ test('a key requested, approved by another administrator, then recovered', async
   const approver = await createUser(api, 'admin')
   const second = await signIn(approver.username, approver.password)
   await second.page.goto('/key-recovery')
-  const approve = second.page.getByRole('button', { name: 'Approve' })
-  await second.page.getByRole('main').locator('div').filter({ hasText: reason }).filter({ has: approve }).last()
-    .getByRole('button', { name: 'Approve' }).click()
+  // The queue row of the request: its approval asks for a note, optional
+  await second.page.getByRole('button', { name: `Approve the recovery of ${cert.common_name}` }).click()
+  await second.page.getByRole('dialog').getByRole('button', { name: 'Approve', exact: true }).click()
   await expect.poll(async () => {
     const data = await api.get('/key-recovery')
     return data.requests.find(r => r.reason === reason)?.status
@@ -31,9 +31,7 @@ test('a key requested, approved by another administrator, then recovered', async
 
   // The requester downloads the key
   await page.goto('/key-recovery')
-  const recover = page.getByRole('button', { name: 'Recover', exact: true })
-  await page.getByRole('main').locator('div').filter({ hasText: reason }).filter({ has: recover }).last()
-    .getByRole('button', { name: 'Recover', exact: true }).click()
+  await page.getByRole('button', { name: `Recover the key of ${cert.common_name}` }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('PKCS#12 password').fill('Recover-pass-123')
   const download = page.waitForEvent('download')

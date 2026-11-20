@@ -4531,6 +4531,18 @@
       "years_one": "{{count}} 年",
       "years_other": "{{count}} 年",
       "expired": "已过期"
+    },
+    "compact": {
+      "inHours_one": "{{count}} 小时后",
+      "inHours_other": "{{count}} 小时后",
+      "inDays_one": "{{count}} 天后",
+      "inDays_other": "{{count}} 天后",
+      "hoursAgo_one": "{{count}} 小时前",
+      "hoursAgo_other": "{{count}} 小时前",
+      "daysAgo_one": "{{count}} 天前",
+      "daysAgo_other": "{{count}} 天前",
+      "overdueDays_one": "已逾期 {{count}} 天",
+      "overdueDays_other": "已逾期 {{count}} 天"
     }
   },
   "validation": {
@@ -4930,7 +4942,10 @@
       "certificate": "证书",
       "ca": "CA",
       "truststore": "受信任证书",
-      "user_certificate": "用户证书"
+      "user_certificate": "用户证书",
+      "approval": "审批请求",
+      "key_recovery": "密钥恢复",
+      "report": "报告"
     },
     "sections": {
       "overview": "概览",
@@ -5117,7 +5132,108 @@
     "summaryProtocol": "协议",
     "summaryIdentity": "协议身份",
     "summaryCsr": "证书请求 (CSR)",
-    "triggerScheduler": "续期调度器"
+    "triggerScheduler": "续期调度器",
+    "work": {
+      "intent": "等待审核的请求。",
+      "total_one": "{{count}} 个待处理",
+      "total_other": "{{count}} 个待处理",
+      "hint": "勾选多个请求可一起批准或拒绝；点击主题可打开详情。",
+      "hintRead": "点击主题可打开详情。",
+      "emptyTitle": "没有待处理的请求",
+      "emptyText": "已处理的请求保留在下方历史记录中；策略决定哪些签发需要审批。",
+      "seePolicies": "查看策略",
+      "history": "最近处理",
+      "kind": "审批 · {{source}}",
+      "requestedBy": "{{user}} 于 {{ago}}申请",
+      "scheduler": "续期调度器",
+      "unknownRequester": "未知申请人",
+      "votes_one": "已批准 {{count}}/{{need}}",
+      "votes_other": "已批准 {{count}}/{{need}}",
+      "groups": {
+        "overdue": "已逾期",
+        "soon": "48 小时内处理",
+        "later": "稍后"
+      },
+      "approve": "批准",
+      "reject": "拒绝",
+      "approveAsk": "批准…",
+      "rejectAsk": "拒绝…",
+      "approveNamed": "批准 {{name}}",
+      "rejectNamed": "拒绝 {{name}}",
+      "what": {
+        "certificate": "待签发证书",
+        "csr": "待签名 CSR",
+        "renewal": "续期",
+        "revocation": "吊销",
+        "ca_revocation": "CA 吊销",
+        "cross_revocation": "交叉证书吊销",
+        "acme_order": "ACME 订单",
+        "est_enroll": "EST 注册",
+        "scep_request": "SCEP 请求",
+        "wstep_request": "WSTEP 请求"
+      },
+      "source": {
+        "certificate": "证书",
+        "csr": "CSR",
+        "renewal": "续期",
+        "revocation": "吊销",
+        "ca_revocation": "CA",
+        "cross_revocation": "交叉证书",
+        "acme_order": "ACME",
+        "est_enroll": "EST",
+        "scep_request": "SCEP",
+        "wstep_request": "WSTEP"
+      },
+      "state": {
+        "pending": "待处理",
+        "approved": "已批准",
+        "rejected": "已拒绝",
+        "expired": "已过期",
+        "cancelled": "已取消"
+      },
+      "dialog": {
+        "approveOne": "批准请求",
+        "approveMany": "批准请求",
+        "rejectOne": "拒绝请求",
+        "rejectMany": "拒绝请求",
+        "reason": "理由",
+        "optional": "可选",
+        "approveHint": "随决定一起记录。",
+        "rejectHint": "拒绝时必填：随决定一起记录。",
+        "reasonRequired": "请填写拒绝理由。",
+        "manyNote": "逐个处理每个请求；结果会列出成功的请求以及其他请求失败的原因。"
+      },
+      "sections": {
+        "request": "请求",
+        "log": "日志"
+      },
+      "detail": {
+        "request": "请求",
+        "id": "标识",
+        "submitted": "提交时间",
+        "due": "处理截止",
+        "votes": "批准数",
+        "csr": "CSR",
+        "object": "对象",
+        "subject": "主题",
+        "ca": "证书颁发机构",
+        "csrId": "已存储的 CSR",
+        "days_one": "{{count}} 天",
+        "days_other": "{{count}} 天",
+        "decision": "决定",
+        "by": "处理人",
+        "on": "时间",
+        "noReason": "无"
+      },
+      "log": {
+        "submitted": "请求已提交",
+        "approved": "已批准",
+        "rejected": "已拒绝",
+        "expired": "未决定即过期",
+        "cancelled": "已取消",
+        "none": "无记录。"
+      }
+    }
   },
   "messages": {
     "confirm": {
@@ -5579,7 +5695,86 @@
         "audit": "安全与审计",
         "recommendations": "建议"
       }
-    }
+    },
+    "work": {
+      "intent": "计划的清单和到期报告。",
+      "total_one": "{{count}} 个计划报告",
+      "total_other": "{{count}} 个计划报告",
+      "hint": "勾选多个报告可一起下载或暂停计划；点击名称可打开详情。",
+      "hintRead": "点击名称可打开详情。",
+      "emptyTitle": "没有计划报告",
+      "emptyText": "报告会按所选频率通过电子邮件发送清单、到期情况或合规情况。",
+      "unscheduled": "未计划",
+      "schedule": "计划报告",
+      "scheduleAsk": "计划…",
+      "scheduleNamed": "计划 {{name}}",
+      "editSchedule": "修改计划…",
+      "suspend": "暂停计划",
+      "suspended_one": "已暂停 {{count}} 个计划",
+      "suspended_other": "已暂停 {{count}} 个计划",
+      "testAsk": "发送测试…",
+      "customPdf": "生成 PDF…",
+      "downloadNamed": "下载 {{name}}",
+      "noRecipient": "无收件人",
+      "groups": {
+        "today": "24 小时内下次运行",
+        "later": "已计划"
+      },
+      "freq": {
+        "daily": "每天 · {{time}} UTC",
+        "weekly": "每周 · {{time}} UTC",
+        "monthly": "每月 · {{time}} UTC"
+      },
+      "freqLong": {
+        "daily": "每天 {{time}} UTC",
+        "weekly": "每周{{day}} {{time}} UTC",
+        "monthly": "每月 {{day}} 日 {{time}} UTC"
+      },
+      "dayName": {
+        "mon": "一",
+        "tue": "二",
+        "wed": "三",
+        "thu": "四",
+        "fri": "五",
+        "sat": "六",
+        "sun": "日"
+      },
+      "state": {
+        "scheduled": "已计划",
+        "unscheduled": "未计划"
+      },
+      "sections": {
+        "report": "报告",
+        "runs": "运行记录",
+        "preview": "预览"
+      },
+      "detail": {
+        "schedule": "计划",
+        "next": "下次运行",
+        "figure": "当前数据"
+      },
+      "items_one": "{{count}} 行",
+      "items_other": "{{count}} 行",
+      "generatedAt": "计算于 {{date}}。",
+      "compute": "计算",
+      "seeCertificates": "查看这些证书",
+      "noRuns": "服务器不提供运行历史：已知的只有计划和下次运行时间。",
+      "pdfPreview": "PDF 报告需下载后查看。",
+      "previewIntro": "立即生成报告以查看其内容。",
+      "previewCount_one": "显示 {{count}} 行，共 {{total}} 行",
+      "previewCount_other": "显示 {{count}} 行，共 {{total}} 行",
+      "dialog": {
+        "content": "内容",
+        "time": "发送时间 (UTC)",
+        "timeHint": "HH:MM 格式，与调度器一致使用 UTC 时间。",
+        "timeInvalid": "请按 HH:MM 格式填写时间。",
+        "recipientsHint": "一个或多个地址，用逗号分隔。",
+        "recipientsRequired": "请至少填写一个收件人：没有收件人则不会发送。",
+        "save": "计划",
+        "editTitle": "修改计划"
+      }
+    },
+    "invalidEmail": "无效的电子邮件地址"
   },
   "export": {
     "title": "导出",
@@ -6622,6 +6817,45 @@
       "rejected": "已拒绝",
       "recovered": "已恢复",
       "cancelled": "已取消"
+    },
+    "work": {
+      "intent": "申请恢复的私钥：经管理员批准后可恢复一次。",
+      "total_one": "{{count}} 个进行中",
+      "total_other": "{{count}} 个进行中",
+      "hint": "勾选多个请求可一起批准或拒绝；点击证书可打开详情。",
+      "hintDual": "双人控制：请求须由申请人以外的管理员批准；点击证书可打开详情。",
+      "emptyText": "在证书的检查器中填写理由即可申请恢复。",
+      "groups": {
+        "approve": "待批准",
+        "approveOther": "待其他管理员批准",
+        "recover": "待恢复"
+      },
+      "kind": "密钥恢复",
+      "requestedBy": "{{user}} 于 {{ago}}申请",
+      "reason": "理由：{{reason}}",
+      "approveAsk": "批准…",
+      "rejectAsk": "拒绝…",
+      "recoverAsk": "恢复…",
+      "approveNamed": "批准恢复 {{name}}",
+      "rejectNamed": "拒绝恢复 {{name}}",
+      "recoverNamed": "恢复 {{name}} 的密钥",
+      "certificate": "证书",
+      "recoveredBy": "恢复人",
+      "recoveredOn": "恢复时间",
+      "dialog": {
+        "approveOne": "批准恢复",
+        "approveMany": "批准恢复",
+        "rejectOne": "拒绝恢复",
+        "rejectMany": "拒绝恢复",
+        "note": "备注",
+        "noteHint": "随决定一起保存。"
+      },
+      "log": {
+        "requested": "已申请恢复",
+        "approved": "请求已批准",
+        "rejected": "请求已拒绝",
+        "recovered": "密钥已恢复"
+      }
     }
   },
   "updatePopup": {
@@ -7156,5 +7390,26 @@
     "sectionCount_one": "{{count}} 个部分",
     "sectionCount_other": "{{count}} 个部分",
     "sectionFailed": "无法显示此部分。请重新加载页面后重试。"
+  },
+  "work": {
+    "sep": "：",
+    "selectRow": "选择 {{name}}",
+    "selectAll": "全选：{{group}}",
+    "loading": "正在加载队列…",
+    "retry": "重试",
+    "bulkLabel": "批量操作",
+    "selected_one": "已选择 {{count}} 项",
+    "selected_other": "已选择 {{count}} 项",
+    "cancelSelection": "取消选择",
+    "historyEmpty": "暂无内容。",
+    "bulk": {
+      "title": "结果",
+      "done_one": "{{count}} 项成功",
+      "done_other": "{{count}} 项成功",
+      "failed_one": "{{count}} 项失败",
+      "failed_other": "{{count}} 项失败",
+      "ok": "成功",
+      "ko": "失败"
+    }
   }
 }

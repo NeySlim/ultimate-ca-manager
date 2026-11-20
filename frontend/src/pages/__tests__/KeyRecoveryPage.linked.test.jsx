@@ -1,103 +1,162 @@
 /**
- * KeyRecoveryPage with ?request=N: the linked request comes first, follows its decision,
- * and leaves the list when the status filter excludes its state.
+ * KeyRecoveryPage as a work queue: requests to approve, then keys to recover,
+ * the closed ones in the history; ?request=N shows and opens that request even
+ * past the 500 the list holds; the actions follow the separation of roles.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within, configure } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
-// A loaded machine slows the first render past the default second
 configure({ asyncUtilTimeout: 5000 })
 
-// One translator and one notifier for every render: the page reloads when either changes
 const stable = vi.hoisted(() => ({
-  i18n: { t: (key) => key, i18n: { language: 'en', changeLanguage: () => {}, on: () => {}, off: () => {} } },
+  i18n: null,
   notify: { showSuccess: () => {}, showError: () => {}, showInfo: () => {}, showWarning: () => {} },
+  perms: [], username: 'bob',
 }))
-vi.mock('react-i18next', () => ({
-  useTranslation: () => stable.i18n,
-  Trans: ({ children }) => children,
-  initReactI18next: { type: '3rdParty', init: () => {} },
-}))
+vi.mock('react-i18next', () => ({ useTranslation: () => stable.i18n, Trans: ({ children }) => children, initReactI18next: { type: '3rdParty', init: () => {} } }))
+import { frI18n } from '../../components/work/__tests__/frI18n'
+stable.i18n = frI18n
+
+const openEntity = vi.fn()
 vi.mock('../../contexts', () => ({
   useNotification: () => stable.notify,
-  useMobile: () => ({ isMobile: false, isTablet: false, screenWidth: 1280, sidebarOpen: true, setSidebarOpen: () => {} }),
-  useInspector: () => ({ openEntity: () => {}, windows: [], prefs: {}, updatePrefs: () => {} }),
+  useMobile: () => ({ isMobile: false, isTablet: false, screenWidth: 1600, sidebarOpen: true, setSidebarOpen: () => {} }),
+  useInspector: () => ({ openEntity, activeKey: null }),
 }))
 vi.mock('../../hooks', () => ({
-  usePermission: () => ({ canWrite: () => true, canRead: () => true, canDelete: () => true, hasPermission: () => true }),
+  usePermission: () => ({
+    canWrite: () => true, canRead: () => true, canDelete: () => true,
+    hasPermission: (p) => stable.perms.includes(p), username: stable.username,
+  }),
 }))
 const api = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn(), approve: vi.fn(), reject: vi.fn(), recover: vi.fn() }))
 vi.mock('../../services', () => ({ keyRecoveryService: api }))
 
 import KeyRecoveryPage from '../KeyRecoveryPage'
 
-const req = (id, status, cn) => ({ id, status, cert_cn: cn, reason: 'lost', requested_by: 'alice', requested_at: '2026-11-01T10:00:00Z' })
-// The database: what the list and the detail read
+const ADMIN = ['admin:key_recovery', 'write:key_recovery', 'read:key_recovery']
+const req = (id, status, cn, by = 'alice') => ({ id, status, cert_id: id, cert_cn: cn, reason: 'lost', requested_by: by, requested_at: new Date(Date.now() - 3 * 3600000).toISOString() })
 let rows
-const renderPage = () => render(<MemoryRouter initialEntries={['/key-recovery?request=900']}><KeyRecoveryPage /></MemoryRouter>)
-const cards = () => screen.getAllByText(/^cn-/).map((el) => el.textContent)
-const filter = (name) => screen.getByRole('button', { name })
-const linkedCard = () => document.querySelector('[aria-current="true"]')
+let dual
+const renderPage = (path = '/key-recovery') => render(<MemoryRouter initialEntries={[path]}><KeyRecoveryPage /></MemoryRouter>)
+const group = (name) => screen.getByRole('heading', { level: 2, name: new RegExp(`^${name}`) }).closest('section')
+const rowOf = (cn) => screen.getByText(cn).closest('li')
 
 beforeEach(() => {
   vi.clearAllMocks()
-  rows = [req(1, 'pending', 'cn-one'), req(2, 'approved', 'cn-two'), req(900, 'pending', 'cn-linked')]
+  stable.perms = ADMIN
+  stable.username = 'bob'
+  dual = true
+  rows = [req(1, 'pending', 'cn-one'), req(2, 'approved', 'cn-two'), req(3, 'pending', 'cn-mine', 'bob'), req(4, 'recovered', 'cn-done'), req(900, 'pending', 'cn-linked')]
   // The list stops before the linked request, as past the 500 it holds
-  api.list.mockImplementation(async (status) => ({ data: { requests: rows.filter((r) => r.id !== 900 && (!status || r.status === status)).map((r) => ({ ...r })), dual_control: true } }))
+  api.list.mockImplementation(async () => ({ data: { requests: rows.filter((r) => r.id !== 900).map((r) => ({ ...r })), dual_control: dual } }))
   api.get.mockImplementation(async (id) => ({ data: { ...rows.find((r) => String(r.id) === String(id)) } }))
-  api.approve.mockImplementation(async (id) => { rows.find((r) => r.id === id).status = 'approved'; return {} })
+})
+
+describe('KeyRecoveryPage queue', () => {
+  it('puts the requests to approve, then the keys to recover, the closed ones in the history', async () => {
+    renderPage()
+    await screen.findByText('cn-one')
+    expect(within(group('À approuver par un autre administrateur')).getAllByText(/^cn-/).map((e) => e.textContent)).toEqual(['cn-one', 'cn-mine'])
+    expect(within(group('À récupérer')).getByText('cn-two')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Traitées récemment/ })).toHaveTextContent('1')
+    expect(screen.getByText('3 en cours')).toBeInTheDocument()
+  })
+
+  it('names the group plainly when dual control is off', async () => {
+    dual = false
+    renderPage()
+    await screen.findByText('cn-one')
+    expect(group('À approuver')).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: /autre administrateur/ })).toBeNull()
+  })
+
+  it('with dual control, offers no approval of one\'s own request, only its rejection', async () => {
+    renderPage()
+    await screen.findByText('cn-mine')
+    expect(within(rowOf('cn-mine')).queryByRole('button', { name: /^Approuver/ })).toBeNull()
+    expect(within(rowOf('cn-mine')).getByRole('button', { name: 'Refuser la récupération de cn-mine' })).toBeInTheDocument()
+    expect(within(rowOf('cn-one')).getByRole('button', { name: 'Approuver la récupération de cn-one' })).toBeInTheDocument()
+  })
+
+  it('selects only the requests a bulk decision can reach: pending ones, not the keys to recover', async () => {
+    renderPage()
+    await screen.findByText('cn-two')
+    expect(within(rowOf('cn-one')).getByRole('checkbox')).toBeInTheDocument()
+    expect(within(rowOf('cn-two')).queryByRole('checkbox')).toBeNull()
+  })
+
+  it('gives no decision and no selection without admin:key_recovery; the requester still recovers', async () => {
+    stable.perms = ['write:key_recovery', 'read:key_recovery']
+    stable.username = 'alice'
+    renderPage()
+    await screen.findByText('cn-one')
+    expect(screen.queryByRole('button', { name: /^Approuver|^Refuser/ })).toBeNull()
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
+    expect(within(rowOf('cn-two')).getByRole('button', { name: 'Récupérer la clé de cn-two' })).toBeInTheDocument()
+  })
+
+  it('does not offer the recovery to someone else than the requester or an administrator', async () => {
+    stable.perms = ['write:key_recovery', 'read:key_recovery']
+    stable.username = 'carol'
+    renderPage()
+    await screen.findByText('cn-two')
+    expect(within(rowOf('cn-two')).queryByRole('button', { name: /Récupérer/ })).toBeNull()
+  })
+
+  it('approves with a note', async () => {
+    api.approve.mockResolvedValue({})
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Approuver la récupération de cn-one' }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText(/Note/), { target: { value: 'vu au téléphone' } })
+    fireEvent.click(within(dialog).getByTestId('recovery-confirm'))
+    await waitFor(() => expect(api.approve).toHaveBeenCalledWith(1, 'vu au téléphone'))
+  })
+
+  it('recovers with a password of eight characters at least', async () => {
+    api.recover.mockResolvedValue(new Blob(['p12']))
+    URL.createObjectURL = vi.fn(() => 'blob:x'); URL.revokeObjectURL = vi.fn()
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Récupérer la clé de cn-two' }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText(/Mot de passe/), { target: { value: 'short' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /Télécharger/ }))
+    expect(await within(dialog).findByRole('alert')).toBeInTheDocument()
+    expect(api.recover).not.toHaveBeenCalled()
+    fireEvent.change(within(dialog).getByLabelText(/Mot de passe/), { target: { value: 'Recover-pass-123' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /Télécharger/ }))
+    await waitFor(() => expect(api.recover).toHaveBeenCalledWith(2, 'Recover-pass-123', false))
+  })
+
+  it('rejects several requests in turn and says which failed and why', async () => {
+    api.reject.mockImplementation(async (id) => { if (id === 3) throw new Error('Request is not pending (status: rejected)'); return {} })
+    renderPage()
+    await screen.findByText('cn-one')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Tout sélectionner : À approuver par un autre administrateur' }))
+    fireEvent.click(within(screen.getByRole('group', { name: 'Actions groupées' })).getByRole('button', { name: /Refuser/ }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByTestId('recovery-confirm'))
+    const outcome = await within(dialog).findByTestId('bulk-outcome')
+    expect(within(outcome).getByRole('status')).toHaveTextContent('1 réussie, 1 échouée')
+    expect(within(outcome).getByText(/cn-mine/).closest('li')).toHaveTextContent('Request is not pending (status: rejected)')
+  })
 })
 
 describe('KeyRecoveryPage linked request', () => {
-  it('shows the linked request first', async () => {
-    // Listed this time, last: it still comes first
-    api.list.mockImplementation(async () => ({ data: { requests: rows.map((r) => ({ ...r })), dual_control: true } }))
-    renderPage()
-    await waitFor(() => expect(linkedCard()).toBeTruthy())
-    expect(within(linkedCard()).getByText('cn-linked')).toBeTruthy()
-    expect(cards()).toEqual(['cn-linked', 'cn-one', 'cn-two'])
+  it('shows a linked request outside the list and opens it in the inspector', async () => {
+    renderPage('/key-recovery?request=900')
+    expect(await screen.findByText('cn-linked')).toBeInTheDocument()
+    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('key_recovery', 900, { data: expect.objectContaining({ id: 900 }) }))
+    expect(rowOf('cn-linked')).toHaveClass('is-opened')
   })
 
   it('the listed copy of the linked request wins over the copy read on opening', async () => {
-    api.list.mockImplementation(async (status) => ({ data: { requests: rows.filter((r) => !status || r.status === status).map((r) => ({ ...r })), dual_control: true } }))
-    renderPage()
-    await waitFor(() => expect(linkedCard()).toBeTruthy())
-    rows[2].status = 'approved'
-    fireEvent.click(filter('keyRecovery.status.approved'))
-    await waitFor(() => expect(cards()).toEqual(['cn-linked', 'cn-two']))
-    expect(within(linkedCard()).getByText('keyRecovery.status.approved')).toBeTruthy()
-  })
-
-  it('a linked request outside the list is shown first', async () => {
-    renderPage()
-    await waitFor(() => expect(linkedCard()).toBeTruthy())
-    expect(cards()).toEqual(['cn-linked', 'cn-one', 'cn-two'])
-  })
-
-  it('no decision buttons are left once the linked request is approved', async () => {
-    renderPage()
-    await waitFor(() => expect(linkedCard()).toBeTruthy())
-    fireEvent.click(filter('keyRecovery.status.pending'))
-    await waitFor(() => expect(api.list).toHaveBeenLastCalledWith('pending'))
-    await waitFor(() => expect(cards()).toEqual(['cn-linked', 'cn-one']))
-    fireEvent.click(within(linkedCard()).getByText('keyRecovery.approve'))
-    await waitFor(() => expect(api.approve).toHaveBeenCalledWith(900))
-    // Approved, it no longer matches the pending filter: neither shown nor offering its buttons
-    await waitFor(() => expect(cards()).toEqual(['cn-one']))
-    expect(screen.getAllByText('keyRecovery.approve')).toHaveLength(1)
-    fireEvent.click(filter('common.all'))
-    await waitFor(() => expect(cards()[0]).toBe('cn-linked'))
-    expect(within(linkedCard()).queryByText('keyRecovery.approve')).toBeNull()
-    expect(within(linkedCard()).getByText('keyRecovery.status.approved')).toBeTruthy()
-  })
-
-  it('the status filter removes a linked request in another state', async () => {
-    renderPage()
-    await waitFor(() => expect(cards()[0]).toBe('cn-linked'))
-    fireEvent.click(filter('keyRecovery.status.approved'))
-    await waitFor(() => expect(api.list).toHaveBeenLastCalledWith('approved'))
-    await waitFor(() => expect(cards()).toEqual(['cn-two']))
-    expect(linkedCard()).toBeNull()
+    api.list.mockImplementation(async () => ({ data: { requests: rows.map((r) => (r.id === 900 ? { ...r, status: 'approved' } : { ...r })), dual_control: true } }))
+    renderPage('/key-recovery?request=900')
+    await waitFor(() => expect(openEntity).toHaveBeenCalled())
+    expect(within(group('À récupérer')).getByText('cn-linked')).toBeInTheDocument()
+    expect(screen.getAllByText('cn-linked')).toHaveLength(1)
   })
 })

@@ -3133,21 +3133,27 @@ A closure as rejected notifies the webhooks as a rejection does; a closure as ap
 ## Deadline
 A request waits **seven days** for a decision. Past that it is closed as expired, is never counted as pending, and the renewal scheduler resumes for its certificate. While a renewal awaits approval, the scheduler leaves the certificate to that decision, as long as it can come before the certificate expires; under a renewal policy it never renews without one.
 
+## The queue
+
+Open requests are grouped by their deadline: **Overdue**, **To handle within 48 h** and **Later**, each with its count. A row gives what the request asks for and its subject, a pill naming its source (CSR, certificate, renewal, revocation, CA, ACME, EST, SCEP, WSTEP), who asked and when, the policy, the authority, and the deadline in short form above its exact date. A subject opens the request in the inspector, with its **Request** and **Log** sections.
+
 ## Approving a Request
 
-1. Click a pending request to view its details
-2. Review the certificate details, requester, and associated policy
-3. Click **Approve** and optionally add a comment
-4. The approval is recorded with your username and timestamp
+1. Click **Approve…** on its row, or in the inspector
+2. Optionally give a reason: it is recorded with the decision
+3. Confirm: what the approval issued (a certificate, or a CA) opens in the inspector
 
 ## Rejecting a Request
 
-1. Click a pending request to view its details
-2. Click **Reject**
-3. Enter a **rejection reason** (required): it is kept in the request's timeline; a rejection writes no audit log entry
-4. The request is immediately stopped
+1. Click **Reject…** on its row, or in the inspector
+2. Enter a **reason** (required): it is kept in the request's timeline; a rejection writes no audit log entry
+3. Confirm: the request is immediately stopped
 
 > ⚠ Any single rejection stops the entire request. This is intentional: if any reviewer identifies a problem, issuance should not proceed.
+
+## Deciding several requests
+
+Tick several rows, or a whole group from its head, then **Approve…** or **Reject…** in the bar that replaces the hint. There is no bulk route: each request is decided in turn, and the outcome lists those that went through and why the others did not (already voted, expired, issuance failed).
 
 ## Approval History
 
@@ -3158,13 +3164,9 @@ Each request maintains a complete approval timeline showing:
 
 This history is stored with the request, not in the audit log.
 
-## Filtering
+## Recently handled
 
-Use the status filter bar at the top to show:
-- **Pending**: Requests awaiting your review
-- **Approved**: Recently approved requests
-- **Rejected**: Rejected requests with reasons
-- **Total**: All requests regardless of status
+Decided requests (approved, rejected, expired, cancelled) are folded at the bottom of the page under **Recently handled**, newest first, with who decided, when and why.
 
 ## Permissions
 
@@ -3194,6 +3196,10 @@ An administrator reviews the request and approves it. With dual control on (the 
 
 ### 3. Download
 Once approved, the archived key is released as a **password-protected PKCS#12** bundle. The download is recorded in the audit trail.
+
+## The queue
+
+The page lists the requests **to approve** (with dual control on, **to approve by another administrator**), then the keys **to recover**; closed requests (recovered, rejected, cancelled) are folded under **Recently handled**. A row offers only what the server would accept from you: **Approve…** and **Reject…** with admin:key_recovery, never the approval of your own request while dual control is on; **Recover…** for the requester or an administrator of key recovery. Several requests can be approved or rejected together: each is decided in turn and the outcome lists them one by one. A certificate name opens the request in the inspector, with its **Request** and **Log** sections.
 
 ## Requirements
 
@@ -3244,7 +3250,7 @@ Certificates revoked during the chosen period (default: 30 days), with revocatio
 
 ## Executive PDF Report
 
-Open the **PDF Reports** tab and click **Download PDF** on the **Executive Summary** template to generate a professional executive report suitable for management reviews, board presentations, and compliance audits.
+The **Executive Summary** template is one of the reports of the page: its **Download** button generates the PDF, suitable for management reviews, board presentations, and compliance audits. **Build a PDF…** in the page head composes one from the sections you choose.
 
 ### Contents
 The PDF report includes 9 sections:
@@ -3263,18 +3269,20 @@ The report includes visual elements: risk gauge bar, status distribution, compli
 
 > 💡 The PDF report is generated from live data. Download it before meetings for the most current snapshot.
 
-## Generating Reports
+## The queue
 
-1. Find the report you want in the list
-2. Click **▶ Generate** to create a preview
-3. The preview appears below as a formatted table
-4. Click **Close** to dismiss the preview
+Scheduled reports are grouped by their next run: **Next run within 24 h**, then **Scheduled**. A row gives the report, its frequency and UTC time in a pill, its format and recipients, and the next run in short form above its exact date. The reports without a schedule are folded under **Not scheduled**, each with **Download** and **Schedule…**.
+
+## Viewing a report
+
+A report's name opens it in the inspector:
+- **Report**: its schedule and, for a data report, **Compute** for the current figure; the inventory, expiring and revoked reports offer **See these certificates**
+- **Runs**: the server serves no run history; the schedule and the next run are what is known
+- **Preview**: **Generate** builds the report now and shows its rows (the first 200; the download holds them all)
 
 ## Downloading Reports
 
-Each report row has download buttons:
-- **CSV**: Spreadsheet format for Excel, Google Sheets, or LibreOffice
-- **JSON**: Structured data for automation and integration
+**Download** on a row, or in the inspector, generates the report now in the format of its schedule: CSV by default, JSON when chosen, PDF for a template. Ticking several rows downloads them one after the other, and the outcome says which failed.
 
 > 💡 CSV reports are easier for non-technical stakeholders. JSON is better for scripts and API integrations.
 
@@ -3287,16 +3295,15 @@ Every data report and every PDF template can be scheduled, each with its own fre
 **Daily**, **Weekly** (choose the day of week) or **Monthly** (choose the day of month), at a time given in UTC.
 
 ### Configuration
-1. Open the **Schedule** tab
-2. Tick the reports you want to schedule
-3. Set the frequency, the time and, for data reports, the format (CSV or JSON)
-4. Add recipient email addresses (press Enter or click Add)
-5. Click Save
+1. Click **Schedule a report**, or **Schedule…** on a report folded under **Not scheduled**
+2. Choose the content, the frequency and its day, the sending time (UTC) and, for a data report, the format (CSV or JSON)
+3. Give one or more recipients, separated by commas: without a recipient, nothing is sent
+4. Click **Schedule**
 
-Each scheduled report is attached to the email in its format: CSV or JSON for data reports, PDF for the PDF templates.
+Each scheduled report is attached to the email in its format: CSV or JSON for data reports, PDF for the PDF templates. **Change the schedule…** and **Suspend the schedule** are in the « ⋯ » menu of the inspector; ticking several rows suspends them together, in one update.
 
 ### Test Send
-Before enabling schedules, use the ✈️ button on any report row to send a test report to a specific email address. This verifies that SMTP is configured correctly and the report format meets your needs.
+Before relying on a schedule, use **Send a test…** in the « ⋯ » menu of a report's inspector to send it to one email address. This verifies that SMTP is configured correctly and the report format meets your needs.
 
 > ⚠ Scheduled reports require SMTP to be configured in **Settings → Email**. Test send will fail if SMTP is not set up.
 

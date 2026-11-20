@@ -92,21 +92,27 @@ Une clôture comme rejetée notifie les webhooks comme le fait un rejet ; une cl
 
 Une demande attend **sept jours** une décision. Passé ce délai, elle est clôturée comme expirée, n'est jamais comptée comme en attente, et le planificateur de renouvellement reprend pour son certificat. Tant qu'un renouvellement attend une approbation, le planificateur laisse le certificat à cette décision, tant qu'elle peut intervenir avant l'expiration du certificat ; sous une politique de renouvellement, il ne renouvelle jamais sans elle.
 
+## La file
+
+Les demandes ouvertes sont groupées par échéance : **En retard**, **À traiter sous 48 h** et **Plus tard**, chacune avec son compteur. Une ligne donne ce que la demande demande et son sujet, une pastille qui nomme sa source (CSR, certificat, renouvellement, révocation, AC, ACME, EST, SCEP, WSTEP), qui l'a demandée et quand, la politique, l'autorité, et l'échéance en forme courte au-dessus de sa date exacte. Un sujet ouvre la demande dans l'inspecteur, avec ses sections **Demande** et **Journal**.
+
 ## Approuver une demande
 
-1. Cliquez sur une demande en attente pour voir ses détails
-2. Examinez les détails du certificat, le demandeur et la politique associée
-3. Cliquez sur **Approuver** et ajoutez optionnellement un commentaire
-4. L'approbation est enregistrée avec votre nom d'utilisateur et l'horodatage
+1. Cliquez sur **Approuver…** sur sa ligne, ou dans l'inspecteur
+2. Donnez éventuellement un motif : il est enregistré avec la décision
+3. Confirmez : ce que l'approbation a émis (un certificat, ou une AC) s'ouvre dans l'inspecteur
 
 ## Rejeter une demande
 
-1. Cliquez sur une demande en attente pour voir ses détails
-2. Cliquez sur **Rejeter**
-3. Entrez un **motif de rejet** (requis) : il est conservé dans la chronologie de la demande ; un rejet n'écrit aucune entrée dans le journal d'audit
-4. La demande est immédiatement arrêtée
+1. Cliquez sur **Refuser…** sur sa ligne, ou dans l'inspecteur
+2. Entrez un **motif** (requis) : il est conservé dans la chronologie de la demande ; un rejet n'écrit aucune entrée dans le journal d'audit
+3. Confirmez : la demande est immédiatement arrêtée
 
 > ⚠ Tout rejet unique arrête la demande entière. C'est intentionnel : si un examinateur identifie un problème, l'émission ne doit pas se poursuivre.
+
+## Décider plusieurs demandes
+
+Cochez plusieurs lignes, ou tout un groupe depuis son en-tête, puis **Approuver…** ou **Refuser…** dans la barre qui remplace l'indication. Il n'existe pas de route groupée : chaque demande est traitée à son tour, et le bilan donne celles qui sont passées et pourquoi les autres ne le sont pas (vote déjà donné, demande expirée, émission en échec).
 
 ## Historique des approbations
 
@@ -117,13 +123,9 @@ Chaque demande maintient un historique d'approbation complet montrant :
 
 Cet historique est stocké avec la demande, pas dans le journal d'audit.
 
-## Filtrage
+## Traitées récemment
 
-Utilisez la barre de filtre de statut en haut pour afficher :
-- **En attente** : Demandes en attente de votre examen
-- **Approuvées** : Demandes récemment approuvées
-- **Rejetées** : Demandes rejetées avec motifs
-- **Total** : Toutes les demandes quel que soit le statut
+Les demandes décidées (approuvées, refusées, expirées, annulées) sont repliées en bas de page sous **Traitées récemment**, de la plus récente à la plus ancienne, avec qui a décidé, quand et pourquoi.
 
 ## Permissions
 

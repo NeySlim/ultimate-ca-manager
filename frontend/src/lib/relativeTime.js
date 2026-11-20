@@ -45,6 +45,15 @@ export const relativeDue = (date, t, opts) => say(relativeParts(date, { ...opts,
 /** "20 hours ago", "3 days ago"; '' without a date. */
 export const relativeAgo = (date, t, opts) => say(relativeParts(date, { ...opts, mode: 'event' }), t)
 
+// Compact wording of the work queues ("dans 28 h", "il y a 3 j"): same counts, keys under time.compact
+const compact = (parts) => (parts ? { ...parts, key: parts.key.replace(/^time\./, 'time.compact.') } : null)
+
+/** "in 28 h", "in 3 d", "overdue by 5 d"; '' without a date. */
+export const compactDue = (date, t, opts) => say(compact(relativeParts(date, { ...opts, mode: 'due' })), t)
+
+/** "20 h ago", "3 d ago"; '' without a date. */
+export const compactAgo = (date, t, opts) => say(compact(relativeParts(date, { ...opts, mode: 'event' })), t)
+
 /** 'bad' once the date is past, 'warn' inside warnDays, '' beyond or without a date. */
 export function dueTone(date, { now = new Date(), warnDays = 7 } = {}) {
   const ms = toTime(date)

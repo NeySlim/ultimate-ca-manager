@@ -76,10 +76,10 @@ function answer(url) {
 beforeEach(() => { api.get.mockReset(); api.get.mockImplementation(async (url) => answer(url)) })
 
 describe('request states in French', () => {
-  it('approvals list and detail', async () => {
+  it('approvals queue and history', async () => {
     render(<MemoryRouter initialEntries={['/approvals?request=1']}><ApprovalsPage /></MemoryRouter>)
-    await screen.findByText('Détails de la demande')
-    await waitFor(() => expect(leaves()).toContain('Rejeté'))
+    await screen.findByText('Traitées récemment')
+    await waitFor(() => expect(leaves()).toEqual(expect.arrayContaining(['Refusée', 'Approuvée', 'Expirée'])))
     expect(englishStates()).toEqual([])
   })
 

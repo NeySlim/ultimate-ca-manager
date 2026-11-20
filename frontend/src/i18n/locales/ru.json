@@ -4622,6 +4622,28 @@
       "years_many": "{{count}} л.",
       "years_other": "{{count}} г.",
       "expired": "Истёк"
+    },
+    "compact": {
+      "inHours_one": "через {{count}} ч",
+      "inHours_other": "через {{count}} ч",
+      "inHours_few": "через {{count}} ч",
+      "inHours_many": "через {{count}} ч",
+      "inDays_one": "через {{count}} дн.",
+      "inDays_other": "через {{count}} дн.",
+      "inDays_few": "через {{count}} дн.",
+      "inDays_many": "через {{count}} дн.",
+      "hoursAgo_one": "{{count}} ч назад",
+      "hoursAgo_other": "{{count}} ч назад",
+      "hoursAgo_few": "{{count}} ч назад",
+      "hoursAgo_many": "{{count}} ч назад",
+      "daysAgo_one": "{{count}} дн. назад",
+      "daysAgo_other": "{{count}} дн. назад",
+      "daysAgo_few": "{{count}} дн. назад",
+      "daysAgo_many": "{{count}} дн. назад",
+      "overdueDays_one": "просрочено на {{count}} дн.",
+      "overdueDays_other": "просрочено на {{count}} дн.",
+      "overdueDays_few": "просрочено на {{count}} дн.",
+      "overdueDays_many": "просрочено на {{count}} дн."
     }
   },
   "validation": {
@@ -5029,7 +5051,10 @@
       "certificate": "Сертификат",
       "ca": "ЦС",
       "truststore": "Доверенный сертификат",
-      "user_certificate": "Сертификат пользователя"
+      "user_certificate": "Сертификат пользователя",
+      "approval": "Запрос на утверждение",
+      "key_recovery": "Восстановление ключа",
+      "report": "Отчёт"
     },
     "sections": {
       "overview": "Обзор",
@@ -5288,7 +5313,114 @@
     "summaryProtocol": "Протокол",
     "summaryIdentity": "Идентичность по протоколу",
     "summaryCsr": "Запрос на сертификат (CSR)",
-    "triggerScheduler": "Планировщик продления"
+    "triggerScheduler": "Планировщик продления",
+    "work": {
+      "intent": "Запросы, ожидающие подтверждения.",
+      "total_one": "{{count}} в ожидании",
+      "total_other": "{{count}} в ожидании",
+      "total_few": "{{count}} в ожидании",
+      "total_many": "{{count}} в ожидании",
+      "hint": "Отметьте несколько запросов, чтобы утвердить или отклонить их вместе; тема открывает подробности.",
+      "hintRead": "Тема открывает подробности.",
+      "emptyTitle": "Нет ожидающих запросов",
+      "emptyText": "Обработанные запросы остаются в истории ниже; политики определяют, каким выпускам он нужен.",
+      "seePolicies": "Открыть политики",
+      "history": "Недавно обработанные",
+      "kind": "Утверждение · {{source}}",
+      "requestedBy": "Запросил {{user}} {{ago}}",
+      "scheduler": "планировщик продления",
+      "unknownRequester": "неизвестный заявитель",
+      "votes_one": "{{count}} из {{need}} утверждений",
+      "votes_other": "{{count}} из {{need}} утверждений",
+      "votes_few": "{{count}} из {{need}} утверждений",
+      "votes_many": "{{count}} из {{need}} утверждений",
+      "groups": {
+        "overdue": "Просрочено",
+        "soon": "Обработать в течение 48 ч",
+        "later": "Позже"
+      },
+      "approve": "Утвердить",
+      "reject": "Отклонить",
+      "approveAsk": "Утвердить…",
+      "rejectAsk": "Отклонить…",
+      "approveNamed": "Утвердить {{name}}",
+      "rejectNamed": "Отклонить {{name}}",
+      "what": {
+        "certificate": "Сертификат к выпуску",
+        "csr": "CSR к подписи",
+        "renewal": "Продление",
+        "revocation": "Отзыв",
+        "ca_revocation": "Отзыв ЦС",
+        "cross_revocation": "Отзыв кросс-сертификата",
+        "acme_order": "Заказ ACME",
+        "est_enroll": "Регистрация EST",
+        "scep_request": "Запрос SCEP",
+        "wstep_request": "Запрос WSTEP"
+      },
+      "source": {
+        "certificate": "сертификат",
+        "csr": "CSR",
+        "renewal": "продление",
+        "revocation": "отзыв",
+        "ca_revocation": "ЦС",
+        "cross_revocation": "кросс-сертификат",
+        "acme_order": "ACME",
+        "est_enroll": "EST",
+        "scep_request": "SCEP",
+        "wstep_request": "WSTEP"
+      },
+      "state": {
+        "pending": "В ожидании",
+        "approved": "Утверждён",
+        "rejected": "Отклонён",
+        "expired": "Истёк",
+        "cancelled": "Отменён"
+      },
+      "dialog": {
+        "approveOne": "Утвердить запрос",
+        "approveMany": "Утвердить запросы",
+        "rejectOne": "Отклонить запрос",
+        "rejectMany": "Отклонить запросы",
+        "reason": "Причина",
+        "optional": "необязательно",
+        "approveHint": "Сохраняется вместе с решением.",
+        "rejectHint": "Обязательно для отклонения: сохраняется вместе с решением.",
+        "reasonRequired": "Укажите причину отклонения.",
+        "manyNote": "Запросы обрабатываются по очереди; итог показывает, какие прошли и почему остальные нет."
+      },
+      "sections": {
+        "request": "Запрос",
+        "log": "Журнал"
+      },
+      "detail": {
+        "request": "Запрос",
+        "id": "Идентификатор",
+        "submitted": "Подан",
+        "due": "Обработать до",
+        "votes": "Утверждения",
+        "csr": "CSR",
+        "object": "Объект",
+        "subject": "Субъект",
+        "ca": "Центр сертификации",
+        "csrId": "Сохранённый CSR",
+        "days_one": "{{count}} день",
+        "days_other": "{{count}} дней",
+        "days_few": "{{count}} дня",
+        "days_many": "{{count}} дней",
+        "decision": "Решение",
+        "by": "Кем",
+        "on": "Когда",
+        "noReason": "Нет"
+      },
+      "log": {
+        "submitted": "Запрос подан",
+        "approved": "Утверждён",
+        "rejected": "Отклонён",
+        "expired": "Истёк без решения",
+        "cancelled": "Отменён",
+        "none": "Нет записей."
+      }
+    }
   },
   "reports": {
     "title": "Отчёты",
@@ -5416,7 +5548,94 @@
         "audit": "Безопасность и аудит",
         "recommendations": "Рекомендации"
       }
-    }
+    },
+    "work": {
+      "intent": "Запланированные инвентаризации и сроки.",
+      "total_one": "{{count}} запланированный отчёт",
+      "total_other": "{{count}} запланированных отчётов",
+      "total_few": "{{count}} запланированных отчёта",
+      "total_many": "{{count}} запланированных отчётов",
+      "hint": "Отметьте несколько отчётов, чтобы скачать их или приостановить расписание вместе; название открывает подробности.",
+      "hintRead": "Название открывает подробности.",
+      "emptyTitle": "Нет запланированных отчётов",
+      "emptyText": "Отчёт отправляет инвентаризацию, сроки или соответствие по электронной почте с выбранной периодичностью.",
+      "unscheduled": "Без расписания",
+      "schedule": "Запланировать отчёт",
+      "scheduleAsk": "Запланировать…",
+      "scheduleNamed": "Запланировать {{name}}",
+      "editSchedule": "Изменить расписание…",
+      "suspend": "Приостановить расписание",
+      "suspended_one": "Приостановлено расписаний: {{count}}",
+      "suspended_other": "Приостановлено расписаний: {{count}}",
+      "suspended_few": "Приостановлено расписаний: {{count}}",
+      "suspended_many": "Приостановлено расписаний: {{count}}",
+      "testAsk": "Отправить тест…",
+      "customPdf": "Собрать PDF…",
+      "downloadNamed": "Скачать {{name}}",
+      "noRecipient": "Нет получателей",
+      "groups": {
+        "today": "Следующий запуск в течение 24 ч",
+        "later": "Запланированы"
+      },
+      "freq": {
+        "daily": "Ежедневно · {{time}} UTC",
+        "weekly": "Еженедельно · {{time}} UTC",
+        "monthly": "Ежемесячно · {{time}} UTC"
+      },
+      "freqLong": {
+        "daily": "Ежедневно, в {{time}} UTC",
+        "weekly": "Еженедельно, {{day}}, в {{time}} UTC",
+        "monthly": "Ежемесячно, {{day}}-го числа, в {{time}} UTC"
+      },
+      "dayName": {
+        "mon": "в понедельник",
+        "tue": "во вторник",
+        "wed": "в среду",
+        "thu": "в четверг",
+        "fri": "в пятницу",
+        "sat": "в субботу",
+        "sun": "в воскресенье"
+      },
+      "state": {
+        "scheduled": "Запланирован",
+        "unscheduled": "Без расписания"
+      },
+      "sections": {
+        "report": "Отчёт",
+        "runs": "Запуски",
+        "preview": "Предпросмотр"
+      },
+      "detail": {
+        "schedule": "Расписание",
+        "next": "Следующий запуск",
+        "figure": "Текущее значение"
+      },
+      "items_one": "{{count}} строка",
+      "items_other": "{{count}} строки",
+      "items_few": "{{count}} строки",
+      "items_many": "{{count}} строк",
+      "generatedAt": "Рассчитано {{date}}.",
+      "compute": "Рассчитать",
+      "seeCertificates": "Показать эти сертификаты",
+      "noRuns": "Сервер не предоставляет историю запусков: известны только расписание и следующий запуск.",
+      "pdfPreview": "PDF-отчёт просматривается после скачивания.",
+      "previewIntro": "Сформируйте отчёт сейчас, чтобы увидеть его строки.",
+      "previewCount_one": "Показана {{count}} строка из {{total}}",
+      "previewCount_other": "Показано {{count}} строк из {{total}}",
+      "previewCount_few": "Показано {{count}} строки из {{total}}",
+      "previewCount_many": "Показано {{count}} строк из {{total}}",
+      "dialog": {
+        "content": "Содержание",
+        "time": "Время отправки (UTC)",
+        "timeHint": "Формат ЧЧ:ММ, время UTC, как у планировщика.",
+        "timeInvalid": "Укажите время в формате ЧЧ:ММ.",
+        "recipientsHint": "Один или несколько адресов через запятую.",
+        "recipientsRequired": "Укажите хотя бы одного получателя: без него ничего не отправляется.",
+        "save": "Запланировать",
+        "editTitle": "Изменить расписание"
+      }
+    },
+    "invalidEmail": "Неверный адрес электронной почты"
   },
   "reconnect": {
     "countdown": "Служба перезапускается...",
@@ -6743,6 +6962,47 @@
       "rejected": "Отклонён",
       "recovered": "Восстановлен",
       "cancelled": "Отменён"
+    },
+    "work": {
+      "intent": "Запрошенные закрытые ключи: утверждение администратором, затем однократное восстановление.",
+      "total_one": "{{count}} открыт",
+      "total_other": "{{count}} открыто",
+      "total_few": "{{count}} открыто",
+      "total_many": "{{count}} открыто",
+      "hint": "Отметьте несколько запросов, чтобы утвердить или отклонить их вместе; сертификат открывает подробности.",
+      "hintDual": "Двойной контроль: запрос утверждает другой администратор, не заявитель; сертификат открывает подробности.",
+      "emptyText": "Восстановление запрашивается из инспектора сертификата с указанием причины.",
+      "groups": {
+        "approve": "Утвердить",
+        "approveOther": "Утвердить другим администратором",
+        "recover": "Восстановить"
+      },
+      "kind": "Восстановление ключа",
+      "requestedBy": "Запросил {{user}} {{ago}}",
+      "reason": "Причина: {{reason}}",
+      "approveAsk": "Утвердить…",
+      "rejectAsk": "Отклонить…",
+      "recoverAsk": "Восстановить…",
+      "approveNamed": "Утвердить восстановление {{name}}",
+      "rejectNamed": "Отклонить восстановление {{name}}",
+      "recoverNamed": "Восстановить ключ {{name}}",
+      "certificate": "Сертификат",
+      "recoveredBy": "Восстановил",
+      "recoveredOn": "Восстановлен",
+      "dialog": {
+        "approveOne": "Утвердить восстановление",
+        "approveMany": "Утвердить восстановления",
+        "rejectOne": "Отклонить восстановление",
+        "rejectMany": "Отклонить восстановления",
+        "note": "Примечание",
+        "noteHint": "Сохраняется вместе с решением."
+      },
+      "log": {
+        "requested": "Восстановление запрошено",
+        "approved": "Запрос утверждён",
+        "rejected": "Запрос отклонён",
+        "recovered": "Ключ восстановлен"
+      }
     }
   },
   "updatePopup": {
@@ -7335,5 +7595,32 @@
     "sectionCount_few": "{{count}} раздела",
     "sectionCount_many": "{{count}} разделов",
     "sectionFailed": "Не удалось показать этот раздел. Перезагрузите страницу, чтобы повторить попытку."
+  },
+  "work": {
+    "sep": ": ",
+    "selectRow": "Выбрать {{name}}",
+    "selectAll": "Выбрать все: {{group}}",
+    "loading": "Загрузка очереди…",
+    "retry": "Повторить",
+    "bulkLabel": "Групповые действия",
+    "selected_one": "Выбран {{count}} элемент",
+    "selected_other": "Выбрано {{count}} элемента",
+    "selected_few": "Выбрано {{count}} элемента",
+    "selected_many": "Выбрано {{count}} элементов",
+    "cancelSelection": "Снять выделение",
+    "historyEmpty": "Пока ничего.",
+    "bulk": {
+      "title": "Итог",
+      "done_one": "{{count}} выполнено",
+      "done_other": "{{count}} выполнено",
+      "done_few": "{{count}} выполнено",
+      "done_many": "{{count}} выполнено",
+      "failed_one": "{{count}} с ошибкой",
+      "failed_other": "{{count}} с ошибкой",
+      "failed_few": "{{count}} с ошибкой",
+      "failed_many": "{{count}} с ошибкой",
+      "ok": "выполнено",
+      "ko": "ошибка"
+    }
   }
 }

@@ -1,5 +1,6 @@
 /**
- * ApprovalsPage: approving a request opens what it issued (certificate or CA).
+ * ApprovalsPage: approving a request opens what it issued (certificate or CA),
+ * with the outcome messages of each case; the queue names each request's type.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
@@ -29,7 +30,7 @@ vi.mock('../../contexts', () => ({
   useNotification: () => stable.notify,
   useMobile: () => ({ isMobile: false, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
   useInspector: () => ({
-    openEntity, closeWindow: vi.fn(), windows: [],
+    openEntity, activeKey: null, closeWindow: vi.fn(), windows: [],
     prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
   }),
 }))
@@ -58,18 +59,18 @@ vi.mock('../../services', () => ({
 
 import ApprovalsPage from '../ApprovalsPage'
 
-const REQUEST = { id: 1, request_type: 'certificate', status: 'pending', requester_username: 'alice', created_at: '2026-01-01T00:00:00Z' }
+const REQUEST = { id: 1, request_type: 'certificate', status: 'pending', requester_username: 'alice', created_at: new Date().toISOString() }
 
 const renderPage = () => render(<MemoryRouter><ApprovalsPage /></MemoryRouter>)
 
 const clickApproveOrReject = async (label) => {
   await waitFor(() => expect(list).toHaveBeenCalled())
-  fireEvent.click(await screen.findByTitle(`approvals.${label}`))
+  // The row's button opens the confirmation; its own button decides
+  fireEvent.click(await screen.findByRole('button', { name: `approvals.work.${label}Named` }))
   if (label === 'reject') {
-    fireEvent.change(document.querySelector('textarea'), { target: { value: 'no' } })
+    fireEvent.change(document.querySelector('#decision-reason'), { target: { value: 'no' } })
   }
-  const dialogButtons = screen.getAllByText(`approvals.${label}`).map(el => el.closest('button')).filter(Boolean)
-  fireEvent.click(dialogButtons[dialogButtons.length - 1])
+  fireEvent.click(await screen.findByTestId('decision-confirm'))
 }
 
 describe('ApprovalsPage — opening what an approval issued', () => {
@@ -194,65 +195,43 @@ describe('ApprovalsPage — opening what an approval issued', () => {
 })
 
 describe('ApprovalsPage — what a request asks for', () => {
-  beforeEach(() => {
-    list.mockReset(); getStats.mockReset()
-    getStats.mockResolvedValue({ data: { pending: 1, approved: 0, rejected: 0, total: 1 } })
-  })
+  beforeEach(() => { list.mockReset() })
 
   it('names a revocation, not the raw type', async () => {
     list.mockResolvedValue({ data: [{ ...REQUEST, id: 5, request_type: 'ca_revocation',
       request_summary: { cn: 'Issuing CA 2', target_ca_id: 3, reason: 'cACompromise' } }] })
     renderPage()
-    expect(await screen.findByText('approvals.requestType.ca_revocation')).toBeTruthy()
-    expect(screen.queryByText('ca_revocation')).toBeNull()
+    expect(await screen.findByText('Issuing CA 2')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^approvals\.work\.what\.ca_revocation/ })).toBeTruthy()
+    expect(screen.queryByText(/ca_revocation$/)).toBeNull()
   })
 
-  it('names a cross-certificate revocation, not the raw type', async () => {
-    list.mockResolvedValue({ data: [{ ...REQUEST, id: 6, request_type: 'cross_revocation',
-      request_summary: { cn: 'Root B', reason: 'keyCompromise' } }] })
+  it('names the protocol of a held enrolment in its pill', async () => {
+    list.mockResolvedValue({ data: [{ ...REQUEST, id: 51, request_type: 'est_enroll', requester_username: 'est:basic:device',
+      request_summary: { cn: 'device.example', protocol: 'est', operation: 'enroll', identity: 'basic:device' } }] })
     renderPage()
-    expect(await screen.findByText('approvals.requestType.cross_revocation')).toBeTruthy()
-    expect(screen.queryByText('cross_revocation')).toBeNull()
+    expect(await screen.findByText('device.example')).toBeTruthy()
+    expect(screen.getByText('approvals.work.kind')).toHaveClass('wk-kind')
+    expect(screen.queryByText('est_enroll')).toBeNull()
+  })
+
+  it('reads every request at once and no statistics', async () => {
+    list.mockResolvedValue({ data: [REQUEST] })
+    renderPage()
+    await waitFor(() => expect(list).toHaveBeenCalledWith('all'))
+    expect(getStats).not.toHaveBeenCalled()
   })
 })
 
 describe('ApprovalsPage deep link', () => {
-  it('opens the request named in the link', async () => {
+  it('opens the request named in the link in the inspector, even when the list does not hold it', async () => {
+    openEntity.mockReset()
     list.mockResolvedValue({ data: [] })
-    getStats.mockResolvedValue({ data: {} })
-    getById.mockResolvedValue({ data: { ...REQUEST, id: 42, requester_username: 'linked-bob' } })
+    const linked = { ...REQUEST, id: 42, request_summary: { cn: 'linked.example.com' } }
+    getById.mockResolvedValue({ data: linked })
     render(<MemoryRouter initialEntries={['/approvals?id=42']}><ApprovalsPage /></MemoryRouter>)
     await waitFor(() => expect(getById).toHaveBeenCalledWith('42'))
-    expect(await screen.findByText('linked-bob')).toBeTruthy()
-  })
-})
-
-describe('ApprovalsPage — protocol requests', () => {
-  const PROTOCOL_REQUEST = {
-    ...REQUEST, id: 51, request_type: 'est_enroll', requester_username: 'est:basic:device',
-    request_summary: {
-      cn: 'device.example', protocol: 'est', operation: 'enroll', identity: 'basic:device',
-      csr: '-----BEGIN CERTIFICATE REQUEST-----\nMIIB\n-----END CERTIFICATE REQUEST-----',
-    },
-  }
-
-  it('names the protocol, not the raw type', async () => {
-    list.mockResolvedValue({ data: [PROTOCOL_REQUEST] })
-    getStats.mockResolvedValue({ data: { pending: 1, approved: 0, rejected: 0, total: 1 } })
-    renderPage()
-    expect(await screen.findByText('approvals.requestType.est_enroll')).toBeTruthy()
-    expect(screen.queryByText('est_enroll')).toBeNull()
-  })
-
-  it('shows the protocol, its identity and the CSR in the detail', async () => {
-    list.mockResolvedValue({ data: [] })
-    getStats.mockResolvedValue({ data: {} })
-    getById.mockResolvedValue({ data: PROTOCOL_REQUEST })
-    render(<MemoryRouter initialEntries={['/approvals?id=51']}><ApprovalsPage /></MemoryRouter>)
-    expect(await screen.findByText('approvals.summaryProtocol')).toBeTruthy()
-    expect(screen.getByText('EST (enroll)')).toBeTruthy()
-    expect(screen.getByText('basic:device')).toBeTruthy()
-    expect(screen.getByText('approvals.summaryCsr')).toBeTruthy()
-    expect(screen.getByText(/BEGIN CERTIFICATE REQUEST/)).toBeTruthy()
+    expect(await screen.findByText('linked.example.com')).toBeTruthy()
+    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('approval', 42, { data: linked }))
   })
 })
