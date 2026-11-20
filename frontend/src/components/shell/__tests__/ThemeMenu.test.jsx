@@ -1,6 +1,6 @@
 /** Theme menu: same ThemeContext as Appearance, applied mode icon, keyboard loop and focus return. */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { Sparkle, Moon } from '@phosphor-icons/react'
 import userEvent from '@testing-library/user-event'
@@ -93,6 +93,14 @@ describe('ThemeMenu', () => {
     trigger().focus()
     await user.keyboard('{ArrowDown}')
     expect(screen.getByRole('menu')).toBeInTheDocument()
+  })
+
+  it('opens on the up arrow of its button, on the last choice, as the mockup', async () => {
+    const user = setup()
+    trigger().focus()
+    await user.keyboard('{ArrowUp}')
+    const choices = within(screen.getByRole('menu')).getAllByRole('menuitemradio')
+    expect(choices[choices.length - 1]).toHaveFocus()
   })
 
   it('names the theme in force on the button, as the mockup: "Theme: System (dark)", a menu popup', () => {

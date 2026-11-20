@@ -7324,7 +7324,7 @@
         "scep_request_pending": "SCEPリクエスト待ち",
         "key_recovery_pending": "鍵リカバリ待ち",
         "crl_due": "CRLの更新期限",
-        "crl_missing": "CRLなし",
+        "crl_missing": "CRL の期限超過",
         "manual_renewal_due": "手動更新の期限",
         "client_renewal_overdue": "クライアント更新の遅延",
         "auto_renewal_blocked": "自動更新のブロック",

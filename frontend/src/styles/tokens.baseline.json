@@ -27,6 +27,7 @@
     "shade": "#000000",
     "glow-rose": "transparent",
     "glow-b": "transparent",
+    "halo": "transparent",
     "text-tertiary": "#a9b9cd"
   },
   "atelier-light": {
@@ -57,6 +58,7 @@
     "shade": "#000000",
     "glow-rose": "transparent",
     "glow-b": "transparent",
+    "halo": "transparent",
     "text-tertiary": "#51647c"
   },
   "aurore-dark": {
@@ -87,6 +89,7 @@
     "shade": "#000000",
     "glow-rose": "rgba(236, 72, 153, 0.10)",
     "glow-b": "rgba(95, 167, 220, 0.22)",
+    "halo": "rgba(107, 120, 224, 0.25)",
     "text-tertiary": "#a3acc9"
   },
   "aurore-light": {
@@ -117,6 +120,7 @@
     "shade": "#1e2864",
     "glow-rose": "rgba(219, 39, 119, 0.06)",
     "glow-b": "rgba(34, 170, 220, 0.14)",
+    "halo": "rgba(107, 120, 224, 0.25)",
     "text-tertiary": "#4a5372"
   },
   "purple-dark": {
@@ -147,6 +151,7 @@
     "shade": "#000000",
     "glow-rose": "transparent",
     "glow-b": "transparent",
+    "halo": "transparent",
     "text-tertiary": "#d4c5e9"
   },
   "purple-light": {
@@ -177,6 +182,7 @@
     "shade": "#000000",
     "glow-rose": "transparent",
     "glow-b": "transparent",
+    "halo": "transparent",
     "text-tertiary": "#6b21a8"
   },
   "sunset-dark": {
@@ -207,6 +213,7 @@
     "shade": "#000000",
     "glow-rose": "transparent",
     "glow-b": "transparent",
+    "halo": "transparent",
     "text-tertiary": "#d9a688"
   },
   "sunset-light": {
@@ -237,6 +244,7 @@
     "shade": "#000000",
     "glow-rose": "transparent",
     "glow-b": "transparent",
+    "halo": "transparent",
     "text-tertiary": "#9a3412"
   }
 }

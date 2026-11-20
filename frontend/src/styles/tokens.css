@@ -1,6 +1,6 @@
 /*
  * Theme tokens: 18 colours + 3 extras (grad-a, grad-b, glow) + 3 constants (ink, paper, scrim), the shadow
- * tint (shade) and the Aurore glows (glow-rose, glow-b; transparent elsewhere), one block
+ * tint (shade), the Aurore glows and focus halo (glow-rose, glow-b, halo; transparent elsewhere), one block
  * per family x mode, selected by data-theme / data-mode on <html>.
  * Bare :root is the fallback (Atelier, dark). Changing a value here means
  * updating tokens.baseline.json in the same commit.
@@ -36,6 +36,7 @@
   --shade: #000000;
   --glow-rose: transparent;
   --glow-b: transparent;
+  --halo: transparent;
 }
 
 :root[data-theme="atelier"][data-mode="light"] {
@@ -67,6 +68,7 @@
   --shade: #000000;
   --glow-rose: transparent;
   --glow-b: transparent;
+  --halo: transparent;
 }
 
 :root[data-theme="aurore"][data-mode="dark"] {
@@ -98,6 +100,7 @@
   --shade: #000000;
   --glow-rose: rgba(236, 72, 153, 0.10);
   --glow-b: rgba(95, 167, 220, 0.22);
+  --halo: rgba(107, 120, 224, 0.25);
 }
 
 :root[data-theme="aurore"][data-mode="light"] {
@@ -129,6 +132,7 @@
   --shade: #1e2864;
   --glow-rose: rgba(219, 39, 119, 0.06);
   --glow-b: rgba(34, 170, 220, 0.14);
+  --halo: rgba(107, 120, 224, 0.25);
 }
 
 :root[data-theme="purple"][data-mode="dark"] {
@@ -160,6 +164,7 @@
   --shade: #000000;
   --glow-rose: transparent;
   --glow-b: transparent;
+  --halo: transparent;
 }
 
 :root[data-theme="purple"][data-mode="light"] {
@@ -191,6 +196,7 @@
   --shade: #000000;
   --glow-rose: transparent;
   --glow-b: transparent;
+  --halo: transparent;
 }
 
 :root[data-theme="sunset"][data-mode="dark"] {
@@ -222,6 +228,7 @@
   --shade: #000000;
   --glow-rose: transparent;
   --glow-b: transparent;
+  --halo: transparent;
 }
 
 :root[data-theme="sunset"][data-mode="light"] {
@@ -253,6 +260,7 @@
   --shade: #000000;
   --glow-rose: transparent;
   --glow-b: transparent;
+  --halo: transparent;
 }
 
 /*

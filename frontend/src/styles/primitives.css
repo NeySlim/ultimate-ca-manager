@@ -221,7 +221,7 @@ textarea.ui-control { min-height: 80px; resize: vertical; }
 /* Tabs: the detail tabs of the mockup */
 .ui-tabs-list { display: flex; gap: 20px; border-bottom: 1px solid var(--line); }
 .ui-tab { display: inline-flex; align-items: center; gap: 7px; min-height: 33px; padding: 9px 0 8px; background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
-.ui-tab:hover { color: var(--text); background: none; }
+.ui-tab:hover:not(:disabled) { background-color: var(--hover); }
 .ui-tab[data-state="active"], .ui-tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
 .ui-tab svg { width: 14px; height: 14px; }
 .ui-tab-panel { flex: 1; padding: 14px 0 0; }
@@ -248,7 +248,9 @@ textarea.ui-control { min-height: 80px; resize: vertical; }
   .ui-btn .ui-spin { animation: none; }
 }
 
-/* Aurore family */
+/* Aurore family: every focused control draws the mockup's 5 px halo (zero specificity, as its :where rule) */
+:where(:root[data-theme="aurore"]) :focus-visible { box-shadow: 0 0 0 5px var(--halo); }
+:root[data-theme="aurore"] .lv-btn.is-primary:focus-visible { box-shadow: 0 0 0 5px var(--halo), 0 8px 24px -8px var(--glow); }
 :root[data-theme="aurore"] .lv-btn.is-danger:not(.is-primary):not(.is-quiet) { color: var(--bad); border-color: var(--bad); background: var(--badbg); }
 :root[data-theme="aurore"] .lv-btn.is-warn:not(.is-primary):not(.is-quiet) { color: var(--warn); border-color: var(--warn-fill); background: var(--warnbg); }
 :root[data-theme="aurore"] .lv-btn:is(.is-danger, .is-warn):not(.is-primary):not(.is-quiet):hover:not(:disabled) { background: var(--hover); }

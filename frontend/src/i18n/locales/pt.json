@@ -7321,7 +7321,7 @@
         "scep_request_pending": "Pedido SCEP pendente",
         "key_recovery_pending": "Recuperação de chave pendente",
         "crl_due": "CRL a emitir",
-        "crl_missing": "CRL ausente",
+        "crl_missing": "CRL atrasada",
         "manual_renewal_due": "Renovação manual devida",
         "client_renewal_overdue": "Renovação do cliente em atraso",
         "auto_renewal_blocked": "Renovação automática bloqueada",

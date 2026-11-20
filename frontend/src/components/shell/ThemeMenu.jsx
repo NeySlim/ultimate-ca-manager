@@ -23,6 +23,8 @@ export function ThemeMenu() {
   const { themeFamily, setThemeFamily, mode, setMode, resolvedMode, themes } = useTheme()
   const { open, setOpen, close, buttonRef, rootProps } = useDisclosure()
   const panelRef = useRef(null)
+  // Up arrow on the button opens on the last choice, down arrow on the current one
+  const openOnLast = useRef(false)
   const items = () => [...(panelRef.current?.querySelectorAll('[role="menuitemradio"]') || [])]
 
   const modeName = t(resolvedMode === 'light' ? 'shell.theme.light' : 'shell.theme.dark')
@@ -36,7 +38,9 @@ export function ThemeMenu() {
   useEffect(() => {
     if (open) {
       const all = items()
-      ;(all.find(b => b.getAttribute('aria-checked') === 'true') || all[0])?.focus()
+      const target = openOnLast.current ? all[all.length - 1] : all.find(b => b.getAttribute('aria-checked') === 'true') || all[0]
+      openOnLast.current = false
+      target?.focus()
     }
   }, [open])
 
@@ -48,9 +52,10 @@ export function ThemeMenu() {
   const onKeyDown = (e) => {
     rootProps.onKeyDown(e)
     if (e.defaultPrevented) return
-    // Down arrow on the button opens the menu, as in the mockup
-    if (!open && e.key === 'ArrowDown' && e.target === buttonRef.current) {
+    // Down or up arrow on the button opens the menu, as in the mockup
+    if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp') && e.target === buttonRef.current) {
       e.preventDefault()
+      openOnLast.current = e.key === 'ArrowUp'
       setOpen(true)
       return
     }

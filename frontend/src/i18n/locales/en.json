@@ -7324,7 +7324,7 @@
         "scep_request_pending": "SCEP request pending",
         "key_recovery_pending": "Key recovery pending",
         "crl_due": "CRL due",
-        "crl_missing": "CRL missing",
+        "crl_missing": "CRL overdue",
         "manual_renewal_due": "Manual renewal due",
         "client_renewal_overdue": "Client renewal overdue",
         "auto_renewal_blocked": "Automatic renewal blocked",

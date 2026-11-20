@@ -7321,7 +7321,7 @@
         "scep_request_pending": "SCEP-Anfrage ausstehend",
         "key_recovery_pending": "Schlüsselwiederherstellung ausstehend",
         "crl_due": "CRL fällig",
-        "crl_missing": "CRL fehlt",
+        "crl_missing": "CRL überfällig",
         "manual_renewal_due": "Manuelle Erneuerung fällig",
         "client_renewal_overdue": "Client-Erneuerung überfällig",
         "auto_renewal_blocked": "Automatische Erneuerung blockiert",

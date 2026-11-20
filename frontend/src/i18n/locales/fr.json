@@ -7324,7 +7324,7 @@
         "scep_request_pending": "Requête SCEP en attente",
         "key_recovery_pending": "Récupération de clé en attente",
         "crl_due": "CRL à publier",
-        "crl_missing": "CRL manquante",
+        "crl_missing": "CRL en retard",
         "manual_renewal_due": "Renouvellement manuel à faire",
         "client_renewal_overdue": "Renouvellement client en retard",
         "auto_renewal_blocked": "Renouvellement automatique bloqué",

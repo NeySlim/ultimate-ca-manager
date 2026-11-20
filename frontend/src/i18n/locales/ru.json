@@ -7528,7 +7528,7 @@
         "scep_request_pending": "Запрос SCEP ожидает",
         "key_recovery_pending": "Восстановление ключа ожидает",
         "crl_due": "Пора обновить CRL",
-        "crl_missing": "CRL отсутствует",
+        "crl_missing": "CRL просрочен",
         "manual_renewal_due": "Пора продлить вручную",
         "client_renewal_overdue": "Клиент не продлил вовремя",
         "auto_renewal_blocked": "Автопродление заблокировано",
