@@ -137,9 +137,12 @@ test('a phone reads the whole page name in the picker, keeps 44 px targets and s
   }
   await expect(page.locator('.shell-help')).toBeHidden()
   // The status bar ends the document; the top bar sticks while it scrolls
-  const docHeight = await page.evaluate(() => document.documentElement.scrollHeight)
-  const status = await box(page.getByRole('contentinfo'))
-  if (docHeight > 844) expect(status.y).toBeGreaterThan(844)
+  // Asked until it holds: the list still grows the document while its rows arrive
+  await expect.poll(async () => {
+    const docHeight = await page.evaluate(() => document.documentElement.scrollHeight)
+    const status = await box(page.getByRole('contentinfo'))
+    return Math.abs(status.y + status.height - docHeight)
+  }).toBeLessThanOrEqual(1)
   await page.evaluate(() => window.scrollTo({ top: 400, behavior: 'instant' }))
   expect(Math.abs((await box(page.locator('.shell-topbar'))).y)).toBeLessThanOrEqual(EPS)
 })

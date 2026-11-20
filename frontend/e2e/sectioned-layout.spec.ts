@@ -83,7 +83,7 @@ test('a short field takes one column of four, a button the width of its text', a
   const general = page.getByRole('region', { name: 'General', exact: true })
   await expect(general).toBeVisible()
   const port = await box(general.getByLabel('ACME public port'))
-  const base = await box(general.getByLabel('Base URL'))
+  const base = await box(general.getByLabel('Base URL', { exact: true }))
   // 1286 px of fields: 4 columns of 309.5 (short) and 2 of 635 (normal), 16 px gaps
   expect(Math.abs(port.width - 309.5)).toBeLessThanOrEqual(2)
   expect(Math.abs(base.width - 635)).toBeLessThanOrEqual(2)
