@@ -61,6 +61,10 @@ describe('IssueCertificateForm policy key types (#397)', () => {
     const onSubmit = vi.fn()
     renderForm({ allowed_key_types: ['ED25519'], allowed_digests: null }, onSubmit)
     expect(await screen.findAllByText('certificates.noKeyTypeAllowedByPolicy')).toBeTruthy()
+    // The list and its hint say it too: no server default is offered that the policies refuse
+    expect(optionValues(LABEL.key)).toEqual([''])
+    expect(field(LABEL.key).value).toBe('')
+    expect(screen.getAllByText('certificates.issueForm.hintAlgorithmsNone').length).toBeGreaterThanOrEqual(2)
     type(LABEL.cn, 'host.example.test')
     fireEvent.click(screen.getByRole('button', { name: /issueForm.toReview/ }))
     await new Promise((r) => setTimeout(r, 20))

@@ -4,9 +4,8 @@
  * A form closed without issuing keeps its draft for the next opening of the same operation.
  */
 import { useState, useEffect, useMemo, useRef, useId } from 'react'
-import {
-  CaretRight, CaretLeft, CaretDown, Check, X, Plus, Question, Warning, CalendarBlank, Hash,
-} from '@phosphor-icons/react'
+import { CalendarBlank, Hash } from '@phosphor-icons/react'
+import { CaretRight, CaretLeft, CaretDown, Check, X, Plus, Question, Warning } from './issue/issueIcons'
 import { templatesService, ekuService, toolsService } from '../../services'
 import { getSanValidationError, getAutoSansFromCn } from '../../lib/sanValidate'
 import { hiddenFromIssuance, listedForIssuance, signingCas, unlistedSigningCas } from '../../lib/caSelection'
@@ -19,8 +18,9 @@ import { customExtensionsPayload, emptyExtensionRow } from '../../lib/customExte
 import { VALIDITY } from '../../constants/config'
 import { DRAFT_FIELDS, draftOp, dropDraft, keepDraft, takeDraft } from './issue/issueDrafts'
 import {
-  CERT_TYPE_KEYS, certificateHash, certificateKey, certificateType, describeRequest, keyDisplay, listOf, SAN_FIELDS,
+  CERT_TYPE_KEYS, certificateHash, certificateType, describeRequest, listOf, SAN_FIELDS,
 } from './issue/describeRequest'
+import { certificateKeyLabel, extKeyUsageName, keyLabel } from '../../lib/certificateDetail'
 import './issue/issue.css'
 
 const P = 'certificates.issueForm.'
@@ -41,6 +41,8 @@ const EKU_DEFAULTS_BY_TYPE = {
 }
 const OID_RE = /^[0-2](?:\.(?:0|[1-9]\d*)){1,15}$/
 const ANY_EKU = '2.5.29.37.0'
+// TLS Feature (RFC 7633): the OCSP Must-Staple box of a renewal shows it
+const MUST_STAPLE_OID = '1.3.6.1.5.5.7.1.24'
 const SUBJECT_KEYS = ['country', 'state', 'locality', 'organization', 'organizational_unit', 'email']
 const SUBJECT_FIELDS = [['country', 'common.country', 2], ['state', 'common.stateProvince'], ['locality', 'common.locality'],
   ['organization', 'common.organization'], ['organizational_unit', `${P}subjectOu`], ['email', 'common.email']]
@@ -188,6 +190,7 @@ export function IssueCertificateForm({
   dRef.current = d
   const reviewTitle = useRef(null)
   const firstField = useRef(null)
+  const submitButton = useRef(null)
   const focusLater = (target) => setTimeout(() => (typeof target === 'string' ? document.getElementById(id(target)) : target?.current)?.focus())
 
   // Closed without issuing: the draft waits for the next opening of the same operation
@@ -423,8 +426,10 @@ export function IssueCertificateForm({
   function validate() {
     const e = {}
     if (renew) {
+      // The original duration is not sent and the server keeps it whatever its length; a typed one is bounded
       const text = String(d.validity_days ?? '').trim()
-      if (text) { const err = daysError(text, MAX_DAYS, false); if (err) e.days = err }
+      const original = originalDurationDays(certificate)
+      if (text && !(original && text === String(original))) { const err = daysError(text, MAX_DAYS, false); if (err) e.days = err }
       return e
     }
     // In the order of the fields on screen: the first one in error takes the focus
@@ -539,7 +544,7 @@ export function IssueCertificateForm({
         const key = info.public_key
         next.csrInfo = {
           subject: info.subject, cn: extractCN(info.subject) || info.subject,
-          key: key ? [key.type, key.curve || key.size].filter(Boolean).join(' ') : '',
+          key: key ? keyLabel([key.type, key.curve || key.size].filter(Boolean).join(' '), t) : '',
         }
       } catch (err) {
         setErrors({ csr: t(`${P}csrUnreadable`, { message: err?.message || '' }) })
@@ -575,8 +580,9 @@ export function IssueCertificateForm({
       if (onSent) onSent(outcome)
       else if (outcome?.approval !== undefined) setApproval(outcome.approval || '')
     } catch (err) {
-      // The refusal stays in the step; the entry is kept for a correction
+      // The refusal stays in the step; the entry is kept for a correction and Issue takes the focus back
       setSubmitError(err?.message || t('common.operationFailed'))
+      focusLater(submitButton)
     } finally {
       issuingRef.current = false
       setIssuing(false)
@@ -642,9 +648,10 @@ export function IssueCertificateForm({
 
   const keyHint = () => {
     if (csrMode) return t(`${P}keyHintCsr`)
+    if (noKeyAllowed) return t(`${P}hintAlgorithmsNone`)
     if (isHybrid) return t(`${P}keyHintHybrid`)
-    if (d.keyBy === 'template' && template?.key_type) return t(`${P}keyHintTemplate`, { key: keyDisplay(template.key_type) })
-    if (defaultKeyType) return t(d.ca_id ? `${P}keyHintServer` : `${P}keyHintServerAny`, { key: keyDisplay(defaultKeyType) })
+    if (d.keyBy === 'template' && template?.key_type) return t(`${P}keyHintTemplate`, { key: keyLabel(template.key_type, t) })
+    if (defaultKeyType) return t(d.ca_id ? `${P}keyHintServer` : `${P}keyHintServerAny`, { key: keyLabel(defaultKeyType, t) })
     return t(`${P}keyHintNone`)
   }
 
@@ -653,20 +660,23 @@ export function IssueCertificateForm({
     return [...new Set([...allowed, current])]
   }
   const serverType = ['server', 'combined'].includes(d.cert_type)
-  const renewSans = SAN_FIELDS.flatMap(([field, type]) => listOf(certificate?.[field]).map((value) => ({ type, value })))
+  // The name that equals the common name is not repeated as a row, as in the Atelier
+  const renewCn = certificate?.cn || certificate?.common_name || ''
+  const allRenewSans = SAN_FIELDS.flatMap(([field, type]) => listOf(certificate?.[field]).map((value) => ({ type, value })))
+  const renewSans = allRenewSans.filter((s) => s.value !== renewCn)
   const renewSubject = SUBJECT_KEYS.filter((k) => certificate?.[k])
 
   const renderHint = () => {
     if (renew) {
       const hash = certificateHash(certificate)
-      const types = [...new Set(renewSans.map((s) => s.type))]
+      const types = [...new Set(allRenewSans.map((s) => s.type))]
       return (
         <aside className="iss-hint" aria-labelledby={id('hint-title')} data-testid="issue-hint">
           <h3 id={id('hint-title')}><ShieldMark /> {t(`${P}hintTitle`)}</h3>
           <p>{withName(t, `${P}hintRenew`, certificate?.cn || certificate?.common_name || '')}</p>
           <dl>
             <dt>{t(`${P}hintAuthorities`)}</dt><dd>{certificate?.issuer_name || ''}</dd>
-            <dt>{t(`${P}hintAlgorithms`)}</dt><dd>{certificateKey(certificate)}</dd>
+            <dt>{t(`${P}hintAlgorithms`)}</dt><dd>{certificateKeyLabel(certificate, t)}</dd>
             <dt>{t(`${P}hintValidity`)}</dt><dd>{t(`${P}hintRenewValidity`, { max: num(MAX_DAYS) })}</dd>
             <dt>{t(`${P}hintSans`)}</dt><dd>{types.length ? types.join(', ') : t(`${P}noneMasc`)}</dd>
             <dt>{t(`${P}hintCsr`)}</dt><dd>{t(`${P}hintCsrRenew`)}</dd>
@@ -690,7 +700,7 @@ export function IssueCertificateForm({
           </dd>
           <dt>{t(`${P}hintAlgorithms`)}</dt>
           <dd data-testid="hint-algorithms">
-            {singleLabels.length ? singleLabels.map(keyDisplay).join(', ') : t(`${P}hintAlgorithmsNone`)}
+            {singleLabels.length ? singleLabels.map((l) => keyLabel(l, t)).join(', ') : t(`${P}hintAlgorithmsNone`)}
             {pqStandalone && hybridPq.length > 0 && <><br /><span className="iss-muted">{t(`${P}hintPqPairOnly`)}</span></>}
           </dd>
           <dt>{t(`${P}hintValidity`)}</dt>
@@ -721,15 +731,25 @@ export function IssueCertificateForm({
         <fieldset className="iss-field is-full">
           <legend>{t(`${P}sansLegend`)}</legend>
           <small id={id('hint-san')}>{t(`${P}sansRenew`)}</small>
+          {/* The rows and buttons of an issuance, read-only: the server keeps the names; without a name
+              besides the common name, the empty row of the Atelier keeps its place */}
           <div className="iss-rows">
-            {renewSans.map((s, i) => (
-              <div className="iss-san-row is-fixed" key={`${s.type}-${s.value}`}>
+            {(renewSans.length ? renewSans : [{ type: 'DNS', value: '' }]).map((s, i) => (
+              <div className="iss-san-row" key={`${s.type}-${s.value}`}>
                 <label className="iss-sr-only" htmlFor={id(`san-type-${i}`)}>{t(`${P}sanType`, { n: i + 1 })}</label>
                 {fixed(`san-type-${i}`, s.type)}
                 <label className="iss-sr-only" htmlFor={id(`san-value-${i}`)}>{t(`${P}sanValue`, { n: i + 1 })}</label>
                 {fixed(`san-value-${i}`, s.value, 'hint-san')}
+                <button type="button" className="iss-icon-btn" disabled aria-label={t(`${P}removeSan`, { n: i + 1 })}>
+                  <X aria-hidden="true" />
+                </button>
               </div>
             ))}
+          </div>
+          <div className="iss-row-actions">
+            <button type="button" className="iss-btn is-quiet iss-add-row" disabled aria-describedby={id('hint-san')}>
+              <Plus aria-hidden="true" />{t(`${P}addSan`)}
+            </button>
           </div>
         </fieldset>
       )
@@ -827,7 +847,7 @@ export function IssueCertificateForm({
               </select>
             )}
             <small id={id('hint-ca')}>
-              {renew ? t(`${P}caRenewHint`) : t(`${P}caCount`, { count: issuingCas.length })}
+              {renew ? t(`${P}caRenewHint`) : t(`${P}caCount`, { count: signers.length })}
             </small>
             <FieldError id={id('err-ca')} message={errors.ca} />
           </div>
@@ -892,13 +912,17 @@ export function IssueCertificateForm({
 
           <div className="iss-field">
             <label htmlFor={id('key')}>{t(`${P}keyAlgorithm`)}</label>
-            {renew ? fixed('key', certificateKey(certificate), 'hint-key') : (
-              <select id={id('key')} value={csrMode ? '' : (isHybrid ? hybridChoice.classical : d.key)} disabled={csrMode || isHybrid}
-                {...errorProps('key', 'hint-key')}
+            {renew ? fixed('key', certificateKeyLabel(certificate, t) || '', 'hint-key') : (
+              <select id={id('key')} value={csrMode || noKeyAllowed ? '' : (isHybrid ? hybridChoice.classical : d.key)}
+                disabled={csrMode || isHybrid} {...errorProps('key', 'hint-key')}
                 onChange={(e) => set({ key: e.target.value, keyBy: 'user' })}>
-                {(csrMode || (!d.key && !isHybrid)) && <option value="">{t(csrMode ? `${P}keyFromCsr` : `${P}keyServerDefault`)}</option>}
-                {!csrMode && (isHybrid ? hybridClassical : singleLabels).map((l) => <option key={l} value={l}>{keyDisplay(l)}</option>)}
-                {!csrMode && d.key && !isHybrid && !singleLabels.includes(d.key) && <option value={d.key}>{keyDisplay(d.key)}</option>}
+                {noKeyAllowed && !csrMode ? <option value="">{t(`${P}noneMasc`)}</option> : (
+                  <>
+                    {(csrMode || (!d.key && !isHybrid)) && <option value="">{t(csrMode ? `${P}keyFromCsr` : `${P}keyServerDefault`)}</option>}
+                    {!csrMode && (isHybrid ? hybridClassical : singleLabels).map((l) => <option key={l} value={l}>{keyLabel(l, t)}</option>)}
+                    {!csrMode && d.key && !isHybrid && !singleLabels.includes(d.key) && <option value={d.key}>{keyLabel(d.key, t)}</option>}
+                  </>
+                )}
               </select>
             )}
             <small id={id('hint-key')}>{renew ? t(`${P}keyHintRenew`) : keyHint()}</small>
@@ -929,7 +953,7 @@ export function IssueCertificateForm({
             )}
             <small id={id('hint-days')}>
               {renew
-                ? t(`${P}validityRenewHint`, { max: num(MAX_DAYS), days: originalDurationDays(certificate) ?? '' })
+                ? t(`${P}validityRenewHint`, { max: num(MAX_DAYS), days: originalDurationDays(certificate) ? num(originalDurationDays(certificate)) : '' })
                 : limit.bound
                   ? t(`${P}validityHintCa`, { max: num(maxDays), date: formatDate(caExpiry, { time: false }) })
                   : t(`${P}validityHint`, { max: num(maxDays) })}
@@ -1044,13 +1068,13 @@ export function IssueCertificateForm({
                       <div className="iss-field">
                         <label htmlFor={id('hybrid-classical')}>{t('certificates.hybrid.classical')}</label>
                         <select id={id('hybrid-classical')} value={hybridChoice.classical} onChange={(e) => set({ hybrid_classical: e.target.value })}>
-                          {hybridClassical.map((l) => <option key={l} value={l}>{keyDisplay(l)}</option>)}
+                          {hybridClassical.map((l) => <option key={l} value={l}>{keyLabel(l, t)}</option>)}
                         </select>
                       </div>
                       <div className="iss-field">
                         <label htmlFor={id('hybrid-pq')}>{t('certificates.hybrid.pq')}</label>
                         <select id={id('hybrid-pq')} value={hybridChoice.pq} onChange={(e) => set({ hybrid_pq: e.target.value })}>
-                          {hybridPq.map((l) => <option key={l} value={l}>{keyDisplay(l)}</option>)}
+                          {hybridPq.map((l) => <option key={l} value={l}>{keyLabel(l, t)}</option>)}
                         </select>
                       </div>
                     </div>
@@ -1099,33 +1123,76 @@ export function IssueCertificateForm({
     )
   }
 
-  // What a renewal carries over unchanged (the server re-signs the same subject and extensions)
+  // What a renewal carries over unchanged (the server re-signs the same subject and extensions), in the
+  // places of the Atelier's Advanced panel: hash and EKU side by side, then the custom extensions
   function renderAdvancedRenew() {
-    const type = certificateType(certificate)
+    const usages = certificate?.extensions?.extended_key_usage?.usages
+    const ekus = Array.isArray(usages) ? usages.map((u) => u?.oid).filter(Boolean)
+      : (EKU_DEFAULTS_BY_TYPE[certificateType(certificate)] || [])
+    // An EKU outside the five common ones is named as the inspector names it, its OID beneath
+    const named = (oid) => {
+      if (EKU_NAME[oid]) return ekuLabel(oid)
+      const name = (usages || []).find((u) => u?.oid === oid)?.name
+      return name && name !== oid ? extKeyUsageName(name) : oid
+    }
+    const listed = [...COMMON_EKUS.map(([, oid]) => oid), ...ekus.filter((oid) => !EKU_NAME[oid])]
+    const others = (certificate?.extensions?.other_extensions || []).filter((x) => x?.oid && x.oid !== MUST_STAPLE_OID)
     return (
       <>
-        <div className="iss-field">
-          <label htmlFor={id('certType')}>{t('certificates.certType')}</label>
-          {fixed('certType', t(`certificates.certType${CERT_TYPE_KEYS[type] || 'Custom'}`), 'hint-certType')}
-          <small id={id('hint-certType')}>{t(`${P}advancedRenewHint`)}</small>
-          <label className="iss-check">
-            <input type="checkbox" checked={!!certificate?.ocsp_must_staple} readOnly aria-disabled="true" onClick={(e) => e.preventDefault()} />
-            <span>{t('certificates.ocspMustStaple')}</span>
-          </label>
-        </div>
         <div className="iss-field">
           <label htmlFor={id('hash')}>{t(`${P}hash`)}</label>
           {fixed('hash', certificateHash(certificate) || '', 'hint-hash')}
           <small id={id('hint-hash')}>{t(`${P}hashRenewHint`)}</small>
+          {certificate?.ocsp_must_staple && (
+            <label className="iss-check">
+              <input type="checkbox" checked readOnly aria-disabled="true" onClick={(e) => e.preventDefault()} />
+              <span>{t('certificates.ocspMustStaple')}</span>
+            </label>
+          )}
         </div>
+        <fieldset className="iss-field">
+          <legend>{t(`${P}ekus`)}</legend>
+          <div className="iss-eku-list">
+            {listed.map((oid) => (
+              <label className="iss-check" key={oid}>
+                {/* Controlled without a change: React puts the box back as the certificate has it */}
+                <input type="checkbox" value={oid} checked={ekus.includes(oid)} aria-disabled="true"
+                  aria-describedby={id('hint-ekus')} onChange={() => {}} />
+                <span>{named(oid)}{named(oid) !== oid && <small className="iss-mono">{oid}</small>}</span>
+              </label>
+            ))}
+          </div>
+          <small id={id('hint-ekus')}>{ekus.length ? t(`${P}ekusRenew`, { list: ekus.map(named).join(', ') }) : t(`${P}ekusNone`)}</small>
+        </fieldset>
+        <fieldset className="iss-field is-full">
+          <legend>{t('customExtensions.title')}</legend>
+          <small id={id('hint-ext')}>{t(`${P}extRenewHint`)}</small>
+          <div className="iss-rows">
+            {others.map((x, i) => (
+              <div className="iss-ext-row is-fixed" key={x.oid}>
+                <label className="iss-sr-only" htmlFor={id(`ext-oid-${i}`)}>{t(`${P}extOid`, { n: i + 1 })}</label>
+                {fixed(`ext-oid-${i}`, x.oid, 'hint-ext', { className: 'iss-mono iss-ext-oid', title: x.name || undefined })}
+                <label className="iss-sr-only" htmlFor={id(`ext-value-${i}`)}>{t(`${P}extValue`, { n: i + 1 })}</label>
+                {fixed(`ext-value-${i}`, x.value_hex || '', x.critical ? 'ext-critical' : null, { className: 'iss-ext-value' })}
+                <button type="button" className="iss-icon-btn" disabled aria-label={t(`${P}removeExt`, { n: i + 1 })}>
+                  <X aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+          </div>
+          {others.some((x) => x.critical) && <small id={id('ext-critical')}>{t(`${P}extRenewCritical`)}</small>}
+          <button type="button" className="iss-btn is-quiet iss-add-row" disabled aria-describedby={id('hint-ext')}>
+            <Plus aria-hidden="true" />{t('customExtensions.add')}
+          </button>
+        </fieldset>
         {renewSubject.length > 0 && (
           <fieldset className="iss-field is-full">
             <legend>{t(`${P}subject`)}</legend>
             <div className="iss-subject">
               {SUBJECT_FIELDS.filter(([key]) => certificate?.[key]).map(([key, label]) => (
-                <div className="iss-field" key={key}>
+                <div className={`iss-field${String(certificate[key]).length > 24 ? ' is-wide' : ''}`} key={key}>
                   <label htmlFor={id(`subject-${key}`)}>{t(label)}</label>
-                  {fixed(`subject-${key}`, certificate[key])}
+                  {fixed(`subject-${key}`, certificate[key], null, { title: certificate[key] })}
                 </div>
               ))}
             </div>
@@ -1176,6 +1243,7 @@ export function IssueCertificateForm({
             <Warning aria-hidden="true" /><span>{submitError}</span>
           </p>
         )}
+        <span className="iss-sr-only" role="status">{issuing ? t(`${P}issuing`) : ''}</span>
         <div className="iss-actions">
           {approval !== null ? (
             <button type="button" className="iss-btn is-primary" onClick={onCancel}>{t('common.close')}</button>
@@ -1184,8 +1252,10 @@ export function IssueCertificateForm({
               <button type="button" className="iss-btn" onClick={back} disabled={issuing}>
                 <CaretLeft aria-hidden="true" />{t(`${P}back`)}
               </button>
-              <button type="button" className="iss-btn is-primary" onClick={issue} disabled={issuing} data-testid="issue-submit">
-                <Check aria-hidden="true" />{issuing ? t(`${P}issuing`) : t(action)}
+              {/* Its words stay while the request is out, so Modify does not slide; the wait is told aloud */}
+              <button type="button" ref={submitButton} className="iss-btn is-primary" onClick={issue} disabled={issuing}
+                aria-busy={issuing ? 'true' : undefined} data-testid="issue-submit">
+                <Check aria-hidden="true" />{t(action)}
               </button>
             </>
           )}

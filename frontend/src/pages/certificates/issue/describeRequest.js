@@ -2,7 +2,7 @@
  * The rows of the Review step, read from the request about to be sent: every field of its
  * body is named by the `fields` of one row, so the step shows exactly what the server gets.
  */
-import { findAlgorithm } from '../../../lib/keyAlgorithms'
+import { certificateKeyLabel, keyLabel } from '../../../lib/certificateDetail'
 import { issueKeyLabel } from '../../../lib/policyAlgorithms'
 import { formatDate } from '../../../lib/utils'
 
@@ -10,15 +10,6 @@ export const SAN_FIELDS = [['san_dns', 'DNS'], ['san_ip', 'IP'], ['san_email', '
 const SUBJECT_FIELDS = [['country', 'C'], ['state', 'ST'], ['locality', 'L'], ['organization', 'O'], ['organizational_unit', 'OU'], ['email', 'E']]
 const P = 'certificates.issueForm.'
 
-export const keyDisplay = (label) => findAlgorithm(label)?.display || label || ''
-
-/** The whole key of a stored certificate ("RSA 2048", never "RSA" alone). */
-export function certificateKey(cert) {
-  const value = cert?.key_type || cert?.key_algo || cert?.key_algorithm || ''
-  const row = findAlgorithm(value)
-  if (row) return row.display
-  return /\d/.test(value) || !cert?.key_size ? value : `${value} ${cert.key_size}`
-}
 
 /** "SHA-256" from a signature algorithm such as "SHA256-RSA", or null (ML-DSA, EdDSA). */
 export function certificateHash(cert) {
@@ -77,7 +68,7 @@ export function describeRequest(request, {
     const description = certificate?.descr || certificate?.description
     row('description', t(`${P}description`), description ? { text: description } : none(`${P}noneFem`))
     row('keySource', t(`${P}keySource`), { text: t(`${P}keySourceRenew`) })
-    row('key', t(`${P}keyAlgorithm`), { text: certificateKey(certificate) })
+    row('key', t(`${P}keyAlgorithm`), { text: certificateKeyLabel(certificate, t) || '' })
     row('validity', t(`${P}validity`), days
       ? { text: t(`${P}validityUntil`, { days, date: endDate(days, now) }) }
       : { text: t(`${P}validityOriginalUnknown`) },
@@ -100,11 +91,11 @@ export function describeRequest(request, {
   if (kind === 'csr') {
     row('key', t(`${P}keyAlgorithm`), { text: csrInfo?.key || t(`${P}keyFromCsr`) })
   } else if (body.hybrid) {
-    row('key', t(`${P}keyAlgorithm`), { text: t(`${P}hybridPair`, { classical: keyDisplay(body.hybrid.classical), pq: keyDisplay(body.hybrid.pq) }) },
+    row('key', t(`${P}keyAlgorithm`), { text: t(`${P}hybridPair`, { classical: keyLabel(body.hybrid.classical, t), pq: keyLabel(body.hybrid.pq, t) }) },
       ['key_type', 'key_size', 'hybrid'])
   } else {
     const label = issueKeyLabel(body.key_type, body.key_size)
-    row('key', t(`${P}keyAlgorithm`), body.key_type ? { text: keyDisplay(label) || `${body.key_type} ${body.key_size ?? ''}`.trim() } : none(`${P}keyServerDefault`),
+    row('key', t(`${P}keyAlgorithm`), body.key_type ? { text: keyLabel(label, t) || `${body.key_type} ${body.key_size ?? ''}`.trim() } : none(`${P}keyServerDefault`),
       ['key_type', 'key_size'])
   }
   row('validity', t(`${P}validity`), { text: t(`${P}validityUntil`, { days: body.validity_days, date: endDate(body.validity_days, now) }) }, ['validity_days'])
@@ -116,11 +107,14 @@ export function describeRequest(request, {
   const typeChanged = defaults.cert_type != null && body.cert_type !== defaults.cert_type
   const subjectChanged = kind === 'issue' && !sameSubject(body, defaults.subject)
   const changed = typeChanged || subjectChanged || body.extra_ekus?.length || body.ocsp_must_staple || body.custom_extensions?.length
+  // As in the Atelier, only what changed gets a line of its own; the rest is told by the Advanced line
+  const subjectFields = SUBJECT_FIELDS.map(([f]) => f)
+  const subjectShown = subject.length > 0 && (subjectChanged || kind !== 'issue')
   row('advanced', t(`${P}advanced`), {
     text: t(changed ? (template ? `${P}advancedChanged` : `${P}advancedChangedDefault`) : (template ? `${P}advancedTemplate` : `${P}advancedDefault`)),
-  }, typeChanged ? [] : ['cert_type'])
+  }, [...(typeChanged ? [] : ['cert_type']), ...(subjectShown ? [] : subjectFields)])
   if (typeChanged) row('certType', t(`${P}certType`), { text: t(`certificates.certType${CERT_TYPE_KEYS[body.cert_type] || 'Custom'}`) }, ['cert_type'])
-  if (subject.length) row('subject', t(`${P}subject`), { text: subject.join(', ') }, SUBJECT_FIELDS.map(([f]) => f))
+  if (subjectShown) row('subject', t(`${P}subject`), { text: subject.join(', ') }, subjectFields)
   if (body.extra_ekus?.length) {
     const all = [...new Set([...defaultEkus, ...body.extra_ekus])]
     row('ekus', t(`${P}ekuRow`), all.map((oid) => ({ text: ekuLabel(oid) })), ['extra_ekus'])

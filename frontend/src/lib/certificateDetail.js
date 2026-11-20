@@ -4,18 +4,27 @@
  * extensions as label, OID and value, and the history of the object.
  */
 import { daysRemaining } from './utils'
-import { keyAlgorithmLabel } from './keyAlgorithms'
+import { algorithmForKeyType, isPostQuantum, keyAlgorithmLabel } from './keyAlgorithms'
 
 const EC_CURVES = { secp256r1: 'P-256', prime256v1: 'P-256', secp384r1: 'P-384', secp521r1: 'P-521' }
 
-/** Key of a certificate as people name it: "RSA 3072", "ECDSA P-256", a post-quantum name with its level. */
+/**
+ * Key of a certificate, a CSR or a form choice as people name it: "RSA 3072", "ECDSA P-256", a post-quantum
+ * name with its level. The one name of a key in the interface: every spelling (`key_type` of the API,
+ * "ECDSA secp256r1" of a decoded CSR, "EC-P256" of the registry) reads the same.
+ */
 export function certificateKeyLabel(cert, t) {
   const type = String(cert?.key_type || '').trim()
   const ec = /^EC\s+(\S+)$/i.exec(type)
   if (ec) return `ECDSA ${EC_CURVES[ec[1].toLowerCase()] || ec[1]}`
   if (/^RSA\s+\d+$/i.test(type)) return type
-  return keyAlgorithmLabel(cert?.key_algorithm || cert?.key_algo || type, t, cert?.security_level) || type || null
+  const row = algorithmForKeyType(type)
+  if (row && !isPostQuantum(row.label)) return row.display
+  return keyAlgorithmLabel(cert?.key_algorithm || cert?.key_algo || row?.label || type, t, cert?.security_level) || type || null
 }
+
+/** A key named by its spelling alone (a registry label, a policy's key type). */
+export const keyLabel = (spelling, t) => certificateKeyLabel({ key_type: spelling }, t) || ''
 
 /** A serial number as octets in hexadecimal, "04:8A:01:9F"; a decimal string from the API is converted. */
 export function serialHex(serial) {

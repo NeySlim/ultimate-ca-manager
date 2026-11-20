@@ -159,7 +159,7 @@ describe('IssueCertificateForm against the Atelier', () => {
     expect(screen.getByText(`${P}sanInvalid.dns`)).toBeTruthy()
   })
 
-  it('reads the Review rows in the Atelier order, the subject and the type after Advanced', async () => {
+  it('reads the Review rows in the Atelier order, after Advanced only what changed', async () => {
     mocks.templates = [TLS]
     renderForm()
     choose(LABEL.ca, '3')
@@ -170,13 +170,19 @@ describe('IssueCertificateForm against the Atelier', () => {
     fireEvent.click(screen.getByText(`${P}eku.clientAuth`))
     const review = await toReview()
     const ids = [...review.querySelectorAll('[data-row]')].map((r) => r.dataset.row)
-    expect(ids).toEqual(['operation', 'template', 'ca', 'description', 'keySource', 'key', 'validity', 'sans', 'advanced', 'subject', 'ekus'])
+    // The template's own subject is told by the Advanced line, not by a line of its own
+    expect(ids).toEqual(['operation', 'template', 'ca', 'description', 'keySource', 'key', 'validity', 'sans', 'advanced', 'ekus'])
+    expect(review.dataset.fields.split(' ')).toContain('organization')
     const ekus = review.querySelector('[data-row="ekus"]')
     expect(within(ekus).getByText(`${P}ekuRow`)).toBeTruthy()
     // Every EKU by its name: the template's and the added one
     expect(ekus.textContent).toContain(`${P}eku.serverAuth`)
     expect(ekus.textContent).toContain(`${P}eku.clientAuth`)
     expect(review.querySelector('[data-row="advanced"]').textContent).toContain(`${P}advancedChanged`)
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`${P}back`) }))
+    type('common.organization', 'Other Org')
+    const changed = await toReview()
+    expect([...changed.querySelectorAll('[data-row]')].map((r) => r.dataset.row)).toContain('subject')
   })
 })
 
@@ -199,8 +205,9 @@ describe('IssueCertificateForm renewal', () => {
     // The whole algorithm, never its family alone
     expect(field(LABEL.key).value).toBe('RSA 2048')
     expect(field(new RegExp(`^${P}description`)).value).toBe('Web GUI')
-    expect(screen.getAllByLabelText(new RegExp(`${P}sanValue`)).map((i) => i.value)).toEqual(['fw.lan', '192.0.2.1'])
-    expect(screen.queryByRole('button', { name: `${P}addSan` })).toBeNull()
+    // The common name is not repeated as a row; Add a name keeps its place, read-only
+    expect(screen.getAllByLabelText(new RegExp(`${P}sanValue`)).map((i) => i.value)).toEqual(['192.0.2.1'])
+    expect(screen.getByRole('button', { name: `${P}addSan` })).toBeDisabled()
     expect(field(LABEL.days).readOnly).toBe(false)
     expect(screen.getByLabelText(new RegExp(`${P}keyCsr`)).disabled).toBe(true)
     expect(advancedToggle().getAttribute('aria-expanded')).toBe('false')
