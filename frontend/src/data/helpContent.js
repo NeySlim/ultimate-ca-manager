@@ -77,6 +77,15 @@ export const helpContent = {
         ]
       },
       {
+        title: 'Session',
+        icon: Clock,
+        items: [
+          { label: 'Warning', text: 'Five minutes before the inactivity timeout, a banner shows the time left; Extend keeps the session, other activity no longer does' },
+          { label: 'Lock', text: 'At the end the session closes and the screen locks: nothing of the console stays open behind it' },
+          { label: 'Return', text: 'Sign in again with the same account to come back to the page that was open; Sign in with another account starts afresh' },
+        ]
+      },
+      {
         title: 'Theme menu',
         icon: Stack,
         items: [
@@ -1675,7 +1684,7 @@ export const helpContent = {
         title: 'Session & Access',
         icon: Fingerprint,
         items: [
-          { label: 'Session Timeout', text: 'Auto-logout after inactivity period (Settings › General)' },
+          { label: 'Session Timeout', text: 'After this inactivity period the screen locks; signing in again returns to the page that was open (Settings › General)' },
           { label: 'Session Duration', text: 'Maximum session length in hours, whatever the activity' },
           { label: 'Account lockout', text: 'Max Login Attempts and Lockout Duration (Settings › General) lock an account after repeated failures. Request rate limits per IP are set by the RATE_LIMIT_* environment variables, not on this page' },
           { label: 'Admin access allowlist', text: 'Limit the web interface and the management API to listed IP addresses and networks' },

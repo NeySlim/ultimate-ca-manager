@@ -2942,7 +2942,7 @@ UCM has no password expiry and no password history setting.
 ## Session Management
 
 ### Session Timeout
-Under **Settings › General**: automatically log out users after N minutes of inactivity. Applies to web UI sessions only, not API keys.
+Under **Settings › General**: close the session of users after N minutes of inactivity. Five minutes before, a banner offers to extend it; at the end the screen locks, and signing in again with the same account returns to the page that was open. Applies to web UI sessions only, not API keys.
 
 ### Session Duration
 Maximum session length in hours, whatever the activity. The number of simultaneous sessions per user is not limited.
