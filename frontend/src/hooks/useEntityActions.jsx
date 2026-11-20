@@ -24,6 +24,7 @@ import { RestoreModal } from '../components/cas/RestoreModal'
 import { ImportCaKeyModal } from '../components/cas/ImportCaKeyModal'
 import { UploadCACertModal } from '../pages/cas/UploadCACertModal'
 import { UploadKeyModal } from '../pages/certificates/UploadKeyModal'
+import { IssueCertificateDialog } from '../pages/certificates/IssueCertificateDialog'
 import { certificatesService, casService, userCertificatesService } from '../services'
 import { ENTITY_RESOURCE, entityService, entityTitle } from '../lib/entityDetail'
 import { isOnHold, downloadBlob } from '../lib/utils'
@@ -71,6 +72,7 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
   const [importKeyOpen, setImportKeyOpen] = useState(false)
   const [uploadCertOpen, setUploadCertOpen] = useState(false)
   const [uploadKeyOpen, setUploadKeyOpen] = useState(false)
+  const [renewOpen, setRenewOpen] = useState(false)
   // The operator asked to delete a still-valid certificate and accepted to
   // revoke it first; the deletion resumes once the revocation is through.
   const [deleteAfterRevoke, setDeleteAfterRevoke] = useState(false)
@@ -200,6 +202,11 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
   }
 
   const handleRenew = async () => {
+    // A certificate UCM signed renews through the issue form; a Microsoft CA sets its own duration
+    if (data?.source !== 'msca') {
+      setRenewOpen(true)
+      return
+    }
     const body = await askRenewal(data, { showPrompt, showConfirm, showError, t })
     if (!body) return
     try {
@@ -393,6 +400,10 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
           title={isCA ? t('cas.revoke', 'Revoke CA') : undefined}
           warning={isCA ? t('cas.revokeWarning') : undefined}
         />
+      )}
+      {isCert && renewOpen && (
+        <IssueCertificateDialog open={renewOpen} onOpenChange={setRenewOpen} mode="renew" certificate={data}
+          onMutate={onMutate} onIssued={() => { refresh(); settle() }} />
       )}
       {isCert && (
         <UploadKeyModal open={uploadKeyOpen} onOpenChange={setUploadKeyOpen} selectedCert={data} t={t}
