@@ -47,6 +47,15 @@ test.describe('sign-in card at 1600 px', () => {
     // Nothing scrolls sideways
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   })
+
+  test('hover and focus change at once: no fade on the fields, buttons and links of the frame', async ({ page }) => {
+    await page.context().clearCookies()
+    await page.goto('/login')
+    await expect(page.getByRole('region', { name: 'Sign in', exact: true })).toBeVisible()
+    const durations = await page.evaluate(() => ['#login-user', '#login-pass', '.auth-submit', '.auth-password .auth-icon-btn', '.auth-foot a', '.auth-tools .shell-icon-btn']
+      .map(s => getComputedStyle(document.querySelector(s) as Element).transitionDuration))
+    expect(durations).toEqual(['0s', '0s', '0s', '0s', '0s', '0s'])
+  })
 })
 
 test('a window shorter than the sign-in card scrolls down to the foot', async ({ page }) => {
@@ -96,6 +105,19 @@ test.describe('sign-in card at phone width', () => {
       expect(m.x).toBeGreaterThanOrEqual(0)
       await page.keyboard.press('Escape')
     }
+  })
+
+  test('in Aurore the language menu is the glass panel of the theme menu, 220 px', async ({ page }) => {
+    await page.context().clearCookies()
+    await page.goto('/login')
+    await page.getByRole('button', { name: /^Theme: / }).click()
+    await page.getByRole('menuitemradio', { name: 'Aurore dark', exact: true }).click()
+    await page.getByRole('button', { name: 'Language', exact: true }).click()
+    const menu = page.getByRole('menu', { name: 'Language', exact: true })
+    await expect(menu).toBeVisible()
+    const panel = await menu.evaluate(el => ({ blur: getComputedStyle(el).backdropFilter, width: el.getBoundingClientRect().width }))
+    expect(panel.blur).toContain('blur(16px)')
+    expect(Math.abs(panel.width - 220)).toBeLessThanOrEqual(EPS)
   })
 })
 

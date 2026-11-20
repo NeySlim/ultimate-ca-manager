@@ -22,6 +22,8 @@
   padding: 56px 20px 22px;
   position: relative;
 }
+/* As the design: hover and focus change at once, only the Aurore buttons fade (below); autofill keeps its delay */
+:is(.auth-page, .session-banner) :is(button, a, input:not(:-webkit-autofill), select, textarea) { transition: none; }
 .auth :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; box-shadow: none; }
 .auth:focus { outline: none; }
 /* Skip link: the first tab stop, shown while focused */
@@ -32,6 +34,7 @@
 .auth-tools .shell-icon-btn { width: 32px; height: 32px; border-radius: 4px; color: var(--text); }
 .auth-tools .shell-icon-btn svg { width: 16px; height: 16px; }
 .auth-tools .shell-pop { max-height: calc(100dvh - 64px); }
+.auth-lang-flag { width: 17px; flex-shrink: 0; text-align: center; }
 .auth-card {
   position: relative;
   width: min(420px, 100%);
@@ -184,7 +187,7 @@
   .auth-tools { right: 12px; }
   .auth-tools .shell-icon-btn { width: 40px; height: 40px; min-width: 40px; min-height: 40px; }
   /* Under the button that opened it, as on a desktop: the console's phone sheet hangs from its bar */
-  .auth-tools .shell-pop { position: absolute; top: calc(100% + 8px); right: 0; left: auto; width: 260px; max-width: calc(100vw - 24px); }
+  .auth-tools .shell-pop { position: absolute; top: calc(100% + 8px); right: 0; left: auto; width: 220px; max-width: calc(100vw - 24px); }
   .auth-password .auth-icon-btn { width: 40px; min-height: 40px; }
   .session-banner { top: auto; bottom: 12px; flex-wrap: wrap; }
   .session-banner .auth-btn { min-height: 40px; }
@@ -217,7 +220,7 @@
 :root[data-theme="aurore"] :is(.auth-user, .auth-field input[readonly], .auth-field input[readonly]:hover) { background: color-mix(in srgb, var(--raised) 85%, transparent) !important; }
 :root[data-theme="aurore"][data-mode="light"] :is(.auth-user, .auth-field input[readonly], .auth-field input[readonly]:hover) { background: color-mix(in srgb, var(--raised) 90%, transparent) !important; }
 :root[data-theme="aurore"] :is(.auth-btn, .auth-icon-btn, .auth-field input, .auth-tools .shell-icon-btn) { border-radius: 6px; }
-:root[data-theme="aurore"] :is(.auth-btn, .auth-icon-btn) { transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease; }
+:root[data-theme="aurore"] :is(.auth-btn, .auth-icon-btn, .auth-tools .shell-icon-btn) { transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease; }
 :root[data-theme="aurore"] .auth-btn.is-primary {
   background: linear-gradient(135deg, var(--grad-a), var(--grad-b));
   color: var(--on-accent);
@@ -233,10 +236,10 @@
 :root[data-theme="aurore"] .auth-btn:not(.is-primary):hover:not(:disabled) { background: color-mix(in srgb, var(--grad-a) 12%, transparent); }
 :root[data-theme="aurore"][data-mode="light"] .auth-btn:not(.is-primary) { background: color-mix(in srgb, var(--paper) 70%, transparent); border-color: var(--control); }
 :root[data-theme="aurore"][data-mode="light"] .auth-btn:not(.is-primary):hover:not(:disabled) { background: color-mix(in srgb, var(--grad-a) 8%, transparent); }
-:root[data-theme="aurore"] :is(.auth :focus-visible, .auth-skip:focus-visible) { box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent); }
+:root[data-theme="aurore"] :is(.auth :focus-visible, .auth-skip:focus-visible) { box-shadow: 0 0 0 5px var(--halo); }
 /* The halo gives way to the red ring of a field in error; the primary button keeps its glow */
 :root[data-theme="aurore"] .auth-field input[aria-invalid="true"]:focus-visible { box-shadow: 0 0 0 1px var(--bad); }
-:root[data-theme="aurore"] .auth-btn.is-primary:focus-visible { box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent), 0 8px 24px -8px var(--glow); }
+:root[data-theme="aurore"] .auth-btn.is-primary:focus-visible { box-shadow: 0 0 0 5px var(--halo), 0 8px 24px -8px var(--glow); }
 :root[data-theme="aurore"] .session-banner {
   background: color-mix(in srgb, var(--panel) 80%, transparent);
   -webkit-backdrop-filter: blur(16px) saturate(1.4);
@@ -249,10 +252,10 @@
   background: color-mix(in srgb, var(--paper) 84%, transparent);
   /* As the design measures: its light rule recolours the left edge with the others */
   border-color: color-mix(in srgb, var(--text) 14%, transparent);
-  box-shadow: inset 0 1px 0 var(--paper), 0 24px 60px -20px color-mix(in srgb, var(--text) 35%, transparent);
+  box-shadow: inset 0 1px 0 var(--paper), 0 24px 60px -20px color-mix(in srgb, var(--shade) 35%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root[data-theme="aurore"] :is(.auth-btn, .auth-icon-btn) { transition: none; }
+  :root[data-theme="aurore"] :is(.auth-btn, .auth-icon-btn, .auth-tools .shell-icon-btn) { transition: none; }
   :root[data-theme="aurore"] .auth-btn.is-primary:hover:not(:disabled) { transform: none; }
 }

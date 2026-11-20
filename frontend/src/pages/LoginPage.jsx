@@ -10,9 +10,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
-import { CaretRight, Lock, Key, Fingerprint, Eye, EyeSlash, Warning, Database } from '@phosphor-icons/react'
+import { Key, Fingerprint, Eye, EyeSlash, Warning, Database } from '@phosphor-icons/react'
 import { useAuth, useNotification } from '../contexts'
 import { AuthFrame, AuthField } from '../components/auth/AuthFrame'
+import { ChevronIcon, LockIcon, SsoIcon } from '../components/auth/icons'
 import { authMethodsService } from '../services/auth-methods.service'
 import { authService } from '../services/auth.service'
 import { safeNext } from '../navigation/safeNext'
@@ -32,16 +33,6 @@ const PROTOCOLS = { oauth2: 'OAuth 2.0', saml: 'SAML 2.0', ldap: 'LDAP' }
 
 const toProviderList = (ssoData) => (Array.isArray(ssoData?.data) ? ssoData.data : [])
 const providerName = (p) => p.display_name || p.name
-// The design's two offset busts (its `users` icon), drawn like its other strokes
-function SsoIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"
-      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="9" cy="8" r="3.5" />
-      <path d="M3 20a6 6 0 0 1 12 0M16 4.5a3.5 3.5 0 0 1 0 7m2 2.5a6 6 0 0 1 3 6" />
-    </svg>
-  )
-}
 
 const initialsOf = (name) => (name || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
@@ -721,7 +712,8 @@ export default function LoginPage() {
 
   const errorBlock = (rateLimit || formError) && (
     <div className="auth-error" role="alert">
-      <Warning size={14} aria-hidden="true" />
+      {/* The end of a countdown is the sentence alone, as in the design */}
+      {!(rateLimit?.wait != null && !rateLimit.left) && <Warning size={14} aria-hidden="true" />}
       <span>
         {!rateLimit ? formError
           : rateLimit.wait == null ? t('auth.page.tooManyNoDelay')
@@ -843,7 +835,7 @@ export default function LoginPage() {
             {errorBlock}
             {waitLine}
             <button type="submit" className="auth-btn is-primary auth-submit" disabled={loading || waiting}>
-              <CaretRight size={17} aria-hidden="true" />{t('auth.verify')}
+              <ChevronIcon size={17} aria-hidden="true" />{t('auth.verify')}
             </button>
           </form>
         )}
@@ -872,7 +864,7 @@ export default function LoginPage() {
           </span>
         </p>
         {maintenanceBlock}
-        {signInForm(handleLDAPLogin, t('auth.page.submit'), CaretRight)}
+        {signInForm(handleLDAPLogin, t('auth.page.submit'), ChevronIcon)}
         <button type="button" className="auth-link" onClick={handleBack} disabled={loading}>{t('common.back')}</button>
       </>
     )
@@ -881,12 +873,9 @@ export default function LoginPage() {
       <>
         {lockedCard}
         {maintenanceBlock}
-        {ssoOnly ? errorBlock : signInForm(handlePasswordLogin, locked ? t('auth.page.unlock') : t('auth.page.submit'), locked ? Lock : CaretRight)}
+        {ssoOnly ? errorBlock : signInForm(handlePasswordLogin, locked ? t('auth.page.unlock') : t('auth.page.submit'), locked ? LockIcon : ChevronIcon)}
         {alternatives.length > 0 && !ssoOnly && <p className="auth-sep"><span>{t('auth.page.or')}</span></p>}
         {alternatives}
-        {loading && statusMessage && statusMessage !== t('auth.touchSecurityKey') && (
-          <p className="auth-wait" aria-live="polite">{statusMessage}</p>
-        )}
         {(locked || (emailConfigured && !locked)) && (
           <div className="auth-links">
             {locked
@@ -902,6 +891,8 @@ export default function LoginPage() {
     <AuthFrame ref={titleRef} title={title} lead={lead}>
       {body}
       <p className="sr-only" aria-live="polite">{announce}</p>
+      {/* The attempt under way is said, not shown: the card keeps its size while the request runs */}
+      <p className="sr-only" id="login-progress" aria-live="polite">{loading && statusMessage !== t('auth.touchSecurityKey') ? statusMessage : ''}</p>
     </AuthFrame>
   )
 }

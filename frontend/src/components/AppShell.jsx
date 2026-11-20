@@ -22,6 +22,8 @@ import { usePermission } from '../hooks'
 import { useNotification } from '../contexts/NotificationContext'
 import { InspectorDock } from './inspector/InspectorDock'
 import { useDockPlacement } from './inspector/placement'
+import { useThemeColor } from '../lib/themeColor'
+import { BANNER_SLOT } from '../lib/sessionBannerSlot'
 
 export function AppShell() {
   const { t } = useTranslation()
@@ -86,23 +88,7 @@ export function AppShell() {
   useEffect(() => {
     document.title = pageName ? `${pageName} · UCM` : 'UCM'
   }, [pageName])
-  useEffect(() => {
-    const root = document.documentElement
-    const paint = () => {
-      let meta = document.querySelector('meta[name="theme-color"]')
-      if (!meta) {
-        meta = document.createElement('meta')
-        meta.name = 'theme-color'
-        document.head.appendChild(meta)
-      }
-      const bg = getComputedStyle(root).getPropertyValue('--bg').trim()
-      if (bg) meta.content = bg
-    }
-    paint()
-    const observer = new MutationObserver(paint)
-    observer.observe(root, { attributes: true, attributeFilter: ['data-theme', 'data-mode'] })
-    return () => observer.disconnect()
-  }, [])
+  useThemeColor()
 
   // Closing the palette gives the focus back to the search button when nothing else took it
   const setPalette = (open) => {
@@ -154,6 +140,8 @@ export function AppShell() {
         hasHelp={hasHelp}
         onNotice={notice}
       />
+      {/* The session expiry banner comes here, after the bar's buttons in the tab order */}
+      <div id={BANNER_SLOT} style={{ display: 'contents' }} />
 
       <div className={`shell-main${dockPlacement === 'right' ? ' has-dock-right' : ''}`}>
         <div className="shell-content">

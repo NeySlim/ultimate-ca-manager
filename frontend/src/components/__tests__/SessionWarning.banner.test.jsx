@@ -17,6 +17,7 @@ vi.mock('../../services', () => ({
 }))
 
 import { SessionWarning } from '../SessionWarning'
+import { BANNER_SLOT } from '../../lib/sessionBannerSlot'
 
 const tick = (ms) => act(async () => { await vi.advanceTimersByTimeAsync(ms) })
 
@@ -43,6 +44,22 @@ describe('SessionWarning banner', () => {
     expect(banner).toHaveTextContent('session.expiresIn|4:5')
     expect(banner).toHaveTextContent('session.lockNotice')
     expect(document.activeElement).toBe(screen.getByText('work'))
+  })
+
+  it('sits after the top bar in the tab order, before the page, as the design inserts it', async () => {
+    render(<><button type="button">bar</button><div id={BANNER_SLOT} /><button type="button">page</button><SessionWarning /></>)
+    await tick(110 * 1000)
+    const extend = screen.getByRole('button', { name: 'session.extend' })
+    expect(document.getElementById('session-banner-slot')).toContainElement(extend)
+    const follows = (a, b) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(follows(screen.getByText('bar'), extend)).toBe(true)
+    expect(follows(extend, screen.getByText('page'))).toBe(true)
+  })
+
+  it('shows in place where the console has no slot for it (a gate over the console)', async () => {
+    renderWithFocus()
+    await tick(110 * 1000)
+    expect(screen.getByRole('button', { name: 'session.extend' })).toBeInTheDocument()
   })
 
   it('stays up under activity: only Extend keeps the session', async () => {

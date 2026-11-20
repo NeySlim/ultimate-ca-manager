@@ -8,12 +8,14 @@ import { Warning } from '@phosphor-icons/react'
 import { Logo } from '../Logo'
 import { ThemeMenu } from '../shell/ThemeMenu'
 import { AuthLanguageMenu } from './AuthLanguageMenu'
+import { useThemeColor } from '../../lib/themeColor'
 import './auth.css'
 
 export const PROJECT_URL = 'https://github.com/NeySlim/ultimate-ca-manager'
 
 export const AuthFrame = forwardRef(function AuthFrame({ title, lead, children, tools = true, footer = true }, titleRef) {
   const { t } = useTranslation()
+  useThemeColor()
   // The tab names the screen while it shows, then gives the console its title back
   useEffect(() => {
     if (typeof title !== 'string' || !title) return undefined

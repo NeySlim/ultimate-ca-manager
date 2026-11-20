@@ -4,7 +4,7 @@
  * messages chosen by the response's status, and the wait of a 429 counted down.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { saveLock, markJustLocked } from '../../lib/sessionLock'
 
@@ -134,6 +134,32 @@ describe('LoginPage, as designed', () => {
     expect(screen.getByRole('button', { name: 'auth.page.submit' })).not.toBeDisabled()
   }, 8000)
 
+  it('ends the countdown on the sentence alone, without the warning sign', async () => {
+    s.loginPassword.mockRejectedValue(refusal(429, 'Too many requests', { retryAfter: 1 }))
+    renderLogin()
+    await submit()
+    expect((await screen.findByRole('alert')).querySelector('svg')).not.toBeNull()
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('auth.page.canRetry'), { timeout: 3000 })
+    expect(screen.getByRole('alert').querySelector('svg')).toBeNull()
+  }, 6000)
+
+  it('says the sign-in under way to assistive technology only: the card keeps its size', async () => {
+    let answer
+    s.loginPassword.mockReturnValue(new Promise((_, reject) => { answer = reject }))
+    renderLogin()
+    await screen.findByLabelText('auth.page.username')
+    // Mounted before the attempt, so that its change is read
+    const status = document.getElementById('login-progress')
+    expect(status).toHaveClass('sr-only')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(status).toHaveTextContent('')
+    await submit()
+    await waitFor(() => expect(status).toHaveTextContent('auth.signingIn'))
+    expect(screen.getAllByText('auth.signingIn')).toEqual([status])
+    await act(async () => { answer(refusal(401, 'Invalid credentials')) })
+    await waitFor(() => expect(status).toHaveTextContent(''))
+  })
+
   it('a 429 without a delay asks to wait and leaves the button on', async () => {
     s.loginPassword.mockRejectedValue(refusal(429, 'Too many requests'))
     renderLogin()
@@ -197,6 +223,19 @@ describe('LoginPage, as designed', () => {
     renderLogin()
     await submit('alice', 'right')
     await waitFor(() => expect(s.showSuccess).toHaveBeenCalledWith('auth.page.signedIn|Alice Martin|common.operator'))
+  })
+
+  it('draws the design chevron on "Sign in" and its padlock on "Unlock"', async () => {
+    const drawing = (name) => [...screen.getByRole('button', { name }).querySelectorAll('svg path, svg rect')]
+      .map(el => el.getAttribute('d') || `rect ${el.getAttribute('width')}x${el.getAttribute('height')}`)
+    renderLogin()
+    await screen.findByLabelText('auth.page.username')
+    expect(drawing('auth.page.submit')).toEqual(['m9 5 7 7-7 7'])
+    cleanup()
+    saveLock({ username: 'alice', name: 'Alice Martin', role: 'operator', method: 'password' })
+    renderLogin()
+    await screen.findByLabelText('auth.page.username')
+    expect(drawing('auth.page.unlock')).toEqual(['rect 14x11', 'M8 10V7a4 4 0 0 1 8 0v3m-4 5v2'])
   })
 
   it('names the screen in the tab title', async () => {
