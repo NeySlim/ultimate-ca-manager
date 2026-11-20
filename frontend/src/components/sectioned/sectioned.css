@@ -192,8 +192,8 @@
 /* A segmented choice keeps the width of its segments */
 .sf-body .ui-field > .ui-segmented { align-self: flex-start; }
 
-/* The task table keeps the mockup's 36 px rows: its run button is the compact one */
-.sf-task-table td .lv-btn { min-height: 28px; padding-block: 3px; }
+/* The task table keeps the mockup's 36 px rows around a 32 px run button: its cell gives up its padding */
+.sf-task-table td:has(> .lv-btn) { padding-block: 1.5px; }
 
 /* A file drop zone reads as a field of the frame: 1 px dashed control line, radius 4 */
 .sf-body .border-dashed { border-width: 1px; border-radius: 4px; padding: 14px; }
@@ -303,7 +303,7 @@
 }
 :root[data-theme="aurore"][data-mode="light"] :is(.sf-section, .sf-history) {
   background: linear-gradient(var(--panel), var(--panel)) padding-box,
-    linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 38%, transparent), color-mix(in srgb, var(--grad-b) 24%, transparent) 60%, color-mix(in srgb, var(--text) 8%, transparent)) border-box;
-  box-shadow: inset 0 1px 0 var(--paper), 0 18px 40px -28px color-mix(in srgb, var(--text) 35%, transparent);
+    linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 38%, transparent), var(--frame-b) 60%, color-mix(in srgb, var(--text) 8%, transparent)) border-box;
+  box-shadow: inset 0 1px 0 var(--paper), 0 18px 40px -28px var(--frame-shade);
 }
 :root[data-theme="aurore"] .sf-body:not(.sf-body-fill) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea, button[role="combobox"]) { border-radius: 6px; }

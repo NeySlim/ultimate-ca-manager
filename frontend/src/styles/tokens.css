@@ -1,6 +1,7 @@
 /*
  * Theme tokens: 18 colours + 3 extras (grad-a, grad-b, glow) + 3 constants (ink, paper, scrim), the shadow
- * tint (shade), the Aurore glows and focus halo (glow-rose, glow-b, halo; transparent elsewhere), one block
+ * tint (shade), the Aurore glows, focus halo and frame tints (glow-rose, glow-b, halo, frame-b, frame-shade;
+ * transparent elsewhere), one block
  * per family x mode, selected by data-theme / data-mode on <html>.
  * Bare :root is the fallback (Atelier, dark). Changing a value here means
  * updating tokens.baseline.json in the same commit.
@@ -37,6 +38,8 @@
   --glow-rose: transparent;
   --glow-b: transparent;
   --halo: transparent;
+  --frame-b: transparent;
+  --frame-shade: transparent;
 }
 
 :root[data-theme="atelier"][data-mode="light"] {
@@ -69,6 +72,8 @@
   --glow-rose: transparent;
   --glow-b: transparent;
   --halo: transparent;
+  --frame-b: transparent;
+  --frame-shade: transparent;
 }
 
 :root[data-theme="aurore"][data-mode="dark"] {
@@ -101,6 +106,8 @@
   --glow-rose: rgba(236, 72, 153, 0.10);
   --glow-b: rgba(95, 167, 220, 0.22);
   --halo: rgba(107, 120, 224, 0.25);
+  --frame-b: rgba(95, 167, 220, 0.25);
+  --frame-shade: rgba(0, 0, 0, 0.80);
 }
 
 :root[data-theme="aurore"][data-mode="light"] {
@@ -133,6 +140,8 @@
   --glow-rose: rgba(219, 39, 119, 0.06);
   --glow-b: rgba(34, 170, 220, 0.14);
   --halo: rgba(107, 120, 224, 0.25);
+  --frame-b: rgba(34, 170, 220, 0.24);
+  --frame-shade: rgba(40, 50, 120, 0.35);
 }
 
 :root[data-theme="purple"][data-mode="dark"] {
@@ -165,6 +174,8 @@
   --glow-rose: transparent;
   --glow-b: transparent;
   --halo: transparent;
+  --frame-b: transparent;
+  --frame-shade: transparent;
 }
 
 :root[data-theme="purple"][data-mode="light"] {
@@ -197,6 +208,8 @@
   --glow-rose: transparent;
   --glow-b: transparent;
   --halo: transparent;
+  --frame-b: transparent;
+  --frame-shade: transparent;
 }
 
 :root[data-theme="sunset"][data-mode="dark"] {
@@ -229,6 +242,8 @@
   --glow-rose: transparent;
   --glow-b: transparent;
   --halo: transparent;
+  --frame-b: transparent;
+  --frame-shade: transparent;
 }
 
 :root[data-theme="sunset"][data-mode="light"] {
@@ -261,6 +276,8 @@
   --glow-rose: transparent;
   --glow-b: transparent;
   --halo: transparent;
+  --frame-b: transparent;
+  --frame-shade: transparent;
 }
 
 /*

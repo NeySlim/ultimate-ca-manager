@@ -626,7 +626,8 @@ export default function CertificatesPage() {
           multiSelect
           selectedIds={selectedIds}
           onSelectionChange={setSelectedIds}
-          selectionLabel={(count) => t('certificates.selectedOnPage', { count })}
+          // The mockup: « 1 sélectionné » for part of the page, the long count once the page is whole
+          selectionLabel={(count, { pageAll }) => t(pageAll ? 'certificates.selectedOnPage' : 'table.selectedCount', { count })}
           bulkActions={
             <>
               <ListButton

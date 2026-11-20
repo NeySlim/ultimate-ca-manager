@@ -500,7 +500,7 @@
 :root[data-theme="aurore"][data-mode="light"] .lv-dialog {
   background: color-mix(in srgb, var(--paper) 84%, transparent);
   border-color: color-mix(in srgb, var(--text) 14%, transparent);
-  box-shadow: inset 0 1px 0 var(--paper), 0 24px 60px -20px color-mix(in srgb, var(--accent) 35%, transparent);
+  box-shadow: inset 0 1px 0 var(--paper), 0 24px 60px -20px color-mix(in srgb, var(--shade) 35%, transparent);
 }
 
 /* Menus of the toolbar (presets, export): the mockup's pop menu, 8 px under its button */
@@ -517,7 +517,7 @@
 .lv-tool-menu-empty { margin: 0; padding: 10px; font-size: 12px; line-height: 1.6; color: var(--muted); }
 
 /* Narrower windows, as the mockup: one row action under 1250 px, 10 px cells under 1100 px,
-   an 18 px gutter, tools by their icon and filters of 140 px at most under 1000 px */
+   an 18 px gutter, tools by their icon and filters of 140 px (its capped select) under 1000 px */
 @media (max-width: 1250px) {
   .lv-row-actions .lv-icon-btn:first-child:not(:last-child) { display: none; }
 }
@@ -529,7 +529,11 @@
   .lv-views-row { flex-wrap: wrap; gap: 0; }
   .lv-views-aside { display: none; }
   .lv-toolbar .lv-btn > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
-  .lv-toolbar .lv-filter > button { max-width: 140px; }
+  /* 140 px each, giving way together where the product's third filter and presets leave less room */
+  .lv-toolbar .lv-tools { flex-shrink: 1; min-width: 0; }
+  .lv-toolbar > .lv-btn { flex-shrink: 0; }
+  .lv-toolbar .lv-filter { flex: 0 1 auto; min-width: 0; }
+  .lv-toolbar .lv-filter > button { width: 140px; max-width: 100%; }
 }
 
 @media (max-width: 800px) {
@@ -565,9 +569,10 @@
   .lv-toolbar .lv-search { flex-basis: 100%; min-height: 42px; }
   .lv-toolbar .lv-search input { min-height: 40px; font-size: 13px; }
   .lv-main:has(.lv-table-box.is-cards) { padding: 0 var(--lv-gutter); }
-  /* Two filters share a line, as the mockup's (max-width:none); a third one takes the next line whole */
-  .lv-toolbar .lv-tools { flex: 1 1 0; flex-wrap: wrap; min-width: 0; }
-  .lv-toolbar .lv-filter { flex: 1 1 calc(50% - 4px); min-width: 0; }
+  /* The filters share the mockup's one line beside the export button (max-width:none):
+     a third filter of the product splits that line, it never adds one */
+  .lv-toolbar .lv-tools { flex: 1 1 0; flex-wrap: nowrap; min-width: 0; }
+  .lv-toolbar .lv-filter { flex: 1 1 0; min-width: 0; }
   .lv-toolbar .lv-filter > button { width: 100%; max-width: none; min-height: 40px; }
   .lv-toolbar .lv-btn.is-icon { width: 40px; height: 40px; }
   .lv-footer { padding: 10px; gap: 8px; flex-wrap: wrap; }
@@ -632,8 +637,8 @@
 :root[data-theme="aurore"][data-mode="light"] .lv-table-box {
   background:
     linear-gradient(var(--panel), var(--panel)) padding-box,
-    linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 38%, transparent), color-mix(in srgb, var(--grad-b) 24%, transparent) 60%, color-mix(in srgb, var(--text) 8%, transparent)) border-box;
-  box-shadow: inset 0 1px 0 var(--paper), 0 18px 40px -28px color-mix(in srgb, var(--text) 35%, transparent);
+    linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 38%, transparent), var(--frame-b) 60%, color-mix(in srgb, var(--text) 8%, transparent)) border-box;
+  box-shadow: inset 0 1px 0 var(--paper), 0 18px 40px -28px var(--frame-shade);
 }
 :root[data-theme="aurore"] .lv-table thead tr { background: linear-gradient(90deg, var(--grad-a), var(--grad-b) 45%, transparent) left bottom / 100% 1px no-repeat, var(--raised); }
 :root[data-theme="aurore"] .lv-table th { background: transparent; border-bottom-color: transparent; }
@@ -642,9 +647,9 @@
 :root[data-theme="aurore"] .lv-table tbody tr.is-opened { background: linear-gradient(90deg, var(--selected), color-mix(in srgb, var(--selected) 55%, var(--panel))); background-color: var(--selected); }
 :root[data-theme="aurore"] .lv-table tbody tr.is-opened td:first-child { position: relative; box-shadow: none; }
 :root[data-theme="aurore"] .lv-table tbody tr.is-opened td:first-child::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: linear-gradient(180deg, var(--grad-a), var(--grad-b)); pointer-events: none; }
-/* Aurore: the focus ring wears the mockup's 5 px halo */
-:root[data-theme="aurore"] :is(.lv-stage, .lv-dialog) :is(button, a, input, select, [tabindex]):focus-visible { box-shadow: 0 0 0 5px var(--halo); }
+/* Aurore: the focus ring wears the mockup's 5 px halo; a field in error keeps its red ring, as the mockup */
+:root[data-theme="aurore"] :is(.lv-stage, .lv-dialog) :is(button, a, input, select, [tabindex]):not(:where([aria-invalid="true"])):focus-visible { box-shadow: 0 0 0 5px var(--halo); }
 :root[data-theme="aurore"] :is(.lv-stage, .lv-dialog) .lv-btn.is-primary:focus-visible { box-shadow: 0 0 0 5px var(--halo), 0 8px 24px -8px var(--glow); }
 @media (prefers-reduced-motion: no-preference) {
-  :root[data-theme="aurore"] :is(.lv-btn, .lv-icon-btn, .lv-table tbody tr) { transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease; }
+  :root[data-theme="aurore"] :is(.lv-btn, .lv-icon-btn, .lv-table tbody tr) { transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease; }
 }

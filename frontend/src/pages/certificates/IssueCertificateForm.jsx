@@ -660,10 +660,12 @@ export function IssueCertificateForm({
     return [...new Set([...allowed, current])]
   }
   const serverType = ['server', 'combined'].includes(d.cert_type)
-  // The name that equals the common name is not repeated as a row, as in the Atelier
+  // The name that equals the common name is not repeated as a row, as in the Atelier; when it is the
+  // only name it stays, so the form and the review list the same names
   const renewCn = certificate?.cn || certificate?.common_name || ''
   const allRenewSans = SAN_FIELDS.flatMap(([field, type]) => listOf(certificate?.[field]).map((value) => ({ type, value })))
-  const renewSans = allRenewSans.filter((s) => s.value !== renewCn)
+  const otherRenewSans = allRenewSans.filter((s) => s.value !== renewCn)
+  const renewSans = otherRenewSans.length ? otherRenewSans : allRenewSans
   const renewSubject = SUBJECT_KEYS.filter((k) => certificate?.[k])
 
   const renderHint = () => {
@@ -731,8 +733,8 @@ export function IssueCertificateForm({
         <fieldset className="iss-field is-full">
           <legend>{t(`${P}sansLegend`)}</legend>
           <small id={id('hint-san')}>{t(`${P}sansRenew`)}</small>
-          {/* The rows and buttons of an issuance, read-only: the server keeps the names; without a name
-              besides the common name, the empty row of the Atelier keeps its place */}
+          {/* The rows and buttons of an issuance, read-only: the server keeps the names; without any
+              name, the empty row of the Atelier keeps its place */}
           <div className="iss-rows">
             {(renewSans.length ? renewSans : [{ type: 'DNS', value: '' }]).map((s, i) => (
               <div className="iss-san-row" key={`${s.type}-${s.value}`}>

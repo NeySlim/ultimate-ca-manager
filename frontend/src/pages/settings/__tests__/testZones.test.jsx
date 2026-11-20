@@ -41,6 +41,21 @@ describe('section test zones', () => {
   })
 })
 
+describe('AutoRenewalSection focus', () => {
+  it('gives the focus back to Run now once the run ends', () => {
+    const props = { arSettings: ar, setArSettings: vi.fn(), arRunResult: null, handleArRunNow: vi.fn() }
+    const { rerender } = render(<AutoRenewalSection {...props} arRunning={false} />)
+    const run = screen.getByText('settings.autoRenewalRunNow').closest('button')
+    run.focus()
+    // Disabled while it runs: the browser drops the focus to the page
+    run.blur()
+    rerender(<AutoRenewalSection {...props} arRunning />)
+    expect(document.activeElement).toBe(document.body)
+    rerender(<AutoRenewalSection {...props} arRunning={false} arRunResult={{ ok: true, text: 'done' }} />)
+    expect(document.activeElement).toBe(run)
+  })
+})
+
 describe('AutoRenewalSection write guard', () => {
   it('suspends Run now with the other writes', () => {
     render(<AutoRenewalSection arSettings={ar} setArSettings={vi.fn()} arRunResult={null} handleArRunNow={vi.fn()} />)

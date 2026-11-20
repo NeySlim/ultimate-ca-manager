@@ -326,7 +326,7 @@
   background: color-mix(in srgb, var(--paper) 84%, transparent);
   border-color: color-mix(in srgb, var(--text) 14%, transparent);
   box-shadow: inset 0 1px 0 var(--paper),
-    0 24px 60px -20px color-mix(in srgb, color-mix(in srgb, var(--accent) 53%, var(--ink)) 35%, transparent);
+    0 24px 60px -20px color-mix(in srgb, var(--shade) 35%, transparent);
 }
 :root[data-theme="aurore"] .iss-btn.is-primary {
   background: linear-gradient(135deg, var(--grad-a), var(--grad-b));
@@ -358,9 +358,9 @@
   transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease;
 }
 /* Aurore's focus halo; an invalid field keeps its own ring (rule above, higher specificity) */
-:root[data-theme="aurore"] .iss-dialog :focus-visible { box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent); }
+:root[data-theme="aurore"] .iss-dialog :focus-visible { box-shadow: 0 0 0 5px var(--halo); }
 :root[data-theme="aurore"] .iss-dialog .iss-btn.is-primary:focus-visible {
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent), 0 8px 24px -8px var(--glow);
+  box-shadow: 0 0 0 5px var(--halo), 0 8px 24px -8px var(--glow);
 }
 :root[data-theme="aurore"] .iss-dialog .iss-fields [aria-invalid="true"]:focus-visible { box-shadow: 0 0 0 1px var(--bad); }
 :root[data-theme="aurore"] :is(.iss-btn, .iss-icon-btn, .iss-dialog input:not([type="checkbox"]):not([type="radio"]), .iss-dialog select, .iss-dialog textarea) {

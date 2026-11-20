@@ -58,6 +58,19 @@ test.describe('desktop', () => {
     await expect(open).toBeFocused()
   })
 
+  test('the close button of a queue dialog fades only in Aurore, as the mockup', async ({ page, api }) => {
+    await page.goto('/reports')
+    await page.locator('.lv-head').getByRole('button', { name: 'Schedule a report' }).click()
+    const close = page.getByRole('dialog').locator('.lv-dialog-head .lv-btn')
+    await expect(close).toBeVisible()
+    const family = (name: string) => page.evaluate((n) => document.documentElement.setAttribute('data-theme', n), name)
+    await family('atelier')
+    expect(await css(close, 'transition-duration')).toBe('0s')
+    await family('aurore')
+    expect(await css(close, 'transition-property')).toBe('background-color, border-color, box-shadow, transform')
+    expect(await css(close, 'transition-duration')).toBe('0.16s, 0.16s, 0.16s, 0.16s')
+  })
+
   test('Clear selection gives the focus to the page title', async ({ page, api }) => {
     const before = await api.get('/reports/schedule')
     await api.put('/reports/schedule', { expiring_certificates: { enabled: true, frequency: 'daily', time: '06:00', recipients: ['pki@example.com'], format: 'csv' } })

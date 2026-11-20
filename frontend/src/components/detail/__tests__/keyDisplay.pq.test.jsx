@@ -80,9 +80,10 @@ describe('key display outside the certificate panel', () => {
     expect(screen.getByText('ECDSA P-384')).toBeInTheDocument()
   })
 
-  it('lists an ML-DSA certificate with its level, an unnamed key as a dash', () => {
+  it('lists an ML-DSA certificate by its name as the mockup, an unnamed key as a dash', () => {
     keyCell({ key_algorithm: 'ML-DSA-65', key_type: 'ML-DSA-65', security_level: 3 })
-    expect(screen.getByText(LEVEL_LABEL)).toBeInTheDocument()
+    expect(screen.getByText('ML-DSA-65')).toBeInTheDocument()
+    expect(screen.queryByText(LEVEL_LABEL)).toBeNull()
     keyCell({ key_algorithm: null, key_type: null })
     expect(screen.queryByText('RSA')).toBeNull()
   })

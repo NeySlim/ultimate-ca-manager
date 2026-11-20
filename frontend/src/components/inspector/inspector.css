@@ -23,7 +23,7 @@
 .ins-dock.is-right { align-self: stretch; height: auto; margin: 14px 24px 14px -8px; border-radius: 5px; }
 .ins-dock.is-mobile { position: fixed; inset: 0; z-index: 40; border: 0; border-radius: 0; }
 .ins-dock :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-:root[data-theme="aurore"] .ins-dock :focus-visible { box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent); }
+:root[data-theme="aurore"] .ins-dock :focus-visible { box-shadow: 0 0 0 5px var(--halo); }
 
 /* Resize grip centred on the edge the dock grows from */
 .ins-grip {
@@ -394,8 +394,8 @@
 :root[data-theme="aurore"][data-mode="light"] .ins-dock:not(.is-mobile) {
   background:
     linear-gradient(var(--panel), var(--panel)) padding-box,
-    linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 38%, transparent), color-mix(in srgb, var(--grad-b) 24%, transparent) 60%, color-mix(in srgb, var(--text) 8%, transparent)) border-box;
-  box-shadow: inset 0 1px 0 var(--paper), 0 18px 40px -28px color-mix(in srgb, var(--text) 35%, transparent);
+    linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 38%, transparent), var(--frame-b) 60%, color-mix(in srgb, var(--text) 8%, transparent)) border-box;
+  box-shadow: inset 0 1px 0 var(--paper), 0 18px 40px -28px var(--frame-shade);
 }
 :root[data-theme="aurore"] .ins-dock:not(.is-mobile)::before { content: ''; position: absolute; top: -1px; left: 5px; right: 5px; z-index: 4; height: 1px; background: linear-gradient(90deg, var(--grad-a), var(--grad-b)); pointer-events: none; }
 :root[data-theme="aurore"] .ins-open-tab.is-active { box-shadow: none; background: linear-gradient(90deg, var(--grad-a), var(--grad-b)) left top / 100% 2px no-repeat, var(--panel); }

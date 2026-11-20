@@ -1,16 +1,19 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ShieldCheck, Question, WarningCircle } from '@phosphor-icons/react'
 import { Button } from '../../components'
 import PreflightReport from '../../components/PreflightReport'
 import { systemService } from '../../services'
 import { FormGroup } from '../../components/sectioned'
+import { useRefocusAfter } from '../../components/sectioned/useRefocus'
 
 export default function FipsPreflightPanel() {
   const { t } = useTranslation()
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const runRef = useRef(null)
+  useRefocusAfter(loading, runRef)
 
   const runCheck = async () => {
     setLoading(true)
@@ -31,7 +34,7 @@ export default function FipsPreflightPanel() {
       <div className="space-y-3">
         {/* The check as the mockup's test zone: the button, its hint or its failure beside it */}
         <div className="sf-test">
-          <Button type="button" variant="secondary" onClick={runCheck} disabled={loading}>
+          <Button ref={runRef} type="button" variant="secondary" onClick={runCheck} disabled={loading}>
             <ShieldCheck size={16} />
             {loading ? t('settings.fipsPreflight.running') : t('settings.fipsPreflight.run')}
           </Button>

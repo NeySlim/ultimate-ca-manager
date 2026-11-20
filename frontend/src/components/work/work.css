@@ -6,9 +6,10 @@
 .wk-view { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-content: start; color: var(--text); font-size: 13px; line-height: normal; }
 .wk-view h2, .wk-view h3, .wk-view p { margin: 0; }
 .wk-view :is(button, a, input, [tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-/* No transition on the queue's controls, its dialogs' fields and close button, as the Atelier themes (Aurore animates its buttons, below) */
+/* No transition on the queue's controls, its dialogs' fields and close button, as the Atelier themes
+   (Aurore animates its buttons below, and the close button through the list's rule) */
 :is(.wk-view, .lv-dialog, .ins-heading) :is(.wk-btn, .wk-subject, .wk-history-toggle, .wk-check input),
-.wk-dialog .wk-field :is(input, select, textarea), .lv-dialog:has(.wk-dialog) .lv-dialog-head .lv-btn { transition: none; }
+.wk-dialog .wk-field :is(input, select, textarea), :root:not([data-theme="aurore"]) .lv-dialog:has(.wk-dialog) .lv-dialog-head .lv-btn { transition: none; }
 /* Shown on one side of the phone width only */
 .wk-phone-only { display: none; }
 
@@ -341,10 +342,10 @@
 }
 /* Aurore family: the keyboard focus wears the mockup's halo around its outline, the primary keeps its glow */
 :root[data-theme="aurore"] :is(.wk-view, .lv-dialog:has(.wk-dialog), .ins-heading:has(.wk-btn)) :focus-visible {
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent);
+  box-shadow: 0 0 0 5px var(--halo);
 }
 :root[data-theme="aurore"] :is(.wk-view, .lv-dialog:has(.wk-dialog), .ins-heading:has(.wk-btn)) .wk-btn.is-primary:focus-visible {
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--grad-a) 25%, transparent), 0 8px 24px -8px var(--glow);
+  box-shadow: 0 0 0 5px var(--halo), 0 8px 24px -8px var(--glow);
 }
 /* Aurore family: rounder dialog fields */
 :root[data-theme="aurore"] .wk-dialog .wk-field :is(input, select, textarea) { border-radius: 6px; }
@@ -361,7 +362,7 @@
 :root[data-theme="aurore"][data-mode="light"] .wk-panel {
   background:
     linear-gradient(var(--panel), var(--panel)) padding-box,
-    linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 38%, transparent), color-mix(in srgb, var(--grad-b) 24%, transparent) 60%, color-mix(in srgb, var(--text) 8%, transparent)) border-box;
+    linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 38%, transparent), var(--frame-b) 60%, color-mix(in srgb, var(--text) 8%, transparent)) border-box;
   background-color: var(--panel);
-  box-shadow: inset 0 1px 0 var(--paper), 0 18px 40px -28px color-mix(in srgb, var(--text) 35%, transparent);
+  box-shadow: inset 0 1px 0 var(--paper), 0 18px 40px -28px var(--frame-shade);
 }

@@ -2533,7 +2533,7 @@ export default function SettingsPage() {
         open={!!ssoConfirmDelete}
         onClose={() => setSsoConfirmDelete(null)}
         onConfirm={handleSsoDelete}
-        title={t('common.confirmDelete')}
+        title={t('sso.deleteTitle')}
         message={t('sso.deleteConfirm', { name: ssoConfirmDelete?.name })}
         confirmLabel={t('common.delete')}
         variant="danger"
@@ -2558,7 +2558,7 @@ export default function SettingsPage() {
         open={!!webhookConfirmDelete}
         onClose={() => setWebhookConfirmDelete(null)}
         onConfirm={handleWebhookDelete}
-        title={t('common.confirmDelete')}
+        title={t('webhooks.deleteTitle')}
         message={t('webhooks.deleteConfirm', { name: webhookConfirmDelete?.name })}
         confirmLabel={t('common.delete')}
         variant="danger"

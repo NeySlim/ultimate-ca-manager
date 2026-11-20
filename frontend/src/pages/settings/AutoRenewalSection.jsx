@@ -2,12 +2,14 @@
  * Automatic renewal: on or off, the delay and the sources, the notifications and their
  * recipients, then a run now with its result on the same line (the mockup's test zone).
  */
+import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowsClockwise, Lightning, CheckCircle, WarningCircle, Question } from '@phosphor-icons/react'
 import { Button, Input } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import TagsInput from '../../components/ui/TagsInput'
 import { FormGroup } from '../../components/sectioned'
+import { useRefocusAfter } from '../../components/sectioned/useRefocus'
 import { fieldBounds } from './fieldChecks'
 
 const SOURCES = ['manual', 'scep', 'acme', 'est']
@@ -23,6 +25,8 @@ export default function AutoRenewalSection({
   handleArRunNow,
 }) {
   const { t } = useTranslation()
+  const runRef = useRef(null)
+  useRefocusAfter(Boolean(arRunning), runRef)
 
   const toggleSource = (src) => {
     setArSettings((prev) => {
@@ -107,6 +111,7 @@ export default function AutoRenewalSection({
         </div>
         <div className="sf-test sf-under-group">
           <Button
+            ref={runRef}
             type="button"
             variant="secondary"
             onClick={handleArRunNow}
