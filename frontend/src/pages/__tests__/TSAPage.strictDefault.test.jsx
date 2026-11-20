@@ -95,7 +95,7 @@ async function openSettingsTab() {
 }
 
 const strictToggle = () => screen.getByText('tsa.requireDedicatedCert')
-  .closest('label').querySelector('button[role="switch"]')
+  .closest('label').querySelector('input[type="checkbox"]')
 
 describe('TSAPage strict mode by default', () => {
   beforeEach(() => { vi.clearAllMocks() })
@@ -103,7 +103,7 @@ describe('TSAPage strict mode by default', () => {
   it('shows the strict mode on and offers to generate the missing signer', async () => {
     config.current = STRICT_NO_SIGNER
     await openSettingsTab()
-    expect(strictToggle().getAttribute('aria-checked')).toBe('true')
+    expect(strictToggle().checked).toBe(true)
     expect(screen.getByText('tsa.strictNoSigner')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /tsa.signerGenerate/ })).not.toBeDisabled()
   })
@@ -112,7 +112,7 @@ describe('TSAPage strict mode by default', () => {
     const { require_dedicated_cert: _omitted, ...rest } = STRICT_NO_SIGNER
     config.current = rest
     await openSettingsTab()
-    expect(strictToggle().getAttribute('aria-checked')).toBe('true')
+    expect(strictToggle().checked).toBe(true)
   })
 
   it('keeps the strict mode on when a signer is picked', async () => {

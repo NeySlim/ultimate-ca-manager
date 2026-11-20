@@ -13,13 +13,13 @@ vi.mock('../ProfilesEditor', () => ({ default: () => null }))
 
 import ConfigTab from '../ConfigTab'
 
-const toggle = () => screen.getByText('acme.allowPrivateIps').closest('div').parentElement.querySelector('[role="switch"]')
+const toggle = () => screen.getByText('acme.allowPrivateIps').closest('label').querySelector('input[type="checkbox"]')
 
 describe('ConfigTab private addresses', () => {
   it('shows the switch on by default and saves a change', () => {
     const updateSetting = vi.fn()
     render(<ConfigTab acmeSettings={{ enabled: true, profiles: {} }} cas={[]} updateSetting={updateSetting} canWrite />)
-    expect(toggle().getAttribute('aria-checked')).toBe('true')
+    expect(toggle().checked).toBe(true)
     fireEvent.click(toggle())
     expect(updateSetting).toHaveBeenCalledWith('allow_private_ips', false)
   })
@@ -27,6 +27,6 @@ describe('ConfigTab private addresses', () => {
   it('reflects a stored off', () => {
     render(<ConfigTab acmeSettings={{ enabled: true, profiles: {}, allow_private_ips: false }} cas={[]}
       updateSetting={vi.fn()} canWrite />)
-    expect(toggle().getAttribute('aria-checked')).toBe('false')
+    expect(toggle().checked).toBe(false)
   })
 })

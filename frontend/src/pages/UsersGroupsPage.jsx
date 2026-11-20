@@ -20,6 +20,7 @@ import {
 } from '../components'
 import { usersService, groupsService, rolesService, casService, accountService, ssoService } from '../services'
 import { hiddenFromIssuance, listedForIssuance, pickerCas, unlistedPickerCas } from '../lib/caSelection'
+import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
 import UserSecurityKeys from '../components/UserSecurityKeys'
 import UserApiKeys from '../components/UserApiKeys'
@@ -1675,27 +1676,12 @@ function UserForm({ user, isSelf = false, onSubmit, onCancel }) {
         />
       )}
       {user && (
-        <div className="flex items-center justify-between py-2">
-          <div>
-            <label className="text-sm font-medium text-text-primary">{t('common.status')}</label>
-            <p className="text-xs text-text-secondary">{t('users.activeDescription')}</p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={formData.active}
-            onClick={() => setFormData(p => ({ ...p, active: !p.active }))}
-            className={cn(
-              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-              formData.active ? "bg-accent-primary" : "bg-bg-tertiary"
-            )}
-          >
-            <span className={cn(
-              "inline-block h-4 w-4 transform rounded-full bg-paper transition-transform",
-              formData.active ? "translate-x-6" : "translate-x-1"
-            )} />
-          </button>
-        </div>
+        <ToggleSwitch
+          checked={!!formData.active}
+          onChange={(val) => setFormData(p => ({ ...p, active: val }))}
+          label={t('common.status')}
+          description={t('users.activeDescription')}
+        />
       )}
       <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>

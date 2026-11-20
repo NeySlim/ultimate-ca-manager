@@ -123,7 +123,7 @@ describe('TSAPage — dedicated signer certificate (#312)', () => {
   it('keeps the strict toggle disabled until a usable signer is saved', async () => {
     await openSettingsTab()
     const label = await screen.findByText('tsa.requireDedicatedCert')
-    const toggle = label.closest('label').querySelector('button[role="switch"]')
+    const toggle = label.closest('label').querySelector('input[type="checkbox"]')
     expect(toggle).toBeDisabled()
   })
 
@@ -133,7 +133,7 @@ describe('TSAPage — dedicated signer certificate (#312)', () => {
     await openSettingsTab()
     expect(await screen.findByText('tsa.signerUnsaved')).toBeInTheDocument()
     const label = screen.getByText('tsa.requireDedicatedCert')
-    const toggle = label.closest('label').querySelector('button[role="switch"]')
+    const toggle = label.closest('label').querySelector('input[type="checkbox"]')
     expect(toggle).toBeDisabled()
   })
 
@@ -141,7 +141,7 @@ describe('TSAPage — dedicated signer certificate (#312)', () => {
     setConfig({ signer_cert_refid: 'cert-ts-1', signer: USABLE_SIGNER })
     await openSettingsTab()
     const label = await screen.findByText('tsa.requireDedicatedCert')
-    const toggle = label.closest('label').querySelector('button[role="switch"]')
+    const toggle = label.closest('label').querySelector('input[type="checkbox"]')
     expect(toggle).not.toBeDisabled()
   })
 
@@ -150,7 +150,7 @@ describe('TSAPage — dedicated signer certificate (#312)', () => {
     setConfig({ signer_cert_refid: '', require_dedicated_cert: true, signer: { configured: false } })
     await openSettingsTab()
     const label = await screen.findByText('tsa.requireDedicatedCert')
-    const toggle = label.closest('label').querySelector('button[role="switch"]')
+    const toggle = label.closest('label').querySelector('input[type="checkbox"]')
     expect(toggle).not.toBeDisabled()
     expect(screen.getByText('tsa.strictNoSigner')).toBeInTheDocument()
   })

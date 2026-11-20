@@ -30,12 +30,12 @@ const show = (formData, result = null, handleChange = vi.fn()) => {
 }
 
 const nestedSwitch = () =>
-  screen.getByText('sso.ldapNestedGroups').closest('div').parentElement.querySelector('[role="switch"]')
+  screen.getByText('sso.ldapNestedGroups').closest('label').querySelector('input[type="checkbox"]')
 
 describe('SsoLdapFields nested groups', () => {
   it('is off without the field and turns on by its switch', () => {
     const handleChange = show({ ldap_group_member_attr: 'memberOf' })
-    expect(nestedSwitch().getAttribute('aria-checked')).toBe('false')
+    expect(nestedSwitch().checked).toBe(false)
     expect(screen.queryByText('sso.ldapNestedGroupsWarning')).toBeNull()
     fireEvent.click(nestedSwitch())
     expect(handleChange).toHaveBeenCalledWith('ldap_nested_groups', true)
@@ -43,7 +43,7 @@ describe('SsoLdapFields nested groups', () => {
 
   it('warns that parent groups give their roles when on', () => {
     show({ ldap_group_member_attr: 'member', ldap_nested_groups: true })
-    expect(nestedSwitch().getAttribute('aria-checked')).toBe('true')
+    expect(nestedSwitch().checked).toBe(true)
     expect(screen.getByText('sso.ldapNestedGroupsWarning')).toBeTruthy()
   })
 

@@ -1,83 +1,50 @@
 /**
- * ToggleSwitch - Theme-aware toggle switch component
- * Uses CSS variables for full theme compatibility (dark, light, etc.)
+ * ToggleSwitch - a setting on or off, drawn as the Atelier check line: a 16 px native
+ * checkbox and its label on one line (`.checkbox-line`), an optional description under the label.
+ * The name keeps its old API; `size` is accepted and ignored (one geometry).
  */
+import { useId } from 'react'
+import { cn } from '../../lib/utils'
 
-export function ToggleSwitch({ 
-  checked = false, 
-  onChange, 
+export function ToggleSwitch({
+  checked = false,
+  onChange,
   disabled = false,
-  size = 'md',
+  // eslint-disable-next-line no-unused-vars
+  size,
   label,
   description,
-  className = '' 
+  className = '',
+  ...rest
 }) {
-  const sizes = {
-    sm: { track: 'w-8 h-[18px]', thumb: 'w-3.5 h-3.5', translate: 'translate-x-[14px]' },
-    md: { track: 'w-10 h-[22px]', thumb: 'w-4 h-4', translate: 'translate-x-[18px]' },
-    lg: { track: 'w-12 h-[26px]', thumb: 'w-5 h-5', translate: 'translate-x-[22px]' },
+  const id = useId()
+  const handleChange = (e) => {
+    if (!disabled && onChange) onChange(e.target.checked)
   }
 
-  const s = sizes[size] || sizes.md
-
-  const handleClick = () => {
-    if (!disabled && onChange) {
-      onChange(!checked)
-    }
-  }
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      handleClick()
-    }
-  }
-
-  const toggle = (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
+  const box = (
+    <input
+      type="checkbox"
+      checked={!!checked}
       disabled={disabled}
-      onClick={handleClick}
-      onKeyDown={handleKeyDown}
-      className={`
-        relative inline-flex items-center shrink-0 rounded-full 
-        transition-colors duration-200 ease-in-out
-        focus:outline-none focus:ring-2 focus:ring-accent-primary-op40 focus:ring-offset-1 focus:ring-offset-bg-primary
-        ${s.track}
-        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-        ${checked ? 'bg-accent-primary' : 'bg-bg-tertiary border border-border'}
-      `}
-    >
-      <span
-        className={`
-          inline-block rounded-full shadow-sm
-          transition-transform duration-200 ease-in-out
-          ${s.thumb}
-          ${checked ? `${s.translate} bg-paper` : 'translate-x-[3px] bg-text-tertiary'}
-        `}
-      />
-    </button>
+      onChange={handleChange}
+      aria-labelledby={label ? `${id}-label` : undefined}
+      aria-describedby={description ? `${id}-desc` : undefined}
+      {...rest}
+      className={label ? undefined : className || undefined}
+    />
   )
 
-  if (!label) {
-    return <div className={className}>{toggle}</div>
-  }
+  if (!label) return box
 
+  // The label names the box; the description is linked to it, outside the name.
   return (
-    <label 
-      className={`flex items-center gap-3 p-2 rounded-lg transition-colors
-        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-tertiary-op50'}
-        ${className}
-      `}
-      onClick={(e) => e.preventDefault()}
-    >
-      {toggle}
-      <div className="flex-1" onClick={handleClick}>
-        <p className="text-sm text-text-primary font-medium">{label}</p>
-        {description && <p className="text-xs text-text-secondary">{description}</p>}
-      </div>
+    <label className={cn('ui-check-line', description && 'has-desc', disabled && 'is-disabled', className)}>
+      {box}
+      <span className="ui-check-text">
+        <span id={`${id}-label`}>{label}</span>
+        {description && <small id={`${id}-desc`}>{description}</small>}
+      </span>
     </label>
   )
 }
