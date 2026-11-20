@@ -1,8 +1,8 @@
 /**
- * InspectorObject: loads one opened entity, then renders its heading, its section tabs
- * and its detail. A certificate has its own detail (CertificateDetail); the other types
- * keep the shared action bar over their pure panel. The actions live in
- * hooks/useEntityActions; their modals are returned beside the body.
+ * InspectorObject: loads one opened entity, then renders the shared action bar,
+ * the section tabs and the pure detail panel; the actions themselves live in
+ * hooks/useEntityActions. The action modals are returned beside the body so
+ * they sit outside the dock region.
  */
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -15,28 +15,12 @@ import { usePermission } from '../../hooks'
 import { useEntityActions } from '../../hooks/useEntityActions'
 import { entityTitle, entitySubtitle } from '../../lib/entityDetail'
 import { extractData } from '../../lib/utils'
+import { LoadingSpinner } from '../LoadingSpinner'
+import { cn } from '../../lib/utils'
 import { INSPECTOR_TYPES } from './config'
 import { SectionTabs, tabId, panelId } from './InspectorTabs'
-import { CertificateDetail } from './certificate/CertificateDetail'
 
-// Bars standing for the three columns of a detail while it loads
-function PanelSkeleton({ label }) {
-  return (
-    <div className="insp-panel" aria-busy="true">
-      <div className="insp-sk-panel" aria-hidden="true">
-        {[0, 1, 2].map((c) => (
-          <div key={c} className="insp-sk-col">
-            <span className="insp-sk" style={{ width: '40%' }} />
-            {[0, 1, 2, 3].map((i) => <span key={i} className="insp-sk" style={{ width: `${45 + ((i + c) * 37) % 45}%` }} />)}
-          </div>
-        ))}
-      </div>
-      <p className="sr-only" role="status">{label}</p>
-    </div>
-  )
-}
-
-export function InspectorObject({ entry, onTitle, layout = 'columns' }) {
+export function InspectorObject({ entry, onTitle }) {
   const { t } = useTranslation()
   const { closeEntity, openEntity, setEntityData } = useInspector()
   const { canWrite, hasPermission } = usePermission()
@@ -71,41 +55,40 @@ export function InspectorObject({ entry, onTitle, layout = 'columns' }) {
   if (!config) return null
   const Icon = config.icon
   const sections = config.sections
-  const subtitle = data ? entitySubtitle(type, data, t) : ''
 
   return (
     <>
-      <div role="tabpanel" id={panelId(key)} aria-labelledby={tabId(key)} className="insp-body">
+      <div role="tabpanel" id={panelId(key)} aria-labelledby={tabId(key)} className="flex-1 min-h-0 flex flex-col">
         {loading ? (
-          <PanelSkeleton label={t('inspector.loading')} />
-        ) : data && type === 'certificate' ? (
-          <CertificateDetail objectKey={key} certificate={data} title={title} actions={actions} layout={layout}
-            onChanged={setData} onOpen={openEntity} />
+          <div className="flex-1 flex items-center justify-center"><LoadingSpinner size="md" /></div>
         ) : data ? (
           <>
-            <header className="insp-heading">
-              <div className="insp-title">
-                <Icon aria-hidden="true" />
-                <h2>{title}</h2>
-                {subtitle && <span className="insp-subtitle">{subtitle}</span>}
+            <div className="shrink-0 flex items-center gap-2 px-3 py-2">
+              <div className={cn('p-1.5 rounded-lg shrink-0', config.iconClass)}><Icon size={16} weight="duotone" /></div>
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-text-primary truncate">{title}</h2>
+                <p className="text-xs text-text-tertiary truncate">{entitySubtitle(type, data, t)}</p>
               </div>
-            </header>
+            </div>
             <ActionBar actions={actions} />
             <SectionTabs objectKey={key} sections={sections} current={section} onSelect={setSection} />
             <div role="tabpanel" id={`${panelId(key)}-section`} aria-labelledby={`${tabId(key)}-${section}`}
-              className="insp-panel is-plain">
+              className="flex-1 min-h-0 overflow-y-auto">
               {type === 'ca' ? (
                 <CAPanel ca={data} embedded section={section} onImportKey={handler('importKey')} onCaChanged={setData}
                   canWriteCas={canWrite('cas')} canAttachProfile={canWrite('cas') && hasPermission('admin:system')} />
               ) : type === 'truststore' ? (
                 <TrustCertPanel cert={data} embedded section={section} />
               ) : (
-                <CertificatePanel certificate={data} embedded section={section} />
+                <CertificatePanel certificate={data} embedded section={section}
+                  onOpenRelated={type === 'certificate' ? (id) => openEntity('certificate', id) : undefined} />
               )}
             </div>
           </>
         ) : (
-          <div className="insp-note">{failed ? t('inspector.loadFailed') : t('common.notFound', 'Not found')}</div>
+          <div className="flex-1 flex items-center justify-center text-text-tertiary text-sm">
+            {failed ? t('inspector.loadFailed') : t('common.notFound', 'Not found')}
+          </div>
         )}
       </div>
       {modals}

@@ -124,11 +124,6 @@ describe('AppShell', () => {
     expect(stage).toContainElement(screen.getByRole('banner'))
     expect(stage).toContainElement(screen.getByText('page body'))
     expect(stage).not.toContainElement(bar)
-    // The page shares its area with the inspector, under the top bar
-    const flow = stage.querySelector('.insp-stage')
-    expect(flow).toContainElement(screen.getByText('page body'))
-    expect(flow).not.toContainElement(screen.getByRole('banner'))
-    expect(flow.previousElementSibling).toBe(screen.getByRole('banner'))
     expect(bar.parentElement).toHaveClass('shell-root')
     expect(bar.parentElement.lastElementChild === bar || bar.previousElementSibling === stage).toBe(true)
   })

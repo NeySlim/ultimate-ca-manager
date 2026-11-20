@@ -404,10 +404,7 @@ Tick two certificates in the list and click **Compare** in the selection bar to 
 - **Text search**: Search by subject, issuer, display name or serial number (SANs are not searched)
 - **Sorting**: By name, expiry date, creation date, status
 - **Columns**: Common name, description, state, issuer, source, expiry and key algorithm by default; the **Columns** button adds the compliance grade, the hybrid link and the creation date
-- **Row actions**: Export on the row; the rest is in the inspector a click on the row opens
-- **Expiry**: The date, then the time left in short form ("3 d", "16 mo", "9 y", "Lapsed"); the full wording and the hour show on hover and on keyboard focus, as does a name too long for its column
-- **Inspector**: Opens under the list or beside it, folds to its tabs and keeps several certificates open (those that do not fit wait in a "+N" menu). **Overview** shows the validity, the identity and key and the chain of trust; **Chain**, **Extensions**, **History** and **PEM** follow. Export and Renew are buttons; Rename, Revoke, Delete, Lint, the upload of a private key and the favorites are in the "⋯" menu, each shown only to an account that may use it
-- **History**: What the certificate record keeps (issued or imported, renewed, revoked), plus its entries among the latest certificate entries of the audit log for an account that may read it
+- **Row actions**: Export on the row; Rename, Renew, Revoke and Delete in the detail a click on the row opens
 
 ## Conformance linting
 

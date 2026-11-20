@@ -470,8 +470,7 @@
       "active": "活跃",
       "revoked": "已吊销"
     },
-    "duplicateKey": "上方另一行已使用“{{key}}”：只能保存其中一行",
-    "retry": "重试"
+    "duplicateKey": "上方另一行已使用“{{key}}”：只能保存其中一行"
   },
   "commandPalette": {
     "searchPlaceholder": "搜索命令、证书、CA、用户...",
@@ -924,13 +923,7 @@
     "exportSelectedPem": "导出为 PEM",
     "bulkExported_one": "已导出 {{count}} 个证书",
     "bulkExported_other": "已导出 {{count}} 个证书",
-    "listLabel": "证书列表",
-    "footnote": "已打开的证书仍可在检查器中查看。",
-    "noMatch": "没有匹配的证书",
-    "loadErrorTitle": "无法加载证书",
-    "loadErrorCause": "原因：{{cause}}。其他页面和检查器仍可使用。",
-    "loadErrorNoAnswer": "服务器没有响应",
-    "uploadKey": "上传私钥"
+    "listLabel": "证书列表"
   },
   "cas": {
     "chainRevoked": "上游已吊销",
@@ -4325,12 +4318,7 @@
     "inDays_one": "{{count}} 天后",
     "inDays_other": "{{count}} 天后",
     "overdueDays_one": "已过期 {{count}} 天",
-    "overdueDays_other": "已过期 {{count}} 天",
-    "lapsed": "已到期",
-    "shortDays": "{{count}} 天",
-    "shortMonths": "{{count}} 个月",
-    "shortYears_one": "{{count}} 年",
-    "shortYears_other": "{{count}} 年"
+    "overdueDays_other": "已过期 {{count}} 天"
   },
   "validation": {
     "required": "此字段必填",
@@ -4712,6 +4700,8 @@
     "closeTab": "关闭 {{name}}",
     "close": "关闭检查器",
     "closeOnNav": "导航时关闭",
+    "openCount": "已打开的对象：{{count}}",
+    "more": "所有已打开的对象",
     "dockBottom": "停靠在底部",
     "dockRight": "停靠在右侧",
     "grow": "放大检查器",
@@ -4729,92 +4719,7 @@
       "overview": "概览",
       "chain": "证书链",
       "extensions": "扩展",
-      "pem": "PEM",
-      "history": "历史"
-    },
-    "fold": "收起检查器",
-    "unfold": "展开检查器",
-    "notShown": "未显示的已打开对象",
-    "moreCount_one": "另有 {{count}} 个已打开对象",
-    "moreCount_other": "另有 {{count}} 个已打开对象",
-    "loading": "正在加载对象…",
-    "moreActions": "{{name}} 的更多操作",
-    "moreActionsShort": "更多操作",
-    "favorite": "加入收藏",
-    "unfavorite": "取消收藏",
-    "copyOf": "复制：{{name}}",
-    "cert": {
-      "validity": "证书有效期",
-      "days_one": "{{count}} 天",
-      "days_other": "{{count}} 天",
-      "remaining": "剩余",
-      "noExpiry": "无截止日期",
-      "validityShare": "有效期剩余百分之 {{percent}}",
-      "renewSoon_one": "需在 {{count}} 天内续期。",
-      "renewSoon_other": "需在 {{count}} 天内续期。",
-      "revokedNotice": "此证书不得再使用。",
-      "onHoldNotice": "已挂起：可恢复，也可永久吊销。",
-      "revokedOn": "吊销于 {{date}}。原因：{{reason}}。",
-      "identity": "身份与密钥",
-      "none": "无",
-      "altNames": "备用名称",
-      "moreNames_one": "另有 {{count}} 个名称",
-      "moreNames_other": "另有 {{count}} 个名称",
-      "sourceTemplate": "来源 / 模板",
-      "noTemplate": "无模板",
-      "templateModified": "{{name}}（已修改：{{fields}}）",
-      "weakHash": "已过时",
-      "serial": "序列号",
-      "serialDecimal": "序列号（十进制）",
-      "keyHeld": "由 UCM 保管",
-      "keyHeldIn": "由 UCM 保管（{{location}}）",
-      "keyNotHeld": "不在 UCM 中",
-      "trustChain": "信任链",
-      "inTrustStore": "信任库",
-      "notHeld": "不在 UCM 中",
-      "selfSigned": "自签名：此证书由自身签发。",
-      "chainToRoot": "链完整，直至 UCM 保管的根CA {{anchor}}。",
-      "chainToStore": "链完整，直至信任库中的锚点 {{anchor}}。",
-      "chainPartial": "签发CA在 UCM 中；其上的链尚未验证至根。",
-      "storeAnchor": "信任库锚点",
-      "issuerNotHeld": "签发者不在 UCM 中",
-      "rootAuthority": "根CA",
-      "intermediateLevel": "中间CA，第 {{level}} 级",
-      "intermediate": "中间CA",
-      "inspectAuthority": "查看该CA",
-      "crossCertified": "交叉认证",
-      "subjectDn": "可分辨名称",
-      "record": "指纹与记录",
-      "noPem": "UCM 未保存此证书的 PEM。",
-      "ext": {
-        "critical": "关键",
-        "permitted": "允许",
-        "excluded": "排除",
-        "present": "存在",
-        "none": "此证书没有扩展。"
-      },
-      "noDescription": "无描述"
-    },
-    "history": {
-      "issued": "证书已签发",
-      "imported": "证书已导入",
-      "renewed": "证书已续期",
-      "renewedTimes_one": "证书已续期（共 {{count}} 次）",
-      "renewedTimes_other": "证书已续期（共 {{count}} 次）",
-      "revoked": "证书已吊销",
-      "revokedReason": "证书已吊销：{{reason}}",
-      "failed": "失败",
-      "empty": "此证书没有已记录的事件。",
-      "loading": "正在读取审计日志…",
-      "noAudit": "此帐户无权读取审计日志：仅显示证书记录中保存的内容。",
-      "loadFailed": "无法读取审计日志：仅显示证书记录中保存的内容。",
-      "scope_one": "此证书在审计日志最近 {{count}} 条证书记录中的事件。",
-      "scope_other": "此证书在审计日志最近 {{count}} 条证书记录中的事件。",
-      "openAudit": "打开审计日志"
-    },
-    "failure": {
-      "title": "最近一次失败",
-      "open": "打开订单"
+      "pem": "PEM"
     }
   },
   "table": {
@@ -4857,13 +4762,7 @@
     "selectRow": "选择 {{name}}",
     "open": "打开",
     "openRow": "打开 {{name}}",
-    "rowAction": "{{action}}：{{name}}",
-    "rowHeight": "每行 {{px}} 像素",
-    "columnCount_one": "{{count}} 列",
-    "columnCount_other": "{{count}} 列",
-    "page": "页码",
-    "pageOf": "共 {{pages, number}} 页",
-    "go": "跳转"
+    "rowAction": "{{action}}：{{name}}"
   },
   "reconnect": {
     "countdown": "服务正在重启...",

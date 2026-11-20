@@ -4,7 +4,7 @@
  * DESKTOP: Dense table with sticky header, hover rows, dropdown actions
  * MOBILE: Card-style rows with primary/secondary info, large touch targets
  */
-import { useState, useMemo, useCallback, useRef, useEffect, useId } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { 
   MagnifyingGlass, CaretUp, CaretDown, DotsThreeVertical,
@@ -18,9 +18,6 @@ import { FilterSelect } from '../Select'
 import { MultiSelectFilter } from '../MultiSelectFilter'
 import { FilterChips } from '../FilterChips'
 import { ListTable } from './ListTable'
-
-// Height of a row of the list template per density (list.css)
-const ROW_PX = { compact: 36, default: 40, comfortable: 44 }
 import '../../list/list.css'
 
 const EXPORT_MAX_ROWS = 10000
@@ -108,8 +105,6 @@ export function ResponsiveDataTable({
   rowLabel, // (row) => string: names the row in the labels of its checkbox and actions
   rangeLabel, // ({ start, end, total }) => string: "1–25 of 276 certificates"
   tableLabel, // accessible name of the table
-  footnote, // one sentence under the table, beside the row height and the column count
-  noMatchTitle, // heading of the empty list when a search or a filter matches nothing
 
   // Custom class
   className
@@ -638,8 +633,7 @@ export function ResponsiveDataTable({
   }, [columns])
   
   // Empty state - but ALWAYS show toolbar if there are filters to clear
-  // (the list template keeps its table: header, empty block, footer)
-  if (!loading && sortedData.length === 0 && !flat) {
+  if (!loading && sortedData.length === 0) {
     return (
       <div className={cn(flat ? 'lv-workspace' : 'flex flex-col h-full', className)}>
         {/* Always show toolbar when there are filters or actions */}
@@ -679,7 +673,7 @@ export function ResponsiveDataTable({
         )}
         
         {/* Empty state content */}
-        <div className="flex-1 flex flex-col items-center justify-center py-16 px-4">
+        <div className={cn('flex-1 flex flex-col items-center justify-center py-16 px-4', flat && 'lv-table-box')}>
           {EmptyIcon && (
             <div className="w-16 h-16 rounded-2xl bg-bg-tertiary flex items-center justify-center mb-4">
               <EmptyIcon size={32} className="text-text-secondary" />
@@ -711,21 +705,8 @@ export function ResponsiveDataTable({
     rangeLabel ? rangeLabel({ start, end, total }) : t('table.range', { start, end, total })
   )
 
-  const isEmpty = !loading && sortedData.length === 0
-  // List template: what the table shows under its header when no row is left
-  const emptyBlock = flat && isEmpty && (
-    <div className="lv-empty">
-      {hasActiveFilters ? <MagnifyingGlass aria-hidden="true" /> : EmptyIcon && <EmptyIcon aria-hidden="true" />}
-      <h3>{hasActiveFilters ? (noMatchTitle || t('table.noResults')) : emptyTitle}</h3>
-      <p>{hasActiveFilters ? t('table.adjustFilters') : emptyDescription}</p>
-      {hasActiveFilters
-        ? <button type="button" className="lv-btn" onClick={handleClearAllChips}>{t('table.clearFilters')}</button>
-        : emptyAction}
-    </div>
-  )
-
   return (
-    <div className={cn(flat ? 'lv-workspace' : 'flex flex-col h-full', className)} aria-busy={flat && loading ? 'true' : undefined}>
+    <div className={cn(flat ? 'lv-workspace' : 'flex flex-col h-full', className)}>
       {/* SEARCH BAR + TOOLBAR */}
       {(searchable || toolbarFilters || toolbarActions || columnStorageKey || filterPresetsKey) && (
         <SearchBar
@@ -758,7 +739,7 @@ export function ResponsiveDataTable({
           deletePreset={deletePreset}
           applyPreset={applyPreset}
           // Export
-          exportEnabled={canExport && !(flat && isEmpty)}
+          exportEnabled={canExport}
           exportBusy={exportState.busy}
           exportNotice={exportState.notice}
           showExportMenu={showExportMenu}
@@ -845,8 +826,6 @@ export function ResponsiveDataTable({
             onSort={handleSort}
             sortable={sortable}
             loading={loading}
-            skeletonRows={paginationProps?.perPage}
-            empty={emptyBlock}
             density={density}
             columnWidths={columnWidths}
             setColumnWidth={setColumnWidth}
@@ -858,10 +837,9 @@ export function ResponsiveDataTable({
           />
           {paginationProps && sortedData.length > 0 ? (
             <PaginationBar {...paginationProps} isMobile={false} flat range={rangeOf} />
-          ) : (
+          ) : sortedData.length > 0 && (
             <footer className="lv-footer">
-              {/* The footer keeps its place while the rows load or when none is left; it has no range to say */}
-              <span>{sortedData.length > 0 && rangeOf({ start: 1, end: sortedData.length, total: sortedData.length })}</span>
+              <span>{rangeOf({ start: 1, end: sortedData.length, total: sortedData.length })}</span>
             </footer>
           )}
         </div>
@@ -890,15 +868,6 @@ export function ResponsiveDataTable({
         />
       )}
       
-      {flat && (
-        <div className="lv-caption">
-          <span>{footnote}</span>
-          <span>
-            {t('table.rowHeight', { px: ROW_PX[density] || ROW_PX.compact })} · {t('table.columnCount', { count: visibleColumns.length })}
-          </span>
-        </div>
-      )}
-
       {/* PAGINATION */}
       {!flat && paginationProps && sortedData.length > 0 && (
         <PaginationBar
@@ -1928,14 +1897,8 @@ function MobileCardRow({
 // PAGINATION BAR
 // =============================================================================
 
-// Above this many pages the footer of the list template offers a jump to a page
-const JUMP_FROM_PAGES = 20
-
 function PaginationBar({ page, total, perPage, onChange, onPerPageChange, isMobile, flat = false, range }) {
   const { t } = useTranslation()
-  const jumpId = useId()
-  const [jump, setJump] = useState(String(page))
-  useEffect(() => { setJump(String(page)) }, [page])
   const totalPages = Math.ceil(total / perPage)
   const start = (page - 1) * perPage + 1
   const end = Math.min(page * perPage, total)
@@ -1949,15 +1912,8 @@ function PaginationBar({ page, total, perPage, onChange, onPerPageChange, isMobi
     />
   )
 
-  // List template: the range in words, the page size, the pages; many pages get a field to jump to one
+  // List template: the range in words, the page size, the pages
   if (flat) {
-    const pages = Math.max(1, totalPages)
-    const go = () => {
-      const wanted = parseInt(jump, 10)
-      const target = Math.max(1, Math.min(pages, Number.isNaN(wanted) ? page : wanted))
-      setJump(String(target))
-      if (target !== page) onChange(target)
-    }
     return (
       <footer className="lv-footer">
         <span>{range({ start, end, total })}</span>
@@ -1967,21 +1923,9 @@ function PaginationBar({ page, total, perPage, onChange, onPerPageChange, isMobi
             onClick={() => onChange(page - 1)} disabled={page <= 1}>
             <CaretLeft size={14} aria-hidden="true" />
           </button>
-          {pages > JUMP_FROM_PAGES ? (
-            <>
-              <label className="lv-page-jump">
-                <span>{t('table.page')}</span>
-                <input type="number" min={1} max={pages} value={jump} inputMode="numeric" aria-describedby={jumpId}
-                  onChange={(e) => setJump(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') go() }} />
-              </label>
-              <span id={jumpId}>{t('table.pageOf', { pages })}</span>
-              <button type="button" className="lv-btn is-small" onClick={go}>{t('table.go')}</button>
-            </>
-          ) : (
-            <span>{page} / {pages}</span>
-          )}
+          <span>{page} / {totalPages}</span>
           <button type="button" className="lv-btn is-small is-icon" aria-label={t('table.nextPage')}
-            onClick={() => onChange(page + 1)} disabled={page >= pages}>
+            onClick={() => onChange(page + 1)} disabled={page >= totalPages}>
             <CaretRight size={14} aria-hidden="true" />
           </button>
         </div>

@@ -6,7 +6,7 @@ export const INSPECTOR_TYPES = {
   certificate: {
     icon: Certificate, iconClass: 'bg-accent-primary-op15 text-accent-primary',
     fetchById: (id) => certificatesService.getById(id),
-    sections: ['overview', 'chain', 'extensions', 'history', 'pem'],
+    sections: ['overview', 'chain', 'extensions', 'pem'],
   },
   ca: {
     icon: ShieldCheck, iconClass: 'bg-accent-success-op15 text-accent-success',

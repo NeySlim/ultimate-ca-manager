@@ -94,7 +94,7 @@ export default {
     tips: [
       'Ajoutez une étoile ⭐ aux certificats importants pour les ajouter à vos favoris',
       'Les onglets au-dessus de la liste filtrent par état et comptent chacun ; l\'onglet fait partie de l\'adresse, un rechargement ou un lien partagé le conserve. Les filtres par AC, source et modèle sont conservés au rechargement',
-      'Une ligne garde une seule action, Exporter ; un clic sur la ligne ouvre le certificat dans l\'inspecteur, sous la liste ou à côté : Aperçu, Chaîne, Extensions, Historique et PEM, avec Exporter et Renouveler en boutons et un menu « ⋯ » pour Renommer, Révoquer, Supprimer et les autres actions. Cochez des lignes pour comparer deux certificats ou en exporter plusieurs dans un seul fichier PEM',
+      'Une ligne garde une seule action, Exporter ; ouvrez le certificat (clic sur sa ligne) pour Renommer, Renouveler, Révoquer et Supprimer. Cochez des lignes pour comparer deux certificats ou en exporter plusieurs dans un seul fichier PEM',
       'Le renouvellement conserve le même enregistrement (id, refid, date de création). Renouveler depuis la page génère une nouvelle clé ; le renouvellement automatique conserve la clé. Un certificat dont UCM ne détient pas la clé (enrôlement SCEP, EST, WSTEP ou ACME, import sans la clé) est refusé (409) : renouvelez-le par son protocole ou signez une nouvelle demande',
       'Besoin d\'un EKU non-standard (Microsoft RDP, smartcard logon, document signing) ? Ajoutez-le via « EKU supplémentaires » plutôt que d\'éditer les modèles',
       'Quand une politique ou l\'expiration de l\'AC émettrice raccourcit la validité demandée, le résultat l\'indique : "Issued for N day(s) instead of the M requested", avec la raison',
@@ -225,10 +225,7 @@ Cochez deux certificats dans la liste et cliquez sur **Comparer** dans la barre 
 - **Recherche textuelle** : Recherche par sujet, émetteur, nom d'affichage ou numéro de série (les SAN ne sont pas recherchés)
 - **Tri** : Par nom, date d'expiration, date de création, statut
 - **Colonnes** : nom commun, description, état, émetteur, source, expiration et algorithme de clé par défaut ; le bouton **Colonnes** ajoute la note de conformité, le lien hybride et la date de création
-- **Actions d'une ligne** : Exporter sur la ligne ; le reste est dans l'inspecteur qu'ouvre un clic sur la ligne
-- **Expiration** : la date, puis le temps restant en forme courte (« 3 j », « 16 mois », « 9 ans », « Échu ») ; la formulation complète et l'heure s'affichent au survol et au focus clavier, comme un nom trop long pour sa colonne
-- **Inspecteur** : s'ouvre sous la liste ou à côté, se replie sur ses onglets et garde plusieurs certificats ouverts (ceux qui ne tiennent pas attendent dans un menu « +N »). **Aperçu** montre la validité, l'identité et la clé, et la chaîne de confiance ; **Chaîne**, **Extensions**, **Historique** et **PEM** suivent. Exporter et Renouveler sont des boutons ; Renommer, Révoquer, Supprimer, Lint, le téléversement d'une clé privée et les favoris sont dans le menu « ⋯ », chacun montré seulement au compte qui peut s'en servir
-- **Historique** : ce que la fiche du certificat conserve (émis ou importé, renouvelé, révoqué), plus ses entrées parmi les dernières entrées de certificats du journal d'audit pour un compte qui peut le lire
+- **Actions d'une ligne** : Exporter sur la ligne ; Renommer, Renouveler, Révoquer et Supprimer dans le détail qu'ouvre un clic sur la ligne
 ## Linting de conformité
 
 Le bouton **Linter** (détail d'un certificat) vérifie la conformité aux standards X.509. Informatif uniquement.

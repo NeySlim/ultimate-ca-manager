@@ -8,12 +8,11 @@ import { createContext, useContext, useState, useCallback, useRef, useEffect, us
 import { useAuth } from './AuthContext'
 import { getPreferences, persistPreference, subscribePreferences } from '../stores/userPreferencesStore'
 
-export const InspectorContext = createContext(null)
+const InspectorContext = createContext(null)
 
 export const MAX_OPEN = 8
 export const SIZE_LIMITS = { height: [200, 4000], width: [360, 720] }
-// The sizes the dock opens with until the user moves its edge
-const DEFAULTS = { position: 'bottom', height: 278, width: 460 }
+const DEFAULTS = { position: 'bottom', height: 380, width: 520 }
 const PREFS_KEY = 'ucm-inspector-prefs'
 
 const keyOf = (type, id) => `${type}:${id}`

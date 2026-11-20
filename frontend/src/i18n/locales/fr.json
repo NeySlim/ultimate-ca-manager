@@ -1352,13 +1352,7 @@
     "exportSelectedPem": "Exporter en PEM",
     "bulkExported_one": "{{count}} certificat exporté",
     "bulkExported_other": "{{count}} certificats exportés",
-    "listLabel": "Liste des certificats",
-    "footnote": "Les certificats ouverts restent disponibles dans l'inspecteur.",
-    "noMatch": "Aucun certificat ne correspond",
-    "loadErrorTitle": "Impossible de charger les certificats",
-    "loadErrorCause": "Cause : {{cause}}. Les autres pages et l'inspecteur restent utilisables.",
-    "loadErrorNoAnswer": "le serveur n'a pas répondu",
-    "uploadKey": "Téléverser la clé privée"
+    "listLabel": "Liste des certificats"
   },
   "common": {
     "duplicateKey": "Une ligne plus haut utilise déjà « {{key}} » : une seule des deux peut être enregistrée",
@@ -1831,8 +1825,7 @@
       "never": "Jamais exécuté",
       "active": "Actif",
       "revoked": "Révoqué"
-    },
-    "retry": "Réessayer"
+    }
   },
   "compare": {
     "title": "Comparer les certificats",
@@ -4247,12 +4240,7 @@
     "inDays_one": "dans {{count}} jour",
     "inDays_other": "dans {{count}} jours",
     "overdueDays_one": "échu depuis {{count}} jour",
-    "overdueDays_other": "échu depuis {{count}} jours",
-    "lapsed": "Échu",
-    "shortDays": "{{count}} j",
-    "shortMonths": "{{count}} mois",
-    "shortYears_one": "{{count}} an",
-    "shortYears_other": "{{count}} ans"
+    "overdueDays_other": "échu depuis {{count}} jours"
   },
   "tools": {
     "groups": {
@@ -4715,6 +4703,8 @@
     "closeTab": "Fermer {{name}}",
     "close": "Fermer l'inspecteur",
     "closeOnNav": "Fermer en naviguant",
+    "openCount": "Objets ouverts : {{count}}",
+    "more": "Tous les objets ouverts",
     "dockBottom": "Ancrer en bas",
     "dockRight": "Ancrer à droite",
     "grow": "Agrandir l'inspecteur",
@@ -4732,92 +4722,7 @@
       "overview": "Aperçu",
       "chain": "Chaîne",
       "extensions": "Extensions",
-      "pem": "PEM",
-      "history": "Historique"
-    },
-    "fold": "Replier l'inspecteur",
-    "unfold": "Déplier l'inspecteur",
-    "notShown": "Objets ouverts non affichés",
-    "moreCount_one": "{{count}} autre objet ouvert",
-    "moreCount_other": "{{count}} autres objets ouverts",
-    "loading": "Chargement de l'objet…",
-    "moreActions": "Autres actions pour {{name}}",
-    "moreActionsShort": "Autres actions",
-    "favorite": "Ajouter aux favoris",
-    "unfavorite": "Retirer des favoris",
-    "copyOf": "Copier : {{name}}",
-    "cert": {
-      "validity": "Validité du certificat",
-      "days_one": "{{count}} jour",
-      "days_other": "{{count}} jours",
-      "remaining": "restants",
-      "noExpiry": "Sans date de fin",
-      "validityShare": "{{percent}} pour cent de la validité restante",
-      "renewSoon_one": "Renouvellement à prévoir d'ici {{count}} jour.",
-      "renewSoon_other": "Renouvellement à prévoir dans les {{count}} prochains jours.",
-      "revokedNotice": "Ce certificat ne doit plus être utilisé.",
-      "onHoldNotice": "Suspendu : il peut être rétabli ou révoqué définitivement.",
-      "revokedOn": "Révoqué le {{date}}. Motif : {{reason}}.",
-      "identity": "Identité et clé",
-      "none": "Aucun",
-      "altNames": "Noms alternatifs",
-      "moreNames_one": "{{count}} autre nom",
-      "moreNames_other": "{{count}} autres noms",
-      "sourceTemplate": "Origine / modèle",
-      "noTemplate": "sans modèle",
-      "templateModified": "{{name}} (modifié : {{fields}})",
-      "weakHash": "obsolète",
-      "serial": "Numéro de série",
-      "serialDecimal": "Série (décimal)",
-      "keyHeld": "Détenue par UCM",
-      "keyHeldIn": "Détenue par UCM ({{location}})",
-      "keyNotHeld": "Non détenue par UCM",
-      "trustChain": "Chaîne de confiance",
-      "inTrustStore": "magasin de confiance",
-      "notHeld": "non détenue par UCM",
-      "selfSigned": "Autosigné : ce certificat est son propre émetteur.",
-      "chainToRoot": "Chaîne complète jusqu'à {{anchor}}, AC racine détenue par UCM.",
-      "chainToStore": "Chaîne complète jusqu'à {{anchor}}, ancre du magasin de confiance.",
-      "chainPartial": "L'AC émettrice est détenue par UCM ; la chaîne au-dessus n'est pas vérifiée jusqu'à une racine.",
-      "storeAnchor": "Ancre du magasin de confiance",
-      "issuerNotHeld": "Émetteur non détenu par UCM",
-      "rootAuthority": "Autorité racine",
-      "intermediateLevel": "Autorité intermédiaire, niveau {{level}}",
-      "intermediate": "Autorité intermédiaire",
-      "inspectAuthority": "Inspecter l'autorité",
-      "crossCertified": "Certification croisée",
-      "subjectDn": "Nom distinctif",
-      "record": "Empreintes et fiche",
-      "noPem": "UCM ne détient pas le PEM de ce certificat.",
-      "ext": {
-        "critical": "critique",
-        "permitted": "Autorisés",
-        "excluded": "Exclus",
-        "present": "Présents",
-        "none": "Ce certificat ne porte aucune extension."
-      },
-      "noDescription": "Aucune description"
-    },
-    "history": {
-      "issued": "Certificat émis",
-      "imported": "Certificat importé",
-      "renewed": "Certificat renouvelé",
-      "renewedTimes_one": "Certificat renouvelé ({{count}} renouvellement en tout)",
-      "renewedTimes_other": "Certificat renouvelé ({{count}} renouvellements en tout)",
-      "revoked": "Certificat révoqué",
-      "revokedReason": "Certificat révoqué : {{reason}}",
-      "failed": "échec",
-      "empty": "Aucun événement n'est enregistré pour ce certificat.",
-      "loading": "Lecture du journal d'audit…",
-      "noAudit": "Ce compte ne peut pas lire le journal d'audit : seul ce que la fiche du certificat conserve est affiché.",
-      "loadFailed": "Le journal d'audit n'a pas pu être lu : seul ce que la fiche du certificat conserve est affiché.",
-      "scope_one": "Événements de ce certificat dans la dernière entrée de certificat du journal d'audit ({{count}}).",
-      "scope_other": "Événements de ce certificat parmi les {{count}} dernières entrées de certificats du journal d'audit.",
-      "openAudit": "Ouvrir le journal d'audit"
-    },
-    "failure": {
-      "title": "Dernier échec",
-      "open": "Ouvrir la commande"
+      "pem": "PEM"
     }
   },
   "table": {
@@ -4860,13 +4765,7 @@
     "selectRow": "Sélectionner {{name}}",
     "open": "Ouvrir",
     "openRow": "Ouvrir {{name}}",
-    "rowAction": "{{action}} : {{name}}",
-    "rowHeight": "{{px}} px par ligne",
-    "columnCount_one": "{{count}} colonne",
-    "columnCount_other": "{{count}} colonnes",
-    "page": "Page",
-    "pageOf": "sur {{pages, number}}",
-    "go": "Aller"
+    "rowAction": "{{action}} : {{name}}"
   },
   "reconnect": {
     "countdown": "Le service redémarre...",

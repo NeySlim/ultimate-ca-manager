@@ -39,7 +39,6 @@ vi.mock('../../services', () => ({
 vi.mock('../deploy/CertDeploySection', () => ({ CertDeploySection: () => null }))
 
 import { InspectorObject } from '../inspector/InspectorObject'
-import { moreAction } from '../../test/moreActions'
 
 const WINDOW = { key: 'certificate:4', type: 'certificate', entityId: 4, data: null }
 const MEMBER = {
@@ -75,7 +74,7 @@ describe('InspectorObject of a hybrid pair member', () => {
 
   it('keeps the linked certificate valid when unchecked', async () => {
     await open()
-    fireEvent.click(moreAction('Revoke'))
+    fireEvent.click(screen.getByText('Revoke'))
     fireEvent.click(await screen.findByLabelText('revocation.revokeRelated'))
     fireEvent.submit(screen.getByTestId('revoke-form'))
     await waitFor(() => expect(mocks.certificatesService.revoke)
@@ -85,7 +84,7 @@ describe('InspectorObject of a hybrid pair member', () => {
   it('names the linked certificate the server revoked too', async () => {
     mocks.certificatesService.revoke.mockResolvedValue({ data: { id: 4, revoked: true, related_revoked: 5 } })
     await open()
-    fireEvent.click(moreAction('Revoke'))
+    fireEvent.click(screen.getByText('Revoke'))
     expect(await screen.findByLabelText('revocation.revokeRelated')).toBeChecked()
     fireEvent.submit(screen.getByTestId('revoke-form'))
     await waitFor(() => expect(mocks.notify.showSuccess).toHaveBeenCalledWith('revocation.revokedWithRelated'))
@@ -108,7 +107,7 @@ describe('InspectorObject of a hybrid pair member', () => {
   it('says the linked certificate could not be revoked', async () => {
     mocks.certificatesService.revoke.mockResolvedValue({ data: { id: 4, revoked: true, related_not_revoked: 5 } })
     await open()
-    fireEvent.click(moreAction('Revoke'))
+    fireEvent.click(screen.getByText('Revoke'))
     await screen.findByLabelText('revocation.revokeRelated')
     fireEvent.submit(screen.getByTestId('revoke-form'))
     await waitFor(() => expect(mocks.notify.showWarning).toHaveBeenCalledWith('revocation.relatedRevokeFailed'))
@@ -117,7 +116,7 @@ describe('InspectorObject of a hybrid pair member', () => {
 
   it('warns when the linked certificate was not revoked', async () => {
     await open()
-    fireEvent.click(moreAction('Revoke'))
+    fireEvent.click(screen.getByText('Revoke'))
     await screen.findByLabelText('revocation.revokeRelated')
     fireEvent.submit(screen.getByTestId('revoke-form'))
     await waitFor(() => expect(mocks.notify.showWarning).toHaveBeenCalledWith('revocation.relatedNotRevoked'))

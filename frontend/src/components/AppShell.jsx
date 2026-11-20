@@ -6,7 +6,6 @@ import { useTranslation } from 'react-i18next'
 import { Outlet, useLocation } from 'react-router-dom'
 import { TopBar } from './shell/TopBar'
 import { StatusBar } from './shell/StatusBar'
-import { InspectorStage } from './inspector/InspectorDock'
 import { usePins } from './shell/pins'
 import { resolveActivePageId } from './shell/activePage'
 import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
@@ -135,7 +134,7 @@ export function AppShell() {
 
   return (
     <div className="shell-root">
-      {/* The page shares the stage with the inspector; the status bar stays under both */}
+      {/* The stage makes room for the inspector dock; the status bar stays under both */}
       <div className="shell-stage">
       <TopBar
         can={can}
@@ -147,15 +146,13 @@ export function AppShell() {
         hasHelp={hasHelp}
       />
 
-      <InspectorStage>
-        <div className="shell-main">
-          <div className="shell-content">
-            <div className="flex-1 flex min-h-0 min-w-0 overflow-auto">
-              <Outlet />
-            </div>
+      <div className="shell-main">
+        <div className="shell-content">
+          <div className="flex-1 flex min-h-0 min-w-0 overflow-auto">
+            <Outlet />
           </div>
         </div>
-      </InspectorStage>
+      </div>
       </div>
 
       <StatusBar />

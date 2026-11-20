@@ -75,14 +75,6 @@ describe('certificate actions by permission', () => {
     expect(visible(run('certificate', CERT, rights([], ['write:key_recovery'])))).toContain('keyRecovery')
   })
 
-  it('offers the upload of a private key to a writer, for a certificate that holds none', () => {
-    const KEYLESS = { ...CERT, has_private_key: false }
-    expect(visible(run('certificate', KEYLESS, rights(['write:certificates'])))).toContain('uploadKey')
-    expect(visible(run('certificate', KEYLESS, rights()))).not.toContain('uploadKey')
-    expect(visible(run('certificate', CERT, rights(['write:certificates'])))).not.toContain('uploadKey')
-    expect(visible(run('ca', { ...CA, has_private_key: false }, rights(['write:certificates', 'write:cas'])))).not.toContain('uploadKey')
-  })
-
   it('offers delete on the resource of the type, not on certificates', () => {
     expect(visible(run('truststore', { id: 1, name: 'root' }, rights(['delete:certificates'])))).not.toContain('delete')
     expect(visible(run('truststore', { id: 1, name: 'root' }, rights(['delete:truststore'])))).toContain('delete')

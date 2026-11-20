@@ -196,12 +196,11 @@ describe('CertificatesPage: rows', () => {
   it('says how far the expiry is and colours it by urgency', async () => {
     await mount()
     const due = (cn) => row(cn).querySelector('.lv-due')
-    // Short, the unit following the size: months at 200 days, days at 3, one word once past
-    expect(due('web.example.com').querySelector('.lv-due-rel')).toHaveTextContent(/^time\.shortMonths:7$/)
+    expect(due('web.example.com').querySelector('.lv-due-rel')).toHaveTextContent('time.inDays:200')
     expect(due('web.example.com').className).not.toMatch(/is-(warn|bad)/)
-    expect(due('soon.example.com').querySelector('.lv-due-rel')).toHaveTextContent(/^time\.shortDays:3$/)
+    expect(due('soon.example.com').querySelector('.lv-due-rel')).toHaveTextContent('time.inDays:3')
     expect(due('soon.example.com')).toHaveClass('is-warn')
-    expect(due('late.example.com').querySelector('.lv-due-rel')).toHaveTextContent(/^time\.lapsed$/)
+    expect(due('late.example.com').querySelector('.lv-due-rel')).toHaveTextContent('time.overdueDays:5')
     expect(due('late.example.com')).toHaveClass('is-bad')
     // The exact date and time, one level down
     expect(due('web.example.com')).toHaveAttribute('tabindex', '0')
@@ -212,8 +211,7 @@ describe('CertificatesPage: rows', () => {
     await mount()
     const due = row('gone.example.com').querySelector('.lv-due')
     expect(due.querySelector('time')).toBeInTheDocument()
-    // The state stands where the count would be
-    expect(due.querySelector('.lv-due-rel')).toHaveTextContent(/^common\.revoked$/)
+    expect(due.querySelector('.lv-due-rel')).toBeNull()
     expect(due.className).not.toMatch(/is-(warn|bad)/)
   })
 
@@ -246,36 +244,6 @@ describe('CertificatesPage: rows', () => {
   })
 })
 
-describe('CertificatesPage: states', () => {
-  it('gives way to an alert when the list cannot be read, and reads again on demand', async () => {
-    svc.getAll.mockRejectedValueOnce(Object.assign(new Error('Service unavailable'), { status: 503 }))
-    render(<MemoryRouter><CertificatesPage /></MemoryRouter>)
-    const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('certificates.loadErrorTitle')
-    expect(alert).toHaveTextContent('certificates.loadErrorCause')
-    expect(screen.queryByRole('table')).toBeNull()
-    // The page stays: its title and its actions
-    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument()
-    svc.getAll.mockResolvedValue({ data: [WEB], meta: { total: 1 } })
-    fireEvent.click(within(alert).getByRole('button', { name: 'common.retry' }))
-    expect(await screen.findByText('web.example.com')).toBeInTheDocument()
-    expect(screen.queryByRole('alert')).toBeNull()
-  })
-
-  it('notes under the table that opened certificates stay in the inspector', async () => {
-    await mount()
-    expect(document.querySelector('.lv-caption').firstElementChild).toHaveTextContent('certificates.footnote')
-  })
-
-  it('shortens a name in its own cell, the marks after it kept whole', async () => {
-    await mount()
-    const cell = within(row('web.example.com')).getByRole('button', { name: 'web.example.com' }).closest('td')
-    expect(cell).toHaveClass('lv-grow')
-    expect(cell.firstElementChild).toHaveClass('lv-fit')
-    expect(cell.querySelector('.lv-entity-text')).toHaveTextContent('web.example.com')
-  })
-})
-
 describe('CertificatesPage on a phone', () => {
   beforeEach(() => { state.mobile = true })
 
@@ -298,6 +266,6 @@ describe('CertificatesPage on a phone', () => {
     expect(list.querySelector('.lv-pill')).toHaveTextContent('common.valid')
     expect(within(list).getByText('Issuing CA 1')).toBeInTheDocument()
     expect(within(list).getByText('certificates.sourceAcme')).toBeInTheDocument()
-    expect(list.querySelector('.lv-due-rel')).toHaveTextContent('time.shortMonths:7')
+    expect(list.querySelector('.lv-due-rel')).toHaveTextContent('time.inDays:200')
   })
 })

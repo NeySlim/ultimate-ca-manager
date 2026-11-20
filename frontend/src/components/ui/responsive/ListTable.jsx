@@ -1,9 +1,8 @@
 /**
  * ListTable: the desktop table of the list template (ResponsiveDataTable variant="list").
- * Columns take the width of their content and the `grow` column absorbs the rest, cut by
- * an ellipsis when it lacks room; every row keeps one height; a row carries its checkbox,
- * its own actions and a chevron that opens the detail. Loading draws bars in place of the
- * rows; an empty list keeps the header and shows `empty` under it.
+ * Columns take the width of their content and the `grow` column absorbs the rest, so a
+ * name is never cut while there is room; every row keeps one height; a row carries its
+ * checkbox, its own actions and a chevron that opens the detail.
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -25,8 +24,6 @@ export function ListTable({
   onSort,
   sortable,
   loading,
-  skeletonRows = 12,
-  empty,
   density = 'compact',
   columnWidths = {},
   setColumnWidth,
@@ -65,9 +62,8 @@ export function ListTable({
   const sizing = (col) => {
     const px = columnWidths[col.key]
     if (px) return { clip: true, style: { width: px, minWidth: px, maxWidth: px } }
-    // `clipInside`: the content shortens itself (a name beside its marks)
-    if (col.grow) return { clip: !col.clipInside, fit: !!col.clipInside, style: undefined }
-    if (col.maxWidth) return { clip: true, capped: true, style: { maxWidth: col.maxWidth } }
+    if (col.grow) return { clip: true, style: undefined }
+    if (col.maxWidth) return { clip: true, style: { maxWidth: col.maxWidth } }
     return { clip: false, style: undefined }
   }
 
@@ -94,7 +90,7 @@ export function ListTable({
               </th>
             )}
             {columns.map((col) => {
-              const { style, capped } = sizing(col)
+              const { style } = sizing(col)
               const canSort = sortable && col.sortable !== false
               const sorted = sort?.key === col.key ? sort.direction : null
               return (
@@ -102,7 +98,7 @@ export function ListTable({
                   key={col.key}
                   scope="col"
                   style={style}
-                  className={cn(col.grow && !columnWidths[col.key] && 'lv-grow', capped && 'lv-capped')}
+                  className={cn(col.grow && !columnWidths[col.key] && 'lv-grow')}
                   aria-sort={canSort ? (SORT[sorted] || 'none') : undefined}
                 >
                   {canSort ? (
@@ -128,23 +124,7 @@ export function ListTable({
         </thead>
         <tbody>
           {loading ? (
-            <>
-              <tr className="lv-sk-status"><td colSpan={span}><span className="sr-only" role="status">{t('common.loading')}</span></td></tr>
-              {Array.from({ length: Math.max(1, Math.min(skeletonRows, 12)) }, (_, i) => (
-                <tr key={i} className="lv-sk-row" aria-hidden="true">
-                  {multiSelect && <td className="lv-col-check"><span className="lv-sk is-box" /></td>}
-                  {columns.map((col, c) => (
-                    <td key={col.key} className={cn(col.grow && !columnWidths[col.key] && 'lv-grow')}>
-                      <span className={cn('lv-sk', col.key === 'status' && 'is-pill')}
-                        style={{ width: col.key === 'status' ? 74 : col.grow ? `${55 + (i * 37) % 35}%` : 52 + ((i + c) * 23) % 44 }} />
-                    </td>
-                  ))}
-                  {hasActions && <td className="lv-col-actions" />}
-                </tr>
-              ))}
-            </>
-          ) : data.length === 0 && empty ? (
-            <tr className="lv-empty-row"><td colSpan={span}>{empty}</td></tr>
+            <tr><td colSpan={span}><div className="lv-loading" role="status">{t('common.loading')}</div></td></tr>
           ) : data.map((row, idx) => {
             const name = nameOf(row)
             const checked = multiSelect && (selectedIds?.has(row.id) || false)
@@ -154,7 +134,6 @@ export function ListTable({
                 key={row.id || idx}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
                 className={cn(onRowClick && 'is-clickable', selectedId === row.id && 'is-opened', checked && 'is-checked')}
-                aria-current={selectedId === row.id ? 'true' : undefined}
               >
                 {multiSelect && (
                   <td className="lv-col-check" onClick={(e) => e.stopPropagation()}>
@@ -169,7 +148,7 @@ export function ListTable({
                   </td>
                 )}
                 {columns.map((col) => {
-                  const { clip, fit, capped, style } = sizing(col)
+                  const { clip, style } = sizing(col)
                   const raw = row[col.key]
                   const content = col.render ? col.render(raw, row) : (raw ?? '—')
                   const tip = col.title ? col.title(row) : raw
@@ -180,7 +159,6 @@ export function ListTable({
                       className={cn(
                         col.grow && !columnWidths[col.key] && 'lv-grow',
                         clip && 'is-clipped',
-                        capped && 'lv-capped',
                         col.muted && 'is-muted',
                         col.small && 'is-small',
                         col.mono && 'font-mono',
@@ -189,7 +167,7 @@ export function ListTable({
                     >
                       {clip
                         ? <div className="lv-clip" title={typeof tip === 'string' && tip ? tip : undefined}>{content}</div>
-                        : <div className={cn('lv-cell', fit && 'lv-fit')}>{content}</div>}
+                        : <div className="lv-cell">{content}</div>}
                     </td>
                   )
                 })}

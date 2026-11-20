@@ -61,7 +61,6 @@ vi.mock('../../services', () => ({
 }))
 
 import { InspectorObject } from '../inspector/InspectorObject'
-import { moreAction } from '../../test/moreActions'
 
 const ENTRY = {
   id: 9,
@@ -132,7 +131,7 @@ describe('deleting a trust store entry from the inspector', () => {
     certificatesService.getById.mockResolvedValue({ data: { id: 4, common_name: 'web.example.com' } })
     render(<InspectorObject entry={{ ...WINDOW, id: 'w2', type: 'certificate', entityId: 4 }} onTitle={() => {}} />)
     await screen.findAllByText('web.example.com')
-    expect(moreAction('common.delete')).not.toBeNull()
+    expect(screen.getByLabelText('common.delete')).toBeInTheDocument()
   })
 })
 

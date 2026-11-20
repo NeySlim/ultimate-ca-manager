@@ -24,12 +24,12 @@ import { usePermission, useRecentHistory, useFavorites, useWebSocket, usePersist
 import { extractCN, cn, certificateNames, downloadBlob, warnSkippedExport } from '../lib/utils'
 import { CERT_STATUSES, parseOverviewFilters, toListParams, toSearch, withoutFilter } from '../lib/overviewFilters'
 import { FilterChips } from '../components/ui/FilterChips'
-import { LoadError } from '../components/list'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { IssueCertificateForm } from './certificates/IssueCertificateForm'
 import { CertificateSlideOver } from './certificates/CertificateSlideOver'
 import { useCertificateColumns } from './certificates/useCertificateColumns'
+import { UploadKeyModal } from './certificates/UploadKeyModal'
 import { soleImported } from '../lib/importResult'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 import { issueWithSubjectOverride } from '../lib/uniqueSubject'
@@ -68,8 +68,6 @@ export default function CertificatesPage() {
   const [certificates, setCertificates] = useState([])
   const [cas, setCas] = useState([])
   const [loading, setLoading] = useState(true)
-  // The failure of the last read of the list; the list gives way to it until a read succeeds
-  const [loadError, setLoadError] = useState(null)
   const [certStats, setCertStats] = useState({ valid: 0, expiring: 0, expired: 0, revoked: 0, orphan: 0, total: 0 })
   
   // Selection
@@ -77,6 +75,7 @@ export default function CertificatesPage() {
   const [showIssueModal, setShowIssueModal] = useState(false)
   const [issueInitialData, setIssueInitialData] = useState(null)
   const [showImportModal, setShowImportModal] = useState(false)
+  const [showKeyModal, setShowKeyModal] = useState(false)
   const [showCompareModal, setShowCompareModal] = useState(false)
   const [exportRowCert, setExportRowCert] = useState(null)
   // Rows ticked on the page on screen, and the two handed to the comparison
@@ -231,14 +230,13 @@ export default function CertificatesPage() {
       if (page > lastPage) setPage(lastPage)
       setCas(caList)
       setCertStats(statsRes.data || { valid: 0, expiring: 0, expired: 0, revoked: 0, orphan: 0, total: 0 })
-      setLoadError(null)
     } catch (error) {
-      if (seq === requestSeq.current) setLoadError(error || new Error(''))
+      showError(error.message || t('messages.errors.loadFailed.certificates'))
     } finally {
       if (seq === requestSeq.current) setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, perPage, JSON.stringify(savedStatus), JSON.stringify(savedCA), JSON.stringify(savedSource), JSON.stringify(savedTemplate), urlFiltersKey, sortBy, sortOrder, searchValue])
+  }, [page, perPage, JSON.stringify(savedStatus), JSON.stringify(savedCA), JSON.stringify(savedSource), JSON.stringify(savedTemplate), urlFiltersKey, sortBy, sortOrder, searchValue, showError, t])
 
   // Load data - reload when filters or sort change
   useEffect(() => {
@@ -557,7 +555,7 @@ export default function CertificatesPage() {
             </ListButton>
           </>
         )}
-        views={loadError ? undefined : views}
+        views={views}
         activeView={activeView}
         onViewChange={(id) => setStatus(id ? [id] : [])}
         viewsLabel={t('certificates.viewsLabel')}
@@ -593,15 +591,6 @@ export default function CertificatesPage() {
         )}
         onSlideOverClose={() => setSelectedCert(null)}
       >
-        {loadError ? (
-          <LoadError
-            title={t('certificates.loadErrorTitle')}
-            cause={t('certificates.loadErrorCause', {
-              cause: [loadError.status, loadError.message].filter(Boolean).join(' ') || t('certificates.loadErrorNoAnswer'),
-            })}
-            onRetry={loadData}
-          />
-        ) : (<>
         <div data-testid="overview-chips" className="shrink-0">
           <FilterChips
             filters={overviewChips}
@@ -619,8 +608,6 @@ export default function CertificatesPage() {
           selectedId={isMobile ? selectedCert?.id : dockedId}
           rowLabel={(row) => row.cn}
           tableLabel={t('certificates.listLabel')}
-          footnote={isMobile ? undefined : t('certificates.footnote')}
-          noMatchTitle={t('certificates.noMatch')}
           rangeLabel={({ start, end, total: count }) => t('certificates.range', { start, end, count })}
           searchable
           searchPlaceholder={t('certificates.searchPlaceholder')}
@@ -674,7 +661,6 @@ export default function CertificatesPage() {
             </Button>
           )}
         />
-        </>)}
       </ResponsiveLayout>
 
       {/* Issue Certificate Modal */}
@@ -722,6 +708,18 @@ export default function CertificatesPage() {
           t={t}
         />
       </Modal>
+
+      {/* Upload Private Key Modal */}
+      <UploadKeyModal
+        open={showKeyModal}
+        onOpenChange={(open) => setShowKeyModal(open)}
+        selectedCert={selectedCert}
+        onUploadComplete={(updatedCert) => {
+          loadData()
+          setSelectedCert(updatedCert)
+        }}
+        t={t}
+      />
 
       {/* Certificate Compare Modal */}
       <CertificateCompareModal

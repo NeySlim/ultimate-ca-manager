@@ -1,17 +1,27 @@
 import { useMemo } from 'react'
-import { Certificate, LinkBreak, Archive, LinkSimple, Key } from '@phosphor-icons/react'
+import {
+  Certificate, Info, CheckCircle, Clock, Warning, Prohibit, LinkBreak, Archive, LinkSimple, Key
+} from '@phosphor-icons/react'
 import { Badge } from '../../components'
 import { StatusPill, SourceLabel, EntityName, RowMark, DueDate } from '../../components/list'
 import { formatDate, extractCN, cn } from '../../lib/utils'
 import { keyAlgorithmLabel } from '../../lib/keyAlgorithms'
 import { EXPIRY_WINDOW_DAYS } from '../../lib/expiry'
-import { certificateState } from '../../lib/certificateState'
 import { sourceOf, sourceLabel, sourceIcon } from './certificateSources'
 
 const GRADE_TONES = { 'A+': 'good', A: 'good', B: 'good', C: 'warn', D: 'warn', F: 'bad' }
 const DUE_TONES = { expired: 'bad', expiring: 'warn', valid: '' }
 
-export { certificateState }
+/** The one state a row shows: tone, icon and label of its pill. */
+export function certificateState(row, t) {
+  const status = row.revoked ? 'revoked' : row.status || 'unknown'
+  return {
+    valid: { tone: 'good', icon: CheckCircle, label: t('common.valid') },
+    expiring: { tone: 'warn', icon: Clock, label: t('certificates.views.expiring') },
+    expired: { tone: 'bad', icon: Warning, label: t('common.expired') },
+    revoked: { tone: 'muted', icon: Prohibit, label: t('common.revoked') },
+  }[status] || { tone: 'muted', icon: Info, label: t('common.unknown') }
+}
 
 export function useCertificateColumns(t) {
   const columns = useMemo(() => {
@@ -32,7 +42,7 @@ export function useCertificateColumns(t) {
         date={row.valid_to}
         warnDays={EXPIRY_WINDOW_DAYS}
         tone={row.revoked ? '' : DUE_TONES[row.status]}
-        relative={row.revoked ? t('common.revoked') : undefined}
+        relative={row.revoked ? null : undefined}
       />
     )
 
@@ -42,9 +52,6 @@ export function useCertificateColumns(t) {
         header: t('common.commonName'),
         priority: 1,
         sortable: true,
-        // The name takes the width the other columns leave and shortens itself
-        grow: true,
-        clipInside: true,
         // One line: the name opens the detail, quiet marks follow it
         render: (val, row) => (
           <>
@@ -80,7 +87,7 @@ export function useCertificateColumns(t) {
         header: t('common.description'),
         sortable: true,
         hideOnMobile: true,
-        maxWidth: 240,
+        grow: true,
         muted: true,
         accessor: (row) => row.subtitle || '',
         title: (row) => row.subtitle || '',
