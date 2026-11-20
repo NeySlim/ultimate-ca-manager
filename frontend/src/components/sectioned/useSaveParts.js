@@ -4,8 +4,7 @@
  * Parts kept inside a section (its own state) register through the context.
  */
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { setLeaveGuard } from '../../navigation/leaveGuard'
+import { keepDraft, readDraft } from './draftMemory'
 
 export const SavePartsContext = createContext(null)
 
@@ -26,11 +25,24 @@ export function useSavePartsRegistry() {
   return { api, list }
 }
 
-/** Registers a part held by a section; the latest closures are kept at each render. */
+/**
+ * Registers a part held by a section; the latest closures are kept at each render.
+ * A part that gives its `draft` (once loaded) has it kept for the tab while it counts changes.
+ */
 export function useSavePart(key, part) {
   const api = useContext(SavePartsContext)
-  useEffect(() => { api?.set(key, part) })
+  useEffect(() => {
+    api?.set(key, part)
+    if (part.draft !== undefined) keepDraft(partDraftKey(key), part.count > 0 ? part.draft : null)
+  })
   useEffect(() => () => api?.remove(key), [api, key])
+}
+
+const partDraftKey = (key) => `part:${key}`
+
+/** The draft a section part left pending, read once when the section loads. */
+export function keptPartDraft(key) {
+  return readDraft(partDraftKey(key))
 }
 
 /** Count of the changes in a draft against what was loaded, key by key. */
@@ -40,38 +52,17 @@ export function changedKeys(draft, saved, keys) {
 }
 
 /**
- * While `active`, leaving the page asks first: a link to another page, a reload or a close
- * of the tab, and the palette or any caller of `whenLeaving`.
+ * While `active`, a reload or a close of the tab asks the browser first; moving to another
+ * page needs no question, the draft is kept for the return (`draftMemory`).
  */
-export function useLeaveGuard(active, ask) {
-  const navigate = useNavigate()
-  const askRef = useRef(ask)
-  askRef.current = ask
+export function useUnloadGuard(active) {
   useEffect(() => {
     if (!active) return undefined
     const onBeforeUnload = (e) => {
       e.preventDefault()
       e.returnValue = ''
     }
-    const onClick = (e) => {
-      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
-      const link = e.target.closest?.('a[href]')
-      if (!link || link.target === '_blank' || link.hasAttribute('download')) return
-      const url = new URL(link.href, window.location.href)
-      if (url.origin !== window.location.origin || url.pathname === window.location.pathname) return
-      e.preventDefault()
-      e.stopPropagation()
-      Promise.resolve(askRef.current()).then((ok) => {
-        if (ok) navigate(url.pathname + url.search + url.hash)
-      })
-    }
     window.addEventListener('beforeunload', onBeforeUnload)
-    document.addEventListener('click', onClick, true)
-    const release = setLeaveGuard(() => askRef.current())
-    return () => {
-      window.removeEventListener('beforeunload', onBeforeUnload)
-      document.removeEventListener('click', onClick, true)
-      release()
-    }
-  }, [active, navigate])
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [active])
 }

@@ -177,7 +177,7 @@ export default function DatabaseBackendSection() {
               </Button>
             </div>
             <p className="text-xs text-text-tertiary">
-              {t('settings.backend.urlExample')}: <span className="font-mono">postgresql://ucm:secret@db.example.com:5432/ucm</span>
+              {t('settings.backend.urlExample')}{t('work.sep')}<span className="font-mono">postgresql://ucm:secret@db.example.com:5432/ucm</span>
             </p>
           </div>
 

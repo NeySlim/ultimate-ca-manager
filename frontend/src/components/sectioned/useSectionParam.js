@@ -11,7 +11,8 @@ export function useSectionParam(ids, fallback, { stacked = false, ready = true }
   const [params, setParams] = useSearchParams()
   const raw = params.get('tab')
   const current = ids.includes(raw) ? raw : fallback
-  const focusNext = useRef(false)
+  // A link that names a section on a one-frame page also lands the focus on its title
+  const focusNext = useRef(Boolean(raw && ids.includes(raw)))
 
   const select = useCallback((id) => {
     const next = new URLSearchParams(params)
@@ -28,10 +29,10 @@ export function useSectionParam(ids, fallback, { stacked = false, ready = true }
   }, [raw, ready, stacked]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (stacked || !focusNext.current) return
+    if (stacked || !ready || !focusNext.current) return
     focusNext.current = false
     document.getElementById(sectionTitleId(current))?.focus()
-  }, [current, stacked])
+  }, [current, stacked, ready])
 
   return [current, select]
 }

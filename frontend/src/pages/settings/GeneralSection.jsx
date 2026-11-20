@@ -11,8 +11,12 @@ import PublicEndpointsPanel from './PublicEndpointsPanel'
 import AdminLockLabel from './AdminLockLabel'
 import { FormGroup } from '../../components/sectioned'
 
-export default function GeneralSection({ settings, updateSetting, canWrite, hasPermission, savedVersion = 0 }) {
-  const { t } = useTranslation()
+export default function GeneralSection({ settings, fieldErrors = {}, updateSetting, canWrite, hasPermission, savedVersion = 0 }) {
+  const { t, i18n } = useTranslation()
+  // The short and long samples in the reader's language, as the dates will read
+  const sampleDate = (month) => {
+    try { return new Intl.DateTimeFormat(i18n?.language, { year: 'numeric', month, day: 'numeric' }).format(new Date(2026, 0, 6)) } catch { return '' }
+  }
   const { showSuccess, showError } = useNotification()
   const [metricsToken, setMetricsToken] = useState('')
   const [metricsBusy, setMetricsBusy] = useState(false)
@@ -99,6 +103,7 @@ export default function GeneralSection({ settings, updateSetting, canWrite, hasP
             helperText={t('settings.protocolBaseUrlHelper')}
           />
           <Input
+            className="sf-short"
             label={t('settings.httpProtocolPort')}
             type="number"
             min={0}
@@ -123,16 +128,16 @@ export default function GeneralSection({ settings, updateSetting, canWrite, hasP
             helperText={t('settings.acmePublicVhostHelper')}
           />
           <Input
+            className="sf-short"
             label={lockedLabel('settings.acmePublicPort')}
             disabled={adminLocked}
             type="number"
             min={1}
             max={65535}
+            inputMode="numeric"
             value={settings.acme_public_port ?? 443}
-            onChange={(e) => {
-              const val = parseInt(e.target.value, 10) || 443
-              updateSetting('acme_public_port', Math.min(65535, Math.max(1, val)))
-            }}
+            onChange={(e) => updateSetting('acme_public_port', e.target.value === '' ? '' : Number(e.target.value))}
+            error={fieldErrors.acme_public_port}
             helperText={t('settings.acmePublicPortHelper')}
           />
           <Select
@@ -160,6 +165,7 @@ export default function GeneralSection({ settings, updateSetting, canWrite, hasP
       <FormGroup title={t('settings.sessionTimezone')}>
         <div className="space-y-4">
           <Input
+            className="sf-short"
             label={lockedLabel('settings.sessionTimeout')}
             disabled={adminLocked}
             type="number"
@@ -170,6 +176,7 @@ export default function GeneralSection({ settings, updateSetting, canWrite, hasP
             helperText={t('settings.sessionTimeoutHelper')}
           />
           <Input
+            className="sf-short"
             label={lockedLabel('settings.maxLoginAttempts')}
             disabled={adminLocked}
             type="number"
@@ -180,6 +187,7 @@ export default function GeneralSection({ settings, updateSetting, canWrite, hasP
             helperText={t('settings.maxLoginAttemptsHelper')}
           />
           <Input
+            className="sf-short"
             label={lockedLabel('settings.lockoutDuration')}
             disabled={adminLocked}
             type="number"
@@ -225,8 +233,8 @@ export default function GeneralSection({ settings, updateSetting, canWrite, hasP
           <Select
             label={t('settings.dateFormat')}
             options={[
-              { value: 'short', label: `${t('settings.dateFormats.short')}, Jan 6, 2026` },
-              { value: 'long', label: `${t('settings.dateFormats.long')}, January 6, 2026` },
+              { value: 'short', label: `${t('settings.dateFormats.short')}, ${sampleDate('short')}` },
+              { value: 'long', label: `${t('settings.dateFormats.long')}, ${sampleDate('long')}` },
               { value: 'iso', label: `${t('settings.dateFormats.iso')}, 2026-01-06` },
               { value: 'eu', label: `${t('settings.dateFormats.eu')}, 06/01/2026` },
               { value: 'us', label: `${t('settings.dateFormats.us')}, 01/06/2026` },

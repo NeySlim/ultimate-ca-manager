@@ -31,7 +31,7 @@ vi.mock('../../contexts', () => ({
 }))
 vi.mock('../../hooks', () => ({ useClipboard: () => ({ copy: vi.fn() }) }))
 vi.mock('../../components/ui/responsive', () => ({
-  ResponsiveLayout: ({ children }) => <div>{children}</div>,
+  ResponsiveLayout: ({ children, intent }) => <div><p>{intent}</p>{children}</div>,
 }))
 
 const decoded = vi.hoisted(() => ({ data: null }))
@@ -62,6 +62,24 @@ describe('certificate tools sections', () => {
     expect(screen.getByRole('heading', { level: 2, name: en.tools.converter })).toBeInTheDocument()
     expect(within(screen.getByRole('navigation', { name: en.tools.tocLabel })).getByRole('link', { name: en.tools.converter }))
       .toHaveAttribute('aria-current', 'true')
+    expect(screen.getByRole('heading', { level: 2, name: en.tools.converter })).toHaveFocus()
+  })
+
+  it('leaves the focus alone when no link names a tool', () => {
+    open()
+    expect(screen.getByRole('heading', { level: 2, name: en.tools.sslChecker })).not.toHaveFocus()
+  })
+
+  it('says under its title what the Modules menu says of it', () => {
+    open()
+    expect(screen.getByText(en.shell.moduleDesc.tools)).toBeInTheDocument()
+  })
+
+  it('runs a tool from a button on its own test line, not across the frame', () => {
+    open()
+    const run = screen.getByRole('button', { name: en.tools.checkSSL })
+    expect(run.parentElement).toHaveClass('sf-test')
+    expect(screen.getByLabelText(en.common.portLabel).closest('.ui-field')).toHaveClass('sf-short')
   })
 
   it('drops the result of the previous tool on a switch', async () => {

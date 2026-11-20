@@ -1,11 +1,12 @@
 /**
  * Account page on the sectioned template: profile, security and API keys each in a frame
  * on one page, a table of contents, a link to ?tab= landing on its frame, the profile's
- * edit and the key creation in their frame heading, no save bar.
+ * edit and the key creation in their frame heading, no save bar, a profile edit kept for
+ * the return to the page, and the inspector's "close on navigate" preference.
  */
 import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Routes, Route, Link } from 'react-router-dom'
 
 const m = vi.hoisted(() => ({ createApiKey: vi.fn(), persistPreference: vi.fn() }))
 vi.mock('../../stores/userPreferencesStore', async (orig) => ({ ...(await orig()), persistPreference: m.persistPreference }))
@@ -37,7 +38,7 @@ const auth = vi.hoisted(() => ({
 }))
 const env = vi.hoisted(() => ({
   mobile: { isMobile: false, isDesktop: true, screenWidth: 1280, sidebarOpen: true, setSidebarOpen: () => {} },
-  windows: { openEntity: () => {}, closeWindow: () => {}, windows: [], prefs: {}, updatePrefs: () => {} },
+  windows: { openEntity: () => {}, closeWindow: () => {}, windows: [], prefs: {}, updatePrefs: () => {}, closeOnNav: true, toggleCloseOnNav: vi.fn() },
 }))
 
 vi.mock('../../contexts', () => ({
@@ -72,6 +73,8 @@ vi.mock('../../components', async (orig) => ({
 }))
 
 import AccountPage from '../AccountPage'
+import { accountService } from '../../services'
+import { dropAllDrafts } from '../../components/sectioned/draftMemory'
 
 beforeAll(() => {
   global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
@@ -81,7 +84,7 @@ const open = (entry = '/account') => render(<MemoryRouter initialEntries={[entry
 
 describe('AccountPage sections', () => {
   beforeEach(() => { vi.clearAllMocks() })
-  afterEach(() => { delete Element.prototype.scrollIntoView })
+  afterEach(() => { delete Element.prototype.scrollIntoView; dropAllDrafts() })
 
   it('shows the three sections on one page with a table of contents and no save bar', async () => {
     open()
@@ -117,5 +120,59 @@ describe('AccountPage sections', () => {
     expect(within(heading).getByRole('button', { name: 'common.cancel' })).toBeInTheDocument()
     const keys = screen.getByRole('region', { name: 'account.apiKeys' }).querySelector('.sf-heading')
     expect(within(keys).getByRole('button', { name: 'account.createKey' })).toBeInTheDocument()
+  })
+
+  it('keeps a profile edit when the page is left, and finds it again on the return', async () => {
+    render(
+      <MemoryRouter initialEntries={['/account']}>
+        <Routes>
+          <Route path="/account" element={<><Link to="/certificates">elsewhere</Link><AccountPage /></>} />
+          <Route path="/certificates" element={<Link to="/account">back</Link>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    const profile = await screen.findByRole('region', { name: 'account.profile' })
+    fireEvent.click(within(profile).getByRole('button', { name: 'common.edit' }))
+    fireEvent.change(screen.getByLabelText('account.fullName'), { target: { value: 'Alice B.' } })
+    fireEvent.click(screen.getByText('elsewhere'))
+    expect(notify.showConfirm).not.toHaveBeenCalled()
+    fireEvent.click(await screen.findByText('back'))
+    expect(await screen.findByLabelText('account.fullName')).toHaveValue('Alice B.')
+    // Cancel forgets it: the next visit shows the profile as stored
+    fireEvent.click(screen.getByRole('button', { name: 'common.cancel' }))
+    fireEvent.click(screen.getByText('elsewhere'))
+    fireEvent.click(await screen.findByText('back'))
+    await screen.findByRole('region', { name: 'account.profile' })
+    expect(screen.queryByLabelText('account.fullName')).toBeNull()
+  })
+
+  it('offers the inspector preference "close on navigate" as a check box with its hint', async () => {
+    open()
+    const box = await screen.findByRole('checkbox', { name: 'account.closeInspectorOnNav' })
+    expect(box).toBeChecked()
+    expect(box).toHaveAccessibleDescription('account.closeInspectorOnNavHint')
+    fireEvent.click(box)
+    expect(env.windows.toggleCloseOnNav).toHaveBeenCalledTimes(1)
+  })
+
+  it('reads the profile as lines of terms and values, as the mockup props', async () => {
+    open()
+    const profile = await screen.findByRole('region', { name: 'account.profile' })
+    const props = profile.querySelector('dl.sf-props')
+    expect(props).not.toBeNull()
+    expect(within(props).getByText('common.username').tagName).toBe('DT')
+    expect(within(props).getAllByText('alice').every((el) => el.tagName === 'DD')).toBe(true)
+  })
+
+  it('lists the API keys one per line with the revoke action named', async () => {
+    accountService.getApiKeys.mockResolvedValueOnce({ data: [
+      { id: 4, name: 'ci', key_prefix: 'ucm_ab', is_active: true, is_expired: false, created_at: '2026-11-01T10:00:00Z', permissions: ['read:certificates'] },
+    ] })
+    open()
+    const keys = await screen.findByRole('region', { name: 'account.apiKeys' })
+    const row = (await within(keys).findByText('ci')).closest('li')
+    expect(row.closest('ul')).toHaveClass('sf-records')
+    expect(row).toHaveTextContent('read:certificates')
+    expect(within(row).getByRole('button', { name: 'common.revoke' })).toBeInTheDocument()
   })
 })

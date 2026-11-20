@@ -38,7 +38,7 @@ export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelected
           <div className="mt-3 p-3 rounded-lg border border-border bg-bg-tertiary flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm font-medium text-text-primary truncate">
-                {t('settings.httpsBound')}: {certificateLabel(httpsInfo.bound_certificate) || httpsInfo.bound_certificate.refid}
+                {t('settings.httpsBound')}{t('work.sep')}{certificateLabel(httpsInfo.bound_certificate) || httpsInfo.bound_certificate.refid}
               </p>
               <p className="text-xs text-text-secondary mt-0.5">{t('settings.httpsBoundDesc')}</p>
             </div>
@@ -107,7 +107,7 @@ export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelected
               </Button>
             </div>
           ) : null}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               type="button"
               variant="secondary"

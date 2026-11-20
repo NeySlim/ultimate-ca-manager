@@ -67,7 +67,7 @@ export default function ServiceStatusWidget() {
       {reconnecting && (
         <ServiceReconnectOverlay status={reconnectStatus} attempt={attempt} countdown={countdown} onCancel={cancel} />
       )}
-      <FormGroup title={t('settings.serviceStatus')} className="mt-4">
+      <FormGroup title={t('settings.serviceStatus')}>
       {loading ? (
         <LoadingSpinner size="sm" />
       ) : status ? (

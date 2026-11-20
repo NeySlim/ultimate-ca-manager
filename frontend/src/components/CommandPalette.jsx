@@ -23,7 +23,6 @@ import { useTranslation } from 'react-i18next'
 import { useAllRecentHistory, useAllFavorites } from '../hooks'
 import { searchService } from '../services'
 import { paletteCommands } from '../navigation/registry'
-import { whenLeaving } from '../navigation/leaveGuard'
 
 const COMMANDS = paletteCommands()
 
@@ -64,7 +63,7 @@ export function CommandPalette({ open, onOpenChange }) {
       openedInspector.current = true
       openInInspector(inspectorType, id, { origin: returnTo.current })
     }
-    else whenLeaving(() => navigate(getTypePath(type, id)))
+    else navigate(getTypePath(type, id))
     onOpenChange(false)
   }
 
@@ -202,7 +201,7 @@ export function CommandPalette({ open, onOpenChange }) {
 
   const executeCommand = (command) => {
     onOpenChange(false)
-    whenLeaving(() => navigate(command.path))
+    navigate(command.path)
     // TODO: Handle action parameter for specific actions
   }
 

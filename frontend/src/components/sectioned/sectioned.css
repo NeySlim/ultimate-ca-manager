@@ -3,10 +3,11 @@
  * a sticky save bar. Geometry of the Atelier settings page; theme tokens only.
  */
 .sf-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 24px; align-items: start; padding-bottom: 24px; }
-.sf-toc { position: sticky; top: 0; padding-top: 2px; max-height: calc(100dvh - 210px); overflow-y: auto; scrollbar-width: thin; }
+/* The table of contents holds every entry on a 1000 px high window; a lower one scrolls it */
+.sf-toc { position: sticky; top: 0; padding-top: 2px; }
 .sf-toc ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-.sf-toc-group + .sf-toc-group { margin-top: 8px; }
-.sf-toc-group-title { display: flex; align-items: center; margin: 0; padding: 6px 10px; font-size: 12px; font-weight: 500; color: var(--muted); }
+.sf-toc-group + .sf-toc-group { margin-top: 4px; }
+.sf-toc-group-title { display: flex; align-items: center; margin: 0; padding: 2px 10px; font-size: 12px; line-height: 14px; font-weight: 500; color: var(--muted); }
 .sf-toc a {
   display: flex;
   align-items: center;
@@ -18,11 +19,11 @@
   color: var(--muted);
   text-decoration: none;
 }
-.sf-toc a:hover { color: var(--text); background: var(--hover); }
-.sf-toc a[aria-current="true"] { color: var(--accent); background: var(--selected); }
+.sf-toc a:hover { background: var(--hover); }
+.sf-toc a[aria-current="true"] { color: var(--accent); background: var(--selected); font-weight: 500; }
 .sf-toc a > svg { width: 15px; height: 15px; flex-shrink: 0; }
 .sf-toc a > span:first-of-type { min-width: 0; overflow-wrap: anywhere; }
-.sf-toc :is(a, button):focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.sf-toc :is(a, button):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .sf-flag { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--warn); white-space: nowrap; }
 .sf-flag.is-bad { color: var(--bad); }
 .sf-flag svg { width: 12px; height: 12px; }
@@ -49,9 +50,9 @@
   border-radius: 5px;
   background: var(--panel);
   min-width: 0;
+  overflow: hidden;
   container-type: inline-size;
 }
-.sf-section.is-error { border-color: var(--bad); }
 .sf-heading {
   display: flex;
   align-items: center;
@@ -66,7 +67,8 @@
 .sf-heading h2:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .sf-heading p { margin: 5px 0 0; font-size: 12px; color: var(--muted); }
 .sf-heading-aside { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.sf-section-error { display: flex; align-items: flex-start; gap: 6px; margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--bad); }
+/* A save the server refused: its message under the sentence, in the error colour; the frame does not change */
+.sf-section-error, .sf-heading p.sf-section-error { display: flex; align-items: flex-start; gap: 6px; margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--bad); }
 .sf-section-error svg { width: 13px; height: 13px; margin-top: 2px; flex-shrink: 0; }
 .sf-body { padding: 18px 20px; display: grid; gap: 20px; min-width: 0; color: var(--text); }
 /* A body that holds a working table fills the screen below the heading, the table scrolls inside */
@@ -90,9 +92,19 @@
   background-color: var(--panel);
   color: var(--text);
 }
+/* A field that cannot be changed reads as the mockup's read-only field: raised, plain text */
+.sf-body:not(.sf-body-fill) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea):is(:disabled, [readonly]) {
+  background-color: var(--raised);
+  color: var(--text);
+  opacity: 1;
+}
 .sf-body :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select) { height: 36px; padding-block: 8px; padding-inline-end: 10px; }
 /* A field with a leading icon keeps the room its own padding gives the icon */
 .sf-body :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select):not([class*="pl-"]) { padding-inline-start: 10px; }
+/* A field drawn by its own control box (tags) keeps its inner input bare */
+.sf-body:not(.sf-body-fill) .ui-control input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]) {
+  height: auto; min-height: 0; padding: 0; border: 0; background: transparent; font-size: inherit;
+}
 .sf-body button[role="combobox"] { height: 36px; padding: 8px 10px; font-size: 12px; border-radius: 4px; border-color: var(--control); background-color: var(--panel); }
 .sf-body .space-y-1\.5 > label { line-height: normal; }
 .sf-body .space-y-1\.5 > label > span { height: auto; }
@@ -100,22 +112,84 @@
 .sf-body .space-y-1\.5 > p { font-size: 12px; line-height: 1.6; color: var(--muted); }
 .sf-body .sf-hint, .sf-body small { font-size: 12px; line-height: 1.6; color: var(--muted); }
 
-/* Fields side by side as in the Atelier grid: two per row, any other block on a row of its own */
-.sf-body .sf-group-body > :is(.space-y-3, .space-y-4) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.sf-body .sf-group-body > :is(.space-y-3, .space-y-4) > :not([hidden]) { grid-column: 1 / -1; margin-top: 0; margin-bottom: 0; }
-.sf-body .sf-group-body > :is(.space-y-3, .space-y-4) > :is(.space-y-1\.5, .ui-field):not([hidden]) { grid-column: auto; }
+/* Text of the frames at the mockup's sizes: 12 px body, legends 13 px */
+.sf-body:not(.sf-body-fill) { font-size: 12px; }
+.sf-body:not(.sf-body-fill) :is(.text-sm, .text-base) { font-size: 12px; line-height: 1.6; }
+.sf-body:not(.sf-body-fill) .font-mono { font-size: 12px; }
+.sf-body:not(.sf-body-fill) h4 { margin: 0; font-size: 13px; line-height: normal; font-weight: 500; color: var(--text); }
+.sf-under { margin: 7px 0 0; }
+.sf-swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+/* Properties read in a frame: the mockup's term and value lines */
+.sf-props { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: 10px 16px; margin: 0; font-size: 12px; }
+.sf-props dt { color: var(--muted); }
+.sf-props dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+@container (min-width: 600px) { .sf-props { grid-template-columns: 160px minmax(0, 1fr); } }
+
+/* Records listed in a frame (providers, webhooks, archives, keys): the mockup's record list */
+.sf-records { list-style: none; margin: 0; padding: 0; }
+.sf-records > li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.sf-records > li:last-child { border-bottom: 0; }
+.sf-record-main { flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sf-record-main strong { font-size: 13px; font-weight: 500; color: var(--text); overflow-wrap: anywhere; }
+.sf-record-title { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; }
+.sf-record-meta { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.sf-record-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.sf-records-empty { margin: 0; padding: 9px 0; font-size: 12px; color: var(--muted); }
+.sf-records > li > input[type="checkbox"] { flex: 0 0 auto; }
+.sf-records-lead { margin: 0 0 6px; }
+.sf-records-summary { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0 0 12px; font-size: 12px; color: var(--muted); }
+.sf-records-summary > span { display: inline-flex; align-items: center; gap: 6px; }
+.sf-records-summary svg { width: 14px; height: 14px; }
+.sf-records-summary .is-warn { color: var(--warn); }
+.sf-record-digest { display: inline-flex; align-items: center; gap: 6px; }
+.sf-inline-icon { display: inline-flex; padding: 2px; border: 0; background: none; color: var(--muted); cursor: pointer; border-radius: 3px; }
+.sf-inline-icon:hover { color: var(--text); }
+.sf-inline-icon:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Fields side by side as in the Atelier grid: two per row, any other block on a row of its own.
+   The grid is a group's direct block (.space-y-3/.space-y-4) or any block marked .sf-grid. */
+.sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) > :not([hidden]) { grid-column: 1 / -1; margin-top: 0; margin-bottom: 0; }
+.sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) > :is(.space-y-1\.5, .ui-field):not([hidden]) { grid-column: auto; }
+/* Fields a section lays out itself: the same two columns, one on a phone */
+.sf-body .sf-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+/* A frame over 900 px packs the short fields (port, hour, protocol) two in the room of one */
+@container (min-width: 900px) {
+  .sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) > :is(.space-y-1\.5, .ui-field):not([hidden]) { grid-column: span 2; }
+  .sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) > .sf-short:not([hidden]) { grid-column: span 1; }
+  .sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) > .sf-wide:not([hidden]) { grid-column: 1 / -1; }
+}
+/* Release notes read in a frame: headings at the legend size */
+.sf-body .prose :is(h1, h2, h3, h4) { font-size: 13px; line-height: 1.4; font-weight: 500; }
+/* A count inside a segment (Operations resource types), muted as the mockup's counts */
+.sf-body .ui-segmented .ops-count { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+/* A button placed straight in a field grid keeps the width of its text */
+.sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid) > :is(button, a.lv-btn) { justify-self: start; }
+/* A segmented choice keeps the width of its segments */
+.sf-body .ui-field > .ui-segmented { align-self: flex-start; }
 
 /* Test of a section with the values typed, and its result */
 .sf-test { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid var(--line); }
+.sf-test > .sf-test-field { flex: 0 1 309px; }
+.sf-test:has(> .sf-test-field) { align-items: flex-end; }
+.sf-test:has(> .sf-test-field) > .sf-test-result { align-self: center; margin-top: 22px; }
 .sf-test-result { display: flex; gap: 6px; align-items: flex-start; font-size: 12px; line-height: 1.5; min-width: 0; flex: 1 1 260px; color: var(--muted); }
 .sf-test-result.is-good { color: var(--good); }
 .sf-test-result.is-bad { color: var(--bad); }
 .sf-test-result svg { width: 13px; height: 13px; margin-top: 2px; flex-shrink: 0; }
 
+.sf-test.sf-under-group { margin-top: 20px; }
+/* A set of check boxes under one label */
+.sf-checks { margin: 0; padding: 0; border: 0; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+.sf-checks > legend { padding: 0; margin-bottom: 7px; }
+.sf-checks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0 16px; }
+
 /* Save bar: what is pending, undo, save */
+/* Sticky 24 px above the bottom of the scrolling view, the content scrolls in that band */
 .sf-savebar {
   position: sticky;
-  bottom: 0;
+  bottom: 24px;
   z-index: 3;
   display: flex;
   align-items: center;
@@ -125,7 +199,7 @@
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 5px;
-  box-shadow: 0 -10px 24px -18px var(--scrim);
+  box-shadow: 0 -10px 24px -18px color-mix(in srgb, var(--ink) 67%, transparent);
 }
 .sf-savebar.is-dirty { border-color: var(--warn-fill); }
 .sf-state { display: flex; align-items: flex-start; gap: 7px; margin: 0 auto 0 0; font-size: 12px; line-height: 1.5; color: var(--muted); flex: 1 1 280px; min-width: 0; }
@@ -138,27 +212,35 @@
 
 /* History of the saves, read from the audit log */
 .sf-history { border: 1px solid var(--line); border-radius: 5px; background: var(--panel); min-width: 0; }
-.sf-history-list { list-style: none; margin: 0; padding: 4px 20px 8px; }
-.sf-history-list li { display: flex; align-items: baseline; gap: 4px 16px; flex-wrap: wrap; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+/* Rows of the mockup's record list: title over its detail, author and date on the right */
+.sf-history-list { list-style: none; margin: 0; padding: 18px 20px; }
+.sf-history-list li { display: flex; align-items: center; gap: 6px 16px; flex-wrap: wrap; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
 .sf-history-list li:last-child { border-bottom: 0; }
-.sf-history-list strong { font-weight: 500; color: var(--text); }
-.sf-history-list .sf-history-detail { flex: 1 1 300px; min-width: 0; color: var(--muted); overflow-wrap: anywhere; }
-.sf-history-list .sf-history-meta { margin-left: auto; color: var(--muted); white-space: nowrap; }
+.sf-history-main { flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sf-history-list strong { font-size: 13px; font-weight: 500; color: var(--text); overflow-wrap: anywhere; }
+.sf-history-list .sf-history-detail { min-width: 0; color: var(--muted); overflow-wrap: anywhere; }
+.sf-history-list .sf-history-meta { color: var(--muted); overflow-wrap: anywhere; }
 .sf-history-empty { padding: 18px 20px; font-size: 12px; color: var(--muted); }
 
 .sr-only-sf { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 @media (max-width: 899px) {
-  .sf-layout { grid-template-columns: 1fr; gap: 12px; padding: 0 var(--lv-gutter, 16px) 16px; }
+  .sf-layout { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 0 var(--lv-gutter, 16px) 16px; }
   .sf-toc { display: none; }
   .sf-jump { display: flex; }
   .sf-body { padding: 16px; }
   .sf-heading { padding: 17px 16px; flex-wrap: wrap; }
-  .sf-body :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select) { height: 44px; font-size: 13px; }
-  .sf-body .sf-group-body > :is(.space-y-3, .space-y-4) { grid-template-columns: 1fr; }
-  .sf-savebar { position: static; padding: 10px 12px; }
+  .sf-body:not(.sf-body-fill) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select) { height: 44px; font-size: 13px; }
+  .sf-body:not(.sf-body-fill) button[role="combobox"] { height: 44px; font-size: 13px; }
+  .sf-body :is(.sf-group-body > :is(.space-y-3, .space-y-4), .sf-grid), .sf-body .sf-fields { grid-template-columns: minmax(0, 1fr); }
+  .sf-savebar { position: static; bottom: 0; padding: 10px 12px; }
   .sf-savebar.is-dirty { position: sticky; }
   .sf-savebar .lv-btn { min-height: 42px; flex: 1 1 auto; }
+}
+
+@media (max-height: 999px) and (min-width: 900px) {
+  .sf-toc { max-height: calc(100dvh - 200px); overflow-y: auto; scrollbar-width: thin; }
+  .sf-toc :is(a, button):focus-visible { outline-offset: -2px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -166,9 +248,16 @@
 }
 
 /* Aurore family: frames keep the gradient border of its panels */
-:root[data-theme="aurore"] :is(.sf-section, .sf-savebar, .sf-history) { border-radius: 6px; }
-:root[data-theme="aurore"] :is(.sf-section, .sf-history):not(.is-error) {
+:root[data-theme="aurore"] :is(.sf-section, .sf-history) { border-radius: 6px; }
+:root[data-theme="aurore"] :is(.sf-section, .sf-history) {
   border-color: transparent;
   background: linear-gradient(var(--panel), var(--panel)) padding-box,
-    linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 55%, transparent), color-mix(in srgb, var(--grad-b) 25%, transparent) 60%, var(--line)) border-box;
+    linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 55%, transparent), color-mix(in srgb, var(--grad-b) 25%, transparent) 60%, color-mix(in srgb, var(--paper) 8%, transparent)) border-box;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--paper) 7%, transparent), 0 20px 50px -30px color-mix(in srgb, var(--ink) 80%, transparent);
 }
+:root[data-theme="aurore"][data-mode="light"] :is(.sf-section, .sf-history) {
+  background: linear-gradient(var(--panel), var(--panel)) padding-box,
+    linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 38%, transparent), color-mix(in srgb, var(--grad-b) 24%, transparent) 60%, color-mix(in srgb, var(--text) 8%, transparent)) border-box;
+  box-shadow: inset 0 1px 0 var(--paper), 0 18px 40px -28px color-mix(in srgb, var(--text) 35%, transparent);
+}
+:root[data-theme="aurore"] .sf-body:not(.sf-body-fill) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea, button[role="combobox"]) { border-radius: 6px; }

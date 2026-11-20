@@ -4,7 +4,8 @@ import { Button, Input, Select, FileUpload, Badge } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import AdminLockLabel from './AdminLockLabel'
 import { useClipboard } from '../../hooks/useClipboard'
-import { formatSize } from '../../lib/fileSize'
+import { formatSize, formatBytes, formatPercent, serverUtcToIso } from '../../lib/fileSize'
+import { formatDate } from '../../lib/utils'
 import { restoreMaxBytes, restoreLegacyCeilingExceeded } from './restoreLimits'
 import { FormGroup } from '../../components/sectioned'
 
@@ -16,7 +17,7 @@ export default function BackupSection({
   setShowBackupModal, setShowRestoreModal, setRestoreFile, backupRunning = false,
   handleDownloadBackup, handleDeleteBackup, handleClearBackupPassword,
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { copy, isCopied } = useClipboard()
   const isAdmin = hasPermission('admin:system')
   // The whole schedule needs admin:settings: the API drops these keys otherwise.
@@ -29,8 +30,8 @@ export default function BackupSection({
   // The server's figures, read after each save: the saved ceiling, not the field being typed,
   // and only the archives retention counts
   const overCeiling = backupSchedule.over_ceiling === true
-  const storedMiB = typeof backupSchedule.stored_bytes === 'number'
-    ? `${(backupSchedule.stored_bytes / (1024 * 1024)).toFixed(1)} MiB` : null
+  const size = (bytes) => formatBytes(bytes, i18n?.language)
+  const storedMiB = typeof backupSchedule.stored_bytes === 'number' ? size(backupSchedule.stored_bytes) : null
 
   const sortOptions = [
     { value: 'created_desc', label: t('settings.backupSortNewest') },
@@ -125,6 +126,7 @@ export default function BackupSection({
       <FormGroup title={t('settings.retentionPeriod')}>
         <div className="space-y-3">
           <Input
+            className="sf-short"
             label={<AdminLockLabel text={t('settings.retentionPeriod')} locked={!canAdminSettings} />}
             disabled={!canAdminSettings}
             type="number"
@@ -135,6 +137,7 @@ export default function BackupSection({
             helperText={t('settings.retentionHelper')}
           />
           <Input
+            className="sf-short"
             label={<AdminLockLabel text={t('settings.backupMaxTotalMb')} locked={!canAdminSettings} />}
             disabled={!canAdminSettings}
             type="number"
@@ -174,17 +177,20 @@ export default function BackupSection({
       </FormGroup>
 
       <FormGroup title={t('settings.availableBackups')}>
-        {/* Summary */}
-        <div className="flex flex-wrap items-center gap-2 mb-4 text-xs">
-          <Badge variant="secondary">{t('settings.backupCount', { count: backupMeta.total ?? backups.length })}</Badge>
-          {backupMeta.total_size && <Badge variant="secondary">{t('settings.backupTotalSize')}: {backupMeta.total_size}</Badge>}
-          {backupMeta.disk_free && (
-            <Badge variant={diskHigh ? 'warning' : 'secondary'} icon={diskHigh ? WarningCircle : HardDrives}>
-              {t('settings.diskFree')}: {backupMeta.disk_free}
-              {typeof backupMeta.disk_used_pct === 'number' ? ` (${backupMeta.disk_used_pct}%)` : ''}
-            </Badge>
+        {/* Summary: count, total size and free disk, on one muted line */}
+        <p className="sf-records-summary">
+          <span>{t('settings.backupCount', { count: backupMeta.total ?? backups.length })}</span>
+          {typeof backupMeta.total_size_bytes === 'number' && (
+            <span>{t('settings.backupTotalSize')}{t('work.sep')}{size(backupMeta.total_size_bytes)}</span>
           )}
-        </div>
+          {typeof backupMeta.disk_free_bytes === 'number' && (
+            <span className={diskHigh ? 'is-warn' : undefined}>
+              {diskHigh ? <WarningCircle aria-hidden="true" /> : <HardDrives aria-hidden="true" />}
+              {t('settings.diskFree')}{t('work.sep')}{size(backupMeta.disk_free_bytes)}
+              {typeof backupMeta.disk_used_pct === 'number' ? ` (${formatPercent(backupMeta.disk_used_pct, i18n?.language)})` : ''}
+            </span>
+          )}
+        </p>
         {sharedStore && (
           <p className="flex items-start gap-2 mb-4 text-xs text-text-secondary">
             <WarningCircle size={14} className="flex-shrink-0 mt-0.5" />
@@ -218,70 +224,69 @@ export default function BackupSection({
         )}
 
         {backups.length === 0 ? (
-          <div className="p-6 text-center">
-            <p className="text-sm text-text-secondary">{backupQuery.search ? t('settings.backupNoMatch') : t('settings.noBackups')}</p>
-            {!backupQuery.search && <p className="text-xs text-text-tertiary mt-1">{t('settings.noBackupsHint')}</p>}
-          </div>
+          <p className="sf-records-empty">
+            {backupQuery.search ? t('settings.backupNoMatch') : t('settings.noBackups')}
+            {!backupQuery.search && <span className="block">{t('settings.noBackupsHint')}</span>}
+          </p>
         ) : (
           <>
             {isAdmin && (
-              <label className="flex items-center gap-2 px-3 py-2 text-xs text-text-secondary cursor-pointer select-none">
+              <label className="ui-check-line">
                 <input type="checkbox" checked={allSelected} onChange={toggleSelectAllBackups} />
                 {t('settings.backupSelectAll')}
               </label>
             )}
-            <div className="space-y-2">
+            {/* The mockup's record list: name, then size, date, node and digest, then the actions */}
+            <ul className="sf-records">
               {backups.map((backup) => (
-                <div key={backup.filename} className="flex items-center justify-between p-3 bg-tertiary-50 border border-border-op30 rounded-lg">
-                  <div className="flex items-center gap-3 min-w-0">
-                    {isAdmin && (
-                      <input
-                        type="checkbox"
-                        checked={selectedBackups.includes(backup.filename)}
-                        onChange={() => toggleSelectBackup(backup.filename)}
-                      />
+                <li key={backup.filename}>
+                  {isAdmin && (
+                    <input
+                      type="checkbox"
+                      aria-label={backup.filename}
+                      checked={selectedBackups.includes(backup.filename)}
+                      onChange={() => toggleSelectBackup(backup.filename)}
+                    />
+                  )}
+                  <div className="sf-record-main">
+                    <strong className="font-mono">{backup.filename}</strong>
+                    <span className="sf-record-meta">
+                      {typeof backup.size_bytes === 'number' ? size(backup.size_bytes) : backup.size}
+                      {' · '}
+                      {formatDate(serverUtcToIso(backup.created_at), { time: true })}
+                      {backup.node && <>{' · '}{t('settings.backupNode')}{t('work.sep')}{backup.node}</>}
+                    </span>
+                    {backup.sha256 && (
+                      <span className="sf-record-meta sf-record-digest">
+                        {t('settings.backupSha256')}{t('work.sep')}<code className="font-mono">{backup.sha256.slice(0, 12)}</code>
+                        <button
+                          type="button"
+                          className="sf-inline-icon"
+                          aria-label={t('settings.backupCopySha256')}
+                          title={t('settings.backupCopySha256')}
+                          onClick={() => copy(backup.sha256, `sha256:${backup.filename}`)}
+                        >
+                          <Copy size={12} />
+                        </button>
+                        {isCopied(`sha256:${backup.filename}`) && <span>{t('common.copied')}</span>}
+                      </span>
                     )}
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-text-primary truncate">{backup.filename}</p>
-                      <div className="flex gap-4 mt-1">
-                        <p className="text-xs text-text-secondary">{backup.size}</p>
-                        <p className="text-xs text-text-secondary">{backup.created_at}</p>
-                        {backup.node && (
-                          <p className="text-xs text-text-secondary truncate">
-                            {t('settings.backupNode')}: {backup.node}
-                          </p>
-                        )}
-                        {backup.sha256 && (
-                          <p className="text-xs text-text-secondary flex items-center gap-1">
-                            {t('settings.backupSha256')}: <code className="font-mono">{backup.sha256.slice(0, 12)}</code>
-                            <button
-                              type="button"
-                              className="text-text-tertiary hover:text-text-primary"
-                              aria-label={t('settings.backupCopySha256')}
-                              title={t('settings.backupCopySha256')}
-                              onClick={() => copy(backup.sha256, `sha256:${backup.filename}`)}
-                            >
-                              <Copy size={12} />
-                            </button>
-                            {isCopied(`sha256:${backup.filename}`) && <span>{t('common.copied')}</span>}
-                          </p>
-                        )}
-                      </div>
-                    </div>
                   </div>
-                  <div className="flex gap-2 flex-shrink-0">
-                    <Button type="button" size="sm" variant="secondary" onClick={() => handleDownloadBackup(backup.filename)}>
-                      <Download size={14} />
+                  <div className="sf-record-actions">
+                    <Button type="button" variant="secondary" onClick={() => handleDownloadBackup(backup.filename)}
+                      aria-label={t('common.download')} title={t('common.download')}>
+                      <Download size={16} />
                     </Button>
                     {isAdmin && (
-                      <Button type="button" size="sm" variant="danger" onClick={() => handleDeleteBackup(backup.filename)}>
-                        <Trash size={14} />
+                      <Button type="button" variant="danger" onClick={() => handleDeleteBackup(backup.filename)}
+                        aria-label={t('common.delete')} title={t('common.delete')}>
+                        <Trash size={16} />
                       </Button>
                     )}
                   </div>
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
 
             {/* Pagination */}
             {backupMeta.pages > 1 && (

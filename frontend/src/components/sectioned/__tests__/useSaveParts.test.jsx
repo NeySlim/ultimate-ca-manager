@@ -1,17 +1,17 @@
 /**
- * Save parts and the leave guard: changes counted key by key, parts a section keeps
- * registered with the page, and leaving with pending changes asked first, by a link,
- * by the palette (`whenLeaving`) or by closing the tab.
+ * Save parts and the drafts: changes counted key by key, parts a section keeps registered
+ * with the page and their draft kept for the tab, no question when a link leaves the page,
+ * the browser's own question before a reload or a close of the tab.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, Link } from 'react-router-dom'
 import { useState } from 'react'
 
-import { changedKeys, useLeaveGuard, useSavePart, useSavePartsRegistry, SavePartsContext } from '..'
-import { whenLeaving } from '../../../navigation/leaveGuard'
+import { changedKeys, keptPartDraft, useUnloadGuard, useSavePart, useSavePartsRegistry, SavePartsContext } from '..'
+import { dropAllDrafts, keepDraft, readDraft, setDraftOwner, signOutDrafts } from '../draftMemory'
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => { vi.restoreAllMocks(); dropAllDrafts() })
 
 describe('changedKeys', () => {
   it('counts what differs, empty and missing alike, objects by value', () => {
@@ -58,75 +58,72 @@ describe('useSavePart', () => {
   })
 })
 
-function Guarded({ active, ask }) {
-  useLeaveGuard(active, ask)
-  return (
-    <>
-      <Link to="/elsewhere">away</Link>
-      <Link to="/form?tab=b">same page</Link>
-    </>
-  )
+function DraftPart({ count, draft }) {
+  useSavePart('d', { section: 's', count, draft, save: vi.fn(), reset: vi.fn() })
+  return null
 }
 
-const mount = (active, ask) => render(
+describe('useSavePart drafts', () => {
+  it('keeps the draft of a part with changes, and forgets it once nothing is pending', () => {
+    const { rerender } = render(<Host><DraftPart count={1} draft={{ host: 'a' }} /></Host>)
+    expect(keptPartDraft('d')).toEqual({ host: 'a' })
+    rerender(<Host><DraftPart count={0} draft={{ host: 'b' }} /></Host>)
+    expect(keptPartDraft('d')).toBeUndefined()
+  })
+
+  it('leaves a kept draft alone while the part has not loaded', () => {
+    keepDraft('part:d', { host: 'a' })
+    render(<Host><DraftPart count={0} draft={undefined} /></Host>)
+    expect(keptPartDraft('d')).toEqual({ host: 'a' })
+  })
+})
+
+describe('draftMemory', () => {
+  it('drops the drafts on sign-out and when another account signs in', () => {
+    setDraftOwner('alice')
+    keepDraft('k', 1)
+    setDraftOwner('alice')
+    expect(readDraft('k')).toBe(1)
+    setDraftOwner('bob')
+    expect(readDraft('k')).toBeUndefined()
+    keepDraft('k', 2)
+    signOutDrafts()
+    expect(readDraft('k')).toBeUndefined()
+  })
+})
+
+function Guarded({ active }) {
+  useUnloadGuard(active)
+  return <Link to="/elsewhere">away</Link>
+}
+
+const mount = (active) => render(
   <MemoryRouter initialEntries={['/form']}>
     <Routes>
-      <Route path="/form" element={<Guarded active={active} ask={ask} />} />
+      <Route path="/form" element={<Guarded active={active} />} />
       <Route path="/elsewhere" element={<p>arrived</p>} />
     </Routes>
   </MemoryRouter>,
 )
 
-describe('useLeaveGuard', () => {
-  it('asks before a link leaves the page, and stays when refused', async () => {
-    window.history.replaceState(null, '', '/form')
-    const ask = vi.fn().mockResolvedValue(false)
-    mount(true, ask)
+describe('useUnloadGuard', () => {
+  it('lets a link leave the page without a question while changes are pending', async () => {
+    mount(true)
     await act(async () => { fireEvent.click(screen.getByText('away')) })
-    expect(ask).toHaveBeenCalledTimes(1)
-    expect(screen.queryByText('arrived')).toBeNull()
-  })
-
-  it('leaves once agreed', async () => {
-    window.history.replaceState(null, '', '/form')
-    const ask = vi.fn().mockResolvedValue(true)
-    mount(true, ask)
-    await act(async () => { fireEvent.click(screen.getByText('away')) })
-    expect(await screen.findByText('arrived')).toBeInTheDocument()
-  })
-
-  it('lets a link to the same page through without asking', async () => {
-    window.history.replaceState(null, '', '/form')
-    const ask = vi.fn().mockResolvedValue(false)
-    mount(true, ask)
-    await act(async () => { fireEvent.click(screen.getByText('same page')) })
-    expect(ask).not.toHaveBeenCalled()
-  })
-
-  it('asks nothing when nothing is pending', async () => {
-    const ask = vi.fn()
-    mount(false, ask)
-    await act(async () => { fireEvent.click(screen.getByText('away')) })
-    expect(ask).not.toHaveBeenCalled()
     expect(screen.getByText('arrived')).toBeInTheDocument()
   })
 
-  it('holds the palette navigation until agreed, and lets it go at once when inactive', async () => {
-    const ask = vi.fn().mockResolvedValue(false)
-    const { unmount } = mount(true, ask)
-    const go = vi.fn()
-    await act(async () => { whenLeaving(go) })
-    expect(ask).toHaveBeenCalled()
-    expect(go).not.toHaveBeenCalled()
-    unmount()
-    whenLeaving(go)
-    expect(go).toHaveBeenCalledTimes(1)
-  })
-
   it('asks the browser before a reload or a close of the tab', () => {
-    mount(true, vi.fn())
+    mount(true)
     const event = new Event('beforeunload', { cancelable: true })
     window.dispatchEvent(event)
     expect(event.defaultPrevented).toBe(true)
+  })
+
+  it('asks the browser nothing when nothing is pending', () => {
+    mount(false)
+    const event = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
   })
 })

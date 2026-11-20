@@ -1143,11 +1143,11 @@ export const helpContent = {
         title: 'Page layout',
         content: 'Every section is on one page, in a frame of its own; the table of contents on the left lists them by group (on a phone, the Go to section list).',
         items: [
-          { label: 'Save bar', text: 'At the bottom of the page: No changes pending, with the date and the account of the last save when you can read the audit log; once a field changes, the count of changes and their sections, with Undo changes (back to the values loaded) and Save. Save stores every changed section through its usual route' },
-          { label: 'Save in error', text: 'A section whose save fails is marked To correct in the table of contents and names the error in its frame; the other sections are saved and what you typed stays' },
-          { label: 'Own actions', text: 'A test, an import, a generation or a list (SSO providers, webhooks, connections, Windows profiles, backups) keeps its button in its section and acts at once' },
+          { label: 'Save bar', text: 'At the bottom of the page: No changes pending, with the date and the account of the last save of the settings when you can read the audit log (a renewal run or an OAuth consent is not a save); once a field changes, the count of changes and their sections, with Undo changes (back to the values loaded) and Save. Save, or Enter in a field, stores every changed section through its usual route' },
+          { label: 'Save in error', text: 'A port out of 1 to 65535 (SMTP, syslog, ACME public port) is marked on its field and nothing is sent until it is corrected. A section whose save fails is marked To correct in the table of contents and names the error in its frame; the other sections are saved and what you typed stays' },
+          { label: 'Own actions', text: 'A test, an import, a generation or a list (SSO providers, webhooks, connections, Windows profiles, backups) keeps its button in its section and acts at once. The result of a test (SMTP, syslog, renewal) shows beside its button; these tests read the saved values, so save your changes first' },
           { label: 'Links', text: 'A link to /settings?tab=<section> (overview, palette, other pages) opens the page on that section' },
-          { label: 'Leaving', text: 'Leaving the page with changes pending asks first' },
+          { label: 'Leaving', text: 'Leaving the page with changes pending asks nothing: the changes are kept in this tab and come back, still pending, when you return; reloading or closing the tab asks the browser first' },
           { label: 'Change history', text: 'Under the sections, the last saves of the settings as the audit log records them (with read:audit)' },
         ]
       },
@@ -1375,6 +1375,8 @@ export const helpContent = {
         items: [
           { label: 'Own actions', text: 'Edit in the Profile frame opens the name and email, Cancel or Save act at once; Create key opens the key form; there is no save bar' },
           { label: 'Links', text: 'A link to /account?tab=security or /account?tab=api-keys opens the page on that frame' },
+          { label: 'Edit kept', text: 'A profile edit not yet saved is kept in this tab when you leave the page and comes back, still in edit mode, on your return; Cancel forgets it' },
+          { label: 'Preferences', text: 'Close the inspector when navigating: the objects open in the inspector close when you go to another page. The choice is kept in this browser' },
         ],
       },
       {

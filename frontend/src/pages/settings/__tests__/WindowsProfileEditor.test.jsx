@@ -321,7 +321,7 @@ describe('CA pickers', () => {
 })
 
 describe('shared accounts', () => {
-  const field = () => screen.queryByLabelText('xcepWstep.xcepTitle: common.username')
+  const field = () => screen.queryByLabelText('xcepWstep.xcepTitlework.sepcommon.username')
 
   it('shows them for the default profile and sends them', async () => {
     mocks.get.mockResolvedValue({ data: { ...PROFILE, is_default: true } })
@@ -352,7 +352,7 @@ describe('shared accounts', () => {
 
 describe('default profile', () => {
   const box = () => screen.queryByRole('checkbox', { name: /xcepWstep\.makeDefault/ })
-  const account = () => screen.queryByLabelText('xcepWstep.xcepTitle: common.username')
+  const account = () => screen.queryByLabelText('xcepWstep.xcepTitlework.sepcommon.username')
   const noDefault = () => mocks.getSettings.mockResolvedValue({ data: { default_profile: null } })
 
   it('is offered on a new profile while none is the default, with the accounts once checked', async () => {

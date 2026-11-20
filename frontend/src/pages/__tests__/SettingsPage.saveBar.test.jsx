@@ -2,12 +2,12 @@
  * Settings page on the sectioned template: every section on the page, a change counted
  * in the save bar and marked in the table of contents, undo back to what was loaded,
  * one save through today's routes, a failed route named on its section while the others
- * are stored and its input kept, a link to ?tab= landing on its frame, and a question
- * before leaving with changes pending.
+ * are stored and its input kept, a link to ?tab= landing on its frame, and leaving with
+ * changes pending: no question, the draft found again on the return.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter, Link } from 'react-router-dom'
+import { MemoryRouter, Link, Routes, Route } from 'react-router-dom'
 
 vi.mock('../settings/GeneralSection', () => ({
   default: ({ settings, updateSetting }) => (
@@ -18,13 +18,20 @@ vi.mock('../settings/GeneralSection', () => ({
   ),
 }))
 vi.mock('../settings/EmailSection', () => ({
-  default: ({ settings, updateSetting }) => (
-    <input aria-label="smtp-host" value={settings.smtp_host || ''} onChange={(e) => updateSetting('smtp_host', e.target.value)} />
+  default: ({ settings, updateSetting, fieldErrors = {} }) => (
+    <>
+      <input aria-label="smtp-host" value={settings.smtp_host || ''} onChange={(e) => updateSetting('smtp_host', e.target.value)} />
+      <input aria-label="smtp-port" value={settings.smtp_port ?? ''} aria-invalid={fieldErrors.smtp_port ? true : undefined}
+        onChange={(e) => updateSetting('smtp_port', e.target.value === '' ? '' : Number(e.target.value))} />
+      {fieldErrors.smtp_port && <p>{fieldErrors.smtp_port}</p>}
+    </>
   ),
 }))
 vi.mock('../settings/AuditSection', () => ({
-  default: ({ syslogConfig, updateSyslogConfig, updateSetting, settings }) => (
+  default: ({ syslogConfig, updateSyslogConfig, updateSetting, settings, handleTestSyslog, syslogTestResult }) => (
     <>
+      <button type="button" onClick={handleTestSyslog}>test-syslog</button>
+      {syslogTestResult && <p data-testid="syslog-result">{`${syslogTestResult.ok}:${syslogTestResult.text}`}</p>}
       <input aria-label="syslog-host" value={syslogConfig.host || ''} onChange={(e) => updateSyslogConfig('host', e.target.value)} />
       <input aria-label="retention" value={settings.audit_retention_days ?? ''} onChange={(e) => updateSetting('audit_retention_days', e.target.value)} />
     </>
@@ -42,6 +49,8 @@ import { notificationSpies } from './pageRenderingSetup.jsx'
 
 import SettingsPage from '../SettingsPage'
 import { settingsService } from '../../services/settings.service'
+import { auditService } from '../../services'
+import { dropAllDrafts } from '../../components/sectioned/draftMemory'
 
 const renderPage = (entry = '/settings') => render(
   <MemoryRouter initialEntries={[entry]}>
@@ -65,7 +74,7 @@ beforeEach(() => {
   notificationSpies.showConfirm = vi.fn().mockResolvedValue(false)
   window.history.replaceState(null, '', '/settings')
 })
-afterEach(() => vi.clearAllMocks())
+afterEach(() => { vi.clearAllMocks(); dropAllDrafts() })
 
 async function loaded(entry) {
   renderPage(entry)
@@ -130,6 +139,74 @@ describe('SettingsPage: one page, one save bar', () => {
     expect(notificationSpies.showError).toHaveBeenCalledWith('sectioned.saveFailedToast')
   })
 
+  it('sends nothing while a port is out of range, marks the field and focuses it', async () => {
+    await loaded()
+    fireEvent.change(screen.getByLabelText('smtp-port'), { target: { value: '99999' } })
+    fireEvent.change(screen.getByLabelText('system-name'), { target: { value: 'PKI 2' } })
+    await act(async () => { fireEvent.click(saveButton()) })
+    expect(settingsService.updateEmailSettings).not.toHaveBeenCalled()
+    expect(settingsService.updateBulk).not.toHaveBeenCalled()
+    const port = screen.getByLabelText('smtp-port')
+    expect(port).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByText('settings.portOutOfRange')).toBeInTheDocument()
+    expect(document.activeElement).toBe(port)
+    expect(tocLink('settings.tabs.email')).toHaveTextContent('sectioned.flagError')
+    expect(screen.getByRole('status')).toHaveTextContent('sectioned.fieldsToCorrect')
+    // Typing in the field clears its mark; a valid port is then sent
+    fireEvent.change(port, { target: { value: '2525' } })
+    expect(port).not.toHaveAttribute('aria-invalid')
+    await act(async () => { fireEvent.click(saveButton()) })
+    expect(settingsService.updateEmailSettings).toHaveBeenCalledWith(expect.objectContaining({ smtp_port: 2525 }))
+  })
+
+  it('dates the last save from a real save only, not from a renewal run in the same log', async () => {
+    auditService.getLogs = vi.fn().mockResolvedValue({ data: [
+      { id: 3, action: 'auto_renewal_manual_run', resource_name: 'Auto-Renewal', details: 'Manual run: 0 renewed', username: 'bob', timestamp: '2026-11-19T10:00:00Z' },
+      { id: 2, action: 'settings_update', resource_name: 'General Settings', details: 'Updated general settings', username: 'alice', timestamp: '2026-11-18T09:00:00Z' },
+    ] })
+    await loaded()
+    await waitFor(() => expect(bar()).toHaveTextContent('sectioned.lastSavedBy'))
+    const history = screen.getByRole('region', { name: 'settings.historyTitle' })
+    expect(within(history).getByText('General Settings')).toBeInTheDocument()
+    expect(within(history).queryByText('Auto-Renewal')).toBeNull()
+  })
+
+  it('says only that nothing is pending when the log holds no save', async () => {
+    auditService.getLogs = vi.fn().mockResolvedValue({ data: [
+      { id: 3, action: 'auto_renewal_manual_run', resource_name: 'Auto-Renewal', username: 'bob', timestamp: '2026-11-19T10:00:00Z' },
+    ] })
+    await loaded()
+    await waitFor(() => expect(auditService.getLogs).toHaveBeenCalled())
+    await waitFor(() => expect(screen.getByRole('region', { name: 'settings.historyTitle' })).toBeInTheDocument())
+    expect(bar()).toHaveTextContent('sectioned.nothingPending')
+    expect(bar()).not.toHaveTextContent('sectioned.lastSaved')
+  })
+
+  it('saves on Enter in a field, as a form does', async () => {
+    await loaded()
+    const name = screen.getByLabelText('system-name')
+    fireEvent.change(name, { target: { value: 'PKI 2' } })
+    await act(async () => { fireEvent.keyDown(name, { key: 'Enter' }) })
+    expect(settingsService.updateBulk).toHaveBeenCalledWith(expect.objectContaining({ system_name: 'PKI 2' }))
+  })
+
+  it('tests the saved syslog forwarding and keeps the result beside the button', async () => {
+    settingsService.testSyslog = vi.fn().mockResolvedValue({ message: 'sent' })
+    await loaded()
+    await act(async () => { fireEvent.click(screen.getByText('test-syslog')) })
+    expect(settingsService.testSyslog).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('syslog-result')).toHaveTextContent('true:sent')
+  })
+
+  it('says syslog is off instead of testing a forwarding that is not saved on', async () => {
+    settingsService.getSyslogConfig = vi.fn().mockResolvedValue({ data: { enabled: false, host: 'log.example.com', port: 514 } })
+    settingsService.testSyslog = vi.fn()
+    await loaded()
+    await act(async () => { fireEvent.click(screen.getByText('test-syslog')) })
+    expect(settingsService.testSyslog).not.toHaveBeenCalled()
+    expect(screen.getByTestId('syslog-result')).toHaveTextContent('false:settings.syslogTestOff')
+  })
+
   it('lands a link to ?tab= on the frame of that section', async () => {
     const scrolled = []
     Element.prototype.scrollIntoView = vi.fn(function scroll() { scrolled.push(this.id) })
@@ -148,13 +225,33 @@ describe('SettingsPage: one page, one save bar', () => {
     delete Element.prototype.scrollIntoView
   })
 
-  it('asks before a link leaves the page with changes pending, and stays when refused', async () => {
-    await loaded()
+  it('leaves without a question and finds the draft again on the return', async () => {
+    render(
+      <MemoryRouter initialEntries={['/settings']}>
+        <Routes>
+          <Route path="/settings" element={<><Link to="/certificates">elsewhere</Link><SettingsPage /></>} />
+          <Route path="/certificates" element={<Link to="/settings">back</Link>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await screen.findByLabelText('system-name')
+    await waitFor(() => expect(screen.getByLabelText('syslog-host')).toHaveValue('log.example.com'))
     fireEvent.change(screen.getByLabelText('system-name'), { target: { value: 'PKI 2' } })
+    fireEvent.change(screen.getByLabelText('syslog-host'), { target: { value: 'log2.example.com' } })
     await act(async () => { fireEvent.click(screen.getByText('elsewhere')) })
-    expect(notificationSpies.showConfirm).toHaveBeenCalledWith('sectioned.leaveConfirm', expect.anything())
-    expect(screen.getByLabelText('system-name')).toHaveValue('PKI 2')
-  })
+    expect(notificationSpies.showConfirm).not.toHaveBeenCalled()
+    await act(async () => { fireEvent.click(await screen.findByText('back')) })
+    await waitFor(() => expect(screen.getByLabelText('system-name')).toHaveValue('PKI 2'))
+    await waitFor(() => expect(screen.getByLabelText('syslog-host')).toHaveValue('log2.example.com'))
+    expect(bar()).toHaveTextContent('sectioned.pendingTitle')
+    expect(tocLink('settings.tabs.general')).toHaveTextContent('sectioned.flagModified')
+    // Undo forgets the draft: the next visit shows what the server holds
+    fireEvent.click(undoButton())
+    await act(async () => { fireEvent.click(screen.getByText('elsewhere')) })
+    await act(async () => { fireEvent.click(await screen.findByText('back')) })
+    await waitFor(() => expect(screen.getByLabelText('syslog-host')).toHaveValue('log.example.com'))
+    expect(screen.getByLabelText('system-name')).toHaveValue('PKI')
+  }, 20000)
 
   it('lets a link go without asking when nothing is pending', async () => {
     await loaded()

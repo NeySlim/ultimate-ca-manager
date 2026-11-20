@@ -159,3 +159,24 @@ describe('relativeShort: the short expiry of a list', () => {
     expect(words.join(' ')).not.toMatch(/time\.short|Expired|\bmo\b/)
   })
 })
+
+describe('relativeParts with minutes', () => {
+  it('counts minutes under one hour, one at least, and hours from one hour on', () => {
+    expect(relativeParts(at(-56 * 60000), { now: NOW, mode: 'event', minutes: true })).toEqual({ key: 'time.minutesAgo', count: 56 })
+    expect(relativeParts(at(-10000), { now: NOW, mode: 'event', minutes: true })).toEqual({ key: 'time.minutesAgo', count: 1 })
+    expect(relativeParts(at(5 * 60000), { now: NOW, minutes: true })).toEqual({ key: 'time.inMinutes', count: 5 })
+    expect(relativeParts(at(-HOUR), { now: NOW, mode: 'event', minutes: true })).toEqual({ key: 'time.hoursAgo', count: 1 })
+  })
+
+  it('keeps an overdue date overdue in due mode', () => {
+    expect(relativeParts(at(-5 * 60000), { now: NOW, minutes: true })).toEqual({ key: 'time.overdueDays', count: 1 })
+  })
+
+  it('has the minute forms in English, French, Russian and Chinese', async () => {
+    const i18n = i18next.createInstance()
+    await i18n.init({ lng: 'fr', resources: { fr: { translation: fr }, en: { translation: en }, ru: { translation: ru }, zh: { translation: zh } } })
+    expect(i18n.t('time.compact.minutesAgo', { count: 56 })).toBe('il y a 56 min')
+    expect(i18n.t('time.compact.inMinutes', { count: 5 })).toBe('dans 5 min')
+    for (const lng of ['en', 'ru', 'zh']) expect(i18n.t('time.compact.minutesAgo', { lng, count: 3 })).not.toMatch(/time\./)
+  })
+})

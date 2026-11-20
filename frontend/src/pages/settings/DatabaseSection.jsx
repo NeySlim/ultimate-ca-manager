@@ -50,7 +50,7 @@ export default function DatabaseSection({ dbStats, handleOptimizeDb, handleInteg
         </div>
       </FormGroup>
 
-      <FormGroup title={t('settings.dangerZone')} className="mt-4">
+      <FormGroup title={t('settings.dangerZone')}>
         <div className="p-4 status-danger-bg status-danger-border border rounded-lg">
           <h4 className="text-sm font-semibold text-status-danger mb-2">⚠️ {t('settings.databaseReset')}</h4>
           <p className="text-xs text-text-secondary mb-3">

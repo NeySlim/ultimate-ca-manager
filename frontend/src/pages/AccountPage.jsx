@@ -2,22 +2,22 @@
  * Account Page - User Profile & Security Settings
  * Uses DetailCard design system like SettingsPage
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  User, Key, FloppyDisk, Fingerprint, Certificate,
+  User, Key, FloppyDisk, Certificate,
   PencilSimple, Trash, Plus, Warning, ShieldCheck, Download, Copy, X
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
   Button, Input, Select, Badge, Modal, FormModal, HelpCard, ExperimentalBadge,
-  DetailGrid, DetailField, ListButton,
+  ListButton,
   LoadingSpinner, ExportModal
 } from '../components'
 import { accountService, casService, userCertificatesService } from '../services'
 import { hiddenFromIssuance, listedForIssuance, pickerCas, unlistedPickerCas } from '../lib/caSelection'
 import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
-import { useAuth, useNotification, useMobile } from '../contexts'
+import { useAuth, useNotification, useMobile, useInspector } from '../contexts'
 import { useClipboard, usePermission } from '../hooks'
 import { formatDate , downloadBlob} from '../lib/utils'
 import { canExportPrivateKey } from '../lib/exportPermissions'
@@ -25,7 +25,13 @@ import { downloadExport } from '../lib/exportDownload'
 import { reportSilentFailure } from '../lib/silentFailure'
 import { localOnlyRevocationWarning } from '../lib/revocationOutcome'
 import { apiKeyScopePermissions } from '../lib/apiKeyScopes'
-import { FormLayout, SectionToc, SectionJump, FormSection, FormGroup, useSectionParam } from '../components/sectioned'
+import {
+  FormLayout, SectionToc, SectionJump, FormSection, FormGroup, useSectionParam, keepDraft, readDraft, useUnloadGuard,
+} from '../components/sectioned'
+import { ToggleSwitch } from '../components/ui/ToggleSwitch'
+
+// Profile edit left pending, kept for the tab (components/sectioned/draftMemory)
+const PROFILE_DRAFT = 'account:profile'
 import LanguageSelector from '../components/ui/LanguageSelector'
 
 export default function AccountPage() {
@@ -35,6 +41,7 @@ export default function AccountPage() {
   const { showSuccess, showError, showWarning, showConfirm, showPrompt } = useNotification()
   const { copy } = useClipboard()
   const { hasPermission } = usePermission()
+  const { closeOnNav, toggleCloseOnNav } = useInspector()
 
   // State
   const [loading, setLoading] = useState(true)
@@ -44,6 +51,7 @@ export default function AccountPage() {
   const [accountData, setAccountData] = useState({})
   const [editMode, setEditMode] = useState(false)
   const [formData, setFormData] = useState({ full_name: '', email: '' })
+  const keptProfile = useRef(readDraft(PROFILE_DRAFT))
   
   // Security state
   const [apiKeys, setApiKeys] = useState([])
@@ -128,7 +136,11 @@ export default function AccountPage() {
       const response = await accountService.getProfile()
       const data = response.data || response
       setAccountData(data)
-      setFormData({ full_name: data.full_name || '', email: data.email || '' })
+      // An edit left pending on this tab comes back, still in edit mode, once
+      const kept = keptProfile.current
+      keptProfile.current = null
+      setFormData(kept || { full_name: data.full_name || '', email: data.email || '' })
+      if (kept) setEditMode(true)
     } catch (error) {
       showError(error.message || t('messages.errors.loadFailed.generic'))
     }
@@ -521,12 +533,24 @@ export default function AccountPage() {
     }
   }
 
+  // An edit with changes is kept for the return to the page; a reload or a close asks the browser
+  const profileChanged = editMode && (formData.full_name !== (accountData.full_name || '')
+    || formData.email !== (accountData.email || ''))
+  useUnloadGuard(profileChanged)
+  useEffect(() => {
+    if (!loading) keepDraft(PROFILE_DRAFT, profileChanged ? formData : null)
+  }, [loading, profileChanged, formData])
+  const cancelProfileEdit = () => {
+    setFormData({ full_name: accountData.full_name || '', email: accountData.email || '' })
+    setEditMode(false)
+  }
+
   // ============ RENDER TAB CONTENT ============
 
   // Editing the profile is its own action: Edit, then Cancel or Save in the frame heading
   const profileActions = editMode ? (
     <>
-      <ListButton onClick={() => setEditMode(false)}>{t('common.cancel')}</ListButton>
+      <ListButton onClick={cancelProfileEdit}>{t('common.cancel')}</ListButton>
       <ListButton primary icon={FloppyDisk} onClick={handleSaveProfile} disabled={saving}>
         {saving ? t('common.saving') : t('common.save')}
       </ListButton>
@@ -554,19 +578,17 @@ export default function AccountPage() {
             />
           </div>
         ) : (
-          <DetailGrid>
-            <DetailField label={t('common.username')} value={accountData.username || '—'} />
-            <DetailField label={t('account.fullName')} value={accountData.full_name || accountData.username || '—'} />
-            <DetailField label={t('common.email')} value={accountData.email || '—'} />
-            <DetailField 
-              label={t('common.role')} 
-              value={
-                <Badge variant={accountData.role === 'admin' ? 'primary' : 'secondary'}>
-                  {accountData.role || t('common.user')}
-                </Badge>
-              } 
-            />
-          </DetailGrid>
+          <dl className="sf-props">
+            <dt>{t('common.username')}</dt><dd>{accountData.username || '—'}</dd>
+            <dt>{t('account.fullName')}</dt><dd>{accountData.full_name || accountData.username || '—'}</dd>
+            <dt>{t('common.email')}</dt><dd>{accountData.email || '—'}</dd>
+            <dt>{t('common.role')}</dt>
+            <dd>
+              <Badge variant={accountData.role === 'admin' ? 'primary' : 'secondary'}>
+                {accountData.role || t('common.user')}
+              </Badge>
+            </dd>
+          </dl>
         )}
       </FormGroup>
 
@@ -574,30 +596,32 @@ export default function AccountPage() {
       <FormGroup title={t('settings.language')}>
         <LanguageSelector />
       </FormGroup>
+
+      {/* Preferences of this browser; the inspector reads this one when the page changes */}
+      <FormGroup title={t('account.preferences')}>
+        <ToggleSwitch
+          checked={closeOnNav}
+          onChange={(on) => { if (on !== closeOnNav) toggleCloseOnNav() }}
+          label={t('account.closeInspectorOnNav')}
+          description={t('account.closeInspectorOnNavHint')}
+        />
+      </FormGroup>
       
       <FormGroup title={t('account.accountActivity')}>
-        <DetailGrid>
-          <DetailField 
-            label={t('account.accountCreated')} 
-            value={accountData.created_at ? formatDate(accountData.created_at) : '—'} 
-          />
-          <DetailField 
-            label={t('common.lastLogin')} 
-            value={accountData.last_login ? formatDate(accountData.last_login, true) : '—'} 
-          />
-          <DetailField 
-            label={t('account.totalLogins')} 
-            value={accountData.login_count || 0} 
-          />
-          <DetailField 
-            label={t('common.status')} 
-            value={
-              <Badge variant={accountData.active ? 'success' : 'danger'}>
-                {accountData.active ? t('common.active') : t('common.inactive')}
-              </Badge>
-            } 
-          />
-        </DetailGrid>
+        <dl className="sf-props">
+          <dt>{t('account.accountCreated')}</dt>
+          <dd>{accountData.created_at ? formatDate(accountData.created_at) : '—'}</dd>
+          <dt>{t('common.lastLogin')}</dt>
+          <dd>{accountData.last_login ? formatDate(accountData.last_login, true) : '—'}</dd>
+          <dt>{t('account.totalLogins')}</dt>
+          <dd>{accountData.login_count || 0}</dd>
+          <dt>{t('common.status')}</dt>
+          <dd>
+            <Badge variant={accountData.active ? 'success' : 'danger'}>
+              {accountData.active ? t('common.active') : t('common.inactive')}
+            </Badge>
+          </dd>
+        </dl>
       </FormGroup>
     </>
   )
@@ -606,63 +630,71 @@ export default function AccountPage() {
     <>
       {/* Password */}
       <FormGroup title={t('common.password')}>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-text-primary">{t('account.changeYourPassword')}</p>
-            <p className="text-xs text-text-tertiary mt-0.5">
-              {t('account.lastChanged')}: {accountData.password_changed_at 
-                ? formatDate(accountData.password_changed_at)
-                : t('common.never')}
-            </p>
-          </div>
-          <Button type="button" size="sm" onClick={() => setShowPasswordModal(true)}>
-            {t('common.changePassword')}
-          </Button>
-        </div>
+        <ul className="sf-records">
+          <li>
+            <div className="sf-record-main">
+              <strong>{t('account.changeYourPassword')}</strong>
+              <span className="sf-record-meta">
+                {t('account.lastChanged')}{t('work.sep')}{accountData.password_changed_at
+                  ? formatDate(accountData.password_changed_at)
+                  : t('common.never')}
+              </span>
+            </div>
+            <div className="sf-record-actions">
+              <Button type="button" variant="secondary" onClick={() => setShowPasswordModal(true)}>
+                {t('common.changePassword')}
+              </Button>
+            </div>
+          </li>
+        </ul>
       </FormGroup>
 
       {/* 2FA */}
       <FormGroup title={t('common.twoFactorAuth')}>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-text-primary">{t('account.authenticatorApp')}</p>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge variant={accountData.two_factor_enabled ? 'success' : 'secondary'}>
-                {accountData.two_factor_enabled ? t('common.enabled') : t('common.disabled')}
-              </Badge>
+        <ul className="sf-records">
+          <li>
+            <div className="sf-record-main">
+              <span className="sf-record-title">
+                <strong>{t('account.authenticatorApp')}</strong>
+                <Badge variant={accountData.two_factor_enabled ? 'success' : 'secondary'}>
+                  {accountData.two_factor_enabled ? t('common.enabled') : t('common.disabled')}
+                </Badge>
+              </span>
             </div>
-          </div>
-          <Button 
-            size="sm" 
-            variant={accountData.two_factor_enabled ? 'danger' : 'primary'} 
-            onClick={handleToggle2FA}
-          >
-            {accountData.two_factor_enabled ? t('common.disable2FA') : t('common.enable2FA')}
-          </Button>
-        </div>
-        <div className="flex items-center justify-between pt-3 mt-3 border-t border-border">
-          <div>
-            <p className="text-sm text-text-primary">{t('account.keyAsSecondFactor')}</p>
-            <p className="text-xs text-text-tertiary mt-0.5">
-              {hasEnabledKey ? t('account.keyAsSecondFactorHint') : t('account.keyAsSecondFactorNoKey')}
-            </p>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge variant={accountData.webauthn_2fa ? 'success' : 'secondary'}>
-                {accountData.webauthn_2fa ? t('common.enabled') : t('common.disabled')}
-              </Badge>
+            <div className="sf-record-actions">
+              <Button
+                variant={accountData.two_factor_enabled ? 'danger' : 'secondary'}
+                onClick={handleToggle2FA}
+              >
+                {accountData.two_factor_enabled ? t('common.disable2FA') : t('common.enable2FA')}
+              </Button>
             </div>
-          </div>
-          <Button
-            size="sm"
-            variant={accountData.webauthn_2fa ? 'danger' : 'primary'}
-            disabled={!accountData.webauthn_2fa && !hasEnabledKey}
-            onClick={handleToggleKey2FA}
-          >
-            {accountData.webauthn_2fa ? t('account.turnOffKey2fa') : t('account.turnOnKey2fa')}
-          </Button>
-        </div>
-        <p className="text-xs text-text-secondary pt-3 mt-3 border-t border-border">
-          {t('account.activeSecondFactors')}: {activeFactors.length
+          </li>
+          <li>
+            <div className="sf-record-main">
+              <span className="sf-record-title">
+                <strong>{t('account.keyAsSecondFactor')}</strong>
+                <Badge variant={accountData.webauthn_2fa ? 'success' : 'secondary'}>
+                  {accountData.webauthn_2fa ? t('common.enabled') : t('common.disabled')}
+                </Badge>
+              </span>
+              <span className="sf-record-meta">
+                {hasEnabledKey ? t('account.keyAsSecondFactorHint') : t('account.keyAsSecondFactorNoKey')}
+              </span>
+            </div>
+            <div className="sf-record-actions">
+              <Button
+                variant={accountData.webauthn_2fa ? 'danger' : 'secondary'}
+                disabled={!accountData.webauthn_2fa && !hasEnabledKey}
+                onClick={handleToggleKey2FA}
+              >
+                {accountData.webauthn_2fa ? t('account.turnOffKey2fa') : t('account.turnOnKey2fa')}
+              </Button>
+            </div>
+          </li>
+        </ul>
+        <p className="sf-hint sf-under">
+          {t('account.activeSecondFactors')}{t('work.sep')}{activeFactors.length
             ? activeFactors.map(m => (m === 'totp' ? t('account.authenticatorApp') : t('account.securityKey'))).join(', ')
             : t('account.noSecondFactor')}
           {accountData.two_factor_enforced && ` (${t('account.twoFactorEnforced')})`}
@@ -674,40 +706,33 @@ export default function AccountPage() {
         title={t('account.securityKeys')}
         subtitle={t('account.webauthnDescription')}
         actions={
-          <Button type="button" size="sm" onClick={() => setShowWebAuthnModal(true)}>
-            <Plus size={14} className="mr-1" />
+          <Button type="button" variant="secondary" onClick={() => setShowWebAuthnModal(true)}>
+            <Plus size={16} />
             {t('account.addKey')}
           </Button>
         }
       >
         {webauthnCredentials.length === 0 ? (
-          <div className="p-4 bg-tertiary-50 border border-border rounded-lg text-center">
-            <Fingerprint size={28} className="mx-auto mb-2 text-text-tertiary" />
-            <p className="text-sm text-text-secondary">{t('account.noSecurityKeys')}</p>
-          </div>
+          <p className="sf-records-empty">{t('account.noSecurityKeys')}</p>
         ) : (
-          <div className="space-y-2">
+          <ul className="sf-records">
             {webauthnCredentials.map(cred => (
-              <div 
-                key={cred.id} 
-                className="flex items-center justify-between p-3 bg-tertiary-50 border border-border rounded-lg"
-              >
-                <div className="flex items-center gap-3">
-                  <Fingerprint size={20} className="text-accent-primary" />
-                  <div>
-                    <p className="text-sm font-medium text-text-primary">{cred.name || t('account.securityKey')}</p>
-                    <p className="text-xs text-text-tertiary">
-                      {t('account.added')} {formatDate(cred.created_at)}
-                      {cred.last_used_at && ` • ${t('common.used')} ${formatDate(cred.last_used_at)}`}
-                    </p>
-                  </div>
+              <li key={cred.id}>
+                <div className="sf-record-main">
+                  <strong>{cred.name || t('account.securityKey')}</strong>
+                  <span className="sf-record-meta">
+                    {t('account.added')} {formatDate(cred.created_at)}
+                    {cred.last_used_at && ` · ${t('common.used')} ${formatDate(cred.last_used_at)}`}
+                  </span>
                 </div>
-                <Button type="button" size="sm" variant="ghost" onClick={() => handleDeleteWebAuthn(cred.id)} aria-label={t('common.delete')}>
-                  <Trash size={16} className="text-status-danger" />
-                </Button>
-              </div>
+                <div className="sf-record-actions">
+                  <Button type="button" variant="danger" onClick={() => handleDeleteWebAuthn(cred.id)} aria-label={t('common.delete')} title={t('common.delete')}>
+                    <Trash size={16} />
+                  </Button>
+                </div>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </FormGroup>
 
@@ -716,52 +741,43 @@ export default function AccountPage() {
         title={t('account.clientCertificates')}
         badge={<ExperimentalBadge />}
         actions={
-          <Button type="button" size="sm" onClick={() => setShowMTLSModal(true)}>
-            <Plus size={14} className="mr-1" />
+          <Button type="button" variant="secondary" onClick={() => setShowMTLSModal(true)}>
+            <Plus size={16} />
             {t('account.addCertificate')}
           </Button>
         }
       >
-        <p className="text-sm text-text-secondary mb-3">
-          {t('account.useMTLSCerts')}
-        </p>
-        
+        <p className="sf-hint sf-records-lead">{t('account.useMTLSCerts')}</p>
+
         {mtlsCertificates.length === 0 ? (
-          <div className="p-4 bg-tertiary-50 border border-border rounded-lg text-center">
-            <Certificate size={28} className="mx-auto mb-2 text-text-tertiary" />
-            <p className="text-sm text-text-secondary">{t('account.noCertificatesEnrolled')}</p>
-          </div>
+          <p className="sf-records-empty">{t('account.noCertificatesEnrolled')}</p>
         ) : (
-          <div className="space-y-2">
+          <ul className="sf-records">
             {mtlsCertificates.map(cert => (
-              <div 
-                key={cert.id} 
-                className="flex items-center justify-between p-3 bg-tertiary-50 border border-border rounded-lg"
-              >
-                <div className="flex items-center gap-3">
-                  <Certificate size={20} className="text-accent-primary" />
-                  <div>
-                    <p className="text-sm font-medium text-text-primary">{cert.name || cert.cert_subject}</p>
-                    <p className="text-xs text-text-tertiary">
-                      {t('common.expires')} {formatDate(cert.valid_until)}
-                      {cert.last_used_at && ` • ${t('common.used')} ${formatDate(cert.last_used_at)}`}
-                    </p>
-                  </div>
+              <li key={cert.id}>
+                <div className="sf-record-main">
+                  <span className="sf-record-title">
+                    <strong>{cert.name || cert.cert_subject}</strong>
+                    <Badge variant={cert.enabled ? 'success' : 'warning'} size="sm">
+                      {cert.enabled ? t('common.active') : t('common.disabled')}
+                    </Badge>
+                  </span>
+                  <span className="sf-record-meta">
+                    {t('common.expires')} {formatDate(cert.valid_until)}
+                    {cert.last_used_at && ` · ${t('common.used')} ${formatDate(cert.last_used_at)}`}
+                  </span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Badge variant={cert.enabled ? 'success' : 'warning'} size="sm">
-                    {cert.enabled ? t('common.active') : t('common.disabled')}
-                  </Badge>
-                  <Button type="button" size="sm" variant="ghost" aria-label={t('common.export')} onClick={() => setExportCert({ id: cert.id, name: cert.name || cert.cert_subject, hasPrivateKey: true, keyAlgorithm: cert.key_algorithm })}>
-                    <Download size={16} className="text-accent-primary" />
+                <div className="sf-record-actions">
+                  <Button type="button" variant="secondary" aria-label={t('common.export')} title={t('common.export')} onClick={() => setExportCert({ id: cert.id, name: cert.name || cert.cert_subject, hasPrivateKey: true, keyAlgorithm: cert.key_algorithm })}>
+                    <Download size={16} />
                   </Button>
-                  <Button type="button" size="sm" variant="ghost" onClick={() => handleDeleteMTLS(cert.id)} aria-label={t('common.delete')}>
-                    <Trash size={16} className="text-status-danger" />
+                  <Button type="button" variant="danger" onClick={() => handleDeleteMTLS(cert.id)} aria-label={t('common.delete')} title={t('common.delete')}>
+                    <Trash size={16} />
                   </Button>
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
 
       </FormGroup>
@@ -782,72 +798,66 @@ export default function AccountPage() {
 
       <FormGroup title={t('account.yourAPIKeys')}>
         {apiKeys.length === 0 ? (
-          <div className="p-4 bg-tertiary-50 border border-border rounded-lg text-center">
-            <Key size={28} className="mx-auto mb-2 text-text-tertiary" />
-            <p className="text-sm text-text-secondary">{t('account.noAPIKeys')}</p>
-            <p className="text-xs text-text-tertiary mt-1">{t('account.createKeyToAccess')}</p>
-          </div>
+          <p className="sf-records-empty">
+            {t('account.noAPIKeys')}
+            <span className="block">{t('account.createKeyToAccess')}</span>
+          </p>
         ) : (
-          <div className="space-y-2">
+          <ul className="sf-records">
             {apiKeys.map(key => {
               const effectivelyActive = key.is_active && !key.is_expired
               return (
-              <div
-                key={key.id}
-                className="flex items-center justify-between p-3 bg-tertiary-50 border border-border rounded-lg"
-              >
-                <div className="flex items-center gap-3">
-                  <Key size={20} className={effectivelyActive ? 'text-accent-primary' : 'text-text-tertiary'} />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-text-primary">{key.name}</p>
-                      {!key.is_active && <Badge variant="secondary" size="sm">{t('common.revoked')}</Badge>}
-                      {key.is_active && key.is_expired && <Badge variant="secondary" size="sm">{t('common.expired')}</Badge>}
-                    </div>
-                    <p className="text-xs text-text-tertiary font-mono inline-flex items-center gap-1">
-                      {key.key_prefix ? (
-                        <>
-                          {key.key_prefix}…
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); copy(key.key_prefix); showSuccess(t('common.copied')) }}
-                            className="inline-flex items-center p-0.5 rounded hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-colors"
-                            aria-label={t('common.copy')}
-                          >
-                            <Copy size={12} />
-                          </button>
-                        </>
-                      ) : (
-                        <span className="italic">{t('account.apiKeyPrefixUnavailable')}</span>
-                      )}
-                    </p>
-                    {key.permissions && (
-                      <p className="text-xs text-text-tertiary">
-                        <span className="font-mono">
-                          {Array.isArray(key.permissions) ? key.permissions.join(', ') : key.permissions}
-                        </span>
-                      </p>
+              <li key={key.id}>
+                <div className="sf-record-main">
+                  <span className="sf-record-title">
+                    <strong>{key.name}</strong>
+                    {!key.is_active && <Badge variant="secondary" size="sm">{t('common.revoked')}</Badge>}
+                    {key.is_active && key.is_expired && <Badge variant="secondary" size="sm">{t('common.expired')}</Badge>}
+                  </span>
+                  <span className="sf-record-meta sf-record-digest">
+                    {key.key_prefix ? (
+                      <>
+                        <code className="font-mono">{key.key_prefix}…</code>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); copy(key.key_prefix); showSuccess(t('common.copied')) }}
+                          className="sf-inline-icon"
+                          aria-label={t('common.copy')}
+                          title={t('common.copy')}
+                        >
+                          <Copy size={12} />
+                        </button>
+                      </>
+                    ) : (
+                      <span className="italic">{t('account.apiKeyPrefixUnavailable')}</span>
                     )}
-                    <div className="grid grid-cols-3 gap-2 text-xs text-text-tertiary mt-0.5">
-                      <span className="text-left">{t('common.created')}: {formatDate(key.created_at)}</span>
-                      <span className="text-center">{t('account.apiKeyLastUsed')}: {key.last_used_at ? formatDate(key.last_used_at) : t('common.never')}</span>
-                      <span className="text-right">{key.expires_at ? `${t('common.expires')}: ${formatDate(key.expires_at)}` : ''}</span>
-                    </div>
-                  </div>
+                  </span>
+                  {key.permissions && (
+                    <span className="sf-record-meta">
+                      {Array.isArray(key.permissions) ? key.permissions.join(', ') : key.permissions}
+                    </span>
+                  )}
+                  <span className="sf-record-meta">
+                    {t('common.created')}{t('work.sep')}{formatDate(key.created_at)}
+                    {' · '}{t('account.apiKeyLastUsed')}{t('work.sep')}{key.last_used_at ? formatDate(key.last_used_at) : t('common.never')}
+                    {key.expires_at && <>{' · '}{t('common.expires')}{t('work.sep')}{formatDate(key.expires_at)}</>}
+                  </span>
                 </div>
-                {effectivelyActive ? (
-                  <Button type="button" size="sm" variant="ghost" onClick={() => handleRevokeApiKey(key.id)} aria-label={t('common.revoke')}>
-                    <X size={16} className="text-status-danger" />
-                  </Button>
-                ) : (
-                  <Button type="button" size="sm" variant="ghost" onClick={() => handleDeleteApiKey(key.id)} aria-label={t('common.delete')}>
-                    <Trash size={16} className="text-status-danger" />
-                  </Button>
-                )}
-              </div>
+                <div className="sf-record-actions">
+                  {effectivelyActive ? (
+                    <Button type="button" variant="danger" onClick={() => handleRevokeApiKey(key.id)} aria-label={t('common.revoke')} title={t('common.revoke')}>
+                      <X size={16} />
+                    </Button>
+                  ) : (
+                    <Button type="button" variant="danger" onClick={() => handleDeleteApiKey(key.id)} aria-label={t('common.delete')} title={t('common.delete')}>
+                      <Trash size={16} />
+                    </Button>
+                  )}
+                </div>
+              </li>
               )
             })}
-          </div>
+          </ul>
         )}
       </FormGroup>
     </>
