@@ -362,7 +362,7 @@
 :root[data-theme="aurore"][data-mode="light"] .wk-panel {
   background:
     linear-gradient(var(--panel), var(--panel)) padding-box,
-    linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 38%, transparent), color-mix(in srgb, var(--grad-b) 24%, transparent) 60%, color-mix(in srgb, var(--text) 8%, transparent)) border-box;
+    linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 38%, transparent), var(--frame-b) 60%, color-mix(in srgb, var(--text) 8%, transparent)) border-box;
   background-color: var(--panel);
-  box-shadow: inset 0 1px 0 var(--paper), 0 18px 40px -28px color-mix(in srgb, var(--text) 35%, transparent);
+  box-shadow: inset 0 1px 0 var(--paper), 0 18px 40px -28px var(--frame-shade);
 }

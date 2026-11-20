@@ -269,8 +269,8 @@ textarea.ui-control { min-height: 80px; resize: vertical; }
 :root[data-theme="aurore"][data-mode="light"] .ui-panel:not(.is-interactive):not([class*="is-accent-"]) {
   background:
     linear-gradient(var(--panel), var(--panel)) padding-box,
-    linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 38%, transparent), color-mix(in srgb, var(--grad-b) 24%, transparent) 60%, color-mix(in srgb, var(--text) 8%, transparent)) border-box;
-  box-shadow: inset 0 1px 0 var(--paper), 0 18px 40px -28px color-mix(in srgb, var(--text) 35%, transparent);
+    linear-gradient(135deg, color-mix(in srgb, var(--grad-a) 38%, transparent), var(--frame-b) 60%, color-mix(in srgb, var(--text) 8%, transparent)) border-box;
+  box-shadow: inset 0 1px 0 var(--paper), 0 18px 40px -28px var(--frame-shade);
 }
 /* Glass on the floating layers: dialogs, menus */
 :root[data-theme="aurore"] :is(.ui-modal.lv-dialog, .ui-pop) {

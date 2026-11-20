@@ -28,6 +28,8 @@
     "glow-rose": "transparent",
     "glow-b": "transparent",
     "halo": "transparent",
+    "frame-b": "transparent",
+    "frame-shade": "transparent",
     "text-tertiary": "#a9b9cd"
   },
   "atelier-light": {
@@ -59,6 +61,8 @@
     "glow-rose": "transparent",
     "glow-b": "transparent",
     "halo": "transparent",
+    "frame-b": "transparent",
+    "frame-shade": "transparent",
     "text-tertiary": "#51647c"
   },
   "aurore-dark": {
@@ -90,6 +94,8 @@
     "glow-rose": "rgba(236, 72, 153, 0.10)",
     "glow-b": "rgba(95, 167, 220, 0.22)",
     "halo": "rgba(107, 120, 224, 0.25)",
+    "frame-b": "rgba(95, 167, 220, 0.25)",
+    "frame-shade": "rgba(0, 0, 0, 0.80)",
     "text-tertiary": "#a3acc9"
   },
   "aurore-light": {
@@ -121,6 +127,8 @@
     "glow-rose": "rgba(219, 39, 119, 0.06)",
     "glow-b": "rgba(34, 170, 220, 0.14)",
     "halo": "rgba(107, 120, 224, 0.25)",
+    "frame-b": "rgba(34, 170, 220, 0.24)",
+    "frame-shade": "rgba(40, 50, 120, 0.35)",
     "text-tertiary": "#4a5372"
   },
   "purple-dark": {
@@ -152,6 +160,8 @@
     "glow-rose": "transparent",
     "glow-b": "transparent",
     "halo": "transparent",
+    "frame-b": "transparent",
+    "frame-shade": "transparent",
     "text-tertiary": "#d4c5e9"
   },
   "purple-light": {
@@ -183,6 +193,8 @@
     "glow-rose": "transparent",
     "glow-b": "transparent",
     "halo": "transparent",
+    "frame-b": "transparent",
+    "frame-shade": "transparent",
     "text-tertiary": "#6b21a8"
   },
   "sunset-dark": {
@@ -214,6 +226,8 @@
     "glow-rose": "transparent",
     "glow-b": "transparent",
     "halo": "transparent",
+    "frame-b": "transparent",
+    "frame-shade": "transparent",
     "text-tertiary": "#d9a688"
   },
   "sunset-light": {
@@ -245,6 +259,8 @@
     "glow-rose": "transparent",
     "glow-b": "transparent",
     "halo": "transparent",
+    "frame-b": "transparent",
+    "frame-shade": "transparent",
     "text-tertiary": "#9a3412"
   }
 }
