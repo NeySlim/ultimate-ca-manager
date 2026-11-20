@@ -3,8 +3,9 @@
  * their schedule and next run. The scheduler (services/report_service.py) runs on
  * UTC time: a weekly report on day_of_week (0 is Monday), a monthly one on day_of_month.
  */
-import { Clock, ChartBar } from '@phosphor-icons/react'
+import { ClockIcon, ChartIcon } from '../../components/work/workIcons'
 import { reportsService } from '../../services'
+import { getAppTimezone } from '../../stores/timezoneStore'
 
 export const DATA_REPORTS = ['certificate_inventory', 'expiring_certificates', 'ca_hierarchy', 'audit_summary', 'compliance_status', 'revoked_certificates']
 export const PDF_REPORTS = ['pdf_executive', 'pdf_certificate_inventory', 'pdf_compliance', 'pdf_ca_overview', 'pdf_security_audit']
@@ -14,8 +15,9 @@ export const DEFAULT_SCHEDULE = { enabled: false, frequency: 'weekly', time: '08
 const HOUR = 3600000
 export const isPdf = (key) => String(key || '').startsWith('pdf_')
 
+// A PDF template says so in its name: two reports must not read the same ("Certificate inventory")
 export function reportName(key, t) {
-  if (isPdf(key)) return t(`reports.pdf.template.${key.slice(4)}.name`)
+  if (isPdf(key)) return t('reports.work.pdfName', { name: t(`reports.pdf.template.${key.slice(4)}.name`) })
   return t(`reports.types.${key}.name`)
 }
 export function reportDescription(key, t) {
@@ -55,21 +57,76 @@ export function reportGroups(entries, t, now = Date.now()) {
   const runs = entries.map((e) => ({ ...e, next: nextRun(e.schedule, new Date(now)) })).filter((e) => e.next)
     .sort((a, b) => a.next - b.next)
   return [
-    { id: 'today', label: t('reports.work.groups.today'), icon: Clock, tone: '', test: (e) => e.next - now < 24 * HOUR },
-    { id: 'later', label: t('reports.work.groups.later'), icon: ChartBar, tone: '', test: (e) => e.next - now >= 24 * HOUR },
+    { id: 'today', label: t('reports.work.groups.today'), icon: ClockIcon, tone: '', test: (e) => e.next - now < 24 * HOUR },
+    { id: 'later', label: t('reports.work.groups.later'), icon: ChartIcon, tone: '', test: (e) => e.next - now >= 24 * HOUR },
   ].map(({ test, ...g }) => ({ ...g, entries: runs.filter(test) }))
 }
 
-/** "Weekly · 08:00 UTC" */
-export const frequencyPill = (schedule, t) => t(`reports.work.freq.${schedule.frequency}`, { time: schedule.time })
+const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 
-/** "Weekly, on Monday, at 08:00 UTC" */
-export function frequencyLong(schedule, t) {
-  const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+/** Wall clock of `date` in `tz`: hour, minute, weekday (0 is Monday), day of the month, offset from UTC in minutes. */
+export function wallClock(date, tz) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', weekday: 'short',
+  }).formatToParts(date).map((p) => [p.type, p.value]))
+  const hour = Number(parts.hour) % 24
+  const wall = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), hour, Number(parts.minute))
+  return {
+    hour,
+    minute: Number(parts.minute),
+    weekday: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(parts.weekday),
+    day: Number(parts.day),
+    offset: Math.round((wall - Math.floor(date.getTime() / 60000) * 60000) / 60000),
+  }
+}
+
+/**
+ * The schedule's time and day as the user reads them: its next run (UTC on the server)
+ * in the app's timezone. A monthly run moved to another day by the conversion is not a
+ * fixed day of the month any more: that one stays in UTC, said so (`utc`).
+ */
+export function scheduleClock(schedule, { now = new Date(), tz = getAppTimezone() } = {}) {
+  const asUtc = { time: schedule.time, weekday: Number(schedule.day_of_week ?? 1), day: Number(schedule.day_of_month ?? 1), utc: false }
+  const next = nextRun({ ...schedule, enabled: true }, now)
+  let clock
+  try { clock = next && wallClock(next, tz) } catch { clock = null }
+  if (!clock) return { ...asUtc, utc: true }
+  if (clock.offset === 0) return asUtc
+  if (schedule.frequency === 'monthly' && clock.day !== asUtc.day) return { ...asUtc, utc: true }
+  const pad = (n) => String(n).padStart(2, '0')
+  return { time: `${pad(clock.hour)}:${pad(clock.minute)}`, weekday: clock.weekday, day: clock.day, utc: false }
+}
+
+/** True when the user's clock is not UTC: a time typed for the scheduler is then said to be UTC. */
+export const typedInUtc = (now = new Date(), tz = getAppTimezone()) => {
+  try { return wallClock(now, tz).offset !== 0 } catch { return true }
+}
+
+const clockTime = (clock, t) => (clock.utc ? t('reports.work.utcTime', { time: clock.time }) : clock.time)
+
+/** "Weekly · 08:00", in the user's timezone */
+export const frequencyPill = (schedule, t, opts) => t(`reports.work.freq.${schedule.frequency}`, { time: clockTime(scheduleClock(schedule, opts), t) })
+
+/** "Weekly, on Monday, at 08:00", in the user's timezone */
+export function frequencyLong(schedule, t, opts) {
+  const clock = scheduleClock(schedule, opts)
   return t(`reports.work.freqLong.${schedule.frequency}`, {
-    time: schedule.time,
-    day: schedule.frequency === 'weekly' ? t(`reports.work.dayName.${days[Number(schedule.day_of_week ?? 1)] || 'mon'}`) : schedule.day_of_month,
+    time: clockTime(clock, t),
+    day: schedule.frequency === 'weekly' ? t(`reports.work.dayName.${DAY_KEYS[clock.weekday] || 'mon'}`) : t('reports.work.monthDay', { count: clock.day }),
   })
+}
+
+/**
+ * The figure of a report read from the certificate counters, when they hold the report's
+ * own count: certificates expiring within 30 days (not revoked, not yet expired), the
+ * window and filter of report_service. Null for the others: they are computed on demand.
+ */
+export const FIGURE_DAYS = 30
+export function reportFigure(key, stats, t) {
+  if (key === 'expiring_certificates' && Number.isFinite(stats?.expiring)) {
+    return t('reports.work.figure.expiring', { count: stats.expiring, days: FIGURE_DAYS })
+  }
+  return null
 }
 
 export const formatLabel = (key, schedule) => (isPdf(key) ? 'PDF' : String(schedule?.format || 'csv').toUpperCase())

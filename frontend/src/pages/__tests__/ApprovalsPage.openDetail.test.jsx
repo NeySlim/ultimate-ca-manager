@@ -68,7 +68,7 @@ const clickApproveOrReject = async (label) => {
   // The row's button opens the confirmation; its own button decides
   fireEvent.click(await screen.findByRole('button', { name: `approvals.work.${label}Named` }))
   if (label === 'reject') {
-    fireEvent.change(document.querySelector('#decision-reason'), { target: { value: 'no' } })
+    fireEvent.change(document.querySelector('#decision-reason'), { target: { value: 'Wrong profile' } })
   }
   fireEvent.click(await screen.findByTestId('decision-confirm'))
 }
@@ -120,7 +120,7 @@ describe('ApprovalsPage — opening what an approval issued', () => {
     approve.mockResolvedValue({ data: { certificate_issued: false, deferred: true, status: 'approved' } })
     renderPage()
     await clickApproveOrReject('approve')
-    await waitFor(() => expect(showSuccess).toHaveBeenCalledWith('approvals.approvedSuccess'))
+    await waitFor(() => expect(showSuccess).toHaveBeenCalledWith('approvals.work.toast.approvedOne'))
     expect(showError).not.toHaveBeenCalled()
     expect(openEntity).not.toHaveBeenCalled()
     showError.mockRestore(); showSuccess.mockRestore()

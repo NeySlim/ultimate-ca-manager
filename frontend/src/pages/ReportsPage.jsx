@@ -8,21 +8,21 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DownloadSimple, Plus, FilePdf, PauseCircle, Clock } from '@phosphor-icons/react'
 import { ResponsiveLayout } from '../components'
-import { WorkQueue, WorkButton, WorkRecord, WorkRecords } from '../components/work'
-import { reportsService } from '../services'
+import { WorkQueue, WorkButton, WorkRecord, WorkRecords, loadCause } from '../components/work'
+import { reportsService, certificatesService } from '../services'
 import { useInspector } from '../contexts'
 import { usePermission } from '../hooks'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 import { formatDate } from '../lib/utils'
 import { compactDue } from '../lib/relativeTime'
 import {
-  REPORT_KEYS, reportName, reportDescription, scheduleOf, reportGroups, frequencyPill, formatLabel,
+  REPORT_KEYS, reportName, reportDescription, scheduleOf, reportGroups, frequencyPill, formatLabel, reportFigure,
 } from './reports/reportModel'
 import { useReportActions } from './reports/useReportActions'
 
 export default function ReportsPage() {
   const { t } = useTranslation()
-  const { hasPermission, canWrite } = usePermission()
+  const { hasPermission, canWrite, canRead } = usePermission()
   const inspector = useInspector()
   const openEntity = useOpenEntity()
   const root = useRef(null)
@@ -30,23 +30,28 @@ export default function ReportsPage() {
   const [schedules, setSchedules] = useState({})
   const [pdfSections, setPdfSections] = useState([])
   const [state, setState] = useState('loading')
-  const [failure, setFailure] = useState('')
+  const [failure, setFailure] = useState(null)
+  const [stats, setStats] = useState(null)
+  const readsCertificates = canRead('certificates')
 
   const load = useCallback(async ({ quiet = false } = {}) => {
     if (!quiet) setState((s) => (s === 'ready' ? s : 'loading'))
     try {
-      const [scheduleRes, pdfRes] = await Promise.all([
+      // The certificate counters give the figure of the reports that count the same thing
+      const [scheduleRes, pdfRes, statsRes] = await Promise.all([
         reportsService.getSchedule(),
         reportsService.getPdfTemplates().catch(() => ({ data: null })),
+        readsCertificates ? certificatesService.getStats().catch(() => null) : null,
       ])
       setSchedules(scheduleRes?.data || {})
       setPdfSections(pdfRes?.data?.sections || [])
+      setStats(statsRes?.data || null)
       setState('ready')
     } catch (err) {
-      setFailure(err?.message || '')
+      setFailure(err || null)
       setState('error')
     }
-  }, [])
+  }, [readsCertificates])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
@@ -58,6 +63,11 @@ export default function ReportsPage() {
   const canExport = hasPermission('export:audit')
   const canSchedule = canWrite('settings')
   const actions = useReportActions({ schedules, pdfSections, onDone: () => load({ quiet: true }) })
+  // The figure, else the format: the second line says what the report holds, then who gets it
+  const factsOf = (e) => [
+    reportFigure(e.key, stats, t) || formatLabel(e.key, e.schedule),
+    e.schedule.recipients?.length ? e.schedule.recipients.join(', ') : t('reports.work.noRecipient'),
+  ]
 
   const entries = REPORT_KEYS.map((key) => ({ key, schedule: scheduleOf(schedules, key) }))
   const unscheduled = entries.filter((e) => !e.schedule.enabled)
@@ -76,7 +86,7 @@ export default function ReportsPage() {
       id: e.key,
       title: reportName(e.key, t),
       kind: frequencyPill(e.schedule, t),
-      facts: [formatLabel(e.key, e.schedule), e.schedule.recipients?.length ? e.schedule.recipients.join(', ') : t('reports.work.noRecipient')],
+      facts: factsOf(e),
       due: e.next,
       dueLabel: compactDue(e.next, t),
       dueDate: formatDate(e.next, { time: true }),
@@ -98,13 +108,17 @@ export default function ReportsPage() {
   return (
     <>
       <ResponsiveLayout
+        className="wk-page"
         title={t('reports.title')}
         total={state === 'ready' ? t('reports.work.total', { count: scheduledCount }) : ''}
         intent={t('reports.work.intent')}
         helpPageKey="reports"
         actions={(canExport || canSchedule) && (
           <>
-            {canExport && <WorkButton quiet icon={FilePdf} onClick={actions.openPdf}>{t('reports.work.customPdf')}</WorkButton>}
+            {canExport && (
+              <WorkButton quiet icon={FilePdf} onClick={actions.openPdf} className="lv-hide-mobile"
+                aria-label={t('reports.work.customPdf')}>{t('reports.work.customPdf')}</WorkButton>
+            )}
             {canSchedule && <WorkButton primary icon={Plus} onClick={() => actions.openSchedule()}>{t('reports.work.schedule')}</WorkButton>}
           </>
         )}
@@ -113,7 +127,7 @@ export default function ReportsPage() {
           rootRef={root}
           label={t('reports.title')}
           state={state}
-          error={{ title: t('reports.loadFailed'), text: failure, onRetry: () => load() }}
+          error={{ title: t('reports.loadFailed'), cause: loadCause(failure, t), onRetry: () => load(), journal: hasPermission('read:audit') && '/audit' }}
           hint={bulkActions ? t('reports.work.hint') : t('reports.work.hintRead')}
           groups={groups}
           bulkActions={bulkActions}

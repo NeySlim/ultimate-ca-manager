@@ -32,9 +32,11 @@ vi.mock('../../hooks', () => ({
 const api = vi.hoisted(() => ({
   getSchedule: vi.fn(), getPdfTemplates: vi.fn(), updateSchedule: vi.fn(), download: vi.fn(), generateCustomPDF: vi.fn(), sendTest: vi.fn(), generate: vi.fn(),
 }))
-vi.mock('../../services', () => ({ reportsService: api }))
+const certs = vi.hoisted(() => ({ getStats: vi.fn() }))
+vi.mock('../../services', () => ({ reportsService: api, certificatesService: certs }))
 
 import ReportsPage from '../ReportsPage'
+import { setAppTimezone } from '../../stores/timezoneStore'
 
 const ALL = ['read:audit', 'export:audit', 'write:settings']
 const HOUR = 3600000
@@ -44,7 +46,9 @@ const group = (name) => screen.getByRole('heading', { level: 2, name: new RegExp
 
 beforeEach(() => {
   vi.clearAllMocks()
+  setAppTimezone('UTC')
   stable.perms = ALL
+  certs.getStats.mockResolvedValue({ data: { total: 282, expiring: 8, expired: 3, revoked: 4 } })
   const soon = new Date(Date.now() + 3 * HOUR)
   api.getSchedule.mockResolvedValue({ data: {
     expiring_certificates: { enabled: true, frequency: 'daily', time: hhmm(soon), recipients: ['pki@example.com'], format: 'csv' },
@@ -69,10 +73,27 @@ describe('ReportsPage queue', () => {
     await screen.findByText('Certificats expirants')
     const today = group('Prochaine exécution sous 24 h')
     const li = within(today).getByText('Certificats expirants').closest('li')
-    expect(within(li).getByText(/^Quotidien · \d\d:\d\d UTC$/)).toHaveClass('wk-kind')
+    expect(within(li).getByText(/^Quotidien · \d\d:\d\d$/)).toHaveClass('wk-kind')
     expect(within(li).getByText('CSV · pki@example.com')).toBeInTheDocument()
     expect(within(li).getByText('dans 3 h')).toBeInTheDocument()
     expect(within(group('Planifiés')).getByText('JSON · Aucun destinataire')).toBeInTheDocument()
+  })
+
+  it('gives the figure the certificate counters hold, as the mockup, for a reader of the certificates', async () => {
+    stable.perms = [...ALL, 'read:certificates']
+    renderPage()
+    const li = (await screen.findByText('8 certificats à J+30 · pki@example.com')).closest('li')
+    expect(within(li).getByText('Certificats expirants')).toBeInTheDocument()
+    // The inventory has no counter of its own: its format stays
+    expect(within(group('Planifiés')).getByText('JSON · Aucun destinataire')).toBeInTheDocument()
+  })
+
+  it('reads the hour of a schedule in the user\'s timezone, without a UTC suffix', async () => {
+    setAppTimezone('Asia/Tokyo')
+    renderPage()
+    await screen.findByText('Certificats expirants')
+    // 06:45 UTC on the 28th is 15:45 the same day in Tokyo
+    expect(within(group('Planifiés')).getByText('Mensuel · 15:45')).toHaveClass('wk-kind')
   })
 
   it('folds the reports without a schedule, each downloadable and schedulable', async () => {
@@ -97,14 +118,29 @@ describe('ReportsPage queue', () => {
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByLabelText('Contenu')).toHaveValue('ca_hierarchy')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Planifier' }))
-    expect(await within(dialog).findByText(/au moins un destinataire/)).toBeInTheDocument()
+    expect(await within(dialog).findByText('Saisissez au moins une adresse.')).toBeInTheDocument()
     expect(api.updateSchedule).not.toHaveBeenCalled()
     fireEvent.change(within(dialog).getByLabelText('Destinataires'), { target: { value: 'a@example.com, b@example.com' } })
-    fireEvent.change(within(dialog).getByLabelText('Heure d\'envoi (UTC)'), { target: { value: '07:00' } })
+    fireEvent.change(within(dialog).getByLabelText('Heure d’envoi'), { target: { value: '25:00' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Planifier' }))
+    expect(await within(dialog).findByText('Heure invalide : format HH:MM, de 00:00 à 23:59.')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Heure d’envoi')).toHaveFocus()
+    fireEvent.change(within(dialog).getByLabelText('Heure d’envoi'), { target: { value: '07:00' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Planifier' }))
     await waitFor(() => expect(api.updateSchedule).toHaveBeenCalledWith({ ca_hierarchy: expect.objectContaining({
       enabled: true, frequency: 'weekly', time: '07:00', recipients: ['a@example.com', 'b@example.com'], format: 'csv',
     }) }))
+  })
+
+  it('gives the focus back to Schedule a report when its dialog is left with Escape', async () => {
+    renderPage()
+    const button = await screen.findByRole('button', { name: 'Planifier un rapport' })
+    button.focus()
+    fireEvent.click(button)
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await waitFor(() => expect(button).toHaveFocus())
   })
 
   it('suspends several schedules in one update', async () => {

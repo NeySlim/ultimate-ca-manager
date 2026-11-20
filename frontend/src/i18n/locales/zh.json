@@ -5223,7 +5223,7 @@
     "commentPlaceholder": "可选备注...",
     "commentRequired": "必须提供拒绝原因",
     "expiresAt": "过期时间",
-    "loadFailed": "加载审批请求失败",
+    "loadFailed": "无法加载审批请求",
     "noRequests": "暂无审批请求",
     "noRequestsDesc": "当证书需要基于策略的审批时，审批请求将显示在此处。",
     "pending": "待处理",
@@ -5329,10 +5329,13 @@
         "rejectMany": "拒绝请求",
         "reason": "理由",
         "optional": "可选",
-        "approveHint": "随决定一起记录。",
-        "rejectHint": "拒绝时必填：随决定一起记录。",
-        "reasonRequired": "请填写拒绝理由。",
-        "manyNote": "逐个处理每个请求；结果会列出成功的请求以及其他请求失败的原因。"
+        "approveHint": "与决定一起记入日志。",
+        "rejectHint": "拒绝时必填：与决定一起记入日志。",
+        "reasonRequired": "请填写拒绝理由，至少 {{min}} 个字符。",
+        "manyNote": "逐个处理每个请求；如有失败，结果会说明是哪一个及原因。",
+        "decidedNote": "决定后，请求将离开队列和“待处理”卡片。",
+        "decidedNoteMany": "决定后，这些请求将离开队列和“待处理”卡片。",
+        "csrNote": "批准的 CSR 会被签名，其证书将在检查器中打开。"
       },
       "sections": {
         "request": "请求",
@@ -5343,26 +5346,46 @@
         "id": "标识",
         "submitted": "提交时间",
         "due": "处理截止",
+        "state": "状态",
+        "reason": "理由",
         "votes": "批准数",
         "csr": "CSR",
         "object": "对象",
         "subject": "主题",
         "ca": "证书颁发机构",
         "csrId": "已存储的 CSR",
+        "validity": "有效期",
+        "extraSan": "新增的备用名称",
         "days_one": "{{count}} 天",
         "days_other": "{{count}} 天",
         "decision": "决定",
         "by": "处理人",
         "on": "时间",
-        "noReason": "无"
+        "noReason": "无",
+        "san": {
+          "dns": "DNS：{{value}}",
+          "ip": "IP：{{value}}",
+          "email": "电子邮件：{{value}}",
+          "uri": "URI：{{value}}"
+        }
       },
       "log": {
         "submitted": "请求已提交",
-        "approved": "已批准",
-        "rejected": "已拒绝",
+        "what": "{{what}}：{{subject}}。",
+        "approved": "请求已批准",
+        "rejected": "请求已拒绝",
         "expired": "未决定即过期",
         "cancelled": "已取消",
-        "none": "无记录。"
+        "none": "无记录。",
+        "noReason": "无理由。"
+      },
+      "toast": {
+        "approvedOne": "请求 #{{id}} 已批准",
+        "rejectedOne": "请求 #{{id}} 已拒绝",
+        "approvedMany_one": "已批准 {{count}} 个请求",
+        "approvedMany_other": "已批准 {{count}} 个请求",
+        "rejectedMany_one": "已拒绝 {{count}} 个请求",
+        "rejectedMany_other": "已拒绝 {{count}} 个请求"
       }
     }
   },
@@ -5714,7 +5737,7 @@
     "generated": "报告已生成",
     "generatedAt": "生成时间",
     "generatedPreview": "报告预览",
-    "loadFailed": "加载报告失败",
+    "loadFailed": "无法加载报告",
     "recipientEmail": "收件人邮箱",
     "recipients": "收件人",
     "scheduleFailed": "更新定时计划失败",
@@ -5831,7 +5854,7 @@
       "intent": "计划的清单和到期报告。",
       "total_one": "{{count}} 个计划报告",
       "total_other": "{{count}} 个计划报告",
-      "hint": "勾选多个报告可一起下载或暂停计划；点击名称可打开详情。",
+      "hint": "勾选多个报告以一起下载或暂停其计划；数字与概览一样来自清单。",
       "hintRead": "点击名称可打开详情。",
       "emptyTitle": "没有计划报告",
       "emptyText": "报告会按所选频率通过电子邮件发送清单、到期情况或合规情况。",
@@ -5845,6 +5868,8 @@
       "suspended_other": "已暂停 {{count}} 个计划",
       "testAsk": "发送测试…",
       "customPdf": "生成 PDF…",
+      "pdfName": "{{name}}（PDF）",
+      "actionsTitle": "报告操作",
       "downloadNamed": "下载 {{name}}",
       "noRecipient": "无收件人",
       "groups": {
@@ -5852,14 +5877,14 @@
         "later": "已计划"
       },
       "freq": {
-        "daily": "每天 · {{time}} UTC",
-        "weekly": "每周 · {{time}} UTC",
-        "monthly": "每月 · {{time}} UTC"
+        "daily": "每天 · {{time}}",
+        "weekly": "每周 · {{time}}",
+        "monthly": "每月 · {{time}}"
       },
       "freqLong": {
-        "daily": "每天 {{time}} UTC",
-        "weekly": "每周{{day}} {{time}} UTC",
-        "monthly": "每月 {{day}} 日 {{time}} UTC"
+        "daily": "每天 {{time}}",
+        "weekly": "每周{{day}} {{time}}",
+        "monthly": "每月 {{day}} 日 {{time}}"
       },
       "dayName": {
         "mon": "一",
@@ -5870,6 +5895,8 @@
         "sat": "六",
         "sun": "日"
       },
+      "monthDay_one": "{{count}}",
+      "monthDay_other": "{{count}}",
       "state": {
         "scheduled": "已计划",
         "unscheduled": "未计划"
@@ -5896,13 +5923,31 @@
       "previewCount_other": "显示 {{count}} 行，共 {{total}} 行",
       "dialog": {
         "content": "内容",
-        "time": "发送时间 (UTC)",
-        "timeHint": "HH:MM 格式，与调度器一致使用 UTC 时间。",
-        "timeInvalid": "请按 HH:MM 格式填写时间。",
+        "time": "发送时间",
+        "timeUtc": "发送时间 (UTC)",
+        "timeHint": "HH:MM 格式。",
+        "timeHintUtc": "HH:MM 格式，与调度器一致使用 UTC 时间。",
+        "timeInvalid": "时间无效：HH:MM 格式，00:00 至 23:59。",
         "recipientsHint": "一个或多个地址，用逗号分隔。",
-        "recipientsRequired": "请至少填写一个收件人：没有收件人则不会发送。",
+        "recipientsRequired": "请至少输入一个地址。",
+        "recipientsInvalid": "地址无效：例如 pki@example.com，用逗号分隔。",
+        "emailInvalid": "地址无效：例如 pki@example.com。",
         "save": "计划",
-        "editTitle": "修改计划"
+        "editTitle": "修改计划",
+        "scheduleSubtitle": "按所选频率通过电子邮件发送给收件人。",
+        "scheduleNote": "报告在每次运行时通过电子邮件发送；报告“⋯”菜单中的“发送测试…”可预先检查发送。",
+        "pdfTitle": "生成 PDF",
+        "pdfSubtitle": "所选章节，下载为一个 PDF。"
+      },
+      "downloadedMany_one": "已下载 {{count}} 个报告",
+      "downloadedMany_other": "已下载 {{count}} 个报告",
+      "downloadedOutcome_one": "{{count}} 个报告",
+      "downloadedOutcome_other": "{{count}} 个报告",
+      "utcTime": "{{time}} UTC",
+      "figure": {
+        "expiring_one": "{{count}} 个证书将在 {{days}} 天内到期",
+        "expiring_other": "{{count}} 个证书将在 {{days}} 天内到期",
+        "expiringNote": "与概览中 {{days}} 天到期范围相同，不含已吊销的证书。"
       }
     },
     "invalidEmail": "无效的电子邮件地址"
@@ -6913,7 +6958,7 @@
   "keyRecovery": {
     "title": "密钥恢复",
     "subtitle": "对归档私钥进行双重控制恢复",
-    "loadFailed": "加载恢复请求失败",
+    "loadFailed": "无法加载恢复请求",
     "actionFailed": "操作失败",
     "dualControlOn": "已启用双重控制",
     "empty": "暂无恢复请求",
@@ -6967,6 +7012,8 @@
       "approveAsk": "批准…",
       "rejectAsk": "拒绝…",
       "recoverAsk": "恢复…",
+      "approve": "批准",
+      "reject": "拒绝",
       "approveNamed": "批准恢复 {{name}}",
       "rejectNamed": "拒绝恢复 {{name}}",
       "recoverNamed": "恢复 {{name}} 的密钥",
@@ -6979,13 +7026,25 @@
         "rejectOne": "拒绝恢复",
         "rejectMany": "拒绝恢复",
         "note": "备注",
-        "noteHint": "随决定一起保存。"
+        "noteHint": "随决定一起保存。",
+        "approveNote": "批准后，请求进入“待恢复”：其申请人或管理员可下载一次密钥。",
+        "approveNoteMany": "批准后，这些请求进入“待恢复”：其申请人或管理员可各下载一次密钥。",
+        "rejectNote": "拒绝后，请求将离开队列，进入下方的历史记录。",
+        "rejectNoteMany": "拒绝后，这些请求将离开队列，进入下方的历史记录。"
       },
       "log": {
         "requested": "已申请恢复",
         "approved": "请求已批准",
         "rejected": "请求已拒绝",
         "recovered": "密钥已恢复"
+      },
+      "toast": {
+        "approvedOne": "请求 #{{id}} 已批准",
+        "rejectedOne": "请求 #{{id}} 已拒绝",
+        "approvedMany_one": "已批准 {{count}} 个请求",
+        "approvedMany_other": "已批准 {{count}} 个请求",
+        "rejectedMany_one": "已拒绝 {{count}} 个请求",
+        "rejectedMany_other": "已拒绝 {{count}} 个请求"
       }
     }
   },
@@ -7695,6 +7754,7 @@
     "selectAll": "全选：{{group}}",
     "loading": "正在加载队列…",
     "retry": "重试",
+    "viewLog": "查看日志",
     "bulkLabel": "批量操作",
     "selected_one": "已选择 {{count}} 项",
     "selected_other": "已选择 {{count}} 项",
@@ -7708,6 +7768,16 @@
       "failed_other": "{{count}} 项失败",
       "ok": "成功",
       "ko": "失败"
+    },
+    "cause": {
+      "status": "原因：服务器对 <mono>{{request}}</mono> 返回了 {{status}} {{reason}}。其他视图和检查器仍可使用。",
+      "noAnswer": "原因：服务器未响应 <mono>{{request}}</mono>。其他视图和检查器仍可使用。",
+      "message": "原因：{{message}}。其他视图和检查器仍可使用。"
+    },
+    "dialog": {
+      "request": "请求 #{{id}}",
+      "requests_one": "{{count}} 个请求",
+      "requests_other": "{{count}} 个请求"
     }
   }
 }

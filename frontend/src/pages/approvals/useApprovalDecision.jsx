@@ -1,15 +1,15 @@
 /**
  * Approve or reject approval requests, from the queue (one or several) or the
- * inspector: a confirmation with a reason (required to reject, as the server asks),
- * then one call per request. One request keeps the outcome messages of each case
- * (issued, revoked, deferred to the client, closed, failed) and opens what it
- * issued; several end on a line-by-line outcome.
+ * inspector: a confirmation with a reason (five characters at least to reject, as the
+ * mockup asks), then one call per request. One request keeps the outcome messages of
+ * each case (issued, revoked, deferred to the client, closed, failed) and opens what it
+ * issued; several end on one message, or on a line-by-line outcome when one failed.
  */
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check, Prohibit, Warning, Question } from '@phosphor-icons/react'
 import { Modal } from '../../components/Modal'
-import { WorkButton, BulkOutcome, runEach } from '../../components/work'
+import { WorkButton, BulkOutcome, runEach, rememberFocus } from '../../components/work'
 import { approvalsService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useOpenEntity } from '../../hooks/useOpenEntity'
@@ -26,8 +26,11 @@ function approvalFailure(result, t) {
 }
 
 export const changedEvent = () => window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: 'approval' } }))
+// The shortest reason a rejection takes
+export const REASON_MIN = 5
 
-export function useApprovalDecision({ onDone } = {}) {
+/** onDone reloads after a decision; refocus places the focus once the dialog is gone (else it goes back where it was). */
+export function useApprovalDecision({ onDone, refocus } = {}) {
   const { t } = useTranslation()
   const { showSuccess, showError, showWarning } = useNotification()
   const openEntity = useOpenEntity()
@@ -37,20 +40,30 @@ export function useApprovalDecision({ onDone } = {}) {
   const [busy, setBusy] = useState(false)
   const [outcome, setOutcome] = useState(null)
   const box = useRef(null)
+  const back = useRef(null)
 
   const open = (kind, requests) => {
+    back.current = rememberFocus()
     setAsk({ kind, requests })
     setComment('')
     setInvalid(false)
     setOutcome(null)
   }
   const close = () => { setAsk(null); setOutcome(null); setComment('') }
+  // Leaving without deciding gives the focus back to the opening control; leaving the outcome, to the queue
+  const settle = () => (refocus ? requestAnimationFrame(refocus) : back.current?.())
+  const dismiss = () => {
+    const decided = !!outcome
+    close()
+    if (decided) settle()
+    else back.current?.()
+  }
 
   // One request: the messages of today's single decision
   const decideOne = async (kind, req) => {
     if (kind === 'reject') {
       await approvalsService.reject(req.id, comment.trim())
-      showSuccess(t('approvals.rejectedSuccess'))
+      showSuccess(t('approvals.work.toast.rejectedOne', { id: req.id }))
       return
     }
     const result = await approvalsService.approve(req.id, comment.trim() || undefined)
@@ -64,11 +77,11 @@ export function useApprovalDecision({ onDone } = {}) {
       showNotices(result, showWarning)
     } else if (d?.deferred) {
       // Approved: the protocol issues when its client comes back
-      showSuccess(t('approvals.approvedSuccess'))
+      showSuccess(t('approvals.work.toast.approvedOne', { id: req.id }))
     } else if (approvalFailure(result, t)) {
       showError(approvalFailure(result, t))
     } else {
-      showSuccess(t('approvals.approvedSuccess'))
+      showSuccess(t('approvals.work.toast.approvedOne', { id: req.id }))
     }
     // What the approval issued: a certificate, or a CA for an intermediate request
     const issued = d?.certificate_issued ? d.certificate : null
@@ -79,12 +92,13 @@ export function useApprovalDecision({ onDone } = {}) {
   const confirm = async () => {
     if (!ask || busy) return
     const { kind, requests } = ask
-    if (kind === 'reject' && !comment.trim()) {
+    if (kind === 'reject' && comment.trim().length < REASON_MIN) {
       setInvalid(true)
       box.current?.focus()
       return
     }
     setBusy(true)
+    let report = false
     try {
       if (requests.length === 1) {
         try {
@@ -103,12 +117,20 @@ export function useApprovalDecision({ onDone } = {}) {
           if (failed) throw new Error(failed)
           return result
         })
-        setOutcome(done)
+        // All through: one message, as the mockup; a failure keeps the line-by-line outcome open
+        if (done.every((o) => o.ok)) {
+          showSuccess(t(kind === 'approve' ? 'approvals.work.toast.approvedMany' : 'approvals.work.toast.rejectedMany', { count: done.length }))
+          close()
+        } else {
+          report = true
+          setOutcome(done)
+        }
       }
     } finally {
       setBusy(false)
       changedEvent()
-      onDone?.()
+      const reloaded = onDone?.()
+      if (!report) Promise.resolve(reloaded).finally(settle)
     }
   }
 
@@ -116,20 +138,23 @@ export function useApprovalDecision({ onDone } = {}) {
   const approve = ask?.kind === 'approve'
   const title = !ask ? '' : outcome ? t('work.bulk.title')
     : t(`approvals.work.dialog.${approve ? 'approve' : 'reject'}${many ? 'Many' : 'One'}`)
+  const subtitle = !ask ? '' : many ? t('work.dialog.requests', { count: ask.requests.length }) : t('work.dialog.request', { id: ask.requests[0].id })
 
   const dialog = (
-    <Modal open={!!ask} onOpenChange={(v) => { if (!v) close() }} title={title} size="md">
+    <Modal open={!!ask} onOpenChange={(v) => { if (!v) dismiss() }} title={title} subtitle={subtitle} size="md">
       {ask && outcome ? (
-        <BulkOutcome outcome={outcome} nameOf={(req) => `#${req.id} · ${requestTitle(req, t)}`} onClose={close} />
+        <BulkOutcome outcome={outcome} nameOf={(req) => `#${req.id} · ${requestTitle(req, t)}`} onClose={dismiss} />
       ) : ask && (
         <form className="wk-dialog" noValidate onSubmit={(e) => { e.preventDefault(); confirm() }}>
-          <ul className="wk-dialog-list" data-testid="decision-list">
-            {ask.requests.map((req) => (
-              <li key={req.id}>
-                <strong>#{req.id}</strong> · {requestTitle(req, t)} <span className="wk-muted">({requesterOf(req, t)})</span>
-              </li>
-            ))}
-          </ul>
+          <div className="wk-review">
+            <ul className="wk-dialog-list" data-testid="decision-list">
+              {ask.requests.map((req) => (
+                <li key={req.id}>
+                  <strong>#{req.id}</strong> · {requestTitle(req, t)} <span className="wk-muted">({requesterOf(req, t)})</span>
+                </li>
+              ))}
+            </ul>
+          </div>
           <div className="wk-field">
             <label htmlFor="decision-reason">
               {t('approvals.work.dialog.reason')}
@@ -141,14 +166,19 @@ export function useApprovalDecision({ onDone } = {}) {
               aria-describedby={invalid ? 'decision-hint decision-error' : 'decision-hint'} />
             <small id="decision-hint">{t(approve ? 'approvals.work.dialog.approveHint' : 'approvals.work.dialog.rejectHint')}</small>
             {invalid && (
-              <p className="wk-field-error" id="decision-error"><Warning aria-hidden="true" /><span>{t('approvals.work.dialog.reasonRequired')}</span></p>
+              <p className="wk-field-error" id="decision-error"><Warning aria-hidden="true" /><span>{t('approvals.work.dialog.reasonRequired', { min: REASON_MIN })}</span></p>
             )}
           </div>
-          {many && (
-            <p className="wk-notice"><Question aria-hidden="true" /><span>{t('approvals.work.dialog.manyNote')}</span></p>
-          )}
-          <div className="wk-dialog-actions">
-            <WorkButton onClick={close}>{t('common.cancel')}</WorkButton>
+          <p className="wk-notice">
+            <Question aria-hidden="true" />
+            <span>
+              {t(many ? 'approvals.work.dialog.decidedNoteMany' : 'approvals.work.dialog.decidedNote')}
+              {approve && !many && ask.requests[0].request_type === 'csr' && <> {t('approvals.work.dialog.csrNote')}</>}
+              {many && <> {t('approvals.work.dialog.manyNote')}</>}
+            </span>
+          </p>
+          <div className="lv-dialog-actions">
+            <WorkButton onClick={dismiss}>{t('common.cancel')}</WorkButton>
             <WorkButton type="submit" primary={approve} danger={!approve} icon={approve ? Check : Prohibit} disabled={busy}
               data-testid="decision-confirm">
               {t(approve ? 'approvals.work.approve' : 'approvals.work.reject')}{many ? ` (${ask.requests.length})` : ''}

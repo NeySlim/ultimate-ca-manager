@@ -2,6 +2,7 @@
  * Approval request in the inspector: heading (state, Approve… and Reject… while
  * it waits), then the Request and Log sections.
  */
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle, Check, Prohibit } from '@phosphor-icons/react'
 import { StatusPill } from '../../components/list'
@@ -11,7 +12,7 @@ import { usePermission } from '../../hooks'
 import { useOpenEntity } from '../../hooks/useOpenEntity'
 import { approvalsService } from '../../services'
 import { formatDate } from '../../lib/utils'
-import { requestDeadline, stateOf, requesterOf, lastVote } from './approvalModel'
+import { requestDeadline, stateOf, requesterOf, lastVote, typeLabel, subjectOf, loadCaIndex, sanLine } from './approvalModel'
 import { useApprovalDecision } from './useApprovalDecision'
 import '../../components/work/work.css'
 
@@ -31,37 +32,56 @@ function Section({ title, children }) {
   return <section><h3 className="ins-section-title">{title}</h3>{children}</section>
 }
 
+// Name and level of an authority ("Services CA G2 · level 2"), for a reader of the CAs; null until known
+function useCaLabel(id) {
+  const { canRead } = usePermission()
+  const [label, setLabel] = useState(null)
+  const allowed = !!id && canRead('cas')
+  useEffect(() => {
+    if (!allowed) return undefined
+    let live = true
+    loadCaIndex().then((index) => { if (live) setLabel(index.get(String(id)) || null) })
+    return () => { live = false }
+  }, [id, allowed])
+  return allowed ? label : null
+}
+
 export function ApprovalRequestPanel({ req }) {
   const { t } = useTranslation()
   const openEntity = useOpenEntity()
   const s = req.request_summary || {}
   const pending = req.status === 'pending'
   const vote = lastVote(req)
+  const ca = useCaLabel(s.ca_id || s.target_ca_id)
   const link = (type, id, text) => (
     <button type="button" className="ins-link" onClick={() => openEntity(type, id)}>{text}</button>
   )
+  const caText = (id) => (ca?.name
+    ? <>{ca.name} <span className="ins-muted">· {t('cas.tree.level', { level: ca.level })}</span></>
+    : `#${id}`)
   const target = s.certificate_id || req.certificate_id
+  const signing = s.csr || req.request_type === 'csr'
   return (
     <div className="wk-detail-grid">
       <Section title={t('approvals.work.detail.request')}>
         <Props rows={[
           [t('approvals.work.detail.id'), <span className="ins-mono">#{req.id}</span>],
-          [t('common.type'), t(`approvals.requestType.${req.request_type}`, req.request_type)],
+          [t('common.type'), typeLabel(req, t)],
           [t('approvals.requester'), requesterOf(req, t)],
           req.policy_name && [t('approvals.policy'), req.policy_name],
           [t('approvals.work.detail.submitted'), formatDate(req.created_at, { time: true })],
           pending && [t('approvals.work.detail.due'), formatDate(requestDeadline(req), { time: true })],
-          [t('common.status'), <StatusPill {...stateOf(req, t)} />],
+          [t('approvals.work.detail.state'), <StatusPill {...stateOf(req, t)} />],
           (req.required_approvals || 1) > 1 && [t('approvals.work.detail.votes'),
             t('approvals.work.votes', { count: (req.approvals || []).filter((v) => v.action === 'approve').length, need: req.required_approvals })],
-          req.requester_comment && [t('approvals.requesterComment'), req.requester_comment],
+          req.requester_comment && [t('approvals.work.detail.reason'), req.requester_comment],
         ]} />
       </Section>
-      <Section title={s.csr || req.request_type === 'csr' ? t('approvals.work.detail.csr') : t('approvals.work.detail.object')}>
+      <Section title={signing ? t('approvals.work.detail.csr') : t('approvals.work.detail.object')}>
         <Props rows={[
-          s.cn && [t('approvals.work.detail.subject'), <span className="ins-mono">{s.cn}</span>],
-          s.ca_id && [t('approvals.work.detail.ca'), link('ca', s.ca_id, `#${s.ca_id}`)],
-          s.target_ca_id && [t('approvals.work.detail.ca'), link('ca', s.target_ca_id, `#${s.target_ca_id}`)],
+          s.cn && [t('approvals.work.detail.subject'), req.request_type === 'csr' ? `CN=${s.cn}` : s.cn],
+          s.ca_id && [t('approvals.work.detail.ca'), link('ca', s.ca_id, caText(s.ca_id))],
+          s.target_ca_id && [t('approvals.work.detail.ca'), link('ca', s.target_ca_id, caText(s.target_ca_id))],
           s.csr_id && [t('approvals.work.detail.csrId'), `#${s.csr_id}`],
           target && [t('approvals.certificateId'), link('certificate', target, `#${target}`)],
           s.serial_number && [t('approvals.summarySerial'), <span className="ins-mono">{s.serial_number}</span>],
@@ -70,9 +90,10 @@ export function ApprovalRequestPanel({ req }) {
           s.trigger === 'auto' && [t('approvals.summaryTrigger'), t('approvals.triggerScheduler')],
           s.protocol && [t('approvals.summaryProtocol'), `${s.protocol.toUpperCase()}${s.operation ? ` (${s.operation})` : ''}`],
           s.protocol && [t('approvals.summaryIdentity'), <span className="ins-mono">{s.identity || '—'}</span>],
-          s.validity_days && [t('approvals.summaryValidity'), t('approvals.work.detail.days', { count: s.validity_days })],
+          s.validity_days && [t('approvals.work.detail.validity'), t('approvals.work.detail.days', { count: s.validity_days })],
           s.extra_ekus?.length > 0 && [t('approvals.summaryExtraEkus'), <span className="ins-mono">{s.extra_ekus.join(', ')}</span>],
-          s.extra_san?.length > 0 && [t('approvals.summaryExtraSan'), <span className="ins-mono">{s.extra_san.join(', ')}</span>],
+          s.extra_san?.length > 0 && [t('approvals.work.detail.extraSan'),
+            <>{s.extra_san.map((v, i) => <span key={i}>{i > 0 && <br />}{sanLine(v, t)}</span>)}</>],
         ]} />
         {s.csr && (
           <details className="ins-more">
@@ -95,15 +116,17 @@ export function ApprovalRequestPanel({ req }) {
   )
 }
 
+// The mockup's journal: what happened, its detail under it, who and when on the right
 export function ApprovalLog({ req }) {
   const { t } = useTranslation()
   const when = (d) => formatDate(d, { time: true })
   const entries = [
-    { at: req.created_at, label: t('approvals.work.log.submitted'), meta: requesterOf(req, t) },
+    { at: req.created_at, label: t('approvals.work.log.submitted'), meta: t('approvals.work.log.what', { what: typeLabel(req, t), subject: subjectOf(req) }), actor: requesterOf(req, t) },
     ...(req.approvals || []).map((v) => ({
       at: v.timestamp,
       label: t(v.action === 'approve' ? 'approvals.work.log.approved' : 'approvals.work.log.rejected'),
-      meta: [v.username, v.comment].filter(Boolean).join(' · '),
+      meta: v.comment || t('approvals.work.log.noReason'),
+      actor: v.username,
     })),
     ['expired', 'cancelled'].includes(req.status) && req.resolved_at
       && { at: req.resolved_at, label: t(`approvals.work.log.${req.status}`), meta: '' },
@@ -111,7 +134,8 @@ export function ApprovalLog({ req }) {
   return (
     <WorkRecords empty={t('approvals.work.log.none')}>
       {entries.map((e, i) => (
-        <WorkRecord key={i} title={e.label} meta={e.meta} badge={<span className="wk-rl-meta">{when(e.at)}</span>} />
+        <WorkRecord key={i} title={e.label} meta={e.meta}
+          badge={<span className="wk-rl-meta">{[e.actor, when(e.at)].filter(Boolean).join(' · ')}</span>} />
       ))}
     </WorkRecords>
   )

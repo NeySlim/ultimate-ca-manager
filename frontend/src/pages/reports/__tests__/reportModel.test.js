@@ -3,7 +3,8 @@
  * HH:MM in UTC, weekly on day_of_week with 0 for Monday, monthly on day_of_month.
  */
 import { describe, it, expect } from 'vitest'
-import { nextRun, reportGroups, scheduleOf, parseReport } from '../reportModel'
+import { nextRun, reportGroups, scheduleOf, parseReport, scheduleClock, frequencyPill, frequencyLong, typedInUtc, reportFigure, reportName } from '../reportModel'
+import { frT } from '../../../components/work/__tests__/frI18n'
 
 // Wednesday 18 November 2026, 10:30 UTC
 const NOW = new Date(Date.UTC(2026, 10, 18, 10, 30))
@@ -58,5 +59,54 @@ describe('parseReport', () => {
   it('reads the rows of the JSON content the generate route returns', () => {
     const r = parseReport({ content: JSON.stringify({ items: [{ id: 1, common_name: 'a' }], columns: ['id', 'common_name'], summary: { total: 1 } }), generated_at: 'x' })
     expect(r).toEqual({ items: [{ id: 1, common_name: 'a' }], columns: ['id', 'common_name'], summary: { total: 1 }, generatedAt: 'x' })
+  })
+})
+
+describe('scheduleClock: the hour of a schedule in the user\'s timezone', () => {
+  const daily = { enabled: true, frequency: 'daily', time: '06:00' }
+  it('keeps the hour as it is for a user on UTC, without a suffix', () => {
+    expect(frequencyPill(daily, frT, { now: NOW, tz: 'UTC' })).toBe('Quotidien · 06:00')
+  })
+
+  it('converts the next run to the user\'s clock, winter and summer time both', () => {
+    expect(frequencyPill(daily, frT, { now: NOW, tz: 'Europe/Paris' })).toBe('Quotidien · 07:00')
+    expect(frequencyPill(daily, frT, { now: new Date(Date.UTC(2026, 6, 1, 3)), tz: 'Europe/Paris' })).toBe('Quotidien · 08:00')
+  })
+
+  it('moves a weekly run to the day it falls on for the user', () => {
+    const monday = { enabled: true, frequency: 'weekly', time: '23:30', day_of_week: 0 }
+    expect(frequencyLong(monday, frT, { now: NOW, tz: 'Europe/Paris' })).toBe('Hebdomadaire, le mardi, à 00:30')
+    expect(frequencyLong(monday, frT, { now: NOW, tz: 'UTC' })).toBe('Hebdomadaire, le lundi, à 23:30')
+  })
+
+  it('keeps UTC, said, for a monthly run the conversion moves to another day', () => {
+    const first = { enabled: true, frequency: 'monthly', time: '02:00', day_of_month: 1 }
+    expect(scheduleClock(first, { now: NOW, tz: 'America/New_York' })).toEqual({ time: '02:00', weekday: 1, day: 1, utc: true })
+    expect(frequencyLong(first, frT, { now: NOW, tz: 'America/New_York' })).toBe('Mensuel, le 1er, à 02:00 UTC')
+    expect(frequencyLong(first, frT, { now: NOW, tz: 'Europe/Paris' })).toBe('Mensuel, le 1er, à 03:00')
+  })
+
+  it('says a typed time is UTC only when the user is not on UTC', () => {
+    expect(typedInUtc(NOW, 'UTC')).toBe(false)
+    expect(typedInUtc(NOW, 'Europe/Paris')).toBe(true)
+  })
+})
+
+describe('reportFigure', () => {
+  it('reads the expiring certificates from the counters, as the report counts them', () => {
+    expect(reportFigure('expiring_certificates', { expiring: 8 }, frT)).toBe('8 certificats à J+30')
+    expect(reportFigure('expiring_certificates', { expiring: 1 }, frT)).toBe('1 certificat à J+30')
+  })
+
+  it('has none for a report the counters do not hold, nor without counters', () => {
+    expect(reportFigure('certificate_inventory', { expiring: 8, total: 282 }, frT)).toBeNull()
+    expect(reportFigure('expiring_certificates', null, frT)).toBeNull()
+  })
+})
+
+describe('reportName', () => {
+  it('names a PDF template apart from the data report of the same title', () => {
+    expect(reportName('certificate_inventory', frT)).not.toBe(reportName('pdf_certificate_inventory', frT))
+    expect(reportName('pdf_certificate_inventory', frT)).toMatch(/\(PDF\)$/)
   })
 })

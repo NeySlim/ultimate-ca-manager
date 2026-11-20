@@ -19,7 +19,8 @@ vi.mock('../../../hooks', () => ({
   usePermission: () => ({ canWrite: () => stable.canWrite, canRead: () => true, hasPermission: () => stable.canWrite }),
 }))
 const api = vi.hoisted(() => ({ approve: vi.fn(), reject: vi.fn(), getById: vi.fn() }))
-vi.mock('../../../services', () => ({ approvalsService: api }))
+const cas = vi.hoisted(() => ({ getAll: vi.fn(async () => ({ data: [{ id: 1, common_name: 'Root CA' }, { id: 4, common_name: 'Services CA G2', parent_id: 1 }] })) }))
+vi.mock('../../../services', () => ({ approvalsService: api, casService: cas }))
 
 import { ApprovalDetail } from '../ApprovalDetail'
 
@@ -59,10 +60,29 @@ describe('ApprovalDetail', () => {
     expect(screen.queryByRole('button', { name: /Approuver/ })).toBeNull()
   })
 
+  it('reads a CSR as the mockup: subject with CN=, authority by name and level, one alternative name a line', async () => {
+    show({ ...PROTOCOL, request_type: 'csr', requester_comment: 'Nouveau service de paiement',
+      request_summary: { cn: 'payments.example.com', ca_id: 4, validity_days: 90, extra_san: ['payments.example.com', '192.0.2.7'] } })
+    const value = (term) => screen.getByText(term, { selector: 'dt' }).nextElementSibling
+    expect(value('Type')).toHaveTextContent('CSR à signer')
+    expect(value('État')).toHaveTextContent('En attente')
+    expect(value('Motif')).toHaveTextContent('Nouveau service de paiement')
+    expect(value('Sujet')).toHaveTextContent('CN=payments.example.com')
+    expect(value('Validité')).toHaveTextContent('90 jours')
+    expect(value('Noms alternatifs ajoutés').innerHTML).toContain('<br>')
+    expect(value('Noms alternatifs ajoutés')).toHaveTextContent('DNS : payments.example.comIP : 192.0.2.7')
+    await waitFor(() => expect(value('Autorité')).toHaveTextContent('Services CA G2 · niveau 2'))
+  })
+
   it('lists the log, newest first', () => {
     show({ ...PROTOCOL, approvals: [{ username: 'alice', action: 'approve', comment: 'ok', timestamp: '2026-11-08T09:00:00Z' }] }, 'log')
     const items = screen.getAllByRole('listitem').map((li) => li.querySelector('strong').textContent)
-    expect(items).toEqual(['Approuvée', 'Demande déposée'])
+    expect(items).toEqual(['Demande approuvée', 'Demande déposée'])
+    // The detail under the label, who and when on the right, as the mockup's journal
+    const [approved, submitted] = screen.getAllByRole('listitem')
+    expect(approved).toHaveTextContent('ok')
+    expect(approved.querySelector(':scope > .wk-rl-meta')).toHaveTextContent(/^alice · /)
+    expect(submitted).toHaveTextContent('Enrôlement EST : device.example.')
   })
 
   it('offers no decision without write:approvals', () => {

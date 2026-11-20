@@ -3146,14 +3146,14 @@ Open requests are grouped by their deadline: **Overdue**, **To handle within 48 
 ## Rejecting a Request
 
 1. Click **Reject…** on its row, or in the inspector
-2. Enter a **reason** (required): it is kept in the request's timeline; a rejection writes no audit log entry
+2. Enter a **reason** of at least five characters (required): it is kept in the request's timeline; a rejection writes no audit log entry
 3. Confirm: the request is immediately stopped
 
 > ⚠ Any single rejection stops the entire request. This is intentional: if any reviewer identifies a problem, issuance should not proceed.
 
 ## Deciding several requests
 
-Tick several rows, or a whole group from its head, then **Approve…** or **Reject…** in the bar that replaces the hint. There is no bulk route: each request is decided in turn, and the outcome lists those that went through and why the others did not (already voted, expired, issuance failed).
+Tick several rows, or a whole group from its head, then **Approve…** or **Reject…** in the bar that replaces the hint. There is no bulk route: each request is decided in turn. When all went through, one message says so; otherwise the outcome lists those that went through and why the others did not (already voted, expired, issuance failed).
 
 ## Approval History
 
@@ -3199,7 +3199,7 @@ Once approved, the archived key is released as a **password-protected PKCS#12** 
 
 ## The queue
 
-The page lists the requests **to approve** (with dual control on, **to approve by another administrator**), then the keys **to recover**; closed requests (recovered, rejected, cancelled) are folded under **Recently handled**. A row offers only what the server would accept from you: **Approve…** and **Reject…** with admin:key_recovery, never the approval of your own request while dual control is on; **Recover…** for the requester or an administrator of key recovery. Several requests can be approved or rejected together: each is decided in turn and the outcome lists them one by one. A certificate name opens the request in the inspector, with its **Request** and **Log** sections.
+The page lists the requests **to approve** (with dual control on, **to approve by another administrator**), then the keys **to recover**; closed requests (recovered, rejected, cancelled) are folded under **Recently handled**. A row offers only what the server would accept from you: **Approve…** and **Reject…** with admin:key_recovery, never the approval of your own request while dual control is on; **Recover…** for the requester or an administrator of key recovery. Several requests can be approved or rejected together: each is decided in turn; one message says when all went through, otherwise the outcome lists them one by one. A certificate name opens the request in the inspector, with its **Request** and **Log** sections.
 
 ## Requirements
 
@@ -3271,18 +3271,18 @@ The report includes visual elements: risk gauge bar, status distribution, compli
 
 ## The queue
 
-Scheduled reports are grouped by their next run: **Next run within 24 h**, then **Scheduled**. A row gives the report, its frequency and UTC time in a pill, its format and recipients, and the next run in short form above its exact date. The reports without a schedule are folded under **Not scheduled**, each with **Download** and **Schedule…**.
+Scheduled reports are grouped by their next run: **Next run within 24 h**, then **Scheduled**. A row gives the report, its frequency and time in a pill (in your timezone; a monthly run that would fall on another day for you keeps its UTC time, said), the current figure when the certificate counters hold it (Expiring Certificates) or else its format, its recipients, and the next run in short form above its exact date. The reports without a schedule are folded under **Not scheduled**, each with **Download** and **Schedule…**.
 
 ## Viewing a report
 
 A report's name opens it in the inspector:
-- **Report**: its schedule and, for a data report, **Compute** for the current figure; the inventory, expiring and revoked reports offer **See these certificates**
+- **Report**: its schedule and the current figure: for Expiring Certificates, the counters' figure (the 30-day window of the overview, revoked certificates left out); for the other data reports, **Compute**; the inventory, expiring and revoked reports offer **See these certificates**
 - **Runs**: the server serves no run history; the schedule and the next run are what is known
 - **Preview**: **Generate** builds the report now and shows its rows (the first 200; the download holds them all)
 
 ## Downloading Reports
 
-**Download** on a row, or in the inspector, generates the report now in the format of its schedule: CSV by default, JSON when chosen, PDF for a template. Ticking several rows downloads them one after the other, and the outcome says which failed.
+**Download** on a row, or in the inspector, generates the report now in the format of its schedule: CSV by default, JSON when chosen, PDF for a template. Ticking several rows downloads them one after the other: one message when all went through, otherwise the outcome says which failed.
 
 > 💡 CSV reports are easier for non-technical stakeholders. JSON is better for scripts and API integrations.
 
@@ -3292,11 +3292,11 @@ A report's name opens it in the inspector:
 Every data report and every PDF template can be scheduled, each with its own frequency, time and recipients. Schedule **Expiring Certificates** daily to catch expiring certificates before they cause outages.
 
 ### Frequency
-**Daily**, **Weekly** (choose the day of week) or **Monthly** (choose the day of month), at a time given in UTC.
+**Daily**, **Weekly** (choose the day of week) or **Monthly** (choose the day of month). The scheduler runs in UTC: when your timezone is not UTC, the time is typed in UTC, and the queue shows it in your timezone.
 
 ### Configuration
 1. Click **Schedule a report**, or **Schedule…** on a report folded under **Not scheduled**
-2. Choose the content, the frequency and its day, the sending time (UTC) and, for a data report, the format (CSV or JSON)
+2. Choose the content, the frequency and its day, the sending time (in UTC when your timezone is not UTC) and, for a data report, the format (CSV or JSON)
 3. Give one or more recipients, separated by commas: without a recipient, nothing is sent
 4. Click **Schedule**
 
