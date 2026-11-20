@@ -7103,7 +7103,15 @@
     "haLate_one": "{{count}} node late",
     "haLate_other": "{{count}} nodes late",
     "theme": {
-      "menu": "Theme"
+      "menu": "Theme",
+      "current": "Theme: {{name}}",
+      "system": "System",
+      "systemNow": "{{mode}} currently",
+      "dark": "Dark",
+      "light": "Light",
+      "aurore": "Aurore dark",
+      "auroreLight": "Aurore light",
+      "more": "More themes"
     },
     "bell": {
       "title": "Notifications",

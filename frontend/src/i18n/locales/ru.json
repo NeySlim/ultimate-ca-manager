@@ -7261,7 +7261,15 @@
     "haLate_many": "{{count}} узлов отстают",
     "haLate_other": "{{count}} узлов отстают",
     "theme": {
-      "menu": "Тема"
+      "menu": "Тема",
+      "current": "Тема: {{name}}",
+      "system": "Системная",
+      "systemNow": "сейчас {{mode}}",
+      "dark": "Тёмная",
+      "light": "Светлая",
+      "aurore": "Аврора тёмная",
+      "auroreLight": "Аврора светлая",
+      "more": "Другие темы"
     },
     "bell": {
       "title": "Уведомления",

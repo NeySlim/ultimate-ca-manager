@@ -7100,7 +7100,15 @@
     "haLate_one": "{{count}} nó em atraso",
     "haLate_other": "{{count}} nós em atraso",
     "theme": {
-      "menu": "Tema"
+      "menu": "Tema",
+      "current": "Theme: {{name}}",
+      "system": "System",
+      "systemNow": "{{mode}} currently",
+      "dark": "Dark",
+      "light": "Light",
+      "aurore": "Aurore dark",
+      "auroreLight": "Aurore light",
+      "more": "More themes"
     },
     "bell": {
       "title": "Notificações",

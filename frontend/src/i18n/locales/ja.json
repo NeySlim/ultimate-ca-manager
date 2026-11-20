@@ -7103,7 +7103,15 @@
     "haLate_one": "{{count}} ノードが遅延",
     "haLate_other": "{{count}} ノードが遅延",
     "theme": {
-      "menu": "テーマ"
+      "menu": "テーマ",
+      "current": "Theme: {{name}}",
+      "system": "System",
+      "systemNow": "{{mode}} currently",
+      "dark": "Dark",
+      "light": "Light",
+      "aurore": "Aurore dark",
+      "auroreLight": "Aurore light",
+      "more": "More themes"
     },
     "bell": {
       "title": "通知",

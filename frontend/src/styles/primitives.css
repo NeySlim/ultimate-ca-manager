@@ -282,3 +282,10 @@ textarea.ui-control { min-height: 80px; resize: vertical; }
 .ui-segmented > button:hover:not(:disabled) { background: var(--hover); }
 .ui-segmented > button[aria-pressed="true"] { background: var(--selected); color: var(--accent); font-weight: 500; }
 .ui-segmented > button:disabled { opacity: 0.42; cursor: not-allowed; }
+
+/* Theme menu of the shell: the mockup's pop menu, 220 px, 8 px under its button on every width */
+.shell-pop.ui-theme-menu { width: 220px; min-width: 220px; box-shadow: 0 18px 50px color-mix(in srgb, var(--ink) 40%, transparent); }
+.ui-pop-item[aria-checked="false"] .ui-pop-check { visibility: hidden; }
+@media (max-width: 899px) {
+  .shell-pop.ui-theme-menu { position: absolute; top: calc(100% + 8px); right: 0; left: auto; width: 220px; }
+}

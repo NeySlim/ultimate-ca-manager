@@ -7103,7 +7103,15 @@
     "haLate_one": "{{count}} nœud en retard",
     "haLate_other": "{{count}} nœuds en retard",
     "theme": {
-      "menu": "Thème"
+      "menu": "Thème",
+      "current": "Thème : {{name}}",
+      "system": "Système",
+      "systemNow": "{{mode}} actuellement",
+      "dark": "Sombre",
+      "light": "Clair",
+      "aurore": "Aurore sombre",
+      "auroreLight": "Aurore clair",
+      "more": "Autres thèmes"
     },
     "bell": {
       "title": "Notifications",

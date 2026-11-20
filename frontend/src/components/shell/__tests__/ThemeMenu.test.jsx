@@ -17,7 +17,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('../../../contexts/ThemeContext', () => ({
   useTheme: () => ({
     ...theme.value, setThemeFamily: theme.setThemeFamily, setMode: theme.setMode,
-    themes: [{ id: 'atelier', nameKey: 'themes.atelier', accent: 'x' }, { id: 'aurore', nameKey: 'themes.aurore', accent: 'y' }],
+    themes: [{ id: 'atelier', nameKey: 'themes.atelier', accent: 'x' }, { id: 'aurore', nameKey: 'themes.aurore', accent: 'y' }, { id: 'purple', nameKey: 'themes.purple', accent: 'z' }],
   }),
 }))
 
@@ -38,46 +38,71 @@ beforeEach(() => {
 })
 
 describe('ThemeMenu', () => {
-  it('picks a family and a mode through the shared context', async () => {
+  it('offers the five choices of the mockup, then the other families', async () => {
     const user = setup()
     await user.click(trigger())
-    await user.click(screen.getByRole('radio', { name: /themes\.aurore/ }))
+    const names = screen.getAllByRole('menuitemradio').map(b => b.textContent)
+    expect(names.slice(0, 5)).toEqual(['shell.theme.system' + 'shell.theme.systemNow', 'shell.theme.dark',
+      'shell.theme.light', 'shell.theme.aurore', 'shell.theme.auroreLight'])
+    expect(names.slice(5)).toEqual(['themes.purple'])
+  })
+
+  it('applies family and mode together, closes, and gives the focus back to the button', async () => {
+    const user = setup()
+    await user.click(trigger())
+    await user.click(screen.getByRole('menuitemradio', { name: /shell\.theme\.auroreLight/ }))
     expect(theme.setThemeFamily).toHaveBeenCalledWith('aurore')
-    await user.click(screen.getByRole('radio', { name: /settings\.light/ }))
     expect(theme.setMode).toHaveBeenCalledWith('light')
-    await user.click(screen.getByRole('radio', { name: /settings\.followSystem/ }))
-    expect(theme.setMode).toHaveBeenCalledWith('system')
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(trigger()).toHaveFocus()
+    await user.click(trigger())
+    await user.click(screen.getByRole('menuitemradio', { name: /shell\.theme\.system/ }))
+    expect(theme.setThemeFamily).toHaveBeenLastCalledWith('atelier')
+    expect(theme.setMode).toHaveBeenLastCalledWith('system')
+    await user.click(trigger())
+    await user.click(screen.getByRole('menuitemradio', { name: /themes\.purple/ }))
+    expect(theme.setThemeFamily).toHaveBeenLastCalledWith('purple')
   })
 
-  it('marks the current family and mode, and focuses the current family on open', async () => {
+  it('checks the current choice and focuses it on open', async () => {
+    theme.value = { themeFamily: 'atelier', mode: 'dark', resolvedMode: 'dark' }
     const user = setup()
     await user.click(trigger())
-    expect(screen.getByRole('radio', { name: /themes\.atelier/ })).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByRole('radio', { name: /settings\.followSystem/ })).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByRole('radio', { name: /themes\.atelier/ })).toHaveFocus()
+    const dark = screen.getByRole('menuitemradio', { name: /shell\.theme\.dark/ })
+    expect(dark).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('menuitemradio', { name: /shell\.theme\.system/ })).toHaveAttribute('aria-checked', 'false')
+    expect(dark).toHaveFocus()
   })
 
-  it('shows the applied mode in the icon, not the chosen one', () => {
+  it('shows the applied theme in the icon and the title', () => {
     theme.value = { themeFamily: 'atelier', mode: 'system', resolvedMode: 'light' }
     setup()
     expect(trigger().querySelector('svg')).toHaveAttribute('data-mode', 'light')
+    expect(trigger().getAttribute('title')).toBe('shell.theme.current|shell.theme.system (shell.theme.light)')
+  })
+
+  it('opens on the down arrow of its button', async () => {
+    const user = setup()
+    trigger().focus()
+    await user.keyboard('{ArrowDown}')
+    expect(screen.getByRole('menu')).toBeInTheDocument()
   })
 
   it('loops the arrow keys over the options', async () => {
     const user = setup()
     await user.click(trigger())
-    const radios = screen.getAllByRole('radio')
+    const items = screen.getAllByRole('menuitemradio')
     await user.keyboard('{ArrowUp}')
-    expect(radios[radios.length - 1]).toHaveFocus()
+    expect(items[items.length - 1]).toHaveFocus()
     await user.keyboard('{ArrowDown}')
-    expect(radios[0]).toHaveFocus()
+    expect(items[0]).toHaveFocus()
   })
 
   it.each(['{Escape}', '{Tab}'])('closes on %s and gives the focus back to the button', async (key) => {
     const user = setup()
     await user.click(trigger())
     await user.keyboard(key)
-    expect(screen.queryByRole('radio', { name: /themes\.aurore/ })).toBeNull()
+    expect(screen.queryByRole('menu')).toBeNull()
     expect(trigger()).toHaveFocus()
     expect(trigger()).toHaveAttribute('aria-expanded', 'false')
   })
