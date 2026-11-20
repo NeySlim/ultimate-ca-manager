@@ -3,8 +3,8 @@
  * form (#430 follow-up).
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, waitFor } from '@testing-library/react'
+import { LABEL, optionValues } from '../certificates/__tests__/issueFormTestUtils'
 
 const TEMPLATES = [
   { id: 1, name: 'Web Server', template_type: 'web_server', is_system: true, is_active: true, key_type: 'RSA-2048', dn_template: {}, extensions_template: {} },
@@ -34,14 +34,10 @@ beforeAll(() => {
 describe('IssueCertificateForm deactivated templates', () => {
   it('offers the active template only', async () => {
     const { IssueCertificateForm } = await import('../certificates/IssueCertificateForm')
-    const user = userEvent.setup()
-    const { container } = render(
+    render(
       <IssueCertificateForm cas={[{ id: 1, descr: 'Test CA', has_private_key: true }]}
         onSubmit={vi.fn()} onCancel={() => {}} t={(key) => key} />
     )
-    await screen.findByText('certificates.templateOptional')
-    await user.click(container.querySelectorAll('[role="combobox"]')[0])
-    expect(await screen.findByRole('option', { name: 'Web Server' })).toBeInTheDocument()
-    expect(screen.queryByRole('option', { name: 'Code Signing' })).toBeNull()
+    await waitFor(() => expect(optionValues(LABEL.template)).toEqual(['', '1']))
   }, 15000)
 })

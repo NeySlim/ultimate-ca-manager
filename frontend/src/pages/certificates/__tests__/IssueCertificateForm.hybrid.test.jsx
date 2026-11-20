@@ -3,7 +3,7 @@
  * issues two linked certificates. Lists come from the key registry.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { GROUP_PQ, KEY_ALGORITHMS } from '../../../lib/keyAlgorithms'
 
 const mocks = vi.hoisted(() => ({ getEffective: vi.fn() }))
@@ -21,25 +21,12 @@ vi.mock('../../../contexts', () => ({
   useNotification: () => ({ showError: vi.fn(), showSuccess: vi.fn(), showWarning: vi.fn() }),
 }))
 
-vi.mock('../../../components', () => ({
-  Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-  Input: ({ label, ...props }) => <input aria-label={label || props.name} {...props} />,
-  DatePicker: () => null,
-  EkuMultiSelect: () => null,
-  Select: ({ label, options = [], value, onChange }) => (
-    <select aria-label={label} value={value ?? ''} onChange={(e) => onChange?.(e.target.value)}>
-      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
-  ),
-}))
-
 import { IssueCertificateForm } from '../IssueCertificateForm'
+import { LABEL, choose, openAdvanced, optionValues, reviewAndIssue, type } from './issueFormTestUtils'
 
 const t = (key) => key
 const PQ_LABELS = KEY_ALGORITHMS.filter(a => a.group === GROUP_PQ && a.generate && a.issue).map(a => a.label)
 const CLASSICAL_LABELS = KEY_ALGORITHMS.filter(a => a.group !== GROUP_PQ && a.generate && a.issue).map(a => a.label)
-const optionValues = (label) =>
-  within(screen.getByLabelText(label)).getAllByRole('option').map((o) => o.value)
 
 function renderForm(effective) {
   const onSubmit = vi.fn().mockResolvedValue(undefined)
@@ -50,15 +37,13 @@ function renderForm(effective) {
       onSubmit={onSubmit} onCancel={() => {}} t={t}
     />
   )
-  fireEvent.change(screen.getByLabelText('common.certificateAuthority'), { target: { value: '3' } })
+  choose(LABEL.ca, '3')
   return onSubmit
 }
 
 async function submit(onSubmit) {
-  fireEvent.change(screen.getByPlaceholderText('example.com'), { target: { value: 'pair.example.test' } })
-  fireEvent.submit(screen.getByPlaceholderText('example.com').closest('form'))
-  await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
-  return onSubmit.mock.calls[0][0]
+  type(LABEL.cn, 'pair.example.test')
+  return reviewAndIssue(onSubmit)
 }
 
 const OPEN = { allowed_key_types: null, allowed_digests: null, default_key_type: 'RSA-2048' }
@@ -69,6 +54,7 @@ describe('IssueCertificateForm hybrid pair', () => {
   it('sends hybrid: { classical, pq } with the chosen pair', async () => {
     const onSubmit = renderForm(OPEN)
     await waitFor(() => expect(mocks.getEffective).toHaveBeenCalled())
+    openAdvanced()
     fireEvent.click(await screen.findByLabelText('certificates.hybrid.toggle'))
     expect(optionValues('certificates.hybrid.classical')).toEqual(CLASSICAL_LABELS)
     expect(optionValues('certificates.hybrid.pq')).toEqual(PQ_LABELS)
@@ -89,20 +75,23 @@ describe('IssueCertificateForm hybrid pair', () => {
 
   it('offers no pair when the policies allow no ML-DSA key', async () => {
     renderForm({ allowed_key_types: ['RSA-2048', 'EC-P256'], allowed_digests: null })
-    await waitFor(() => expect(optionValues('common.keyType')).toEqual(['rsa', 'ecdsa']))
+    await waitFor(() => expect(optionValues(LABEL.key)).toEqual(['RSA-2048', 'EC-P256']))
+    openAdvanced()
     expect(screen.queryByLabelText('certificates.hybrid.toggle')).toBeNull()
   })
 
   it('offers no pair in FIPS mode', async () => {
     renderForm({ ...OPEN, fips: true })
-    await waitFor(() => expect(optionValues('common.keyType')).not.toContain('ml-dsa'))
+    await waitFor(() => expect(optionValues(LABEL.key).some((l) => l.startsWith('ML-DSA'))).toBe(false))
+    openAdvanced()
     expect(screen.queryByLabelText('certificates.hybrid.toggle')).toBeNull()
   })
 
   it('keeps each list to what the policies allow', async () => {
     renderForm({ allowed_key_types: ['EC-P384', 'ML-DSA-87', 'RSA-2048'], allowed_digests: null })
     // The unrestricted lists already offer ml-dsa: wait for the policy itself
-    await waitFor(() => expect(optionValues('common.keySize')).toEqual(['2048']))
+    await waitFor(() => expect(optionValues(LABEL.key)).toEqual(['RSA-2048', 'EC-P384', 'ML-DSA-87']))
+    openAdvanced()
     fireEvent.click(screen.getByLabelText('certificates.hybrid.toggle'))
     expect(optionValues('certificates.hybrid.classical')).toEqual(
       CLASSICAL_LABELS.filter(l => ['EC-P384', 'RSA-2048'].includes(l)))
@@ -112,15 +101,17 @@ describe('IssueCertificateForm hybrid pair', () => {
   it('offers ML-DSA in the pair only when the policies refuse it alone', async () => {
     renderForm({ allowed_key_types: ['EC-P256', 'ML-DSA-65', 'ML-DSA-87'], allowed_digests: null,
       pq_standalone: true })
+    openAdvanced()
     fireEvent.click(await screen.findByLabelText('certificates.hybrid.toggle'))
     expect(optionValues('certificates.hybrid.pq')).toEqual(['ML-DSA-65', 'ML-DSA-87'])
     fireEvent.click(screen.getByLabelText('certificates.hybrid.toggle'))
-    expect(optionValues('common.keyType')).toEqual(['ecdsa'])
+    expect(optionValues(LABEL.key)).toEqual(['EC-P256'])
   })
 
   it('starts the classical member on the server default key when it is a classical one', async () => {
     const onSubmit = renderForm({ ...OPEN, default_key_type: 'EC-P384' })
     await waitFor(() => expect(mocks.getEffective).toHaveBeenCalled())
+    openAdvanced()
     fireEvent.click(await screen.findByLabelText('certificates.hybrid.toggle'))
     await waitFor(() => expect(screen.getByLabelText('certificates.hybrid.classical').value).toBe('EC-P384'))
     // a classical default says nothing about the post-quantum side

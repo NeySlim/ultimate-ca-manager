@@ -12,12 +12,11 @@ import {
   Certificate, DownloadSimple, Plus, UploadSimple, Star, ArrowsLeftRight, Warning, ArrowsClockwise, CaretRight
 } from '@phosphor-icons/react'
 import {
-  ResponsiveLayout, ResponsiveDataTable, Button, Modal, ListButton,
+  ResponsiveLayout, ResponsiveDataTable, Button, ListButton,
   CertificateCompareModal
 } from '../components'
 import { ExportModal } from '../components/ExportModal'
 import { SmartImportModal } from '../components/SmartImport'
-import { showNotices } from '../lib/notices'
 import { certificatesService, casService, truststoreService } from '../services'
 import { useNotification, useMobile, useInspector } from '../contexts'
 import { usePermission, useRecentHistory, useFavorites, useWebSocket, usePersistedState } from '../hooks'
@@ -26,12 +25,11 @@ import { CERT_STATUSES, parseOverviewFilters, toListParams, toSearch, withoutFil
 import { FilterChips } from '../components/ui/FilterChips'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
-import { IssueCertificateForm } from './certificates/IssueCertificateForm'
+import { IssueCertificateDialog } from './certificates/IssueCertificateDialog'
 import { CertificateSlideOver } from './certificates/CertificateSlideOver'
 import { useCertificateColumns } from './certificates/useCertificateColumns'
 import { soleImported } from '../lib/importResult'
 import { useOpenEntity } from '../hooks/useOpenEntity'
-import { issueWithSubjectOverride } from '../lib/uniqueSubject'
 import { sourceLabel } from './certificates/certificateSources'
 
 const NONE = []
@@ -160,7 +158,7 @@ export default function CertificatesPage() {
     else setFilterSource([])
   }, [navigate, location.pathname])
   
-  const { showSuccess, showError, showConfirm, showWarning } = useNotification()
+  const { showSuccess, showError, showWarning } = useNotification()
   const { canWrite, hasPermission } = usePermission()
   const failed = Boolean(loadError) && certificates.length === 0
   // One rule for every export surface on this page — the server's own (see
@@ -685,51 +683,23 @@ export default function CertificatesPage() {
         </>)}
       </ResponsiveLayout>
 
-      {/* Issue Certificate Modal */}
-      <Modal
+      {/* Issue: Configure, then Review (the Atelier issue form) */}
+      <IssueCertificateDialog
         open={showIssueModal}
         onOpenChange={(open) => {
           setShowIssueModal(open)
           if (!open) setIssueInitialData(null)
         }}
-        title={t('certificates.issueCertificate')}
-        size="xl"
-      >
-        <IssueCertificateForm
-          cas={cas}
-          initialData={issueInitialData}
-          onSubmit={async (data) => {
-            try {
-              muteToasts()
-              const response = await issueWithSubjectOverride(
-                options => certificatesService.create({ ...data, ...options }), showConfirm, t)
-              if (response === null) return  // the operator kept the refusal of a taken subject
-              // A hybrid pair answers { certificate: classical, related: ML-DSA }
-              const pair = response?.data?.certificate ? response.data : null
-              const issued = pair ? pair.certificate : response?.data
-              if (response?.data?.approval_required) {
-                showWarning(t('certificates.approvalRequired', { policy: response.data.policy_name }))
-              } else {
-                showSuccess(pair
-                  ? t('certificates.hybrid.pairIssued', { classical: pair.certificate.id, pq: pair.related?.id })
-                  : t('messages.success.create.certificate'))
-                showNotices(response, showWarning)
-              }
-              setShowIssueModal(false)
-              setIssueInitialData(null)
-              loadData()
-              // Straight to what was just issued; a request awaiting approval has no id
-              if (issued?.id) {
-                handleSelectCert(issued)
-              }
-            } catch (error) {
-              showError(error.message || t('common.operationFailed'))
-            }
-          }}
-          onCancel={() => { setShowIssueModal(false); setIssueInitialData(null) }}
-          t={t}
-        />
-      </Modal>
+        cas={cas}
+        initialData={issueInitialData}
+        onMutate={muteToasts}
+        onIssued={(issued) => {
+          setIssueInitialData(null)
+          loadData()
+          // Straight to what was just issued
+          if (issued?.id) handleSelectCert(issued)
+        }}
+      />
 
       {/* Certificate Compare Modal */}
       <CertificateCompareModal

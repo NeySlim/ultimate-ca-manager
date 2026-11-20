@@ -37,6 +37,10 @@ vi.mock('../../services', () => ({
   truststoreService: { getById: vi.fn(), delete: vi.fn() },
 }))
 vi.mock('../deploy/CertDeploySection', () => ({ CertDeploySection: () => null }))
+// Renewal goes through the issue form, stubbed here: its Review step sends an unchanged duration
+vi.mock('../../pages/certificates/IssueCertificateForm', () => ({
+  IssueCertificateForm: ({ onSubmit }) => <button type="button" onClick={() => onSubmit({})}>submit-renew</button>,
+}))
 
 import { InspectorObject } from '../inspector/InspectorObject'
 import { chooseMoreAction } from '../../test/moreActions'
@@ -102,6 +106,8 @@ describe('InspectorObject of a hybrid pair member', () => {
     mocks.notify.showPrompt.mockResolvedValue('')
     await open()
     fireEvent.click(screen.getByText('Renew'))
+    fireEvent.click(await screen.findByText('submit-renew'))
+    await waitFor(() => expect(mocks.certificatesService.renew).toHaveBeenCalledWith(4, {}))
     await waitFor(() => expect(mocks.notify.showSuccess).toHaveBeenCalledWith(toast))
   })
 

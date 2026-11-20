@@ -2,7 +2,7 @@
  * useEntityActions: which actions an entity offers, to whom, and what the
  * guarded ones do when a surface calls them anyway.
  */
-import { renderHook, act, render, screen, fireEvent } from '@testing-library/react'
+import { renderHook, act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const notify = vi.hoisted(() => ({
@@ -122,13 +122,28 @@ describe('what a list row leaves to the detail', () => {
     expect(notify.showSuccess).toHaveBeenCalledWith('certificates.renameSuccess')
   })
 
-  it('renews through the shared renewal prompt', async () => {
-    notify.showPrompt.mockResolvedValueOnce('')
+  it('renews a Microsoft CA certificate through the shared confirmation', async () => {
+    notify.showConfirm.mockResolvedValueOnce(true)
     svc.certs.renew.mockResolvedValue({ data: { id: 4 } })
-    const r = run('certificate', CERT, ALL)
+    const r = run('certificate', { ...CERT, source: 'msca' }, ALL)
     await act(async () => { await r.actions.find(a => a.id === 'renew').onClick() })
     expect(svc.certs.renew).toHaveBeenCalledWith(4, {})
-    expect(notify.showPrompt.mock.calls[0][1].title).toBe('certificates.renewCertificate')
+    expect(notify.showConfirm.mock.calls[0][1].title).toBe('certificates.renewCertificate')
+  })
+
+  it('renews a certificate UCM signed through the issue form, in two steps', async () => {
+    svc.certs.renew.mockResolvedValue({ data: { id: 4 } })
+    function Harness() {
+      const r = useEntityActions({ type: 'certificate', entity: CERT, permissions: ALL, onClose: vi.fn() })
+      return <>{r.actions.map(a => <button key={a.id} type="button" onClick={a.onClick}>{`action-${a.id}`}</button>)}{r.modals}</>
+    }
+    render(<Harness />)
+    fireEvent.click(screen.getByText('action-renew'))
+    expect(await screen.findByRole('heading', { name: 'certificates.issueForm.titleRenew' })).toBeTruthy()
+    expect(notify.showPrompt).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: /issueForm.toReview/ }))
+    fireEvent.click(await screen.findByTestId('issue-submit'))
+    await waitFor(() => expect(svc.certs.renew).toHaveBeenCalledWith(4, {}))
   })
 
   it('sends a still-valid certificate to the revocation dialog before deleting it', async () => {

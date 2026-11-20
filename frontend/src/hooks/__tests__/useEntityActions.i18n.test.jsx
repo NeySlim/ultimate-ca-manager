@@ -80,20 +80,26 @@ describe('translated messages of the entity actions', () => {
     await waitFor(() => expect(notify.showError).toHaveBeenCalledWith(fr.messages.errors.revokeFailed.certificate))
   })
 
-  it('reports a renewed certificate in the locale', async () => {
-    svc.certs.renew.mockResolvedValue({ data: { id: 5 } })
+  // Renewal goes through the issue form: Configure, then Review, where alone it is sent
+  const renewThroughForm = async () => {
     render(<ActionsHarness entity={CERT} permissions={ALLOW} />)
     fireEvent.click(screen.getByText(fr.common.renew))
+    fireEvent.click(await screen.findByRole('button', { name: new RegExp(fr.certificates.issueForm.toReview) }))
+    fireEvent.click(await screen.findByTestId('issue-submit'))
+  }
+
+  it('reports a renewed certificate in the locale', async () => {
+    svc.certs.renew.mockResolvedValue({ data: { id: 5 } })
+    await renewThroughForm()
     await waitFor(() => expect(notify.showSuccess).toHaveBeenCalled())
     expect(fr.certificates.renewed).toEqual(expect.any(String))
     expect(notify.showSuccess).toHaveBeenCalledWith(fr.certificates.renewed)
   })
 
-  it('reports a failed renewal in the locale', async () => {
+  it('reports a failed renewal in the locale, in the Review step', async () => {
     svc.certs.renew.mockRejectedValue(new Error(''))
-    render(<ActionsHarness entity={CERT} permissions={ALLOW} />)
-    fireEvent.click(screen.getByText(fr.common.renew))
-    await waitFor(() => expect(notify.showError).toHaveBeenCalledWith(fr.common.operationFailed))
+    await renewThroughForm()
+    expect((await screen.findByRole('alert')).textContent).toContain(fr.common.operationFailed)
   })
 
   it.each([

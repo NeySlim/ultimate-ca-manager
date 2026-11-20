@@ -2,7 +2,7 @@
  * The issue form says how many CAs it leaves out instead of hiding them in silence (#426).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({ getEffective: vi.fn(), getAll: vi.fn(), getForCA: vi.fn() }))
 
@@ -16,22 +16,8 @@ vi.mock('../../contexts', () => ({
   useNotification: () => ({ showError: vi.fn(), showSuccess: vi.fn(), showWarning: vi.fn() }),
 }))
 
-vi.mock('../../components', () => ({
-  Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-  Input: ({ label, ...props }) => <input aria-label={label || props.name} {...props} />,
-  DatePicker: () => null,
-  EkuMultiSelect: () => null,
-  Select: ({ label, options = [], value, onChange, helperText }) => (
-    <>
-      <select aria-label={label} value={value ?? ''} onChange={(e) => onChange?.(e.target.value)}>
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      {helperText && <p data-testid={`help-${label}`}>{helperText}</p>}
-    </>
-  ),
-}))
-
 import { IssueCertificateForm } from '../certificates/IssueCertificateForm'
+import { LABEL, optionValues } from '../certificates/__tests__/issueFormTestUtils'
 
 const t = (key, opts) => (opts?.count !== undefined ? `${key}:${opts.count}` : key)
 
@@ -50,13 +36,13 @@ describe('IssueCertificateForm CAs that cannot sign (#426)', () => {
       { id: 3, descr: 'Issuing CA', has_private_key: true },
       { id: 4, descr: 'Imported root', is_root: true, certificate_only: true, has_private_key: false },
     ])
-    const options = within(screen.getByLabelText('common.certificateAuthority')).getAllByRole('option').map((o) => o.value)
-    expect(options).toEqual(['3'])
-    expect(screen.getByTestId('help-common.certificateAuthority')).toHaveTextContent('cas.notListedForSigning:1')
+    // The placeholder leads the list until a CA is chosen
+    expect(optionValues(LABEL.ca)).toEqual(['', '3'])
+    expect(screen.getByTestId('unlisted-cas')).toHaveTextContent('cas.notListedForSigning:1')
   })
 
   it('says nothing when every CA can sign', () => {
     renderForm([{ id: 3, descr: 'Issuing CA', has_private_key: true }])
-    expect(screen.queryByTestId('help-common.certificateAuthority')).toBeNull()
+    expect(screen.queryByTestId('unlisted-cas')).toBeNull()
   })
 })
