@@ -180,7 +180,7 @@ describe('screen labels quoted by every help language', () => {
     const mtls = help(lang, 'user-certificates').guide
     for (const s of [t.account.addCertificate, t.account.mtlsGenerate, t.account.generateCertificate, t.account.clientCertificates]) expect(mtls).toContain(bold(s))
     const audit = help(lang, 'auditLogs').guide
-    for (const s of [t.audit.cleanupLogs, t.common.deleteOldLogs]) expect(audit).toContain(bold(s))
+    for (const s of [t.audit.exportJournal, t.audit.filters, t.audit.verifyIntegrity, t.audit.cleanupLogsEllipsis, t.audit.deleteOldLogs, t.audit.inspectCertificate]) expect(audit).toContain(bold(s))
     expect(help(lang, 'importExport').guide).toContain(bold(t.importExport.opnsense.importSelected))
     expect(strings(help(lang, 'account').page).join('\n')).toContain(t.common.logout)
     // Key regeneration and signature schemes have no control on screen: the help names the API.

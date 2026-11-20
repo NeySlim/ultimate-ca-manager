@@ -196,7 +196,7 @@ it. Without a master key, entries are sealed with SHA-256, which anyone able to 
 database can recompute, and the check reports the log as not protected. A retention purge
 removes the oldest entries only and records, sealed, where the log now starts.
 
-`GET /api/v2/audit/verify` (Audit Logs > Verify Integrity) reports `intact`, `broken` at
+`GET /api/v2/audit/verify` (Audit Logs > Verify integrity) reports `intact`, `broken` at
 entry N, or `unprotected`. It runs as a background job in the scheduler process, page by page,
 so the web worker stays available and other writes go on meanwhile; past 25 seconds the route
 answers `202` and the job is followed at `/api/v2/system/jobs/<id>` (see API_REFERENCE.md,

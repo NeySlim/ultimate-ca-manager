@@ -30,7 +30,7 @@ function leading(element, labels) {
 const PAGES_DIR = path.resolve(__dirname, '../pages')
 const pagesJs = fs.readFileSync(path.resolve(__dirname, '../navigation/pages.js'), 'utf8')
 const PAGE_FILE = Object.fromEntries([...pagesJs.matchAll(/^\s+['"]?([\w-]+)['"]?: lazyWithRetry\(\(\) => import\('\.\.\/pages\/(\w+)'\)/gm)].map(m => [m[1], m[2]]))
-const PAGE_DIR = { users: 'users', acme: 'acme', scep: 'scep', cas: 'cas', certificates: 'certificates', discovery: 'discovery', settings: 'settings' }
+const PAGE_DIR = { users: 'users', acme: 'acme', scep: 'scep', cas: 'cas', certificates: 'certificates', discovery: 'discovery', settings: 'settings', audit: 'activity' }
 const sourcesOf = (dir) => fs.existsSync(dir)
   ? fs.readdirSync(dir, { recursive: true }).filter(f => /\.jsx?$/.test(f) && !/(^|\/)__tests__\//.test(f)).map(f => path.join(dir, f))
   : []

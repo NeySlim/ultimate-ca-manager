@@ -1098,38 +1098,38 @@ export const helpContent = {
   },
 
   auditLogs: {
-    title: 'Audit Logs',
-    subtitle: 'Activity tracking and compliance',
-    overview: 'Complete audit trail of all operations performed in UCM. Track who did what, when, and from where. Supports filtering, search, export, and integrity verification.',
+    title: 'Activity',
+    subtitle: 'The audit log of every operation',
+    overview: 'Every operation performed in UCM, from certificate to log: who did what, when, from where, with what result. The list reads the server page by page; the filters, the export, the integrity check and the clean-up act on the whole log.',
     sections: [
       {
-        title: 'Filters',
+        title: 'Find an entry',
         icon: ListChecks,
         items: [
-          { label: 'Action Type', text: 'Filter by operation type (create, update, delete, login, etc.)' },
-          { label: 'User', text: 'Filter by the user who performed the action' },
-          { label: 'Status', text: 'Show only successful or failed operations' },
-          { label: 'Date Range', text: 'Set from/to dates to narrow the time window' },
-          { label: 'Search', text: 'Free-text search across all log entries' },
+          { label: 'Search', text: 'Free text in the user name, action code, details, resource type and IP address; the resource name itself is not searched' },
+          { label: 'Operation type', text: 'Issuances, renewals, revocations, sign-ins, users, settings and the other types each group the server’s action codes' },
+          { label: 'Filters', text: 'Dates, user, result and individual action codes; each active filter shows as a chip under the toolbar, with its own remove button' },
+          { label: 'Shortcuts and saved filters', text: 'Failed sign-ins or all failures in one click; the current filters can be saved under a name and applied again (kept in this browser)' },
+          { label: 'Detail', text: 'The resource name or the arrow of a row opens the entry: its text, user, date and time, result, action code, IP address and client; Inspect the certificate (or View the authority) opens what the entry names' },
         ]
       },
       {
-        title: 'Actions',
+        title: 'Journal actions',
         icon: Database,
         items: [
-          { label: 'Export', text: 'Download logs in JSON or CSV format' },
-          { label: 'Cleanup Old Logs', text: 'Purge old logs with configurable retention (days)' },
-          { label: 'Verify Integrity', text: 'Check log chain integrity to detect tampering; on a large ledger it runs in the background, with its progress and a cancel button' },
+          { label: 'Export the log', text: 'CSV or JSON, with the current search and filters, 10,000 entries at most; on a phone it is in the « ⋯ » menu' },
+          { label: 'Verify integrity', text: 'In the « ⋯ » menu: checks the hash chain of the log; on a large log it runs in the background, its progress and Cancel verification show in the summary line' },
+          { label: 'Clean up old logs', text: 'In the « ⋯ » menu, with the right to delete the log: deletes the entries older than a retention of 30 to 365 days' },
         ]
       },
     ],
     tips: [
-      'Export logs regularly for compliance and archival purposes',
-      'Failed login attempts are logged with source IP for security monitoring',
-      'Log entries include User Agent for identifying client applications',
+      'Export the log regularly for compliance and archiving',
+      'Failed sign-ins are recorded with their source IP address, and every entry with its client (user agent)',
+      'A certificate’s « View its activity » opens this page on a search for its name',
     ],
     warnings: [
-      'Log cleanup is irreversible: exported data cannot be re-imported',
+      'Cleaning up is irreversible: an exported log cannot be imported back',
     ],
     related: ['Settings', 'Users & Groups', 'RBAC']
   },
