@@ -4,11 +4,12 @@
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import i18next from 'i18next'
-import { dueTone, relativeParts, relativeDue, relativeAgo } from '../relativeTime'
+import { dueTone, relativeParts, relativeDue, relativeAgo, shortParts, relativeShort } from '../relativeTime'
 import { daysRemaining } from '../utils'
 import en from '../../i18n/locales/en.json'
 import fr from '../../i18n/locales/fr.json'
 import ru from '../../i18n/locales/ru.json'
+import zh from '../../i18n/locales/zh.json'
 
 const NOW = new Date('2026-11-08T12:00:00Z')
 const HOUR = 3600000
@@ -110,5 +111,42 @@ describe('dueTone', () => {
   it('is quiet without a date', () => {
     expect(dueTone(null, { now: NOW })).toBe('')
     expect(dueTone('nope', { now: NOW })).toBe('')
+  })
+})
+
+describe('relativeShort: the short expiry of a list', () => {
+  it.each([
+    [3, 'time.short.days', 3],
+    [59, 'time.short.days', 59],
+    [61, 'time.short.months', 2],
+    [493, 'time.short.months', 16],
+    [731, 'time.short.years', 2],
+    [3324, 'time.short.years', 9],
+  ])('reads %i days in the unit its size calls for', (days, key, count) => {
+    expect(shortParts(at((days - 0.5) * DAY), { now: NOW })).toEqual({ key, count })
+  })
+
+  it('says Expired once the date is past, and nothing without a date', () => {
+    expect(shortParts(at(-HOUR), { now: NOW })).toEqual({ key: 'time.short.expired' })
+    expect(relativeShort(null, t, { now: NOW })).toBe('')
+  })
+
+  it.each([
+    ['en', en, ['3 d', '16 mo', '9 y', 'Expired']],
+    ['fr', fr, ['3 j', '16 mois', '9 ans', 'Échu']],
+  ])('is translated in %s', async (lng, resources, expected) => {
+    const i18n = i18next.createInstance()
+    await i18n.init({ lng, resources: { [lng]: { translation: resources } } })
+    const say = i18n.t.bind(i18n)
+    expect([2.5, 492.5, 3323.5, -1].map((d) => relativeShort(at(d * DAY), say, { now: NOW }))).toEqual(expected)
+  })
+
+  it.each([['ru', ru], ['zh', zh]])('has its own words in %s', async (lng, resources) => {
+    const i18n = i18next.createInstance()
+    await i18n.init({ lng, resources: { [lng]: { translation: resources } } })
+    const say = i18n.t.bind(i18n)
+    const words = [2.5, 492.5, 3323.5, -1].map((d) => relativeShort(at(d * DAY), say, { now: NOW }))
+    expect(new Set(words).size).toBe(4)
+    expect(words.join(' ')).not.toMatch(/time\.short|Expired|\bmo\b/)
   })
 })

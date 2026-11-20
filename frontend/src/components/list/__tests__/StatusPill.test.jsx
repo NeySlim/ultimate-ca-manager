@@ -58,6 +58,34 @@ describe('EntityName', () => {
     fireEvent.click(name)
     expect(open).toHaveBeenCalledTimes(1)
   })
+
+  it('shows a name its column cuts whole in a tooltip, on keyboard focus as on hover', () => {
+    const LONG = 'acme-certificate-order-7T5-25smlvstR5csU9Msq.example.com'
+    render(<EntityName icon={Icon}>{LONG}</EntityName>)
+    const name = screen.getByRole('button', { name: LONG })
+    const text = name.querySelector('.lv-entity-text')
+    // Shortened by its column: wider content than room
+    Object.defineProperty(text, 'scrollWidth', { configurable: true, value: 400 })
+    Object.defineProperty(text, 'clientWidth', { configurable: true, value: 120 })
+    fireEvent.focus(name)
+    const tip = screen.getByRole('tooltip')
+    expect(tip).toHaveTextContent(LONG)
+    expect(name).toHaveAttribute('aria-describedby', tip.id)
+    fireEvent.keyDown(name, { key: 'Escape' })
+    expect(screen.queryByRole('tooltip')).toBeNull()
+    fireEvent.mouseEnter(name)
+    expect(screen.getByRole('tooltip')).toBeInTheDocument()
+    fireEvent.mouseLeave(name)
+    expect(screen.queryByRole('tooltip')).toBeNull()
+  })
+
+  it('offers no tooltip for a name shown whole', () => {
+    render(<EntityName>api.example.com</EntityName>)
+    const name = screen.getByRole('button', { name: 'api.example.com' })
+    fireEvent.focus(name)
+    expect(screen.queryByRole('tooltip')).toBeNull()
+    expect(name).not.toHaveAttribute('aria-describedby')
+  })
 })
 
 describe('RowMark', () => {

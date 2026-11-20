@@ -2,6 +2,8 @@
  * State pill of the list template: an icon and a coloured label, no fill and no
  * animated dot. The icon and the word carry the state; the colour only repeats it.
  */
+import { useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { CheckCircle, Clock, Warning, Prohibit } from '@phosphor-icons/react'
 import { cn } from '../../lib/utils'
 import './list.css'
@@ -30,13 +32,34 @@ export function SourceLabel({ icon: Icon, label, className, ...props }) {
   )
 }
 
-/** The name that opens a row's detail: its click reaches the row, which opens it. */
+/**
+ * The name that opens a row's detail: its click reaches the row, which opens it.
+ * A name cut by its column shows whole in a tooltip on hover and on keyboard focus.
+ */
 export function EntityName({ icon: Icon, children, className, ...props }) {
+  const text = useRef(null)
+  const tipId = useId()
+  const [tip, setTip] = useState(null)
+  const show = () => {
+    const el = text.current
+    if (!el || el.scrollWidth <= el.clientWidth) return
+    const r = el.getBoundingClientRect()
+    setTip({ left: Math.round(r.left), top: Math.round(r.bottom + 6) })
+  }
+  const hide = () => setTip(null)
   return (
-    <button type="button" className={cn('lv-entity', className)} {...props}>
-      {Icon && <Icon aria-hidden="true" />}
-      {children}
-    </button>
+    <>
+      <button type="button" className={cn('lv-entity', className)} aria-describedby={tip ? tipId : undefined}
+        onFocus={show} onBlur={hide} onMouseEnter={show} onMouseLeave={hide}
+        onKeyDown={(e) => { if (e.key === 'Escape' && tip) { e.stopPropagation(); hide() } }} {...props}>
+        {Icon && <Icon aria-hidden="true" />}
+        <span ref={text} className="lv-entity-text">{children}</span>
+      </button>
+      {tip && createPortal(
+        <div role="tooltip" id={tipId} className="lv-float-tip" style={{ left: tip.left, top: tip.top }}>{children}</div>,
+        document.body,
+      )}
+    </>
   )
 }
 

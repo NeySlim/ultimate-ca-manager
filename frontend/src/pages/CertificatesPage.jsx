@@ -7,9 +7,9 @@
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
-  Certificate, DownloadSimple, Plus, UploadSimple, Star, ArrowsLeftRight
+  Certificate, DownloadSimple, Plus, UploadSimple, Star, ArrowsLeftRight, Warning, ArrowsClockwise, CaretRight
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Button, Modal, ListButton,
@@ -29,7 +29,6 @@ import { downloadExport } from '../lib/exportDownload'
 import { IssueCertificateForm } from './certificates/IssueCertificateForm'
 import { CertificateSlideOver } from './certificates/CertificateSlideOver'
 import { useCertificateColumns } from './certificates/useCertificateColumns'
-import { UploadKeyModal } from './certificates/UploadKeyModal'
 import { soleImported } from '../lib/importResult'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 import { issueWithSubjectOverride } from '../lib/uniqueSubject'
@@ -68,6 +67,8 @@ export default function CertificatesPage() {
   const [certificates, setCertificates] = useState([])
   const [cas, setCas] = useState([])
   const [loading, setLoading] = useState(true)
+  // Why the last read failed; the banner replaces an empty list until a read succeeds
+  const [loadError, setLoadError] = useState(null)
   const [certStats, setCertStats] = useState({ valid: 0, expiring: 0, expired: 0, revoked: 0, orphan: 0, total: 0 })
   
   // Selection
@@ -75,7 +76,6 @@ export default function CertificatesPage() {
   const [showIssueModal, setShowIssueModal] = useState(false)
   const [issueInitialData, setIssueInitialData] = useState(null)
   const [showImportModal, setShowImportModal] = useState(false)
-  const [showKeyModal, setShowKeyModal] = useState(false)
   const [showCompareModal, setShowCompareModal] = useState(false)
   const [exportRowCert, setExportRowCert] = useState(null)
   // Rows ticked on the page on screen, and the two handed to the comparison
@@ -162,6 +162,7 @@ export default function CertificatesPage() {
   
   const { showSuccess, showError, showConfirm, showWarning } = useNotification()
   const { canWrite, hasPermission } = usePermission()
+  const failed = Boolean(loadError) && certificates.length === 0
   // One rule for every export surface on this page — the server's own (see
   // lib/exportPermissions): read:private_keys, not write:certificates.
   const canExportKey = canExportPrivateKey('certificate', { hasPermission, canWrite })
@@ -217,6 +218,7 @@ export default function CertificatesPage() {
       const caList = casRes.data || []
 
       if (seq !== requestSeq.current) return
+      setLoadError(null)
       setCertificates(certs)
       // A selection never outlives the rows it was made on
       setSelectedIds((prev) => {
@@ -231,6 +233,8 @@ export default function CertificatesPage() {
       setCas(caList)
       setCertStats(statsRes.data || { valid: 0, expiring: 0, expired: 0, revoked: 0, orphan: 0, total: 0 })
     } catch (error) {
+      if (seq !== requestSeq.current) return
+      setLoadError(error?.message || t('messages.errors.loadFailed.certificates'))
       showError(error.message || t('messages.errors.loadFailed.certificates'))
     } finally {
       if (seq === requestSeq.current) setLoading(false)
@@ -543,7 +547,8 @@ export default function CertificatesPage() {
     <>
       <ResponsiveLayout
         title={t('common.certificates')}
-        total={t('certificates.total', { count: certStats.total })}
+        // No count before the first read succeeds: a zero there would be a claim
+        total={failed || (loading && !certificates.length) ? '' : t('certificates.total', { count: certStats.total })}
         intent={t('certificates.intent')}
         actions={canWrite('certificates') && (
           <>
@@ -555,7 +560,7 @@ export default function CertificatesPage() {
             </ListButton>
           </>
         )}
-        views={views}
+        views={failed ? [] : views}
         activeView={activeView}
         onViewChange={(id) => setStatus(id ? [id] : [])}
         viewsLabel={t('certificates.viewsLabel')}
@@ -591,6 +596,21 @@ export default function CertificatesPage() {
         )}
         onSlideOverClose={() => setSelectedCert(null)}
       >
+        {failed ? (
+          <div className="lv-error" role="alert" data-testid="certificates-load-error">
+            <Warning aria-hidden="true" />
+            <div>
+              <h2>{t('certificates.loadFailed')}</h2>
+              <p>{t('certificates.loadFailedCause', { message: loadError })}</p>
+              <div className="lv-error-actions">
+                <ListButton primary icon={ArrowsClockwise} onClick={() => loadData()}>{t('table.retry')}</ListButton>
+                {hasPermission('read:audit') && (
+                  <Link className="lv-text-link" to="/audit">{t('certificates.viewLog')}<CaretRight size={14} aria-hidden="true" /></Link>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (<>
         <div data-testid="overview-chips" className="shrink-0">
           <FilterChips
             filters={overviewChips}
@@ -609,6 +629,7 @@ export default function CertificatesPage() {
           rowLabel={(row) => row.cn}
           tableLabel={t('certificates.listLabel')}
           rangeLabel={({ start, end, total: count }) => t('certificates.range', { start, end, count })}
+          footNote={t('certificates.listNote')}
           searchable
           searchPlaceholder={t('certificates.searchPlaceholder')}
           externalSearch={searchValue}
@@ -661,6 +682,7 @@ export default function CertificatesPage() {
             </Button>
           )}
         />
+        </>)}
       </ResponsiveLayout>
 
       {/* Issue Certificate Modal */}
@@ -708,18 +730,6 @@ export default function CertificatesPage() {
           t={t}
         />
       </Modal>
-
-      {/* Upload Private Key Modal */}
-      <UploadKeyModal
-        open={showKeyModal}
-        onOpenChange={(open) => setShowKeyModal(open)}
-        selectedCert={selectedCert}
-        onUploadComplete={(updatedCert) => {
-          loadData()
-          setSelectedCert(updatedCert)
-        }}
-        t={t}
-      />
 
       {/* Certificate Compare Modal */}
       <CertificateCompareModal
