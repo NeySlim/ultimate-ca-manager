@@ -327,7 +327,8 @@ export const helpContent = {
     tips: [
       'Star ⭐ important certificates to add them to your favorites list',
       'The tabs above the list filter by state and count each one; the tab is part of the address, so a reload or a shared link keeps it. The CA, source and template filters are remembered across reloads',
-      'A row keeps one action, Export; open the certificate (click its row) for Rename, Renew, Revoke and Delete. Tick rows to compare two certificates or to export several as one PEM file',
+      'A row keeps one action, Export; click the row to open the certificate in the inspector, with Export and Renew in its heading and Rename, Revoke, Delete and the other actions in its ⋯ menu. Tick rows to compare two certificates or to export several as one PEM file',
+      'The Expiry column says in short how far the date is (3 d, 16 mo, 9 y, Expired); hover or focus it for the exact date and time. A name too long for its column ends with an ellipsis and shows whole on hover or focus',
       'Renewing keeps the same record (id, refid, creation date). Renew from the page generates a new key; the automatic renewal keeps the key. A certificate whose key UCM does not hold (SCEP, EST, WSTEP or ACME enrolment, import without the key) is refused (409): renew it through its protocol or sign a new request',
       'Need a non-standard EKU (Microsoft RDP, smartcard logon, document signing)? Add it via "Extra EKUs" instead of editing templates',
       'When a policy or the issuing CA\'s expiry shortens the requested validity, the result says so: "Issued for N day(s) instead of the M requested", with the reason',
