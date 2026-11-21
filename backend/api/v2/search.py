@@ -4,7 +4,8 @@ Global Search API - Search across all entities
 from flask import Blueprint, request, g
 from sqlalchemy import or_
 from auth.unified import require_auth, has_permission
-from models import Certificate, CA, User, CertificateTemplate
+from models import Certificate, CA, User, CertificateTemplate, AcmeAccount
+from models.scep import ScepProfile
 from utils.response import success_response
 from utils.pagination import parse_request_limit
 from utils.datetime_utils import utc_now
@@ -17,7 +18,7 @@ bp = Blueprint('search', __name__)
 @require_auth()
 def global_search():
     """
-    Search across certificates, CAs, users, and templates.
+    Search across certificates, CAs, users, templates, ACME accounts and SCEP profiles.
     
     Query params:
         q: search query (required, min 2 chars)
@@ -28,7 +29,9 @@ def global_search():
             "certificates": [...],
             "cas": [...],
             "users": [...],
-            "templates": [...]
+            "templates": [...],
+            "acme_accounts": [...],   # read:acme only
+            "scep_profiles": [...]    # read:scep only
         }
     """
     query = request.args.get('q', '').strip()
@@ -39,7 +42,9 @@ def global_search():
             'certificates': [],
             'cas': [],
             'users': [],
-            'templates': []
+            'templates': [],
+            'acme_accounts': [],
+            'scep_profiles': [],
         })
     
     # Escape LIKE wildcards in user input
@@ -129,8 +134,50 @@ def global_search():
         'description': t.description,
         'type': 'template'
     } for t in templates]
-    
+
+    # The protocol objects the palette offers, each to the readers of its module only
+    results['acme_accounts'] = []
+    if has_permission('read:acme', g.permissions):
+        accounts = AcmeAccount.query.filter(
+            or_(
+                AcmeAccount.contact.ilike(search_pattern, escape='\\'),
+                AcmeAccount.account_id.ilike(search_pattern, escape='\\'),
+            )
+        ).order_by(AcmeAccount.created_at.desc()).limit(limit).all()
+        results['acme_accounts'] = [{
+            'id': a.id,
+            'name': _acme_account_name(a),
+            'account_id': a.account_id,
+            'status': a.status,
+            'type': 'acme_account',
+        } for a in accounts]
+
+    results['scep_profiles'] = []
+    if has_permission('read:scep', g.permissions):
+        profiles = ScepProfile.query.filter(
+            or_(
+                ScepProfile.name.ilike(search_pattern, escape='\\'),
+                ScepProfile.url_slug.ilike(search_pattern, escape='\\'),
+                ScepProfile.description.ilike(search_pattern, escape='\\'),
+            )
+        ).order_by(ScepProfile.name).limit(limit).all()
+        results['scep_profiles'] = [{
+            'id': p.id,
+            'name': p.name,
+            'url_slug': p.url_slug,
+            'enabled': p.enabled,
+            'type': 'scep_profile',
+        } for p in profiles]
+
     return success_response(data=results)
+
+
+def _acme_account_name(account):
+    """The first contact without its scheme, else the account's own id."""
+    for uri in account.contact_list:
+        if isinstance(uri, str) and uri:
+            return uri.split(':', 1)[1] if uri.lower().startswith('mailto:') else uri
+    return account.account_id
 
 
 def _extract_cn(subject):

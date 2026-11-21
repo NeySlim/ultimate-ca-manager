@@ -65,7 +65,7 @@ export default function CertificatesPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const openEntity = useOpenEntity()
-  const { opened = [], activeKey } = useInspector()
+  const { opened = [], activeKey, closeOnNav } = useInspector()
   const docked = opened.find((o) => o.key === activeKey)
   const dockedId = docked?.type === 'certificate' ? Number(docked.entityId) : undefined
   const { addToHistory } = useRecentHistory('certificates')
@@ -580,7 +580,7 @@ export default function CertificatesPage() {
             pagination={{ page, pages, perPage, sizes: PAGE_SIZES, jump: true, perPageLabel: t('certificates.perPageLabel'),
               onPage: setPage, onPerPage: (v) => { setPerPage(v); setPage(1) } }} />
         )}
-        captionNote={t('certificates.listNote')} />
+        captionNote={t(closeOnNav ? 'certificates.listNoteCloseOnNav' : 'certificates.listNote')} />
     </Zone>
   )
 }

@@ -481,6 +481,8 @@
     "searchLabel": "Search for a command or a certificate",
     "subtitle": "Certificates, authorities and console navigation",
     "noCommandsFound": "Keine Befehle gefunden",
+    "acmeAccount": "ACME account",
+    "scepProfile": "SCEP profile",
     "favorites": "Favoriten",
     "recent": "Kürzlich",
     "searchSections": {
@@ -920,6 +922,7 @@
     "listLabel": "Liste der Zertifikate",
     "uploadKey": "Upload private key",
     "listNote": "Open certificates stay available in the inspector.",
+    "listNoteCloseOnNav": "Open certificates close when you change page (setting in My Account).",
     "loadFailed": "Could not load the certificates",
     "loadFailedCause": "Cause: {{message}}. The other views and the inspector stay usable.",
     "viewLog": "View the log",
@@ -7004,7 +7007,12 @@
       "discovery": "Zu Discovery",
       "msca": "Zu MS CA",
       "sshCas": "SSH-CAs",
-      "sshCertificates": "SSH-Zertifikate"
+      "sshCertificates": "SSH-Zertifikate",
+      "trustStore": "Go to Trust Store",
+      "userCertificates": "Go to User Certificates",
+      "tsa": "Go to TSA",
+      "keyRecovery": "Go to Key Recovery",
+      "logs": "Go to System Logs"
     },
     "actions": {
       "newCertificate": "Neues Zertifikat ausstellen",

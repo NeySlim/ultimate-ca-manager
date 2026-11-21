@@ -5,10 +5,10 @@ import { apiClient, buildQueryString } from './apiClient'
 
 export const searchService = {
   /**
-   * Global search across certificates, CAs, users, templates, CSRs
+   * Global search across certificates, CAs, users, templates, CSRs, ACME accounts and SCEP profiles
    * @param {string} query - Search query (min 2 chars)
    * @param {number} limit - Max results per category (default 5)
-   * @returns {Promise<{certificates: [], cas: [], users: [], templates: [], csrs: []}>}
+   * @returns {Promise<{certificates: [], cas: [], users: [], templates: [], csrs: [], acme_accounts: [], scep_profiles: []}>}
    */
   async globalSearch(query, limit = 5) {
     if (!query || query.length < 2) {
@@ -17,7 +17,9 @@ export const searchService = {
         cas: [],
         users: [],
         templates: [],
-        csrs: []
+        csrs: [],
+        acme_accounts: [],
+        scep_profiles: []
       }
     }
     

@@ -181,12 +181,18 @@ export default function CSRsPage() {
 
   useEffect(() => {
     loadAux()
-    if (searchParams.get('action') === 'upload') {
-      openModal('upload')
-      searchParams.delete('action')
-      setSearchParams(searchParams)
-    }
   }, [])
+
+  // `?action=upload` (the palette) opens the upload form, the page already open or not, then leaves the URL
+  const askedAction = searchParams.get('action')
+  useEffect(() => {
+    if (askedAction !== 'upload') return
+    if (canWrite('csrs')) openModal('upload')
+    const next = new URLSearchParams(searchParams)
+    next.delete('action')
+    setSearchParams(next, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askedAction])
 
   // The active tab's page, plus both tabs' unfiltered totals for the counts.
   // A reload started earlier must not overwrite a later one (page or search

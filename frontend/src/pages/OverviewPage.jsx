@@ -67,16 +67,6 @@ export default function OverviewPage() {
   }), [save, t, title, notify])
   const context = useMemo(() => ({ ...page, notify }), [page, notify])
 
-  // A figure of the strip leads to its card when that card is on screen
-  const go = (id) => {
-    if (!shown.includes(id)) return null
-    return () => {
-      const card = document.getElementById(`card-${id}`)
-      card?.scrollIntoView?.({ block: 'start' })
-      document.getElementById(`card-${id}-title`)?.focus({ preventScroll: true })
-    }
-  }
-
   return (
     <OverviewContext.Provider value={context}>
       <Zone testId="overview-page" after={dialog && (
@@ -108,7 +98,7 @@ export default function OverviewPage() {
           )} />
         <div className="scroll-view" id="view-scroll">
           <SetupWizard admin={isAdmin()} share={page.share} />
-          <MetricStrip showQueue={page.showQueue} go={go} />
+          <MetricStrip showQueue={page.showQueue} />
           {shown.length > 0 ? (
             <div className="dash-cards">
               {shown.map((id) => {

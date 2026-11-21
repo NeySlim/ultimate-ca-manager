@@ -109,14 +109,19 @@ export default function CAsPage() {
   useEffect(() => {
     loadCAs()
     if (canRead('certificates')) crlService.getOcspStatus().then((res) => setOcsp(res?.data || null)).catch(() => setOcsp(null))
-    if (searchParams.get('action') === 'create') {
-      if (canWriteCAs) setCreateOpen(true)
-      const next = new URLSearchParams(searchParams)
-      next.delete('action')
-      setSearchParams(next, { replace: true })
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // `?action=create` (setup steps, the palette) opens the form, the page already open or not, then leaves the URL
+  const askedAction = searchParams.get('action')
+  useEffect(() => {
+    if (askedAction !== 'create') return
+    if (canWriteCAs) setCreateOpen(true)
+    const next = new URLSearchParams(searchParams)
+    next.delete('action')
+    setSearchParams(next, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askedAction])
 
   // Reload when an action changed an authority; the listener follows the loader (#345)
   useEffect(() => {

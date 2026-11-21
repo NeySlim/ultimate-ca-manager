@@ -25,7 +25,7 @@ export const helpContent = {
         title: 'Cards',
         icon: ListChecks,
         items: [
-          { label: 'Figures', text: 'Certificates (the full inventory), the items to handle (interventions, and those to watch), the expired certificates, and the ACME, SCEP and EST failures of the current UTC day; the second shows the To handle card, the last leads to the Automation health card' },
+          { label: 'Figures', text: 'Certificates (the full inventory), the items to handle (interventions, and those to watch), the expired certificates, and the ACME, SCEP and EST failures of the current UTC day; the second shows the To handle card, the last shows it on its ACME rows' },
           { label: 'First steps', text: 'On an empty instance, an administrator sees three steps above the figures (a root CA, an issuing CA, a protocol), each leading to its screen; Later folds them into one line that keeps the progress, Resume brings them back' },
           { label: 'To handle', text: 'The interventions by urgency, critical first, six shown and Show the others for the rest; each row gives the name and its type, the cause, a short delay with the exact date under it, and a button: Renew, Retry or Publish now where UCM can act, Review, View the CA or Open otherwise. Chips filter by type with their totals, and what only needs watching is folded apart' },
           { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the last operation, the successes and failures of today and of the period, and a curve per day; ACME failures open To handle on ACME. Then the TSA signer, the scheduler and, with the right to read settings, email, webhooks and auto-renewal, each with its state' },
@@ -65,7 +65,7 @@ export const helpContent = {
         title: 'Search and shortcuts',
         icon: Stack,
         items: [
-          { label: 'Search', text: 'Press Ctrl K (Cmd K on macOS) or select the search field to jump to a page or find a certificate. Down Arrow moves from the field to the results, Up Arrow from the first result back to the field, and Enter in the field opens the first result. A certificate, authority, template, user or CSR found opens in the detail of its page' },
+          { label: 'Search', text: 'Press Ctrl K (Cmd K on macOS) or select the search field to jump to any page of the menu you may open, run an action (Issue New Certificate opens its form), or find a certificate, an authority, a user, a template, an ACME account or a SCEP profile. Down Arrow moves from the field to the results, Up Arrow from the first result back to the field, and Enter in the field opens the first result. An object found opens in the detail of its page' },
           { label: 'Address', text: 'The object open in a page\'s detail dock and its section are part of the address: a reload or a shared link reopens them, and the browser\'s Back closes the dock' },
           { label: 'Help', text: 'Press ? outside a text field to open the help of the current page' },
           { label: 'Phone width', text: 'The top bar shows a single list of pages instead of the links and the menu' },

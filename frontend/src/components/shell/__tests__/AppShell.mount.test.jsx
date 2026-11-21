@@ -1,7 +1,7 @@
 /** The shell around the page: bar, status bar, search entries, help, and the overlays it keeps mounted. */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { lazy, Suspense } from 'react'
-import { render, screen, within, act, waitFor } from '@testing-library/react'
+import { render, screen, within, act, waitFor, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { ROLES, tStub } from './shellTestUtils'
@@ -33,8 +33,9 @@ vi.mock('../../CommandPalette', async () => {
   const actual = await vi.importActual('../../CommandPalette')
   return {
     ...actual,
-    CommandPalette: ({ open, onOpenChange }) => (
-      <div data-testid="palette" data-open={String(open)}>
+    CommandPalette: ({ open, onOpenChange, can }) => (
+      <div data-testid="palette" data-open={String(open)} data-read-logs={String(!!can?.isAdmin())}
+        data-write-certs={String(!!can?.hasPermission('write:certificates'))}>
         {open && <button type="button" onClick={() => onOpenChange(false)}>close palette</button>}
       </div>
     ),
@@ -180,6 +181,18 @@ describe('AppShell', () => {
     expect(screen.getByTestId('palette')).toHaveAttribute('data-open', 'false')
     await user.click(screen.getByRole('button', { name: 'shell.search' }))
     expect(screen.getByTestId('palette')).toHaveAttribute('data-open', 'true')
+  })
+
+  it('hands the account\'s rights to the palette, which lists only what it may open', () => {
+    perms.list = ['read:certificates']
+    setup()
+    expect(screen.getByTestId('palette')).toHaveAttribute('data-read-logs', 'false')
+    expect(screen.getByTestId('palette')).toHaveAttribute('data-write-certs', 'false')
+    cleanup()
+    perms.list = ['*']
+    setup()
+    expect(screen.getByTestId('palette')).toHaveAttribute('data-read-logs', 'true')
+    expect(screen.getByTestId('palette')).toHaveAttribute('data-write-certs', 'true')
   })
 
   it('opens the palette with Ctrl K', async () => {

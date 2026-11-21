@@ -34,7 +34,7 @@ function Metric({ id, value, label, sub, tone, to, href, onClick, loading, index
   return <a className="metric" data-metric={id}>{inner}</a>
 }
 
-export function MetricStrip({ showQueue, go }) {
+export function MetricStrip({ showQueue }) {
   const { t } = useTranslation()
   const statsState = useCardData(() => dashboardService.getStats(), ['certificate', 'ca'], 'stats')
   const queueState = useCardData(() => overviewService.getQueue(), ['certificate', 'ca', 'truststore'], 'queue')
@@ -47,7 +47,8 @@ export function MetricStrip({ showQueue, go }) {
   const certificates = count(stats.total_certificates)
   const expired = count(stats.expired)
   const first = (s) => s.status === 'loading' && !s.data
-  const toHealth = failures === null ? null : go?.('health')
+  // The mockup's failures lead to the queue filtered on ACME (M:356), the card shown again if hidden
+  const toFailures = failures === null || !showQueue ? null : () => showQueue('acme')
 
   return (
     <div className="metric-strip">
@@ -62,7 +63,7 @@ export function MetricStrip({ showQueue, go }) {
       <Metric id="expired" index={2} loading={first(statsState)} value={expired} label={t('overview.horizon.expired')}
         sub={t('overview.metrics.toCheck')} to={expired === null ? null : '/certificates?status=expired'} />
       <Metric id="failures" index={3} loading={first(healthState)} value={failures} label={t('overview.metrics.failures')}
-        tone={failures > 0 ? 'bad' : ''} sub={t('overview.metrics.failuresSub')} href="#card-health" onClick={toHealth} />
+        tone={failures > 0 ? 'bad' : ''} sub={t('overview.metrics.failuresSub')} href="#card-queue" onClick={toFailures} />
     </div>
   )
 }

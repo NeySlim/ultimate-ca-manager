@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
+import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import { ca, smallHierarchy, largeInstallation } from '../cas/__tests__/caFixtures'
 
 const stable = vi.hoisted(() => ({
@@ -336,6 +336,29 @@ describe('CAsPage: functions in reach', () => {
     fireEvent.click(screen.getByRole('button', { name: 'common.import' }))
     fireEvent.click(screen.getByText('import-modal'))
     await waitFor(() => expect(where()).toBe('/cas?authority=7'))
+  })
+
+  it('opens the creation form from ?action=create, on arrival and when the page is already open (the palette)', async () => {
+    const Go = () => { const go = useNavigate(); return <button type="button" onClick={() => go('/cas?action=create')}>palette-create-ca</button> }
+    render(
+      <MemoryRouter initialEntries={['/cas']}>
+        <Routes><Route path="/cas" element={<CAsPage />} /></Routes>
+        <Go /><Where />
+      </MemoryRouter>,
+    )
+    await loaded()
+    expect(screen.queryByText('create-modal')).toBeNull()
+    fireEvent.click(screen.getByText('palette-create-ca'))
+    expect(await screen.findByText('create-modal')).toBeTruthy()
+    await waitFor(() => expect(where()).toBe('/cas'))
+  })
+
+  it('leaves ?action=create without a form for an account that may not create', async () => {
+    mockCanWrite = false
+    renderAt('/cas?action=create')
+    await loaded()
+    await waitFor(() => expect(where()).toBe('/cas'))
+    expect(screen.queryByText('create-modal')).toBeNull()
   })
 
   it('opens a single imported certificate in its inspector, and nothing for two objects', async () => {

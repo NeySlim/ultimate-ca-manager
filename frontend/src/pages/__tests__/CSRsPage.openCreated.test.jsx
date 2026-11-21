@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation, useSearchParams } from 'react-router-dom'
 
 beforeAll(() => {
   global.ResizeObserver = global.ResizeObserver || class {
@@ -28,6 +28,7 @@ vi.mock('react-i18next', () => ({
 }))
 
 let mockIsMobile = false
+let mockWriteCsrs = true
 const openEntity = vi.fn()
 const showWarning = vi.fn()
 const navigate = vi.fn()
@@ -67,7 +68,7 @@ vi.mock('../../hooks', async () => {
   return {
     useModals: common.useModals,
     usePermission: () => ({
-      canWrite: () => true, canDelete: () => true, hasPermission: () => true, canRead: () => true,
+      canWrite: (r) => r !== 'csrs' || mockWriteCsrs, canDelete: () => true, hasPermission: () => true, canRead: () => true,
     }),
   }
 })
@@ -125,6 +126,7 @@ const renderPage = (initialEntries = ['/csrs']) => render(
 describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
   beforeEach(() => {
     mockIsMobile = false
+    mockWriteCsrs = true
     openEntity.mockReset()
     navigate.mockReset()
     getAll.mockReset().mockResolvedValue({ data: [PENDING_CSR] })
@@ -151,6 +153,26 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
 
     await waitFor(() => expect(create).toHaveBeenCalled())
     await waitFor(() => expect(getById).toHaveBeenCalledWith(101))
+  })
+
+  it('opens the upload form from ?action=upload when the page is already open (the palette), then leaves the URL', async () => {
+    const Go = () => { const [, set] = useSearchParams(); return <button type="button" onClick={() => set('action=upload')}>palette-upload</button> }
+    const Where = () => <output data-testid="where">{useLocation().search}</output>
+    render(<MemoryRouter initialEntries={['/csrs']}><CSRsPage /><Go /><Where /></MemoryRouter>)
+    await waitFor(() => expect(getAll).toHaveBeenCalled())
+    expect(screen.queryByText('csrs.pastePEM')).toBeNull()
+    fireEvent.click(screen.getByText('palette-upload'))
+    expect(await screen.findByText('csrs.pastePEM')).toBeTruthy()
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe(''))
+  })
+
+  it('leaves ?action=upload without a form for an account that may not upload', async () => {
+    mockWriteCsrs = false
+    const Where = () => <output data-testid="where">{useLocation().search}</output>
+    render(<MemoryRouter initialEntries={['/csrs?action=upload']}><CSRsPage /><Where /></MemoryRouter>)
+    await waitFor(() => expect(getAll).toHaveBeenCalled())
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe(''))
+    expect(screen.queryByText('csrs.pastePEM')).toBeNull()
   })
 
   it('selects the CSR it has just uploaded (paste)', async () => {

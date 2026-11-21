@@ -1630,6 +1630,7 @@
     "listLabel": "Liste des certificats",
     "uploadKey": "Téléverser la clé privée",
     "listNote": "Les certificats ouverts restent disponibles dans l’inspecteur.",
+    "listNoteCloseOnNav": "Les certificats ouverts se ferment quand vous changez de page (réglage de Mon compte).",
     "loadFailed": "Impossible de charger les certificats",
     "loadFailedCause": "Cause : {{message}}. Les autres vues et l’inspecteur restent utilisables.",
     "viewLog": "Voir le journal",
@@ -3141,6 +3142,8 @@
     "searchLabel": "Rechercher une commande ou un certificat",
     "subtitle": "Certificats, autorités et navigation de la console",
     "noCommandsFound": "Aucun résultat. Essayez un nom de certificat ou de page.",
+    "acmeAccount": "Compte ACME",
+    "scepProfile": "Profil SCEP",
     "favorites": "Favoris",
     "recent": "Récents",
     "searchSections": {
@@ -7004,7 +7007,12 @@
       "discovery": "Aller à Découverte",
       "msca": "Aller à l’AC Microsoft",
       "sshCas": "AC SSH",
-      "sshCertificates": "Certificats SSH"
+      "sshCertificates": "Certificats SSH",
+      "trustStore": "Aller au magasin de confiance",
+      "userCertificates": "Aller aux certificats utilisateur",
+      "tsa": "Aller à TSA",
+      "keyRecovery": "Aller à la récupération de clés",
+      "logs": "Aller aux journaux système"
     },
     "actions": {
       "newCertificate": "Émettre un nouveau certificat",

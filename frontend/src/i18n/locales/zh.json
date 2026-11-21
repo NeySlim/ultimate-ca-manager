@@ -481,6 +481,8 @@
     "searchLabel": "Search for a command or a certificate",
     "subtitle": "Certificates, authorities and console navigation",
     "noCommandsFound": "未找到命令",
+    "acmeAccount": "ACME account",
+    "scepProfile": "SCEP profile",
     "favorites": "收藏",
     "recent": "最近",
     "searchSections": {
@@ -920,6 +922,7 @@
     "listLabel": "证书列表",
     "uploadKey": "上传私钥",
     "listNote": "已打开的证书仍可在检查器中查看。",
+    "listNoteCloseOnNav": "Open certificates close when you change page (setting in My Account).",
     "loadFailed": "无法加载证书",
     "loadFailedCause": "原因：{{message}}。其他视图和检查器仍可使用。",
     "viewLog": "查看日志",
@@ -7004,7 +7007,12 @@
       "discovery": "前往发现",
       "msca": "前往MS CA",
       "sshCas": "SSH 证书颁发机构",
-      "sshCertificates": "SSH 证书"
+      "sshCertificates": "SSH 证书",
+      "trustStore": "Go to Trust Store",
+      "userCertificates": "Go to User Certificates",
+      "tsa": "Go to TSA",
+      "keyRecovery": "Go to Key Recovery",
+      "logs": "Go to System Logs"
     },
     "actions": {
       "newCertificate": "签发新证书",
