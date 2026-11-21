@@ -195,7 +195,7 @@ export function CertDeploySection({ certificate }) {
                 meta={(
                   <>
                     {pathsOf(binding)}
-                    {binding.reload_command && <> · {t('deploy.reloadCommand')}: <span className="mono" title={binding.reload_command}>{binding.reload_command}</span></>}
+                    {binding.reload_command && <> · {t('deploy.reloadCommandIs')} <span className="mono" title={binding.reload_command}>{binding.reload_command}</span></>}
                     {delivery?.delivered_at && <> · {t('deploy.lastDeployed', { date: formatDate(delivery.delivered_at) })}</>}
                   </>
                 )}

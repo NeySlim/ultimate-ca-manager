@@ -58,6 +58,8 @@ describe('the deployment section of the inspector', () => {
     expect(rows[0].querySelector('.rl-main > strong')).toHaveTextContent('web01')
     expect(rows[0].querySelector('.rl-meta .mono')).toHaveTextContent('/etc/ssl/app.pem · /etc/ssl/app.key')
     expect(rows[0].querySelector('.rl-meta')).toHaveTextContent('deploy.lastDeployed|')
+    // The label carries its own colon, spaced as each language spaces it
+    expect(rows[0].querySelector('.rl-meta')).toHaveTextContent('deploy.reloadCommandIs systemctl reload nginx')
     // Only the mockup's vocabulary: no Tailwind utility, no former card
     const classes = [...section().querySelectorAll('[class]')].flatMap((el) => [...el.classList])
     expect(classes.filter((c) => /^(bg-|text-|p-|space-|flex|items-|gap-|rounded|border|font-|truncate|status-)/.test(c))).toEqual([])

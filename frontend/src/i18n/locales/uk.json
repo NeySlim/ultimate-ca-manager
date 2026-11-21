@@ -3167,7 +3167,8 @@
     "reattached": "{{name}} тепер розгортає поновлений сертифікат",
     "reattachFailed": "Не вдалося знову прив'язати розгортання",
     "kind_http": "HTTP API",
-    "kind_ssh": "SSH / SFTP"
+    "kind_ssh": "SSH / SFTP",
+    "reloadCommandIs": "Reload command:"
   },
   "crlDeploy": {
     "title": "Розгортання CRL",

@@ -2618,7 +2618,8 @@
     "reattached": "{{name}} déploie désormais le certificat renouvelé",
     "reattachFailed": "Impossible de rattacher le déploiement",
     "kind_http": "API HTTP",
-    "kind_ssh": "SSH / SFTP"
+    "kind_ssh": "SSH / SFTP",
+    "reloadCommandIs": "Commande de rechargement :"
   },
   "csrs": {
     "uploadCSR": "Téléverser une CSR",
