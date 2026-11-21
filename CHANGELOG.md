@@ -92,6 +92,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- **The console's frame is the Atelier one.** The top bar, its menus, the notification panel, the status bar, the state and session banners, the search dialog and the messages take the Atelier forms; the search lists its results in one list that the arrow keys walk, and a message shows on one line at the bottom, the newest first.
 - **HSM and Users are the Atelier module lists.** HSM lists each provider's type, keys, last connection test and state with its overview, keys and configuration in the dock; Users and roles lists the accounts with Active, Disabled and SSO chips, an export of the list, and each account's profile, effective permissions, API keys (scope and creation date), security and mTLS certificates in the dock, groups behind the Groups button.
 - **Access Control is an Atelier module list.** Roles show their description, parent, permission and account counts with System and Custom chips; a role's dock gives its overview and its permissions as check boxes per resource, read-only for a system role.
 - **The scheduler fits a phone.** Each task of Settings > Scheduler is a card there, its values named and its Run now button on its own line, where the table scrolled sideways and left the button off the screen.
