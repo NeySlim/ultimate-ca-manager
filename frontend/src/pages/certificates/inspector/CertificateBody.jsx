@@ -35,8 +35,8 @@ const MENU_ICONS = { lint: 'policy', uploadKey: 'upload', rename: 'file', unhold
 const MENU_ORDER = ['lint', 'uploadKey', 'rename']
 const menuRank = (id) => (MENU_ORDER.includes(id) ? MENU_ORDER.indexOf(id) : MENU_ORDER.length)
 
-/** entry: the inspector's { key, entityId, data }; onTitle(key, title) names its tab; the section is the dock's. */
-export function CertificateBody({ entry, onTitle, onOpenCa, section, onSection: setSection }) {
+/** entry: the inspector's { key, entityId, data }, whose data names its tab; the section is the dock's. */
+export function CertificateBody({ entry, onOpenCa, section, onSection: setSection }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { closeEntity, openEntity, setEntityData } = useInspector()
@@ -60,10 +60,9 @@ export function CertificateBody({ entry, onTitle, onOpenCa, section, onSection: 
     return () => { cancelled = true }
   }, [entityId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Kept in the context so switching tabs does not read it again
+  // Kept in the context so switching tabs does not read it again, and its tab keeps its title
   useEffect(() => { if (cert && cert !== entry.data) setEntityData(key, cert) }, [cert]) // eslint-disable-line react-hooks/exhaustive-deps
   const title = cert ? entityTitle('certificate', cert, t) : ''
-  useEffect(() => { if (title) onTitle(key, title) }, [title, key]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { actions, modals } = useEntityActions({
     type: 'certificate', entity: cert, entityId, onChanged: setCert, onClose: () => closeEntity(key), onOpenEntity: openEntity, dialogs: DIALOGS,

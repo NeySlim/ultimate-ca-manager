@@ -125,6 +125,45 @@ function List({ rows, ready = true, load }) {
 }
 const rows = [{ id: 1, name: 'one' }, { id: 2, name: 'two' }]
 
+function ListProbe({ list }) {
+  const d = useDockParam({ list })
+  return (
+    <div>
+      <span data-testid="list">{d.list.join('|')}</span>
+      <button type="button" onClick={() => d.open(8, { list: [7, 8] })}>open8of2</button>
+      <button type="button" onClick={() => d.setList([8])}>only8</button>
+      <button type="button" onClick={() => d.setSection('chain')}>chain</button>
+      <button type="button" onClick={d.close}>close</button>
+    </div>
+  )
+}
+
+describe('useDockParam with several open objects (list)', () => {
+  it('keeps them in `open` once there are two, the shown one as `item`, a section change keeping them', () => {
+    at('/certificates?item=7&q=web', <ListProbe list />)
+    fireEvent.click(screen.getByText('open8of2'))
+    expect(url()).toBe('/certificates?q=web&item=8&open=7%2C8')
+    expect(screen.getByTestId('list')).toHaveTextContent('7|8')
+    fireEvent.click(screen.getByText('chain'))
+    expect(url()).toBe('/certificates?q=web&item=8&section=chain&open=7%2C8')
+    fireEvent.click(screen.getByText('only8'))
+    expect(url()).toBe('/certificates?q=web&item=8&section=chain')
+  })
+
+  it('drops the list with the last object', () => {
+    at('/certificates?item=8&open=7,8', <ListProbe list />)
+    fireEvent.click(screen.getByText('close'))
+    expect(url()).toBe('/certificates')
+  })
+
+  it('leaves an `open` parameter alone on a dock without a list', () => {
+    at('/elsewhere?open=x&item=3', <ListProbe list={false} />)
+    expect(screen.getByTestId('list')).toHaveTextContent('')
+    fireEvent.click(screen.getByText('close'))
+    expect(url()).toBe('/elsewhere?open=x')
+  })
+})
+
 describe('useDockSelection', () => {
   it('reopens the object of the URL once the list is there', () => {
     at('/t?item=2&section=subject', <List rows={rows} />)

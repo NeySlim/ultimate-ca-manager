@@ -3,12 +3,15 @@
  * inspector `tab`, M:134-161): `?item=<id>&section=<id>`. `tab` already names the sub-view of
  * several pages, so the section takes `section`. Opening adds a history step, so Back closes the
  * dock; a section change or another object replaces it; closing a dock opened here steps back.
+ * A dock with several open objects (`list`) also keeps them, as the mockup's `open=1,2,3`.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
 export const ITEM_PARAM = 'item'
 export const SECTION_PARAM = 'section'
+export const LIST_PARAM = 'open'
+const NONE = []
 // The mark of a history step this hook added: closing then steps back instead of adding one
 const OPENED = 'ucmDockOpened'
 
@@ -21,8 +24,9 @@ export const asId = (v) => (typeof v === 'string' && /^\d+$/.test(v) ? Number(v)
  * @param {string[]} [o.sections]  the section ids; another value in the URL reads as `fallback`
  * @param {string} [o.fallback]  the first section, left out of the URL
  * @param {string[]} [o.aliases]  former names of the object in incoming links (`selected`, `request`)
+ * @param {boolean} [o.list]  the dock holds several objects: their ids live in `open` once there are two
  */
-export function useDockParam({ sections, fallback = 'overview', aliases = [] } = {}) {
+export function useDockParam({ sections, fallback = 'overview', aliases = [], list: withList = false } = {}) {
   const [params] = useSearchParams()
   const location = useLocation()
   const navigate = useNavigate()
@@ -30,6 +34,8 @@ export function useDockParam({ sections, fallback = 'overview', aliases = [] } =
   const item = names.map((n) => params.get(n)).find((v) => v) ?? null
   const raw = params.get(SECTION_PARAM)
   const section = item && raw && (!sections || sections.includes(raw)) ? raw : fallback
+  const listRaw = withList ? params.get(LIST_PARAM) : null
+  const list = useMemo(() => (listRaw ? [...new Set(listRaw.split(',').filter(Boolean))] : NONE), [listRaw])
 
   // The latest URL, so callbacks stay stable while writing on top of it
   const now = useRef(null)
@@ -41,21 +47,28 @@ export function useDockParam({ sections, fallback = 'overview', aliases = [] } =
     const next = new URLSearchParams(cur)
     for (const n of [ITEM_PARAM, ...aliasKey.split(',').filter(Boolean)]) next.delete(n)
     next.delete(SECTION_PARAM)
+    const kept = next.get(LIST_PARAM)
+    if (withList) next.delete(LIST_PARAM)
     if (patch.item != null) next.set(ITEM_PARAM, String(patch.item))
     if (patch.item != null && patch.section && patch.section !== fallback) next.set(SECTION_PARAM, patch.section)
+    // No object open, no list; a write without one keeps the URL's; a single object is `item` alone
+    if (withList && patch.item != null) {
+      const ids = patch.list ? patch.list.map(String) : kept ? kept.split(',') : []
+      if (ids.length > 1) next.set(LIST_PARAM, ids.join(','))
+    }
     const qs = next.toString()
     const to = { pathname: loc.pathname, search: qs ? `?${qs}` : '', hash: loc.hash }
     const state = push ? { ...(loc.state || {}), [OPENED]: true } : loc.state
     navigate(to, { replace: !push, state })
     // A second write in the same handler builds on this one, not on the URL still rendered
     now.current = { params: next, location: { ...loc, search: to.search, state }, item: patch.item != null ? String(patch.item) : null }
-  }, [navigate, fallback, aliasKey])
+  }, [navigate, fallback, aliasKey, withList])
 
-  const open = useCallback((id, { section: asked } = {}) => {
+  const open = useCallback((id, { section: asked, list: ids } = {}) => {
     if (id == null) return
     const cur = now.current.item
     const keep = sameId(cur, id) && !asked ? now.current.params.get(SECTION_PARAM) : asked
-    write({ item: id, section: keep }, { push: cur == null })
+    write({ item: id, section: keep, list: ids }, { push: cur == null })
   }, [write])
 
   const close = useCallback(() => {
@@ -72,7 +85,13 @@ export function useDockParam({ sections, fallback = 'overview', aliases = [] } =
     if (cur != null) write({ item: cur, section: id })
   }, [write])
 
-  return { item, section, open, close, setSection }
+  // The open objects changed, the shown one did not
+  const setList = useCallback((ids) => {
+    const cur = now.current.item
+    if (cur != null) write({ item: cur, section: now.current.params.get(SECTION_PARAM), list: ids })
+  }, [write])
+
+  return { item, section, list, open, close, setSection, setList }
 }
 
 /**
