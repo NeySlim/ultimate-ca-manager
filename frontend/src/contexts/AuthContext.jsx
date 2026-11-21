@@ -14,7 +14,7 @@ import { saveLock, markJustLocked, markSignedOut } from '../lib/sessionLock'
 import { setDateFormat, setShowTime } from '../stores/dateFormatStore'
 import { applyServerPreferences, getPreferences, setAuthenticated as setPrefsAuthenticated } from '../stores/userPreferencesStore'
 import i18n from '../i18n'
-import { setDraftOwner, signOutDrafts } from '../components/sectioned/draftMemory'
+import { setDraftOwner, signOutDrafts } from '../lib/draftMemory'
 
 const AuthContext = createContext()
 

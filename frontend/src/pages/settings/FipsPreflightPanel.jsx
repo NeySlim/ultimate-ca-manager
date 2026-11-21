@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import PreflightReport from '../../components/PreflightReport'
 import { systemService } from '../../services'
 import { SettingsGroup, SettingsTest } from '../../components/atelier/SettingsView'
-import { useRefocusAfter } from '../../components/sectioned/useRefocus'
+import { useRefocusAfter } from '../../hooks/useRefocus'
 
 export default function FipsPreflightPanel() {
   const { t } = useTranslation()

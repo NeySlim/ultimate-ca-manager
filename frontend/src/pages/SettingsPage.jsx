@@ -80,9 +80,8 @@ import { setDateFormat, setShowTime } from '../stores/dateFormatStore'
 import { reportSilentFailure } from '../lib/silentFailure'
 import { autoRenewalWaitingMessage } from '../lib/autoRenewalWaiting'
 import { secretRequiredForTarget, smtpSecretTargets } from '../lib/secretTarget'
-import {
-  SavePartsContext, useSavePartsRegistry, changedKeys, useUnloadGuard, keepDraft, readDraft,
-} from '../components/sectioned'
+import { SavePartsContext, useSavePartsRegistry, changedKeys, useUnloadGuard } from '../hooks/useSaveParts'
+import { keepDraft, readDraft } from '../lib/draftMemory'
 import { Zone, PageHead, Pill, SkeletonPanel, jumpTo } from '../components/atelier'
 import { SettingsLayout, SettingsToc, SettingsJump, SettingsFrame, SettingsSaveBar } from '../components/atelier/SettingsView'
 import SettingsHistory from './settings/SettingsHistory'
@@ -139,7 +138,7 @@ const SETTINGS_SAVE_ACTIONS = ['settings_update', 'syslog_config_updated', 'mtls
 // Type of the HTTPS certificate the server names, in the reader's language
 const HTTPS_TYPES = { 'CA-Signed': 'settings.httpsType.caSigned', 'Self-Signed': 'settings.httpsType.selfSigned' }
 
-// Draft of the page kept for the tab (components/sectioned/draftMemory)
+// Draft of the page kept for the tab (lib/draftMemory)
 const SETTINGS_DRAFT = 'settings'
 
 // Keys the email route stores (mapped names); the others go through the bulk route

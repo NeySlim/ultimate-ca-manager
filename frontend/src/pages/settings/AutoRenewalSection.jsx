@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { SkeletonPanel } from '../../components/atelier'
 import { NumberInput, ToggleSwitch, SegmentedField, ListInput } from '../../components/atelier/Form'
 import { SettingsGroup, SettingsTest } from '../../components/atelier/SettingsView'
-import { useRefocusAfter } from '../../components/sectioned/useRefocus'
+import { useRefocusAfter } from '../../hooks/useRefocus'
 import { shownNumber, typedNumber } from './numberFields'
 
 const SOURCES = ['manual', 'scep', 'acme', 'est']

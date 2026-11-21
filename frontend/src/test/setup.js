@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom'
 import { vi, afterEach } from 'vitest'
-import { dropAllDrafts } from '../components/sectioned/draftMemory'
+import { dropAllDrafts } from '../lib/draftMemory'
 
 // Drafts kept for the tab live in module memory: none passes from one test to the next
 afterEach(() => dropAllDrafts())

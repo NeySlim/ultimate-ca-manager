@@ -29,7 +29,7 @@ vi.mock('../../../contexts/MobileContext', () => ({ useMobile: () => mocks.mobil
 vi.mock('../../../contexts/ThemeContext', () => ({ useTheme: () => mocks.theme }))
 vi.mock('../../../lib/chooseLanguage', () => ({ chooseLanguage: mocks.chooseLanguage }))
 vi.mock('../../../i18n', () => ({ languages: [{ code: 'en', name: 'English' }, { code: 'fr', name: 'Français' }] }))
-vi.mock('../../../components/sectioned', () => ({ useSavePart: () => {}, keptPartDraft: () => ({}) }))
+vi.mock('../../../hooks/useSaveParts', () => ({ useSavePart: () => {}, keptPartDraft: () => ({}) }))
 
 import BackupSection from '../BackupSection'
 import DatabaseBackendSection from '../DatabaseBackendSection'

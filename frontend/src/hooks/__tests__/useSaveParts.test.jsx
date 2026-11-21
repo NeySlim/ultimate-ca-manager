@@ -8,8 +8,8 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, Link } from 'react-router-dom'
 import { useState } from 'react'
 
-import { changedKeys, keptPartDraft, useUnloadGuard, useSavePart, useSavePartsRegistry, SavePartsContext } from '..'
-import { dropAllDrafts, keepDraft, readDraft, setDraftOwner, signOutDrafts } from '../draftMemory'
+import { changedKeys, keptPartDraft, useUnloadGuard, useSavePart, useSavePartsRegistry, SavePartsContext } from '../useSaveParts'
+import { dropAllDrafts, keepDraft, readDraft, setDraftOwner, signOutDrafts } from '../../lib/draftMemory'
 
 afterEach(() => { vi.restoreAllMocks(); dropAllDrafts() })
 

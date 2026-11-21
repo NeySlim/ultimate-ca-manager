@@ -50,7 +50,7 @@ import { notificationSpies } from './pageRenderingSetup.jsx'
 import SettingsPage from '../SettingsPage'
 import { settingsService } from '../../services/settings.service'
 import { auditService } from '../../services'
-import { dropAllDrafts } from '../../components/sectioned/draftMemory'
+import { dropAllDrafts } from '../../lib/draftMemory'
 
 const renderPage = (entry = '/settings') => render(
   <MemoryRouter initialEntries={[entry]}>

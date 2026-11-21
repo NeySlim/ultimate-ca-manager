@@ -4,7 +4,7 @@
  * Parts kept inside a section (its own state) register through the context.
  */
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { keepDraft, readDraft } from './draftMemory'
+import { keepDraft, readDraft } from '../lib/draftMemory'
 
 export const SavePartsContext = createContext(null)
 

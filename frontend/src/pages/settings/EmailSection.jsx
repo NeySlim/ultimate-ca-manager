@@ -7,7 +7,7 @@ import { Input, NumberInput, SecretInput, Select, ToggleSwitch, SegmentedField, 
 import { SettingsGroup, SettingsTest } from '../../components/atelier/SettingsView'
 import EmailTemplateWindow from '../../components/EmailTemplateWindow'
 import { secretInputProps, smtpSecretTargets } from '../../lib/secretTarget'
-import { useRefocusAfter } from '../../components/sectioned/useRefocus'
+import { useRefocusAfter } from '../../hooks/useRefocus'
 import { shownNumber, typedNumber } from './numberFields'
 
 const OAUTH_CONSOLES = {

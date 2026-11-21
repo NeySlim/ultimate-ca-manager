@@ -8,7 +8,7 @@ import { Select, ToggleSwitch } from '../../components/atelier/Form'
 import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { apiClient } from '../../services'
 import { useNotification } from '../../contexts'
-import { useSavePart, keptPartDraft } from '../../components/sectioned'
+import { useSavePart, keptPartDraft } from '../../hooks/useSaveParts'
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
   value: h,
