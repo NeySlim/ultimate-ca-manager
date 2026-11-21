@@ -67,13 +67,9 @@ export {
   CompactHeader
 } from './DetailCard'
 
-// Certificate Details (reusable)
-export { CertificatePanel } from './detail/CertificatePanel'
-export { CertificateExtensions, SubjectAltNames } from './detail/CertificateExtensions'
 export { CertificateLintModal } from './CertificateLintModal'
 export { KeyRecoveryRequestModal } from './KeyRecoveryRequestModal'
 export { TemplatePreviewModal } from './TemplatePreviewModal'
-export { TrustCertPanel } from './detail/TrustCertPanel'
 export { EkuMultiSelect } from './EkuMultiSelect'
 
 // Filter components
@@ -95,5 +91,4 @@ export { SafeModeOverlay } from './SafeModeOverlay'
 export { SessionWarning } from './SessionWarning'
 export { ForcePasswordChange } from './ForcePasswordChange'
 export { ForceEnroll2FA } from './ForceEnroll2FA'
-export { InspectorDock } from './inspector/InspectorDock'
 export { InspectorCloseOnNavigate } from './inspector/InspectorCloseOnNavigate'

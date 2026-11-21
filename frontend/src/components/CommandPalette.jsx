@@ -43,7 +43,7 @@ export function CommandPalette({ open, onOpenChange }) {
     }
   }
   
-  // Certificates and CAs open in the inspector; the other types still go to their page
+  // Certificates and CAs open in the dock their zone draws (InspectorContext); the other types go to their page
   const INSPECTOR_TYPE = { certificates: 'certificate', certificate: 'certificate', cas: 'ca', ca: 'ca' }
   const openItem = (type, id) => {
     const inspectorType = INSPECTOR_TYPE[type]

@@ -1,6 +1,6 @@
 /**
- * The pre-Atelier interface is gone: its files must not exist and nothing may
- * import them. ui/FloatingWindow and useFloatingWindow are not in that set:
+ * The pre-Atelier interface and the shell's inspector are gone: their files must not
+ * exist and nothing may import them. ui/FloatingWindow and useFloatingWindow are not in that set:
  * the help panel and the email template editor still use them.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
@@ -15,6 +15,14 @@ const LEGACY = {
   'components/Sidebar.jsx': /\/Sidebar['"]/,
   'components/DashboardChart.jsx': /\bDashboardChart\b/,
   'pages/DashboardPage.jsx': /\bDashboardPage\b/,
+  // The shell's inspector: every object now opens in the dock its zone draws
+  'components/inspector/InspectorDock.jsx': /\bInspectorDock\b/,
+  'components/inspector/InspectorObject.jsx': /\bInspectorObject\b/,
+  'components/inspector/InspectorTabs.jsx': /\/InspectorTabs['"]/,
+  'components/inspector/config.js': /\/inspector\/config['"]/,
+  'components/inspector/placement.js': /\/inspector\/placement['"]/,
+  'components/inspector/certificate/CertificateDetail.jsx': /\/inspector\/certificate\//,
+  'components/detail/CertificatePanel.jsx': /\/detail\/|\bCertificatePanel\b|\bTrustCertPanel\b/,
 }
 
 function sources(dir, out = []) {

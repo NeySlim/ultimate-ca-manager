@@ -1,7 +1,7 @@
 /**
- * The Certificates zone's inspector (the mockup's dockFrame() and inspector()): the objects open
- * in the inspector as tabs, the shell's dock stepping aside, a certificate's heading, its actions
- * menu (certMenu()), its sections, and an authority opened in its own zone.
+ * The Certificates zone's inspector (the mockup's dockFrame() and inspector()): the certificates
+ * open in the inspector as tabs, a certificate's heading, its actions menu (certMenu()), its
+ * sections, and an authority or a trusted certificate opened in its own zone.
  */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
@@ -39,10 +39,8 @@ vi.mock('../../../services', () => ({
 }))
 vi.mock('../../../services/account.service', () => ({ accountService: { updatePreferences: vi.fn() } }))
 vi.mock('../../../components/deploy/CertDeploySection', () => ({ CertDeploySection: () => <div data-testid="deploy" /> }))
-vi.mock('../../../components/inspector/InspectorObject', () => ({ InspectorObject: ({ entry }) => <div data-testid="legacy-object">{entry.key}</div> }))
 
 import { InspectorProvider, useInspector } from '../../../contexts/InspectorContext'
-import { InspectorDock } from '../../../components/inspector/InspectorDock'
 import { Zone } from '../../../components/atelier'
 import { CertificateInspector } from '../inspector/CertificateInspector'
 
@@ -72,7 +70,6 @@ const mount = () => render(
   <MemoryRouter initialEntries={['/certificates']}>
     <InspectorProvider>
       <Zone dock={<CertificateInspector />}><Opener /></Zone>
-      <InspectorDock />
       <Where />
     </InspectorProvider>
   </MemoryRouter>,
@@ -94,12 +91,11 @@ beforeEach(() => {
 })
 
 describe('the zone inspector frame (dockFrame)', () => {
-  it('draws the mockup dock in the zone and the shell dock steps aside', async () => {
+  it('draws the mockup dock in the zone', async () => {
     mount()
     await open('open-7', 'web.example.com')
     expect(dock().closest('.atl')).not.toBeNull()
     expect(dock()).toHaveAttribute('aria-label', 'inspector.regionCertificate')
-    expect(screen.queryByTestId('inspector-dock')).toBeNull()
     expect(within(dock().querySelector('.open-tabs')).getByRole('button', { name: /web\.example\.com/, pressed: true })).toBeInTheDocument()
   })
 
@@ -132,12 +128,12 @@ describe('the zone inspector frame (dockFrame)', () => {
     expect(dock().style.getPropertyValue('--dock')).toBe('420px')
   })
 
-  it('keeps the product panel of another object opened from here', async () => {
+  it('sends a trusted certificate opened from here to the Trust Store, beside the open certificates', async () => {
     mount()
-    await open('open-trusted')
-    expect(await within(dock()).findByTestId('legacy-object')).toHaveTextContent('truststore:3')
-    expect(screen.getByTestId('legacy-object').closest('.atl-out')).not.toBeNull()
-    expect(dock()).toHaveAttribute('aria-label', 'inspector.region')
+    await open('open-7', 'web.example.com')
+    fireEvent.click(screen.getByText('open-trusted'))
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/truststore/3'))
+    expect(dock().querySelectorAll('.open-tab')).toHaveLength(1)
   })
 })
 

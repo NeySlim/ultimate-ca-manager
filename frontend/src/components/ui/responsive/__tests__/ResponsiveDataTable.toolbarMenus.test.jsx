@@ -1,10 +1,11 @@
 /**
  * The menus of the list toolbar (a filter, « Filtres prédéfinis », « Exporter les données »)
  * answer Escape themselves, as every layer of the mockup does: the first Escape closes
- * the menu and gives the focus back to its button, the inspector closes on the next one.
+ * the menu and gives the focus back to its button, the zone's dock closes on the next one.
  * Presets and export are the mockup's pop menus: role menu, items, arrows, Home, End, Tab.
  */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { useState } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('react-i18next', () => ({
@@ -23,53 +24,42 @@ vi.mock('../../../../contexts/MobileContext', () => ({ useMobile: () => ({ isMob
 vi.mock('../../../../contexts/AuthContext', () => ({
   useAuth: () => ({ isAuthenticated: true, permissions: ['read:certificates'] }),
 }))
-vi.mock('../../../../services', () => ({
-  certificatesService: { getById: vi.fn((id) => Promise.resolve({ data: { id, common_name: `c${id}.example.com` } })) },
-  casService: { getById: vi.fn() },
-  userCertificatesService: { getById: vi.fn() },
-  truststoreService: { getById: vi.fn() },
-}))
-vi.mock('../../../../services/account.service', () => ({ accountService: { updatePreferences: vi.fn().mockResolvedValue({}) } }))
-vi.mock('../../../inspector/certificate/CertificateDetail', () => ({
-  CertificateDetail: ({ cert, section }) => <div data-testid="panel">{`${cert.common_name}:${section}`}</div>,
-}))
 
-import { InspectorProvider, useInspector } from '../../../../contexts/InspectorContext'
-import { setAuthenticated } from '../../../../stores/userPreferencesStore'
-import { InspectorDock } from '../../../inspector/InspectorDock'
+import { Dock } from '../../../atelier'
 import { ResponsiveDataTable } from '../ResponsiveDataTable'
 
 const ROWS = [{ id: 1, name: 'one' }, { id: 2, name: 'two' }]
 
 function Page() {
-  const { openEntity } = useInspector()
+  const [open, setOpen] = useState(false)
   return (
     <>
-      <button type="button" onClick={() => openEntity('certificate', 1)}>open-1</button>
+      <button type="button" onClick={() => setOpen(true)}>open-1</button>
       <ResponsiveDataTable variant="list" data={ROWS} columns={[{ key: 'name', header: 'Name' }]}
         searchable filterPresetsKey="test-presets" exportEnabled
         toolbarFilters={[{ key: 'state', type: 'multiSelect', value: [], onChange: () => {}, placeholder: 'All states',
           options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] }]} />
-      <InspectorDock />
+      {open && (
+        <Dock label="dock" tabsLabel="open" tabs={[{ key: '1', title: 'c1.example.com', icon: 'cert' }]} activeKey="1" onClose={() => setOpen(false)}>
+          <div data-testid="panel">c1.example.com:overview</div>
+        </Dock>
+      )}
     </>
   )
 }
 
 const renderPage = async () => {
   localStorage.setItem('test-presets', JSON.stringify([{ id: 7, name: 'Mine', filters: { state: ['a'] } }]))
-  render(<InspectorProvider><Page /></InspectorProvider>)
+  render(<Page />)
   fireEvent.click(screen.getByText('open-1'))
   await screen.findByText('c1.example.com:overview')
-  // The dock takes the focus on opening; the menus are opened after that
-  await waitFor(() => expect(screen.getByRole('tab', { name: 'c1.example.com' })).toHaveFocus())
 }
 const escape = (target = document.activeElement || document.body) => fireEvent.keyDown(target, { key: 'Escape' })
-const dockShown = () => screen.queryByTestId('inspector-dock') !== null
+const dockShown = () => document.getElementById('inspector') !== null
 
 describe('Menus of the list toolbar and Escape', () => {
   beforeEach(() => {
     localStorage.clear()
-    setAuthenticated(false)
     window.innerWidth = 1600
     window.innerHeight = 1000
   })

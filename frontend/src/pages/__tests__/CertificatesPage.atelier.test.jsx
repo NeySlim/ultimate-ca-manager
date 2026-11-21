@@ -34,7 +34,7 @@ vi.mock('../../contexts', () => ({
   useMobile: () => ({ isMobile: state.mobile, isDesktop: !state.mobile }),
   useInspector: () => ({
     openEntity: state.openEntity, closeEntity: vi.fn(), closeAll: vi.fn(), setActiveKey: vi.fn(), setEntityData: vi.fn(),
-    opened: state.opened, activeKey: state.activeKey, claimDock: () => () => {}, setGeometry: vi.fn(), setCollapsed: vi.fn(),
+    opened: state.opened, activeKey: state.activeKey, setGeometry: vi.fn(), setCollapsed: vi.fn(),
     height: 278, width: 460, position: 'bottom', collapsed: false,
   }),
 }))
@@ -61,7 +61,6 @@ vi.mock('../../services', () => ({
 // The import and issue dialogs are their own subjects: a stand-in says when they open
 vi.mock('../../components/SmartImport', () => ({ SmartImportModal: ({ isOpen }) => (isOpen ? <div data-testid="import-open" /> : null) }))
 vi.mock('../certificates/IssueCertificateDialog', () => ({ IssueCertificateDialog: ({ open }) => (open ? <div data-testid="issue-open" /> : null) }))
-vi.mock('../../components/inspector/InspectorObject', () => ({ InspectorObject: () => <div data-testid="legacy-object" /> }))
 vi.mock('../../components/shell/SetupCard', () => ({ SetupCard: () => null }))
 vi.mock('../certificates/dialogs/ExportDialog', () => ({ ExportDialog: ({ open, entityName }) => (open ? <div data-testid="export-open">{entityName}</div> : null) }))
 

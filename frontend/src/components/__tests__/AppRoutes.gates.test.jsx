@@ -28,7 +28,6 @@ vi.mock('../../components', async () => {
     ForcePasswordChange: () => <div>password-prompt</div>,
     ForceEnroll2FA: () => <div>enrol-prompt</div>,
     SafeModeOverlay: () => null,
-    InspectorDock: () => null,
   }
 })
 vi.mock('../../pages/LoginPage', () => ({ default: () => <div>login-page</div> }))

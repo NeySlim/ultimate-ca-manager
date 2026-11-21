@@ -64,6 +64,19 @@ test('the inspector shows the certificate the row names', async ({ page, api }) 
   await expect(panel).toContainText(new RegExp(`DNS:\\s*${cert.common_name.replace(/\./g, '\\.')}`))
 })
 
+test('a certificate chosen in the search on another page opens in the Certificates dock', async ({ page, api }) => {
+  const cert = await issueCert(api, (await createCA(api)).id)
+  await page.goto('/cas')
+  await page.keyboard.press('Control+k')
+  const palette = page.getByTestId('command-palette')
+  await palette.getByPlaceholder('Certificate, page or action…').fill(cert.common_name)
+  await palette.getByRole('button', { name: new RegExp(`^${cert.common_name.replace(/\./g, '\\.')}`) }).first().click()
+  // As the mockup's openCert(): the Certificates view, its dock heading the certificate
+  await expect(page).toHaveURL(url => url.pathname === '/certificates')
+  await expect(page.locator('#inspector').getByRole('heading', { name: cert.common_name })).toBeVisible()
+  await expect(page.locator('#inspector')).toHaveCount(1)
+})
+
 test('renewing from the inspector issues a new certificate for the same name', async ({ page, api }) => {
   const cert = await issueCert(api, (await createCA(api)).id)
   const panel = await openInInspector(page, cert.common_name)

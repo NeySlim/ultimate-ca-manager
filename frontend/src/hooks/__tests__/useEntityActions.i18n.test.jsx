@@ -39,7 +39,7 @@ vi.mock('../../services', async (orig) => ({
   truststoreService: svc.trust,
 }))
 
-import { ActionsHarness } from '../../components/detail/__tests__/ActionsHarness'
+import { ActionsHarness } from '../../test/ActionsHarness'
 
 const ALLOW = { canWrite: () => true, canDelete: () => true, hasPermission: () => true }
 const CERT = {

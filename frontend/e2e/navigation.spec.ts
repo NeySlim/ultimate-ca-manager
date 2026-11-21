@@ -48,7 +48,7 @@ for (const route of ROUTES) {
     await expect(heading).toHaveText(/\S/)
     await expect(heading).not.toHaveText(/^[a-z]+(\.[a-zA-Z0-9_]+)+$/)
     // The admin is never sent away from a route of the registry; a detail route
-    // opens its object in the inspector over the module's list
+    // opens its object in the dock its zone draws, under the module's list
     const landing = detail ? route.path.replace(/\/:[^/]+$/, '') : path
     await expect(page).toHaveURL(url => url.pathname === landing || url.pathname === path)
     if (detail && route.path.startsWith('/cas/')) {
@@ -56,9 +56,10 @@ for (const route of ROUTES) {
       await expect(page).toHaveURL(new RegExp(`[?&]authority=${detail.id}`))
       await expect(page.getByRole('complementary', { name: detail.name })).toBeVisible()
     } else if (detail) {
-      // The Atelier dock names its panel by its section and heads it with the object; older inspectors name the panel
-      const named = page.getByRole('tabpanel', { name: detail.name }).getByRole('heading', { name: detail.name })
-      await expect(named.or(page.locator('#inspector').getByRole('heading', { name: detail.name }))).toBeVisible()
+      // The zone's dock heads its body with the object; the shell has no dock of its own
+      await expect(page.locator('#inspector').getByRole('heading', { name: detail.name })).toBeVisible()
+      await expect(page.locator('#inspector')).toHaveCount(1)
+      await expect(page.locator('[data-testid="inspector-dock"]')).toHaveCount(0)
     }
     await expect(page.getByRole('heading', { name: 'Something went wrong' })).toHaveCount(0)
     await page.waitForLoadState('networkidle')
