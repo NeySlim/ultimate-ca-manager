@@ -35,6 +35,7 @@ vi.mock('../../../data/helpGuides', () => ({
       ].join('\n'),
     },
     guideOnly: { title: 'Guide only', content: 'No heading at all' },
+    rich: { title: 'Rich', content: ['## Table', '| Operation | Online |', '|---|---|', '| Issue | **Blocked** |', '1. one', '   - nested', '2. two', '> ⚠ Careful'].join('\n') },
   },
 }))
 
@@ -100,10 +101,23 @@ describe('HelpDialog', () => {
     expect(first.querySelector('span.mono')).toHaveTextContent('code')
     expect(first.querySelector('em')).toHaveTextContent('italic')
     expect([...first.querySelectorAll('ul li')].map((li) => li.textContent)).toEqual(['one', 'two'])
-    expect([...first.querySelectorAll('p strong')].map((s) => s.textContent)).toContain('Sub')
+    const sub = first.querySelector('h4')
+    expect(sub).toHaveTextContent('Sub')
+    expect(sub).toHaveAttribute('id', 'both-sub')
+    expect(first.querySelector('h3')).toHaveAttribute('id', 'both-first')
     expect([...second.querySelectorAll('ol li')].map((li) => li.textContent)).toEqual(['step', 'next'])
     expect(second.querySelector('.notice')).toHaveTextContent('Tip: quoted')
     expect(second.querySelector('pre.code-preview')).toHaveTextContent('code line')
+  })
+
+  it('draws the guide\'s tables, nested lists and notices without their symbol', () => {
+    show('rich')
+    const section = dialog().querySelector('.help-grid > section')
+    expect([...section.querySelectorAll('table.compare-table thead th')].map((th) => th.textContent)).toEqual(['Operation', 'Online'])
+    expect([...section.querySelectorAll('tbody td')].map((td) => td.textContent)).toEqual(['Issue', 'Blocked'])
+    expect(section.querySelectorAll(':scope > ol > li')).toHaveLength(2)
+    expect(section.querySelector('ol > li > ul > li')).toHaveTextContent('nested')
+    expect(section.querySelector('.notice.warn').textContent).toBe('Careful')
   })
 
   it('searches the guide: only the sections that hold the text, then a line when none does', () => {
@@ -122,6 +136,7 @@ describe('HelpDialog', () => {
     show('both')
     const links = [...dialog().querySelectorAll('p.small a.text-link')]
     expect(links.map((a) => a.textContent)).toEqual(['First', 'Second', 'Third'])
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['#both-first', '#both-second', '#both-third'])
     Element.prototype.scrollIntoView = vi.fn()
     fireEvent.click(links[2])
     expect(document.activeElement).toHaveTextContent('Third')

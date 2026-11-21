@@ -212,6 +212,15 @@
 /* The page help's guide: its contents line above the sections, its steps numbered as the mockup's help lists its items */
 .atl .help-toc{margin:0 0 20px;line-height:1.7}
 .atl .help-grid ol{padding-left:17px;margin:0}
+/* The guide's sub-headings under a section's title (class by Markdown depth, whatever the tag), its nested lists,
+   and its tables in the mockup's comparison table: a section that holds one takes the grid's whole width */
+.atl .help-grid .help-h3,.atl .help-grid .help-h4{font-size:12px;font-weight:600;margin:16px 0 6px}
+.atl .help-grid .help-h4{color:var(--muted)}
+.atl .help-grid li>ul,.atl .help-grid li>ol{margin:2px 0}
+.atl .help-table{margin:12px 0}
+.atl .help-table .compare-table{font-size:12px}
+.atl .help-grid>section{min-width:0}
+.atl .help-grid>section:has(.help-table){grid-column:1/-1}
 /* The email template editor: the source and its preview side by side, one height that keeps the dialog below
    the top bar (the template draws its own canvas) */
 .atl .field textarea.template-source,.atl .template-preview{height:clamp(160px,calc(100dvh - 480px),360px)}
