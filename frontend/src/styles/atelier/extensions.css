@@ -21,16 +21,16 @@
 .atl .ca-node.ca-bundle{flex-direction:column;gap:10px}
 .atl .ca-bundle-head{display:flex;align-items:center;gap:6px;min-height:26px;font-size:12px;color:var(--muted);cursor:pointer}
 .atl .ca-bundle-head .icon{width:14px;height:14px}
-/* The side panel of an authority: the tools under a section, a folded section whose title opens it. */
+/* The side panel of an authority: the tools under a section, the content of a folded section. */
 .atl .ca-side-tools{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .atl .ca-side .notice .text-link{min-height:24px;padding:2px 0}
-.atl .ca-fold .section-title{margin-bottom:0}
 .atl .ca-fold>div:not([hidden]){margin-top:10px}
-.atl .fold-toggle{display:flex;align-items:center;gap:7px;width:100%;min-height:24px;text-align:left;color:inherit;cursor:pointer}
-.atl .fold-toggle .icon{width:14px;height:14px}
 .atl .ca-fold .code-preview{margin:0;max-height:240px;overflow:auto}
+.atl .ca-fold .props dt{overflow-wrap:anywhere}
 /* The chain repair strip under the page head: a notice holding the counts, the progress bar and the findings. */
 .atl .ca-repair-body{flex:1;min-width:0;display:grid;gap:8px}
 .atl .ca-repair-head{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px}
 .atl .ca-repair-head strong{color:var(--text);font-weight:500}
 .atl .ca-repair .setup-progress{margin:0;padding:0}
+/* A notice or a refusal among the fields of a form (the creation of an authority) spans the form. */
+.atl .form-fields>:is(.notice,.field-error){grid-column:1/-1;margin:0}

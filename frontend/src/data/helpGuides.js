@@ -79,16 +79,16 @@ Any CA signed by an Intermediate CA, creating deeper hierarchy levels.
 
 ## Views
 
-The tabs under the title count the CAs (All, Roots, Intermediates, Expired, then Offline, Revoked and Awaiting certificate when there are some) and filter the page; the tab is part of the address. The search field filters on the name, the common name and the subject. The three buttons next to it switch between:
+The tabs under the title count the CAs (All, Roots, Intermediates, Expired, then Offline, Revoked and Awaiting certificate when there are some) and filter the page; the tab is part of the address. The search field filters on the name, the common name and the subject. Hierarchy and List, next to it, switch between the two views; the authority shown in the side panel is part of the address.
 
 ### Tree View
-The default view. Each root that heads a hierarchy is drawn with its sub-authorities on its right, folded beyond the first level; a node gives its state, the number of its certificates and of its sub-authorities, and a dotted line joins a CA to the one that cross-certified it. A root without a sub-authority takes a single line, and the roots that have no certificate either fold into one group once there are many. The arrow keys move through the tree, right and left unfold and fold, and Enter opens the CA in the detail panel.
+The default view. Each root that heads a hierarchy is drawn with its sub-authorities on its right, folded beyond the first level; a node gives its state, the number of its certificates and of its sub-authorities, and a dotted line joins a CA to the one that cross-certified it. A root without a sub-authority takes a single line, and the roots that have no certificate either fold into one group once there are many. The arrow keys move through the tree, right and left unfold and fold, and Enter or a click selects the CA.
 
-### Columns View
-Browses the hierarchy level by level, one column per level: select a CA to see the CAs below it.
+### Side panel
+Beside the tree (under it on a phone) the selected CA shows its identity, its key, what it issued and its revocation: issuer, sub-authorities and cross-certificates are links that select them, the CRL gives its number, its publication and its next update (with a warning a day ahead), and the OCSP responder reads active or inactive. **View certificates** opens the certificate list on this CA, **Issue with this CA** opens the issue form on it (disabled, with the reason, when the CA cannot sign), **Download the chain** downloads its PEM chain, and **Other actions** holds export, CSR, revocation, taking offline, restore, template pins and deletion. The other details (constraints, extensions, fingerprints, PEM, metadata) are folded below. A CA opened from another page opens here.
 
 ### List View
-Flat table with sortable columns. A row carries one action (download the certificate) and a chevron that opens the detail, where the other actions are. On a phone each CA is a card with the same facts and its chevron; a tap anywhere on it opens the detail, where **Export** downloads the certificate.
+Flat table with sortable columns, beside the side panel. A row carries one action (download the certificate) and a chevron that shows the CA in the panel. On a phone each CA is a card with the same facts and its chevron; a tap anywhere on it shows the CA.
 
 ## Creating a CA
 

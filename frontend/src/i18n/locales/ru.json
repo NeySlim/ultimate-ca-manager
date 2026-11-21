@@ -1441,7 +1441,11 @@
       "profileRequiresHsm": "Этот профиль требует хранить ключ ЦС на HSM.",
       "profileHorizon": "Профиль соответствия допускает {{key}} до {{date}}, а этот ЦС проживёт дольше.",
       "noDigestAllowedByPolicy": "Политики, применимые к этому ЦС, не допускают ни одного хеша подписи.",
-      "hsmNeedsRead": "Для создания ЦС на ключе HSM нужно разрешение read:hsm."
+      "hsmNeedsRead": "Для создания ЦС на ключе HSM нужно разрешение read:hsm.",
+      "title": "Создать центр сертификации",
+      "constraintType": "Тип ограничения {{n}}",
+      "constraintValue": "Значение ограничения {{n}}",
+      "choose": "Выберите…"
     },
     "detail": {
       "hsmBacked": "На HSM",

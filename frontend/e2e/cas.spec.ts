@@ -10,20 +10,20 @@ test('a root then an intermediate created on screen form the hierarchy', async (
   const intName = uid('int')
   await page.goto('/cas')
 
-  await page.getByRole('button', { name: 'Create', exact: true }).click()
-  let dialog = page.getByRole('dialog', { name: 'Create CA' })
+  await page.getByRole('button', { name: 'Create CA', exact: true }).click()
+  let dialog = page.getByRole('dialog', { name: 'Create a certificate authority' })
   await dialog.getByLabel('Common Name (CN)').fill(rootName)
   await dialog.getByRole('button', { name: 'Create CA' }).click()
   await expect(dialog).toBeHidden()
-  await expect(page.getByRole('main').getByText(rootName).first()).toBeVisible()
+  // The new authority is the one the side panel shows
+  await expect(page.getByRole('complementary', { name: rootName })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Create', exact: true }).click()
-  dialog = page.getByRole('dialog', { name: 'Create CA' })
+  await page.getByRole('button', { name: 'Create CA', exact: true }).click()
+  dialog = page.getByRole('dialog', { name: 'Create a certificate authority' })
   await dialog.getByLabel('Common Name (CN)').fill(intName)
-  await dialog.getByLabel('Type', { exact: true }).click()
-  await page.getByRole('option', { name: /^Intermediate CA/ }).click()
-  await dialog.getByLabel('Parent CA').click()
-  await page.getByRole('option', { name: new RegExp(rootName) }).click()
+  await dialog.getByLabel('Type', { exact: true }).selectOption('intermediate')
+  const parent = dialog.getByLabel('Parent CA')
+  await parent.selectOption({ label: (await parent.locator('option', { hasText: rootName }).first().textContent()) || rootName })
   await dialog.getByRole('button', { name: 'Create CA' }).click()
   await expect(dialog).toBeHidden()
 
@@ -41,12 +41,12 @@ test('a root then an intermediate created on screen form the hierarchy', async (
   expect(inter.issuer).toBe(`CN=${rootName}`)
 })
 
-test('the hierarchy is a tree driven by the keyboard, the tabs and the search', async ({ page, api }) => {
+test('the hierarchy is a tree driven by the keyboard, the filters and the search', async ({ page, api }) => {
   const root = await createCA(api)
   const mid = await createCA(api, { parentCAId: root.id })
   const leaf = await createCA(api, { parentCAId: mid.id })
   await issueCert(api, mid.id)
-  await page.goto('/cas')
+  await page.goto(`/cas?authority=${root.id}`)
 
   const tree = page.getByRole('tree', { name: 'Trust hierarchy' })
   const item = (name: string) => tree.getByRole('treeitem', { name, exact: true })
@@ -57,30 +57,52 @@ test('the hierarchy is a tree driven by the keyboard, the tabs and the search', 
   await expect(item(mid.common_name)).toContainText('1 sub-authority')
   await expect(item(leaf.common_name)).toHaveCount(0)
 
-  // Right unfolds then enters the branch, Enter opens the detail in the dock
+  // Right unfolds then enters the branch, Enter shows the authority in the side panel
   await item(mid.common_name).focus()
   await page.keyboard.press('ArrowRight')
   await expect(item(mid.common_name)).toHaveAttribute('aria-expanded', 'true')
   await page.keyboard.press('ArrowRight')
   await expect(item(leaf.common_name)).toBeFocused()
   await page.keyboard.press('Enter')
-  await expect(page.getByRole('tabpanel', { name: leaf.common_name }).getByRole('heading', { name: leaf.common_name })).toBeVisible()
+  await expect(page.getByRole('complementary', { name: leaf.common_name })).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`[?&]authority=${leaf.id}`))
   await expect(item(leaf.common_name)).toHaveAttribute('aria-selected', 'true')
+  // Its issuer is a link that selects it
+  await page.getByRole('complementary', { name: leaf.common_name }).getByRole('button', { name: mid.common_name, exact: true }).click()
+  await expect(page.getByRole('complementary', { name: mid.common_name })).toBeVisible()
 
-  // The tab is part of the address and filters the tree
-  await page.getByRole('tab', { name: /^Intermediates/ }).click()
+  // The filter is part of the address and filters the tree
+  const filters = page.getByRole('group', { name: 'Filter the authorities' })
+  await filters.getByRole('button', { name: /^Intermediates/ }).click()
   await expect(page).toHaveURL(/[?&]view=intermediates/)
   await expect(item(leaf.common_name)).toBeVisible()
-  await page.getByRole('tab', { name: /^All/ }).click()
+  await filters.getByRole('button', { name: /^All/ }).click()
   await expect(page).not.toHaveURL(/view=/)
 
   // The search keeps the branch that leads to what it found
-  await page.getByRole('searchbox', { name: /^Name, common name/ }).fill(leaf.common_name)
+  await page.getByRole('searchbox', { name: 'Search the authorities' }).fill(leaf.common_name)
   await expect(tree.getByRole('treeitem')).toHaveCount(3)
 
-  // The list view: one action on the row, next to the chevron that opens it
-  await page.getByRole('button', { name: 'List view' }).click()
+  // The list view: one action on the row, next to the chevron that shows it
+  await page.getByRole('group', { name: 'Display' }).getByRole('button', { name: 'List' }).click()
   const row = page.getByRole('row', { name: new RegExp(leaf.common_name) })
   await expect(row.getByRole('button', { name: /Download certificate/ })).toBeVisible()
   await expect(row.getByRole('button')).toHaveCount(3)
+})
+
+test('an authority shows its CRL, its revoked count and its actions beside the tree', async ({ page, api }) => {
+  const root = await createCA(api)
+  await page.goto(`/cas?authority=${root.id}`)
+  const side = page.getByRole('complementary', { name: root.common_name })
+  await expect(side.getByRole('heading', { name: 'Revocation' })).toBeVisible()
+  await expect(side.getByText('Of which revoked')).toBeVisible()
+  // A root that holds its key issues
+  await expect(side.getByRole('button', { name: 'Issue with this CA' })).toBeEnabled()
+  await side.getByRole('button', { name: 'Other actions' }).click()
+  const menu = page.getByRole('dialog', { name: 'Authority actions' })
+  await expect(menu.getByRole('button', { name: /Export/ })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(menu).toHaveCount(0)
+  await side.getByRole('button', { name: 'View certificates' }).click()
+  await expect(page).toHaveURL(new RegExp(`/certificates\\?ca_id=${root.id}`))
 })

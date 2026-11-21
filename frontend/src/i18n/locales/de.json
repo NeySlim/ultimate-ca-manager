@@ -1407,7 +1407,11 @@
       "profileRequiresHsm": "Dieses Profil verlangt, dass der CA-Schlüssel in einem HSM gespeichert wird.",
       "profileHorizon": "Das Compliance-Profil akzeptiert {{key}} bis {{date}}, und diese CA würde diesen Zeitpunkt überdauern.",
       "noDigestAllowedByPolicy": "Die für diese CA geltenden Richtlinien erlauben keinen Signatur-Hash.",
-      "hsmNeedsRead": "Das Anlegen einer CA auf einem HSM-Schlüssel erfordert die Berechtigung read:hsm."
+      "hsmNeedsRead": "Das Anlegen einer CA auf einem HSM-Schlüssel erfordert die Berechtigung read:hsm.",
+      "title": "Create a certificate authority",
+      "constraintType": "Type of constraint {{n}}",
+      "constraintValue": "Value of constraint {{n}}",
+      "choose": "Choose…"
     },
     "detail": {
       "hsmBacked": "HSM-gesichert",

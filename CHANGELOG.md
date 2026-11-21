@@ -92,6 +92,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- **The Authorities page is the Atelier hierarchy.** The trust tree sits beside the panel of the selected authority (identity, key, issuance with its revoked count, CRL and OCSP state, View certificates, Issue with this CA, Download the chain, the other actions under Other actions), and an authority opened from another page opens there instead of the inspector. The columns view is gone; the list stays, and Create CA uses the Atelier form.
 - **The Activity page is the Atelier journal.** The audit log shows the mockup's toolbar, summary, rows and entry detail, with the operation type as a filter, the dates, user, result, action codes and saved filters under Filters, CSV or JSON export under Export the log, and the integrity check and clean-up in its « ⋯ » menu. Its rows keep the mockup's height: the density switch is gone.
 - **Tables give their room to the long columns, and a phone shows cards.** Short columns (time, user, result, state, dates, counts, actions) take the width of their content in the Activity journal, the scheduler and the tables of the module pages, the free-text columns sharing the rest. On a phone the Activity journal and the CA list show one card per entry, opened by a tap anywhere on it, its chevron on screen; the journal no longer scrolls sideways.
 - **The Activity journal's times use the mockup's Fira Code face.** Its monospaced cells fell back to the browser's own monospace font.

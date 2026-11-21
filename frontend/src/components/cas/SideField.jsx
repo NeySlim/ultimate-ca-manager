@@ -13,17 +13,15 @@ export function SideAction({ children, ...rest }) {
   return <>{' '}<button type="button" className="text-link" data-write="" {...rest}>{children}</button></>
 }
 
-/** A folded section of the side panel (the product's details beyond the mockup's sections): its title opens it. */
+/** A folded section of the side panel (the product's details beyond the mockup's sections), opened by the issue form's « Avancé » toggle. */
 export function SideFold({ id, title, children, onToggle, testId }) {
   const [open, setOpen] = useState(false)
   return (
     <section className="ca-side-section ca-fold" data-testid={testId}>
-      <h3 className="section-title">
-        <button type="button" className="fold-toggle" id={`${id}-toggle`} aria-expanded={open} aria-controls={id}
-          onClick={() => { setOpen(!open); onToggle?.(!open) }}>
-          <Icon name={open ? 'down' : 'right'} />{title}
-        </button>
-      </h3>
+      <button type="button" className="advanced-toggle" id={`${id}-toggle`} aria-expanded={open} aria-controls={id}
+        onClick={() => { setOpen(!open); onToggle?.(!open) }}>
+        <Icon name={open ? 'down' : 'right'} /><span>{title}</span>
+      </button>
       <div id={id} hidden={!open}>{open && children}</div>
     </section>
   )

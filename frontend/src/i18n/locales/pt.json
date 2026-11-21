@@ -1407,7 +1407,11 @@
       "profileRequiresHsm": "Este perfil exige que a chave da CA seja guardada num HSM.",
       "profileHorizon": "O perfil de conformidade aceita {{key}} até {{date}}, e esta CA ultrapassaria essa data.",
       "noDigestAllowedByPolicy": "Nenhum hash de assinatura é permitido pelas políticas aplicáveis a esta CA.",
-      "hsmNeedsRead": "Criar uma AC em uma chave HSM exige a permissão read:hsm."
+      "hsmNeedsRead": "Criar uma AC em uma chave HSM exige a permissão read:hsm.",
+      "title": "Create a certificate authority",
+      "constraintType": "Type of constraint {{n}}",
+      "constraintValue": "Value of constraint {{n}}",
+      "choose": "Choose…"
     },
     "detail": {
       "hsmBacked": "Apoiada por HSM",

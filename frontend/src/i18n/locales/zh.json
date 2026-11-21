@@ -1407,7 +1407,11 @@
       "profileRequiresHsm": "此配置文件要求 CA 密钥存储在 HSM 上。",
       "profileHorizon": "合规配置文件接受 {{key}} 至 {{date}}，而此 CA 的有效期将超过该日期。",
       "noDigestAllowedByPolicy": "适用于此 CA 的策略不允许任何签名摘要。",
-      "hsmNeedsRead": "在 HSM 密钥上创建 CA 需要 read:hsm 权限。"
+      "hsmNeedsRead": "在 HSM 密钥上创建 CA 需要 read:hsm 权限。",
+      "title": "创建证书颁发机构",
+      "constraintType": "约束 {{n}} 的类型",
+      "constraintValue": "约束 {{n}} 的值",
+      "choose": "请选择…"
     },
     "detail": {
       "hsmBacked": "HSM 支持",

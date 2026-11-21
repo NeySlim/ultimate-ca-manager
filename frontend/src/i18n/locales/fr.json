@@ -1158,7 +1158,11 @@
       "profileRequiresHsm": "Ce profil exige que la clé de l’AC soit stockée sur un HSM.",
       "profileHorizon": "Le profil de conformité accepte {{key}} jusqu’au {{date}}, et cette AC lui survivrait.",
       "noDigestAllowedByPolicy": "Aucun hachage de signature n’est autorisé par les politiques qui s’appliquent à cette AC.",
-      "hsmNeedsRead": "Créer une AC sur une clé HSM exige la permission read:hsm."
+      "hsmNeedsRead": "Créer une AC sur une clé HSM exige la permission read:hsm.",
+      "title": "Créer une autorité de certification",
+      "constraintType": "Type de la contrainte {{n}}",
+      "constraintValue": "Valeur de la contrainte {{n}}",
+      "choose": "Choisir…"
     },
     "detail": {
       "hsmBacked": "Adossé HSM",

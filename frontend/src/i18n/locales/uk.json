@@ -1441,7 +1441,11 @@
       "profileRequiresHsm": "Цей профіль вимагає зберігати ключ ЦС на HSM.",
       "profileHorizon": "Профіль відповідності приймає {{key}} до {{date}}, а цей ЦС діяв би довше.",
       "noDigestAllowedByPolicy": "Жоден дайджест підпису не дозволений політиками, що застосовуються до цього ЦС.",
-      "hsmNeedsRead": "Для створення ЦС на ключі HSM потрібен дозвіл read:hsm."
+      "hsmNeedsRead": "Для створення ЦС на ключі HSM потрібен дозвіл read:hsm.",
+      "title": "Create a certificate authority",
+      "constraintType": "Type of constraint {{n}}",
+      "constraintValue": "Value of constraint {{n}}",
+      "choose": "Choose…"
     },
     "detail": {
       "hsmBacked": "На основі HSM",

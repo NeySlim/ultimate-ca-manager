@@ -9,20 +9,18 @@
  */
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CaretRight, CaretDown, X, Plus } from '@phosphor-icons/react'
-import { Modal, Input, Select, Button } from '../../components'
+import { AtelierDialog, Icon } from '../../components/atelier'
 import { casService, hsmService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useWebSocket } from '../../hooks'
-import { extractData, cn, downloadBlob } from '../../lib/utils'
+import { extractData, downloadBlob } from '../../lib/utils'
 import { signingCas, unlistedSigningCas } from '../../lib/caSelection'
 import { CA_KEY_CHOICES, POLICY_DIGESTS, caKeyLabel, isAllowed, useEffectiveAlgorithms } from '../../lib/policyAlgorithms'
 import { PSS_HSM_TYPES } from '../../lib/signatureName'
 import {
   CA_DEFAULT_LABELS, KEY_ALGORITHMS, algorithmForKeyType, algorithmName, defaultDigestFor, defaultKeyChoice, findAlgorithm,
-  groupedOptions, isPostQuantum, isUsable, keyFamilyOptions, listAlgorithms,
+  groupedOptions, isBrainpool, isPostQuantum, isUntestedOn, isUsable, keyFamilyOptions, listAlgorithms,
 } from '../../lib/keyAlgorithms'
-import { BrainpoolNotice, UntestedKeyNotice } from '../../components/BrainpoolNotice'
 import { COMPLIANCE_PROFILE_NAMES, limitsWithProfile, useComplianceDefault, useComplianceProfiles } from '../../lib/complianceProfiles'
 
 const CA_FAMILY_OPTIONS = keyFamilyOptions('ca')
@@ -49,49 +47,44 @@ const NC_TYPE_OPTIONS = [
  * Repeatable {type, value} rows for a NameConstraints subtree list.
  * Mirrors the SAN editor in IssueCertificateForm.
  */
-function NameConstraintRows({ label, hint, addLabel, rows, onChange }) {
+/** Consecutive options of one key group (groupedOptions) as one optgroup, the others as they are. */
+function groupRuns(options) {
+  const runs = []
+  for (const o of options) {
+    const last = runs[runs.length - 1]
+    if (last && last.group === o.group) last.options.push(o)
+    else runs.push({ group: o.group, options: [o] })
+  }
+  return runs
+}
+
+function NameConstraintRows({ id, label, hint, addLabel, rows, onChange }) {
   const { t } = useTranslation()
-  const typeOptions = NC_TYPE_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))
   const update = (idx, key, val) =>
     onChange(rows.map((r, i) => (i === idx ? { ...r, [key]: val } : r)))
   const add = () => onChange([...rows, { type: 'dns', value: '' }])
   const remove = (idx) => onChange(rows.filter((_, i) => i !== idx))
 
+  // The mockup's SAN rows of the issue form: type, value, remove; then « Ajouter »
   return (
-    <fieldset className="space-y-2">
-      <legend className="text-xs font-medium text-text-secondary">{label}</legend>
-      {rows.map((row, idx) => (
-        <div key={idx} className="flex items-center gap-2">
-          <div className="w-28 flex-shrink-0">
-            <Select
-              value={row.type}
-              onChange={(val) => update(idx, 'type', val)}
-              options={typeOptions}
-            />
+    <fieldset className="field full">
+      <legend>{label}</legend>
+      {hint && <small id={`hint-${id}`}>{hint}</small>}
+      <div className="row-list">
+        {rows.map((row, idx) => (
+          <div key={idx} className="san-row">
+            <label className="sr-only" htmlFor={`${id}-type-${idx}`}>{t('cas.create.constraintType', { n: idx + 1 })}</label>
+            <select id={`${id}-type-${idx}`} value={row.type} onChange={(e) => update(idx, 'type', e.target.value)}>
+              {NC_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{t(o.labelKey)}</option>)}
+            </select>
+            <label className="sr-only" htmlFor={`${id}-value-${idx}`}>{t('cas.create.constraintValue', { n: idx + 1 })}</label>
+            <input id={`${id}-value-${idx}`} placeholder={t('cas.nameConstraintValuePlaceholder')} value={row.value}
+              autoComplete="off" spellCheck={false} onChange={(e) => update(idx, 'value', e.target.value)} />
+            <button type="button" className="icon-btn" aria-label={t('common.remove')} onClick={() => remove(idx)}><Icon name="close" /></button>
           </div>
-          <div className="flex-1">
-            <Input
-              placeholder={t('cas.nameConstraintValuePlaceholder')}
-              value={row.value}
-              onChange={(e) => update(idx, 'value', e.target.value)}
-            />
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => remove(idx)}
-            className="flex-shrink-0 text-text-tertiary hover:text-accent-danger"
-            aria-label={t('common.remove')}
-          >
-            <X size={14} />
-          </Button>
-        </div>
-      ))}
-      <Button type="button" variant="ghost" size="sm" onClick={add} className="text-xs">
-        <Plus size={12} /> {addLabel}
-      </Button>
-      {hint && <p className="text-xs text-text-tertiary">{hint}</p>}
+        ))}
+      </div>
+      <button type="button" className="btn quiet add-row" onClick={add}><Icon name="plus" />{addLabel}</button>
     </fieldset>
   )
 }
@@ -444,468 +437,227 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     }
   }
 
+  const field = (id, label, control, hint) => (
+    <div className={hint?.full ? 'field full' : 'field'}>
+      <label htmlFor={id}>{label}</label>
+      {control}
+      {hint?.text && <small id={`hint-${id}`}>{hint.text}</small>}
+    </div>
+  )
+  const select = (id, value, onChange, options, extra = {}) => (
+    <select id={id} value={value ?? ''} onChange={(e) => onChange(e.target.value)} {...extra}>
+      {extra.required && !value && <option value="" disabled hidden>{t('cas.create.choose')}</option>}
+      {groupRuns(options).map((run) => (run.group
+        ? <optgroup key={run.group} label={run.group}>{run.options.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}</optgroup>
+        : run.options.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)))}
+    </select>
+  )
+  const warn = (text, role = 'note') => <p className="notice warn" role={role}><Icon name="warning" /><span>{text}</span></p>
+  const refuse = (text) => <p className="field-error" role="alert"><Icon name="warning" /><span>{text}</span></p>
+  const radio = (name, value, current, onChange, label, { disabled = false, hint } = {}) => (
+    <label className="format-option">
+      <input type="radio" name={name} value={value} checked={current === value} disabled={disabled} onChange={() => onChange(value)} />
+      <span>{label}{hint && <small>{hint}</small>}</span>
+    </label>
+  )
+  const toggle = (id, open, onToggle, label, sub) => (
+    <button type="button" className="advanced-toggle" id={`${id}-toggle`} aria-expanded={open} aria-controls={id} onClick={onToggle}>
+      <Icon name={open ? 'down' : 'right'} /><span>{label}</span>{sub && <small>{sub}</small>}
+    </button>
+  )
+  const parentHint = unlistedSigningCas(cas) > 0 ? t('cas.notListedForSigning', { count: unlistedSigningCas(cas) }) : undefined
+  const profileHint = createFormProfile === null && profileName
+    ? t(COMPLIANCE_PROFILE_NAMES.includes(parentProfile) ? 'cas.complianceProfileFromParent' : 'cas.complianceProfileFromDefault')
+    : t('cas.complianceProfileHelp')
+
+  if (!open) return null
+  // The mockup's setupDialog(): a modal holding a form of `.form-fields`, then Annuler and the primary action
   return (
-    <Modal
-      open={open}
-      onOpenChange={onClose}
-      title={t('common.createCA')}
-      size="lg"
-    >
-      <form onSubmit={handleCreateCA} className="space-y-6 p-4">
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-text-primary">{t('cas.subjectInfo')}</h3>
-          <Input name="commonName" label={t('common.commonName') + ' (CN)'} placeholder={t('cas.cnPlaceholder')} required />
-          <div className="grid grid-cols-2 gap-4">
-            <Input name="country" label={t('common.country') + ' (C)'} placeholder={t('common.countryPlaceholder')} maxLength={2} />
-            <Input name="state" label={t('common.stateProvince') + ' (ST)'} placeholder={t('common.statePlaceholder')} />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input name="locality" label={t('cas.locality') + ' (L)'} placeholder={t('cas.localityPlaceholder')} />
-            <Input name="organization" label={t('common.organization') + ' (O)'} placeholder={t('cas.orgPlaceholder')} />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input name="organizationalUnit" label={t('common.orgUnit') + ' (OU)'} placeholder={t('csrs.departmentPlaceholder')} />
-            <Input name="description" label={t('common.description')} placeholder={t('cas.descriptionPlaceholder')} />
-          </div>
-        </div>
+    <AtelierDialog title={t('cas.create.title')} onClose={onClose} testId="create-ca-dialog">
+      <form id="create-ca-form" onSubmit={handleCreateCA}>
+        <div className="form-fields">
+          {field('ca-type', t('common.type'), select('ca-type', createFormType, setCreateFormType, [
+            { value: 'root', label: t('cas.rootCASelfSigned') },
+            { value: 'intermediate', label: t('cas.intermediateCASigned') },
+            { value: 'external', label: t('cas.externalCASigned') },
+          ]), { text: createFormType === 'external' ? t('cas.create.externalHint') : undefined })}
+          {createFormType === 'intermediate' && field('ca-parent', t('cas.parentCA'), select('ca-parent', createFormParentCAId, setCreateFormParentCAId,
+            signingCas(cas).map((ca) => ({ value: ca.id.toString(), label: ca.name || ca.descr || ca.common_name })), { required: true, 'aria-describedby': parentHint ? 'hint-ca-parent' : undefined }),
+          { text: parentHint })}
 
-        <div className="space-y-2">
-          <Select
-            label={t('cas.complianceProfile')}
-            options={[
-              { value: '', label: t('cas.complianceProfileNone') },
-              ...COMPLIANCE_PROFILE_NAMES.map(n => ({
-                value: n,
-                label: profiles[n] ? `${profiles[n].title} (${profiles[n].reference})` : n,
-              })),
-            ]}
-            value={profileName}
-            onChange={(value) => setCreateFormProfile(value)}
-            helperText={
-              createFormProfile === null && profileName
-                ? t(COMPLIANCE_PROFILE_NAMES.includes(parentProfile) ? 'cas.complianceProfileFromParent' : 'cas.complianceProfileFromDefault')
-                : t('cas.complianceProfileHelp')
-            }
-          />
-          {requireHsm && (
-            <p className="text-xs text-text-secondary">{t('cas.create.profileRequiresHsm')}</p>
-          )}
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-text-primary">{t('cas.create.keyStorage')}</h3>
-          <div className="flex gap-2">
-            <label className={cn(
-              'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm cursor-pointer transition-all',
-              keyStorage === 'local'
-                ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary font-semibold'
-                : 'border-border hover:border-border-hover text-text-secondary'
-            )}>
-              <input
-                type="radio"
-                name="keyStorage"
-                value="local"
-                className="sr-only"
-                checked={keyStorage === 'local'}
-                disabled={requireHsm}
-                onChange={() => setCreateFormKeyStorage('local')}
-              />
-              {t('cas.create.keyStorageLocal')}
-            </label>
-            <label className={cn(
-              'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all',
-              hsmDenied ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
-              keyStorage === 'hsm'
-                ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary font-semibold'
-                : 'border-border hover:border-border-hover text-text-secondary'
-            )}>
-              <input
-                type="radio"
-                name="keyStorage"
-                value="hsm"
-                className="sr-only"
-                checked={keyStorage === 'hsm'}
-                disabled={hsmDenied}
-                onChange={() => setCreateFormKeyStorage('hsm')}
-              />
-              {t('cas.create.keyStorageHsm')}
-            </label>
+          <div className="field full">
+            <label htmlFor="ca-cn">{t('common.commonName') + ' (CN)'}</label>
+            <input id="ca-cn" name="commonName" placeholder={t('cas.cnPlaceholder')} required maxLength={64} autoComplete="off" />
           </div>
-          {hsmDenied && <p className="mt-1 text-xs text-text-secondary">{t('cas.create.hsmNeedsRead')}</p>}
-        </div>
+          {field('ca-country', t('common.country') + ' (C)', <input id="ca-country" name="country" placeholder={t('common.countryPlaceholder')} maxLength={2} autoComplete="off" />)}
+          {field('ca-state', t('common.stateProvince') + ' (ST)', <input id="ca-state" name="state" placeholder={t('common.statePlaceholder')} autoComplete="off" />)}
+          {field('ca-locality', t('cas.locality') + ' (L)', <input id="ca-locality" name="locality" placeholder={t('cas.localityPlaceholder')} autoComplete="off" />)}
+          {field('ca-organization', t('common.organization') + ' (O)', <input id="ca-organization" name="organization" placeholder={t('cas.orgPlaceholder')} autoComplete="off" />)}
+          {field('ca-ou', t('common.orgUnit') + ' (OU)', <input id="ca-ou" name="organizationalUnit" placeholder={t('csrs.departmentPlaceholder')} autoComplete="off" />)}
+          {field('ca-description', t('common.description'), <input id="ca-description" name="description" placeholder={t('cas.descriptionPlaceholder')} autoComplete="off" />)}
 
-        {keyStorage === 'local' && (
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-text-primary">{t('cas.keyConfiguration')}</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <Select
-              label={t('common.keyAlgorithm')}
-              options={CA_FAMILY_OPTIONS
-                .filter(o => noKeyAllowed || allowedLocalKeys.some(([a]) => a === o.value))}
-              value={createFormKeyAlgo}
-              onChange={(value) => {
+          {field('ca-profile', t('cas.complianceProfile'), select('ca-profile', profileName, (v) => setCreateFormProfile(v), [
+            { value: '', label: t('cas.complianceProfileNone') },
+            ...COMPLIANCE_PROFILE_NAMES.map((n) => ({ value: n, label: profiles[n] ? `${profiles[n].title} (${profiles[n].reference})` : n })),
+          ], { 'aria-describedby': 'hint-ca-profile' }), { full: true, text: profileHint })}
+          {requireHsm && warn(t('cas.create.profileRequiresHsm'))}
+
+          <fieldset className="field full">
+            <legend>{t('cas.create.keyStorage')}</legend>
+            <div className="choice-grid">
+              {radio('keyStorage', 'local', keyStorage, setCreateFormKeyStorage, t('cas.create.keyStorageLocal'), { disabled: requireHsm })}
+              {radio('keyStorage', 'hsm', keyStorage, setCreateFormKeyStorage, t('cas.create.keyStorageHsm'), { disabled: hsmDenied })}
+            </div>
+            {hsmDenied && <small>{t('cas.create.hsmNeedsRead')}</small>}
+          </fieldset>
+
+          {keyStorage === 'local' && (
+            <>
+              {field('ca-key-algo', t('common.keyAlgorithm'), select('ca-key-algo', createFormKeyAlgo, (value) => {
                 setCreateFormKeyAlgo(value)
                 const sizes = allowedLocalKeys.filter(([a]) => a === value).map(([, sz]) => sz)
                 const preferred = defaultKeyChoice('ca', value, CA_DEFAULT_LABELS)?.[1]
                 setCreateFormKeySize(sizes.includes(preferred) ? preferred : sizes[0] || preferred)
-              }}
-            />
-            <Select
-              label={t('common.keySize')}
-              options={groupedOptions(
-                KEY_ALGORITHMS.filter(k => k.ca && k.ca[0] === createFormKeyAlgo), t,
-                k => algorithmName(k, t, 'sizeKey'), k => k.ca[1],
-              ).filter(o => noKeyAllowed || allowedLocalKeys.some(([a, sz]) => a === createFormKeyAlgo && sz === o.value))}
-              value={createFormKeySize}
-              onChange={(value) => setCreateFormKeySize(value)}
-            />
-            {keyHasDigest && (
-            <Select
-              label={t('common.signatureAlgorithm')}
-              options={[
+              }, CA_FAMILY_OPTIONS.filter((o) => noKeyAllowed || allowedLocalKeys.some(([a]) => a === o.value))))}
+              {field('ca-key-size', t('common.keySize'), select('ca-key-size', createFormKeySize, (value) => setCreateFormKeySize(value),
+                groupedOptions(
+                  KEY_ALGORITHMS.filter((k) => k.ca && k.ca[0] === createFormKeyAlgo), t,
+                  (k) => algorithmName(k, t, 'sizeKey'), (k) => k.ca[1],
+                ).filter((o) => noKeyAllowed || allowedLocalKeys.some(([a, sz]) => a === createFormKeyAlgo && sz === o.value))))}
+              {keyHasDigest && field('ca-digest', t('common.signatureAlgorithm'), select('ca-digest', createFormDigest, (value) => setCreateFormDigest(value), [
                 ...(noDigestAllowed ? [] : [{ value: 'auto', label: t('cas.create.digestAuto') }]),
-                ...allowedDigestChoices.map(d => ({ value: d, label: d.toUpperCase().replace('SHA', 'SHA-') })),
-              ]}
-              value={createFormDigest}
-              onChange={(value) => setCreateFormDigest(value)}
-              helperText={
-                createFormDigest === 'auto' && autoDigest
-                  ? t('cas.create.digestAutoHint', { digest: autoDigest.toUpperCase() })
-                  : undefined
-              }
-            />
-            )}
-          </div>
-          {noKeyAllowed && (
-            <p className="text-xs text-status-danger" role="alert">{t('cas.create.noKeyTypeAllowedByPolicy')}</p>
-          )}
-        </div>
-        )}
-        {noSchemeAllowed && (
-          <p className="text-xs text-status-danger" role="alert">{t('cas.create.noSchemeAllowedByProfile')}</p>
-        )}
-        {noDigestAllowed && (
-          <p className="text-xs text-status-danger" role="alert">{t('cas.create.noDigestAllowedByPolicy')}</p>
-        )}
-        {createFormType !== 'external' && <BrainpoolNotice label={horizonLabel} />}
-        {pastProfileHorizon && (
-          <div className="px-3 py-2 rounded-lg border border-status-warning bg-status-warning-op10 text-xs text-status-warning">
-            {t('cas.create.profileHorizon', { key: horizonLabel, date: profileHorizon })}
-          </div>
-        )}
-        {rsa2048PastHorizon && (
-          <div className="px-3 py-2 rounded-lg border border-status-warning bg-status-warning-op10 text-xs text-status-warning">
-            {t('cas.create.rsa2048Horizon')}
-          </div>
-        )}
-
-        {keyStorage === 'hsm' && (
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-text-primary">{t('cas.keyConfiguration')}</h3>
-          {!hsmLoading && hsmProviders.length === 0 ? (
-            <div className="px-3 py-2 rounded-lg border border-status-warning bg-status-warning-op10 text-xs text-status-warning">
-              {t('cas.create.hsmNoProviders')}
-            </div>
-          ) : (
-            <>
-              <Select
-                label={t('cas.create.hsmProvider')}
-                options={hsmProviders.map(p => ({
-                  value: p.id.toString(),
-                  label: `${p.name} (${p.provider_type})`
-                }))}
-                value={createFormHsmProviderId}
-                onChange={(v) => { setCreateFormHsmProviderId(v); setCreateFormHsmKeyId('') }}
-                required
-              />
-              <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                  {t('cas.create.hsmKeyMode')}
-                </label>
-                <div className="flex gap-2">
-                  <label className={cn(
-                    'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm cursor-pointer transition-all',
-                    createFormHsmKeyMode === 'generate'
-                      ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary font-semibold'
-                      : 'border-border hover:border-border-hover text-text-secondary'
-                  )}>
-                    <input
-                      type="radio"
-                      name="hsmKeyMode"
-                      value="generate"
-                      className="sr-only"
-                      checked={createFormHsmKeyMode === 'generate'}
-                      onChange={() => setCreateFormHsmKeyMode('generate')}
-                    />
-                    {t('cas.create.hsmKeyModeGenerate')}
-                  </label>
-                  <label className={cn(
-                    'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm cursor-pointer transition-all',
-                    createFormHsmKeyMode === 'existing'
-                      ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary font-semibold'
-                      : 'border-border hover:border-border-hover text-text-secondary'
-                  )}>
-                    <input
-                      type="radio"
-                      name="hsmKeyMode"
-                      value="existing"
-                      className="sr-only"
-                      checked={createFormHsmKeyMode === 'existing'}
-                      onChange={() => setCreateFormHsmKeyMode('existing')}
-                    />
-                    {t('cas.create.hsmKeyModeExisting')}
-                  </label>
-                </div>
-              </div>
-
-              {createFormHsmKeyMode === 'generate' && (
-                <div className="grid grid-cols-2 gap-4">
-                  <Input
-                    label={t('cas.create.hsmKeyLabel')}
-                    value={createFormHsmKeyLabel}
-                    onChange={(e) => setCreateFormHsmKeyLabel(e.target.value)}
-                    placeholder="ca-signing-key-1"
-                    helperText={t('cas.create.hsmKeyLabelHelp')}
-                    required
-                  />
-                  <Select
-                    label={t('cas.create.hsmKeyAlgorithm')}
-                    options={groupedOptions(hsmAlgorithms, t, a => a.label)}
-                    value={createFormHsmKeyAlgorithm}
-                    onChange={(v) => setCreateFormHsmKeyAlgorithm(v)}
-                  />
-                </div>
-              )}
-              {createFormHsmKeyMode === 'generate' && (
-                <UntestedKeyNotice label={createFormHsmKeyAlgorithm} provider={hsmProviderType} />
-              )}
-              {createFormHsmKeyMode === 'generate' && hsmAlgorithmOptions.length === 0 && (
-                <p className="text-xs text-status-danger" role="alert">{t('cas.create.noKeyTypeAllowedByPolicy')}</p>
-              )}
-
-              {createFormHsmKeyMode === 'existing' && (
-                createFormHsmProviderId && usableHsmKeys.length === 0 ? (
-                  <div className="px-3 py-2 rounded-lg border border-status-warning bg-status-warning-op10 text-xs text-status-warning">
-                    {t('cas.create.hsmNoUnusedKeys')}
-                  </div>
-                ) : (
-                  <Select
-                    label={t('cas.create.hsmExistingKey')}
-                    options={usableHsmKeys.map(k => ({
-                      value: k.id.toString(),
-                      label: `${k.label} (${k.algorithm})`
-                    }))}
-                    value={createFormHsmKeyId}
-                    onChange={(v) => setCreateFormHsmKeyId(v)}
-                    required
-                  />
-                )
-              )}
+                ...allowedDigestChoices.map((d) => ({ value: d, label: d.toUpperCase().replace('SHA', 'SHA-') })),
+              ]), { text: createFormDigest === 'auto' && autoDigest ? t('cas.create.digestAutoHint', { digest: autoDigest.toUpperCase() }) : undefined })}
+              {noKeyAllowed && refuse(t('cas.create.noKeyTypeAllowedByPolicy'))}
             </>
           )}
-          {hsmRefusal && (
-            <div role="alert" className="px-3 py-2 rounded-lg border border-status-danger-op30 bg-status-danger-op10 text-xs text-status-danger">
-              {hsmRefusal}
-            </div>
+          {noSchemeAllowed && refuse(t('cas.create.noSchemeAllowedByProfile'))}
+          {noDigestAllowed && refuse(t('cas.create.noDigestAllowedByPolicy'))}
+          {createFormType !== 'external' && isBrainpool(horizonLabel) && warn(t('common.keyGroups.brainpoolWarning'))}
+          {pastProfileHorizon && warn(t('cas.create.profileHorizon', { key: horizonLabel, date: profileHorizon }), undefined)}
+          {rsa2048PastHorizon && warn(t('cas.create.rsa2048Horizon'), undefined)}
+
+          {keyStorage === 'hsm' && (
+            !hsmLoading && hsmProviders.length === 0 ? warn(t('cas.create.hsmNoProviders'), undefined) : (
+              <>
+                {field('ca-hsm-provider', t('cas.create.hsmProvider'), select('ca-hsm-provider', createFormHsmProviderId,
+                  (v) => { setCreateFormHsmProviderId(v); setCreateFormHsmKeyId('') },
+                  hsmProviders.map((p) => ({ value: p.id.toString(), label: `${p.name} (${p.provider_type})` })), { required: true }))}
+                <fieldset className="field">
+                  <legend>{t('cas.create.hsmKeyMode')}</legend>
+                  <div className="choice-grid">
+                    {radio('hsmKeyMode', 'generate', createFormHsmKeyMode, setCreateFormHsmKeyMode, t('cas.create.hsmKeyModeGenerate'))}
+                    {radio('hsmKeyMode', 'existing', createFormHsmKeyMode, setCreateFormHsmKeyMode, t('cas.create.hsmKeyModeExisting'))}
+                  </div>
+                </fieldset>
+                {createFormHsmKeyMode === 'generate' && (
+                  <>
+                    {field('ca-hsm-label', t('cas.create.hsmKeyLabel'), <input id="ca-hsm-label" value={createFormHsmKeyLabel} required placeholder="ca-signing-key-1"
+                      aria-describedby="hint-ca-hsm-label" onChange={(e) => setCreateFormHsmKeyLabel(e.target.value)} />, { text: t('cas.create.hsmKeyLabelHelp') })}
+                    {field('ca-hsm-algo', t('cas.create.hsmKeyAlgorithm'), select('ca-hsm-algo', createFormHsmKeyAlgorithm, (v) => setCreateFormHsmKeyAlgorithm(v),
+                      groupedOptions(hsmAlgorithms, t, (a) => a.label)))}
+                    {isUntestedOn(createFormHsmKeyAlgorithm, hsmProviderType) && warn(t('hsm.mldsaUntestedGoogleKms'))}
+                    {hsmAlgorithmOptions.length === 0 && refuse(t('cas.create.noKeyTypeAllowedByPolicy'))}
+                  </>
+                )}
+                {createFormHsmKeyMode === 'existing' && (
+                  createFormHsmProviderId && usableHsmKeys.length === 0 ? warn(t('cas.create.hsmNoUnusedKeys'), undefined)
+                    : field('ca-hsm-key', t('cas.create.hsmExistingKey'), select('ca-hsm-key', createFormHsmKeyId, (v) => setCreateFormHsmKeyId(v),
+                      usableHsmKeys.map((k) => ({ value: k.id.toString(), label: `${k.label} (${k.algorithm})` })), { required: true }))
+                )}
+              </>
+            )
           )}
-        </div>
-        )}
+          {keyStorage === 'hsm' && hsmRefusal && refuse(hsmRefusal)}
 
-        {keyIsRsa && (
-          <Select
-            label={t('cas.signatureScheme')}
-            options={schemeChoices.map(v => ({
-              value: v, label: t(v === 'pss' ? 'cas.signatureSchemePss' : 'cas.signatureSchemePkcs1v15'),
-            }))}
-            value={createFormSignatureScheme}
-            onChange={(value) => setCreateFormSignatureScheme(value)}
-            helperText={pssAvailable ? t('cas.signatureSchemeHelp') : t('cas.signatureSchemeHsmUnsupported')}
-          />
-        )}
+          {keyIsRsa && field('ca-scheme', t('cas.signatureScheme'), select('ca-scheme', createFormSignatureScheme, (value) => setCreateFormSignatureScheme(value),
+            schemeChoices.map((v) => ({ value: v, label: t(v === 'pss' ? 'cas.signatureSchemePss' : 'cas.signatureSchemePkcs1v15') })),
+            { 'aria-describedby': 'hint-ca-scheme' }), { text: pssAvailable ? t('cas.signatureSchemeHelp') : t('cas.signatureSchemeHsmUnsupported') })}
 
-        {createFormType !== 'external' && (
-          <div className="space-y-4">
-            <Select
-              label={t('common.validityPeriod')}
-              options={[
-                ...VALIDITY_YEAR_PRESETS.map(years => ({
-                  value: String(years), label: t('cas.yearsValidity', { count: years }),
-                })),
+          {createFormType !== 'external' && (
+            <>
+              {field('ca-validity', t('common.validityPeriod'), select('ca-validity', createFormValidity, (value) => setCreateFormValidity(value), [
+                ...VALIDITY_YEAR_PRESETS.map((years) => ({ value: String(years), label: t('cas.yearsValidity', { count: years }) })),
                 { value: CUSTOM_VALIDITY, label: t('cas.customValidityDays') },
-              ]}
-              value={createFormValidity}
-              onChange={(value) => setCreateFormValidity(value)}
-            />
-            {createFormValidity === CUSTOM_VALIDITY && (
-              <Input
-                name="validityDays"
-                type="number"
-                min={1}
-                max={MAX_CA_VALIDITY_DAYS}
-                required
-                label={t('cas.validityDays')}
-                value={createFormValidityDays}
-                onChange={(e) => setCreateFormValidityDays(e.target.value)}
-                helperText={t('cas.validityDaysHelp', { max: MAX_CA_VALIDITY_DAYS })}
-              />
-            )}
-          </div>
-        )}
-
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-text-primary">{t('cas.caType')}</h3>
-          <Select
-            label={t('common.type')}
-            options={[
-              { value: 'root', label: t('cas.rootCASelfSigned') },
-              { value: 'intermediate', label: t('cas.intermediateCASigned') },
-              { value: 'external', label: t('cas.externalCASigned') }
-            ]}
-            value={createFormType}
-            onChange={(value) => setCreateFormType(value)}
-          />
-          {createFormType === 'external' && (
-            <p className="text-xs text-text-secondary">{t('cas.create.externalHint')}</p>
+              ]))}
+              {createFormValidity === CUSTOM_VALIDITY && field('ca-validity-days', t('cas.validityDays'),
+                <input id="ca-validity-days" name="validityDays" type="number" min={1} max={MAX_CA_VALIDITY_DAYS} required value={createFormValidityDays}
+                  aria-describedby="hint-ca-validity-days" onChange={(e) => setCreateFormValidityDays(e.target.value)} />,
+                { text: t('cas.validityDaysHelp', { max: MAX_CA_VALIDITY_DAYS }) })}
+            </>
           )}
-          {createFormType === 'intermediate' && (
-            <Select
-              label={t('cas.parentCA')}
-              options={signingCas(cas).map(ca => ({
-                value: ca.id.toString(),
-                label: ca.name || ca.descr || ca.common_name
-              }))}
-              value={createFormParentCAId}
-              onChange={(value) => setCreateFormParentCAId(value)}
-              helperText={unlistedSigningCas(cas) > 0 ? t('cas.notListedForSigning', { count: unlistedSigningCas(cas) }) : undefined}
-              required
-            />
-          )}
-        </div>
 
-        {/* Certificate profile (RFC 5280 Key Usage / EKU) */}
-        <div className="space-y-4">
-          <button
-            type="button"
-            className="flex items-center gap-2 text-sm font-semibold text-text-secondary hover:text-text-primary transition-colors"
-            onClick={() => setShowCertProfile(!showCertProfile)}
-          >
-            {showCertProfile ? <CaretDown size={14} /> : <CaretRight size={14} />}
-            {t('cas.create.certificateProfile')}
-          </button>
-          {showCertProfile && (
-            <div className="space-y-4 pl-2 border-l-2 border-border">
-              <p className="text-xs text-text-secondary">{t('cas.create.certificateProfileHelp')}</p>
-              <fieldset className="space-y-2">
-                <legend className="text-xs font-medium text-text-secondary">{t('common.keyUsage')}</legend>
-                {CA_KU_OPTIONS.map((ku) => (
-                  <label key={ku} className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="rounded border-border"
-                      checked={createFormKeyUsage.includes(ku)}
-                      onChange={(e) => {
-                        setCreateFormKeyUsage((prev) => {
-                          if (e.target.checked) {
-                            return prev.includes(ku) ? prev : [...prev, ku]
-                          }
-                          return prev.filter((x) => x !== ku)
-                        })
-                      }}
-                    />
-                    {ku}
-                  </label>
-                ))}
-              </fieldset>
-              {createFormType === 'intermediate' && (
-                <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="rounded border-border"
-                    checked={createFormEkuServerAuth}
-                    onChange={(e) => setCreateFormEkuServerAuth(e.target.checked)}
-                  />
-                  {t('cas.create.ekuServerAuth')}
-                </label>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Advanced Constraints (RFC 5280) */}
-        <div className="space-y-4">
-          <button
-            type="button"
-            className="flex items-center gap-2 text-sm font-semibold text-text-secondary hover:text-text-primary transition-colors"
-            onClick={() => setShowAdvanced(!showAdvanced)}
-          >
-            {showAdvanced ? <CaretDown size={14} /> : <CaretRight size={14} />}
-            {t('cas.advancedConstraints')}
-          </button>
-          {showAdvanced && (
-            <div className="space-y-4 pl-2 border-l-2 border-border">
-              <Input
-                label={t('cas.pathLength')}
-                type="number"
-                min="0"
-                value={createFormPathLength}
-                onChange={(e) => setCreateFormPathLength(e.target.value)}
-                placeholder={t('cas.pathLengthPlaceholder')}
-              />
-              {createFormType === 'external' ? (
-                <p className="text-xs text-text-tertiary">{t('cas.nameConstraintsExternalNote')}</p>
-              ) : (
+          {/* Certificate profile (RFC 5280 Key Usage / EKU), folded as the issue form's « Avancé » */}
+          <div className="field full advanced">
+            {toggle('ca-cert-profile', showCertProfile, () => setShowCertProfile(!showCertProfile), t('cas.create.certificateProfile'))}
+            <div className="advanced-panel" id="ca-cert-profile" hidden={!showCertProfile}>
+              {showCertProfile && (
                 <>
-                  <NameConstraintRows
-                    label={t('cas.nameConstraintsPermitted')}
-                    hint={t('cas.nameConstraintsPermittedHint')}
-                    addLabel={t('cas.nameConstraintAddPermitted')}
-                    rows={createFormNCPermitted}
-                    onChange={setCreateFormNCPermitted}
-                  />
-                  <NameConstraintRows
-                    label={t('cas.nameConstraintsExcluded')}
-                    hint={t('cas.nameConstraintsExcludedHint')}
-                    addLabel={t('cas.nameConstraintAddExcluded')}
-                    rows={createFormNCExcluded}
-                    onChange={setCreateFormNCExcluded}
-                  />
+                  <p className="field full small muted">{t('cas.create.certificateProfileHelp')}</p>
+                  <fieldset className="field full eku-list">
+                    <legend>{t('common.keyUsage')}</legend>
+                    {CA_KU_OPTIONS.map((ku) => (
+                      <label key={ku} className="checkbox-line">
+                        <input type="checkbox" checked={createFormKeyUsage.includes(ku)} onChange={(e) => {
+                          setCreateFormKeyUsage((prev) => (e.target.checked ? (prev.includes(ku) ? prev : [...prev, ku]) : prev.filter((x) => x !== ku)))
+                        }} />
+                        {ku}
+                      </label>
+                    ))}
+                  </fieldset>
+                  {createFormType === 'intermediate' && (
+                    <label className="checkbox-line field full">
+                      <input type="checkbox" checked={createFormEkuServerAuth} onChange={(e) => setCreateFormEkuServerAuth(e.target.checked)} />
+                      {t('cas.create.ekuServerAuth')}
+                    </label>
+                  )}
                 </>
               )}
-              <label className="flex items-start gap-2 text-sm text-text-secondary cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="mt-0.5"
-                  checked={createFormNamedUrls}
-                  onChange={(e) => setCreateFormNamedUrls(e.target.checked)}
-                />
-                <span>
-                  {t('cas.namedUrls')}
-                  <span className="block text-xs text-text-tertiary">{t('cas.namedUrlsHint')}</span>
-                </span>
-              </label>
             </div>
-          )}
-        </div>
+          </div>
 
-        <div className="flex justify-end gap-2 pt-4 border-t border-border">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button
-            type="submit"
+          {/* Advanced constraints (RFC 5280) */}
+          <div className="field full advanced">
+            {toggle('ca-constraints', showAdvanced, () => setShowAdvanced(!showAdvanced), t('cas.advancedConstraints'))}
+            <div className="advanced-panel" id="ca-constraints" hidden={!showAdvanced}>
+              {showAdvanced && (
+                <>
+                  {field('ca-pathlen', t('cas.pathLength'), <input id="ca-pathlen" type="number" min="0" value={createFormPathLength}
+                    placeholder={t('cas.pathLengthPlaceholder')} onChange={(e) => setCreateFormPathLength(e.target.value)} />)}
+                  {createFormType === 'external' ? (
+                    <p className="field full small muted">{t('cas.nameConstraintsExternalNote')}</p>
+                  ) : (
+                    <>
+                      <NameConstraintRows id="nc-permitted" label={t('cas.nameConstraintsPermitted')} hint={t('cas.nameConstraintsPermittedHint')}
+                        addLabel={t('cas.nameConstraintAddPermitted')} rows={createFormNCPermitted} onChange={setCreateFormNCPermitted} />
+                      <NameConstraintRows id="nc-excluded" label={t('cas.nameConstraintsExcluded')} hint={t('cas.nameConstraintsExcludedHint')}
+                        addLabel={t('cas.nameConstraintAddExcluded')} rows={createFormNCExcluded} onChange={setCreateFormNCExcluded} />
+                    </>
+                  )}
+                  <label className="checkbox-line field full">
+                    <input type="checkbox" checked={createFormNamedUrls} onChange={(e) => setCreateFormNamedUrls(e.target.checked)} />
+                    <span>{t('cas.namedUrls')}<small className="muted"> {t('cas.namedUrlsHint')}</small></span>
+                  </label>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={onClose}>{t('common.cancel')}</button>
+          <button type="submit" className="btn primary" data-write=""
             disabled={
               creating || policyBlocksCreate || missingParent || (
-              keyStorage === 'hsm' && (
-                hsmProviders.length === 0 ||
-                (createFormHsmKeyMode === 'existing' && !!createFormHsmProviderId && usableHsmKeys.length === 0)
+                keyStorage === 'hsm' && (
+                  hsmProviders.length === 0
+                  || (createFormHsmKeyMode === 'existing' && !!createFormHsmProviderId && usableHsmKeys.length === 0)
+                )
               )
-              )
-            }
-          >
+            }>
             {creating ? t('common.creating') : t('common.createCA')}
-          </Button>
+          </button>
         </div>
       </form>
-    </Modal>
+    </AtelierDialog>
   )
 }

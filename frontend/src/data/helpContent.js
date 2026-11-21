@@ -149,11 +149,11 @@ export const helpContent = {
         icon: TreeStructure,
         items: [
           { label: 'Tabs', text: 'All, Roots, Intermediates and Expired, each with its count, then Offline, Revoked and Awaiting certificate when there are some. The tab is part of the address' },
-          { label: 'Tree view', text: 'The trust hierarchy, opened by default: each root with its sub-authorities on its right, folded beyond the first level. A node shows its state, its certificates and its sub-authorities; a dotted line joins a CA to the one that cross-certified it. Roots without a sub-authority take one line each, and those without a certificate either fold into one group once there are many' },
-          { label: 'Keyboard', text: 'In the tree, the arrow keys move, right and left unfold and fold, Enter opens the CA in the detail panel' },
-          { label: 'Search', text: 'Filters the three views on the name, the common name and the subject; the tree keeps the branch that leads to each match' },
-          { label: 'Columns view', text: 'Hierarchy browsed level by level, one column per level' },
-          { label: 'List view', text: 'Flat sortable table: one action per row (download the certificate) and a chevron that opens the detail; on a phone each CA is a card, opened by a tap anywhere on it, its export in the detail' },
+          { label: 'Tree view', text: 'The trust hierarchy, opened by default beside the panel of the selected authority: each root with its sub-authorities on its right, folded beyond the first level. A node shows its state, its certificates and its sub-authorities; a dotted line joins a CA to the one that cross-certified it. Roots without a sub-authority take one line each, and those without a certificate either fold into one group once there are many' },
+          { label: 'Keyboard', text: 'In the tree, the arrow keys move, right and left unfold and fold, Enter or a click selects the CA and shows it in the side panel; the selected CA is part of the address' },
+          { label: 'Search', text: 'Filters the tree and the list on the name, the common name and the subject; the tree keeps the branch that leads to each match' },
+          { label: 'Side panel', text: 'Beside the tree (under it on a phone): identity, key, issuance and revocation of the selected CA, its issuer, sub-authorities and cross-certificates as links, its CRL (number, published, next update, a warning a day ahead) and whether its OCSP responder is active. View certificates, Issue with this CA (disabled with the reason when the CA cannot sign), Download the chain, then Other actions (export, CSR, revoke, take offline, restore, template pins, delete). The other details (constraints, extensions, fingerprints, PEM, metadata) are folded below. A CA opened from another page (a certificate chain, the command palette, an approval) opens here' },
+          { label: 'List view', text: 'Flat sortable table beside the side panel: one action per row (download the certificate) and a chevron that shows the CA in the panel; on a phone each CA is a card, opened by a tap anywhere on it' },
         ]
       },
       {
@@ -198,13 +198,13 @@ export const helpContent = {
         icon: Certificate,
         content: 'A cross-certificate carries a CA\'s subject and key under another issuer, so clients that trust only that other root can still build a path. It sits beside the CA\'s own certificate and never replaces it.',
         items: [
-          { label: 'Where', text: 'CA details › Cross certificates; a CA that carries one shows a Cross-signed badge' },
+          { label: 'Where', text: 'Side panel of the CA › Cross certificates; a CA that carries one shows a Cross-signed badge' },
           { label: 'Attach', text: 'Paste or pick a certificate (PEM or DER) issued by another CA for this CA\'s key; name or policy constraints it carries are reported' },
           { label: 'Cross-sign', text: 'Sign this CA\'s key with another CA held in UCM, with a validity and a path length' },
           { label: 'Serve', text: 'At most one per CA is served in the default chain (TLS, PKCS#12, ACME, WSTEP, TSA, deployments, AIA .cer and .pem). A revoked, expired or not yet valid one is never served' },
           { label: 'Chain to present', text: 'Exports and deploy bindings can pin the default chain, the self-signed root or one cross-certificate. ACME offers the other chains as alternates (certbot --preferred-chain)' },
           { label: 'Import', text: 'A certificate over a held CA\'s key is attached to a self-signed root; on an intermediate the 409 offers Attach as cross certificate or Replace. Smart Import attaches it next to a held root or reports it as skipped' },
-          { label: 'Still chaining', text: 'CA details › Still chaining to this CA lists the certificates, active sub-CAs, deploy bindings and CRL pushes that still depend on the CA, directly or through a cross-certificate, to tell when an old root can be retired; a client that cached a chain is not counted' },
+          { label: 'Still chaining', text: 'Side panel of the CA › Still chaining to this CA lists the certificates, active sub-CAs, deploy bindings and CRL pushes that still depend on the CA, directly or through a cross-certificate, to tell when an old root can be retired; a client that cached a chain is not counted' },
           { label: 'Repair', text: 'The bar under the statistics lists records an older import damaged: Convert to cross-certificate (needs delete:cas) and Restore as primary. Nothing runs by itself' },
         ]
       },

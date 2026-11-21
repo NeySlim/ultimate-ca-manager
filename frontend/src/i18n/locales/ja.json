@@ -1407,7 +1407,11 @@
       "profileRequiresHsm": "このプロファイルでは、CA 鍵を HSM に保管する必要があります。",
       "profileHorizon": "コンプライアンスプロファイルは {{key}} を {{date}} まで認めており、この CA はそれより長く存続します。",
       "noDigestAllowedByPolicy": "この CA に適用されるポリシーで許可されている署名ハッシュはありません。",
-      "hsmNeedsRead": "HSMキー上にCAを作成するには、read:hsm権限が必要です。"
+      "hsmNeedsRead": "HSMキー上にCAを作成するには、read:hsm権限が必要です。",
+      "title": "Create a certificate authority",
+      "constraintType": "Type of constraint {{n}}",
+      "constraintValue": "Value of constraint {{n}}",
+      "choose": "Choose…"
     },
     "detail": {
       "hsmBacked": "HSM バック",
