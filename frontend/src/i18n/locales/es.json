@@ -3044,7 +3044,8 @@
     "reattached": "{{name}} despliega ahora el certificado renovado",
     "reattachFailed": "No se pudo volver a vincular el despliegue",
     "kind_http": "API HTTP",
-    "kind_ssh": "SSH / SFTP"
+    "kind_ssh": "SSH / SFTP",
+    "reloadCommandIs": "Reload command:"
   },
   "crlDeploy": {
     "title": "Despliegue de CRL",
@@ -7922,7 +7923,8 @@
           "doneWith": "{{protocol}} activo.",
           "action": "Elegir un protocolo"
         }
-      }
+      },
+      "open": "Open the setup assistant"
     },
     "offline": {
       "title": "Sin conexión.",

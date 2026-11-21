@@ -92,6 +92,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- **The setup assistant on the certificate list.** The certificate list shows the overview's Initial setup assistant in place of the former card, and while its steps remain the empty certificate list and the empty Authorities page offer *Open the setup assistant*.
+- **Several open certificates survive a reload.** The certificates open in the inspector are kept in the address (`open`, beside `item` for the one shown), so a reload or a shared link reopens all of them; a link with `item` alone still opens its certificate.
+- **The deployments of a certificate are a section of the inspector.** Under *More details*, each deployment is a row with its target, paths, state and actions, drawn like the rest of the inspector.
+- **The certificate list keeps no filter outside its address.** The CA, source and template filters are read from the address only: a bare `/certificates` shows the whole list instead of the filters last chosen in that browser.
 - **One dock preference for every page.** The dock's position, height and width are the account's choice on every page with a dock, where only Certificates followed it; the size a browser kept for the other pages becomes the account's choice once when the account has none.
 - **Open objects stay open across pages.** *Close the inspector when navigating* is now off by default, as the open objects stay in the dock's tabs; a browser where it was set keeps its value.
 - **The dock is a modal dialog on a phone.** Tab stays in the full-screen dock, the page and the bars behind it are inert, and closing it gives the focus back to the row that opened it on every page.
@@ -213,6 +217,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **Open certificate tabs keep their titles.** After a visit to another page or a Back, the tabs of the certificates still open showed "…" instead of their names; each tab now keeps its certificate's name.
 - **The bars stay on screen while a page loads.** On a slow link, opening a page for the first time replaced the whole window by a loader for a moment; only the page area waits now.
 - Shell: the status bar stays at the bottom of the window, full width, with the inspector docked above it, and the expiry badge of the top bar no longer slips under its own link. The second bottom bar is gone: the count of open objects and the *Close on navigate* switch are in the inspector header, and the switch now applies on every page and on mobile.
 - **A restored audit log verifies.** A replacing restore wrote every archived entry under a new id, which its seal covers, so the restored history no longer verified; the archive now carries the ids, a replacement writes each entry back under its own, and the report counts the entries that cannot verify here (a merge, an older archive, another master key).

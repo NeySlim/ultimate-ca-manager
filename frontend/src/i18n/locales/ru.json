@@ -3168,7 +3168,8 @@
     "reattached": "{{name}} теперь развёртывает продлённый сертификат",
     "reattachFailed": "Не удалось привязать развёртывание заново",
     "kind_http": "HTTP API",
-    "kind_ssh": "SSH / SFTP"
+    "kind_ssh": "SSH / SFTP",
+    "reloadCommandIs": "Команда перезагрузки:"
   },
   "crlDeploy": {
     "title": "Развёртывание CRL",
@@ -8268,7 +8269,8 @@
           "doneWith": "{{protocol}} активен.",
           "action": "Выбрать протокол"
         }
-      }
+      },
+      "open": "Открыть мастер настройки"
     },
     "offline": {
       "title": "Нет сети.",

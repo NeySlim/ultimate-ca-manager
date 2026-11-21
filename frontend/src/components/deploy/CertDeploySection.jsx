@@ -1,18 +1,13 @@
 /**
- * CertDeploySection — deployment block on the certificate detail view (#299).
- *
- * Shows the certificate's deploy bindings (target + destination paths + last
- * delivery status), lets an admin attach a target, push now, or detach.
+ * The certificate's deployments (#299), a section of the inspector's « Plus de détails » drawn with
+ * the mockup's detail vocabulary (section title, record rows, badges, buttons): each binding's target,
+ * paths and last delivery, and to who may write them, attach a target, deploy now, edit or detach.
  * An HTTP target (#428) takes no paths: its body template decides what is sent.
- * Renders nothing for non-admin users or certificates without a cert.
+ * Renders nothing without the right to read deployments.
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CloudArrowUp, Plus, Trash, ArrowsClockwise, PencilSimple, Warning, LinkSimple } from '@phosphor-icons/react'
-import { Badge } from '../Badge'
-import { Button } from '../Button'
-import { CompactSection } from '../DetailCard'
-import { AtelierDialog, Icon } from '../atelier'
+import { AtelierDialog, Btn, Icon, IconBtn, Pill, RecordList, RecordRow } from '../atelier'
 import { ChainVariantSelect, variantLabel } from '../ChainVariantSelect'
 import { fetchChainVariants } from '../../lib/crossCertificates'
 import { deployService } from '../../services'
@@ -20,7 +15,7 @@ import { useNotification } from '../../contexts'
 import { usePermission } from '../../hooks'
 import { extractData, formatDate } from '../../lib/utils'
 
-const STATUS_VARIANT = { delivered: 'success', pending: 'warning', failed: 'danger' }
+const STATUS_TONE = { delivered: 'good', pending: 'warn', failed: 'bad' }
 
 export function CertDeploySection({ certificate }) {
   const { t } = useTranslation()
@@ -59,6 +54,12 @@ export function CertDeploySection({ certificate }) {
     setChainVariants([])
     if (eligible) fetchChainVariants({ type: 'certificate', id: certificate.id }).then(setChainVariants)
   }, [certificate?.id, eligible])
+
+  // The work queue links to a binding with ?binding=<id>: that row is marked and brought into view
+  const focusId = Number(new URLSearchParams(window.location.search).get('binding')) || null
+  useEffect(() => {
+    if (focusId && bindings?.length) document.querySelector(`[data-binding-id="${focusId}"]`)?.scrollIntoView?.({ block: 'nearest' })
+  }, [focusId, bindings])
 
   if (!eligible || bindings === null) return null
   if (bindings.length === 0 && !hasPermission('write:deploy')) return null
@@ -172,129 +173,92 @@ export function CertDeploySection({ certificate }) {
   }
 
   const field = (key) => (e) => setForm({ ...form, [key]: e.target.value })
-  // The work queue links to a binding with ?binding=<id>; that row is outlined
-  const focusId = Number(new URLSearchParams(window.location.search).get('binding')) || null
   const canWriteDeploy = hasPermission('write:deploy')
   const certificateName = certificate.cn || certificate.common_name || certificate.descr ||
     certificate.name || `${t('common.certificate')} #${certificate.id}`
 
+  const pathsOf = (binding) => (binding.target_kind === 'http'
+    ? t('deploy.httpBinding')
+    : <span className="mono">{[binding.cert_path, binding.key_path, binding.fullchain_path].filter(Boolean).join(' · ')}</span>)
+
   return (
     <>
-      <CompactSection title={t('deploy.certSection')} icon={CloudArrowUp} iconClass="icon-bg-emerald">
-        <div className="space-y-2">
-          {bindings.length === 0 && (
-            <p className="text-2xs text-text-secondary">{t('deploy.noBindings')}</p>
-          )}
-          {bindings.map(binding => (
-            <div key={binding.id} data-binding-id={binding.id}
-                 ref={binding.id === focusId ? (el) => el?.scrollIntoView?.({ block: 'nearest' }) : undefined}
-                 className={`p-2.5 bg-tertiary-50 border rounded-lg space-y-1 ${
-                   binding.id === focusId ? 'border-accent-primary' : 'border-border'}`}>
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-xs font-medium text-text-primary truncate">{binding.target_name}</span>
-                  {!binding.enabled && (
-                    <Badge variant="secondary" size="sm">{t('common.disabled')}</Badge>
-                  )}
-                  {binding.fullchain_path && binding.include_root && (
-                    <Badge variant="secondary" size="sm">{t('deploy.rootIncluded')}</Badge>
-                  )}
-                  {binding.fullchain_path && binding.chain_variant && binding.chain_variant !== 'auto' && (
-                    <Badge variant="secondary" size="sm" data-testid="binding-variant">
-                      {variantLabel(chainVariants.find(v => v.id === binding.chain_variant) || { id: binding.chain_variant, ca_name: '' }, t)}
-                    </Badge>
-                  )}
-                  {binding.needs_attention && (
-                    <Badge variant="danger" size="sm">{t('deploy.leftBehind')}</Badge>
-                  )}
-                  {binding.last_delivery && (
-                    <Badge variant={STATUS_VARIANT[binding.last_delivery.status] || 'secondary'} size="sm"
-                           title={binding.last_delivery.last_error || ''}>
-                      {t(`deploy.status.${binding.last_delivery.status}`)}
-                    </Badge>
-                  )}
-                </div>
-                {canWriteDeploy && (
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <Button type="button" size="xs" variant="secondary"
-                            data-deploy-binding-edit="certificate"
-                            onClick={() => openEdit(binding)} title={t('common.edit')}>
-                      <PencilSimple size={12} />
-                    </Button>
-                    <Button type="button" size="xs" variant="secondary" onClick={() => handleDeploy(binding)}
-                            disabled={deploying === binding.id} title={t('deploy.deployNow')}>
-                      {deploying === binding.id
-                        ? <ArrowsClockwise size={12} className="animate-spin" />
-                        : <CloudArrowUp size={12} />}
-                    </Button>
-                    <Button type="button" size="xs" variant="danger" onClick={() => handleDetach(binding)}>
-                      <Trash size={12} />
-                    </Button>
-                  </div>
+      <section data-testid="cert-deploy">
+        <h3 className="section-title">{t('deploy.certSection')}</h3>
+        <RecordList empty={t('deploy.noBindings')} label={t('deploy.certSection')}>
+          {bindings.map(binding => {
+            const attention = binding.needs_attention
+            const delivery = binding.last_delivery
+            return (
+              <RecordRow key={binding.id} data-binding-id={binding.id} aria-current={binding.id === focusId ? 'true' : undefined}
+                title={binding.target_name}
+                meta={(
+                  <>
+                    {pathsOf(binding)}
+                    {binding.reload_command && <> · {t('deploy.reloadCommandIs')} <span className="mono" title={binding.reload_command}>{binding.reload_command}</span></>}
+                    {delivery?.delivered_at && <> · {t('deploy.lastDeployed', { date: formatDate(delivery.delivered_at) })}</>}
+                  </>
                 )}
-              </div>
-              <p className="text-2xs text-text-tertiary font-mono truncate">
-                {binding.target_kind === 'http'
-                  ? t('deploy.httpBinding')
-                  : [binding.cert_path, binding.key_path, binding.fullchain_path].filter(Boolean).join(' · ')}
-              </p>
-              {binding.reload_command && (
-                <p className="text-2xs text-text-tertiary font-mono truncate"
-                   title={binding.reload_command}>
-                  {t('deploy.reloadCommand')}: {binding.reload_command}
-                </p>
-              )}
-              {binding.needs_attention && (
-                <div className="flex items-start gap-1.5 p-2 rounded-md status-danger-bg" data-testid="binding-left-behind">
-                  <Warning size={14} className="status-danger-text shrink-0 mt-0.5" aria-hidden="true" />
-                  <div className="space-y-1 min-w-0">
-                    <p className="text-2xs text-text-primary">{t('deploy.leftBehindHelp')}</p>
-                    {!binding.needs_attention.can_reattach && (
-                      <p className="text-2xs text-text-secondary">
-                        {binding.needs_attention.successor_archived
-                          ? t('deploy.leftBehindSuperseded')
-                          : binding.needs_attention.successor_has_key
-                            ? t('deploy.leftBehindTargetTaken')
-                            : t('deploy.leftBehindNoKey')}
-                      </p>
+                badge={(
+                  <>
+                    {!binding.enabled && <Pill tone="muted" icon="block" label={t('common.disabled')} />}
+                    {binding.fullchain_path && binding.include_root && <Pill icon="shield" label={t('deploy.rootIncluded')} />}
+                    {binding.fullchain_path && binding.chain_variant && binding.chain_variant !== 'auto' && (
+                      <span className="badge" data-testid="binding-variant"><Icon name="link" />
+                        {variantLabel(chainVariants.find(v => v.id === binding.chain_variant) || { id: binding.chain_variant, ca_name: '' }, t)}
+                      </span>
                     )}
-                    <div className="flex flex-wrap items-center gap-2">
-                      {binding.needs_attention.successor_id && (
-                        <a className="text-2xs underline text-accent-primary"
-                           href={`/certificates/${binding.needs_attention.successor_id}`}>
-                          {t('deploy.openRenewed')}
-                        </a>
-                      )}
-                      {canWriteDeploy && binding.needs_attention.can_reattach && (
-                        <Button type="button" size="xs" variant="primary"
-                                onClick={() => handleReattach(binding)}
-                                loading={reattaching === binding.id}>
-                          <LinkSimple size={12} /> {t('deploy.reattach')}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-              {binding.last_delivery?.delivered_at && (
-                <p className="text-2xs text-text-tertiary">
-                  {t('deploy.lastDeployed', { date: formatDate(binding.last_delivery.delivered_at) })}
-                </p>
-              )}
-              {binding.last_delivery?.status === 'failed' && binding.last_delivery.last_error && (
-                <p className="text-2xs status-danger-text truncate" title={binding.last_delivery.last_error}>
-                  {binding.last_delivery.last_error}
-                </p>
-              )}
-            </div>
-          ))}
-          {canWriteDeploy && (
-            <Button type="button" size="xs" variant="secondary" onClick={openAdd}>
-              <Plus size={12} /> {t('deploy.attachTarget')}
-            </Button>
-          )}
-        </div>
-      </CompactSection>
+                    {attention && <Pill tone="bad" label={t('deploy.leftBehind')} />}
+                    {delivery && <Pill tone={STATUS_TONE[delivery.status]} label={t(`deploy.status.${delivery.status}`)} />}
+                  </>
+                )}
+                action={canWriteDeploy && (
+                  <>
+                    <Btn icon="send" write data-deploy-now={binding.id} disabled={deploying === binding.id || undefined}
+                      aria-busy={deploying === binding.id || undefined} onClick={() => handleDeploy(binding)}>{t('deploy.deployNow')}</Btn>
+                    <IconBtn quiet icon="settings" label={t('common.edit')} data-deploy-binding-edit="certificate" onClick={() => openEdit(binding)} />
+                    <IconBtn quiet icon="close" label={t('deploy.detachTarget')} write data-deploy-detach={binding.id} onClick={() => handleDetach(binding)} />
+                  </>
+                )}
+                extra={(
+                  <>
+                    {attention && (
+                      <div data-testid="binding-left-behind">
+                        <p className="rl-error"><Icon name="warning" /><span>{t('deploy.leftBehindHelp')}</span></p>
+                        {!attention.can_reattach && (
+                          <span className="rl-meta">
+                            {attention.successor_archived
+                              ? t('deploy.leftBehindSuperseded')
+                              : attention.successor_has_key ? t('deploy.leftBehindTargetTaken') : t('deploy.leftBehindNoKey')}
+                          </span>
+                        )}
+                        {(attention.successor_id || (canWriteDeploy && attention.can_reattach)) && (
+                          <div className="rl-action">
+                            {attention.successor_id && (
+                              <a className="text-link" href={`/certificates/${attention.successor_id}`}>{t('deploy.openRenewed')}</a>
+                            )}
+                            {canWriteDeploy && attention.can_reattach && (
+                              <Btn icon="link" write data-deploy-reattach={binding.id} disabled={reattaching === binding.id || undefined}
+                                aria-busy={reattaching === binding.id || undefined} onClick={() => handleReattach(binding)}>{t('deploy.reattach')}</Btn>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {delivery?.status === 'failed' && delivery.last_error && (
+                      <p className="rl-error"><Icon name="warning" /><span>{delivery.last_error}</span></p>
+                    )}
+                  </>
+                )} />
+            )
+          })}
+        </RecordList>
+        {canWriteDeploy && (
+          <div className="rl-action">
+            <Btn icon="plus" data-action="attach-target" onClick={openAdd}>{t('deploy.attachTarget')}</Btn>
+          </div>
+        )}
+      </section>
 
       {addOpen && (
         <AtelierDialog onClose={() => { if (!saving) { setAddOpen(false); setEditing(null) } }} testId="deploy-attach-dialog"

@@ -241,7 +241,9 @@ describe('a certificate in the inspector (inspector, certMenu)', () => {
     expect(document.getElementById(toggle.getAttribute('aria-controls'))).toHaveAttribute('hidden')
     fireEvent.click(toggle)
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByTestId('deploy').closest('.atl-out')).not.toBeNull()
+    // The deployment section sits among the others, drawn as they are
+    expect(screen.getByTestId('deploy').closest('.atl-out')).toBeNull()
+    expect(screen.getByTestId('deploy').parentElement).toHaveClass('advanced-panel')
   })
 
   it('opens an authority of the chain in the authorities zone', async () => {

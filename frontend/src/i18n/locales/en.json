@@ -3044,7 +3044,8 @@
     "reattached": "{{name}} now deploys the renewed certificate",
     "reattachFailed": "Could not reattach the deployment",
     "kind_http": "HTTP API",
-    "kind_ssh": "SSH / SFTP"
+    "kind_ssh": "SSH / SFTP",
+    "reloadCommandIs": "Reload command:"
   },
   "crlDeploy": {
     "title": "CRL Deployment",
@@ -7922,7 +7923,8 @@
           "doneWith": "{{protocol}} active.",
           "action": "Choose a protocol"
         }
-      }
+      },
+      "open": "Open the setup assistant"
     },
     "offline": {
       "title": "Offline.",

@@ -1,4 +1,4 @@
-/** First run: shown to an administrator of an empty instance, steps leading to the real screens, closed for good. */
+/** The first-run assistant's course (useSetup): shown to an administrator of an empty instance, steps leading to the real screens, closed for good. */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, within, waitFor as rtlWaitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -29,8 +29,9 @@ vi.mock('../../../stores/userPreferencesStore', () => ({
   },
 }))
 
-import { SetupCard, SETUP_PREF } from '../SetupCard'
-import { resetHealthForTests } from '../health'
+import { SetupWizard } from '../SetupWizard'
+import { SETUP_PREF } from '../../shell/useSetup'
+import { resetHealthForTests } from '../../shell/health'
 
 // The card shows after five reads in sequence: a loaded worker needs more than the default second
 const waitFor = (check) => rtlWaitFor(check, { timeout: 4000 })
@@ -39,7 +40,7 @@ const ISSUING = { id: 2, is_root: false, parent_id: 1 }
 
 function setup() {
   const user = userEvent.setup()
-  const view = render(<MemoryRouter><SetupCard admin={m.admin} /></MemoryRouter>)
+  const view = render(<MemoryRouter><SetupWizard admin={m.admin} /></MemoryRouter>)
   return { user, ...view }
 }
 const card = () => screen.queryByRole('region', { name: /shell\.setup\.(title|doneTitle)/ })
@@ -55,7 +56,7 @@ beforeEach(() => {
 })
 afterEach(() => { vi.unstubAllGlobals() })
 
-describe('SetupCard', () => {
+describe('SetupWizard: the first-run course', () => {
   it('shows the three steps on an instance without CA nor certificate, each leading to its screen', async () => {
     setup()
     await waitFor(() => expect(card()).not.toBeNull())
@@ -81,7 +82,7 @@ describe('SetupCard', () => {
     setup()
     await waitFor(() => expect(card()).not.toBeNull())
     const steps = within(card()).getAllByRole('listitem')
-    expect(steps[0]).toHaveClass('is-done')
+    expect(steps[0]).toHaveClass('done')
     expect(within(steps[1]).getByRole('link', { name: 'shell.setup.steps.issuing.action' })).toHaveAttribute('href', '/cas?action=create')
   })
 
@@ -103,7 +104,7 @@ describe('SetupCard', () => {
 
   it('reads the counts through the page when it shares its requests', async () => {
     const share = vi.fn((key, run) => run())
-    render(<MemoryRouter><SetupCard admin share={share} /></MemoryRouter>)
+    render(<MemoryRouter><SetupWizard admin share={share} /></MemoryRouter>)
     await waitFor(() => expect(card()).not.toBeNull())
     expect(share).toHaveBeenCalledWith('stats', expect.any(Function))
   })
@@ -113,7 +114,7 @@ describe('SetupCard', () => {
     m.cas = [ROOT, ISSUING]
     const { unmount } = setup()
     await waitFor(() => expect(card()).not.toBeNull())
-    expect(within(card()).getAllByRole('listitem')[2]).not.toHaveClass('is-done')
+    expect(within(card()).getAllByRole('listitem')[2]).not.toHaveClass('done')
     expect(within(card()).getByRole('link', { name: 'shell.setup.steps.protocol.action' })).toHaveAttribute('href', '/acme?tab=config')
     unmount()
     m.scep = { enabled: true, ca_id: 2 }

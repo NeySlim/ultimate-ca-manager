@@ -1,7 +1,8 @@
 /**
  * The certificate active in the Certificates zone's dock and its section live in the URL (`item`,
- * `section`): a reload or a shared link reopens them, Back closes the dock, the deep link
- * /certificates/:id becomes the dock's item. Real page, real inspector.
+ * `section`), with every open certificate (`open`) once there are several: a reload or a shared link
+ * reopens them, Back closes the dock, the deep link /certificates/:id becomes the dock's item. The
+ * tab titles travel with the open certificates. Real page, real inspector.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
@@ -53,7 +54,6 @@ vi.mock('../../../services', () => ({
 }))
 vi.mock('../../../services/account.service', () => ({ accountService: { updatePreferences: vi.fn() } }))
 vi.mock('../../../components/deploy/CertDeploySection', () => ({ CertDeploySection: () => null }))
-vi.mock('../../../components/shell/SetupCard', () => ({ SetupCard: () => null }))
 
 import { InspectorProvider } from '../../../contexts/InspectorContext'
 import CertificatesPage from '../../CertificatesPage'
@@ -77,6 +77,12 @@ const at = (url) => render(
   </MemoryRouter>,
 )
 const dock = () => document.getElementById('inspector')
+// Every open tab, shown or under « +N », by its key (the certificate id), with its title
+const tabTitles = () => {
+  const out = {}
+  for (const el of dock()?.querySelectorAll('[data-active]') || []) out[el.dataset.active] = el.getAttribute('title')
+  return out
+}
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -115,8 +121,54 @@ describe('the certificate dock in the URL', () => {
     at('/certificates?item=7')
     await waitFor(() => expect(dock()).not.toBeNull())
     fireEvent.click(await screen.findByRole('button', { name: 'mail.example.com' }))
-    await waitFor(() => expect(where).toBe('/certificates?item=8'))
+    await waitFor(() => expect(where).toBe('/certificates?item=8&open=7%2C8'))
     fireEvent.click(dock().querySelector('[data-action="close-dock"]'))
     await waitFor(() => expect(where).toBe('/certificates'))
+  })
+})
+
+describe('several open certificates (the mockup\'s open=…&active=…)', () => {
+  it('writes every open certificate in the URL, the active one as item', async () => {
+    at('/certificates')
+    fireEvent.click(await screen.findByRole('button', { name: 'web.example.com' }))
+    await waitFor(() => expect(where).toBe('/certificates?item=7'))
+    fireEvent.click(await screen.findByRole('button', { name: 'mail.example.com' }))
+    await waitFor(() => expect(where).toBe('/certificates?item=8&open=7%2C8'))
+    // Back to the first tab: the list stays, the item follows
+    fireEvent.click(dock().querySelector('.open-tab [data-active="7"], .tabs-menu-open[data-active="7"]'))
+    await waitFor(() => expect(where).toBe('/certificates?item=7&open=7%2C8'))
+  })
+
+  it('reopens every certificate the URL lists on a reload, the item active, each tab named', async () => {
+    at('/certificates?item=8&open=7,8,9')
+    await waitFor(() => expect(dock()).not.toBeNull())
+    expect(await within(dock()).findByRole('heading', { name: 'mail.example.com' })).toBeInTheDocument()
+    await waitFor(() => expect(tabTitles()).toEqual({ 7: 'web.example.com', 8: 'mail.example.com', 9: 'cert-9' }))
+    // The URL already says it all: nothing rewritten
+    expect(where).toBe('/certificates?item=8&open=7,8,9')
+  })
+
+  it('closing a tab rewrites the list, and the last one left goes back to item alone', async () => {
+    at('/certificates?item=8&open=7,8')
+    await waitFor(() => expect(Object.keys(tabTitles())).toEqual(['7', '8']))
+    fireEvent.click(dock().querySelector('[data-close-tab="7"]'))
+    await waitFor(() => expect(where).toBe('/certificates?item=8'))
+    expect(Object.keys(tabTitles())).toEqual(['8'])
+  })
+})
+
+describe('the open tabs keep their titles (the entry carries them)', () => {
+  it('after a visit to another page, and after Back', async () => {
+    at('/certificates')
+    fireEvent.click(await screen.findByRole('button', { name: 'web.example.com' }))
+    expect(await within(dock()).findByRole('heading', { name: 'web.example.com' })).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: 'mail.example.com' }))
+    await waitFor(() => expect(tabTitles()).toEqual({ 7: 'web.example.com', 8: 'mail.example.com' }))
+    act(() => nav('/elsewhere'))
+    await screen.findByText('elsewhere')
+    expect(dock()).toBeNull()
+    act(() => nav(-1))
+    await waitFor(() => expect(dock()).not.toBeNull())
+    expect(tabTitles()).toEqual({ 7: 'web.example.com', 8: 'mail.example.com' })
   })
 })

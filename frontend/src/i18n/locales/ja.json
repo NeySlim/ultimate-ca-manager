@@ -3044,7 +3044,8 @@
     "reattached": "{{name}} は更新後の証明書をデプロイするようになりました",
     "reattachFailed": "デプロイを再バインドできませんでした",
     "kind_http": "HTTP API",
-    "kind_ssh": "SSH / SFTP"
+    "kind_ssh": "SSH / SFTP",
+    "reloadCommandIs": "Reload command:"
   },
   "crlDeploy": {
     "title": "CRL デプロイ",
@@ -7922,7 +7923,8 @@
           "doneWith": "{{protocol}} 有効。",
           "action": "プロトコルを選択"
         }
-      }
+      },
+      "open": "Open the setup assistant"
     },
     "offline": {
       "title": "オフライン。",

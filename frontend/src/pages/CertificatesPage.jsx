@@ -18,7 +18,8 @@ import { usePermission, useRecentHistory, useWebSocket, usePersistedState } from
 import { extractCN, certificateNames, downloadBlob, warnSkippedExport, exportToCSV, exportToJSON } from '../lib/utils'
 import { CERT_STATUSES, OVERVIEW_FILTER_KEYS, parseOverviewFilters, toListParams, toSearch, withoutFilter } from '../lib/overviewFilters'
 import { fetchPages } from '../lib/fetchAllPages'
-import { SetupCard } from '../components/shell/SetupCard'
+import { useSetup, setupPending, openSetupAction } from '../components/shell/useSetup'
+import { SetupWizardView } from '../components/overview/SetupWizard'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { soleImported } from '../lib/importResult'
@@ -74,6 +75,8 @@ export default function CertificatesPage() {
   const canExportKey = canExportPrivateKey('certificate', { hasPermission, canWrite })
   const { muteToasts } = useWebSocket()
   const number = useMemo(() => new Intl.NumberFormat(i18n.language || undefined), [i18n.language])
+  // The first-run assistant, read once: drawn above the list and followed by the empty state's action
+  const setup = useSetup({ admin: hasPermission('*') })
 
   const [certificates, setCertificates] = useState([])
   const [cas, setCas] = useState([])
@@ -126,19 +129,16 @@ export default function CertificatesPage() {
     patchList({ sort: plain ? '' : s.key, order: plain ? '' : (s.asc ? 'asc' : 'desc') })
   }, [sort, patchList])
 
-  // A filter the URL names wins; a bare address takes the saved one. Setting one writes both.
-  const [storedCA, storeCA] = usePersistedState('ucm-filter-certs-ca', [])
-  const [storedSource, storeSource] = usePersistedState('ucm-filter-certs-source', [])
-  const [storedTemplate, storeTemplate] = usePersistedState('ucm-filter-certs-template', [])
+  // The URL is the filters' only state, as the mockup's: a bare address shows the whole list
   const urlCA = query.getAll('ca').join(',')
   const urlSource = query.getAll('source').join(',')
   const urlTemplate = query.getAll('template').join(',')
-  const filterCA = useMemo(() => (query.has('ca') ? urlCA.split(',') : storedCA), [query, urlCA, storedCA])
-  const filterSource = useMemo(() => (query.has('source') ? urlSource.split(',') : storedSource), [query, urlSource, storedSource])
-  const filterTemplate = useMemo(() => (query.has('template') ? urlTemplate.split(',') : storedTemplate), [query, urlTemplate, storedTemplate])
-  const setFilterCA = useCallback((v) => { storeCA(v); patchList({ ca: v, page: '' }) }, [storeCA, patchList])
-  const setFilterSource = useCallback((v) => { storeSource(v); patchList({ source: v, page: '' }) }, [storeSource, patchList])
-  const setFilterTemplate = useCallback((v) => { storeTemplate(v); patchList({ template: v, page: '' }) }, [storeTemplate, patchList])
+  const filterCA = useMemo(() => (urlCA ? urlCA.split(',') : NONE), [urlCA])
+  const filterSource = useMemo(() => (urlSource ? urlSource.split(',') : NONE), [urlSource])
+  const filterTemplate = useMemo(() => (urlTemplate ? urlTemplate.split(',') : NONE), [urlTemplate])
+  const setFilterCA = useCallback((v) => patchList({ ca: v, page: '' }), [patchList])
+  const setFilterSource = useCallback((v) => patchList({ source: v, page: '' }), [patchList])
+  const setFilterTemplate = useCallback((v) => patchList({ template: v, page: '' }), [patchList])
   const searchValue = query.get('q') || ''
   const setSearchValue = useCallback((v) => patchList({ q: v, page: '' }), [patchList])
   const [typed, setTyped] = useState(null)
@@ -306,10 +306,9 @@ export default function CertificatesPage() {
   const resetFilters = useCallback(() => {
     clearTimeout(searchTimer.current)
     setTyped(null)
-    if (!linkView) { storeCA([]); storeSource([]); storeTemplate([]) }
     clearList()
     requestAnimationFrame(() => document.getElementById('search')?.focus())
-  }, [linkView, clearList, storeCA, storeSource, storeTemplate])
+  }, [clearList])
   const narrowed = Boolean(searchValue) || savedCA.length > 0 || savedSource.length > 0 || savedTemplate.length > 0
 
   // Presets: the search, the statuses and the filters, and the overview link when one is open
@@ -502,7 +501,7 @@ export default function CertificatesPage() {
     return (
       <Zone testId="certificates-zone" after={after}>
         {head}
-        <div className="atl-out"><SetupCard admin={hasPermission('*')} /></div>
+        <SetupWizardView setup={setup} />
         <LoadError id="certificates" title={t('certificates.loadFailed')} onRetry={() => loadData()}
           journal={hasPermission('read:audit') ? '/audit' : undefined}
           cause={<LoadCause error={loadError} fallback={t('messages.errors.loadFailed.certificates')} />} />
@@ -515,7 +514,7 @@ export default function CertificatesPage() {
   return (
     <Zone testId="certificates-zone" dock={<CertificateInspector />} after={after}>
       {head}
-      <div className="atl-out"><SetupCard admin={hasPermission('*')} /></div>
+      <SetupWizardView setup={setup} />
       <StateFilters views={views} active={activeView} onChange={(id) => setStatus(id ? [id] : [])} label={t('certificates.viewsLabel')} busy={!counted}
         aside={narrowed
           ? <TextLink icon="close" iconFirst data-action="clear-filters" onClick={resetFilters}> {t('certificates.clearSearchAndFilters')}</TextLink>
@@ -553,7 +552,7 @@ export default function CertificatesPage() {
         applied={(chips.length > 0 || liveScope) && (
           <AppliedFilters chips={chips.map((c) => ({ key: c.key, label: c.label, onRemove: () => removeUrlFilter(c.remove) }))}
             note={liveScope ? t('certificates.liveScope') : undefined}
-            onClearAll={() => { if (!linkView) storeTemplate([]); patchList(Object.fromEntries([...OVERVIEW_FILTER_KEYS, 'view', 'template', 'page'].map((k) => [k, '']))) }} />
+            onClearAll={() => { patchList(Object.fromEntries([...OVERVIEW_FILTER_KEYS, 'view', 'template', 'page'].map((k) => [k, '']))) }} />
         )}
         batch={n > 0 && (
           <BatchBar onClear={clearSelection}
@@ -570,7 +569,8 @@ export default function CertificatesPage() {
         empty={!narrowed && !linkView && !activeStatus.length && !certStats.total ? (
           <EmptyBlock id="certificates" icon="cert" title={t('certificates.emptyTitle')}
             text={t(cas.length || !hasPermission('read:cas') ? 'certificates.emptyHintReady' : 'certificates.emptyHintNoCa')}
-            action={canWrite('certificates') ? { label: t('certificates.issueCertificate'), icon: 'plus', primary: true, onClick: () => setDialog('issue') } : undefined} />
+            action={setupPending(setup) ? openSetupAction(t)
+              : canWrite('certificates') ? { label: t('certificates.issueCertificate'), icon: 'plus', primary: true, onClick: () => setDialog('issue') } : undefined} />
         ) : (
           <NoMatch title={t('certificates.noMatchTitle')} text={t('certificates.noMatchHint')} resetLabel={t('certificates.resetFilters')} onReset={resetFilters} />
         )}

@@ -198,8 +198,8 @@ function MoreDetails({ cert }) {
             row(t('details.caReference'), cert.caref, true),
           ]} />
         </section>
-        {/* Deployment targets: the product's own panel, kept with its styles */}
-        <div className="atl-out"><CertDeploySection certificate={cert} /></div>
+        {/* Deployment targets: the product's own section, drawn as the others */}
+        <CertDeploySection certificate={cert} />
       </div>
     </div>
   )

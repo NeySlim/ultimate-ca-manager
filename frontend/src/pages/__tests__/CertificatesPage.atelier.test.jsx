@@ -21,7 +21,7 @@ const stable = vi.hoisted(() => ({
     showConfirm: () => Promise.resolve(false), showPrompt: () => Promise.resolve(null),
   },
 }))
-const state = vi.hoisted(() => ({ mobile: false, write: true, opened: [], activeKey: null, openEntity: null }))
+const state = vi.hoisted(() => ({ mobile: false, write: true, opened: [], activeKey: null, openEntity: null, setup: { visible: false } }))
 const svc = vi.hoisted(() => ({ getAll: vi.fn(), getStats: vi.fn(), bulkExport: vi.fn(), cas: vi.fn() }))
 
 vi.mock('react-i18next', () => ({
@@ -61,7 +61,8 @@ vi.mock('../../services', () => ({
 // The import and issue dialogs are their own subjects: a stand-in says when they open
 vi.mock('../../components/SmartImport', () => ({ SmartImportModal: ({ isOpen }) => (isOpen ? <div data-testid="import-open" /> : null) }))
 vi.mock('../certificates/IssueCertificateDialog', () => ({ IssueCertificateDialog: ({ open }) => (open ? <div data-testid="issue-open" /> : null) }))
-vi.mock('../../components/shell/SetupCard', () => ({ SetupCard: () => null }))
+// The first-run state is useSetup's own subject: here it is given, drawn by the real assistant
+vi.mock('../../components/shell/useSetup', async (actual) => ({ ...(await actual()), useSetup: () => state.setup }))
 vi.mock('../certificates/dialogs/ExportDialog', () => ({ ExportDialog: ({ open, entityName }) => (open ? <div data-testid="export-open">{entityName}</div> : null) }))
 
 import CertificatesPage from '../CertificatesPage'
@@ -96,12 +97,18 @@ const tab = (id) => tabs().find((b) => b.dataset.status === id)
 const row = (cn) => screen.getByRole('row', { name: new RegExp(cn.replace(/\./g, '\\.')) })
 const headers = () => [...zone().querySelectorAll('thead th')].map((th) => th.textContent).filter((x) => x && x !== 'common.actions')
 const settle = () => new Promise((r) => setTimeout(r, 400))
+// useSetup's answer for an empty instance whose first step is to do
+const pendingSetup = (over = {}) => {
+  const steps = [{ id: 'root', done: false, to: '/cas?action=create' }, { id: 'issuing', done: false, to: '/cas?action=create' }, { id: 'protocol', done: false, to: '/acme?tab=config' }]
+  return { visible: true, later: false, fold: vi.fn(), steps, n: 0, complete: false, next: steps[0], nextIndex: 0, nextTitle: 'root',
+    doneText: () => '', savePref: vi.fn(), guard: { suspended: false }, resumeRef: { current: null }, stepRef: { current: null }, ...over }
+}
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(NOW)
   window.localStorage.clear()
-  Object.assign(state, { mobile: false, write: true, opened: [], activeKey: null, openEntity: vi.fn() })
+  Object.assign(state, { mobile: false, write: true, opened: [], activeKey: null, openEntity: vi.fn(), setup: { visible: false } })
   svc.getAll.mockReset()
   svc.bulkExport.mockReset()
   svc.getStats.mockReset()
@@ -436,13 +443,34 @@ describe('CertificatesPage: the list in the URL (shared link, reload)', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'certificates.filterBySource' }), { target: { value: 'acme' } })
     await waitFor(() => expect(where()).toBe('?q=web&sort=name&order=asc&source=acme'))
     expect(lastParams()).toMatchObject({ page: 1, source: ['acme'], search: 'web' })
-    await waitFor(() => expect(JSON.parse(window.localStorage.getItem('ucm-filter-certs-source'))).toEqual(['acme']))
+    // The address is the list's only state: nothing is kept aside in this browser (a store would write within 200 ms)
+    await act(settle)
+    for (const k of ['ca', 'source', 'template']) expect(window.localStorage.getItem(`ucm-filter-certs-${k}`)).toBeNull()
   })
 
-  it('keeps the saved filters for a bare address', async () => {
+  it('shows the whole list for a bare address, whatever an earlier session stored, as the mockup', async () => {
+    window.localStorage.setItem('ucm-filter-certs-ca', JSON.stringify(['2']))
     window.localStorage.setItem('ucm-filter-certs-source', JSON.stringify(['manual']))
+    window.localStorage.setItem('ucm-filter-certs-template', JSON.stringify(['modified']))
     await mount('/certificates')
-    expect(lastParams().source).toEqual(['manual'])
+    expect(lastParams().ca_id).toBeUndefined()
+    expect(lastParams().source).toBeUndefined()
+    expect(lastParams().template_modified).toBeUndefined()
+    expect(screen.getByRole('combobox', { name: 'certificates.filterByCa' })).toHaveValue('')
+    expect(screen.getByRole('combobox', { name: 'certificates.filterBySource' })).toHaveValue('')
+    expect(zone().querySelector('[data-action="clear-filters"]')).toBeNull()
+  })
+
+  it('a filter chosen, then the page left and opened bare, is gone (no filter the URL does not carry)', async () => {
+    const view = await mount('/certificates')
+    fireEvent.change(screen.getByRole('combobox', { name: 'certificates.filterByCa' }), { target: { value: '2' } })
+    await waitFor(() => expect(where()).toBe('?ca=2'))
+    expect(lastParams().ca_id).toEqual(['2'])
+    await act(settle)
+    view.unmount()
+    await mount('/certificates')
+    expect(lastParams().ca_id).toBeUndefined()
+    expect(screen.getByRole('combobox', { name: 'certificates.filterByCa' })).toHaveValue('')
   })
 
   it('keeps the open certificate when the list changes, and Réinitialiser leaves it', async () => {
@@ -528,6 +556,53 @@ describe('CertificatesPage: overview links and saved filters', () => {
 })
 
 describe('CertificatesPage: states (emptyBlock, loadError, skeletonRows)', () => {
+  it('draws the mockup setup assistant above the state tabs, in the zone, no older card', async () => {
+    state.setup = pendingSetup()
+    await mount()
+    const wizard = zone().querySelector('section#setup-wizard')
+    expect(wizard).toHaveClass('panel', 'setup-wizard')
+    expect(wizard.closest('.atl-out')).toBeNull()
+    const tabsGroup = screen.getByRole('group', { name: 'certificates.viewsLabel' })
+    expect(wizard.compareDocumentPosition(tabsGroup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(document.getElementById('shell-setup')).toBeNull()
+    expect(zone().querySelector('[class*="shell-setup"]')).toBeNull()
+  })
+
+  it('keeps the assistant above a failed read, as the mockup tableView()', async () => {
+    state.setup = pendingSetup()
+    svc.getAll.mockRejectedValue(Object.assign(new Error('boom'), { status: 500 }))
+    render(<MemoryRouter initialEntries={['/certificates']}><CertificatesPage /><Where /></MemoryRouter>)
+    await waitFor(() => expect(document.getElementById('load-error-certificates')).not.toBeNull())
+    const wizard = zone().querySelector('section#setup-wizard.setup-wizard')
+    expect(wizard).not.toBeNull()
+    expect(wizard.closest('.atl-out')).toBeNull()
+  })
+
+  it('leads the empty list to the setup assistant while steps remain, as the mockup emptyAction(setup)', async () => {
+    state.setup = pendingSetup()
+    svc.getStats.mockResolvedValue({ data: { valid: 0, expiring: 0, expired: 0, revoked: 0, total: 0 } })
+    svc.cas.mockResolvedValue({ data: [] })
+    await mount('/certificates', [], 0)
+    await waitFor(() => expect(zone().querySelector('#empty-certificates')).not.toBeNull())
+    const block = zone().querySelector('#empty-certificates')
+    const go = within(block).getByRole('link', { name: 'shell.setup.open' })
+    expect(go).toHaveAttribute('href', '/')
+    expect(go).toHaveClass('btn', 'primary')
+    // A way to a page, not a write: the write guard leaves it
+    expect(go).toHaveAttribute('data-write', 'false')
+    expect(within(block).queryByRole('button', { name: 'certificates.issueCertificate' })).toBeNull()
+  })
+
+  it('offers Émettre un certificat once the setup is complete', async () => {
+    state.setup = pendingSetup({ complete: true, n: 3 })
+    svc.getStats.mockResolvedValue({ data: { valid: 0, expiring: 0, expired: 0, revoked: 0, total: 0 } })
+    await mount('/certificates', [], 0)
+    await waitFor(() => expect(zone().querySelector('#empty-certificates')).not.toBeNull())
+    const block = zone().querySelector('#empty-certificates')
+    expect(within(block).queryByRole('link', { name: 'shell.setup.open' })).toBeNull()
+    expect(within(block).getByRole('button', { name: 'certificates.issueCertificate' })).toBeInTheDocument()
+  })
+
   it('says the first issuance waits for an issuing CA, with Émettre un certificat when one exists', async () => {
     svc.getStats.mockResolvedValue({ data: { valid: 0, expiring: 0, expired: 0, revoked: 0, total: 0 } })
     await mount('/certificates', [], 0)

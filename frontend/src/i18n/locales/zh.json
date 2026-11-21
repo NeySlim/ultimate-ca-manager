@@ -3044,7 +3044,8 @@
     "reattached": "{{name}} 现在部署续期后的证书",
     "reattachFailed": "无法重新绑定部署",
     "kind_http": "HTTP API",
-    "kind_ssh": "SSH / SFTP"
+    "kind_ssh": "SSH / SFTP",
+    "reloadCommandIs": "Reload command:"
   },
   "crlDeploy": {
     "title": "CRL 部署",
@@ -7922,7 +7923,8 @@
           "doneWith": "{{protocol}} 已启用。",
           "action": "选择协议"
         }
-      }
+      },
+      "open": "Open the setup assistant"
     },
     "offline": {
       "title": "离线。",

@@ -3044,7 +3044,8 @@
     "reattached": "{{name}} stellt jetzt das erneuerte Zertifikat bereit",
     "reattachFailed": "Die Bereitstellung konnte nicht neu gebunden werden",
     "kind_http": "HTTP-API",
-    "kind_ssh": "SSH / SFTP"
+    "kind_ssh": "SSH / SFTP",
+    "reloadCommandIs": "Reload command:"
   },
   "crlDeploy": {
     "title": "CRL-Bereitstellung",
@@ -7922,7 +7923,8 @@
           "doneWith": "{{protocol}} aktiv.",
           "action": "Protokoll wählen"
         }
-      }
+      },
+      "open": "Open the setup assistant"
     },
     "offline": {
       "title": "Offline.",

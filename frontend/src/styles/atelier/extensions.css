@@ -231,3 +231,5 @@
 .atl .field textarea.template-source,.atl .template-preview{height:clamp(160px,calc(100dvh - 480px),360px)}
 .atl iframe.template-preview{width:100%;border:1px solid var(--control);border-radius:4px}
 .atl pre.template-preview{margin:0;overflow:auto}
+/* Inspector, deployments: the binding a work-queue link names, marked as the mockup's current setup step. */
+.atl .record-list>li[aria-current=true]{background:var(--selected)}

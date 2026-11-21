@@ -37,6 +37,9 @@ vi.mock('../../contexts', () => ({
 vi.mock('../../contexts/InspectorContext', () => ({ useInspector: () => ({ openEntity: stable.openEntity, opened: [] }) }))
 vi.mock('../../contexts/MobileContext', () => ({ useMobile: () => mobile }))
 vi.mock('../../hooks/useOpenEntity', () => ({ useOpenEntity: () => stable.openEntity }))
+// The first-run state is useSetup's own subject: here it is given
+let mockSetup = { visible: false }
+vi.mock('../../components/shell/useSetup', async (actual) => ({ ...(await actual()), useSetup: () => mockSetup }))
 
 vi.mock('../../hooks', () => ({
   usePermission: () => ({
@@ -303,6 +306,20 @@ describe('CAsPage: list', () => {
 })
 
 describe('CAsPage: states', () => {
+  it('leads the empty page to the setup assistant while its steps remain, as the mockup emptyAction(setup)', async () => {
+    mockSetup = { visible: true, complete: false }
+    getAll.mockResolvedValue({ data: [] })
+    try {
+      renderAt()
+      await loaded()
+      const block = document.getElementById('empty-cas')
+      const go = within(block).getByRole('link', { name: 'shell.setup.open' })
+      expect(go).toHaveAttribute('href', '/')
+      expect(go).toHaveClass('btn', 'primary')
+      expect(within(block).queryByRole('button', { name: 'common.createCA' })).toBeNull()
+    } finally { mockSetup = { visible: false } }
+  })
+
   it('offers to create the first authority when there is none', async () => {
     getAll.mockResolvedValue({ data: [] })
     renderAt()

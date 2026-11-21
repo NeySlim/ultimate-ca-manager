@@ -19,7 +19,7 @@ vi.mock('react-i18next', () => ({
 }))
 vi.mock('../../../hooks', () => ({ usePermission: () => ({ hasPermission: () => false }) }))
 vi.mock('../../../services/acme.service', () => ({ acmeService: { getClientOrders: vi.fn() } }))
-vi.mock('../../../components/deploy/CertDeploySection', () => ({ CertDeploySection: () => null }))
+vi.mock('../../../components/deploy/CertDeploySection', () => ({ CertDeploySection: () => <section data-testid="cert-deploy" /> }))
 
 import { OverviewPanel } from '../inspector/OverviewPanel'
 import { GROUP_PQ, KEY_ALGORITHMS } from '../../../lib/keyAlgorithms'
@@ -80,5 +80,14 @@ describe('the Windows profile under Plus de détails', () => {
   it('says nothing of a profile for a certificate no profile issued', () => {
     render(<OverviewPanel cert={{ ...base, windows_profile_id: null }} title="pc" />)
     expect(screen.queryByText(en.certificates.windowsProfile)).toBeNull()
+  })
+})
+
+describe('the deployment section under Plus de détails', () => {
+  it('sits in the panel among the other sections, outside any former-style island', () => {
+    render(<OverviewPanel cert={base} title="pc" />)
+    const deploy = screen.getByTestId('cert-deploy')
+    expect(deploy.parentElement).toHaveClass('advanced-panel')
+    expect(deploy.closest('.atl-out')).toBeNull()
   })
 })

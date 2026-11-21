@@ -2,6 +2,7 @@ import { test, expect, createCA, issueCert } from './support/fixtures'
 
 // The object open in a dock and its section live in the URL (`item`, `section`), as the mockup's:
 // a reload reopens them, the browser's Back closes the dock, a search result lands on the object.
+// The Certificates dock lists its open certificates in `open` once there are several.
 
 test('a reload reopens the certificate, its section and the list as they were; Back closes the dock', async ({ page, api }) => {
   const cert = await issueCert(api, (await createCA(api)).id)
@@ -23,6 +24,30 @@ test('a reload reopens the certificate, its section and the list as they were; B
   await page.goBack()
   await expect(page.locator('#inspector')).toHaveCount(0)
   await expect(page).toHaveURL(url => url.searchParams.get('q') === cn && !url.searchParams.has('item'))
+})
+
+test('several open certificates survive a reload and a visit to another page, each tab named', async ({ page, api }) => {
+  const ca = (await createCA(api)).id
+  const a = await issueCert(api, ca)
+  const b = await issueCert(api, ca)
+  // The mockup's open=…&active=…: every open certificate in `open`, the shown one in `item`
+  await page.goto(`/certificates?item=${b.id}&open=${a.id},${b.id}`)
+  const panel = page.locator('#inspector')
+  const tab = (cert) => panel.locator(`[data-active="${cert.id}"]`).first()
+  await expect(panel.getByRole('heading', { name: b.common_name })).toBeVisible()
+  await expect(tab(a)).toHaveAttribute('title', a.common_name)
+  await expect(tab(b)).toHaveAttribute('title', b.common_name)
+
+  await page.reload()
+  await expect(panel.getByRole('heading', { name: b.common_name })).toBeVisible()
+  await expect(tab(a)).toHaveAttribute('title', a.common_name)
+
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Authorities' }).click()
+  await expect(page).toHaveURL(url => url.pathname === '/cas')
+  await page.goBack()
+  await expect(panel.getByRole('heading', { name: b.common_name })).toBeVisible()
+  await expect(tab(a)).toHaveAttribute('title', a.common_name)
+  await expect(page).toHaveURL(url => url.searchParams.get('item') === String(b.id) && url.searchParams.get('open') === `${a.id},${b.id}`)
 })
 
 test('the sort of the certificate list survives a reload', async ({ page, api }) => {

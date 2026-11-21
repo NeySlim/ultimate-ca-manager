@@ -7,7 +7,7 @@ export function renderCertificateBody(id, { section = 'overview', onSection = ()
   const entry = { key: `certificate:${id}`, type: 'certificate', entityId: id, data: null }
   return render(
     <MemoryRouter>
-      <CertificateBody entry={entry} onTitle={() => {}} onOpenCa={() => {}} section={section} onSection={onSection} />
+      <CertificateBody entry={entry} onOpenCa={() => {}} section={section} onSection={onSection} />
     </MemoryRouter>,
   )
 }

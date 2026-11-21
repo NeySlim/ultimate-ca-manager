@@ -71,7 +71,7 @@ export default {
       {
         title: 'Premier lancement',
         items: [
-          { label: 'Configuration initiale', text: 'Sur une instance sans AC ni certificat, les administrateurs voient la carte Configuration initiale sur la vue d’ensemble et sur la liste des certificats : une racine, une AC émettrice, un protocole' },
+          { label: 'Configuration initiale', text: 'Sur une instance sans AC ni certificat, les administrateurs voient l’assistant Configuration initiale sur la vue d’ensemble et sur la liste des certificats : une racine, une AC émettrice, un protocole. Tant que ses étapes restent à faire, la liste des certificats vide et la page Autorités vide proposent Ouvrir l’assistant de configuration' },
           { label: 'Étapes', text: 'Chaque étape ouvre l’écran qui la réalise, et se coche dès que ce qu’elle crée existe' },
           { label: 'Plus tard et Masquer', text: 'Plus tard replie la carte en une ligne et Reprendre la rouvre ; Masquer ferme une configuration terminée, qui n’est plus montrée' },
         ]

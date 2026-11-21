@@ -21,9 +21,10 @@ export function RecordList({ children, empty, label }) {
   return list.length ? <ul className="record-list" aria-label={label}>{list}</ul> : <p className="muted small">{empty}</p>
 }
 
-export function RecordRow({ title, meta, badge, action, extra }) {
+/** A record; other props (a data attribute, aria-current) go on its row. */
+export function RecordRow({ title, meta, badge, action, extra, ...row }) {
   return (
-    <li>
+    <li {...row}>
       <div className="rl-main"><strong>{title}</strong>{meta && <span className="rl-meta">{meta}</span>}{extra}</div>
       {badge}
       {action && <div className="rl-action">{action}</div>}

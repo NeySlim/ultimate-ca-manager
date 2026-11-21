@@ -1,6 +1,6 @@
 /**
- * State of the first-run steps (root CA, issuing CA, a protocol), shared by the card of the shell
- * and the overview's assistant: shown to an administrator of an instance without any CA nor
+ * State of the first-run steps (root CA, issuing CA, a protocol), read by the assistant of the
+ * overview and of the certificate list: shown to an administrator of an instance without any CA nor
  * certificate, then until its steps are done; closed or finished, never again.
  */
 import { useEffect, useRef, useState } from 'react'
@@ -69,7 +69,13 @@ async function readState(share) {
   }
 }
 
-/** The state of the first-run steps, shared by the card of the shell and the overview's assistant. */
+/** True while the assistant shows steps left: an empty list then leads to it, as the mockup's emptyAction('setup'). */
+export const setupPending = (setup) => !!setup?.visible && !setup.complete
+
+/** The empty states' way to the assistant: the overview holds it, as the mockup's link to the dashboard. */
+export const openSetupAction = (t) => ({ label: t('shell.setup.open'), icon: 'right', primary: true, to: '/', write: false })
+
+/** The state of the first-run steps, read by the assistant of the overview and of the certificate list. */
 export function useSetup({ admin = false, share }) {
   const { t, i18n } = useTranslation()
   const guard = useWriteGuard()

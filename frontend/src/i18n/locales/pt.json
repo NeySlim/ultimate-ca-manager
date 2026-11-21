@@ -3044,7 +3044,8 @@
     "reattached": "{{name}} agora implanta o certificado renovado",
     "reattachFailed": "Não foi possível vincular novamente a implantação",
     "kind_http": "API HTTP",
-    "kind_ssh": "SSH / SFTP"
+    "kind_ssh": "SSH / SFTP",
+    "reloadCommandIs": "Reload command:"
   },
   "crlDeploy": {
     "title": "Implantação de CRL",
@@ -7922,7 +7923,8 @@
           "doneWith": "{{protocol}} ativo.",
           "action": "Escolher um protocolo"
         }
-      }
+      },
+      "open": "Open the setup assistant"
     },
     "offline": {
       "title": "Sem ligação.",
