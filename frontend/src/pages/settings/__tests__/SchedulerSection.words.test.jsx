@@ -19,6 +19,8 @@ const { notify, api, i18n } = vi.hoisted(() => ({
   },
 }))
 vi.mock('react-i18next', () => ({ useTranslation: () => i18n }))
+const size = vi.hoisted(() => ({ isMobile: false }))
+vi.mock('../../../contexts/MobileContext', () => ({ useMobile: () => ({ isMobile: size.isMobile }) }))
 vi.mock('../../../contexts', () => ({ useNotification: () => notify }))
 vi.mock('../../../services', () => ({ systemService: api }))
 vi.mock('../../../components', () => ({
@@ -33,6 +35,7 @@ const NOW = new Date('2026-11-20T12:00:00Z')
 const at = (ms) => new Date(NOW.getTime() + ms).toISOString()
 
 beforeEach(() => {
+  size.isMobile = false
   vi.useFakeTimers({ now: NOW, toFake: ['Date'] })
   api.getSchedulerTasks.mockResolvedValue({ data: { tasks: [
     { name: 'scheduled_backup', label: 'Scheduled backups', interval: 21600, last_run: at(-56 * 60000), next_run: at(5 * 3600000), last_duration_ms: 1.4, run_count: 3 },
@@ -46,10 +49,11 @@ describe('SchedulerSection words', () => {
     render(<SchedulerSection hasPermission={() => false} />)
     const backup = (await screen.findByText('tr(scheduler.tasks.scheduled_backup)')).closest('tr')
     const cells = within(backup).getAllByRole('cell').map((c) => c.textContent)
-    expect(cells.slice(1, 5)).toEqual(['scheduler.interval.everyHours:6', 'time.compact.minutesAgo:56', 'time.compact.inHours:5', '1,4 ms'])
+    // After the task and its state: interval, last run, next run, duration
+    expect(cells.slice(2, 6)).toEqual(['scheduler.interval.everyHours:6', 'time.compact.minutesAgo:56', 'time.compact.inHours:5', '1,4 ms'])
     const other = screen.getByText('Brand new task').closest('tr')
     const more = within(other).getAllByRole('cell').map((c) => c.textContent)
-    expect(more.slice(1, 4)).toEqual(['scheduler.interval.daily', 'time.compact.hoursAgo:13', 'time.compact.minutesAgo:1'])
+    expect(more.slice(2, 5)).toEqual(['scheduler.interval.daily', 'time.compact.hoursAgo:13', 'time.compact.minutesAgo:1'])
   })
 
   it('words a skip reason a task gives as an English sentence', async () => {
@@ -64,12 +68,46 @@ describe('SchedulerSection words', () => {
 })
 
 describe('SchedulerSection column widths', () => {
-  it('sizes the schedule, run, duration, count and action columns to their content; the task takes the rest', async () => {
+  it('sizes the state, schedule, run, duration, count and action columns to their content; the task takes the rest', async () => {
     render(<SchedulerSection hasPermission={() => true} />)
     const row = (await screen.findByText('tr(scheduler.tasks.scheduled_backup)')).closest('tr')
     const table = row.closest('table')
-    expect([...table.querySelectorAll('thead th')].map((th) => th.classList.contains('fit'))).toEqual([false, true, true, true, true, true, true])
-    expect([...row.children].map((td) => td.classList.contains('fit'))).toEqual([false, true, true, true, true, true, true])
+    // The mockup's module table: a fitted column is marked on its header (adjust.css), the task grows
+    expect(table).toHaveClass('module-table')
+    expect([...table.querySelectorAll('thead th')].map((th) => th.classList.contains('fit'))).toEqual([false, true, true, true, true, true, true, true])
+    expect(row.children[0]).toHaveClass('description-cell')
+  })
+
+  it('says the state of the last run in words, beside its colour', async () => {
+    api.getSchedulerTasks.mockResolvedValue({ data: { tasks: [
+      { name: 'a', label: 'A', interval: 60, last_status: 'skipped', last_reason: 'not configured or disabled', run_count: 1 },
+      { name: 'b', label: 'B', interval: 60, last_error: 'boom', run_count: 1 },
+      { name: 'c', label: 'C', interval: 60, run_count: 1 },
+    ], total: 3, warnings: 1 } })
+    render(<SchedulerSection hasPermission={() => false} />)
+    const state = async (name) => within((await screen.findByText(name)).closest('tr')).getByText(/scheduler\.status/).closest('.badge')
+    expect(await state('A')).toHaveClass('muted')
+    expect(await state('B')).toHaveClass('warn')
+    expect(await state('C')).toHaveClass('good')
+    expect(screen.getByText('boom')).toHaveClass('mono')
+    expect(screen.getByText('scheduler.warningsCount:1').closest('legend')).not.toBeNull()
+  })
+})
+
+describe('SchedulerSection on a phone', () => {
+  it('draws each task as a card, its facts named, its state and run button on the card', async () => {
+    size.isMobile = true
+    render(<SchedulerSection hasPermission={() => true} />)
+    const card = (await screen.findByText('tr(scheduler.tasks.scheduled_backup)')).closest('.mobile-record')
+    expect(card).not.toBeNull()
+    expect(document.querySelector('table')).toBeNull()
+    // A task opens nothing: its name is not a button, no chevron
+    expect(within(card).getByText('tr(scheduler.tasks.scheduled_backup)').tagName).toBe('STRONG')
+    expect(card).not.toHaveClass('opens')
+    expect(card.textContent).toContain('scheduler.colLastRun')
+    expect(card.textContent).toContain('time.compact.minutesAgo:56')
+    expect(within(card).getByText('scheduler.statusOk')).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: /scheduler.runNow/ })).toBeEnabled()
   })
 })
 

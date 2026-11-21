@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ShieldCheck, Question } from '@phosphor-icons/react'
-import { Button, Select } from '../../components'
+import { Select } from '../../components/atelier/Form'
+import { SettingsGroup, SettingsTest } from '../../components/atelier/SettingsView'
 import PreflightReport from '../../components/PreflightReport'
 import { settingsService, systemService } from '../../services'
 import { useNotification } from '../../contexts'
 import { usePermission } from '../../hooks'
 import { extractData } from '../../lib/utils'
 import { COMPLIANCE_PROFILE_NAMES, useComplianceProfiles } from '../../lib/complianceProfiles'
-import { FormGroup } from '../../components/sectioned'
 
 const VERDICT = {
   ready: 'settings.compliancePreflight.ready',
@@ -74,41 +73,22 @@ export default function CompliancePreflightPanel() {
   }
 
   return (
-    <FormGroup title={t('settings.compliancePreflight.title')}>
-      <div className="space-y-3">
-        <Select
-          label={t('settings.compliancePreflight.defaultProfile')}
-          options={[{ value: '', label: t('cas.complianceProfileNone') }, ...options]}
-          value={defaultProfile}
-          onChange={saveDefault}
-          disabled={!canSetDefault || savingDefault}
-          helperText={t('settings.compliancePreflight.defaultHint')}
-        />
-
-        {/* The check as the mockup's test zone: the profile, then the button on its line */}
-        {canCheck && <div className="sf-test sf-wide">
-          <div className="sf-test-field">
-            <Select
-              label={t('settings.compliancePreflight.profile')}
-              options={options}
-              value={profile}
-              onChange={(value) => { setProfile(value); setReport(null) }}
-            />
-          </div>
-          <Button type="button" variant="secondary" onClick={runCheck} disabled={loading}>
-            <ShieldCheck size={16} />
-            {loading ? t('settings.compliancePreflight.running') : t('settings.compliancePreflight.run')}
-          </Button>
-          <p className="sf-test-result">
-            <Question aria-hidden="true" />
-            <span>{t('settings.compliancePreflight.hint')}</span>
-          </p>
-        </div>}
-
-        {error && <p className="ui-error sf-wide" role="alert">{error}</p>}
-
-        {report && <PreflightReport report={report} testId="compliance-preflight-report" verdict={VERDICT} />}
+    <SettingsGroup legend={t('settings.compliancePreflight.title')} grid={false}>
+      <div className="settings-grid">
+        <Select id="set-compliance_profile_default" label={t('settings.compliancePreflight.defaultProfile')}
+          options={[{ value: '', label: t('cas.complianceProfileNone') }, ...options]} value={defaultProfile} onChange={saveDefault}
+          disabled={!canSetDefault || savingDefault} hint={t('settings.compliancePreflight.defaultHint')} />
       </div>
-    </FormGroup>
+      {/* The check as the mockup's test zone: the profile, then the button on its line */}
+      {canCheck && (
+        <SettingsTest id="compliance-preflight" icon="shield" onTest={runCheck} busy={loading} write={false}
+          label={loading ? t('settings.compliancePreflight.running') : t('settings.compliancePreflight.run')}
+          result={error ? { ok: false, text: error } : null} hint={t('settings.compliancePreflight.hint')}>
+          <Select id="set-compliance_profile" label={t('settings.compliancePreflight.profile')} options={options} value={profile}
+            onChange={(value) => { setProfile(value); setReport(null) }} />
+        </SettingsTest>
+      )}
+      {report && <PreflightReport report={report} testId="compliance-preflight-report" verdict={VERDICT} />}
+    </SettingsGroup>
   )
 }

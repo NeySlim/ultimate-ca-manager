@@ -7,15 +7,6 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
-vi.mock('../../../components', async () => {
-  const { forwardRef } = await import('react')
-  return {
-  Button: forwardRef(({ children, ...props }, ref) => <button ref={ref} {...props}>{children}</button>),
-  Badge: ({ children, variant }) => <span data-variant={variant}>{children}</span>,
-  DetailSection: ({ title, children }) => <section><h2>{title}</h2>{children}</section>,
-  }
-})
-
 const getFipsPreflight = vi.fn()
 vi.mock('../../../services', () => ({
   systemService: { getFipsPreflight: (...args) => getFipsPreflight(...args) },
@@ -74,12 +65,16 @@ describe('FipsPreflightPanel', () => {
       'settings.fipsPreflight.checks.users_password_scrypt.remedy|remedy of users.password_scrypt',
     )).toBeInTheDocument()
 
-    const headings = within(report).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)
+    // One titled block per severity (the mockup's section()), its findings as records with their count in a pill
+    const headings = within(report).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
     expect(headings).toEqual([
       'settings.fipsPreflight.severity.blocker',
       'settings.fipsPreflight.severity.warning',
       'settings.fipsPreflight.severity.info',
     ])
+    const blocker = within(report).getByText('settings.fipsPreflight.checks.users_password_scrypt.title|title of users.password_scrypt').closest('li')
+    expect(within(blocker).getByText('7').closest('.badge')).toHaveClass('bad')
+    expect(within(report).getByText('settings.fipsPreflight.notReady').closest('.badge')).toHaveClass('bad')
   })
 
   it('says when no FIPS module judged EdDSA and ML-DSA', async () => {

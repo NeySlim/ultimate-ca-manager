@@ -4,16 +4,14 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
-import { ArrowsClockwise, Download, Warning, ArrowCircleUp } from '@phosphor-icons/react'
-import { Button, Badge, LoadingSpinner, ServiceReconnectOverlay } from '../components'
-import { SelectComponent as Select } from './Select'
-import { HelpCard } from './HelpCard'
-import { FormGroup, FormProps } from './sectioned'
+import { ServiceReconnectOverlay } from '../components'
+import { Btn, Pill, Props, RecordList, RecordRow } from './atelier'
+import { Select, Notice } from './atelier/Form'
+import { SettingsGroup } from './atelier/SettingsView'
 import { compactAgo } from '../lib/relativeTime'
 import { apiClient } from '../services'
 import { useNotification } from '../contexts'
 import { useServiceReconnect, UPDATE_MAX_WAIT_MS } from '../hooks'
-import { MARKDOWN_ELEMENT_CLASSES } from '../lib/markdown'
 import { UpdateCampaignStatus } from './UpdateCampaignStatus'
 
 // A rolling update moves one node every minute at most: the screen follows it at this pace
@@ -32,8 +30,6 @@ export function UpdateChecker() {
   const [resuming, setResuming] = useState(false)
   const { showSuccess, showError, showConfirm } = useNotification()
   const { reconnecting, status, attempt, countdown, waitForRestart, cancel } = useServiceReconnect()
-
-  const markdownClasses = "sf-notes-body prose prose-sm prose-invert max-w-none " + MARKDOWN_ELEMENT_CLASSES
 
   const checkForUpdates = async (showNotification = false, force = false) => {
     setChecking(true)
@@ -176,134 +172,112 @@ export function UpdateChecker() {
 
   if (loading) {
     return (
-      <FormGroup title={t('settings.updates.checkTitle')}>
-        <p className="sf-hint" role="status">{t('settings.updates.checking')}</p>
-      </FormGroup>
+      <SettingsGroup legend={t('settings.updates.checkTitle')} grid={false}>
+        <p className="group-hint" role="status">{t('settings.updates.checking')}</p>
+      </SettingsGroup>
     )
   }
 
+  const legend = updateInfo?.update_available ? t('settings.updateAvailableTitle') : t('settings.upToDateTitle')
   return (
     <>
       {reconnecting && (
         <ServiceReconnectOverlay status={status} attempt={attempt} countdown={countdown} onCancel={cancel}
           note={t('reconnect.updateNote', { minutes: UPDATE_MAX_WAIT_MS / 60000 })} />
       )}
-      <FormGroup
-        title={updateInfo?.update_available ? t('settings.updateAvailableTitle') : t('settings.upToDateTitle')}
-        badge={updateInfo?.prerelease ? <Badge variant="warning" size="sm">{t('settings.prerelease')}</Badge> : null}
-        actions={(
-          <>
-            {updateInfo?.update_available && updateInfo?.can_auto_update && !campaignRunning && (
-              <Button variant="primary" onClick={installUpdate} disabled={installing || !updateInfo.download_url}>
-                {installing ? <LoadingSpinner size="xs" /> : <Download size={16} />}
-                {installing ? t('settings.updates.installing') : t('settings.updates.install')}
-              </Button>
-            )}
-            <Button variant="secondary" onClick={() => checkForUpdates(true, true)} disabled={checking}>
-              <ArrowsClockwise size={16} className={checking ? 'animate-spin' : ''} />
-              {checking ? t('settings.updates.checking') : t('settings.checkNow')}
-            </Button>
-          </>
+      <SettingsGroup grid={false} legend={(
+        <>{legend}{updateInfo?.prerelease && <>{' '}<Pill tone="warn" icon="sparkles" label={t('settings.prerelease')} /></>}</>
+      )}>
+        <Props items={[
+          [t('settings.updates.installed'), updateInfo?.current_version ? `v${updateInfo.current_version}` : '—'],
+          updateInfo?.update_available && [t('settings.updates.latest'), `v${updateInfo.latest_version}`],
+          updateInfo?.update_available && updateInfo?.published_at && [t('settings.updates.published'), ago(updateInfo.published_at)],
+        ]} />
+
+        {updateInfo?.ha_mode && updateInfo?.can_auto_update && <p className="group-hint">{t('settings.updateCampaign.haNote')}</p>}
+
+        {updateInfo?.update_available && !updateInfo?.can_auto_update && (
+          <p className="group-hint">
+            {t('settings.updates.dockerHint')}{' '}
+            <code className="mono">{`docker pull ${updateInfo.download_url || `ghcr.io/neyslim/ultimate-ca-manager:${updateInfo.latest_version}`}`}</code>
+          </p>
         )}
-      >
-        <div className="sf-stack">
-          <FormProps items={[
-            [t('settings.updates.installed'), updateInfo?.current_version ? `v${updateInfo.current_version}` : '—'],
-            updateInfo?.update_available && [t('settings.updates.latest'), `v${updateInfo.latest_version}`],
-            updateInfo?.update_available && updateInfo?.published_at && [t('settings.updates.published'), ago(updateInfo.published_at)],
-          ]} />
 
-          {updateInfo?.ha_mode && updateInfo?.can_auto_update && (
-            <p className="sf-hint">{t('settings.updateCampaign.haNote')}</p>
+        {error && <Notice tone="bad">{error}</Notice>}
+
+        {updateInfo?.message && !updateInfo?.update_available && <p className="group-hint">{serverMessage(updateInfo.message)}</p>}
+
+        <div className="settings-actions">
+          {updateInfo?.update_available && updateInfo?.can_auto_update && !campaignRunning && (
+            <Btn tone="primary" icon="download" onClick={installUpdate} disabled={installing || !updateInfo.download_url}>
+              {installing ? t('settings.updates.installing') : t('settings.updates.install')}
+            </Btn>
           )}
+          <Btn icon="refresh" onClick={() => checkForUpdates(true, true)} disabled={checking}>
+            {checking ? t('settings.updates.checking') : t('settings.checkNow')}
+          </Btn>
+        </div>
 
-          {updateInfo?.update_available && !updateInfo?.can_auto_update && (
-            <p className="sf-hint">
-              {t('settings.updates.dockerHint')}{' '}
-              <code>{`docker pull ${updateInfo.download_url || `ghcr.io/neyslim/ultimate-ca-manager:${updateInfo.latest_version}`}`}</code>
-            </p>
-          )}
-
-          {error && <p className="ui-error" role="alert"><Warning aria-hidden="true" />{error}</p>}
-
-          {updateInfo?.message && !updateInfo?.update_available && (
-            <p className="sf-hint">{serverMessage(updateInfo.message)}</p>
-          )}
-
-          {/* Later major version: never installed automatically */}
-          {majorUpgrade && (
-            <ul className="sf-records">
-              <li>
-                <div className="sf-record-main">
-                  <strong>{t('settings.majorUpgradeTitle', { version: majorUpgrade.version })}</strong>
-                  <span className="sf-record-meta">{t('settings.majorUpgradeDesc')}</span>
+        {/* Later major version: never installed automatically */}
+        {majorUpgrade && (
+          <RecordList>
+            <RecordRow title={t('settings.majorUpgradeTitle', { version: majorUpgrade.version })} meta={t('settings.majorUpgradeDesc')}
+              extra={(
+                <>
                   {majorUpgrade.html_url && (
-                    <a className="sf-link" href={majorUpgrade.html_url} target="_blank" rel="noopener noreferrer">
-                      {t('settings.majorUpgradeNotes')}
-                    </a>
+                    <a className="text-link" href={majorUpgrade.html_url} target="_blank" rel="noopener noreferrer">{t('settings.majorUpgradeNotes')}</a>
                   )}
                   {!updateInfo?.can_auto_update && (
-                    <span className="sf-record-meta">
+                    <span className="rl-meta">
                       {t('settings.majorUpgradeDocker', { image: majorUpgrade.download_url || `ghcr.io/neyslim/ultimate-ca-manager:${majorUpgrade.version}` })}
                     </span>
                   )}
-                </div>
-                {updateInfo?.can_auto_update && !campaignRunning && (
-                  <div className="sf-record-actions">
-                    <Button variant="secondary" onClick={installMajorUpgrade} disabled={installing || !majorUpgrade.download_url}>
-                      <ArrowCircleUp size={16} />
-                      {t('settings.majorUpgradeInstall')}
-                    </Button>
-                  </div>
-                )}
-              </li>
-            </ul>
-          )}
+                </>
+              )}
+              action={updateInfo?.can_auto_update && !campaignRunning && (
+                <Btn tone="primary" icon="upload" onClick={installMajorUpgrade} disabled={installing || !majorUpgrade.download_url}>
+                  {t('settings.majorUpgradeInstall')}
+                </Btn>
+              )} />
+          </RecordList>
+        )}
 
-          <UpdateCampaignStatus campaign={campaign} onResume={resumeCampaign} resuming={resuming} />
+        <UpdateCampaignStatus campaign={campaign} onResume={resumeCampaign} resuming={resuming} />
 
-          {/* Release notes of the running version, then of the available one */}
-          {updateInfo?.current_release_notes && (
-            <details className="sf-notes">
-              <summary>
-                {t('settings.currentReleaseNotes', { version: updateInfo.current_version })}
-                {updateInfo.current_published_at && <span>{` (${ago(updateInfo.current_published_at)})`}</span>}
-              </summary>
-              <div className={markdownClasses}>
-                <ReactMarkdown>{updateInfo.current_release_notes}</ReactMarkdown>
-              </div>
-            </details>
-          )}
-          {updateInfo?.update_available && updateInfo?.release_notes && (
-            <details className="sf-notes" open>
-              <summary>{t('settings.updateReleaseNotes', { version: updateInfo.latest_version })}</summary>
-              <div className={markdownClasses}>
-                <ReactMarkdown>{updateInfo.release_notes}</ReactMarkdown>
-              </div>
-            </details>
-          )}
+        {/* Release notes of the running version, then of the available one */}
+        {updateInfo?.current_release_notes && (
+          <details className="release-notes">
+            <summary>
+              {t('settings.currentReleaseNotes', { version: updateInfo.current_version })}
+              {updateInfo.current_published_at && <span className="muted">{` (${ago(updateInfo.current_published_at)})`}</span>}
+            </summary>
+            <div className="release-notes-body"><ReactMarkdown>{updateInfo.current_release_notes}</ReactMarkdown></div>
+          </details>
+        )}
+        {updateInfo?.update_available && updateInfo?.release_notes && (
+          <details className="release-notes" open>
+            <summary>{t('settings.updateReleaseNotes', { version: updateInfo.latest_version })}</summary>
+            <div className="release-notes-body"><ReactMarkdown>{updateInfo.release_notes}</ReactMarkdown></div>
+          </details>
+        )}
 
-          {/* Versions the check looks at; the scheduled channel is set under automatic updates */}
-          <div className="sf-grid">
-            <Select
-              label={t('settings.updates.checkChannel')}
-              value={includeChannel}
-              onChange={(value) => setIncludeChannel(value)}
-              options={[
-                { value: 'stable', label: t('settings.channelStable') },
-                { value: 'prerelease', label: t('settings.channelPrerelease') },
-                { value: 'dev', label: t('settings.channelDev') },
-              ]}
-            />
-          </div>
-          {includeChannel === 'dev' && <HelpCard variant="warning">{t('settings.channelDevWarning')}</HelpCard>}
-          {updateInfo?.html_url && (
-            <p className="sf-hint">
-              <a className="sf-link" href={updateInfo.html_url} target="_blank" rel="noopener noreferrer">{t('settings.viewOnGithub')}</a>
-            </p>
-          )}
+        {/* Versions the check looks at; the scheduled channel is set under automatic updates */}
+        <div className="settings-grid">
+          <Select id="set-update_check_channel" label={t('settings.updates.checkChannel')} value={includeChannel}
+            onChange={(value) => setIncludeChannel(value)}
+            options={[
+              { value: 'stable', label: t('settings.channelStable') },
+              { value: 'prerelease', label: t('settings.channelPrerelease') },
+              { value: 'dev', label: t('settings.channelDev') },
+            ]} />
+          {includeChannel === 'dev' && <Notice tone="warn">{t('settings.channelDevWarning')}</Notice>}
         </div>
-      </FormGroup>
+        {updateInfo?.html_url && (
+          <p className="group-hint">
+            <a className="text-link" href={updateInfo.html_url} target="_blank" rel="noopener noreferrer">{t('settings.viewOnGithub')}</a>
+          </p>
+        )}
+      </SettingsGroup>
     </>
   )
 }

@@ -1,6 +1,7 @@
 /**
  * Audit retention: the field shows 0 (keep every log) when nothing is stored,
- * is editable by settings admins only, and sends a number.
+ * is editable by settings admins only, and sends a number; an emptied field stays empty
+ * (refused by the checks at the save), never replaced by 0 under the fingers.
  */
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
@@ -51,13 +52,13 @@ describe('AuditSection audit retention', () => {
     expect(renderAudit({ audit_retention_days: 365 }).value).toBe('365')
   })
 
-  it('sends a number, and 0 for an emptied field', () => {
+  it('sends a number, and keeps an emptied field empty', () => {
     const updateSetting = vi.fn()
     const field = renderAudit({ audit_retention_days: 365 }, updateSetting)
     fireEvent.change(field, { target: { value: '400' } })
     expect(updateSetting).toHaveBeenLastCalledWith('audit_retention_days', 400)
     fireEvent.change(field, { target: { value: '' } })
-    expect(updateSetting).toHaveBeenLastCalledWith('audit_retention_days', 0)
+    expect(updateSetting).toHaveBeenLastCalledWith('audit_retention_days', '')
   })
 
   it('is read-only without admin:settings, as the backend refuses it', () => {

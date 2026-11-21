@@ -122,12 +122,13 @@ export function SettingsGroup({ legend, hint, grid = true, children, ...rest }) 
 /**
  * A section's test (`.settings-test`): the button, then its result in the tone of the outcome, or
  * the hint at rest. result: { ok, text } | null. A field the test needs (`children`) precedes it.
+ * `write={false}` for a check that only reads (the write guard lets it run).
  */
-export function SettingsTest({ id, label, icon = 'send', onTest, busy = false, result, hint, buttonRef, children }) {
+export function SettingsTest({ id, label, icon = 'send', onTest, busy = false, result, hint, buttonRef, write = true, children }) {
   return (
     <div className="settings-test">
       {children}
-      <button type="button" className="btn" id={`test-${id}`} data-settings-test={id} data-write="" ref={buttonRef} disabled={busy || undefined} onClick={onTest}>
+      <button type="button" className="btn" id={`test-${id}`} data-settings-test={id} data-write={write ? '' : undefined} ref={buttonRef} disabled={busy || undefined} onClick={onTest}>
         <Icon name={icon} />{label}
       </button>
       {result ? (

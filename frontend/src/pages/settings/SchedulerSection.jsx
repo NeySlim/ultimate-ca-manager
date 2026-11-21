@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Play, CheckCircle, WarningCircle, MinusCircle, ArrowsClockwise } from '@phosphor-icons/react'
-import { Button, Badge } from '../../components'
+import { Btn, Pill, Notice, DataTable, SkeletonPanel } from '../../components/atelier'
+import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { useNotification } from '../../contexts'
 import { systemService } from '../../services'
-import { FormGroup } from '../../components/sectioned'
 import { useRefocusAfter } from '../../components/sectioned/useRefocus'
 import { compactRun } from '../../lib/relativeTime'
 
@@ -51,10 +50,7 @@ function RunButton({ busy, onRun, children }) {
   const ref = useRef(null)
   useRefocusAfter(busy, ref)
   return (
-    <Button ref={ref} type="button" variant="secondary" onClick={onRun} disabled={busy} data-write>
-      <Play size={13} weight="fill" />
-      {children}
-    </Button>
+    <Btn ref={ref} icon="refresh" write onClick={onRun} disabled={busy}>{children}</Btn>
   )
 }
 
@@ -118,95 +114,60 @@ export default function SchedulerSection({ hasPermission }) {
     }
   }
 
+  const status = (task) => (task.last_error || task.last_status === 'warning'
+    ? <Pill tone="warn" label={t('scheduler.statusWarning')} />
+    : task.last_status === 'skipped' ? <Pill tone="muted" icon="clock" label={t('scheduler.statusSkipped')} />
+      : <Pill tone="good" label={t('scheduler.statusOk')} />)
+  // What the last run said: its error, its warning, or why it stood down
+  const note = (task) => (task.last_error ? <span className="mono">{task.last_error}</span>
+    : task.last_status === 'warning' && task.last_reason ? task.last_reason
+      : task.last_status === 'skipped' ? t('scheduler.skipped', { reason: skipReason(t, task.last_reason) }) : null)
+  const run = (task) => (
+    <RunButton busy={!!running[task.name]} onRun={() => handleRun(task.name, taskLabel(t, task))}>{t('scheduler.runNow')}</RunButton>
+  )
+  const columns = [
+    { id: 'task', label: t('scheduler.colTask'), grow: true, cell: (task) => (
+      <span className="task-cell"><strong>{taskLabel(t, task)}</strong>{note(task) && <span className="rl-meta">{note(task)}</span>}</span>
+    ) },
+    { id: 'status', label: t('atelier.state'), fit: true, cell: status },
+    { id: 'schedule', label: t('scheduler.colSchedule'), fit: true, tone: 'muted', cell: (task) => humanizeInterval(task.interval, t) },
+    { id: 'last', label: t('scheduler.colLastRun'), fit: true, tone: 'muted', cell: (task) => compactRun(task.last_run, t) || '—' },
+    { id: 'next', label: t('scheduler.colNextRun'), fit: true, tone: 'muted', cell: (task) => compactRun(task.next_run, t) || '—' },
+    { id: 'duration', label: t('scheduler.colDuration'), fit: true, tone: 'muted', cell: (task) => fmtDuration(task.last_duration_ms, i18n?.language) },
+    { id: 'runs', label: t('scheduler.colRuns'), fit: true, tone: 'muted', cell: (task) => task.run_count },
+    ...(canRun ? [{ id: 'run', label: <span className="sr-only">{t('common.actions')}</span>, fit: true, cell: run }] : []),
+  ]
+  const labelled = (key, value) => `${t(key)}${t('work.sep')}${value}`
+
   return (
     <>
-      {meta.stale && (
-        <p className="mb-3 flex items-center gap-1.5 text-xs text-status-warning">
-          <WarningCircle size={14} className="shrink-0" />
-          {t('scheduler.stateStale')}
-        </p>
-      )}
-
-      <FormGroup
-        title={t('scheduler.tasksTitle')}
-        badge={meta.warnings > 0 ? (
-          <Badge variant="warning" size="sm">
-            <WarningCircle size={12} weight="bold" className="mr-1" />
-            {t('scheduler.warningsCount', { count: meta.warnings })}
-          </Badge>
-        ) : null}
-        actions={(
-          <Button type="button" variant="secondary" size="sm" onClick={() => load()}>
-            <ArrowsClockwise size={14} />
-            {t('common.refresh')}
-          </Button>
-        )}
-      >
+      {meta.stale && <Notice tone="warn">{t('scheduler.stateStale')}</Notice>}
+      <SettingsGroup grid={false} legend={(
+        <>{t('scheduler.tasksTitle')}{meta.warnings > 0 && <>{' '}<Pill tone="warn" label={t('scheduler.warningsCount', { count: meta.warnings })} /></>}</>
+      )}>
+        <div className="settings-actions">
+          <Btn icon="refresh" onClick={() => load()}>{t('common.refresh')}</Btn>
+        </div>
         {loading ? (
-          <div className="p-6 text-center text-sm text-text-secondary">{t('common.loading')}</div>
-        ) : tasks.length === 0 ? (
-          <div className="p-6 text-center text-sm text-text-secondary">{t('scheduler.noTasks')}</div>
+          <SkeletonPanel label={t('common.loading')} />
         ) : (
-          <div className="ui-table-box overflow-x-auto">
-            <table className="ui-table sf-task-table">
-              <thead>
-                <tr>
-                  <th>{t('scheduler.colTask')}</th>
-                  <th className="fit">{t('scheduler.colSchedule')}</th>
-                  <th className="fit">{t('scheduler.colLastRun')}</th>
-                  <th className="fit">{t('scheduler.colNextRun')}</th>
-                  <th className="fit">{t('scheduler.colDuration')}</th>
-                  <th className="fit text-right">{t('scheduler.colRuns')}</th>
-                  {canRun && <th className="fit" />}
-                </tr>
-              </thead>
-              <tbody>
-                {tasks.map((task) => (
-                  <tr key={task.name}>
-                    <td>
-                      <div className="flex items-center gap-2">
-                        {task.last_error || task.last_status === 'warning' ? (
-                          <WarningCircle size={16} className="text-status-warning shrink-0" weight="fill" />
-                        ) : task.last_status === 'skipped' ? (
-                          <MinusCircle size={16} className="text-text-tertiary shrink-0" weight="fill" />
-                        ) : (
-                          <CheckCircle size={16} className="text-status-success shrink-0" weight="fill" />
-                        )}
-                        <div>
-                          <p className="font-medium text-text-primary">{taskLabel(t, task)}</p>
-                          {task.last_error && (
-                            <p className="text-xs text-status-warning mt-0.5 font-mono">{task.last_error}</p>
-                          )}
-                          {!task.last_error && task.last_status === 'warning' && task.last_reason && (
-                            <p className="text-xs text-status-warning mt-0.5">{task.last_reason}</p>
-                          )}
-                          {!task.last_error && task.last_status === 'skipped' && (
-                            <p className="text-xs text-text-tertiary mt-0.5">
-                              {t('scheduler.skipped', { reason: skipReason(t, task.last_reason) })}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="fit text-text-secondary" data-label={t('scheduler.colSchedule')}>{humanizeInterval(task.interval, t)}</td>
-                    <td className="fit text-text-secondary" data-label={t('scheduler.colLastRun')}>{compactRun(task.last_run, t) || '—'}</td>
-                    <td className="fit text-text-secondary" data-label={t('scheduler.colNextRun')}>{compactRun(task.next_run, t) || '—'}</td>
-                    <td className="fit text-text-secondary tabular-nums" data-label={t('scheduler.colDuration')}>{fmtDuration(task.last_duration_ms, i18n?.language)}</td>
-                    <td className="fit text-right text-text-secondary tabular-nums" data-label={t('scheduler.colRuns')}>{task.run_count}</td>
-                    {canRun && (
-                      <td className="fit text-right sf-task-run">
-                        <RunButton busy={!!running[task.name]} onRun={() => handleRun(task.name, taskLabel(t, task))}>
-                          {t('scheduler.runNow')}
-                        </RunButton>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable kind="module" scrollId="scheduler-scroll" recordsId="scheduler-records" label={t('scheduler.tasksTitle')}
+            columns={columns} rows={tasks} rowKey={(task) => task.name} rowLabel={(task) => taskLabel(t, task)}
+            empty={<div className="empty"><p>{t('scheduler.noTasks')}</p></div>}
+            card={(task) => ({
+              description: note(task),
+              meta: [
+                labelled('scheduler.colSchedule', humanizeInterval(task.interval, t)),
+                labelled('scheduler.colLastRun', compactRun(task.last_run, t) || '—'),
+                labelled('scheduler.colNextRun', compactRun(task.next_run, t) || '—'),
+                labelled('scheduler.colDuration', fmtDuration(task.last_duration_ms, i18n?.language)),
+                labelled('scheduler.colRuns', task.run_count),
+              ],
+              status: status(task),
+              end: canRun ? run(task) : undefined,
+            })} />
         )}
-      </FormGroup>
+      </SettingsGroup>
     </>
   )
 }

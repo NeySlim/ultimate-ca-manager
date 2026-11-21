@@ -73,11 +73,13 @@ describe('settings record lists', () => {
         backups={[{ filename: 'ucm_backup_1.ucmbkp', size: '1.5 MB', size_bytes: 1.5 * 1024 * 1024, created_at: '2026-11-20 10:05:00 UTC' }]}
         backupMeta={{ total: 1, total_size_bytes: 1.5 * 1024 * 1024 }} updateBackupQuery={noop} />,
     )
-    const row = screen.getByText('ucm_backup_1.ucmbkp').closest('li')
-    expect(row.closest('ul')).toHaveClass('sf-records')
+    // The mockup's module table: one row per archive, its icon actions at the end
+    const row = screen.getByText('ucm_backup_1.ucmbkp').closest('tr')
+    expect(row.closest('table')).toHaveClass('module-table')
     expect(row.textContent).not.toContain('UTC')
     expect(row.textContent).toMatch(/1[.,]5\s?(MB|Mo)/)
-    expect(within(row).getByRole('button', { name: 'common.download' })).toBeInTheDocument()
+    expect(within(row).getByTitle('common.download')).toBeInTheDocument()
+    expect(within(row).getByTitle('common.delete')).toHaveAttribute('data-write')
   })
 
   it('says the outcome of a Microsoft AC test and syncs in words, without check marks', () => {

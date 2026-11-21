@@ -2092,7 +2092,7 @@ A manual backup runs on the server: the dialog shows its progress, can cancel it
 
 ### Scheduled Backup
 Configure automatic backups:
-- Frequency (daily, weekly, monthly)
+- Frequency (daily, weekly, monthly, or Off, not recommended, which stops the scheduled backups)
 - Retention in days: older backups are pruned (30 by default)
 - **Key derivation**: Automatic (Argon2id when available, PBKDF2 in FIPS mode), PBKDF2-HMAC-SHA256 or Argon2id. Archives written with Argon2id cannot be restored on an instance in FIPS mode
 
@@ -2112,7 +2112,7 @@ Upload a backup file to restore UCM to a previous state.
 ## Audit
 
 - **Log retention**: Auto-cleanup old logs after N days
-- **Syslog forwarding**: Send events to a remote syslog server (UDP/TCP/TLS)
+- **Syslog forwarding**: Send events to a remote syslog server over TLS (RFC 5425), TCP or UDP
 - **Integrity verification**: Check the hash chain that links every audit entry; the chain is always on, there is nothing to enable
 
 ## Database

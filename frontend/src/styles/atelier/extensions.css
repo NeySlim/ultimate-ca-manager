@@ -50,6 +50,9 @@
 .atl .ext-row:not(.fixed){grid-template-columns:minmax(0,210px) minmax(0,1fr) auto 36px}
 .atl .ext-row .ext-critical{min-height:36px}
 .atl .row-actions{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px}
+/* A row's own icon buttons in a table cell stay on one line; a card without its checkbox drops the indent of its description */
+.atl .module-table td .row-actions{flex-wrap:nowrap;gap:1px}
+.atl .mobile-record:not(:has(.check-hit)) .row-description{margin-left:0}
 .atl .result-icon.warn{background:var(--warnbg);color:var(--warn)}
 @media(max-width:800px){.atl .subject-grid{grid-template-columns:1fr}.atl .subject-grid .field.wide{grid-column:auto}.atl .ext-row:not(.fixed){grid-template-columns:minmax(0,1fr) 40px;grid-template-areas:"oid remove" "value value" "critical critical"}.atl .ext-row .ext-critical{grid-area:critical}}
 /* Authorities: a root alone on one line, the group of idle roots and the button that draws more of them
@@ -159,6 +162,27 @@
 .atl .lock-mark{display:inline-flex;margin-left:5px;vertical-align:-2px;color:var(--muted)}
 .atl .lock-mark .icon{width:12px;height:12px}
 .atl .settings-section .panel-heading h2[data-quiet-focus]:focus-visible{outline:none}
+/*
+ * Settings, data and system sections: a sentence among the fields spans the grid; a value and
+ * its copy button on one line; the archives' summary; a task's name over what its last run said;
+ * a list in a notice or a finding; release notes folded under their summary.
+ */
+.atl .settings-grid>.group-hint{grid-column:1/-1;margin:0}
+.atl .copy-value{display:inline-flex;align-items:center;gap:6px;min-width:0;overflow-wrap:anywhere}
+.atl .backup-digest{display:inline-flex;align-items:center;gap:6px;margin-left:10px}
+.atl .backup-summary{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px}
+.atl .backup-summary .badge{margin-right:6px}
+.atl .task-cell{display:flex;flex-direction:column;gap:2px;min-width:0}
+.atl .restore-todo,.atl .preflight-examples{margin:6px 0 0;padding-left:18px;list-style:disc}
+.atl .preflight-examples{color:var(--muted);font-size:12px}
+.atl .release-notes summary{cursor:pointer;font-size:13px;font-weight:500;min-height:28px}
+.atl .release-notes-body{margin-top:8px;padding:12px 16px;background:var(--raised);border-radius:4px;font-size:12px;line-height:1.7;max-height:320px;overflow:auto;overflow-wrap:anywhere}
+.atl .release-notes-body h1,.atl .release-notes-body h2,.atl .release-notes-body h3{font-size:13px;font-weight:500;margin:12px 0 4px}
+.atl .release-notes-body p{margin:4px 0}
+.atl .release-notes-body ul,.atl .release-notes-body ol{margin:4px 0;padding-left:18px}
+.atl .release-notes-body code{font-family:Fira,monospace;font-size:12px}
+.atl .release-notes-body a{color:var(--accent)}
+.atl .segmented .swatch{margin-right:6px;vertical-align:-1px}
 /*
  * A section the product still draws (.atl-out, until its zone is converted) keeps its own look: the
  * mockup's rules on bare elements (button, input, p, table) outrank the product's classes, so the

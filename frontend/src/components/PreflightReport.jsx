@@ -1,10 +1,12 @@
 import { useTranslation } from 'react-i18next'
-import { Badge } from './Badge'
+import { Pill, RecordList, RecordRow } from './atelier'
+import { Notice } from './atelier/Form'
 
+// The tone of each severity in the mockup's pills
 const SEVERITIES = [
-  { id: 'blocker', variant: 'danger' },
-  { id: 'warning', variant: 'warning' },
-  { id: 'info', variant: 'info' },
+  { id: 'blocker', tone: 'bad' },
+  { id: 'warning', tone: 'warn' },
+  { id: 'info', tone: 'muted' },
 ]
 
 // i18n keys cannot hold dots inside a segment: 'users.password_scrypt' -> 'users_password_scrypt'
@@ -28,59 +30,47 @@ export default function PreflightReport({ report, testId, checkBase = null, verd
     : finding[part]
 
   return (
-    <div className="space-y-3" data-testid={testId}>
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge variant={report.ready ? 'success' : 'danger'}>
-          {report.ready ? t(verdict.ready) : t(verdict.notReady)}
-        </Badge>
-        {SEVERITIES.map(({ id, variant }) => (
-          <Badge key={id} variant={variant}>
-            {t(`settings.fipsPreflight.severity.${id}`)}: {report.summary?.[id] ?? 0}
-          </Badge>
+    <div className="settings-stack" data-testid={testId}>
+      <div className="settings-actions">
+        <Pill tone={report.ready ? 'good' : 'bad'} label={report.ready ? t(verdict.ready) : t(verdict.notReady)} />
+        {SEVERITIES.map(({ id, tone }) => (
+          <Pill key={id} tone={tone} label={`${t(`settings.fipsPreflight.severity.${id}`)}: ${report.summary?.[id] ?? 0}`} />
         ))}
       </div>
 
       {report.findings.length === 0 && report.errors.length === 0 && (
-        <p className="text-sm text-text-secondary">{t(verdict.nothingFound)}</p>
+        <p className="muted small">{t(verdict.nothingFound)}</p>
       )}
 
-      {SEVERITIES.map(({ id: severity, variant }) => {
+      {SEVERITIES.map(({ id: severity, tone }) => {
         const findings = report.findings.filter((f) => f.severity === severity)
         if (findings.length === 0) return null
         return (
-          <div key={severity} className="space-y-2">
-            <h4 className="text-xs font-semibold uppercase text-text-secondary">
-              {t(`settings.fipsPreflight.severity.${severity}`)}
-            </h4>
-            {findings.map((finding) => (
-              <div key={finding.id} className="p-3 bg-tertiary-50 border border-border rounded-lg">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="text-sm font-medium text-text-primary">
-                    {checkText(finding, 'title')}
-                  </div>
-                  <Badge variant={variant} size="sm">{finding.count}</Badge>
-                </div>
-                <div className="text-xs text-text-tertiary font-mono mt-1">{finding.id}</div>
-                <ul className="mt-2 text-xs text-text-secondary list-disc pl-4">
-                  {finding.examples.map((example) => <li key={example}>{example}</li>)}
-                  {finding.count > finding.examples.length && (
-                    <li>{t('settings.fipsPreflight.more', { count: finding.count - finding.examples.length })}</li>
-                  )}
-                </ul>
-                <div className="mt-2 text-xs text-text-primary">
-                  <span className="font-medium">{t('settings.fipsPreflight.remedy')}</span>{' '}
-                  {checkText(finding, 'remedy')}
-                </div>
-              </div>
-            ))}
-          </div>
+          <section key={severity}>
+            <h3 className="section-title">{t(`settings.fipsPreflight.severity.${severity}`)}</h3>
+            <RecordList>
+              {findings.map((finding) => (
+                <RecordRow key={finding.id} title={checkText(finding, 'title')} meta={<span className="mono">{finding.id}</span>}
+                  badge={<Pill tone={tone} label={String(finding.count)} />}
+                  extra={(
+                    <>
+                      <ul className="preflight-examples">
+                        {finding.examples.map((example) => <li key={example}>{example}</li>)}
+                        {finding.count > finding.examples.length && (
+                          <li>{t('settings.fipsPreflight.more', { count: finding.count - finding.examples.length })}</li>
+                        )}
+                      </ul>
+                      <span className="rl-meta"><strong>{t('settings.fipsPreflight.remedy')}</strong>{' '}{checkText(finding, 'remedy')}</span>
+                    </>
+                  )} />
+              ))}
+            </RecordList>
+          </section>
         )
       })}
 
       {report.errors.map((item) => (
-        <p key={item.id} className="text-xs status-danger-text">
-          {t('settings.fipsPreflight.checkFailed', { id: item.id })}
-        </p>
+        <Notice key={item.id} tone="bad">{t('settings.fipsPreflight.checkFailed', { id: item.id })}</Notice>
       ))}
     </div>
   )

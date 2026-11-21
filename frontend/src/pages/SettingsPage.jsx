@@ -60,6 +60,7 @@ import SsoSection from './settings/SsoSection'
 import BackupSection from './settings/BackupSection'
 import { ceilingNotice } from './settings/backupCeiling'
 import RestoreReport from './settings/RestoreReport'
+import { BackupDialog, RestoreDialog } from './settings/BackupDialogs'
 import { loginUrl } from '../navigation/safeNext'
 import { useRestoreJob, UNCANCELLABLE_PHASES } from './settings/useRestoreJob'
 import AuditSection from './settings/AuditSection'
@@ -120,7 +121,7 @@ const SECTION_ICONS = {
   ct: 'eye', autoRenewal: 'refresh', deploy: 'upload', microsoftCA: 'plug', adConnector: 'globe', xcepWstep: 'monitor', about: 'help',
 }
 // Sections drawn with the mockup's fields; the others keep the product's own styles (`.atl-out`) until converted
-const CONVERTED_SECTIONS = new Set(['general', 'security', 'email', 'https'])
+const CONVERTED_SECTIONS = new Set(['general', 'security', 'email', 'https', 'appearance', 'backup', 'audit', 'database', 'updates', 'scheduler', 'autoRenewal', 'about'])
 
 // Groups of the table of contents, named by what they hold; the frames follow the same
 // order. Four groups keep every entry in view on a 1000 px high window.
@@ -2114,6 +2115,7 @@ export default function SettingsPage() {
             handleDownloadBackup={handleDownloadBackup}
             handleDeleteBackup={handleDeleteBackup}
             handleClearBackupPassword={handleClearBackupPassword}
+            clearBackupSelection={() => setSelectedBackups([])}
           />
         )
       case 'audit':
@@ -2356,153 +2358,31 @@ export default function SettingsPage() {
         </SavePartsContext.Provider>
       </Zone>
 
-      {/* Backup Password Modal; then the running backup, then its archive to download */}
-      <Modal
-        open={showBackupModal}
-        onClose={closeBackupModal}
-        title={t('settings.encryptedBackup')}
-      >
-        {backupRunning ? (
-          <div className="space-y-4" data-testid="backup-job">
-            <p className="text-sm text-text-primary">{backupProgress}</p>
-            <p className="text-sm text-text-secondary">{t('settings.backupRunsInBackground')}</p>
-            <div className="ui-dialog-actions">
-              <Button type="button" variant="secondary" onClick={closeBackupModal}>
-                {t('common.close')}
-              </Button>
-              <Button type="button" variant="danger" onClick={handleCancelBackup} disabled={!!backupJob?.cancel_requested}
-                data-testid="backup-job-cancel">
-                {t('settings.backupCancel')}
-              </Button>
-            </div>
-          </div>
-        ) : backupReady ? (
-          <div className="space-y-4" data-testid="backup-ready">
-            <p className="text-sm text-text-primary">{t('settings.backupReady', { filename: backupReady.filename })}</p>
-            <div className="ui-dialog-actions">
-              <Button type="button" variant="secondary" onClick={closeBackupModal}>
-                {t('common.close')}
-              </Button>
-              <Button type="button" onClick={() => handleDownloadBackup(backupReady.filename)} data-testid="backup-ready-download">
-                {t('common.download')}
-              </Button>
-            </div>
-          </div>
-        ) : (
-        <div className="space-y-4">
-          <p className="text-sm text-text-secondary">
-            {t('settings.createBackupDesc')}
-          </p>
-          <Input
-            label={t('settings.encryptionPassword')}
-            type="password"
-            noAutofill
-            value={backupPassword}
-            onChange={(e) => setBackupPassword(e.target.value)}
-            placeholder={t('settings.min12Characters')}
-            helperText={t('settings.encryptionPasswordHelper')}
-            error={backupPassword ? backupPasswordProblem(backupPassword, t) : null}
-            autoFocus
-            showStrength
-          />
-          <div className="ui-dialog-actions">
-            <Button type="button" variant="secondary" onClick={closeBackupModal}>
-              {t('common.cancel')}
-            </Button>
-            <Button 
-              onClick={handleBackup} 
-              disabled={backupLoading || !!backupPasswordProblem(backupPassword, t)}
-            >
-              {backupLoading ? t('settings.creating') : t('settings.createAndDownload')}
-            </Button>
-          </div>
-        </div>
-        )}
-      </Modal>
+      {/* Backup: the password, then the running backup, then its archive to download */}
+      {showBackupModal && (
+        <BackupDialog running={backupRunning} progress={backupProgress} job={backupJob} ready={backupReady}
+          password={backupPassword} setPassword={setBackupPassword} problem={backupPasswordProblem(backupPassword, t)}
+          loading={backupLoading} onClose={closeBackupModal} onCreate={handleBackup} onCancelJob={handleCancelBackup}
+          onDownload={handleDownloadBackup} />
+      )}
 
-      {/* Restore Password Modal; then the running restore, or the sign-in its end asks for */}
-      <Modal
-        open={showRestoreModal}
-        onClose={() => {
-          // Closed on "sign in again": every call now answers 401, which must lead to the sign-in
-          if (restoreJob.signInNeeded) releaseSignOut()
-          setShowRestoreModal(false); setRestorePassword(''); setRestoreFile(null)
-        }}
-        title={t('settings.restoreFromBackup')}
-      >
-        {restoreJob.signInNeeded ? (
-          <div className="space-y-4" data-testid="restore-sign-in">
-            <p className="text-sm text-text-primary" role="status">{t('settings.restoreSignInAgain')}</p>
-            <div className="ui-dialog-actions">
-              <Button type="button" autoFocus onClick={() => {
-                // Back to this tab after the sign-in: its report is shown there
-                releaseSignOut(); window.location.href = loginUrl('/settings', '?tab=backup')
-              }}
-                data-testid="restore-sign-in-button">
-                {t('settings.restoreSignIn')}
-              </Button>
-            </div>
-          </div>
-        ) : restoreJob.running ? (
-          <div className="space-y-4" data-testid="restore-job">
-            <p className="text-sm text-text-primary" role="status" data-testid="restore-job-progress">
-              {restoreJobProgress}
-            </p>
-            <p className="text-sm text-text-secondary">{t('settings.restoreRunsInBackground')}</p>
-            <div className="ui-dialog-actions">
-              <Button type="button" variant="secondary" onClick={() => setShowRestoreModal(false)}>
-                {t('common.close')}
-              </Button>
-              {/* From the commit on the server refuses the cancellation (409): none is offered */}
-              {!UNCANCELLABLE_PHASES.includes(restoreJob.job?.phase) && (
-                <Button type="button" variant="danger" onClick={handleCancelRestore}
-                  disabled={!!restoreJob.job?.cancel_requested} data-testid="restore-job-cancel">
-                  {t('settings.restoreCancel')}
-                </Button>
-              )}
-            </div>
-          </div>
-        ) : (
-        <div className="space-y-4">
-          <div className="p-3 status-warning-bg status-warning-border border rounded-lg">
-            <p className="text-sm status-warning-text font-medium">⚠️ {t('common.warning')}</p>
-            <p className="text-xs status-warning-text opacity-80">
-              {t('settings.restoreWarning')}
-            </p>
-          </div>
-          {restoreFile && (
-            <p className="text-sm text-text-primary">
-              {t('settings.file')}: <strong>{restoreFile.name}</strong>
-            </p>
-          )}
-          <Input
-            label={t('settings.backupPassword')}
-            type="password"
-            noAutofill
-            value={restorePassword}
-            onChange={(e) => setRestorePassword(e.target.value)}
-            placeholder={t('settings.enterBackupPassword')}
-            autoFocus
-          />
-          <div className="ui-dialog-actions">
-            <Button type="button" variant="secondary" onClick={() => { setShowRestoreModal(false); setRestorePassword(''); setRestoreFile(null) }}>
-              {t('common.cancel')}
-            </Button>
-            <Button 
-              variant="danger"
-              onClick={handleRestoreBackup} 
-              disabled={backupLoading || !restorePassword || restorePassword.length < 12}
-            >
-              {backupLoading
-                ? (restoreProgress !== null && restoreProgress < 100
-                  ? t('settings.restoreUploading', { percent: restoreProgress })
-                  : t('settings.restoring'))
-                : t('settings.restoreBackup')}
-            </Button>
-          </div>
-        </div>
-        )}
-      </Modal>
+      {/* Restore: the password, then the running restore, or the sign-in its end asks for */}
+      {showRestoreModal && (
+        <RestoreDialog job={restoreJob} uncancellable={UNCANCELLABLE_PHASES.includes(restoreJob.job?.phase)} progress={restoreJobProgress}
+          file={restoreFile} password={restorePassword} setPassword={setRestorePassword} loading={backupLoading}
+          uploadLabel={restoreProgress !== null && restoreProgress < 100 ? t('settings.restoreUploading', { percent: restoreProgress }) : t('settings.restoring')}
+          onClose={() => {
+            // Closed on "sign in again": every call now answers 401, which must lead to the sign-in
+            if (restoreJob.signInNeeded) releaseSignOut()
+            setShowRestoreModal(false); setRestorePassword(''); setRestoreFile(null)
+          }}
+          onCancel={() => { setShowRestoreModal(false); setRestorePassword(''); setRestoreFile(null) }}
+          onRestore={handleRestoreBackup} onCancelJob={handleCancelRestore}
+          onSignIn={() => {
+            // Back to this tab after the sign-in: its report is shown there
+            releaseSignOut(); window.location.href = loginUrl('/settings', '?tab=backup')
+          }} />
+      )}
 
       <RestoreReport data={restoreReport} onClose={() => setRestoreReport(null)} />
 

@@ -1,148 +1,85 @@
+/**
+ * Audit: the retention of the log, then the mockup's « Export du journal » (its syslog section):
+ * the switch, the server, the port and the transport (TLS is TCP with TLS on), then what the
+ * product adds (framing, certificate check, categories), and the test of the saved forwarding.
+ */
+import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { PaperPlaneTilt, CheckCircle, WarningCircle, Question } from '@phosphor-icons/react'
-import { Button, Input, Select } from '../../components'
-import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
-import { fieldBounds } from './fieldChecks'
-import { FormGroup } from '../../components/sectioned'
+import { Notice } from '../../components/atelier'
+import { Input, NumberInput, Select, ToggleSwitch, SegmentedField } from '../../components/atelier/Form'
+import { SettingsGroup, SettingsTest } from '../../components/atelier/SettingsView'
+import { useRefocusAfter } from '../../components/sectioned/useRefocus'
+import AdminLockLabel from './AdminLockLabel'
+import { shownNumber, typedNumber } from './numberFields'
+
+const CATEGORIES = [
+  ['certificate', 'settings.syslogCatCertificates'], ['ca', 'settings.syslogCatCAs'], ['csr', 'settings.syslogCatCSRs'],
+  ['user', 'settings.syslogCatUsers'], ['acme', null, 'ACME'], ['scep', null, 'SCEP'], ['system', 'settings.syslogCatSystem'],
+]
+
+// The mockup's transport: TLS, TCP or UDP; the server keeps TLS as a switch of TCP
+const transportOf = (c) => (c.protocol === 'tcp' && c.tls ? 'tls' : c.protocol || 'udp')
 
 export default function AuditSection({ settings, fieldErrors = {}, updateSetting, hasPermission, syslogConfig, updateSyslogConfig, syslogTesting, syslogTestResult, handleTestSyslog }) {
   const { t } = useTranslation()
+  const testButton = useRef(null)
+  useRefocusAfter(Boolean(syslogTesting), testButton)
   // The backend accepts a retention from admins only: shortening it deletes history.
   const canAdminSettings = Boolean(hasPermission('admin:settings'))
+  const transport = transportOf(syslogConfig)
+  const overTcp = transport !== 'udp'
+  const categories = syslogConfig.categories || []
+
+  const pickTransport = (value) => {
+    updateSyslogConfig('protocol', value === 'udp' ? 'udp' : 'tcp')
+    updateSyslogConfig('tls', value === 'tls')
+  }
+
   return (
     <>
-      <FormGroup title={t('settings.auditLogging')}>
-        <div className="space-y-4">
-          <Input
-            className="sf-short"
-            label={t('settings.logRetention')}
-            type="number"
-            value={settings.audit_retention_days ?? 0}
-            onChange={(e) => updateSetting('audit_retention_days', parseInt(e.target.value, 10) || 0)}
-            helperText={t('settings.logRetentionHelp')}
-            disabled={canAdminSettings === false}
-            {...fieldBounds('audit_retention_days')}
-            error={fieldErrors['audit_retention_days']}
-          />
-        </div>
-      </FormGroup>
-      <FormGroup title={t('settings.remoteSyslog')} description={t('settings.remoteSyslogDesc')}>
-        <div className="space-y-4">
-          <ToggleSwitch
-            checked={syslogConfig.enabled}
-            onChange={(val) => updateSyslogConfig('enabled', val)}
-            label={t('settings.enableSyslog')}
-          />
-          <Input
-            label={t('settings.syslogHost')}
-            value={syslogConfig.host}
-            onChange={(e) => updateSyslogConfig('host', e.target.value)}
-            error={fieldErrors['syslog.host']}
-            placeholder="syslog.example.com"
-          />
-          <Input
-            className="sf-short"
-            label={t('settings.syslogPort')}
-            type="number"
-            inputMode="numeric"
-            value={syslogConfig.port ?? ''}
-            onChange={(e) => updateSyslogConfig('port', e.target.value === '' ? '' : Number(e.target.value))}
-            min="1"
-            max="65535"
-            error={fieldErrors['syslog.port']}
-          />
-          <Select
-            className="sf-short"
-            label={t('settings.syslogProtocol')}
-            value={syslogConfig.protocol}
-            onChange={(value) => updateSyslogConfig('protocol', value)}
+      <SettingsGroup legend={t('settings.auditLogging')}>
+        <NumberInput id="set-audit_retention_days" label={<AdminLockLabel text={t('settings.logRetention')} locked={!canAdminSettings} mockup />}
+          value={shownNumber(settings.audit_retention_days ?? 0)} onChange={(e) => updateSetting('audit_retention_days', typedNumber(e))}
+          hint={t('settings.logRetentionHelp')} disabled={!canAdminSettings} error={fieldErrors.audit_retention_days} />
+      </SettingsGroup>
+
+      <SettingsGroup legend={t('settings.remoteSyslog')} hint={t('settings.remoteSyslogDesc')}>
+        <ToggleSwitch id="set-syslog_enabled" checked={!!syslogConfig.enabled} label={t('settings.enableSyslog')}
+          onChange={(val) => updateSyslogConfig('enabled', val)} />
+        <Input id="set-syslog_host" label={t('settings.syslogHost')} value={syslogConfig.host || ''} placeholder="syslog.example.com"
+          onChange={(e) => updateSyslogConfig('host', e.target.value)} error={fieldErrors['syslog.host']} />
+        <NumberInput id="set-syslog_port" label={t('settings.syslogPort')} value={shownNumber(syslogConfig.port)}
+          onChange={(e) => updateSyslogConfig('port', typedNumber(e))} hint={t('settings.syslogPortHint')} error={fieldErrors['syslog.port']} />
+        <Select id="set-syslog_protocol" short label={t('settings.syslogProtocol')} value={transport} onChange={pickTransport}
+          options={[
+            { value: 'tls', label: t('settings.syslogTransportTls') },
+            { value: 'tcp', label: 'TCP' },
+            { value: 'udp', label: 'UDP' },
+          ]} />
+        {overTcp && (
+          <Select id="set-syslog_framing" label={t('settings.syslogFraming')} value={syslogConfig.framing || 'line'}
+            onChange={(value) => updateSyslogConfig('framing', value)}
             options={[
-              { value: 'udp', label: 'UDP' },
-              { value: 'tcp', label: 'TCP' },
-            ]}
-          />
-          {syslogConfig.protocol === 'tcp' && (
-            <Select
-              label={t('settings.syslogFraming')}
-              value={syslogConfig.framing || 'line'}
-              onChange={(value) => updateSyslogConfig('framing', value)}
-              options={[
-                { value: 'line', label: t('settings.syslogFramingLine') },
-                { value: 'octet', label: t('settings.syslogFramingOctet') },
-              ]}
-            />
-          )}
-          {syslogConfig.protocol === 'tcp' && (
-            <div>
-              <ToggleSwitch
-                checked={syslogConfig.tls}
-                onChange={(val) => updateSyslogConfig('tls', val)}
-                label={t('settings.syslogTls')}
-              />
-              {syslogConfig.tls && (
-                <ToggleSwitch
-                  checked={syslogConfig.tls_verify ?? true}
-                  onChange={(val) => updateSyslogConfig('tls_verify', val)}
-                  label={t('settings.syslogTlsVerify')}
-                />
-              )}
-              {syslogConfig.tls && syslogConfig.tls_verify === false && (
-                <p className="ui-error">{t('settings.syslogTlsVerifyWarning')}</p>
-              )}
-            </div>
-          )}
-          <fieldset className="sf-checks">
-            <legend className="ui-label">{t('settings.syslogCategories')}</legend>
-            <p className="ui-help">{t('settings.syslogCategoriesHelp')}</p>
-            <div className="sf-checks-grid">
-              {[
-                { value: 'certificate', label: t('settings.syslogCatCertificates') },
-                { value: 'ca', label: t('settings.syslogCatCAs') },
-                { value: 'csr', label: t('settings.syslogCatCSRs') },
-                { value: 'user', label: t('settings.syslogCatUsers') },
-                { value: 'acme', label: 'ACME' },
-                { value: 'scep', label: 'SCEP' },
-                { value: 'system', label: t('settings.syslogCatSystem') },
-              ].map(cat => (
-                <label key={cat.value} className="ui-check-line">
-                  <input
-                    type="checkbox"
-                    checked={(syslogConfig.categories || []).includes(cat.value)}
-                    onChange={(e) => {
-                      const cats = syslogConfig.categories || []
-                      updateSyslogConfig('categories', e.target.checked
-                        ? [...cats, cat.value]
-                        : cats.filter(c => c !== cat.value)
-                      )
-                    }}
-                  />
-                  {cat.label}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        </div>
-        {/* Test of the saved forwarding: the button stays, its result on the same line */}
-        {hasPermission('admin:system') && (
-          <div className="sf-test sf-under-group">
-            <Button type="button" variant="secondary" onClick={handleTestSyslog} loading={syslogTesting}>
-              <PaperPlaneTilt size={16} />
-              {t('settings.syslogTest')}
-            </Button>
-            {syslogTestResult ? (
-              <p className={`sf-test-result ${syslogTestResult.ok ? 'is-good' : 'is-bad'}`} role="status">
-                {syslogTestResult.ok ? <CheckCircle aria-hidden="true" /> : <WarningCircle aria-hidden="true" />}
-                <span>{syslogTestResult.text}</span>
-              </p>
-            ) : (
-              <p className="sf-test-result">
-                <Question aria-hidden="true" />
-                <span>{t('settings.syslogTestSavedHint')}</span>
-              </p>
-            )}
-          </div>
+              { value: 'line', label: t('settings.syslogFramingLine') },
+              { value: 'octet', label: t('settings.syslogFramingOctet') },
+            ]} />
         )}
-      </FormGroup>
+        {transport === 'tls' && (
+          <ToggleSwitch id="set-syslog_tls_verify" checked={syslogConfig.tls_verify ?? true} label={t('settings.syslogTlsVerify')}
+            onChange={(val) => updateSyslogConfig('tls_verify', val)} />
+        )}
+        {transport === 'tls' && syslogConfig.tls_verify === false && <Notice tone="bad">{t('settings.syslogTlsVerifyWarning')}</Notice>}
+        <SegmentedField id="set-syslog_categories" label={t('settings.syslogCategories')} hint={t('settings.syslogCategoriesHelp')}
+          options={CATEGORIES.map(([value, key, name]) => ({ value, label: key ? t(key) : name }))}
+          pressed={(value) => categories.includes(value)}
+          onPick={(value) => updateSyslogConfig('categories', categories.includes(value) ? categories.filter((c) => c !== value) : [...categories, value])} />
+      </SettingsGroup>
+
+      {/* Test of the saved forwarding, last in the frame as in the mockup: the button and its result */}
+      {hasPermission('admin:system') && (
+        <SettingsTest id="syslog" label={t('settings.syslogTest')} onTest={handleTestSyslog} busy={Boolean(syslogTesting)} buttonRef={testButton}
+          result={syslogTestResult ? { ok: syslogTestResult.ok, text: syslogTestResult.text } : null} hint={t('settings.syslogTestSavedHint')} />
+      )}
     </>
   )
 }

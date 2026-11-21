@@ -1,4 +1,4 @@
-import { UpdateChecker } from '../../components'
+import { UpdateChecker } from '../../components/UpdateChecker'
 import AutoUpdateSettings from './AutoUpdateSettings'
 
 export default function UpdatesSection() {

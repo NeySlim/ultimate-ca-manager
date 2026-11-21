@@ -1207,7 +1207,7 @@ export const helpContent = {
         items: [
           { label: "Tasks", text: "Expiry checks, CRL refresh, webhook delivery, scheduled backups, auto-renewal, etc." },
           { label: "Run now", text: "Trigger any task on demand" },
-          { label: "Visibility", text: "Last run, last duration and failure count per task" },
+          { label: "Visibility", text: "State in words (succeeded, failed, skipped), last run, last duration and run count per task; on a phone each task is a card with its Run now button" },
           { label: 'Scheduler process (v2.251)', text: 'The tasks run in a scheduler process of their own, started with the service and restarted within seconds after a crash or a reload, so a long task delays neither requests nor workers. It takes about 150 MB of memory' },
           { label: 'Stale status (v2.251)', text: 'When the scheduler process has not reported for a while, the tab warns that the status shown may be out of date' },
           { label: 'Long tasks (v2.251)', text: 'Run now waits up to 30 seconds for the result. A task still running then is reported as started and still running, and its result shows on a later refresh' },
@@ -1217,7 +1217,7 @@ export const helpContent = {
         title: "Scheduled backups",
         content: "Automatic, encrypted database backups on a configurable cadence with retention.",
         items: [
-          { label: "Cadence", text: "Daily / weekly / monthly" },
+          { label: "Cadence", text: "Daily / weekly / monthly, or Off (not recommended), which stops the scheduled backups" },
           { label: "Retention", text: "Backups older than the set number of days (30 by default) are pruned" },
           { label: "Size ceiling", text: "A ceiling in MB for all archives (0 for none): the oldest are removed, each audited, until the total fits. Retention never removes, on a single node, the newest archive that matches its validation record, up to 2 archives with no validation record and the minimum kept, and in HA the minimum kept: the total can stay above the ceiling, which is reported. A manual backup removes nothing. Settings > Backup shows the space used" },
           { label: "Encryption", text: "Backups are encrypted with the configured backup password" },

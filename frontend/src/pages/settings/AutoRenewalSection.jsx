@@ -4,13 +4,11 @@
  */
 import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowsClockwise, Lightning, CheckCircle, WarningCircle, Question } from '@phosphor-icons/react'
-import { Button, Input } from '../../components'
-import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
-import TagsInput from '../../components/ui/TagsInput'
-import { FormGroup } from '../../components/sectioned'
+import { SkeletonPanel } from '../../components/atelier'
+import { NumberInput, ToggleSwitch, SegmentedField, ListInput } from '../../components/atelier/Form'
+import { SettingsGroup, SettingsTest } from '../../components/atelier/SettingsView'
 import { useRefocusAfter } from '../../components/sectioned/useRefocus'
-import { fieldBounds } from './fieldChecks'
+import { shownNumber, typedNumber } from './numberFields'
 
 const SOURCES = ['manual', 'scep', 'acme', 'est']
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -40,100 +38,37 @@ export default function AutoRenewalSection({
     })
   }
 
-  if (arLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="w-6 h-6 border-2 border-accent-primary-op30 border-t-accent-primary rounded-full animate-spin" />
-      </div>
-    )
-  }
+  if (arLoading) return <SkeletonPanel label={t('common.loading')} />
 
   return (
     <>
-      <FormGroup title={t('settings.autoRenewal')}>
-        <div className="space-y-4">
-          <ToggleSwitch
-            label={t('settings.autoRenewalEnabled')}
-            description={t('settings.autoRenewalEnabledDesc')}
-            checked={arSettings.enabled}
-            onChange={(val) => setArSettings((prev) => ({ ...prev, enabled: val }))}
-          />
-          <Input
-            className="sf-short"
-            label={t('settings.autoRenewalDays')}
-            type="number"
-            inputMode="numeric"
-            {...fieldBounds('ar.days_before_expiry')}
-            error={fieldErrors['ar.days_before_expiry']}
-            value={arSettings.days_before_expiry}
-            onChange={(e) => setArSettings((prev) => ({ ...prev, days_before_expiry: e.target.value === '' ? '' : parseInt(e.target.value, 10) }))}
-            helperText={t('settings.autoRenewalDaysHelp')}
-          />
-          <div className="ui-field">
-            <span className="ui-label" id="ar-sources">{t('settings.autoRenewalSources')}</span>
-            <div className="ui-segmented" role="group" aria-labelledby="ar-sources">
-              {SOURCES.map((src) => (
-                <button
-                  key={src}
-                  type="button"
-                  aria-pressed={arSettings.renewal_sources.includes(src)}
-                  onClick={() => toggleSource(src)}
-                >
-                  {t(`settings.autoRenewalSource_${src}`)}
-                </button>
-              ))}
-            </div>
-            <p className="ui-help">{t('settings.autoRenewalSourcesHelp')}</p>
-          </div>
-        </div>
-      </FormGroup>
+      <SettingsGroup legend={t('settings.autoRenewal')}>
+        <ToggleSwitch id="set-ar_enabled" label={t('settings.autoRenewalEnabled')} description={t('settings.autoRenewalEnabledDesc')}
+          checked={arSettings.enabled} onChange={(val) => setArSettings((prev) => ({ ...prev, enabled: val }))} />
+        <NumberInput id="set-ar_days_before_expiry" label={t('settings.autoRenewalDays')} hint={t('settings.autoRenewalDaysHelp')}
+          error={fieldErrors['ar.days_before_expiry']} value={shownNumber(arSettings.days_before_expiry)}
+          onChange={(e) => setArSettings((prev) => ({ ...prev, days_before_expiry: typedNumber(e) }))} />
+        <SegmentedField id="set-ar_sources" label={t('settings.autoRenewalSources')} hint={t('settings.autoRenewalSourcesHelp')}
+          options={SOURCES.map((src) => ({ value: src, label: t(`settings.autoRenewalSource_${src}`) }))}
+          pressed={(src) => arSettings.renewal_sources.includes(src)} onPick={toggleSource} />
+      </SettingsGroup>
 
-      <FormGroup title={t('settings.autoRenewalNotifications')}>
-        <div className="space-y-4">
-          <ToggleSwitch
-            label={t('settings.autoRenewalNotifyOnRenewal')}
-            checked={arSettings.notify_on_renewal}
-            onChange={(val) => setArSettings((prev) => ({ ...prev, notify_on_renewal: val }))}
-          />
-          <ToggleSwitch
-            label={t('settings.autoRenewalNotifyOnFailure')}
-            checked={arSettings.notify_on_failure}
-            onChange={(val) => setArSettings((prev) => ({ ...prev, notify_on_failure: val }))}
-          />
-          <TagsInput
-            label={t('settings.autoRenewalNotifyEmails')}
-            value={arSettings.notify_emails || []}
-            onChange={(tags) => setArSettings((prev) => ({ ...prev, notify_emails: tags }))}
-            placeholder="ops@example.com"
-            helperText={t('settings.autoRenewalNotifyEmailsHelp')}
-            validate={(v) => EMAIL.test(v)}
-          />
-        </div>
-        <div className="sf-test sf-under-group">
-          <Button
-            ref={runRef}
-            type="button"
-            variant="secondary"
-            onClick={handleArRunNow}
-            disabled={arRunning || !arSettings.enabled}
-            data-write
-          >
-            {arRunning ? <ArrowsClockwise size={14} className="animate-spin" /> : <Lightning size={14} />}
-            {t('settings.autoRenewalRunNow')}
-          </Button>
-          {arRunResult ? (
-            <p className={`sf-test-result ${arRunResult.ok ? 'is-good' : 'is-bad'}`} role="status">
-              {arRunResult.ok ? <CheckCircle aria-hidden="true" /> : <WarningCircle aria-hidden="true" />}
-              <span>{arRunResult.text}</span>
-            </p>
-          ) : (
-            <p className="sf-test-result">
-              <Question aria-hidden="true" />
-              <span>{arSettings.enabled ? t('settings.autoRenewalRunHint') : t('settings.autoRenewalRunDisabled')}</span>
-            </p>
-          )}
-        </div>
-      </FormGroup>
+      <SettingsGroup legend={t('settings.autoRenewalNotifications')}>
+        <ToggleSwitch id="set-ar_notify_on_renewal" label={t('settings.autoRenewalNotifyOnRenewal')} checked={arSettings.notify_on_renewal}
+          onChange={(val) => setArSettings((prev) => ({ ...prev, notify_on_renewal: val }))} />
+        <ToggleSwitch id="set-ar_notify_on_failure" label={t('settings.autoRenewalNotifyOnFailure')} checked={arSettings.notify_on_failure}
+          onChange={(val) => setArSettings((prev) => ({ ...prev, notify_on_failure: val }))} />
+        <ListInput id="set-ar_notify_emails" full label={t('settings.autoRenewalNotifyEmails')} value={arSettings.notify_emails || []}
+          onChange={(list) => setArSettings((prev) => ({ ...prev, notify_emails: list }))} validate={(v) => EMAIL.test(v)}
+          invalidMessage={(bad) => t('settings.alertRecipientsInvalid', { list: bad.join(', ') })}
+          placeholder="ops@example.com" hint={t('settings.autoRenewalNotifyEmailsHelp')} />
+      </SettingsGroup>
+
+      {/* Run now as the mockup's test zone, last in the frame: the button, then its result on the line */}
+      <SettingsTest id="autoRenewal" label={t('settings.autoRenewalRunNow')} icon="refresh" onTest={handleArRunNow}
+        busy={Boolean(arRunning) || !arSettings.enabled} buttonRef={runRef}
+        result={arRunResult ? { ok: arRunResult.ok, text: arRunResult.text } : null}
+        hint={arSettings.enabled ? t('settings.autoRenewalRunHint') : t('settings.autoRenewalRunDisabled')} />
     </>
   )
 }

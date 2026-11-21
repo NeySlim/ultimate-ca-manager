@@ -78,9 +78,9 @@ describe('SettingsPage: backup job', () => {
     expect(await screen.findByText('settings.backupProgress')).toBeTruthy()
     expect(screen.getByTestId('backup-job-cancel')).toBeTruthy()
     // Its buttons sit in the mockup's dialog actions row (rule above, 36 px buttons)
-    expect(screen.getByTestId('backup-job-cancel').parentElement).toHaveClass('ui-dialog-actions')
+    expect(screen.getByTestId('backup-job-cancel').parentElement).toHaveClass('modal-actions')
     const download = await screen.findByTestId('backup-ready-download', {}, { timeout: 3000 })
-    expect(download.parentElement).toHaveClass('ui-dialog-actions')
+    expect(download.parentElement).toHaveClass('modal-actions')
     expect(systemService.downloadBackup).not.toHaveBeenCalled()
     // Nothing is downloaded yet: the notice says where the archive is, not that it was downloaded
     expect(notificationSpies.showSuccess).toHaveBeenCalledWith('messages.success.backup.ready')

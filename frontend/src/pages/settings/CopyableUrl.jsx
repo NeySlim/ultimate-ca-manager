@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Copy } from '@phosphor-icons/react'
-import { Button } from '../../components'
+import { IconBtn, RecordList, RecordRow } from '../../components/atelier'
 import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks/useClipboard'
 
@@ -15,17 +14,10 @@ export default function CopyableUrl({ label, value, description }) {
     if (await copy(value)) showInfo(t('common.copiedToClipboard'))
   }
   return (
-    <div className="sf-copy">
-      <div className="sf-record-main">
-        <strong>{label}</strong>
-        <span className="sf-copy-value">{value}</span>
-        {description && <span className="sf-record-meta">{description}</span>}
-      </div>
-      <div className="sf-record-actions">
-        <Button variant="secondary" onClick={handleCopy} type="button" title={t('common.copy')} aria-label={t('common.copy')}>
-          <Copy size={16} />
-        </Button>
-      </div>
-    </div>
+    <RecordList>
+      <RecordRow title={label} meta={<span className="mono">{value}</span>}
+        extra={description && <span className="rl-meta">{description}</span>}
+        action={<IconBtn icon="copy" label={t('common.copy')} onClick={handleCopy} />} />
+    </RecordList>
   )
 }

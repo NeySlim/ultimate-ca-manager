@@ -3,83 +3,64 @@
  * choices, the desktop layout as a check line, the language, and what is in force.
  */
 import { useTranslation } from 'react-i18next'
-import { Desktop, Sun, Moon, Info } from '@phosphor-icons/react'
-
-import LanguageSelector from '../../components/ui/LanguageSelector'
-import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
+import { Props } from '../../components/atelier'
+import { Select, ToggleSwitch, SegmentedField } from '../../components/atelier/Form'
+import { SettingsGroup } from '../../components/atelier/SettingsView'
+import { chooseLanguage } from '../../lib/chooseLanguage'
+import { languages } from '../../i18n'
 import { useMobile } from '../../contexts'
 import { useTheme } from '../../contexts/ThemeContext'
-import { FormGroup } from '../../components/sectioned'
 
 export default function AppearanceSettings() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
   const { forceDesktop, setForceDesktop, screenWidth, breakpoints } = useMobile()
 
   const modeOptions = [
-    { id: 'system', label: t('settings.followSystem'), icon: Desktop, description: t('settings.followSystemDesc') },
-    { id: 'light', label: t('settings.light'), icon: Sun, description: t('settings.lightDesc') },
-    { id: 'dark', label: t('settings.dark'), icon: Moon, description: t('settings.darkDesc') },
+    { value: 'system', label: t('settings.followSystem'), description: t('settings.followSystemDesc') },
+    { value: 'light', label: t('settings.light'), description: t('settings.lightDesc') },
+    { value: 'dark', label: t('settings.dark'), description: t('settings.darkDesc') },
   ]
-  const currentMode = modeOptions.find((o) => o.id === mode)
+  const currentMode = modeOptions.find((o) => o.value === mode)
+  const family = themes.find((th) => th.id === themeFamily)
 
   return (
     <>
-      <FormGroup title={t('settings.colorTheme')} description={t('settings.colorThemeDesc')}>
-        <div className="ui-segmented" role="group" aria-label={t('settings.colorTheme')}>
-          {themes.map((theme) => (
-            <button key={theme.id} type="button" aria-pressed={themeFamily === theme.id} onClick={() => setThemeFamily(theme.id)}>
-              <span className="sf-swatch" style={{ background: theme.accent }} aria-hidden="true" />
-              {t(theme.nameKey)}
-            </button>
-          ))}
-        </div>
-      </FormGroup>
+      <SettingsGroup legend={t('settings.theme')} hint={t('settings.colorThemeDesc')}>
+        {/* The theme's own accent is a value of the theme, shown as its swatch */}
+        <SegmentedField id="set-theme_family" label={t('settings.colorTheme')}
+          options={themes.map((theme) => ({
+            value: theme.id,
+            label: <><span className="swatch" style={{ background: theme.accent }} aria-hidden="true" />{t(theme.nameKey)}</>,
+          }))}
+          pressed={(id) => themeFamily === id} onPick={setThemeFamily} />
+        <SegmentedField id="set-theme_mode" label={t('settings.appearanceMode')} hint={currentMode?.description}
+          options={modeOptions} pressed={(value) => mode === value} onPick={setMode} />
+      </SettingsGroup>
 
-      <FormGroup title={t('settings.appearanceMode')} description={t('settings.appearanceModeDesc')}>
-        <div className="ui-segmented" role="group" aria-label={t('settings.appearanceMode')}>
-          {modeOptions.map((opt) => {
-            const Icon = opt.icon
-            return (
-              <button key={opt.id} type="button" aria-pressed={mode === opt.id} onClick={() => setMode(opt.id)}>
-                <Icon size={14} aria-hidden="true" />
-                {opt.label}
-              </button>
-            )
-          })}
-        </div>
-        {currentMode && <p className="sf-hint sf-under">{currentMode.description}</p>}
-      </FormGroup>
-
-      <FormGroup title={t('settings.layoutMode')} description={t('settings.layoutModeDesc')}>
-        <ToggleSwitch
-          checked={forceDesktop}
-          onChange={(on) => setForceDesktop(on)}
-          label={t('settings.forceDesktopLayout')}
+      <SettingsGroup legend={t('settings.layoutMode')} hint={t('settings.layoutModeDesc')}>
+        <ToggleSwitch id="set-force_desktop" checked={forceDesktop} onChange={(on) => setForceDesktop(on)} label={t('settings.forceDesktopLayout')}
           description={forceDesktop
             ? t('settings.desktopLayoutEnabled')
-            : t('settings.mobileLayoutActivates', { breakpoint: breakpoints.lg, current: screenWidth })}
-        />
-      </FormGroup>
+            : t('settings.mobileLayoutActivates', { breakpoint: breakpoints.lg, current: screenWidth })} />
+      </SettingsGroup>
 
-      <FormGroup title={t('settings.language')} description={t('settings.languageDesc')}>
-        <div className="sf-grid"><LanguageSelector /></div>
-      </FormGroup>
+      <SettingsGroup legend={t('settings.language')} hint={t('settings.languageDesc')}>
+        <Select id="set-language" label={t('settings.language')} value={i18n.language?.split('-')[0] || 'en'}
+          onChange={(code) => chooseLanguage(i18n, code)} options={languages.map((lang) => ({ value: lang.code, label: lang.name }))} />
+      </SettingsGroup>
 
-      <FormGroup title={t('settings.preview')}>
-        <dl className="sf-props">
-          <dt>{t('settings.currentSettings')}</dt>
-          <dd>
-            {t(themes.find((th) => th.id === themeFamily)?.nameKey)}
+      <SettingsGroup legend={t('settings.preview')} grid={false}>
+        <Props items={[[t('settings.currentSettings'), (
+          <>
+            {t(family?.nameKey)}
             {' · '}
             {mode === 'system' ? t('settings.followingSystemPreference') : mode === 'dark' ? t('settings.darkMode') : t('settings.lightMode')}
             {forceDesktop && <>{' · '}{t('settings.desktopForced')}</>}
-          </dd>
-        </dl>
-        {forceDesktop && (
-          <p className="sf-hint sf-under"><Info size={12} aria-hidden="true" /> {t('settings.settingSavedInBrowser')}</p>
-        )}
-      </FormGroup>
+          </>
+        )]]} />
+        {forceDesktop && <p className="group-hint">{t('settings.settingSavedInBrowser')}</p>}
+      </SettingsGroup>
     </>
   )
 }

@@ -216,7 +216,10 @@ export function MobileRecord({ row, id, name, card, selection, checked, opened, 
             <input type="checkbox" data-select={id} aria-label={t('table.selectRow', { name })} checked={checked} onChange={() => selection.onToggle(id)} />
           </label>
         )}
-        <button type="button" className="entity-name" data-open={id} disabled={locked || undefined} onClick={() => onOpen?.(row)}>{card.title ?? name}</button>
+        {/* A record with nothing to open (a task, an archive) names itself without a button */}
+        {onOpen
+          ? <button type="button" className="entity-name" data-open={id} disabled={locked || undefined} onClick={() => onOpen(row)}>{card.title ?? name}</button>
+          : <strong className="entity-name">{card.title ?? name}</strong>}
         {onOpen && (
           <button type="button" className="icon-btn quiet" data-open={id} aria-label={chevronLabel} disabled={locked || undefined} onClick={() => onOpen(row)}>
             <Icon name="right" />
