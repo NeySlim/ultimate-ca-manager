@@ -19,17 +19,7 @@ beforeAll(() => {
 // NotificationContext Tests
 // ════════════════════════════════════════════════════════════════════
 
-// Must mock Radix UI Toast/Dialog before import
-vi.mock('@radix-ui/react-toast', () => ({
-  Provider: ({ children }) => <div>{children}</div>,
-  Root: ({ children }) => <div>{children}</div>,
-  Title: ({ children }) => <div>{children}</div>,
-  Description: ({ children }) => <div>{children}</div>,
-  Action: ({ children }) => <div>{children}</div>,
-  Close: ({ children }) => <div>{children}</div>,
-  Viewport: () => null,
-}))
-
+// Must mock Radix UI Dialog before import
 vi.mock('@radix-ui/react-dialog', () => ({
   Root: ({ children, open }) => open ? <div>{children}</div> : null,
   Trigger: ({ children }) => <div>{children}</div>,
