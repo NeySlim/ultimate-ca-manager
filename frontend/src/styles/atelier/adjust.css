@@ -29,3 +29,18 @@
 :root .atl .toolbar.folded .search{flex-basis:100%}
 :root .atl .toolbar.folded .search-status{min-width:0}
 :root .atl .toolbar.folded .search-status:empty{display:none}
+
+/* The bar's links read larger from 1000 px (13 px, 14 px from 1200 px); the bar's height and their own do not change. */
+@media(min-width:1000px){:root .atl .main-nav>:is(a,button){font-size:13px}}
+@media(min-width:1200px){:root .atl .main-nav>:is(a,button){font-size:14px}}
+/* The bar never grows past the window and its tools never give way: the links take what is left. */
+@media(min-width:801px){:root .atl .masthead{min-width:0}:root .atl .masthead .global-tools{flex-shrink:0}:root .atl .main-nav{min-width:0}}
+/* Short of room (shell/useNavRoom.js) the links' side padding tightens, the underline with it; */
+:root .atl .main-nav[style*="--nav-pad"]>:is(a,button){padding-left:var(--nav-pad);padding-right:var(--nav-pad)}
+:root .atl .main-nav[style*="--nav-pad"] .active:after{left:var(--nav-pad);right:var(--nav-pad)}
+/* then the pinned labels end in an ellipsis, then the pinned links fold away into the Modules menu. */
+:root .atl .main-nav>.pinned-link,:root .atl .main-nav .pin-label{min-width:0}
+:root .atl .main-nav[data-room=fold]>.pinned-link{display:none}
+/* While useNavRoom measures, every link takes its natural width. */
+:root .atl .main-nav[data-room=measure]>*{flex-shrink:0}
+
