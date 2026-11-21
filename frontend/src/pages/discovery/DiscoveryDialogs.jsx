@@ -108,7 +108,7 @@ export function ScanDialog({ quick = false, profile, busy, onSubmit, onClose, re
           </div>
           <div className="field">
             <label htmlFor="scan-ports">{t('discovery.ports')}</label>
-            <input id="scan-ports" className="mono" value={f.ports} spellCheck={false}
+            <input id="scan-ports" value={f.ports} spellCheck={false}
               aria-invalid={errs.ports ? true : undefined} aria-describedby={described('scan-ports', errs.ports)}
               onChange={(e) => set('ports', e.target.value)} />
             {error('scan-ports', errs.ports)}
