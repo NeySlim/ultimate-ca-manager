@@ -7,24 +7,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('../../../hooks/useClipboard', () => ({
   useClipboard: () => ({ copy: vi.fn(), isCopied: () => false }),
 }))
-vi.mock('../../../components/ui/ToggleSwitch', () => ({
-  ToggleSwitch: ({ label }) => <span>{label}</span>,
-}))
-
-vi.mock('../../../components', async () => ({
-  Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-  Input: ({ label }) => <label>{label}</label>,
-  Select: () => <select />,
-  FileUpload: (await import('../../../components/FileUpload')).FileUpload,
-  Badge: ({ children }) => <span>{children}</span>,
-  DetailHeader: ({ title }) => <header>{title}</header>,
-  DetailSection: ({ title, children }) => <section><h2>{title}</h2>{children}</section>,
-  DetailContent: ({ children }) => <div>{children}</div>,
-}))
-
-// The real FileUpload and its siblings: the point is what the picker does with a file.
 import BackupSection from '../BackupSection'
-import { FileUpload } from '../../../components/FileUpload'
 
 const MIB = 1024 * 1024
 const fakeFile = (mib) => {
@@ -112,15 +95,5 @@ describe('restore picker applies the ceiling of the archive format', () => {
     const file = archive(100, V3)
     pick(container, file)
     await waitFor(() => expect(setRestoreFile).toHaveBeenCalledWith(file))
-  })
-})
-
-describe('other uploads keep the 10 MiB default', () => {
-  it('refuses 11 MiB', () => {
-    const onFileSelect = vi.fn()
-    const { container } = render(<FileUpload onFileSelect={onFileSelect} />)
-    pick(container, fakeFile(11))
-    expect(onFileSelect).not.toHaveBeenCalled()
-    expect(screen.getByText('File size exceeds 10MB')).toBeTruthy()
   })
 })

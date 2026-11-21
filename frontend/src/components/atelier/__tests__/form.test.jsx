@@ -12,7 +12,7 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k) => k }) }))
 
 describe('fields', () => {
   it('draws an input as the mockup field: label, hint, error, place', () => {
-    const { container } = render(<Input label="Nom" helperText="Affiché partout" error="Requis" className="sf-short" value="" onChange={() => {}} />)
+    const { container } = render(<Input label="Nom" helperText="Affiché partout" error="Requis" short value="" onChange={() => {}} />)
     const box = screen.getByLabelText('Nom')
     const field = container.querySelector('.field')
     expect(field).toHaveClass('short')

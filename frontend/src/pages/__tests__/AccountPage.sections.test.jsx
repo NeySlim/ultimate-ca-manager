@@ -75,7 +75,7 @@ vi.mock('../../components', async (orig) => ({
 
 import AccountPage from '../AccountPage'
 import { accountService } from '../../services'
-import { dropAllDrafts } from '../../components/sectioned/draftMemory'
+import { dropAllDrafts } from '../../lib/draftMemory'
 
 beforeAll(() => {
   global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }

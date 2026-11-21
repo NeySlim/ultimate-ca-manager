@@ -1,6 +1,6 @@
 /**
  * The pieces a settings page composes (settingsView() split): a column that is not a form when the
- * sections hold their own, a frame that keeps a section the product still draws under .atl-out, a
+ * sections hold their own, a frame drawn under the mockup rules, a
  * group with its sentence, a test with its outcome announced, a save bar outside any form, a table
  * of contents that links to a page address, and the quiet focus of a link landing.
  */
@@ -35,12 +35,8 @@ describe('settings layout', () => {
 })
 
 describe('settings frame and group', () => {
-  it('keeps a section the product still draws under .atl-out, a converted one under the mockup rules', () => {
-    render(<>
-      <SettingsFrame id="backup" label="Sauvegarde" legacy><p>old</p></SettingsFrame>
-      <SettingsFrame id="general" label="Général" desc="Identité." aside={<span data-testid="aside" />} error="Refusé"><p>new</p></SettingsFrame>
-    </>)
-    expect(screen.getByText('old').parentElement).toHaveClass('settings-body', 'atl-out', 'sf-body')
+  it('draws a section body under the mockup rules, its state and refusal in the heading', () => {
+    render(<SettingsFrame id="general" label="Général" desc="Identité." aside={<span data-testid="aside" />} error="Refusé"><p>new</p></SettingsFrame>)
     expect(screen.getByText('new').parentElement).toHaveClass('settings-body')
     expect(screen.getByText('new').parentElement).not.toHaveClass('atl-out')
     const general = document.getElementById('set-sec-general')

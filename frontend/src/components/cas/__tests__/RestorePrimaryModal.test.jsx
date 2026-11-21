@@ -8,7 +8,6 @@ vi.mock('../../../contexts', () => ({
   useNotification: () => ({ showSuccess: mocks.showSuccess, showError: mocks.showError, showWarning: mocks.showWarning }),
 }))
 vi.mock('../../../services', () => ({ casService: { restorePrimary: mocks.restorePrimary } }))
-vi.mock('../../Modal', () => ({ Modal: ({ open, children }) => (open ? <div role="dialog">{children}</div> : null) }))
 
 import { RestorePrimaryModal } from '../RestorePrimaryModal'
 

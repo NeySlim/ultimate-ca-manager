@@ -51,7 +51,6 @@ vi.mock('../../services', () => ({
 }))
 
 import SSHCAsPage from '../SSHCAsPage'
-import { HsmBadge } from '../cas/CAListUtils'
 
 // A PIV card as the HSM page would list it: a signing key per slot
 const CARD_KEYS = [
@@ -185,16 +184,5 @@ describe('SSHCAsPage SSH CA on HSM', () => {
     expect([...form.querySelectorAll('input[type="radio"]')].every(r => r.disabled)).toBe(true)
     expect(getProviders).not.toHaveBeenCalled()
     expect(getSigningKeys).not.toHaveBeenCalled()
-  })
-})
-
-describe('the HSM badge an SSH CA and an X.509 CA share', () => {
-  it('marks both, and nothing for a software CA', () => {
-    const translate = (key) => key
-    expect(render(<HsmBadge ca={{ key_source: 'hsm', hsm_key_label: 'piv-sign' }} t={translate} />)
-      .container.textContent).toBe('HSM')
-    expect(render(<HsmBadge ca={{ uses_hsm: true, hsm_key_label: 'ca-key' }} t={translate} />)
-      .container.textContent).toBe('HSM')
-    expect(render(<HsmBadge ca={{ key_source: 'software' }} t={translate} />).container).toBeEmptyDOMElement()
   })
 })

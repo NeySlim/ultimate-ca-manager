@@ -21,7 +21,6 @@ vi.mock('../index', () => ({
   Button: ({ children, loading: _loading, ...props }) => <button {...props}>{children}</button>,
   CompactSection: ({ children }) => <section>{children}</section>,
 }))
-vi.mock('../Modal', () => ({ Modal: ({ open, children }) => open ? <div role="dialog">{children}</div> : null }))
 
 import { CRLDeploySection } from '../CRLDeploySection'
 

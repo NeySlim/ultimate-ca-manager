@@ -30,9 +30,6 @@ vi.mock('../../contexts', () => ({
   useMobile: () => ({ isMobile: false, isTablet: false, isDesktop: true }),
 }))
 vi.mock('../../hooks', () => ({ useClipboard: () => ({ copy: vi.fn() }) }))
-vi.mock('../../components/ui/responsive', () => ({
-  ResponsiveLayout: ({ children }) => <div>{children}</div>,
-}))
 
 // Radix Select renders its items in a portal; a native <select> exposes the same options
 vi.mock('../../components/Select', () => ({

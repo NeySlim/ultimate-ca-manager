@@ -35,12 +35,6 @@ vi.mock('../../../components', () => ({
   EmptyState: ({ title }) => <p>{title}</p>,
   HelpCard: ({ children }) => <aside>{children}</aside>,
 }))
-vi.mock('../../../components/ui/ToggleSwitch', () => ({
-  ToggleSwitch: ({ label, checked, onChange, disabled }) => (
-    <label>{label}<input type="checkbox" checked={checked} disabled={disabled}
-                         onChange={(e) => onChange(e.target.checked)} /></label>
-  ),
-}))
 
 import ScepProfileForm from '../ScepProfileForm'
 

@@ -10,7 +10,6 @@ vi.mock('../../../contexts/NotificationContext', () => ({
 vi.mock('../../../services', () => ({
   casService: { confirmParent: mocks.confirmParent, withdrawParent: mocks.withdrawParent },
 }))
-vi.mock('../../Modal', () => ({ Modal: ({ open, children }) => (open ? <div role="dialog">{children}</div> : null) }))
 
 import { ParentConfirmationSection } from '../ParentConfirmationSection'
 

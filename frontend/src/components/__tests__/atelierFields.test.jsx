@@ -9,35 +9,10 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key) => key }),
 }))
 
-import { Input } from '../Input'
 import { Textarea } from '../Textarea'
 import { SelectComponent } from '../Select'
-import { Select as UiSelect } from '../ui/Select'
 
 describe('Atelier fields', () => {
-  it('Input: the error is at the field, linked to it, and replaces the hint', () => {
-    render(<Input label="Port" helperText="1 to 65535." error="Port out of range." />)
-    const input = screen.getByLabelText('Port')
-    expect(input).toHaveAttribute('aria-invalid', 'true')
-    const message = screen.getByText('Port out of range.')
-    expect(message.className).toContain('ui-error')
-    expect(input.getAttribute('aria-describedby')).toContain(message.id)
-    expect(screen.queryByText('1 to 65535.')).not.toBeInTheDocument()
-  })
-
-  it('Input: the hint is linked to the control when there is no error', () => {
-    render(<Input label="Port" helperText="1 to 65535." />)
-    const input = screen.getByLabelText('Port')
-    expect(input).not.toHaveAttribute('aria-invalid')
-    expect(input.className).toContain('ui-control')
-    expect(input.getAttribute('aria-describedby')).toBe(screen.getByText('1 to 65535.').id)
-  })
-
-  it('Input: the reveal button of a typed password has an accessible name', () => {
-    render(<Input label="Password" type="password" value="secret" onChange={() => {}} />)
-    expect(screen.getByRole('button', { name: 'auth.page.showPassword' })).toBeInTheDocument()
-  })
-
   it('Textarea: same field, error linked', () => {
     render(<Textarea label="Reason" error="Required for a refusal." />)
     const area = screen.getByLabelText('Reason')
@@ -51,13 +26,5 @@ describe('Atelier fields', () => {
     const trigger = screen.getByRole('combobox')
     expect(trigger.className).toContain('ui-select-trigger')
     expect(trigger).toHaveAttribute('aria-invalid', 'true')
-  })
-
-  it('ui/Select: only the form variant takes the field geometry, filters keep theirs', () => {
-    const { unmount } = render(<UiSelect label="Kind" options={[{ value: 'a', label: 'A' }]} />)
-    expect(screen.getByRole('combobox').className).toContain('ui-select-trigger')
-    unmount()
-    render(<UiSelect variant="filter" options={[{ value: 'a', label: 'A' }]} />)
-    expect(screen.getByRole('combobox').className).not.toContain('ui-select-trigger')
   })
 })

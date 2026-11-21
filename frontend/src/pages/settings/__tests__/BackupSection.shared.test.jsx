@@ -21,9 +21,6 @@ vi.mock('../../../hooks/useClipboard', () => ({
   useClipboard: () => ({ copy, isCopied: () => false }),
 }))
 
-vi.mock('../../../components/ui/ToggleSwitch', () => ({
-  ToggleSwitch: ({ label }) => <span>{label}</span>,
-}))
 
 import BackupSection from '../BackupSection'
 

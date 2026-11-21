@@ -13,9 +13,6 @@ const { showSuccess, showError, showWarning, uploadCertificate, importCa } = vi.
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key) => key }) }))
 vi.mock('../../../contexts', () => ({ useNotification: () => ({ showSuccess, showError, showWarning }) }))
 vi.mock('../../../services', () => ({ casService: { uploadCertificate, import: importCa } }))
-vi.mock('../../../components/Modal', () => ({
-  Modal: ({ open, title, children }) => (open ? <div>{title}{children}</div> : null),
-}))
 
 const PEM = '-----BEGIN CERTIFICATE-----\nAA\n-----END CERTIFICATE-----'
 // The 409 body the backend sends (problem+json with the legacy keys)

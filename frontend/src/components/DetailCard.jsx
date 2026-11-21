@@ -506,7 +506,6 @@ export function CompactField({
   copyable,
   hint,
   className,
-  colSpan,
   children
 }) {
   const { copy, isCopied } = useClipboard()
@@ -534,7 +533,6 @@ export function CompactField({
       <div className={cn(
         "flex items-start gap-2 group p-1.5 -m-1.5 rounded-md transition-colors duration-150",
         "hover:bg-tertiary-op30",
-        colSpan && `col-span-${colSpan}`,
         className
       )}>
         <Icon size={14} className="text-text-tertiary shrink-0 mt-0.5" aria-hidden="true" />
@@ -566,7 +564,6 @@ export function CompactField({
   return (
     <div 
       className={cn(
-        colSpan && `col-span-${colSpan}`, 
         copyable && "cursor-pointer group",
         className
       )}

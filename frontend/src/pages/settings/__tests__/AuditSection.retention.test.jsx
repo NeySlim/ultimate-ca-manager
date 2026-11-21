@@ -18,7 +18,6 @@ vi.mock('../../../components', () => ({
   DetailSection: ({ children }) => <section>{children}</section>,
   DetailContent: ({ children }) => <div>{children}</div>,
 }))
-vi.mock('../../../components/ui/ToggleSwitch', () => ({ ToggleSwitch: () => <input type="checkbox" /> }))
 
 import AuditSection from '../AuditSection'
 

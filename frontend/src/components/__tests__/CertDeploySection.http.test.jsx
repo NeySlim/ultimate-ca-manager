@@ -21,9 +21,6 @@ vi.mock('../../services', () => ({
   casService: { getChainVariants: mocks.getChainVariants },
   deployService: mocks,
 }))
-vi.mock('../Modal', () => ({
-  Modal: ({ open, children }) => (open ? <div role="dialog">{children}</div> : null),
-}))
 
 import { CertDeploySection } from '../deploy/CertDeploySection'
 

@@ -28,9 +28,6 @@ vi.mock('../../../contexts', () => ({
 }))
 vi.mock('../../../services', () => ({ casService: mocks }))
 vi.mock('../../../lib/utils', async (orig) => ({ ...(await orig()), downloadBlob: mocks.downloadBlob }))
-vi.mock('../../Modal', () => ({
-  Modal: ({ open, children }) => (open ? <div role="dialog">{children}</div> : null),
-}))
 
 import { CrossCertificatesSection } from '../CrossCertificatesSection'
 

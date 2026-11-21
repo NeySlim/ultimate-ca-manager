@@ -16,7 +16,8 @@ import { downloadExport } from '../lib/exportDownload'
 import { reportSilentFailure } from '../lib/silentFailure'
 import { localOnlyRevocationWarning } from '../lib/revocationOutcome'
 import { apiKeyScopePermissions } from '../lib/apiKeyScopes'
-import { keepDraft, readDraft, useUnloadGuard } from '../components/sectioned'
+import { useUnloadGuard } from '../hooks/useSaveParts'
+import { keepDraft, readDraft } from '../lib/draftMemory'
 import { Zone, PageHead, Btn, IconBtn, Pill, Props, RecordList, RecordRow, SkeletonPanel, AtelierDialog } from '../components/atelier'
 import { SettingsLayout, SettingsToc, SettingsJump, SettingsFrame, SettingsGroup, SettingsSaveBar } from '../components/atelier/SettingsView'
 import { Field, FormModal, Input, NumberInput, Notice, SecretInput, Select, Textarea, ToggleSwitch } from '../components/atelier/Form'
@@ -28,7 +29,7 @@ import { ROLE_KEYS } from './users/userFacts'
 import { languages } from '../i18n'
 import { persistPreference } from '../stores/userPreferencesStore'
 
-// Profile edit left pending, kept for the tab (components/sectioned/draftMemory)
+// Profile edit left pending, kept for the tab (lib/draftMemory)
 const PROFILE_DRAFT = 'account:profile'
 const SECTION_IDS = ['profile', 'security', 'api-keys']
 const NO_KEY_FORM = { name: '', expires_days: '', scope: 'full' }

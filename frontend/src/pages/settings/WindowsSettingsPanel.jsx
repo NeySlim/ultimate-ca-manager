@@ -7,7 +7,7 @@ import { windowsProfilesService } from '../../services'
 import { useNotification } from '../../contexts'
 import { groupEntriesByRealm } from '../../lib/windowsProfile'
 import CopyableUrl from './CopyableUrl'
-import { useSavePart, keptPartDraft } from '../../components/sectioned'
+import { useSavePart, keptPartDraft } from '../../hooks/useSaveParts'
 
 function KeytabStatus({ settings, t }) {
   if (!settings.keytab_set) return null

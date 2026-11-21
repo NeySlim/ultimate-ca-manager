@@ -8,7 +8,6 @@ import { act, render, screen } from '@testing-library/react'
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k) => k }) }))
 
 import { NotificationProvider, useNotification } from '../NotificationContext'
-import { ListDialog } from '../../components/list/ListDialog'
 
 beforeAll(() => {
   global.ResizeObserver = class ResizeObserver {
@@ -55,16 +54,10 @@ describe('confirmation dialog', () => {
     expect(screen.getByRole('button', { name: 'Understood' })).toHaveFocus()
   })
 
-  it('asks in the mockup\'s native dialog, in a Radix layer only above a dialog still drawn by Radix', async () => {
+  it('asks in the mockup\'s native dialog', async () => {
     const native = await ask('Export the selection?')
     expect(native.tagName).toBe('DIALOG')
     expect(native).toHaveAttribute('aria-labelledby', 'modal-title')
-    document.body.innerHTML = ''
-    render(<NotificationProvider><Probe /><ListDialog open onOpenChange={() => {}} title="Settings">x</ListDialog></NotificationProvider>)
-    await act(async () => { api.showConfirm('Delete the target?', { variant: 'danger' }) })
-    const layered = await screen.findByTestId('confirm-dialog')
-    expect(layered.tagName).not.toBe('DIALOG')
-    expect(layered).toHaveClass('lv-dialog')
   })
 
   it('names the answer field of a prompt by its question, and sends it with Enter', async () => {

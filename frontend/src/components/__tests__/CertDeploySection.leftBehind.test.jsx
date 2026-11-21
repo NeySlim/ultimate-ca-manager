@@ -25,10 +25,6 @@ vi.mock('../../hooks', () => ({
 
 vi.mock('../../services', () => ({ deployService: mocks }))
 
-vi.mock('../Modal', () => ({
-  Modal: ({ open, children }) => open ? <div role="dialog">{children}</div> : null,
-}))
-
 import { CertDeploySection } from '../deploy/CertDeploySection'
 
 const certificate = { id: 42, has_private_key: true }

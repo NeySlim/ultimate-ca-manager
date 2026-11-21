@@ -3,19 +3,10 @@
  * (#378): a 27-day certificate is "expiring" from the day it is issued.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key) => key }),
-}))
-
-vi.mock('../index.js', () => ({
-  Modal: ({ open, children }) => (open ? <div>{children}</div> : null),
-  Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-  Input: (props) => <input {...props} />,
-  Badge: ({ children }) => <span>{children}</span>,
-  EmptyState: ({ title }) => <div>{title}</div>,
-  LoadingSpinner: () => <div>loading</div>,
 }))
 
 const getAll = vi.fn()
@@ -56,6 +47,33 @@ describe('CertificatePickerModal status filter', () => {
     await screen.findByText('valid.example.com')
     rerender(<CertificatePickerModal {...props} filters={{ status: ['valid', 'expiring'] }} />)
     await waitFor(() => expect(getAll).toHaveBeenCalledTimes(1))
+  })
+
+  it('is the mockup dialog: a search, then one result per certificate, picked by a click', async () => {
+    getAll.mockResolvedValue({ data: [cert(1, 'valid'), cert(2, 'expiring')], meta: { total: 2 } })
+    const onSelect = vi.fn()
+    const onClose = vi.fn()
+    render(<CertificatePickerModal isOpen onClose={onClose} onSelect={onSelect} />)
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.closest('.atl')).not.toBeNull()
+    expect(dialog.querySelector('.command-search input')).toHaveAccessibleName('settings.certPickerSearch')
+    fireEvent.click((await screen.findByText('expiring.example.com')).closest('button.command-result'))
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 2 }))
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('sends what is typed as the search, from the first page', async () => {
+    getAll.mockResolvedValue({ data: [cert(1, 'valid')], meta: { total: 1 } })
+    render(<CertificatePickerModal isOpen onClose={vi.fn()} onSelect={vi.fn()} />)
+    await screen.findByText('valid.example.com')
+    fireEvent.change(screen.getByRole('searchbox', { name: 'settings.certPickerSearch' }), { target: { value: 'web' } })
+    await waitFor(() => expect(getAll).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'web', page: 1 })))
+  })
+
+  it('says when no certificate qualifies', async () => {
+    getAll.mockResolvedValue({ data: [], meta: { total: 0 } })
+    render(<CertificatePickerModal isOpen onClose={vi.fn()} onSelect={vi.fn()} />)
+    expect(await screen.findByText('settings.noValidCertificates')).toBeInTheDocument()
   })
 
   it('defaults to valid certificates only', async () => {

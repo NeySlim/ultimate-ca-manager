@@ -1,13 +1,14 @@
 /**
- * The section of a sectioned page lives in ?tab=: a link opens on it, a choice writes it
- * (the first section leaves the address bare), stacked frames scroll to it, and a page of
- * one frame at a time gives the new frame's title the focus.
+ * The section of a page on the mockup's sectioned form lives in ?tab=: a link opens on it, a
+ * choice writes it (the first section leaves the address bare), stacked frames scroll to it,
+ * and a page of one frame at a time gives the new frame's title the focus.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { act, render, screen } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 
-import { useSectionParam, FormSection } from '..'
+import { useSectionParam } from '../useSectionParam'
+import { SettingsFrame } from '../SettingsView'
 
 afterEach(() => { delete Element.prototype.scrollIntoView })
 
@@ -21,7 +22,7 @@ function Page({ stacked, ready = true }) {
       <output data-testid="search">{location.search}</output>
       <button type="button" onClick={() => select('c')}>to-c</button>
       <button type="button" onClick={() => select('a')}>to-a</button>
-      {ids.map((id) => <FormSection key={id} id={id} title={`Title ${id}`}>{id}</FormSection>)}
+      {ids.map((id) => <SettingsFrame key={id} id={id} label={`Title ${id}`}>{id}</SettingsFrame>)}
     </>
   )
 }
@@ -59,7 +60,7 @@ describe('useSectionParam', () => {
     const { rerender } = mount('/x?tab=c', { stacked: true, ready: false })
     expect(scrolled).toEqual([])
     rerender(<MemoryRouter initialEntries={['/x?tab=c']}><Page stacked ready /></MemoryRouter>)
-    expect(scrolled).toContain('sf-sec-c')
+    expect(scrolled).toContain('set-sec-c')
     expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Title c' }))
   })
 

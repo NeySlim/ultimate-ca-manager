@@ -17,7 +17,6 @@ vi.mock('../../../components', () => ({
   DetailGrid: ({ children }) => <div>{children}</div>,
   DetailContent: ({ children }) => <div>{children}</div>,
 }))
-vi.mock('../../../components/ui/ToggleSwitch', () => ({ ToggleSwitch: () => <input type="checkbox" /> }))
 vi.mock('../../../contexts', () => ({ useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn() }) }))
 vi.mock('../ServiceStatusWidget', () => ({ default: () => null }))
 vi.mock('../PublicEndpointsPanel', () => ({ default: () => null }))

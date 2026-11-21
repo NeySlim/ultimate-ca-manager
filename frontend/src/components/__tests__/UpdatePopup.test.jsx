@@ -26,10 +26,6 @@ vi.mock('../../stores/userPreferencesStore', () => ({
   persistPreference: mocks.persistPreference,
 }))
 
-vi.mock('../Modal', () => ({
-  Modal: ({ open, title, children }) => open ? <div role="dialog">{title}{children}</div> : null,
-}))
-
 vi.mock('../Button', () => ({
   Button: ({ children, ...props }) => <button {...props}>{children}</button>,
 }))

@@ -1,52 +1,26 @@
 /**
- * Settings Page - Horizontal tabs for desktop, scrollable for mobile
- * Uses DetailCard design system
+ * Settings page, on the mockup's sectioned form (settingsView()): the table of contents, the
+ * stacked section frames, then the save bar.
  */
 import { withoutAdminOnly } from './settings/adminOnlySettings'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
-import ReactMarkdown from 'react-markdown'
-import { 
-  Database, ListBullets, FloppyDisk, 
-  Envelope, Download, Trash, HardDrives, Lock, Palette, Sun, Moon, Desktop, Info,
-  Timer, Clock, WarningCircle, UploadSimple, Certificate, Eye, ArrowsClockwise, Rocket,
-  Plus, PencilSimple, TestTube, Lightning, Globe, Shield, CheckCircle, XCircle, MagnifyingGlass,
-  Bell, Copy, Power, ArrowClockwise, LockKey, Warning, User, GithubLogo,
-  Plugs, UsersThree, UserPlus, TreeStructure, CaretDown, Play,
-  WindowsLogo, ClockClockwise, IdentificationBadge, CloudArrowUp,
-  SlidersHorizontal, PaperPlaneTilt, Archive,
-} from '@phosphor-icons/react'
-import {
-  Button, Input, Select, Textarea, Card, EmptyState, ConfirmModal,
-  LoadingSpinner, FileUpload, Modal, HelpCard, Logo,
-  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
-  CompactSection,
-  UpdateChecker, ServiceReconnectOverlay
-} from '../components'
+import { ListBullets, HardDrives, Lock, Palette, Info, Timer, Certificate, Eye, Rocket, Bell, UsersThree, WindowsLogo, ClockClockwise, IdentificationBadge, CloudArrowUp, SlidersHorizontal, PaperPlaneTilt, Archive } from '@phosphor-icons/react'
+import { ServiceReconnectOverlay } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
 import CertificatePickerModal from '../components/CertificatePickerModal'
-import CertificateInput from '../components/CertificateInput'
-import LanguageSelector from '../components/ui/LanguageSelector'
 import { settingsService, systemService, casService, ssoService, mtlsService, mscaService, auditService } from '../services'
 import { holdSignOut } from '../services/apiClient'
 import { useAuth, useNotification, useMobile } from '../contexts'
 import { useServiceReconnect } from '../hooks'
 import { usePermission, useJob, isTransientError, jobPercent } from '../hooks'
 import { acceptedJob } from '../services/jobs.service'
-import { formatDate , downloadBlob} from '../lib/utils'
-import {  } from '../contexts/ThemeContext'
-import {  } from '../components/ui/ToggleSwitch'
-import TagsInput from '../components/ui/TagsInput'
-import EmailTemplateWindow from '../components/EmailTemplateWindow'
-import DatabaseBackendSection from './settings/DatabaseBackendSection'
-import ServiceStatusWidget from './settings/ServiceStatusWidget'
+import { formatDate, downloadBlob } from '../lib/utils'
 import AboutSection from './settings/AboutSection'
 import { expiryCheckOutcome } from './settings/expiryCheck'
 import { addCtLogUrl, removeCtLogUrl } from './settings/ctLogUrls'
 import AppearanceSettings from './settings/AppearanceSettings'
-import CopyableUrl from './settings/CopyableUrl'
-import MappingEditor from './settings/MappingEditor'
 import SsoProviderForm from './settings/SsoProviderForm'
 import WebhookForm from './settings/WebhookForm'
 import MscaConnectionForm from './settings/MscaConnectionForm'
@@ -62,6 +36,7 @@ import BackupSection from './settings/BackupSection'
 import { ceilingNotice } from './settings/backupCeiling'
 import RestoreReport from './settings/RestoreReport'
 import { BackupDialog, RestoreDialog } from './settings/BackupDialogs'
+import { EnableEncryptionDialog, MasterKeyBackupDialog } from './settings/EncryptionDialogs'
 import { loginUrl } from '../navigation/safeNext'
 import { useRestoreJob, UNCANCELLABLE_PHASES } from './settings/useRestoreJob'
 import AuditSection from './settings/AuditSection'
@@ -80,9 +55,8 @@ import { setDateFormat, setShowTime } from '../stores/dateFormatStore'
 import { reportSilentFailure } from '../lib/silentFailure'
 import { autoRenewalWaitingMessage } from '../lib/autoRenewalWaiting'
 import { secretRequiredForTarget, smtpSecretTargets } from '../lib/secretTarget'
-import {
-  SavePartsContext, useSavePartsRegistry, changedKeys, useUnloadGuard, keepDraft, readDraft,
-} from '../components/sectioned'
+import { SavePartsContext, useSavePartsRegistry, changedKeys, useUnloadGuard } from '../hooks/useSaveParts'
+import { keepDraft, readDraft } from '../lib/draftMemory'
 import { Zone, PageHead, Pill, SkeletonPanel, jumpTo } from '../components/atelier'
 import { SettingsLayout, SettingsToc, SettingsJump, SettingsFrame, SettingsSaveBar } from '../components/atelier/SettingsView'
 import SettingsHistory from './settings/SettingsHistory'
@@ -121,9 +95,6 @@ const SECTION_ICONS = {
   audit: 'activity', database: 'server', https: 'cert', updates: 'download', scheduler: 'clock', webhooks: 'bell',
   ct: 'eye', autoRenewal: 'refresh', deploy: 'upload', microsoftCA: 'plug', adConnector: 'globe', xcepWstep: 'monitor', about: 'help',
 }
-// Sections drawn with the mockup's fields; the others keep the product's own styles (`.atl-out`) until converted
-const CONVERTED_SECTIONS = new Set(['general', 'security', 'email', 'https', 'appearance', 'backup', 'audit', 'database', 'updates', 'scheduler', 'autoRenewal', 'about', 'sso', 'adConnector', 'microsoftCA', 'xcepWstep', 'webhooks', 'deploy', 'ct'])
-
 // Groups of the table of contents, named by what they hold; the frames follow the same
 // order. Four groups keep every entry in view on a 1000 px high window.
 const SETTINGS_GROUPS = [
@@ -139,7 +110,7 @@ const SETTINGS_SAVE_ACTIONS = ['settings_update', 'syslog_config_updated', 'mtls
 // Type of the HTTPS certificate the server names, in the reader's language
 const HTTPS_TYPES = { 'CA-Signed': 'settings.httpsType.caSigned', 'Self-Signed': 'settings.httpsType.selfSigned' }
 
-// Draft of the page kept for the tab (components/sectioned/draftMemory)
+// Draft of the page kept for the tab (lib/draftMemory)
 const SETTINGS_DRAFT = 'settings'
 
 // Keys the email route stores (mapped names); the others go through the bulk route
@@ -154,14 +125,6 @@ const bulkKeys = (draft, saved) => [...new Set([...Object.keys(saved || {}), ...
   .filter((k) => !k.startsWith('_') && !EMAIL_KEYS.includes(k) && !EMAIL_STATE_KEYS.includes(k))
 const MTLS_KEYS = ['enabled', 'required', 'trusted_ca_id']
 const pick = (obj, keys) => Object.fromEntries(keys.filter((k) => k in (obj || {})).map((k) => [k, obj[k]]))
-
-// SSO Provider type icons
-const SSO_PROVIDER_ICONS = {
-  ldap: Database,
-  oauth2: Globe,
-  saml: Shield,
-}
-
 
 // Backup password rules, mirrored from the server (services/backup):
 // at least 12 characters, and at least 8 distinct ones, relaxed to 6 for a
@@ -401,8 +364,6 @@ export default function SettingsPage() {
   const [showEnableEncryptionModal, setShowEnableEncryptionModal] = useState(false)
   const [showDisableEncryptionModal, setShowDisableEncryptionModal] = useState(false)
   const [encryptionLoading, setEncryptionLoading] = useState(false)
-  const [encryptionConfirmText, setEncryptionConfirmText] = useState('')
-  const [encryptionChecks, setEncryptionChecks] = useState({ backup: false, keyFile: false, lostKeys: false })
 
   // Master-key backup modal — shown immediately after enable-encryption succeeds.
   // Holds the freshly-generated key so the user can download it BEFORE leaving
@@ -411,7 +372,6 @@ export default function SettingsPage() {
   const [showBackupKeyModal, setShowBackupKeyModal] = useState(false)
   const [backupKeyMaterial, setBackupKeyMaterial] = useState(null)
   const [backupKeyDownloaded, setBackupKeyDownloaded] = useState(false)
-  const [backupKeyConfirmed, setBackupKeyConfirmed] = useState(false)
 
   // Anomaly detection state
   const [anomalies, setAnomalies] = useState([])
@@ -1003,8 +963,6 @@ export default function SettingsPage() {
         count: response?.data?.key_files_removed ?? 0,
       }))
       setShowEnableEncryptionModal(false)
-      setEncryptionConfirmText('')
-      setEncryptionChecks({ backup: false, keyFile: false, lostKeys: false })
       await loadEncryptionStatus()
 
       // CRITICAL: prompt the operator to back up the master key right now.
@@ -1014,7 +972,6 @@ export default function SettingsPage() {
       if (masterKey) {
         setBackupKeyMaterial(masterKey)
         setBackupKeyDownloaded(false)
-        setBackupKeyConfirmed(false)
         setShowBackupKeyModal(true)
       }
     } catch (error) {
@@ -2246,41 +2203,6 @@ export default function SettingsPage() {
     }
   }
 
-  // Help content for modal
-  const helpContent = (
-    <div className="space-y-4">
-      <HelpCard variant="info" title={t('settings.helpGeneral')}>
-        Configure your UCM instance name, base URL, session timeout, and timezone.
-        These settings affect all users and system behavior.
-      </HelpCard>
-      
-      <HelpCard variant="tip" title={t('settings.helpEmail')}>
-        Configure SMTP settings to enable email notifications for certificate
-        expiration alerts and system events. Test your configuration before saving.
-      </HelpCard>
-
-      <HelpCard variant="warning" title={t('common.securitySettings')}>
-        Security settings like 2FA enforcement and password policies affect all users.
-        Changes take effect immediately - users may need to update their credentials.
-      </HelpCard>
-
-      <HelpCard variant="info" title={t('settings.helpBackup')}>
-        Create encrypted backups of all data including certificates, CAs, users, 
-        and settings. Store backup passwords securely - they cannot be recovered.
-      </HelpCard>
-
-      <HelpCard variant="tip" title={t('settings.helpDatabase')}>
-        Optimize database performance, check integrity, or export data.
-        The danger zone allows complete database reset - use with extreme caution.
-      </HelpCard>
-
-      <HelpCard variant="info" title={t('settings.https')}>
-        Manage the SSL/TLS certificate used by UCM. You can use a certificate
-        from your PKI or generate a self-signed certificate for testing.
-      </HelpCard>
-    </div>
-  )
-
   // Sections in the order of the table of contents (permission-gated ones hidden from other roles)
   const allowed = SETTINGS_CATEGORIES.filter(cat => !cat.permission || [].concat(cat.permission).some(hasPermission))
   const sections = SETTINGS_GROUPS.flatMap(g => g.ids)
@@ -2334,7 +2256,7 @@ export default function SettingsPage() {
             <SettingsJump sections={sections} current={selectedCategory} onJump={handleCategoryChange} />
             {sections.map(section => (
               <SettingsFrame key={section.id} id={section.id} label={section.label} desc={section.description}
-                aside={sectionAside[section.id]} error={sectionErrors[section.id]} legacy={!CONVERTED_SECTIONS.has(section.id)}>
+                aside={sectionAside[section.id]} error={sectionErrors[section.id]}>
                 {renderCategoryContent(section.id)}
               </SettingsFrame>
             ))}
@@ -2470,97 +2392,14 @@ export default function SettingsPage() {
         onClose={() => setMscaCaControl(null)}
       />
 
-      {/* Enable Encryption Modal */}
-      <Modal
+      <EnableEncryptionDialog
         open={showEnableEncryptionModal}
-        onClose={() => {
-          setShowEnableEncryptionModal(false)
-          setEncryptionConfirmText('')
-          setEncryptionChecks({ backup: false, keyFile: false, lostKeys: false })
-        }}
-        title={t('settings.enableEncryption')}
-        maxWidth="lg"
-      >
-        <div className="p-4 space-y-4">
-          <div className="p-3 rounded-lg bg-status-warning-op10 border border-status-warning-op30">
-            <div className="flex items-start gap-2">
-              <WarningCircle size={20} className="text-status-warning flex-shrink-0 mt-0.5" weight="fill" />
-              <div className="text-sm text-text-primary">
-                <p className="font-semibold mb-1">{t('settings.encryptionWarningTitle')}</p>
-                <p className="text-text-secondary">{t('settings.encryptionWarningDesc')}</p>
-              </div>
-            </div>
-          </div>
+        loading={encryptionLoading}
+        onConfirm={handleEnableEncryption}
+        onClose={() => setShowEnableEncryptionModal(false)}
+      />
 
-          <div className="space-y-3">
-            <label className="flex items-start gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={encryptionChecks.keyFile}
-                onChange={(e) => setEncryptionChecks(prev => ({ ...prev, keyFile: e.target.checked }))}
-                className="rounded border-border bg-bg-tertiary mt-0.5"
-              />
-              <span className="text-sm text-text-primary">{t('settings.encryptionCheckKeyFile')}</span>
-            </label>
-            <label className="flex items-start gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={encryptionChecks.backup}
-                onChange={(e) => setEncryptionChecks(prev => ({ ...prev, backup: e.target.checked }))}
-                className="rounded border-border bg-bg-tertiary mt-0.5"
-              />
-              <span className="text-sm text-text-primary">{t('settings.encryptionCheckBackup')}</span>
-            </label>
-            <label className="flex items-start gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={encryptionChecks.lostKeys}
-                onChange={(e) => setEncryptionChecks(prev => ({ ...prev, lostKeys: e.target.checked }))}
-                className="rounded border-border bg-bg-tertiary mt-0.5"
-              />
-              <span className="text-sm text-text-primary">{t('settings.encryptionCheckLostKeys')}</span>
-            </label>
-          </div>
-
-          <div>
-            <label className="block text-sm text-text-secondary mb-1">
-              {t('settings.typeToConfirm', { word: 'ENCRYPT' })}
-            </label>
-            <Input
-              value={encryptionConfirmText}
-              onChange={(e) => setEncryptionConfirmText(e.target.value)}
-              placeholder="ENCRYPT"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button type="button" variant="outline" onClick={() => {
-              setShowEnableEncryptionModal(false)
-              setEncryptionConfirmText('')
-              setEncryptionChecks({ backup: false, keyFile: false, lostKeys: false })
-            }}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleEnableEncryption}
-              disabled={
-                encryptionLoading ||
-                encryptionConfirmText !== 'ENCRYPT' ||
-                !encryptionChecks.backup ||
-                !encryptionChecks.keyFile ||
-                !encryptionChecks.lostKeys
-              }
-            >
-              {encryptionLoading ? <LoadingSpinner size="sm" /> : <LockKey size={16} />}
-              {t('settings.enableEncryption')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Disable Encryption Modal */}
-      <ConfirmModal
+      <AtlConfirmModal
         open={showDisableEncryptionModal}
         onClose={() => setShowDisableEncryptionModal(false)}
         onConfirm={handleDisableEncryption}
@@ -2571,88 +2410,17 @@ export default function SettingsPage() {
         loading={encryptionLoading}
       />
 
-      {/* Backup Master Key Modal — shown immediately after enabling encryption.
-          Operator MUST download the key + confirm storage before closing. */}
-      <Modal
+      {/* The master key, shown once after enabling: downloaded and its storage confirmed before it closes */}
+      <MasterKeyBackupDialog
         open={showBackupKeyModal}
-        onClose={() => {
-          // Disallow dismiss without explicit confirmation. Closing without
-          // backup is the #1 cause of "I lost my master.key" support tickets.
-          if (backupKeyConfirmed) {
-            setShowBackupKeyModal(false)
-            setBackupKeyMaterial(null)
-            setBackupKeyDownloaded(false)
-            setBackupKeyConfirmed(false)
-          }
+        downloaded={backupKeyDownloaded}
+        onDownload={handleDownloadMasterKey}
+        onDone={() => {
+          setShowBackupKeyModal(false)
+          setBackupKeyMaterial(null)
+          setBackupKeyDownloaded(false)
         }}
-        title={t('settings.masterKeyBackupTitle')}
-        size="md"
-        showClose={backupKeyConfirmed}
-      >
-        <div className="p-4 space-y-4">
-          <div className="p-3 rounded-lg bg-status-danger-op10 border border-status-danger-op30">
-            <div className="flex items-start gap-2">
-              <WarningCircle size={20} className="text-status-danger flex-shrink-0 mt-0.5" weight="fill" />
-              <div className="text-sm text-text-primary">
-                <p className="font-semibold mb-1">{t('settings.masterKeyBackupCritical')}</p>
-                <p className="text-text-secondary">{t('settings.masterKeyBackupDesc')}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-sm text-text-secondary space-y-2">
-            <p>{t('settings.masterKeyBackupInstructions')}</p>
-            <ul className="list-disc list-inside text-xs space-y-1 pl-2">
-              <li>{t('settings.masterKeyBackupTip1')}</li>
-              <li>{t('settings.masterKeyBackupTip2')}</li>
-              <li>{t('settings.masterKeyBackupTip3')}</li>
-            </ul>
-          </div>
-
-          <div className="flex justify-center">
-            <Button
-              type="button"
-              variant={backupKeyDownloaded ? 'outline' : 'primary'}
-              onClick={handleDownloadMasterKey}
-            >
-              <Download size={16} />
-              {backupKeyDownloaded
-                ? t('settings.masterKeyDownloadAgain')
-                : t('settings.masterKeyDownloadNow')}
-            </Button>
-          </div>
-
-          <label className={`flex items-start gap-2 cursor-pointer p-3 rounded-lg border ${backupKeyDownloaded ? 'border-border bg-bg-tertiary' : 'border-border-op50 bg-tertiary-op40 opacity-60'}`}>
-            <input
-              type="checkbox"
-              checked={backupKeyConfirmed}
-              onChange={(e) => setBackupKeyConfirmed(e.target.checked)}
-              disabled={!backupKeyDownloaded}
-              className="rounded border-border bg-bg-tertiary mt-0.5"
-            />
-            <span className="text-sm text-text-primary">
-              {t('settings.masterKeyBackupConfirm')}
-            </span>
-          </label>
-
-          <div className="flex justify-end pt-4 border-t border-border">
-            <Button
-              type="button"
-              variant="primary"
-              disabled={!backupKeyConfirmed}
-              onClick={() => {
-                setShowBackupKeyModal(false)
-                setBackupKeyMaterial(null)
-                setBackupKeyDownloaded(false)
-                setBackupKeyConfirmed(false)
-              }}
-            >
-              <CheckCircle size={16} />
-              {t('common.done')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      />
 
       {/* Smart Import Modal for HTTPS certificate */}
       <SmartImportModal

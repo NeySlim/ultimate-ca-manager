@@ -333,36 +333,3 @@ describe('useFavorites', () => {
     expect(caResult.current.favorites).toHaveLength(0)
   })
 })
-
-
-// ════════════════════════════════════════════════════════════════════
-// useAutoPageSize Hook Tests
-// ════════════════════════════════════════════════════════════════════
-import { useAutoPageSize } from '../../hooks/useAutoPageSize'
-
-describe('useAutoPageSize', () => {
-  it('returns an object with perPage', () => {
-    const { result } = renderHook(() => useAutoPageSize())
-    expect(typeof result.current.perPage).toBe('number')
-    expect(result.current.perPage).toBeGreaterThan(0)
-  })
-
-  it('returns containerRef', () => {
-    const { result } = renderHook(() => useAutoPageSize())
-    expect(result.current.containerRef).toBeDefined()
-  })
-
-  it('defaults to defaultPerPage option', () => {
-    const { result } = renderHook(() => useAutoPageSize({ defaultPerPage: 25 }))
-    expect(result.current.perPage).toBe(25)
-  })
-
-  it('setPerPage overrides auto mode', () => {
-    const { result } = renderHook(() => useAutoPageSize({ defaultPerPage: 20 }))
-    act(() => {
-      result.current.setPerPage(50)
-    })
-    expect(result.current.perPage).toBe(50)
-    expect(result.current.autoMode).toBe(false)
-  })
-})

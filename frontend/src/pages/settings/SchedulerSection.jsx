@@ -4,7 +4,7 @@ import { Btn, Pill, Notice, DataTable, SkeletonPanel } from '../../components/at
 import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { useNotification } from '../../contexts'
 import { systemService } from '../../services'
-import { useRefocusAfter } from '../../components/sectioned/useRefocus'
+import { useRefocusAfter } from '../../hooks/useRefocus'
 import { compactRun } from '../../lib/relativeTime'
 
 const POLL_MS = 15000

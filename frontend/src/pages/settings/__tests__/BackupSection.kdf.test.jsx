@@ -23,9 +23,6 @@ vi.mock('../../../components', () => ({
   DetailContent: ({ children }) => <div>{children}</div>,
 }))
 
-vi.mock('../../../components/ui/ToggleSwitch', () => ({
-  ToggleSwitch: ({ label }) => <span>{label}</span>,
-}))
 
 import BackupSection from '../BackupSection'
 

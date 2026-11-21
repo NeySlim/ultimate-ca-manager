@@ -9,24 +9,6 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key) => key }),
 }))
 
-vi.mock('../ui/Select', () => ({
-  Select: ({ options = [] }) => (
-    <select>{options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
-  ),
-}))
-
-vi.mock('../Modal', () => ({
-  Modal: ({ open, children }) => (open ? <div>{children}</div> : null),
-}))
-
-vi.mock('../index.js', () => ({
-  Modal: ({ open, children }) => (open ? <div>{children}</div> : null),
-  Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-  Input: (props) => <input {...props} />,
-  Badge: ({ children }) => <span>{children}</span>,
-  EmptyState: ({ title }) => <div>{title}</div>,
-  LoadingSpinner: () => <div>loading</div>,
-}))
 
 const getAll = vi.fn()
 vi.mock('../../services', () => ({
@@ -44,17 +26,17 @@ describe('certificate pickers name a certificate by its CN (#365)', () => {
     getAll.mockResolvedValue({ data: [renamed, plain], meta: { total: 2 } })
     render(<CertificatePickerModal isOpen onClose={vi.fn()} onSelect={vi.fn()} />)
     const name = await screen.findByText('host.example.com')
-    const cell = name.closest('td')
-    expect(cell).toHaveTextContent(/^host\.example\.comRenamed$/)
-    const plainCell = (await screen.findByText('plain.example.com')).closest('td')
+    const cell = name.closest('.name')
+    expect(cell.firstChild).toHaveTextContent(/^host\.example\.com · Renamed$/)
+    const plainCell = (await screen.findByText('plain.example.com')).closest('.name')
     expect(within(plainCell).getAllByText('plain.example.com')).toHaveLength(1)
   })
 
   it('the picker dialog counts the SANs of a certificate that has several', async () => {
     getAll.mockResolvedValue({ data: [{ ...renamed, san_count: 2 }, { ...plain, san_count: 1 }], meta: { total: 2 } })
     render(<CertificatePickerModal isOpen onClose={vi.fn()} onSelect={vi.fn()} />)
-    expect(await screen.findByText('2 details.sans')).toBeInTheDocument()
-    const plainCell = (await screen.findByText('plain.example.com')).closest('td')
+    expect(await screen.findByText(/2 details\.sans/)).toBeInTheDocument()
+    const plainCell = (await screen.findByText('plain.example.com')).closest('.name')
     expect(plainCell).not.toHaveTextContent('details.sans')
   })
 })

@@ -28,10 +28,6 @@ vi.mock('../../../services', () => ({
   casService: { uploadCertificate },
 }))
 
-vi.mock('../../../components/Modal', () => ({
-  Modal: ({ open, title, children }) => (open ? <div>{title}{children}</div> : null),
-}))
-
 const CA = { id: 5, common_name: 'Ext CA' }
 
 async function submitPem() {

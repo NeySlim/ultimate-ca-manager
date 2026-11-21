@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next'
 import { Notice } from '../../components/atelier'
 import { Input, NumberInput, Select, ToggleSwitch, SegmentedField } from '../../components/atelier/Form'
 import { SettingsGroup, SettingsTest } from '../../components/atelier/SettingsView'
-import { useRefocusAfter } from '../../components/sectioned/useRefocus'
+import { useRefocusAfter } from '../../hooks/useRefocus'
 import AdminLockLabel from './AdminLockLabel'
 import { shownNumber, typedNumber } from './numberFields'
 

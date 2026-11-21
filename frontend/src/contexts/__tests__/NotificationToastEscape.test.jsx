@@ -1,13 +1,13 @@
 /**
- * A toast that arrives while a dialog is open sits above it in Radix's layer stack:
- * Escape typed in the dialog must still close the dialog, and leave the toast.
+ * A toast that arrives while a dialog is open sits above it: Escape typed in the dialog
+ * must still close the dialog, and leave the toast.
  */
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 
 import { NotificationProvider, useNotification } from '../NotificationContext'
-import { ListDialog } from '../../components/list/ListDialog'
+import { AtelierDialog } from '../../components/atelier/AtelierDialog'
 
 beforeAll(() => {
   global.ResizeObserver = class ResizeObserver {
@@ -22,10 +22,11 @@ let api
 function Page({ onOpenChange }) {
   api = useNotification()
   const [open, setOpen] = useState(true)
+  if (!open) return null
   return (
-    <ListDialog open={open} onOpenChange={(v) => { onOpenChange(v); setOpen(v) }} title="Schedule a report">
+    <AtelierDialog title="Schedule a report" onClose={() => { onOpenChange(false); setOpen(false) }}>
       <input aria-label="Sending time" />
-    </ListDialog>
+    </AtelierDialog>
   )
 }
 
