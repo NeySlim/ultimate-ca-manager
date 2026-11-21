@@ -1,19 +1,23 @@
 /**
  * The mockup's modal(): a native <dialog> opened with showModal() (the browser holds the focus
  * inside and answers Escape), a head with the title and Fermer la fenêtre, then the body.
- * On close the focus goes back to the control that opened it, else to the page title.
+ * On close the focus goes back to the control that opened it (or the element that replaced it,
+ * same id), else to `returnTo` (an id, the mockup's returnFallback), else to the page title.
+ * size: 'narrow' (520 px), 'wide' (920 px) or none (760 px).
  */
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Icon } from './Icon'
 import { escapeYielded } from '../list/dialogEscape'
 
-export function AtelierDialog({ title, subtitle, size = '', onClose, children, testId }) {
+export function AtelierDialog({ title, subtitle, size = '', onClose, children, testId, returnTo }) {
   const { t } = useTranslation()
   const ref = useRef(null)
   const opener = useRef(null)
   const close = useRef(onClose)
   close.current = onClose
+  const fallback = useRef(returnTo)
+  fallback.current = returnTo
 
   useLayoutEffect(() => {
     const dialog = ref.current
@@ -27,9 +31,13 @@ export function AtelierDialog({ title, subtitle, size = '', onClose, children, t
       const back = opener.current
       // after React has committed: the opener may be replaced by an element with the same id
       requestAnimationFrame(() => {
-        const target = back?.isConnected ? back : (back?.id && document.getElementById(back.id))
-        if (target) target.focus()
-        if (!target || document.activeElement !== target) document.getElementById('main-title')?.focus()
+        const candidates = [back, back?.id && document.getElementById(back.id), fallback.current && document.getElementById(fallback.current)]
+        for (const el of candidates) {
+          if (!el?.isConnected || el === document.body) continue
+          el.focus()
+          if (document.activeElement === el) return
+        }
+        document.getElementById('main-title')?.focus()
       })
     }
   }, [])

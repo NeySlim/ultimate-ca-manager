@@ -8030,5 +8030,23 @@
       "requests_one": "{{count}} demande",
       "requests_other": "{{count}} demandes"
     }
+  },
+  "atelier": {
+    "name": "Nom",
+    "state": "État",
+    "tableOf": "Tableau : {{name}}",
+    "openDetail": "Ouvrir le détail de {{name}}",
+    "resizeColumn": "Glisser pour régler la largeur, double-clic pour la remettre",
+    "properties": "Propriétés",
+    "summary": "Résumé",
+    "overview": "Aperçu",
+    "cardOptions": "Options de la carte {{name}}",
+    "cardOptionsTitle": "Options de la carte",
+    "hideCard": "Masquer la carte",
+    "customizeCards": "Personnaliser les cartes…",
+    "openItem": "Élément ouvert",
+    "detailOf": "Détail : {{name}}",
+    "sectionsOf": "Sections : {{name}}",
+    "settingsSections": "Sections des paramètres"
   }
 }

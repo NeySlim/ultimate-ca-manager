@@ -8027,5 +8027,23 @@
       "requests_one": "{{count}} 个请求",
       "requests_other": "{{count}} 个请求"
     }
+  },
+  "atelier": {
+    "name": "名称",
+    "state": "状态",
+    "tableOf": "表格：{{name}}",
+    "openDetail": "打开 {{name}} 的详情",
+    "resizeColumn": "拖动以设置宽度，双击恢复",
+    "properties": "属性",
+    "summary": "摘要",
+    "overview": "概览",
+    "cardOptions": "{{name}} 卡片选项",
+    "cardOptionsTitle": "卡片选项",
+    "hideCard": "隐藏卡片",
+    "customizeCards": "自定义卡片…",
+    "openItem": "已打开的项目",
+    "detailOf": "详情：{{name}}",
+    "sectionsOf": "分区：{{name}}",
+    "settingsSections": "设置分区"
   }
 }
