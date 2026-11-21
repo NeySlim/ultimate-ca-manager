@@ -10,7 +10,7 @@ import { Toolbar, SearchField } from '../atelier/Toolbar'
 import { ModalActions, Notice } from '../atelier/Form'
 import { QuickHelp } from '../help/QuickHelp'
 import { mergeHelpContent } from '../help/content'
-import { guideSections, renderLines } from '../help/markdown'
+import { guideHeadings, guideSections, renderMarkdown } from '../help/markdown'
 import { helpContent as defaultHelpData } from '../../data/helpContent'
 import { helpGuides as defaultHelpGuides } from '../../data/helpGuides'
 import { HELP_TRANSLATED_LANGUAGES } from '../../data/helpLanguages'
@@ -60,14 +60,14 @@ export function HelpDialog({ open, onClose, pageKey, returnTo }) {
     const en = pageKey ? defaultHelpGuides[pageKey] : null
     if (!en) return null
     const tr = translation?.helpGuides
-    return tr ? { ...en, title: tr.title || en.title, content: tr.content || en.content } : en
+    return { ...en, title: tr?.title || en.title, content: tr?.content || en.content, english: en.content }
   }, [pageKey, translation])
 
   if (!open || (!quick && !guide)) return null
   return (
     <AtelierDialog title={quick?.title || guide?.title || t('common.help')} subtitle={quick?.subtitle || undefined}
       size="wide" onClose={onClose} returnTo={returnTo} testId="help-dialog">
-      <HelpBody key={pageKey} quick={quick} guide={guide} englishNotice={englishNotice} />
+      <HelpBody key={pageKey} pageKey={pageKey} quick={quick} guide={guide} englishNotice={englishNotice} />
       <ModalActions>
         <button type="button" className="btn primary" data-action="close-modal" onClick={onClose}>{t('help.back')}</button>
       </ModalActions>
@@ -75,7 +75,7 @@ export function HelpDialog({ open, onClose, pageKey, returnTo }) {
   )
 }
 
-function HelpBody({ quick, guide, englishNotice }) {
+function HelpBody({ pageKey, quick, guide, englishNotice }) {
   const { t } = useTranslation()
   const [tab, setTab] = useState(guide ? 'guide' : 'quick')
   const [query, setQuery] = useState('')
@@ -97,21 +97,24 @@ function HelpBody({ quick, guide, englishNotice }) {
           )}
         </Toolbar>
       )}
-      {tab === 'quick' ? <QuickHelp content={quick} /> : <GuideHelp markdown={guide.content} query={query} />}
+      {tab === 'quick' ? <QuickHelp content={quick} /> : <GuideHelp chapter={pageKey} markdown={guide.content} english={guide.english} query={query} />}
     </>
   )
 }
 
-function GuideHelp({ markdown, query }) {
+// The guide under the dialog's own h2: `##` is an h3, `###` an h4, `####` an h5; ids from guideHeadings()
+function GuideHelp({ chapter, markdown, english, query }) {
   const { t } = useTranslation()
   const sections = useMemo(() => guideSections(markdown), [markdown])
+  const ids = useMemo(() => guideHeadings(chapter, markdown, english).map((h) => h.id), [chapter, markdown, english])
+  const idOf = (s) => (s.heading === null ? `help-section-${s.i}` : ids[s.heading])
   const q = query.trim().toLowerCase()
   const shown = sections
     .map((s, i) => ({ ...s, i }))
     .filter((s) => !q || s.title.toLowerCase().includes(q) || s.lines.some((l) => l.toLowerCase().includes(q)))
-  const jump = (e, i) => {
+  const jump = (e, id) => {
     e.preventDefault()
-    const head = document.getElementById(`help-section-${i}`)
+    const head = document.getElementById(id)
     head?.scrollIntoView({ block: 'start' })
     head?.focus({ preventScroll: true })
   }
@@ -121,7 +124,7 @@ function GuideHelp({ markdown, query }) {
         <p className="small muted help-toc">
           {t('help.contentsLead')}
           {shown.map((s, k) => (
-            <span key={s.i}>{k > 0 && ', '}<a className="text-link" href={`#help-section-${s.i}`} onClick={(e) => jump(e, s.i)}>{s.title}</a></span>
+            <span key={s.i}>{k > 0 && ', '}<a className="text-link" href={`#${idOf(s)}`} onClick={(e) => jump(e, idOf(s))}>{s.title}</a></span>
           ))}
         </p>
       )}
@@ -129,8 +132,8 @@ function GuideHelp({ markdown, query }) {
         <div className="help-grid">
           {shown.map((s) => (
             <section key={s.i}>
-              {s.title && <h3 id={`help-section-${s.i}`} tabIndex={-1}>{s.title}</h3>}
-              {renderLines(s.lines)}
+              {s.title && <h3 id={idOf(s)} className="help-h2" tabIndex={-1}>{s.title}</h3>}
+              {renderMarkdown(s.lines, { ids, first: (s.heading ?? -1) + 1, levelOffset: 1 })}
             </section>
           ))}
         </div>
