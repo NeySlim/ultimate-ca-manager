@@ -21,6 +21,8 @@ export const searchService = {
       }
     }
     
-    return apiClient.get(`/search${buildQueryString({ q: query, limit })}`)
+    // The API answers in its envelope: the groups are its data
+    const res = await apiClient.get(`/search${buildQueryString({ q: query, limit })}`)
+    return res?.data ?? res
   }
 }
