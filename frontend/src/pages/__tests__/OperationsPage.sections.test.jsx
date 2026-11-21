@@ -1,7 +1,7 @@
 /**
- * Operations on the sectioned template: a table of contents of the three operations,
+ * Operations on the mockup's sectioned form: a table of contents of the three operations,
  * one frame at a time, a link to ?tab= opening on its operation, no save bar (import,
- * export and bulk actions keep their own buttons).
+ * export and bulk actions keep their own buttons), the resource as the mockup's state chips.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
@@ -16,7 +16,7 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 
-const mocks = vi.hoisted(() => ({ bulkDelete: vi.fn(), showWarning: vi.fn(), showSuccess: vi.fn(), showInfo: vi.fn() }))
+const mocks = vi.hoisted(() => ({ bulkDelete: vi.fn(), showWarning: vi.fn(), showSuccess: vi.fn(), showInfo: vi.fn(), admin: true }))
 
 vi.mock('../../contexts', () => ({
   useNotification: () => ({
@@ -36,7 +36,7 @@ vi.mock('../../contexts', () => ({
 vi.mock('../../hooks', () => ({
   usePermission: () => ({
     canWrite: () => true, canDelete: () => true, hasPermission: () => true, canRead: () => true,
-    isAdmin: () => true,
+    isAdmin: () => mocks.admin,
   }),
 }))
 
@@ -52,15 +52,15 @@ vi.mock('../../services', () => ({
   },
 }))
 
-vi.mock('../../components/SmartImport', () => ({ SmartImportWidget: () => null }))
+vi.mock('../../components/SmartImport', () => ({ SmartImportModal: () => null }))
 
-vi.mock('../../components', async (orig) => ({
+// The list stands in for the Atelier table: one button ticks the records, the selection bar follows
+vi.mock('../../components/atelier', async (orig) => ({
   ...(await orig()),
-  ResponsiveLayout: ({ children }) => <div>{children}</div>,
-  ResponsiveDataTable: ({ onSelectionChange, bulkActions }) => (
+  TableView: ({ selection, batch }) => (
     <div>
-      <button onClick={() => onSelectionChange(new Set([9]))}>select-users</button>
-      {bulkActions}
+      <button onClick={() => ([9]).forEach((id) => selection.onToggle(id))}>select-users</button>
+      {batch}
     </div>
   ),
 }))
@@ -71,7 +71,7 @@ const open = (entry = '/operations') => render(<MemoryRouter initialEntries={[en
 const toc = () => screen.getByRole('navigation', { name: 'operations.tocLabel' })
 
 describe('OperationsPage sections', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => { vi.clearAllMocks(); mocks.admin = true })
 
   it('lists the three operations and shows import first, without a save bar', async () => {
     open()
@@ -79,7 +79,7 @@ describe('OperationsPage sections', () => {
     expect(links.map((a) => a.getAttribute('href'))).toEqual(['/operations', '/operations?tab=export', '/operations?tab=bulk'])
     expect(screen.getByRole('heading', { level: 2, name: 'common.import' })).toBeInTheDocument()
     expect(within(toc()).getByRole('link', { name: 'common.import' })).toHaveAttribute('aria-current', 'true')
-    expect(screen.queryByTestId('sf-savebar')).toBeNull()
+    expect(document.getElementById('settings-savebar')).toBeNull()
   })
 
   it('opens on the operation a link names', async () => {
@@ -88,12 +88,34 @@ describe('OperationsPage sections', () => {
     expect(screen.queryByRole('heading', { level: 2, name: 'common.import' })).toBeNull()
   })
 
-  it('picks the bulk resource type from a segmented choice', async () => {
+  it('picks the bulk resource type from the state chips, its count beside it, and keeps the choice', async () => {
+    localStorage.removeItem('ucm-ops-resource-type')
     open('/operations?tab=bulk')
     const group = await screen.findByRole('group', { name: 'operations.selectResource' })
-    expect(group).toHaveClass('ui-segmented')
-    const pressed = within(group).getAllByRole('button').filter((b) => b.getAttribute('aria-pressed') === 'true')
-    expect(pressed).toHaveLength(1)
+    expect(group).toHaveClass('views')
+    const pressed = () => within(group).getAllByRole('button').filter((b) => b.getAttribute('aria-pressed') === 'true')
+    expect(pressed().map((b) => b.dataset.status)).toEqual(['certificates'])
+    await waitFor(() => expect(within(group).getByRole('button', { name: /common\.usersShort/ })).toHaveTextContent('1'))
+    fireEvent.click(within(group).getByRole('button', { name: /common\.usersShort/ }))
+    expect(pressed().map((b) => b.dataset.status)).toEqual(['users'])
+    expect(localStorage.getItem('ucm-ops-resource-type')).toBe('users')
+  })
+
+  it('offers the bulk actions of the resource on the selection bar, once records are ticked', async () => {
+    localStorage.setItem('ucm-ops-resource-type', 'users')
+    open('/operations?tab=bulk')
+    expect(screen.queryByRole('group', { name: 'table.selection' })).toBeNull()
+    fireEvent.click(await screen.findByText('select-users'))
+    const bar = screen.getByRole('group', { name: 'table.selection' })
+    expect(within(bar).getAllByRole('button').map((b) => b.textContent)).toEqual(['common.delete', 'table.clearSelection'])
+  })
+
+  it('shows no selection bar to who is not an administrator, as the bulk routes are admin-only', async () => {
+    mocks.admin = false
+    localStorage.setItem('ucm-ops-resource-type', 'users')
+    open('/operations?tab=bulk')
+    fireEvent.click(await screen.findByText('select-users'))
+    expect(screen.queryByRole('group', { name: 'table.selection' })).toBeNull()
   })
 
   it('switches the frame from the table of contents and from the phone list', async () => {

@@ -1,5 +1,5 @@
 import { cn } from '../lib/utils'
-import { Crown, ShieldCheck, Flask } from '@phosphor-icons/react'
+import { Crown, ShieldCheck } from '@phosphor-icons/react'
 import { useTranslation } from 'react-i18next'
 
 // A badge is the mockup's `.badge` (and the list's state pill): 12 px text and icon in the
@@ -87,20 +87,3 @@ export function CATypeIcon({ isRoot, size = 'md', className }) {
   )
 }
 
-/**
- * ExperimentalBadge - Inline badge for features not yet fully tested
- */
-export function ExperimentalBadge({ className }) {
-  const { t } = useTranslation()
-  return (
-    <Badge
-      variant="amber"
-      size="sm"
-      icon={Flask}
-      className={className}
-      title={t('common.experimentalTooltip')}
-    >
-      {t('common.experimental')}
-    </Badge>
-  )
-}

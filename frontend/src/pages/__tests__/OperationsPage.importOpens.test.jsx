@@ -50,10 +50,10 @@ vi.mock('../../services', () => ({
   usersService: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
 }))
 
+// Smart import opens in its dialog from the import frame
 vi.mock('../../components/SmartImport', () => ({
-  SmartImportWidget: ({ onImportComplete }) => (
-    <button onClick={() => onImportComplete(window.__importResult)}>do-import</button>
-  ),
+  SmartImportModal: ({ isOpen, onImportComplete }) => (isOpen
+    ? <button onClick={() => onImportComplete(window.__importResult)}>do-import</button> : null),
 }))
 
 import OperationsPage from '../OperationsPage'
@@ -71,6 +71,7 @@ describe('OperationsPage — Smart Import opens the sole created entity (#368)',
   it('opens the CA when exactly one was imported', async () => {
     window.__importResult = { imported_ids: { cas: [501] } }
     renderPage()
+    fireEvent.click(await screen.findByText('operations.openSmartImport'))
     fireEvent.click(await screen.findByText('do-import'))
     await waitFor(() => expect(openEntity).toHaveBeenCalledWith('ca', 501))
   })
@@ -78,6 +79,7 @@ describe('OperationsPage — Smart Import opens the sole created entity (#368)',
   it('opens nothing when exactly one CSR was imported (no detail window)', async () => {
     window.__importResult = { imported_ids: { csrs: [502] } }
     renderPage()
+    fireEvent.click(await screen.findByText('operations.openSmartImport'))
     fireEvent.click(await screen.findByText('do-import'))
     // Give any (wrong) async open a chance to fire before asserting it didn't
     await new Promise((r) => setTimeout(r, 0))
@@ -87,6 +89,7 @@ describe('OperationsPage — Smart Import opens the sole created entity (#368)',
   it('opens nothing when two objects were imported', async () => {
     window.__importResult = { imported_ids: { cas: [503], certificates: [504] } }
     renderPage()
+    fireEvent.click(await screen.findByText('operations.openSmartImport'))
     fireEvent.click(await screen.findByText('do-import'))
     await new Promise((r) => setTimeout(r, 0))
     expect(openEntity).not.toHaveBeenCalled()

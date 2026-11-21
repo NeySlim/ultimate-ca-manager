@@ -1,252 +1,119 @@
 /**
- * Operations Page - Import, Export & Bulk Actions
- * Replaces ImportExportPage with unified operations center
+ * Operations (import, export, bulk actions), on the mockup's sectioned form (settingsView()): the
+ * table of contents of the operations, then the one chosen in its frame. Import: smart import and
+ * OPNsense (its connection test as a settings test); export: the downloads as records; bulk: the
+ * resource as the mockup's state chips, the list as its tableView() with the selection bar.
  */
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { 
-  UploadSimple, DownloadSimple, Lightning,
-  CheckCircle, XCircle, Clock, X, Certificate, ShieldCheck, Trash, 
-  ArrowsClockwise, Prohibit, PencilSimple, FileText, User, Crown, Info,
-  Table, ShoppingCart, CaretDown, MagnifyingGlass, WarningCircle, Question, PlugsConnected
-} from '@phosphor-icons/react'
-import { 
-  ResponsiveLayout, ResponsiveDataTable, Button, Input, 
-  ConfirmModal, Badge, KeyIndicator, TransferPanel
-} from '../components'
-import { HelpCard } from '../components/HelpCard'
-import { ToggleSwitch } from '../components/ui/ToggleSwitch'
-import { SmartImportWidget } from '../components/SmartImport'
-import { 
-  opnsenseService, casService, certificatesService, 
-  csrsService, templatesService, usersService 
+import { SmartImportModal } from '../components/SmartImport'
+import {
+  opnsenseService, casService, certificatesService,
+  csrsService, templatesService, usersService
 } from '../services'
 import { REVOCATION_REASONS } from '../components/RevokeCertificateModal'
-import { useNotification, useMobile } from '../contexts'
+import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
-import { formatDate, extractCN, cn, downloadBlob, warnSkippedExport } from '../lib/utils'
+import { formatDate, extractCN, downloadBlob, warnSkippedExport } from '../lib/utils'
 import { soleImported } from '../lib/importResult'
 import { bulkLocalOnlyRevocationWarning } from '../lib/revocationOutcome'
 import { hiddenFromIssuance, listedForIssuance, signingCas, unlistedSigningCas } from '../lib/caSelection'
 import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
 import { useOpenEntity } from '../hooks/useOpenEntity'
-import { FormLayout, SectionToc, SectionJump, FormSection, FormGroup, useSectionParam } from '../components/sectioned'
+import {
+  Zone, PageHead, Btn, Icon, Pill, RecordList, RecordRow, StateFilters, TableView, SearchField, FilterSelect, BatchBar,
+  TableFooter, EmptyBlock, AtelierDialog,
+} from '../components/atelier'
+import { SettingsLayout, SettingsToc, SettingsJump, SettingsFrame, SettingsGroup, SettingsTest } from '../components/atelier/SettingsView'
+import { ConfirmModal, Input, NumberInput, Notice, SecretInput, Select, ToggleSwitch } from '../components/atelier/Form'
+import { useSectionParam } from '../components/atelier/useSectionParam'
+import { ROLE_KEYS } from './users/userFacts'
 
 const STORAGE_KEY = 'opnsense_config'
+const TYPE_KEY = 'ucm-ops-resource-type'
+const TYPES = ['certificates', 'cas', 'csrs', 'templates', 'users']
+// What each resource offers in bulk, and the fields its local search reads
+const ACTIONS = {
+  certificates: ['revoke', 'renew', 'export', 'delete'], cas: ['export', 'delete'], csrs: ['sign', 'delete'], templates: ['delete'], users: ['delete'],
+}
+const SEARCH_KEYS = ['cn', 'descr', 'name', 'subject', 'username', 'email', 'common_name']
+const TYPE_ICONS = { certificates: 'cert', cas: 'shield', csrs: 'file', templates: 'template', users: 'users' }
 
-// Resource type definitions - built inside component to use t() for translations
-function useResourceTypes(t) {
-  return useMemo(() => ({
-    certificates: {
-      icon: Certificate,
-      color: 'icon-bg-teal',
-      actions: ['revoke', 'renew', 'delete', 'export'],
-      columns: [
-        {
-          key: 'cn',
-          header: t('common.commonName'),
-          sortable: true, priority: 1,
-          render: (val, row) => {
-            const name = val || row.common_name || extractCN(row.subject) || row.descr || t('common.certificate')
-            return (
-              <div className="flex items-center gap-2">
-                <span className="font-medium truncate">{name}</span>
-                <KeyIndicator hasKey={row.has_private_key} size={14} />
-              </div>
-            )
-          }
-        },
-        {
-          key: 'status',
-          header: t('common.status'),
-          priority: 2, sortable: true, hideOnMobile: true,
-          render: (val, row) => {
-            const isRevoked = row.revoked
-            const status = isRevoked ? 'revoked' : val || 'unknown'
-            // The mockup's badge: an icon and the word, no dot
-            const config = {
-              valid: { variant: 'success', icon: CheckCircle, label: t('common.valid') },
-              expiring: { variant: 'warning', icon: Clock, label: t('common.expiring') },
-              expired: { variant: 'danger', icon: XCircle, label: t('common.expired') },
-              revoked: { variant: 'danger', icon: X, label: t('common.revoked') },
-              unknown: { variant: 'secondary', icon: Info, label: t('common.status') }
-            }
-            const { variant, icon, label } = config[status] || config.unknown
-            return <Badge variant={variant} size="sm" icon={icon}>{label}</Badge>
-          }
-        },
-        {
-          key: 'issuer',
-          header: t('common.issuer'),
-          priority: 3, sortable: true, hideOnMobile: true,
-          render: (val, row) => (
-            <span className="text-text-secondary truncate">{extractCN(val) || row.issuer_name || '—'}</span>
-          )
-        },
-        {
-          key: 'valid_to',
-          header: t('common.expires'),
-          priority: 4, sortable: true,
-          render: (val) => (
-            <span className="text-xs text-text-secondary whitespace-nowrap">{formatDate(val)}</span>
-          )
-        }
+const certName = (row, t) => row.cn || row.common_name || extractCN(row.subject) || row.descr || t('common.certificate')
+const certStatus = (row) => (row.revoked ? 'revoked' : row.status || 'unknown')
+const STATUS = {
+  valid: ['good', 'common.valid'], expiring: ['warn', 'common.expiring'], expired: ['bad', 'common.expired'],
+  revoked: ['bad', 'common.revoked'], unknown: ['muted', 'common.status'],
+}
+
+/** The columns of each resource: { id, label, cell, value (sort), grow, fit }. */
+function useColumns(t) {
+  return useMemo(() => {
+    const status = (row) => { const [tone, key] = STATUS[certStatus(row)] || STATUS.unknown; return <Pill tone={tone} label={t(key)} /> }
+    const date = (key) => (row) => formatDate(row[key])
+    const name = (row) => row.descr || extractCN(row.subject) || '—'
+    // Every column sorts the rows shown, as the former table did
+    const sortable = (cols) => cols.map((c) => ({ ...c, sort: c.id }))
+    const all = {
+      certificates: [
+        { id: 'cn', label: t('common.commonName'), grow: true, value: (r) => certName(r, t),
+          cell: (r) => <span className="row-actions"><span>{certName(r, t)}</span>{r.has_private_key && <span title={t('common.hasKey')}><Icon name="key" /></span>}</span> },
+        { id: 'status', label: t('common.status'), fit: true, value: certStatus, cell: status },
+        { id: 'issuer', label: t('common.issuer'), value: (r) => extractCN(r.issuer) || r.issuer_name || '', cell: (r) => extractCN(r.issuer) || r.issuer_name || '—' },
+        { id: 'valid_to', label: t('common.expires'), fit: true, value: (r) => r.valid_to || '', cell: date('valid_to') },
       ],
-      filterFields: ['status', 'ca']
-    },
-    cas: {
-      icon: ShieldCheck,
-      color: 'icon-bg-green',
-      actions: ['delete', 'export'],
-      columns: [
-        {
-          key: 'descr',
-          header: t('common.name'),
-          sortable: true, priority: 1,
-          render: (val, row) => (
-            <span className="font-medium truncate">{val || extractCN(row.subject) || '—'}</span>
-          )
-        },
-        {
-          key: 'subject',
-          header: t('common.subject'),
-          sortable: true, priority: 2, hideOnMobile: true,
-          render: (val) => <span className="text-text-secondary truncate">{extractCN(val) || val || '—'}</span>
-        },
-        {
-          key: 'valid_to',
-          header: t('common.expires'),
-          sortable: true, priority: 3,
-          render: (val) => (
-            <span className="text-xs text-text-secondary whitespace-nowrap">{formatDate(val)}</span>
-          )
-        }
+      cas: [
+        { id: 'descr', label: t('common.name'), grow: true, value: name, cell: name },
+        { id: 'subject', label: t('common.subject'), value: (r) => extractCN(r.subject) || r.subject || '', cell: (r) => extractCN(r.subject) || r.subject || '—' },
+        { id: 'valid_to', label: t('common.expires'), fit: true, value: (r) => r.valid_to || '', cell: date('valid_to') },
       ],
-      filterFields: []
-    },
-    csrs: {
-      icon: FileText,
-      color: 'icon-bg-amber',
-      actions: ['sign', 'delete'],
-      columns: [
-        {
-          key: 'descr',
-          header: t('common.name'),
-          sortable: true, priority: 1,
-          render: (val, row) => (
-            <span className="font-medium truncate">{val || extractCN(row.subject) || '—'}</span>
-          )
-        },
-        {
-          key: 'subject',
-          header: t('common.subject'),
-          sortable: true, priority: 2, hideOnMobile: true,
-          render: (val) => <span className="text-text-secondary truncate">{extractCN(val) || val || '—'}</span>
-        },
-        {
-          key: 'created_at',
-          header: t('common.created'),
-          sortable: true, priority: 3,
-          render: (val) => (
-            <span className="text-xs text-text-secondary whitespace-nowrap">{formatDate(val)}</span>
-          )
-        }
+      csrs: [
+        { id: 'descr', label: t('common.name'), grow: true, value: name, cell: name },
+        { id: 'subject', label: t('common.subject'), value: (r) => extractCN(r.subject) || r.subject || '', cell: (r) => extractCN(r.subject) || r.subject || '—' },
+        { id: 'created_at', label: t('common.created'), fit: true, value: (r) => r.created_at || '', cell: date('created_at') },
       ],
-      filterFields: []
-    },
-    templates: {
-      icon: PencilSimple,
-      color: 'icon-bg-violet',
-      actions: ['delete'],
-      columns: [
-        {
-          key: 'name',
-          header: t('common.name'),
-          sortable: true, priority: 1,
-          render: (val) => (
-            <span className="font-medium truncate">{val || '—'}</span>
-          )
-        },
-        {
-          key: 'key_type',
-          header: t('common.keyType'),
-          sortable: true, priority: 2,
-          render: (val) => <Badge variant="secondary" size="sm">{val || '—'}</Badge>
-        },
-        {
-          key: 'validity_days',
-          header: t('common.validity'),
-          sortable: true, priority: 3,
-          render: (val) => <span className="text-text-secondary">{val ? `${val} ${t('common.days')}` : '—'}</span>
-        }
+      templates: [
+        { id: 'name', label: t('common.name'), grow: true, value: (r) => r.name || '', cell: (r) => r.name || '—' },
+        { id: 'key_type', label: t('common.keyType'), fit: true, value: (r) => r.key_type || '', cell: (r) => r.key_type || '—' },
+        { id: 'validity_days', label: t('common.validity'), fit: true, value: (r) => Number(r.validity_days) || 0,
+          cell: (r) => (r.validity_days ? `${r.validity_days} ${t('common.days')}` : '—') },
       ],
-      filterFields: []
-    },
-    users: {
-      icon: User,
-      color: 'icon-bg-orange',
-      actions: ['delete'],
-      columns: [
-        {
-          key: 'username',
-          header: t('common.user'),
-          sortable: true, priority: 1,
-          render: (val, row) => {
-            return (
-              <div className="min-w-0">
-                <div className="font-medium text-text-primary truncate">{val || '—'}</div>
-                <div className="text-xs text-text-secondary truncate">{row.email || '—'}</div>
-              </div>
-            )
-          }
-        },
-        {
-          key: 'role',
-          header: t('common.role'),
-          sortable: true, priority: 2,
-          render: (val) => {
-            const roleConfig = { admin: { variant: 'violet' }, operator: { variant: 'primary' }, auditor: { variant: 'orange' }, viewer: { variant: 'teal' } }
-            const config = roleConfig[val] || roleConfig.viewer
-            const roleLabels = { admin: t('users.admin', 'Admin'), operator: t('common.operator', 'Operator'), auditor: t('common.auditor', 'Auditor'), viewer: t('common.viewer', 'Viewer') }
-            return (
-              <Badge variant={config.variant} size="sm">
-                {val === 'admin' && <Crown weight="fill" className="h-3 w-3 mr-1" />}
-                {roleLabels[val] || t('common.viewer')}
-              </Badge>
-            )
-          }
-        },
-        {
-          key: 'active',
-          header: t('common.status'),
-          priority: 3, sortable: true,
-          render: (v) => v 
-            ? <Badge variant="success" size="sm">{t('common.active')}</Badge>
-            : <Badge variant="orange" size="sm">{t('common.disabled')}</Badge>
-        }
+      users: [
+        { id: 'username', label: t('common.user'), grow: true, value: (r) => r.username || '', cell: (r) => r.username || '—' },
+        { id: 'email', label: t('common.email'), value: (r) => r.email || '', cell: (r) => r.email || '—' },
+        { id: 'role', label: t('common.role'), fit: true, value: (r) => r.role || '', cell: (r) => t(ROLE_KEYS[r.role] || ROLE_KEYS.viewer) },
+        { id: 'active', label: t('common.status'), fit: true, value: (r) => (r.active ? 1 : 0),
+          cell: (r) => <Pill tone={r.active ? 'good' : 'warn'} label={r.active ? t('common.active') : t('common.disabled')} /> },
       ],
-      filterFields: []
     }
-  }), [t])
+    return Object.fromEntries(Object.entries(all).map(([type, cols]) => [type, sortable(cols)]))
+  }, [t])
+}
+
+/** A record's name, in the labels of its checkbox and on its phone card. */
+function rowName(type, row, t) {
+  if (type === 'certificates') return certName(row, t)
+  if (type === 'users') return row.username || '—'
+  if (type === 'templates') return row.name || '—'
+  return row.descr || extractCN(row.subject) || '—'
 }
 
 export default function OperationsPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showWarning, showInfo } = useNotification()
-  const { isMobile } = useMobile()
   const { isAdmin } = usePermission()
   const openEntity = useOpenEntity()
-  const RESOURCE_TYPES = useResourceTypes(t)
-  
+  const COLUMNS = useColumns(t)
+
   const TABS = [
-    { id: 'import', label: t('common.import'), description: t('operations.importHeaderDesc'), icon: UploadSimple },
-    { id: 'export', label: t('common.export'), description: t('operations.exportHeaderDesc'), icon: DownloadSimple },
-    { id: 'bulk', label: t('operations.bulkActions', 'Bulk Actions'), description: t('operations.bulkHeaderDesc'), icon: Lightning },
+    { id: 'import', label: t('common.import'), description: t('operations.importHeaderDesc'), icon: 'upload' },
+    { id: 'export', label: t('common.export'), description: t('operations.exportHeaderDesc'), icon: 'download' },
+    { id: 'bulk', label: t('operations.bulkActions'), description: t('operations.bulkHeaderDesc'), icon: 'layers' },
   ]
   // The operation a link names (/operations?tab=bulk) is the one shown
   const [activeTab, setActiveTab] = useSectionParam(['import', 'export', 'bulk'], 'import')
 
-  // ===== IMPORT STATE (from ImportExportPage) =====
+  const [smartImport, setSmartImport] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [cas, setCas] = useState([])
   const [opnsenseHost, setOpnsenseHost] = useState('')
@@ -260,9 +127,8 @@ export default function OperationsPage() {
   const [testResult, setTestResult] = useState(null)
   const [testItems, setTestItems] = useState([])
 
-  // ===== BULK STATE =====
   const [bulkResourceType, setBulkResourceType] = useState(() => {
-    try { return localStorage.getItem('ucm-ops-resource-type') || 'certificates' } catch { return 'certificates' }
+    try { const kept = localStorage.getItem(TYPE_KEY); return TYPES.includes(kept) ? kept : 'certificates' } catch { return 'certificates' }
   })
   const [bulkData, setBulkData] = useState([])
   const [bulkLoading, setBulkLoading] = useState(false)
@@ -279,13 +145,15 @@ export default function OperationsPage() {
   const [bulkSignDays, setBulkSignDays] = useState('365')
   const [statusFilter, setStatusFilter] = useState('')
   const [caFilter, setCaFilter] = useState('')
-  const [bulkViewMode, setBulkViewMode] = useState('table') // 'table' | 'basket'
+  // The selection alone (the former basket): every ticked item, from any page
+  const [selectionOnly, setSelectionOnly] = useState(false)
   const [resourceCounts, setResourceCounts] = useState({})
   const [bulkSearch, setBulkSearch] = useState('')
   const [bulkPage, setBulkPage] = useState(1)
   const [bulkPerPage, setBulkPerPage] = useState(25)
   const [bulkTotal, setBulkTotal] = useState(0)
-  // Items selected on other pages, kept so the basket view can still render
+  const [sort, setSort] = useState(null)
+  // Items selected on other pages, kept so the selection view can still render
   // them after the page they were loaded with is replaced
   const seenItemsRef = useRef(new Map())
 
@@ -561,10 +429,7 @@ export default function OperationsPage() {
       const data = result?.data
       const successCount = data?.success?.length || 0
       const failedCount = data?.failed?.length || 0
-      showSuccess(t('operations.bulkSuccess', { 
-        action: bulkAction, count: successCount,
-        defaultValue: `${bulkAction}: ${successCount} succeeded${failedCount ? `, ${failedCount} failed` : ''}`
-      }))
+      showSuccess(t('operations.bulkSuccess', { action: bulkAction, count: successCount }))
       if (failedCount > 0) {
         showError(t('operations.bulkPartialFail', {
           count: failedCount,
@@ -626,81 +491,6 @@ export default function OperationsPage() {
     return offPage.length ? [...bulkData, ...offPage] : bulkData
   }, [bulkData, selectedIds, serverPaged])
 
-  // Toolbar filters for bulk table
-  const bulkToolbarFilters = useMemo(() => {
-    if (bulkResourceType !== 'certificates') return undefined
-    return [
-      {
-        key: 'status',
-        value: statusFilter,
-        onChange: (v) => { setStatusFilter(v); setBulkPage(1) },
-        placeholder: t('common.allStatuses', 'All Statuses'),
-        options: [
-          { value: 'valid', label: t('common.valid', 'Valid') },
-          { value: 'expired', label: t('common.expired', 'Expired') },
-          { value: 'revoked', label: t('common.revoked', 'Revoked') }
-        ]
-      },
-      {
-        key: 'ca',
-        value: caFilter,
-        onChange: (v) => { setCaFilter(v); setBulkPage(1) },
-        placeholder: t('common.allCAs', 'All CAs'),
-        options: cas.map(ca => ({ value: String(ca.id), label: ca.descr || ca.subject || `CA #${ca.id}` }))
-      }
-    ]
-  }, [bulkResourceType, statusFilter, caFilter, cas, t])
-
-  const resourceConfig = RESOURCE_TYPES[bulkResourceType]
-
-  // Bulk action buttons
-  const renderBulkActionButtons = useCallback(() => {
-    // Every bulk route here is admin-only, and so is the page: keeping the
-    // bar on the same check means a routing change cannot expose it.
-    if (!resourceConfig || !isAdmin()) return null
-    return (
-      <div className="flex items-center gap-1.5">
-        {resourceConfig.actions.includes('revoke') && (
-          <Button type="button" size="sm" variant="secondary" onClick={() => setBulkAction('revoke')}>
-            <Prohibit size={14} /> {t('common.revoke', 'Revoke')}
-          </Button>
-        )}
-        {resourceConfig.actions.includes('renew') && (
-          <Button type="button" size="sm" variant="secondary" onClick={() => setBulkAction('renew')}>
-            <ArrowsClockwise size={14} /> {t('common.renew', 'Renew')}
-          </Button>
-        )}
-        {resourceConfig.actions.includes('sign') && (
-          <Button type="button" size="sm" variant="secondary" onClick={() => setBulkAction('sign')}>
-            <PencilSimple size={14} /> {t('common.sign', 'Sign')}
-          </Button>
-        )}
-        {resourceConfig.actions.includes('export') && (
-          <Button type="button" size="sm" variant="secondary" onClick={async () => {
-            const ids = Array.from(selectedIds)
-            if (!ids.length) return
-            try {
-              const service = bulkResourceType === 'certificates' ? certificatesService : casService
-              const blob = await service.bulkExport(ids, 'pem')
-              if (blob) {
-                downloadBlob(blob, `${bulkResourceType}_export.pem`)
-              }
-              showSuccess(t('operations.bulkSuccess', { action: 'export', count: blob?.exportedCount ?? ids.length, defaultValue: `Exported ${blob?.exportedCount ?? ids.length} items` }))
-              warnSkippedExport(blob, t, showWarning)
-            } catch (e) { showError(e.message || 'Export failed') }
-          }}>
-            <DownloadSimple size={14} /> {t('export.title', 'Export')} PEM
-          </Button>
-        )}
-        {resourceConfig.actions.includes('delete') && (
-          <Button type="button" size="sm" variant="danger" onClick={() => setBulkAction('delete')}>
-            <Trash size={14} /> {t('common.delete', 'Delete')}
-          </Button>
-        )}
-      </div>
-    )
-  }, [resourceConfig, selectedIds, bulkResourceType, t])
-
   // Confirm modal content
   const getConfirmMessage = () => {
     const count = selectedIds.size
@@ -714,476 +504,251 @@ export default function OperationsPage() {
     return actionLabels[bulkAction] || ''
   }
 
-  // ===== TAB CONTENT =====
+  const chooseType = (type) => {
+    setBulkResourceType(type)
+    try { localStorage.setItem(TYPE_KEY, type) } catch { /* private mode */ }
+    setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()); setBulkSearch(''); setBulkPage(1); setSort(null); setSelectionOnly(false)
+    seenItemsRef.current.clear()
+  }
+
+  const exportSelection = async () => {
+    const ids = Array.from(selectedIds)
+    if (!ids.length) return
+    try {
+      const service = bulkResourceType === 'certificates' ? certificatesService : casService
+      const blob = await service.bulkExport(ids, 'pem')
+      if (blob) downloadBlob(blob, `${bulkResourceType}_export.pem`)
+      showSuccess(t('operations.bulkSuccess', { action: 'export', count: blob?.exportedCount ?? ids.length }))
+      warnSkippedExport(blob, t, showWarning)
+    } catch (e) { showError(e.message || t('importExport.export.exportFailed')) }
+  }
+
+  // ===== IMPORT =====
+  const ticked = testItems.filter(i => i.selected).length
   const renderImportTab = () => (
     <>
-      <FormGroup 
-        title={t('importExport.smartImport.title')} 
-        description={t('importExport.smartImport.description')}
-      >
-        <SmartImportWidget onImportComplete={handleImportComplete} />
-      </FormGroup>
-
-      <FormGroup title={t('importExport.opnsense.title')} description={t('importExport.opnsense.description')}>
-        <form onSubmit={(e) => e.preventDefault()} className="sf-stack">
-          <div className="sf-grid">
-            <Input label={t('importExport.opnsense.hostLabel')} value={opnsenseHost} onChange={(e) => setOpnsenseHost(e.target.value)} placeholder={t('importExport.opnsense.hostPlaceholder')} />
-            <Input className="sf-short" label={t('common.portLabel')} inputMode="numeric" value={opnsensePort} onChange={(e) => setOpnsensePort(e.target.value)} placeholder={t('common.portPlaceholder')} />
-            <Input label={t('importExport.opnsense.apiKeyLabel')} value={opnsenseApiKey} onChange={(e) => setOpnsenseApiKey(e.target.value)} placeholder={t('importExport.opnsense.apiKeyLabel')} />
-            <Input label={t('importExport.opnsense.apiSecretLabel')} type="password" noAutofill value={opnsenseApiSecret} onChange={(e) => setOpnsenseApiSecret(e.target.value)} placeholder={t('importExport.opnsense.apiSecretLabel')} />
+      <SettingsGroup legend={t('importExport.smartImport.title')} hint={t('importExport.smartImport.description')} grid={false}>
+        <div className="settings-actions">
+          <Btn tone="primary" icon="upload" id="ops-smart-import" onClick={() => setSmartImport(true)}>{t('operations.openSmartImport')}</Btn>
+        </div>
+      </SettingsGroup>
+      <SettingsGroup legend={t('importExport.opnsense.title')} hint={t('importExport.opnsense.description')} grid={false}>
+        <form onSubmit={(e) => e.preventDefault()} noValidate className="settings-stack">
+          <div className="settings-grid">
+            <Input id="ops-opnsense-host" label={t('importExport.opnsense.hostLabel')} value={opnsenseHost} onChange={(e) => setOpnsenseHost(e.target.value)}
+              placeholder={t('importExport.opnsense.hostPlaceholder')} />
+            <NumberInput id="ops-opnsense-port" label={t('common.portLabel')} value={opnsensePort} onChange={(e) => setOpnsensePort(e.target.value)}
+              placeholder={t('common.portPlaceholder')} />
+            <Input id="ops-opnsense-key" label={t('importExport.opnsense.apiKeyLabel')} value={opnsenseApiKey} onChange={(e) => setOpnsenseApiKey(e.target.value)} />
+            <SecretInput id="ops-opnsense-secret" label={t('importExport.opnsense.apiSecretLabel')} value={opnsenseApiSecret}
+              onChange={(e) => setOpnsenseApiSecret(e.target.value)} />
+            <ToggleSwitch id="ops-opnsense-ignore" checked={!opnsenseVerifySsl} onChange={(ignore) => setOpnsenseVerifySsl(!ignore)}
+              label={t('importExport.opnsense.ignoreCert')} />
+            {!opnsenseVerifySsl && <Notice tone="warn">{t('importExport.opnsense.sslWarning')}</Notice>}
           </div>
-          <ToggleSwitch
-            checked={!opnsenseVerifySsl}
-            onChange={(ignore) => setOpnsenseVerifySsl(!ignore)}
-            label={t('importExport.opnsense.ignoreCert')}
-          />
-          {!opnsenseVerifySsl && (
-            <HelpCard variant="warning">{t('importExport.opnsense.sslWarning')}</HelpCard>
-          )}
-
-          {testResult?.success && testItems.length > 0 && (
-            <div>
-              <ToggleSwitch
-                checked={testItems.every(i => i.selected)}
-                onChange={(on) => toggleAllItems(on)}
-                label={`${t('importExport.opnsense.selectAll')} (${testItems.filter(i => i.selected).length}/${testItems.length})`}
-              />
-              <ul className="sf-records sf-records-scroll">
-                {testItems.map(item => (
-                  <li key={item.id}>
-                    <ToggleSwitch
-                      checked={item.selected}
-                      onChange={() => toggleItemSelection(item.id)}
-                      label={(
-                        <span className="sf-record-title">
-                          <strong>{item.name || t('common.unnamed')}</strong>
-                          <Badge variant={item.type === 'CA' ? 'primary' : 'info'}>{item.type === 'CA' ? t('common.ca') : t('common.certificate')}</Badge>
-                        </span>
-                      )}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
           {/* The test as the mockup's test zone: the button, then its result on the line */}
-          <div className="sf-test">
-            <Button ref={opnsenseTestButton} type="button" variant="secondary" onClick={handleTestConf} disabled={processing || !opnsenseHost || !opnsenseApiKey || !opnsenseApiSecret}>
-              <PlugsConnected size={16} />
-              {processing ? t('common.testing') : t('common.testConnection')}
-            </Button>
-            {testResult?.success && testItems.some(i => i.selected) && (
-              <Button type="button" onClick={handleImportFromOpnsense} disabled={processing}>
-                <UploadSimple size={16} />
-                {t('importExport.opnsense.importSelected', { count: testItems.filter(i => i.selected).length })}
-              </Button>
-            )}
-            {testResult ? (
-              <p className={testResult.success ? 'sf-test-result is-good' : 'sf-test-result is-bad'} role="status">
-                {testResult.success ? <CheckCircle aria-hidden="true" /> : <WarningCircle aria-hidden="true" />}
-                <span>
-                  {testResult.success
-                    ? (testResult.stats
-                      ? t('importExport.opnsense.connectedWithCounts', { cas: testResult.stats.cas, certificates: testResult.stats.certificates })
-                      : t('importExport.opnsense.connectedSuccessfully'))
-                    : (testResult.error || t('importExport.opnsense.connectionFailed'))}
-                </span>
-              </p>
-            ) : (
-              <p className="sf-test-result">
-                <Question aria-hidden="true" />
-                <span>{t('importExport.opnsense.testHint')}</span>
-              </p>
-            )}
-          </div>
+          <SettingsTest id="opnsense" icon="plug" label={processing ? t('common.testing') : t('common.testConnection')} buttonRef={opnsenseTestButton}
+            write={false} busy={processing || !opnsenseHost || !opnsenseApiKey || !opnsenseApiSecret} onTest={handleTestConf}
+            hint={t('importExport.opnsense.testHint')}
+            result={testResult && {
+              ok: testResult.success,
+              text: testResult.success
+                ? (testResult.stats
+                  ? t('importExport.opnsense.connectedWithCounts', { cas: testResult.stats.cas, certificates: testResult.stats.certificates })
+                  : t('importExport.opnsense.connectedSuccessfully'))
+                : (testResult.error || t('importExport.opnsense.connectionFailed')),
+            }} />
+          {testResult?.success && testItems.length > 0 && (
+            <>
+              <ToggleSwitch id="ops-opnsense-all" checked={testItems.every(i => i.selected)} onChange={(on) => toggleAllItems(on)}
+                label={`${t('importExport.opnsense.selectAll')} (${ticked}/${testItems.length})`} />
+              <div className="columns-list compare-scroll" role="group" aria-label={t('importExport.opnsense.foundItems')}>
+                {testItems.map(item => (
+                  <label key={item.id} className="checkbox-line">
+                    <input type="checkbox" checked={item.selected} onChange={() => toggleItemSelection(item.id)} />
+                    {item.name || t('common.unnamed')}{' '}
+                    <Pill tone="muted" icon={item.type === 'CA' ? 'shield' : 'cert'} label={item.type === 'CA' ? t('common.ca') : t('common.certificate')} />
+                  </label>
+                ))}
+              </div>
+              <div className="settings-actions">
+                <Btn tone="primary" icon="upload" onClick={handleImportFromOpnsense} disabled={processing || !ticked || undefined}>
+                  {t('importExport.opnsense.importSelected', { count: ticked })}
+                </Btn>
+              </div>
+            </>
+          )}
         </form>
-      </FormGroup>
+      </SettingsGroup>
     </>
   )
 
-  // Each export as a record of the mockup's list: the format, what it holds, its download button
+  // ===== EXPORT: each download as a record of the mockup's list =====
   const exportRow = (key, label, desc, onClick) => (
-    <li key={key}>
-      <div className="sf-record-main">
-        <strong>{label}</strong>
-        <span className="sf-record-meta">{desc}</span>
-      </div>
-      <div className="sf-record-actions">
-        <Button type="button" variant="secondary" onClick={onClick} aria-label={`${t('common.download')} ${label}`}>
-          <DownloadSimple size={16} />
-          {t('common.download')}
-        </Button>
-      </div>
-    </li>
+    <RecordRow key={key} title={label} meta={desc}
+      action={<Btn icon="download" write={false} onClick={onClick} aria-label={`${t('common.download')} ${label}`}>{t('common.download')}</Btn>} />
   )
-
   const renderExportTab = () => (
     <>
-      <FormGroup title={t('importExport.export.allCertsTitle')} description={t('importExport.export.allCertsDesc')}>
-        <ul className="sf-records">
+      <SettingsGroup legend={t('importExport.export.allCertsTitle')} hint={t('importExport.export.allCertsDesc')} grid={false}>
+        <RecordList>
           {exportRow('cert-pem', t('importExport.export.pemBundle'), t('importExport.export.pemDesc'),
             () => handleExport(certificatesService.exportAll, 'pem', 'certificates'))}
           {exportRow('cert-p7b', t('importExport.export.p7bBundle'), t('importExport.export.p7bDesc'),
             () => handleExport(certificatesService.exportAll, 'pkcs7', 'certificates'))}
-        </ul>
-      </FormGroup>
-
-      <FormGroup title={t('importExport.export.allCAsTitle')} description={t('importExport.export.allCAsDesc', { count: cas.length })}>
-        <ul className="sf-records">
+        </RecordList>
+      </SettingsGroup>
+      <SettingsGroup legend={t('importExport.export.allCAsTitle')} hint={t('importExport.export.allCAsDesc', { count: cas.length })} grid={false}>
+        <RecordList>
           {exportRow('ca-pem', t('importExport.export.pemBundle'), t('importExport.export.pemDesc'),
             () => handleExport(casService.exportAll, 'pem', 'ca-certificates'))}
           {exportRow('ca-p7b', t('importExport.export.p7bBundle'), t('importExport.export.p7bDesc'),
             () => handleExport(casService.exportAll, 'pkcs7', 'ca-certificates'))}
-        </ul>
-      </FormGroup>
+        </RecordList>
+      </SettingsGroup>
     </>
   )
 
-  // Render item for basket/transfer view — compact row per resource type
-  const renderBasketItem = useCallback((item) => {
-    const type = bulkResourceType
-    if (type === 'certificates') {
-      const name = item.cn || item.common_name || extractCN(item.subject) || item.descr || '?'
-      const status = item.revoked ? 'revoked' : item.status || 'unknown'
-      const statusColors = { valid: 'text-accent-success', expiring: 'text-accent-warning', expired: 'text-accent-danger', revoked: 'text-accent-danger' }
-      const statusLabels = { valid: t('common.valid'), expiring: t('common.expiring'), expired: t('common.expired'), revoked: t('common.revoked') }
-      return (
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium truncate flex-1">{name}</span>
-          <span className={cn("text-xs", statusColors[status] || 'text-text-tertiary')}>{statusLabels[status] || t('common.status')}</span>
-        </div>
-      )
-    }
-    if (type === 'cas') {
-      return (
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium truncate">{item.descr || extractCN(item.subject) || '—'}</span>
-        </div>
-      )
-    }
-    if (type === 'csrs') {
-      return (
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium truncate">{item.descr || extractCN(item.subject) || '—'}</span>
-        </div>
-      )
-    }
-    if (type === 'templates') {
-      return (
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium truncate flex-1">{item.name || '—'}</span>
-          <span className="text-xs text-text-tertiary">{item.key_type}</span>
-        </div>
-      )
-    }
-    if (type === 'users') {
-      return (
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium truncate flex-1">{item.username || '—'}</span>
-          <span className="text-xs text-text-tertiary">{item.role}</span>
-        </div>
-      )
-    }
-    return <span className="text-sm truncate">{item.name || item.descr || item.username || '—'}</span>
-  }, [bulkResourceType, t])
+  // ===== BULK =====
+  const columns = COLUMNS[bulkResourceType]
+  const actions = ACTIONS[bulkResourceType]
+  // CAs, templates and users come whole: searched, sorted and paged here; certificates and CSRs by the server
+  const searched = serverPaged || !bulkSearch ? bulkData : bulkData.filter((row) => SEARCH_KEYS.some((k) => String(row[k] ?? '').toLowerCase().includes(bulkSearch.toLowerCase())))
+  const listed = selectionOnly ? basketItems.filter((row) => selectedIds.has(row.id)) : searched
+  const sortCol = sort && columns.find((c) => c.id === sort.key)
+  const sorted = sortCol ? [...listed].sort((a, b) => {
+    const x = sortCol.value(a); const y = sortCol.value(b)
+    const order = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))
+    return sort.asc ? order : -order
+  }) : listed
+  const localPages = !serverPaged && !selectionOnly
+  const total = selectionOnly ? sorted.length : serverPaged ? bulkTotal : sorted.length
+  const pages = Math.max(1, Math.ceil(total / bulkPerPage))
+  const rows = localPages ? sorted.slice((bulkPage - 1) * bulkPerPage, bulkPage * bulkPerPage) : sorted
+  const start = total ? (selectionOnly ? 1 : (bulkPage - 1) * bulkPerPage + 1) : 0
+  const end = selectionOnly ? total : Math.min(total, start + rows.length - 1)
+  const toggle = (id) => setSelectedIds((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  const togglePage = (on) => setSelectedIds((prev) => { const next = new Set(prev); rows.forEach((r) => (on ? next.add(r.id) : next.delete(r.id))); return next })
+  const n = selectedIds.size
 
   const renderBulkTab = () => (
-    <div className="flex flex-col h-full min-h-0">
-      {/* Resource type selector, at the 20 px content edge of the other frames */}
-      <div className="shrink-0 px-4 md:px-5 pb-1">
-        {isMobile ? (
-          /* Mobile: dropdown select */
-          <div className="relative">
-            <select
-              value={bulkResourceType}
-              onChange={(e) => { const v = e.target.value; setBulkResourceType(v); try { localStorage.setItem('ucm-ops-resource-type', v) } catch {}; setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()); setBulkSearch(''); setBulkPage(1); seenItemsRef.current.clear() }}
-              className="ui-control w-full appearance-none pr-10"
-            >
-              {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
-                const count = resourceCounts[key]
-                return (
-                  <option key={key} value={key}>
-                    {t(`common.${key}Short`, key)}{count !== undefined ? ` (${count})` : ''}
-                  </option>
-                )
-              })}
-            </select>
-            <CaretDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" />
-          </div>
-        ) : (
-          /* Desktop: two rows — chips, then search + filters + toggle */
-          <div className="space-y-2">
-            {/* The resource type as the mockup's segmented choice, its count after the name */}
-            <div className="ui-segmented" role="group" aria-label={t('operations.selectResource')}>
-              {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
-                const Icon = config.icon
-                const isActive = bulkResourceType === key
-                const count = resourceCounts[key]
-                return (
-                  <button
-                    type="button"
-                    key={key}
-                    aria-pressed={isActive}
-                    onClick={() => { setBulkResourceType(key); try { localStorage.setItem('ucm-ops-resource-type', key) } catch {}; setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()); setBulkSearch(''); setBulkPage(1); seenItemsRef.current.clear() }}
-                  >
-                    <Icon size={14} aria-hidden="true" />
-                    {t(`common.${key}Short`, key)}
-                    {count !== undefined && <span className="ops-count">{count}</span>}
-                  </button>
-                )
-              })}
-            </div>
-
-            <div className="flex items-center gap-2">
-              {/* Search */}
-              <div className="relative flex-1 min-w-0">
-                <MagnifyingGlass size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
-                <input
-                  type="text"
-                  value={bulkSearch}
-                  onChange={(e) => { setBulkSearch(e.target.value); setBulkPage(1) }}
-                  placeholder={t('common.search')}
-                  className="ui-control pl-8"
-                />
-              </div>
-
-              {/* Status & CA filters — only for certificates */}
-              {bulkResourceType === 'certificates' && (
-                <>
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => { setStatusFilter(e.target.value); setBulkPage(1) }}
-                    className="ui-control is-filter shrink-0"
-                  >
-                    <option value="">{t('common.allStatuses', 'All Statuses')}</option>
-                    <option value="valid">{t('common.valid', 'Valid')}</option>
-                    <option value="expired">{t('common.expired', 'Expired')}</option>
-                    <option value="revoked">{t('common.revoked', 'Revoked')}</option>
-                  </select>
-                  <select
-                    value={caFilter}
-                    onChange={(e) => { setCaFilter(e.target.value); setBulkPage(1) }}
-                    className="ui-control is-filter shrink-0 truncate"
-                  >
-                    <option value="">{t('common.allCAs', 'All CAs')}</option>
-                    {cas.map(ca => (
-                      <option key={ca.id} value={String(ca.id)}>{ca.descr || ca.subject || `CA #${ca.id}`}</option>
-                    ))}
-                  </select>
-                </>
-              )}
-
-              {/* View mode toggle */}
-              <div className="ui-segmented shrink-0" role="group">
-                <button
-                  type="button"
-                  onClick={() => setBulkViewMode('table')}
-                  aria-pressed={bulkViewMode === 'table'}
-                  aria-label={t('operations.tableView', 'Table View')}
-                  title={t('operations.tableView', 'Table View')}
-                >
-                  <Table size={16} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBulkViewMode('basket')}
-                  aria-pressed={bulkViewMode === 'basket'}
-                  aria-label={t('operations.basketView', 'Basket View')}
-                  title={t('operations.basketView', 'Basket View')}
-                >
-                  <ShoppingCart size={16} aria-hidden="true" />
-                </button>
-              </div>
-            </div>
-          </div>
+    <>
+      <StateFilters label={t('operations.selectResource')} active={bulkResourceType} onChange={chooseType}
+        views={TYPES.map((type) => ({ id: type, label: t(`common.${type}Short`), count: resourceCounts[type] }))} />
+      <TableView label={t('operations.bulkListLabel')} tableLabel={t('operations.bulkTableLabel')} kind="module" scrollId="ops-scroll"
+        storageKey="ucm-operations" density
+        search={<>
+          <SearchField id="ops-search" label={t('common.search')} placeholder={t('common.search')} value={bulkSearch}
+            onChange={(v) => { setBulkSearch(v); setBulkPage(1) }} />
+          {bulkResourceType === 'certificates' && (
+            <>
+              <FilterSelect id="ops-status" label={t('common.status')} value={statusFilter} onChange={(v) => { setStatusFilter(v); setBulkPage(1) }}
+                options={[
+                  { value: '', label: t('common.allStatuses') },
+                  { value: 'valid', label: t('common.valid') },
+                  { value: 'expired', label: t('common.expired') },
+                  { value: 'revoked', label: t('common.revoked') },
+                ]} />
+              <FilterSelect id="ops-ca" label={t('common.certificateAuthority')} value={caFilter} onChange={(v) => { setCaFilter(v); setBulkPage(1) }}
+                options={[{ value: '', label: t('common.allCAs') }, ...cas.map(ca => ({ value: String(ca.id), label: ca.descr || ca.subject || `CA #${ca.id}` }))]} />
+            </>
+          )}
+        </>}
+        tools={(
+          <button type="button" className="btn" id="ops-selection-only" aria-pressed={selectionOnly} disabled={(!n && !selectionOnly) || undefined}
+            onClick={() => setSelectionOnly((v) => !v)}>
+            <Icon name="check" />{t('operations.selectionOnly', { count: n })}
+          </button>
         )}
-      </div>
-
-      {/* Content area — table on mobile, table or basket on desktop */}
-      <div className="flex-1 min-h-0 md:px-5 md:pb-5">
-        {(isMobile || bulkViewMode === 'table') ? (
-          <ResponsiveDataTable
-            data={bulkData}
-            columns={resourceConfig.columns}
-            multiSelect={true}
-            selectedIds={selectedIds}
-            onSelectionChange={setSelectedIds}
-            bulkActions={renderBulkActionButtons()}
-            searchable={isMobile}
-            externalSearch={serverPaged ? bulkSearch : (isMobile ? undefined : bulkSearch)}
-            onSearchChange={serverPaged
-              ? (v) => { setBulkSearch(v); setBulkPage(1) }
-              : (isMobile ? undefined : setBulkSearch)}
-            searchPlaceholder={t('common.search')}
-            searchKeys={serverPaged ? [] : ['cn', 'descr', 'name', 'subject', 'username', 'email', 'common_name']}
-            sortable
-            densityStorageKey="ucm-operations-density"
-            toolbarFilters={isMobile ? bulkToolbarFilters : undefined}
-            loading={bulkLoading}
-            pagination={serverPaged
-              ? {
-                  page: bulkPage,
-                  total: bulkTotal,
-                  perPage: bulkPerPage,
-                  onChange: setBulkPage,
-                  onPerPageChange: (v) => { setBulkPerPage(v); setBulkPage(1) }
-                }
-              : true}
-            defaultPerPage={25}
-            emptyIcon={resourceConfig.icon}
-            emptyTitle={t('operations.noData', 'No items found')}
-            emptyDescription={t('operations.noDataDesc', 'Try adjusting your filters')}
-          />
-        ) : (
-          <div className="h-full px-4 md:px-0 pb-2">
-            <TransferPanel
-              items={basketItems}
-              selectedIds={selectedIds}
-              onSelectionChange={setSelectedIds}
-              renderItem={renderBasketItem}
-              searchKeys={['cn', 'descr', 'name', 'subject', 'username', 'email', 'common_name']}
-              leftTitle={t(`common.${bulkResourceType}`, bulkResourceType)}
-              rightTitle={t('operations.basket', 'Basket')}
-              leftIcon={resourceConfig.icon}
-              rightIcon={ShoppingCart}
-              emptyRightMessage={t('operations.dragHere', 'Drag items here or click + to add')}
-              bulkActions={renderBulkActionButtons()}
-            />
-          </div>
+        batch={n > 0 && isAdmin() && (
+          // Every bulk route here is admin-only, and so is the page: the bar keeps the same check
+          <BatchBar count={t('table.selectedCount', { count: n })} onClear={() => { setSelectedIds(new Set()); setSelectionOnly(false) }}>
+            {actions.includes('revoke') && <Btn tone="danger" icon="block" onClick={() => setBulkAction('revoke')}>{t('common.revoke')}</Btn>}
+            {actions.includes('renew') && <Btn write icon="refresh" onClick={() => setBulkAction('renew')}>{t('common.renew')}</Btn>}
+            {actions.includes('sign') && <Btn write icon="stamp" onClick={() => setBulkAction('sign')}>{t('common.sign')}</Btn>}
+            {actions.includes('export') && <Btn icon="download" onClick={exportSelection}>{t('operations.exportPem')}</Btn>}
+            {actions.includes('delete') && <Btn tone="danger" icon="close" onClick={() => setBulkAction('delete')}>{t('common.delete')}</Btn>}
+          </BatchBar>
         )}
-      </div>
-    </div>
+        columns={columns} rows={rows} rowKey={(r) => r.id} rowLabel={(r) => rowName(bulkResourceType, r, t)}
+        selection={{ selected: selectedIds, onToggle: toggle, onTogglePage: togglePage }}
+        sort={sort} onSort={(key) => setSort((prev) => (prev?.key === key ? { key, asc: !prev.asc } : { key, asc: true }))}
+        loading={bulkLoading}
+        card={(r) => ({ description: columns[1]?.cell(r), meta: columns.slice(2).map((c) => c.cell(r)) })}
+        empty={<EmptyBlock id="operations" icon={TYPE_ICONS[bulkResourceType]} title={t('operations.noData')} text={t('operations.noDataDesc')} />}
+        footer={(
+          <TableFooter range={total ? t('table.range', { start, end, total }) : ''}
+            pagination={selectionOnly ? undefined : { page: bulkPage, pages, perPage: bulkPerPage, onPage: setBulkPage, onPerPage: (v) => { setBulkPerPage(v); setBulkPage(1) } }} />
+        )} />
+    </>
   )
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'import': return renderImportTab()
-      case 'export': return renderExportTab()
-      case 'bulk': return renderBulkTab()
-      default: return null
-    }
-  }
-
+  const content = { import: renderImportTab, export: renderExportTab, bulk: renderBulkTab }
   const active = TABS.find(tab => tab.id === activeTab)
+  const closeAction = () => { setBulkAction(null); setBulkRevokeReason('unspecified') }
+  const unlisted = unlistedSigningCas(cas)
+  const hidden = hiddenFromIssuance(signingCas(cas), bulkSignCaId)
+
+  const dialogs = (
+    <>
+      {bulkAction === 'revoke' && (
+        <AtelierDialog title={t('operations.confirmBulk')} size="narrow" onClose={closeAction} testId="ops-revoke">
+          <p>{getConfirmMessage()}</p>
+          <div className="form-fields">
+            <Select id="ops-revoke-reason" full label={t('revocation.reasonLabel')} value={bulkRevokeReason} onChange={setBulkRevokeReason}
+              hint={`${t(`revocation.hints.${bulkRevokeReason}`)} ${t('revocation.bulkReasonHelp')}`}
+              options={REVOCATION_REASONS.map(r => ({ value: r, label: t(`revocation.reasons.${r}`) }))} />
+            {selectionHasPairs && (
+              <ToggleSwitch id="bulk-revoke-related" checked={bulkRevokeRelated} onChange={setBulkRevokeRelated}
+                label={t('revocation.revokeRelatedBulk')} description={t('revocation.revokeRelatedBulkHint')} />
+            )}
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="btn" data-action="close-modal" disabled={bulkProcessing || undefined} onClick={closeAction}>{t('common.cancel')}</button>
+            <Btn tone="danger" icon="block" disabled={bulkProcessing || partnersLoading || undefined} onClick={executeBulkAction}>{t('common.revoke')}</Btn>
+          </div>
+        </AtelierDialog>
+      )}
+      <ConfirmModal open={bulkAction === 'renew' || bulkAction === 'delete'} onClose={closeAction} onConfirm={executeBulkAction}
+        title={t('operations.confirmBulk')} message={getConfirmMessage()}
+        confirmLabel={bulkAction === 'delete' ? t('common.delete') : t('common.renew')}
+        variant={bulkAction === 'delete' ? 'danger' : 'primary'} loading={bulkProcessing || partnersLoading} />
+      {bulkAction === 'sign' && (
+        <AtelierDialog title={t('operations.signCSRs', { count: n })} size="narrow" onClose={closeAction} testId="ops-sign">
+          <p>{t('operations.selectCAForSign')}</p>
+          <div className="form-fields">
+            <Select id="ops-sign-ca" full label={t('common.certificateAuthority')} value={bulkSignCaId} onChange={setBulkSignCaId} placeholder={t('common.selectCA')}
+              options={listedForIssuance(signingCas(cas), showHiddenCas, bulkSignCaId).map(ca => ({ value: String(ca.id), label: ca.descr || ca.subject }))}
+              hint={(unlisted > 0 || hidden > 0) && <>
+                {unlisted > 0 && t('cas.notListedForSigning', { count: unlisted })}{' '}
+                <HiddenCasToggle count={hidden} shown={showHiddenCas} onToggle={() => setShowHiddenCas(v => !v)} />
+              </>} />
+            <NumberInput id="ops-sign-days" label={t('account.mtlsValidityDays')} value={bulkSignDays} onChange={(e) => setBulkSignDays(e.target.value)} />
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="btn" data-action="close-modal" disabled={bulkProcessing || undefined} onClick={closeAction}>{t('common.cancel')}</button>
+            <Btn tone="primary" icon="stamp" disabled={bulkProcessing || undefined} onClick={executeBulkAction}>{t('common.sign')}</Btn>
+          </div>
+        </AtelierDialog>
+      )}
+    </>
+  )
 
   // One operation at a time in its frame; import and export keep their own actions, no save bar
   return (
-    <ResponsiveLayout
-      title={t('operations.title', 'Operations')}
-      total={t('sectioned.sectionCount', { count: TABS.length })}
-      intent={t('shell.moduleDesc.operations')}
-      helpPageKey="operations"
-    >
-      <FormLayout
-        toc={(
-          <SectionToc
-            label={t('operations.tocLabel')}
-            sections={TABS}
-            current={activeTab}
-            hrefFor={(id) => (id === 'import' ? '/operations' : `/operations?tab=${id}`)}
-            onJump={setActiveTab}
-          />
-        )}
-      >
-        <SectionJump label={t('sectioned.jumpLabel')} sections={TABS} value={activeTab} onJump={setActiveTab} />
-        <FormSection
-          id={active.id}
-          title={active.label}
-          description={active.description}
-          bodyClassName={activeTab === 'bulk' ? 'sf-body-fill' : undefined}
+    <>
+      <Zone testId="operations-page" after={dialogs}>
+        <PageHead title={t('operations.title')} total={t('sectioned.sectionCount', { count: TABS.length })} intent={t('shell.moduleDesc.operations')} />
+        <SettingsLayout
+          toc={<SettingsToc label={t('operations.tocLabel')} sections={TABS} current={activeTab}
+            hrefFor={(id) => (id === 'import' ? '/operations' : `/operations?tab=${id}`)} onJump={setActiveTab} />}
         >
-          {renderContent()}
-        </FormSection>
-      </FormLayout>
-
-      {/* Confirm modal for bulk actions (not export/sign — they have their own) */}
-      <ConfirmModal
-        open={!!bulkAction && bulkAction !== 'export' && bulkAction !== 'sign'}
-        onClose={() => { setBulkAction(null); setBulkRevokeReason('unspecified') }}
-        onConfirm={executeBulkAction}
-        title={t('operations.confirmBulk', 'Confirm Bulk Operation')}
-        message={bulkAction === 'revoke' && bulkResourceType === 'certificates' ? (
-          <div className="space-y-3">
-            <p>{getConfirmMessage()}</p>
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide">
-                {t('revocation.reasonLabel')}
-              </label>
-              <select
-                value={bulkRevokeReason}
-                onChange={(e) => setBulkRevokeReason(e.target.value)}
-                className="ui-control w-full"
-              >
-                {REVOCATION_REASONS.map(r => (
-                  <option key={r} value={r}>{t(`revocation.reasons.${r}`)}</option>
-                ))}
-              </select>
-              <p className="text-xs text-text-tertiary">{t(`revocation.hints.${bulkRevokeReason}`)} {t('revocation.bulkReasonHelp')}</p>
-            </div>
-            {selectionHasPairs && (
-              <div className="flex items-start gap-2.5">
-                <input
-                  type="checkbox"
-                  id="bulk-revoke-related"
-                  checked={bulkRevokeRelated}
-                  onChange={(e) => setBulkRevokeRelated(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 rounded accent-accent-primary"
-                />
-                <div>
-                  <label htmlFor="bulk-revoke-related" className="text-sm text-text-primary cursor-pointer">
-                    {t('revocation.revokeRelatedBulk')}
-                  </label>
-                  <p className="text-xs text-text-tertiary">{t('revocation.revokeRelatedBulkHint')}</p>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : getConfirmMessage()}
-        confirmLabel={bulkAction === 'delete' ? t('common.delete') : t('common.confirm', 'Confirm')}
-        variant={bulkAction === 'delete' || bulkAction === 'revoke' ? 'danger' : 'primary'}
-        loading={bulkProcessing || partnersLoading}
-      />
-
-      {/* Sign CSR modal (needs CA selection) */}
-      {bulkAction === 'sign' && (
-        <ConfirmModal
-          open={true}
-          onClose={() => setBulkAction(null)}
-          onConfirm={executeBulkAction}
-          title={t('operations.signCSRs', `Sign ${selectedIds.size} CSR(s)`)}
-          message={
-            <div className="space-y-3">
-              <p>{t('operations.selectCAForSign', 'Select a CA to sign the CSRs:')}</p>
-              <select
-                value={bulkSignCaId}
-                onChange={(e) => setBulkSignCaId(e.target.value)}
-                className="ui-control w-full"
-              >
-                <option value="">{t('common.selectCA', 'Select CA...')}</option>
-                {listedForIssuance(signingCas(cas), showHiddenCas, bulkSignCaId).map(ca => (
-                  <option key={ca.id} value={ca.id}>{ca.descr || ca.subject}</option>
-                ))}
-              </select>
-              <HiddenCasToggle count={hiddenFromIssuance(signingCas(cas), bulkSignCaId)} shown={showHiddenCas} onToggle={() => setShowHiddenCas(v => !v)} />
-              {unlistedSigningCas(cas) > 0 && (
-                <p className="text-xs text-text-tertiary">{t('cas.notListedForSigning', { count: unlistedSigningCas(cas) })}</p>
-              )}
-              <Input
-                label={t('common.validityDays', 'Validity (days)')}
-                type="number"
-                value={bulkSignDays}
-                onChange={(e) => setBulkSignDays(e.target.value)}
-              />
-            </div>
-          }
-          confirmLabel={t('common.sign', 'Sign')}
-          variant="primary"
-          loading={bulkProcessing}
-        />
-      )}
-
-      {/* Export action is immediate, no confirmation needed */}
-    </ResponsiveLayout>
+          <SettingsJump sections={TABS} current={activeTab} onJump={setActiveTab} />
+          <SettingsFrame id={active.id} label={active.label} desc={active.description}>{content[activeTab]()}</SettingsFrame>
+        </SettingsLayout>
+      </Zone>
+      <SmartImportModal isOpen={smartImport} onClose={() => setSmartImport(false)}
+        onImportComplete={(result) => { setSmartImport(false); handleImportComplete(result) }} />
+    </>
   )
 }

@@ -68,15 +68,14 @@ vi.mock('../../services', () => ({
   usersService: { getAll: vi.fn().mockResolvedValue({ data: [] }), bulkDelete: (...args) => mocks.bulkDeleteUsers(...args) },
 }))
 
-vi.mock('../../components/SmartImport', () => ({ SmartImportWidget: () => null }))
+vi.mock('../../components/SmartImport', () => ({ SmartImportModal: () => null }))
 
-vi.mock('../../components', async (orig) => ({
+vi.mock('../../components/atelier', async (orig) => ({
   ...(await orig()),
-  ResponsiveLayout: ({ children }) => <div>{children}</div>,
   // Draws each cell of each row as the page renders it
-  ResponsiveDataTable: ({ data, columns }) => (
-    <table><tbody>{data.map((row) => (
-      <tr key={row.id}>{columns.map((c) => <td key={c.key}>{c.render ? c.render(row[c.key], row) : row[c.key]}</td>)}</tr>
+  TableView: ({ rows, columns }) => (
+    <table><tbody>{rows.map((row) => (
+      <tr key={row.id}>{columns.map((c) => <td key={c.id}>{c.cell(row)}</td>)}</tr>
     ))}</tbody></table>
   ),
 }))
