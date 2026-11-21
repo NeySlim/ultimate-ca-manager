@@ -1,13 +1,14 @@
 /**
- * Inspector: the objects opened for detail (certificate, CA, trusted
- * certificate, user certificate), the active one and the dock geometry.
- * Position and size follow the user (server preference `inspector`), with a
- * local copy when the server is unreachable.
+ * Inspector: the certificates open in the Certificates zone's dock, the active one and the dock
+ * geometry. An object opened from any page goes to the zone that draws it (ZONES), as the
+ * mockup's openCert() and navigate(). Position and size follow the user (server preference
+ * `inspector`), with a local copy when the server is unreachable.
  */
 import { createContext, useContext, useState, useCallback, useRef, useEffect, useMemo } from 'react'
-import { useInRouterContext, useNavigate } from 'react-router-dom'
+import { useInRouterContext, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import { getPreferences, persistPreference, subscribePreferences } from '../stores/userPreferencesStore'
+import { pageOf } from '../lib/pageOf'
 
 const InspectorContext = createContext(null)
 
@@ -20,8 +21,14 @@ const DEFAULTS = { position: 'bottom', height: 278, width: 460 }
 const PREFS_KEY = 'ucm-inspector-prefs'
 
 const keyOf = (type, id) => `${type}:${id}`
-// The shell's dock and the Atelier dock a page draws itself
-const DOCKS = '[data-testid="inspector-dock"], #inspector'
+// The dock a zone draws
+const DOCKS = '#inspector'
+// Per type, the page whose dock draws it and the route that opens it there; `page`: docked in place on it
+const ZONES = {
+  certificate: { page: '/certificates', to: (id) => `/certificates/${encodeURIComponent(id)}` },
+  ca: { to: (id) => `/cas?authority=${encodeURIComponent(id)}` },
+  truststore: { to: (id) => `/truststore/${encodeURIComponent(id)}` },
+}
 
 // Keep only what the server would accept; anything else falls back to the default
 export function cleanGeometry(raw) {
@@ -48,9 +55,10 @@ function writeLocal(patch) {
   } catch { /* storage unavailable: the server copy still applies */ }
 }
 
-// Holds the router's navigate for the provider, when it sits inside a router
-function NavigateCapture({ into }) {
+// Holds the router's navigate and current page for the provider, when it sits inside a router
+function NavigateCapture({ into, page }) {
   into.current = useNavigate()
+  page.current = pageOf(useLocation().pathname)
   return null
 }
 
@@ -58,6 +66,7 @@ export function InspectorProvider({ children }) {
   const { isAuthenticated } = useAuth()
   const inRouter = useInRouterContext()
   const navigateRef = useRef(null)
+  const pageRef = useRef(null)
   const [opened, setOpened] = useState([])
   const [activeKey, setActiveKey] = useState(null)
   const [geometry, setGeometry] = useState(() => ({ ...DEFAULTS, ...readLocal(), ...cleanGeometry(getPreferences().inspector) }))
@@ -65,8 +74,6 @@ export function InspectorProvider({ children }) {
   const [focusToken, setFocusToken] = useState(0)
   // Folded to its tab strip; any opening unfolds it (session only, like the active object)
   const [collapsed, setCollapsed] = useState(false)
-  // A page that draws the inspector in its own zone (the Atelier dock) claims it: the shell's dock steps aside
-  const [claims, setClaims] = useState(0)
   const origins = useRef(new Map())
   const openedRef = useRef([])
   const geometryRef = useRef(geometry)
@@ -83,12 +90,14 @@ export function InspectorProvider({ children }) {
 
   // `origin` names the control to refocus on close when it is not the one focused now (the palette)
   const openEntity = useCallback((type, entityId, { data, origin } = {}) => {
-    if (entityId == null) return
-    // An authority opens in the Authorities view, beside its hierarchy, as the mockup does
-    if (type === 'ca' && navigateRef.current) {
-      navigateRef.current(`/cas?authority=${encodeURIComponent(entityId)}`)
+    const zone = ZONES[type]
+    if (entityId == null || !zone) return
+    // Off its zone's page the object goes there; that page docks it (the Authorities page beside its tree)
+    if (navigateRef.current && (!zone.page || pageRef.current !== zone.page)) {
+      navigateRef.current(zone.to(entityId))
       return
     }
+    if (!zone.page) return
     const key = keyOf(type, entityId)
     const from = origin || document.activeElement
     // Reopening replaces the origin, unless the focus is on body or in the dock (then the old one stays)
@@ -158,11 +167,6 @@ export function InspectorProvider({ children }) {
     persistPreference('inspector', { position: next.position, height: next.height, width: next.width })
   }, [])
 
-  const claimDock = useCallback(() => {
-    setClaims((n) => n + 1)
-    return () => setClaims((n) => n - 1)
-  }, [])
-
   const toggleCloseOnNav = useCallback(() => {
     setCloseOnNav((prev) => { writeLocal({ closeOnNav: !prev }); return !prev })
   }, [])
@@ -174,12 +178,12 @@ export function InspectorProvider({ children }) {
     opened, activeKey, setActiveKey, openEntity, closeEntity, closeAll, setEntityData,
     openCount: opened.length, focusToken,
     ...geometry, setGeometry: updateGeometry,
-    closeOnNav, toggleCloseOnNav, collapsed, setCollapsed, claimDock, dockClaimed: claims > 0,
-  }), [opened, activeKey, openEntity, closeEntity, closeAll, setEntityData, focusToken, geometry, updateGeometry, closeOnNav, toggleCloseOnNav, collapsed, claimDock, claims])
+    closeOnNav, toggleCloseOnNav, collapsed, setCollapsed,
+  }), [opened, activeKey, openEntity, closeEntity, closeAll, setEntityData, focusToken, geometry, updateGeometry, closeOnNav, toggleCloseOnNav, collapsed])
 
   return (
     <InspectorContext.Provider value={value}>
-      {inRouter && <NavigateCapture into={navigateRef} />}
+      {inRouter && <NavigateCapture into={navigateRef} page={pageRef} />}
       {children}
     </InspectorContext.Provider>
   )

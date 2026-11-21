@@ -1,10 +1,9 @@
 /**
- * The detail window of a hybrid pair member (RFC 9763): the linked certificate
- * opens in a window, the export offers the bundle, and the revocation answer
- * about the linked certificate reaches the service.
+ * A hybrid pair member (RFC 9763) in the Certificates zone dock: the linked certificate opens
+ * in the inspector, the export offers the bundle, and the revocation answer about the linked
+ * certificate reaches the service.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -21,34 +20,31 @@ vi.mock('react-i18next', () => ({
   Trans: ({ children }) => children,
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
-vi.mock('../../contexts', () => ({
+vi.mock('../../../contexts', () => ({
   useNotification: () => mocks.notify,
   useMobile: () => ({ isMobile: false, isTablet: false }),
-}))
-vi.mock('../../contexts/InspectorContext', () => ({
   useInspector: () => ({ closeEntity: vi.fn(), setEntityData: vi.fn(), openEntity: mocks.openEntity }),
 }))
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => ({ permissions: ['read:certificates', 'write:certificates', 'delete:certificates'] }),
 }))
-vi.mock('../../services', () => ({
+vi.mock('../../../services', () => ({
   certificatesService: mocks.certificatesService,
   casService: { getById: vi.fn(), delete: vi.fn(), export: vi.fn() },
   userCertificatesService: { getById: vi.fn(), delete: vi.fn(), export: vi.fn() },
   truststoreService: { getById: vi.fn(), delete: vi.fn() },
 }))
-vi.mock('../deploy/CertDeploySection', () => ({ CertDeploySection: () => null }))
+vi.mock('../../../components/deploy/CertDeploySection', () => ({ CertDeploySection: () => null }))
 // Renewal goes through the issue form, stubbed here: its Review step sends an unchanged duration
-vi.mock('../../pages/certificates/IssueCertificateForm', () => ({
+vi.mock('../IssueCertificateForm', () => ({
   IssueCertificateForm: ({ onSubmit, onSent }) => (
     <button type="button" onClick={async () => onSent(await onSubmit({}))}>submit-renew</button>
   ),
 }))
 
-import { InspectorObject } from '../inspector/InspectorObject'
-import { chooseMoreAction } from '../../test/moreActions'
+import { renderCertificateBody } from '../../../test/certificateBody'
+import { chooseMoreAction } from '../../../test/moreActions'
 
-const WINDOW = { key: 'certificate:4', type: 'certificate', entityId: 4, data: null }
 const MEMBER = {
   id: 4, common_name: 'pair.example.com', status: 'valid', key_algorithm: 'EC-P256',
   related_certificate_id: 5, hybrid_role: 'classical',
@@ -57,18 +53,21 @@ const MEMBER = {
 const PARTNER = { id: 5, common_name: 'pair.example.com', related_certificate_id: 4, revoked: false, hybrid_role: 'pq' }
 
 const open = async () => {
-  render(<InspectorObject entry={WINDOW} onTitle={() => {}} />, { wrapper: MemoryRouter })
+  renderCertificateBody(4)
   await screen.findAllByText('pair.example.com')
 }
 
-describe('InspectorObject of a hybrid pair member', () => {
+const relatedBox = async () => within(await screen.findByTestId('revoke-dialog')).findByRole('checkbox')
+const confirmRevoke = () => fireEvent.click(within(screen.getByTestId('revoke-dialog')).getByRole('button', { name: 'revocation.confirm' }))
+
+describe('the dock of a hybrid pair member', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.certificatesService.getById.mockImplementation((id) => Promise.resolve({ data: id === 5 ? PARTNER : MEMBER }))
     mocks.certificatesService.revoke.mockResolvedValue({ data: { id: 4, revoked: true } })
   })
 
-  it('opens the linked certificate in a window', async () => {
+  it('opens the linked certificate in the inspector', async () => {
     await open()
     fireEvent.click(screen.getByRole('link', { name: 'certificates.hybrid.openRelated' }))
     expect(mocks.openEntity).toHaveBeenCalledWith('certificate', 5)
@@ -76,15 +75,15 @@ describe('InspectorObject of a hybrid pair member', () => {
 
   it('offers the hybrid bundle', async () => {
     await open()
-    fireEvent.click(screen.getByText('Export'))
+    fireEvent.click(screen.getByRole('button', { name: 'export.title' }))
     expect(screen.getByText('export.formats.hybridBundle')).toBeInTheDocument()
   })
 
   it('keeps the linked certificate valid when unchecked', async () => {
     await open()
     await chooseMoreAction('inspector.cert.revokeAction')
-    fireEvent.click(await screen.findByLabelText('revocation.revokeRelated'))
-    fireEvent.submit(screen.getByTestId('revoke-form'))
+    fireEvent.click(await relatedBox())
+    confirmRevoke()
     await waitFor(() => expect(mocks.certificatesService.revoke)
       .toHaveBeenCalledWith(4, 'unspecified', { revokeRelated: false }))
   })
@@ -93,8 +92,8 @@ describe('InspectorObject of a hybrid pair member', () => {
     mocks.certificatesService.revoke.mockResolvedValue({ data: { id: 4, revoked: true, related_revoked: 5 } })
     await open()
     await chooseMoreAction('inspector.cert.revokeAction')
-    expect(await screen.findByLabelText('revocation.revokeRelated')).toBeChecked()
-    fireEvent.submit(screen.getByTestId('revoke-form'))
+    expect(await relatedBox()).toBeChecked()
+    confirmRevoke()
     await waitFor(() => expect(mocks.notify.showSuccess).toHaveBeenCalledWith('revocation.revokedWithRelated'))
     expect(mocks.notify.showWarning).not.toHaveBeenCalled()
   })
@@ -108,7 +107,7 @@ describe('InspectorObject of a hybrid pair member', () => {
     mocks.certificatesService.renew.mockResolvedValue({ data: answer })
     mocks.notify.showPrompt.mockResolvedValue('')
     await open()
-    fireEvent.click(screen.getByText('Renew'))
+    fireEvent.click(screen.getByRole('button', { name: 'common.renew' }))
     fireEvent.click(await screen.findByText('submit-renew'))
     await waitFor(() => expect(mocks.certificatesService.renew).toHaveBeenCalledWith(4, {}))
     // The result screen says it, in place of a toast
@@ -119,8 +118,8 @@ describe('InspectorObject of a hybrid pair member', () => {
     mocks.certificatesService.revoke.mockResolvedValue({ data: { id: 4, revoked: true, related_not_revoked: 5 } })
     await open()
     await chooseMoreAction('inspector.cert.revokeAction')
-    await screen.findByLabelText('revocation.revokeRelated')
-    fireEvent.submit(screen.getByTestId('revoke-form'))
+    await relatedBox()
+    confirmRevoke()
     await waitFor(() => expect(mocks.notify.showWarning).toHaveBeenCalledWith('revocation.relatedRevokeFailed'))
     expect(mocks.notify.showWarning).not.toHaveBeenCalledWith('revocation.relatedNotRevoked')
   })
@@ -128,8 +127,8 @@ describe('InspectorObject of a hybrid pair member', () => {
   it('warns when the linked certificate was not revoked', async () => {
     await open()
     await chooseMoreAction('inspector.cert.revokeAction')
-    await screen.findByLabelText('revocation.revokeRelated')
-    fireEvent.submit(screen.getByTestId('revoke-form'))
+    await relatedBox()
+    confirmRevoke()
     await waitFor(() => expect(mocks.notify.showWarning).toHaveBeenCalledWith('revocation.relatedNotRevoked'))
   })
 
@@ -140,9 +139,9 @@ describe('InspectorObject of a hybrid pair member', () => {
   ])('shows %s', async (_name, error, toast) => {
     mocks.certificatesService.export.mockRejectedValue(error)
     await open()
-    fireEvent.click(screen.getByText('Export'))
+    fireEvent.click(screen.getByRole('button', { name: 'export.title' }))
     fireEvent.click(screen.getByText('export.formats.hybridBundle').closest('label').querySelector('input'))
-    fireEvent.submit(screen.getByText('PEM').closest('form'))
+    fireEvent.click(screen.getByRole('button', { name: 'export.download' }))
     await waitFor(() => expect(mocks.notify.showError).toHaveBeenCalledWith(toast))
   })
 })

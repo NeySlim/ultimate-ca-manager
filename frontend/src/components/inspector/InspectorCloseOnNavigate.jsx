@@ -2,9 +2,8 @@
 import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useInspector } from '../../contexts/InspectorContext'
-
 // A detail URL (/certificates/12) belongs to its list page: opening one is no page change
-const pageOf = (pathname) => pathname.replace(/\/\d+\/?$/, '') || '/'
+import { pageOf } from '../../lib/pageOf'
 
 export function InspectorCloseOnNavigate() {
   const page = pageOf(useLocation().pathname)

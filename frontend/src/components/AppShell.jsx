@@ -1,6 +1,6 @@
 /**
  * The console's frame, the mockup's render(): masthead, session banner and notification panel,
- * the stage (the page, its banners, the inspector), the status bar. The shell's own parts are
+ * the stage (the page and its banners; a zone draws its own dock), the status bar. The shell's own parts are
  * drawn under .atl (atl-island: no box of its own); the page slot is not, a page brings its own.
  */
 import { Suspense, useState, useEffect, useCallback } from 'react'
@@ -22,8 +22,6 @@ import { UpdatePopup } from './UpdatePopup'
 import { KofiSupportCard } from './KofiSupportCard'
 import { usePermission } from '../hooks'
 import { useNotification } from '../contexts/NotificationContext'
-import { InspectorDock } from './inspector/InspectorDock'
-import { useDockPlacement } from './inspector/placement'
 import { useThemeColor } from '../lib/themeColor'
 import { BANNER_SLOT } from '../lib/sessionBannerSlot'
 import { NOTIF_SLOT } from './shell/NotificationBell'
@@ -42,8 +40,6 @@ export function AppShell() {
   const [helpModalOpen, setHelpModalOpen] = useState(false)
   // Help key requested by the shell itself (navigation help); cleared on close
   const [helpOverride, setHelpOverride] = useState(null)
-  // The inspector sits in the page flow: under the page, or beside it on the right
-  const dockPlacement = useDockPlacement()
   // Cluster nodes, read from the service status (read:settings), from the bar or the HA banner
   const [nodesOpen, setNodesOpen] = useState(false)
   const ha = haState(useHealth())
@@ -157,7 +153,7 @@ export function AppShell() {
         <div id={NOTIF_SLOT} style={{ display: 'contents' }} />
       </div>
 
-      <div className={`shell-main${dockPlacement === 'right' ? ' has-dock-right' : ''}`}>
+      <div className="shell-main">
         <div className="shell-content">
           {claims === 0 && <div className="atl atl-island"><div className="stage shell-banners">{bannerNode}</div></div>}
           <div className="shell-page" id="shell-page" tabIndex={-1}>
@@ -168,7 +164,6 @@ export function AppShell() {
             </Suspense>
           </div>
         </div>
-        <InspectorDock />
       </div>
 
       <div className="atl atl-island"><StatusBar onShowNodes={showNodes} can={can} /></div>

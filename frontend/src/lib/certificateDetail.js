@@ -173,6 +173,7 @@ export function extensionRows(ext, sanCombined) {
       qc.cc_legislation?.length ? `QcCClegislation: ${qc.cc_legislation.join(', ')}` : null,
       qc.retention_period != null ? `QcRetentionPeriod: ${qc.retention_period}` : null,
       ...(qc.pds || []).map((p) => `QcPDS ${p.language}: ${p.url}`),
+      qc.limit_value ? `QcLimitValue: ${qc.limit_value.amount}e${qc.limit_value.exponent} ${qc.limit_value.currency}` : null,
     ], qc.critical)
   }
   if (e.signed_certificate_timestamps) add('signed_certificate_timestamps', 'details.ext.sct', 'Present', e.signed_certificate_timestamps.critical)

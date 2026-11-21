@@ -1,9 +1,8 @@
 /**
- * A revocation from the certificate inspector that the issuing CA did not confirm
+ * A revocation from the Certificates zone dock that the issuing CA did not confirm
  * (ACME upstream, Microsoft CA): the server's warning is shown, not a plain success.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -19,35 +18,32 @@ vi.mock('react-i18next', () => ({
   Trans: ({ children }) => children,
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
-vi.mock('../../contexts', () => ({
+vi.mock('../../../contexts', () => ({
   useNotification: () => mocks.notify,
   useMobile: () => ({ isMobile: false, isTablet: false }),
-}))
-vi.mock('../../contexts/InspectorContext', () => ({
   useInspector: () => ({ closeEntity: vi.fn(), setEntityData: vi.fn(), openEntity: vi.fn() }),
 }))
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => ({ permissions: ['read:certificates', 'write:certificates', 'delete:certificates'] }),
 }))
-vi.mock('../../services', () => ({
+vi.mock('../../../services', () => ({
   certificatesService: mocks.certificatesService,
   casService: { getById: vi.fn(), delete: vi.fn(), export: vi.fn() },
   userCertificatesService: { getById: vi.fn(), delete: vi.fn(), export: vi.fn() },
   truststoreService: { getById: vi.fn(), delete: vi.fn() },
 }))
-vi.mock('../deploy/CertDeploySection', () => ({ CertDeploySection: () => null }))
+vi.mock('../../../components/deploy/CertDeploySection', () => ({ CertDeploySection: () => null }))
 
-import { InspectorObject } from '../inspector/InspectorObject'
-import { chooseMoreAction } from '../../test/moreActions'
+import { renderCertificateBody } from '../../../test/certificateBody'
+import { chooseMoreAction } from '../../../test/moreActions'
 
-const WINDOW = { key: 'certificate:11', type: 'certificate', entityId: 11, data: null }
 const CERT = { id: 11, common_name: 'web.example.com', status: 'valid', source: 'acme_client', key_algorithm: 'EC-P256' }
 
 const revokeFromInspector = async () => {
-  render(<InspectorObject entry={WINDOW} onTitle={() => {}} />, { wrapper: MemoryRouter })
+  renderCertificateBody(11)
   await screen.findAllByText('web.example.com')
   await chooseMoreAction('inspector.cert.revokeAction')
-  fireEvent.submit(await screen.findByTestId('revoke-form'))
+  fireEvent.click(within(await screen.findByTestId('revoke-dialog')).getByRole('button', { name: 'revocation.confirm' }))
   await waitFor(() => expect(mocks.certificatesService.revoke).toHaveBeenCalled())
 }
 

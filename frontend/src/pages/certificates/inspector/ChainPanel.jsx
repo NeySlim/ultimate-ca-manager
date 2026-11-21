@@ -10,7 +10,7 @@ import { chainNodes, certificateKeyLabel } from '../../../lib/certificateDetail'
 import { extractCN } from '../../../lib/utils'
 import { usePermission } from '../../../hooks'
 import { casService } from '../../../services'
-import { useAddIssuerToTrustStore } from '../../../components/inspector/certificate/CertificateChain'
+import { useAddIssuerToTrustStore } from './useAddIssuerToTrustStore'
 import { CertBadge } from '../CertBadge'
 
 // The chain links carry names only: the key of each CA comes from the CA list, when it may be read

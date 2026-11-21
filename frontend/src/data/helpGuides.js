@@ -407,7 +407,7 @@ Tick two certificates in the list and click **Compare** in the selection bar to 
 - **Sorting**: By name, expiry date, creation date, status
 - **Columns**: Common name, description, state, issuer, source, expiry and key algorithm by default; the **Columns** button adds the compliance grade, the hybrid link and the creation date
 - **Row actions**: Export on the row; the other actions in the inspector a click on the row opens: Export and Renew in its heading, Rename, Revoke, Delete and the rest in its ⋯ menu
-- **Inspector**: opens under the list, inside the page margins, or on its right from 1400 px wide. Drag its edge or use the arrow keys on it to resize it, fold it to its tab strip, enlarge it. Open certificates stay as tabs; those that do not fit go into a +N menu. Its tabs are Overview, Chain, Extensions, History and PEM; History lists the dates of the record and, with read:audit, the audit entries of this certificate among the latest 100 on certificates
+- **Inspector**: opens under the list, inside the page margins, or on its right from 1400 px wide. A certificate opened from another page (the search, an approval, an authority) comes here, in this inspector. Drag its edge or use the arrow keys on it to resize it, fold it to its tab strip, enlarge it. Open certificates stay as tabs; those that do not fit go into a +N menu. Its tabs are Overview, Chain, Extensions, History and PEM; History lists the dates of the record and, with read:audit, the audit entries of this certificate among the latest 100 on certificates
 
 ## Conformance linting
 
@@ -713,7 +713,7 @@ A template can add extensions UCM has no setting for. Each one is an **OID**, a 
 - Extensions UCM sets itself (key usage, EKU, names, key identifiers, CRL and OCSP pointers, policies, name constraints, qcStatements...) are refused: use their own settings
 - A client that does not recognise a **critical** extension must reject the certificate (RFC 5280, section 4.2). Leave it non-critical unless every relying party understands it
 
-The inspector lists such extensions for certificates and CAs under **Other extensions** on the Extensions tab, with their OID, name when known, criticality and value.
+The inspector lists such extensions for certificates and CAs on the Extensions tab, each with its OID, name when known, criticality and value; for a certificate, a button copies the whole value.
 
 ## Copying Templates
 
@@ -3147,7 +3147,7 @@ Open requests are grouped by their deadline: **To handle within 48 h** and **Lat
 
 1. Click **Approve…** on its row, or in the inspector
 2. Optionally give a reason: it is recorded with the decision
-3. Confirm: what the approval issued (a certificate, or a CA) opens in the inspector
+3. Confirm: what the approval issued opens in its page, a certificate in the inspector of the Certificates page, a CA in the Authorities page
 
 ## Rejecting a Request
 

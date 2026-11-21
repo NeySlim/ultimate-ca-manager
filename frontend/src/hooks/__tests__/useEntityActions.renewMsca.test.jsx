@@ -1,7 +1,7 @@
 /** Renewing an AD CS certificate that awaits CA approval says so, not "renewed". */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import en from '../../../i18n/locales/en.json'
+import en from '../../i18n/locales/en.json'
 
 const lookup = (key) => key.split('.').reduce((node, part) => (node == null ? node : node[part]), en)
 vi.mock('react-i18next', () => ({
@@ -13,19 +13,19 @@ const notify = vi.hoisted(() => ({
   showSuccess: vi.fn(), showError: vi.fn(), showWarning: vi.fn(),
   showConfirm: vi.fn(async () => true), showPrompt: vi.fn(),
 }))
-vi.mock('../../../contexts', () => ({
+vi.mock('../../contexts', () => ({
   useNotification: () => notify,
   useMobile: () => ({ isMobile: false, isTablet: false }),
 }))
-vi.mock('../../../contexts/AuthContext', () => ({ useAuth: () => ({ permissions: ['*'] }) }))
-vi.mock('../../CertificateLintModal', () => ({ CertificateLintModal: () => null }))
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ permissions: ['*'] }) }))
+vi.mock('../../components/CertificateLintModal', () => ({ CertificateLintModal: () => null }))
 const renew = vi.hoisted(() => vi.fn())
-vi.mock('../../../services', async (orig) => ({
+vi.mock('../../services', async (orig) => ({
   ...(await orig()),
   certificatesService: { ...((await orig()).certificatesService), renew },
 }))
 
-import { ActionsHarness } from './ActionsHarness'
+import { ActionsHarness } from '../../test/ActionsHarness'
 
 const ALLOW = { canWrite: () => true, canDelete: () => true, hasPermission: () => true }
 const cert = {

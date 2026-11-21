@@ -9,7 +9,7 @@ import { historyEntries } from '../../../lib/certificateDetail'
 import { formatDate } from '../../../lib/utils'
 import { usePermission } from '../../../hooks'
 import { auditService } from '../../../services'
-import { AUDIT_WINDOW, auditWords } from '../../../components/inspector/certificate/CertificateHistory'
+import { AUDIT_WINDOW, auditWords } from './auditWords'
 
 const humanize = (action) => String(action || '').replace(/[._]/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
 

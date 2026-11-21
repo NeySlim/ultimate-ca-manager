@@ -1,7 +1,7 @@
 /**
- * The inspector judges an entry by its own resource (DUP-FE-020).
+ * The entity actions judge an entry by its own resource (DUP-FE-020).
  *
- * The window opens certificates, CAs, user certificates and trust store
+ * They serve certificates, CAs, user certificates and trust store
  * entries, but derived the RBAC resource from only the first three:
  *
  *   const resource = isCA ? 'cas' : isUserCert ? 'user_certificates' : 'certificates'
@@ -10,14 +10,13 @@
  * gated on delete:certificates. DELETE /api/v2/truststore/<id> requires
  * delete:truststore (backend/api/v2/truststore.py), and TrustStorePage gates
  * the very same call on canDelete('truststore'). The asymmetry cut both ways:
- * the window offered a delete the route would refuse, and hid one it would
+ * the actions offered a delete the route would refuse, and hid one they would
  * accept, for the same row.
  *
  * The guard now also sits at the head of the handler, so a call site that
  * wires the button up anyway still cannot reach the API.
  */
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const authState = vi.hoisted(() => ({ permissions: [] }))
@@ -44,10 +43,6 @@ vi.mock('../../contexts', () => ({
   useMobile: () => ({ isMobile: false, isTablet: false }),
 }))
 
-vi.mock('../../contexts/InspectorContext', () => ({
-  useInspector: () => ({ closeEntity: vi.fn(), setEntityData: vi.fn(), openEntity: vi.fn() }),
-}))
-
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ permissions: authState.permissions }),
 }))
@@ -59,8 +54,7 @@ vi.mock('../../services', () => ({
   truststoreService: truststoreMocks,
 }))
 
-import { InspectorObject } from '../inspector/InspectorObject'
-import { openMoreActions } from '../../test/moreActions'
+import { ActionsHarness } from '../../test/ActionsHarness'
 
 const ENTRY = {
   id: 9,
@@ -69,14 +63,11 @@ const ENTRY = {
   purpose: 'tls',
 }
 
-const WINDOW = { key: 'truststore:9', type: 'truststore', entityId: 9, data: null }
-
 const renderWindow = async () => {
-  render(<InspectorObject entry={WINDOW} onTitle={() => {}} />, { wrapper: MemoryRouter })
-  await screen.findByText(ENTRY.name)
+  render(<ActionsHarness type="truststore" entity={ENTRY} />)
 }
 
-describe('deleting a trust store entry from the inspector', () => {
+describe('deleting a trust store entry from its actions', () => {
   beforeEach(() => {
     Object.values(notify).forEach(fn => fn.mockReset())
     truststoreMocks.getById.mockReset()
@@ -103,7 +94,7 @@ describe('deleting a trust store entry from the inspector', () => {
   })
 
   it('revokes a user certificate through its own route, with its own id', async () => {
-    // windowInfo.entityId is the enrolment (AuthCertificate) id: the row comes
+    // The entity id is the enrolment (AuthCertificate) id: the row comes
     // from auth_cert.to_dict() and exposes the Certificate id separately as
     // cert_id. Sending it to POST /certificates/<id>/revoke resolves it against
     // a different table, so an admin revoked an unrelated certificate.
@@ -115,8 +106,7 @@ describe('deleting a trust store entry from the inspector', () => {
     userCertificatesService.revoke = vi.fn().mockResolvedValue({})
     certificatesService.revoke = vi.fn().mockResolvedValue({})
 
-    render(<InspectorObject entry={{ ...WINDOW, id: 'w3', type: 'user_certificate', entityId: 11 }} onTitle={() => {}} />, { wrapper: MemoryRouter })
-    await screen.findAllByText('alice@example.test')
+    render(<ActionsHarness type="user_certificate" entity={{ id: 11, name: 'alice@example.test', status: 'valid' }} />)
     fireEvent.click(screen.getByText('Revoke'))
     fireEvent.submit(await screen.findByText('revocation.confirm').then(el => el.closest('form')))
 
@@ -125,12 +115,12 @@ describe('deleting a trust store entry from the inspector', () => {
     expect(certificatesService.revoke).not.toHaveBeenCalled()
   })
 
-  it('still judges a certificate window by delete:certificates', async () => {
-    authState.permissions = ['read:certificates', 'delete:certificates']
-    const { certificatesService } = await import('../../services')
-    certificatesService.getById.mockResolvedValue({ data: { id: 4, common_name: 'web.example.com' } })
-    render(<InspectorObject entry={{ ...WINDOW, id: 'w2', type: 'certificate', entityId: 4 }} onTitle={() => {}} />, { wrapper: MemoryRouter })
-    await screen.findAllByText('web.example.com')
-    expect(within(await openMoreActions()).getByRole('button', { name: 'common.delete' })).toBeInTheDocument()
+  it.each([
+    [['read:certificates', 'delete:certificates'], true],
+    [['read:certificates', 'delete:truststore'], false],
+  ])('still judges a certificate by delete:certificates (%o)', (permissions, offered) => {
+    authState.permissions = permissions
+    render(<ActionsHarness entity={{ id: 4, common_name: 'web.example.com' }} />)
+    expect(!!screen.queryByLabelText('common.delete') || !!screen.queryByText('common.delete')).toBe(offered)
   })
 })

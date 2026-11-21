@@ -4,8 +4,8 @@
  */
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import en from '../../../i18n/locales/en.json'
-import { isOnHold } from '../../../lib/utils'
+import en from '../../i18n/locales/en.json'
+import { isOnHold } from '../../lib/utils'
 
 const lookup = (key) => key.split('.').reduce((node, part) => (node == null ? node : node[part]), en)
 vi.mock('react-i18next', () => ({
@@ -13,14 +13,14 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => {} },
   Trans: ({ children }) => children,
 }))
-vi.mock('../../../contexts', () => ({
+vi.mock('../../contexts', () => ({
   useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showWarning: vi.fn(), showConfirm: vi.fn(), showPrompt: vi.fn() }),
   useMobile: () => ({ isMobile: false, isTablet: false }),
 }))
-vi.mock('../../../contexts/AuthContext', () => ({ useAuth: () => ({ permissions: ['*'] }) }))
-vi.mock('../../CertificateLintModal', () => ({ CertificateLintModal: () => null }))
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ permissions: ['*'] }) }))
+vi.mock('../../components/CertificateLintModal', () => ({ CertificateLintModal: () => null }))
 
-import { ActionsHarness } from './ActionsHarness'
+import { ActionsHarness } from '../../test/ActionsHarness'
 
 const base = {
   id: 21, common_name: 'held.example.com', subject: 'CN=held.example.com', serial_number: '42',

@@ -1,11 +1,11 @@
 /**
- * Surfaces other than the certificate panel: a post-quantum key keeps its
+ * Surfaces other than the certificate dock: a post-quantum key keeps its
  * name and level, and a missing or unsplittable key name is never shown as RSA.
  */
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import en from '../../../i18n/locales/en.json'
-import { GROUP_PQ, KEY_ALGORITHMS } from '../../../lib/keyAlgorithms'
+import en from '../../i18n/locales/en.json'
+import { GROUP_PQ, KEY_ALGORITHMS } from '../../lib/keyAlgorithms'
 
 const lookup = (key) => key.split('.').reduce((node, part) => (node == null ? node : node[part]), en)
 const t = (key, opts) => {
@@ -18,15 +18,14 @@ vi.mock('react-i18next', () => ({
   Trans: ({ children }) => children,
   initReactI18next: { type: '3rdParty', init: () => {} },
 }))
-vi.mock('../../../contexts/NotificationContext', () => ({
+vi.mock('../../contexts/NotificationContext', () => ({
   useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showConfirm: vi.fn() }),
 }))
-vi.mock('../../../services', () => ({ casService: {} }))
+vi.mock('../../services', () => ({ casService: {} }))
 
-const { CAMarks } = await import('../../../pages/cas/CAState')
-const { TemplatePreviewModal } = await import('../../TemplatePreviewModal')
-const { TrustCertPanel } = await import('../TrustCertPanel')
-const { certificateColumns } = await import('../../../pages/certificates/certificateRows')
+const { CAMarks } = await import('../../pages/cas/CAState')
+const { TemplatePreviewModal } = await import('../TemplatePreviewModal')
+const { certificateColumns } = await import('../../pages/certificates/certificateRows')
 
 const ML_DSA_65 = KEY_ALGORITHMS.find(a => a.group === GROUP_PQ && a.label === 'ML-DSA-65')
 const LEVEL_LABEL = `${ML_DSA_65.label} (level ${ML_DSA_65.securityLevel})`
@@ -36,15 +35,10 @@ const keyCell = (row) => {
   return render(<div>{column.cell(row)}</div>)
 }
 
-describe('key display outside the certificate panel', () => {
+describe('key display outside the certificate dock', () => {
   it('marks an ML-DSA CA as post-quantum among its chips', () => {
     render(<div><CAMarks ca={{ id: 9, descr: 'PQ root', key_type: 'ML-DSA-65', security_level: 3, post_quantum: true }} t={t} /></div>)
     expect(screen.getByTestId('post-quantum-badge')).toHaveTextContent(t('common.postQuantum'))
-  })
-
-  it('shows the badge in the compact bar of a trusted certificate window', () => {
-    render(<TrustCertPanel cert={{ id: 3, name: 'PQ root', key_type: 'ML-DSA-65', security_level: 3, post_quantum: true }} embedded />)
-    expect(screen.getByTestId('post-quantum-badge')).toBeInTheDocument()
   })
 
   it('explains the badge by the key, never by the signature', () => {

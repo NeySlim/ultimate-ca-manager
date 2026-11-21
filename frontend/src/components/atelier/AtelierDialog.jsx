@@ -19,7 +19,7 @@ const loadSheets = () => Promise.all([
 ])
 
 export function AtelierDialog(props) {
-  // Outside a zone (a dialog of the shell's inspector), the dialog carries the zone's scope itself
+  // Outside a zone (a dialog a page or the shell opens there), the dialog carries the zone's scope itself
   const inZone = useContext(AtlScopeContext)
   useEffect(() => { if (!inZone) loadSheets().catch(() => {}) }, [inZone])
   if (inZone) return <ModalDialog {...props} />

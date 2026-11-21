@@ -4,7 +4,7 @@
  */
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import en from '../../../i18n/locales/en.json'
+import en from '../../i18n/locales/en.json'
 
 const lookup = (key) => key.split('.').reduce((node, part) => (node == null ? node : node[part]), en)
 vi.mock('react-i18next', () => ({
@@ -12,13 +12,13 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => {} },
   Trans: ({ children }) => children,
 }))
-vi.mock('../../../contexts', () => ({
+vi.mock('../../contexts', () => ({
   useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showWarning: vi.fn(), showConfirm: vi.fn(), showPrompt: vi.fn() }),
   useMobile: () => ({ isMobile: false, isTablet: false }),
 }))
-vi.mock('../../../contexts/AuthContext', () => ({ useAuth: () => ({ permissions: ['*'] }) }))
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ permissions: ['*'] }) }))
 
-import { ActionsHarness } from './ActionsHarness'
+import { ActionsHarness } from '../../test/ActionsHarness'
 
 const ALLOW = { canWrite: () => true, canDelete: () => true, hasPermission: () => true }
 const base = {
@@ -28,7 +28,7 @@ const base = {
 }
 const openExport = () => fireEvent.click(screen.getAllByRole('button', { name: /export/i })[0])
 
-describe('export dialog of the action bar', () => {
+describe('export dialog of the inspector actions', () => {
   it('offers no PKCS#12 or JKS export for an ML-DSA key', () => {
     const mldsa = { ...base, key_algorithm: 'ML-DSA-65', key_type: 'ML-DSA-65', security_level: 3, post_quantum: true }
     render(<ActionsHarness entity={mldsa} permissions={ALLOW} />)

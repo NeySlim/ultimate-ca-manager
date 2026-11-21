@@ -1,9 +1,8 @@
 /**
  * A revocation a policy queues for approval revokes nothing, so the
- * "revoke then delete" of the detail window must not delete either.
+ * "revoke then delete" of the Certificates zone dock must not delete either.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const authState = vi.hoisted(() => ({ permissions: [] }))
@@ -25,42 +24,37 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 
-vi.mock('../../contexts', () => ({
+vi.mock('../../../contexts', () => ({
   useNotification: () => notify,
   useMobile: () => ({ isMobile: false, isTablet: false }),
-}))
-
-vi.mock('../../contexts/InspectorContext', () => ({
   useInspector: () => ({ closeEntity: vi.fn(), setEntityData: vi.fn(), openEntity: vi.fn() }),
 }))
 
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => ({ permissions: authState.permissions }),
 }))
 
-vi.mock('../../services', () => ({
+vi.mock('../../../services', () => ({
   certificatesService: { getById: vi.fn(), delete: vi.fn(), export: vi.fn() },
   casService: { getById: vi.fn(), delete: vi.fn(), export: vi.fn() },
   userCertificatesService: { getById: vi.fn(), delete: vi.fn(), export: vi.fn() },
   truststoreService: truststoreMocks,
 }))
 
-import { InspectorObject } from '../inspector/InspectorObject'
-import { chooseMoreAction } from '../../test/moreActions'
-
-const WINDOW = { key: 'certificate:4', type: 'certificate', entityId: 4, data: null }
+import { renderCertificateBody } from '../../../test/certificateBody'
+import { chooseMoreAction } from '../../../test/moreActions'
 
 async function revokeThenDelete(revokeResult) {
   authState.permissions = ['read:certificates', 'write:certificates', 'delete:certificates']
-  const { certificatesService } = await import('../../services')
+  const { certificatesService } = await import('../../../services')
   certificatesService.getById.mockResolvedValue({ data: { id: 4, common_name: 'web.example.com', status: 'valid' } })
   certificatesService.revoke = vi.fn().mockResolvedValue(revokeResult)
   certificatesService.delete.mockResolvedValue({})
   notify.showConfirm.mockResolvedValue(true)
-  render(<InspectorObject entry={WINDOW} onTitle={() => {}} />, { wrapper: MemoryRouter })
+  renderCertificateBody(4)
   await screen.findAllByText('web.example.com')
   await chooseMoreAction('common.delete')
-  fireEvent.submit(await screen.findByText('revocation.confirm').then(el => el.closest('form')))
+  fireEvent.click(within(await screen.findByTestId('revoke-dialog')).getByRole('button', { name: 'revocation.confirm' }))
   await waitFor(() => expect(certificatesService.revoke).toHaveBeenCalledTimes(1))
   return certificatesService
 }

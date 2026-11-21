@@ -2,7 +2,7 @@
  * CertificatesPage and a hybrid pair (RFC 9763): the classical member opens in the
  * inspector after issuance, and a link to a member opens it there on a phone too.
  * Revoking, renewing and opening the linked member from the inspector are covered
- * by InspectorObject.related.test.jsx.
+ * by certificateBody.related.test.jsx.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'

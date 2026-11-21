@@ -9,9 +9,8 @@
 .shell-app .masthead { grid-row: 1; }
 .shell-app > .shell-main { grid-row: 2; }
 .shell-app .statusbar { grid-row: 3; }
-/* The stage of a page drawn outside the mockup's zones: the page, the inspector beside or under it */
+/* The stage: the page (a zone draws its own dock) */
 .shell-main { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
-.shell-main.has-dock-right { flex-direction: row; }
 .shell-content { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
 .shell-page { flex: 1; display: flex; min-height: 0; min-width: 0; overflow: auto; }
 .shell-page:focus { outline: none; }

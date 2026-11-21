@@ -1,5 +1,5 @@
 /**
- * Opens a CA of a certificate's chain in the inspector. The chain the API returns
+ * Opens a CA of a certificate's chain in the Authorities zone. The chain the API returns
  * names its CAs only, so the list of CAs is read once, on the first click.
  * Null when the user cannot read the CAs: the chain then shows plain names.
  */

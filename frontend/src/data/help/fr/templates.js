@@ -133,7 +133,7 @@ Un modèle peut ajouter des extensions pour lesquelles UCM n’a aucun réglage.
 - Les extensions qu’UCM pose lui-même (usage de la clé, EKU, noms, identifiants de clé, pointeurs CRL et OCSP, politiques, contraintes de noms, qcStatements...) sont refusées : utilisez leurs propres réglages
 - Un client qui ne reconnaît pas une extension **critique** doit rejeter le certificat (RFC 5280, section 4.2). Laissez-la non critique sauf si toutes les parties utilisatrices la comprennent
 
-L’inspecteur liste ces extensions pour les certificats et les AC sous **Autres extensions**, dans l’onglet Extensions, avec leur OID, leur nom s’il est connu, leur criticité et leur valeur.
+L’inspecteur liste ces extensions pour les certificats et les AC dans l’onglet Extensions, chacune avec son OID, son nom s’il est connu, sa criticité et sa valeur ; pour un certificat, un bouton copie la valeur entière.
 
 ## Copier des modèles
 

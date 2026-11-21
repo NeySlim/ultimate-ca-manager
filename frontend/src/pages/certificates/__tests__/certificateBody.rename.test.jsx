@@ -1,9 +1,8 @@
 /**
- * Rename (#286) from the detail views: the floating window on desktop and
- * the action bar of the page slide-over, both on write:certificates.
+ * Rename (#286) from the Certificates zone dock's « ⋯ » and from the actions a page draws
+ * itself, both on write:certificates.
  */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const authState = vi.hoisted(() => ({ permissions: [] }))
@@ -25,36 +24,32 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => {} },
 }))
 
-vi.mock('../../contexts', () => ({
+vi.mock('../../../contexts', () => ({
   useNotification: () => notify,
   useMobile: () => ({ isMobile: false, isTablet: false }),
-}))
-
-vi.mock('../../contexts/InspectorContext', () => ({
   useInspector: () => ({
     closeEntity: () => {}, setEntityData: () => {}, openEntity: () => {},
   }),
 }))
 
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => ({ permissions: authState.permissions }),
 }))
 
-vi.mock('../../services', () => ({
+vi.mock('../../../services', () => ({
   certificatesService: certs,
   casService: { getById: vi.fn(), delete: vi.fn(), export: vi.fn() },
   userCertificatesService: { getById: vi.fn(), delete: vi.fn(), export: vi.fn() },
   truststoreService: { getById: vi.fn(), delete: vi.fn() },
 }))
 
-import { InspectorObject } from '../inspector/InspectorObject'
-import { ActionsHarness } from '../detail/__tests__/ActionsHarness'
-import { chooseMoreAction, openMoreActions } from '../../test/moreActions'
+import { renderCertificateBody } from '../../../test/certificateBody'
+import { ActionsHarness } from '../../../test/ActionsHarness'
+import { chooseMoreAction, openMoreActions } from '../../../test/moreActions'
 
 const CERT = { id: 4, common_name: 'web.example.com', descr: 'Front door', status: 'valid' }
-const WINDOW = { key: 'certificate:4', type: 'certificate', entityId: 4, data: null }
 
-describe('rename in the floating detail window', () => {
+describe('rename in the zone dock', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     certs.getById.mockResolvedValue({ data: CERT })
@@ -66,7 +61,7 @@ describe('rename in the floating detail window', () => {
     certs.rename.mockResolvedValue({ data: { ...CERT, descr: 'Back door' } })
     const changed = vi.fn()
     window.addEventListener('ucm:data-changed', changed)
-    render(<InspectorObject entry={WINDOW} onTitle={() => {}} />, { wrapper: MemoryRouter })
+    renderCertificateBody(4)
     await chooseMoreAction('certificates.rename')
     await waitFor(() => expect(certs.rename).toHaveBeenCalledWith(4, 'Back door'))
     await waitFor(() => expect(changed).toHaveBeenCalled())
@@ -77,7 +72,7 @@ describe('rename in the floating detail window', () => {
   it('does not call the route when the name is unchanged', async () => {
     authState.permissions = ['read:certificates', 'write:certificates']
     notify.showPrompt.mockResolvedValueOnce('Front door ')
-    render(<InspectorObject entry={WINDOW} onTitle={() => {}} />, { wrapper: MemoryRouter })
+    renderCertificateBody(4)
     await chooseMoreAction('certificates.rename')
     await waitFor(() => expect(notify.showPrompt).toHaveBeenCalled())
     expect(certs.rename).not.toHaveBeenCalled()
@@ -85,13 +80,13 @@ describe('rename in the floating detail window', () => {
 
   it('is absent for a read-only operator', async () => {
     authState.permissions = ['read:certificates']
-    render(<InspectorObject entry={WINDOW} onTitle={() => {}} />, { wrapper: MemoryRouter })
+    renderCertificateBody(4)
     await screen.findByText('export.title')
     expect(within(await openMoreActions()).queryByRole('button', { name: 'certificates.rename' })).toBeNull()
   })
 })
 
-describe('rename from the action bar of a page slide-over', () => {
+describe('rename from the actions a page draws', () => {
   const rights = (write) => ({ canWrite: () => write, canDelete: () => false, hasPermission: () => false })
 
   it('shows the action to a writer and renames in place', async () => {

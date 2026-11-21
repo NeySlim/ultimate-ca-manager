@@ -38,15 +38,15 @@ vi.mock('react-i18next', () => ({
   Trans: ({ children }) => children,
 }))
 
-vi.mock('../../../contexts', () => ({
+vi.mock('../../contexts', () => ({
   useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showWarning: vi.fn(), showConfirm: vi.fn(), showPrompt: vi.fn() }),
   useMobile: () => ({ isMobile: false, isTablet: false }),
 }))
-vi.mock('../../../contexts/AuthContext', () => ({ useAuth: () => ({ permissions: ['*'] }) }))
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ permissions: ['*'] }) }))
 
-import { ActionsHarness } from './ActionsHarness'
-import { ExportModal } from '../../ExportModal'
-import { canExportPrivateKey } from '../../../lib/exportPermissions'
+import { ActionsHarness } from '../../test/ActionsHarness'
+import { ExportModal } from '../../components/ExportModal'
+import { canExportPrivateKey } from '../../lib/exportPermissions'
 
 // Verbatim from backend/auth/permissions.py.
 const OPERATOR_PERMISSIONS = [
