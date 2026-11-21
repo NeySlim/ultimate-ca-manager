@@ -2,7 +2,7 @@
  * CertificatesPage: a certificate just issued is easy to find (#368).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, renderHook, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
 
 // Stable across renders: t and showError are loader dependencies, a fresh one reloads in a loop
@@ -79,7 +79,7 @@ vi.mock('../../components/SmartImport', () => ({
 }))
 
 import CertificatesPage from '../CertificatesPage'
-import { useCertificateColumns } from '../certificates/useCertificateColumns'
+import { certificateColumns } from '../certificates/certificateRows'
 
 const renderPage = () => render(
   <MemoryRouter><CertificatesPage /></MemoryRouter>
@@ -119,11 +119,10 @@ describe('CertificatesPage — finding a new certificate (#368)', () => {
   })
 
   it('offers a sortable creation date column', () => {
-    const { result } = renderHook(() => useCertificateColumns((key) => key))
-    const column = result.current.find(col => col.key === 'created_at')
+    const column = certificateColumns((key) => key).find(col => col.id === 'created')
     expect(column).toBeDefined()
-    expect(column.sortable).toBe(true)
-    expect(column.header).toBe('common.created')
+    expect(column.sort).toBe('created')
+    expect(column.label).toBe('common.created')
   })
 
   it('opens the certificate it has just issued', async () => {

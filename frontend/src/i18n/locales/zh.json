@@ -1214,6 +1214,40 @@
       },
       "resultViewCertificate": "查看证书",
       "resultViewApproval": "查看请求"
+    },
+    "tableLabel": "证书表格",
+    "caption": "证书。激活名称即可在检查器中打开。",
+    "noneInRange": "没有证书",
+    "filterByCa": "按证书颁发机构筛选",
+    "filterBySource": "按来源筛选",
+    "filterByTemplate": "按模板筛选",
+    "presets": {
+      "title": "已保存的筛选",
+      "note": "已保存的筛选会在此浏览器中保留当前的搜索、状态和筛选条件。"
+    },
+    "exportList": "导出列表",
+    "allResultsSelected_one": "已选择 {{count, number}} 个结果",
+    "allResultsSelected_other": "已选择全部 {{count, number}} 个结果",
+    "keepPageOnly": "仅保留本页",
+    "selectAllResults_one": "选择 {{count, number}} 个结果",
+    "selectAllResults_other": "选择全部 {{count, number}} 个结果",
+    "exportSelection": "导出…",
+    "bulkExport": {
+      "title": "导出所选项？",
+      "all": "全部结果：{{n}}，而不仅是本页的 {{page}} 个。",
+      "allQuery": "搜索“{{query}}”的全部结果：{{n}}，而不仅是本页的 {{page}} 个。",
+      "page": "本页的 {{n}}。",
+      "certificates_one": "{{count, number}} 个证书",
+      "certificates_other": "{{count, number}} 个证书",
+      "pemDesc": "证书本身",
+      "csvDesc": "其元数据，表格",
+      "jsonDesc": "其元数据，结构化",
+      "note": "此导出不会让任何私钥离开 UCM。元数据列出每个证书的名称、描述和日期；最多 10 000 个。",
+      "confirm_one": "导出 {{count, number}} 个证书",
+      "confirm_other": "导出 {{count, number}} 个证书"
+    },
+    "filters": {
+      "title": "筛选"
     }
   },
   "cas": {
@@ -5043,7 +5077,14 @@
     "selectTwoToCompare": "选择两个证书进行比较",
     "differences_one": "{{count}} 个差异",
     "differences_other": "{{count}} 个差异",
-    "differences": "{{count}}处差异"
+    "differences": "{{count}}处差异",
+    "twoTitle": "比较两个证书",
+    "lead": "不同的属性已突出显示。",
+    "property": "属性",
+    "authority": "颁发机构",
+    "keyHeld": "存在",
+    "keyAbsent": "不存在",
+    "close": "关闭比较"
   },
   "members": {
     "manageMembers": "管理成员",
@@ -5371,7 +5412,9 @@
       "copyFailed": "无法复制通用名称",
       "viewActivity": "查看其活动",
       "revokeAction": "吊销证书…",
-      "trustAnchorLine": "信任锚：{{name}}"
+      "trustAnchorLine": "信任锚：{{name}}",
+      "moreDetailsHint": "主题、指纹、合规性、元数据、部署",
+      "revokedMenuNote": "证书已吊销：不能续期，也不能再次吊销。仍可导出。"
     },
     "history": {
       "issued": "证书已签发",
@@ -6268,7 +6311,9 @@
     "previewRoot": "根 CA",
     "previewKey": "私钥",
     "previewKeyEncrypted": "私钥，以密码加密",
-    "previewRelated": "混合证书对中的关联证书"
+    "previewRelated": "混合证书对中的关联证书",
+    "noPrivateKey": "私钥不存在",
+    "noKeyPermissionShort": "不允许导出密钥"
   },
   "userCertificates": {
     "title": "用户证书",

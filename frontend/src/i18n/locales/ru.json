@@ -1236,6 +1236,48 @@
       },
       "resultViewCertificate": "Открыть сертификат",
       "resultViewApproval": "Открыть запрос"
+    },
+    "tableLabel": "Таблица сертификатов",
+    "caption": "Сертификаты. Активируйте имя, чтобы открыть его в инспекторе.",
+    "noneInRange": "Нет сертификатов",
+    "filterByCa": "Фильтр по центру сертификации",
+    "filterBySource": "Фильтр по источнику",
+    "filterByTemplate": "Фильтр по шаблону",
+    "presets": {
+      "title": "Сохранённые фильтры",
+      "note": "Сохранённый фильтр запоминает текущий поиск, состояние и фильтры в этом браузере."
+    },
+    "exportList": "Экспортировать список",
+    "allResultsSelected_one": "Выбран {{count, number}} результат",
+    "allResultsSelected_few": "Выбраны все {{count, number}} результата",
+    "allResultsSelected_many": "Выбраны все {{count, number}} результатов",
+    "allResultsSelected_other": "Выбраны все {{count, number}} результата",
+    "keepPageOnly": "Оставить только эту страницу",
+    "selectAllResults_one": "Выбрать {{count, number}} результат",
+    "selectAllResults_few": "Выбрать все {{count, number}} результата",
+    "selectAllResults_many": "Выбрать все {{count, number}} результатов",
+    "selectAllResults_other": "Выбрать все {{count, number}} результата",
+    "exportSelection": "Экспортировать…",
+    "bulkExport": {
+      "title": "Экспортировать выбранное?",
+      "all": "Все результаты: {{n}}, а не только {{page}} на этой странице.",
+      "allQuery": "Все результаты поиска «{{query}}»: {{n}}, а не только {{page}} на этой странице.",
+      "page": "{{n}} на этой странице.",
+      "certificates_one": "{{count, number}} сертификат",
+      "certificates_few": "{{count, number}} сертификата",
+      "certificates_many": "{{count, number}} сертификатов",
+      "certificates_other": "{{count, number}} сертификата",
+      "pemDesc": "Сами сертификаты",
+      "csvDesc": "Их метаданные, таблицей",
+      "jsonDesc": "Их метаданные, структурированно",
+      "note": "Через этот экспорт закрытые ключи не покидают UCM. Метаданные называют, описывают и датируют каждый сертификат; не более 10 000.",
+      "confirm_one": "Экспортировать {{count, number}} сертификат",
+      "confirm_few": "Экспортировать {{count, number}} сертификата",
+      "confirm_many": "Экспортировать {{count, number}} сертификатов",
+      "confirm_other": "Экспортировать {{count, number}} сертификата"
+    },
+    "filters": {
+      "title": "Фильтры"
     }
   },
   "cas": {
@@ -5198,7 +5240,14 @@
     "differences_few": "{{count}} различия",
     "differences_many": "{{count}} различий",
     "differences_other": "{{count}} различия",
-    "differences": "Различий: {{count}}"
+    "differences": "Различий: {{count}}",
+    "twoTitle": "Сравнить два сертификата",
+    "lead": "Различающиеся свойства выделены.",
+    "property": "Свойство",
+    "authority": "Центр сертификации",
+    "keyHeld": "Есть",
+    "keyAbsent": "Нет",
+    "close": "Закрыть сравнение"
   },
   "members": {
     "manageMembers": "Управление участниками",
@@ -5546,7 +5595,9 @@
       "copyFailed": "Не удалось скопировать общее имя",
       "viewActivity": "Просмотреть его активность",
       "revokeAction": "Отозвать сертификат…",
-      "trustAnchorLine": "Якорь доверия: {{name}}"
+      "trustAnchorLine": "Якорь доверия: {{name}}",
+      "moreDetailsHint": "Субъект, отпечатки, соответствие, метаданные, развёртывание",
+      "revokedMenuNote": "Сертификат отозван: ни продления, ни повторного отзыва. Экспорт остаётся возможным."
     },
     "history": {
       "issued": "Сертификат выпущен",
@@ -6475,7 +6526,9 @@
     "previewRoot": "корневой УЦ",
     "previewKey": "закрытый ключ",
     "previewKeyEncrypted": "закрытый ключ, зашифрованный паролем",
-    "previewRelated": "связанный сертификат гибридной пары"
+    "previewRelated": "связанный сертификат гибридной пары",
+    "noPrivateKey": "Закрытый ключ отсутствует",
+    "noKeyPermissionShort": "Экспорт ключа не разрешён"
   },
   "userCertificates": {
     "title": "Сертификаты пользователей",

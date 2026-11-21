@@ -55,8 +55,12 @@ const definedOnly = (obj) => Object.fromEntries(Object.entries(obj || {}).filter
  * @param {() => void} [p.onMutate]  called just before a mutating request
  * @param {object} [p.permissions]  { canWrite, canDelete, hasPermission } override
  * @param {Function} [p.t]  translator override
+ * @param {{ Export?, Revoke?, Issue? }} [p.dialogs]  a zone's own export, revocation and issue dialogs, same props as the defaults
  */
-export function useEntityActions({ type, entity, entityId, onChanged, onClose, onOpenEntity, onMutate, afterMutation = 'close', permissions, t: tOverride }) {
+export function useEntityActions({ type, entity, entityId, onChanged, onClose, onOpenEntity, onMutate, afterMutation = 'close', permissions, t: tOverride, dialogs }) {
+  const ExportDialog = dialogs?.Export || ExportModal
+  const RevokeDialog = dialogs?.Revoke || RevokeCertificateModal
+  const IssueDialog = dialogs?.Issue || IssueCertificateDialog
   const { t: hookT } = useTranslation()
   const t = tOverride || hookT
   const { showSuccess, showError, showConfirm, showPrompt, showWarning } = useNotification()
@@ -376,7 +380,7 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
 
   const modals = data ? (
     <>
-      <ExportModal
+      <ExportDialog
         open={exportOpen}
         onClose={() => setExportOpen(false)}
         entityType={isCA ? 'ca' : 'certificate'}
@@ -395,7 +399,7 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
         <CertificateLintModal certId={id} certName={title} open={lintOpen} onClose={() => setLintOpen(false)} />
       )}
       {(isCert || isUserCert || isCA) && (
-        <RevokeCertificateModal
+        <RevokeDialog
           allowHold={!isCA && !onHold}
           open={revokeOpen}
           onClose={() => { setRevokeOpen(false); setDeleteAfterRevoke(false) }}
@@ -407,7 +411,7 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
         />
       )}
       {isCert && renewOpen && (
-        <IssueCertificateDialog open={renewOpen} mode="renew" certificate={data} onMutate={onMutate}
+        <IssueDialog open={renewOpen} mode="renew" certificate={data} onMutate={onMutate}
           // Renewed in place: the surface stays on the certificate and reloads it once the result screen closes
           onOpenChange={(next) => { setRenewOpen(next); if (!next && renewed.current) { renewed.current = false; reload() } }}
           onIssued={() => { renewed.current = true; refresh() }}

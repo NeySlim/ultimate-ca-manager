@@ -7,7 +7,8 @@
  * rules (Tailwind's reset, transitions, border colours) do not reach under the copied rules.
  */
 .atl{flex:1;min-width:0;min-height:0;display:grid;grid-template-rows:minmax(0,1fr);grid-template-columns:minmax(0,1fr);font-family:'IBM Plex Sans',sans-serif;font-size:13px;line-height:normal;color:var(--text);-webkit-font-smoothing:auto;-moz-osx-font-smoothing:auto}
-.atl :where(:not(svg,svg *)),.atl :where(:not(svg,svg *))::before,.atl :where(:not(svg,svg *))::after{all:revert}
+/* Content the product draws with its own styles inside a zone (a panel not yet taken from the mockup) sits under .atl-out and keeps them. */
+.atl :where(:not(svg,svg *,.atl-out,.atl-out *)),.atl :where(:not(svg,svg *,.atl-out,.atl-out *))::before,.atl :where(:not(svg,svg *,.atl-out,.atl-out *))::after{all:revert}
 .atl svg{display:revert;vertical-align:revert}
 /* The revert above drops the browser's own [hidden] (a presentational hint in Chromium): given back, at the same weight. */
 .atl :where([hidden]:not([hidden=until-found])){display:none}

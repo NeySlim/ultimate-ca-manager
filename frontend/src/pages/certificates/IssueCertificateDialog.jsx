@@ -4,26 +4,23 @@
  * (issued, renewed, or held for approval). The focus goes back to the opener when it closes.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import * as Dialog from '@radix-ui/react-dialog'
 import { useInRouterContext, useNavigate } from 'react-router-dom'
-import { Hourglass } from '@phosphor-icons/react'
-import { Check, Warning, X } from './issue/issueIcons'
 import { useTranslation } from 'react-i18next'
+import { AtelierDialog } from '../../components/atelier/AtelierDialog'
+import { Icon } from '../../components/atelier/Icon'
 import { certificatesService, csrsService, casService } from '../../services'
 import { useNotification } from '../../contexts'
 import { usePermission } from '../../hooks'
 import { issueWithSubjectOverride } from '../../lib/uniqueSubject'
 import { noticesOf } from '../../lib/notices'
 import { IssueCertificateForm } from './IssueCertificateForm'
-import { escapeYielded } from '../../components/list/dialogEscape'
-import './issue/issue.css'
 
 const P = 'certificates.issueForm.'
 
 function ViewApproval({ id, onDone, t }) {
   const navigate = useNavigate()
   return (
-    <button type="button" className="iss-btn is-primary" onClick={() => { onDone(); navigate(`/approvals?id=${id}`) }}>
+    <button type="button" className="btn primary" data-write="false" onClick={() => { onDone(); navigate(`/approvals?id=${id}`) }}>
       {t(`${P}resultViewApproval`)}
     </button>
   )
@@ -39,25 +36,25 @@ function Result({ result, onClose, onOpen, canSeeApprovals, inRouter, t }) {
     return b === undefined ? a : <>{a}<strong>{result.name}</strong>{b}</>
   }
   return (
-    <div className="iss-result" data-testid="issue-result">
-      <div className={`iss-result-icon${held || waiting ? ' is-warn' : ''}`}>
-        {held ? <Warning aria-hidden="true" /> : waiting ? <Hourglass aria-hidden="true" /> : <Check aria-hidden="true" />}
+    <div data-testid="issue-result">
+      <div className={held || waiting ? 'result-icon warn' : 'result-icon'}>
+        <Icon name={held ? 'warning' : waiting ? 'clock' : 'check'} />
       </div>
-      <h3 className="iss-result-title">{t(`${P}result.${result.kind}.title`)}</h3>
-      <p className="iss-result-copy">
+      <h3 className="result-title">{t(`${P}result.${result.kind}.title`)}</h3>
+      <p className="result-copy">
         {strong(`${P}result.${result.kind}.copy`, { policy: result.policy ?? '' })}
         {result.related && <> {t(result.related.key, result.related.params)}</>}
       </p>
       {result.notices?.map((notice) => (
-        <p className="iss-notice is-warn iss-result-note" key={notice}><Warning aria-hidden="true" /><span>{notice}</span></p>
+        <div className="notice warn" style={{ marginTop: 20 }} key={notice}><Icon name="warning" /><span>{notice}</span></div>
       ))}
-      <div className="iss-actions">
-        <button type="button" className="iss-btn" onClick={onClose}>{t('common.close')}</button>
+      <div className="modal-actions">
+        <button type="button" className="btn" data-action="close-modal" onClick={onClose}>{t('common.close')}</button>
         {held && result.approvalId != null && canSeeApprovals && inRouter && (
           <ViewApproval id={result.approvalId} onDone={onClose} t={t} />
         )}
         {!held && !waiting && result.certificate && (
-          <button type="button" className="iss-btn is-primary" onClick={() => onOpen(result.certificate)}>{t(`${P}resultViewCertificate`)}</button>
+          <button type="button" className="btn primary" data-write="false" data-result-open={result.certificate.id} onClick={() => onOpen(result.certificate)}>{t(`${P}resultViewCertificate`)}</button>
         )}
       </div>
     </div>
@@ -86,18 +83,13 @@ export function IssueCertificateDialog({
   const [step, setStep] = useState(1)
   const [result, setResult] = useState(null)
   // While the request is out the dialog stays: its answer always reaches the result screen
-  const [sending, setSending] = useState(false)
   const sendingRef = useRef(false)
   const [loadedCas, setLoadedCas] = useState([])
   // One upload per CSR text: a retry after a refused signature signs the request already uploaded
   const [uploaded, setUploaded] = useState({ pem: null, id: null })
   const renew = mode === 'renew'
-  const closeButton = useRef(null)
-  // The element that had the focus when the dialog opened takes it back at the close
-  const opener = useRef(null)
-  const wasOpen = useRef(false)
-  if (open && !wasOpen.current) opener.current = typeof document !== 'undefined' ? document.activeElement : null
-  wasOpen.current = open
+  // The dialog's own close button (the mockup's « Fermer la fenêtre »)
+  const closeButton = () => document.querySelector('[data-testid="issue-dialog"] .modal-head [data-action="close-modal"]')
 
   useEffect(() => {
     if (!open || cas) return undefined
@@ -112,7 +104,7 @@ export function IssueCertificateDialog({
   const close = () => onOpenChange(false)
   // Escape and the close button both go through here: neither closes while the request is out
   const changeOpen = (next) => { if (next || !sendingRef.current) onOpenChange(next) }
-  const busy = (on) => { sendingRef.current = on; setSending(on) }
+  const busy = (on) => { sendingRef.current = on }
 
   // The form names its operation; without it, the dialog's mode decides
   const submit = useCallback(async (body, { kind = renew ? 'renew' : 'issue', csr } = {}) => {
@@ -171,66 +163,36 @@ export function IssueCertificateDialog({
     if (!outcome?.result) return
     setResult(outcome.result)
     // The result screen replaces the form: its close button takes the focus, as in the Atelier
-    setTimeout(() => closeButton.current?.focus())
+    setTimeout(() => closeButton()?.focus())
   }, [])
 
   const title = result ? t(`${P}result.${result.kind}.head`)
     : step === 2 ? t(`${P}titleReview`) : t(renew ? `${P}titleRenew` : `${P}titleIssue`)
+  if (!open) return null
   return (
-    <Dialog.Root open={open} onOpenChange={changeOpen}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="iss-overlay" />
-        <Dialog.Content className={`iss-dialog${result ? ' is-narrow' : ''}`}
-          aria-describedby={step === 1 && !result ? 'iss-subtitle' : undefined}
-          onOpenAutoFocus={(e) => {
-            // The first field takes the focus, as in the Atelier, not the close button
-            e.preventDefault()
-            const body = e.currentTarget.querySelector('.iss-body')
-            const first = body?.querySelector('[data-first-field]')
-            ;(first && !first.disabled ? first : body?.querySelector('select:not(:disabled), input:not(:disabled)'))?.focus()
-          }}
-          onCloseAutoFocus={(e) => {
-            e.preventDefault()
-            if (opener.current?.isConnected) opener.current.focus()
-          }}
-          // A toast above the dialog yields it an Escape typed here (still refused while sending)
-          onKeyDown={(e) => { if (e.key === 'Escape' && escapeYielded(e.nativeEvent)) changeOpen(false) }}
-          // A modal of the Atelier closes by its buttons or Escape, never by a click beside it
-          onPointerDownOutside={(e) => e.preventDefault()}
-          onInteractOutside={(e) => e.preventDefault()}>
-          <header className="iss-head">
-            <div>
-              <Dialog.Title asChild><h2>{title}</h2></Dialog.Title>
-              {step === 1 && !result && <p id="iss-subtitle">{t(renew ? `${P}subtitleRenew` : `${P}subtitleIssue`)}</p>}
-            </div>
-            <Dialog.Close ref={closeButton} className="iss-icon-btn is-quiet" aria-label={t(`${P}close`)}
-              aria-disabled={sending ? 'true' : undefined}>
-              <X aria-hidden="true" />
-            </Dialog.Close>
-          </header>
-          <div className="iss-body">
-            {open && result && (
-              <Result result={result} t={t} inRouter={inRouter} canSeeApprovals={hasPermission('read:approvals')}
-                onClose={close} onOpen={(issued) => { close(); onOpen?.(issued) }} />
-            )}
-            {open && !result && (
-              <IssueCertificateForm
-                mode={mode}
-                certificate={certificate}
-                cas={cas || loadedCas}
-                initialData={initialData}
-                canUseCsr={!renew && hasPermission('write:csrs')}
-                onSubmit={async (...args) => { busy(true); try { return await submit(...args) } finally { busy(false) } }}
-                onSent={sent}
-                onCancel={close}
-                onStepChange={setStep}
-                reviewFocus={() => closeButton.current}
-                t={t}
-              />
-            )}
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <AtelierDialog title={title} subtitle={step === 1 && !result ? t(renew ? `${P}subtitleRenew` : `${P}subtitleIssue`) : undefined}
+      size={result ? 'narrow' : 'wide'} onClose={() => changeOpen(false)} testId="issue-dialog">
+      <>
+        {result && (
+          <Result result={result} t={t} inRouter={inRouter} canSeeApprovals={hasPermission('read:approvals')}
+            onClose={close} onOpen={(issued) => { close(); onOpen?.(issued) }} />
+        )}
+        {!result && (
+          <IssueCertificateForm
+            mode={mode}
+            certificate={certificate}
+            cas={cas || loadedCas}
+            initialData={initialData}
+            canUseCsr={!renew && hasPermission('write:csrs')}
+            onSubmit={async (...args) => { busy(true); try { return await submit(...args) } finally { busy(false) } }}
+            onSent={sent}
+            onCancel={close}
+            onStepChange={setStep}
+            reviewFocus={closeButton}
+            t={t}
+          />
+        )}
+      </>
+    </AtelierDialog>
   )
 }

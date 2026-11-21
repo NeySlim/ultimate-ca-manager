@@ -1736,6 +1736,40 @@
       },
       "resultViewCertificate": "Voir le certificat",
       "resultViewApproval": "Voir la demande"
+    },
+    "tableLabel": "Tableau des certificats",
+    "caption": "Certificats. Activez un nom pour ouvrir son inspecteur.",
+    "noneInRange": "Aucun certificat",
+    "filterByCa": "Filtrer par autorité",
+    "filterBySource": "Filtrer par source",
+    "filterByTemplate": "Filtrer par modèle",
+    "presets": {
+      "title": "Filtres enregistrés",
+      "note": "Un filtre enregistré reprend la recherche, l’état et les filtres en cours, dans ce navigateur."
+    },
+    "exportList": "Exporter la liste",
+    "allResultsSelected_one": "{{count, number}} résultat est sélectionné",
+    "allResultsSelected_other": "Les {{count, number}} résultats sont sélectionnés",
+    "keepPageOnly": "Ne garder que cette page",
+    "selectAllResults_one": "Sélectionner le {{count, number}} résultat",
+    "selectAllResults_other": "Sélectionner les {{count, number}} résultats",
+    "exportSelection": "Exporter…",
+    "bulkExport": {
+      "title": "Exporter la sélection ?",
+      "all": "Tous les résultats : {{n}}, pas seulement les {{page}} de cette page.",
+      "allQuery": "Tous les résultats de la recherche « {{query}} » : {{n}}, pas seulement les {{page}} de cette page.",
+      "page": "{{n}} de cette page.",
+      "certificates_one": "{{count, number}} certificat",
+      "certificates_other": "{{count, number}} certificats",
+      "pemDesc": "Les certificats",
+      "csvDesc": "Leurs métadonnées, en tableau",
+      "jsonDesc": "Leurs métadonnées, structurées",
+      "note": "Aucune clé privée ne sort d’UCM par cet export. Les métadonnées nomment, décrivent et datent chaque certificat ; 10 000 au plus.",
+      "confirm_one": "Exporter {{count, number}} certificat",
+      "confirm_other": "Exporter {{count, number}} certificats"
+    },
+    "filters": {
+      "title": "Filtres"
     }
   },
   "common": {
@@ -2228,7 +2262,14 @@
     "selectTwoToCompare": "Sélectionnez deux certificats à comparer",
     "differences_one": "{{count}} différence",
     "differences_other": "{{count}} différences",
-    "differences": "{{count}} différences"
+    "differences": "{{count}} différences",
+    "twoTitle": "Comparer deux certificats",
+    "lead": "Les propriétés différentes sont mises en évidence.",
+    "property": "Propriété",
+    "authority": "Autorité",
+    "keyHeld": "Présente",
+    "keyAbsent": "Absente",
+    "close": "Fermer la comparaison"
   },
   "crlOcsp": {
     "crl": "Liste de révocation de certificats",
@@ -5374,7 +5415,9 @@
       "copyFailed": "Le nom commun n’a pas pu être copié",
       "viewActivity": "Voir son activité",
       "revokeAction": "Révoquer le certificat…",
-      "trustAnchorLine": "Ancre de confiance : {{name}}"
+      "trustAnchorLine": "Ancre de confiance : {{name}}",
+      "moreDetailsHint": "Sujet, empreintes, conformité, métadonnées, déploiement",
+      "revokedMenuNote": "Certificat révoqué : ni renouvellement ni nouvelle révocation. L’export reste possible."
     },
     "history": {
       "issued": "Certificat émis",
@@ -6271,7 +6314,9 @@
     "previewRoot": "AC racine",
     "previewKey": "clé privée",
     "previewKeyEncrypted": "clé privée, chiffrée par le mot de passe",
-    "previewRelated": "certificat lié de la paire hybride"
+    "previewRelated": "certificat lié de la paire hybride",
+    "noPrivateKey": "Clé privée absente",
+    "noKeyPermissionShort": "Export de la clé non permis"
   },
   "userCertificates": {
     "title": "Certificats utilisateurs",

@@ -15,7 +15,7 @@ test('the status bar keeps the bottom of the window under the open dock', async 
   await page.goto('/certificates')
   await page.getByRole('main').getByRole('searchbox').fill(cert.common_name)
   await page.getByRole('main').getByRole('button', { name: cert.common_name, exact: true }).click()
-  const dock = page.getByTestId('inspector-dock')
+  const dock = page.locator('#inspector')
   await expect(dock).toBeVisible()
   const view = page.viewportSize()!
   const bar = page.getByRole('contentinfo')

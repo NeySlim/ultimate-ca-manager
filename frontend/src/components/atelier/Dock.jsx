@@ -165,17 +165,31 @@ function OpenTabs({ tabs, activeKey, onSelect, onClose, label, moreTitle, hidden
  * @param {string} p.activeKey
  * @param {() => void} p.onClose
  * @param {import('react').ReactNode} p.children  a DockBody
+ * @param {{height, width, side}} [p.geometry]  held by the page, with `onGeometry(patch)`; else kept under `storageKey`
+ * @param {boolean} [p.collapsed]  held by the page, with `onCollapsed(folded)`
  */
-export function Dock({ label, tabsLabel, tabs, activeKey, onSelectTab, onCloseTab, onClose, children, storageKey = 'ucm-atelier-dock' }) {
+export function Dock({
+  label, tabsLabel, tabs, activeKey, onSelectTab, onCloseTab, onClose, children, storageKey = 'ucm-atelier-dock',
+  geometry, onGeometry, collapsed: heldCollapsed, onCollapsed,
+}) {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
   const setZoneRight = useContext(DockSideContext)
   const ref = useRef(null)
-  const [stored, setStored] = usePersistedState(`${storageKey}-height`, 278)
-  const [storedW, setStoredW] = usePersistedState(`${storageKey}-width`, 460)
-  const [side, setSide] = usePersistedState(`${storageKey}-side`, 'bottom')
+  const [ownH, setOwnH] = usePersistedState(geometry ? null : `${storageKey}-height`, 278)
+  const [ownW, setOwnW] = usePersistedState(geometry ? null : `${storageKey}-width`, 460)
+  const [ownSide, setOwnSide] = usePersistedState(geometry ? null : `${storageKey}-side`, 'bottom')
+  const [ownCollapsed, setOwnCollapsed] = useState(false)
+  // A page may hold the geometry and the fold itself (the user's inspector preference): then the dock follows it
+  const stored = geometry ? geometry.height : ownH
+  const storedW = geometry ? geometry.width : ownW
+  const side = geometry ? geometry.side : ownSide
+  const setStored = geometry ? (v) => onGeometry?.({ height: v }) : setOwnH
+  const setStoredW = geometry ? (v) => onGeometry?.({ width: v }) : setOwnW
+  const setSide = geometry ? (v) => onGeometry?.({ side: v }) : setOwnSide
+  const collapsed = onCollapsed ? !!heldCollapsed : ownCollapsed
+  const setCollapsed = onCollapsed || setOwnCollapsed
   const [viewW, setViewW] = useState(() => window.innerWidth)
-  const [collapsed, setCollapsed] = useState(false)
   const [drag, setDrag] = useState(null)
   // The right needs room for the list beside it: under 1400 px the dock goes back to the bottom
   const right = side === 'right' && viewW >= RIGHT_MIN && !isMobile

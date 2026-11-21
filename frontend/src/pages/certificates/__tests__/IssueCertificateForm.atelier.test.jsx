@@ -39,6 +39,14 @@ const renderForm = (props = {}) => {
 const advancedToggle = () => screen.getByRole('button', { name: new RegExp(`${P}advanced`) })
 const announced = () => screen.getByRole('status').textContent
 
+// A review row is its term and its value, siblings in the mockup's list
+const rowOf = (review, id) => {
+  const dt = review.querySelector(`[data-row="${id}"]`)
+  const box = document.createElement('div')
+  box.append(dt.cloneNode(true), dt.nextElementSibling.cloneNode(true))
+  return box
+}
+
 describe('IssueCertificateForm against the Atelier', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -173,12 +181,12 @@ describe('IssueCertificateForm against the Atelier', () => {
     // The template's own subject is told by the Advanced line, not by a line of its own
     expect(ids).toEqual(['operation', 'template', 'ca', 'description', 'keySource', 'key', 'validity', 'sans', 'advanced', 'ekus'])
     expect(review.dataset.fields.split(' ')).toContain('organization')
-    const ekus = review.querySelector('[data-row="ekus"]')
+    const ekus = rowOf(review, 'ekus')
     expect(within(ekus).getByText(`${P}ekuRow`)).toBeTruthy()
     // Every EKU by its name: the template's and the added one
     expect(ekus.textContent).toContain(`${P}eku.serverAuth`)
     expect(ekus.textContent).toContain(`${P}eku.clientAuth`)
-    expect(review.querySelector('[data-row="advanced"]').textContent).toContain(`${P}advancedChanged`)
+    expect(rowOf(review, 'advanced').textContent).toContain(`${P}advancedChanged`)
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`${P}back`) }))
     type('common.organization', 'Other Org')
     const changed = await toReview()
@@ -223,9 +231,9 @@ describe('IssueCertificateForm renewal', () => {
     render(<IssueCertificateForm mode="renew" certificate={CERT} cas={[{ ...CAS[1], refid: 'svc' }, CAS[0]]}
       onCancel={() => {}} t={t} onSubmit={vi.fn()} />)
     const review = await toReview()
-    expect(review.querySelector('[data-row="description"]').textContent).toContain('Web GUI')
-    expect(review.querySelector('[data-row="ca"]').textContent).toContain(`${P}caLevelUnder`)
-    expect(review.querySelector('[data-row="key"]').textContent).toContain('RSA 2048')
-    expect(review.querySelector('[data-row="validity"]').textContent).toContain(`${P}validityUntil`)
+    expect(rowOf(review, 'description').textContent).toContain('Web GUI')
+    expect(rowOf(review, 'ca').textContent).toContain(`${P}caLevelUnder`)
+    expect(rowOf(review, 'key').textContent).toContain('RSA 2048')
+    expect(rowOf(review, 'validity').textContent).toContain(`${P}validityUntil`)
   })
 })

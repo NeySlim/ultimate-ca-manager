@@ -9,7 +9,7 @@
  * screen while the list showed everything.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, renderHook, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 // Stable across renders: t and showError are loader dependencies, a fresh one reloads in a loop
@@ -41,6 +41,9 @@ vi.mock('../../contexts', () => ({
   }),
 }))
 
+// The zone's table reads the phone from the context module itself
+vi.mock('../../contexts/MobileContext', () => ({ useMobile: () => ({ isMobile: mockIsMobile }) }))
+
 vi.mock('../../hooks', async () => {
   const actual = await vi.importActual('../../hooks/usePersistedState')
   return {
@@ -66,7 +69,6 @@ vi.mock('../../services', () => ({
 }))
 
 import CertificatesPage from '../CertificatesPage'
-import { useCertificateColumns } from '../certificates/useCertificateColumns'
 
 const renderPage = () => render(
   <MemoryRouter><CertificatesPage /></MemoryRouter>
@@ -121,16 +123,8 @@ describe('CertificatesPage — filter survives an external action (#345)', () =>
     renderPage()
     // The record shows the description on its own line, under the name
     const name = await screen.findByText('phone.example.com')
-    const record = name.closest('[role="listitem"]')
-    expect(record.querySelector('.lv-mrecord-desc')).toHaveTextContent(/^Renamed on mobile$/)
-  })
-
-  it('exports the description in its own column, beside the Common Name', () => {
-    const { result } = renderHook(() => useCertificateColumns((key) => key))
-    const column = result.current.find(col => col.key === 'descr')
-    expect(result.current.find(col => col.key === 'cn').accessor).toBeUndefined()
-    expect(column.accessor({ cn: 'host.example.com', subtitle: 'Renamed' })).toBe('Renamed')
-    expect(column.accessor({ cn: 'host.example.com', subtitle: null })).toBe('')
+    const record = name.closest('article.mobile-record')
+    expect(record.querySelector('.row-description')).toHaveTextContent(/^Renamed on mobile$/)
   })
 
   it('does not repeat a description that is the CN', async () => {

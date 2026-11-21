@@ -33,21 +33,13 @@ vi.mock('../../services', () => ({
   certificatesService: { getAll: (...a) => getAll(...a) },
 }))
 
-import { CertificateCompareModal } from '../CertificateCompareModal'
 import CertificatePickerModal from '../CertificatePickerModal'
 
 const renamed = { id: 7, common_name: 'host.example.com', descr: 'Renamed', key_type: 'EC', has_private_key: true, valid_to: '2099-01-01T00:00:00Z' }
 const plain = { id: 8, common_name: 'plain.example.com', descr: 'plain.example.com', has_private_key: true, valid_to: '2099-01-01T00:00:00Z' }
 
-const optionLabels = () => Array.from(document.querySelectorAll('option')).map((o) => o.textContent)
 
 describe('certificate pickers name a certificate by its CN (#365)', () => {
-  it('the compare dialog lists the CN with the description alongside', () => {
-    render(<CertificateCompareModal open onClose={vi.fn()} certificates={[renamed, plain]} />)
-    expect(optionLabels()).toContain('host.example.com · Renamed (EC)')
-    expect(optionLabels()).toContain('plain.example.com')
-  })
-
   it('the picker dialog shows the CN with the description under it', async () => {
     getAll.mockResolvedValue({ data: [renamed, plain], meta: { total: 2 } })
     render(<CertificatePickerModal isOpen onClose={vi.fn()} onSelect={vi.fn()} />)
