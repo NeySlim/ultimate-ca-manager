@@ -18,8 +18,8 @@ import {
   SlidersHorizontal, PaperPlaneTilt, Archive,
 } from '@phosphor-icons/react'
 import {
-  Button, Input, Select, Badge, Textarea, Card, EmptyState, ConfirmModal,
-  LoadingSpinner, FileUpload, Modal, HelpCard, Logo, ExperimentalBadge,
+  Button, Input, Select, Textarea, Card, EmptyState, ConfirmModal,
+  LoadingSpinner, FileUpload, Modal, HelpCard, Logo,
   DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
   CompactSection,
   UpdateChecker, ServiceReconnectOverlay

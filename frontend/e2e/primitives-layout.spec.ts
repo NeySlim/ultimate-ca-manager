@@ -1,6 +1,6 @@
 import { test, expect, createCA, issueCert } from './support/fixtures'
 
-// Base components at the Atelier geometry: 32 px buttons with a 4 px radius, 36 px fields,
+// Base components at the Atelier geometry: 32 px buttons with a 4 px radius (6 px in Aurore), 36 px fields,
 // 16 px check boxes, the 760 px dialog and the 220 px theme menu
 const EPS = 1
 type Box = { x: number; y: number; width: number; height: number }
@@ -15,22 +15,23 @@ test.use({ viewport: { width: 1600, height: 1000 } })
 
 test('settings fields, buttons and check lines follow the mockup', async ({ page, api }) => {
   await page.goto('/settings?tab=security')
-  const frame = page.locator('#sf-title-security')
+  const frame = page.locator('#set-title-security')
   await expect(frame).toBeVisible()
+  const radius = (await page.evaluate(() => document.documentElement.dataset.theme || '')).startsWith('aurore') ? '6px' : '4px'
 
-  const field = page.locator('.sf-body .ui-control:visible').first()
+  const field = page.locator('#set-sec-security .field input:not([type="checkbox"]):visible').first()
   near((await box(field)).height, 36)
-  expect(await field.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('4px')
+  expect(await field.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe(radius)
 
-  const check = page.locator('.sf-body .ui-check-line input[type="checkbox"]:visible').first()
+  const check = page.locator('#set-sec-security .checkbox-line input[type="checkbox"]:visible').first()
   const c = await box(check)
   near(c.width, 16)
   near(c.height, 16)
 
-  const button = page.locator('main .ui-btn:visible').first()
+  const button = page.locator('#set-sec-security .btn:visible').first()
   const b = await box(button)
   near(b.height, 32)
-  expect(await button.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('4px')
+  expect(await button.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe(radius)
   expect(await button.evaluate((el) => getComputedStyle(el).fontSize)).toBe('12px')
   expect(await page.evaluate(() => getComputedStyle(document.body).fontSize)).toBe('13px')
 })
