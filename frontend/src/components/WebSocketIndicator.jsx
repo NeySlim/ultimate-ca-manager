@@ -20,7 +20,7 @@ export function WebSocketIndicator() {
   const [tone, key] = STATES[connectionState] || STATES[ConnectionState.DISCONNECTED]
   const label = t(key)
   return (
-    <button type="button" className={tone ? `ha-link ${tone}` : 'ha-link'} aria-label={label} title={label}
+    <button type="button" className={tone ? `ha-link ${tone}` : 'ha-link'} id="ws-button" aria-label={label} title={label}
       onClick={() => { if (!isConnected) connect() }}>
       <Icon name="plug" />
     </button>

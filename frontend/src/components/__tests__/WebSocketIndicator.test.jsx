@@ -25,6 +25,7 @@ describe('WebSocketIndicator', () => {
     const button = screen.getByRole('button', { name: label })
     expect(button.className.split(' ').sort()).toEqual(['ha-link', ...(tone ? [tone] : [])].sort())
     expect(button).toHaveAttribute('title', label)
+    expect(button.id).toBe('ws-button')
     expect(button.querySelector('svg.icon')).toBeTruthy()
   })
 
