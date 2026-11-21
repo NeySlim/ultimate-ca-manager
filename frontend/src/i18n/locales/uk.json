@@ -475,7 +475,8 @@
       "active": "Активний",
       "revoked": "Відкликано"
     },
-    "duplicateKey": "Інший рядок вище вже використовує \"{{key}}\": зберегти можна лише один із них"
+    "duplicateKey": "Інший рядок вище вже використовує \"{{key}}\": зберегти можна лише один із них",
+    "chooseFile": "Choose a file…"
   },
   "commandPalette": {
     "searchPlaceholder": "Пошук команд, сертифікатів, ЦС, користувачів...",
@@ -531,7 +532,12 @@
     },
     "selectResource": "Тип ресурсу",
     "selectCA": "Виберіть CA",
-    "tocLabel": "Operations"
+    "tocLabel": "Operations",
+    "openSmartImport": "Import files…",
+    "bulkListLabel": "Items for bulk actions",
+    "bulkTableLabel": "Table of items",
+    "exportPem": "Export PEM",
+    "selectionOnly": "Selection ({{count}})"
   },
   "auth": {
     "login": "Увійти",
@@ -3471,6 +3477,7 @@
       "configSaved": "Конфігурацію збережено",
       "hostPlaceholder": "192.168.1.1",
       "selectAll": "Вибрати все",
+      "foundItems": "Items found on the firewall",
       "importSelected": "Імпортувати {{count}} вибраних",
       "importSuccess": "Успішно імпортовано {{count}} елементів ({{skipped}} пропущено)",
       "noItemsSelected": "Будь ласка, виберіть хоча б один елемент для імпорту",
@@ -3550,6 +3557,8 @@
     "inputAnyFormat": "Вхід (будь-який формат)",
     "supportsFormats": "Підтримує: PEM, DER, CRT, CER, P12/PFX, P7B, KEY, CSR",
     "binaryFileLoaded": "Бінарний файл завантажено",
+    "removeFile": "Remove the file",
+    "binaryFileLoadedSize": "Binary file loaded, {{bytes}} bytes.",
     "sectionConnection": "З'єднання",
     "sectionPemInput": "Введення PEM",
     "sectionCertificateInput": "Введення сертифіката",
@@ -3624,7 +3633,13 @@
     "toolCount_one": "{{count}} tool",
     "toolCount_other": "{{count}} tools",
     "toolCount_few": "{{count}} tools",
-    "toolCount_many": "{{count}} tools"
+    "toolCount_many": "{{count}} tools",
+    "runHint": "The outcome shows here; nothing is saved.",
+    "decodedBelow": "Decoded, details below.",
+    "csrSignatureInvalid": "Decoded, but the request's signature is not valid.",
+    "itemRead": "Read",
+    "itemUnreadable": "Unreadable",
+    "noParsedItems": "Nothing could be read."
   },
   "audit": {
     "event": "Подія",
@@ -4842,6 +4857,8 @@
     "mtlsOrUploadFile": "Або завантажте файл",
     "importCertificate": "Імпортувати сертифікат",
     "mtlsAssign": "Призначити наявний",
+    "mtlsAssignChoice": "Certificate to assign",
+    "mtlsWay": "Certificate source",
     "mtlsNoAvailableCerts": "Немає доступних непризначених сертифікатів користувача",
     "mtlsExpiresOn": "Закінчується: {{date}}",
     "mtlsCertAssigned": "Сертифікат успішно призначено",
@@ -4861,6 +4878,7 @@
     "apiKeySavedDone": "Я зберіг ключ",
     "apiKeyPrefixUnavailable": "Префікс недоступний (старий ключ)",
     "expiresInDaysHelp": "Залиште порожнім або встановіть 0 для безстрокового ключа.",
+    "expiresInDaysInvalid": "Type a whole number of days, or leave the field empty.",
     "expiresInDaysPlaceholder": "напр. 365 (порожньо = без терміну)",
     "enroll2faRequired": "Потрібна двофакторна автентифікація",
     "enroll2faReason": "Ваш адміністратор вимагає 2FA для вашого облікового запису. Налаштуйте її зараз, щоб продовжити.",
@@ -4883,7 +4901,9 @@
     "backupCodesSaved": "Я зберіг свої резервні коди",
     "intent": "Your profile, the security of your sign-in and your API keys.",
     "tocLabel": "Account sections",
-    "apiKeysIntent": "Keys that call the API on behalf of your account."
+    "apiKeysIntent": "Keys that call the API on behalf of your account.",
+    "profileSaved": "Profile saved.",
+    "profileReset": "Profile changes undone."
   },
   "rbac": {
     "title": "Контроль доступу на основі ролей",
@@ -7772,7 +7792,8 @@
     "weak": "Слабкий",
     "fair": "Задовільний",
     "good": "Добрий",
-    "strong": "Сильний"
+    "strong": "Сильний",
+    "reading": "Strength: {{level}}"
   },
   "websocket": {
     "status": {

@@ -158,7 +158,7 @@
 .atl .field>.segmented{align-self:flex-start;flex-wrap:wrap}
 .atl .lock-mark{display:inline-flex;margin-left:5px;vertical-align:-2px;color:var(--muted)}
 .atl .lock-mark .icon{width:12px;height:12px}
-.atl .settings-section .panel-heading h2[data-quiet-focus]:focus-visible{outline:none}
+.atl .settings-section .panel-heading h2[data-quiet-focus]:focus-visible{outline:none;box-shadow:none}
 /*
  * A section the product still draws (.atl-out, until its zone is converted) keeps its own look: the
  * mockup's rules on bare elements (button, input, p, table) outrank the product's classes, so the

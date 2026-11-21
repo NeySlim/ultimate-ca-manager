@@ -11,7 +11,7 @@ import { Icon } from './Icon'
 import { Btn } from './Btn'
 import { AtelierDialog } from './AtelierDialog'
 import { FieldError } from './SettingsView'
-import { Input as StrengthInput } from '../Input'
+import { fileContent, usePasswordStrength } from './formHelpers'
 
 const join = (...c) => c.filter(Boolean).join(' ')
 // The product's `sf-short` class placed a short field; it maps to the mockup's `.field.short`
@@ -30,23 +30,47 @@ export function Field({ id, label, hint, error, full, short, className, optional
   )
 }
 
+const STRENGTH_SHARE = { weak: 25, fair: 50, good: 75, strong: 100 }
+
+/**
+ * A password's strength in the mockup's gauge (`.progress`, the validity bar of a certificate),
+ * `warn` below « good », then its level in words under it: the colour is never the only signal.
+ */
+export function StrengthGauge({ id, reading }) {
+  const { t } = useTranslation()
+  if (!reading) return null
+  const level = STRENGTH_SHARE[reading.level] ? reading.level : 'weak'
+  const words = t('passwordStrength.reading', { level: t(`passwordStrength.${level}`) })
+  return (
+    <>
+      <div className={level === 'weak' || level === 'fair' ? 'progress warn' : 'progress'} role="img" aria-label={words}>
+        <span style={{ width: `${STRENGTH_SHARE[level]}%` }} />
+      </div>
+      <small id={id} aria-live="polite">{words}</small>
+    </>
+  )
+}
+
 /**
  * A text input. hasExistingValue: a stored secret, shown as a masked placeholder with the hint
- * that typing replaces it. showStrength keeps the product's server-scored meter (no gabarit in the mockup).
+ * that typing replaces it. showStrength (a password) adds the server-scored gauge under the field.
  */
 // eslint-disable-next-line no-unused-vars
 export const Input = forwardRef(function Input({ label, error, helperText, hint, full, short, className, id, hasExistingValue, showStrength, mono, noAutofill, icon, ...rest }, ref) {
   const { t } = useTranslation()
   const auto = useId()
   const fid = id ?? auto
-  if (showStrength) return <StrengthInput ref={ref} label={label} error={error} helperText={helperText ?? hint} id={id} showStrength hasExistingValue={hasExistingValue} {...rest} />
+  const [typed, setTyped] = useState('')
+  const reading = usePasswordStrength(rest.value ?? typed, Boolean(showStrength && rest.type === 'password'))
   const note = hasExistingValue ? t('common.enterNewToChange') : (helperText ?? hint)
   const placeholder = hasExistingValue && rest.type === 'password' ? '••••••••••••' : rest.placeholder
+  const change = showStrength ? (e) => { setTyped(e.target.value); rest.onChange?.(e) } : rest.onChange
   return (
     <Field id={fid} label={label} hint={note} error={error} full={full} short={short} className={className}>
-      <input ref={ref} autoComplete="off" spellCheck={false} {...rest} placeholder={placeholder} id={fid} className={mono ? 'mono' : undefined}
+      <input ref={ref} autoComplete="off" spellCheck={false} {...rest} onChange={change} placeholder={placeholder} id={fid} className={mono ? 'mono' : undefined}
         required={rest.required && !hasExistingValue} aria-invalid={error ? 'true' : undefined}
-        aria-describedby={describedBy(note && `hint-${fid}`, error && `err-${fid}`, rest['aria-describedby'])} />
+        aria-describedby={describedBy(note && `hint-${fid}`, reading && `strength-${fid}`, error && `err-${fid}`, rest['aria-describedby'])} />
+      {reading && <StrengthGauge id={`strength-${fid}`} reading={reading} />}
     </Field>
   )
 })
@@ -128,6 +152,45 @@ export function Textarea({ label, error, helperText, hint, full = true, short, c
       <textarea id={fid} value={value} maxLength={maxLength} className={mono ? 'mono' : undefined} aria-invalid={error ? 'true' : undefined}
         aria-describedby={describedBy(note && `hint-${fid}`, error && `err-${fid}`)} {...rest} />
     </Field>
+  )
+}
+
+/**
+ * Pasted PEM or a file (the CSR field of the mockup's issueDialog()): the monospace textarea, its
+ * hint, then « Choisir un fichier… » as a `.text-link` over a hidden file input. A binary file
+ * replaces the textarea by its size, with the link that removes it. onChange receives the text.
+ */
+export function PemField({ id, label, value = '', onChange, accept, hint, rows = 6, placeholder, full = true, fileLabel, onFile }) {
+  const { t } = useTranslation()
+  const auto = useId()
+  const fid = id ?? auto
+  const binary = value.startsWith('BASE64:')
+  const pick = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const content = await fileContent(file)
+    onChange?.(content)
+    onFile?.(file, content)
+  }
+  return (
+    <div className={join('field', full && 'full')}>
+      <label htmlFor={binary ? `${fid}-file` : fid}>{label}</label>
+      {binary ? (
+        <p className="group-hint" id={fid} role="status">{t('tools.binaryFileLoadedSize', { bytes: Math.round((value.length - 7) * 0.75) })}</p>
+      ) : (
+        <textarea id={fid} className="mono" rows={rows} spellCheck={false} value={value} placeholder={placeholder}
+          aria-describedby={hint ? `hint-${fid}` : undefined} onChange={(e) => onChange?.(e.target.value)} />
+      )}
+      {hint && <small id={`hint-${fid}`}>{hint}</small>}
+      <span className="row-actions">
+        <label className="text-link">
+          <input id={`${fid}-file`} type="file" accept={accept} className="sr-only" onChange={pick} />
+          {fileLabel ?? t('common.chooseFile')}
+        </label>
+        {binary && <button type="button" className="text-link" onClick={() => onChange?.('')}>{t('tools.removeFile')}</button>}
+      </span>
+    </div>
   )
 }
 

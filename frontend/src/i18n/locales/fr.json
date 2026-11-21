@@ -104,6 +104,8 @@
     "mtlsOrUploadFile": "Ou importer un fichier",
     "importCertificate": "Importer le certificat",
     "mtlsAssign": "Assigner existant",
+    "mtlsAssignChoice": "Certificat à associer",
+    "mtlsWay": "Origine du certificat",
     "mtlsNoAvailableCerts": "Aucun certificat utilisateur non assigné disponible",
     "mtlsExpiresOn": "Expire le : {{date}}",
     "mtlsCertAssigned": "Certificat assigné avec succès",
@@ -123,6 +125,7 @@
     "apiKeySavedDone": "J’ai sauvegardé la clé",
     "apiKeyPrefixUnavailable": "Préfixe indisponible (ancienne clé)",
     "expiresInDaysHelp": "Laissez vide ou mettez 0 pour une clé sans date d’expiration.",
+    "expiresInDaysInvalid": "Saisissez un nombre entier de jours, ou laissez le champ vide.",
     "expiresInDaysPlaceholder": "ex. 365 (vide = pas d’expiration)",
     "enroll2faRequired": "Authentification à deux facteurs requise",
     "enroll2faReason": "Votre administrateur impose la 2FA sur votre compte. Configurez-la maintenant pour continuer.",
@@ -145,7 +148,9 @@
     "backupCodesSaved": "J’ai sauvegardé mes codes de secours",
     "intent": "Votre profil, la sécurité de votre connexion et vos clés d’API.",
     "tocLabel": "Sections du compte",
-    "apiKeysIntent": "Clés qui appellent l’API au nom de votre compte."
+    "apiKeysIntent": "Clés qui appellent l’API au nom de votre compte.",
+    "profileSaved": "Profil enregistré.",
+    "profileReset": "Modifications du profil annulées."
   },
   "acme": {
     "title": "Protocole ACME",
@@ -2422,7 +2427,8 @@
       "never": "Jamais exécuté",
       "active": "Actif",
       "revoked": "Révoqué"
-    }
+    },
+    "chooseFile": "Choisir un fichier…"
   },
   "compare": {
     "title": "Comparer les certificats",
@@ -3283,6 +3289,7 @@
       "configSaved": "Configuration enregistrée",
       "hostPlaceholder": "192.168.1.1",
       "selectAll": "Tout sélectionner",
+      "foundItems": "Éléments trouvés sur le pare-feu",
       "importSelected": "Importer {{count}} sélectionnés",
       "importSuccess": "{{count}} éléments importés avec succès ({{skipped}} ignorés)",
       "noItemsSelected": "Veuillez sélectionner au moins un élément à importer",
@@ -3377,7 +3384,12 @@
     },
     "selectResource": "Type de ressource",
     "selectCA": "Veuillez sélectionner une AC",
-    "tocLabel": "Opérations"
+    "tocLabel": "Opérations",
+    "openSmartImport": "Importer des fichiers…",
+    "bulkListLabel": "Éléments des actions en masse",
+    "bulkTableLabel": "Tableau des éléments",
+    "exportPem": "Exporter en PEM",
+    "selectionOnly": "Sélection ({{count}})"
   },
   "notifications": {
     "certificateIssued": "Certificat émis : {{name}}",
@@ -5194,6 +5206,8 @@
     "inputAnyFormat": "Entrée (n’importe quel format)",
     "supportsFormats": "Supporte : PEM, DER, CRT, CER, P12/PFX, P7B, KEY, CSR",
     "binaryFileLoaded": "Fichier binaire chargé",
+    "removeFile": "Retirer le fichier",
+    "binaryFileLoadedSize": "Fichier binaire chargé, {{bytes}} octets.",
     "sectionConnection": "Connexion",
     "sectionPemInput": "Entrée PEM",
     "sectionCertificateInput": "Entrée Certificat",
@@ -5266,7 +5280,13 @@
     "pkcs12PasswordPlaceholder": "Mot de passe du fichier PKCS12/PFX",
     "tocLabel": "Outils",
     "toolCount_one": "{{count}} outil",
-    "toolCount_other": "{{count}} outils"
+    "toolCount_other": "{{count}} outils",
+    "runHint": "Le résultat s’affiche ici ; rien n’est enregistré.",
+    "decodedBelow": "Décodé, détails ci-dessous.",
+    "csrSignatureInvalid": "Décodée, mais la signature de la demande n’est pas valide.",
+    "itemRead": "Lu",
+    "itemUnreadable": "Illisible",
+    "noParsedItems": "Rien n’a pu être lu."
   },
   "crlDeploy": {
     "title": "Déploiement de CRL",
@@ -7477,7 +7497,8 @@
     "weak": "Faible",
     "fair": "Passable",
     "good": "Bon",
-    "strong": "Fort"
+    "strong": "Fort",
+    "reading": "Robustesse : {{level}}"
   },
   "websocket": {
     "status": {
