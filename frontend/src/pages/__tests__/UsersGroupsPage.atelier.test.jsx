@@ -110,6 +110,44 @@ describe('the account list', () => {
     expect(screen.getByRole('button', { name: 'Chloé Durand' })).toBeTruthy()
   })
 
+  it('sorts its seven columns from their headers, on the pages it keeps', async () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({ id: 100 + i, username: `u${String(i).padStart(2, '0')}`, email: `u${i}@example.com`, role: 'viewer', active: true, sso_identities: [] }))
+    m.getAll.mockResolvedValue({ data: [ME, CHLOE, OLD, ...many] })
+    const { container } = page()
+    await screen.findByRole('button', { name: 'Chloé Durand' })
+    const footer = container.querySelector('footer.table-footer')
+    const bodyRows = () => container.querySelectorAll('tbody tr')
+    expect(footer).toHaveTextContent('users.pageRange {"start":1,"end":25,"count":33}')
+    fireEvent.click(within(footer).getByRole('button', { name: 'table.nextPage' }))
+    expect(footer).toHaveTextContent('users.pageRange {"start":26,"end":33,"count":33}')
+    fireEvent.click(screen.getByRole('button', { name: 'users.lastSeen' }))
+    expect(screen.getByRole('columnheader', { name: 'users.lastSeen' })).toHaveAttribute('aria-sort', 'ascending')
+    expect(footer).toHaveTextContent('users.pageRange {"start":1,"end":25,"count":33}')
+    expect(bodyRows()[0]).toHaveTextContent('admin')
+    // The role sorts by its words, as the list shows it
+    fireEvent.click(screen.getByRole('button', { name: 'common.role' }))
+    expect(bodyRows()[0]).toHaveTextContent('common.operator')
+    fireEvent.click(screen.getByRole('button', { name: 'common.role' }))
+    expect(bodyRows()[0]).toHaveTextContent('users.admin')
+    fireEvent.click(screen.getByRole('button', { name: 'atelier.state' }))
+    fireEvent.click(screen.getByRole('button', { name: 'atelier.state' }))
+    expect(bodyRows()[0]).toHaveTextContent('ancien')
+    fireEvent.click(screen.getByRole('button', { name: 'users.email' }))
+    expect(bodyRows()[0]).toHaveTextContent('=cmd|calc')
+    fireEvent.click(screen.getByRole('button', { name: 'users.source' }))
+    fireEvent.click(screen.getByRole('button', { name: 'users.source' }))
+    expect(bodyRows()[0]).toHaveTextContent('Chloé Durand')
+    fireEvent.click(screen.getByRole('button', { name: 'users.login' }))
+    fireEvent.click(screen.getByRole('button', { name: 'users.login' }))
+    expect(bodyRows()[0]).toHaveTextContent('u29')
+    fireEvent.click(screen.getByRole('button', { name: 'atelier.name' }))
+    expect(bodyRows()[0]).toHaveTextContent('admin')
+    // A search goes back to page one
+    fireEvent.click(within(footer).getByRole('button', { name: 'table.nextPage' }))
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'example.com' } })
+    expect(footer).toHaveTextContent('users.pageRange {"start":1,"end":25,"count":32}')
+  })
+
   it("words the head's main action as a short verb, named in full", async () => {
     page()
     const create = await screen.findByRole('button', { name: 'users.createUser' })
@@ -224,6 +262,11 @@ describe('the groups view', () => {
   it('opens on the groups from the address', async () => {
     page('/users?tab=groups')
     expect(await screen.findByRole('button', { name: 'pki-ops' })).toBeTruthy()
+    // Its three columns sort too
+    for (const name of ['atelier.name', 'common.description', 'groups.members']) {
+      fireEvent.click(screen.getByRole('button', { name }))
+      expect(screen.getByRole('columnheader', { name })).toHaveAttribute('aria-sort', 'ascending')
+    }
   })
 })
 
