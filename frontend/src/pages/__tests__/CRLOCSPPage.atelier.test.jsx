@@ -190,7 +190,7 @@ describe('the CRL / OCSP states', () => {
     cas.getAll.mockResolvedValue({ data: [] })
     svc.getAll.mockResolvedValue({ data: [] })
     page()
-    expect(await screen.findByText('common.noCA')).toBeInTheDocument()
+    expect(await screen.findByText('crlOcsp.emptyTitle')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'crlOcsp.createCa' })).toHaveAttribute('href', '/cas')
   })
 })

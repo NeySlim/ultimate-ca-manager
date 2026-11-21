@@ -2684,7 +2684,9 @@
       "deactivated": "Отключена",
       "revoked": "Отозвана"
     },
-    "identifier": "Идентификатор"
+    "identifier": "Идентификатор",
+    "emptyAccountsTitle": "Нет учётных записей ACME",
+    "emptyAccountsText": "Клиенты ACME (certbot, cert-manager, acme.sh) сами создают учётную запись в каталоге: скопируйте его URL в их конфигурацию."
   },
   "scep": {
     "title": "Протокол SCEP",
@@ -2866,7 +2868,8 @@
     "fixBeforeSaving_many": "{{count}} полей нужно исправить перед сохранением.",
     "views": {
       "challenges": "Пароли центров"
-    }
+    },
+    "emptyProfilesText": "Профиль связывает выдающий ЦС, шаблон и пароль проверки."
   },
   "crlOcsp": {
     "subtitle": "Активных CRL: {{count}}",
@@ -3015,7 +3018,9 @@
     "ocspResponderOf": "Отвечать по OCSP для этого центра",
     "statsAllAuthorities": "Запросы и попадания в кэш учитывают все центры ответчика.",
     "serial": "Серийный № {{serial}}",
-    "slug": "Имя в URL"
+    "slug": "Имя в URL",
+    "emptyTitle": "Нет списков отзыва",
+    "emptyText": "Сначала создайте ЦС: каждый центр появится здесь со своим CRL и OCSP-ответчиком."
   },
   "deploy": {
     "title": "Развёртывание сертификатов",

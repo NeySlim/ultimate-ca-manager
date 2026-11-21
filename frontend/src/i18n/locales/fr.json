@@ -787,7 +787,9 @@
       "deactivated": "Désactivé",
       "revoked": "Révoqué"
     },
-    "identifier": "Identifiant"
+    "identifier": "Identifiant",
+    "emptyAccountsTitle": "Aucun compte ACME",
+    "emptyAccountsText": "Les clients ACME (certbot, cert-manager, acme.sh) créent leur compte eux-mêmes auprès du répertoire : copiez son URL dans leur configuration."
   },
   "audit": {
     "event": "Événement",
@@ -2446,7 +2448,9 @@
     "ocspResponderOf": "Répondre en OCSP pour cette autorité",
     "statsAllAuthorities": "Requêtes et réponses en cache comptent toutes les autorités du répondeur.",
     "serial": "N° de série {{serial}}",
-    "slug": "Nom dans les URL"
+    "slug": "Nom dans les URL",
+    "emptyTitle": "Aucune liste de révocation",
+    "emptyText": "Créez d’abord une AC : chaque autorité apparaîtra ici avec sa CRL et son répondeur OCSP."
   },
   "deploy": {
     "title": "Déploiement de certificats",
@@ -3497,7 +3501,8 @@
     "fixBeforeSaving_other": "{{count}} champs à corriger avant d’enregistrer.",
     "views": {
       "challenges": "Défis des autorités"
-    }
+    },
+    "emptyProfilesText": "Un profil relie une AC émettrice, un modèle et un mot de passe de défi."
   },
   "session": {
     "expiring": "Session en cours d’expiration",

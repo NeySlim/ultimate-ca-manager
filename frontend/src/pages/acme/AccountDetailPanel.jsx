@@ -6,7 +6,7 @@
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, Dock, DockBody, Section, Props, RecordList, RecordRow, Pill, TextLink, AtelierDialog } from '../../components/atelier'
+import { Btn, Dock, DockBody, Section, Props, RecordList, RecordRow, Pill, TextLink, AtelierDialog, Icon } from '../../components/atelier'
 import { apiClient } from '../../services'
 import { useNotification } from '../../contexts'
 import { usePermission } from '../../hooks'
@@ -74,9 +74,9 @@ export default function AccountDock({ account, orders = [], challenges = [], sec
               <Props items={[
                 [t('acme.identifier'), <Copyable key="id" value={account.account_id} label={t('acme.accountId')} />],
                 [t('acme.contact'), (
-                  <span key="c">{currentEmail ? `mailto:${currentEmail}` : t('acme.noContact')}
+                  <>{currentEmail ? `mailto:${currentEmail}` : t('acme.noContact')}
                     {canWrite && <>{' '}<TextLink id="acme-edit-email" onClick={() => { setEmailDraft(currentEmail); setEditing(true) }}>{t('acme.editEmail')}</TextLink></>}
-                  </span>
+                  </>
                 )],
                 [t('acme.accountKey'), account.key_type || '—'],
                 [t('acme.createdOn'), dateOf(account.created_at, locale) || '—'],
@@ -88,8 +88,8 @@ export default function AccountDock({ account, orders = [], challenges = [], sec
                 [t('atelier.state'), pill(account.status)],
                 [t('acme.orders'), failing ? t('acme.ordersFailing', { count: orders.length, failing }) : String(orders.length)],
                 [t('acme.lastOrder'), last ? (
-                  <span key="l">{t('acme.orderLine', { id: String(last.order_id || last.id).slice(0, 12) })} · {stateLabel(t, last.status)}<br />
-                    <span className="muted">{last.domain}, {dateTimeOf(last.created_at, locale)}</span></span>
+                  <>{t('acme.orderLine', { id: String(last.order_id || last.id).slice(0, 12) })} · <span className={ORDER_TONES[String(last.status).toLowerCase()] || 'muted'}>{stateLabel(t, last.status)}</span><br />
+                    <span className="muted">{last.domain}, {dateTimeOf(last.created_at, locale)}</span></>
                 ) : t('acme.noneOrder')],
               ]} />
               {account.status !== 'valid' && <Notice>{t('acme.deactivationFinal')}</Notice>}
@@ -115,7 +115,7 @@ export default function AccountDock({ account, orders = [], challenges = [], sec
       </DockBody>
       {confirming && (
         <AtelierDialog size="narrow" title={t('acme.disableTitle')} onClose={() => setConfirming(false)} returnTo="acme-disable">
-          <Notice tone="warn">{t('acme.disableWarning', { name })}</Notice>
+          <div className="notice warn"><Icon name="warning" /><span>{t('acme.disableWarning', { name })}</span></div>
           <Props items={[[t('acme.tabs.account'), <span key="n" className="mono">{name}</span>], [t('acme.contact'), currentEmail || '—'], [t('acme.accountKey'), account.key_type || '—']]} />
           <div className="modal-actions">
             <Btn onClick={() => setConfirming(false)}>{t('common.cancel')}</Btn>

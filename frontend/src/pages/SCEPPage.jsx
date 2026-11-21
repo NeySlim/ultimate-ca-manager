@@ -45,6 +45,7 @@ export default function SCEPPage() {
   const locale = i18n?.language || 'en'
   const { showSuccess, showError, showInfo, showConfirm } = useNotification()
   const { hasPermission } = usePermission()
+  const auditPath = hasPermission('read:audit') ? '/audit' : undefined
   const canEdit = hasPermission('write:scep')
   const { copy } = useClipboard()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -527,7 +528,7 @@ crypto ca enroll UCM-CA`}</pre>
 
   // ── Views ──
   const loadErr = loadError && (
-    <LoadError id="scep" title={t('messages.errors.loadFailed.scep')} onRetry={() => { setLoading(true); loadData() }}
+    <LoadError id="scep" journal={auditPath} title={t('messages.errors.loadFailed.scep')} onRetry={() => { setLoading(true); loadData() }}
       cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/scep/config', message: loadError.message }} />} />
   )
   const profilesView = (
@@ -535,7 +536,7 @@ crypto ca enroll UCM-CA`}</pre>
       filters={{ views: profileFilters.map(([id, label, test]) => ({ id, label, count: profiles.filter(test).length })), active: activeFilter[0], onChange: setProfileState, label: t('scep.filterByState') }}
       title={(p) => p.name} status={profilePill} openedId={openProfile} onOpen={(p) => setOpenProfile(p.id)}
       columns={[
-        { id: 'ca', label: t('scep.columns.ca'), cell: (p) => p.ca_name || caName(p.ca_refid), grow: true },
+        { id: 'ca', label: t('scep.columns.ca'), cell: (p) => p.ca_name || caName(p.ca_refid) },
         { id: 'template', label: t('scep.columns.template'), cell: (p) => p.template_name || t('scep.noTemplate') },
         { id: 'intune', label: 'Intune', cell: (p) => yesNo(p.intune_enabled) },
         { status: true },
@@ -544,7 +545,7 @@ crypto ca enroll UCM-CA`}</pre>
       empty={profiles.length ? (
         <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')} onReset={() => setProfileState('')} />
       ) : (
-        <EmptyBlock id="scep" icon="globe" title={t('scep.noProfiles')} text={t('scep.noProfilesDesc')}
+        <EmptyBlock id="scep" icon="globe" title={t('scep.noProfiles')} text={t('scep.emptyProfilesText')}
           action={canEdit ? { label: t('scep.newProfile'), icon: 'plus', onClick: () => setProfileForm({ profile: null }), primary: true } : undefined} />
       )}
       footer={{ range: t('scep.range', { shown: shownProfiles.length, count: profiles.length }) }} />

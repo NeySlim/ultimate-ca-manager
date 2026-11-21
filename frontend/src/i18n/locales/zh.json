@@ -2596,7 +2596,9 @@
       "deactivated": "已停用",
       "revoked": "已吊销"
     },
-    "identifier": "标识符"
+    "identifier": "标识符",
+    "emptyAccountsTitle": "没有 ACME 账户",
+    "emptyAccountsText": "ACME 客户端（certbot、cert-manager、acme.sh）会自行在目录中创建账户：请将目录 URL 复制到它们的配置中。"
   },
   "scep": {
     "title": "SCEP协议",
@@ -2766,7 +2768,8 @@
     "fixBeforeSaving_other": "保存前需修正 {{count}} 个字段。",
     "views": {
       "challenges": "机构质询"
-    }
+    },
+    "emptyProfilesText": "配置文件将签发 CA、模板和质询密码关联在一起。"
   },
   "crlOcsp": {
     "subtitle": "{{count}}个活跃CRL",
@@ -2905,7 +2908,9 @@
     "ocspResponderOf": "为此机构提供 OCSP 响应",
     "statsAllAuthorities": "请求和缓存命中统计响应器的所有机构。",
     "serial": "序列号 {{serial}}",
-    "slug": "URL 中的名称"
+    "slug": "URL 中的名称",
+    "emptyTitle": "没有吊销列表",
+    "emptyText": "请先创建一个 CA：每个机构都会在此显示其 CRL 和 OCSP 响应器。"
   },
   "deploy": {
     "title": "证书部署",

@@ -46,6 +46,7 @@ export default function TSAPage() {
   const locale = i18n?.language || 'en'
   const { showSuccess, showError } = useNotification()
   const { hasPermission } = usePermission()
+  const auditPath = hasPermission('read:audit') ? '/audit' : undefined
   const canEdit = hasPermission('write:settings')
   const platform = useKeyPlatform()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -272,7 +273,7 @@ openssl ts -reply -in response.tsr -text`}</pre>
         { status: true },
       ]}
       error={loadError && (
-        <LoadError id="tsa" title={t('messages.errors.loadFailed.tsa')} onRetry={() => { setLoading(true); loadData() }}
+        <LoadError id="tsa" journal={auditPath} title={t('messages.errors.loadFailed.tsa')} onRetry={() => { setLoading(true); loadData() }}
           cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/tsa/config', message: loadError.message }} />} />
       )}
       empty={<EmptyBlock id="tsa" icon="stamp" title={t('tsa.serviceName')} />}

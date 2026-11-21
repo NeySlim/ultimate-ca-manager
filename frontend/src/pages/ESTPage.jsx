@@ -42,6 +42,7 @@ export default function ESTPage() {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
   const { hasPermission } = usePermission()
+  const auditPath = hasPermission('read:audit') ? '/audit' : undefined
   const canEdit = hasPermission('write:est')
   const [searchParams, setSearchParams] = useSearchParams()
   const view = searchParams.get('tab') === 'config' ? 'config' : 'list'
@@ -247,7 +248,7 @@ export default function ESTPage() {
         { status: true },
       ]}
       error={loadError && (
-        <LoadError id="est" title={t('messages.errors.loadFailed.est')} onRetry={() => { setLoading(true); loadData() }}
+        <LoadError id="est" journal={auditPath} title={t('messages.errors.loadFailed.est')} onRetry={() => { setLoading(true); loadData() }}
           cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/est/config', message: loadError.message }} />} />
       )}
       empty={<EmptyBlock id="est" icon="plug" title={t('est.defaultEndpoint')} />}

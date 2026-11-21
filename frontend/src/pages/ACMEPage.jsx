@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { Warning } from '@phosphor-icons/react'
 import { Modal, Button } from '../components'
-import { Zone, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, ListView, SkeletonPanel, EmptyBlock, NoMatch } from '../components/atelier'
+import { Zone, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, ListView, SkeletonPanel, EmptyBlock, NoMatch, LoadError, LoadCause } from '../components/atelier'
 import { acmeService, casService, certificatesService, templatesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
@@ -55,7 +55,7 @@ export default function ACMEPage() {
   const { t, i18n } = useTranslation()
   const locale = i18n?.language || 'en'
   const { showSuccess, showError, showConfirm, showWarning, showInfo } = useNotification()
-  const { canWrite, canDelete } = usePermission()
+  const { canWrite, canDelete, hasPermission } = usePermission()
   const { copy } = useClipboard()
 
   // Data states - ACME Server
@@ -87,6 +87,7 @@ export default function ACMEPage() {
 
   // UI states
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
   const [saving, setSaving] = useState(false)
   // /acme?tab=<view>&order=N: the view, and the order it holds
   const [searchParams, setSearchParams] = useSearchParams()
@@ -245,6 +246,7 @@ export default function ACMEPage() {
 
   const loadData = async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const [accountsRes, settingsRes, casRes, clientOrdersRes, clientSettingsRes, dnsProvidersRes, dnsTypesRes, domainsRes, localDomainsRes, eabReqRes, caAccountsRes] = await Promise.all([
         acmeService.getAccounts(),
@@ -279,6 +281,7 @@ export default function ACMEPage() {
       setLocalDomains(localDomainsRes.data || [])
       loadHistoryRef.current()
     } catch (error) {
+      setLoadError(error)
       showError(error.message || t('messages.errors.loadFailed.acme'))
     } finally {
       setLoading(false)
@@ -901,7 +904,8 @@ export default function ACMEPage() {
   }
 
   // ── The accounts of the server (the mockup's list) ──
-  const accountStates = ['valid', 'deactivated', 'revoked'].filter((s) => accounts.some((a) => a.status === s))
+  // The mockup's chips Actifs and Désactivés always, Révoqués when an account is (Avec échec needs the orders per account, M01)
+  const accountStates = ['valid', 'deactivated', ...(accounts.some((a) => a.status === 'revoked') ? ['revoked'] : [])]
   const searchedAccounts = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     return accounts.filter((a) => !q || [accountContact(a), a.account_id, a.key_type].some((v) => String(v || '').toLowerCase().includes(q)))
@@ -925,6 +929,10 @@ export default function ACMEPage() {
         </Toolbar>
       )}
       title={accountLabel} status={accountPill} openedId={selectedAccount?.id} onOpen={selectAccount}
+      error={loadError && (
+        <LoadError id="acme" title={t('messages.errors.loadFailed.acme')} onRetry={loadData} journal={hasPermission('read:audit') ? '/audit' : undefined}
+          cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/acme/accounts', message: loadError.message }} />} />
+      )}
       columns={[
         { id: 'contact', label: t('acme.contact'), cell: (a) => accountContact(a) || <span className="muted">{t('acme.noContact')}</span>, grow: true },
         { id: 'created', label: t('acme.createdOn'), cell: (a) => dateOf(a.created_at, locale) || '—', muted: true },
@@ -934,8 +942,8 @@ export default function ACMEPage() {
       empty={accounts.length ? (
         <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')} onReset={() => { setSearchQuery(''); setAccountState('') }} />
       ) : (
-        <EmptyBlock id="acme" icon="refresh" title={t('acme.noAccounts')} text={t('acme.noAccountsDesc')}
-          action={canWrite('acme') ? { label: t('acme.newAccount'), icon: 'plus', onClick: () => setShowCreateModal(true), primary: true } : undefined} />
+        <EmptyBlock id="acme" icon="refresh" title={t('acme.emptyAccountsTitle')} text={t('acme.emptyAccountsText')}
+          action={{ label: t('acme.copyDirectory'), icon: 'copy', onClick: async () => { if (await copy(directoryUrl)) showSuccess(t('common.copied')) } }} />
       )}
       footer={{ range: t('acme.accountsRange', { shown: shownAccounts.length, count: accounts.length }) }} />
   )

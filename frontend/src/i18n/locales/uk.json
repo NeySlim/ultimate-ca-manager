@@ -2684,7 +2684,9 @@
       "deactivated": "Disabled",
       "revoked": "Revoked"
     },
-    "identifier": "Identifier"
+    "identifier": "Identifier",
+    "emptyAccountsTitle": "No ACME account",
+    "emptyAccountsText": "ACME clients (certbot, cert-manager, acme.sh) create their account themselves with the directory: copy its URL into their configuration."
   },
   "scep": {
     "title": "Протокол SCEP",
@@ -2866,7 +2868,8 @@
     "fixBeforeSaving_many": "{{count}} fields to fix before saving.",
     "views": {
       "challenges": "Challenges of the authorities"
-    }
+    },
+    "emptyProfilesText": "A profile links an issuing CA, a template and a challenge password."
   },
   "crlOcsp": {
     "subtitle": "{{count}} активних CRL",
@@ -3015,7 +3018,9 @@
     "ocspResponderOf": "Answer OCSP for this authority",
     "statsAllAuthorities": "Requests and cache hits count every authority of the responder.",
     "serial": "Serial {{serial}}",
-    "slug": "Name in the URLs"
+    "slug": "Name in the URLs",
+    "emptyTitle": "No revocation list",
+    "emptyText": "Create an authority first: each one will show here with its CRL and its OCSP responder."
   },
   "deploy": {
     "title": "Розгортання сертифікатів",

@@ -34,7 +34,9 @@ export default function CRLOCSPPage() {
   const { t, i18n } = useTranslation()
   const locale = i18n?.language || 'en'
   const { showSuccess, showError, showInfo, showConfirm } = useNotification()
-  const { canWrite } = usePermission()
+  const { canWrite, hasPermission } = usePermission()
+  // The read error links the journal for who may read it
+  const auditPath = hasPermission('read:audit') ? '/audit' : undefined
 
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
@@ -593,13 +595,13 @@ export default function CRLOCSPPage() {
           { status: true },
         ]}
         error={loadError && (
-          <LoadError id="crl" title={t('messages.errors.loadFailed.crl')} onRetry={() => { setLoading(true); loadData() }}
+          <LoadError id="crl" journal={auditPath} title={t('messages.errors.loadFailed.crl')} onRetry={() => { setLoading(true); loadData() }}
             cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/crl', message: loadError.message }} />} />
         )}
         empty={rows.length && (query.trim() || active) ? (
           <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')} onReset={() => { setQuery(''); setState('') }} />
         ) : (
-          <EmptyBlock id="crl" icon="crl" title={t('common.noCA')} text={t('crlOcsp.createCAFirst')}
+          <EmptyBlock id="crl" icon="crl" title={t('crlOcsp.emptyTitle')} text={t('crlOcsp.emptyText')}
             action={canWrite('cas') ? { label: t('crlOcsp.createCa'), icon: 'plus', to: '/cas' } : undefined} />
         )}
         footer={{ range: t('crlOcsp.range', { shown: shown.length, count: rows.length }) }} />
