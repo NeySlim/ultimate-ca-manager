@@ -137,8 +137,9 @@ export default function ESTPage() {
   const open = openId === null ? null : endpoints.find((e) => e.id === openId) || null
   const pill = () => <Pill label={t(state === 'active' ? 'common.active' : 'common.disabled')} tone={state === 'active' ? 'good' : 'muted'} />
 
+  // activeKey is the row's data-open (the default endpoint's is ''), so the focus finds the row back
   const dock = open && (
-    <Dock label={t('atelier.detailOf', { name: 'EST' })} tabsLabel={t('atelier.openItem')} activeKey={open.id || 'default'}
+    <Dock label={t('atelier.detailOf', { name: 'EST' })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
       tabs={[{ key: open.id || 'default', title: open.name, icon: 'plug' }]} onClose={() => setOpenId(null)}>
       <DockBody icon="plug" title={open.name} badge={pill()} section="overview" onSection={() => {}}
         sectionsLabel={t('atelier.sectionsOf', { name: open.name })} sections={[['overview', t('atelier.overview')]]}

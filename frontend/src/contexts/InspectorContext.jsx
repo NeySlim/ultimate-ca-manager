@@ -2,13 +2,15 @@
  * Inspector: the certificates open in the Certificates zone's dock, the active one and the dock
  * geometry. An object opened from any page goes to the zone that draws it (ZONES), as the
  * mockup's openCert() and navigate(). Position and size follow the user (server preference
- * `inspector`), with a local copy when the server is unreachable.
+ * `inspector`), with a local copy when the server is unreachable; every page's dock reads them
+ * (DockPreferenceContext), as the mockup's one state.dock.
  */
 import { createContext, useContext, useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useInRouterContext, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
-import { getPreferences, persistPreference, subscribePreferences } from '../stores/userPreferencesStore'
+import { arePreferencesLoaded, getPreferences, persistPreference, subscribePreferences } from '../stores/userPreferencesStore'
 import { pageOf } from '../lib/pageOf'
+import { DOCK_DEFAULTS, DockPreferenceContext } from '../components/atelier/dockSide'
 
 const InspectorContext = createContext(null)
 
@@ -16,9 +18,10 @@ export const MAX_OPEN = 8
 export const SIZE_LIMITS = { height: [200, 4000], width: [360, 720] }
 // What the bottom dock shows of the saved height: 210 to 450 px (and 60 % of the window), Agrandir 420
 export const DOCK_HEIGHT = { min: 210, max: 450, grown: 420 }
-// The defaults of the Atelier layout: a 278 px band under the list, a 460 px column beside it
-const DEFAULTS = { position: 'bottom', height: 278, width: 460 }
+const DEFAULTS = DOCK_DEFAULTS
 const PREFS_KEY = 'ucm-inspector-prefs'
+// The module docks' former per-browser geometry, carried over once into the account preference
+const LEGACY_DOCK = { position: 'ucm-atelier-dock-side', height: 'ucm-atelier-dock-height', width: 'ucm-atelier-dock-width' }
 
 const keyOf = (type, id) => `${type}:${id}`
 // The dock a zone draws
@@ -45,8 +48,26 @@ export function cleanGeometry(raw) {
 function readLocal() {
   try { return cleanGeometry(JSON.parse(localStorage.getItem(PREFS_KEY))) } catch { return {} }
 }
+// Off unless this browser set it: the open objects stay across pages, as the mockup's state.opened
 function readLocalCloseOnNav() {
-  try { return JSON.parse(localStorage.getItem(PREFS_KEY))?.closeOnNav ?? true } catch { return true }
+  try { return JSON.parse(localStorage.getItem(PREFS_KEY))?.closeOnNav ?? false } catch { return false }
+}
+// null when this browser holds none of the former keys
+function readLegacyDock() {
+  let found = false
+  const raw = {}
+  for (const [k, key] of Object.entries(LEGACY_DOCK)) {
+    try {
+      const v = localStorage.getItem(key)
+      if (v === null) continue
+      found = true
+      raw[k] = JSON.parse(v)
+    } catch { /* storage unavailable or value unreadable: that one is not carried over */ }
+  }
+  return found ? cleanGeometry(raw) : null
+}
+function dropLegacyDock() {
+  try { for (const key of Object.values(LEGACY_DOCK)) localStorage.removeItem(key) } catch { /* storage unavailable */ }
 }
 function writeLocal(patch) {
   try {
@@ -69,7 +90,7 @@ export function InspectorProvider({ children }) {
   const pageRef = useRef(null)
   const [opened, setOpened] = useState([])
   const [activeKey, setActiveKey] = useState(null)
-  const [geometry, setGeometry] = useState(() => ({ ...DEFAULTS, ...readLocal(), ...cleanGeometry(getPreferences().inspector) }))
+  const [geometry, setGeometry] = useState(() => ({ ...DEFAULTS, ...readLegacyDock(), ...readLocal(), ...cleanGeometry(getPreferences().inspector) }))
   const [closeOnNav, setCloseOnNav] = useState(readLocalCloseOnNav)
   const [focusToken, setFocusToken] = useState(0)
   // Folded to its tab strip; any opening unfolds it (session only, like the active object)
@@ -80,13 +101,36 @@ export function InspectorProvider({ children }) {
   const activeRef = useRef(null)
   activeRef.current = activeKey
 
-  // The server copy arrives after sign-in and wins over the local one
-  useEffect(() => subscribePreferences((prefs) => {
-    const server = cleanGeometry(prefs.inspector)
-    if (!Object.keys(server).length) return
-    geometryRef.current = { ...geometryRef.current, ...server }
-    setGeometry(geometryRef.current)
-  }), [])
+  // `persist: false` follows a drag in progress; the last call of the drag persists
+  const updateGeometry = useCallback((patch, { persist = true } = {}) => {
+    const cur = geometryRef.current
+    const next = { ...cur, ...cleanGeometry({ ...cur, ...patch }) }
+    geometryRef.current = next
+    setGeometry(next)
+    if (!persist) return
+    writeLocal(next)
+    persistPreference('inspector', { position: next.position, height: next.height, width: next.width })
+  }, [])
+
+  // The server copy arrives after sign-in and wins over the local one. Once it is loaded, the
+  // former per-browser keys of the module docks go: they become the account's choice if it has none
+  useEffect(() => {
+    const apply = (prefs) => {
+      const server = cleanGeometry(prefs.inspector)
+      if (Object.keys(server).length) {
+        geometryRef.current = { ...geometryRef.current, ...server }
+        setGeometry(geometryRef.current)
+      }
+      if (!arePreferencesLoaded()) return
+      const legacy = readLegacyDock()
+      if (!legacy) return
+      dropLegacyDock()
+      const carried = { ...legacy, ...readLocal() }
+      if (!Object.keys(server).length && Object.keys(carried).length) updateGeometry(carried)
+    }
+    if (arePreferencesLoaded()) apply(getPreferences())
+    return subscribePreferences(apply)
+  }, [updateGeometry])
 
   // `origin` names the control to refocus on close when it is not the one focused now (the palette)
   const openEntity = useCallback((type, entityId, { data, origin } = {}) => {
@@ -156,17 +200,6 @@ export function InspectorProvider({ children }) {
     setOpened(openedRef.current)
   }, [])
 
-  // `persist: false` follows a drag in progress; the last call of the drag persists
-  const updateGeometry = useCallback((patch, { persist = true } = {}) => {
-    const cur = geometryRef.current
-    const next = { ...cur, ...cleanGeometry({ ...cur, ...patch }) }
-    geometryRef.current = next
-    setGeometry(next)
-    if (!persist) return
-    writeLocal(next)
-    persistPreference('inspector', { position: next.position, height: next.height, width: next.width })
-  }, [])
-
   const toggleCloseOnNav = useCallback(() => {
     setCloseOnNav((prev) => { writeLocal({ closeOnNav: !prev }); return !prev })
   }, [])
@@ -180,11 +213,14 @@ export function InspectorProvider({ children }) {
     ...geometry, setGeometry: updateGeometry,
     closeOnNav, toggleCloseOnNav, collapsed, setCollapsed,
   }), [opened, activeKey, openEntity, closeEntity, closeAll, setEntityData, focusToken, geometry, updateGeometry, closeOnNav, toggleCloseOnNav, collapsed])
+  const dock = useMemo(() => ({ ...geometry, setGeometry: updateGeometry, collapsed, setCollapsed }), [geometry, updateGeometry, collapsed])
 
   return (
     <InspectorContext.Provider value={value}>
-      {inRouter && <NavigateCapture into={navigateRef} page={pageRef} />}
-      {children}
+      <DockPreferenceContext.Provider value={dock}>
+        {inRouter && <NavigateCapture into={navigateRef} page={pageRef} />}
+        {children}
+      </DockPreferenceContext.Provider>
     </InspectorContext.Provider>
   )
 }

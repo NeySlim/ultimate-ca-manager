@@ -2,27 +2,30 @@
  * The mockup's inspector dock: dockFrame() (the frame under the page, its resize grip, the open
  * tabs with their « +N » menu, the size, fold and close tools) and dockBody() (the heading with
  * the object's actions, its section tabs and the panel). On a phone the dock covers the screen as
- * a modal dialog and its close button takes the focus. Escape closes it from anywhere on the page,
- * unless a dialog or a menu answers Escape itself; on close the focus returns to the row button
- * of the object, else to the control that opened it.
+ * a modal dialog: its close button takes the focus, Tab stays in it and the page behind is inert.
+ * Escape closes it from anywhere on the page, unless a dialog or a menu answers Escape itself; on
+ * close the focus returns to the row button of the object, else to the control that opened it.
+ * Its position, size and fold are the user's one dock preference, the same on every page.
  */
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMobile } from '../../contexts/MobileContext'
-import { usePersistedState } from '../../hooks/usePersistedState'
 import { splitTabs, tabsThatFit } from '../inspector/tabFit'
 import { useToolbarMenu } from '../list/useToolbarMenu'
 import { Icon } from './Icon'
 import { heightMax, heightMin } from './helpers'
-import { DockSideContext } from './dockSide'
+import { DOCK_RIGHT_MIN, DockSideContext, useDockPreference } from './dockSide'
 
 const STEP = 20
 const WIDTH = [360, 720]
-const RIGHT_MIN = 1400
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
 const OWN_ESCAPE = '[role="dialog"][aria-modal="true"]:not(.inspector), dialog[open], [role="alertdialog"], [role="menu"]:not([hidden]), [role="listbox"], [data-radix-popper-content-wrapper]'
 const ownLayerOpen = () => [...document.querySelectorAll(OWN_ESCAPE)].some((el) => !el.closest('[hidden]'))
 const visible = (el) => el && el.isConnected && el.getClientRects().length > 0
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]'
+// What the full-screen dock covers on a phone, inert while it is open (the mockup's `cover`)
+const BEHIND = '.skip, .masthead, .shell-banners, .statusbar, .page-content'
+const MODAL = 'dialog[open], [role="dialog"][aria-modal="true"], [role="alertdialog"]'
 
 /** The section tabs and the panel of the active object. */
 export function DockBody({ icon, title, badge, actions, sections, section, onSection, sectionsLabel, busy = false, children }) {
@@ -165,34 +168,21 @@ function OpenTabs({ tabs, activeKey, onSelect, onClose, label, moreTitle, hidden
  * @param {string} p.activeKey
  * @param {() => void} p.onClose
  * @param {import('react').ReactNode} p.children  a DockBody
- * @param {{height, width, side}} [p.geometry]  held by the page, with `onGeometry(patch)`; else kept under `storageKey`
- * @param {boolean} [p.collapsed]  held by the page, with `onCollapsed(folded)`
  */
-export function Dock({
-  label, tabsLabel, tabs, activeKey, onSelectTab, onCloseTab, onClose, children, storageKey = 'ucm-atelier-dock',
-  geometry, onGeometry, collapsed: heldCollapsed, onCollapsed,
-}) {
+export function Dock({ label, tabsLabel, tabs, activeKey, onSelectTab, onCloseTab, onClose, children }) {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
   const setZoneRight = useContext(DockSideContext)
   const ref = useRef(null)
-  const [ownH, setOwnH] = usePersistedState(geometry ? null : `${storageKey}-height`, 278)
-  const [ownW, setOwnW] = usePersistedState(geometry ? null : `${storageKey}-width`, 460)
-  const [ownSide, setOwnSide] = usePersistedState(geometry ? null : `${storageKey}-side`, 'bottom')
-  const [ownCollapsed, setOwnCollapsed] = useState(false)
-  // A page may hold the geometry and the fold itself (the user's inspector preference): then the dock follows it
-  const stored = geometry ? geometry.height : ownH
-  const storedW = geometry ? geometry.width : ownW
-  const side = geometry ? geometry.side : ownSide
-  const setStored = geometry ? (v) => onGeometry?.({ height: v }) : setOwnH
-  const setStoredW = geometry ? (v) => onGeometry?.({ width: v }) : setOwnW
-  const setSide = geometry ? (v) => onGeometry?.({ side: v }) : setOwnSide
-  const collapsed = onCollapsed ? !!heldCollapsed : ownCollapsed
-  const setCollapsed = onCollapsed || setOwnCollapsed
+  const pref = useDockPreference()
+  const { height: stored, width: storedW, position: side, collapsed, setCollapsed } = pref
+  const setStored = (v) => pref.setGeometry({ height: v })
+  const setStoredW = (v) => pref.setGeometry({ width: v })
+  const setSide = (v) => pref.setGeometry({ position: v })
   const [viewW, setViewW] = useState(() => window.innerWidth)
   const [drag, setDrag] = useState(null)
-  // The right needs room for the list beside it: under 1400 px the dock goes back to the bottom
-  const right = side === 'right' && viewW >= RIGHT_MIN && !isMobile
+  // The right needs room for the list beside it: under the threshold the dock goes back to the bottom
+  const right = side === 'right' && viewW >= DOCK_RIGHT_MIN && !isMobile
   const height = clamp(drag ?? Number(stored) ?? 278, heightMin(), heightMax())
   const width = clamp(drag ?? Number(storedW) ?? 460, WIDTH[0], WIDTH[1])
   const folded = collapsed && !isMobile && !right
@@ -212,17 +202,63 @@ export function Dock({
     return () => setZoneRight?.(false)
   }, [right, setZoneRight])
 
+  // A module object opened unfolds the dock (the mockup's openItem()); Certificates unfold in openEntity
+  useEffect(() => {
+    if (!onCloseTab) setCollapsed(false)
+  }, [activeKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // On a phone the dock is a dialog over the page: its close button takes the focus
   useEffect(() => {
     if (isMobile) ref.current?.querySelector('[data-action="close-dock"]')?.focus()
   }, [isMobile])
 
-  // The focus goes back to the row button of the object, else to the opener, once the dock is gone
+  // On a phone the page, the bars and the skip link are inert behind the dock, as the mockup's cover;
+  // a part that holds a modal dialog opened over the dock is not (the dialog makes the rest inert)
+  useEffect(() => {
+    if (!isMobile) return undefined
+    const dock = ref.current
+    const covered = [...document.querySelectorAll(BEHIND)].filter((el) => !el.hasAttribute('inert') && !el.contains(dock))
+    const sync = () => covered.forEach((el) => {
+      const holds = el.querySelector(MODAL)
+      if (holds && el.hasAttribute('inert')) el.removeAttribute('inert')
+      else if (!holds && !el.hasAttribute('inert')) el.setAttribute('inert', '')
+    })
+    sync()
+    const watch = new MutationObserver(sync)
+    covered.forEach((el) => watch.observe(el, { subtree: true, childList: true, attributes: true, attributeFilter: ['open', 'aria-modal'] }))
+    return () => {
+      watch.disconnect()
+      covered.forEach((el) => el.removeAttribute('inert'))
+    }
+  }, [isMobile])
+
+  // On a phone Tab and Shift Tab go round the dock's controls; a dialog over it keeps its own
+  useEffect(() => {
+    if (!isMobile) return undefined
+    const onKey = (e) => {
+      const dock = ref.current
+      const cur = document.activeElement
+      if (e.key !== 'Tab' || e.defaultPrevented || !dock) return
+      if (cur && !dock.contains(cur) && cur.closest?.('dialog, [role="dialog"], [role="alertdialog"]')) return
+      const els = [...dock.querySelectorAll(FOCUSABLE)].filter((el) => el.tabIndex >= 0 && !el.closest('[hidden]') && visible(el))
+      if (!els.length) return
+      const inside = dock.contains(cur)
+      const edge = e.shiftKey ? els[0] : els.at(-1)
+      if (inside && cur !== edge) return
+      e.preventDefault()
+      ;(e.shiftKey ? els.at(-1) : els[0]).focus()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [isMobile])
+
+  // The focus goes back to the row button of the object, else to the opener, once the dock is gone;
+  // a mobile record carries the key too but takes no focus: its name button does
   useEffect(() => () => {
     const key = active.current
     const back = opener.current
     requestAnimationFrame(() => {
-      const row = [...document.querySelectorAll(`[data-open="${CSS.escape(String(key))}"]`)].find((el) => visible(el) && !el.closest('.inspector'))
+      const row = [...document.querySelectorAll(`[data-open="${CSS.escape(String(key))}"]`)].find((el) => visible(el) && !el.closest('.inspector') && el.matches(FOCUSABLE))
       const target = row || (visible(back) ? back : null)
       if (target) target.focus()
     })
@@ -289,7 +325,7 @@ export function Dock({
           </div>
         )}
         <div className="dock-tools">
-          {viewW >= RIGHT_MIN && (
+          {viewW >= DOCK_RIGHT_MIN && (
             <button type="button" className="icon-btn dock-side-button" data-action="dock-side" aria-label={t(right ? 'inspector.dockBottom' : 'inspector.dockRight')}
               title={t(right ? 'inspector.dockBottom' : 'inspector.dockRight')} onClick={() => { setSide(right ? 'bottom' : 'right'); setCollapsed(false) }}>
               <Icon name={right ? 'dockBottom' : 'dockRight'} />

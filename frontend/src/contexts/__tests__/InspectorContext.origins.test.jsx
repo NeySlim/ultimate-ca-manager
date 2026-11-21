@@ -24,6 +24,8 @@ describe('inspector focus origins', () => {
   beforeEach(() => { localStorage.clear() })
 
   it('leaves the focus on the link that closed the inspector by navigation', async () => {
+    // Close-on-navigate is off by default: this browser turned it on
+    localStorage.setItem('ucm-inspector-prefs', JSON.stringify({ closeOnNav: true }))
     render(
       <MemoryRouter initialEntries={['/certificates']}>
         <InspectorProvider>

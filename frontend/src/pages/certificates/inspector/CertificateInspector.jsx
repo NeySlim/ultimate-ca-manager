@@ -16,7 +16,7 @@ const tabKey = (o) => String(o.entityId)
 export function CertificateInspector() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { opened = [], activeKey, setActiveKey, closeEntity, closeAll, height, width, position, setGeometry, collapsed, setCollapsed } = useInspector()
+  const { opened = [], activeKey, setActiveKey, closeEntity, closeAll } = useInspector()
   const [titles, setTitles] = useState({})
   const [section, setSection] = useState('overview')
   const count = useRef(opened.length)
@@ -36,9 +36,7 @@ export function CertificateInspector() {
     <Dock label={t('inspector.regionCertificate')} tabsLabel={t('inspector.certificatesLabel')}
       tabs={opened.map((o) => ({ key: tabKey(o), title: titles[o.key] || '…', icon: 'cert' }))}
       activeKey={tabKey(entry)} onSelectTab={(k) => setActiveKey(byTab[k]?.key)} onCloseTab={(k) => closeEntity(byTab[k]?.key)}
-      onClose={() => closeAll({ refocus: true })}
-      geometry={{ height, width, side: position }} onGeometry={(p) => setGeometry(p.side ? { position: p.side } : p)}
-      collapsed={collapsed} onCollapsed={setCollapsed}>
+      onClose={() => closeAll({ refocus: true })}>
       <CertificateBody key={entry.key} entry={entry} onTitle={onTitle} onOpenCa={onOpenCa} section={section} onSection={setSection} />
     </Dock>
   )

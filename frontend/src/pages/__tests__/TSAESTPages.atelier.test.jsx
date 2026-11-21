@@ -113,6 +113,21 @@ describe('the EST page', () => {
     expect(dock).toHaveTextContent('/.well-known/est/iot/simpleenroll')
   })
 
+  it('gives the focus back to the default endpoint row when its dock closes', async () => {
+    // jsdom draws no box: every element is said to be on screen
+    const rects = vi.spyOn(Element.prototype, 'getClientRects').mockReturnValue([{ width: 10, height: 10 }])
+    try {
+      at('/est-config', ESTPage)
+      fireEvent.click(await screen.findByRole('button', { name: 'est.defaultEndpoint' }))
+      const dock = await screen.findByRole('complementary', { name: /atelier.detailOf/ })
+      fireEvent.click(within(dock).getByRole('button', { name: 'inspector.close' }))
+      await waitFor(() => expect(document.activeElement).toHaveAttribute('data-open', ''))
+      expect(document.activeElement.closest('tr')).toHaveTextContent('Services CA')
+    } finally {
+      rects.mockRestore()
+    }
+  })
+
   it('says client certificate only when no Basic credentials are saved', async () => {
     est.getConfig.mockResolvedValue({ data: { enabled: true, ca_id: 1, labels: {} } })
     at('/est-config', ESTPage)
