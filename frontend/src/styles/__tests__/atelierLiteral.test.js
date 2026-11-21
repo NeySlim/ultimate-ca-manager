@@ -18,8 +18,8 @@ const MOCKUP_SHA256 = {
   'style.css': '176c01929728433d0ed1e8d0c445c0b20870091c6c9ee148f6335dcc26358d92',
   'icons.js': 'aa622666fa1d339a56f9fb19473a9e8a910dfe3f6678ce09fc7b7350cd90180f',
 }
-// Not copies: the scope rules themselves
-const NOT_COPIES = new Set(['scope.css'])
+// Not copies: the scope rules and the maintainer's deviations
+const NOT_COPIES = new Set(['scope.css', 'adjust.css'])
 
 const copies = fs.readdirSync(COPIES).filter((f) => f.endsWith('.css') && !NOT_COPIES.has(f))
 

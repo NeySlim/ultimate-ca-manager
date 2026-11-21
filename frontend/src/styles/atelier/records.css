@@ -1,0 +1,18 @@
+/*
+ * Records on a phone: rules copied from the Atelier mockup's style.css (its mobile list of
+ * certificates), in its order, values untouched, each selector under .atl.
+ */
+.atl .entity-name{display:inline-flex;align-items:center;gap:9px;font-weight:500;padding:3px 0;min-height:28px;text-align:left}
+.atl .mobile-list{display:none}
+@media(max-width:800px){
+  .atl .mobile-list{display:block}
+  .atl .mobile-record{padding:13px 14px;border-bottom:1px solid var(--line)}
+  .atl .mobile-record:last-child{border:0}
+  .atl .mobile-record .row-top{display:flex;align-items:center;gap:9px}
+  .atl .mobile-record .entity-name{min-width:0;flex:1;overflow-wrap:anywhere;word-break:break-word;min-height:42px;font-size:13px}
+  .atl .mobile-record .row-meta{margin-left:41px;display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:var(--muted)}
+  .atl .mobile-record .row-status{margin:12px 0 0 41px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px}
+  .atl .mobile-record .row-status .remaining{color:var(--muted);font-size:12px}
+}
+.atl .sk-thin{height:8px}
+.atl .sk-record{display:flex;flex-direction:column;gap:10px}

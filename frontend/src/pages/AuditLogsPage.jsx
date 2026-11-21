@@ -22,6 +22,8 @@ import { ExportDialog, ActionsDialog, CleanupDialog } from './activity/JournalDi
 import { FiltersDialog } from './activity/FiltersDialog'
 import '../styles/atelier/scope.css'
 import '../styles/atelier/activity.css'
+import '../styles/atelier/records.css'
+import { useMobile } from '../contexts/MobileContext'
 
 const PAGE_SIZES = [10, 25, 50, 100]
 const PRESETS_KEY = 'ucm-audit-presets'
@@ -38,6 +40,8 @@ export default function AuditLogsPage() {
   const { showError, showSuccess, showWarning } = useNotification()
   const { openEntity } = useInspector()
   const { canDelete, canWrite, hasPermission } = usePermission()
+  // On a phone each entry is a record, its chevron on screen; the table stays on wider screens
+  const { isMobile } = useMobile()
 
   const [logs, setLogs] = useState([])
   const [total, setTotal] = useState(0)
@@ -291,6 +295,26 @@ export default function AuditLogsPage() {
   const firstRead = loading && !loadError
   const shown = firstRead ? [] : logs
 
+  const emptyBlock = journalEmpty ? (
+    <div className="empty empty-hint" id="empty-activity">
+      <Icon name="activity" />
+      <h3>{t('audit.emptyTitle')}</h3>
+      <p>{t('audit.emptyText')}</p>
+      {canWrite('certificates') && (
+        <Link className="btn primary" to="/certificates?action=create" data-write=""><Icon name="plus" />{t('audit.emptyAction')}</Link>
+      )}
+    </div>
+  ) : (
+    <div className="empty">
+      <h3>{t('audit.noMatchTitle')}</h3>
+      <p>{t('audit.noMatchText')}</p>
+      {narrowed && <button type="button" className="btn" data-action="reset-filters" onClick={clearFilters}>{t('audit.resetFilters')}</button>}
+    </div>
+  )
+  const badgeOf = (e) => (e.success
+    ? <span className="badge good"><Icon name="check" />{t('audit.badgeOk')}</span>
+    : <span className="badge bad"><Icon name="warning" />{t('audit.badgeFailed')}</span>)
+
   return (
     <div className="atl" data-testid="audit-page">
       <main className="stage" id="main">
@@ -370,64 +394,74 @@ export default function AuditLogsPage() {
                 )}
               </div>
               <div className="table-container audit-container" style={{ marginBottom: 20 }} aria-busy={firstRead || undefined}>
-                <div className="table-scroll" id="audit-scroll" role="region" tabIndex={0} aria-label={t('audit.regionLabel')}>
-                  <table className="audit-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">{t('audit.colTime')}</th>
-                        <th scope="col">{t('audit.colOperation')}</th>
-                        <th scope="col">{t('audit.colResource')}</th>
-                        <th scope="col">{t('audit.colUser')}</th>
-                        <th scope="col">{t('audit.colResult')}</th>
-                        <th scope="col"><span className="sr-only">{t('audit.colDetail')}</span></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {firstRead ? Array.from({ length: 12 }, (_, i) => (
-                        <tr key={`sk-${i}`} className="sk-row" aria-hidden={i > 0 || undefined}>
-                          <td>{i === 0 && <span className="sr-only" role="status">{t('table.loadingRows')}</span>}<Bar width="64px" /></td>
-                          <td><Bar width={skWidth(i, 45, 35)} /></td>
-                          <td><Bar width={skWidth(i, 50, 40)} /></td>
-                          <td><Bar width="70px" /></td>
-                          <td><Bar width="74px" cls="sk-pill" /></td>
-                          <td />
+                {isMobile ? (
+                  <div className="mobile-list" id="audit-records">
+                    {firstRead ? Array.from({ length: 6 }, (_, i) => (
+                      <article key={`sk-${i}`} className="mobile-record sk-record" aria-hidden={i > 0 || undefined}>
+                        {i === 0 && <span className="sr-only" role="status">{t('table.loadingRows')}</span>}
+                        <Bar width={skWidth(i, 50, 30)} /><Bar width={skWidth(i, 30, 40)} cls="sk-thin" /><Bar width="90px" cls="sk-pill" />
+                      </article>
+                    )) : shown.length ? shown.map((e) => {
+                      const type = typeOf(e.action)
+                      return (
+                        // The whole record opens the detail; its two buttons reach it from the keyboard
+                        <article key={e.id} className="mobile-record opens" data-event={e.id} onClick={() => openEvent(e)}>
+                          <div className="row-top">
+                            <button type="button" className="entity-name" data-event={e.id}>{resourceOf(e)}</button>
+                            <button type="button" className="icon-btn quiet" data-event={e.id} aria-label={t('audit.detailOf', { id: e.id })}><Icon name="right" /></button>
+                          </div>
+                          <div className="row-meta">
+                            <span className="audit-type"><Icon name={typeIcon(type)} />{actionLabel(e.action)}</span>
+                            <span>{e.username || t('common.system')}</span>
+                          </div>
+                          <div className="row-status">{badgeOf(e)}<span className="remaining">{rowTime(e.timestamp, locale)}</span></div>
+                        </article>
+                      )
+                    }) : emptyBlock}
+                  </div>
+                ) : (
+                  <div className="table-scroll" id="audit-scroll" role="region" tabIndex={0} aria-label={t('audit.regionLabel')}>
+                    <table className="audit-table">
+                      <thead>
+                        <tr>
+                          <th scope="col" className="fit">{t('audit.colTime')}</th>
+                          <th scope="col">{t('audit.colOperation')}</th>
+                          <th scope="col">{t('audit.colResource')}</th>
+                          <th scope="col" className="fit">{t('audit.colUser')}</th>
+                          <th scope="col" className="fit">{t('audit.colResult')}</th>
+                          <th scope="col" className="fit"><span className="sr-only">{t('audit.colDetail')}</span></th>
                         </tr>
-                      )) : shown.length ? shown.map((e) => {
-                        const type = typeOf(e.action)
-                        const label = actionLabel(e.action)
-                        return (
-                          <tr key={e.id}>
-                            <td className="mono muted">{rowTime(e.timestamp, locale)}</td>
-                            <td><span className="audit-type"><Icon name={typeIcon(type)} />{label}</span></td>
-                            <td><button type="button" className="resource" data-event={e.id} onClick={() => openEvent(e)}>{resourceOf(e)}</button></td>
-                            <td className="muted small">{e.username || t('common.system')}</td>
-                            <td>{e.success
-                              ? <span className="badge good"><Icon name="check" />{t('audit.badgeOk')}</span>
-                              : <span className="badge bad"><Icon name="warning" />{t('audit.badgeFailed')}</span>}</td>
-                            <td><button type="button" className="icon-btn quiet" data-event={e.id} aria-label={t('audit.detailOf', { id: e.id })} onClick={() => openEvent(e)}><Icon name="right" /></button></td>
+                      </thead>
+                      <tbody>
+                        {firstRead ? Array.from({ length: 12 }, (_, i) => (
+                          <tr key={`sk-${i}`} className="sk-row" aria-hidden={i > 0 || undefined}>
+                            <td>{i === 0 && <span className="sr-only" role="status">{t('table.loadingRows')}</span>}<Bar width="64px" /></td>
+                            <td><Bar width={skWidth(i, 45, 35)} /></td>
+                            <td><Bar width={skWidth(i, 50, 40)} /></td>
+                            <td><Bar width="70px" /></td>
+                            <td><Bar width="74px" cls="sk-pill" /></td>
+                            <td />
                           </tr>
-                        )
-                      }) : (
-                        <tr><td colSpan={6}>{journalEmpty ? (
-                          <div className="empty empty-hint" id="empty-activity">
-                            <Icon name="activity" />
-                            <h3>{t('audit.emptyTitle')}</h3>
-                            <p>{t('audit.emptyText')}</p>
-                            {canWrite('certificates') && (
-                              <Link className="btn primary" to="/certificates?action=create" data-write=""><Icon name="plus" />{t('audit.emptyAction')}</Link>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="empty">
-                            <h3>{t('audit.noMatchTitle')}</h3>
-                            <p>{t('audit.noMatchText')}</p>
-                            {narrowed && <button type="button" className="btn" data-action="reset-filters" onClick={clearFilters}>{t('audit.resetFilters')}</button>}
-                          </div>
-                        )}</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                        )) : shown.length ? shown.map((e) => {
+                          const type = typeOf(e.action)
+                          const label = actionLabel(e.action)
+                          return (
+                            <tr key={e.id}>
+                              <td className="mono muted">{rowTime(e.timestamp, locale)}</td>
+                              <td><span className="audit-type"><Icon name={typeIcon(type)} />{label}</span></td>
+                              <td><button type="button" className="resource" data-event={e.id} onClick={() => openEvent(e)}>{resourceOf(e)}</button></td>
+                              <td className="muted small">{e.username || t('common.system')}</td>
+                              <td>{badgeOf(e)}</td>
+                              <td><button type="button" className="icon-btn quiet" data-event={e.id} aria-label={t('audit.detailOf', { id: e.id })} onClick={() => openEvent(e)}><Icon name="right" /></button></td>
+                            </tr>
+                          )
+                        }) : (
+                          <tr><td colSpan={6}>{emptyBlock}</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
                 {!firstRead && total > 0 && (
                   <footer className="table-footer">
                     <span id="page-range">{t('audit.pageRange', {
