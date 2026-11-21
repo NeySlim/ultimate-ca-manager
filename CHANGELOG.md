@@ -92,6 +92,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- **ACME, SCEP, EST, TSA and CRL / OCSP are the Atelier module lists.** Each page lists its objects (ACME accounts, SCEP profiles, EST endpoints, the TSA service, the CAs and their CRLs) with state chips and a detail dock, the rest of a page being reached from the view menu of its head; settings are forms with one save bar, so ACME client settings no longer save field by field and an out-of-range value is refused before saving.
+- **A regenerated SCEP challenge is shown once, and a CRL says when it falls due.** Regenerating a profile's challenge asks first, then shows the new value in a dialog to copy, whatever the clipboard does; the CRL list reads each CRL's next update as Up to date, Under 24 h, Expired or No CRL.
 - **HSM and Users are the Atelier module lists.** HSM lists each provider's type, keys, last connection test and state with its overview, keys and configuration in the dock; Users and roles lists the accounts with Active, Disabled and SSO chips, an export of the list, and each account's profile, effective permissions, API keys (scope and creation date), security and mTLS certificates in the dock, groups behind the Groups button.
 - **Access Control is an Atelier module list.** Roles show their description, parent, permission and account counts with System and Custom chips; a role's dock gives its overview and its permissions as check boxes per resource, read-only for a system role.
 - **The scheduler fits a phone.** Each task of Settings > Scheduler is a card there, its values named and its Run now button on its own line, where the table scrolled sideways and left the button off the screen.

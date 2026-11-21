@@ -109,6 +109,24 @@ describe('the SCEP profiles', () => {
     expect(screen.queryByText('NEW-SECRET-01')).toBeNull()
   })
 
+  it('says copied only when the clipboard took the value, and keeps a failed rotation out of the dialog', async () => {
+    at('/scep-config')
+    fireEvent.click(await screen.findByRole('button', { name: 'Équipements réseau' }))
+    fireEvent.click(within(await dock()).getByRole('button', { name: 'scep.rotate' }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'scep.rotateTitle' })).getByRole('button', { name: 'scep.regenerate' }))
+    const shown = await screen.findByRole('dialog', { name: 'scep.newChallengeTitle' })
+    fireEvent.click(within(shown).getByRole('button', { name: 'common.copy' }))
+    await waitFor(() => expect(clip.copy).toHaveBeenCalled())
+    expect(notify.showSuccess).not.toHaveBeenCalledWith('common.copied')
+    fireEvent.click(within(shown).getByRole('button', { name: 'common.close' }))
+    // The server refuses: its reason, and no value to show
+    scep.regenerateProfileChallenge.mockRejectedValue(new Error('CA offline'))
+    fireEvent.click(within(await dock()).getByRole('button', { name: 'scep.rotate' }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'scep.rotateTitle' })).getByRole('button', { name: 'scep.regenerate' }))
+    await waitFor(() => expect(notify.showError).toHaveBeenCalledWith('CA offline'))
+    expect(screen.queryByRole('dialog', { name: 'scep.newChallengeTitle' })).toBeNull()
+  })
+
   it('offers no rotation for an Intune profile and no action without write:scep', async () => {
     at('/scep-config')
     fireEvent.click(await screen.findByRole('button', { name: 'Postes nomades' }))

@@ -858,7 +858,7 @@ Enable CA Issuers per CA in the **AIA CA Issuers** section of that CA's panel on
 
 The Simple Certificate Enrollment Protocol (SCEP) enables network devices: routers, switches, firewalls, MDM-managed endpoints, to automatically request and obtain certificates.
 
-## Tabs
+## Views
 
 ### Requests
 View all SCEP enrollment requests:
@@ -890,7 +890,7 @@ Each profile is bound to:
 Point each device fleet, MDM profile, or tenant at its own profile URL. The unlabelled \`/scep/pkiclient.exe\` endpoint keeps serving the global configuration unchanged.
 
 ### Challenge Passwords
-The **Challenges** tab shows the challenge passwords. Devices must include a valid challenge password in their enrollment request to authenticate.
+The **Challenges of the authorities** view shows the challenge passwords. Devices must include a valid challenge password in their enrollment request to authenticate.
 
 - **View password**: Show the current challenge for a CA
 - **Regenerate**: Create a new challenge password (invalidates the old one for new enrollments)
@@ -1101,7 +1101,7 @@ ACME Proxy lets internal clients request certificates from a public CA (Let's En
 - Audit and tracking of all public certificate issuance
 
 ### Configuration
-1. Go to **ACME** → **Let's Encrypt** tab
+1. Open **ACME**, view **Client settings**
 2. Scroll down to the **ACME Proxy** section
 3. Select an **Upstream CA account** from **Certificate Authorities (CA)** (Let's Encrypt, Actalis, ZeroSSL, custom directory URL, EAB)
 4. Click **Test Connection** to verify connectivity with the upstream CA
@@ -1111,7 +1111,7 @@ ACME Proxy lets internal clients request certificates from a public CA (Let's En
 ### Dedicated proxy paths (multi-CA)
 Each external CA account can expose its own ACME proxy endpoint:
 
-1. Open **Certificate Authorities (CA)** (same Let's Encrypt tab)
+1. Open the **Upstream CAs** view
 2. Edit or create a CA account
 3. Enable **Expose via ACME proxy**
 4. Set a unique **Proxy path (slug)**: e.g. \`actalis-production\`, \`letsencrypt-staging\`
@@ -1380,7 +1380,7 @@ Enrollment over Secure Transport (EST) is defined in **RFC 7030** and provides c
 
 ## Configuration
 
-### Settings Tab
+### Configuration
 
 1. **Enable EST**: Toggle the EST protocol on or off
 2. **Signing CA**: Select which Certificate Authority signs EST-enrolled certificates
@@ -1465,9 +1465,9 @@ The generated key takes the issuing CA's strength: the family of the request's k
 
 The private key comes as unencrypted PKCS#8 (\`application/pkcs8\`), protected by TLS. To get it encrypted, authenticate with mTLS and put the client certificate's key identifier in the CSR (AsymmetricDecryptKeyIdentifier): the key then arrives in an RFC 5958 key package enveloped for that certificate, by key transport for an RSA certificate of 2048 bits or more asserting keyEncipherment or by key agreement (ECDH) for an EC certificate asserting keyAgreement, with the key transport or key agreement and content algorithms taken from the CSR's SMIMECapabilities in the client's order. The package is signed by an "EST key generator" certificate that the issuing CA issues on first use and renews by itself; it chains to the CA that \`/cacerts\` serves and has the CA's key family, Ed25519 under an Ed448 CA (v2.252).
 
-## EST Endpoints Tab
+## Endpoints
 
-The EST Endpoints tab displays:
+The detail of an endpoint displays:
 - **Endpoint URLs**: Copy-paste ready URLs for each EST operation
 - **Enrollment Statistics**: total, successful and failed enrollments
 
@@ -1533,7 +1533,7 @@ Time Stamp Authority (TSA) implements **RFC 3161** to provide trusted timestamps
 
 ## Configuration
 
-### Settings Tab
+### Configuration
 
 1. **Enable TSA**: Toggle the TSA server on or off
 2. **Signing CA**: Select which Certificate Authority signs timestamp tokens
@@ -1545,7 +1545,7 @@ Time Stamp Authority (TSA) implements **RFC 3161** to provide trusted timestamps
 The signing CA's private key is used to sign every timestamp token. Best practices:
 
 - Use a **dedicated sub-CA** for timestamping rather than your root CA
-- RFC 3161 §2.3 requires a signer whose only, critical EKU is **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8), which a CA certificate cannot carry without losing its other uses. Tokens signed by the CA certificate are refused by strict verifiers: \`openssl ts -verify\` fails with "unsuitable certificate purpose" and jarsigner with "Certificate is not valid for timestamping". The Settings tab warns while the CA certificate signs: **generate a dedicated signing certificate** there for these clients
+- RFC 3161 §2.3 requires a signer whose only, critical EKU is **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8), which a CA certificate cannot carry without losing its other uses. Tokens signed by the CA certificate are refused by strict verifiers: \`openssl ts -verify\` fails with "unsuitable certificate purpose" and jarsigner with "Certificate is not valid for timestamping". The configuration warns while the CA certificate signs: **generate a dedicated signing certificate** there for these clients
 - Ensure the CA certificate has **sufficient validity**: timestamps must remain verifiable for years. A CA outside its validity period does not sign: \`/tsa\` answers 503
 - Keep **Require a dedicated TSA certificate** on to enforce this at signing time
 
@@ -1553,12 +1553,12 @@ The signing CA's private key is used to sign every timestamp token. Best practic
 
 The Policy OID identifies the TSA policy under which timestamps are issued. It is embedded in every \`TimeStampResp\`.
 
-- Default: \`1.2.3.4.1\` (placeholder: OpenSSL's example OID, assigned to no one; the Settings tab warns while it is in use)
+- Default: \`1.2.3.4.1\` (placeholder: OpenSSL's example OID, assigned to no one; the configuration warns while it is in use)
 - For production, register an OID under your organization's arc or use one from your CP/CPS
 
-## TSA Endpoint Tab
+## Endpoint
 
-The TSA Endpoint tab displays:
+The detail of the service displays:
 
 - **TSA Endpoint URL**: Copy-paste ready URL for client configuration
 - **Usage Examples**: OpenSSL commands for creating requests, sending them, and verifying responses

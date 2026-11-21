@@ -5,10 +5,10 @@ export default {
     overview: 'EST（RFC 7030）通过 HTTPS 提供安全的证书注册，支持双向 TLS（mTLS）或 HTTP Basic 认证。适用于需要基于标准的注册协议和强传输安全的现代企业环境。',
     sections: [
       {
-        title: '选项卡',
+        title: '视图',
         items: [
-          { label: '设置', text: '启用 EST、选择签名 CA、配置认证凭据和证书有效期' },
-          { label: 'EST 端点', text: '用于集成的 EST 端点 URL 和注册统计' },
+          { label: '注册端点', text: '默认端点以及每个 CA 标签一个端点（/.well-known/est/<标签>/），显示机构、认证（客户端证书；保存 HTTP Basic 凭据后为客户端证书或密码）和状态。端点打开其详情，含五个 URL 和注册总数' },
+          { label: '配置', text: '在带保存栏的表单中启用 EST、设置签发 CA、有效期、响应中的证书链、CA 标签和 HTTP Basic 凭据；重复的标签会阻止保存' },
         ]
       },
       {
@@ -37,7 +37,7 @@ export default {
       'EST 是 SCEP 的现代替代方案：新部署请优先使用 EST',
       '使用 mTLS 认证获得最高安全性：Basic Auth 是备用方案',
       '/simplereenroll 端点要求客户端通过 mTLS 提供当前证书',
-      '从 EST 端点选项卡复制端点 URL 以配置您的 EST 客户端',
+      '从注册端点的详情复制端点 URL 以配置您的 EST 客户端',
     ],
     warnings: [
       'EST 需要 HTTPS：客户端必须信任 UCM 服务器证书或 CA',
@@ -53,7 +53,7 @@ export default {
 
 ## 配置
 
-### 设置选项卡
+### 配置
 
 1. **启用 EST**: 开启或关闭 EST 协议
 2. **签名 CA**: 选择为 EST 注册的证书签名的证书颁发机构
@@ -138,9 +138,9 @@ curl -k --cert client.pem --key client.key \\
 
 私钥以未加密的 PKCS#8 (\`application/pkcs8\`) 返回，由 TLS 保护。若要加密返回，请使用 mTLS 认证，并在 CSR 中写入客户端证书的密钥标识符 (AsymmetricDecryptKeyIdentifier)：密钥将以 RFC 5958 密钥包的形式封装给该证书，断言 keyEncipherment 的 2048 位及以上 RSA 证书使用密钥传输，断言 keyAgreement 的 EC 证书使用密钥协商 (ECDH)；密钥传输或密钥协商算法以及内容算法按客户端的顺序取自 CSR 的 SMIMECapabilities。该密钥包由“EST key generator”证书签名，该证书由签发 CA 在首次使用时签发并自动续期；它链接到 \`/cacerts\` 提供的 CA，并采用该 CA 的密钥族，Ed448 CA 下为 Ed25519 (v2.252)。
 
-## EST 端点选项卡
+## 端点
 
-EST 端点选项卡显示：
+注册端点的详情显示：
 - **端点 URL**: 可直接复制粘贴的各 EST 操作 URL
 - **注册统计**: 注册总数、成功数和失败数
 

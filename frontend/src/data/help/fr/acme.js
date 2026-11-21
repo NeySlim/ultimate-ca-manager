@@ -5,6 +5,15 @@ export default {
     overview: 'UCM prend en charge deux modes ACME : client ACME pour les certificats publics depuis toute AC conforme RFC 8555 (Let’s Encrypt, ZeroSSL, HARICA, etc.), et serveur ACME local pour l’automatisation PKI interne avec mappage multi-AC de domaines.',
     sections: [
       {
+        title: 'Vues',
+        items: [
+          { label: 'Comptes', text: 'La page s’ouvre sur les comptes du serveur : puces par état, Contact, Créé le, État et Commandes. Un compte ouvre son détail sur Compte, Commandes et Défis, avec Désactiver le compte… (définitif, RFC 8555, §7.3.6) et Supprimer' },
+          { label: 'Copier l’URL du répertoire', text: 'Dans l’en-tête de la page : l’URL du répertoire que visent les clients ACME' },
+          { label: 'Vue', text: 'Le menu Vue de l’en-tête mène aux commandes, domaines, identifiants EAB et réglages du serveur, aux réglages, commandes, AC amont, fournisseurs DNS et domaines du client, et aux certificats émis. L’adresse garde la vue (?tab=)' },
+          { label: 'Réglages du client', text: 'Un formulaire enregistré en une seule requête, les bornes du serveur vérifiées avant (renouvellement de 1 à 60 jours, attentes DNS, port TLS-ALPN)' },
+        ]
+      },
+      {
         title: "Renewal Information (ARI, RFC 9773)",
         content: "Le serveur ACME local publie une ressource renewalInfo : les clients y apprennent le moment idéal pour renouveler chaque certificat.",
         items: [
@@ -18,7 +27,7 @@ export default {
         title: 'Client ACME',
         items: [
           { label: 'Client', text: 'Demander des certificats depuis toute AC ACME, Let’s Encrypt, ZeroSSL, HARICA ou personnalisée' },
-          { label: 'Onglet des orders (v2.219)', text: 'Les orders du client ont leur propre onglet « Let’s Encrypt orders » dans la barre latérale, avec compteur visibles/total et filtre de statut, à l’image de la vue Local orders' },
+          { label: 'Commandes du client', text: 'Les commandes du client ont leur propre vue, avec des puces par état, les échecs de renouvellement sur la ligne, et leur détail avec les actions que leur état permet' },
           { label: 'Autorités de certification (AC)', text: 'Un ou plusieurs comptes par AC, plusieurs comptes peuvent partager la même URL de répertoire (ex. deux comptes Let’s Encrypt pour une séparation administrative) ; une URL de répertoire vide vaut Let’s Encrypt Production' },
           { label: 'Serveur personnalisé', text: 'Définir une URL de répertoire ACME personnalisée pour utiliser toute AC conforme RFC 8555' },
           { label: 'EAB', text: 'Prise en charge de la liaison de compte externe pour les AC nécessitant une pré-inscription (ZeroSSL, HARICA, etc.)' },
@@ -32,7 +41,7 @@ export default {
           { label: "Renouvellement en place (v2.251)", text: "Un renouvellement conserve l’id et le refid du certificat : la liaison HTTPS, les liaisons de déploiement et les webhooks le suivent. Les certificats que d’anciens renouvellements ont importés comme nouvelles lignes restent dans l’inventaire : archivez-les ou supprimez-les à la main" },
           { label: "Orders interrompus (v2.251)", text: "Un order laissé en traitement par un redémarrage repasse en attente avec un message, prêt pour Verify Challenge, en 15 minutes environ. Un certificat que l’AC a émis avant un redémarrage ou un import échoué est récupéré par Check Status, la finalisation ou le prochain renouvellement" },
           { label: "Orders en attente périmés (v2.251)", text: "La tâche de renouvellement supprime, avec leurs enregistrements TXT, les orders en attente depuis plus de 7 jours dont l’order chez l’AC a expiré ou dont l’expiration est inconnue, et audite chaque suppression. Les enregistrements TXT d’un order dont la validation a échoué sont supprimés dès qu’il est invalide" },
-          { label: "Liste des orders (v2.251)", text: "L’onglet des orders Let’s Encrypt charge tous les orders, jusqu’à 5000, quatre pages à la fois, et réessaie une page refusée en 429 après son Retry-After. Une page toujours manquante laisse les orders obtenus, avec un avis que la liste est partielle" },
+          { label: "Liste des orders (v2.251)", text: "La vue Commandes du client charge tous les orders, jusqu’à 5000, quatre pages à la fois, et réessaie une page refusée en 429 après son Retry-After. Une page toujours manquante laisse les orders obtenus, avec un avis que la liste est partielle" },
           { label: "Échecs de renouvellement (v2.251)", text: "Un order affiche son nombre de renouvellements échoués, avec la dernière erreur et sa date. Après 5 échecs de renouvellement planifié, il est retenté une fois par jour, et chaque échec, manuel compris, émet l’événement acme_order.renewal_failed" },
           { label: "Renouvellement automatique par order (v2.251)", text: "Un order sélectionné affiche un interrupteur Renouvellement automatique qui arrête ou reprend son renouvellement. Supprimer un certificat après l’avoir révoqué désactive le renouvellement de son order, avec un message" },
           { label: "Un renouvellement à la fois (v2.251)", text: "Un renouvellement ou une finalisation verrouille son order : un second lancé entre-temps reçoit un 409, et le planificateur ignore l’order" },
@@ -61,7 +70,7 @@ export default {
           { label: 'Comptes', text: 'Voir et gérer les comptes clients ACME enregistrés' },
           { label: 'E-mail du compte (v2.218)', text: 'L’e-mail de contact d’un compte local peut être modifié depuis son panneau de détails. Selon la RFC 8555, le contact appartient au client ACME : sa prochaine mise à jour de compte peut donc écraser la valeur' },
           { label: 'Historique', text: 'Suivre toutes les commandes d’émission de certificats ACME' },
-                  { label: 'Orders locaux (v2.217)', text: 'L’onglet Local orders liste les orders du serveur intégré avec filtre de statut, suppression unitaire et purge ; les orders expirés non émis sont purgés automatiquement toutes les 6 h, et un digest de signature par défaut s’applique aux orders sans profil. Depuis la v2.218, la purge supprime aussi les défis frères résiduels encore pending des autorisations déjà validées, et depuis la v2.252 les nonces expirés et utilisés' },
+                  { label: 'Orders locaux (v2.217)', text: 'La vue Commandes liste les orders du serveur intégré avec filtre de statut, suppression unitaire et purge ; les orders expirés non émis sont purgés automatiquement toutes les 6 h, et un digest de signature par défaut s’applique aux orders sans profil. Depuis la v2.218, la purge supprime aussi les défis frères résiduels encore pending des autorisations déjà validées, et depuis la v2.252 les nonces expirés et utilisés' },
                   { label: 'Profils et templates (v2.221)', text: 'Les profils de certificat (draft-ietf-acme-profiles) sont publiés dans le directory et choisis par le client à chaque order. Chaque profil fixe validité et digest et peut lier un template de certificat, dont les KU/EKU gouvernent alors le certificat émis' },
                   { label: 'Profil par défaut', text: 'La plupart des clients ne demandent aucun profil. Le profil par défaut, choisi sous les profils, s’applique à leurs commandes ; sans lui, elles reçoivent 90 jours et le digest par défaut' },
                   { label: 'Révocation (v2.248)', text: 'Le certificat envoyé par un client pour le révoquer doit correspondre octet pour octet à celui stocké. Seule une clé de certificat RSA ou EC P-256, P-384 ou P-521 peut signer la requête elle-même : révoquez un certificat ML-DSA, EdDSA ou Brainpool avec le compte qui l’a commandé' },
@@ -132,7 +141,7 @@ export default {
         content: 'La validation HTTP-01 et TLS-ALPN-01 fonctionne nativement pour les cibles RFC1918, loopback, .lan / .local / .corp, le mode de déploiement principal de UCM.',
         items: [
           { label: 'Bascule', text: 'ACME → ACME Local → Autoriser les adresses privées et internes (par défaut : activé)' },
-          { label: 'Bascule', text: 'Onglet Let’s Encrypt → Autoriser une AC ACME sur loopback, pour une AC colocalisée sur 127.0.0.1 (par défaut : désactivé)' },
+          { label: 'Bascule', text: 'Réglages du client → Autoriser une AC ACME sur loopback, pour une AC colocalisée sur 127.0.0.1 (par défaut : désactivé)' },
           { label: 'Toujours bloqué', text: 'Les IP de métadonnées cloud (169.254.169.254, fd00:ec2::254, etc.) sont bloquées inconditionnellement' },
         ]
       },
@@ -326,7 +335,7 @@ Le proxy ACME permet aux clients internes de demander des certificats à une AC 
 - Audit et suivi de toutes les émissions de certificats publics
 
 ### Configuration
-1. Allez dans **ACME** → onglet **Let’s Encrypt**
+1. Ouvrez **ACME**, vue **Réglages du client**
 2. Faites défiler jusqu’à la section **Proxy ACME**
 3. Sélectionnez un **Compte AC en amont** dans **Autorités de certification (AC)** (Let’s Encrypt, Actalis, ZeroSSL, URL personnalisée, EAB)
 4. Cliquez sur **Tester la connexion** pour vérifier la connectivité avec l’AC en amont
@@ -336,7 +345,7 @@ Le proxy ACME permet aux clients internes de demander des certificats à une AC 
 ### Chemins proxy dédiés (multi-AC)
 Chaque compte AC externe peut exposer son propre endpoint proxy ACME :
 
-1. Ouvrez **Autorités de certification (AC)** (même onglet Let’s Encrypt)
+1. Ouvrez la vue **AC amont**
 2. Modifiez ou créez un compte AC
 3. Activez **Exposer via le proxy ACME**
 4. Définissez un **Chemin proxy (slug)** unique : ex. \`actalis-production\`, \`letsencrypt-staging\`

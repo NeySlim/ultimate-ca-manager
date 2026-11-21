@@ -5,10 +5,10 @@ export default {
     overview: 'TSA（RFC 3161）提供可信时间戳，证明文档或哈希值在特定时间点存在。用于代码签名、法律合规和审计追踪。',
     sections: [
       {
-        title: '选项卡',
+        title: '视图',
         items: [
-          { label: '设置', text: '启用 TSA、选择签名 CA 并配置 TSA 策略 OID' },
-          { label: 'TSA 端点', text: 'TSA 端点 URL、OpenSSL 使用示例和请求统计' },
+          { label: '服务', text: '时间戳服务及其机构、哈希（请求可携带的摘要）、策略和状态。其详情给出签名证书、/tsa URL、请求总数和 OpenSSL 用法' },
+          { label: '配置', text: '在带保存栏的表单中启用 TSA、设置签名 CA、策略 OID、签名证书和严格模式；“生成签名证书”保留在其所在部分' },
         ]
       },
       {
@@ -40,8 +40,8 @@ export default {
       '无需认证：TSA 端点像 CRL/OCSP 一样是公开可访问的',
     ],
     warnings: [
-      '/tsa 签名之前必须设置专用签名证书：请在设置选项卡中生成一个',
-      'openssl ts -verify 和 jarsigner 会拒绝由 CA 证书签署的令牌：RFC 3161 要求使用带有关键且独占的 timeStamping EKU 的专用签名者。请在设置选项卡中生成一个',
+      '/tsa 签名之前必须设置专用签名证书：请在配置中生成一个',
+      'openssl ts -verify 和 jarsigner 会拒绝由 CA 证书签署的令牌：RFC 3161 要求使用带有关键且独占的 timeStamping EKU 的专用签名者。请在配置中生成一个',
       'TSA 端点是公共协议端点：不要在时间戳请求中放入敏感数据',
     ],
   },
@@ -61,7 +61,7 @@ export default {
 
 ## 配置
 
-### 设置选项卡
+### 配置
 
 1. **启用 TSA**: 开关 TSA 服务器
 2. **签名 CA**: 选择哪个证书颁发机构签署时间戳令牌
@@ -73,7 +73,7 @@ export default {
 签名 CA 的私钥用于签署每个时间戳令牌。最佳实践：
 
 - 使用**专用子 CA** 进行时间戳签发，而不是根 CA
-- RFC 3161 §2.3 要求签名者唯一且关键的 EKU 为 **id-kp-timeStamping**（OID 1.3.6.1.5.5.7.3.8），而 CA 证书若带有它就会失去其他用途。由 CA 证书签署的令牌会被严格校验器拒绝：\`openssl ts -verify\` 报“unsuitable certificate purpose”，jarsigner 报“Certificate is not valid for timestamping”。CA 证书签名期间，设置选项卡会给出警告：请在那里为这些客户端**生成专用签名证书**
+- RFC 3161 §2.3 要求签名者唯一且关键的 EKU 为 **id-kp-timeStamping**（OID 1.3.6.1.5.5.7.3.8），而 CA 证书若带有它就会失去其他用途。由 CA 证书签署的令牌会被严格校验器拒绝：\`openssl ts -verify\` 报“unsuitable certificate purpose”，jarsigner 报“Certificate is not valid for timestamping”。CA 证书签名期间，配置会给出警告：请在那里为这些客户端**生成专用签名证书**
 - 确保 CA 证书有**足够的有效期**：时间戳必须在数年内保持可验证。超出有效期的 CA 不会签名：\`/tsa\` 应答 503
 - 保持**要求专用 TSA 证书**开启，在签名时强制执行此要求
 
@@ -81,12 +81,12 @@ export default {
 
 策略 OID 标识时间戳签发所依据的 TSA 策略。它嵌入在每个 \`TimeStampResp\` 中。
 
-- 默认值：\`1.2.3.4.1\`（占位符：OpenSSL 的示例 OID，未分配给任何人；使用期间设置选项卡会给出警告）
+- 默认值：\`1.2.3.4.1\`（占位符：OpenSSL 的示例 OID，未分配给任何人；使用期间配置会给出警告）
 - 生产环境中，请在您组织的 OID 弧下注册一个 OID，或使用 CP/CPS 中的 OID
 
-## TSA 端点选项卡
+## 端点
 
-TSA 端点选项卡显示：
+服务的详情显示：
 
 - **TSA 端点 URL**: 可直接复制的客户端配置 URL
 - **使用示例**: 用于创建请求、发送请求和验证响应的 OpenSSL 命令

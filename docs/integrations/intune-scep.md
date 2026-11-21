@@ -39,7 +39,7 @@ SCEP endpoint to devices, and the Intune-side profile.
 
 **Protocols → SCEP → Profiles → New profile**
 
-![UCM SCEP Profiles tab](img/intune-scep-profiles-empty.png)
+![UCM SCEP profiles](img/intune-scep-profiles-empty.png)
 
 Fill in the profile fields:
 

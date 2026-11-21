@@ -9,12 +9,6 @@
  *  - the SMTP OAuth redirect URI used `navigator.clipboard?.writeText(val)` and
  *    then showed "Copied to clipboard" unconditionally — the `?.` short-circuits
  *    and the operator is told the URI is on the clipboard when it is not;
- *  - rotating a SCEP profile challenge called
- *    `navigator.clipboard.writeText(c).catch(...)`, which throws BEFORE `.catch`
- *    is attached: the outer catch then reported failure and skipped
- *    `onChanged()`, even though the server had already rotated the challenge
- *    (every enrolled device has stopped enrolling) and the new challenge is
- *    shown exactly once;
  *  - the PEM / field copy buttons flipped to "Copied!" without awaiting or
  *    catching anything.
  */
@@ -58,7 +52,6 @@ import { CSRPanel } from '../detail/CSRPanel'
 import { TrustCertPanel } from '../detail/TrustCertPanel'
 import CopyableUrl from '../../pages/settings/CopyableUrl'
 import EmailSection from '../../pages/settings/EmailSection'
-import ScepProfilesTab from '../../pages/scep/ScepProfilesTab'
 
 // ── transports ──────────────────────────────────────────────────────────────
 // Two ways a copy fails in the field, and the one way it works.
@@ -177,60 +170,8 @@ describe('SMTP OAuth redirect URI', () => {
   })
 })
 
-// ── 2. SCEP profile challenge rotation ──────────────────────────────────────
-
-const PROFILE = { id: 3, name: 'Kiosks', url_slug: 'kiosks', ca_refid: 'ca-1', enabled: true }
-
-const renderProfiles = (onChanged) => render(
-  <ScepProfilesTab profiles={[PROFILE]} cas={[]} templates={[]} canWrite onChanged={onChanged} />
-)
-
-describe('SCEP profile challenge rotation', () => {
-  it('refreshes the table even when the challenge cannot be copied', async () => {
-    notify.showConfirm.mockResolvedValue(true)
-    const onChanged = vi.fn()
-    renderProfiles(onChanged)
-    fireEvent.click(screen.getByLabelText('scep.regenerate'))
-
-    await waitFor(() => expect(scepMocks.regenerateProfileChallenge).toHaveBeenCalledWith(PROFILE.id))
-    // The rotation succeeded; the clipboard is a courtesy, not a gate.
-    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1))
-    expect(notify.showError).not.toHaveBeenCalled()
-  })
-
-  it('does not say "copied to clipboard" when nothing was copied', async () => {
-    notify.showConfirm.mockResolvedValue(true)
-    renderProfiles(vi.fn())
-    fireEvent.click(screen.getByLabelText('scep.regenerate'))
-
-    await waitFor(() => expect(notify.showSuccess).toHaveBeenCalled())
-    // scep.profileChallengeRegenerated reads "…and copied to clipboard".
-    expect(notify.showSuccess).not.toHaveBeenCalledWith('scep.profileChallengeRegenerated')
-    expect(notify.showSuccess).toHaveBeenCalledWith('scep.challengeRegenerated')
-  })
-
-  it('keeps the full message when the challenge really did reach the clipboard', async () => {
-    workingClipboard()
-    notify.showConfirm.mockResolvedValue(true)
-    const onChanged = vi.fn()
-    renderProfiles(onChanged)
-    fireEvent.click(screen.getByLabelText('scep.regenerate'))
-
-    await waitFor(() => expect(notify.showSuccess).toHaveBeenCalledWith('scep.profileChallengeRegenerated'))
-    expect(onChanged).toHaveBeenCalledTimes(1)
-  })
-
-  it('still surfaces a real server failure', async () => {
-    notify.showConfirm.mockResolvedValue(true)
-    scepMocks.regenerateProfileChallenge.mockRejectedValue(new Error('CA offline'))
-    const onChanged = vi.fn()
-    renderProfiles(onChanged)
-    fireEvent.click(screen.getByLabelText('scep.regenerate'))
-
-    await waitFor(() => expect(notify.showError).toHaveBeenCalledWith('CA offline'))
-    expect(onChanged).not.toHaveBeenCalled()
-  })
-})
+// ── 2. SCEP profile challenge rotation: the new value is shown once in a dialog, copied only on
+// request (pages/__tests__/SCEPPage.atelier.test.jsx), so no automatic copy is left to report.
 
 // ── 3. the "Copied!" badges ─────────────────────────────────────────────────
 
@@ -350,9 +291,8 @@ const MIGRATED = [
   'pages/settings/EmailSection.jsx',
   'pages/settings/CopyableUrl.jsx',
   'pages/settings/DeploySection.jsx',
-  'pages/scep/ScepProfilesTab.jsx',
-  'pages/ESTPage.jsx',
-  'pages/TSAPage.jsx',
+  // The protocol pages copy through the copyable value of their parts
+  'pages/protocols/atelierParts.jsx',
   'pages/SCEPPage.jsx',
   'components/DetailCard.jsx',
   'components/detail/CSRPanel.jsx',

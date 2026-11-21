@@ -7,6 +7,7 @@ export default {
       {
         title: 'CRL 管理',
         items: [
+          { label: '列表与详情', text: '每个机构显示其 CRL 编号、发布时间、下次更新、OCSP 以及根据 CRL 日期得出的状态（最新、不足 24 小时、已过期、无 CRL）。名称打开其详情：概览、发布（计划、增量 CRL、部署）、OCSP（响应器、委派响应器）和分发点（命名 URL、CDP、OCSP 和 CA Issuers URL、CPS）' },
           { label: '自动重新生成', text: '按 CA 切换 CRL 自动重新生成' },
           { label: '手动重新生成', text: '立即强制重新生成 CRL' },
           { label: '下载 CRL', text: '以 PEM 格式下载 CRL（.crl 文件）；DER 格式由 CDP URL 提供' },

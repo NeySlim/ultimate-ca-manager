@@ -5,10 +5,10 @@ export default {
     overview: 'EST (RFC 7030) fournit une inscription sécurisée de certificats via HTTPS avec TLS mutuel (mTLS) ou authentification HTTP Basic. Idéal pour les environnements d’entreprise modernes nécessitant une inscription basée sur des standards avec une forte sécurité de transport.',
     sections: [
       {
-        title: 'Onglets',
+        title: 'Vues',
         items: [
-          { label: 'Paramètres', text: 'Activer EST, sélectionner l’AC de signature, configurer les identifiants d’authentification et la validité des certificats' },
-          { label: "Points d’accès EST", text: 'URL des points de terminaison EST pour l’intégration et statistiques d’inscription' },
+          { label: 'Points d’enrôlement', text: 'Le point par défaut et un par libellé d’AC (/.well-known/est/<libellé>/), avec Autorité, Authentification (certificat client, ou certificat client ou mot de passe dès que des identifiants HTTP Basic sont enregistrés) et État. Un point ouvre son détail avec ses cinq URL et les totaux d’enrôlement' },
+          { label: 'Configuration', text: 'Activer EST, AC émettrice, validité, chaîne dans les réponses, libellés d’AC et identifiants HTTP Basic, dans un formulaire avec sa barre d’enregistrement ; un libellé répété bloque l’enregistrement' },
         ]
       },
       {
@@ -37,7 +37,7 @@ export default {
       'EST est le remplacement moderne de SCEP : préférez EST pour les nouveaux déploiements',
       'Utilisez l’authentification mTLS pour la meilleure sécurité : Basic Auth est un repli',
       'Le point de terminaison /simplereenroll nécessite que le client présente son certificat actuel via mTLS',
-      'Copiez les URL des points de terminaison depuis l’onglet Points d’accès EST pour configurer vos clients EST',
+      'Copiez les URL des points de terminaison depuis le détail d’un point d’enrôlement pour configurer vos clients EST',
     ],
     warnings: [
       'EST nécessite HTTPS : le client doit faire confiance au certificat du serveur UCM ou à l’AC',
@@ -53,7 +53,7 @@ L’inscription par transport sécurisé (EST) est définie dans le **RFC 7030**
 
 ## Configuration
 
-### Onglet Paramètres
+### Configuration
 
 1. **Activer EST** : Basculer le protocole EST on ou off
 2. **AC de signature** : Sélectionner quelle autorité de certification signe les certificats inscrits via EST
@@ -138,9 +138,9 @@ La clé générée prend la force de l’AC émettrice : la famille de la clé d
 
 La clé privée est livrée en PKCS#8 non chiffré (\`application/pkcs8\`), protégée par TLS. Pour l’obtenir chiffrée, authentifiez-vous en mTLS et placez l’identifiant de clé du certificat client dans la CSR (AsymmetricDecryptKeyIdentifier) : la clé arrive alors dans un paquet de clé RFC 5958 enveloppé pour ce certificat, par transport de clé pour un certificat RSA de 2048 bits ou plus déclarant keyEncipherment, ou par accord de clé (ECDH) pour un certificat EC déclarant keyAgreement, les algorithmes de transport ou d’accord de clé et de contenu étant tirés de la SMIMECapabilities de la CSR, dans l’ordre du client. Le paquet est signé par un certificat « EST key generator » que l’AC émettrice délivre à la première utilisation et renouvelle seule ; il se rattache à l’AC que sert \`/cacerts\` et a la famille de clé de l’AC, Ed25519 sous une AC Ed448 (v2.252).
 
-## Onglet Points d’accès EST
+## Points d’accès
 
-L’onglet Points d’accès EST affiche :
+Le détail d’un point d’enrôlement affiche :
 - **URL des points de terminaison** : URL prêtes à copier-coller pour chaque opération EST
 - **Statistiques d’inscription** : inscriptions totales, réussies et en échec
 
