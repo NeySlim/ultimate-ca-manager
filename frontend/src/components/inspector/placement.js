@@ -22,10 +22,11 @@ export function useViewport() {
 
 /** 'bottom' | 'right' | 'mobile', or null while no object is open. */
 export function useDockPlacement() {
-  const { opened, position } = useInspector()
+  const { opened, position, dockClaimed } = useInspector()
   const { isMobile } = useMobile()
   const { w } = useViewport()
-  if (!opened.length) return null
+  // A page that draws its own dock lays it out itself
+  if (!opened.length || dockClaimed) return null
   if (isMobile) return 'mobile'
   return position === 'right' && w >= RIGHT_MIN_VIEWPORT ? 'right' : 'bottom'
 }

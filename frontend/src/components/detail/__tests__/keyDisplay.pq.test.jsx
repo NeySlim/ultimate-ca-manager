@@ -2,7 +2,7 @@
  * Surfaces other than the certificate panel: a post-quantum key keeps its
  * name and level, and a missing or unsplittable key name is never shown as RSA.
  */
-import { render, renderHook, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import en from '../../../i18n/locales/en.json'
 import { GROUP_PQ, KEY_ALGORITHMS } from '../../../lib/keyAlgorithms'
@@ -28,15 +28,14 @@ vi.mock('../../cas/ChainUsageSection', () => ({ ChainUsageSection: () => null })
 const { CAPanel } = await import('../CAPanel')
 const { TemplatePreviewModal } = await import('../../TemplatePreviewModal')
 const { TrustCertPanel } = await import('../TrustCertPanel')
-const { useCertificateColumns } = await import('../../../pages/certificates/useCertificateColumns')
+const { certificateColumns } = await import('../../../pages/certificates/certificateRows')
 
 const ML_DSA_65 = KEY_ALGORITHMS.find(a => a.group === GROUP_PQ && a.label === 'ML-DSA-65')
 const LEVEL_LABEL = `${ML_DSA_65.label} (level ${ML_DSA_65.securityLevel})`
 
 const keyCell = (row) => {
-  const { result } = renderHook(() => useCertificateColumns(t))
-  const column = result.current.find(c => c.key === 'key_type')
-  return render(<div>{column.render(row.key_type, row)}</div>)
+  const column = certificateColumns(t).find(c => c.id === 'key')
+  return render(<div>{column.cell(row)}</div>)
 }
 
 describe('key display outside the certificate panel', () => {

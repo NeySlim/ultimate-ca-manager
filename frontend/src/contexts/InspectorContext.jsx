@@ -19,6 +19,8 @@ const DEFAULTS = { position: 'bottom', height: 278, width: 460 }
 const PREFS_KEY = 'ucm-inspector-prefs'
 
 const keyOf = (type, id) => `${type}:${id}`
+// The shell's dock and the Atelier dock a page draws itself
+const DOCKS = '[data-testid="inspector-dock"], #inspector'
 
 // Keep only what the server would accept; anything else falls back to the default
 export function cleanGeometry(raw) {
@@ -54,6 +56,8 @@ export function InspectorProvider({ children }) {
   const [focusToken, setFocusToken] = useState(0)
   // Folded to its tab strip; any opening unfolds it (session only, like the active object)
   const [collapsed, setCollapsed] = useState(false)
+  // A page that draws the inspector in its own zone (the Atelier dock) claims it: the shell's dock steps aside
+  const [claims, setClaims] = useState(0)
   const origins = useRef(new Map())
   const openedRef = useRef([])
   const geometryRef = useRef(geometry)
@@ -74,7 +78,7 @@ export function InspectorProvider({ children }) {
     const key = keyOf(type, entityId)
     const from = origin || document.activeElement
     // Reopening replaces the origin, unless the focus is on body or in the dock (then the old one stays)
-    if (from && from !== document.body && !from.closest?.('[data-testid="inspector-dock"]')) origins.current.set(key, from)
+    if (from && from !== document.body && !from.closest?.(DOCKS)) origins.current.set(key, from)
     if (!openedRef.current.some((o) => o.key === key)) {
       const next = [...openedRef.current, { key, type, entityId, data: data || null }]
       openedRef.current = next.length > MAX_OPEN ? next.slice(next.length - MAX_OPEN) : next
@@ -95,7 +99,7 @@ export function InspectorProvider({ children }) {
     const origin = origins.current.get(key)
     origins.current.delete(key)
     const focused = document.activeElement
-    const focusInDock = !focused || focused === document.body || !!focused.closest?.('[data-testid="inspector-dock"]')
+    const focusInDock = !focused || focused === document.body || !!focused.closest?.(DOCKS)
     openedRef.current = next
     setOpened(next)
     setActiveKey((cur) => (cur === key ? (next[Math.min(idx, next.length - 1)]?.key ?? null) : cur))
@@ -116,7 +120,7 @@ export function InspectorProvider({ children }) {
     // that closes the inspector goes away with it and does not count
     const focused = document.activeElement
     const free = !focused || focused === document.body || !focused.isConnected
-      || !!focused.closest?.('[data-testid="inspector-dock"]')
+      || !!focused.closest?.(DOCKS)
     if (origin && (free || refocus)) queueMicrotask(() => origin.focus())
     openedRef.current = []
     setOpened([])
@@ -140,6 +144,11 @@ export function InspectorProvider({ children }) {
     persistPreference('inspector', { position: next.position, height: next.height, width: next.width })
   }, [])
 
+  const claimDock = useCallback(() => {
+    setClaims((n) => n + 1)
+    return () => setClaims((n) => n - 1)
+  }, [])
+
   const toggleCloseOnNav = useCallback(() => {
     setCloseOnNav((prev) => { writeLocal({ closeOnNav: !prev }); return !prev })
   }, [])
@@ -151,8 +160,8 @@ export function InspectorProvider({ children }) {
     opened, activeKey, setActiveKey, openEntity, closeEntity, closeAll, setEntityData,
     openCount: opened.length, focusToken,
     ...geometry, setGeometry: updateGeometry,
-    closeOnNav, toggleCloseOnNav, collapsed, setCollapsed,
-  }), [opened, activeKey, openEntity, closeEntity, closeAll, setEntityData, focusToken, geometry, updateGeometry, closeOnNav, toggleCloseOnNav, collapsed])
+    closeOnNav, toggleCloseOnNav, collapsed, setCollapsed, claimDock, dockClaimed: claims > 0,
+  }), [opened, activeKey, openEntity, closeEntity, closeAll, setEntityData, focusToken, geometry, updateGeometry, closeOnNav, toggleCloseOnNav, collapsed, claimDock, claims])
 
   return <InspectorContext.Provider value={value}>{children}</InspectorContext.Provider>
 }

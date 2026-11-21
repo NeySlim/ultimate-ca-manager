@@ -66,7 +66,7 @@ describe('IssueCertificateDialog', () => {
     await screen.findByTestId('issue-review')
     expect(heading()).toBe(`${P}titleReview`)
     // The Review step gives the focus to the close button, as the Atelier does
-    await waitFor(() => expect(document.activeElement).toBe(button(`${P}close`)))
+    await waitFor(() => expect(document.activeElement).toBe(button("common.closeWindow")))
     fireEvent.click(screen.getByTestId('issue-submit'))
     await screen.findByTestId('issue-result')
     expect(mocks.create.mock.calls[0][0]).toMatchObject({ ca_id: '3', cn: 'service.example.com' })
@@ -171,7 +171,7 @@ describe('IssueCertificateDialog', () => {
     fireEvent.click(await screen.findByTestId('issue-submit'))
     await waitFor(() => expect(mocks.create).toHaveBeenCalled())
     fireEvent.keyDown(document.activeElement || document.body, { key: 'Escape' })
-    fireEvent.click(button(`${P}close`))
+    fireEvent.click(button("common.closeWindow"))
     expect(onOpenChange).not.toHaveBeenCalled()
     answer({ data: { id: 41, cn: 'service.example.com' } })
     await screen.findByTestId('issue-result')

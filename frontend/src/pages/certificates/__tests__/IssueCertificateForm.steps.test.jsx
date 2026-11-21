@@ -229,7 +229,7 @@ describe('IssueCertificateForm steps', () => {
     const review = await toReview()
     expect(within(review).getByRole('heading').textContent).toBe('device.example.com')
     // The key of the CSR is named as the list and the inspector name a key
-    expect(review.querySelector('[data-row="key"] dd').textContent).toBe('ECDSA P-256')
+    expect(review.querySelector('[data-row="key"] + dd').textContent).toBe('ECDSA P-256')
     fireEvent.click(screen.getByTestId('issue-submit'))
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
     const [body, info] = onSubmit.mock.calls[0]
@@ -277,7 +277,7 @@ describe('IssueCertificateForm steps', () => {
     expect(values.map((v) => [v.value, v.readOnly])).toEqual([['fw.lan', true]])
     expect(screen.getAllByLabelText(new RegExp(`${P}sanType`)).map((v) => v.value)).toEqual(['DNS'])
     const review = await toReview()
-    expect(review.querySelector('[data-row="sans"] dd').textContent).toBe('DNS : fw.lan')
+    expect(review.querySelector('[data-row="sans"] + dd').textContent).toBe('DNS : fw.lan')
   })
 
   it('keeps the empty SAN row of the Atelier for a certificate without any name', () => {
@@ -298,7 +298,7 @@ describe('IssueCertificateForm steps', () => {
     expect(field(LABEL.key).value).toBe('ECDSA P-256')
     expect(screen.getByTestId('issue-hint').textContent).toContain('ECDSA P-256')
     const review = await toReview()
-    expect(review.querySelector('[data-row="key"] dd').textContent).toBe('ECDSA P-256')
+    expect(review.querySelector('[data-row="key"] + dd').textContent).toBe('ECDSA P-256')
   })
 
   it('counts the authorities once: the field hint and the column agree, hidden ones included', () => {

@@ -1236,7 +1236,46 @@
       },
       "resultViewCertificate": "View the certificate",
       "resultViewApproval": "View the request"
-    }
+    },
+    "tableLabel": "Certificates table",
+    "caption": "Certificates. Activate a name to open its inspector.",
+    "noneInRange": "No certificate",
+    "filterByCa": "Filter by authority",
+    "filterBySource": "Filter by source",
+    "filterByTemplate": "Filter by template",
+    "presets": {
+      "title": "Saved filters",
+      "note": "A saved filter keeps the current search, state and filters, in this browser."
+    },
+    "exportList": "Export the list",
+    "allResultsSelected_one": "{{count, number}} result is selected",
+    "allResultsSelected_other": "All {{count, number}} results are selected",
+    "keepPageOnly": "Keep this page only",
+    "selectAllResults_one": "Select the {{count, number}} result",
+    "selectAllResults_other": "Select all {{count, number}} results",
+    "exportSelection": "Export…",
+    "bulkExport": {
+      "title": "Export the selection?",
+      "all": "Every result: {{n}}, not only the {{page}} on this page.",
+      "allQuery": "Every result of the search “{{query}}”: {{n}}, not only the {{page}} on this page.",
+      "page": "{{n}} on this page.",
+      "certificates_one": "{{count, number}} certificate",
+      "certificates_other": "{{count, number}} certificates",
+      "pemDesc": "The certificates",
+      "csvDesc": "Their metadata, a table",
+      "jsonDesc": "Their metadata, structured",
+      "note": "No private key leaves UCM through this export. The metadata name, describe and date each certificate; 10,000 at most.",
+      "confirm_one": "Export {{count, number}} certificate",
+      "confirm_other": "Export {{count, number}} certificates",
+      "certificates_few": "{{count, number}} certificates",
+      "certificates_many": "{{count, number}} certificates",
+      "confirm_few": "Export {{count, number}} certificates",
+      "confirm_many": "Export {{count, number}} certificates"
+    },
+    "allResultsSelected_few": "All {{count, number}} results are selected",
+    "allResultsSelected_many": "All {{count, number}} results are selected",
+    "selectAllResults_few": "Select all {{count, number}} results",
+    "selectAllResults_many": "Select all {{count, number}} results"
   },
   "cas": {
     "chainRevoked": "Відкликано вище",
@@ -5084,7 +5123,14 @@
     "differences_few": "{{count}} відмінності",
     "differences_many": "{{count}} відмінностей",
     "differences_other": "{{count}} відмінностей",
-    "differences": "{{count}} відмінностей"
+    "differences": "{{count}} відмінностей",
+    "twoTitle": "Compare two certificates",
+    "lead": "The properties that differ are highlighted.",
+    "property": "Property",
+    "authority": "Authority",
+    "keyHeld": "Present",
+    "keyAbsent": "Absent",
+    "close": "Close the comparison"
   },
   "members": {
     "manageMembers": "Керування учасниками",
@@ -5432,7 +5478,9 @@
       "copyFailed": "The common name could not be copied",
       "viewActivity": "View its activity",
       "revokeAction": "Revoke the certificate…",
-      "trustAnchorLine": "Trust anchor: {{name}}"
+      "trustAnchorLine": "Trust anchor: {{name}}",
+      "moreDetailsHint": "Subject, fingerprints, compliance, metadata, deployment",
+      "revokedMenuNote": "Revoked certificate: no renewal and no new revocation. The export stays possible."
     },
     "history": {
       "issued": "Certificate issued",
@@ -6361,7 +6409,9 @@
     "previewRoot": "root CA",
     "previewKey": "private key",
     "previewKeyEncrypted": "private key, encrypted with the password",
-    "previewRelated": "related certificate of the hybrid pair"
+    "previewRelated": "related certificate of the hybrid pair",
+    "noPrivateKey": "Private key absent",
+    "noKeyPermissionShort": "Key export not allowed"
   },
   "userCertificates": {
     "title": "Сертифікати користувачів",

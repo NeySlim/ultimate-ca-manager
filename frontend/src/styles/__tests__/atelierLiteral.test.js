@@ -131,7 +131,16 @@ describe('the Atelier mockup, copied literally', () => {
   it('keeps what the product adds under the zone scope', () => {
     const added = parseRules(read(path.join(COPIES, 'extensions.css')))
     expect(added.length).toBeGreaterThan(0)
-    for (const r of added) for (const sel of r.sel.split(',')) expect(sel.trim().startsWith('.atl '), sel).toBe(true)
+    // The one rule on the scope itself: a dialog drawn outside a zone carries `.atl` without a box
+    const onScope = new Set(['.atl.atl-island'])
+    for (const r of added) for (const sel of r.sel.split(',')) expect(sel.trim().startsWith('.atl ') || onScope.has(sel.trim()), sel).toBe(true)
+  })
+
+  it('leaves the product\'s own styles to what a zone puts under .atl-out', () => {
+    const revert = scope.find((r) => /all:\s*revert/.test(r.body))
+    expect(revert.sel).toContain('.atl-out')
+    // the element, its ::before and its ::after
+    expect(revert.sel.split(':not(svg,svg *,.atl-out,.atl-out *)').length - 1).toBe(3)
   })
 
   it('uses no variable that neither tokens.css nor the copy nor the markup sets', () => {

@@ -5,12 +5,23 @@
  * same id), else to `returnTo` (an id, the mockup's returnFallback), else to the page title.
  * size: 'narrow' (520 px), 'wide' (920 px) or none (760 px).
  */
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useContext, useEffect, useLayoutEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Icon } from './Icon'
+import { AtlScopeContext } from './scope'
 import { escapeYielded } from '../list/dialogEscape'
+import '../../styles/atelier/scope.css'
+import '../../styles/atelier/maquette.css'
+import '../../styles/atelier/extensions.css'
 
-export function AtelierDialog({ title, subtitle, size = '', onClose, children, testId, returnTo }) {
+export function AtelierDialog(props) {
+  // Outside a zone (a dialog of the shell's inspector), the dialog carries the zone's scope itself
+  const inZone = useContext(AtlScopeContext)
+  if (inZone) return <ModalDialog {...props} />
+  return <div className="atl atl-island"><AtlScopeContext.Provider value><ModalDialog {...props} /></AtlScopeContext.Provider></div>
+}
+
+function ModalDialog({ title, subtitle, size = '', onClose, children, testId, returnTo }) {
   const { t } = useTranslation()
   const ref = useRef(null)
   const opener = useRef(null)

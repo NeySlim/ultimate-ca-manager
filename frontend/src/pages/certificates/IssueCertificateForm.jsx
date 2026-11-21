@@ -3,9 +3,8 @@
  * Review reads the request about to be sent (describeRequest), and Issue is only there.
  * A form closed without issuing keeps its draft for the next opening of the same operation.
  */
-import { useState, useEffect, useMemo, useRef, useId } from 'react'
-import { CalendarBlank, Hash } from '@phosphor-icons/react'
-import { CaretRight, CaretLeft, CaretDown, Check, X, Plus, Question, Warning } from './issue/issueIcons'
+import { Fragment, useState, useEffect, useMemo, useRef, useId } from 'react'
+import { Icon } from '../../components/atelier'
 import { templatesService, ekuService, toolsService } from '../../services'
 import { getSanValidationError, getAutoSansFromCn } from '../../lib/sanValidate'
 import { hiddenFromIssuance, listedForIssuance, signingCas, unlistedSigningCas } from '../../lib/caSelection'
@@ -13,7 +12,6 @@ import { daysRemaining, extractCN, formatDate } from '../../lib/utils'
 import { ISSUE_KEY_CHOICES, issueKeyLabel, isAllowed, useEffectiveAlgorithms } from '../../lib/policyAlgorithms'
 import { RENEW_MAX_DAYS, originalDurationDays } from '../../lib/renewalPrompt'
 import { ISSUE_DEFAULT_LABELS, findAlgorithm, isBrainpool, isPostQuantum, isUsable } from '../../lib/keyAlgorithms'
-import { BrainpoolNotice } from '../../components/BrainpoolNotice'
 import { customExtensionsPayload, emptyExtensionRow } from '../../lib/customExtensions'
 import { VALIDITY } from '../../constants/config'
 import { DRAFT_FIELDS, draftOp, dropDraft, keepDraft, takeDraft } from './issue/issueDrafts'
@@ -21,7 +19,6 @@ import {
   CERT_TYPE_KEYS, certificateHash, certificateType, describeRequest, listOf, SAN_FIELDS,
 } from './issue/describeRequest'
 import { certificateKeyLabel, extKeyUsageName, keyLabel } from '../../lib/certificateDetail'
-import './issue/issue.css'
 
 const P = 'certificates.issueForm.'
 const MAX_DAYS = RENEW_MAX_DAYS
@@ -108,30 +105,20 @@ function withName(t, key, name, params = {}) {
   return parts.length === 2 ? <>{parts[0]}<strong>{name}</strong>{parts[1]}</> : parts[0]
 }
 
-/** The shield of the Atelier (pointed shield and tick), drawn as its icons are. */
-function ShieldMark() {
-  return (
-    <svg className="iss-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"
-      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6l-8-3Z" /><path d="m8 12 3 3 5-6" />
-    </svg>
-  )
-}
-
 function FieldError({ id, message }) {
   if (!message) return null
-  return <p className="iss-error" id={id}><Warning aria-hidden="true" /><span>{message}</span></p>
+  return <p className="field-error" id={id}><Icon name="warning" /><span>{message}</span></p>
 }
 
 export function Steps({ step, t }) {
   return (
-    <div className="iss-steps" aria-label={t(`${P}stepsLabel`)} role="group">
-      <div className={`iss-step${step === 1 ? ' is-active' : ''}`} aria-current={step === 1 ? 'step' : undefined}>
-        <span className="iss-step-mark">{step === 1 ? '1' : <Check aria-hidden="true" />}</span>{t(`${P}stepConfigure`)}
+    <div className="steps" aria-label={step === 1 ? t(`${P}stepsLabel`) : undefined}>
+      <div className={`step${step === 1 ? ' active' : ''}`} aria-current={step === 1 ? 'step' : undefined}>
+        <span>{step === 1 ? '1' : <Icon name="check" />}</span>{t(`${P}stepConfigure`)}
       </div>
-      <CaretRight aria-hidden="true" />
-      <div className={`iss-step${step === 2 ? ' is-active' : ''}`} aria-current={step === 2 ? 'step' : undefined}>
-        <span className="iss-step-mark">2</span>{t(`${P}stepReview`)}
+      <Icon name="right" />
+      <div className={`step${step === 2 ? ' active' : ''}`} aria-current={step === 2 ? 'step' : undefined}>
+        <span>2</span>{t(`${P}stepReview`)}
       </div>
     </div>
   )
@@ -673,8 +660,8 @@ export function IssueCertificateForm({
       const hash = certificateHash(certificate)
       const types = [...new Set(allRenewSans.map((s) => s.type))]
       return (
-        <aside className="iss-hint" aria-labelledby={id('hint-title')} data-testid="issue-hint">
-          <h3 id={id('hint-title')}><ShieldMark /> {t(`${P}hintTitle`)}</h3>
+        <aside className="field-hint" aria-labelledby={id('hint-title')} data-testid="issue-hint">
+          <h3 id={id('hint-title')}><Icon name="shield" /> {t(`${P}hintTitle`)}</h3>
           <p>{withName(t, `${P}hintRenew`, certificate?.cn || certificate?.common_name || '')}</p>
           <dl>
             <dt>{t(`${P}hintAuthorities`)}</dt><dd>{certificate?.issuer_name || ''}</dd>
@@ -691,30 +678,30 @@ export function IssueCertificateForm({
     const digest = template?.digest ? String(template.digest).toUpperCase().replace(/^SHA(\d)/, 'SHA-$1') : null
     const sanTypes = enforcedSanTypes || (templateSanTypes.length ? templateSanTypes : SAN_TYPES)
     return (
-      <aside className="iss-hint" aria-labelledby={id('hint-title')} data-testid="issue-hint">
-        <h3 id={id('hint-title')}><ShieldMark /> {t(`${P}hintTitle`)}</h3>
+      <aside className="field-hint" aria-labelledby={id('hint-title')} data-testid="issue-hint">
+        <h3 id={id('hint-title')}><Icon name="shield" /> {t(`${P}hintTitle`)}</h3>
         <p>{template ? withName(t, `${P}hintTemplate`, template.name) : t(`${P}hintNoTemplate`)}</p>
-        <dl>
+        <dl className="props">
           <dt>{t(`${P}hintAuthorities`)}</dt>
           <dd>
             {signers.length <= 3 ? signers.map(caLabel).join(', ') || t(`${P}noneFem`) : t(`${P}hintCaCount`, { count: signers.length })}
-            {unlisted > 0 && <><br /><span className="iss-muted" data-testid="unlisted-cas">{t(`${P}hintExcluded`, { count: unlisted })}</span></>}
+            {unlisted > 0 && <><br /><span className="muted" data-testid="unlisted-cas">{t(`${P}hintExcluded`, { count: unlisted })}</span></>}
           </dd>
           <dt>{t(`${P}hintAlgorithms`)}</dt>
           <dd data-testid="hint-algorithms">
             {singleLabels.length ? singleLabels.map((l) => keyLabel(l, t)).join(', ') : t(`${P}hintAlgorithmsNone`)}
-            {pqStandalone && hybridPq.length > 0 && <><br /><span className="iss-muted">{t(`${P}hintPqPairOnly`)}</span></>}
+            {pqStandalone && hybridPq.length > 0 && <><br /><span className="muted">{t(`${P}hintPqPairOnly`)}</span></>}
           </dd>
           <dt>{t(`${P}hintValidity`)}</dt>
           <dd>{t(`${P}hintValidityValue`, { days: num(defaultDays), max: num(maxDays) })}</dd>
           <dt>{t(`${P}hintSans`)}</dt>
           <dd>{sanTypes.map((s) => SAN_LABEL[s]).join(', ')}
-            {!enforcedSanTypes && templateSanTypes.length > 0 && <span className="iss-muted"> {t(`${P}hintSansSuggested`)}</span>}</dd>
+            {!enforcedSanTypes && templateSanTypes.length > 0 && <span className="muted"> {t(`${P}hintSansSuggested`)}</span>}</dd>
           {canUseCsr && <><dt>{t(`${P}hintCsr`)}</dt><dd>{t(`${P}hintCsrAccepted`)}</dd></>}
           <dt>{t(`${P}hintHashEku`)}</dt>
           <dd>
             {digest || t(`${P}hintHashCa`)} · {defaultEkus.length ? defaultEkus.map(ekuLabel).join(', ') : t(`${P}ekusNone`)}
-            {allowedDigests && <><br /><span className="iss-muted">{t(`${P}hintDigestsAllowed`, { list: allowedDigests.map((x) => x.toUpperCase().replace(/^SHA(\d)/, 'SHA-$1')).join(', ') })}</span></>}
+            {allowedDigests && <><br /><span className="muted">{t(`${P}hintDigestsAllowed`, { list: allowedDigests.map((x) => x.toUpperCase().replace(/^SHA(\d)/, 'SHA-$1')).join(', ') })}</span></>}
           </dd>
         </dl>
         <p>{t(`${P}hintFooter`)}</p>
@@ -730,36 +717,34 @@ export function IssueCertificateForm({
   const renderSans = () => {
     if (renew) {
       return (
-        <fieldset className="iss-field is-full">
+        <fieldset className="field full">
           <legend>{t(`${P}sansLegend`)}</legend>
           <small id={id('hint-san')}>{t(`${P}sansRenew`)}</small>
           {/* The rows and buttons of an issuance, read-only: the server keeps the names; without any
               name, the empty row of the Atelier keeps its place */}
-          <div className="iss-rows">
+          <div className="row-list">
             {(renewSans.length ? renewSans : [{ type: 'DNS', value: '' }]).map((s, i) => (
-              <div className="iss-san-row" key={`${s.type}-${s.value}`}>
-                <label className="iss-sr-only" htmlFor={id(`san-type-${i}`)}>{t(`${P}sanType`, { n: i + 1 })}</label>
+              <div className="san-row" key={`${s.type}-${s.value}`}>
+                <label className="sr-only" htmlFor={id(`san-type-${i}`)}>{t(`${P}sanType`, { n: i + 1 })}</label>
                 {fixed(`san-type-${i}`, s.type)}
-                <label className="iss-sr-only" htmlFor={id(`san-value-${i}`)}>{t(`${P}sanValue`, { n: i + 1 })}</label>
+                <label className="sr-only" htmlFor={id(`san-value-${i}`)}>{t(`${P}sanValue`, { n: i + 1 })}</label>
                 {fixed(`san-value-${i}`, s.value, 'hint-san')}
-                <button type="button" className="iss-icon-btn" disabled aria-label={t(`${P}removeSan`, { n: i + 1 })}>
-                  <X aria-hidden="true" />
+                <button type="button" className="icon-btn" disabled aria-label={t(`${P}removeSan`, { n: i + 1 })}>
+                  <Icon name="close" />
                 </button>
               </div>
             ))}
           </div>
-          <div className="iss-row-actions">
-            <button type="button" className="iss-btn is-quiet iss-add-row" disabled aria-describedby={id('hint-san')}>
-              <Plus aria-hidden="true" />{t(`${P}addSan`)}
-            </button>
-          </div>
+          <button type="button" className="btn quiet add-row" disabled aria-describedby={id('hint-san')}>
+            <Icon name="plus" />{t(`${P}addSan`)}
+          </button>
         </fieldset>
       )
     }
     const types = (enforcedSanTypes || SAN_TYPES).map((s) => SAN_LABEL[s]).join(', ')
     const included = autoSans.map((s) => `${SAN_LABEL[s.type]} ${s.value}`).join(', ')
     return (
-      <fieldset className="iss-field is-full">
+      <fieldset className="field full">
         <legend>{t(`${P}sansLegend`)}</legend>
         <small id={id('hint-san')}>
           {csrMode ? t(`${P}sansCsrHint`)
@@ -768,10 +753,10 @@ export function IssueCertificateForm({
             ? <span data-testid="auto-sans"> {t(`${P}autoIncluded`, { list: included })}</span>
             : serverType && <> {t(`${P}sansCnCounts`)}</>)}
         </small>
-        <div className="iss-rows">
+        <div className="row-list">
           {d.sans.map((s, i) => (
-            <div className="iss-san-row" key={i}>
-              <label className="iss-sr-only" htmlFor={id(`san-type-${i}`)}>{t(`${P}sanType`, { n: i + 1 })}</label>
+            <div className="san-row" key={i}>
+              <label className="sr-only" htmlFor={id(`san-type-${i}`)}>{t(`${P}sanType`, { n: i + 1 })}</label>
               <select id={id(`san-type-${i}`)} value={s.type} onChange={(e) => updateSan(i, { type: e.target.value })}>
                 {sanTypeOptions(s.type).map((type) => (
                   <option key={type} value={type}>
@@ -779,27 +764,27 @@ export function IssueCertificateForm({
                   </option>
                 ))}
               </select>
-              <label className="iss-sr-only" htmlFor={id(`san-value-${i}`)}>{t(`${P}sanValue`, { n: i + 1 })}</label>
+              <label className="sr-only" htmlFor={id(`san-value-${i}`)}>{t(`${P}sanValue`, { n: i + 1 })}</label>
               <input id={id(`san-value-${i}`)} value={s.value} placeholder={SAN_PLACEHOLDER[s.type]} autoComplete="off" spellCheck="false"
                 {...errorProps(`san-${i}`, 'hint-san')} onChange={(e) => updateSan(i, { value: e.target.value })} />
-              <button type="button" className="iss-icon-btn" aria-label={t(`${P}removeSan`, { n: i + 1 })} onClick={() => removeSan(i)}>
-                <X aria-hidden="true" />
+              <button type="button" className="icon-btn" aria-label={t(`${P}removeSan`, { n: i + 1 })} onClick={() => removeSan(i)}>
+                <Icon name="close" />
               </button>
               <FieldError id={id(`err-san-${i}`)} message={errors[`san-${i}`]} />
             </div>
           ))}
         </div>
-        <div className="iss-row-actions">
-          <button type="button" id={id('san-add')} className="iss-btn is-quiet iss-add-row" onClick={addSan}>
-            <Plus aria-hidden="true" />{t(`${P}addSan`)}
-          </button>
-          {wildcardBase && (
-            <button type="button" className="iss-text-link"
+        <button type="button" id={id('san-add')} className="btn quiet add-row" onClick={addSan}>
+          <Icon name="plus" />{t(`${P}addSan`)}
+        </button>
+        {wildcardBase && (
+          <div className="row-actions">
+            <button type="button" className="text-link"
               onClick={() => set((prev) => ({ sans: [...prev.sans.filter((s) => s.value.trim()), { type: 'dns', value: wildcardBase }] }))}>
               {t(`${P}addBaseDomain`, { domain: wildcardBase })}
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </fieldset>
     )
   }
@@ -807,19 +792,20 @@ export function IssueCertificateForm({
   const renderConfigure = () => (
     <form onSubmit={toReview} noValidate>
       {restored && (
-        <p className="iss-notice iss-draft-note" data-testid="draft-note">
-          <Question aria-hidden="true" />
-          <span>{t(`${P}draftRestored`)} <button type="button" className="iss-text-link" onClick={resetDraft}>{t(`${P}draftReset`)}</button></span>
+        <p className="notice draft-note" id="draft-note" data-testid="draft-note">
+          <Icon name="help" />
+          <span>{t(`${P}draftRestored`)} <button type="button" className="text-link" onClick={resetDraft}>{t(`${P}draftReset`)}</button></span>
         </p>
       )}
-      <div className="iss-layout">
-        <div className="iss-fields">
-          <div className="iss-field">
+      <div id="issue-dynamic">
+      <div className="form-layout">
+        <div className="form-fields">
+          <div className="field">
             <label htmlFor={id('template')}>{t(`${P}template`)}</label>
             {renew ? (
-              fixed('template', certificate?.template_name || t(`${P}noTemplate`), 'hint-template', { ref: firstField, 'data-first-field': '' })
+              fixed('template', certificate?.template_name || t(`${P}noTemplate`), 'hint-template', { ref: firstField, 'data-autofocus': '' })
             ) : (
-              <select id={id('template')} ref={firstField} data-first-field="" value={d.template} aria-describedby={id('hint-template')}
+              <select id={id('template')} ref={firstField} data-autofocus="" value={d.template} aria-describedby={id('hint-template')}
                 onChange={(e) => (e.target.value === SHOW_PINS
                   ? set((prev) => ({ showAllTemplates: !prev.showAllTemplates })) : applyTemplate(e.target.value))}>
                 <option value="">{t(`${P}noTemplate`)}</option>
@@ -835,7 +821,7 @@ export function IssueCertificateForm({
               {renew ? t(`${P}templateRenewHint`) : (template?.description || (template ? '' : t(`${P}templateNoneHint`)))}
             </small>
           </div>
-          <div className="iss-field">
+          <div className="field">
             <label htmlFor={id('ca')}>{t(`${P}authority`)}</label>
             {renew ? fixed('ca', certificate?.issuer_name || '', 'hint-ca') : (
               <select id={id('ca')} value={d.ca_id} {...errorProps('ca', 'hint-ca')}
@@ -854,7 +840,7 @@ export function IssueCertificateForm({
             <FieldError id={id('err-ca')} message={errors.ca} />
           </div>
 
-          <div className="iss-field is-full">
+          <div className="field full">
             <label htmlFor={id('cn')}>{t(`${P}commonName`)}</label>
             <input id={id('cn')} value={renew ? (certificate?.cn || certificate?.common_name || '') : d.cn} maxLength={253}
               readOnly={renew} disabled={csrMode} autoComplete="off" spellCheck="false"
@@ -865,8 +851,8 @@ export function IssueCertificateForm({
             <FieldError id={id('err-cn')} message={errors.cn} />
           </div>
 
-          <div className="iss-field is-full">
-            <label htmlFor={id('description')}>{t(`${P}description`)} <span className="iss-optional">{t(`${P}optional`)}</span></label>
+          <div className="field full">
+            <label htmlFor={id('description')}>{t(`${P}description`)} <span className="optional">{t(`${P}optional`)}</span></label>
             {renew ? fixed('description', certificate?.descr || certificate?.description || '', 'hint-description') : (
               <input id={id('description')} value={d.description} maxLength={120} disabled={csrMode} autoComplete="off"
                 placeholder={t(`${P}descriptionPlaceholder`)} aria-describedby={id('hint-description')}
@@ -875,16 +861,16 @@ export function IssueCertificateForm({
             <small id={id('hint-description')}>{t(renew ? `${P}descriptionRenewHint` : csrMode ? `${P}descriptionCsrHint` : `${P}descriptionHint`)}</small>
           </div>
 
-          <fieldset className="iss-field is-full">
+          <fieldset className="field full">
             <legend>{t(`${P}keySource`)}</legend>
-            <div className="iss-choices">
-              <label className="iss-choice">
+            <div className="choice-grid">
+              <label className="format-option">
                 <input type="radio" name={id('keySource')} value="generate" checked={renew || !csrMode}
                   onChange={() => set({ keySource: 'generate' })} />
                 <span>{t(`${P}keyGenerate`)}<small>{t(renew ? `${P}keyGenerateRenewHint` : `${P}keyGenerateHint`)}</small></span>
               </label>
               {(renew || canUseCsr) && (
-                <label className="iss-choice">
+                <label className="format-option">
                   <input type="radio" name={id('keySource')} value="csr" checked={csrMode} disabled={renew}
                     onChange={() => { clearError('key'); set({ keySource: 'csr' }) }} />
                   <span>{t(`${P}keyCsr`)}<small>{t(renew ? `${P}keyCsrRenewHint` : `${P}keyCsrHint`)}</small></span>
@@ -894,14 +880,14 @@ export function IssueCertificateForm({
           </fieldset>
 
           {csrMode && (
-            <div className="iss-field is-full">
+            <div className="field full">
               <label htmlFor={id('csr')}>{t(`${P}csr`)}</label>
-              <textarea id={id('csr')} className="iss-mono" rows={5} spellCheck="false" value={d.csr}
+              <textarea id={id('csr')} className="mono" rows={5} spellCheck="false" value={d.csr}
                 placeholder="-----BEGIN CERTIFICATE REQUEST-----" {...errorProps('csr', 'hint-csr')}
                 onChange={(e) => { clearError('csr'); set({ csr: e.target.value }) }} />
               <small id={id('hint-csr')}>{t(`${P}csrHint`)}</small>
-              <label className="iss-text-link">
-                <input type="file" accept=".csr,.pem,.req,.txt" className="iss-sr-only"
+              <label className="text-link">
+                <input type="file" accept=".csr,.pem,.req,.txt" className="sr-only"
                   onChange={async (e) => {
                     const file = e.target.files?.[0]
                     if (file) { clearError('csr'); set({ csr: await file.text() }) }
@@ -912,7 +898,7 @@ export function IssueCertificateForm({
             </div>
           )}
 
-          <div className="iss-field">
+          <div className="field">
             <label htmlFor={id('key')}>{t(`${P}keyAlgorithm`)}</label>
             {renew ? fixed('key', certificateKeyLabel(certificate, t) || '', 'hint-key') : (
               <select id={id('key')} value={csrMode || noKeyAllowed ? '' : (isHybrid ? hybridChoice.classical : d.key)}
@@ -928,19 +914,19 @@ export function IssueCertificateForm({
               </select>
             )}
             <small id={id('hint-key')}>{renew ? t(`${P}keyHintRenew`) : keyHint()}</small>
-            {!renew && !csrMode && !isHybrid && isBrainpool(d.key) && <div className="iss-brainpool"><BrainpoolNotice label={d.key} /></div>}
+            {!renew && !csrMode && !isHybrid && isBrainpool(d.key) && <small className="brainpool" role="note"><Icon name="warning" /><span>{t('common.keyGroups.brainpoolWarning')}</span></small>}
             <FieldError id={id('err-key')} message={errors.key || (noKeyAllowed && !csrMode ? t('certificates.noKeyTypeAllowedByPolicy') : '')} />
           </div>
-          <div className="iss-field">
-            <div className="iss-label-row">
+          <div className="field">
+            <div className="label-row">
               <label htmlFor={id(d.validityMode === 'date' && !renew ? 'date' : 'days')}>
                 {t(d.validityMode === 'date' && !renew ? `${P}validityDate` : `${P}validityDays`)}
               </label>
               {!renew && (
-                <button type="button" className="iss-text-link" aria-label={t(d.validityMode === 'date' ? `${P}useDays` : `${P}useDate`)}
+                <button type="button" className="text-link" aria-label={t(d.validityMode === 'date' ? `${P}useDays` : `${P}useDate`)}
                   title={t(d.validityMode === 'date' ? `${P}useDays` : `${P}useDate`)}
                   onClick={() => { clearError('days'); set((prev) => ({ validityMode: prev.validityMode === 'date' ? 'days' : 'date' })) }}>
-                  {d.validityMode === 'date' ? <Hash aria-hidden="true" /> : <CalendarBlank aria-hidden="true" />}
+                  {d.validityMode === 'date' ? <Icon name="rows" /> : <Icon name="clock" />}
                 </button>
               )}
             </div>
@@ -968,11 +954,12 @@ export function IssueCertificateForm({
         </div>
         {renderHint()}
       </div>
-      <p className="iss-announce" role="status" aria-live="polite">{announce}</p>
-      <div className="iss-actions">
-        <button type="button" className="iss-btn" onClick={onCancel}>{t('common.cancel')}</button>
-        <button type="submit" className="iss-btn is-primary" disabled={reviewing}>
-          {t(`${P}toReview`)}<CaretRight aria-hidden="true" />
+      </div>
+      <p className="form-announce" role="status" aria-live="polite">{announce}</p>
+      <div className="modal-actions">
+        <button type="button" className="btn" onClick={onCancel}>{t('common.cancel')}</button>
+        <button type="submit" className="btn primary" disabled={reviewing}>
+          {t(`${P}toReview`)}<Icon name="right" />
         </button>
       </div>
     </form>
@@ -987,16 +974,16 @@ export function IssueCertificateForm({
   function renderAdvanced() {
     const extras = d.extra_ekus.filter((oid) => !COMMON_EKUS.some(([, o]) => o === oid))
     return (
-      <div className="iss-field is-full iss-advanced">
-        <button type="button" className="iss-advanced-toggle" aria-expanded={d.advanced} aria-controls={id('advanced')}
+      <div className="field full advanced">
+        <button type="button" className="advanced-toggle" aria-expanded={d.advanced} aria-controls={id('advanced')}
           onClick={() => set((prev) => ({ advanced: !prev.advanced }))}>
-          {d.advanced ? <CaretDown aria-hidden="true" /> : <CaretRight aria-hidden="true" />}
+          {d.advanced ? <Icon name="down" /> : <Icon name="right" />}
           <span>{t(`${P}advanced`)}</span><small>{advancedSummary()}</small>
         </button>
-        <div className="iss-advanced-panel" id={id('advanced')} hidden={!d.advanced}>
+        <div className="advanced-panel" id={id('advanced')} hidden={!d.advanced}>
           {renew ? renderAdvancedRenew() : (
             <>
-              <div className="iss-field">
+              <div className="field">
                 <label htmlFor={id('certType')}>{t('certificates.certType')}</label>
                 <select id={id('certType')} value={d.cert_type} disabled={!!template} aria-describedby={id('hint-certType')}
                   onChange={(e) => set({ cert_type: e.target.value })}>
@@ -1004,36 +991,36 @@ export function IssueCertificateForm({
                 </select>
                 <small id={id('hint-certType')}>{template ? t('certificates.certTypeFromTemplate') : t(`${P}certTypeHint`)}</small>
                 {!csrMode && (
-                  <label className="iss-check">
+                  <label className="checkbox-line">
                     <input type="checkbox" checked={d.ocsp_must_staple} onChange={(e) => set({ ocsp_must_staple: e.target.checked })} />
                     <span>{t('certificates.ocspMustStaple')}</span>
                   </label>
                 )}
               </div>
-              <fieldset className="iss-field">
+              <fieldset className="field">
                 <legend>{t(`${P}ekus`)}</legend>
-                <div className="iss-eku-list">
+                <div className="eku-list">
                   {[...COMMON_EKUS.map(([, oid]) => oid), ...extras].map((oid) => {
                     // The template or the type sets it: shown ticked, it cannot be taken off (the API only adds)
                     const locked = defaultEkus.includes(oid)
                     return (
-                      <label className="iss-check" key={oid}>
+                      <label className="checkbox-line" key={oid}>
                         <input type="checkbox" value={oid} checked={locked || d.extra_ekus.includes(oid)}
                           aria-disabled={locked ? 'true' : undefined} aria-describedby={locked ? id('hint-ekus') : undefined}
                           onClick={(e) => { if (locked) e.preventDefault() }}
                           onChange={(e) => { if (!locked) toggleEku(oid, e.target.checked) }} />
-                        <span>{ekuLabel(oid)}<small className="iss-mono">{oid}</small></span>
+                        <span>{ekuLabel(oid)}<small className="mono">{oid}</small></span>
                       </label>
                     )
                   })}
                 </div>
-                <div className="iss-inline">
-                  <label className="iss-sr-only" htmlFor={id('oid')}>{t(`${P}otherOid`)}</label>
-                  <input id={id('oid')} className="iss-mono" value={customOid} placeholder={t(`${P}otherOid`)} autoComplete="off" spellCheck="false"
+                <div className="inline-row">
+                  <label className="sr-only" htmlFor={id('oid')}>{t(`${P}otherOid`)}</label>
+                  <input id={id('oid')} className="mono" value={customOid} placeholder={t(`${P}otherOid`)} autoComplete="off" spellCheck="false"
                     aria-invalid={customOidError ? 'true' : undefined} aria-describedby={customOidError ? id('err-oid') : undefined}
                     onChange={(e) => { setCustomOid(e.target.value); setCustomOidError('') }}
                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomOid() } }} />
-                  <button type="button" className="iss-btn" onClick={addCustomOid}>{t(`${P}addOid`)}</button>
+                  <button type="button" className="btn" onClick={addCustomOid}>{t(`${P}addOid`)}</button>
                 </div>
                 <FieldError id={id('err-oid')} message={customOidError} />
                 <small id={id('hint-ekus')}>{defaultEkus.length
@@ -1042,12 +1029,12 @@ export function IssueCertificateForm({
               </fieldset>
 
               {!csrMode && (
-                <fieldset className="iss-field is-full">
+                <fieldset className="field full">
                   <legend>{t(`${P}subject`)}</legend>
                   <small>{t(`${P}subjectHint`)}</small>
-                  <div className="iss-subject">
+                  <div className="subject-grid">
                     {SUBJECT_FIELDS.map(([key, label, max]) => (
-                      <div className="iss-field" key={key}>
+                      <div className="field" key={key}>
                         <label htmlFor={id(`subject-${key}`)}>{t(label)}</label>
                         <input id={id(`subject-${key}`)} value={d.subject[key]} maxLength={max} autoComplete="off"
                           type={key === 'email' ? 'email' : 'text'} onChange={(e) => setSubject(key, e.target.value)} />
@@ -1058,22 +1045,22 @@ export function IssueCertificateForm({
               )}
 
               {!csrMode && hybridAvailable && (
-                <fieldset className="iss-field is-full">
+                <fieldset className="field full">
                   <legend>{t(`${P}hybrid`)}</legend>
-                  <label className="iss-check">
+                  <label className="checkbox-line">
                     <input type="checkbox" checked={d.hybrid} onChange={(e) => set({ hybrid: e.target.checked })} />
                     <span>{t('certificates.hybrid.toggle')}</span>
                   </label>
                   <small>{t('certificates.hybrid.toggleHint')}</small>
                   {isHybrid && (
-                    <div className="iss-subject">
-                      <div className="iss-field">
+                    <div className="subject-grid">
+                      <div className="field">
                         <label htmlFor={id('hybrid-classical')}>{t('certificates.hybrid.classical')}</label>
                         <select id={id('hybrid-classical')} value={hybridChoice.classical} onChange={(e) => set({ hybrid_classical: e.target.value })}>
                           {hybridClassical.map((l) => <option key={l} value={l}>{keyLabel(l, t)}</option>)}
                         </select>
                       </div>
-                      <div className="iss-field">
+                      <div className="field">
                         <label htmlFor={id('hybrid-pq')}>{t('certificates.hybrid.pq')}</label>
                         <select id={id('hybrid-pq')} value={hybridChoice.pq} onChange={(e) => set({ hybrid_pq: e.target.value })}>
                           {hybridPq.map((l) => <option key={l} value={l}>{keyLabel(l, t)}</option>)}
@@ -1084,25 +1071,25 @@ export function IssueCertificateForm({
                 </fieldset>
               )}
 
-              <fieldset className="iss-field is-full">
+              <fieldset className="field full">
                 <legend>{t('customExtensions.title')}</legend>
                 <small id={id('hint-ext')}>{`${t(`${P}extHint`)} ${template ? t('customExtensions.requestHint') : ''}`.trim()}</small>
-                <div className="iss-rows">
+                <div className="row-list">
                   {d.customExt.map((row, i) => (
-                    <div className="iss-ext-row" key={i}>
-                      <label className="iss-sr-only" htmlFor={id(`ext-oid-${i}`)}>{t(`${P}extOid`, { n: i + 1 })}</label>
-                      <input id={id(`ext-oid-${i}`)} className="iss-mono iss-ext-oid" value={row.oid} placeholder="1.3.6.1.4.1.32473.1"
+                    <div className="ext-row" key={i}>
+                      <label className="sr-only" htmlFor={id(`ext-oid-${i}`)}>{t(`${P}extOid`, { n: i + 1 })}</label>
+                      <input id={id(`ext-oid-${i}`)} className="mono" name="extOid" value={row.oid} placeholder="1.3.6.1.4.1.32473.1"
                         autoComplete="off" spellCheck="false" inputMode="decimal" {...errorProps(`ext-${i}`, 'hint-ext')}
                         onChange={(e) => updateExt(i, { oid: e.target.value })} />
-                      <label className="iss-sr-only" htmlFor={id(`ext-value-${i}`)}>{t(`${P}extValue`, { n: i + 1 })}</label>
-                      <input id={id(`ext-value-${i}`)} className="iss-mono iss-ext-value" value={row.value} placeholder={t(`${P}extValuePlaceholder`)}
+                      <label className="sr-only" htmlFor={id(`ext-value-${i}`)}>{t(`${P}extValue`, { n: i + 1 })}</label>
+                      <input id={id(`ext-value-${i}`)} className="mono" name="extValue" value={row.value} placeholder={t(`${P}extValuePlaceholder`)}
                         autoComplete="off" spellCheck="false" {...errorProps(`extv-${i}`)} onChange={(e) => updateExt(i, { value: e.target.value })} />
-                      <label className="iss-check iss-ext-critical">
+                      <label className="checkbox-line ext-critical">
                         <input type="checkbox" checked={row.critical} onChange={(e) => updateExt(i, { critical: e.target.checked })} />
                         <span>{t('customExtensions.critical')}</span>
                       </label>
-                      <button type="button" className="iss-icon-btn" aria-label={t(`${P}removeExt`, { n: i + 1 })} onClick={() => removeExt(i)}>
-                        <X aria-hidden="true" />
+                      <button type="button" className="icon-btn" aria-label={t(`${P}removeExt`, { n: i + 1 })} onClick={() => removeExt(i)}>
+                        <Icon name="close" />
                       </button>
                       <FieldError id={id(`err-ext-${i}`)} message={errors[`ext-${i}`]} />
                       <FieldError id={id(`err-extv-${i}`)} message={errors[`extv-${i}`]} />
@@ -1110,12 +1097,12 @@ export function IssueCertificateForm({
                   ))}
                 </div>
                 {d.customExt.some((r) => r.critical) && (
-                  <p className="iss-notice is-warn" data-testid="custom-extensions-critical-warning">
-                    <Warning aria-hidden="true" /><span>{t('customExtensions.criticalWarning')}</span>
+                  <p className="notice warn" data-testid="custom-extensions-critical-warning">
+                    <Icon name="warning" /><span>{t('customExtensions.criticalWarning')}</span>
                   </p>
                 )}
-                <button type="button" id={id('ext-add')} className="iss-btn is-quiet iss-add-row" onClick={addExt}>
-                  <Plus aria-hidden="true" />{t('customExtensions.add')}
+                <button type="button" id={id('ext-add')} className="btn quiet add-row" onClick={addExt}>
+                  <Icon name="plus" />{t('customExtensions.add')}
                 </button>
               </fieldset>
             </>
@@ -1141,58 +1128,58 @@ export function IssueCertificateForm({
     const others = (certificate?.extensions?.other_extensions || []).filter((x) => x?.oid && x.oid !== MUST_STAPLE_OID)
     return (
       <>
-        <div className="iss-field">
+        <div className="field">
           <label htmlFor={id('hash')}>{t(`${P}hash`)}</label>
           {fixed('hash', certificateHash(certificate) || '', 'hint-hash')}
           <small id={id('hint-hash')}>{t(`${P}hashRenewHint`)}</small>
           {certificate?.ocsp_must_staple && (
-            <label className="iss-check">
+            <label className="checkbox-line">
               <input type="checkbox" checked readOnly aria-disabled="true" onClick={(e) => e.preventDefault()} />
               <span>{t('certificates.ocspMustStaple')}</span>
             </label>
           )}
         </div>
-        <fieldset className="iss-field">
+        <fieldset className="field">
           <legend>{t(`${P}ekus`)}</legend>
-          <div className="iss-eku-list">
+          <div className="eku-list">
             {listed.map((oid) => (
-              <label className="iss-check" key={oid}>
+              <label className="checkbox-line" key={oid}>
                 {/* Controlled without a change: React puts the box back as the certificate has it */}
                 <input type="checkbox" value={oid} checked={ekus.includes(oid)} aria-disabled="true"
                   aria-describedby={id('hint-ekus')} onChange={() => {}} />
-                <span>{named(oid)}{named(oid) !== oid && <small className="iss-mono">{oid}</small>}</span>
+                <span>{named(oid)}{named(oid) !== oid && <small className="mono">{oid}</small>}</span>
               </label>
             ))}
           </div>
           <small id={id('hint-ekus')}>{ekus.length ? t(`${P}ekusRenew`, { list: ekus.map(named).join(', ') }) : t(`${P}ekusNone`)}</small>
         </fieldset>
-        <fieldset className="iss-field is-full">
+        <fieldset className="field full">
           <legend>{t('customExtensions.title')}</legend>
           <small id={id('hint-ext')}>{t(`${P}extRenewHint`)}</small>
-          <div className="iss-rows">
+          <div className="row-list">
             {others.map((x, i) => (
-              <div className="iss-ext-row is-fixed" key={x.oid}>
-                <label className="iss-sr-only" htmlFor={id(`ext-oid-${i}`)}>{t(`${P}extOid`, { n: i + 1 })}</label>
-                {fixed(`ext-oid-${i}`, x.oid, 'hint-ext', { className: 'iss-mono iss-ext-oid', title: x.name || undefined })}
-                <label className="iss-sr-only" htmlFor={id(`ext-value-${i}`)}>{t(`${P}extValue`, { n: i + 1 })}</label>
-                {fixed(`ext-value-${i}`, x.value_hex || '', x.critical ? 'ext-critical' : null, { className: 'iss-ext-value' })}
-                <button type="button" className="iss-icon-btn" disabled aria-label={t(`${P}removeExt`, { n: i + 1 })}>
-                  <X aria-hidden="true" />
+              <div className="ext-row fixed" key={x.oid}>
+                <label className="sr-only" htmlFor={id(`ext-oid-${i}`)}>{t(`${P}extOid`, { n: i + 1 })}</label>
+                {fixed(`ext-oid-${i}`, x.oid, 'hint-ext', { className: 'mono', name: 'extOid', title: x.name || undefined })}
+                <label className="sr-only" htmlFor={id(`ext-value-${i}`)}>{t(`${P}extValue`, { n: i + 1 })}</label>
+                {fixed(`ext-value-${i}`, x.value_hex || '', x.critical ? 'ext-critical' : null, { name: 'extValue' })}
+                <button type="button" className="icon-btn" disabled aria-label={t(`${P}removeExt`, { n: i + 1 })}>
+                  <Icon name="close" />
                 </button>
               </div>
             ))}
           </div>
           {others.some((x) => x.critical) && <small id={id('ext-critical')}>{t(`${P}extRenewCritical`)}</small>}
-          <button type="button" className="iss-btn is-quiet iss-add-row" disabled aria-describedby={id('hint-ext')}>
-            <Plus aria-hidden="true" />{t('customExtensions.add')}
+          <button type="button" className="btn quiet add-row" disabled aria-describedby={id('hint-ext')}>
+            <Icon name="plus" />{t('customExtensions.add')}
           </button>
         </fieldset>
         {renewSubject.length > 0 && (
-          <fieldset className="iss-field is-full">
+          <fieldset className="field full">
             <legend>{t(`${P}subject`)}</legend>
-            <div className="iss-subject">
+            <div className="subject-grid">
               {SUBJECT_FIELDS.filter(([key]) => certificate?.[key]).map(([key, label]) => (
-                <div className={`iss-field${String(certificate[key]).length > 24 ? ' is-wide' : ''}`} key={key}>
+                <div className={`field${String(certificate[key]).length > 24 ? ' wide' : ''}`} key={key}>
                   <label htmlFor={id(`subject-${key}`)}>{t(label)}</label>
                   {fixed(`subject-${key}`, certificate[key], null, { title: certificate[key] })}
                 </div>
@@ -1212,65 +1199,65 @@ export function IssueCertificateForm({
     const fields = new Set(rows.flatMap((r) => r.fields))
     const action = request.kind === 'renew' ? `${P}renewAction` : request.kind === 'csr' ? `${P}signAction` : `${P}issueAction`
     return (
-      <div>
-        <div className="iss-review" data-testid="issue-review" data-fields={[...fields].join(' ')}>
+      <>
+        <div className="review-summary" data-testid="issue-review" data-fields={[...fields].join(' ')}>
           <h3 ref={reviewTitle} tabIndex={-1}>{title}</h3>
-          <dl>
+          <dl className="props">
             {rows.map((r) => (
-              <div key={r.id} style={{ display: 'contents' }} data-row={r.id}>
-                <dt>{r.label}</dt>
-                <dd className={r.lines.some((l) => l.mono) ? 'iss-mono' : undefined}>
+              <Fragment key={r.id}>
+                <dt data-row={r.id}>{r.label}</dt>
+                <dd className={r.lines.some((l) => l.mono) ? 'mono' : undefined}>
                   {r.lines.map((l, i) => (
-                    <span key={i}>{i > 0 && <br />}<span className={l.muted === true ? 'iss-muted' : undefined}>{l.text}</span>
-                      {typeof l.muted === 'string' && l.muted && <span className="iss-muted">{l.muted}</span>}</span>
+                    <Fragment key={i}>{i > 0 && <br />}{l.muted === true ? <span className="muted">{l.text}</span> : l.text}
+                      {typeof l.muted === 'string' && l.muted && <span className="muted">{l.muted}</span>}</Fragment>
                   ))}
                 </dd>
-              </div>
+              </Fragment>
             ))}
           </dl>
         </div>
         {approval !== null ? (
-          <p className="iss-notice is-warn iss-review-note" role="status" data-testid="approval-sent">
-            <Warning aria-hidden="true" />
+          <div className="notice warn" style={{ marginTop: 18, marginBottom: 0 }} role="status" data-testid="approval-sent">
+            <Icon name="warning" />
             <span>{t(request.kind === 'renew' ? `${P}approvalSentRenew` : `${P}approvalSent`, { policy: approval })}</span>
-          </p>
+          </div>
         ) : (
-          <p className="iss-notice iss-review-note">
-            <Question aria-hidden="true" />
+          <div className="notice" style={{ marginTop: 18, marginBottom: 0 }}>
+            <Icon name="help" />
             <span>{t(request.kind === 'renew' ? `${P}reviewNoteRenew` : `${P}reviewNote`)}</span>
-          </p>
+          </div>
         )}
         {submitError && (
-          <p className="iss-notice is-bad iss-review-note" role="alert" data-testid="issue-error">
-            <Warning aria-hidden="true" /><span>{submitError}</span>
-          </p>
+          <div className="notice bad" style={{ marginTop: 18, marginBottom: 0 }} role="alert" data-testid="issue-error">
+            <Icon name="warning" /><span>{submitError}</span>
+          </div>
         )}
-        <span className="iss-sr-only" role="status">{issuing ? t(`${P}issuing`) : ''}</span>
-        <div className="iss-actions">
+        <span className="sr-only" role="status">{issuing ? t(`${P}issuing`) : ''}</span>
+        <div className="modal-actions">
           {approval !== null ? (
-            <button type="button" className="iss-btn is-primary" onClick={onCancel}>{t('common.close')}</button>
+            <button type="button" className="btn primary" onClick={onCancel}>{t('common.close')}</button>
           ) : (
             <>
-              <button type="button" className="iss-btn" onClick={back} disabled={issuing}>
-                <CaretLeft aria-hidden="true" />{t(`${P}back`)}
+              <button type="button" className="btn" onClick={back} disabled={issuing}>
+                <Icon name="left" />{t(`${P}back`)}
               </button>
               {/* Its words stay while the request is out, so Modify does not slide; the wait is told aloud */}
-              <button type="button" ref={submitButton} className="iss-btn is-primary" onClick={issue} disabled={issuing}
+              <button type="button" ref={submitButton} className="btn primary" onClick={issue} disabled={issuing}
                 aria-busy={issuing ? 'true' : undefined} data-testid="issue-submit">
-                <Check aria-hidden="true" />{t(action)}
+                <Icon name="check" />{t(action)}
               </button>
             </>
           )}
         </div>
-      </div>
+      </>
     )
   }
 
   return (
-    <div className="iss-step-body">
+    <>
       <Steps step={step} t={t} />
       {step === 1 || !request ? renderConfigure() : renderReview()}
-    </div>
+    </>
   )
 }
 

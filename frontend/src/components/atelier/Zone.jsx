@@ -6,6 +6,7 @@
  */
 import { useState } from 'react'
 import { DockSideContext } from './dockSide'
+import { AtlScopeContext } from './scope'
 import '../../styles/atelier/scope.css'
 import '../../styles/atelier/maquette.css'
 import '../../styles/atelier/extensions.css'
@@ -15,13 +16,15 @@ export function Zone({ children, dock, after, testId }) {
   const [right, setRight] = useState(false)
   return (
     <div className="atl" data-testid={testId}>
-      <div id="app" className={right ? 'zone-app dock-right' : 'zone-app'}>
-        <main className="stage" id="main">
-          <div className="page-content">{children}</div>
-          <DockSideContext.Provider value={setRight}>{dock}</DockSideContext.Provider>
-          {after}
-        </main>
-      </div>
+      <AtlScopeContext.Provider value>
+        <div id="app" className={right ? 'zone-app dock-right' : 'zone-app'}>
+          <main className="stage" id="main">
+            <div className="page-content">{children}</div>
+            <DockSideContext.Provider value={setRight}>{dock}</DockSideContext.Provider>
+            {after}
+          </main>
+        </div>
+      </AtlScopeContext.Provider>
     </div>
   )
 }
