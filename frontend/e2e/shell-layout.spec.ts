@@ -38,7 +38,7 @@ test('the status bar keeps the bottom of the window under the open dock', async 
   }
   await check()
 
-  // The zone's dock goes to the right from 1400 px; the position is a preference of the account: put it back
+  // The zone's dock goes to the right from 1200 px; the position is a preference of the account: put it back
   await dock.getByRole('button', { name: 'Dock on the right' }).click()
   try {
     await expect(dock.getByRole('button', { name: 'Dock at the bottom' })).toBeVisible()
