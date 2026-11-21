@@ -11,6 +11,8 @@ test('a template created on screen is stored with its settings', async ({ page, 
   await dialog.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(dialog).toBeHidden()
 
+  // The list pages by 25: the search brings the new row onto the first page
+  await page.getByRole('main').getByRole('searchbox').fill(name)
   await expect(page.getByRole('main').getByText(name).first()).toBeVisible()
   const data = await api.get('/templates?per_page=500')
   const list = (Array.isArray(data) ? data : data.items || data.templates) as any[]
