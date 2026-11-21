@@ -33,6 +33,11 @@ export const rolesService = {
     return apiClient.get('/rbac/permissions')
   },
 
+  /** What authorisation applies to a user: built-in role, custom role and groups together */
+  async getEffectivePermissions(userId) {
+    return apiClient.get(`/rbac/effective-permissions/${userId}`)
+  },
+
   async listRoles() {
     return apiClient.get('/rbac/roles')
   },

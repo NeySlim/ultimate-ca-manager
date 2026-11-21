@@ -1783,7 +1783,8 @@
       "revoked": "Chiave API revocata",
       "deleted": "Chiave API eliminata",
       "loadFailed": "Impossibile caricare le chiavi API",
-      "updateFailed": "Impossibile modificare la chiave API"
+      "updateFailed": "Impossibile modificare la chiave API",
+      "meta": "{{scope}} · created on {{created}} · last used {{used}} · expires {{expires}}"
     },
     "createUser": "Crea utente",
     "editUser": "Modifica utente",
@@ -1872,7 +1873,47 @@
     "require2fa": "Richiedi 2FA",
     "exempt2faOn": "Utente esentato dall'obbligo di 2FA",
     "exempt2faOff": "L'utente è ora soggetto all'obbligo di 2FA",
-    "exempt2faLabel": "Esente da 2FA"
+    "exempt2faLabel": "Esente da 2FA",
+    "title": "Users and roles",
+    "intent": "Accounts, groups, SSO and permissions.",
+    "unit_one": "{{count}} account",
+    "unit_other": "{{count}} accounts",
+    "range_one": "{{shown}} of {{count}} account",
+    "range_other": "{{shown}} of {{count}} accounts",
+    "pageRange_one": "{{start}}–{{end}} of {{count}} account",
+    "pageRange_other": "{{start}}–{{end}} of {{count}} accounts",
+    "caption": "Users and roles. Activate a name to open its detail.",
+    "views": {
+      "active": "Active",
+      "disabled": "Disabled",
+      "sso": "SSO"
+    },
+    "filterByState": "Filter by state",
+    "filterByRole": "Filter by role",
+    "search": "Name, username, email…",
+    "login": "Username",
+    "email": "Email",
+    "lastSeen": "Last access",
+    "exportList": "Export the list",
+    "accounts": "Accounts",
+    "tabs": {
+      "profile": "Profile",
+      "permissions": "Permissions"
+    },
+    "identity": "Identity",
+    "access": "Access",
+    "twoFactor": "Two-factor authentication",
+    "sourceSso": "SSO, {{providers}}",
+    "selfNotice": "Your own account cannot be disabled from this page.",
+    "permsIntro": "Role {{role}}: the effective permissions, custom role and groups included.",
+    "permsLoading": "Reading the effective permissions…",
+    "permsFailed": "The effective permissions could not be read.",
+    "allowed": "Allowed",
+    "notAllowed": "Not allowed",
+    "disableEllipsis": "Disable…",
+    "disableTitle": "Disable this account?",
+    "disableText": "{{login}} will no longer be able to sign in.",
+    "disableConfirm": "Disable the account"
   },
   "groups": {
     "group": "Gruppo",
@@ -1895,7 +1936,17 @@
     "memberCount_one": "{{count}} membro",
     "memberCount_other": "{{count}} membri",
     "subtitle": "{{count}} gruppi",
-    "memberCount": "{{count}} membri"
+    "memberCount": "{{count}} membri",
+    "intent": "Groups of accounts and the permissions they grant.",
+    "unit_one": "{{count}} group",
+    "unit_other": "{{count}} groups",
+    "range_one": "{{shown}} of {{count}} group",
+    "range_other": "{{shown}} of {{count}} groups",
+    "pageRange_one": "{{start}}–{{end}} of {{count}} group",
+    "pageRange_other": "{{start}}–{{end}} of {{count}} groups",
+    "caption": "Groups. Activate a name to open its detail.",
+    "search": "Name, description…",
+    "manageMembers": "Manage members"
   },
   "acme": {
     "title": "Protocollo ACME",
@@ -4448,7 +4499,31 @@
       "notRead": "Verifica la connessione per leggere ciò che il modulo riporta.",
       "softhsmFips": "SoftHSM non è un modulo validato: in modalità FIPS, le chiavi al suo interno non sono protette da FIPS."
     },
-    "syncingKeys": "Sincronizzazione..."
+    "syncingKeys": "Sincronizzazione...",
+    "unit_one": "{{count}} location",
+    "unit_other": "{{count}} locations",
+    "keyCount_one": "{{count}} key",
+    "keyCount_other": "{{count}} keys",
+    "range_one": "{{shown}} of {{count}} location",
+    "range_other": "{{shown}} of {{count}} locations",
+    "states": {
+      "connected": "Connected",
+      "error": "Error",
+      "disconnected": "Disconnected",
+      "unknown": "Not tested"
+    },
+    "columns": {
+      "type": "Type",
+      "keys": "Keys",
+      "checked": "Last check"
+    },
+    "never": "Never",
+    "caption": "HSM. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
+    "filterByType": "Filter by type",
+    "copyValue": "Copy {{name}}",
+    "summaryKeys": "Keys: {{names}}.",
+    "deleteKey": "Delete key {{name}}"
   },
   "sso": {
     "subtitle": "Configura provider LDAP, OAuth2 o SAML per autenticazione centralizzata",

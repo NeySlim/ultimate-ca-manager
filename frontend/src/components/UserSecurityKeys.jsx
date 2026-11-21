@@ -1,16 +1,17 @@
 /**
- * Another user's security keys, for an administrator: disable or remove a lost one.
+ * Another user's security keys, for an administrator, in the mockup's record rows: disable or
+ * remove a lost one.
  */
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Fingerprint, Trash } from '@phosphor-icons/react'
-import { Badge, Button, CompactSection } from './index'
+import { Btn, Pill, RecordList, RecordRow, Section } from './atelier'
 import { usersService } from '../services'
 import { useNotification } from '../contexts'
-import { formatDate } from '../lib/utils'
+import { dateOf } from '../pages/admin/adminDates'
 
 export default function UserSecurityKeys({ user }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = i18n?.language || 'en'
   const { showSuccess, showError, showConfirm } = useNotification()
   const [keys, setKeys] = useState([])
 
@@ -34,9 +35,7 @@ export default function UserSecurityKeys({ user }) {
     } catch (error) {
       if (error.status !== 409) throw error
       const confirmed = await showConfirm(t('users.securityKeys.lastFactorConfirm', { name: user.username }), {
-        title: t('users.securityKeys.title'),
-        confirmText: t('common.confirm'),
-        variant: 'danger'
+        title: t('users.securityKeys.title'), confirmText: t('common.confirm'), variant: 'danger',
       })
       if (!confirmed) return false
       await action({ confirmLastFactor: true })
@@ -46,13 +45,11 @@ export default function UserSecurityKeys({ user }) {
 
   const handleRemove = async (key) => {
     const confirmed = await showConfirm(t('users.securityKeys.removeConfirm', { key: key.name, name: user.username }), {
-      title: t('users.securityKeys.title'),
-      confirmText: t('common.delete'),
-      variant: 'danger'
+      title: t('users.securityKeys.title'), confirmText: t('common.delete'), variant: 'danger',
     })
     if (!confirmed) return
     try {
-      if (await withLastFactorConfirmation(opts => usersService.deleteSecurityKey(user.id, key.id, opts))) {
+      if (await withLastFactorConfirmation((opts) => usersService.deleteSecurityKey(user.id, key.id, opts))) {
         showSuccess(t('users.securityKeys.removed'))
       }
     } catch (error) {
@@ -64,7 +61,7 @@ export default function UserSecurityKeys({ user }) {
   const handleToggle = async (key) => {
     try {
       const enabled = !key.enabled
-      if (await withLastFactorConfirmation(opts => usersService.setSecurityKeyEnabled(user.id, key.id, enabled, opts))) {
+      if (await withLastFactorConfirmation((opts) => usersService.setSecurityKeyEnabled(user.id, key.id, enabled, opts))) {
         showSuccess(enabled ? t('users.securityKeys.enabled') : t('users.securityKeys.disabled'))
       }
     } catch (error) {
@@ -74,37 +71,18 @@ export default function UserSecurityKeys({ user }) {
   }
 
   return (
-    <CompactSection title={t('users.securityKeys.title')} icon={Fingerprint} iconClass="icon-bg-teal">
-      <div className="p-2">
-        <p className="text-xs text-text-secondary mb-2">{t('users.securityKeys.description')}</p>
-        {keys.length === 0 ? (
-          <p className="text-xs text-text-tertiary py-2 text-center">{t('users.securityKeys.none')}</p>
-        ) : (
-          <div className="space-y-1.5">
-            {keys.map(key => (
-              <div key={key.id} className="flex items-center justify-between p-2 bg-tertiary-50 border border-border rounded-lg">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-text-primary truncate">{key.name}</p>
-                  <p className="text-xs text-text-tertiary">
-                    {t('common.created')} {formatDate(key.created_at)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                  <Badge variant={key.enabled ? 'success' : 'warning'} size="sm">
-                    {key.enabled ? t('common.active') : t('common.disabled')}
-                  </Badge>
-                  <Button type="button" size="xs" variant="ghost" onClick={() => handleToggle(key)}>
-                    {key.enabled ? t('common.disable') : t('common.enable')}
-                  </Button>
-                  <Button type="button" size="xs" variant="ghost" onClick={() => handleRemove(key)} aria-label={t('common.delete')}>
-                    <Trash size={14} className="text-status-danger" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </CompactSection>
+    <Section title={t('users.securityKeys.title')}>
+      <p className="small muted perm-intro">{t('users.securityKeys.description')}</p>
+      <RecordList empty={t('users.securityKeys.none')}>
+        {keys.map((key) => (
+          <RecordRow key={key.id} title={key.name} meta={`${t('common.created')} ${dateOf(key.created_at, locale)}`}
+            badge={<Pill label={key.enabled ? t('common.active') : t('common.disabled')} tone={key.enabled ? 'good' : 'muted'} />}
+            action={<>
+              <Btn write onClick={() => handleToggle(key)}>{key.enabled ? t('common.disable') : t('common.enable')}</Btn>
+              <Btn icon="block" write aria-label={t('common.delete')} onClick={() => handleRemove(key)}>{t('common.delete')}</Btn>
+            </>} />
+        ))}
+      </RecordList>
+    </Section>
   )
 }
