@@ -12,7 +12,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { Modal } from '../components/atelier/Form'
-import { Zone, Icon, Btn, IconBtn, Pill, RecordList, RecordRow, PageHead, Toolbar, SearchField, ListView, SkeletonPanel, EmptyBlock, NoMatch, LoadError, LoadCause } from '../components/atelier'
+import { Zone, Icon, Btn, IconBtn, Pill, RecordList, RecordRow, PageHead, Toolbar, SearchField, ListView, SkeletonPanel, EmptyBlock, NoMatch, LoadError, LoadCause, useClientList } from '../components/atelier'
 import { acmeService, casService, certificatesService, templatesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
@@ -910,12 +910,20 @@ export default function ACMEPage() {
     return accounts.filter((a) => !q || [accountContact(a), a.account_id, a.key_type].some((v) => String(v || '').toLowerCase().includes(q)))
   }, [accounts, searchQuery])
   const shownAccounts = searchedAccounts.filter((a) => !accountState || a.status === accountState)
+  // The API sends the accounts whole (no page nor sort parameter): sorted and paged here
+  const accountList = useClientList(shownAccounts, {
+    resetKey: `${searchQuery}|${accountState}`,
+    sorts: {
+      name: accountLabel, contact: accountContact, created: (a) => a.created_at && Date.parse(a.created_at),
+      state: (a) => (accountStates.includes(a.status) ? accountStates.indexOf(a.status) : null), orders: (a) => a.orders_count ?? 0,
+    },
+  })
   const accountPill = (a) => <Pill label={t(`acme.accountState.${a.status}`, { defaultValue: stateLabel(t, a.status) })} tone={ACCOUNT_TONES[a.status] || 'muted'} />
   const acmePublicBase = publicBaseUrl(acmeSettings.acme_public_base_url, '/acme')
   const directoryUrl = `${acmePublicBase}/directory`
 
   const accountsView = (
-    <ListView label="ACME" caption={t('acme.accountsCaption')} icon="refresh" rows={shownAccounts} loading={loading}
+    <ListView label="ACME" caption={t('acme.accountsCaption')} icon="refresh" list={accountList} nameSort="name" loading={loading}
       filters={{
         views: [{ id: '', label: t('common.all'), count: searchedAccounts.length },
           ...accountStates.map((s) => ({ id: s, label: t(`acme.accountStates.${s}`), count: searchedAccounts.filter((a) => a.status === s).length }))],
@@ -933,10 +941,10 @@ export default function ACMEPage() {
           cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/acme/accounts', message: loadError.message }} />} />
       )}
       columns={[
-        { id: 'contact', label: t('acme.contact'), cell: (a) => accountContact(a) || <span className="muted">{t('acme.noContact')}</span>, grow: true },
-        { id: 'created', label: t('acme.createdOn'), cell: (a) => dateOf(a.created_at, locale) || '—', muted: true },
-        { status: true },
-        { id: 'orders', label: t('acme.orders'), cell: (a) => String(a.orders_count ?? 0) },
+        { id: 'contact', label: t('acme.contact'), cell: (a) => accountContact(a) || <span className="muted">{t('acme.noContact')}</span>, grow: true, sort: 'contact' },
+        { id: 'created', label: t('acme.createdOn'), cell: (a) => dateOf(a.created_at, locale) || '—', muted: true, sort: 'created' },
+        { status: true, sort: 'state' },
+        { id: 'orders', label: t('acme.orders'), cell: (a) => String(a.orders_count ?? 0), sort: 'orders' },
       ]}
       empty={accounts.length ? (
         <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')} onReset={() => { setSearchQuery(''); setAccountState('') }} />
@@ -944,7 +952,7 @@ export default function ACMEPage() {
         <EmptyBlock id="acme" icon="refresh" title={t('acme.emptyAccountsTitle')} text={t('acme.emptyAccountsText')}
           action={{ label: t('acme.copyDirectory'), icon: 'copy', onClick: async () => { if (await copy(directoryUrl)) showSuccess(t('common.copied')) } }} />
       )}
-      footer={{ range: t('acme.accountsRange', { shown: shownAccounts.length, count: accounts.length }) }} />
+      footer={{ range: t('acme.accountsRange', accountList.counts(accounts.length)) }} />
   )
 
   const views = {

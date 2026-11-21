@@ -146,3 +146,40 @@ describe('EabTab allowed domains', () => {
     })))
   })
 })
+
+describe('EabTab list', () => {
+  const many = () => Array.from({ length: 30 }, (_, i) => ({
+    ...cred(i + 1, ['*']), label: `cred-${i + 1}`, kid: `kid-${String(30 - i).padStart(2, '0')}`,
+    status: i % 3 === 0 ? 'revoked' : 'active', created_at: `2026-10-${String(i + 1).padStart(2, '0')}T00:00:00Z`,
+  }))
+
+  it('searches, sorts from the headers and pages by 25', async () => {
+    mocks.list.mockResolvedValue({ data: many() })
+    const { container } = renderTab()
+    await screen.findByRole('button', { name: 'cred-1' })
+    const footer = container.querySelector('footer.table-footer')
+    const bodyRows = () => container.querySelectorAll('tbody tr')
+    expect(bodyRows()).toHaveLength(25)
+    expect(footer).toHaveTextContent('1 / 2')
+    fireEvent.click(within(footer).getByRole('button', { name: 'table.nextPage' }))
+    expect(bodyRows()).toHaveLength(5)
+    fireEvent.click(screen.getByRole('button', { name: 'acme.eab.kid' }))
+    expect(footer).toHaveTextContent('1 / 2')
+    expect(bodyRows()[0]).toHaveTextContent('kid-01')
+    fireEvent.click(screen.getByRole('button', { name: 'atelier.state' }))
+    fireEvent.click(screen.getByRole('button', { name: 'atelier.state' }))
+    expect(bodyRows()[0]).toHaveTextContent('acme.eab.statusRevoked')
+    for (const name of ['atelier.name', 'acme.eab.allowedDomains', 'acme.eab.created']) expect(screen.getByRole('button', { name })).toBeInTheDocument()
+    // The search reads the key id; the chips count what it kept
+    fireEvent.click(within(footer).getByRole('button', { name: 'table.nextPage' }))
+    fireEvent.change(screen.getByRole('searchbox', { name: 'acme.eab.search' }), { target: { value: 'cred' } })
+    expect(footer).toHaveTextContent('1 / 2')
+    fireEvent.change(screen.getByRole('searchbox', { name: 'acme.eab.search' }), { target: { value: 'kid-0' } })
+    expect(bodyRows()).toHaveLength(9)
+    expect(within(footer).queryByRole('button', { name: 'table.nextPage' })).toBeNull()
+    expect(within(screen.getByRole('group', { name: 'acme.filterByState' })).getByRole('button', { name: /common.all/ })).toHaveTextContent('9')
+    fireEvent.change(screen.getByRole('searchbox', { name: 'acme.eab.search' }), { target: { value: 'nothing' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'table.clearFilters' }))
+    expect(bodyRows()).toHaveLength(25)
+  })
+})

@@ -2599,6 +2599,7 @@
       "statusRevoked": "Відкликано",
       "statusExpired": "Прострочено",
       "totalCount": "{{count}} облікових даних",
+      "search": "Search credentials",
       "created": "Створено",
       "usedAt": "Використано",
       "boundTo": "Прив'язано до акаунта",

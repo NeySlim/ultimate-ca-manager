@@ -2503,6 +2503,7 @@
       "statusRevoked": "Revocata",
       "statusExpired": "Scaduta",
       "totalCount": "{{count}} credenzial(i)",
+      "search": "Search credentials",
       "created": "Creata",
       "usedAt": "Usata",
       "boundTo": "Collegata all'account",

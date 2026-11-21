@@ -2503,6 +2503,7 @@
       "statusRevoked": "Revoked",
       "statusExpired": "Expired",
       "totalCount": "{{count}} credential(s)",
+      "search": "Search credentials",
       "created": "Created",
       "usedAt": "Used",
       "boundTo": "Bound to account",

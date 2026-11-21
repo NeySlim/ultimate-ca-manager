@@ -2503,6 +2503,7 @@
       "statusRevoked": "Revocada",
       "statusExpired": "Expirada",
       "totalCount": "{{count}} credencial(es)",
+      "search": "Search credentials",
       "created": "Creada",
       "usedAt": "Usada",
       "boundTo": "Vinculada a cuenta",
