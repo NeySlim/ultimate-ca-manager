@@ -3009,6 +3009,10 @@ Security-sensitive settings: session, lockout, HSTS, public URL, and password po
 
 Certificate policies define the rules and constraints enforced when certificates are issued, renewed, or revoked. Policies are evaluated in **priority order** (lower number = higher precedence) and can be scoped to specific CAs.
 
+## The list
+
+The policies are listed in the order the server applies them, by priority then by name, with their scope, operations, priority, approval and state (**Applied** or **Disabled**); the chips filter by state, the search and the operation filter narrow the list. A name opens the policy in the inspector, with its properties, rules and approval; **Edit**, **Disable** or **Enable** ask for write:policies, **Delete Policy…** for delete:policies and a confirmation.
+
 ## Operations
 
 A policy governs one or more operations: its approval requirement and its rules apply to those.
@@ -3132,7 +3136,7 @@ A request waits **seven days** for a decision. Past that it is closed as expired
 
 ## The queue
 
-Open requests are grouped by their deadline: **Overdue**, **To handle within 48 h** and **Later**, each with its count. A row gives what the request asks for and its subject, a pill naming its source (CSR, certificate, renewal, revocation, CA, ACME, EST, SCEP, WSTEP), who asked and when, the policy, the authority, and the deadline in short form above its exact date. A subject opens the request in the inspector, with its **Request** and **Log** sections.
+Open requests are grouped by their deadline: **To handle within 48 h** and **Later**, each with its count. A request past its deadline is expired: it moves to **Recently handled** and can no longer be decided. A row gives what the request asks for and its subject, a pill naming its source (CSR, certificate, renewal, revocation, CA, ACME, EST, SCEP, WSTEP), who asked and when, the policy, the authority, and the deadline in short form above its exact date. A subject opens the request in the inspector, with its **Request** and **Log** sections.
 
 ## Approving a Request
 
@@ -3322,23 +3326,23 @@ Before relying on a schedule, use **Send a test…** in the « ⋯ » menu of a 
 
 Certificate Discovery scans your network to find TLS certificates deployed on servers and endpoints, and matches them against your managed PKI inventory. Use it to locate untracked certificates, detect changes, and watch for expiring certificates outside UCM's control.
 
-## Tabs
+## Views
 
-### Discovered
-All certificates found by scans, with status, expiry, and endpoint details. Click a row to open the detail panel with certificate info, Subject Alternative Names, and scan history (first seen, last seen, last changed).
+### Analyses
+The page opens on the analyses, one per scan profile: its range, what its last run found and when, and the state of that run (**Completed**, **Failed**, **Running**, **Scheduled**, **Never run**). A name opens the analysis in the dock: **Overview** gives its properties and description, **Runs** its runs; **Analyse now**, **Edit…** and **Delete…** need admin:system. **New analysis…** creates one.
 
-### Profiles
-Saved scan configurations for recurring scans: targets, ports, schedule, and notifications.
+### Found certificates
+Every certificate the scans met, with host, issuer, expiry and state. A name opens the certificate in the dock: its subject, issuer, validity, extensions and fingerprints, and, for one in error, the error and a hint on its cause.
 
-### History
-Past scan runs with duration, targets scanned and certificates found.
+### Run history
+Every run, of an analysis or a quick scan, newest first, with what it found, the targets scanned and its duration.
 
 ## Quick Scan
 
 Run an ad-hoc scan without saving a profile:
 
-1. Click **Quick Scan**
-2. Enter **targets**, each as a tag: hostname, IP, CIDR subnet (\`192.168.1.0/24\`), or \`host:port\` (\`10.0.0.1:8443\`)
+1. Click **Quick scan…**
+2. Enter the **range**, one target per line or separated by commas: hostname, IP, IPv4 range (\`192.0.2.0/24\`), or \`host:port\` (\`mail.example.com:465\`). A DNS wildcard, an IPv6 range and an IPv4 range of more than 65,536 hosts are refused in the form
 3. Enter **ports**: comma-separated TCP ports (e.g. \`443, 8443, 636\`), or pick the common-ports preset
 4. Optionally tune **advanced options**: reverse DNS resolution (PTR records), timeout, concurrency
 5. Click **Start Scan**: progress updates live via WebSocket
@@ -3351,22 +3355,22 @@ Profiles save a target configuration for repeated use:
 - **Schedule**: manual, or automatic every 1h / 6h / 12h / 24h / 7d
 - **Notifications**: email alerts when new certificates are discovered, when a certificate changes on an endpoint, or when discovered certificates are expiring. A certificate found through SNI on an IP target is counted as new at every scan
 
-Run a profile on demand with **Scan**, or let the scheduler run it at the configured interval.
+Run an analysis on demand with **Analyse now** in its dock, or let the scheduler run it at the configured interval.
 
 ## Result Statuses
 
-- **Managed**: The certificate's SHA-256 fingerprint matches a certificate in UCM's inventory
-- **Unmanaged**: Found on the network but not in the inventory: a candidate for bringing under management
-- **Error**: The endpoint answered but its TLS handshake or certificate failed (SNI rejected, unreadable certificate). A refused connection, a timeout, a DNS or network failure is not recorded
+- **In UCM**: The certificate's SHA-256 fingerprint matches a certificate in UCM's inventory
+- **Unknown to UCM**: Found on the network but not in the inventory: a candidate for bringing under management
+- **In error**: The endpoint answered but its TLS handshake or certificate failed (SNI rejected, unreadable certificate). A refused connection, a timeout, a DNS or network failure is not recorded
 
 ### Change Detection
 When an endpoint presents a different certificate than the previous scan, the change is recorded (previous fingerprint kept, **Last changed** timestamp) and can trigger a notification.
 
 ## Filtering & Export
 
-- **Status filter pills**: All, Managed, Unmanaged, Error
+- **State chips**: All, In UCM, Unknown to UCM, In error
 - **Profile filter**: Restrict results to one scan profile
-- **Export**: Download every discovered certificate as CSV, whatever the filters
+- **Export**: Download, as CSV, the found certificates the search, state and analysis filters show
 - **Retry**: Re-scan individual error targets, or **Retry all errors** shown on the current page
 - **Resolve DNS**: Bulk reverse-DNS resolution for discovered IPs
 

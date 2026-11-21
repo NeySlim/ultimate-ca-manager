@@ -18,7 +18,6 @@ import { INSPECTOR_TYPES } from './config'
 import { SectionTabs, tabId, panelId } from './InspectorTabs'
 import { CertificateDetail } from './certificate/CertificateDetail'
 import { DetailSkeleton } from './certificate/DetailSkeleton'
-import { QUEUE_DETAILS } from './queueDetails'
 
 export function InspectorObject({ entry, onTitle }) {
   const { t } = useTranslation()
@@ -63,11 +62,6 @@ export function InspectorObject({ entry, onTitle }) {
         onSection={setSection} onChanged={setData} onOpenRelated={(id) => openEntity('certificate', id)}
         onOpenCa={(id) => openEntity('ca', id)} />
     )
-  } else if (QUEUE_DETAILS[type]) {
-    // A work queue object (approval, key recovery, report) draws its own heading and sections
-    const Detail = QUEUE_DETAILS[type]
-    const current = config.sections.includes(section) ? section : config.sections[0]
-    body = <Detail data={data} objectKey={key} title={title} section={current} onSection={setSection} onChanged={setData} />
   } else {
     body = (
       <>

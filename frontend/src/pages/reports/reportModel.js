@@ -4,7 +4,6 @@
  * UTC time: a weekly report on day_of_week (0 is Monday), a monthly one on day_of_month.
  * The page reads and types those in the user's timezone, converted both ways.
  */
-import { ClockIcon, ChartIcon } from '../../components/work/workIcons'
 import { reportsService } from '../../services'
 import { getAppTimezone } from '../../stores/timezoneStore'
 
@@ -58,8 +57,8 @@ export function reportGroups(entries, t, now = Date.now()) {
   const runs = entries.map((e) => ({ ...e, next: nextRun(e.schedule, new Date(now)) })).filter((e) => e.next)
     .sort((a, b) => a.next - b.next)
   return [
-    { id: 'today', label: t('reports.work.groups.today'), icon: ClockIcon, tone: '', test: (e) => e.next - now < 24 * HOUR },
-    { id: 'later', label: t('reports.work.groups.later'), icon: ChartIcon, tone: '', test: (e) => e.next - now >= 24 * HOUR },
+    { id: 'today', label: t('reports.work.groups.today'), icon: 'clock', tone: '', test: (e) => e.next - now < 24 * HOUR },
+    { id: 'later', label: t('reports.work.groups.later'), icon: 'chart', tone: '', test: (e) => e.next - now >= 24 * HOUR },
   ].map(({ test, ...g }) => ({ ...g, entries: runs.filter(test) }))
 }
 
@@ -163,12 +162,6 @@ export function reportFigure(key, stats, t) {
 }
 
 export const formatLabel = (key, schedule) => (isPdf(key) ? 'PDF' : String(schedule?.format || 'csv').toUpperCase())
-
-/** The inspector's copy of a report: its key and schedule, read from the schedule route. */
-export async function fetchReport(key) {
-  const res = await reportsService.getSchedule()
-  return { data: { key, schedule: scheduleOf(res?.data, key) } }
-}
 
 /** Downloads a report now: the data report in its schedule's format, or the PDF of its template. */
 export async function downloadReport(key, format, downloadBlob) {

@@ -5684,7 +5684,6 @@
       "votes_one": "{{count}} of {{need}} approvals",
       "votes_other": "{{count}} of {{need}} approvals",
       "groups": {
-        "overdue": "Overdue",
         "soon": "To handle within 48 h",
         "later": "Later"
       },
@@ -6100,6 +6099,12 @@
     "searchPlaceholder": "ポリシーを検索...",
     "selectGroup": "グループを選択...",
     "subtitle": "発行ルール、鍵要件、承認ワークフローを管理します",
+    "unit_one": "{{count}} policy",
+    "unit_other": "{{count}} policies",
+    "range_one": "{{shown}} of {{count}} policy",
+    "range_other": "{{shown}} of {{count}} policies",
+    "caption": "Policies. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
     "fipsRulesTitle": "FIPS ルールが有効です（読み取り専用）",
     "fipsRulesDesc": "FIPS モードでは、これらより先にシステムポリシーが適用されます: 2048 から 16384 ビットの偶数長の RSA 鍵、EC P-256 から P-521、そして読み込まれた FIPS モジュールが承認する場合は Ed25519、Ed448、ML-DSA の鍵、SHA-256 から SHA-512 の署名。ここで設定するポリシーは、それをさらに絞り込むことしかできません。",
     "targetCA": "対象CA",
@@ -6115,7 +6120,9 @@
     },
     "allowedDigests": "許可する署名ハッシュ",
     "allowedKeyTypesHelp": "未選択の場合: すべての鍵タイプが許可されます。",
+    "anyKeyType": "Any key type",
     "allowedDigestsHelp": "未選択の場合: すべてのハッシュが許可されます。",
+    "anyDigest": "Any hash",
     "operations": "オペレーション",
     "operationHelp": {
       "issuance": "発行フォーム、CSR 署名と一括署名、およびオペレーターが行う更新",
@@ -6124,7 +6131,12 @@
     },
     "operationsRequired": "オペレーションを 1 つ以上選択してください",
     "noOperation": "オペレーションなし",
-    "rulesRevocationOnly": "ルールは発行と更新にのみ適用されます。失効ポリシーは CA、テンプレート、DNS パターンでスコープされます。"
+    "noDescription": "No description.",
+    "rulesRevocationOnly": "ルールは発行と更新にのみ適用されます。失効ポリシーは CA、テンプレート、DNS パターンでスコープされます。",
+    "state": {
+      "applied": "Applied",
+      "inactive": "Disabled"
+    }
   },
   "reports": {
     "complianceReport": "コンプライアンスレポート",
@@ -6571,7 +6583,7 @@
     "exportFailed": "エクスポート失敗",
     "exportSuccess": "エクスポート完了",
     "filterByProfile": "プロファイルでフィルター",
-    "filterByStatus": "ステータスでフィルター",
+    "filterByState": "Filter by state",
     "firstSeen": "初回検出",
     "groups": {
       "monitoring": "モニタリング",
@@ -6681,7 +6693,111 @@
     "helpExport": "発見された証明書をCSVまたはJSONとしてエクスポートします。必要なサブセットのみをエクスポートするために、先にフィルターを適用してください。",
     "helpExportTitle": "結果のエクスポート",
     "helpSecurity": "DiscoveryはSSRF保護のために内部/ループバックアドレスをブロックします。ターゲットはスキャン前に検証されます。すべてのスキャンアクションは監査ログに記録されます。",
-    "helpSecurityTitle": "セキュリティ"
+    "helpSecurityTitle": "セキュリティ",
+    "quickScanAsk": "Quick scan…",
+    "views": {
+      "profiles": "Analyses",
+      "discovered": "Found certificates",
+      "history": "Run history"
+    },
+    "scans": {
+      "unit_one": "{{count}} analysis",
+      "unit_other": "{{count}} analyses",
+      "range_one": "{{shown}} of {{count}} analysis",
+      "range_other": "{{shown}} of {{count}} analyses",
+      "caption": "Network analyses. Activate a name to open its detail.",
+      "create": "New analysis…",
+      "found": "Found",
+      "foundNew": "{{count}}, {{fresh}} new",
+      "last": "Last analysis",
+      "next": "Next analysis",
+      "notScanned": "Not analysed",
+      "interrupted": "Interrupted",
+      "plannedOn": "Planned on {{date}}",
+      "state": {
+        "running": "Running",
+        "done": "Completed",
+        "failed": "Failed",
+        "scheduled": "Scheduled",
+        "never": "Never run"
+      },
+      "noDescription": "No description.",
+      "runsTab": "Runs",
+      "runNow": "Analyse now",
+      "remove": "Delete the analysis",
+      "removeText": "The analysis and its schedule are deleted. The certificates it found stay in the found certificates.",
+      "empty": "No network analysis",
+      "emptyText": "An analysis lists the certificates exposed on a range of addresses, for example 192.0.2.0/24, to match them with the inventory.",
+      "progress": "Scan in progress: {{scanned}} of {{total}} targets, {{found}} certificates found."
+    },
+    "found": {
+      "unit_one": "{{count}} certificate",
+      "unit_other": "{{count}} certificates",
+      "range": "{{start}}–{{end}} of {{count}}",
+      "intent": "The certificates the analyses met on the network, matched with the inventory.",
+      "caption": "Found certificates. Activate a name to open its detail.",
+      "state": {
+        "managed": "In UCM",
+        "unmanaged": "Unknown to UCM",
+        "error": "In error"
+      },
+      "inInventory": "In the inventory",
+      "inDays_one": "in {{count}} day",
+      "inDays_other": "in {{count}} days",
+      "extensions": "Extensions",
+      "remove": "Delete the found certificate",
+      "purged": "Found certificates deleted"
+    },
+    "runs": {
+      "unit_one": "{{count}} run",
+      "unit_other": "{{count}} runs",
+      "range_one": "{{shown}} of {{count}} run",
+      "range_other": "{{shown}} of {{count}} runs",
+      "intent": "Every run of an analysis or a quick scan, newest first.",
+      "caption": "Runs. Activate a name to open its detail.",
+      "summary": "{{count}} certificates on {{targets}} targets",
+      "new": "New",
+      "changed": "Changed",
+      "trigger": "Started by",
+      "by": {
+        "manual": "Manual",
+        "scheduled": "Schedule"
+      },
+      "state": {
+        "running": "Running",
+        "completed": "Completed",
+        "failed": "Failed"
+      }
+    },
+    "form": {
+      "range": "Range",
+      "rangeHint": "One host name, address or IPv4 range per line, for example 192.0.2.0/24; a port can follow, as in mail.example.com:465.",
+      "nameRequired": "Name the analysis.",
+      "targetsRequired": "Give at least one host, address or range.",
+      "problem": {
+        "wildcard": "{{target}}: a DNS wildcard names no host; list the hosts.",
+        "ipv6Range": "{{target}}: IPv6 ranges are not scanned; list the addresses.",
+        "tooWide": "{{target}}: the range holds more than {{max}} hosts.",
+        "format": "{{target}}: not a host name, an address or a range."
+      },
+      "preset": "Common ports",
+      "presetOther": "Ports typed",
+      "presets": {
+        "https": "HTTPS (443)",
+        "alt": "HTTPS and 8443",
+        "common": "Every common TLS port"
+      },
+      "every": {
+        "0": "Manual only",
+        "60": "Every hour",
+        "360": "Every 6 hours",
+        "720": "Every 12 hours",
+        "1440": "Every day",
+        "10080": "Every week"
+      },
+      "timeoutHint": "Seconds per connection, 1 to 30.",
+      "workersHint": "Connections at once, 1 to 50."
+    }
   },
   "compliance": {
     "title": "コンプライアンススコア",
@@ -8273,12 +8389,10 @@
     "selectRow": "Select {{name}}",
     "selectAll": "Select all: {{group}}",
     "loading": "Loading the queue…",
-    "retry": "Retry",
     "viewLog": "View the log",
     "bulkLabel": "Bulk actions",
     "selected_one": "{{count}} item selected",
     "selected_other": "{{count}} items selected",
-    "cancelSelection": "Clear selection",
     "historyEmpty": "Nothing yet.",
     "bulk": {
       "title": "Outcome",

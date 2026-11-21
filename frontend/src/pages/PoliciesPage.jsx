@@ -1,49 +1,29 @@
 /**
- * PoliciesPage — Certificate Policies & Approval Workflows
- * CRUD for certificate policies with rules, approval settings, and notifications.
+ * Policies: the mockup's policies module, a simplePage() list (Portée, État) with its one-object
+ * dock (Aperçu), on the server's certificate policies. What the product has more (operations,
+ * priority, approval, the rules, search and operation filter, creation, edit, enable / disable and
+ * removal) takes the mockup's toolbar, further columns, dock actions and sections, and its form
+ * dialog. The mockup's Exceptions column and « En observation » state have no data (G03, G04).
  */
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Gavel, Plus, PencilSimple, Trash, Power, ShieldCheck,
-  Warning, CheckCircle, XCircle, Certificate, ArrowsDownUp,
-  UsersThree, Bell, Funnel, CaretDown, CaretUp
-} from '@phosphor-icons/react'
-import {
-  ResponsiveLayout, ResponsiveDataTable, Card, Button, Badge,
-  Input, Modal, LoadingSpinner, Select, Textarea
-} from '../components'
+  Zone, Icon, Btn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody,
+  Section, Props, LoadError, LoadCause, EmptyBlock, NoMatch, AtelierDialog,
+} from '../components/atelier'
 import { policiesService, casService, groupsService } from '../services'
 import { useNotification } from '../contexts'
-import { usePermission, usePersistedState, useCRUDPage } from '../hooks'
-import { formatDate, cn } from '../lib/utils'
+import { usePermission, usePersistedState } from '../hooks'
+import { formatDate } from '../lib/utils'
 import { useKeyPlatform } from '../lib/policyAlgorithms'
 import { KEY_ALGORITHMS, KEY_GROUPS, isBrainpool, isUsable } from '../lib/keyAlgorithms'
-import { BrainpoolNotice } from '../components/BrainpoolNotice'
 
-// Operations a policy governs: labels resolved via t() inside component
+// Operations a policy governs
 const POLICY_TYPES = [
-  { value: 'issuance', labelKey: 'policies.policyType.issuance', helpKey: 'policies.operationHelp.issuance', variant: 'info' },
-  { value: 'renewal', labelKey: 'policies.policyType.renewal', helpKey: 'policies.operationHelp.renewal', variant: 'success' },
-  { value: 'revocation', labelKey: 'policies.policyType.revocation', helpKey: 'policies.operationHelp.revocation', variant: 'warning' },
+  { value: 'issuance', labelKey: 'policies.policyType.issuance', helpKey: 'policies.operationHelp.issuance' },
+  { value: 'renewal', labelKey: 'policies.policyType.renewal', helpKey: 'policies.operationHelp.renewal' },
+  { value: 'revocation', labelKey: 'policies.policyType.revocation', helpKey: 'policies.operationHelp.revocation' },
 ]
-
-// One badge per operation; a policy left with none (an old renewal or
-// revocation type, never enforced) says so
-function OperationBadges({ operations, t }) {
-  if (!operations?.length) {
-    return <Badge variant="danger">{t('policies.noOperation')}</Badge>
-  }
-  return (
-    <div className="flex flex-wrap gap-1">
-      {POLICY_TYPES.filter(o => operations.includes(o.value)).map(o => (
-        <Badge key={o.value} variant={o.variant}>{t(o.labelKey)}</Badge>
-      ))}
-    </div>
-  )
-}
-
-// Key types a policy can allow come from the shared registry (lib/keyAlgorithms.js)
 
 // Signature hashes; none selected means any hash
 const DIGEST_OPTIONS = [
@@ -84,16 +64,192 @@ function parseEmails(text) {
   return { emails, invalid: emails.filter(e => !EMAIL_RE.test(e)) }
 }
 
+const STATES = { applied: 'good', inactive: 'muted' }
+const stateOf = (p) => (p.is_active ? 'applied' : 'inactive')
+
+/** The create and edit form, in the mockup's dialog and fields. */
+function PolicyDialog({ editing, cas, groups, keyTypeOptions, saving, onSave, onClose }) {
+  const { t } = useTranslation()
+  const [formData, setFormData] = useState(() => (editing ? {
+    name: editing.name || '',
+    description: editing.description || '',
+    operations: Array.isArray(editing.operations) ? editing.operations : ['issuance'],
+    ca_id: editing.ca_id || null,
+    template_id: editing.template_id || null,
+    requires_approval: editing.requires_approval || false,
+    approval_group_id: editing.approval_group_id || null,
+    min_approvers: editing.min_approvers || 1,
+    notify_on_violation: editing.notify_on_violation ?? true,
+    is_active: editing.is_active ?? true,
+    priority: editing.priority || 100,
+    // The update replaces the rules: keys the form does not show go back unchanged
+    rules: {
+      ...(editing.rules || {}),
+      max_validity_days: editing.rules?.max_validity_days || 397,
+      allowed_key_types: editing.rules?.allowed_key_types || [],
+      allowed_digests: editing.rules?.allowed_digests || [],
+      san_restrictions: {
+        ...(editing.rules?.san_restrictions || {}),
+        max_dns_names: editing.rules?.san_restrictions?.max_dns_names || 50,
+        dns_pattern: editing.rules?.san_restrictions?.dns_pattern || '',
+      },
+    },
+    notification_emails: editing.notification_emails || [],
+  } : { ...DEFAULT_FORM, rules: { ...DEFAULT_FORM.rules, san_restrictions: { ...DEFAULT_FORM.rules.san_restrictions } } }))
+  const [emailsText, setEmailsText] = useState(() => (editing?.notification_emails || []).join('\n'))
+  const parsedEmails = parseEmails(emailsText)
+  // A key this server cannot use (FIPS mode, no ML-DSA) shows only while ticked, so it can be removed
+  const shownKeyTypes = keyTypeOptions.filter(opt => opt.usable || formData.rules.allowed_key_types?.includes(opt.value))
+  const noOperation = !(formData.operations || []).length
+
+  const set = (field, value) => setFormData(p => ({ ...p, [field]: value }))
+  const updateRule = (key, value) => setFormData(p => ({ ...p, rules: { ...p.rules, [key]: value } }))
+  const updateSan = (key, value) => setFormData(p => ({ ...p, rules: { ...p.rules, san_restrictions: { ...p.rules.san_restrictions, [key]: value } } }))
+  const toggle = (list, value) => (list.includes(value) ? list.filter(v => v !== value) : [...list, value])
+
+  const submit = (e) => {
+    e.preventDefault()
+    if (!formData.name.trim() || noOperation || parsedEmails.invalid.length) return
+    onSave({ ...formData, notification_emails: parsedEmails.emails })
+  }
+  const check = (name, checked, onChange, label, help) => (
+    <label className="checkbox-line" key={name}>
+      <input type="checkbox" name={name} checked={checked} onChange={onChange} />
+      <span>{label}{help && <small>{help}</small>}</span>
+    </label>
+  )
+
+  return (
+    <AtelierDialog title={editing ? t('policies.editPolicy') : t('policies.createPolicy')} subtitle={editing?.name} onClose={onClose} testId="policy-dialog">
+      <form id="policy-form" noValidate onSubmit={submit}>
+        <div className="form-fields">
+          <div className="field full">
+            <label htmlFor="pol-name">{t('policies.policyName')}</label>
+            <input id="pol-name" value={formData.name} required data-autofocus="" placeholder={t('policies.policyNamePlaceholder')}
+              onChange={(e) => set('name', e.target.value)} />
+          </div>
+          <fieldset className="field full">
+            <legend>{t('policies.operations')}</legend>
+            <div className="eku-list">
+              {POLICY_TYPES.map(op => check(`op-${op.value}`, (formData.operations || []).includes(op.value),
+                () => set('operations', toggle(formData.operations || [], op.value)), t(op.labelKey), t(op.helpKey)))}
+            </div>
+            {noOperation && <p className="field-error" id="err-pol-ops"><Icon name="warning" /><span>{t('policies.operationsRequired')}</span></p>}
+          </fieldset>
+          <div className="field full">
+            <label htmlFor="pol-desc">{t('common.description')}</label>
+            <textarea id="pol-desc" rows={2} value={formData.description} placeholder={t('policies.descriptionPlaceholder')}
+              onChange={(e) => set('description', e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="pol-ca">{t('policies.targetCA')}</label>
+            <select id="pol-ca" value={formData.ca_id?.toString() || ''} onChange={(e) => set('ca_id', e.target.value ? parseInt(e.target.value, 10) : null)}>
+              <option value="">{t('policies.allCAs')}</option>
+              {cas.map(ca => <option key={ca.id} value={ca.id.toString()}>{ca.common_name}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="pol-priority">{t('policies.priority')}</label>
+            <input id="pol-priority" type="number" min={1} max={1000} value={formData.priority}
+              onChange={(e) => set('priority', parseInt(e.target.value, 10) || 100)} />
+          </div>
+          <p className="field full small muted">
+            <strong>{t('policies.rules')}</strong> · {t('policies.rulesEnforcedHelp')}
+            {!(formData.operations || []).some(op => op === 'issuance' || op === 'renewal') && <> {t('policies.rulesRevocationOnly')}</>}
+          </p>
+          <div className="field">
+            <label htmlFor="pol-validity">{t('policies.maxValidity')}</label>
+            <input id="pol-validity" type="number" min={1} max={3650} value={formData.rules.max_validity_days}
+              onChange={(e) => updateRule('max_validity_days', parseInt(e.target.value, 10) || 397)} />
+          </div>
+          <div className="field">
+            <label htmlFor="pol-sans">{t('policies.maxSANs')}</label>
+            <input id="pol-sans" type="number" min={1} max={500} value={formData.rules.san_restrictions?.max_dns_names || 50}
+              onChange={(e) => updateSan('max_dns_names', parseInt(e.target.value, 10) || 50)} />
+          </div>
+          <fieldset className="field full">
+            <legend>{t('policies.allowedKeyTypes')}</legend>
+            {[...new Set(shownKeyTypes.map(o => o.group))].map(group => (
+              <div key={group} className="eku-list" role="group" aria-label={group}>
+                <small>{group}</small>
+                {shownKeyTypes.filter(opt => opt.group === group).map(opt => check(`key-${opt.value}`, !!formData.rules.allowed_key_types?.includes(opt.value),
+                  () => updateRule('allowed_key_types', toggle(formData.rules.allowed_key_types || [], opt.value)), opt.label))}
+              </div>
+            ))}
+            {(formData.rules.allowed_key_types || []).some(isBrainpool) && (
+              <p className="notice warn" role="note" style={{ margin: 0 }}><Icon name="warning" />{t('common.keyGroups.brainpoolWarning')}</p>
+            )}
+            <small>{t('policies.allowedKeyTypesHelp')}</small>
+          </fieldset>
+          <fieldset className="field full">
+            <legend>{t('policies.allowedDigests')}</legend>
+            <div className="eku-list">
+              {DIGEST_OPTIONS.map(opt => check(`digest-${opt.value}`, !!formData.rules.allowed_digests?.includes(opt.value),
+                () => updateRule('allowed_digests', toggle(formData.rules.allowed_digests || [], opt.value)), opt.label))}
+            </div>
+            <small>{t('policies.allowedDigestsHelp')}</small>
+          </fieldset>
+          <div className="field full">
+            <label htmlFor="pol-dns">{t('policies.dnsPattern')}</label>
+            <input id="pol-dns" value={formData.rules.san_restrictions?.dns_pattern || ''} placeholder="*.company.com" spellCheck={false}
+              onChange={(e) => updateSan('dns_pattern', e.target.value)} />
+          </div>
+          <div className="field full">
+            {check('requires-approval', formData.requires_approval, (e) => set('requires_approval', e.target.checked), t('policies.requireApproval'))}
+          </div>
+          {formData.requires_approval && (
+            <>
+              <div className="field">
+                <label htmlFor="pol-group">{t('policies.approvalGroup')}</label>
+                <select id="pol-group" value={formData.approval_group_id?.toString() || ''}
+                  onChange={(e) => set('approval_group_id', e.target.value ? parseInt(e.target.value, 10) : null)}>
+                  <option value="">{t('policies.selectGroup')}</option>
+                  {groups.map(g => <option key={g.id} value={g.id.toString()}>{g.name}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="pol-approvers">{t('policies.minApprovers')}</label>
+                <input id="pol-approvers" type="number" min={1} max={10} value={formData.min_approvers}
+                  onChange={(e) => set('min_approvers', parseInt(e.target.value, 10) || 1)} />
+              </div>
+            </>
+          )}
+          <div className="field full">
+            {check('notify', formData.notify_on_violation, (e) => set('notify_on_violation', e.target.checked), t('policies.notifyOnViolation'), t('policies.notifyHelp'))}
+          </div>
+          {formData.notify_on_violation && (
+            <div className="field full">
+              <label htmlFor="pol-emails">{t('policies.notificationEmails')}</label>
+              <textarea id="pol-emails" rows={2} value={emailsText} placeholder="pki-team@example.com" spellCheck={false}
+                aria-invalid={parsedEmails.invalid.length > 0 || undefined}
+                aria-describedby={parsedEmails.invalid.length ? 'hint-pol-emails err-pol-emails' : 'hint-pol-emails'}
+                onChange={(e) => setEmailsText(e.target.value)} />
+              {parsedEmails.invalid.length > 0 && (
+                <p className="field-error" id="err-pol-emails"><Icon name="warning" /><span>{t('policies.invalidEmails', { emails: parsedEmails.invalid.join(', ') })}</span></p>
+              )}
+              <small id="hint-pol-emails">{t('policies.notificationEmailsHelp')}</small>
+            </div>
+          )}
+        </div>
+        <div className="modal-actions">
+          <Btn data-action="close-modal" onClick={onClose}>{t('common.cancel')}</Btn>
+          <Btn type="submit" tone="primary" icon={editing ? 'check' : 'plus'}
+            disabled={saving || !formData.name.trim() || noOperation || parsedEmails.invalid.length > 0 || undefined}>
+            {editing ? t('common.update') : t('common.create')}
+          </Btn>
+        </div>
+      </form>
+    </AtelierDialog>
+  )
+}
+
 export default function PoliciesPage() {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
-  const { canRead, canWrite, canDelete } = usePermission()
+  const { canWrite, canDelete, hasPermission } = usePermission()
 
-  // Resolve i18n labels for module-level option arrays
-  const policyTypeOptions = useMemo(() => POLICY_TYPES.map(o => ({ value: o.value, label: t(o.labelKey) })), [t])
   // FIPS mode puts a read-only system policy ahead of these, without EdDSA keys
   const platform = useKeyPlatform()
-  const fipsActive = platform.fips
   const keyTypeOptions = useMemo(
     () => KEY_ALGORITHMS.map(a => ({
       value: a.label,
@@ -104,231 +260,42 @@ export default function PoliciesPage() {
     [t, platform],
   )
 
-  // cas/groups must be declared before loadFn (loadFn sets them as side effects)
+  const [policies, setPolicies] = useState([])
   const [cas, setCas] = useState([])
   const [groups, setGroups] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
+  const [openId, setOpenId] = useState(null)
+  const [section, setSection] = useState('overview')
+  const [dialog, setDialog] = useState(null) // { kind: 'form', editing } | { kind: 'delete', policy }
+  const [saving, setSaving] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [query, setQuery] = useState('')
+  const [type, setType] = usePersistedState('ucm-policies-operation', '')
+  const [state, setState] = usePersistedState('ucm-policies-state', '')
 
-  // Hook: CRUD state
-  const loadFn = useCallback(async () => {
-    const [policiesRes, casRes, groupsRes] = await Promise.all([
-      policiesService.list(),
-      casService.getAll().catch(() => ({ data: [] })),
-      groupsService.getAll().catch(() => ({ data: [] })),
-    ])
-    setCas(casRes.data || [])
-    setGroups(groupsRes.data || [])
-    return policiesRes.data || []
-  }, []) // setCas/setGroups are stable setState refs
-  const {
-    items: policies, setItems: setPolicies,
-    loading,
-    selectedItem: selectedPolicy, setSelectedItem: setSelectedPolicy,
-    showModal, setShowModal,
-    editing, setEditing,
-    saving, setSaving,
-    deleteTarget: showDeleteConfirm, setDeleteTarget: setShowDeleteConfirm,
-    loadData,
-  } = useCRUDPage({ loadFn, loadErrorMsg: t('policies.loadFailed') })
-
-  // Modal state (page-specific)
-  const [formData, setFormData] = useState({ ...DEFAULT_FORM })
-  // A key this server cannot use (FIPS mode, no ML-DSA) shows only while ticked, so it can be removed
-  const shownKeyTypes = keyTypeOptions.filter(opt => opt.usable
-    || formData.rules.allowed_key_types?.includes(opt.value))
-  const [emailsText, setEmailsText] = useState('')
-  const parsedEmails = parseEmails(emailsText)
-  const [actionInProgress, setActionInProgress] = useState(false)
-
-  // Filters
-  const [filterType, setFilterType] = usePersistedState('ucm-filter-policies-type', [])
-  const [filterStatus, setFilterStatus] = usePersistedState('ucm-filter-policies-status', [])
-
-  // Filtered policies
-  const filteredPolicies = useMemo(() => {
-    let result = policies
-    if (filterType.length > 0) result = result.filter(p => (p.operations || []).some(op => filterType.includes(op)))
-    if (filterStatus.length > 0) {
-      result = result.filter(p => {
-        if (p.is_active && filterStatus.includes('active')) return true
-        if (!p.is_active && filterStatus.includes('inactive')) return true
-        return false
-      })
+  const loadData = useCallback(async () => {
+    setLoadError(null)
+    try {
+      const [policiesRes, casRes, groupsRes] = await Promise.all([
+        policiesService.list(),
+        casService.getAll().catch(() => ({ data: [] })),
+        groupsService.getAll().catch(() => ({ data: [] })),
+      ])
+      setCas(casRes?.data || [])
+      setGroups(groupsRes?.data || [])
+      setPolicies(Array.isArray(policiesRes?.data) ? policiesRes.data : [])
+    } catch (err) {
+      setLoadError(err || {})
+      showError(t('policies.loadFailed'))
+    } finally {
+      setLoading(false)
     }
-    return result
-  }, [policies, filterType, filterStatus])
+  }, [showError, t])
+  useEffect(() => { loadData() }, [loadData])
 
-  // Stats
-  const stats = useMemo(() => [
-    {
-      icon: Gavel,
-      label: t('policies.total'),
-      value: policies.length,
-      variant: 'default',
-    },
-    {
-      icon: CheckCircle,
-      label: t('policies.active'),
-      value: policies.filter(p => p.is_active).length,
-      variant: 'success',
-      filterValue: 'active',
-    },
-    {
-      icon: XCircle,
-      label: t('policies.inactive'),
-      value: policies.filter(p => !p.is_active).length,
-      variant: 'warning',
-      filterValue: 'inactive',
-    },
-    {
-      icon: ShieldCheck,
-      label: t('policies.withApproval'),
-      value: policies.filter(p => p.requires_approval).length,
-      variant: 'info',
-    },
-  ], [policies, t])
-
-  // Column definitions
-  const columns = useMemo(() => [
-    {
-      key: 'name',
-      header: t('common.name'),
-      priority: 1,
-      sortable: true,
-      render: (val, row) => (
-        <div className="flex items-center gap-2">
-          <div className={cn(
-            'w-2 h-2 rounded-full shrink-0',
-            row.is_active ? 'bg-status-success' : 'bg-text-tertiary'
-          )} />
-          <div>
-            <div className="font-medium text-text-primary">{val}</div>
-            {row.description && (
-              <div className="text-xs text-text-tertiary truncate max-w-[200px]">{row.description}</div>
-            )}
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'operations',
-      header: t('policies.operations'),
-      priority: 2,
-      render: (val) => <OperationBadges operations={val} t={t} />,
-    },
-    {
-      key: 'ca_name',
-      header: t('policies.scope'),
-      priority: 3,
-      render: (val) => val || <span className="text-text-tertiary">{t('policies.allCAs')}</span>,
-    },
-    {
-      key: 'priority',
-      header: t('policies.priority'),
-      priority: 3,
-      sortable: true,
-      render: (val) => (
-        <span className="text-text-secondary font-mono text-sm">{val}</span>
-      ),
-    },
-    {
-      key: 'requires_approval',
-      header: t('policies.approval'),
-      priority: 2,
-      render: (val, row) => val ? (
-        <div className="flex items-center gap-1.5">
-          <UsersThree size={14} className="text-accent-primary" weight="fill" />
-          <span className="text-xs text-text-secondary">
-            {row.min_approvers}+ {row.approval_group_name || ''}
-          </span>
-        </div>
-      ) : (
-        <span className="text-text-tertiary text-xs">{t('common.no')}</span>
-      ),
-    },
-    {
-      key: 'is_active',
-      header: t('common.status'),
-      priority: 1,
-      render: (val) => (
-        <Badge variant={val ? 'success' : 'warning'}>
-          {val ? t('policies.active') : t('policies.inactive')}
-        </Badge>
-      ),
-    },
-  ], [t])
-
-  // Row actions
-  const rowActions = useCallback((row) => {
-    const actions = []
-    if (canWrite('policies')) {
-      actions.push({
-        label: t('common.edit'),
-        icon: PencilSimple,
-        onClick: () => openEditModal(row),
-      })
-      actions.push({
-        label: row.is_active ? t('policies.disable') : t('policies.enable'),
-        icon: Power,
-        onClick: () => handleToggle(row),
-      })
-    }
-    if (canDelete('policies')) {
-      actions.push({
-        label: t('common.delete'),
-        icon: Trash,
-        variant: 'danger',
-        onClick: () => setShowDeleteConfirm(row),
-      })
-    }
-    return actions
-  }, [canWrite, canDelete, t])
-
-  // Modal handlers
-  const openCreateModal = () => {
-    setEditing(null)
-    setFormData({ ...DEFAULT_FORM, rules: { ...DEFAULT_FORM.rules, san_restrictions: { ...DEFAULT_FORM.rules.san_restrictions } } })
-    setEmailsText('')
-    setShowModal(true)
-  }
-
-  const openEditModal = (policy) => {
-    setEditing(policy)
-    setFormData({
-      name: policy.name || '',
-      description: policy.description || '',
-      operations: Array.isArray(policy.operations) ? policy.operations : ['issuance'],
-      ca_id: policy.ca_id || null,
-      template_id: policy.template_id || null,
-      requires_approval: policy.requires_approval || false,
-      approval_group_id: policy.approval_group_id || null,
-      min_approvers: policy.min_approvers || 1,
-      notify_on_violation: policy.notify_on_violation ?? true,
-      is_active: policy.is_active ?? true,
-      priority: policy.priority || 100,
-      // The update replaces the rules: keys the form does not show go back unchanged
-      rules: {
-        ...(policy.rules || {}),
-        max_validity_days: policy.rules?.max_validity_days || 397,
-        allowed_key_types: policy.rules?.allowed_key_types || [],
-        allowed_digests: policy.rules?.allowed_digests || [],
-        san_restrictions: {
-          ...(policy.rules?.san_restrictions || {}),
-          max_dns_names: policy.rules?.san_restrictions?.max_dns_names || 50,
-          dns_pattern: policy.rules?.san_restrictions?.dns_pattern || '',
-        },
-      },
-      notification_emails: policy.notification_emails || [],
-    })
-    setEmailsText((policy.notification_emails || []).join('\n'))
-    setShowModal(true)
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!formData.name.trim() || !(formData.operations || []).length) return
-    if (parsedEmails.invalid.length) return
-    const payload = { ...formData, notification_emails: parsedEmails.emails }
-
+  const save = async (payload) => {
+    const editing = dialog?.editing
     try {
       setSaving(true)
       if (editing) {
@@ -338,582 +305,173 @@ export default function PoliciesPage() {
         await policiesService.create(payload)
         showSuccess(t('policies.created'))
       }
-      setShowModal(false)
+      setDialog(null)
       loadData()
-    } catch (err) {
+    } catch {
       showError(t('policies.saveFailed'))
     } finally {
       setSaving(false)
     }
   }
 
-  const handleToggle = async (policy) => {
-    if (actionInProgress) return
+  const toggleActive = async (policy) => {
+    if (busy) return
     try {
-      setActionInProgress(true)
+      setBusy(true)
       await policiesService.toggle(policy.id)
       showSuccess(policy.is_active ? t('policies.disabled') : t('policies.enabled'))
       loadData()
-    } catch (err) {
+    } catch {
       showError(t('policies.toggleFailed'))
     } finally {
-      setActionInProgress(false)
+      setBusy(false)
     }
   }
 
-  const handleDelete = async (policy) => {
-    if (actionInProgress) return
+  const remove = async (policy) => {
+    if (busy) return
     try {
-      setActionInProgress(true)
+      setBusy(true)
       await policiesService.delete(policy.id)
       showSuccess(t('policies.deleted'))
-      setShowDeleteConfirm(null)
+      setDialog(null)
+      setOpenId(null)
       loadData()
-    } catch (err) {
+    } catch {
       showError(t('policies.deleteFailed'))
     } finally {
-      setActionInProgress(false)
+      setBusy(false)
     }
   }
 
-  const updateRule = (key, value) => {
-    setFormData(prev => ({
-      ...prev,
-      rules: { ...prev.rules, [key]: value },
-    }))
-  }
+  // The list reads by priority, the order the server applies them in, then by name
+  const sorted = useMemo(() => [...policies].sort((a, b) => (a.priority ?? 100) - (b.priority ?? 100) || String(a.name).localeCompare(String(b.name))), [policies])
+  const operationsOf = (p) => (p.operations?.length
+    ? POLICY_TYPES.filter(o => p.operations.includes(o.value)).map(o => t(o.labelKey)).join(', ')
+    : t('policies.noOperation'))
+  const scopeOf = (p) => p.ca_name || t('policies.allCAs')
+  const approvalOf = (p) => (p.requires_approval ? [`${p.min_approvers || 1}+`, p.approval_group_name].filter(Boolean).join(' ') : t('common.no'))
+  const searched = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return sorted.filter(p => (!type || (p.operations || []).includes(type))
+      && (!q || [p.name, p.description, p.policy_type, p.ca_name].some(v => String(v || '').toLowerCase().includes(q))))
+  }, [sorted, type, query])
+  const present = Object.keys(STATES).filter(s => policies.some(p => stateOf(p) === s))
+  const active = present.includes(state) ? state : ''
+  const rows = searched.filter(p => !active || stateOf(p) === active)
+  const views = [
+    { id: '', label: t('common.all'), count: searched.length },
+    ...present.map(s => ({ id: s, label: t(`policies.state.${s}`), count: searched.filter(p => stateOf(p) === s).length })),
+  ]
+  const narrowed = Boolean(query.trim() || type || active)
+  const pill = (p) => <Pill label={t(`policies.state.${stateOf(p)}`)} tone={STATES[stateOf(p)]} />
+  const open = policies.find(p => p.id === openId) || null
+  const create = canWrite('policies') ? { label: t('policies.createPolicy'), icon: 'plus', primary: true, onClick: () => setDialog({ kind: 'form', editing: null }) } : undefined
+  const r = open?.rules || {}
 
-  const toggleDigest = (digest) => {
-    setFormData(prev => {
-      const current = prev.rules.allowed_digests || []
-      const next = current.includes(digest) ? current.filter(d => d !== digest) : [...current, digest]
-      return { ...prev, rules: { ...prev.rules, allowed_digests: next } }
-    })
-  }
-
-  const toggleOperation = (operation) => {
-    setFormData(prev => {
-      const current = prev.operations || []
-      const next = current.includes(operation) ? current.filter(o => o !== operation) : [...current, operation]
-      return { ...prev, operations: next }
-    })
-  }
-
-  const toggleKeyType = (keyType) => {
-    setFormData(prev => {
-      const current = prev.rules.allowed_key_types || []
-      const next = current.includes(keyType)
-        ? current.filter(k => k !== keyType)
-        : [...current, keyType]
-      return { ...prev, rules: { ...prev.rules, allowed_key_types: next } }
-    })
-  }
-
-  // Policy detail (slide-over)
-  const slideOverContent = selectedPolicy ? (
-    <div className="p-4 space-y-4">
-      {/* Status */}
-      <div className="flex items-center gap-2">
-        <Badge variant={selectedPolicy.is_active ? 'success' : 'warning'} size="lg">
-          {selectedPolicy.is_active ? t('policies.active') : t('policies.inactive')}
-        </Badge>
-        <OperationBadges operations={selectedPolicy.operations} t={t} />
-      </div>
-
-      {selectedPolicy.description && (
-        <p className="text-sm text-text-secondary">{selectedPolicy.description}</p>
-      )}
-
-      {/* Scope */}
-      <div className="border-t border-border pt-3">
-        <h4 className="text-sm font-semibold text-text-primary mb-2">{t('policies.scope')}</h4>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div className="text-text-tertiary">{t('policies.targetCA')}</div>
-          <div className="text-text-primary">{selectedPolicy.ca_name || t('policies.allCAs')}</div>
-          <div className="text-text-tertiary">{t('policies.priority')}</div>
-          <div className="text-text-primary font-mono">{selectedPolicy.priority}</div>
-        </div>
-      </div>
-
-      {/* Rules */}
-      {selectedPolicy.rules && Object.keys(selectedPolicy.rules).length > 0 && (
-        <div className="border-t border-border pt-3">
-          <h4 className="text-sm font-semibold text-text-primary mb-2">{t('policies.rules')}</h4>
-          <div className="space-y-2 text-sm">
-            {selectedPolicy.rules.max_validity_days > 0 && (
-              <div className="flex justify-between">
-                <span className="text-text-tertiary">{t('policies.maxValidity')}</span>
-                <span className="text-text-primary">{selectedPolicy.rules.max_validity_days} {t('common.days')}</span>
-              </div>
-            )}
-            {selectedPolicy.rules.allowed_key_types?.length > 0 && (
-              <div>
-                <span className="text-text-tertiary">{t('policies.allowedKeyTypes')}</span>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {selectedPolicy.rules.allowed_key_types.map(k => (
-                    <Badge key={k} variant="default" size="sm">{k}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-            {selectedPolicy.rules.allowed_digests?.length > 0 && (
-              <div>
-                <span className="text-text-tertiary">{t('policies.allowedDigests')}</span>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {selectedPolicy.rules.allowed_digests.map(d => (
-                    <Badge key={d} variant="default" size="sm">
-                      {DIGEST_OPTIONS.find(o => o.value === d)?.label || d}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-            {selectedPolicy.rules.san_restrictions?.max_dns_names != null && selectedPolicy.rules.san_restrictions.max_dns_names > 0 && (
-              <div className="flex justify-between">
-                <span className="text-text-tertiary">{t('policies.maxSANs')}</span>
-                <span className="text-text-primary">{selectedPolicy.rules.san_restrictions.max_dns_names}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Approval */}
-      {selectedPolicy.requires_approval && (
-        <div className="border-t border-border pt-3">
-          <h4 className="text-sm font-semibold text-text-primary mb-2">{t('policies.approvalWorkflow')}</h4>
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div className="text-text-tertiary">{t('policies.approvalGroup')}</div>
-            <div className="text-text-primary">{selectedPolicy.approval_group_name || '—'}</div>
-            <div className="text-text-tertiary">{t('policies.minApprovers')}</div>
-            <div className="text-text-primary">{selectedPolicy.min_approvers}</div>
-          </div>
-        </div>
-      )}
-
-      {/* Metadata */}
-      <div className="border-t border-border pt-3">
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div className="text-text-tertiary">{t('common.createdAt')}</div>
-          <div className="text-text-primary">{formatDate(selectedPolicy.created_at)}</div>
-          {selectedPolicy.created_by && (
-            <>
-              <div className="text-text-tertiary">{t('common.createdBy')}</div>
-              <div className="text-text-primary">{selectedPolicy.created_by}</div>
-            </>
+  const dock = open && (
+    <Dock label={t('atelier.detailOf', { name: t('common.policies') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
+      tabs={[{ key: open.id, title: open.name, icon: 'policy' }]} onClose={() => setOpenId(null)}>
+      <DockBody icon="policy" title={open.name} badge={pill(open)} section={section} onSection={setSection}
+        sectionsLabel={t('atelier.sectionsOf', { name: open.name })} sections={[['overview', t('atelier.overview')]]}
+        actions={<>
+          {canWrite('policies') && <Btn icon="settings" id="policy-edit" write onClick={() => setDialog({ kind: 'form', editing: open })}>{t('common.edit')}</Btn>}
+          {canWrite('policies') && (
+            <Btn icon={open.is_active ? 'block' : 'check'} id="policy-toggle" write disabled={busy || undefined} onClick={() => toggleActive(open)}>
+              {open.is_active ? t('policies.disable') : t('policies.enable')}
+            </Btn>
+          )}
+          {canDelete('policies') && <Btn tone="danger" icon="block" id="policy-delete" onClick={() => setDialog({ kind: 'delete', policy: open })}>{t('policies.deletePolicy')}…</Btn>}
+        </>}>
+        <div className="module-detail">
+          <Section title={t('atelier.properties')}>
+            <Props items={[
+              [t('policies.scope'), scopeOf(open)],
+              [t('atelier.state'), pill(open)],
+              [t('policies.operations'), operationsOf(open)],
+              [t('policies.priority'), <span className="mono">{open.priority}</span>],
+              [t('policies.approval'), approvalOf(open)],
+              [t('common.createdAt'), formatDate(open.created_at)],
+              open.created_by && [t('common.createdBy'), open.created_by],
+            ]} />
+          </Section>
+          <Section title={t('atelier.summary')}>
+            <p className="summary">{open.description || <span className="muted">{t('policies.noDescription')}</span>}</p>
+          </Section>
+          <Section title={t('policies.rules')}>
+            <Props items={[
+              r.max_validity_days > 0 && [t('policies.maxValidity'), r.max_validity_days],
+              r.san_restrictions?.max_dns_names > 0 && [t('policies.maxSANs'), r.san_restrictions.max_dns_names],
+              [t('policies.allowedKeyTypes'), r.allowed_key_types?.length ? r.allowed_key_types.join(', ') : <span className="muted">{t('policies.anyKeyType')}</span>],
+              [t('policies.allowedDigests'), r.allowed_digests?.length
+                ? r.allowed_digests.map(d => DIGEST_OPTIONS.find(o => o.value === d)?.label || d).join(', ')
+                : <span className="muted">{t('policies.anyDigest')}</span>],
+              r.san_restrictions?.dns_pattern && [t('policies.dnsPattern'), <span className="mono">{r.san_restrictions.dns_pattern}</span>],
+            ]} />
+          </Section>
+          {open.requires_approval && (
+            <Section title={t('policies.approvalWorkflow')}>
+              <Props items={[
+                [t('policies.approvalGroup'), open.approval_group_name || '—'],
+                [t('policies.minApprovers'), open.min_approvers],
+              ]} />
+            </Section>
           )}
         </div>
-      </div>
-
-      {/* Actions */}
-      {canWrite('policies') && (
-        <div className="border-t border-border pt-3 flex gap-2">
-          <Button type="button" size="sm" onClick={() => openEditModal(selectedPolicy)}>
-            <PencilSimple size={14} className="mr-1" /> {t('common.edit')}
-          </Button>
-          <Button type="button" size="sm" variant="secondary" onClick={() => handleToggle(selectedPolicy)}>
-            <Power size={14} className="mr-1" />
-            {selectedPolicy.is_active ? t('policies.disable') : t('policies.enable')}
-          </Button>
-        </div>
-      )}
-    </div>
-  ) : null
-
-  const handleApplyFilterPreset = useCallback((filters) => {
-    if (filters.type) setFilterType(Array.isArray(filters.type) ? filters.type : [filters.type])
-    else setFilterType([])
-    if (filters.status) setFilterStatus(Array.isArray(filters.status) ? filters.status : [filters.status])
-    else setFilterStatus([])
-  }, [])
-
-  // Toolbar filters
-  const toolbarFilters = [
-    {
-      key: 'type',
-      label: t('common.type'),
-      type: 'multiSelect',
-      value: filterType,
-      onChange: setFilterType,
-      placeholder: t('policies.allTypes'),
-      options: policyTypeOptions,
-    },
-    {
-      key: 'status',
-      label: t('common.status'),
-      type: 'multiSelect',
-      value: filterStatus,
-      onChange: setFilterStatus,
-      placeholder: t('policies.allStatuses'),
-      options: [
-        { value: 'active', label: t('policies.active') },
-        { value: 'inactive', label: t('policies.inactive') },
-      ],
-    },
-  ]
+      </DockBody>
+    </Dock>
+  )
 
   return (
-    <>
-      <ResponsiveLayout
-        title={t('policies.title')}
-        subtitle={t('policies.subtitle')}
-        icon={Gavel}
-        stats={stats}
-        activeStatFilter={filterStatus}
-        onStatClick={(stat) => {
-          if (!stat.filterValue) {
-            setFilterStatus([])
-          } else {
-            setFilterStatus(prev => {
-              if (prev.includes(stat.filterValue)) {
-                return prev.filter(v => v !== stat.filterValue)
-              }
-              return [...prev, stat.filterValue]
-            })
-          }
-        }}
-        helpPageKey="policies"
-        actions={canWrite('policies') ? (
-          <Button type="button" onClick={openCreateModal}>
-            <Plus size={16} className="mr-1.5" /> {t('policies.createPolicy')}
-          </Button>
-        ) : null}
-        slideOverOpen={!!selectedPolicy}
-        slideOverTitle={selectedPolicy?.name}
-        slideOverContent={slideOverContent}
-        onSlideOverClose={() => setSelectedPolicy(null)}
-        loading={loading}
-      >
-        {fipsActive && (
-          <div role="note" className="mx-4 mt-3 flex items-start gap-2 rounded-lg px-3 py-2 text-sm bg-status-info-op10 text-status-info">
-            <ShieldCheck size={16} className="mt-0.5 shrink-0" />
-            <div>
-              <div className="font-medium">{t('policies.fipsRulesTitle')}</div>
-              <div className="text-text-secondary">{t('policies.fipsRulesDesc')}</div>
-            </div>
+    <Zone dock={dock} after={<>
+      {dialog?.kind === 'form' && (
+        <PolicyDialog editing={dialog.editing} cas={cas} groups={groups} keyTypeOptions={keyTypeOptions} saving={saving}
+          onSave={save} onClose={() => setDialog(null)} />
+      )}
+      {dialog?.kind === 'delete' && (
+        <AtelierDialog title={t('policies.deletePolicy')} subtitle={dialog.policy.name} size="narrow" onClose={() => setDialog(null)} testId="policy-delete-dialog">
+          <div className="notice warn"><Icon name="warning" />{t('policies.deleteConfirm', { name: dialog.policy.name })}</div>
+          <div className="modal-actions">
+            <Btn data-action="close-modal" onClick={() => setDialog(null)}>{t('common.cancel')}</Btn>
+            <Btn tone="danger" icon="block" disabled={busy || undefined} onClick={() => remove(dialog.policy)}>{t('common.delete')}</Btn>
           </div>
+        </AtelierDialog>
+      )}
+    </>}>
+      <PageHead title={t('common.policies')} total={t('policies.unit', { count: policies.length })} intent={t('shell.moduleDesc.policies')}
+        actions={create && <Btn tone="primary" icon="plus" id="policy-new" onClick={create.onClick}>{create.label}</Btn>} />
+      {platform.fips && (
+        <div className="notice" role="note"><Icon name="shield" /><span><strong>{t('policies.fipsRulesTitle')}</strong> {t('policies.fipsRulesDesc')}</span></div>
+      )}
+      <ListView label={t('common.policies')} caption={t('policies.caption')} icon="policy" rows={rows} loading={loading}
+        filters={{ views, active, onChange: setState, label: t('policies.filterByState') }}
+        toolbar={(
+          <Toolbar>
+            <SearchField id="policy-search" name="q" label={t('policies.searchPlaceholder')} placeholder={t('policies.searchPlaceholder')} value={query} onChange={setQuery} />
+            <FilterSelect id="policy-operation" label={t('policies.operations')} value={type} onChange={setType}
+              options={[{ value: '', label: t('policies.allTypes') }, ...POLICY_TYPES.map(o => ({ value: o.value, label: t(o.labelKey) }))]} />
+          </Toolbar>
         )}
-        <ResponsiveDataTable
-          data={filteredPolicies}
-          columns={columns}
-          loading={loading}
-          selectedId={selectedPolicy?.id}
-          onRowClick={setSelectedPolicy}
-          rowActions={rowActions}
-          searchable
-          searchPlaceholder={t('policies.searchPlaceholder')}
-          searchKeys={['name', 'description', 'policy_type', 'ca_name']}
-          sortable
-          defaultSort={{ key: 'priority', direction: 'asc' }}
-          toolbarFilters={toolbarFilters}
-          filterPresetsKey="ucm-policies-presets"
-          densityStorageKey="ucm-policies-density"
-          onApplyFilterPreset={handleApplyFilterPreset}
-          emptyIcon={Gavel}
-          emptyTitle={t('policies.noPolicies')}
-          emptyDescription={t('policies.noPoliciesDesc')}
-          emptyAction={canWrite('policies') ? (
-            <Button type="button" onClick={openCreateModal} size="sm">
-              <Plus size={14} className="mr-1" /> {t('policies.createPolicy')}
-            </Button>
-          ) : null}
-        />
-      </ResponsiveLayout>
-
-      {/* Create/Edit Modal */}
-      <Modal
-        open={showModal}
-        onOpenChange={(open) => { if (!open) { setShowModal(false); setEditing(null) } }}
-        title={editing ? t('policies.editPolicy') : t('policies.createPolicy')}
-        size="lg"
-      >
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          {/* Basic Info */}
-          <Input
-            label={t('policies.policyName')}
-            value={formData.name}
-            onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
-            placeholder={t('policies.policyNamePlaceholder')}
-            required
-          />
-
-          <fieldset>
-            <legend className="text-sm font-medium text-text-primary mb-2">{t('policies.operations')}</legend>
-            <div className="space-y-2">
-              {POLICY_TYPES.map(op => (
-                <label key={op.value} className="flex items-start gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={(formData.operations || []).includes(op.value)}
-                    onChange={() => toggleOperation(op.value)}
-                    className="rounded border-border mt-0.5"
-                  />
-                  <span>
-                    <span className="text-sm text-text-primary">{t(op.labelKey)}</span>
-                    <span className="block text-xs text-text-tertiary">{t(op.helpKey)}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-            {!(formData.operations || []).length && (
-              <p className="text-xs text-status-danger mt-1">{t('policies.operationsRequired')}</p>
-            )}
-          </fieldset>
-
-          <Textarea
-            label={t('common.description')}
-            value={formData.description}
-            onChange={(e) => setFormData(p => ({ ...p, description: e.target.value }))}
-            placeholder={t('policies.descriptionPlaceholder')}
-            rows={2}
-          />
-
-          {/* Scope */}
-          <div className="border-t border-border pt-4">
-            <h4 className="text-sm font-medium text-text-primary mb-3 flex items-center gap-1.5">
-              <Certificate size={16} /> {t('policies.scope')}
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Select
-                label={t('policies.targetCA')}
-                value={formData.ca_id?.toString() || ''}
-                onChange={(val) => setFormData(p => ({ ...p, ca_id: val ? parseInt(val, 10) : null }))}
-                options={[
-                  { value: '', label: t('policies.allCAs') },
-                  ...cas.map(ca => ({ value: ca.id.toString(), label: ca.common_name })),
-                ]}
-              />
-              <Input
-                label={t('policies.priority')}
-                type="number"
-                value={formData.priority}
-                onChange={(e) => setFormData(p => ({ ...p, priority: parseInt(e.target.value) || 100 }))}
-                min={1}
-                max={1000}
-              />
-            </div>
-          </div>
-
-          {/* Rules */}
-          <div className="border-t border-border pt-4">
-            <h4 className="text-sm font-medium text-text-primary mb-1 flex items-center gap-1.5">
-              <Gavel size={16} /> {t('policies.rules')}
-            </h4>
-            <p className="text-xs text-text-tertiary mb-3">{t('policies.rulesEnforcedHelp')}</p>
-            {!(formData.operations || []).some(op => op === 'issuance' || op === 'renewal') && (
-              <p className="text-xs text-status-warning mb-3">{t('policies.rulesRevocationOnly')}</p>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                label={t('policies.maxValidity')}
-                type="number"
-                value={formData.rules.max_validity_days}
-                onChange={(e) => updateRule('max_validity_days', parseInt(e.target.value) || 397)}
-                min={1}
-                max={3650}
-              />
-              <Input
-                label={t('policies.maxSANs')}
-                type="number"
-                value={formData.rules.san_restrictions?.max_dns_names || 50}
-                onChange={(e) => setFormData(p => ({
-                  ...p,
-                  rules: {
-                    ...p.rules,
-                    san_restrictions: {
-                      ...p.rules.san_restrictions,
-                      max_dns_names: parseInt(e.target.value) || 50,
-                    },
-                  },
-                }))}
-                min={1}
-                max={500}
-              />
-            </div>
-
-            {/* Allowed Key Types */}
-            <div className="mt-3">
-              <label className="text-sm font-medium text-text-primary mb-2 block">
-                {t('policies.allowedKeyTypes')}
-              </label>
-              {[...new Set(shownKeyTypes.map(o => o.group))].map(group => (
-                <div key={group} className="mb-2">
-                  <div className="text-xs text-text-tertiary mb-1">{group}</div>
-                  <div className="flex flex-wrap gap-2">
-                    {shownKeyTypes.filter(opt => opt.group === group).map(opt => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => toggleKeyType(opt.value)}
-                        className={cn(
-                          'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
-                          formData.rules.allowed_key_types?.includes(opt.value)
-                            ? 'bg-accent-primary-op10 border-accent-primary text-accent-primary'
-                            : 'bg-bg-secondary border-border text-text-tertiary hover:border-border-hover'
-                        )}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              <BrainpoolNotice label={(formData.rules.allowed_key_types || []).find(isBrainpool)} />
-              <p className="text-xs text-text-tertiary mt-1">{t('policies.allowedKeyTypesHelp')}</p>
-            </div>
-
-            {/* Allowed signature hashes */}
-            <div className="mt-3">
-              <label className="text-sm font-medium text-text-primary mb-2 block">
-                {t('policies.allowedDigests')}
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {DIGEST_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    aria-pressed={!!formData.rules.allowed_digests?.includes(opt.value)}
-                    onClick={() => toggleDigest(opt.value)}
-                    className={cn(
-                      'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
-                      formData.rules.allowed_digests?.includes(opt.value)
-                        ? 'bg-accent-primary-op10 border-accent-primary text-accent-primary'
-                        : 'bg-bg-secondary border-border text-text-tertiary hover:border-border-hover'
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-text-tertiary mt-1">{t('policies.allowedDigestsHelp')}</p>
-            </div>
-
-            {/* DNS Pattern */}
-            <div className="mt-3">
-              <Input
-                label={t('policies.dnsPattern')}
-                value={formData.rules.san_restrictions?.dns_pattern || ''}
-                onChange={(e) => setFormData(p => ({
-                  ...p,
-                  rules: {
-                    ...p.rules,
-                    san_restrictions: {
-                      ...p.rules.san_restrictions,
-                      dns_pattern: e.target.value,
-                    },
-                  },
-                }))}
-                placeholder="*.company.com"
-              />
-            </div>
-          </div>
-
-          {/* Approval Workflow */}
-          <div className="border-t border-border pt-4">
-            <h4 className="text-sm font-medium text-text-primary mb-3 flex items-center gap-1.5">
-              <UsersThree size={16} /> {t('policies.approvalWorkflow')}
-            </h4>
-            <div className="flex items-center gap-3 mb-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.requires_approval}
-                  onChange={(e) => setFormData(p => ({ ...p, requires_approval: e.target.checked }))}
-                  className="rounded border-border"
-                />
-                <span className="text-sm text-text-primary">{t('policies.requireApproval')}</span>
-              </label>
-            </div>
-
-            {formData.requires_approval && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pl-6">
-                <Select
-                  label={t('policies.approvalGroup')}
-                  value={formData.approval_group_id?.toString() || ''}
-                  onChange={(val) => setFormData(p => ({ ...p, approval_group_id: val ? parseInt(val, 10) : null }))}
-                  options={[
-                    { value: '', label: t('policies.selectGroup') },
-                    ...groups.map(g => ({ value: g.id.toString(), label: g.name })),
-                  ]}
-                />
-                <Input
-                  label={t('policies.minApprovers')}
-                  type="number"
-                  value={formData.min_approvers}
-                  onChange={(e) => setFormData(p => ({ ...p, min_approvers: parseInt(e.target.value) || 1 }))}
-                  min={1}
-                  max={10}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Notifications */}
-          <div className="border-t border-border pt-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.notify_on_violation}
-                onChange={(e) => setFormData(p => ({ ...p, notify_on_violation: e.target.checked }))}
-                className="rounded border-border"
-              />
-              <Bell size={16} className="text-text-secondary" />
-              <span className="text-sm text-text-primary">{t('policies.notifyOnViolation')}</span>
-            </label>
-            <p className="text-xs text-text-secondary mt-1">{t('policies.notifyHelp')}</p>
-            {formData.notify_on_violation && (
-              <div className="mt-3">
-                <Textarea
-                  label={t('policies.notificationEmails')}
-                  value={emailsText}
-                  onChange={(e) => setEmailsText(e.target.value)}
-                  placeholder="pki-team@example.com"
-                  rows={2}
-                />
-                {parsedEmails.invalid.length > 0 ? (
-                  <p className="text-xs text-status-danger mt-1">
-                    {t('policies.invalidEmails', { emails: parsedEmails.invalid.join(', ') })}
-                  </p>
-                ) : (
-                  <p className="text-xs text-text-secondary mt-1">{t('policies.notificationEmailsHelp')}</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => { setShowModal(false); setEditing(null) }}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit" disabled={saving || !formData.name.trim() || !(formData.operations || []).length || parsedEmails.invalid.length > 0}>
-              {saving ? <LoadingSpinner size="sm" /> : (editing ? t('common.update') : t('common.create'))}
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Delete Confirmation */}
-      <Modal
-        open={!!showDeleteConfirm}
-        onOpenChange={(open) => { if (!open) setShowDeleteConfirm(null) }}
-        title={t('policies.deletePolicy')}
-        size="sm"
-      >
-        <div className="p-4">
-          <p className="text-text-secondary text-sm mb-4">
-            {t('policies.deleteConfirm', { name: showDeleteConfirm?.name })}
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setShowDeleteConfirm(null)}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="button" variant="danger" onClick={() => handleDelete(showDeleteConfirm)} disabled={actionInProgress}>
-              {actionInProgress ? <LoadingSpinner size="sm" /> : t('common.delete')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-    </>
+        title={(p) => p.name} status={pill} openedId={openId}
+        onOpen={(p) => { if (p.id !== openId) setSection('overview'); setOpenId(p.id) }}
+        columns={[
+          { id: 'scope', label: t('policies.scope'), cell: scopeOf, grow: true },
+          { id: 'operations', label: t('policies.operations'), cell: operationsOf },
+          { id: 'priority', label: t('policies.priority'), cell: (p) => p.priority, fit: true },
+          { id: 'approval', label: t('policies.approval'), cell: approvalOf },
+          { status: true },
+        ]}
+        error={loadError && (
+          <LoadError id="policies" title={t('policies.loadFailed')} onRetry={() => { setLoading(true); loadData() }} journal={hasPermission('read:audit') && '/audit'}
+            cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/policies', message: loadError.message }} />} />
+        )}
+        empty={narrowed && policies.length ? (
+          <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')}
+            onReset={() => { setQuery(''); setType(''); setState('') }} />
+        ) : (
+          <EmptyBlock id="policies" icon="policy" title={t('policies.noPolicies')} text={t('policies.noPoliciesDesc')} action={create} />
+        )}
+        footer={{ range: t('policies.range', { shown: rows.length, count: policies.length }) }} />
+    </Zone>
   )
 }

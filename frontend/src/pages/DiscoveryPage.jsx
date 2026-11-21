@@ -1,985 +1,341 @@
 /**
- * DiscoveryPage — Certificate Discovery with scan profiles, results & history
- * Pattern: CSRsPage (stats + sidebar tabs + table) 
+ * Discovery: the mockup's discovery module, a simplePage() list of analyses (Plage, Trouvés,
+ * Dernière analyse, État) with its one-object dock, on the server's scan profiles and their last
+ * run. The certificates found and the run history are the product's further views of the same
+ * page, with the scans, export, DNS resolution and removals the server allows (admin:system to
+ * scan, delete:certificates to remove a found certificate).
  */
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
-  Globe, MagnifyingGlass, ShieldCheck, Warning, WarningCircle, Clock,
-  ArrowsClockwise, Trash, Play, Plus, CheckCircle, XCircle,
-  ClockCounterClockwise, FolderOpen, Pencil,
-  Certificate, Export, MapPin, ArrowCounterClockwise,
-} from '@phosphor-icons/react'
-import {
-  ResponsiveLayout, ResponsiveDataTable,
-  Badge, Button, HelpCard,
-} from '../components'
-import { ConfirmModal } from '../components/FormModal'
+  Zone, Btn, Icon, PageHead, Toolbar, SearchField, FilterSelect, ListView, LoadError, LoadCause, EmptyBlock, NoMatch,
+} from '../components/atelier'
 import { discoveryService } from '../services'
 import { useNotification } from '../contexts'
-import { useMobile } from '../contexts/MobileContext'
 import { usePermission, useWebSocket } from '../hooks'
-import { formatDate, cn, extractCN, downloadBlob } from '../lib/utils'
-import QuickScanModal from './discovery/QuickScanModal'
-import ProfileFormModal from './discovery/ProfileFormModal'
-import DiscoveryFilterBar from './discovery/DiscoveryFilterBar'
-import DiscoveredDetailPanel from './discovery/DiscoveredDetailPanel'
-import ProfileDetailPanel from './discovery/ProfileDetailPanel'
-import RunDetailPanel from './discovery/RunDetailPanel'
+import { formatDate, downloadBlob } from '../lib/utils'
+import { ScanDialog, RemoveDialog } from './discovery/DiscoveryDialogs'
+import {
+  ScanDock, RunDock, FoundDock, FoundActions, ScanPill, RunPill, FoundPill,
+} from './discovery/DiscoveryDocks'
+import { lastRuns, scanState, runState, SCAN_TONES, RUN_TONES, durationLabel, cnOf, useScanFacts, runTitle, foundTitle } from './discovery/discoveryModel'
+
+const VIEWS = ['profiles', 'discovered', 'history']
+const VIEW_ICONS = { profiles: 'radar', discovered: 'cert', history: 'clock' }
+const pageOf = (res) => {
+  const data = res?.data ?? res
+  return Array.isArray(data) ? { items: data, total: data.length } : { items: data?.items ?? [], total: data?.total ?? data?.items?.length ?? 0 }
+}
 
 export default function DiscoveryPage() {
   const { t } = useTranslation()
-  const { isMobile } = useMobile()
   const { showSuccess, showError } = useNotification()
   const { canDelete, hasPermission } = usePermission()
-  // Scanning, profiles and the bulk operations ask for admin:system, which no
-  // role carries outside the admin wildcard. The page offered them on
-  // write:certificates and every one of those buttons answered 403.
+  // Scans, analyses, the DNS resolution and the purge ask for admin:system on the server
   const canScan = hasPermission('admin:system')
+  const canRemove = canDelete('certificates')
   const { subscribe } = useWebSocket({ showToasts: false })
   const [searchParams, setSearchParams] = useSearchParams()
+  const facts = useScanFacts()
 
-  // Tab state
-  const TABS = [
-    { id: 'discovered', label: t('discovery.tabDiscovered'), icon: Globe },
-    { id: 'profiles', label: t('discovery.tabProfiles'), icon: FolderOpen },
-    { id: 'history', label: t('discovery.tabHistory'), icon: ClockCounterClockwise },
-  ]
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'discovered')
-
-  // Data
+  const view = VIEWS.includes(searchParams.get('tab')) ? searchParams.get('tab') : 'profiles'
   const [loading, setLoading] = useState(true)
-  const [discovered, setDiscovered] = useState([])
-  const [discoveredTotal, setDiscoveredTotal] = useState(0)
+  const [loadError, setLoadError] = useState(null)
   const [profiles, setProfiles] = useState([])
   const [runs, setRuns] = useState([])
-  const [runsTotal, setRunsTotal] = useState(0)
-  const [stats, setStats] = useState({ total: 0, managed: 0, unmanaged: 0, expired: 0, expiring_soon: 0, errors: 0 })
-
-  // Scan state
+  const [found, setFound] = useState({ items: [], total: 0 })
+  const [stats, setStats] = useState({ total: 0, managed: 0, unmanaged: 0, errors: 0 })
   const [scanning, setScanning] = useState(false)
-  const [scanProgress, setScanProgress] = useState(null)
+  const [progress, setProgress] = useState(null)
+  const [opened, setOpened] = useState(null) // { view, id }
+  const [section, setSection] = useState('overview')
+  const [dialog, setDialog] = useState(null)
+  const [busy, setBusy] = useState(false)
 
-  // Selection (detail panel)
-  const [selectedItem, setSelectedItem] = useState(null)
-
-  // Modals
-  const [showProfileForm, setShowProfileForm] = useState(false)
-  const [editingProfile, setEditingProfile] = useState(null)
-  const [showQuickScan, setShowQuickScan] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState(null)
-
-  // Pagination
+  const [query, setQuery] = useState('')
+  const [scanView, setScanView] = useState('')
+  const [foundView, setFoundView] = useState('')
+  const [runView, setRunView] = useState('')
+  const [profileFilter, setProfileFilter] = useState('')
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(25)
 
-  // Search & Filters
-  const [discoveredSearch, setDiscoveredSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState([])   // [] = all, ['managed', 'unmanaged', 'error']
-  const [profileFilter, setProfileFilter] = useState(null)  // null = all, profile id
-
-  // Reset to first page and update search term (discovered tab)
-  const handleDiscoveredSearchChange = useCallback((val) => {
-    setPage(1)
-    setDiscoveredSearch(val)
-  }, [])
-
-  // ── Data loaders ──────────────────────────────────────
-  const loadStats = useCallback(async () => {
-    try {
-      const res = await discoveryService.getStats(profileFilter)
-      setStats(res.data ?? res)
-    } catch { /* silent */ }
-  }, [profileFilter])
-
   const loadProfiles = useCallback(async () => {
-    try {
-      const res = await discoveryService.getProfiles()
-      setProfiles(res.data ?? res ?? [])
-    } catch { /* silent */ }
+    const [p, r] = await Promise.all([discoveryService.getProfiles(), discoveryService.getRuns({ limit: 200 })])
+    setProfiles(pageOf(p).items)
+    setRuns(pageOf(r).items)
   }, [])
-
-  const loadDiscovered = useCallback(async () => {
-    try {
-      const params = { limit: perPage, offset: (page - 1) * perPage, search: discoveredSearch || undefined }
-      if (statusFilter.length > 0) params.status = statusFilter
-      if (profileFilter) params.profile_id = profileFilter
-      const res = await discoveryService.getAll(params)
-      const data = res.data ?? res
-      if (Array.isArray(data)) {
-        setDiscovered(data)
-        setDiscoveredTotal(data.length)
-      } else {
-        setDiscovered(data.items ?? [])
-        setDiscoveredTotal(data.total ?? data.items?.length ?? 0)
-      }
-    } catch { /* silent */ }
-  }, [page, perPage, discoveredSearch, JSON.stringify(statusFilter), profileFilter])
-
-  const loadRuns = useCallback(async () => {
-    try {
-      const params = { limit: 200 }
-      if (profileFilter) params.profile_id = profileFilter
-      const res = await discoveryService.getRuns(params)
-      const data = res.data ?? res
-      if (Array.isArray(data)) {
-        setRuns(data)
-        setRunsTotal(data.length)
-      } else {
-        setRuns(data.items ?? [])
-        setRunsTotal(data.total ?? data.items?.length ?? 0)
-      }
-    } catch { /* silent */ }
-  }, [profileFilter])
-
+  const loadFound = useCallback(async () => {
+    const params = { limit: perPage, offset: (page - 1) * perPage, search: query.trim() || undefined }
+    if (foundView) params.status = [foundView]
+    if (profileFilter) params.profile_id = profileFilter
+    const [res, st] = await Promise.all([discoveryService.getAll(params), discoveryService.getStats(profileFilter || null).catch(() => null)])
+    setFound(pageOf(res))
+    if (st) setStats(st.data ?? st)
+  }, [page, perPage, query, foundView, profileFilter])
   const loadAll = useCallback(async () => {
-    setLoading(true)
-    await Promise.all([loadStats(), loadProfiles(), loadDiscovered(), loadRuns()])
-    setLoading(false)
-  }, [loadStats, loadProfiles, loadDiscovered, loadRuns])
-
-  useEffect(() => { loadAll() }, [loadAll])
-
-  // ── WebSocket ─────────────────────────────────────────
-  useEffect(() => {
-    const unsub1 = subscribe('discovery.scan_started', () => {
-      setScanning(true)
-      setScanProgress({ scanned: 0, total: 0, found: 0 })
-    })
-    const unsub2 = subscribe('discovery.scan_progress', (data) => {
-      setScanProgress(prev => ({
-        scanned: data.scanned ?? prev?.scanned ?? 0,
-        total: data.total ?? prev?.total ?? 0,
-        found: data.found ?? prev?.found ?? 0,
-      }))
-    })
-    const unsub3 = subscribe('discovery.scan_complete', () => {
-      setScanning(false)
-      setScanProgress(null)
-      loadAll()
-    })
-    return () => { unsub1(); unsub2(); unsub3() }
-  }, [subscribe, loadAll])
-
-  // ── Handlers ──────────────────────────────────────────
-  const handleTabChange = (tabId) => {
-    setActiveTab(tabId)
-    setSelectedItem(null)
-    setPage(1)
-    if (tabId !== 'discovered') {
-      setStatusFilter([])
-    }
-    setSearchParams({ tab: tabId, ...(profileFilter ? { profile: profileFilter } : {}) })
-  }
-
-  // Filter helpers
-  const handleStatusFilter = (status) => {
-    setStatusFilter(prev => {
-      if (prev.includes(status)) return prev.filter(v => v !== status)
-      return [...prev, status]
-    })
-    setPage(1)
-  }
-
-  const handleProfileFilter = (id) => {
-    setProfileFilter(prev => prev === id ? null : id)
-    setPage(1)
-    setStatusFilter([])
-  }
-
-  const handleRetryScan = async (target, port) => {
+    setLoadError(null)
     try {
-      setScanning(true)
-      await discoveryService.scan({ targets: [`${target}:${port}`], ports: [port], timeout: 10 })
-    } catch (error) {
-      showError(error.message || t('discovery.scanFailed'))
+      await Promise.all([loadProfiles(), loadFound()])
+    } catch (err) {
+      setLoadError(err || {})
     } finally {
-      setScanning(false)
+      setLoading(false)
     }
-  }
+  }, [loadProfiles, loadFound])
+  useEffect(() => { loadAll() }, [loadAll])
+  const reload = useRef(loadAll)
+  reload.current = loadAll
 
-  const handleSaveProfile = async (formData) => {
+  useEffect(() => {
+    const off = [
+      subscribe('discovery.scan_started', () => { setScanning(true); setProgress({ scanned: 0, total: 0, found: 0 }) }),
+      subscribe('discovery.scan_progress', (d) => setProgress((p) => ({
+        scanned: d.scanned ?? p?.scanned ?? 0, total: d.total ?? p?.total ?? 0, found: d.found ?? p?.found ?? 0,
+      }))),
+      subscribe('discovery.scan_complete', () => { setScanning(false); setProgress(null); reload.current() }),
+    ]
+    return () => off.forEach((u) => u?.())
+  }, [subscribe])
+
+  const goView = (next) => {
+    setOpened(null)
+    setQuery('')
+    setPage(1)
+    setSearchParams(next === 'profiles' ? {} : { tab: next })
+  }
+  const act = async (fn, okMsg, failMsg) => {
     try {
-      if (editingProfile) {
-        await discoveryService.updateProfile(editingProfile.id, formData)
-        showSuccess(t('discovery.profileUpdated'))
-      } else {
-        await discoveryService.createProfile(formData)
-        showSuccess(t('discovery.profileCreated'))
-      }
-      await loadProfiles()
-      setShowProfileForm(false)
-      setEditingProfile(null)
-    } catch (error) {
-      showError(error.message || t('messages.errors.saveFailed'))
+      setBusy(true)
+      const out = await fn()
+      if (okMsg) showSuccess(typeof okMsg === 'function' ? okMsg(out) : okMsg)
+      return true
+    } catch (err) {
+      showError(err?.message || failMsg)
+      return false
+    } finally {
+      setBusy(false)
     }
   }
-
-  const handleDeleteProfile = async (id) => {
-    try {
-      await discoveryService.deleteProfile(id)
-      showSuccess(t('discovery.profileDeleted'))
-      loadProfiles()
-    } catch (error) {
-      showError(error.message || t('messages.errors.deleteFailed'))
-    }
-    setDeleteConfirm(null)
+  const startScan = async (call) => {
+    setScanning(true)
+    try { await call() } catch (err) { showError(err?.message || t('discovery.scanFailed')); setScanning(false) }
   }
 
-  const handleScanProfile = async (profileId) => {
-    try {
-      setScanning(true)
-      await discoveryService.scanProfile(profileId)
-    } catch (error) {
-      showError(error.message || t('discovery.scanFailed'))
-      setScanning(false)
-    }
+  const saveProfile = async (payload) => {
+    const editing = dialog?.profile
+    const ok = await act(() => (editing ? discoveryService.updateProfile(editing.id, payload) : discoveryService.createProfile(payload)),
+      editing ? t('discovery.profileUpdated') : t('discovery.profileCreated'), t('messages.errors.saveFailed'))
+    if (ok) { setDialog(null); loadProfiles().catch(() => {}) }
   }
-
-  const handleQuickScan = async (formData) => {
-    try {
-      setScanning(true)
-      setShowQuickScan(false)
-      await discoveryService.scan(formData)
-    } catch (error) {
-      showError(error.message || t('discovery.scanFailed'))
-      setScanning(false)
-    }
+  const quickScan = (payload) => { setDialog(null); startScan(() => discoveryService.scan(payload)) }
+  const retry = (c) => startScan(() => discoveryService.scan({ targets: [`${c.target}:${c.port}`], ports: [c.port], timeout: 10 }))
+  const retryErrors = () => {
+    const targets = found.items.filter((c) => c.status === 'error').map((c) => `${c.target}:${c.port}`)
+    if (targets.length) startScan(() => discoveryService.scan({ targets, timeout: 10 }))
   }
-
-  const handleDeleteDiscovered = async (id) => {
-    try {
-      await discoveryService.delete(id)
-      showSuccess(t('messages.success.delete'))
-      loadDiscovered()
-      loadStats()
-    } catch (error) {
-      showError(error.message)
-    }
-    setDeleteConfirm(null)
+  const remove = async () => {
+    const d = dialog
+    const ok = await act(() => (d.kind === 'removeProfile' ? discoveryService.deleteProfile(d.item.id)
+      : d.kind === 'removeFound' ? discoveryService.delete(d.item.id) : discoveryService.deleteAll()),
+    d.kind === 'removeProfile' ? t('discovery.profileDeleted') : d.kind === 'removeFound' ? t('messages.success.delete') : t('discovery.found.purged'),
+    t('messages.errors.deleteFailed'))
+    if (!ok) return
+    setDialog(null)
+    if (d.kind !== 'removeAll') setOpened(null)
+    loadAll()
   }
+  const exportFound = () => act(async () => {
+    // The file holds what the list holds: the same search, state and analysis
+    const params = { search: query.trim() || undefined }
+    if (foundView) params.status = [foundView]
+    if (profileFilter) params.profile_id = profileFilter
+    downloadBlob(await discoveryService.export('csv', params), 'discovered_certificates.csv')
+  }, t('discovery.exportSuccess'), t('discovery.exportFailed'))
+  const resolveDns = () => act(async () => {
+    const res = await discoveryService.bulkResolveDns()
+    loadFound().catch(() => {})
+    return res?.data ?? res
+  }, (d) => t('discovery.bulkDnsSuccess', { updated: d?.updated ?? 0, total: d?.total ?? 0 }), t('discovery.scanFailed'))
 
-  const handleDeleteAll = async () => {
-    try {
-      await discoveryService.deleteAll()
-      showSuccess(t('discovery.deleteAll'))
-      loadDiscovered()
-      loadStats()
-    } catch (error) {
-      showError(error.message)
-    }
-    setDeleteConfirm(null)
-  }
+  // ── Analyses: a profile and its last run ──
+  const last = useMemo(() => lastRuns(runs), [runs])
+  const stateOfScan = useCallback((p) => scanState(p, last.get(p.id)), [last])
+  const q = query.trim().toLowerCase()
+  const scanSearched = useMemo(() => [...profiles]
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+    .filter((p) => !q || [p.name, p.description, ...(Array.isArray(p.targets) ? p.targets : [])].some((v) => String(v || '').toLowerCase().includes(q))), [profiles, q])
+  const scanPresent = Object.keys(SCAN_TONES).filter((s) => profiles.some((p) => stateOfScan(p) === s))
+  const scanActive = scanPresent.includes(scanView) ? scanView : ''
+  const scanRows = scanSearched.filter((p) => !scanActive || stateOfScan(p) === scanActive)
 
-  const handleExport = async (format = 'csv') => {
-    try {
-      // The filters on screen: the file holds what the table holds
-      const params = { search: discoveredSearch || undefined }
-      if (statusFilter.length > 0) params.status = statusFilter
-      if (profileFilter) params.profile_id = profileFilter
-      const blob = await discoveryService.export(format, params)
-      downloadBlob(blob, `discovered_certificates.${format}`)
-      showSuccess(t('discovery.exportSuccess'))
-    } catch (error) {
-      showError(error.message || t('discovery.exportFailed'))
-    }
-  }
+  // ── Runs ──
+  const runSearched = useMemo(() => [...runs]
+    .sort((a, b) => new Date(b.started_at) - new Date(a.started_at))
+    .filter((r) => (!profileFilter || String(r.scan_profile_id) === String(profileFilter))
+      && (!q || String(runTitle(r, t)).toLowerCase().includes(q))), [runs, profileFilter, q, t])
+  const runPresent = Object.keys(RUN_TONES).filter((s) => runs.some((r) => runState(r) === s))
+  const runActive = runPresent.includes(runView) ? runView : ''
+  const runRows = runSearched.filter((r) => !runActive || runState(r) === runActive)
 
-  const handleBulkResolveDns = async () => {
-    try {
-      const res = await discoveryService.bulkResolveDns()
-      const data = res.data ?? res
-      showSuccess(t('discovery.bulkDnsSuccess', { updated: data.updated, total: data.total }))
-      loadDiscovered()
-    } catch (error) {
-      showError(error.message)
-    }
-  }
+  const openedItem = opened && (opened.view === 'profiles' ? profiles : opened.view === 'history' ? runs : found.items).find((x) => x.id === opened.id)
+  const open = (v) => (x) => { if (opened?.view !== v || opened?.id !== x.id) setSection('overview'); setOpened({ view: v, id: x.id }) }
+  const openedId = openedItem && opened.view === view ? opened.id : null
 
-  // ── Stats bar (clickable → filter) ─────────────────────
-  const statsBar = useMemo(() => [
-    { icon: Globe, label: t('common.total'), value: stats.total, variant: 'primary',
-      filterValue: null },
-    { icon: ShieldCheck, label: t('discovery.managed'), value: stats.managed, variant: 'success',
-      filterValue: 'managed' },
-    { icon: Warning, label: t('discovery.unmanaged'), value: stats.unmanaged, variant: 'warning',
-      filterValue: 'unmanaged' },
-    { icon: XCircle, label: t('common.expired'), value: stats.expired, variant: 'danger' },
-    ...(stats.expiring_soon > 0 ? [{ icon: Clock, label: t('discovery.expiringSoon'), value: stats.expiring_soon, variant: 'warning' }] : []),
-    ...(stats.errors > 0 ? [{ icon: WarningCircle, label: t('common.error'), value: stats.errors, variant: 'danger',
-      filterValue: 'error' }] : []),
-  ], [stats, t])
-
-  // ── Discovered columns ────────────────────────────────
-  const discoveredColumns = useMemo(() => [
-    {
-      key: 'subject',
-      header: t('common.commonName'),
-      sortable: true,
-      priority: 1,
-      render: (val, row) => {
-        const name = extractCN(row.subject) || row.target || t('common.unknown')
-        const isError = row.status === 'error'
-        return (
-          <div className="flex items-center gap-2">
-            <div className={cn(
-              "w-6 h-6 rounded-lg flex items-center justify-center shrink-0",
-              isError ? 'icon-bg-red' : row.status === 'managed' ? 'icon-bg-emerald' : 'icon-bg-orange'
-            )}>
-              {isError ? <XCircle size={14} weight="duotone" /> : <Certificate size={14} weight="duotone" />}
-            </div>
-            <div className="truncate">
-              <span className={cn("font-medium truncate", isError && "text-status-danger")}>{isError ? `${row.target}:${row.port}` : name}</span>
-              {isError && row.scan_error && (
-                <div className="text-2xs text-text-tertiary truncate" title={row.scan_error}>{row.scan_error}</div>
-              )}
-            </div>
-          </div>
-        )
-      }
-    },
-    {
-      key: 'target',
-      header: t('discovery.host'),
-      sortable: true,
-      priority: 2,
-      hideOnMobile: true,
-      render: (val, row) => (
-        <div className="text-sm">
-          <span className="text-text-secondary">{val || '—'}:{row.port || 443}</span>
-          {row.sni_hostname && (
-            <div className="text-2xs text-accent-primary truncate" title={`SNI: ${row.sni_hostname}`}>SNI: {row.sni_hostname}</div>
-          )}
-          {row.dns_hostname && (
-            <div className="text-2xs text-text-tertiary truncate">{row.dns_hostname}</div>
-          )}
-        </div>
-      )
-    },
-    {
-      key: 'status',
-      header: t('common.status'),
-      sortable: true,
-      priority: 2,
-      render: (val) => {
-        const cfg = {
-          managed: { variant: 'success', icon: ShieldCheck, label: t('discovery.managed') },
-          unmanaged: { variant: 'warning', icon: Warning, label: t('discovery.unmanaged') },
-          error: { variant: 'danger', icon: XCircle, label: t('common.error') },
-        }
-        const { variant, icon, label } = cfg[val] || cfg.error
-        return <Badge variant={variant} size="sm" icon={icon} dot>{label}</Badge>
-      }
-    },
-    {
-      key: 'not_after',
-      header: t('common.expires'),
-      sortable: true,
-      priority: 3,
-      hideOnMobile: true,
-      render: (val) => {
-        if (!val) return <span className="text-text-tertiary">—</span>
-        const d = new Date(val)
-        const now = new Date()
-        const days = Math.floor((d - now) / 86400000)
-        const isExpired = days < 0
-        const isExpiring = days >= 0 && days <= 30
-        return (
-          <span className={cn(
-            "text-xs whitespace-nowrap",
-            isExpired ? "text-status-danger" : isExpiring ? "text-status-warning" : "text-text-secondary"
-          )}>
-            {formatDate(val)}
-            {isExpired && <span className="ml-1">({t('common.expired')})</span>}
-            {isExpiring && <span className="ml-1">({days}d)</span>}
-          </span>
-        )
-      }
-    },
-    {
-      key: 'issuer',
-      header: t('common.issuer'),
-      sortable: true,
-      priority: 4,
-      hideOnMobile: true,
-      render: (val) => <span className="text-text-secondary truncate text-sm">{val || '—'}</span>
-    },
-    {
-      key: 'actions',
-      header: '',
-      priority: 1,
-      width: 80,
-      render: (_, row) => (
-        <div className="flex items-center gap-1">
-          {row.status === 'error' && canScan && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); handleRetryScan(row.target, row.port) }}
-              className="p-1.5 rounded-md hover:bg-bg-tertiary text-text-tertiary hover:text-accent-primary transition-colors"
-              title={t('discovery.retry')}
-            >
-              <ArrowCounterClockwise size={14} />
-            </button>
-          )}
-          {/* DELETE /api/v2/discovery/<id> asks for delete:certificates, the
-              same scope the certificates list uses for its own Delete. */}
-          {canDelete('certificates') && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'discovered', id: row.id }) }}
-              className="p-1.5 rounded-md hover:bg-bg-tertiary text-text-tertiary hover:text-status-danger transition-colors"
-              title={t('common.delete')}
-            >
-              <Trash size={14} />
-            </button>
-          )}
-        </div>
-      )
-    }
-  ], [t, canScan, canDelete])
-
-  // ── Profile columns ───────────────────────────────────
-  const profileColumns = useMemo(() => [
-    {
-      key: 'name',
-      header: t('common.name'),
-      sortable: true,
-      priority: 1,
-      render: (val, row) => (
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 icon-bg-violet">
-            <FolderOpen size={14} weight="duotone" />
-          </div>
-          <div className="min-w-0">
-            <span className="font-medium truncate block">{val}</span>
-            {row.description && (
-              <span className="text-xs text-text-tertiary truncate block">{row.description}</span>
-            )}
-          </div>
-        </div>
-      )
-    },
-    {
-      key: 'targets',
-      header: t('discovery.targets'),
-      priority: 2,
-      hideOnMobile: true,
-      render: (val, row) => {
-        const targets = row.targets_list || (typeof val === 'string' ? val.split(',') : val) || []
-        return (
-          <span className="text-text-secondary text-sm truncate">
-            {targets.slice(0, 3).join(', ')}
-            {targets.length > 3 && ` +${targets.length - 3}`}
-          </span>
-        )
-      }
-    },
-    {
-      key: 'schedule_interval_minutes',
-      header: t('discovery.schedule'),
-      priority: 3,
-      hideOnMobile: true,
-      render: (val) => {
-        if (!val || val === 0) return <Badge variant="secondary" size="sm">{t('discovery.manual')}</Badge>
-        const hours = Math.round(val / 60)
-        if (hours >= 24) {
-          const days = Math.round(hours / 24)
-          return <Badge variant="info" size="sm" icon={Clock}>{days}d</Badge>
-        }
-        return <Badge variant="info" size="sm" icon={Clock}>{hours}h</Badge>
-      }
-    },
-    {
-      key: 'schedule_enabled',
-      header: t('common.status'),
-      priority: 2,
-      render: (val) => (
-        <Badge variant={val ? 'success' : 'secondary'} size="sm" dot>
-          {val ? t('common.enabled') : t('common.disabled')}
-        </Badge>
-      )
-    },
-    {
-      key: 'actions',
-      header: '',
-      priority: 1,
-      width: 100,
-      render: (_, row) => (
-        <div className="flex items-center gap-1">
-          {canScan && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); handleScanProfile(row.id) }}
-              disabled={scanning}
-              className="p-1.5 rounded-md hover:bg-bg-tertiary text-text-tertiary hover:text-accent-primary transition-colors disabled:opacity-40"
-              title={t('discovery.runScan')}
-            >
-              <Play size={14} />
-            </button>
-          )}
-          {canScan && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setEditingProfile(row); setShowProfileForm(true) }}
-              className="p-1.5 rounded-md hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-colors"
-              title={t('common.edit')}
-            >
-              <Pencil size={14} />
-            </button>
-          )}
-          {canScan && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'profile', id: row.id }) }}
-              className="p-1.5 rounded-md hover:bg-bg-tertiary text-text-tertiary hover:text-status-danger transition-colors"
-              title={t('common.delete')}
-            >
-              <Trash size={14} />
-            </button>
-          )}
-        </div>
-      )
-    }
-  ], [t, scanning, canScan, handleScanProfile])
-
-  // ── History columns ───────────────────────────────────
-  const historyColumns = useMemo(() => [
-    {
-      key: 'profile_name',
-      header: t('discovery.profile'),
-      sortable: true,
-      priority: 1,
-      render: (val, row) => (
-        <div className="flex items-center gap-2">
-          <div className={cn(
-            "w-6 h-6 rounded-lg flex items-center justify-center shrink-0",
-            row.status === 'completed' ? 'icon-bg-emerald' : row.status === 'running' ? 'icon-bg-blue' : 'icon-bg-red'
-          )}>
-            <ClockCounterClockwise size={14} weight="duotone" />
-          </div>
-          <span className="font-medium truncate">{val || t('discovery.adHocScan')}</span>
-        </div>
-      )
-    },
-    {
-      key: 'status',
-      header: t('common.status'),
-      sortable: true,
-      priority: 2,
-      render: (val) => {
-        const cfg = {
-          completed: { variant: 'success', icon: CheckCircle, label: t('common.completed') },
-          running: { variant: 'info', icon: ArrowsClockwise, label: t('discovery.scanning') },
-          failed: { variant: 'danger', icon: XCircle, label: t('common.failed') },
-        }
-        const { variant, icon, label } = cfg[val] || { variant: 'secondary', icon: Clock, label: val }
-        return <Badge variant={variant} size="sm" icon={icon} dot={val === 'running'}>{label}</Badge>
-      }
-    },
-    {
-      key: 'certs_found',
-      header: t('discovery.certsFound'),
-      sortable: true,
-      priority: 3,
-      render: (val, row) => (
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-text-secondary">{val ?? 0}</span>
-          {row.errors_count > 0 && (
-            <Badge variant="danger" size="sm">{row.errors_count} err</Badge>
-          )}
-        </div>
-      )
-    },
-    {
-      key: 'targets_scanned',
-      header: t('discovery.targetsScanned'),
-      sortable: true,
-      priority: 4,
-      hideOnMobile: true,
-      render: (val) => (
-        <span className="text-sm text-text-secondary">{val ?? '—'}</span>
-      )
-    },
-    {
-      key: 'started_at',
-      header: t('common.date'),
-      sortable: true,
-      priority: 2,
-      render: (val) => (
-        <span className="text-xs text-text-secondary whitespace-nowrap">{formatDate(val)}</span>
-      )
-    },
-    {
-      key: 'duration_seconds',
-      header: t('discovery.duration'),
-      priority: 4,
-      hideOnMobile: true,
-      render: (val) => {
-        if (!val && val !== 0) return <span className="text-text-tertiary">—</span>
-        const secs = Math.round(val)
-        return <span className="text-xs text-text-secondary">{secs < 60 ? `${secs}s` : `${Math.round(secs / 60)}m`}</span>
-      }
-    }
-  ], [t])
-
-  // ── Filter Bar Component ─────────────────────────────
-  // ── Tab content ───────────────────────────────────────
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'discovered':
-        return (
-          <div className="flex flex-col h-full">
-            <DiscoveryFilterBar statusFilter={statusFilter} setStatusFilter={setStatusFilter} profileFilter={profileFilter} profiles={profiles} handleProfileFilter={handleProfileFilter} setPage={setPage} t={t} />
-            <div className="flex-1 min-h-0">
-              <ResponsiveDataTable
-            data={discovered}
-            columns={discoveredColumns}
-            loading={loading}
-            selectedId={selectedItem?.id}
-            onRowClick={(item) => item ? setSelectedItem(item) : setSelectedItem(null)}
-            searchable
-            searchPlaceholder={t('discovery.searchDiscovered')}
-            externalSearch={discoveredSearch}
-            onSearchChange={handleDiscoveredSearchChange}
-            columnStorageKey="ucm-discovery-columns"
-            densityStorageKey="ucm-discovery-density"
-            sortable
-            defaultSort={{ key: 'cn', direction: 'asc' }}
-            pagination={{
-              page,
-              total: discoveredTotal,
-              perPage,
-              onChange: setPage,
-              onPerPageChange: (v) => { setPerPage(v); setPage(1) }
-            }}
-            toolbarActions={(canScan || discovered.length > 0) && (
-              isMobile ? (canScan && (
-                <Button type="button" size="lg" onClick={() => setShowQuickScan(true)} disabled={scanning} className="w-11 h-11 p-0">
-                  <MagnifyingGlass size={22} weight="bold" />
-                </Button>
-              )) : (
-                <div className="flex items-center gap-2 flex-wrap justify-end">
-                  {scanning && scanProgress && scanProgress.total > 0 && (
-                    <div className="flex items-center gap-2 text-xs text-text-secondary mr-1">
-                      <div className="w-24 h-1.5 bg-bg-tertiary rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-accent-primary rounded-full transition-all"
-                          style={{ width: `${Math.round(scanProgress.scanned / scanProgress.total * 100)}%` }}
-                        />
-                      </div>
-                      <span className="tabular-nums whitespace-nowrap">{scanProgress.scanned}/{scanProgress.total}</span>
-                    </div>
-                  )}
-                  {discovered.length > 0 && (
-                    <>
-                      {canScan && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={handleBulkResolveDns}
-                          title={t('discovery.bulkResolveDns')}
-                        >
-                          <MapPin size={14} />
-                          {t('discovery.bulkResolveDns')}
-                        </Button>
-                      )}
-                      {canScan && stats.errors > 0 && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={async () => {
-                            const errorEntries = discovered.filter(d => d.status === 'error')
-                            if (!errorEntries.length) return
-                            const targets = errorEntries.map(e => `${e.target}:${e.port}`)
-                            try {
-                              setScanning(true)
-                              await discoveryService.scan({ targets, timeout: 10 })
-                            } catch (err) {
-                              showError(err.message || t('discovery.scanFailed'))
-                              setScanning(false)
-                            }
-                          }}
-                          className="text-status-danger hover:text-status-danger"
-                          title={t('discovery.retryAllErrors')}
-                        >
-                          <ArrowCounterClockwise size={14} />
-                          {t('discovery.retryAllErrors')}
-                        </Button>
-                      )}
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleExport('csv')}
-                      >
-                        <Export size={14} />
-                        {t('common.export')}
-                      </Button>
-                      {canScan && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setDeleteConfirm({ type: 'all' })}
-                          className="text-status-danger hover:text-status-danger"
-                        >
-                          <Trash size={14} />
-                          {t('discovery.deleteAll')}
-                        </Button>
-                      )}
-                    </>
-                  )}
-                  {canScan && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => setShowQuickScan(true)}
-                      disabled={scanning}
-                    >
-                      {scanning ? <ArrowsClockwise size={14} className="animate-spin" /> : <MagnifyingGlass size={14} />}
-                      {scanning ? t('discovery.scanning') : t('discovery.quickScan')}
-                    </Button>
-                  )}
-                </div>
-              )
-            )}
-            emptyIcon={Globe}
-            emptyTitle={t('discovery.noResults')}
-            emptyDescription={t('discovery.noResultsDesc')}
-            emptyAction={canScan && (
-              <Button type="button" onClick={() => setShowQuickScan(true)}>
-                <MagnifyingGlass size={16} />
-                {t('discovery.quickScan')}
-              </Button>
-            )}
-          />
-            </div>
-          </div>
-        )
-
-      case 'profiles':
-        return (
-          <ResponsiveDataTable
-            data={profiles}
-            columns={profileColumns}
-            loading={loading}
-            selectedId={selectedItem?.id}
-            onRowClick={(item) => item ? setSelectedItem(item) : setSelectedItem(null)}
-            searchable
-            searchPlaceholder={t('discovery.searchProfiles')}
-            searchKeys={['name', 'description', 'targets']}
-            columnStorageKey="ucm-discovery-profiles-columns"
-            sortable
-            defaultSort={{ key: 'name', direction: 'asc' }}
-            pagination={true}
-            toolbarActions={canScan && (
-              isMobile ? (
-                <Button type="button" size="lg" onClick={() => { setEditingProfile(null); setShowProfileForm(true) }} className="w-11 h-11 p-0">
-                  <Plus size={22} weight="bold" />
-                </Button>
-              ) : (
-                <Button type="button" size="sm" onClick={() => { setEditingProfile(null); setShowProfileForm(true) }}>
-                  <Plus size={14} weight="bold" />
-                  {t('discovery.createProfile')}
-                </Button>
-              )
-            )}
-            emptyIcon={FolderOpen}
-            emptyTitle={t('discovery.noProfiles')}
-            emptyDescription={t('discovery.noProfilesDesc')}
-            emptyAction={canScan && (
-              <Button type="button" onClick={() => { setEditingProfile(null); setShowProfileForm(true) }}>
-                <Plus size={16} />
-                {t('discovery.createProfile')}
-              </Button>
-            )}
-          />
-        )
-
-      case 'history':
-        return (
-          <ResponsiveDataTable
-            data={runs}
-            columns={historyColumns}
-            loading={loading}
-            selectedId={selectedItem?.id}
-            onRowClick={(item) => item ? setSelectedItem(item) : setSelectedItem(null)}
-            searchable
-            searchPlaceholder={t('discovery.searchHistory')}
-            searchKeys={['profile_name', 'status']}
-            columnStorageKey="ucm-discovery-history-columns"
-            sortable
-            defaultSort={{ key: 'started_at', direction: 'desc' }}
-            pagination={true}
-            emptyIcon={ClockCounterClockwise}
-            emptyTitle={t('discovery.noHistory')}
-            emptyDescription={t('discovery.noHistoryDesc')}
-          />
-        )
-
-      default:
-        return null
-    }
-  }
-
-  // ── Help content ──────────────────────────────────────
-  const helpContent = (
-    <div className="space-y-4">
-      <div className="visual-section">
-        <div className="visual-section-header">
-          <Globe size={16} className="status-primary-text" />
-          {t('discovery.title')}
-        </div>
-        <div className="visual-section-body">
-          <div className="quick-info-grid">
-            <div className="help-stat-card">
-              <div className="help-stat-value help-stat-value-primary">{stats.total}</div>
-              <div className="help-stat-label">{t('common.total')}</div>
-            </div>
-            <div className="help-stat-card">
-              <div className="help-stat-value help-stat-value-success">{stats.managed}</div>
-              <div className="help-stat-label">{t('discovery.managed')}</div>
-            </div>
-            <div className="help-stat-card">
-              <div className="help-stat-value help-stat-value-warning">{stats.unmanaged}</div>
-              <div className="help-stat-label">{t('discovery.unmanaged')}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <HelpCard title={t('discovery.aboutDiscovery')} variant="info">
-        {t('discovery.aboutDiscoveryDesc')}
-      </HelpCard>
-      <HelpCard title={t('discovery.quickScan')} variant="tip">
-        {t('discovery.quickScanHelp')}
-      </HelpCard>
-      <HelpCard title={t('discovery.helpScanProfilesTitle')} variant="info">
-        {t('discovery.helpScanProfiles')}
-      </HelpCard>
-      <HelpCard title={t('discovery.helpFiltersTitle')} variant="tip">
-        {t('discovery.helpFilters')}
-      </HelpCard>
-      <HelpCard title={t('discovery.helpErrorsTitle')} variant="warning">
-        {t('discovery.helpErrors')}
-      </HelpCard>
-      <HelpCard title={t('discovery.helpExportTitle')} variant="info">
-        {t('discovery.helpExport')}
-      </HelpCard>
-      <HelpCard title={t('discovery.helpSecurityTitle')} variant="info">
-        {t('discovery.helpSecurity')}
-      </HelpCard>
-    </div>
+  const dock = openedItem && opened.view === view && (
+    view === 'profiles' ? (
+      <ScanDock profile={openedItem} run={last.get(openedItem.id)} runs={runs} state={stateOfScan(openedItem)} section={section} onSection={setSection}
+        onClose={() => setOpened(null)}
+        actions={canScan && <>
+          <Btn icon="radar" id="scan-run" write disabled={scanning || undefined} onClick={() => startScan(() => discoveryService.scanProfile(openedItem.id))}>{t('discovery.scans.runNow')}</Btn>
+          <Btn icon="settings" id="scan-edit" write onClick={() => setDialog({ kind: 'profile', profile: openedItem, from: 'scan-edit' })}>{t('common.edit')}…</Btn>
+          <Btn tone="danger" icon="block" id="scan-remove" onClick={() => setDialog({ kind: 'removeProfile', item: openedItem, from: 'scan-remove' })}>{t('common.delete')}…</Btn>
+        </>} />
+    ) : view === 'history' ? (
+      <RunDock run={openedItem} onClose={() => setOpened(null)} />
+    ) : (
+      <FoundDock cert={openedItem} onClose={() => setOpened(null)}
+        actions={<FoundActions cert={openedItem} canScan={canScan} canRemove={canRemove} busy={scanning}
+          onRetry={retry} onRemove={(c) => setDialog({ kind: 'removeFound', item: c, from: 'found-remove' })} />} />
+    )
   )
 
-  // Tabs with counts
-  const tabsWithCounts = TABS.map(tab => ({
-    ...tab,
-    count: tab.id === 'discovered' ? discoveredTotal
-      : tab.id === 'profiles' ? profiles.length
-      : tab.id === 'history' ? runsTotal
-      : undefined
-  }))
+  const createScan = canScan ? { label: t('discovery.scans.create'), icon: 'plus', primary: true, onClick: () => setDialog({ kind: 'profile', profile: null, from: 'scan-new' }) } : undefined
+  const quick = canScan ? { label: t('discovery.quickScanAsk'), icon: 'radar', onClick: () => setDialog({ kind: 'quick', from: 'scan-quick' }) } : undefined
+  const others = VIEWS.filter((v) => v !== view)
+  const switches = others.map((v) => (
+    <Btn key={v} tone="quiet" icon={VIEW_ICONS[v]} data-view={v} onClick={() => goView(v)}>{t(`discovery.views.${v}`)}</Btn>
+  ))
+  const profileOptions = [{ value: '', label: t('discovery.allProfiles') }, ...profiles.map((p) => ({ value: String(p.id), label: p.name }))]
+  const search = (id, label) => <SearchField id={id} name="q" label={label} placeholder={label} value={query} onChange={(v) => { setQuery(v); setPage(1) }} />
+  const resetFilters = () => { setQuery(''); setScanView(''); setFoundView(''); setRunView(''); setProfileFilter(''); setPage(1) }
+  const noMatch = <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')} onReset={resetFilters} />
+  const error = loadError && (
+    <LoadError id="discovery" title={t('discovery.errors.loadFailed')} onRetry={() => { setLoading(true); loadAll() }} journal={hasPermission('read:audit') && '/audit'}
+      cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/discovery', message: loadError.message }} />} />
+  )
+  const progressNote = scanning && (
+    <div className="notice" role="status">
+      <Icon name="radar" />
+      <span>{progress?.total > 0 ? t('discovery.scans.progress', { scanned: progress.scanned, total: progress.total, found: progress.found }) : t('discovery.scanning')}</span>
+    </div>
+  )
+  const foundPages = Math.max(1, Math.ceil(found.total / perPage))
 
-  // Scanning progress subtitle
-  const subtitle = scanning && scanProgress
-    ? `${t('discovery.scanning')}… ${scanProgress.scanned}/${scanProgress.total}`
-    : t('discovery.subtitle')
-
-  // ── Detail panel content ────────────────────────────────
-  const getSlideOverTitle = () => {
-    if (!selectedItem) return ''
-    if (activeTab === 'discovered') return t('discovery.certDetails')
-    if (activeTab === 'profiles') return t('discovery.profileDetails')
-    return t('discovery.runDetails')
-  }
-
-  const getSlideOverContent = () => {
-    if (!selectedItem) return null
-    if (activeTab === 'discovered') return <DiscoveredDetailPanel item={selectedItem} t={t} />
-    if (activeTab === 'profiles') return <ProfileDetailPanel item={selectedItem} t={t} />
-    return <RunDetailPanel item={selectedItem} t={t} />
-  }
+  const head = {
+    profiles: { title: t('shell.moduleLabel.discovery'), total: t('discovery.scans.unit', { count: profiles.length }), intent: t('shell.moduleDesc.discovery') },
+    discovered: { title: t('discovery.views.discovered'), total: t('discovery.found.unit', { count: stats.total ?? found.total }), intent: t('discovery.found.intent') },
+    history: { title: t('discovery.views.history'), total: t('discovery.runs.unit', { count: runs.length }), intent: t('discovery.runs.intent') },
+  }[view]
 
   return (
-    <>
-      <ResponsiveLayout
-        title={t('discovery.title')}
-        subtitle={subtitle}
-        icon={Globe}
-        stats={statsBar}
-        activeStatFilter={statusFilter}
-        onStatClick={(filterValue) => handleStatusFilter(filterValue)}
-        tabs={tabsWithCounts}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        tabLayout="sidebar"
-        helpPageKey="discovery"
-        splitView={true}
-        splitEmptyContent={
-          <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
-              <Globe size={24} className="text-text-tertiary" />
-            </div>
-            <p className="text-sm text-text-secondary">{t('discovery.selectItem')}</p>
-          </div>
-        }
-        slideOverOpen={!!selectedItem}
-        onSlideOverClose={() => setSelectedItem(null)}
-        slideOverTitle={getSlideOverTitle()}
-        slideOverContent={getSlideOverContent()}
-      >
-        {renderContent()}
-      </ResponsiveLayout>
+    <Zone dock={dock} after={<>
+      {(dialog?.kind === 'profile' || dialog?.kind === 'quick') && (
+        <ScanDialog quick={dialog.kind === 'quick'} profile={dialog.profile} busy={busy} returnTo={dialog.from}
+          onSubmit={dialog.kind === 'quick' ? quickScan : saveProfile} onClose={() => setDialog(null)} />
+      )}
+      {dialog?.kind?.startsWith('remove') && (
+        <RemoveDialog busy={busy} onConfirm={remove} onClose={() => setDialog(null)} returnTo={dialog.from}
+          title={dialog.kind === 'removeProfile' ? t('discovery.scans.remove') : dialog.kind === 'removeFound' ? t('discovery.found.remove') : t('discovery.deleteAll')}
+          subtitle={dialog.item && (dialog.kind === 'removeProfile' ? dialog.item.name : foundTitle(dialog.item, t))}
+          text={dialog.kind === 'removeProfile' ? t('discovery.scans.removeText') : dialog.kind === 'removeFound' ? t('discovery.deleteDiscoveredConfirm') : t('discovery.deleteAllConfirm')}
+          confirm={dialog.kind === 'removeAll' ? t('discovery.deleteAll') : t('common.delete')} />
+      )}
+    </>}>
+      <PageHead title={head.title} total={head.total} intent={head.intent}
+        actions={<>
+          {switches}
+          {quick && <Btn icon="radar" id="scan-quick" disabled={scanning || undefined} onClick={quick.onClick}>{quick.label}</Btn>}
+          {view === 'profiles' && createScan && <Btn tone="primary" icon="plus" id="scan-new" onClick={createScan.onClick}>{createScan.label}</Btn>}
+        </>} />
+      {progressNote}
 
-      {/* Quick Scan Modal */}
-      <QuickScanModal
-        open={showQuickScan}
-        onClose={() => setShowQuickScan(false)}
-        onScan={handleQuickScan}
-        scanning={scanning}
-        t={t}
-      />
+      {view === 'profiles' && (
+        <ListView label={t('shell.moduleLabel.discovery')} caption={t('discovery.scans.caption')} icon="radar" rows={scanRows} loading={loading}
+          filters={{ views: [{ id: '', label: t('common.all'), count: scanSearched.length },
+            ...scanPresent.map((s) => ({ id: s, label: t(`discovery.scans.state.${s}`), count: scanSearched.filter((p) => stateOfScan(p) === s).length }))],
+          active: scanActive, onChange: setScanView, label: t('discovery.filterByState') }}
+          toolbar={<Toolbar>{search('scan-search', t('discovery.searchProfiles'))}</Toolbar>}
+          title={(p) => p.name} status={(p) => <ScanPill state={stateOfScan(p)} />} openedId={openedId} onOpen={open('profiles')}
+          columns={[
+            { id: 'range', label: t('discovery.form.range'), cell: (p) => facts.range(p), grow: true },
+            { id: 'found', label: t('discovery.scans.found'), cell: (p) => facts.found(p, last.get(p.id)) },
+            { id: 'last', label: t('discovery.scans.last'), cell: (p) => facts.last(p, last.get(p.id)) },
+            { status: true },
+          ]}
+          error={error}
+          empty={q || scanActive ? noMatch : (
+            <EmptyBlock id="discovery" icon="radar" title={t('discovery.scans.empty')} text={t('discovery.scans.emptyText')} action={createScan} />
+          )}
+          footer={{ range: t('discovery.scans.range', { shown: scanRows.length, count: profiles.length }) }} />
+      )}
 
-      {/* Profile Form Modal */}
-      <ProfileFormModal
-        open={showProfileForm}
-        onClose={() => { setShowProfileForm(false); setEditingProfile(null) }}
-        onSave={handleSaveProfile}
-        profile={editingProfile}
-        t={t}
-      />
+      {view === 'discovered' && (
+        <ListView label={t('discovery.views.discovered')} caption={t('discovery.found.caption')} icon="cert" rows={found.items} loading={loading}
+          filters={{ views: [
+            { id: '', label: t('common.all'), count: stats.total ?? found.total },
+            { id: 'managed', label: t('discovery.found.state.managed'), count: stats.managed ?? 0 },
+            { id: 'unmanaged', label: t('discovery.found.state.unmanaged'), count: stats.unmanaged ?? 0 },
+            ...(stats.errors > 0 ? [{ id: 'error', label: t('discovery.found.state.error'), count: stats.errors, warn: true }] : []),
+          ], active: foundView, onChange: (v) => { setFoundView(v); setPage(1) }, label: t('discovery.filterByState') }}
+          toolbar={(
+            <Toolbar>
+              {search('found-search', t('discovery.searchDiscovered'))}
+              <FilterSelect id="found-profile" label={t('discovery.filterByProfile')} value={profileFilter} onChange={(v) => { setProfileFilter(v); setPage(1) }} options={profileOptions} />
+              <Btn icon="download" id="found-export" disabled={busy || !found.total || undefined} onClick={exportFound}>{t('common.export')}</Btn>
+              {canScan && found.total > 0 && <Btn icon="globe" id="found-dns" write disabled={busy || undefined} onClick={resolveDns}>{t('discovery.bulkResolveDns')}</Btn>}
+              {canScan && stats.errors > 0 && <Btn icon="refresh" id="found-retry-all" write disabled={scanning || undefined} onClick={retryErrors}>{t('discovery.retryAllErrors')}</Btn>}
+              {canScan && found.total > 0 && <Btn tone="danger" icon="block" id="found-purge" onClick={() => setDialog({ kind: 'removeAll', from: 'found-purge' })}>{t('discovery.deleteAll')}…</Btn>}
+            </Toolbar>
+          )}
+          title={(c) => foundTitle(c, t)} status={(c) => <FoundPill cert={c} />} openedId={openedId} onOpen={open('discovered')}
+          rowActions={(c) => [
+            c.status === 'error' && canScan && { icon: 'refresh', label: t('discovery.retry'), write: true, onClick: retry },
+            canRemove && { icon: 'block', label: t('common.delete'), onClick: (x) => setDialog({ kind: 'removeFound', item: x }) },
+          ].filter(Boolean)}
+          columns={[
+            { id: 'host', label: t('discovery.host'), cell: (c) => <span className="mono">{c.target}:{c.port || 443}</span> },
+            { id: 'issuer', label: t('common.issuer'), cell: (c) => (c.status === 'error' ? c.scan_error : cnOf(c.issuer) || c.issuer || '—'), grow: true, muted: true },
+            { id: 'expires', label: t('common.expires'), cell: (c) => (c.not_after ? formatDate(c.not_after) : '—'), fit: true },
+            { status: true },
+          ]}
+          error={error}
+          empty={query.trim() || foundView || profileFilter ? noMatch : (
+            <EmptyBlock id="discovered" icon="cert" title={t('discovery.noDiscovered')} text={t('discovery.noResultsDesc')} action={quick} />
+          )}
+          footer={{
+            range: t('discovery.found.range', { start: found.total ? (page - 1) * perPage + 1 : 0, end: Math.min(page * perPage, found.total), count: found.total }),
+            pagination: foundPages > 1 || found.total > 10 ? { page, pages: foundPages, perPage, sizes: [10, 25, 50, 100], onPage: setPage, onPerPage: (n) => { setPerPage(n); setPage(1) } } : undefined,
+          }} />
+      )}
 
-      {/* Confirm Dialogs */}
-      <ConfirmModal
-        open={deleteConfirm?.type === 'profile'}
-        onClose={() => setDeleteConfirm(null)}
-        onConfirm={() => handleDeleteProfile(deleteConfirm?.id)}
-        title={t('discovery.deleteProfile')}
-        message={t('discovery.deleteProfileConfirm')}
-        confirmLabel={t('common.delete')}
-        variant="danger"
-      />
-      <ConfirmModal
-        open={deleteConfirm?.type === 'discovered'}
-        onClose={() => setDeleteConfirm(null)}
-        onConfirm={() => handleDeleteDiscovered(deleteConfirm?.id)}
-        title={t('common.delete')}
-        message={t('discovery.deleteDiscoveredConfirm')}
-        confirmLabel={t('common.delete')}
-        variant="danger"
-      />
-      <ConfirmModal
-        open={deleteConfirm?.type === 'all'}
-        onClose={() => setDeleteConfirm(null)}
-        onConfirm={handleDeleteAll}
-        title={t('discovery.deleteAll')}
-        message={t('discovery.deleteAllConfirm')}
-        confirmLabel={t('discovery.deleteAll')}
-        variant="danger"
-      />
-    </>
+      {view === 'history' && (
+        <ListView label={t('discovery.views.history')} caption={t('discovery.runs.caption')} icon="clock" rows={runRows} loading={loading}
+          filters={{ views: [{ id: '', label: t('common.all'), count: runSearched.length },
+            ...runPresent.map((s) => ({ id: s, label: t(`discovery.runs.state.${s}`), count: runSearched.filter((r) => runState(r) === s).length }))],
+          active: runActive, onChange: setRunView, label: t('discovery.filterByState') }}
+          toolbar={(
+            <Toolbar>
+              {search('run-search', t('discovery.searchHistory'))}
+              <FilterSelect id="run-profile" label={t('discovery.filterByProfile')} value={profileFilter} onChange={setProfileFilter} options={profileOptions} />
+            </Toolbar>
+          )}
+          title={(r) => runTitle(r, t)} status={(r) => <RunPill run={r} />} openedId={openedId} onOpen={open('history')}
+          columns={[
+            { id: 'started', label: t('discovery.startedAt'), cell: (r) => (r.started_at ? formatDate(r.started_at, { time: true }) : '—') },
+            { id: 'found', label: t('discovery.certsFound'), cell: (r) => r.certs_found ?? 0, fit: true },
+            { id: 'targets', label: t('discovery.targetsScanned'), cell: (r) => r.targets_scanned ?? '—', fit: true },
+            { id: 'duration', label: t('discovery.duration'), cell: (r) => durationLabel(r.duration_seconds) || '—', grow: true, muted: true },
+            { status: true },
+          ]}
+          error={error}
+          empty={q || runActive || profileFilter ? noMatch : <EmptyBlock id="history" icon="clock" title={t('discovery.noHistory')} text={t('discovery.noHistoryDesc')} />}
+          footer={{ range: t('discovery.runs.range', { shown: runRows.length, count: runs.length }) }} />
+      )}
+      <p className="phone-only">{others.map((v) => (
+        <Btn key={v} icon={VIEW_ICONS[v]} data-view={v} onClick={() => goView(v)}>{t(`discovery.views.${v}`)}</Btn>
+      ))}{quick && <Btn icon="radar" disabled={scanning || undefined} onClick={quick.onClick}>{quick.label}</Btn>}</p>
+    </Zone>
   )
 }

@@ -1,37 +1,34 @@
 /**
- * ReportsPage: the scheduled reports as a work queue grouped by next run, each
- * downloadable now; the reports without a schedule in the folded section below,
- * downloadable and schedulable. A name opens the report in the inspector
- * (schedule, runs, preview). Page actions: build a PDF, schedule a report.
+ * Reports: the mockup's reports module, a workView() of the scheduled reports grouped by their
+ * next run, each downloadable now, and its moduleInspector() dock (Rapport, Exécutions, then the
+ * product's Aperçu). The reports without a schedule take the folded section below the queue, where
+ * the mockup lists its runs (the server keeps none it serves). Page actions: compose a PDF,
+ * schedule a report (the mockup's scheduleDialog()).
  */
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { DownloadSimple, Plus, FilePdf, PauseCircle } from '@phosphor-icons/react'
-import { ResponsiveLayout } from '../components'
-import { WorkQueue, WorkButton, WorkRecord, WorkRecords, loadCause, ClockIcon } from '../components/work'
+import { Zone, PageHead, WorkView, Btn, RecordRow, LoadError, LoadCause } from '../components/atelier'
 import { reportsService, certificatesService } from '../services'
-import { useInspector } from '../contexts'
 import { usePermission } from '../hooks'
-import { useOpenEntity } from '../hooks/useOpenEntity'
 import { formatDate } from '../lib/utils'
 import { compactDue } from '../lib/relativeTime'
 import {
   REPORT_KEYS, reportName, reportDescription, scheduleOf, reportGroups, frequencyPill, formatLabel, reportFigure,
 } from './reports/reportModel'
 import { useReportActions } from './reports/useReportActions'
+import { ReportDock } from './reports/ReportDetail'
 
 export default function ReportsPage() {
   const { t } = useTranslation()
   const { hasPermission, canWrite, canRead } = usePermission()
-  const inspector = useInspector()
-  const openEntity = useOpenEntity()
-  const root = useRef(null)
 
   const [schedules, setSchedules] = useState({})
   const [pdfSections, setPdfSections] = useState([])
   const [state, setState] = useState('loading')
   const [failure, setFailure] = useState(null)
   const [stats, setStats] = useState(null)
+  const [openKey, setOpenKey] = useState(null)
+  const [section, setSection] = useState('report')
   const readsCertificates = canRead('certificates')
 
   const load = useCallback(async ({ quiet = false } = {}) => {
@@ -71,13 +68,15 @@ export default function ReportsPage() {
 
   const entries = REPORT_KEYS.map((key) => ({ key, schedule: scheduleOf(schedules, key) }))
   const unscheduled = entries.filter((e) => !e.schedule.enabled)
-  const open = (e) => openEntity('report', e.key, { data: e })
-  const activeKey = inspector?.activeKey || ''
-  const openedId = activeKey.startsWith('report:') ? activeKey.slice(7) : undefined
+  const opened = entries.find((e) => e.key === openKey) || null
+  const open = (e) => {
+    if (e.key !== openKey) setSection('report')
+    setOpenKey(e.key)
+  }
 
   const downloadButton = (e, disabled) => canExport && (
-    <WorkButton icon={DownloadSimple} disabled={disabled} onClick={() => actions.download(e.key)}
-      aria-label={t('reports.work.downloadNamed', { name: reportName(e.key, t) })}>{t('reports.download')}</WorkButton>
+    <Btn icon="download" disabled={disabled || undefined} onClick={() => actions.download(e.key)}
+      aria-label={t('reports.work.downloadNamed', { name: reportName(e.key, t) })}>{t('reports.download')}</Btn>
   )
 
   const groups = reportGroups(entries, t).map((g) => ({
@@ -98,73 +97,60 @@ export default function ReportsPage() {
   }))
   const scheduledCount = entries.length - unscheduled.length
 
-  const bulkActions = (canExport || canSchedule) ? (ids, clear) => (
+  const bulk = (canExport || canSchedule) ? (ids, clear) => (
     <>
-      {canExport && <WorkButton icon={DownloadSimple} onClick={() => actions.downloadMany(ids)}>{t('reports.download')}</WorkButton>}
-      {canSchedule && <WorkButton icon={PauseCircle} onClick={async () => { await actions.suspend(ids); clear() }}>{t('reports.work.suspend')}</WorkButton>}
+      {canExport && <Btn icon="download" onClick={() => actions.downloadMany(ids)}>{t('reports.download')}</Btn>}
+      {canSchedule && <Btn icon="block" write onClick={async () => { await actions.suspend(ids); clear() }}>{t('reports.work.suspend')}</Btn>}
     </>
   ) : undefined
 
+  const dock = opened && (
+    <ReportDock entry={opened} section={section} onSection={setSection} onClose={() => setOpenKey(null)} actions={actions} />
+  )
+
   return (
-    <>
-      <ResponsiveLayout
-        className="wk-page"
-        title={t('reports.title')}
-        total={state === 'ready' ? t('reports.work.total', { count: scheduledCount }) : ''}
+    <Zone dock={dock} after={actions.dialog}>
+      <PageHead title={t('reports.title')} total={state === 'ready' ? t('reports.work.total', { count: scheduledCount }) : ''}
         intent={t('reports.work.intent')}
-        helpPageKey="reports"
         actions={(canExport || canSchedule) && (
           <>
-            {canExport && (
-              <WorkButton quiet icon={FilePdf} onClick={actions.openPdf} className="wk-not-phone">{t('reports.work.customPdf')}</WorkButton>
-            )}
-            {canSchedule && <WorkButton primary icon={Plus} onClick={() => actions.openSchedule()}>{t('reports.work.schedule')}</WorkButton>}
+            {canExport && <Btn icon="file" id="report-pdf" onClick={() => actions.openPdf('report-pdf')}>{t('reports.work.customPdf')}</Btn>}
+            {canSchedule && <Btn tone="primary" icon="plus" id="report-schedule" data-action="report-schedule" onClick={() => actions.openSchedule()}>{t('reports.work.schedule')}</Btn>}
           </>
+        )} />
+      <WorkView
+        state={state}
+        error={(
+          <LoadError id="reports" title={t('reports.loadFailed')} onRetry={() => load()} journal={hasPermission('read:audit') && '/audit'}
+            cause={failure && <LoadCause error={{ status: failure.status, request: failure.status && 'GET /api/v2/reports/schedule', message: failure.message }} />} />
         )}
-      >
-        <WorkQueue
-          rootRef={root}
-          label={t('reports.title')}
-          state={state}
-          error={{ title: t('reports.loadFailed'), cause: loadCause(failure, t), onRetry: () => load(), journal: hasPermission('read:audit') && '/audit' }}
-          hint={bulkActions ? t('reports.work.hint') : t('reports.work.hintRead')}
-          groups={groups}
-          bulkActions={bulkActions}
-          openedId={openedId}
-          empty={{
-            title: t('reports.work.emptyTitle'),
-            text: t('reports.work.emptyText'),
-            action: canSchedule && <WorkButton icon={Plus} onClick={() => actions.openSchedule()}>{t('reports.work.schedule')}</WorkButton>,
-          }}
-          history={{
-            label: t('reports.work.unscheduled'),
-            count: unscheduled.length,
-            children: (
-              <WorkRecords empty={t('work.historyEmpty')}>
-                {unscheduled.map((e) => (
-                  <WorkRecord key={e.key}
-                    title={<button type="button" className="wk-subject" onClick={() => open(e)}>{reportName(e.key, t)}</button>}
-                    meta={reportDescription(e.key, t)}
-                    action={<>
-                      {downloadButton(e, false)}
-                      {canSchedule && (
-                        <WorkButton icon={ClockIcon} onClick={() => actions.openSchedule(e.key)}
-                          aria-label={t('reports.work.scheduleNamed', { name: reportName(e.key, t) })}>{t('reports.work.scheduleAsk')}</WorkButton>
-                      )}
-                    </>} />
-                ))}
-              </WorkRecords>
-            ),
-          }}
-          // On a phone the head keeps the mockup's one action: the PDF composer goes under the queue
-          after={canExport && (
-            <p className="wk-phone-only">
-              <WorkButton quiet icon={FilePdf} onClick={actions.openPdf}>{t('reports.work.customPdf')}</WorkButton>
-            </p>
-          )}
-        />
-      </ResponsiveLayout>
-      {actions.dialog}
-    </>
+        hint={bulk ? t('reports.work.hint') : t('reports.work.hintRead')}
+        groups={groups}
+        bulk={bulk}
+        openedId={openKey}
+        empty={{
+          title: t('reports.work.emptyTitle'),
+          text: t('reports.work.emptyText'),
+          action: canSchedule && <Btn icon="plus" data-action="report-schedule" onClick={() => actions.openSchedule()}>{t('reports.work.schedule')}</Btn>,
+        }}
+        history={{
+          label: t('reports.work.unscheduled'),
+          count: unscheduled.length,
+          children: unscheduled.map((e) => (
+            <RecordRow key={e.key}
+              title={<button type="button" className="text-link" data-item={e.key} data-open={e.key} onClick={() => open(e)}>{reportName(e.key, t)}</button>}
+              meta={reportDescription(e.key, t)}
+              action={<>
+                {downloadButton(e, false)}
+                {canSchedule && (
+                  <Btn icon="clock" write onClick={() => actions.openSchedule(e.key)}
+                    aria-label={t('reports.work.scheduleNamed', { name: reportName(e.key, t) })}>{t('reports.work.scheduleAsk')}</Btn>
+                )}
+              </>} />
+          )),
+        }}
+        after={canExport && <p className="phone-only"><Btn icon="file" onClick={() => actions.openPdf()}>{t('reports.work.customPdf')}</Btn></p>}
+      />
+    </Zone>
   )
 }

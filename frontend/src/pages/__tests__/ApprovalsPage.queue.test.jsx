@@ -30,6 +30,7 @@ vi.mock('../../hooks', () => ({
     hasPermission: () => stable.canWrite,
   }),
 }))
+vi.mock('../../hooks/useOpenEntity', () => ({ useOpenEntity: () => openEntity }))
 const api = vi.hoisted(() => ({ list: vi.fn(), approve: vi.fn(), reject: vi.fn(), getById: vi.fn(), getStats: vi.fn() }))
 vi.mock('../../services', () => ({ approvalsService: api, casService: { getAll: async () => ({ data: [{ id: 4, common_name: 'Services CA G2' }] }) } }))
 
@@ -70,17 +71,17 @@ describe('ApprovalsPage queue', () => {
 
   it('groups the open requests by their real deadline, soonest first', async () => {
     renderPage()
-    await screen.findByText('payments.example.com')
+    await screen.findByText('CSR à signer : payments.example.com')
     const soon = group('À traiter sous 48 h')
-    expect([...soon.querySelectorAll('.wk-subject')].map((b) => b.textContent))
+    expect([...soon.querySelectorAll('.work-subject')].map((b) => b.textContent))
       .toEqual(['CSR à signer : nodeadline.example.com', 'CSR à signer : payments.example.com'])
-    expect(within(group('Plus tard')).getByText('later.example.com')).toBeInTheDocument()
+    expect(within(group('Plus tard')).getByText('CSR à signer : later.example.com')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: /^En retard/ })).toBeNull()
   })
 
   it('draws a row as the mockup: type pill, requester, policy and authority, due date', async () => {
     renderPage()
-    const li = (await screen.findByText('payments.example.com')).closest('li')
+    const li = (await screen.findByText('CSR à signer : payments.example.com')).closest('li')
     expect(within(li).getByText('Approbation · CSR')).toBeInTheDocument()
     await waitFor(() => expect(within(li).getByText('Demandée par equipe-paiement il y a 20 h · Serveur TLS · Services CA G2')).toBeInTheDocument())
     expect(within(li).getByText('dans 28 h')).toBeInTheDocument()
@@ -124,7 +125,7 @@ describe('ApprovalsPage queue', () => {
       return { data: { certificate_issued: true, certificate: { id: 7 } } }
     })
     renderPage()
-    await screen.findByText('payments.example.com')
+    await screen.findByText('CSR à signer : payments.example.com')
     fireEvent.click(screen.getByRole('checkbox', { name: 'Tout sélectionner : À traiter sous 48 h' }))
     fireEvent.click(screen.getByRole('checkbox', { name: 'Sélectionner CSR à signer : later.example.com' }))
     const bar = screen.getByRole('group', { name: 'Actions groupées' })
@@ -139,7 +140,7 @@ describe('ApprovalsPage queue', () => {
     expect(within(outcome).getByRole('status')).toHaveTextContent('1 réussie, 2 échouées')
     expect(within(outcome).getByText(/nodeadline/).closest('li')).toHaveTextContent('You have already voted on this request')
     expect(within(outcome).getByText(/payments/).closest('li')).toHaveTextContent('CA offline')
-    expect(within(outcome).getByText(/later/).closest('li')).toHaveClass('is-ok')
+    expect(within(outcome).getByText(/later/).closest('li')).toHaveTextContent('réussie')
   })
 
   it('gives the focus back to the row button when a decision is left with Escape', async () => {
@@ -158,13 +159,13 @@ describe('ApprovalsPage queue', () => {
     const success = vi.spyOn(stable.notify, 'showSuccess')
     api.reject.mockResolvedValue({ data: {} })
     renderPage()
-    await screen.findByText('payments.example.com')
+    await screen.findByText('CSR à signer : payments.example.com')
     fireEvent.click(screen.getByRole('checkbox', { name: 'Tout sélectionner : À traiter sous 48 h' }))
     fireEvent.click(within(screen.getByRole('group', { name: 'Actions groupées' })).getByRole('button', { name: /Refuser…/ }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('2 demandes')).toBeInTheDocument()
     // The notice is the one sentence of the decision, as the mockup's
-    expect(dialog.querySelector('.wk-notice')).toHaveTextContent(/^Les demandes quittent la file, la barre d’état et la carte À traiter\.$/)
+    expect(dialog.querySelector('.notice')).toHaveTextContent(/^Les demandes quittent la file, la barre d’état et la carte À traiter\.$/)
     fireEvent.change(within(dialog).getByLabelText('Motif'), { target: { value: 'Mauvais modèle' } })
     fireEvent.click(within(dialog).getByTestId('decision-confirm'))
     await waitFor(() => expect(success).toHaveBeenCalledWith('2 demandes refusées'))
@@ -188,7 +189,7 @@ describe('ApprovalsPage queue', () => {
   it('offers neither decisions nor selection without write:approvals', async () => {
     stable.canWrite = false
     renderPage()
-    await screen.findByText('payments.example.com')
+    await screen.findByText('CSR à signer : payments.example.com')
     expect(screen.queryByRole('button', { name: /^Approuver/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /^Refuser/ })).toBeNull()
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
@@ -200,15 +201,34 @@ describe('ApprovalsPage queue', () => {
     const toggle = await screen.findByRole('button', { name: /^Traitées récemment/ })
     expect(toggle).toHaveTextContent('Traitées récemment1')
     fireEvent.click(toggle)
-    const li = screen.getByText('refused.example.com').closest('li')
+    const li = screen.getByText('#90 · refused.example.com').closest('li')
     expect(within(li).getByText('Refusée')).toBeInTheDocument()
     expect(li).toHaveTextContent(/bob · .* · Mauvais modèle/)
   })
 
-  it('opens a request in the inspector from its subject', async () => {
+  it('opens a request in the module dock from its subject, as the mockup\'s moduleInspector', async () => {
     renderPage()
     fireEvent.click(await screen.findByRole('button', { name: 'CSR à signer : payments.example.com' }))
-    expect(openEntity).toHaveBeenCalledWith('approval', 118, { data: expect.objectContaining({ id: 118 }) })
+    const dock = await screen.findByRole('complementary', { name: 'Détail : Approbations' })
+    expect(within(dock).getByRole('heading', { level: 2, name: 'CSR à signer : payments.example.com' })).toBeInTheDocument()
+    expect(within(dock).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Demande', 'Journal'])
+    expect(within(dock).getByRole('button', { name: 'Approuver CSR à signer : payments.example.com' })).toBeInTheDocument()
+    expect(openEntity).not.toHaveBeenCalled()
+    // The row of the open request is marked, as the mockup's
+    expect(screen.getAllByText('CSR à signer : payments.example.com')[0].closest('li')).toHaveClass('opened')
+  })
+
+  it('treats a request past its deadline as expired: out of the queue, never decidable', async () => {
+    rows = [req(130, 'lapsed.example.com', { expires_at: at(-1) })]
+    renderPage()
+    expect(await screen.findByText('Aucune demande en attente')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /^En retard/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /^Traitées récemment/ }))
+    const li = screen.getByText('#130 · lapsed.example.com').closest('li')
+    expect(within(li).getByText('Expirée')).toBeInTheDocument()
+    fireEvent.click(within(li).getByRole('button', { name: '#130 · lapsed.example.com' }))
+    const dock = await screen.findByRole('complementary', { name: 'Détail : Approbations' })
+    expect(within(dock).queryByRole('button', { name: /^Approuver/ })).toBeNull()
   })
 
   it('says the queue is empty with the mockup sentence and points to the policies', async () => {
@@ -224,6 +244,6 @@ describe('ApprovalsPage queue', () => {
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('HTTP 503')
     fireEvent.click(within(alert).getByRole('button', { name: 'Réessayer' }))
-    expect(await screen.findByText('payments.example.com')).toBeInTheDocument()
+    expect(await screen.findByText('CSR à signer : payments.example.com')).toBeInTheDocument()
   })
 })

@@ -5,8 +5,7 @@
  *  - reject: admin:key_recovery
  *  - recover: write:key_recovery, by the requester or an administrator of key recovery
  */
-import { Key } from '@phosphor-icons/react'
-import { ClockIcon } from '../../components/work/workIcons'
+export const recoveryName = (r) => r.cert_cn || r.cert_refid || `#${r.cert_id}`
 
 export const RECOVERY_TONES = { pending: 'warn', approved: 'good', rejected: 'bad', recovered: 'good', cancelled: 'muted' }
 
@@ -34,7 +33,7 @@ export function recoveryState(req, t) {
 /** The two groups of the queue: requests to approve, then approved keys to recover. */
 export function recoveryGroups(rows, t, dualControl) {
   return [
-    { id: 'approve', label: t(dualControl ? 'keyRecovery.work.groups.approveOther' : 'keyRecovery.work.groups.approve'), icon: ClockIcon, tone: 'warn', status: 'pending' },
-    { id: 'recover', label: t('keyRecovery.work.groups.recover'), icon: Key, tone: '', status: 'approved' },
+    { id: 'approve', label: t(dualControl ? 'keyRecovery.work.groups.approveOther' : 'keyRecovery.work.groups.approve'), icon: 'clock', tone: 'warn', status: 'pending' },
+    { id: 'recover', label: t('keyRecovery.work.groups.recover'), icon: 'key', tone: '', status: 'approved' },
   ].map(({ status, ...g }) => ({ ...g, requests: rows.filter((r) => r.status === status) }))
 }

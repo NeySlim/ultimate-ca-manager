@@ -1,10 +1,9 @@
 /**
- * Preview of a generated data report: its summary counts, then its rows in a
- * table (the first 200; the download holds them all).
+ * Preview of a generated data report: its summary counts in the mockup's props, then its rows
+ * in the module table of listView() (the first 200; the download holds them all).
  */
 import { useTranslation } from 'react-i18next'
-import { Play } from '@phosphor-icons/react'
-import { WorkButton } from '../../components/work'
+import { Btn, Props, Section } from '../../components/atelier'
 
 const SHOWN_ROWS = 200
 const label = (col) => col.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
@@ -17,14 +16,29 @@ function cell(value) {
   return s.length > 60 ? `${s.slice(0, 57)}…` : s
 }
 
+function Table({ name, head, rows }) {
+  return (
+    <div className="table-container">
+      <div className="table-scroll" role="region" tabIndex={0} aria-label={name}>
+        <table className="cert-table module-table">
+          {head && <thead><tr>{head.map((c) => <th key={c} scope="col">{label(c)}</th>)}</tr></thead>}
+          <tbody>{rows}</tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 export function ReportPreview({ report, busy, failed, canGenerate, onGenerate }) {
   const { t } = useTranslation()
   if (!report) {
     return (
-      <div>
-        <p className="wk-none">{t('reports.work.previewIntro')}</p>
-        <WorkButton icon={Play} disabled={!canGenerate || busy} onClick={onGenerate}>{t('reports.generate')}</WorkButton>
-        {failed && <p className="ins-notice is-bad" role="alert">{t('reports.generateFailed')}</p>}
+      <div className="module-detail">
+        <section>
+          <p className="muted small">{t('reports.work.previewIntro')}</p>
+          <p><Btn icon="refresh" disabled={!canGenerate || busy || undefined} onClick={onGenerate}>{t('reports.generate')}</Btn></p>
+          {failed && <p className="notice warn" role="alert">{t('reports.generateFailed')}</p>}
+        </section>
       </div>
     )
   }
@@ -32,40 +46,25 @@ export function ReportPreview({ report, busy, failed, canGenerate, onGenerate })
   // The audit summary holds one count table per category
   const grouped = report.items.length > 0 && report.items[0]?.category && report.items[0]?.data
   return (
-    <div className="wk-detail-grid" style={{ gridTemplateColumns: '1fr' }}>
+    <div className="module-detail">
       {summary.length > 0 && (
-        <dl className="ins-props">
-          {summary.map(([k, v]) => <div key={k} style={{ display: 'contents' }}><dt>{label(k)}</dt><dd>{typeof v === 'number' ? v.toLocaleString() : String(v)}</dd></div>)}
-        </dl>
+        <Section title={t('atelier.summary')}>
+          <Props items={summary.map(([k, v]) => [label(k), typeof v === 'number' ? v.toLocaleString() : String(v)])} />
+        </Section>
       )}
       {grouped ? report.items.map((item) => (
-        <section key={item.category}>
-          <h3 className="ins-section-title">{label(item.category)}</h3>
-          <div className="wk-table-box">
-            <table className="wk-table">
-              <tbody>
-                {Object.entries(item.data || {}).map(([k, v]) => <tr key={k}><td className="ins-mono">{k}</td><td>{v}</td></tr>)}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )) : report.items.length > 0 ? (
-        <div className="wk-table-box" role="region" tabIndex={0} aria-label={t('reports.generatedPreview')}>
-          <table className="wk-table">
-            <thead><tr>{report.columns.map((c) => <th key={c} scope="col">{label(c)}</th>)}</tr></thead>
-            <tbody>
-              {report.items.slice(0, SHOWN_ROWS).map((row, i) => (
-                <tr key={row.id ?? i}>{report.columns.map((c) => <td key={c}>{cell(row[c])}</td>)}</tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <p className="wk-none">{t('common.noData')}</p>
+        <Section key={item.category} title={label(item.category)}>
+          <Table name={label(item.category)} rows={Object.entries(item.data || {}).map(([k, v]) => <tr key={k}><td className="mono">{k}</td><td>{v}</td></tr>)} />
+        </Section>
+      )) : (
+        <Section title={t('reports.generatedPreview')}>
+          {report.items.length > 0 ? (
+            <Table name={t('reports.generatedPreview')} head={report.columns}
+              rows={report.items.slice(0, SHOWN_ROWS).map((row, i) => <tr key={row.id ?? i}>{report.columns.map((c) => <td key={c}>{cell(row[c])}</td>)}</tr>)} />
+          ) : <p className="muted small">{t('common.noData')}</p>}
+          <p className="small muted">{t('reports.work.previewCount', { count: Math.min(report.items.length, SHOWN_ROWS), total: report.items.length })}</p>
+        </Section>
       )}
-      <p className="ins-muted">
-        {t('reports.work.previewCount', { count: Math.min(report.items.length, SHOWN_ROWS), total: report.items.length })}
-      </p>
     </div>
   )
 }

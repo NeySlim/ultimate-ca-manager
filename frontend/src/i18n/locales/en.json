@@ -5597,6 +5597,12 @@
   "policies": {
     "title": "Certificate Policies",
     "subtitle": "Manage issuance rules, key requirements, and approval workflows",
+    "unit_one": "{{count}} policy",
+    "unit_other": "{{count}} policies",
+    "range_one": "{{shown}} of {{count}} policy",
+    "range_other": "{{shown}} of {{count}} policies",
+    "caption": "Policies. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
     "fipsRulesTitle": "FIPS rules active (read only)",
     "fipsRulesDesc": "FIPS mode applies a system policy ahead of these: RSA keys of an even length from 2048 to 16384 bits, EC P-256 to P-521, and Ed25519, Ed448 and ML-DSA when the loaded FIPS module approves them; SHA-256 to SHA-512 signatures. Policies here can only narrow it.",
     "total": "Total",
@@ -5611,7 +5617,7 @@
     "descriptionPlaceholder": "Describe the purpose of this policy",
     "scope": "Scope",
     "targetCA": "Target CA",
-    "allCAs": "All CAs",
+    "allCAs": "All authorities",
     "allTypes": "All Types",
     "allStatuses": "All Statuses",
     "priority": "Priority",
@@ -5634,7 +5640,7 @@
     "invalidEmails": "Invalid addresses: {{emails}}",
     "enable": "Enable",
     "disable": "Disable",
-    "noPolicies": "No policies defined",
+    "noPolicies": "No issuance policy",
     "noPoliciesDesc": "Create certificate policies to enforce issuance rules, key requirements, and approval workflows.",
     "searchPlaceholder": "Search policies...",
     "loadFailed": "Failed to load policies",
@@ -5654,7 +5660,9 @@
     },
     "allowedDigests": "Allowed Signature Hashes",
     "allowedKeyTypesHelp": "None selected: any key type is allowed.",
+    "anyKeyType": "Any key type",
     "allowedDigestsHelp": "None selected: any hash is allowed.",
+    "anyDigest": "Any hash",
     "operations": "Operations",
     "operationHelp": {
       "issuance": "The issue form, CSR signing and bulk signing, and the renewals an operator performs",
@@ -5663,7 +5671,12 @@
     },
     "operationsRequired": "Select at least one operation",
     "noOperation": "No operation",
-    "rulesRevocationOnly": "Rules apply to issuance and renewal only: a revocation policy is scoped by its CA, template and DNS pattern."
+    "noDescription": "No description.",
+    "rulesRevocationOnly": "Rules apply to issuance and renewal only: a revocation policy is scoped by its CA, template and DNS pattern.",
+    "state": {
+      "applied": "Applied",
+      "inactive": "Disabled"
+    }
   },
   "approvals": {
     "title": "Approval Requests",
@@ -5742,7 +5755,6 @@
       "votes_one": "{{count}} of {{need}} approvals",
       "votes_other": "{{count}} of {{need}} approvals",
       "groups": {
-        "overdue": "Overdue",
         "soon": "To handle within 48 h",
         "later": "Later"
       },
@@ -6571,7 +6583,7 @@
     "exportFailed": "Export failed",
     "exportSuccess": "Export completed",
     "filterByProfile": "Filter by profile",
-    "filterByStatus": "Filter by status",
+    "filterByState": "Filter by state",
     "firstSeen": "First Seen",
     "groups": {
       "monitoring": "Monitoring",
@@ -6681,7 +6693,111 @@
     "helpExport": "Export discovered certificates as CSV or JSON. Apply filters first to export only the subset you need.",
     "helpExportTitle": "Export Results",
     "helpSecurity": "Discovery blocks internal/loopback addresses for SSRF protection. Targets are validated before scanning. All scan actions are audit-logged.",
-    "helpSecurityTitle": "Security"
+    "helpSecurityTitle": "Security",
+    "quickScanAsk": "Quick scan…",
+    "views": {
+      "profiles": "Analyses",
+      "discovered": "Found certificates",
+      "history": "Run history"
+    },
+    "scans": {
+      "unit_one": "{{count}} analysis",
+      "unit_other": "{{count}} analyses",
+      "range_one": "{{shown}} of {{count}} analysis",
+      "range_other": "{{shown}} of {{count}} analyses",
+      "caption": "Network analyses. Activate a name to open its detail.",
+      "create": "New analysis…",
+      "found": "Found",
+      "foundNew": "{{count}}, {{fresh}} new",
+      "last": "Last analysis",
+      "next": "Next analysis",
+      "notScanned": "Not analysed",
+      "interrupted": "Interrupted",
+      "plannedOn": "Planned on {{date}}",
+      "state": {
+        "running": "Running",
+        "done": "Completed",
+        "failed": "Failed",
+        "scheduled": "Scheduled",
+        "never": "Never run"
+      },
+      "noDescription": "No description.",
+      "runsTab": "Runs",
+      "runNow": "Analyse now",
+      "remove": "Delete the analysis",
+      "removeText": "The analysis and its schedule are deleted. The certificates it found stay in the found certificates.",
+      "empty": "No network analysis",
+      "emptyText": "An analysis lists the certificates exposed on a range of addresses, for example 192.0.2.0/24, to match them with the inventory.",
+      "progress": "Scan in progress: {{scanned}} of {{total}} targets, {{found}} certificates found."
+    },
+    "found": {
+      "unit_one": "{{count}} certificate",
+      "unit_other": "{{count}} certificates",
+      "range": "{{start}}–{{end}} of {{count}}",
+      "intent": "The certificates the analyses met on the network, matched with the inventory.",
+      "caption": "Found certificates. Activate a name to open its detail.",
+      "state": {
+        "managed": "In UCM",
+        "unmanaged": "Unknown to UCM",
+        "error": "In error"
+      },
+      "inInventory": "In the inventory",
+      "inDays_one": "in {{count}} day",
+      "inDays_other": "in {{count}} days",
+      "extensions": "Extensions",
+      "remove": "Delete the found certificate",
+      "purged": "Found certificates deleted"
+    },
+    "runs": {
+      "unit_one": "{{count}} run",
+      "unit_other": "{{count}} runs",
+      "range_one": "{{shown}} of {{count}} run",
+      "range_other": "{{shown}} of {{count}} runs",
+      "intent": "Every run of an analysis or a quick scan, newest first.",
+      "caption": "Runs. Activate a name to open its detail.",
+      "summary": "{{count}} certificates on {{targets}} targets",
+      "new": "New",
+      "changed": "Changed",
+      "trigger": "Started by",
+      "by": {
+        "manual": "Manual",
+        "scheduled": "Schedule"
+      },
+      "state": {
+        "running": "Running",
+        "completed": "Completed",
+        "failed": "Failed"
+      }
+    },
+    "form": {
+      "range": "Range",
+      "rangeHint": "One host name, address or IPv4 range per line, for example 192.0.2.0/24; a port can follow, as in mail.example.com:465.",
+      "nameRequired": "Name the analysis.",
+      "targetsRequired": "Give at least one host, address or range.",
+      "problem": {
+        "wildcard": "{{target}}: a DNS wildcard names no host; list the hosts.",
+        "ipv6Range": "{{target}}: IPv6 ranges are not scanned; list the addresses.",
+        "tooWide": "{{target}}: the range holds more than {{max}} hosts.",
+        "format": "{{target}}: not a host name, an address or a range."
+      },
+      "preset": "Common ports",
+      "presetOther": "Ports typed",
+      "presets": {
+        "https": "HTTPS (443)",
+        "alt": "HTTPS and 8443",
+        "common": "Every common TLS port"
+      },
+      "every": {
+        "0": "Manual only",
+        "60": "Every hour",
+        "360": "Every 6 hours",
+        "720": "Every 12 hours",
+        "1440": "Every day",
+        "10080": "Every week"
+      },
+      "timeoutHint": "Seconds per connection, 1 to 30.",
+      "workersHint": "Connections at once, 1 to 50."
+    }
   },
   "compliance": {
     "title": "Compliance Score",
@@ -8273,12 +8389,10 @@
     "selectRow": "Select {{name}}",
     "selectAll": "Select all: {{group}}",
     "loading": "Loading the queue…",
-    "retry": "Retry",
     "viewLog": "View the log",
     "bulkLabel": "Bulk actions",
     "selected_one": "{{count}} item selected",
     "selected_other": "{{count}} items selected",
-    "cancelSelection": "Clear selection",
     "historyEmpty": "Nothing yet.",
     "bulk": {
       "title": "Outcome",

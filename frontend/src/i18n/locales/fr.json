@@ -5610,6 +5610,12 @@
   "policies": {
     "title": "Politiques de certificats",
     "subtitle": "Gérer les règles d’émission, les exigences de clés et les workflows d’approbation",
+    "unit_one": "{{count}} politique",
+    "unit_other": "{{count}} politiques",
+    "range_one": "{{shown}} sur {{count}} politique",
+    "range_other": "{{shown}} sur {{count}} politiques",
+    "caption": "Politiques. Activez un nom pour ouvrir son détail.",
+    "filterByState": "Filtrer par état",
     "fipsRulesTitle": "Règles FIPS actives (lecture seule)",
     "fipsRulesDesc": "Le mode FIPS applique en amont une politique système : clés RSA de longueur paire de 2048 à 16384 bits, EC P-256 à P-521, et Ed25519, Ed448 et ML-DSA quand le module FIPS chargé les approuve ; signatures SHA-256 à SHA-512. Les politiques définies ici ne peuvent que la restreindre.",
     "total": "Total",
@@ -5622,9 +5628,9 @@
     "policyName": "Nom de la politique",
     "policyNamePlaceholder": "ex. Politique TLS Production",
     "descriptionPlaceholder": "Décrivez l’objectif de cette politique",
-    "scope": "Périmètre",
+    "scope": "Portée",
     "targetCA": "AC cible",
-    "allCAs": "Toutes les AC",
+    "allCAs": "Toutes les autorités",
     "allTypes": "Tous les types",
     "allStatuses": "Tous les statuts",
     "priority": "Priorité",
@@ -5647,7 +5653,7 @@
     "invalidEmails": "Adresses invalides : {{emails}}",
     "enable": "Activer",
     "disable": "Désactiver",
-    "noPolicies": "Aucune politique définie",
+    "noPolicies": "Aucune politique d’émission",
     "noPoliciesDesc": "Créez des politiques de certificats pour appliquer les règles d’émission, les exigences de clés et les workflows d’approbation.",
     "searchPlaceholder": "Rechercher des politiques...",
     "loadFailed": "Échec du chargement des politiques",
@@ -5667,7 +5673,9 @@
     },
     "allowedDigests": "Algorithmes de hachage de signature autorisés",
     "allowedKeyTypesHelp": "Aucun sélectionné : tous les types de clés sont autorisés.",
+    "anyKeyType": "Tous les types de clé",
     "allowedDigestsHelp": "Aucun sélectionné : tous les hachages sont autorisés.",
+    "anyDigest": "Tous les hachages",
     "operations": "Opérations",
     "operationHelp": {
       "issuance": "Le formulaire d’émission, la signature de CSR et la signature en masse, ainsi que les renouvellements effectués par un opérateur",
@@ -5676,7 +5684,12 @@
     },
     "operationsRequired": "Sélectionnez au moins une opération",
     "noOperation": "Aucune opération",
-    "rulesRevocationOnly": "Les règles s’appliquent uniquement à l’émission et au renouvellement : une politique de révocation est limitée par son AC, son modèle et son motif DNS."
+    "noDescription": "Aucune description.",
+    "rulesRevocationOnly": "Les règles s’appliquent uniquement à l’émission et au renouvellement : une politique de révocation est limitée par son AC, son modèle et son motif DNS.",
+    "state": {
+      "applied": "Appliquée",
+      "inactive": "Désactivée"
+    }
   },
   "approvals": {
     "title": "Demandes d’approbation",
@@ -5755,7 +5768,6 @@
       "votes_one": "{{count}} approbation sur {{need}}",
       "votes_other": "{{count}} approbations sur {{need}}",
       "groups": {
-        "overdue": "En retard",
         "soon": "À traiter sous 48 h",
         "later": "Plus tard"
       },
@@ -6571,7 +6583,7 @@
     "exportFailed": "Échec de l’export",
     "exportSuccess": "Export terminé",
     "filterByProfile": "Filtrer par profil",
-    "filterByStatus": "Filtrer par statut",
+    "filterByState": "Filtrer par état",
     "firstSeen": "Première détection",
     "groups": {
       "monitoring": "Surveillance",
@@ -6681,7 +6693,111 @@
     "helpExport": "Exportez les certificats découverts en CSV ou JSON. Appliquez d’abord les filtres pour n’exporter que le sous-ensemble nécessaire.",
     "helpExportTitle": "Exporter les Résultats",
     "helpSecurity": "Le Discovery bloque les adresses internes/bouclage pour la protection SSRF. Les cibles sont validées avant le scan. Toutes les actions sont journalisées.",
-    "helpSecurityTitle": "Sécurité"
+    "helpSecurityTitle": "Sécurité",
+    "quickScanAsk": "Analyse rapide…",
+    "views": {
+      "profiles": "Analyses",
+      "discovered": "Certificats trouvés",
+      "history": "Historique des analyses"
+    },
+    "scans": {
+      "unit_one": "{{count}} analyse",
+      "unit_other": "{{count}} analyses",
+      "range_one": "{{shown}} sur {{count}} analyse",
+      "range_other": "{{shown}} sur {{count}} analyses",
+      "caption": "Analyses du réseau. Activez un nom pour ouvrir son détail.",
+      "create": "Nouvelle analyse…",
+      "found": "Trouvés",
+      "foundNew": "{{count}}, dont {{fresh}} nouveaux",
+      "last": "Dernière analyse",
+      "next": "Prochaine analyse",
+      "notScanned": "Non analysé",
+      "interrupted": "Interrompue",
+      "plannedOn": "Planifiée le {{date}}",
+      "state": {
+        "running": "En cours",
+        "done": "Terminée",
+        "failed": "En échec",
+        "scheduled": "Planifiée",
+        "never": "Jamais lancée"
+      },
+      "noDescription": "Aucune description.",
+      "runsTab": "Exécutions",
+      "runNow": "Analyser maintenant",
+      "remove": "Supprimer l’analyse",
+      "removeText": "L’analyse et sa planification sont supprimées. Les certificats qu’elle a trouvés restent dans les certificats trouvés.",
+      "empty": "Aucune analyse du réseau",
+      "emptyText": "Une analyse recense les certificats exposés sur une plage d’adresses, par exemple 192.0.2.0/24, pour les rattacher à l’inventaire.",
+      "progress": "Analyse en cours : {{scanned}} cibles sur {{total}}, {{found}} certificats trouvés."
+    },
+    "found": {
+      "unit_one": "{{count}} certificat",
+      "unit_other": "{{count}} certificats",
+      "range": "{{start}}–{{end}} sur {{count}}",
+      "intent": "Les certificats rencontrés sur le réseau par les analyses, rapprochés de l’inventaire.",
+      "caption": "Certificats trouvés. Activez un nom pour ouvrir son détail.",
+      "state": {
+        "managed": "Dans UCM",
+        "unmanaged": "Inconnu d’UCM",
+        "error": "En erreur"
+      },
+      "inInventory": "Dans l’inventaire",
+      "inDays_one": "dans {{count}} jour",
+      "inDays_other": "dans {{count}} jours",
+      "extensions": "Extensions",
+      "remove": "Supprimer le certificat trouvé",
+      "purged": "Certificats trouvés supprimés"
+    },
+    "runs": {
+      "unit_one": "{{count}} exécution",
+      "unit_other": "{{count}} exécutions",
+      "range_one": "{{shown}} sur {{count}} exécution",
+      "range_other": "{{shown}} sur {{count}} exécutions",
+      "intent": "Chaque exécution d’une analyse ou d’une analyse rapide, de la plus récente à la plus ancienne.",
+      "caption": "Exécutions. Activez un nom pour ouvrir son détail.",
+      "summary": "{{count}} certificats sur {{targets}} cibles",
+      "new": "Nouveaux",
+      "changed": "Modifiés",
+      "trigger": "Lancée par",
+      "by": {
+        "manual": "Manuelle",
+        "scheduled": "Planification"
+      },
+      "state": {
+        "running": "En cours",
+        "completed": "Terminée",
+        "failed": "En échec"
+      }
+    },
+    "form": {
+      "range": "Plage",
+      "rangeHint": "Un nom d’hôte, une adresse ou une plage IPv4 par ligne, par exemple 192.0.2.0/24 ; un port peut suivre, comme mail.example.com:465.",
+      "nameRequired": "Nommez l’analyse.",
+      "targetsRequired": "Indiquez au moins un hôte, une adresse ou une plage.",
+      "problem": {
+        "wildcard": "{{target}} : un joker DNS ne nomme aucun hôte ; indiquez les hôtes.",
+        "ipv6Range": "{{target}} : les plages IPv6 ne sont pas analysées ; indiquez les adresses.",
+        "tooWide": "{{target}} : la plage compte plus de {{max}} hôtes.",
+        "format": "{{target}} : ni un nom d’hôte, ni une adresse, ni une plage."
+      },
+      "preset": "Ports courants",
+      "presetOther": "Ports saisis",
+      "presets": {
+        "https": "HTTPS (443)",
+        "alt": "HTTPS et 8443",
+        "common": "Tous les ports TLS courants"
+      },
+      "every": {
+        "0": "Manuelle seulement",
+        "60": "Toutes les heures",
+        "360": "Toutes les 6 heures",
+        "720": "Toutes les 12 heures",
+        "1440": "Tous les jours",
+        "10080": "Toutes les semaines"
+      },
+      "timeoutHint": "Secondes par connexion, de 1 à 30.",
+      "workersHint": "Connexions simultanées, de 1 à 50."
+    }
   },
   "compliance": {
     "title": "Score de conformité",
@@ -8273,12 +8389,10 @@
     "selectRow": "Sélectionner {{name}}",
     "selectAll": "Tout sélectionner : {{group}}",
     "loading": "Chargement de la file…",
-    "retry": "Réessayer",
     "viewLog": "Voir le journal",
     "bulkLabel": "Actions groupées",
     "selected_one": "{{count}} élément sélectionné",
     "selected_other": "{{count}} éléments sélectionnés",
-    "cancelSelection": "Annuler la sélection",
     "historyEmpty": "Rien pour l’instant.",
     "bulk": {
       "title": "Bilan",

@@ -85,3 +85,8 @@
 .atl .command-line{display:flex;align-items:center;gap:8px;margin:8px 0 12px}
 .atl .command-line code{flex:1;min-width:0;overflow-x:auto;white-space:nowrap;padding:8px 10px;background:var(--raised);border-radius:4px;font-size:12px}
 .atl .public-key{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;padding:10px;background:var(--raised);border-radius:4px}
+/* Work queues: a row without an action its group has elsewhere keeps the action's place, so the due dates line up. */
+.atl .work-action .slot{visibility:hidden}
+/* A page action the mockup's phone head hides (every button but the primary one) keeps a way in under the queue. */
+.atl .phone-only{display:none}
+@media (max-width:800px){.atl .phone-only{display:flex}}

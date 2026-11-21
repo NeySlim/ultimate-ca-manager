@@ -94,7 +94,7 @@ Une demande attend **sept jours** une décision. Passé ce délai, elle est clô
 
 ## La file
 
-Les demandes ouvertes sont groupées par échéance : **En retard**, **À traiter sous 48 h** et **Plus tard**, chacune avec son compteur. Une ligne donne ce que la demande demande et son sujet, une pastille qui nomme sa source (CSR, certificat, renouvellement, révocation, AC, ACME, EST, SCEP, WSTEP), qui l’a demandée et quand, la politique, l’autorité, et l’échéance en forme courte au-dessus de sa date exacte. Un sujet ouvre la demande dans l’inspecteur, avec ses sections **Demande** et **Journal**.
+Les demandes ouvertes sont groupées par échéance : **À traiter sous 48 h** et **Plus tard**, chacune avec son compteur. Une demande dont l’échéance est passée est expirée : elle rejoint **Traitées récemment** et ne peut plus être décidée. Une ligne donne ce que la demande demande et son sujet, une pastille qui nomme sa source (CSR, certificat, renouvellement, révocation, AC, ACME, EST, SCEP, WSTEP), qui l’a demandée et quand, la politique, l’autorité, et l’échéance en forme courte au-dessus de sa date exacte. Un sujet ouvre la demande dans l’inspecteur, avec ses sections **Demande** et **Journal**.
 
 ## Approuver une demande
 

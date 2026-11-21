@@ -1,11 +1,9 @@
 /**
- * Outcome of a bulk action where one failed, line by line: what went through, what failed and why.
+ * Outcome of a bulk action where one failed, line by line, in the mockup's record list: what
+ * went through, what failed and why, then the dialog's single action.
  */
 import { useTranslation } from 'react-i18next'
-import { Warning } from '@phosphor-icons/react'
-import { CheckIcon } from './workIcons'
-import { cn } from '../../lib/utils'
-import { WorkButton } from './WorkQueue'
+import { Btn, Pill, RecordList, RecordRow } from '../atelier'
 
 /** @param {{ outcome: Array<{ item, ok, reason }>, nameOf: (item) => string, onClose: () => void }} p */
 export function BulkOutcome({ outcome, nameOf, onClose }) {
@@ -13,25 +11,19 @@ export function BulkOutcome({ outcome, nameOf, onClose }) {
   const ok = outcome.filter((o) => o.ok).length
   const failed = outcome.length - ok
   return (
-    <div className="wk-dialog" data-testid="bulk-outcome">
-      <p role="status">
+    <div data-testid="bulk-outcome">
+      <p className="small muted" role="status">
         {t('work.bulk.done', { count: ok })}
         {failed > 0 && <>{', '}{t('work.bulk.failed', { count: failed })}</>}
       </p>
-      <ul className="wk-outcome">
+      <RecordList>
         {outcome.map((o, i) => (
-          <li key={i} className={cn(o.ok ? 'is-ok' : 'is-failed')}>
-            {o.ok ? <CheckIcon aria-hidden="true" /> : <Warning aria-hidden="true" />}
-            <span>
-              <strong>{nameOf(o.item)}</strong>
-              {' '}<span className="wk-muted">{o.ok ? t('work.bulk.ok') : t('work.bulk.ko')}</span>
-              {!o.ok && o.reason && <span className="wk-reason">{o.reason}</span>}
-            </span>
-          </li>
+          <RecordRow key={i} title={nameOf(o.item)} meta={!o.ok && o.reason ? o.reason : undefined}
+            badge={<Pill label={t(o.ok ? 'work.bulk.ok' : 'work.bulk.ko')} tone={o.ok ? 'good' : 'bad'} />} />
         ))}
-      </ul>
-      <div className="lv-dialog-actions">
-        <WorkButton primary data-write="false" onClick={onClose}>{t('common.close')}</WorkButton>
+      </RecordList>
+      <div className="modal-actions">
+        <Btn tone="primary" write={false} onClick={onClose}>{t('common.close')}</Btn>
       </div>
     </div>
   )

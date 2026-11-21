@@ -25,22 +25,10 @@ vi.mock('../../hooks', async () => {
   return {
     useCRUDPage: crud.useCRUDPage,
     usePersistedState: (_key, initial) => useState(initial),
-    usePermission: () => ({ canRead: () => true, canWrite: () => true, canDelete: () => true }),
+    usePermission: () => ({ canRead: () => true, canWrite: () => true, canDelete: () => true, hasPermission: () => true }),
   }
 })
 
-vi.mock('../../components', () => ({
-  ResponsiveLayout: ({ children, actions, slideOverContent }) => <div>{actions}{children}{slideOverContent}</div>,
-  ResponsiveDataTable: () => null,
-  Card: ({ children }) => <div>{children}</div>,
-  Badge: ({ children }) => <span>{children}</span>,
-  LoadingSpinner: () => null,
-  Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-  Input: ({ label, ...props }) => <input aria-label={label} {...props} />,
-  Textarea: ({ label, ...props }) => <textarea aria-label={label} {...props} />,
-  Modal: ({ open, children }) => (open ? <div>{children}</div> : null),
-  Select: () => null,
-}))
 
 import PoliciesPage from '../PoliciesPage'
 
@@ -48,7 +36,7 @@ async function openCreate(effective) {
   mocks.list.mockResolvedValue({ data: [] })
   mocks.getEffective.mockResolvedValue({ data: effective })
   render(<PoliciesPage />)
-  fireEvent.click(await screen.findByText('policies.createPolicy'))
+  fireEvent.click((await screen.findAllByText('policies.createPolicy'))[0])
   await waitFor(() => expect(mocks.getEffective).toHaveBeenCalled())
 }
 

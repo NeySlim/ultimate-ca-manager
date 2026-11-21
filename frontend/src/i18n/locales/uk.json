@@ -5875,7 +5875,6 @@
       "votes_few": "{{count}} of {{need}} approvals",
       "votes_many": "{{count}} of {{need}} approvals",
       "groups": {
-        "overdue": "Overdue",
         "soon": "To handle within 48 h",
         "later": "Later"
       },
@@ -6297,6 +6296,16 @@
     "searchPlaceholder": "Пошук політик...",
     "selectGroup": "Оберіть групу...",
     "subtitle": "Керування правилами видачі, вимогами до ключів та процесами затвердження",
+    "unit_one": "{{count}} policy",
+    "unit_few": "{{count}} policies",
+    "unit_many": "{{count}} policies",
+    "unit_other": "{{count}} policies",
+    "range_one": "{{shown}} of {{count}} policy",
+    "range_few": "{{shown}} of {{count}} policies",
+    "range_many": "{{shown}} of {{count}} policies",
+    "range_other": "{{shown}} of {{count}} policies",
+    "caption": "Policies. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
     "fipsRulesTitle": "Правила FIPS активні (лише читання)",
     "fipsRulesDesc": "Режим FIPS застосовує системну політику перед цими: ключі RSA парної довжини від 2048 до 16384 біт, EC від P-256 до P-521, а також Ed25519, Ed448 і ML-DSA, коли завантажений модуль FIPS їх схвалює; підписи від SHA-256 до SHA-512. Політики тут можуть лише звужувати її.",
     "targetCA": "Цільовий CA",
@@ -6312,7 +6321,9 @@
     },
     "allowedDigests": "Дозволені дайджести підпису",
     "allowedKeyTypesHelp": "Нічого не вибрано: дозволено будь-який тип ключа.",
+    "anyKeyType": "Any key type",
     "allowedDigestsHelp": "Нічого не вибрано: дозволено будь-який дайджест.",
+    "anyDigest": "Any hash",
     "operations": "Операції",
     "operationHelp": {
       "issuance": "Форма видачі, підписання CSR і масове підписання, а також оновлення, які виконує оператор",
@@ -6321,7 +6332,12 @@
     },
     "operationsRequired": "Виберіть принаймні одну операцію",
     "noOperation": "Немає операцій",
-    "rulesRevocationOnly": "Правила діють лише для видачі та оновлення: політика відкликання обмежується своїм ЦС, шаблоном і шаблоном DNS-імені."
+    "noDescription": "No description.",
+    "rulesRevocationOnly": "Правила діють лише для видачі та оновлення: політика відкликання обмежується своїм ЦС, шаблоном і шаблоном DNS-імені.",
+    "state": {
+      "applied": "Applied",
+      "inactive": "Disabled"
+    }
   },
   "reports": {
     "complianceReport": "Звіт відповідності",
@@ -6784,7 +6800,7 @@
     "exportFailed": "Помилка експорту",
     "exportSuccess": "Експорт завершено",
     "filterByProfile": "Фільтр за профілем",
-    "filterByStatus": "Фільтр за статусом",
+    "filterByState": "Filter by state",
     "firstSeen": "Перше виявлення",
     "groups": {
       "monitoring": "Моніторинг",
@@ -6894,7 +6910,123 @@
     "helpExport": "Експортуйте знайдені сертифікати як CSV або JSON. Спочатку застосуйте фільтри, щоб експортувати лише потрібну підмножину.",
     "helpExportTitle": "Експорт Результатів",
     "helpSecurity": "Discovery блокує внутрішні/loopback адреси для захисту від SSRF. Цілі перевіряються перед скануванням. Усі дії записуються в аудит.",
-    "helpSecurityTitle": "Безпека"
+    "helpSecurityTitle": "Безпека",
+    "quickScanAsk": "Quick scan…",
+    "views": {
+      "profiles": "Analyses",
+      "discovered": "Found certificates",
+      "history": "Run history"
+    },
+    "scans": {
+      "unit_one": "{{count}} analysis",
+      "unit_few": "{{count}} analyses",
+      "unit_many": "{{count}} analyses",
+      "unit_other": "{{count}} analyses",
+      "range_one": "{{shown}} of {{count}} analysis",
+      "range_few": "{{shown}} of {{count}} analyses",
+      "range_many": "{{shown}} of {{count}} analyses",
+      "range_other": "{{shown}} of {{count}} analyses",
+      "caption": "Network analyses. Activate a name to open its detail.",
+      "create": "New analysis…",
+      "found": "Found",
+      "foundNew": "{{count}}, {{fresh}} new",
+      "last": "Last analysis",
+      "next": "Next analysis",
+      "notScanned": "Not analysed",
+      "interrupted": "Interrupted",
+      "plannedOn": "Planned on {{date}}",
+      "state": {
+        "running": "Running",
+        "done": "Completed",
+        "failed": "Failed",
+        "scheduled": "Scheduled",
+        "never": "Never run"
+      },
+      "noDescription": "No description.",
+      "runsTab": "Runs",
+      "runNow": "Analyse now",
+      "remove": "Delete the analysis",
+      "removeText": "The analysis and its schedule are deleted. The certificates it found stay in the found certificates.",
+      "empty": "No network analysis",
+      "emptyText": "An analysis lists the certificates exposed on a range of addresses, for example 192.0.2.0/24, to match them with the inventory.",
+      "progress": "Scan in progress: {{scanned}} of {{total}} targets, {{found}} certificates found."
+    },
+    "found": {
+      "unit_one": "{{count}} certificate",
+      "unit_few": "{{count}} certificates",
+      "unit_many": "{{count}} certificates",
+      "unit_other": "{{count}} certificates",
+      "range": "{{start}}–{{end}} of {{count}}",
+      "intent": "The certificates the analyses met on the network, matched with the inventory.",
+      "caption": "Found certificates. Activate a name to open its detail.",
+      "state": {
+        "managed": "In UCM",
+        "unmanaged": "Unknown to UCM",
+        "error": "In error"
+      },
+      "inInventory": "In the inventory",
+      "inDays_one": "in {{count}} day",
+      "inDays_few": "in {{count}} days",
+      "inDays_many": "in {{count}} days",
+      "inDays_other": "in {{count}} days",
+      "extensions": "Extensions",
+      "remove": "Delete the found certificate",
+      "purged": "Found certificates deleted"
+    },
+    "runs": {
+      "unit_one": "{{count}} run",
+      "unit_few": "{{count}} runs",
+      "unit_many": "{{count}} runs",
+      "unit_other": "{{count}} runs",
+      "range_one": "{{shown}} of {{count}} run",
+      "range_few": "{{shown}} of {{count}} runs",
+      "range_many": "{{shown}} of {{count}} runs",
+      "range_other": "{{shown}} of {{count}} runs",
+      "intent": "Every run of an analysis or a quick scan, newest first.",
+      "caption": "Runs. Activate a name to open its detail.",
+      "summary": "{{count}} certificates on {{targets}} targets",
+      "new": "New",
+      "changed": "Changed",
+      "trigger": "Started by",
+      "by": {
+        "manual": "Manual",
+        "scheduled": "Schedule"
+      },
+      "state": {
+        "running": "Running",
+        "completed": "Completed",
+        "failed": "Failed"
+      }
+    },
+    "form": {
+      "range": "Range",
+      "rangeHint": "One host name, address or IPv4 range per line, for example 192.0.2.0/24; a port can follow, as in mail.example.com:465.",
+      "nameRequired": "Name the analysis.",
+      "targetsRequired": "Give at least one host, address or range.",
+      "problem": {
+        "wildcard": "{{target}}: a DNS wildcard names no host; list the hosts.",
+        "ipv6Range": "{{target}}: IPv6 ranges are not scanned; list the addresses.",
+        "tooWide": "{{target}}: the range holds more than {{max}} hosts.",
+        "format": "{{target}}: not a host name, an address or a range."
+      },
+      "preset": "Common ports",
+      "presetOther": "Ports typed",
+      "presets": {
+        "https": "HTTPS (443)",
+        "alt": "HTTPS and 8443",
+        "common": "Every common TLS port"
+      },
+      "every": {
+        "0": "Manual only",
+        "60": "Every hour",
+        "360": "Every 6 hours",
+        "720": "Every 12 hours",
+        "1440": "Every day",
+        "10080": "Every week"
+      },
+      "timeoutHint": "Seconds per connection, 1 to 30.",
+      "workersHint": "Connections at once, 1 to 50."
+    }
   },
   "compliance": {
     "title": "Оцінка відповідності",
@@ -8606,14 +8738,12 @@
     "selectRow": "Select {{name}}",
     "selectAll": "Select all: {{group}}",
     "loading": "Loading the queue…",
-    "retry": "Retry",
     "viewLog": "View the log",
     "bulkLabel": "Bulk actions",
     "selected_one": "{{count}} item selected",
     "selected_other": "{{count}} items selected",
     "selected_few": "{{count}} items selected",
     "selected_many": "{{count}} items selected",
-    "cancelSelection": "Clear selection",
     "historyEmpty": "Nothing yet.",
     "bulk": {
       "title": "Outcome",

@@ -18,8 +18,6 @@
  */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const authState = vi.hoisted(() => ({ permissions: [] }))
@@ -134,27 +132,5 @@ describe('deleting a trust store entry from the inspector', () => {
     render(<InspectorObject entry={{ ...WINDOW, id: 'w2', type: 'certificate', entityId: 4 }} onTitle={() => {}} />, { wrapper: MemoryRouter })
     await screen.findAllByText('web.example.com')
     expect(within(await openMoreActions()).getByRole('button', { name: 'common.delete' })).toBeInTheDocument()
-  })
-})
-
-// One more row menu disagreed with its own detail panel. Reading the source is
-// enough to catch the guard going away again.
-//
-// TemplatesPage used to be checked here the same way, against a `rowActions`
-// callback the table was never given. The menu it built was never rendered, so
-// the assertion could not fail for the reason that mattered; the guard that a
-// user actually meets is the detail panel's, and it is asserted by rendering
-// the page in pages/__tests__/TemplatesPage.systemCustom.test.jsx.
-const readPage = (rel) => readFileSync(join(__dirname, '..', '..', 'pages', rel), 'utf8')
-
-describe('row menus agree with the panel beside them', () => {
-  it('gates the discovered-row delete on delete:certificates', () => {
-    const source = readPage('DiscoveryPage.jsx')
-    const marker = source.indexOf("setDeleteConfirm({ type: 'discovered'")
-    expect(marker).toBeGreaterThan(-1)
-    // DELETE /api/v2/discovery/<id> asks for delete:certificates, not write.
-    const preceding = source.slice(Math.max(0, marker - 400), marker)
-    expect(preceding).toContain("canDelete('certificates')")
-    expect(preceding).not.toContain("canWrite('certificates') && (\n            <button")
   })
 })

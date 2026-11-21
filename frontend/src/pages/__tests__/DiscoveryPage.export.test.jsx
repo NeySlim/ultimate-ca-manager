@@ -37,6 +37,8 @@ vi.mock('../../contexts', () => ({
   }),
 }))
 
+vi.mock('../../hooks/useOpenEntity', () => ({ useOpenEntity: () => vi.fn() }))
+
 vi.mock('../../contexts/MobileContext', () => ({
   useMobile: () => ({ isMobile: false, isTablet: false }),
 }))
@@ -78,11 +80,11 @@ describe('DiscoveryPage: export follows the filters', () => {
   })
 
   it('sends the typed search to the export', async () => {
-    render(<MemoryRouter><DiscoveryPage /></MemoryRouter>)
+    render(<MemoryRouter initialEntries={['/discovery?tab=discovered']}><DiscoveryPage /></MemoryRouter>)
     await screen.findAllByText('10.0.0.5:443')
-    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'probe' } })
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'probe' } })
     await waitFor(() => expect(discoveryService.getAll.mock.calls.at(-1)[0].search).toBe('probe'))
-    fireEvent.click(await screen.findByText('common.export'))
+    fireEvent.click(await screen.findByRole('button', { name: 'common.export' }))
     await waitFor(() => expect(discoveryService.export).toHaveBeenCalled())
     expect(discoveryService.export.mock.calls[0][1]).toMatchObject({ search: 'probe' })
   })

@@ -3,7 +3,7 @@
  * with the outcome messages of each case; the queue names each request's type.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 // Stable across renders: t and showError are loader dependencies, a fresh one reloads in a loop
@@ -201,7 +201,7 @@ describe('ApprovalsPage — what a request asks for', () => {
     list.mockResolvedValue({ data: [{ ...REQUEST, id: 5, request_type: 'ca_revocation',
       request_summary: { cn: 'Issuing CA 2', target_ca_id: 3, reason: 'cACompromise' } }] })
     renderPage()
-    expect(await screen.findByText('Issuing CA 2')).toBeTruthy()
+    expect(await screen.findByText(/Issuing CA 2$/)).toBeTruthy()
     expect(screen.getByRole('button', { name: /^approvals\.work\.what\.ca_revocation/ })).toBeTruthy()
     expect(screen.queryByText(/ca_revocation$/)).toBeNull()
   })
@@ -210,8 +210,8 @@ describe('ApprovalsPage — what a request asks for', () => {
     list.mockResolvedValue({ data: [{ ...REQUEST, id: 51, request_type: 'est_enroll', requester_username: 'est:basic:device',
       request_summary: { cn: 'device.example', protocol: 'est', operation: 'enroll', identity: 'basic:device' } }] })
     renderPage()
-    expect(await screen.findByText('device.example')).toBeTruthy()
-    expect(screen.getByText('approvals.work.kind')).toHaveClass('wk-kind')
+    expect(await screen.findByText(/device\.example$/)).toBeTruthy()
+    expect(screen.getByText('approvals.work.kind')).toHaveClass('queue-kind')
     expect(screen.queryByText('est_enroll')).toBeNull()
   })
 
@@ -224,14 +224,15 @@ describe('ApprovalsPage — what a request asks for', () => {
 })
 
 describe('ApprovalsPage deep link', () => {
-  it('opens the request named in the link in the inspector, even when the list does not hold it', async () => {
+  it('opens the request named in the link in the dock, even when the list does not hold it', async () => {
     openEntity.mockReset()
     list.mockResolvedValue({ data: [] })
     const linked = { ...REQUEST, id: 42, request_summary: { cn: 'linked.example.com' } }
     getById.mockResolvedValue({ data: linked })
     render(<MemoryRouter initialEntries={['/approvals?id=42']}><ApprovalsPage /></MemoryRouter>)
     await waitFor(() => expect(getById).toHaveBeenCalledWith('42'))
-    expect(await screen.findByText('linked.example.com')).toBeTruthy()
-    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('approval', 42, { data: linked }))
+    const dock = await screen.findByRole('complementary', { name: 'atelier.detailOf' })
+    expect(within(dock).getByRole('heading', { level: 2, name: /linked\.example\.com$/ })).toBeTruthy()
+    expect(openEntity).not.toHaveBeenCalled()
   })
 })

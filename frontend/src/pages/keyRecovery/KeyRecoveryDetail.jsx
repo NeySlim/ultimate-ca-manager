@@ -1,42 +1,79 @@
 /**
- * Key recovery request in the inspector: heading (state, the actions the user
- * may take on it), then the Request and Log sections.
+ * A key recovery request in the module dock. The mockup has no key recovery screen: the page
+ * takes its work queue template, so the request opens in the queue's moduleInspector() dock as an
+ * approval does (Demande, Journal), with the actions the user may take on it in the heading.
  */
 import { useTranslation } from 'react-i18next'
-import { Vault, Prohibit, DownloadSimple } from '@phosphor-icons/react'
-import { StatusPill } from '../../components/list'
-import { WorkButton, WorkRecord, WorkRecords, CheckIcon } from '../../components/work'
-import { SectionTabs, tabId, panelId } from '../../components/inspector/InspectorTabs'
+import { Btn, Dock, DockBody, Pill, Props, RecordList, RecordRow, Section } from '../../components/atelier'
 import { usePermission } from '../../hooks'
 import { useOpenEntity } from '../../hooks/useOpenEntity'
-import { keyRecoveryService } from '../../services'
 import { formatDate } from '../../lib/utils'
-import { recoveryRights, recoveryState } from './recoveryRules'
-import { useRecoveryActions } from './useRecoveryActions'
-import '../../components/work/work.css'
+import { recoveryRights, recoveryState, recoveryName } from './recoveryRules'
 
 const when = (d) => formatDate(d, { time: true })
 
-function Props({ rows }) {
+/** The row's (and the dock's) buttons; `slot` keeps Approuver…'s place where the user may not approve. */
+export function RecoveryButtons({ req, who, onAsk, disabled, slot = false, named = true }) {
+  const { t } = useTranslation()
+  const rights = recoveryRights(req, who)
+  const name = recoveryName(req)
+  const aria = (key) => (named ? t(key, { name }) : undefined)
   return (
-    <dl className="ins-props">
-      {rows.filter(Boolean).map(([k, v]) => <div key={k} style={{ display: 'contents' }}><dt>{k}</dt><dd>{v}</dd></div>)}
-    </dl>
+    <>
+      {rights.approve ? (
+        <Btn icon="check" write disabled={disabled || undefined} onClick={() => onAsk('approve')}
+          aria-label={aria('keyRecovery.work.approveNamed')}>{t('keyRecovery.work.approveAsk')}</Btn>
+      ) : slot && (
+        <span className="btn slot" aria-hidden="true">{t('keyRecovery.work.approveAsk')}</span>
+      )}
+      {rights.reject && (
+        <Btn tone="quiet" icon="block" write disabled={disabled || undefined} onClick={() => onAsk('reject')}
+          aria-label={aria('keyRecovery.work.rejectNamed')}>{t('keyRecovery.work.rejectAsk')}</Btn>
+      )}
+      {rights.recover && (
+        <Btn icon="download" write disabled={disabled || undefined} onClick={() => onAsk('recover')}
+          aria-label={aria('keyRecovery.work.recoverNamed')}>{t('keyRecovery.work.recoverAsk')}</Btn>
+      )}
+    </>
   )
 }
 
-export function KeyRecoveryDetail({ data: req, objectKey, title, section, onSection, onChanged }) {
+export function RecoveryPanel({ req }) {
   const { t } = useTranslation()
-  const { hasPermission, username } = usePermission()
   const openEntity = useOpenEntity()
-  // The list says whether dual control is on; a request opened from elsewhere assumes the default, on
-  const rights = recoveryRights(req, { hasPermission, username, dualControl: req.dual_control !== false })
-  const actions = useRecoveryActions({
-    onDone: () => keyRecoveryService.get(req.id)
-      .then((res) => { const row = res?.data || res; if (row?.id) onChanged?.({ ...row, dual_control: req.dual_control }) })
-      .catch(() => {}),
-  })
-  // The mockup's journal: what happened, its detail under it, who and when on the right
+  const state = recoveryState(req, t)
+  const title = recoveryName(req)
+  return (
+    <div className="module-detail">
+      <Section title={t('approvals.work.detail.request')}>
+        <Props items={[
+          [t('approvals.work.detail.id'), <span className="mono">#{req.id}</span>],
+          [t('keyRecovery.work.certificate'), req.cert_id
+            ? <button type="button" className="text-link" onClick={() => openEntity('certificate', req.cert_id)}>{title}</button> : title],
+          [t('approvals.requester'), req.requested_by],
+          [t('approvals.work.detail.submitted'), when(req.requested_at)],
+          [t('approvals.work.detail.state'), <Pill label={state.label} tone={state.tone} />],
+          [t('keyRecovery.reason'), req.reason],
+        ]} />
+      </Section>
+      {(req.decided_at || req.recovered_at) && (
+        <Section title={t('approvals.work.detail.decision')}>
+          <Props items={[
+            req.decided_by && [t('approvals.work.detail.by'), req.decided_by],
+            req.decided_at && [t('approvals.work.detail.on'), when(req.decided_at)],
+            req.decision_note && [t('keyRecovery.work.dialog.note'), req.decision_note],
+            req.recovered_by && [t('keyRecovery.work.recoveredBy'), req.recovered_by],
+            req.recovered_at && [t('keyRecovery.work.recoveredOn'), when(req.recovered_at)],
+          ]} />
+        </Section>
+      )}
+    </div>
+  )
+}
+
+/** The mockup's journal(): what happened, its detail under it, who and when on the right. */
+export function RecoveryLog({ req }) {
+  const { t } = useTranslation()
   const log = [
     { at: req.requested_at, label: t('keyRecovery.work.log.requested'), meta: req.reason, actor: req.requested_by },
     req.decided_at && {
@@ -47,64 +84,33 @@ export function KeyRecoveryDetail({ data: req, objectKey, title, section, onSect
     },
     req.recovered_at && { at: req.recovered_at, label: t('keyRecovery.work.log.recovered'), meta: '', actor: req.recovered_by },
   ].filter(Boolean).reverse()
-
   return (
-    <>
-      <header className="ins-heading">
-        <div className="ins-title">
-          <Vault className="ins-title-icon" aria-hidden="true" />
-          <h2>{title}</h2>
-          <StatusPill {...recoveryState(req, t)} />
-        </div>
-        <div className="ins-actions">
-          {rights.approve && <WorkButton icon={CheckIcon} onClick={() => actions.open('approve', [req])}>{t('keyRecovery.work.approveAsk')}</WorkButton>}
-          {rights.reject && <WorkButton quiet icon={Prohibit} onClick={() => actions.open('reject', [req])}>{t('keyRecovery.work.rejectAsk')}</WorkButton>}
-          {rights.recover && <WorkButton primary icon={DownloadSimple} onClick={() => actions.open('recover', [req])}>{t('keyRecovery.work.recoverAsk')}</WorkButton>}
-        </div>
-      </header>
-      <SectionTabs objectKey={objectKey} sections={['request', 'log']} current={section} onSelect={onSection}
-        labelOf={(s) => t(`approvals.work.sections.${s}`)} />
-      <div role="tabpanel" id={`${panelId(objectKey)}-section`} aria-labelledby={`${tabId(objectKey)}-${section}`}
-        className="ins-panel" tabIndex={0}>
-        {section === 'request' ? (
-          <div className="wk-detail-grid">
-            <section>
-              <h3 className="ins-section-title">{t('approvals.work.detail.request')}</h3>
-              <Props rows={[
-                [t('approvals.work.detail.id'), <span className="ins-mono">#{req.id}</span>],
-                [t('keyRecovery.work.certificate'), req.cert_id
-                  ? <button type="button" className="ins-link" onClick={() => openEntity('certificate', req.cert_id)}>{title}</button> : title],
-                [t('keyRecovery.reason'), req.reason],
-                [t('approvals.requester'), req.requested_by],
-                [t('approvals.work.detail.submitted'), when(req.requested_at)],
-                [t('approvals.work.detail.state'), <StatusPill {...recoveryState(req, t)} />],
-              ]} />
-            </section>
-            {(req.decided_at || req.recovered_at) && (
-              <section>
-                <h3 className="ins-section-title">{t('approvals.work.detail.decision')}</h3>
-                <Props rows={[
-                  req.decided_by && [t('approvals.work.detail.by'), req.decided_by],
-                  req.decided_at && [t('approvals.work.detail.on'), when(req.decided_at)],
-                  req.decision_note && [t('keyRecovery.work.dialog.note'), req.decision_note],
-                  req.recovered_by && [t('keyRecovery.work.recoveredBy'), req.recovered_by],
-                  req.recovered_at && [t('keyRecovery.work.recoveredOn'), when(req.recovered_at)],
-                ]} />
-              </section>
-            )}
-          </div>
-        ) : (
-          <WorkRecords empty={t('approvals.work.log.none')}>
-            {log.map((e, i) => (
-              <WorkRecord key={i} title={e.label} meta={e.meta}
-                badge={<span className="wk-rl-meta">{[e.actor, when(e.at)].filter(Boolean).join(' · ')}</span>} />
-            ))}
-          </WorkRecords>
-        )}
-      </div>
-      {actions.dialog}
-    </>
+    <RecordList empty={t('approvals.work.log.none')}>
+      {log.map((e, i) => (
+        <RecordRow key={i} title={e.label} meta={e.meta || undefined}
+          badge={<span className="rl-meta">{[e.actor, when(e.at)].filter(Boolean).join(' · ')}</span>} />
+      ))}
+    </RecordList>
   )
 }
 
-export default KeyRecoveryDetail
+/** The dock of the open request; onAsk(kind) opens the decision or the recovery. */
+export function KeyRecoveryDock({ req, section, onSection, onClose, onAsk }) {
+  const { t } = useTranslation()
+  const { hasPermission, username } = usePermission()
+  const title = recoveryName(req)
+  const state = recoveryState(req, t)
+  // The list says whether dual control is on; a request read alone assumes the default, on
+  const who = { hasPermission, username, dualControl: req.dual_control !== false }
+  return (
+    <Dock label={t('atelier.detailOf', { name: t('keyRecovery.title') })} tabsLabel={t('atelier.openItem')} activeKey={req.id}
+      tabs={[{ key: req.id, title, icon: 'key' }]} onClose={onClose}>
+      <DockBody icon="key" title={title} badge={<Pill label={state.label} tone={state.tone} />}
+        actions={<RecoveryButtons req={req} who={who} onAsk={onAsk} />}
+        sections={[['request', t('approvals.work.sections.request')], ['log', t('approvals.work.sections.log')]]}
+        section={section} onSection={onSection} sectionsLabel={t('atelier.sectionsOf', { name: title })}>
+        {section === 'log' ? <RecoveryLog req={req} /> : <RecoveryPanel req={req} />}
+      </DockBody>
+    </Dock>
+  )
+}

@@ -66,10 +66,11 @@ describe('ReportsPage queue', () => {
     expect(await screen.findByText('2 rapports planifiés')).toBeInTheDocument()
     expect(screen.getByText('Cochez plusieurs rapports pour les télécharger ensemble ; les chiffres suivent l’inventaire, comme la vue d’ensemble.')).toBeInTheDocument()
     // The PDF composer leaves the head on a phone for a line under the queue
-    expect(container.querySelector('.lv-actions .wk-not-phone')).toHaveTextContent('Composer un PDF…')
-    expect(container.querySelector('.wk-view > .wk-phone-only')).toHaveTextContent('Composer un PDF…')
+    expect(container.querySelector('.page-head .actions #report-pdf')).toHaveTextContent('Composer un PDF…')
+    // The mockup's phone head keeps the primary button only: the composer stays reachable under the queue
+    expect(container.querySelector('.work-view > .phone-only')).toHaveTextContent('Composer un PDF…')
     expect(screen.getByText('Inventaires et échéances planifiés.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Planifier un rapport' })).toHaveClass('is-primary')
+    expect(screen.getByRole('button', { name: 'Planifier un rapport' })).toHaveClass('btn', 'primary')
   })
 
   it('groups the scheduled reports by next run; the frequency is the pill', async () => {
@@ -77,7 +78,7 @@ describe('ReportsPage queue', () => {
     await screen.findByText('Certificats expirants')
     const today = group('Prochaine exécution sous 24 h')
     const li = within(today).getByText('Certificats expirants').closest('li')
-    expect(within(li).getByText(/^Quotidien · \d\d:\d\d$/)).toHaveClass('wk-kind')
+    expect(within(li).getByText(/^Quotidien · \d\d:\d\d$/)).toHaveClass('queue-kind')
     expect(within(li).getByText('CSV · pki@example.com')).toBeInTheDocument()
     expect(within(li).getByText('dans 3 h')).toBeInTheDocument()
     expect(within(group('Planifiés')).getByText('JSON · Aucun destinataire')).toBeInTheDocument()
@@ -97,7 +98,7 @@ describe('ReportsPage queue', () => {
     renderPage()
     await screen.findByText('Certificats expirants')
     // 06:45 UTC on the 28th is 15:45 the same day in Tokyo
-    expect(within(group('Planifiés')).getByText('Mensuel · 15:45')).toHaveClass('wk-kind')
+    expect(within(group('Planifiés')).getByText('Mensuel · 15:45')).toHaveClass('queue-kind')
   })
 
   it('folds the reports without a schedule, each downloadable and schedulable', async () => {
@@ -162,7 +163,7 @@ describe('ReportsPage queue', () => {
   it('builds a PDF from the sections chosen', async () => {
     api.generateCustomPDF.mockResolvedValue(new Blob(['%PDF']))
     renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: 'Composer un PDF…' }))
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Composer un PDF…' }))[0])
     const dialog = await screen.findByRole('dialog')
     // One sentence says what the dialog does: its subtitle
     expect(dialog).toHaveTextContent('Les sections choisies, téléchargées en un seul PDF.')
@@ -180,10 +181,13 @@ describe('ReportsPage queue', () => {
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
   })
 
-  it('opens a report in the inspector from its name', async () => {
+  it('opens a report in the module dock from its name, its tabs those of the mockup then Aperçu', async () => {
     renderPage()
     fireEvent.click(await screen.findByRole('button', { name: 'Certificats expirants' }))
-    expect(openEntity).toHaveBeenCalledWith('report', 'expiring_certificates', { data: expect.objectContaining({ key: 'expiring_certificates' }) })
+    const dock = await screen.findByRole('complementary', { name: 'Détail : Rapports' })
+    expect(within(dock).getByRole('heading', { level: 2, name: 'Certificats expirants' })).toBeInTheDocument()
+    expect(within(dock).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Rapport', 'Exécutions', 'Aperçu'])
+    expect(openEntity).not.toHaveBeenCalled()
   })
 
   it('shows a load failure with Retry', async () => {
