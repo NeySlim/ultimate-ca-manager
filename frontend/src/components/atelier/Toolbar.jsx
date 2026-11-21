@@ -3,10 +3,48 @@
  * divider, then the tools (Colonnes, density, export). Each piece is its own component so a
  * page lines up only what it has.
  */
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Icon } from './Icon'
 
+/** Short of room: the search field at its floor (the copied min-width), or the tools overflowing. */
+function cramped(el) {
+  const search = el.querySelector(':scope > .search')
+  const floor = search ? parseFloat(getComputedStyle(search).minWidth) || 0 : 0
+  return el.scrollWidth > el.clientWidth + 1 || (!!search && floor > 0 && search.offsetWidth <= floor + 1)
+}
+
+/**
+ * Beside the dock anchored at the right (#app.dock-right), a toolbar short of room folds as the mockup's
+ * phone toolbar: the search on its own line, the filters and tools on the next. A change of width unfolds
+ * it and measures again, before the browser paints.
+ */
+function useFoldedToolbar(ref) {
+  const [folded, setFolded] = useState(false)
+  const [width, setWidth] = useState(0)
+  const measured = useRef(width)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return undefined
+    const observer = new ResizeObserver(() => setWidth(el.clientWidth))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [ref])
+  useLayoutEffect(() => {
+    const el = ref.current
+    const right = !!el?.closest('.dock-right')
+    if (!right || measured.current !== width) {
+      measured.current = width
+      if (folded) { setFolded(false); return }
+    }
+    if (right && !folded && cramped(el)) setFolded(true)
+  })
+  return folded
+}
+
 export function Toolbar({ children }) {
-  return <div className="toolbar">{children}</div>
+  const ref = useRef(null)
+  const folded = useFoldedToolbar(ref)
+  return <div ref={ref} className={folded ? 'toolbar folded' : 'toolbar'}>{children}</div>
 }
 
 /** `.search`: the field, its hidden label and the live count of results when the server searches. */

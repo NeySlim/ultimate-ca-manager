@@ -22,3 +22,10 @@
 /* On a phone a toolbar of a search field and one icon button (ACME, CRL / OCSP) keeps the button on the
    field's line; the copied rule gives the field the whole line, written for the Certificates toolbar. */
 @media(max-width:800px){:root .atl .toolbar:not(:has(>:not(.search,.search-status,.icon-btn))):has(>.icon-btn:only-of-type) .search{flex-basis:0}}
+
+/* Beside the dock at the right (from 1200 px), a toolbar short of room folds as the mockup's phone toolbar
+   (components/atelier/Toolbar.jsx): the search on its own line, the filters and tools on the next. */
+:root .atl .toolbar.folded{flex-wrap:wrap}
+:root .atl .toolbar.folded .search{flex-basis:100%}
+:root .atl .toolbar.folded .search-status{min-width:0}
+:root .atl .toolbar.folded .search-status:empty{display:none}

@@ -69,7 +69,7 @@ for (const width of [1199, 1200]) {
 
 test.describe('at 1200 px with the dock at the right', () => {
   test.use({ viewport: { width: 1200, height: 900 } })
-  // Beside the right dock the list folds its secondary columns: no horizontal scroll, the chevron in view.
+  // Beside the right dock the list folds its secondary columns and its toolbar: no horizontal scroll, the chevron in view.
   // The page alone reads the dock at the right: the shared account's preference is never written.
   test('the lists fit beside the dock', async ({ page, api }) => {
     await issueCert(api, (await createCA(api)).id)
@@ -98,6 +98,21 @@ test.describe('at 1200 px with the dock at the right', () => {
         return region.scrollWidth - region.clientWidth <= 1 && (!chevron || chevron.getBoundingClientRect().right <= box.right + 1)
       })
       await expect.poll(fits, { message: path }).toBe(true)
+      // Its toolbar folds when short of room: the search shows its whole hint, each filter its whole choice
+      const readable = () => page.evaluate(() => {
+        const bar = document.querySelector('.atl .page-content .toolbar') as HTMLElement
+        const ctx = document.createElement('canvas').getContext('2d')!
+        const fits = (el: HTMLElement, text: string, room: number) => {
+          const cs = getComputedStyle(el)
+          ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`
+          return ctx.measureText(text).width <= room + 0.5
+        }
+        const input = bar.querySelector('.search input') as HTMLInputElement
+        const selects = [...bar.querySelectorAll('select')] as HTMLSelectElement[]
+        return bar.scrollWidth <= bar.clientWidth + 1 && (!input || fits(input, input.placeholder, input.clientWidth))
+          && selects.every((s) => fits(s, s.options[s.selectedIndex]?.text || '', s.getBoundingClientRect().width - 38))
+      })
+      await expect.poll(readable, { message: `${path} toolbar` }).toBe(true)
     }
   })
 })
