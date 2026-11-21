@@ -1,4 +1,4 @@
-/** The palette reaches the help of the current page: the way to it on a phone, where the bar hides its button. */
+/** The palette reaches the help of the current page on a search only, after the pages and modules (mockup: no help entry). */
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -15,13 +15,23 @@ vi.mock('../../services', () => ({ searchService: { globalSearch: vi.fn().mockRe
 
 import { CommandPalette } from '../CommandPalette'
 
-const helpResult = () => [...document.querySelectorAll('.command-result')].find((b) => b.textContent.includes('commandPalette.pageHelp'))
+const results = () => [...document.querySelectorAll('.command-result')]
+const helpResult = () => results().find((b) => b.textContent.includes('commandPalette.pageHelp'))
+const search = (value) => fireEvent.change(screen.getByRole('searchbox'), { target: { value } })
 
 describe('CommandPalette, help of the page', () => {
-  it('lists the help of the page and opens it, closing the palette', () => {
+  it('starts the empty palette with the pages, as the mockup, without the help entry', () => {
+    render(<CommandPalette open onOpenChange={vi.fn()} onOpenHelp={vi.fn()} />)
+    expect(results().length).toBeGreaterThan(0)
+    expect(helpResult()).toBeUndefined()
+    expect(results()[0].textContent).not.toContain('commandPalette.pageHelp')
+  })
+
+  it('lists the help on a matching search and opens it, closing the palette', () => {
     const onOpenChange = vi.fn()
     const onOpenHelp = vi.fn()
     render(<CommandPalette open onOpenChange={onOpenChange} onOpenHelp={onOpenHelp} />)
+    search('help')
     const result = helpResult()
     expect(result).toBeTruthy()
     expect(result.querySelector('.hint').textContent).toBe('common.help')
@@ -30,19 +40,28 @@ describe('CommandPalette, help of the page', () => {
     expect(onOpenHelp).toHaveBeenCalledTimes(1)
   })
 
+  it('places the help after the pages and modules the search also finds', () => {
+    render(<CommandPalette open onOpenChange={vi.fn()} onOpenHelp={vi.fn()} />)
+    search('e')
+    const all = results()
+    const help = all.indexOf(helpResult())
+    expect(help).toBeGreaterThan(0)
+    expect(help).toBe(all.length - 1)
+  })
+
   it('finds it by its name or its hint, and leaves it out of other searches', () => {
     render(<CommandPalette open onOpenChange={vi.fn()} onOpenHelp={vi.fn()} />)
-    const field = screen.getByRole('searchbox')
-    fireEvent.change(field, { target: { value: 'pagehelp' } })
+    search('pagehelp')
     expect(helpResult()).toBeTruthy()
-    fireEvent.change(field, { target: { value: 'common.help' } })
+    search('common.help')
     expect(helpResult()).toBeTruthy()
-    fireEvent.change(field, { target: { value: 'trustStore' } })
+    search('trustStore')
     expect(helpResult()).toBeUndefined()
   })
 
   it('has no help entry on a page without help', () => {
     render(<CommandPalette open onOpenChange={vi.fn()} />)
+    search('help')
     expect(helpResult()).toBeUndefined()
   })
 })
