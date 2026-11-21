@@ -8013,14 +8013,15 @@
   },
   "overview": {
     "title": "Обзор",
-    "allHidden": "Все карточки скрыты. Выберите набор, чтобы показать их снова.",
+    "allHidden": "Выберите карточки для показа или примените набор.",
     "presets": {
-      "label": "Наборы компоновки",
+      "label": "Набор карточек",
       "operator": "Оператор",
       "manager": "Менеджер",
       "all": "Все карточки",
       "short": "Набор",
-      "allHint": "Все карточки в исходном порядке"
+      "allHint": "Все карточки, исходный порядок",
+      "rowLabel": "Наборы"
     },
     "cards": {
       "queue": "Требует внимания",
@@ -8029,17 +8030,17 @@
       "horizon": "Горизонт истечения",
       "compliance": "Соответствие",
       "activity": "Последние операции",
-      "trend": "Активность сертификатов",
-      "states": "Распределение состояний"
+      "trend": "Активность сертификатов"
     },
     "state": {
       "loading": "Загрузка...",
       "error": "Не удалось загрузить эту карточку.",
-      "retry": "Повторить",
       "forbidden": "У вас нет доступа к этой карточке.",
       "empty": "Нечего показать.",
       "partial": "Часть этой карточки не удалось загрузить.",
-      "partialForbidden": "У вас нет доступа к части этой карточки."
+      "partialForbidden": "У вас нет доступа к части этой карточки.",
+      "forbiddenTitle": "Нет доступа",
+      "errorTitle": "Не удалось загрузить «{{name}}»"
     },
     "queue": {
       "sub": "По срочности: сначала критические, затем по сроку; то, за чем достаточно наблюдать, идёт последним.",
@@ -8061,8 +8062,6 @@
       "watch_few": "{{count}} под наблюдением",
       "watch_many": "{{count}} под наблюдением",
       "watchNote": "продления на стороне клиента, центры сертификации и якоря доверия, до истечения которых далеко: сегодня делать нечего",
-      "watchShow": "Показать строки под наблюдением",
-      "watchHide": "Скрыть строки под наблюдением",
       "show": "Показать",
       "hide": "Скрыть",
       "partial": "Показано {{shown}} из {{total}}: очередь показывает самые срочные элементы.",
@@ -8084,17 +8083,29 @@
         "ca": "Центры сертификации",
         "deploy": "Развёртывания"
       },
-      "less": "Показать меньше"
+      "less": "Показать меньше",
+      "again": "Повторить",
+      "emptyTitle": "Ничего не требует внимания",
+      "emptyType": "Нет строк вида «{{name}}».",
+      "seeAll": "Показать всю очередь",
+      "watchShow_one": "Показать {{count}} строку под наблюдением",
+      "watchShow_other": "Показать {{count}} строк под наблюдением",
+      "watchHide_one": "Скрыть {{count}} строку под наблюдением",
+      "watchHide_other": "Скрыть {{count}} строк под наблюдением",
+      "watchShow_few": "Показать {{count}} строки под наблюдением",
+      "watchShow_many": "Показать {{count}} строк под наблюдением",
+      "watchHide_few": "Скрыть {{count}} строки под наблюдением",
+      "watchHide_many": "Скрыть {{count}} строк под наблюдением"
     },
     "kind": {
-      "acme_order_failed": "Заказ ACME не выполнен",
+      "acme_order_failed": "Сбой ACME",
       "acme_client_renewal_failed": "Продление клиента ACME не удалось",
-      "approval_pending": "Ожидает утверждения",
+      "approval_pending": "Одобрение",
       "scep_request_pending": "Запрос SCEP ожидает",
       "key_recovery_pending": "Восстановление ключа ожидает",
-      "crl_due": "Пора обновить CRL",
+      "crl_due": "Публикация CRL",
       "crl_missing": "CRL отсутствует",
-      "manual_renewal_due": "Пора продлить вручную",
+      "manual_renewal_due": "Ручное продление",
       "client_renewal_overdue": "Клиент не продлил вовремя",
       "auto_renewal_blocked": "Автопродление заблокировано",
       "renewal_declined": "Продление отклонено",
@@ -8104,14 +8115,20 @@
       "truststore_expiring": "Сертификат в хранилище доверия истекает или истёк"
     },
     "compliance": {
-      "rsa_below_3072": "RSA короче 3072 бит",
+      "rsa_below_3072": "Слабые ключи",
       "weak_signature_hash": "Слабый хеш подписи",
-      "server_lifetime_over_398_days": "Серверные сертификаты дольше 398 дней",
+      "server_lifetime_over_398_days": "Срок > 398 дн.",
       "incomplete_chain": "Неполная цепочка",
-      "no_private_key": "Нет закрытого ключа",
+      "no_private_key": "Нет закрытого ключа в UCM",
       "byAlgorithm": "Алгоритмы ключей",
       "unknownAlgo": "Неизвестно",
-      "sub": "По действующим сертификатам. Показатель со списком открывает его с фильтром."
+      "sub": "Из {{count}} действующих сертификатов. Плитка со списком открывает его с фильтром.",
+      "algoLabel": "{{name}}: сертификатов {{count}}",
+      "sub_rsa_below_3072": "RSA менее 3072",
+      "sub_weak_signature_hash": "Устаревшая подпись",
+      "sub_server_lifetime_over_398_days": "Серверные сертификаты TLS",
+      "sub_incomplete_chain": "Нет промежуточного ЦС",
+      "sub_no_private_key": "Внешний CSR или импорт"
     },
     "health": {
       "acme": "ACME",
@@ -8184,10 +8201,6 @@
       "idle_few": "Нет операций за {{count}} дня.",
       "idle_many": "Нет операций за {{count}} дней.",
       "today": "Сегодня",
-      "successes_one": "{{count}} успех",
-      "successes_other": "{{count}} успеха",
-      "successes_few": "{{count}} успеха",
-      "successes_many": "{{count}} успехов",
       "failures_one": "{{count}} сбой",
       "failures_other": "{{count}} сбоя",
       "failures_few": "{{count}} сбоя",
@@ -8198,7 +8211,20 @@
       "alerts_few": "{{count}} строки сообщают о проблеме.",
       "alerts_many": "{{count}} строк сообщают о проблеме.",
       "seeQueue": "Открыть «Требует внимания»",
-      "allFine": "Ни одна строка не сообщает о проблеме."
+      "allFine": "Ни одна строка не сообщает о проблеме.",
+      "failLink_one": "{{count}} сбой {{name}} за {{span}}: заказы для повтора в «Требует внимания»",
+      "failLink_other": "{{count}} сбоев {{name}} за {{span}}: заказы для повтора в «Требует внимания»",
+      "taskCount_one": "{{count}} задача",
+      "taskCount_other": "{{count}} задач",
+      "lastRun": "последний запуск {{when}}",
+      "failLink_few": "{{count}} сбоя {{name}} за {{span}}: заказы для повтора в «Требует внимания»",
+      "failLink_many": "{{count}} сбоев {{name}} за {{span}}: заказы для повтора в «Требует внимания»",
+      "taskCount_few": "{{count}} задачи",
+      "taskCount_many": "{{count}} задач",
+      "runs_one": "<strong>{{count}}</strong> успех",
+      "runs_other": "<strong>{{count}}</strong> успехов",
+      "runs_few": "<strong>{{count}}</strong> успеха",
+      "runs_many": "<strong>{{count}}</strong> успехов"
     },
     "filter": {
       "status": "Статус",
@@ -8231,20 +8257,33 @@
     "hierarchy": {
       "crlOn": "CRL включён",
       "crlOff": "CRL выключен",
-      "ocspOn": "OCSP включён",
-      "ocspOff": "OCSP выключен",
-      "issued7d": "Выпущено за 7 дней:",
+      "ocspOn": "OCSP активен",
+      "ocspOff": "OCSP неактивен",
       "offline": "Автономный",
       "crossSigned": "Перекрёстно подписан",
-      "sub": "Центров сертификации: {{total}}, корневых: {{roots}}. CRL, OCSP и сертификаты, выпущенные за 7 дней.",
+      "sub": "{{authorities}} под {{roots}}. CRL, OCSP и выпуски за 7 дней.",
       "explore": "Просмотреть",
       "branch": "Ветвь {{name}}",
       "bounded": "Показано центров сертификации: {{shown}} из {{total}}, сначала самые активные деревья.",
-      "all": "Показать все ({{total}})",
       "below_one": "ещё {{count}} ниже",
       "below_other": "ещё {{count}} ниже",
       "below_few": "ещё {{count}} ниже",
-      "below_many": "ещё {{count}} ниже"
+      "below_many": "ещё {{count}} ниже",
+      "active": ", активен",
+      "issued_one": "{{count}} выпуск за 7 дн.",
+      "issued_other": "{{count}} выпусков за 7 дн.",
+      "authorities_one": "{{count}} центр сертификации",
+      "authorities_other": "{{count}} центров сертификации",
+      "roots_one": "{{count}} корнем",
+      "roots_other": "{{count}} корнями",
+      "emptyTitle": "Нет центров сертификации",
+      "emptyText": "Создайте офлайн-корень или импортируйте существующий ЦС, затем выпускающий ЦС под этим корнем.",
+      "issued_few": "{{count}} выпуска за 7 дн.",
+      "issued_many": "{{count}} выпусков за 7 дн.",
+      "authorities_few": "{{count}} центра сертификации",
+      "authorities_many": "{{count}} центров сертификации",
+      "roots_few": "{{count}} корнями",
+      "roots_many": "{{count}} корнями"
     },
     "horizon": {
       "expiring": "Скоро истекают",
@@ -8253,11 +8292,13 @@
       "tsaSigner": "Подписывающий TSA",
       "ocspResponder": "OCSP-ответчик",
       "sub": "Сертификаты, которые истекут следующими, сначала ближайшие.",
-      "expiresIn_one": "Истекает через {{count}} день",
-      "expiresIn_other": "Истекает через {{count}} дня",
-      "expiresIn_few": "Истекает через {{count}} дня",
-      "expiresIn_many": "Истекает через {{count}} дней",
-      "elapsed": "Прошло {{percent}} % срока действия"
+      "elapsed": "Прошло {{percent}} % срока действия",
+      "state": {
+        "valid": "Действительные",
+        "expiring": "К продлению",
+        "expired": "Истёкшие",
+        "revoked": "Отозванные"
+      }
     },
     "activity": {
       "all": "Показать все",
@@ -8271,9 +8312,7 @@
     "refresh": "Обновить",
     "intent": "Что требует ваших действий сегодня, затем состояние автоматизации, иерархии и соответствия.",
     "actions": {
-      "issue": "Выпустить",
-      "newCa": "Новый ЦС",
-      "discovery": "Обнаружение в сети"
+      "issue": "Выпустить"
     },
     "days_one": "{{count}} день",
     "days_other": "{{count}} дня",
@@ -8283,42 +8322,27 @@
       "cards": "Карточки",
       "cardsLabel": "Карточки: показать, скрыть, переупорядочить",
       "dialogTitle": "Карточки обзора",
-      "dialogSub": "Показать, скрыть и переупорядочить.",
+      "dialogSub": "Показать, скрыть и упорядочить",
       "saved": "Порядок и скрытые карточки сохраняются в вашей учётной записи.",
       "up": "Поднять «{{name}}»",
       "down": "Опустить «{{name}}»",
-      "grip": "Переместить карточку «{{name}}»: перетащите её или используйте стрелки",
-      "gripHint": "Перетащите или используйте стрелки",
-      "menu": "Параметры карточки «{{name}}»",
-      "menuTitle": "Параметры карточки",
-      "earlier": "Переместить раньше",
-      "later": "Переместить позже",
       "hide": "Скрыть карточку",
       "customize": "Настроить карточки…",
-      "moved": "«{{name}}» теперь карточка {{position}} из {{total}}.",
-      "hidden": "«{{name}}» скрыта. Кнопка «Карточки» покажет её снова."
+      "hidden": "Карточка «{{name}}» скрыта. Кнопка «Карточки» снова её покажет.",
+      "listLabel": "Карточки в порядке страницы",
+      "queueShown": "Карточка «Требует внимания» снова показана."
     },
     "metrics": {
-      "label": "Ключевые показатели",
-      "cas_one": "{{count}} центр сертификации",
-      "cas_other": "{{count}} центра сертификации",
-      "cas_few": "{{count}} центра сертификации",
-      "cas_many": "{{count}} центров сертификации",
-      "pending_one": "{{count}} ожидающий запрос",
-      "pending_other": "{{count}} ожидающих запроса",
-      "pending_few": "{{count}} ожидающих запроса",
-      "pending_many": "{{count}} ожидающих запросов",
-      "ssh_one": "{{count}} сертификат SSH",
-      "ssh_other": "{{count}} сертификата SSH",
-      "ssh_few": "{{count}} сертификата SSH",
-      "ssh_many": "{{count}} сертификатов SSH",
-      "queueSub": "К действию: {{act}}, под наблюдением: {{watch}}",
-      "expiringSoon_one": "{{count}} скоро истекает",
-      "expiringSoon_other": "{{count}} скоро истекают",
-      "expiringSoon_few": "{{count}} скоро истекают",
-      "expiringSoon_many": "{{count}} скоро истекают",
+      "queueSub": "{{act}}, {{watch}} под наблюдением",
       "failures": "Сбои за сегодня",
-      "failuresSub": "ACME, SCEP и EST, сутки UTC"
+      "failuresSub": "ACME, SCEP и EST, сутки UTC",
+      "certificates": "Сертификаты",
+      "inventory": "Полный перечень",
+      "interventions_one": "{{count}} действие",
+      "interventions_other": "{{count}} действий",
+      "toCheck": "Проверить",
+      "interventions_few": "{{count}} действия",
+      "interventions_many": "{{count}} действий"
     },
     "cause": {
       "acme_order_failed": "Заказ ACME завершился как недействительный за последние 7 дней",
@@ -8355,10 +8379,8 @@
       "alt_many": "Активность сертификатов за {{count}} дней: выпущено {{issued}}, отозвано {{revoked}}, истекло {{expired}}.",
       "keys": "График: стрелки влево и вправо читают его день за днём"
     },
-    "states": {
-      "sub": "Сертификаты по состояниям. Каждая строка открывает свой список.",
-      "alt": "Сертификатов: {{total}}. Действительных: {{valid}}, скоро истекающих: {{expiring}}, истёкших: {{expired}}, отозванных: {{revoked}}."
-    }
+    "clockToday": "сегодня в {{time}}",
+    "allHiddenTitle": "Все карточки скрыты"
   },
   "sectioned": {
     "flagModified": "Изменено",

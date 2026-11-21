@@ -22,11 +22,6 @@ function Page({ busy = false, onIssue = () => {}, onRead = () => {}, onSubmit = 
         <a className="lv-btn is-primary" href="/certificates?action=create" onClick={onIssue}>Issue page</a>
         <form onSubmit={onSubmit}><input aria-label="name" /><button type="submit">Save</button></form>
         <button type="button" className="lv-btn is-primary" disabled>Own reason</button>
-        <div className="ov-actions">
-          <button type="button" className="ov-btn is-secondary">New CA</button>
-          <button type="button" className="ov-btn is-primary">Issue now</button>
-          <button type="button" className="ov-btn is-collapsible">Cards</button>
-        </div>
       </div>
       <div role="dialog"><button type="button" className="wk-btn is-primary">Publish</button></div>
     </>
@@ -44,7 +39,7 @@ describe('applyWriteGuard', () => {
   it('disables the write controls of the page, the inspector and the dialogs, pointing to the reason', () => {
     render(<Page />)
     applyWriteGuard(SUSPENDED)
-    for (const name of ['Issue', 'Import', 'Delete', 'Save', 'Publish', 'New CA', 'Issue now']) {
+    for (const name of ['Issue', 'Import', 'Delete', 'Save', 'Publish']) {
       const el = screen.getByRole('button', { name })
       expect(el).toBeDisabled()
       expect(el).toHaveAttribute('aria-describedby', NOTE)
@@ -57,7 +52,7 @@ describe('applyWriteGuard', () => {
   it('leaves alone what only reads, what opts out, and the shell bars', () => {
     render(<Page />)
     applyWriteGuard(SUSPENDED)
-    for (const name of ['Filter', 'Retry', 'bar', 'Cards']) expect(screen.getByRole('button', { name })).toBeEnabled()
+    for (const name of ['Filter', 'Retry', 'bar']) expect(screen.getByRole('button', { name })).toBeEnabled()
   })
 
   it('gives back only what it disabled, never a control disabled by its own view', () => {

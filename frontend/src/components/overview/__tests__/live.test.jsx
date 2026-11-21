@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k, o) => (o?.defaultValue ?? k) }) }))
+vi.mock('react-i18next', () => ({ Trans: ({ i18nKey }) => i18nKey, useTranslation: () => ({ t: (k, o) => (o?.defaultValue ?? k) }) }))
 const api = vi.hoisted(() => ({
   getQueue: vi.fn(), getHealth: vi.fn(), getCompliance: vi.fn(), getIssuance: vi.fn(),
   getStats: vi.fn(), getAll: vi.fn(), getNext: vi.fn(), getActivity: vi.fn(),
@@ -26,13 +26,13 @@ vi.mock('../../../hooks/useWebSocket', () => ({
   ConnectionState: { CONNECTED: 'connected', DISCONNECTED: 'disconnected', CONNECTING: 'connecting', ERROR: 'error' },
 }))
 
-import { QueueCard, ComplianceCard, HealthCard, HierarchyCard, HorizonCard, ActivityCard, TrendCard, StatesCard } from '..'
+import { QueueCard, ComplianceCard, HealthCard, HierarchyCard, HorizonCard, ActivityCard, TrendCard } from '..'
 import { REFRESH_EVENT } from '../../../lib/overviewRefresh'
 
 const CARDS = { queue: [QueueCard, api.getQueue], compliance: [ComplianceCard, api.getCompliance],
   health: [HealthCard, api.getHealth], hierarchy: [HierarchyCard, api.getAll],
-  horizon: [HorizonCard, api.getStats], activity: [ActivityCard, api.getActivity],
-  trend: [TrendCard, api.getTrend], states: [StatesCard, api.getDashStats] }
+  horizon: [HorizonCard, api.getDashStats], activity: [ActivityCard, api.getActivity],
+  trend: [TrendCard, api.getTrend] }
 
 const announce = (type) => act(() => { window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type } })) })
 const settle = async (ms = 0) => { await act(async () => { await vi.advanceTimersByTimeAsync(ms) }) }
@@ -162,7 +162,7 @@ describe('overview cards follow the data', () => {
     await settle()
     expect(api.getQueue).toHaveBeenCalledTimes(2)
     expect(screen.queryByText('overview.state.loading')).toBeNull()
-    expect(screen.getByTestId('card-queue').textContent).toMatch(/overview\.state\.(error|empty)/)
+    expect(document.getElementById('card-queue').textContent).toMatch(/overview\.(state\.errorTitle|queue\.emptyTitle)/)
   })
 
   it('the tab coming back to the foreground reloads the cards', async () => {

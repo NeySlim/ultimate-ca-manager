@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
-import { Warning } from '@phosphor-icons/react'
-import { Button } from '../Button'
+import { Btn, Icon } from '../atelier'
 import { dashboardService } from '../../services'
 import { usePermission } from '../../hooks/usePermission'
 
-// Private keys are stored unencrypted while no master key is loaded
+/** Private keys are stored unencrypted while no master key is loaded: the mockup's state banner says so. */
 export function KeyEncryptionBanner() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
   const { hasPermission } = usePermission()
   const [off, setOff] = useState(false)
 
@@ -23,16 +20,11 @@ export function KeyEncryptionBanner() {
 
   if (!off) return null
   return (
-    <div role="alert" className="flex items-center gap-3 rounded-lg border status-warning-bg status-warning-border px-4 py-2 text-xs">
-      <Warning size={16} weight="duotone" className="text-status-warning shrink-0" />
-      <div className="flex-1 min-w-0">
-        <span className="font-semibold text-text-primary">{t('dashboard.keyEncryptionOffTitle')}</span>{' '}
-        <span className="text-text-secondary">{t('dashboard.keyEncryptionOffDesc')}</span>
-      </div>
+    <div role="alert" className="state-banner tone-warn" id="key-encryption-banner">
+      <Icon name="warning" />
+      <p><strong>{t('dashboard.keyEncryptionOffTitle')}</strong> {t('dashboard.keyEncryptionOffDesc')}</p>
       {hasPermission('admin:system') && (
-        <Button type="button" size="sm" variant="secondary" onClick={() => navigate('/settings?tab=security')}>
-          {t('settings.tabs.security')}
-        </Button>
+        <Btn icon="lock" to="/settings?tab=security">{t('settings.tabs.security')}</Btn>
       )}
     </div>
   )

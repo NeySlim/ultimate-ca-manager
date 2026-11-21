@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k, o) => (o?.defaultValue ?? k) }) }))
+vi.mock('react-i18next', () => ({ Trans: ({ i18nKey }) => i18nKey, useTranslation: () => ({ t: (k, o) => (o?.defaultValue ?? k) }) }))
 const api = vi.hoisted(() => ({
   getQueue: vi.fn(), getHealth: vi.fn(), getCompliance: vi.fn(), getIssuance: vi.fn(),
   getStats: vi.fn(), getAll: vi.fn(), getNext: vi.fn(), getActivity: vi.fn(), can: vi.fn(),
@@ -25,10 +25,12 @@ vi.mock('../../../hooks/useWebSocket', () => ({
 }))
 vi.mock('../../../hooks/usePermission', () => ({ usePermission: () => ({ hasPermission: api.can }) }))
 
-import { QueueCard, HierarchyCard, HorizonCard, ActivityCard, ComplianceCard, HealthCard, TrendCard, StatesCard } from '..'
+import { QueueCard, HierarchyCard, HorizonCard, ActivityCard, ComplianceCard, HealthCard, TrendCard } from '..'
 
 const show = (ui) => render(<MemoryRouter>{ui}</MemoryRouter>)
 const item = (i) => ({ kind: 'manual_renewal_due', tier: 'warning', id: i, label: `cert-${i}`, due_at: null, href_hint: `/certificates/${i}` })
+// A row folded by the mockup carries hidden: it stays in the list, out of sight
+const visibleNames = () => [...document.querySelectorAll('#queue-list li.queue-row')].filter((li) => !li.hidden).map((li) => li.querySelector('strong, .queue-subject').textContent)
 const queue = (n, total = n) => ({ data: { items: Array.from({ length: n }, (_, i) => item(i + 1)), counts: { manual_renewal_due: total }, total } })
 
 beforeEach(() => {
@@ -43,18 +45,18 @@ describe('queue ceiling and folded total', () => {
     api.getQueue.mockResolvedValue(queue(9))
     show(<QueueCard />)
     await screen.findByText('cert-1')
-    expect(screen.getAllByText(/^cert-\d$/)).toHaveLength(6)
+    expect(visibleNames()).toHaveLength(6)
     fireEvent.click(screen.getByText('overview.queue.unfold'))
-    expect(screen.getAllByText(/^cert-\d$/)).toHaveLength(9)
+    expect(visibleNames()).toHaveLength(9)
     fireEvent.click(screen.getByText('overview.queue.less'))
-    expect(screen.getAllByText(/^cert-\d$/)).toHaveLength(6)
+    expect(visibleNames()).toHaveLength(6)
   })
 
   it('the total counts the whole queue, not the rows shown', async () => {
     api.getQueue.mockResolvedValue(queue(100, 140))
     show(<QueueCard />)
     await screen.findByText('cert-1')
-    expect(screen.getByTestId('queue-total').textContent).toBe('140')
+    expect(document.querySelector('#card-queue-title .counter').textContent).toBe('140')
     expect(screen.getByText('overview.queue.group.renew').closest('button').textContent).toContain('140')
     expect(screen.getByText('overview.queue.partial')).toBeTruthy()
   })
@@ -63,7 +65,7 @@ describe('queue ceiling and folded total', () => {
     api.getQueue.mockResolvedValue(queue(9))
     show(<QueueCard defaultOpen />)
     await screen.findByText('cert-9')
-    expect(screen.getAllByText(/^cert-\d$/)).toHaveLength(9)
+    expect(visibleNames()).toHaveLength(9)
   })
 })
 
@@ -74,7 +76,7 @@ describe('exact links', () => {
       { id: 2, refid: 'b', descr: 'Issuing', parent_id: 1 },
       { id: 3, refid: 'c', descr: 'Orphan', parent_id: 99 },
     ], meta: { total: 3 } })
-    api.getIssuance.mockResolvedValue({ data: { by_ca: [{ caref: 'b', issued: 4 }] } })
+    api.getIssuance.mockResolvedValue({ data: { by_ca: [{ caref: 'b', issued: 4, total: 4 }] } })
     show(<HierarchyCard />)
     const root = (await screen.findByText('Root')).closest('a')
     const child = screen.getByText('Issuing').closest('a')
@@ -83,17 +85,17 @@ describe('exact links', () => {
     expect(root.closest('li').querySelector('ul').contains(child)).toBe(true)
     // A CA whose parent is not in the list heads its own tree
     expect(screen.getByText('Orphan').closest('li').parentElement.closest('li')).toBeNull()
-    expect(child.textContent).toContain('overview.hierarchy.issued7d 4')
-    // A zero is not a figure worth a line
-    expect(root.textContent).not.toContain('overview.hierarchy.issued7d')
+    expect(child.textContent).toContain('overview.hierarchy.issued')
+    // A root gives its CRL and its state, not issuances
+    expect(root.textContent).not.toContain('overview.hierarchy.issued')
   })
 
   it('horizon counters open the list of their own status, each soonest row its certificate', async () => {
-    api.getStats.mockResolvedValue({ data: { total: 9, expiring: 3, expired: 1 } })
+    api.getDashStats.mockResolvedValue({ data: { total_certificates: 9, expiring_soon: 3, expired: 1 } })
     api.getNext.mockResolvedValue({ data: [{ id: 7, common_name: 'soon.example', valid_to: '2027-01-01T00:00:00Z' }] })
     show(<HorizonCard />)
-    expect((await screen.findByText('overview.horizon.expiring')).closest('a').getAttribute('href')).toBe('/certificates?status=expiring')
-    expect(screen.getByText('overview.horizon.expired').closest('a').getAttribute('href')).toBe('/certificates?status=expired')
+    expect((await screen.findByText('overview.horizon.state.expiring')).closest('a').getAttribute('href')).toBe('/certificates?status=expiring')
+    expect(screen.getByText('overview.horizon.state.expired').closest('a').getAttribute('href')).toBe('/certificates?status=expired')
     expect(screen.getByText('soon.example').closest('a').getAttribute('href')).toBe('/certificates/7')
   })
 
@@ -101,7 +103,7 @@ describe('exact links', () => {
     api.getActivity.mockResolvedValue({ data: { activity: [{ message: 'Created x', user: 'u', timestamp: null }] } })
     api.can.mockReturnValue(true)
     const a = show(<ActivityCard />)
-    expect((await screen.findByText('overview.activity.all')).getAttribute('href')).toBe('/audit')
+    expect((await screen.findByText('overview.activity.all')).closest('a').getAttribute('href')).toBe('/audit')
     a.unmount()
     api.can.mockReturnValue(false)
     show(<ActivityCard />)
@@ -112,27 +114,26 @@ describe('exact links', () => {
 
 describe('empty state is not the error state', () => {
   const cards = [
-    ['queue', QueueCard, api.getQueue, { items: [], counts: {}, total: 0 }],
-    ['health', HealthCard, api.getHealth, { protocols: {} }],
-    ['hierarchy', HierarchyCard, api.getAll, []],
-    ['horizon', HorizonCard, api.getStats, { total: 0 }],
-    ['compliance', ComplianceCard, api.getCompliance, { total: 0, counters: {}, by_key_algorithm: [] }],
-    ['activity', ActivityCard, api.getActivity, { activity: [] }],
-    ['trend', TrendCard, api.getTrend, { trend: [] }],
-    ['states', StatesCard, api.getDashStats, { valid: 0, expiring_soon: 0, expired: 0, revoked: 0 }],
+    ['queue', QueueCard, api.getQueue, { items: [], counts: {}, total: 0 }, 'overview.queue.emptyTitle'],
+    ['health', HealthCard, api.getHealth, { protocols: {} }, 'overview.state.empty'],
+    ['hierarchy', HierarchyCard, api.getAll, [], 'overview.hierarchy.emptyTitle'],
+    ['horizon', HorizonCard, api.getDashStats, { total_certificates: 0 }, 'overview.state.empty'],
+    ['compliance', ComplianceCard, api.getCompliance, { total: 0, counters: {}, by_key_algorithm: [] }, 'overview.state.empty'],
+    ['activity', ActivityCard, api.getActivity, { activity: [] }, 'overview.state.empty'],
+    ['trend', TrendCard, api.getTrend, { trend: [] }, 'overview.state.empty'],
   ]
-  it.each(cards)('%s says "nothing" for an empty answer and offers a retry for a failure, never both', async (id, Card, fetcher, empty) => {
+  it.each(cards)('%s says "nothing" for an empty answer and offers a retry for a failure, never both', async (id, Card, fetcher, empty, emptyText) => {
     fetcher.mockResolvedValueOnce({ data: empty, meta: { total: 0 } })
     const a = show(<Card />)
-    await screen.findByText('overview.state.empty')
+    await screen.findByText(emptyText)
     expect(screen.queryByRole('alert')).toBeNull()
     a.unmount()
 
     fetcher.mockRejectedValueOnce(Object.assign(new Error('x'), { status: 500 }))
     show(<Card />)
     await screen.findByRole('alert')
-    expect(screen.queryByText('overview.state.empty')).toBeNull()
-    await waitFor(() => expect(screen.getByText('overview.state.retry')).toBeTruthy())
+    expect(screen.queryByText(emptyText)).toBeNull()
+    await waitFor(() => expect(screen.getByText('table.retry')).toBeTruthy())
   })
 
   it('hierarchy keeps its tree, flagged partial, when its issuance half fails', async () => {

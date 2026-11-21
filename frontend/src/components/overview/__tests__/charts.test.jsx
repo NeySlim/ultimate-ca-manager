@@ -1,12 +1,13 @@
 /**
- * The two chart cards: their figures are readable without the drawing (alternative text, table,
- * legend), each series keeps its own pattern, and the status ring leaves out an empty state.
+ * The activity chart: its figures are readable without the drawing (alternative text, table,
+ * legend), and each series keeps its own pattern.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
+  Trans: ({ i18nKey }) => i18nKey,
   useTranslation: () => ({ t: (k, o) => (o && Object.keys(o).length > 0 ? `${k}:${JSON.stringify(o)}` : k) }),
 }))
 const api = vi.hoisted(() => ({ getTrend: vi.fn(), getDashStats: vi.fn() }))
@@ -19,7 +20,7 @@ vi.mock('../../../hooks/useWebSocket', () => ({
 }))
 vi.mock('../../../hooks/usePermission', () => ({ usePermission: () => ({ hasPermission: () => true }) }))
 
-import { TrendCard, StatesCard } from '..'
+import { TrendCard } from '..'
 
 const show = (ui) => render(<MemoryRouter>{ui}</MemoryRouter>)
 const day = (n, issued, revoked = 0, expired = 0) => ({ date: `2026-11-${String(n).padStart(2, '0')}`, name: 'x', issued, revoked, expired })
@@ -41,7 +42,7 @@ describe('certificate activity', () => {
     api.getTrend.mockResolvedValue({ data: { trend: week } })
     show(<TrendCard />)
     await screen.findByTestId('trend-chart')
-    const legend = screen.getByTestId('card-trend').querySelector('.ov-legend')
+    const legend = document.querySelector('#card-trend .horizon-legend')
     expect([...legend.querySelectorAll('li')].map((li) => li.textContent)).toEqual(['common.issued12', 'common.revoked2', 'common.expired3'])
     const dashes = ['issued', 'revoked', 'expired'].map((s) => screen.getByTestId(`trend-line-${s}`).getAttribute('stroke-dasharray'))
     expect(new Set(dashes).size).toBe(3)
@@ -68,7 +69,7 @@ describe('certificate activity', () => {
     api.getTrend.mockResolvedValue({ data: { trend: week } })
     show(<TrendCard />)
     const chart = await screen.findByTestId('trend-chart')
-    const ticks = [...chart.querySelectorAll('g > text.ov-chart-axis')].map((el) => el.textContent)
+    const ticks = [...chart.querySelectorAll('g > text.trend-axis')].map((el) => el.textContent)
     expect(ticks).toEqual(['0', '3', '6'])
   })
 
@@ -117,52 +118,5 @@ describe('certificate activity', () => {
     expect(await screen.findByText('overview.trend.quiet:{"count":7}')).toBeTruthy()
     expect(screen.queryByTestId('trend-chart')).toBeNull()
     expect(screen.getByRole('group', { name: 'overview.trend.period' })).toBeTruthy()
-  })
-})
-
-describe('status distribution', () => {
-  const stats = { total_certificates: 282, valid: 205, expiring_soon: 11, expired: 55, revoked: 11 }
-
-  it('gives every figure in the alternative text and the total in the middle', async () => {
-    api.getDashStats.mockResolvedValue({ data: stats })
-    show(<StatesCard />)
-    const donut = await screen.findByTestId('states-donut')
-    expect(donut.getAttribute('aria-label')).toBe('overview.states.alt:{"total":282,"valid":205,"expiring":11,"expired":55,"revoked":11}')
-    expect(donut.parentElement.querySelector('.ov-donut-total strong').textContent).toBe('282')
-  })
-
-  it('each state is a line with its count and share that opens its list', async () => {
-    api.getDashStats.mockResolvedValue({ data: stats })
-    show(<StatesCard />)
-    await screen.findByTestId('states-donut')
-    const links = within(screen.getByTestId('card-states')).getAllByRole('link')
-    expect(links.map((a) => a.getAttribute('href'))).toEqual([
-      '/certificates?status=valid', '/certificates?status=expiring', '/certificates?status=expired', '/certificates?status=revoked',
-    ])
-    expect(links.map((a) => a.textContent)).toEqual([
-      'overview.filterValue.valid20573%', 'overview.filterValue.expiring114%',
-      'overview.filterValue.expired5520%', 'overview.filterValue.revoked114%',
-    ])
-  })
-
-  it('draws one slice per state that has certificates, in a fixed order, whose lengths fill the ring', async () => {
-    api.getDashStats.mockResolvedValue({ data: { valid: 30, expiring_soon: 0, expired: 10, revoked: 0 } })
-    show(<StatesCard />)
-    const donut = await screen.findByTestId('states-donut')
-    const slices = [...donut.querySelectorAll('.ov-donut-seg')]
-    expect(slices.map((s) => s.getAttribute('data-series'))).toEqual(['valid', 'expired'])
-    const [a, b] = slices.map((s) => Number(s.getAttribute('stroke-dasharray').split(' ')[0]))
-    const ring = 2 * Math.PI * 58
-    expect(a + b).toBeCloseTo(ring - 4, 1)
-    expect(a / b).toBeCloseTo((ring * 0.75 - 2) / (ring * 0.25 - 2), 2)
-    expect(slices[0].querySelector('title').textContent).toBe('overview.filterValue.valid: 30')
-  })
-
-  it('a state under one percent is not rounded to nothing', async () => {
-    api.getDashStats.mockResolvedValue({ data: { valid: 999, expiring_soon: 1, expired: 0, revoked: 0 } })
-    show(<StatesCard />)
-    await screen.findByTestId('states-donut')
-    expect(screen.getByText('overview.filterValue.expiring').closest('a').textContent).toContain('<1%')
-    expect(screen.getByText('overview.filterValue.expired').closest('a').textContent).toContain('0%')
   })
 })

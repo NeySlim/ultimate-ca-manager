@@ -2,11 +2,12 @@
  * The real cards under the real figures strip: a route two of them read is requested once,
  * at load and at each reload, whether or not its card is shown.
  */
+// The setup assistant reads the shared counters; an instance with certificates asks nothing more
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k, o) => (o?.defaultValue ?? k) }) }))
+vi.mock('react-i18next', () => ({ Trans: ({ i18nKey }) => i18nKey, useTranslation: () => ({ t: (k, o) => (o?.defaultValue ?? k) }) }))
 const api = vi.hoisted(() => ({
   getQueue: vi.fn(), getHealth: vi.fn(), getCompliance: vi.fn(), getIssuance: vi.fn(), getCertStats: vi.fn(),
   getCas: vi.fn(), getNext: vi.fn(), getActivity: vi.fn(), getStats: vi.fn(), getTrend: vi.fn(), getStatus: vi.fn(),
@@ -26,17 +27,19 @@ vi.mock('../../hooks/usePermission', () => ({
   usePermission: () => ({ isAdmin: () => true, hasPermission: () => true, canWrite: () => true }),
 }))
 vi.mock('../../components/KofiSupportCard', () => ({ KofiSupportCard: () => null }))
-vi.mock('../../contexts/NotificationContext', () => ({ useNotification: () => ({}) }))
+vi.mock('../../contexts/NotificationContext', () => ({ useNotification: () => ({ showInfo: vi.fn() }) }))
 const store = vi.hoisted(() => ({ prefs: {} }))
 vi.mock('../../stores/userPreferencesStore', () => ({
   getPreferences: () => store.prefs, persistPreference: vi.fn(), subscribePreferences: () => () => {},
 }))
 
 import OverviewPage from '../OverviewPage'
-import { REFRESH_EVENT } from '../../lib/overviewRefresh'
 
 const calls = () => Object.fromEntries(Object.entries(api).map(([name, fn]) => [name, fn.mock.calls.length]))
-const ONCE = Object.fromEntries(Object.keys(api).map((name) => [name, 1]))
+// No card reads the certificates' own counters any more: the horizon shares the dashboard's
+const ONCE = { ...Object.fromEntries(Object.keys(api).map((name) => [name, 1])), getCertStats: 0 }
+const metric = (id) => document.querySelector(`[data-metric="${id}"]`)
+const value = (id) => metric(id).querySelector('.value').textContent
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -55,8 +58,8 @@ beforeEach(() => {
 })
 
 const loaded = async () => {
-  await waitFor(() => expect(screen.getByTestId('metric-failures').querySelector('.ov-metric-value').textContent).toBe('2'))
-  await waitFor(() => expect(screen.queryAllByRole('status')).toHaveLength(0))
+  await waitFor(() => expect(value('failures')).toBe('2'))
+  await waitFor(() => expect(document.querySelectorAll('.sk-card')).toHaveLength(0))
 }
 
 describe('requests of the overview', () => {
@@ -65,10 +68,10 @@ describe('requests of the overview', () => {
     await loaded()
     expect(calls()).toEqual(ONCE)
     // Both readers got the answer
-    expect(screen.getByTestId('metric-queue').querySelector('.ov-metric-value').textContent).toBe('1')
+    expect(value('queue')).toBe('1')
     expect(screen.getByText('cert-one')).toBeTruthy()
-    expect(screen.getByTestId('metric-certificates').querySelector('.ov-metric-value').textContent).toBe('4')
-    expect(screen.getByTestId('states-donut')).toBeTruthy()
+    expect(value('certificates')).toBe('4')
+    expect(screen.getByText('overview.horizon.state.valid').parentElement.querySelector('strong').textContent).toBe('2')
   })
 
   it('the refresh button asks each card route once more, not twice', async () => {
@@ -77,34 +80,35 @@ describe('requests of the overview', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'overview.refresh' })) })
     await waitFor(() => expect(api.getActivity).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(api.getQueue).toHaveBeenCalledTimes(2))
-    expect(calls()).toEqual({ ...Object.fromEntries(Object.keys(api).map((name) => [name, 2])), getStatus: 1 })
+    expect(calls()).toEqual({ ...Object.fromEntries(Object.keys(api).map((name) => [name, 2])), getStatus: 1, getCertStats: 0 })
   })
 
   it('with the queue and health cards hidden, the strip still gets its figures, once', async () => {
-    store.prefs = { dashboard: { hidden: ['queue', 'health', 'states'] } }
+    store.prefs = { dashboard: { hidden: ['queue', 'health'] } }
     render(<MemoryRouter><OverviewPage /></MemoryRouter>)
     await loaded()
-    expect(screen.queryByTestId('card-queue')).toBeNull()
+    expect(document.getElementById('card-queue')).toBeNull()
     expect(calls()).toEqual(ONCE)
-    // No card to lead to: the figures are plain
-    expect(screen.getByTestId('metric-queue').tagName).toBe('DIV')
-    expect(screen.getByTestId('metric-failures').tagName).toBe('DIV')
+    // The failures lead to no card; the queue figure brings its card back (the mockup's showQueue)
+    expect(metric('failures').hasAttribute('href')).toBe(false)
+    fireEvent.click(metric('queue'))
+    await waitFor(() => expect(document.getElementById('card-queue')).not.toBeNull())
   })
 
   it('a figure of the strip leads to its card when the card is shown', async () => {
     render(<MemoryRouter><OverviewPage /></MemoryRouter>)
     await loaded()
-    fireEvent.click(screen.getByTestId('metric-queue'))
-    expect(document.activeElement).toBe(screen.getByTestId('card-queue').querySelector('h2'))
-    fireEvent.click(screen.getByTestId('metric-failures'))
-    expect(document.activeElement).toBe(screen.getByTestId('card-health').querySelector('h2'))
+    fireEvent.click(metric('queue'))
+    await waitFor(() => expect(document.activeElement).toBe(document.getElementById('card-queue-title')))
+    fireEvent.click(metric('failures'))
+    expect(document.activeElement).toBe(document.getElementById('card-health-title'))
   })
 
   it('a failure shared by two readers reaches both', async () => {
     api.getQueue.mockRejectedValue(Object.assign(new Error('down'), { status: 500 }))
     render(<MemoryRouter><OverviewPage /></MemoryRouter>)
-    await waitFor(() => expect(screen.getByTestId('card-queue').textContent).toContain('overview.state.error'))
-    expect(screen.getByTestId('metric-queue').querySelector('.ov-metric-value').textContent).toBe('–')
+    await waitFor(() => expect(document.getElementById('card-queue').textContent).toContain('overview.state.errorTitle'))
+    expect(value('queue')).toBe('–')
     expect(api.getQueue).toHaveBeenCalledTimes(1)
   })
 })

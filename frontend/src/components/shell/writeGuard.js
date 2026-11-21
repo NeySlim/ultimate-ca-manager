@@ -14,8 +14,6 @@ export const WRITE_SELECTOR = [
   '.wk-btn.is-primary',
   '.wk-btn.is-danger',
   '.shell-btn.is-primary',
-  '.ov-actions .ov-btn.is-primary',
-  '.ov-actions .ov-btn.is-secondary',
   '.btn-gradient',
   'button[type="submit"]',
   'input[type="submit"]',

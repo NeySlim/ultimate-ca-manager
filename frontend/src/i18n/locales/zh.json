@@ -7759,7 +7759,8 @@
       "manager": "管理者",
       "all": "所有卡片",
       "short": "预设",
-      "allHint": "所有卡片，按初始顺序"
+      "allHint": "所有卡片，按初始顺序",
+      "rowLabel": "Presets"
     },
     "cards": {
       "queue": "待处理",
@@ -7768,17 +7769,17 @@
       "horizon": "到期视野",
       "compliance": "合规性",
       "activity": "最新操作",
-      "trend": "证书活动",
-      "states": "状态分布"
+      "trend": "证书活动"
     },
     "state": {
       "loading": "加载中...",
       "error": "无法加载此卡片。",
-      "retry": "重试",
       "forbidden": "您无权访问此卡片。",
       "empty": "没有可显示的内容。",
       "partial": "此卡片的部分内容无法加载。",
-      "partialForbidden": "您无权访问此卡片的部分内容。"
+      "partialForbidden": "您无权访问此卡片的部分内容。",
+      "forbiddenTitle": "No access",
+      "errorTitle": "Could not load “{{name}}”"
     },
     "queue": {
       "sub": "按紧急程度排序：严重项优先，然后按期限；只需关注的事项排在最后。",
@@ -7794,8 +7795,6 @@
       "watch_one": "{{count}} 项需关注",
       "watch_other": "{{count}} 项需关注",
       "watchNote": "客户端续期、距到期尚远的颁发机构和信任锚：今天无需处理",
-      "watchShow": "显示需关注的行",
-      "watchHide": "隐藏需关注的行",
       "show": "显示",
       "hide": "隐藏",
       "partial": "已列出 {{total}} 项中的 {{shown}} 项：队列显示最紧急的事项。",
@@ -7817,7 +7816,15 @@
         "ca": "颁发机构",
         "deploy": "部署"
       },
-      "less": "收起"
+      "less": "收起",
+      "again": "Retry",
+      "emptyTitle": "Nothing to handle",
+      "emptyType": "No row of type “{{name}}”.",
+      "seeAll": "See the whole queue",
+      "watchShow_one": "Show the {{count}} row to watch",
+      "watchShow_other": "Show the {{count}} rows to watch",
+      "watchHide_one": "Hide the {{count}} row to watch",
+      "watchHide_other": "Hide the {{count}} rows to watch"
     },
     "kind": {
       "acme_order_failed": "ACME 订单失败",
@@ -7837,14 +7844,20 @@
       "truststore_expiring": "信任存储中的证书即将到期或已到期"
     },
     "compliance": {
-      "rsa_below_3072": "RSA 低于 3072 位",
+      "rsa_below_3072": "Weak keys",
       "weak_signature_hash": "弱签名哈希",
-      "server_lifetime_over_398_days": "服务器证书超过 398 天",
+      "server_lifetime_over_398_days": "Validity > 398 d",
       "incomplete_chain": "证书链不完整",
-      "no_private_key": "无私钥",
+      "no_private_key": "No private key in UCM",
       "byAlgorithm": "密钥算法",
       "unknownAlgo": "未知",
-      "sub": "基于在用证书。带列表的数字会打开筛选后的列表。"
+      "sub": "Over the {{count}} active certificates. A tile that has a list opens it, filtered.",
+      "algoLabel": "{{name}}: {{count}} certificates",
+      "sub_rsa_below_3072": "RSA < 3072",
+      "sub_weak_signature_hash": "Obsolete signature",
+      "sub_server_lifetime_over_398_days": "TLS server certificates",
+      "sub_incomplete_chain": "Intermediate missing",
+      "sub_no_private_key": "External CSR or import"
     },
     "health": {
       "acme": "ACME",
@@ -7903,15 +7916,20 @@
       "idle_one": "{{count}} 天内无操作。",
       "idle_other": "{{count}} 天内无操作。",
       "today": "今天",
-      "successes_one": "{{count}} 次成功",
-      "successes_other": "{{count}} 次成功",
       "failures_one": "{{count}} 次失败",
       "failures_other": "{{count}} 次失败",
       "sparkAlt": "{{name}}，按天，从最早开始。成功：{{ok}}。失败：{{failed}}。",
       "alerts_one": "{{count}} 行报告问题。",
       "alerts_other": "{{count}} 行报告问题。",
       "seeQueue": "查看待处理",
-      "allFine": "没有任何行报告问题。"
+      "allFine": "没有任何行报告问题。",
+      "failLink_one": "{{count}} {{name}} failure over {{span}}: see the orders to retry in To handle",
+      "failLink_other": "{{count}} {{name}} failures over {{span}}: see the orders to retry in To handle",
+      "taskCount_one": "{{count}} task",
+      "taskCount_other": "{{count}} tasks",
+      "lastRun": "last run {{when}}",
+      "runs_one": "<strong>{{count}}</strong> success",
+      "runs_other": "<strong>{{count}}</strong> successes"
     },
     "filter": {
       "status": "状态",
@@ -7946,16 +7964,23 @@
       "crlOff": "CRL 已禁用",
       "ocspOn": "OCSP 已启用",
       "ocspOff": "OCSP 已禁用",
-      "issued7d": "7 天内签发：",
       "offline": "离线",
       "crossSigned": "交叉签名",
-      "sub": "颁发机构：{{total}}，根：{{roots}}。CRL、OCSP 和 7 天内签发的证书。",
+      "sub": "{{authorities}} under {{roots}}. CRL, OCSP and issuances over 7 days.",
       "explore": "浏览",
       "branch": "分支 {{name}}",
       "bounded": "已显示 {{total}} 个颁发机构中的 {{shown}} 个，最活跃的树优先。",
-      "all": "查看全部（{{total}}）",
       "below_one": "其下还有 {{count}} 个",
-      "below_other": "其下还有 {{count}} 个"
+      "below_other": "其下还有 {{count}} 个",
+      "active": ", active",
+      "issued_one": "{{count}} issuance in 7 d",
+      "issued_other": "{{count}} issuances in 7 d",
+      "authorities_one": "{{count}} authority",
+      "authorities_other": "{{count}} authorities",
+      "roots_one": "{{count}} root",
+      "roots_other": "{{count}} roots",
+      "emptyTitle": "No certificate authority",
+      "emptyText": "Create an offline root or import an existing CA, then an issuing CA under that root."
     },
     "horizon": {
       "expiring": "即将到期",
@@ -7964,9 +7989,13 @@
       "tsaSigner": "TSA 签名者",
       "ocspResponder": "OCSP 响应器",
       "sub": "接下来到期的证书，最近的在前。",
-      "expiresIn_one": "{{count}} 天后到期",
-      "expiresIn_other": "{{count}} 天后到期",
-      "elapsed": "有效期已过 {{percent}}%"
+      "elapsed": "有效期已过 {{percent}}%",
+      "state": {
+        "valid": "Valid",
+        "expiring": "To renew",
+        "expired": "Expired",
+        "revoked": "Revoked"
+      }
     },
     "activity": {
       "all": "查看全部",
@@ -7980,9 +8009,7 @@
     "refresh": "刷新",
     "intent": "今天需要您处理的事项，然后是自动化、层级和合规性的状态。",
     "actions": {
-      "issue": "签发",
-      "newCa": "新建 CA",
-      "discovery": "网络发现"
+      "issue": "签发"
     },
     "days_one": "{{count}} 天",
     "days_other": "{{count}} 天",
@@ -7994,30 +8021,21 @@
       "saved": "顺序和隐藏的卡片随您的账户保存。",
       "up": "上移 {{name}}",
       "down": "下移 {{name}}",
-      "grip": "移动卡片 {{name}}：拖动它，或使用方向键",
-      "gripHint": "拖动以移动，或使用方向键",
-      "menu": "卡片 {{name}} 的选项",
-      "menuTitle": "卡片选项",
-      "earlier": "前移",
-      "later": "后移",
       "hide": "隐藏卡片",
       "customize": "自定义卡片…",
-      "moved": "{{name}} 现在是第 {{position}} 张卡片，共 {{total}} 张。",
-      "hidden": "{{name}} 已隐藏。“卡片”按钮可重新显示它。"
+      "hidden": "{{name}} 已隐藏。“卡片”按钮可重新显示它。",
+      "listLabel": "Cards, in the order of the page",
+      "queueShown": "To handle card shown again."
     },
     "metrics": {
-      "label": "关键数字",
-      "cas_one": "{{count}} 个颁发机构",
-      "cas_other": "{{count}} 个颁发机构",
-      "pending_one": "{{count}} 个待处理请求",
-      "pending_other": "{{count}} 个待处理请求",
-      "ssh_one": "{{count}} 张 SSH 证书",
-      "ssh_other": "{{count}} 张 SSH 证书",
-      "queueSub": "需处理：{{act}}，需关注：{{watch}}",
-      "expiringSoon_one": "{{count}} 张即将到期",
-      "expiringSoon_other": "{{count}} 张即将到期",
+      "queueSub": "{{act}}, {{watch}} to watch",
       "failures": "今日失败",
-      "failuresSub": "ACME、SCEP 和 EST，UTC 日"
+      "failuresSub": "ACME、SCEP 和 EST，UTC 日",
+      "certificates": "Certificates",
+      "inventory": "Full inventory",
+      "interventions_one": "{{count}} intervention",
+      "interventions_other": "{{count}} interventions",
+      "toCheck": "To check"
     },
     "cause": {
       "acme_order_failed": "过去 7 天内有 ACME 订单以无效结束",
@@ -8048,10 +8066,8 @@
       "alt_other": "{{count}} 天内的证书活动：签发 {{issued}}，吊销 {{revoked}}，过期 {{expired}}。",
       "keys": "图表：左右方向键可逐日读取"
     },
-    "states": {
-      "sub": "按状态统计的证书。每一行打开对应列表。",
-      "alt": "共 {{total}} 张证书：有效 {{valid}}，即将到期 {{expiring}}，已过期 {{expired}}，已吊销 {{revoked}}。"
-    }
+    "clockToday": "today at {{time}}",
+    "allHiddenTitle": "Every card is hidden"
   },
   "sectioned": {
     "flagModified": "已修改",

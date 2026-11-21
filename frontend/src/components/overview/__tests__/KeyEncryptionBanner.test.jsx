@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k) => k }) }))
+vi.mock('react-i18next', () => ({ Trans: ({ i18nKey }) => i18nKey, useTranslation: () => ({ t: (k) => k }) }))
 const api = vi.hoisted(() => ({ getSystemStatus: vi.fn(), can: vi.fn() }))
 vi.mock('../../../services', () => ({ dashboardService: { getSystemStatus: api.getSystemStatus } }))
 vi.mock('../../../hooks/usePermission', () => ({ usePermission: () => ({ hasPermission: api.can }) }))

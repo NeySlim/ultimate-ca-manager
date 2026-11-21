@@ -19,27 +19,27 @@ export const helpContent = {
   dashboard: {
     title: 'Overview',
     subtitle: 'What needs action, and the state of the PKI',
-    overview: 'A strip of four figures, then independent cards over the live data of your PKI. Each card loads on its own and shows its own loading, empty, error or missing-permission state. Every figure that has a list opens the certificate list filtered to exactly the certificates it counts.',
+    overview: 'A strip of four figures, then the cards of the overview over the live data of your PKI, in the order and selection you choose. Each card loads on its own and shows its own loading, empty, error or missing-permission state. Every figure that has a list opens the certificate list filtered to exactly the certificates it counts.',
     sections: [
       {
         title: 'Cards',
         icon: ListChecks,
         items: [
-          { label: 'Figures', text: 'Certificates (with the authorities and, when there are any, the pending requests and the SSH certificates), items to handle, expired certificates, and the ACME, SCEP and EST failures of the current UTC day' },
-          { label: 'To handle', text: 'The six most urgent interventions, critical first, each on two lines (the name and its type, then the cause) with its delay and exact date; a button where UCM can act (Renew, Retry, Publish now), a link to the record otherwise. Chips filter by type with their totals, and what only needs watching is folded apart (with the right to read the trust store, the trust store certificates that expire within 90 days or have expired are listed too)' },
-          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the successes and failures of the day and of the period, the last operation and a curve when there is something to draw; then the scheduler state, the TSA signer while the TSA is enabled (a warning while the CA certificate signs) and, with the right to read settings, whether email, webhooks and auto-renewal are set up' },
-          { label: 'Hierarchy', text: 'At most ten authorities, the trees that issued most first, each under its parent with CRL and OCSP state, an offline or cross-signed mark, and the certificates it issued over 7 days when there are any; each authority opens its page and a link opens them all' },
-          { label: 'Expiry horizon', text: 'The expiring and expired counters, each opening its list, and the six certificates that expire next, each with the days left and a bar for the validity already spent' },
+          { label: 'Figures', text: 'Certificates (the full inventory), the items to handle (interventions, and those to watch), the expired certificates, and the ACME, SCEP and EST failures of the current UTC day; the second shows the To handle card, the last leads to the Automation health card' },
+          { label: 'First steps', text: 'On an empty instance, an administrator sees three steps above the figures (a root CA, an issuing CA, a protocol), each leading to its screen; Later folds them into one line that keeps the progress, Resume brings them back' },
+          { label: 'To handle', text: 'The interventions by urgency, critical first, six shown and Show the others for the rest; each row gives the name and its type, the cause, a short delay with the exact date under it, and a button: Renew, Retry or Publish now where UCM can act, Review, View the CA or Open otherwise. Chips filter by type with their totals, and what only needs watching is folded apart' },
+          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the last operation, the successes and failures of today and of the period, and a curve per day; ACME failures open To handle on ACME. Then the TSA signer, the scheduler and, with the right to read settings, email, webhooks and auto-renewal, each with its state' },
+          { label: 'Hierarchy', text: 'At most ten authorities, one column per root: each root with its offline mark, CRL and cross-signing, each authority below with its CRL, OCSP and its issuances over 7 days; each authority opens its page, Explore opens them all' },
+          { label: 'Expiry horizon', text: 'The six certificates that expire next, each with its delay coloured by urgency and a bar for the validity already spent, then the valid, to renew, expired and revoked certificates, each opening its list' },
+          { label: 'Compliance', text: 'Live certificates by key algorithm, then five checks (RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key), each saying what it counts and opening its list when there is one' },
+          { label: 'Latest operations', text: 'The five most recent operations, each with the icon of its type, who did it and when; with the audit permission, the operation opens the audit log searched on it and See all opens the whole trail' },
           { label: 'Certificate activity', text: 'Certificates issued, revoked and expired per day over 7, 15 or 30 days, as curves with their totals; the left and right arrow keys read the chart day by day' },
-          { label: 'Status distribution', text: 'Valid, expiring, expired and revoked certificates as a ring with their counts and shares; each line opens its list' },
-          { label: 'Compliance', text: 'Live certificates by key algorithm and weakness (RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key); each figure that has a list opens it' },
-          { label: 'Latest operations', text: 'The six most recent operations with their delay; with the audit permission, a link opens the whole trail' },
         ]
       },
     ],
     tips: [
-      'Pick the Operator or Manager preset in the header, or open Cards to show, hide and reorder the cards',
-      'Drag a card by its grip to move it, or focus the grip and use the arrow keys; the layout is saved with your account and follows you across browsers',
+      'Pick the Operator or Manager preset in the header, or open Cards to show, hide and reorder the cards; the layout is saved with your account and follows you across browsers',
+      'The menu of a card hides it or opens the Cards dialog; a hidden To handle card comes back when a figure or another card asks for it',
       'On the certificate list, filters coming from the overview appear as chips; remove one with its x',
     ],
     related: ['Certificates', 'CAs', 'Settings']

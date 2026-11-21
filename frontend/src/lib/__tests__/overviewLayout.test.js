@@ -1,20 +1,26 @@
-/** Overview layout: a preference stored before a card existed stays readable, and a card moves by one place or onto another. */
+/** Overview layout: the mockup's cards and presets, a stored preference stays readable, a card moves onto another. */
 import { describe, it, expect } from 'vitest'
 import {
-  CARD_IDS, PRESETS, moveCard, normalizeLayout, presetActive, presetLayout, setCardHidden, stepCard, visibleCards,
+  CARD_IDS, PRESETS, moveCard, normalizeLayout, presetActive, presetLayout, setCardHidden, visibleCards,
 } from '../overviewLayout'
 
 const SIX = ['queue', 'health', 'hierarchy', 'horizon', 'compliance', 'activity']
 
 describe('stored layout', () => {
-  it('a layout saved with six cards keeps its order and hidden cards, the new cards come after', () => {
-    const stored = { order: ['activity', 'queue', 'horizon', 'health', 'hierarchy', 'compliance'], hidden: ['health'], queueShowAll: true }
+  it('the six cards of the mockup in its order, then the trend; its presets as its dashPresets', () => {
+    expect(CARD_IDS).toEqual([...SIX, 'trend'])
+    expect(PRESETS.operator).toEqual(['queue', 'health', 'hierarchy', 'horizon'])
+    expect(PRESETS.manager).toEqual(['compliance', 'horizon', 'hierarchy', 'activity'])
+    expect(PRESETS.all).toEqual(CARD_IDS)
+  })
+
+  it('a layout saved before keeps its order and hidden cards; a card that is gone is dropped, a new one comes after', () => {
+    const stored = { order: ['activity', 'states', 'queue', 'horizon', 'health', 'hierarchy', 'compliance'], hidden: ['health', 'states'], queueShowAll: true }
     const layout = normalizeLayout(stored)
-    expect(layout.order.slice(0, 6)).toEqual(stored.order)
-    expect(layout.order.slice(6).sort()).toEqual(['states', 'trend'])
+    expect(layout.order).toEqual(['activity', 'queue', 'horizon', 'health', 'hierarchy', 'compliance', 'trend'])
     expect(layout.hidden).toEqual(['health'])
     expect(layout.queueShowAll).toBe(true)
-    expect(visibleCards(layout)).toEqual(['activity', 'queue', 'horizon', 'hierarchy', 'compliance', 'trend', 'states'])
+    expect(visibleCards(layout)).toEqual(['activity', 'queue', 'horizon', 'hierarchy', 'compliance', 'trend'])
   })
 
   it('drops unknown and duplicate ids, and reads garbage as the default', () => {
@@ -61,15 +67,6 @@ describe('moving a card', () => {
   it('leaves the layout as it is for itself or an unknown card', () => {
     expect(moveCard(base, 'queue', 'queue')).toBe(base)
     expect(moveCard(base, 'queue', 'nope')).toBe(base)
-  })
-
-  it('one step skips the hidden cards and stops at both ends', () => {
-    const layout = setCardHidden(base, 'health', true)
-    expect(visibleCards(stepCard(layout, 'queue', 1)).slice(0, 2)).toEqual(['hierarchy', 'queue'])
-    expect(stepCard(layout, 'queue', -1)).toBe(layout)
-    const last = visibleCards(layout).at(-1)
-    expect(stepCard(layout, last, 1)).toBe(layout)
-    expect(stepCard(layout, 'health', 1)).toBe(layout)
   })
 
   it('hides and shows a card without touching the order', () => {

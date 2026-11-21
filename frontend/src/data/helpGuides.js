@@ -13,48 +13,48 @@ export const helpGuides = {
     content: `
 ## Overview
 
-The Overview is the home page: a strip of four figures, then independent cards over the live data of your PKI. Each card loads on its own and shows its own loading, empty, error or missing-permission state.
+The Overview is the home page: a strip of four figures, then the cards of the overview over the live data of your PKI. Each card loads on its own and shows its own loading, empty, error or missing-permission state.
+
+## First steps
+On an instance without any certificate, an administrator sees three steps above the figures: create a root CA, then an issuing CA, then set up a protocol (ACME, SCEP or EST). Each step leads to the screen that does it; a step waits for the one before. **Later** folds the steps into one line that keeps the progress, **Resume** brings them back. Once the three are done, **Issue a first certificate** opens the certificate form and **Hide** closes the steps for good.
 
 ## Figures
-Four figures head the page: the certificates (with the number of authorities and, when there are any, the pending requests and the SSH certificates), the items to handle (split between what to act on and what to watch), the expired certificates (with those expiring soon), and the ACME, SCEP and EST failures of the current UTC day. Certificates and Expired open the certificate list; the two others lead to their card when it is shown. A figure the server did not give reads as a dash.
+Four figures head the page: the certificates (the full inventory), the items to handle (the interventions, and those to watch), the expired certificates, and the ACME, SCEP and EST failures of the current UTC day. Certificates and Expired open the certificate list; To handle shows the To handle card, bringing it back if you had hidden it; the failures lead to the Automation health card when it is shown. A figure the server did not give reads as a dash.
 
 ## Cards
 
 ### To handle
-The six most urgent interventions, critical first, then by due date; **Show the others** lists the rest. Each row has two lines: the name, which opens the record, with its type, then the cause. On the right, the delay ("in 12 days", "overdue by 6 months") with the exact date under it, and a button: **Renew** for a manual renewal, **Retry** for a renewal the ACME client failed, **Publish now** for a CRL due or missing, each with the matching write permission; any other row, or a row without that permission, has a link to its record. The chips above the list filter by type and carry the total of each. What needs no action today (certificates their client renews, authorities and trust anchors still far from expiry) is counted on a line of its own, **Show** unfolds it; a critical item is never put there. With the right to read the trust store, the trust store certificates that expire within 90 days or have already expired are listed too (the expired ones as critical).
+The interventions by urgency, critical first, then by due date; six are shown and **Show the others** lists the rest. Each row has two lines: the name with its type, then the cause. On the right, a short delay ("in 12 d", "overdue by 3 d") with the exact date under it, and a button: **Renew** for a manual renewal, **Retry** for a renewal the ACME client failed, **Publish now** for a CRL due or missing, each with the matching write permission; then the name opens the record. Any other row has **Review** (a request waiting for approval), **View the CA** or **Open**. A Retry or a publication that fails leaves a message with **Retry**, to start it again. The chips above the list filter by type and carry the total of each, and a link in the head of the card opens the manual renewals due. What needs no action today (certificates their client renews, authorities and trust anchors still far from expiry) is counted on a line of its own, **Show** unfolds it; a critical item is never put there. With the right to read the trust store, the trust store certificates that expire within 90 days or have already expired are listed too (the expired ones as critical).
 
 ### Automation health
-Per protocol (ACME, SCEP, EST), the successes and failures of the current UTC day and of the period, the last operation, the last status, and a curve of the daily figures when there are any. Below, the scheduler state and, while the TSA is enabled, the state of its signer: a warning while the CA certificate signs, since those tokens do not satisfy RFC 3161. With the right to read settings, three more tiles tell whether email, webhooks and auto-renewal are set up: a setting that is not configured is information, not an alert; email configured but disabled or incomplete, or webhooks with none active, show as alerts. A line under the card counts the lines that report a problem.
+Per protocol (ACME, SCEP, EST): the last operation, the successes and failures of the current UTC day and of the period, and a curve of the daily figures. ACME failures open the To handle card on its ACME rows. A failed or unknown last state is said beside the name. Below, the TSA signer while the TSA is enabled (a warning while the CA certificate signs, since those tokens do not satisfy RFC 3161), the scheduler with its number of tasks and its last run and, with the right to read settings, whether email, webhooks and auto-renewal are set up: a setting that is not configured is information, not an alert; email configured but disabled or incomplete, or webhooks with none active, show as alerts. A line under the card counts the lines that report a problem.
 
 ### Hierarchy
-At most ten authorities, whatever the installation holds: the trees that issued most over 7 days come first, then the largest, each authority under its parent with its CRL and OCSP state, an offline or cross-signed mark, and the certificates it issued over 7 days when there are any. An authority whose children are not all shown says how many are below. Each authority opens its page; **Explore** and **See all** open the Certificate Authorities page.
+At most ten authorities, whatever the installation holds, one column per root: the trees that issued most over 7 days come first, then the largest. A root gives its offline mark, its CRL and the cross-signing; each authority under it gives its CRL, its OCSP responder and its issuances over 7 days. An authority whose children are not all shown says how many are below, and the line under the title says how many are shown. Each authority opens its page; **Explore** opens the Certificate Authorities page.
 
 ### Expiry horizon
-The expiring and expired counters, each opening its list, and the six certificates that expire next. Each row gives the days left, coloured by urgency (7 days or less, 30 days or less, beyond), and a bar as long as the share of the validity already spent.
+The six certificates that expire next, each with its delay, red once past and amber within 7 days, and a bar as long as the share of the validity already spent; the TSA signer and the OCSP responder are marked. Under them, the valid, to renew, expired and revoked certificates, each opening its list; **View all** opens the certificates to renew.
+
+### Compliance
+Live certificates by key algorithm, with a bar for the share of each, then five checks: RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key. Each check says what it counts and opens its list when there is one; the four weaknesses show as a warning above zero and as fine at zero, the certificates without a private key are a plain count.
+
+### Latest operations
+The five most recent operations, each with the icon of its type, the operation, the object, who did it and the time; the exact date shows when pointing at it. Without **read:audit** you only see your own operations; with it, the object opens the Audit Logs page searched on that operation and **See all** opens the whole trail.
 
 ### Certificate activity
 Certificates issued, revoked and expired per day, over 7, 15 or 30 days, as three curves with their totals under the chart. Pointing at the chart, or focusing it and pressing the left and right arrow keys, reads one day at a time. A period without any event shows a sentence instead of an empty chart.
-
-### Status distribution
-Valid, expiring, expired and revoked certificates as a ring around their total. Each line gives the count and the share of a state and opens the certificate list filtered on it.
-
-### Compliance
-Live certificates by key algorithm and weakness: RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key. Each figure that has a list opens it.
-
-### Latest operations
-The six most recent operations with their delay; the exact date shows when pointing at it. A **Live** mark shows while the live link is up. Without **read:audit** you only see your own events; with it, a link opens the whole trail on the Audit Logs page.
 
 ## Opening a filtered list
 Every figure that has a list opens the Certificates page filtered to exactly the certificates it counts. The filter appears as a chip above the table; remove it with its x.
 
 ## Choosing and ordering the cards
-Pick the **Operator** or **Manager** preset in the page header, or open **Cards** to tick the cards to show, move them up and down, or apply a preset (**All cards** shows every card in the initial order). To move a card on the page itself, drag it by the grip at the left of its title onto the place of another card, or focus the grip and press an arrow key; the menu of a card also moves it or hides it. The order and the hidden cards are saved with your account and follow you across browsers.
+Pick the **Operator** preset (To handle, Automation health, Hierarchy, Expiry horizon) or the **Manager** preset (Compliance, Expiry horizon, Hierarchy, Latest operations) in the page header, or open **Cards** to tick the cards to show, move them up and down, or apply a preset (**All cards** shows every card in the initial order). The menu of a card hides it, the Cards button showing it again, or opens the same dialog. The order and the hidden cards are saved with your account and follow you across browsers; with every card hidden, the page says so and offers the Cards button.
 
 ## Quick actions
-The header offers **Issue** (opens the certificate form), **New CA** and **Network discovery**, each shown only with the permission it needs.
+The header offers **Issue**, which opens the certificate form, to who may issue certificates.
 
 ## Refreshing
-Cards load when the page opens and reload on their own, without leaving the page, when certificates or CAs change, when the live link comes back and when you return to the tab; the refresh button of the header reloads them all at once. While the live link is down they reload once a minute. A card in error offers **Retry**. The connection icon in the top bar shows the state of the live link, and the status bar at the bottom shows the version and whether the service answers.
+Cards load when the page opens and reload on their own, without leaving the page, when certificates or CAs change, when the live link comes back and when you return to the tab; the refresh button of the header reloads them all at once. While the live link is down they reload once a minute. A card that could not read says why (the status and the request) and offers **Retry**, and **View the log** for who may read it. The connection icon in the top bar shows the state of the live link, and the status bar at the bottom shows the version and whether the service answers.
 `
   },
 
