@@ -5,9 +5,12 @@
  * filters) borrows the mockup's own gabarits: filter selects, applied filters, table footer, dialogs.
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { useTranslation, Trans } from 'react-i18next'
-import { Icon } from '../components/atelier/Icon'
+import { useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import {
+  Zone, Icon, Btn, IconBtn, PageHead, Toolbar, SearchField, FilterSelect, ToolsDivider, AppliedFilters,
+  DataTable, TableFooter, LoadError, LoadCause, EmptyBlock, NoMatch,
+} from '../components/atelier'
 import { useNotification, useInspector } from '../contexts'
 import { integrityMessage } from '../lib/auditIntegrity'
 import { usePermission, usePersistedState, useJob } from '../hooks'
@@ -20,14 +23,9 @@ import { rowTime, eventDate } from './activity/activityDates'
 import { EventDialog } from './activity/EventDialog'
 import { ExportDialog, ActionsDialog, CleanupDialog } from './activity/JournalDialogs'
 import { FiltersDialog } from './activity/FiltersDialog'
-import '../styles/atelier/scope.css'
-import '../styles/atelier/maquette.css'
-import { useMobile } from '../contexts/MobileContext'
 
 const PAGE_SIZES = [10, 25, 50, 100]
 const PRESETS_KEY = 'ucm-audit-presets'
-const skWidth = (i, base, spread) => `${base + ((i * 37) % spread)}%`
-const Bar = ({ width, cls = '' }) => <span className={`sk ${cls}`.trim()} style={{ width }} />
 
 function readPresets() {
   try { const saved = localStorage.getItem(PRESETS_KEY); return saved ? JSON.parse(saved) : [] } catch { return [] }
@@ -39,8 +37,6 @@ export default function AuditLogsPage() {
   const { showError, showSuccess, showWarning } = useNotification()
   const { openEntity } = useInspector()
   const { canDelete, canWrite, hasPermission } = usePermission()
-  // On a phone each entry is a record, its chevron on screen; the table stays on wider screens
-  const { isMobile } = useMobile()
 
   const [logs, setLogs] = useState([])
   const [total, setTotal] = useState(0)
@@ -53,7 +49,6 @@ export default function AuditLogsPage() {
 
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(50)
-  const [pageInput, setPageInput] = useState('1')
 
   // A link may open the journal on a search (an inspector's « View its activity »)
   const location = useLocation()
@@ -130,7 +125,6 @@ export default function AuditLogsPage() {
 
   useEffect(() => { loadJournal() }, [loadJournal])
   useEffect(() => { loadLogs() }, [loadLogs])
-  useEffect(() => { setPageInput(String(page)) }, [page])
   useEffect(() => { try { localStorage.setItem(PRESETS_KEY, JSON.stringify(presets)) } catch { /* private mode */ } }, [presets])
 
   const refresh = () => { loadLogs(); loadJournal() }
@@ -267,7 +261,6 @@ export default function AuditLogsPage() {
   }, [actions, filterType])
 
   const pages = Math.max(1, Math.ceil(total / perPage))
-  const goTo = (n) => setPage(Math.min(pages, Math.max(1, n)))
   const narrowed = Boolean(search || filterType || filterUsername || chosenActions.length || filterSuccess || filterDateFrom || filterDateTo)
   const journalEmpty = journalTotal === 0 && !narrowed && !loading && !loadError
 
@@ -277,254 +270,125 @@ export default function AuditLogsPage() {
 
   // Chips of the filters the toolbar does not show
   const chips = []
-  if (filterUsername) chips.push(['user', t('audit.chipUser', { user: filterUsername }), () => changeFilter(setFilterUsername)('')])
-  if (filterSuccess) chips.push(['result', filterSuccess === 'true' ? t('audit.resultsOk') : t('audit.resultsFailed'), () => changeFilter(setFilterSuccess)('')])
-  if (filterDateFrom) chips.push(['from', t('audit.chipFrom', { date: eventDate(`${filterDateFrom}T12:00:00`, locale) }), () => changeFilter(setFilterDateFrom)('')])
-  if (filterDateTo) chips.push(['to', t('audit.chipTo', { date: eventDate(`${filterDateTo}T12:00:00`, locale) }), () => changeFilter(setFilterDateTo)('')])
-  for (const a of chosenActions) chips.push([`action-${a}`, t('audit.chipAction', { action: actionLabel(a) }), () => changeFilter(setFilterAction)(chosenActions.filter((x) => x !== a))])
-
-  const cause = loadError?.status && loadError.request ? (
-    <Trans i18nKey="work.cause.status"
-      values={{ status: loadError.status, reason: t(`certificates.httpStatus${loadError.status}`, { defaultValue: '' }), request: loadError.request }}
-      components={{ mono: <span className="mono" /> }} />
-  ) : loadError?.request ? (
-    <Trans i18nKey="work.cause.noAnswer" values={{ request: loadError.request }} components={{ mono: <span className="mono" /> }} />
-  ) : t('work.cause.message', { message: loadError?.message || t('messages.errors.loadFailed.auditLogs') })
+  const chip = (key, label, onRemove) => chips.push({ key, label, onRemove })
+  if (filterUsername) chip('user', t('audit.chipUser', { user: filterUsername }), () => changeFilter(setFilterUsername)(''))
+  if (filterSuccess) chip('result', filterSuccess === 'true' ? t('audit.resultsOk') : t('audit.resultsFailed'), () => changeFilter(setFilterSuccess)(''))
+  if (filterDateFrom) chip('from', t('audit.chipFrom', { date: eventDate(`${filterDateFrom}T12:00:00`, locale) }), () => changeFilter(setFilterDateFrom)(''))
+  if (filterDateTo) chip('to', t('audit.chipTo', { date: eventDate(`${filterDateTo}T12:00:00`, locale) }), () => changeFilter(setFilterDateTo)(''))
+  for (const a of chosenActions) chip(`action-${a}`, t('audit.chipAction', { action: actionLabel(a) }), () => changeFilter(setFilterAction)(chosenActions.filter((x) => x !== a)))
 
   const firstRead = loading && !loadError
   const shown = firstRead ? [] : logs
 
   const emptyBlock = journalEmpty ? (
-    <div className="empty empty-hint" id="empty-activity">
-      <Icon name="activity" />
-      <h3>{t('audit.emptyTitle')}</h3>
-      <p>{t('audit.emptyText')}</p>
-      {canWrite('certificates') && (
-        <Link className="btn primary" to="/certificates?action=create" data-write=""><Icon name="plus" />{t('audit.emptyAction')}</Link>
-      )}
-    </div>
+    <EmptyBlock id="activity" icon="activity" title={t('audit.emptyTitle')} text={t('audit.emptyText')}
+      action={canWrite('certificates') ? { label: t('audit.emptyAction'), icon: 'plus', to: '/certificates?action=create', primary: true } : undefined} />
   ) : (
-    <div className="empty">
-      <h3>{t('audit.noMatchTitle')}</h3>
-      <p>{t('audit.noMatchText')}</p>
-      {narrowed && <button type="button" className="btn" data-action="reset-filters" onClick={clearFilters}>{t('audit.resetFilters')}</button>}
-    </div>
+    <NoMatch icon={false} title={t('audit.noMatchTitle')} text={t('audit.noMatchText')} resetLabel={t('audit.resetFilters')} onReset={narrowed ? clearFilters : undefined} />
   )
   const badgeOf = (e) => (e.success
     ? <span className="badge good"><Icon name="check" />{t('audit.badgeOk')}</span>
     : <span className="badge bad"><Icon name="warning" />{t('audit.badgeFailed')}</span>)
 
+  // The journal's columns: short ones fit their content (adjust.css), the operation and the resource share the rest
+  const columns = [
+    { id: 'time', label: t('audit.colTime'), fit: true, tone: ['mono', 'muted'], cell: (e) => rowTime(e.timestamp, locale), skeleton: { width: '64px' } },
+    { id: 'operation', label: t('audit.colOperation'), cell: (e) => <span className="audit-type"><Icon name={typeIcon(typeOf(e.action))} />{actionLabel(e.action)}</span>, skeleton: { base: 45, spread: 35 } },
+    { id: 'resource', label: t('audit.colResource'), resource: true, cell: resourceOf, skeleton: { base: 50, spread: 40 } },
+    { id: 'user', label: t('audit.colUser'), fit: true, tone: ['muted', 'small'], cell: (e) => e.username || t('common.system'), skeleton: { width: '70px' } },
+    { id: 'result', label: t('audit.colResult'), fit: true, cell: badgeOf, skeleton: { width: '74px', kind: 'pill' } },
+  ]
+  const card = (e) => ({
+    title: resourceOf(e),
+    meta: [<span key="type" className="audit-type"><Icon name={typeIcon(typeOf(e.action))} />{actionLabel(e.action)}</span>, e.username || t('common.system')],
+    status: badgeOf(e),
+    end: rowTime(e.timestamp, locale),
+  })
+
   return (
-    <div className="atl" data-testid="audit-page">
-      <main className="stage" id="main">
-        <div className="page-content">
-          <header className="page-head">
-            <div>
-              <div className="title-line">
-                <h1 id="main-title" tabIndex={-1}>{t('audit.pageTitle')}</h1>
-                <span className="total">{journalTotal === null ? '' : t('audit.events', { count: journalTotal })}</span>
-              </div>
-              <p>{t('audit.intent')}</p>
-            </div>
-            <div className="actions">
-              <button type="button" className="btn" data-action="export-events" onClick={() => setDialog('export')}>
-                <Icon name="download" />{t('audit.exportJournal')}
-              </button>
-              <button type="button" className="icon-btn quiet" data-action="journal-menu" aria-label={t('audit.moreActions')} title={t('audit.moreActions')} onClick={() => setDialog('actions')}>
-                <Icon name="more" />
-              </button>
-            </div>
-          </header>
+    <Zone testId="audit-page" after={<>
+      {dialog?.kind === 'event' && (
+        <EventDialog log={dialog.log} locale={locale} resource={resourceOf(dialog.log)} onClose={() => setDialog(null)}
+          canInspect={(type) => hasPermission(type === 'ca' ? 'read:cas' : 'read:certificates')}
+          onInspect={(type, id) => { setDialog(null); openEntity(type, id) }} />
+      )}
+      {dialog === 'export' && (
+        <ExportDialog count={total} onExport={handleExport} onClose={() => setDialog(null)} />
+      )}
+      {dialog === 'actions' && (
+        <ActionsDialog canClean={canDelete('audit')} verifying={verifying} onExport={() => setDialog('export')}
+          onVerify={handleVerifyIntegrity} onClean={() => setDialog('cleanup')} onClose={() => setDialog(null)} />
+      )}
+      {dialog === 'cleanup' && canDelete('audit') && (
+        <CleanupDialog loading={cleanupLoading} onConfirm={handleCleanup} onClose={() => setDialog(null)} />
+      )}
+      {dialog === 'filters' && (
+        <FiltersDialog
+          actions={actions} type={filterType} chosen={chosenActions}
+          usernames={usernames} username={filterUsername} onUsername={changeFilter(setFilterUsername)}
+          result={filterSuccess} onResult={changeFilter(setFilterSuccess)}
+          dateFrom={filterDateFrom} dateTo={filterDateTo}
+          onDateFrom={changeFilter(setFilterDateFrom)} onDateTo={changeFilter(setFilterDateTo)}
+          onActions={changeFilter(setFilterAction)}
+          onQuick={(kind) => {
+            setPage(1)
+            if (kind === 'failedLogins') { setFilterAction(['login_failure']); setFilterSuccess('') }
+            else { setFilterSuccess('false'); setFilterAction([]) }
+            setDialog(null)
+          }}
+          quick={{ failedLogins: chosenActions.length === 1 && chosenActions[0] === 'login_failure', failures: filterSuccess === 'false' && !chosenActions.length }}
+          presets={presets} onApplyPreset={(p) => { applyPreset(p.filters); setDialog(null) }}
+          onDeletePreset={(id) => setPresets((prev) => prev.filter((p) => p.id !== id))}
+          onSavePreset={savePreset} canSave={narrowed}
+          narrowed={narrowed} onClear={() => { clearFilters(); setDialog(null) }}
+          onClose={() => setDialog(null)} />
+      )}
+    </>}>
+      <PageHead title={t('audit.pageTitle')} total={journalTotal === null ? '' : t('audit.events', { count: journalTotal })} intent={t('audit.intent')}
+        actions={<>
+          <Btn icon="download" data-action="export-events" onClick={() => setDialog('export')}>{t('audit.exportJournal')}</Btn>
+          <IconBtn quiet icon="more" data-action="journal-menu" label={t('audit.moreActions')} onClick={() => setDialog('actions')} />
+        </>} />
 
-          <div className="toolbar">
-            <label className="search">
-              <Icon name="search" />
-              <span className="sr-only">{t('audit.searchLabel')}</span>
-              <input type="search" id="event-search" name="eventSearch" value={search} placeholder={t('audit.searchPlaceholder')} autoComplete="off"
-                onChange={(e) => changeFilter(setSearch)(e.target.value)} />
-            </label>
-            <select className="filter-select" id="event-type" aria-label={t('audit.typeLabel')} value={filterType} onChange={(e) => changeFilter(setFilterType)(e.target.value)}>
-              <option value="">{t('audit.allTypes')}</option>
-              {types.map((k) => <option key={k} value={k}>{t(`audit.types.${k}`)}</option>)}
-            </select>
-            <span className="tools-divider" />
-            <button type="button" className="btn" data-action="filters" onClick={() => setDialog('filters')}>
-              <Icon name="filter" /><span>{t('audit.filters')}</span>
-            </button>
-            <button type="button" className="icon-btn" data-action="refresh" aria-label={t('audit.refresh')} title={t('audit.refresh')} onClick={refresh}>
-              <Icon name="refresh" />
-            </button>
+      <Toolbar>
+        <SearchField id="event-search" name="eventSearch" label={t('audit.searchLabel')} placeholder={t('audit.searchPlaceholder')} value={search}
+          onChange={changeFilter(setSearch)} />
+        <FilterSelect id="event-type" label={t('audit.typeLabel')} value={filterType} onChange={changeFilter(setFilterType)}
+          options={[{ value: '', label: t('audit.allTypes') }, ...types.map((k) => ({ value: k, label: t(`audit.types.${k}`) }))]} />
+        <ToolsDivider />
+        <Btn icon="filter" data-action="filters" onClick={() => setDialog('filters')}><span>{t('audit.filters')}</span></Btn>
+        <IconBtn icon="refresh" data-action="refresh" label={t('audit.refresh')} onClick={refresh} />
+      </Toolbar>
+
+      <AppliedFilters chips={chips} />
+
+      {loadError ? (
+        <LoadError id="activity" title={t('audit.loadErrorTitle')} onRetry={retry}
+          cause={<LoadCause error={loadError} fallback={t('messages.errors.loadFailed.auditLogs')} />} />
+      ) : (
+        <>
+          <div className="audit-summary">
+            <span>{firstRead ? '' : t('audit.events', { count: total })}</span>
+            {oldest && <span>{t('audit.since', { date: eventDate(oldest, locale) })}</span>}
+            {stats && <span>{t('audit.last30', { success: (stats.success_count || 0).toLocaleString(locale), failed: (stats.failure_count || 0).toLocaleString(locale), users: (stats.unique_users || 0).toLocaleString(locale) })}</span>}
+            {verifying && (
+              <span role="status">{verifyProgress || t('audit.verifying')}
+                {verifyRunning && <> <button type="button" className="text-link" data-testid="audit-verify-cancel" onClick={handleCancelVerification}>{t('audit.verifyCancel')}</button></>}
+              </span>
+            )}
           </div>
-
-          {chips.length > 0 && (
-            <div className="applied-filters" role="group" aria-label={t('audit.activeFilters')}>
-              <span className="applied-label"><Icon name="filter" />{t('audit.activeFilters')}</span>
-              {chips.map(([key, label, remove]) => (
-                <span key={key} className="chip filter-chip">{label}
-                  <button type="button" className="icon-btn" id={`clear-${key}`} aria-label={t('audit.removeFilter', { label })} title={t('audit.removeFilterShort')} onClick={remove}>
-                    <Icon name="close" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-
-          {loadError ? (
-            <div className="load-error" id="load-error-activity" role="alert">
-              <Icon name="warning" />
-              <div>
-                <h2>{t('audit.loadErrorTitle')}</h2>
-                <p>{cause}</p>
-                <div className="load-error-actions">
-                  <button type="button" className="btn primary" id="retry-activity" onClick={retry}><Icon name="refresh" />{t('table.retry')}</button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="audit-summary">
-                <span>{firstRead ? '' : t('audit.events', { count: total })}</span>
-                {oldest && <span>{t('audit.since', { date: eventDate(oldest, locale) })}</span>}
-                {stats && <span>{t('audit.last30', { success: (stats.success_count || 0).toLocaleString(locale), failed: (stats.failure_count || 0).toLocaleString(locale), users: (stats.unique_users || 0).toLocaleString(locale) })}</span>}
-                {verifying && (
-                  <span role="status">{verifyProgress || t('audit.verifying')}
-                    {verifyRunning && <> <button type="button" className="text-link" data-testid="audit-verify-cancel" onClick={handleCancelVerification}>{t('audit.verifyCancel')}</button></>}
-                  </span>
-                )}
-              </div>
-              <div className="table-container audit-container" style={{ marginBottom: 20 }} aria-busy={firstRead || undefined}>
-                {isMobile ? (
-                  <div className="mobile-list" id="audit-records">
-                    {firstRead ? Array.from({ length: 6 }, (_, i) => (
-                      <article key={`sk-${i}`} className="mobile-record sk-record" aria-hidden={i > 0 || undefined}>
-                        {i === 0 && <span className="sr-only" role="status">{t('table.loadingRows')}</span>}
-                        <Bar width={skWidth(i, 50, 30)} /><Bar width={skWidth(i, 30, 40)} cls="sk-thin" /><Bar width="90px" cls="sk-pill" />
-                      </article>
-                    )) : shown.length ? shown.map((e) => {
-                      const type = typeOf(e.action)
-                      return (
-                        // The whole record opens the detail; its two buttons reach it from the keyboard
-                        <article key={e.id} className="mobile-record opens" data-event={e.id} onClick={() => openEvent(e)}>
-                          <div className="row-top">
-                            <button type="button" className="entity-name" data-event={e.id}>{resourceOf(e)}</button>
-                            <button type="button" className="icon-btn quiet" data-event={e.id} aria-label={t('audit.detailOf', { id: e.id })}><Icon name="right" /></button>
-                          </div>
-                          <div className="row-meta">
-                            <span className="audit-type"><Icon name={typeIcon(type)} />{actionLabel(e.action)}</span>
-                            <span>{e.username || t('common.system')}</span>
-                          </div>
-                          <div className="row-status">{badgeOf(e)}<span className="remaining">{rowTime(e.timestamp, locale)}</span></div>
-                        </article>
-                      )
-                    }) : emptyBlock}
-                  </div>
-                ) : (
-                  <div className="table-scroll" id="audit-scroll" role="region" tabIndex={0} aria-label={t('audit.regionLabel')}>
-                    <table className="audit-table">
-                      <thead>
-                        <tr>
-                          <th scope="col" className="fit">{t('audit.colTime')}</th>
-                          <th scope="col">{t('audit.colOperation')}</th>
-                          <th scope="col">{t('audit.colResource')}</th>
-                          <th scope="col" className="fit">{t('audit.colUser')}</th>
-                          <th scope="col" className="fit">{t('audit.colResult')}</th>
-                          <th scope="col" className="fit"><span className="sr-only">{t('audit.colDetail')}</span></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {firstRead ? Array.from({ length: 12 }, (_, i) => (
-                          <tr key={`sk-${i}`} className="sk-row" aria-hidden={i > 0 || undefined}>
-                            <td>{i === 0 && <span className="sr-only" role="status">{t('table.loadingRows')}</span>}<Bar width="64px" /></td>
-                            <td><Bar width={skWidth(i, 45, 35)} /></td>
-                            <td><Bar width={skWidth(i, 50, 40)} /></td>
-                            <td><Bar width="70px" /></td>
-                            <td><Bar width="74px" cls="sk-pill" /></td>
-                            <td />
-                          </tr>
-                        )) : shown.length ? shown.map((e) => {
-                          const type = typeOf(e.action)
-                          const label = actionLabel(e.action)
-                          return (
-                            <tr key={e.id}>
-                              <td className="mono muted">{rowTime(e.timestamp, locale)}</td>
-                              <td><span className="audit-type"><Icon name={typeIcon(type)} />{label}</span></td>
-                              <td><button type="button" className="resource" data-event={e.id} onClick={() => openEvent(e)}>{resourceOf(e)}</button></td>
-                              <td className="muted small">{e.username || t('common.system')}</td>
-                              <td>{badgeOf(e)}</td>
-                              <td><button type="button" className="icon-btn quiet" data-event={e.id} aria-label={t('audit.detailOf', { id: e.id })} onClick={() => openEvent(e)}><Icon name="right" /></button></td>
-                            </tr>
-                          )
-                        }) : (
-                          <tr><td colSpan={6}>{emptyBlock}</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-                {!firstRead && total > 0 && (
-                  <footer className="table-footer">
-                    <span id="page-range">{t('audit.pageRange', {
-                      from: ((page - 1) * perPage + 1).toLocaleString(locale),
-                      to: Math.min(page * perPage, total).toLocaleString(locale),
-                      count: total,
-                    })}</span>
-                    <div className="controls">
-                      <select id="page-size" aria-label={t('audit.perPageLabel')} value={perPage} onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1) }}>
-                        {PAGE_SIZES.map((n) => <option key={n} value={n}>{t('audit.perPage', { n })}</option>)}
-                      </select>
-                      <button type="button" className="icon-btn" data-page="prev" aria-label={t('audit.prevPage')} disabled={page === 1} onClick={() => goTo(page - 1)}><Icon name="left" /></button>
-                      <label className="page-jump"><span>{t('audit.pageWord')}</span>
-                        <input id="page-jump" type="number" min="1" max={pages} value={pageInput} inputMode="numeric" aria-describedby="page-total"
-                          onChange={(e) => setPageInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') goTo(parseInt(pageInput, 10) || 1) }} />
-                      </label>
-                      <span id="page-total">{t('audit.pageTotal', { total: pages.toLocaleString(locale) })}</span>
-                      <button type="button" className="btn" id="page-go" data-action="page-go" onClick={() => goTo(parseInt(pageInput, 10) || 1)}>{t('audit.pageGo')}</button>
-                      <button type="button" className="icon-btn" data-page="next" aria-label={t('audit.nextPage')} disabled={page >= pages} onClick={() => goTo(page + 1)}><Icon name="right" /></button>
-                    </div>
-                  </footer>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-
-        {dialog?.kind === 'event' && (
-          <EventDialog log={dialog.log} locale={locale} resource={resourceOf(dialog.log)} onClose={() => setDialog(null)}
-            canInspect={(type) => hasPermission(type === 'ca' ? 'read:cas' : 'read:certificates')}
-            onInspect={(type, id) => { setDialog(null); openEntity(type, id) }} />
-        )}
-        {dialog === 'export' && (
-          <ExportDialog count={total} onExport={handleExport} onClose={() => setDialog(null)} />
-        )}
-        {dialog === 'actions' && (
-          <ActionsDialog canClean={canDelete('audit')} verifying={verifying} onExport={() => setDialog('export')}
-            onVerify={handleVerifyIntegrity} onClean={() => setDialog('cleanup')} onClose={() => setDialog(null)} />
-        )}
-        {dialog === 'cleanup' && canDelete('audit') && (
-          <CleanupDialog loading={cleanupLoading} onConfirm={handleCleanup} onClose={() => setDialog(null)} />
-        )}
-        {dialog === 'filters' && (
-          <FiltersDialog
-            actions={actions} type={filterType} chosen={chosenActions}
-            usernames={usernames} username={filterUsername} onUsername={changeFilter(setFilterUsername)}
-            result={filterSuccess} onResult={changeFilter(setFilterSuccess)}
-            dateFrom={filterDateFrom} dateTo={filterDateTo}
-            onDateFrom={changeFilter(setFilterDateFrom)} onDateTo={changeFilter(setFilterDateTo)}
-            onActions={changeFilter(setFilterAction)}
-            onQuick={(kind) => {
-              setPage(1)
-              if (kind === 'failedLogins') { setFilterAction(['login_failure']); setFilterSuccess('') }
-              else { setFilterSuccess('false'); setFilterAction([]) }
-              setDialog(null)
-            }}
-            quick={{ failedLogins: chosenActions.length === 1 && chosenActions[0] === 'login_failure', failures: filterSuccess === 'false' && !chosenActions.length }}
-            presets={presets} onApplyPreset={(p) => { applyPreset(p.filters); setDialog(null) }}
-            onDeletePreset={(id) => setPresets((prev) => prev.filter((p) => p.id !== id))}
-            onSavePreset={savePreset} canSave={narrowed}
-            narrowed={narrowed} onClear={() => { clearFilters(); setDialog(null) }}
-            onClose={() => setDialog(null)} />
-        )}
-      </main>
-    </div>
+          <DataTable kind="audit" scrollId="audit-scroll" recordsId="audit-records" label={t('audit.regionLabel')} columns={columns} rows={shown}
+            rowKey={(e) => e.id} rowLabel={resourceOf} loading={firstRead} onOpen={openEvent} openLabel={(e) => t('audit.detailOf', { id: e.id })}
+            actionsLabel={t('audit.colDetail')} empty={emptyBlock} card={card}
+            footer={!firstRead && total > 0 && (
+              <TableFooter range={t('audit.pageRange', {
+                from: ((page - 1) * perPage + 1).toLocaleString(locale),
+                to: Math.min(page * perPage, total).toLocaleString(locale),
+                count: total,
+              })} pagination={{ page, pages, perPage, sizes: PAGE_SIZES, onPage: setPage, onPerPage: (n) => { setPerPage(n); setPage(1) }, perPageLabel: t('audit.perPageLabel'), jump: true }} />
+            )} />
+        </>
+      )}
+    </Zone>
   )
 }
