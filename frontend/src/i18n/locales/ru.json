@@ -1275,6 +1275,9 @@
       "confirm_few": "Экспортировать {{count, number}} сертификата",
       "confirm_many": "Экспортировать {{count, number}} сертификатов",
       "confirm_other": "Экспортировать {{count, number}} сертификата"
+    },
+    "filters": {
+      "title": "Фильтры"
     }
   },
   "cas": {

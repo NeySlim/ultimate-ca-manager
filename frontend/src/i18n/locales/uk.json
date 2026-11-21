@@ -1275,7 +1275,10 @@
     "allResultsSelected_few": "All {{count, number}} results are selected",
     "allResultsSelected_many": "All {{count, number}} results are selected",
     "selectAllResults_few": "Select all {{count, number}} results",
-    "selectAllResults_many": "Select all {{count, number}} results"
+    "selectAllResults_many": "Select all {{count, number}} results",
+    "filters": {
+      "title": "Filters"
+    }
   },
   "cas": {
     "chainRevoked": "Відкликано вище",

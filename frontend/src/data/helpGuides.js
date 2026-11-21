@@ -400,9 +400,9 @@ Tick two certificates in the list and click **Compare** in the selection bar to 
 - **State tabs**: All, To renew, Valid, Expired, Revoked and Archived, plus Orphans when there are some; each shows its count, except Archived. The tab is part of the address, so a reload or a shared link keeps it
 - **CA filter**: Show certificates from a specific CA
 - **Source filter**: Filter by how the certificate entered UCM (issued, imported, ACME, SCEP, etc.)
-- **Template filter**: Find certificates **modified from template**: issued from a template but with the key type or validity explicitly overridden at request time. The divergent fields are listed on the certificate detail; the record is frozen at issuance
+- **Template filter** (in the **Filters** dialog at the end of the toolbar, a chip once on): Find certificates **modified from template**: issued from a template but with the key type or validity explicitly overridden at request time. The divergent fields are listed on the certificate detail; the record is frozen at issuance
 - **Text search**: Search by subject, issuer, display name or serial number (SANs are not searched); the search runs once you stop typing and says how many results it found
-- **Saved filters**: the filter button at the end of the toolbar saves the search, the state and the filters under a name in this browser, and applies a saved set again
+- **Saved filters**: the **Filters** dialog at the end of the toolbar saves the search, the state and the filters under a name in this browser, and applies a saved set again
 - **Export the list**: the export button of the toolbar exports every result, the selection bar's **Export…** the ticked certificates: in PEM, or their metadata in CSV or JSON. Once the whole page is ticked, **Select all N results** extends the selection to every result
 - **Sorting**: By name, expiry date, creation date, status
 - **Columns**: Common name, description, state, issuer, source, expiry and key algorithm by default; the **Columns** button adds the compliance grade, the hybrid link and the creation date

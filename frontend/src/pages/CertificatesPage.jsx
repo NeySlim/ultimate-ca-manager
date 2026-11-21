@@ -30,7 +30,7 @@ import { CertificateInspector } from './certificates/inspector/CertificateInspec
 import { ExportDialog } from './certificates/dialogs/ExportDialog'
 import { BulkExportDialog } from './certificates/dialogs/BulkExportDialog'
 import { CompareDialog } from './certificates/dialogs/CompareDialog'
-import { PresetsDialog } from './certificates/dialogs/PresetsDialog'
+import { FiltersDialog } from './certificates/dialogs/FiltersDialog'
 import { certificateKeyLabel } from '../lib/certificateDetail'
 
 const NONE = []
@@ -321,19 +321,24 @@ export default function CertificatesPage() {
         out.push({ key: `${key}-${v}`, label: t('table.filterChip', { label: t(`overview.filter.${key}`), value: t(`overview.filterValue.${v}`, { defaultValue: v }) }), remove: [key, v] })
       }
     }
+    // The template filter lives in the Filters dialog: its chip says it is on
+    if (savedTemplate.includes('modified')) {
+      out.unshift({ key: 'template', label: t('table.filterChip', { label: t('certificates.template'), value: t('certificates.modifiedFromTemplate') }), remove: ['template'] })
+    }
     // Several statuses outside a link (an older preset) are no single tab: one chip says them
     if (!linkView && viewStatus.length > 1) {
       out.unshift({ key: 'view', label: t('table.filterChip', { label: t('certificates.state'), value: viewStatus.map((v) => t(`overview.filterValue.${v}`, { defaultValue: v })).join(', ') }), remove: ['view'] })
     }
     return out
-  }, [urlFilters, linkView, viewStatus, t])
+  }, [urlFilters, linkView, viewStatus, savedTemplate, t])
   const removeUrlFilter = useCallback(([key, value]) => {
     setPage(1)
+    if (key === 'template') { setFilterTemplate([]); return }
     const search = key === WEAK_KEY
       ? withoutFilter(withoutFilter(location.search, 'key_algo_prefix'), 'key_bits_below')
       : withoutFilter(location.search, key, value)
     navigate({ pathname: location.pathname, search }, { replace: true })
-  }, [location.pathname, location.search, navigate])
+  }, [location.pathname, location.search, navigate, setFilterTemplate])
   const liveScope = urlFilters.some(([k]) => k === 'live')
 
   // Selection: the ticked rows of the page, or every result
@@ -448,8 +453,9 @@ export default function CertificatesPage() {
           onExport={(format) => runBulkExport(format, dialog === 'bulk-all')} onClose={() => setDialog(null)} />
       )}
       {dialog === 'compare' && selectedRows.length === 2 && <CompareDialog pair={selectedRows} onClose={() => setDialog(null)} />}
-      {dialog === 'presets' && (
-        <PresetsDialog presets={presets} canSave={narrowed || linkView || activeStatus.length > 0}
+      {dialog === 'filters' && (
+        <FiltersDialog template={savedTemplate.includes('modified') ? 'modified' : ''}
+          onTemplate={(v) => { setPage(1); leaveLink(); setFilterTemplate(v ? [v] : []) }} presets={presets} canSave={narrowed || linkView || activeStatus.length > 0}
           onApply={(p) => { applyPreset(p.filters); setDialog(null) }} onDelete={(id) => setPresets((prev) => prev.filter((p) => p.id !== id))}
           onSave={savePreset} onClose={() => setDialog(null)} />
       )}
@@ -499,14 +505,11 @@ export default function CertificatesPage() {
             <FilterSelect id="source-filter" label={t('certificates.filterBySource')} value={savedSource[0] || ''}
               onChange={(v) => { setPage(1); leaveLink(); setFilterSource(v ? [v] : []) }}
               options={[{ value: '', label: t('certificates.allSources') }, ...sources]} />
-            <FilterSelect id="template-filter" label={t('certificates.filterByTemplate')} value={savedTemplate.includes('modified') ? 'modified' : ''}
-              onChange={(v) => { setPage(1); leaveLink(); setFilterTemplate(v ? [v] : []) }}
-              options={[{ value: '', label: t('certificates.allTemplates') }, { value: 'modified', label: t('certificates.modifiedFromTemplate') }]} />
           </>
         )}
         tools={(
           <>
-            <IconBtn icon="filter" label={t('certificates.presets.title')} data-action="presets" onClick={() => setDialog('presets')} />
+            <IconBtn icon="filter" label={t('certificates.filters.title')} data-action="filters" onClick={() => setDialog('filters')} />
           </>
         )}
         columnsDialog={{ note: t('certificates.columnsNote') }} density
@@ -514,7 +517,7 @@ export default function CertificatesPage() {
         applied={(chips.length > 0 || liveScope) && (
           <AppliedFilters chips={chips.map((c) => ({ key: c.key, label: c.label, onRemove: () => removeUrlFilter(c.remove) }))}
             note={liveScope ? t('certificates.liveScope') : undefined}
-            onClearAll={() => navigate({ pathname: location.pathname, search: '' }, { replace: true })} />
+            onClearAll={() => { if (!linkView) setFilterTemplate([]); navigate({ pathname: location.pathname, search: '' }, { replace: true }) }} />
         )}
         batch={n > 0 && (
           <BatchBar onClear={clearSelection}

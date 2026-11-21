@@ -1245,6 +1245,9 @@
       "note": "此导出不会让任何私钥离开 UCM。元数据列出每个证书的名称、描述和日期；最多 10 000 个。",
       "confirm_one": "导出 {{count, number}} 个证书",
       "confirm_other": "导出 {{count, number}} 个证书"
+    },
+    "filters": {
+      "title": "筛选"
     }
   },
   "cas": {

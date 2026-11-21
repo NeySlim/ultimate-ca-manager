@@ -1767,6 +1767,9 @@
       "note": "Aucune clé privée ne sort d’UCM par cet export. Les métadonnées nomment, décrivent et datent chaque certificat ; 10 000 au plus.",
       "confirm_one": "Exporter {{count, number}} certificat",
       "confirm_other": "Exporter {{count, number}} certificats"
+    },
+    "filters": {
+      "title": "Filtres"
     }
   },
   "common": {

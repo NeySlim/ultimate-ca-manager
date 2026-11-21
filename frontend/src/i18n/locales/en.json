@@ -1245,6 +1245,9 @@
       "note": "No private key leaves UCM through this export. The metadata name, describe and date each certificate; 10,000 at most.",
       "confirm_one": "Export {{count, number}} certificate",
       "confirm_other": "Export {{count, number}} certificates"
+    },
+    "filters": {
+      "title": "Filters"
     }
   },
   "cas": {

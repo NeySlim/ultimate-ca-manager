@@ -211,10 +211,18 @@ describe('CertificatesPage: the toolbar (tableView)', () => {
     await waitFor(() => expect(lastParams().source).toEqual(['manual']))
   })
 
-  it('keeps the « modified from its template » filter of the product', async () => {
+  it('keeps the « modified from its template » filter in the Filters dialog, its chip removable', async () => {
     await mount()
-    fireEvent.change(screen.getByRole('combobox', { name: 'certificates.filterByTemplate' }), { target: { value: 'modified' } })
+    expect(zone().querySelector('.toolbar #template-filter')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'certificates.filters.title' }))
+    const dialog = await screen.findByTestId('filters-dialog')
+    fireEvent.change(within(dialog).getByRole('combobox', { name: 'certificates.template' }), { target: { value: 'modified' } })
     await waitFor(() => expect(lastParams().template_modified).toBe('true'))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'table.done' }))
+    const chips = zone().querySelector('.applied-filters')
+    expect(chips).toHaveTextContent('table.filterChip:certificates.template/certificates.modifiedFromTemplate')
+    fireEvent.click(within(chips).getByRole('button', { name: /table\.removeFilter/ }))
+    await waitFor(() => expect(lastParams().template_modified).toBeUndefined())
   })
 
   it('shows the mockup columns in order, the product ones in the Columns dialog', async () => {
@@ -445,8 +453,8 @@ describe('CertificatesPage: overview links and saved filters', () => {
     await mount('/certificates?view=expired')
     fireEvent.change(screen.getByRole('combobox', { name: 'certificates.filterBySource' }), { target: { value: 'acme' } })
     await settle()
-    fireEvent.click(screen.getByRole('button', { name: 'certificates.presets.title' }))
-    let dialog = await screen.findByTestId('presets-dialog')
+    fireEvent.click(screen.getByRole('button', { name: 'certificates.filters.title' }))
+    let dialog = await screen.findByTestId('filters-dialog')
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'table.presetName' }), { target: { value: 'Old ACME' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'table.saveFilters' }))
     expect(JSON.parse(window.localStorage.getItem('ucm-certs-presets'))[0]).toMatchObject({ name: 'Old ACME', filters: { status: ['expired'], source: ['acme'] } })
@@ -454,8 +462,8 @@ describe('CertificatesPage: overview links and saved filters', () => {
     fireEvent.click(tab(''))
     fireEvent.click(screen.getByRole('button', { name: /certificates\.clearSearchAndFilters/ }))
     await waitFor(() => expect(lastParams().source).toBeUndefined())
-    fireEvent.click(screen.getByRole('button', { name: 'certificates.presets.title' }))
-    dialog = await screen.findByTestId('presets-dialog')
+    fireEvent.click(screen.getByRole('button', { name: 'certificates.filters.title' }))
+    dialog = await screen.findByTestId('filters-dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Old ACME' }))
     await waitFor(() => expect(lastParams()).toMatchObject({ status: ['expired'], source: ['acme'] }))
     expect(where()).toBe('?view=expired')
@@ -464,8 +472,8 @@ describe('CertificatesPage: overview links and saved filters', () => {
   it('a preset with several states applies them all: no state pressed, one chip', async () => {
     window.localStorage.setItem('ucm-certs-presets', JSON.stringify([{ id: 1, name: 'Due', filters: { status: ['expiring', 'expired'] } }]))
     await mount()
-    fireEvent.click(screen.getByRole('button', { name: 'certificates.presets.title' }))
-    fireEvent.click(within(await screen.findByTestId('presets-dialog')).getByRole('button', { name: 'Due' }))
+    fireEvent.click(screen.getByRole('button', { name: 'certificates.filters.title' }))
+    fireEvent.click(within(await screen.findByTestId('filters-dialog')).getByRole('button', { name: 'Due' }))
     await waitFor(() => expect(lastParams().status).toEqual(['expiring', 'expired']))
     expect(tabs().filter((b) => b.getAttribute('aria-pressed') === 'true')).toEqual([])
     const chips = zone().querySelector('.applied-filters')
