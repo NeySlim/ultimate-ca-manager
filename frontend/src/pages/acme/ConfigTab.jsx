@@ -1,15 +1,15 @@
 import { useTranslation } from 'react-i18next'
 import { publicBaseUrl } from '../../lib/utils'
-import { FloppyDisk, Globe, ArrowsClockwise, Lightning, FileText, PencilSimple, Stack } from '@phosphor-icons/react'
-import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
-import { Select, Button, HelpCard, CompactSection, CompactGrid, CompactField, Input, Modal } from '../../components'
 import { useState, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkBreaks from 'remark-breaks'
 import remarkGfm from 'remark-gfm'
+import { Button, Input, Modal } from '../../components'
+import { Btn, SettingsView } from '../../components/atelier'
 import { MARKDOWN_ELEMENT_CLASSES } from '../../lib/markdown'
 import ProfilesEditor from './ProfilesEditor'
 import { pickerCas, unlistedPickerCas } from '../../lib/caSelection'
+import { Field, Notice } from '../protocols/atelierParts'
 
 /** Render a markdown ToS preview.
  *
@@ -63,246 +63,174 @@ export function TosPreview({ body }) {
   )
 }
 
-export default function ConfigTab({ acmeSettings, savedProfiles = {}, cas, templates = [], updateSetting, onSaveConfig, saving, revokeSuperseded, onRevokeSupersededChange, onToggleRevokeOnRenewal, canWrite }) {
+// The ACME server settings drawn as the mockup's settingsView(): the parent holds the draft
+// (acmeSettings) and the saved settings (saved); every change comes back through updateSetting.
+const FIELDS = ['enabled', 'issuing_ca_id', 'default_profile', 'default_digest', 'revoke_on_renewal', 'allow_private_ips',
+  'caa_identifiers', 'caa_enforce', 'dns_persist_enabled']
+const norm = (k, v) => (k === 'allow_private_ips' ? v ?? true : ['enabled', 'revoke_on_renewal', 'caa_enforce', 'dns_persist_enabled'].includes(k) ? !!v
+  : k === 'default_digest' ? v || 'sha256' : v ?? '')
+
+export default function ConfigTab({ acmeSettings, saved = acmeSettings, savedProfiles = {}, cas, templates = [], updateSetting, onSaveConfig, onReset, saving,
+  revokeSuperseded, onRevokeSupersededChange, onToggleRevokeOnRenewal, canWrite }) {
   const { t } = useTranslation()
   const [editOpen, setEditOpen] = useState(false)
   const [editTitle, setEditTitle] = useState(acmeSettings.terms_of_service?.title || '')
   const [editBody, setEditBody] = useState(acmeSettings.terms_of_service?.body || '')
-
   const tos = acmeSettings.terms_of_service
   const tosExists = tos?.title || tos?.body
   const acmePublicBase = publicBaseUrl(acmeSettings.acme_public_base_url, '/acme')
-
-  // Preview of saved ToS (from props)
-  const savedPreview = useMemo(() => Boolean(tos?.body?.trim()), [tos?.body])
-
-  // Preview inside edit modal
   const editPreview = useMemo(() => Boolean(editBody?.trim()), [editBody])
+  const off = !canWrite
 
   const handleOpenEdit = () => {
     setEditTitle(tos?.title || '')
     setEditBody(tos?.body || '')
     setEditOpen(true)
   }
-
   const handleSaveEdit = () => {
     updateSetting('terms_of_service', { title: editTitle, body: editBody })
     setEditOpen(false)
   }
 
-  return (
-    <div className="p-4 space-y-4">
-      <HelpCard variant="info" title={t('common.aboutAcme')} compact>
-        {t('acme.aboutAcmeDesc')}
-      </HelpCard>
+  const onProfiles = (profiles) => {
+    updateSetting('profiles', profiles)
+    // A renamed default follows its new name; a removed one is dropped
+    const previous = acmeSettings.profiles || {}
+    const current = acmeSettings.default_profile
+    // A name emptied while typing is not a removal yet
+    if (current && !(current in profiles) && !('' in profiles)) {
+      const added = Object.keys(profiles).filter(name => !(name in previous))
+      const renamed = added.length === 1 && Object.keys(profiles).length === Object.keys(previous).length
+      updateSetting('default_profile', renamed ? added[0] : '')
+    }
+  }
 
-      <CompactSection title={t('acme.acmeServer')} icon={Globe}>
-        <div className="space-y-3">
-          <ToggleSwitch
-            checked={acmeSettings.enabled || false}
-            onChange={(val) => updateSetting('enabled', val)}
-            disabled={!canWrite}
-            label={t('acme.enableAcmeServer')}
-            description={t('acme.enableAcmeServerDesc')}
-          />
+  const changed = [
+    ...FIELDS.filter((k) => String(norm(k, acmeSettings[k])) !== String(norm(k, saved[k]))),
+    ...(JSON.stringify(acmeSettings.profiles || {}) !== JSON.stringify(saved.profiles || {}) ? ['profiles'] : []),
+    ...(JSON.stringify(acmeSettings.terms_of_service || {}) !== JSON.stringify(saved.terms_of_service || {}) ? ['terms_of_service'] : []),
+  ]
+  const values = Object.fromEntries(FIELDS.map((k) => [k, norm(k, acmeSettings[k])]))
+  values.issuing_ca_id = acmeSettings.issuing_ca_id != null && acmeSettings.issuing_ca_id !== '' ? String(acmeSettings.issuing_ca_id) : ''
+  const onChange = (key, value) => {
+    if (key === 'revoke_on_renewal') onToggleRevokeOnRenewal(value)
+    else if (key === 'issuing_ca_id') updateSetting(key, value ? parseInt(value, 10) : null)
+    else updateSetting(key, value)
+  }
+  const unlisted = unlistedPickerCas(cas, acmeSettings.issuing_ca_id)
 
-          <Select
-            label={t('acme.defaultIssuingCA')}
-            value={acmeSettings.issuing_ca_id?.toString() || ''}
-            onChange={(val) => updateSetting('issuing_ca_id', val ? parseInt(val) : null)}
-            disabled={!acmeSettings.enabled || !canWrite}
-            placeholder={t('common.acmeSelectCA')}
-            options={pickerCas(cas, acmeSettings.issuing_ca_id).map(ca => ({ 
-              value: ca.id.toString(), 
-              label: ca.name || ca.common_name 
-            }))}
-            helperText={unlistedPickerCas(cas, acmeSettings.issuing_ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, acmeSettings.issuing_ca_id) }) : undefined}
-          />
+  const sections = [
+    {
+      id: 'server', label: t('acme.acmeServer'), icon: 'refresh', desc: t('acme.aboutAcmeDesc'),
+      groups: [{ legend: t('acme.acmeServer'), fields: [
+        { key: 'enabled', label: t('acme.enableAcmeServer'), hint: t('acme.enableAcmeServerDesc'), checkbox: true, disabled: off },
+        { key: 'issuing_ca_id', label: t('acme.defaultIssuingCA'), disabled: !acmeSettings.enabled || off,
+          hint: unlisted > 0 ? t('cas.notListedForSigning', { count: unlisted }) : undefined,
+          options: [['', t('common.acmeSelectCA')], ...pickerCas(cas, acmeSettings.issuing_ca_id).map(ca => [ca.id.toString(), ca.name || ca.common_name])] },
+      ] }],
+    },
+    {
+      id: 'profiles', label: t('acme.profiles'), icon: 'template', desc: t('acme.profilesDesc'),
+      extraKeys: [['profiles', t('acme.profiles')], ['default_profile', t('acme.defaultProfile')], ['default_digest', t('acme.defaultDigest')]],
+      groups: [],
+      children: (
+        <fieldset className="settings-group">
+          <legend>{t('acme.profiles')}</legend>
+          <ProfilesEditor value={acmeSettings.profiles || {}} saved={savedProfiles} onChange={onProfiles} disabled={off} templates={templates} />
+          <p className="muted small">{t('acme.profileTemplateHelp')}</p>
+          <div className="settings-grid">
+            <Field label={t('acme.defaultProfile')} hint={t('acme.defaultProfileDesc')} id="acme-default-profile">
+              {(p) => (
+                <select {...p} value={acmeSettings.default_profile || ''} disabled={off || undefined} onChange={(e) => updateSetting('default_profile', e.target.value)}>
+                  <option value="">{t('acme.defaultProfileNone')}</option>
+                  {Object.keys(acmeSettings.profiles || {}).map(name => <option key={name} value={name}>{name}</option>)}
+                </select>
+              )}
+            </Field>
+            <Field label={t('acme.defaultDigest')} hint={t('acme.defaultDigestDesc')} id="acme-default-digest">
+              {(p) => (
+                <select {...p} value={acmeSettings.default_digest || 'sha256'} disabled={off || undefined} onChange={(e) => updateSetting('default_digest', e.target.value)}>
+                  <option value="sha256">SHA-256</option><option value="sha384">SHA-384</option><option value="sha512">SHA-512</option>
+                </select>
+              )}
+            </Field>
+          </div>
+        </fieldset>
+      ),
+    },
+    {
+      id: 'renewal', label: t('acme.renewalPolicy'), icon: 'refresh', desc: t('acme.revokeOnRenewalDesc'),
+      groups: [{ legend: t('acme.renewalPolicy'), fields: [
+        { key: 'revoke_on_renewal', label: t('acme.revokeOnRenewal'), checkbox: true, disabled: off },
+      ] }],
+      children: !acmeSettings.revoke_on_renewal && acmeSettings.superseded_count > 0 && (
+        <div className="field full">
+          <label className="checkbox-line">
+            <input type="checkbox" checked={!!revokeSuperseded} disabled={off || undefined} aria-describedby="acme-revoke-superseded-hint"
+              onChange={(e) => onRevokeSupersededChange(e.target.checked)} />
+            {t('acme.revokeExistingSuperseded', { count: acmeSettings.superseded_count })}
+          </label>
+          <small id="acme-revoke-superseded-hint">{t('acme.revokeExistingSupersededDesc')}</small>
         </div>
-      </CompactSection>
-
-      <CompactSection title={t('acme.profiles')} icon={Stack}>
-        <div className="space-y-3">
-          <p className="text-xs text-text-secondary">{t('acme.profilesDesc')}</p>
-          <ProfilesEditor
-            value={acmeSettings.profiles || {}}
-            saved={savedProfiles}
-            onChange={(profiles) => {
-              updateSetting('profiles', profiles)
-              // A renamed default follows its new name; a removed one is dropped
-              const previous = acmeSettings.profiles || {}
-              const current = acmeSettings.default_profile
-              // A name emptied while typing is not a removal yet
-              if (current && !(current in profiles) && !('' in profiles)) {
-                const added = Object.keys(profiles).filter(name => !(name in previous))
-                const renamed = added.length === 1
-                  && Object.keys(profiles).length === Object.keys(previous).length
-                updateSetting('default_profile', renamed ? added[0] : '')
-              }
-            }}
-            disabled={!canWrite}
-            templates={templates}
-          />
-          <p className="text-xs text-text-tertiary">{t('acme.profileTemplateHelp')}</p>
-          <Select
-            label={t('acme.defaultProfile')}
-            value={acmeSettings.default_profile || ''}
-            onChange={(val) => updateSetting('default_profile', val)}
-            disabled={!canWrite}
-            options={[
-              { value: '', label: t('acme.defaultProfileNone') },
-              ...Object.keys(acmeSettings.profiles || {}).map(name => ({ value: name, label: name })),
-            ]}
-          />
-          <p className="text-xs text-text-tertiary">{t('acme.defaultProfileDesc')}</p>
-          <Select
-            label={t('acme.defaultDigest')}
-            value={acmeSettings.default_digest || 'sha256'}
-            onChange={(val) => updateSetting('default_digest', val)}
-            disabled={!canWrite}
-            options={[
-              { value: 'sha256', label: 'SHA-256' },
-              { value: 'sha384', label: 'SHA-384' },
-              { value: 'sha512', label: 'SHA-512' },
-            ]}
-          />
-          <p className="text-xs text-text-tertiary">{t('acme.defaultDigestDesc')}</p>
-        </div>
-      </CompactSection>
-
-      <CompactSection title={t('acme.renewalPolicy')} icon={ArrowsClockwise}>
-        <div className="space-y-2">
-          <ToggleSwitch
-            checked={acmeSettings.revoke_on_renewal || false}
-            onChange={onToggleRevokeOnRenewal}
-            disabled={!canWrite}
-            label={t('acme.revokeOnRenewal')}
-            description={t('acme.revokeOnRenewalDesc')}
-          />
-          
-          {!acmeSettings.revoke_on_renewal && acmeSettings.superseded_count > 0 && (
-            <label className="flex items-center gap-3 cursor-pointer ml-7 p-2 rounded-lg hover:bg-tertiary-op50 transition-colors">
-              <input
-                type="checkbox"
-                checked={revokeSuperseded}
-                onChange={(e) => onRevokeSupersededChange(e.target.checked)}
-                className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-warning focus:ring-accent-warning-op50"
-              />
-              <div>
-                <p className="text-sm text-accent-warning font-medium">
-                  {t('acme.revokeExistingSuperseded', { count: acmeSettings.superseded_count })}
-                </p>
-                <p className="text-xs text-text-secondary">{t('acme.revokeExistingSupersededDesc')}</p>
-              </div>
-            </label>
-          )}
-        </div>
-      </CompactSection>
-
-      <CompactSection title={t('acme.challengeTargets')} icon={ArrowsClockwise}>
-        <ToggleSwitch
-          checked={acmeSettings.allow_private_ips ?? true}
-          onChange={(val) => updateSetting('allow_private_ips', val)}
-          disabled={!canWrite}
-          label={t('acme.allowPrivateIps')}
-          description={t('acme.allowPrivateIpsDesc')}
-        />
-      </CompactSection>
-
-      <CompactSection title={t('acme.caaSection')} icon={ArrowsClockwise}>
-        <div className="space-y-2">
-          <Input
-            label={t('acme.caaIdentifiers')}
-            value={acmeSettings.caa_identifiers || ''}
-            onChange={(e) => updateSetting('caa_identifiers', e.target.value)}
-            placeholder="ca.example.com, pki.example.com"
-            helperText={t('acme.caaIdentifiersHelp')}
-            disabled={!canWrite}
-          />
-          <ToggleSwitch
-            checked={acmeSettings.caa_enforce || false}
-            onChange={(val) => updateSetting('caa_enforce', val)}
-            disabled={!canWrite}
-            label={t('acme.caaEnforce')}
-            description={t('acme.caaEnforceDesc')}
-          />
-          {acmeSettings.caa_enforce && (
-            <p className="text-xs text-status-warning">{t('acme.caaEnforceWarning')}</p>
-          )}
-        </div>
-      </CompactSection>
-
-      <CompactSection title={t('acme.dnsPersistSection')} icon={ArrowsClockwise}>
-        <div className="space-y-2">
-          <ToggleSwitch
-            checked={acmeSettings.dns_persist_enabled || false}
-            onChange={(val) => updateSetting('dns_persist_enabled', val)}
-            disabled={!canWrite}
-            label={t('acme.dnsPersistEnabled')}
-            description={t('acme.dnsPersistEnabledDesc')}
-          />
-          {acmeSettings.dns_persist_enabled && (
-            <>
-              <p className="text-xs text-status-warning">{t('acme.dnsPersistWarning')}</p>
-              <p className="text-xs text-text-tertiary">
-                {t('acme.dnsPersistIssuerNote', { domains: (acmeSettings.dns_persist_issuer_domains || []).join(', ') || '—' })}
-              </p>
-            </>
-          )}
-        </div>
-      </CompactSection>
-
-      <CompactSection title={t('acme.termsOfService')} icon={FileText}>
-        <div className="space-y-2">
-          {tosExists && savedPreview ? (
-            <div className="rounded-lg border border-border bg-bg-tertiary p-3 max-h-52 overflow-y-auto">
-              {tos.title && <p className="text-sm font-semibold text-text-primary mb-2">{tos.title}</p>}
-              <div className="text-xs text-text-secondary"><TosPreview body={tos?.body} /></div>
+      ),
+    },
+    {
+      id: 'targets', label: t('acme.challengeTargets'), icon: 'globe', desc: t('acme.allowPrivateIpsDesc'),
+      groups: [{ legend: t('acme.challengeTargets'), fields: [
+        { key: 'allow_private_ips', label: t('acme.allowPrivateIps'), checkbox: true, disabled: off },
+      ] }],
+    },
+    {
+      id: 'caa', label: t('acme.caaSection'), icon: 'policy', desc: t('acme.caaIdentifiersHelp'),
+      groups: [{ legend: t('acme.caaSection'), fields: [
+        { key: 'caa_identifiers', label: t('acme.caaIdentifiers'), placeholder: 'ca.example.com, pki.example.com', wide: true, disabled: off },
+        { key: 'caa_enforce', label: t('acme.caaEnforce'), hint: t('acme.caaEnforceDesc'), checkbox: true, disabled: off },
+      ] }],
+      children: acmeSettings.caa_enforce && <Notice tone="warn">{t('acme.caaEnforceWarning')}</Notice>,
+    },
+    {
+      id: 'persist', label: t('acme.dnsPersistSection'), icon: 'globe', desc: t('acme.dnsPersistEnabledDesc'),
+      groups: [{ legend: t('acme.dnsPersistSection'), fields: [
+        { key: 'dns_persist_enabled', label: t('acme.dnsPersistEnabled'), checkbox: true, disabled: off },
+      ] }],
+      children: acmeSettings.dns_persist_enabled && (
+        <>
+          <Notice tone="warn">{t('acme.dnsPersistWarning')}</Notice>
+          <p className="muted small">{t('acme.dnsPersistIssuerNote', { domains: (acmeSettings.dns_persist_issuer_domains || []).join(', ') || '—' })}</p>
+        </>
+      ),
+    },
+    {
+      id: 'tos', label: t('acme.termsOfService'), icon: 'file', desc: t('acme.termsOfServiceHelper'),
+      extraKeys: [['terms_of_service', t('acme.termsOfService')]],
+      groups: [],
+      children: (
+        <fieldset className="settings-group">
+          <legend>{t('acme.termsOfService')}</legend>
+          {tosExists && tos?.body?.trim() ? (
+            <div className="summary tos-preview">
+              {tos.title && <strong>{tos.title}</strong>}
+              <TosPreview body={tos?.body} />
             </div>
-          ) : (
-            <p className="text-xs text-text-tertiary">{t('acme.termsOfServiceHelper')}</p>
-          )}
-          {canWrite && (
-            <Button type="button" variant="ghost" size="sm" onClick={handleOpenEdit} data-write>
-              <PencilSimple size={14} />
-              {t('common.edit')}
-            </Button>
-          )}
-        </div>
-      </CompactSection>
+          ) : <p className="muted small">{t('acme.termsOfServiceHelper')}</p>}
+          {canWrite && <div className="copy-url"><Btn icon="settings" write onClick={handleOpenEdit}>{t('common.edit')}</Btn></div>}
+        </fieldset>
+      ),
+    },
+    {
+      id: 'endpoints', label: t('acme.endpoints'), icon: 'link', desc: t('acme.certbotUsage'),
+      groups: [{ legend: t('acme.endpoints'), fields: [
+        { key: 'directory', label: t('acme.directory'), readonly: `${acmePublicBase}/directory` },
+        ...(tosExists ? [{ key: 'terms', label: t('acme.termsOfServiceUrl'), readonly: `${acmePublicBase}/terms` }] : []),
+      ] }],
+      children: <pre className="code-preview">{`--server ${acmePublicBase}/directory`}</pre>,
+    },
+  ]
 
-      <CompactSection title={t('acme.endpoints')} icon={Lightning}>
-        <CompactGrid columns={1}>
-          <CompactField 
-            autoIcon="environment"
-            label={t('acme.directory')} 
-            value={`${acmePublicBase}/directory`}
-            mono
-            copyable
-          />
-          {(acmeSettings.terms_of_service?.title || acmeSettings.terms_of_service?.body) && (
-            <CompactField 
-              label={t('acme.termsOfServiceUrl')}
-              value={`${acmePublicBase}/terms`}
-              mono
-              copyable
-            />
-          )}
-        </CompactGrid>
-        <p className="text-xs text-text-tertiary mt-2">
-          {t('acme.certbotUsage')} <code className="bg-bg-tertiary px-1 rounded">--server {acmePublicBase}/directory</code>
-        </p>
-      </CompactSection>
-
-      {canWrite && (
-        <div className="flex gap-2 pt-3 border-t border-border">
-          <Button type="button" onClick={onSaveConfig} disabled={saving}>
-            <FloppyDisk size={14} />
-            {saving ? t('common.saving') : t('common.saveConfiguration')}
-          </Button>
-        </div>
-      )}
-
+  return (
+    <>
+      <SettingsView sections={sections} values={values} changed={changed} onChange={onChange}
+        onSave={canWrite ? onSaveConfig : undefined} onReset={onReset} saving={saving} tocLabel={t('protocols.sectionsOf', { name: t('acme.acmeServer') })} />
       {/* Terms of Service edit modal */}
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title={t('acme.termsOfService')} size="md">
         <div className="p-4 space-y-4">
@@ -336,6 +264,6 @@ export default function ConfigTab({ acmeSettings, savedProfiles = {}, cas, templ
           </div>
         </div>
       </Modal>
-    </div>
+    </>
   )
 }

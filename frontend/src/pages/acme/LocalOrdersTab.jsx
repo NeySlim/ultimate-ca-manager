@@ -1,42 +1,44 @@
 /**
- * LocalOrdersTab — orders of the built-in ACME server (#303 M6).
- * Self-contained: fetches its own data, supports status filter, delete and
- * purge of expired orders.
+ * Orders of the built-in ACME server (#303 M6), drawn as the mockup's module list with its dock:
+ * paged by the server, filtered by state, an order opens its detail; deletion and the purge of
+ * expired orders stay with delete:acme. A linked order (?order=N) opens in the dock.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Trash, Broom, ArrowsClockwise, Globe } from '@phosphor-icons/react'
-import { Badge, Button, EmptyState, ResponsiveDataTable, FilterSelect } from '../../components'
+import { Btn, IconBtn, Pill, ListView, Toolbar, Dock, DockBody, Section, Props, EmptyBlock } from '../../components/atelier'
 import { apiClient } from '../../services'
 import { buildQueryString } from '../../services/apiClient'
 import { useNotification } from '../../contexts'
 import { usePermission } from '../../hooks'
-import { formatDate } from '../../lib/utils'
 import { stateLabel } from '../../lib/stateLabel'
+import { dateTimeOf, dateOf } from '../admin/adminDates'
+import { Copyable } from '../protocols/atelierParts'
+import { SlotDock } from '../protocols/dockSlot'
 
-const STATUS_VARIANT = {
-  valid: 'success', ready: 'info', pending: 'warning',
-  processing: 'warning', invalid: 'danger',
-}
+const TONES = { valid: 'good', ready: 'good', pending: 'warn', processing: 'warn', invalid: 'bad' }
+const STATES = ['pending', 'ready', 'processing', 'valid', 'invalid']
+const PER_PAGE = 50
 
 export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = i18n?.language || 'en'
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canDelete } = usePermission()
   const canDeleteOrders = canDelete('acme')
   const [items, setItems] = useState([])
-  const [meta, setMeta] = useState({ page: 1, per_page: 50, total: 0 })
+  const [meta, setMeta] = useState({ page: 1, per_page: PER_PAGE, total: 0 })
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('')
   const [loading, setLoading] = useState(true)
+  const [opened, setOpened] = useState(null)
 
   const load = useCallback(async (p = page, s = status) => {
     setLoading(true)
     try {
-      const qs = buildQueryString({ page: p, per_page: 50, status: s || undefined })
+      const qs = buildQueryString({ page: p, per_page: PER_PAGE, status: s || undefined })
       const response = await apiClient.get(`/acme/orders${qs}`)
       const data = response?.data || response || {}
-      const nextMeta = data.meta || { page: p, per_page: 50, total: 0 }
+      const nextMeta = data.meta || { page: p, per_page: PER_PAGE, total: 0 }
       const totalPages = Math.max(1, Math.ceil(nextMeta.total / nextMeta.per_page))
       setMeta(nextMeta)
       if (p > totalPages) {
@@ -52,21 +54,17 @@ export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked }) {
   }, [page, status, showError, t])
 
   useEffect(() => { load(page, status) }, [page, status]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (linkedOrder) setOpened(linkedOrder) }, [linkedOrder])
 
   const handleDelete = async (row) => {
-    const confirmed = await showConfirm(
-      t('acme.deleteLocalOrderConfirmDesc', { domain: row.domain }),
-      {
-        title: t('acme.deleteLocalOrderConfirm'),
-        confirmText: t('common.delete'),
-        cancelText: t('common.cancel'),
-        variant: 'danger',
-      }
-    )
+    const confirmed = await showConfirm(t('acme.deleteLocalOrderConfirmDesc', { domain: row.domain }), {
+      title: t('acme.deleteLocalOrderConfirm'), confirmText: t('common.delete'), cancelText: t('common.cancel'), variant: 'danger',
+    })
     if (!confirmed) return
     try {
       await apiClient.delete(`/acme/orders/${row.id}`)
       showSuccess(t('acme.localOrderDeleted'))
+      if (opened?.id === row.id) setOpened(null)
       load()
     } catch (err) {
       showError(err.message || t('common.deleteFailed'))
@@ -74,15 +72,9 @@ export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked }) {
   }
 
   const handlePurge = async () => {
-    const confirmed = await showConfirm(
-      t('acme.purgeLocalOrdersConfirmDesc'),
-      {
-        title: t('acme.purgeLocalOrdersConfirm'),
-        confirmText: t('acme.purgeLocalOrders'),
-        cancelText: t('common.cancel'),
-        variant: 'danger',
-      }
-    )
+    const confirmed = await showConfirm(t('acme.purgeLocalOrdersConfirmDesc'), {
+      title: t('acme.purgeLocalOrdersConfirm'), confirmText: t('acme.purgeLocalOrders'), cancelText: t('common.cancel'), variant: 'danger',
+    })
     if (!confirmed) return
     try {
       const response = await apiClient.post('/acme/orders/purge')
@@ -94,90 +86,60 @@ export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked }) {
     }
   }
 
-  const columns = useMemo(() => [
-    { key: 'domain', header: t('acme.domains'), priority: 1, sortable: true },
-    { key: 'account', header: t('acme.account'), priority: 3,
-      render: (v) => <span className="text-xs text-text-tertiary truncate">{v}</span> },
-    { key: 'status', header: t('common.status'), priority: 1,
-      render: (v) => <Badge variant={STATUS_VARIANT[(v || '').toLowerCase()] || 'default'}>{stateLabel(t, v)}</Badge> },
-    { key: 'method', header: t('acme.challengeType'), priority: 4 },
-    { key: 'expires', header: t('common.expires'), priority: 2,
-      render: (v) => v ? formatDate(v) : '-' },
-    { key: 'created_at', header: t('common.created'), priority: 3,
-      render: (v) => v ? formatDate(v) : '-' },
-    ...(canDeleteOrders ? [{
-      key: '_actions', header: '', priority: 1,
-      render: (_v, row) => (
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          aria-label={t('common.delete')}
-          onClick={(e) => { e.stopPropagation(); handleDelete(row) }}
-        >
-          <Trash size={14} />
-        </Button>
-      ),
-    }] : []),
-  ], [t, canDeleteOrders]) // eslint-disable-line react-hooks/exhaustive-deps
+  const tone = (o) => TONES[String(o.status || '').toLowerCase()] || 'muted'
+  const pill = (o) => <Pill label={stateLabel(t, o.status)} tone={tone(o)} />
+  const pages = Math.max(1, Math.ceil((meta.total || 0) / (meta.per_page || PER_PAGE)))
+  const close = () => { setOpened(null); onCloseLinked?.() }
+
+  const dock = opened && (
+    <Dock label={t('atelier.detailOf', { name: t('acme.localOrders') })} tabsLabel={t('atelier.openItem')} activeKey={opened.id}
+      tabs={[{ key: opened.id, title: opened.domain, icon: 'refresh' }]} onClose={close}>
+      <DockBody icon="refresh" title={opened.domain} badge={pill(opened)} section="order" onSection={() => {}}
+        sectionsLabel={t('atelier.sectionsOf', { name: opened.domain })} sections={[['order', t('acme.orderInfo')]]}
+        actions={canDeleteOrders && <Btn icon="close" id="acme-order-delete" onClick={() => handleDelete(opened)}>{t('common.delete')}</Btn>}>
+        <div className="module-detail">
+          <Section title={t('acme.orderInfo')}>
+            <Props items={[
+              [t('acme.domains'), opened.domain], [t('acme.account'), <span key="a" className="mono">{opened.account}</span>],
+              [t('acme.challengeType'), opened.method || '—'], [t('atelier.state'), pill(opened)],
+              [t('common.expires'), dateOf(opened.expires, locale) || '—'], [t('common.created'), dateTimeOf(opened.created_at, locale) || '—'],
+              opened.order_id && [t('acme.orderId'), <Copyable key="o" value={opened.order_id} label={t('acme.orderId')} />],
+            ]} />
+          </Section>
+        </div>
+      </DockBody>
+    </Dock>
+  )
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <FilterSelect
-            value={status}
-            onChange={(v) => { setPage(1); setStatus(v) }}
-            allLabel={t('common.allStatuses')}
-            options={['pending', 'ready', 'processing', 'valid', 'invalid'].map(sv => ({ value: sv, label: stateLabel(t, sv) }))}
-          />
-          <span className="text-xs text-text-tertiary">{t('acme.localOrdersCount', { count: meta.total })}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button type="button" size="sm" variant="secondary" onClick={() => load()}>
-            <ArrowsClockwise size={14} />
-          </Button>
-          {canDeleteOrders && (
-            <Button type="button" size="sm" variant="secondary" onClick={handlePurge}>
-              <Broom size={14} />
-              {t('acme.purgeLocalOrders')}
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {linkedOrder && (
-        <div aria-current="true" className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-accent-primary p-3">
-          <div className="min-w-0">
-            <div className="text-sm font-medium text-text-primary truncate">{linkedOrder.domain}</div>
-            <div className="text-xs text-text-tertiary">
-              {linkedOrder.account} · {linkedOrder.method} · {linkedOrder.created_at ? formatDate(linkedOrder.created_at) : '-'}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant={STATUS_VARIANT[(linkedOrder.status || '').toLowerCase()] || 'default'}>{stateLabel(t, linkedOrder.status)}</Badge>
-            {onCloseLinked && <Button type="button" size="sm" variant="ghost" onClick={onCloseLinked}>{t('common.close')}</Button>}
-          </div>
-        </div>
-      )}
-
-      {items.length === 0 && !loading ? (
-        <EmptyState icon={Globe} title={t('acme.noLocalOrders')} description={t('acme.noLocalOrdersDesc')} />
-      ) : (
-        <ResponsiveDataTable
-          columns={columns}
-          data={items}
-          selectable={false}
-        />
-      )}
-
-      {meta.total > meta.per_page && (
-        <div className="flex items-center justify-end gap-2 text-xs">
-          <Button type="button" size="sm" variant="ghost" disabled={page <= 1} onClick={() => setPage(page - 1)}>‹</Button>
-          <span>{page} / {Math.max(1, Math.ceil(meta.total / meta.per_page))}</span>
-          <Button type="button" size="sm" variant="ghost" disabled={page >= Math.ceil(meta.total / meta.per_page)} onClick={() => setPage(page + 1)}>›</Button>
-        </div>
-      )}
-    </div>
+    <>
+      <ListView label={t('acme.localOrders')} caption={t('acme.ordersCaption')} icon="refresh" rows={items} loading={loading}
+        filters={{
+          views: [{ id: '', label: t('common.all') }, ...STATES.map((s) => ({ id: s, label: stateLabel(t, s) }))],
+          active: status, onChange: (v) => { setPage(1); setStatus(v) }, label: t('acme.filterByState'),
+          aside: t('acme.localOrdersCount', { count: meta.total }),
+        }}
+        toolbar={(
+          <Toolbar>
+            <IconBtn icon="refresh" label={t('common.refresh')} onClick={() => load()} />
+            {canDeleteOrders && <Btn icon="close" id="acme-orders-purge" onClick={handlePurge}>{t('acme.purgeLocalOrders')}</Btn>}
+          </Toolbar>
+        )}
+        title={(o) => o.domain} status={pill} openedId={opened?.id} onOpen={setOpened}
+        columns={[
+          { id: 'account', label: t('acme.account'), cell: (o) => <span className="mono">{o.account}</span>, grow: true, muted: true },
+          { id: 'method', label: t('acme.challengeType'), cell: (o) => o.method || '—' },
+          { id: 'expires', label: t('common.expires'), cell: (o) => dateOf(o.expires, locale) || '—' },
+          { id: 'created', label: t('common.created'), cell: (o) => dateTimeOf(o.created_at, locale) || '—' },
+          { status: true },
+        ]}
+        rowActions={canDeleteOrders ? () => [{ icon: 'close', label: t('common.delete'), onClick: handleDelete, write: true }] : undefined}
+        empty={<EmptyBlock id="acme-orders" icon="refresh" title={t('acme.noLocalOrders')} text={t('acme.noLocalOrdersDesc')} />}
+        footer={{
+          range: t('acme.localOrdersCount', { count: meta.total }),
+          pagination: meta.total > (meta.per_page || PER_PAGE) ? { page, pages, perPage: PER_PAGE, sizes: [PER_PAGE], onPage: setPage } : undefined,
+        }} />
+      <SlotDock>{dock}</SlotDock>
+    </>
   )
 }

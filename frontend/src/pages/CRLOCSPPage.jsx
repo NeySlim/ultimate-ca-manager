@@ -32,7 +32,7 @@ const URL_FIELDS = { cdp: 'cdp_urls', ocsp: 'ocsp_urls', aia: 'aia_ca_issuers_ur
 
 export default function CRLOCSPPage() {
   const { t, i18n } = useTranslation()
-  const locale = i18n.language || 'en'
+  const locale = i18n?.language || 'en'
   const { showSuccess, showError, showInfo, showConfirm } = useNotification()
   const { canWrite } = usePermission()
 

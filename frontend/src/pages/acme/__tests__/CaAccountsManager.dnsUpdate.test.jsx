@@ -1,21 +1,23 @@
 /**
- * The "DNS UPDATE keys" button of a CA account: shown when the proxy is on,
+ * The DNS UPDATE keys tab of a CA account's dock: shown when the proxy is on,
  * or when the account still has keys (they can be revoked after the proxy is off).
  */
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key) => key }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
+vi.mock('../../../contexts', () => ({ useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn() }), useMobile: () => ({ isMobile: false }) }))
 
 vi.mock('../DnsUpdateKeysPanel', () => ({
   default: ({ proxyActive }) => <div data-testid="keys-panel" data-proxy-active={String(proxyActive)} />,
 }))
 
 import CaAccountsManager from '../CaAccountsManager'
+import { WithDockSlot } from '../../protocols/__tests__/withDockSlot'
 
 const account = (extra = {}) => ({
   id: 1, label: 'Actalis', directory_url: 'https://ca.example/dir', email: 'a@example.com',
@@ -23,37 +25,42 @@ const account = (extra = {}) => ({
   proxy_enabled: true, proxy_slug: 'actalis', dns_update_key_count: 0, ...extra,
 })
 
-const renderManager = (acct) => render(
-  <CaAccountsManager accounts={[acct]} canWrite canDelete />,
-)
+// The account opens its dock; the keys are a tab of it
+const renderManager = (acct) => {
+  render(<WithDockSlot><CaAccountsManager accounts={[acct]} canWrite canDelete /></WithDockSlot>)
+  screen.getByRole('button', { name: 'Actalis' }).click()
+}
+const keysTab = () => within(screen.getByRole('complementary')).queryByRole('tab', { name: 'acme.dnsUpdate.title' })
 
 describe('CaAccountsManager DNS UPDATE keys button', () => {
   it('shows the button for an account whose proxy is off and that has keys', async () => {
     const user = userEvent.setup()
     renderManager(account({ proxy_enabled: false, dns_update_key_count: 1 }))
-    await user.click(screen.getByRole('button', { name: /acme.dnsUpdate.manage/ }))
+    await user.click(await screen.findByRole('tab', { name: 'acme.dnsUpdate.title' }))
     expect(screen.getByTestId('keys-panel')).toHaveAttribute('data-proxy-active', 'false')
   })
 
-  it('shows the button for an account whose proxy has no slug and that has keys', () => {
+  it('shows the button for an account whose proxy has no slug and that has keys', async () => {
     renderManager(account({ proxy_slug: null, dns_update_key_count: 2 }))
-    expect(screen.getByRole('button', { name: /acme.dnsUpdate.manage/ })).toBeInTheDocument()
+    expect(await screen.findByRole('tab', { name: 'acme.dnsUpdate.title' })).toBeInTheDocument()
   })
 
-  it('hides the button for an account whose proxy is off and that has no keys', () => {
+  it('hides the button for an account whose proxy is off and that has no keys', async () => {
     renderManager(account({ proxy_enabled: false, dns_update_key_count: 0 }))
-    expect(screen.queryByRole('button', { name: /acme.dnsUpdate.manage/ })).not.toBeInTheDocument()
+    await screen.findByRole('complementary')
+    expect(keysTab()).not.toBeInTheDocument()
   })
 
-  it('hides the button when the count is missing and the proxy is off', () => {
+  it('hides the button when the count is missing and the proxy is off', async () => {
     renderManager(account({ proxy_enabled: false, dns_update_key_count: undefined }))
-    expect(screen.queryByRole('button', { name: /acme.dnsUpdate.manage/ })).not.toBeInTheDocument()
+    await screen.findByRole('complementary')
+    expect(keysTab()).not.toBeInTheDocument()
   })
 
   it('shows the button for an account whose proxy is on, without keys', async () => {
     const user = userEvent.setup()
     renderManager(account())
-    await user.click(screen.getByRole('button', { name: /acme.dnsUpdate.manage/ }))
+    await user.click(await screen.findByRole('tab', { name: 'acme.dnsUpdate.title' }))
     expect(screen.getByTestId('keys-panel')).toHaveAttribute('data-proxy-active', 'true')
   })
 })

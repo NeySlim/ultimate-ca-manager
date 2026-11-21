@@ -39,8 +39,7 @@ beforeEach(() => {
 })
 
 async function openHistory() {
-  render(<MemoryRouter initialEntries={['/acme']}><ACMEPage /></MemoryRouter>)
-  fireEvent.click((await screen.findAllByText('common.history'))[0])
+  render(<MemoryRouter initialEntries={['/acme?tab=history']}><ACMEPage /></MemoryRouter>)
   await screen.findByText('h1.example.com')
 }
 
@@ -54,8 +53,8 @@ describe('ACME history tab', () => {
   it('exports every page of the list', async () => {
     await openHistory()
     acmeService.getHistory.mockClear()
-    fireEvent.click(await screen.findByTitle('table.exportData'))
-    fireEvent.click(await screen.findByText('table.exportCSV'))
+    fireEvent.click(await screen.findByRole('button', { name: 'table.exportData' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'table.exportCSV' }))
     await waitFor(() => expect(exported.csv).toHaveBeenCalled())
     expect(exported.csv.mock.calls[0][0]).toHaveLength(TOTAL)
   })

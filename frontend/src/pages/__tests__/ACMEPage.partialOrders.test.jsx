@@ -2,7 +2,7 @@
  * The orders tab under a rate limit: a page that keeps answering 429 leaves a partial list with a notice.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import './pageRenderingSetup.jsx'
 import { acmeService } from '../../services/acme.service'
@@ -28,8 +28,7 @@ function mockAcme(getClientOrders) {
 }
 
 async function openOrdersTab() {
-  render(<MemoryRouter initialEntries={['/acme']}><ACMEPage /></MemoryRouter>)
-  fireEvent.click((await screen.findAllByText('acme.letsEncryptOrders'))[0])
+  render(<MemoryRouter initialEntries={['/acme?tab=letsencryptorders']}><ACMEPage /></MemoryRouter>)
 }
 
 describe('ACMEPage orders under a rate limit', () => {

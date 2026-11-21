@@ -1,267 +1,146 @@
+/**
+ * The dock of an ACME account, the mockup's acmeAccountPanel() and its tabs (Compte, Commandes,
+ * Défis), on the server's account, orders and challenges. The client name, the EAB binding, the
+ * failure of a challenge and the account journal are functions the product lacks (M01, M02);
+ * a contact e-mail to edit and the removal of an account are the product's own.
+ */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Key, Globe, ShieldCheck, CheckCircle, XCircle, Trash, Copy, PencilSimple } from '@phosphor-icons/react'
-import { Badge, Button, Input, StatusIndicator, CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader } from '../../components'
+import { Btn, Dock, DockBody, Section, Props, RecordList, RecordRow, Pill, TextLink, AtelierDialog } from '../../components/atelier'
 import { apiClient } from '../../services'
 import { useNotification } from '../../contexts'
-import { useClipboard, usePermission } from '../../hooks'
-import { formatDate } from '../../lib/utils'
+import { usePermission } from '../../hooks'
+import { stateLabel } from '../../lib/stateLabel'
+import { dateOf, dateTimeOf } from '../admin/adminDates'
+import { Copyable, Notice } from '../protocols/atelierParts'
+import { ACCOUNT_TONES, accountLabel, accountContact } from '../protocols/protocolStates'
 
-export default function AccountDetailPanel({ account, orders, challenges, detailTabs, activeDetailTab, onDetailTabChange, onDeactivate, onDelete, onChanged }) {
-  const { t } = useTranslation()
+const ORDER_TONES = { valid: 'good', ready: 'good', issued: 'good', pending: 'warn', processing: 'warn', invalid: 'bad' }
+
+
+/** The URL or record a challenge of this type is checked at (RFC 8555 §8.3, §8.4; RFC 8737). */
+function challengeWhere(t, ch) {
+  const type = String(ch.type || '').toUpperCase()
+  if (type.startsWith('DNS')) return t('acme.challengeTxt', { name: `_acme-challenge.${ch.domain}` })
+  if (type === 'HTTP-01') return `http://${ch.domain}/.well-known/acme-challenge/`
+  if (type === 'TLS-ALPN-01') return t('acme.challengeAlpn', { host: `${ch.domain}:443` })
+  return ch.domain
+}
+
+export default function AccountDock({ account, orders = [], challenges = [], section, onSection, onClose, onDeactivate, onDelete, onChanged }) {
+  const { t, i18n } = useTranslation()
+  const locale = i18n?.language || 'en'
   const { showSuccess, showError } = useNotification()
   const { hasPermission } = usePermission()
-  const canEditEmail = hasPermission('write:acme')
-  const [editingEmail, setEditingEmail] = useState(false)
+  const canWrite = hasPermission('write:acme')
+  const canDelete = hasPermission('delete:acme')
+  const [editing, setEditing] = useState(false)
   const [emailDraft, setEmailDraft] = useState('')
+  const [confirming, setConfirming] = useState(false)
+  const currentEmail = accountContact(account)
+  const name = accountLabel(account)
+  const pill = (s) => <Pill label={t(`acme.accountState.${s}`, { defaultValue: stateLabel(t, s) })} tone={ACCOUNT_TONES[s] || 'muted'} />
+  const orderPill = (o) => <Pill label={stateLabel(t, o.status)} tone={ORDER_TONES[String(o.status).toLowerCase()] || 'muted'} />
+  const last = orders[0]
+  const failing = orders.filter((o) => String(o.status).toLowerCase() === 'invalid').length
 
-  const currentEmail = account.contact?.[0]?.replace('mailto:', '') || account.email || ''
   const saveEmail = async () => {
     try {
-      const response = await apiClient.patch(
-        `/acme/accounts/${account.account_id || account.id}`,
-        { email: emailDraft.trim() }
-      )
-      const contact = response?.data?.contact
-        ?? (emailDraft.trim() ? [`mailto:${emailDraft.trim()}`] : [])
+      const response = await apiClient.patch(`/acme/accounts/${account.account_id || account.id}`, { email: emailDraft.trim() })
+      const contact = response?.data?.contact ?? (emailDraft.trim() ? [`mailto:${emailDraft.trim()}`] : [])
       onChanged?.({ ...account, contact })
       showSuccess(t('acme.emailUpdated'))
-      setEditingEmail(false)
+      setEditing(false)
     } catch (err) {
       showError(err.message || t('messages.errors.updateFailed.settings'))
     }
   }
-  const { copy } = useClipboard()
 
   return (
-    <div className="p-3 space-y-3">
-      <CompactHeader
-        icon={Key}
-        iconClass={account.status === 'valid' ? "bg-status-success-op20" : "bg-bg-tertiary"}
-        title={account.contact?.[0]?.replace('mailto:', '') || account.email || t('acme.account')}
-        subtitle={`ID: ${account.account_id?.substring(0, 24)}...`}
-        badge={
-          <Badge variant={account.status === 'valid' ? 'success' : 'secondary'} size="sm">
-            {account.status === 'valid' && <CheckCircle size={10} weight="fill" />}
-            {account.status}
-          </Badge>
-        }
-      />
-
-      <CompactStats stats={[
-        // key_type is read from the stored JWK and null when unreadable: never a guess
-        ...(account.key_type ? [{ icon: Key, value: account.key_type }] : []),
-        { icon: Globe, value: `${orders.length} ${t('acme.orders').toLowerCase()}` },
-        { icon: ShieldCheck, value: `${challenges.length} ${t('common.challenges').toLowerCase()}` },
-      ]} />
-
-      <div className="flex gap-2">
-        <Button 
-          size="sm" 
-          variant="secondary"
-          className="flex-1"
-          onClick={() => onDeactivate(account.id)}
-          disabled={account.status !== 'valid'}
-        >
-          <XCircle size={14} />
-          {t('common.deactivate')}
-        </Button>
-        <Button 
-          size="sm" 
-          variant="danger"
-          onClick={() => onDelete(account.id)}
-        >
-          <Trash size={14} />
-        </Button>
-      </div>
-
-      <div className="flex gap-1 border-b border-border">
-        {detailTabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => onDetailTabChange(tab.id)}
-            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
-              activeDetailTab === tab.id
-                ? 'border-accent-primary text-accent-primary'
-                : 'border-transparent text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            <tab.icon size={14} />
-            {tab.label}
-            {tab.count > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 text-2xs rounded-full bg-bg-tertiary">
-                {tab.count}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {activeDetailTab === 'account' && (
-        <div className="space-y-3">
-          <CompactSection title={t('common.accountInformation')}>
-            <CompactGrid>
-              <CompactField autoIcon="email" label={t('common.email')} colSpan={2}>
-                <span className="flex items-center gap-1.5 min-w-0">
-                  <span className="truncate" title={currentEmail}>{currentEmail || '-'}</span>
-                  {canEditEmail && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="xs"
-                      className="shrink-0 whitespace-nowrap text-accent-primary hover:text-accent-primary"
-                      aria-expanded={editingEmail}
-                      onClick={() => { setEmailDraft(currentEmail); setEditingEmail(!editingEmail) }}
-                    >
-                      <PencilSimple size={12} />
-                      {t('acme.editEmail')}
-                    </Button>
-                  )}
-                </span>
-              </CompactField>
-              <CompactField autoIcon="status" label={t('common.status')}>
-                <StatusIndicator status={account.status === 'valid' ? 'active' : 'inactive'}>
-                  {account.status}
-                </StatusIndicator>
-              </CompactField>
-              <CompactField autoIcon="keyType" label={t('common.keyType')} value={account.key_type} />
-              <CompactField autoIcon="created" label={t('common.created')} value={formatDate(account.created_at)} />
-            </CompactGrid>
-            {canEditEmail && editingEmail && (
-              <div className="mt-2 space-y-2">
-                <Input
-                  value={emailDraft}
-                  onChange={(e) => setEmailDraft(e.target.value)}
-                  placeholder="admin@example.com"
-                  helperText={t('acme.editEmailCaveat')}
-                />
-                <div className="flex gap-2 justify-end">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setEditingEmail(false)}>{t('common.cancel')}</Button>
-                  <Button type="button" variant="primary" size="sm" onClick={saveEmail}>{t('common.save')}</Button>
-                </div>
-              </div>
-            )}
-          </CompactSection>
-
-          <CompactSection title={t('acme.accountId')} collapsible defaultOpen={false}>
-            <div className="relative group">
-              <p className="font-mono text-2xs text-text-secondary break-all bg-tertiary-op50 p-2 rounded pr-8">
-                {account.account_id}
-              </p>
-              <button
-                type="button"
-                onClick={() => { copy(account.account_id); showSuccess(t('common.copied')) }}
-                className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-all"
-                aria-label={t('common.copy')}
-              >
-                <Copy size={14} />
-              </button>
-            </div>
-          </CompactSection>
-
-          <CompactSection title={t('acme.termsOfService')}>
-            <div className="flex items-center gap-2 text-xs">
-              {account.terms_of_service_agreed || account.tos_agreed ? (
-                <>
-                  <CheckCircle size={14} className="status-success-text" weight="fill" />
-                  <span className="status-success-text">{t('acme.accepted')}</span>
-                </>
-              ) : (
-                <>
-                  <XCircle size={14} className="status-danger-text" weight="fill" />
-                  <span className="status-danger-text">{t('acme.notAccepted')}</span>
-                </>
-              )}
-            </div>
-          </CompactSection>
-        </div>
-      )}
-
-      {activeDetailTab === 'orders' && (
-        <CompactSection title={`${orders.length} ${t('acme.orders')}`}>
-          {orders.length === 0 ? (
-            <p className="text-xs text-text-tertiary py-4 text-center">{t('acme.noCertificateOrders')}</p>
-          ) : (
-            <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-              {orders.map((order, i) => (
-                <div key={i} className="p-3 bg-tertiary-op50 rounded-lg border border-border-op50 hover:border-border transition-colors">
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="text-sm font-medium text-text-primary truncate flex-1">
-                      {order.domain || order.identifier || t('common.unknown')}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      {order.source === 'proxy' && (
-                        <Badge variant="info" size="sm" title={order.environment || ''}>
-                          {t('acme.proxy')}
-                        </Badge>
-                      )}
-                      <Badge 
-                        variant={
-                          order.status?.toLowerCase() === 'valid' || order.status?.toLowerCase() === 'issued' ? 'success' : 
-                          order.status?.toLowerCase() === 'pending' ? 'warning' :
-                          order.status?.toLowerCase() === 'ready' ? 'info' :
-                          'danger'
-                        } 
-                        size="sm"
-                      >
-                        {order.status || t('common.unknown')}
-                      </Badge>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-text-tertiary">{t('acme.method')}</span>
-                      <span className="text-text-secondary font-medium">{order.method || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-text-tertiary">{t('common.expires')}</span>
-                      <span className="text-text-secondary">{order.expires || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between col-span-2">
-                      <span className="text-text-tertiary">{t('common.created')}</span>
-                      <span className="text-text-secondary">{order.created_at ? formatDate(order.created_at) : 'N/A'}</span>
-                    </div>
-                    {order.order_id && (
-                      <div className="flex justify-between col-span-2 mt-1 pt-1 border-t border-border-op30">
-                        <span className="text-text-tertiary">{t('acme.orderId')}</span>
-                        <span className="text-text-tertiary font-mono text-xs truncate max-w-[180px]" title={order.order_id}>
-                          {order.order_id}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+    <Dock label={t('atelier.detailOf', { name: 'ACME' })} tabsLabel={t('atelier.openItem')} activeKey={account.id}
+      tabs={[{ key: account.id, title: name, icon: 'refresh' }]} onClose={onClose}>
+      <DockBody icon="refresh" title={name} badge={pill(account.status)} section={section} onSection={onSection}
+        sectionsLabel={t('atelier.sectionsOf', { name })}
+        sections={[['account', t('acme.tabs.account')], ['orders', t('acme.orders')], ['challenges', t('common.challenges')]]}
+        actions={<>
+          {canWrite && account.status === 'valid' && (
+            <Btn tone="danger" icon="block" id="acme-disable" onClick={() => setConfirming(true)}>{t('acme.disableAccount')}</Btn>
           )}
-        </CompactSection>
+          {canDelete && <Btn icon="close" id="acme-delete" onClick={() => onDelete(account.id)}>{t('common.delete')}</Btn>}
+        </>}>
+        {section === 'account' && (
+          <div className="module-detail">
+            <Section title={t('acme.tabs.account')}>
+              <Props items={[
+                [t('acme.identifier'), <Copyable key="id" value={account.account_id} label={t('acme.accountId')} />],
+                [t('acme.contact'), (
+                  <span key="c">{currentEmail ? `mailto:${currentEmail}` : t('acme.noContact')}
+                    {canWrite && <>{' '}<TextLink id="acme-edit-email" onClick={() => { setEmailDraft(currentEmail); setEditing(true) }}>{t('acme.editEmail')}</TextLink></>}
+                  </span>
+                )],
+                [t('acme.accountKey'), account.key_type || '—'],
+                [t('acme.createdOn'), dateOf(account.created_at, locale) || '—'],
+                [t('acme.termsOfService'), t(account.terms_of_service_agreed || account.tos_agreed ? 'acme.accepted' : 'acme.notAccepted')],
+              ]} />
+            </Section>
+            <Section title={t('atelier.state')}>
+              <Props items={[
+                [t('atelier.state'), pill(account.status)],
+                [t('acme.orders'), failing ? t('acme.ordersFailing', { count: orders.length, failing }) : String(orders.length)],
+                [t('acme.lastOrder'), last ? (
+                  <span key="l">{t('acme.orderLine', { id: String(last.order_id || last.id).slice(0, 12) })} · {stateLabel(t, last.status)}<br />
+                    <span className="muted">{last.domain}, {dateTimeOf(last.created_at, locale)}</span></span>
+                ) : t('acme.noneOrder')],
+              ]} />
+              {account.status !== 'valid' && <Notice>{t('acme.deactivationFinal')}</Notice>}
+            </Section>
+          </div>
+        )}
+        {section === 'orders' && (
+          <RecordList empty={t('acme.noCertificateOrders')}>
+            {orders.map((o, i) => (
+              <RecordRow key={o.id ?? i} title={`${t('acme.orderLine', { id: String(o.order_id || o.id).slice(0, 12) })} · ${o.domain || o.identifier || t('common.unknown')}`}
+                meta={[o.method, o.created_at && dateTimeOf(o.created_at, locale), o.source === 'proxy' && t('acme.proxy')].filter(Boolean).join(' · ')}
+                badge={orderPill(o)} />
+            ))}
+          </RecordList>
+        )}
+        {section === 'challenges' && (
+          <RecordList empty={t('acme.noActiveChallenges')}>
+            {challenges.map((ch, i) => (
+              <RecordRow key={ch.id ?? i} title={`${ch.type} · ${ch.domain}`} meta={challengeWhere(t, ch)} badge={orderPill(ch)} />
+            ))}
+          </RecordList>
+        )}
+      </DockBody>
+      {confirming && (
+        <AtelierDialog size="narrow" title={t('acme.disableTitle')} onClose={() => setConfirming(false)} returnTo="acme-disable">
+          <Notice tone="warn">{t('acme.disableWarning', { name })}</Notice>
+          <Props items={[[t('acme.tabs.account'), <span key="n" className="mono">{name}</span>], [t('acme.contact'), currentEmail || '—'], [t('acme.accountKey'), account.key_type || '—']]} />
+          <div className="modal-actions">
+            <Btn onClick={() => setConfirming(false)}>{t('common.cancel')}</Btn>
+            <Btn tone="danger" icon="block" id="acme-disable-confirm" onClick={async () => { setConfirming(false); await onDeactivate(account.id) }}>
+              {t('acme.disableConfirm')}
+            </Btn>
+          </div>
+        </AtelierDialog>
       )}
-
-      {activeDetailTab === 'challenges' && (
-        <CompactSection title={`${challenges.length} ${t('common.challenges')}`}>
-          {challenges.length === 0 ? (
-            <p className="text-xs text-text-tertiary py-4 text-center">{t('acme.noActiveChallenges')}</p>
-          ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {challenges.map((ch, i) => (
-                <div key={i} className="p-2 bg-tertiary-op30 rounded text-xs space-y-1">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="secondary" size="sm">{ch.type}</Badge>
-                    <Badge 
-                      variant={ch.status?.toLowerCase() === 'valid' ? 'success' : ch.status?.toLowerCase() === 'pending' ? 'warning' : 'danger'}
-                      size="sm"
-                    >
-                      {ch.status}
-                    </Badge>
-                  </div>
-                  <p className="text-text-secondary truncate">{ch.domain}</p>
-                </div>
-              ))}
+      {editing && (
+        <AtelierDialog size="narrow" title={t('acme.editEmail')} onClose={() => setEditing(false)} returnTo="acme-edit-email">
+          <div className="form-fields">
+            <div className="field full">
+              <label htmlFor="acme-email">{t('common.email')}</label>
+              <input id="acme-email" data-autofocus type="email" value={emailDraft} placeholder="admin@example.com" aria-describedby="acme-email-hint"
+                onChange={(e) => setEmailDraft(e.target.value)} />
+              <small id="acme-email-hint">{t('acme.editEmailCaveat')}</small>
             </div>
-          )}
-        </CompactSection>
+          </div>
+          <div className="modal-actions">
+            <Btn onClick={() => setEditing(false)}>{t('common.cancel')}</Btn>
+            <Btn tone="primary" icon="check" onClick={saveEmail}>{t('common.save')}</Btn>
+          </div>
+        </AtelierDialog>
       )}
-    </div>
+    </Dock>
   )
 }

@@ -43,7 +43,7 @@ const draftOf = (c) => ({
 
 export default function TSAPage() {
   const { t, i18n } = useTranslation()
-  const locale = i18n.language || 'en'
+  const locale = i18n?.language || 'en'
   const { showSuccess, showError } = useNotification()
   const { hasPermission } = usePermission()
   const canEdit = hasPermission('write:settings')

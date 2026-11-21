@@ -35,3 +35,9 @@
 .atl .module-detail .dock-form{margin:12px 0}
 /* The page switch of a protocol page that holds more than the mockup's list, in the page head. */
 .atl .page-head .view-switch{min-height:34px;max-width:240px}
+/* ACME server profiles: one row of six controls (name, description, validity, digest, template, remove); one column on a phone. */
+.atl .profile-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) 90px 110px minmax(0,1.2fr) 36px;gap:8px;align-items:center}
+.atl .profile-row .icon-btn{width:36px;min-height:36px}
+@media(max-width:800px){.atl .profile-row{grid-template-columns:minmax(0,1fr) 40px}.atl .profile-row>:not(.icon-btn,.sr-only){grid-column:1}}
+/* The dock slot of a page whose views draw their own dock: no box, the dock inside lays out as the mockup's #inspector. */
+.atl .dock-slot{display:contents}

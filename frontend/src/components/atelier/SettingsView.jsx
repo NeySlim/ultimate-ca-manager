@@ -42,7 +42,7 @@ export function SettingsField({ field: f, value, error, onChange }) {
       <div className={f.short ? 'field short' : 'field'}>
         <label htmlFor={id}>{f.label}</label>
         <select id={id} data-setting={f.key} value={value ?? ''} disabled={f.disabled || undefined} aria-describedby={ids} aria-invalid={error ? 'true' : undefined} onChange={(e) => onChange(f.key, e.target.value)}>
-          {f.options.map(([o, l]) => <option key={o} value={o}>{l}</option>)}
+          {optionTree(f.options)}
         </select>
         {hint}
       </div>
@@ -57,6 +57,19 @@ export function SettingsField({ field: f, value, error, onChange }) {
       {error && <FieldError id={`err-${id}`} message={error} />}
     </div>
   )
+}
+
+/** Options [value, label] in order; a third element names an optgroup, consecutive options of one group share it. */
+function optionTree(options) {
+  const out = []
+  for (const [o, l, g] of options) {
+    const last = out[out.length - 1]
+    if (g && last?.group === g) last.items.push([o, l])
+    else out.push(g ? { group: g, items: [[o, l]] } : { option: [o, l] })
+  }
+  return out.map((x) => (x.group
+    ? <optgroup key={`g-${x.group}`} label={x.group}>{x.items.map(([o, l]) => <option key={o} value={o}>{l}</option>)}</optgroup>
+    : <option key={x.option[0]} value={x.option[0]}>{x.option[1]}</option>))
 }
 
 /** One section that fails to render leaves the others on the page. */

@@ -42,7 +42,7 @@ const configDraft = (c) => ({
 
 export default function SCEPPage() {
   const { t, i18n } = useTranslation()
-  const locale = i18n.language || 'en'
+  const locale = i18n?.language || 'en'
   const { showSuccess, showError, showInfo, showConfirm } = useNotification()
   const { hasPermission } = usePermission()
   const canEdit = hasPermission('write:scep')
@@ -177,7 +177,7 @@ export default function SCEPPage() {
       setApps(extractData(await scepService.getIntuneApps()) || [])
     } catch (error) {
       setApps([])
-      showError(error.message || t('common.loadFailed'))
+      showError(error.message || t('messages.errors.loadFailed.scep'))
     }
   }
   useEffect(() => { if (view === 'intune' && apps === null) loadApps() }, [view]) // eslint-disable-line react-hooks/exhaustive-deps

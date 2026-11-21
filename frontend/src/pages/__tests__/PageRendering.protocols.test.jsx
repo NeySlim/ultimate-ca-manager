@@ -23,9 +23,9 @@ describe('Page Rendering — Protocol pages', () => {
     expect(container.firstChild).toBeTruthy()
   })
 
-  it('ACMEPage exposes a dedicated Let’s Encrypt orders tab', async () => {
+  it('ACMEPage exposes a dedicated Let’s Encrypt orders view', async () => {
     render(<TestWrapper route="/acme"><ACMEPage /></TestWrapper>)
-    expect(await screen.findByText('acme.letsEncryptOrders')).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: 'acme.views.letsencryptorders' })).toBeInTheDocument()
   })
 
   it('SCEPPage offers no CA identifier, which no SCEP exchange used', async () => {

@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  Plus, Trash, PencilSimple, Key, CheckCircle, Star, Globe, LockKey, X, Power, ShieldCheck
-} from '@phosphor-icons/react'
-import { Button, Badge, Input, Select, Textarea, CompactSection } from '../../components'
+import { Button, Input, Select, Textarea, Modal } from '../../components'
+import { Btn, Pill, ListView, Dock, DockBody, Section, Props, EmptyBlock } from '../../components/atelier'
+import { SlotDock } from '../protocols/dockSlot'
+import { Copyable, YesNo } from '../protocols/atelierParts'
 import DnsUpdateKeysPanel from './DnsUpdateKeysPanel'
 
 const EMPTY_FORM = {
@@ -43,13 +43,15 @@ export default function CaAccountsManager({
   onDeactivate,
   onSetDefault,
   onRegister,
+  createSignal = 0,
 }) {
   const { t } = useTranslation()
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [busy, setBusy] = useState(false)
-  const [keysAccountId, setKeysAccountId] = useState(null)
+  const [openId, setOpenId] = useState(null)
+  const [section, setSection] = useState('overview')
 
   const openCreate = () => {
     setEditingId(null)
@@ -119,131 +121,78 @@ export default function CaAccountsManager({
     }
   }
 
-  return (
-    <CompactSection title={t('acme.certificateAuthorities')} icon={Globe}>
-      <div className="space-y-3">
-        <p className="text-xs text-text-tertiary">{t('acme.certificateAuthoritiesDesc')}</p>
+  // The page head's Ajouter une AC opens the form
+  useEffect(() => { if (createSignal) openCreate() }, [createSignal])
 
-        {canWrite && !showForm && (
-          <Button type="button" size="sm" onClick={openCreate}>
-            <Plus size={14} />
-            {t('acme.addCertificateAuthority')}
-          </Button>
-        )}
+  const open = accounts.find((a) => a.id === openId)
+  const pill = (a) => <Pill label={t(a.is_registered ? 'acme.registered' : 'acme.notRegistered')} tone={a.is_registered ? 'good' : 'warn'} />
+  const proxyUrl = (a) => `${proxyPublicBase || '/acme/proxy'}/${a.proxy_slug}/directory`
+  const sections = [['overview', t('atelier.overview')], ...(proxyIsOn(open || {}) || open?.dns_update_key_count > 0 ? [['dnsupdate', t('acme.dnsUpdate.title')]] : [])]
+  const shown = sections.some(([id]) => id === section) ? section : 'overview'
 
-        {/* Account list */}
-        {accounts.length === 0 ? (
-          <p className="text-xs text-text-tertiary py-3 text-center">{t('acme.noCaAccounts')}</p>
-        ) : (
-          <div className="space-y-2">
-            {accounts.map((acct) => (
-              <div key={acct.id} className="p-3 bg-tertiary-op50 rounded-lg border border-border-op50">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-text-primary truncate">{acct.label}</span>
-                      {acct.is_default && (
-                        <Badge variant="success" size="sm"><Star size={10} weight="fill" /> {t('common.default')}</Badge>
-                      )}
-                      {acct.environment && acct.environment !== 'custom' && (
-                        <Badge variant="secondary" size="sm">{acct.environment}</Badge>
-                      )}
-                      {acct.is_registered
-                        ? <Badge variant="success" size="sm"><CheckCircle size={10} weight="fill" /> {t('acme.registered')}</Badge>
-                        : <Badge variant="warning" size="sm">{t('acme.notRegistered')}</Badge>}
-                      {acct.eab_kid && (
-                        <Badge variant="outline" size="sm"><LockKey size={10} /> EAB</Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-text-tertiary font-mono truncate mt-1" title={acct.directory_url}>
-                      {acct.directory_url}
-                    </p>
-                    <p className="text-xs text-text-tertiary mt-0.5">{acct.email}</p>
-                    {acct.proxy_enabled && acct.proxy_slug && (
-                      <p className="text-xs text-accent-primary font-mono mt-1 break-all">
-                        {proxyPublicBase || '/acme/proxy'}/{acct.proxy_slug}/directory
-                      </p>
-                    )}
-                    <p className="text-xs text-text-tertiary mt-0.5">
-                      {t('acme.caTimingSummary', {
-                        timeout: acct.order_poll_timeout_sec ?? 180,
-                        interval: acct.order_poll_interval_sec ?? 3,
-                        http: acct.http_timeout_sec ?? 60,
-                      })}
-                    </p>
-                    {acct.preferred_chain && (
-                      <p className="text-xs text-text-tertiary mt-0.5">
-                        {t('acme.preferredChainSummary', { chain: acct.preferred_chain })}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                {canWrite && (
-                  <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-border-op30">
-                    {!acct.is_registered && (
-                      <Button type="button" variant="secondary" size="sm" onClick={() => onRegister(acct.id, acct.email)}>
-                        <Key size={12} /> {t('acme.registerAccount')}
-                      </Button>
-                    )}
-                    {!acct.is_default && (
-                      <Button type="button" variant="secondary" size="sm" onClick={() => onSetDefault(acct.id)} data-write>
-                        <Star size={12} /> {t('acme.setDefault')}
-                      </Button>
-                    )}
-                    <Button type="button" variant="secondary" size="sm" onClick={() => openEdit(acct)} data-write>
-                      <PencilSimple size={12} /> {t('common.edit')}
-                    </Button>
-                    {canDelete && acct.is_registered && onDeactivate && (
-                      <Button type="button" variant="danger" size="sm" onClick={() => onDeactivate(acct.id)}>
-                        <Power size={12} /> {t('common.deactivate')}
-                      </Button>
-                    )}
-                    {canDelete && (
-                      <Button type="button" variant="danger" size="sm" onClick={() => onDelete(acct.id)}>
-                        <Trash size={12} /> {t('common.delete')}
-                      </Button>
-                    )}
-                  </div>
-                )}
-                {(proxyIsOn(acct) || acct.dns_update_key_count > 0) && (
-                  <div className={canWrite ? 'mt-2' : 'mt-2 pt-2 border-t border-border-op30'}>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setKeysAccountId(keysAccountId === acct.id ? null : acct.id)}
-                    >
-                      <ShieldCheck size={12} /> {t('acme.dnsUpdate.manage')}
-                    </Button>
-                    {keysAccountId === acct.id && (
-                      <DnsUpdateKeysPanel
-                        account={acct}
-                        proxyPublicBase={proxyPublicBase}
-                        dnsUpdatePort={dnsUpdatePort}
-                        proxyActive={proxyIsOn(acct)}
-                        canWrite={canWrite}
-                        canDelete={canDelete}
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+  const dock = open && (
+    <Dock label={t('atelier.detailOf', { name: t('acme.certificateAuthorities') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
+      tabs={[{ key: open.id, title: open.label, icon: 'server' }]} onClose={() => setOpenId(null)}>
+      <DockBody icon="server" title={open.label} badge={pill(open)} section={shown} onSection={setSection}
+        sectionsLabel={t('atelier.sectionsOf', { name: open.label })} sections={sections}
+        actions={canWrite && <>
+          {!open.is_registered && <Btn icon="key" write onClick={() => onRegister(open.id, open.email)}>{t('acme.registerAccount')}</Btn>}
+          {!open.is_default && <Btn icon="check" write onClick={() => onSetDefault(open.id)}>{t('acme.setDefault')}</Btn>}
+          <Btn icon="settings" write onClick={() => openEdit(open)}>{t('common.edit')}</Btn>
+          {canDelete && open.is_registered && onDeactivate && <Btn tone="danger" icon="block" onClick={() => onDeactivate(open.id)}>{t('common.deactivate')}</Btn>}
+          {canDelete && <Btn icon="close" onClick={() => onDelete(open.id)}>{t('common.delete')}</Btn>}
+        </>}>
+        {shown === 'overview' && (
+          <div className="module-detail">
+            <Section title={t('atelier.properties')}>
+              <Props items={[
+                [t('acme.directoryUrl'), <Copyable key="d" url value={open.directory_url} label={t('acme.directoryUrl')} />],
+                [t('acme.contactEmail'), open.email || '—'],
+                [t('acme.accountKeyType'), open.account_key_algorithm || '—'],
+                [t('common.default'), <YesNo key="def" value={open.is_default} />],
+                ['EAB', open.eab_kid ? <span key="e" className="mono">{open.eab_kid}</span> : t('common.no')],
+                open.environment && open.environment !== 'custom' && [t('acme.environment'), open.environment],
+                open.account_url && [t('acme.accountUrl'), <span key="u" className="mono url">{open.account_url}</span>],
+              ]} />
+            </Section>
+            <Section title={t('acme.caTimingSettings')}>
+              <Props items={[
+                [t('acme.caOrderPollTimeout'), String(open.order_poll_timeout_sec ?? 180)],
+                [t('acme.caOrderPollInterval'), String(open.order_poll_interval_sec ?? 3)],
+                [t('acme.caHttpTimeout'), String(open.http_timeout_sec ?? 60)],
+                open.preferred_chain && [t('acme.preferredChain'), open.preferred_chain],
+                proxyIsOn(open) && [t('acme.proxySlug'), <Copyable key="p" url value={proxyUrl(open)} label={t('acme.proxySlug')} />],
+              ]} />
+            </Section>
           </div>
         )}
+        {shown === 'dnsupdate' && (
+          <div className="module-detail">
+            <DnsUpdateKeysPanel account={open} proxyPublicBase={proxyPublicBase} dnsUpdatePort={dnsUpdatePort}
+              proxyActive={proxyIsOn(open)} canWrite={canWrite} canDelete={canDelete} />
+          </div>
+        )}
+      </DockBody>
+    </Dock>
+  )
 
-        {/* Create / edit form */}
-        {showForm && (
-          <form onSubmit={submit} className="p-3 bg-bg-secondary rounded-lg border border-border space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-text-primary">
-                {editingId ? t('acme.editCertificateAuthority') : t('acme.addCertificateAuthority')}
-              </p>
-              <Button type="button" variant="ghost" size="sm" onClick={closeForm}>
-                <X size={14} />
-              </Button>
-            </div>
-
+  return (
+    <>
+      <ListView label={t('acme.certificateAuthorities')} caption={t('acme.upstreamCaption')} icon="server" rows={accounts}
+        title={(a) => a.label} status={pill} openedId={openId} onOpen={(a) => { if (a.id !== openId) setSection('overview'); setOpenId(a.id) }}
+        columns={[
+          { id: 'directory', label: t('acme.directoryUrl'), cell: (a) => <span className="mono">{a.directory_url}</span>, grow: true, muted: true },
+          { id: 'email', label: t('acme.contactEmail'), cell: (a) => a.email || '—' },
+          { id: 'default', label: t('common.default'), cell: (a) => t(a.is_default ? 'common.yes' : 'common.no') },
+          { id: 'proxy', label: t('acme.proxy'), cell: (a) => (proxyIsOn(a) ? a.proxy_slug : '—') },
+          { status: true },
+        ]}
+        empty={<EmptyBlock id="acme-upstream" icon="server" title={t('acme.noCaAccounts')} text={t('acme.certificateAuthoritiesDesc')}
+          action={canWrite ? { label: t('acme.addCertificateAuthority'), icon: 'plus', onClick: openCreate, primary: true } : undefined} />}
+        footer={{ range: t('acme.upstreamRange', { count: accounts.length }) }} />
+      <SlotDock>{dock}</SlotDock>
+      <Modal open={showForm} onClose={closeForm} title={editingId ? t('acme.editCertificateAuthority') : t('acme.addCertificateAuthority')} size="lg">
+          <form onSubmit={submit} className="p-4 space-y-3">
             <Input
               label={t('acme.caLabel')}
               value={form.label}
@@ -391,8 +340,7 @@ export default function CaAccountsManager({
               </Button>
             </div>
           </form>
-        )}
-      </div>
-    </CompactSection>
+      </Modal>
+    </>
   )
 }

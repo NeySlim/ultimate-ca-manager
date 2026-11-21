@@ -30,3 +30,14 @@ export function parseDN(dn) {
   while (dn && (match = regex.exec(dn)) !== null) parts[match[1]] = match[2]
   return { cn: parts.CN || null, parts }
 }
+
+/** ACME accounts: the tone of a state, the short name (the start of the ACME identifier, as the client orders show it), the contact. */
+export const ACCOUNT_TONES = { valid: 'good', deactivated: 'muted', revoked: 'bad' }
+export const accountLabel = (a) => `acct/${(a.account_id || String(a.id)).slice(0, 12)}`
+export const accountContact = (a) => a.contact?.[0]?.replace('mailto:', '') || a.email || ''
+
+/** RFC 8555 §8.3: the CA fetches the key authorization over plain HTTP, port 80; ':' marks an IPv6 literal. */
+export function http01Url(domain, data) {
+  const host = domain.includes(':') ? `[${domain}]` : domain
+  return `http://${host}/.well-known/acme-challenge/${data.token}`
+}
