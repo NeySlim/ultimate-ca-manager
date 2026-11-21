@@ -16,8 +16,8 @@
 .atl .ca-line.active{background:var(--selected);border-color:var(--accent)}
 .atl .ca-line>.icon{width:16px;height:16px;color:var(--accent);flex-shrink:0}
 .atl .ca-line strong{font-size:13px;font-weight:500;overflow-wrap:anywhere}
-.atl :is(.ca-line-count,.ca-line-date){font-size:12px;color:var(--muted);white-space:nowrap}
-.atl .ca-node:focus-visible>:is(.ca-line,.ca-bundle-head){outline:2px solid var(--accent);outline-offset:3px}
+.atl .ca-line-count,.atl .ca-line-date{font-size:12px;color:var(--muted);white-space:nowrap}
+.atl .ca-node:focus-visible>.ca-line,.atl .ca-node:focus-visible>.ca-bundle-head{outline:2px solid var(--accent);outline-offset:3px}
 .atl .ca-node.ca-bundle{flex-direction:column;gap:10px}
 .atl .ca-bundle-head{display:flex;align-items:center;gap:6px;min-height:26px;font-size:12px;color:var(--muted);cursor:pointer}
 .atl .ca-bundle-head .icon{width:14px;height:14px}
@@ -33,4 +33,4 @@
 .atl .ca-repair-head strong{color:var(--text);font-weight:500}
 .atl .ca-repair .setup-progress{margin:0;padding:0}
 /* A notice or a refusal among the fields of a form (the creation of an authority) spans the form. */
-.atl .form-fields>:is(.notice,.field-error){grid-column:1/-1;margin:0}
+.atl .form-fields>.notice,.atl .form-fields>.field-error{grid-column:1/-1;margin:0}
