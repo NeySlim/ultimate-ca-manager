@@ -89,7 +89,7 @@
 .atl .lang-flag{width:17px;flex-shrink:0;text-align:center}
 /* The product's mark in the box of the mockup's 30 × 34 image. */
 .atl .auth-brand>svg{display:block;width:30px;height:34px}
-/* The theme menu of the shell, until the shell's zone draws the mockup's themeMenu(): sized as the mockup's quiet icon button. */
+/* The theme menu of the shell, until the shell's zone draws the mockup's themeMenu(): kept in its own styles (.atl-out), its button sized as the mockup's quiet icon button. */
 .atl .auth-tools .shell-icon-btn{width:32px;height:32px;border-radius:4px;color:var(--text)}
 .atl .auth-tools .shell-icon-btn svg{width:16px;height:16px}
 /* A notice in the card (maintenance, SSO test) takes the card's gap, not the page's margin under it. */

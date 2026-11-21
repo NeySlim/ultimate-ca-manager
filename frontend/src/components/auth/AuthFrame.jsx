@@ -41,7 +41,8 @@ export const AuthFrame = forwardRef(function AuthFrame({ title, lead, children, 
             {tools && (
               <div className="auth-tools">
                 <AuthLanguageMenu />
-                <ThemeMenu />
+                {/* The shell's own menu, drawn by its styles until the shell's zone takes the mockup's themeMenu() */}
+                <div className="atl-out"><ThemeMenu /></div>
               </div>
             )}
             <section className="auth-card" aria-labelledby="main-title">
