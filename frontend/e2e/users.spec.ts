@@ -33,8 +33,7 @@ test('a user created on screen can sign in with its role', async ({ page, api, r
   await dialog.getByLabel('Username').fill(username)
   await dialog.getByLabel('Email').fill(`${username}@example.test`)
   await dialog.getByLabel('Password').fill(password)
-  await dialog.getByLabel('Role', { exact: true }).click()
-  await page.getByRole('option', { name: 'Operator', exact: true }).click()
+  await dialog.getByLabel('Role', { exact: true }).selectOption({ label: 'Operator' })
   await dialog.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(dialog).toBeHidden()
 

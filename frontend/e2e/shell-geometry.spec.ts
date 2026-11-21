@@ -182,7 +182,8 @@ test('a dialog opens over the mockup veil, on its first field', async ({ page, a
   await page.getByRole('button', { name: 'Create User' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
-  const veil = await page.locator('.lv-dialog-backdrop').evaluate(el => getComputedStyle(el).backgroundColor)
+  // The mockup's veil is the native dialog's backdrop: #070e19a8
+  const veil = await dialog.evaluate(el => getComputedStyle(el, '::backdrop').backgroundColor)
   expect(veil.replace(/\s/g, '')).toMatch(/^(rgba\(7,14,25,0\.66\)|color\(srgb0\.027\d*0\.054\d*0\.098\d*\/0\.66\))$/)
-  await expect(dialog.locator('.lv-dialog-body input:not([type="checkbox"]), .lv-dialog-body select').first()).toBeFocused()
+  await expect(dialog.locator('.modal-body input:not([type="checkbox"]), .modal-body select').first()).toBeFocused()
 })
