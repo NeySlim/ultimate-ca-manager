@@ -1,28 +1,22 @@
 /**
- * SSHCAsPage - SSH Certificate Authority management
- * Pattern: ResponsiveLayout + ResponsiveDataTable + Modal actions
- *
- * DESKTOP: Dense table with hover rows, inline slide-over details
- * MOBILE: Card-style list with full-screen details
+ * Autorités SSH: the mockup's ssh module, a simplePage() list (Type, Clé, then the product's
+ * certificate count and creation date) with its one-object dock, on the server's SSH CAs. What
+ * the product has more (type chips, search, creation on a key or an HSM key, import, edit,
+ * removal, the public key, the KRL, the setup scripts and commands) takes the mockup's head
+ * actions, row actions, dock actions, record rows, further dock tabs and form dialog.
  */
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Key, Plus, Trash, PencilSimple, Download, Copy, Upload,
-  ShieldCheck, User, Clock, Fingerprint, Terminal, Check, WindowsLogo
-} from '@phosphor-icons/react'
-import {
-  ResponsiveLayout, ResponsiveDataTable, Badge, Button, Input, Select,
-  FormModal, Modal, Textarea,
-  CompactSection, CompactGrid, CompactField, CompactHeader
-} from '../components'
+  Zone, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody,
+  Section, Props, EmptyBlock, NoMatch, Input, Select, Textarea, ChoiceField, FormModal, Notice,
+} from '../components/atelier'
 import { sshCasService, hsmService } from '../services'
-import { useNotification, useMobile } from '../contexts'
-import { usePermission, useClipboard, usePersistedState, useCRUDPage } from '../hooks'
-import { formatDate , downloadBlob, cn, extractData} from '../lib/utils'
+import { useNotification } from '../contexts'
+import { usePermission, useClipboard, useCRUDPage } from '../hooks'
+import { formatDate, downloadBlob, extractData } from '../lib/utils'
 import { SSH_EDDSA_KEY_TYPES, SSH_FIPS_DEFAULT_KEY_TYPE, sshEddsaRefused, sshKeyOptions, useKeyPlatform } from '../lib/policyAlgorithms'
 import { findAlgorithm, isUsable, GROUP_RSA, GROUP_NIST } from '../lib/keyAlgorithms'
-import { HsmBadge } from './cas/CAListUtils'
 import { sanitizeFilename } from '../lib/exportDownload'
 
 const KEY_ALGORITHM_OPTIONS = [
@@ -41,9 +35,10 @@ const DEFAULT_EXTENSIONS = [
   { value: 'permit-user-rc', labelKey: 'sshCas.extensions.permitUserRc' },
 ]
 
-// An HSM key decides the SSH key type it signs with: 'EC-P384' -> 'ecdsa-p384',
-// 'RSA-3072' -> 'rsa'. Only RSA and NIST ECDSA are offered: the HSM wrappers do not sign
-// Ed25519, and OpenSSH certificates have no key type for Brainpool or ML-DSA.
+const PAGE_SIZE = 25
+
+// An HSM key decides the SSH key type it signs with: 'EC-P384' -> 'ecdsa-p384', 'RSA-3072' -> 'rsa'.
+// Only RSA and NIST ECDSA: the HSM wrappers do not sign Ed25519, and OpenSSH has no Brainpool or ML-DSA type.
 function hsmSshKeyType(algorithm) {
   const row = findAlgorithm(algorithm)
   if (row?.group === GROUP_RSA) return 'rsa'
@@ -51,45 +46,40 @@ function hsmSshKeyType(algorithm) {
   return null
 }
 
+function principalList(ca) {
+  const listed = ca?.allowed_principals
+  if (Array.isArray(listed)) return listed
+  return (listed || '').split(',').map((p) => p.trim()).filter(Boolean)
+}
+
 export default function SSHCAsPage() {
   const { t } = useTranslation()
-  const { isMobile } = useMobile()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const { copy: clipboardCopy, isCopied } = useClipboard()
 
-  // Hook: CRUD state
   const loadFn = useCallback(async () => {
     const res = await sshCasService.getAll()
     return res.data || []
   }, [])
   const {
-    items: sshCas, setItems: setSSHCAs,
-    loading,
+    items: sshCas, loading,
     selectedItem: selectedCA, setSelectedItem: setSelectedCA,
     showModal, setShowModal,
     editing: editingCA, setEditing: setEditingCA,
     loadData,
   } = useCRUDPage({ loadFn, loadErrorMsg: t('messages.errors.loadFailed.sshCas') })
 
-  // Modals (page-specific)
   const [showImportModal, setShowImportModal] = useState(false)
   const [importCaType, setImportCaType] = useState('user')
   const [importPrivateKey, setImportPrivateKey] = useState('')
-
-  // Pagination
+  const [query, setQuery] = useState('')
+  const [typeView, setTypeView] = useState('')
+  const [section, setSection] = useState('overview')
   const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(25)
+  const [perPage, setPerPage] = useState(PAGE_SIZE)
 
-  // Filters
-  const [filterType, setFilterType] = usePersistedState('ucm-filter-ssh-cas-type', [])
-
-    const handleApplyFilterPreset = useCallback((filters) => {
-    if (filters.ca_type) setFilterType(Array.isArray(filters.ca_type) ? filters.ca_type : [filters.ca_type])
-    else setFilterType([])
-  }, [])
-
-// ============= ACTIONS =============
+  // ============= ACTIONS =============
 
   const handleCreate = async (data) => {
     try {
@@ -98,10 +88,10 @@ export default function SSHCAsPage() {
       setShowModal(false)
       setEditingCA(null)
       loadData()
-      if (response?.data?.id) setSelectedCA(response.data)
+      if (response?.data?.id) { setSelectedCA(response.data); setSection('overview') }
     } catch (error) {
       showError(error.message || t('messages.errors.createFailed.sshCa'))
-      // The modal puts the message under the field it belongs to
+      // The dialog puts the message under the field it belongs to
       throw error
     }
   }
@@ -113,31 +103,23 @@ export default function SSHCAsPage() {
       setShowModal(false)
       setEditingCA(null)
       loadData()
-      if (selectedCA?.id === editingCA.id) {
-        setSelectedCA({ ...selectedCA, ...data })
-      }
+      if (selectedCA?.id === editingCA.id) setSelectedCA({ ...selectedCA, ...data })
     } catch (error) {
       showError(error.message || t('messages.errors.updateFailed.sshCa'))
       throw error
     }
   }
 
-  const handleImportCA = async (e) => {
-    e.preventDefault()
-    const formData = new FormData(e.target)
+  const closeImport = () => { setShowImportModal(false); setImportCaType('user'); setImportPrivateKey('') }
+  const handleImportCA = async (data) => {
     try {
       const response = await sshCasService.importCA({
-        descr: formData.get('descr'),
-        ca_type: importCaType,
-        private_key: importPrivateKey,
-        comment: formData.get('comment'),
+        descr: data.descr, ca_type: importCaType, private_key: importPrivateKey, comment: data.comment,
       })
       showSuccess(t('messages.success.create.sshCa'))
-      setShowImportModal(false)
-      setImportCaType('user')
-      setImportPrivateKey('')
+      closeImport()
       loadData()
-      if (response?.data?.id) setSelectedCA(response.data)
+      if (response?.data?.id) { setSelectedCA(response.data); setSection('overview') }
     } catch (error) {
       setImportPrivateKey('')
       showError(error.message || t('messages.errors.createFailed.sshCa'))
@@ -146,9 +128,7 @@ export default function SSHCAsPage() {
 
   const handleDelete = async (ca) => {
     const confirmed = await showConfirm(t('messages.confirm.delete.sshCa'), {
-      title: t('sshCas.deleteCA'),
-      confirmText: t('common.delete'),
-      variant: 'danger'
+      title: t('sshCas.deleteCA'), confirmText: t('common.delete'), variant: 'danger',
     })
     if (!confirmed) return
     try {
@@ -165,8 +145,7 @@ export default function SSHCAsPage() {
     try {
       // getPublicKey already returns the raw key text
       const publicKey = await sshCasService.getPublicKey(ca.id)
-      const blob = new Blob([publicKey], { type: 'text/plain' })
-      downloadBlob(blob, `${ca.descr || 'ssh-ca'}_key.pub`)
+      downloadBlob(new Blob([publicKey], { type: 'text/plain' }), `${ca.descr || 'ssh-ca'}_key.pub`)
     } catch (error) {
       showError(error.message || t('messages.errors.downloadFailed.publicKey'))
     }
@@ -174,8 +153,7 @@ export default function SSHCAsPage() {
 
   const handleDownloadKRL = async (ca) => {
     try {
-      const blob = await sshCasService.getKRL(ca.id)
-      downloadBlob(blob, `${ca.descr || 'ssh-ca'}_krl.bin`)
+      downloadBlob(await sshCasService.getKRL(ca.id), `${ca.descr || 'ssh-ca'}_krl.bin`)
     } catch (error) {
       showError(error.message || t('messages.errors.downloadFailed.krl'))
     }
@@ -184,8 +162,7 @@ export default function SSHCAsPage() {
   const handleDownloadSetupScript = async (ca, platform = 'unix') => {
     try {
       const blob = await sshCasService.getSetupScript(ca.id, platform)
-      const ext = platform === 'windows' ? 'ps1' : 'sh'
-      downloadBlob(blob, `ssh_ca_setup_${sanitizeFilename(ca.descr || 'ca')}.${ext}`)
+      downloadBlob(blob, `ssh_ca_setup_${sanitizeFilename(ca.descr || 'ca')}.${platform === 'windows' ? 'ps1' : 'sh'}`)
     } catch (error) {
       showError(error.message || t('common.operationFailed'))
     }
@@ -193,519 +170,198 @@ export default function SSHCAsPage() {
 
   const handleCopyPublicKey = async (ca) => {
     try {
-      const publicKey = await sshCasService.getPublicKey(ca.id)
-      await clipboardCopy(publicKey, 'publicKey')
+      await clipboardCopy(await sshCasService.getPublicKey(ca.id), 'publicKey')
       showSuccess(t('sshCas.publicKeyCopied'))
     } catch (error) {
       showError(error.message || t('messages.errors.copyFailed.publicKey'))
     }
   }
 
-  const getCurlCommand = (ca) => {
-    const baseUrl = window.location.origin
-    return `curl -sSL ${baseUrl}/ssh/setup/${ca.refid} | sudo bash`
-  }
-
+  const getCurlCommand = (ca) => `curl -sSL ${window.location.origin}/ssh/setup/${ca.refid} | sudo bash`
+  // Self-elevating one-liner: a new admin PowerShell window that stays open, the script run through iex
   const getPowershellCommand = (ca) => {
-    const baseUrl = window.location.origin
-    // Self-elevating one-liner: opens a NEW admin PowerShell window (-Verb RunAs),
-    // keeps it open (-NoExit), bypasses ExecutionPolicy, and runs the script via iex.
-    // The script itself handles pause + transcript logging.
-    const url = `${baseUrl}/ssh/setup/${ca.refid}?platform=windows`
+    const url = `${window.location.origin}/ssh/setup/${ca.refid}?platform=windows`
     return `Start-Process powershell -Verb RunAs "-NoExit -ExecutionPolicy Bypass -Command iwr '${url}' -UseBasicParsing|iex"`
   }
-
-  const handleCopyCurlCommand = async (ca) => {
+  const copyCommand = async (text, key, done) => {
     try {
-      await clipboardCopy(getCurlCommand(ca), 'curl')
-      showSuccess(t('sshCas.curlCopied'))
+      await clipboardCopy(text, key)
+      showSuccess(t(done))
     } catch (error) {
       showError(error.message || t('messages.errors.copyFailed.publicKey'))
     }
   }
 
-  const handleCopyPowershellCommand = async (ca) => {
-    try {
-      await clipboardCopy(getPowershellCommand(ca), 'powershell')
-      showSuccess(t('sshCas.powershellCopied'))
-    } catch (error) {
-      showError(error.message || t('messages.errors.copyFailed.publicKey'))
-    }
-  }
+  // ============= LIST =============
 
-  // ============= FILTERED DATA =============
+  const typeLabel = (ca) => (ca.ca_type === 'user' ? t('sshCas.typeUser') : t('sshCas.typeHost'))
+  const hsmPill = (ca) => (ca.key_source === 'hsm' || ca.uses_hsm ? <Pill label="HSM" icon="chip" /> : null)
+  const keyCell = (ca) => <><span className="mono">{ca.key_type || '—'}</span>{hsmPill(ca) && <> {hsmPill(ca)}</>}</>
 
-  const filteredCAs = useMemo(() => {
-    if (filterType.length === 0) return sshCas
-    return sshCas.filter(ca => filterType.includes(ca.ca_type))
-  }, [sshCas, filterType])
+  const searched = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return [...sshCas]
+      .filter((ca) => !q || ['descr', 'ca_type', 'key_type', 'fingerprint', 'hsm_key_label'].some((k) => String(ca[k] || '').toLowerCase().includes(q)))
+      .sort((a, b) => String(a.descr || '').localeCompare(String(b.descr || '')))
+  }, [sshCas, query])
+  const shown = searched.filter((ca) => !typeView || ca.ca_type === typeView)
+  const views = [
+    { id: '', label: t('common.all'), count: searched.length },
+    { id: 'user', label: t('sshCas.typeUser'), count: searched.filter((ca) => ca.ca_type === 'user').length },
+    { id: 'host', label: t('sshCas.typeHost'), count: searched.filter((ca) => ca.ca_type === 'host').length },
+  ]
+  const pages = Math.max(1, Math.ceil(shown.length / perPage))
+  const current = Math.min(page, pages)
+  const paged = shown.slice((current - 1) * perPage, current * perPage)
+  const narrowed = Boolean(query.trim() || typeView)
+  const openCreate = () => { setEditingCA(null); setShowModal(true) }
+  const openEdit = (ca) => { setEditingCA(ca); setShowModal(true) }
+  const create = canWrite('ssh_cas') ? { label: t('sshCas.createCA'), icon: 'plus', onClick: openCreate, primary: true } : undefined
 
-  // ============= STATS =============
+  const footer = shown.length > PAGE_SIZE ? {
+    range: t('sshCas.pageRange', { start: (current - 1) * perPage + 1, end: Math.min(current * perPage, shown.length), count: shown.length }),
+    pagination: { page: current, pages, perPage, sizes: [10, 25, 50, 100], onPage: setPage, onPerPage: (n) => { setPerPage(n); setPage(1) } },
+  } : { range: t('sshCas.range', { shown: shown.length, count: sshCas.length }) }
 
-  const stats = useMemo(() => {
-    const userCAs = sshCas.filter(ca => ca.ca_type === 'user').length
-    const hostCAs = sshCas.filter(ca => ca.ca_type === 'host').length
-    const totalCerts = sshCas.reduce((acc, ca) => acc + (ca.cert_count || 0), 0)
-    return [
-      { icon: Key, label: t('sshCas.stats.total'), value: sshCas.length, variant: 'primary' },
-      { icon: User, label: t('sshCas.stats.userCas'), value: userCAs, variant: 'teal' },
-      { icon: ShieldCheck, label: t('sshCas.stats.hostCas'), value: hostCAs, variant: 'violet' },
-      { icon: Terminal, label: t('sshCas.stats.certificates'), value: totalCerts, variant: 'default' },
-    ]
-  }, [sshCas, t])
+  const open = selectedCA
+  const openCA = (ca) => { if (open?.id !== ca.id) setSection('overview'); setSelectedCA(ca) }
+  const principals = open ? principalList(open) : []
 
-  // ============= COLUMNS =============
-
-  const columns = useMemo(() => [
-    {
-      key: 'descr',
-      header: t('sshCas.description'),
-      priority: 1,
-      sortable: true,
-      render: (val, row) => {
-        const isUser = row.ca_type === 'user'
-        return (
-          <div className="flex items-center gap-2">
-            <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-              isUser ? 'icon-bg-teal' : 'icon-bg-violet'
-            }`}>
-              {isUser ? <User size={14} weight="duotone" /> : <ShieldCheck size={14} weight="duotone" />}
-            </div>
-            <span className="font-medium truncate">{val || t('common.unnamed')}</span>
+  const dock = open && (
+    <Dock label={t('atelier.detailOf', { name: t('sshCas.title') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
+      tabs={[{ key: open.id, title: open.descr || t('common.unnamed'), icon: 'terminal' }]} onClose={() => setSelectedCA(null)}>
+      <DockBody icon="terminal" title={open.descr || t('common.unnamed')} badge={<Pill label={typeLabel(open)} icon={open.ca_type === 'user' ? 'users' : 'server'} />}
+        section={section} onSection={setSection} sectionsLabel={t('atelier.sectionsOf', { name: open.descr || '' })}
+        sections={[['overview', t('atelier.overview')], ['install', t('sshCas.quickInstall')], ['config', t('sshCas.configuration')], ['key', t('sshCas.publicKey')]]}
+        actions={<>
+          <Btn icon="download" id="ssh-ca-pubkey" onClick={() => handleDownloadPublicKey(open)}>{t('sshCas.downloadPublicKey')}</Btn>
+          <Btn icon="download" id="ssh-ca-krl" onClick={() => handleDownloadKRL(open)}>{t('sshCas.downloadKrl')}</Btn>
+          <Btn icon={isCopied('publicKey') ? 'check' : 'copy'} id="ssh-ca-copy" onClick={() => handleCopyPublicKey(open)}>
+            {isCopied('publicKey') ? t('sshCas.publicKeyCopied') : t('sshCas.copyPublicKey')}
+          </Btn>
+          {canWrite('ssh_cas') && <Btn icon="settings" id="ssh-ca-edit" write onClick={() => openEdit(open)}>{t('common.edit')}</Btn>}
+          {canDelete('ssh_cas') && <Btn tone="danger" icon="block" id="ssh-ca-delete" onClick={() => handleDelete(open)}>{t('common.delete')}</Btn>}
+        </>}>
+        {section === 'overview' && (
+          <div className="module-detail">
+            <Section title={t('atelier.properties')}>
+              <Props items={[
+                [t('sshCas.caType'), typeLabel(open)],
+                [t('sshCas.keyType'), keyCell(open)],
+                open.key_source === 'hsm' && [t('cas.detail.hsmKey'), <span key="k" className="mono">{open.hsm_key_label || '—'}</span>],
+                [t('sshCas.fingerprint'), <span key="f" className="mono">{open.fingerprint || '—'}</span>],
+                [t('sshCas.serialCounter'), open.serial_counter ?? '—'],
+                [t('sshCas.stats.certificates'), open.cert_count || 0],
+                [t('common.created'), formatDate(open.created_at)],
+                [t('common.createdBy'), open.created_by || '—'],
+              ]} />
+            </Section>
+            <Section title={t('atelier.summary')}>
+              <p className="summary">{open.allow_custom_key_id ? t('sshCas.keyIdChosenByRequester') : t('sshCas.keyIdSetByCa')}</p>
+            </Section>
           </div>
-        )
-      },
-      mobileRender: (val, row) => {
-        const isUser = row.ca_type === 'user'
-        return (
-          <div className="flex items-center justify-between gap-2 w-full">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-                isUser ? 'icon-bg-teal' : 'icon-bg-violet'
-              }`}>
-                {isUser ? <User size={14} weight="duotone" /> : <ShieldCheck size={14} weight="duotone" />}
+        )}
+        {section === 'install' && (
+          <div className="module-detail">
+            <Section title={t('sshCas.quickInstall')}>
+              <p className="muted small">{t('sshCas.quickInstallLinuxDescription')}</p>
+              <div className="command-line">
+                <code className="mono">{getCurlCommand(open)}</code>
+                <IconBtn icon={isCopied('curl') ? 'check' : 'copy'} label={t('common.copy')} onClick={() => copyCommand(getCurlCommand(open), 'curl', 'sshCas.curlCopied')} />
               </div>
-              <span className="font-medium truncate">{val || t('common.unnamed')}</span>
-            </div>
-            <Badge variant={isUser ? 'teal' : 'violet'} size="sm" dot>
-              {isUser ? t('sshCas.typeUser') : t('sshCas.typeHost')}
-            </Badge>
-          </div>
-        )
-      }
-    },
-    {
-      key: 'ca_type',
-      header: t('sshCas.caType'),
-      priority: 2,
-      sortable: true,
-      hideOnMobile: true,
-      render: (val) => (
-        <Badge variant={val === 'user' ? 'teal' : 'violet'} size="sm" icon={val === 'user' ? User : ShieldCheck}>
-          {val === 'user' ? t('sshCas.typeUser') : t('sshCas.typeHost')}
-        </Badge>
-      )
-    },
-    {
-      key: 'key_type',
-      header: t('sshCas.keyType'),
-      priority: 3,
-      hideOnMobile: true,
-      sortable: true,
-      render: (val, row) => (
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-text-secondary font-mono">
-            {val || '—'}
-          </span>
-          <HsmBadge ca={row} t={t} />
-        </div>
-      ),
-      mobileRender: (val, row) => (
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-text-tertiary">{t('sshCas.keyType')}:</span>
-          <span className="text-text-secondary font-mono">{val || '—'}</span>
-          <HsmBadge ca={row} t={t} />
-        </div>
-      )
-    },
-    {
-      key: 'fingerprint',
-      header: t('sshCas.fingerprint'),
-      priority: 4,
-      hideOnMobile: true,
-      render: (val) => (
-        <span className="text-xs text-text-secondary font-mono truncate max-w-[200px]">
-          {val ? `${val.substring(0, 24)}…` : '—'}
-        </span>
-      )
-    },
-    {
-      key: 'cert_count',
-      header: t('sshCas.stats.certificates'),
-      priority: 3,
-      hideOnMobile: true,
-      sortable: true,
-      render: (val) => (
-        <Badge variant={val > 0 ? 'primary' : 'secondary'} size="sm" icon={Terminal}>
-          {val || 0}
-        </Badge>
-      )
-    },
-    {
-      key: 'created_at',
-      header: t('common.created'),
-      priority: 4,
-      hideOnMobile: true,
-      sortable: true,
-      render: (val) => (
-        <span className="text-xs text-text-secondary">{formatDate(val)}</span>
-      )
-    }
-  ], [t])
-
-  // ============= ROW ACTIONS =============
-
-  const rowActions = useCallback((row) => [
-    ...(canWrite('ssh_cas') ? [
-      { label: t('common.edit'), icon: PencilSimple, onClick: () => { setEditingCA(row); setShowModal(true) } }
-    ] : []),
-    { label: t('sshCas.downloadPublicKey'), icon: Download, onClick: () => handleDownloadPublicKey(row) },
-    ...(canDelete('ssh_cas') ? [
-      { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDelete(row) }
-    ] : [])
-  ], [canWrite, canDelete, t])
-
-  // ============= DETAIL PANEL =============
-
-  const detailContent = selectedCA && (
-    <div className="p-3 space-y-4">
-      <CompactHeader
-        icon={selectedCA.ca_type === 'user' ? User : ShieldCheck}
-        iconClass={selectedCA.ca_type === 'user' ? 'icon-bg-teal' : 'icon-bg-violet'}
-        title={selectedCA.descr || t('common.unnamed')}
-        subtitle={t('sshCas.stats.certificates') + ': ' + (selectedCA.cert_count || 0)}
-        badge={
-          <div className="flex items-center gap-2">
-            <Badge variant={selectedCA.ca_type === 'user' ? 'teal' : 'violet'} size="sm">
-              {selectedCA.ca_type === 'user' ? t('sshCas.typeUser') : t('sshCas.typeHost')}
-            </Badge>
-            <HsmBadge ca={selectedCA} t={t} />
-          </div>
-        }
-      />
-
-      {/* Actions */}
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" size="sm" variant="secondary" onClick={() => handleDownloadPublicKey(selectedCA)}>
-          <Download size={14} /> {t('sshCas.downloadPublicKey')}
-        </Button>
-        <Button type="button" size="sm" variant="secondary" onClick={() => handleDownloadKRL(selectedCA)}>
-          <Download size={14} /> {t('sshCas.downloadKrl')}
-        </Button>
-        <Button type="button" size="sm" variant="secondary" onClick={() => handleCopyPublicKey(selectedCA)}>
-          {isCopied('publicKey') ? <Check size={14} /> : <Copy size={14} />}
-          {isCopied('publicKey') ? t('sshCas.publicKeyCopied') : t('sshCas.copyPublicKey')}
-        </Button>
-        <Button type="button" size="sm" variant="primary" onClick={() => handleDownloadSetupScript(selectedCA, 'unix')}>
-          <Terminal size={14} /> {t('sshCas.downloadSetupScriptLinux')}
-        </Button>
-        <Button type="button" size="sm" variant="primary" onClick={() => handleDownloadSetupScript(selectedCA, 'windows')}>
-          <WindowsLogo size={14} /> {t('sshCas.downloadSetupScriptWindows')}
-        </Button>
-        {canWrite('ssh_cas') && (
-          <Button type="button" size="sm" variant="secondary" onClick={() => { setEditingCA(selectedCA); setShowModal(true) }}>
-            <PencilSimple size={14} /> {t('common.edit')}
-          </Button>
-        )}
-        {canDelete('ssh_cas') && (
-          <Button type="button" size="sm" variant="danger" onClick={() => handleDelete(selectedCA)}>
-            <Trash size={14} /> {t('common.delete')}
-          </Button>
-        )}
-      </div>
-
-      {/* Quick Install */}
-      <CompactSection title={t('sshCas.quickInstall')} icon={Terminal}>
-        <p className="text-xs text-secondary mb-2">{t('sshCas.quickInstallLinuxDescription')}</p>
-        <div className="flex items-center gap-2 mb-3">
-          <code className="flex-1 text-xs bg-tertiary rounded px-3 py-2 font-mono text-primary overflow-x-auto whitespace-nowrap">
-            {getCurlCommand(selectedCA)}
-          </code>
-          <Button type="button" size="sm" variant="secondary" onClick={() => handleCopyCurlCommand(selectedCA)}>
-            {isCopied('curl') ? <Check size={14} /> : <Copy size={14} />}
-          </Button>
-        </div>
-        <p className="text-xs text-secondary mb-2">{t('sshCas.quickInstallWindowsDescription')}</p>
-        <div className="flex items-center gap-2">
-          <code className="flex-1 text-xs bg-tertiary rounded px-3 py-2 font-mono text-primary overflow-x-auto whitespace-nowrap">
-            {getPowershellCommand(selectedCA)}
-          </code>
-          <Button type="button" size="sm" variant="secondary" onClick={() => handleCopyPowershellCommand(selectedCA)}>
-            {isCopied('powershell') ? <Check size={14} /> : <Copy size={14} />}
-          </Button>
-        </div>
-      </CompactSection>
-
-      {/* CA Information */}
-      <CompactSection title={t('sshCas.caInformation')} icon={Key}>
-        <CompactGrid columns={2}>
-          <CompactField
-            autoIcon="type"
-            label={t('sshCas.caType')}
-            value={selectedCA.ca_type === 'user' ? t('sshCas.typeUser') : t('sshCas.typeHost')}
-          />
-          <CompactField
-            autoIcon="keyType"
-            label={t('sshCas.keyType')}
-            value={selectedCA.key_type || '—'}
-          />
-          {selectedCA.key_source === 'hsm' && (
-            <CompactField
-              label={t('cas.detail.hsmKey')}
-              value={selectedCA.hsm_key_label || '—'}
-              mono
-            />
-          )}
-          <CompactField
-            label={t('sshCas.fingerprint')}
-            icon={Fingerprint}
-            value={selectedCA.fingerprint || '—'}
-            mono
-            copyable
-          />
-          <CompactField
-            label={t('sshCas.serialCounter')}
-            value={selectedCA.serial_counter ?? '—'}
-          />
-          <CompactField
-            autoIcon="createdAt"
-            label={t('common.created')}
-            value={formatDate(selectedCA.created_at)}
-          />
-          <CompactField
-            autoIcon="createdBy"
-            label={t('common.createdBy')}
-            value={selectedCA.created_by || '—'}
-          />
-        </CompactGrid>
-      </CompactSection>
-
-      {/* Configuration */}
-      <CompactSection title={t('sshCas.configuration')} icon={Clock} collapsible>
-        <CompactGrid columns={2}>
-          <CompactField
-            autoIcon="default"
-            label={t('sshCas.defaultTtl')}
-            value={selectedCA.default_ttl || '—'}
-          />
-          <CompactField
-            autoIcon="maximum"
-            label={t('sshCas.maxTtl')}
-            value={selectedCA.max_ttl || '—'}
-          />
-        </CompactGrid>
-
-        {selectedCA.default_extensions?.length > 0 && (
-          <div className="mt-3 space-y-1">
-            <div className="text-xs font-semibold text-text-primary">
-              {t('sshCas.defaultExtensions')}
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {selectedCA.default_extensions.map(ext => (
-                <Badge key={ext} variant="teal" size="sm">{ext}</Badge>
-              ))}
-            </div>
+              <p className="muted small">{t('sshCas.quickInstallWindowsDescription')}</p>
+              <div className="command-line">
+                <code className="mono">{getPowershellCommand(open)}</code>
+                <IconBtn icon={isCopied('powershell') ? 'check' : 'copy'} label={t('common.copy')} onClick={() => copyCommand(getPowershellCommand(open), 'powershell', 'sshCas.powershellCopied')} />
+              </div>
+            </Section>
+            <Section title={t('sshCas.downloadSetupScript')}>
+              <p className="muted small">{t('sshCas.setupScriptDescription')}</p>
+              <div className="copy-url">
+                <Btn icon="terminal" onClick={() => handleDownloadSetupScript(open, 'unix')}>{t('sshCas.downloadSetupScriptLinux')}</Btn>
+                <Btn icon="monitor" onClick={() => handleDownloadSetupScript(open, 'windows')}>{t('sshCas.downloadSetupScriptWindows')}</Btn>
+              </div>
+            </Section>
           </div>
         )}
-
-        {!principalList(selectedCA).length && (
-          <div className="mt-3">
-            {selectedCA.allow_any_principal
-              ? <Badge variant="warning" size="sm">{t('sshCas.anyPrincipal')}</Badge>
-              : <p className="text-xs text-text-secondary">{t('sshCas.noPrincipalSignsNothing')}</p>}
+        {section === 'config' && (
+          <div className="module-detail">
+            <Section title={t('sshCas.configuration')}>
+              <Props items={[
+                [t('sshCas.defaultTtl'), open.default_ttl || '—'],
+                [t('sshCas.maxTtl'), open.max_ttl || '—'],
+                [t('sshCas.defaultExtensions'), open.default_extensions?.length ? open.default_extensions.join(', ') : t('sshCas.noExtensions')],
+                [t('sshCas.allowedPrincipals'), principals.length ? principals.join(', ')
+                  : open.allow_any_principal ? <Pill key="p" label={t('sshCas.anyPrincipal')} tone="warn" /> : t('sshCas.noPrincipalSignsNothing')],
+                [t('sshCertificates.keyId'), open.allow_custom_key_id ? t('sshCas.keyIdChosenByRequester') : t('sshCas.keyIdSetByCa')],
+              ]} />
+            </Section>
           </div>
         )}
-
-        <p className="mt-3 text-xs text-text-secondary">
-          {selectedCA.allow_custom_key_id ? t('sshCas.keyIdChosenByRequester') : t('sshCas.keyIdSetByCa')}
-        </p>
-
-        {principalList(selectedCA).length > 0 && (
-          <div className="mt-3 space-y-1">
-            <div className="text-xs font-semibold text-text-primary">
-              {t('sshCas.allowedPrincipals')}
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {principalList(selectedCA).map(principal => (
-                <Badge key={principal} variant="primary" size="sm">{principal}</Badge>
-              ))}
-            </div>
+        {section === 'key' && (
+          <div className="module-detail">
+            <Section title={t('sshCas.publicKey')}>
+              {open.public_key ? <pre className="mono public-key">{open.public_key}</pre> : <p className="muted small">—</p>}
+            </Section>
           </div>
         )}
-      </CompactSection>
-
-      {/* Public Key */}
-      {selectedCA.public_key && (
-        <CompactSection title={t('sshCas.publicKey')} icon={Key} collapsible defaultOpen={false}>
-          <div className="relative">
-            <pre className="text-2xs font-mono text-text-secondary break-all bg-tertiary-op50 p-2 rounded whitespace-pre-wrap max-h-32 overflow-y-auto">
-              {selectedCA.public_key}
-            </pre>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="absolute top-1 right-1"
-              onClick={() => handleCopyPublicKey(selectedCA)}
-            >
-              {isCopied('publicKey') ? <Check size={12} /> : <Copy size={12} />}
-            </Button>
-          </div>
-        </CompactSection>
-      )}
-    </div>
+      </DockBody>
+    </Dock>
   )
-
-  // ============= RENDER =============
 
   return (
-    <>
-      <ResponsiveLayout
-        title={t('sshCas.title')}
-        subtitle={t('sshCas.subtitle', { count: sshCas.length })}
-        icon={Key}
-        stats={stats}
-        helpPageKey="sshCas"
-        splitView={true}
-        splitEmptyContent={
-          <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
-              <Key size={24} className="text-text-tertiary" weight="duotone" />
-            </div>
-            <p className="text-sm text-text-secondary">{t('sshCas.selectCA')}</p>
-          </div>
-        }
-        slideOverOpen={!!selectedCA}
-        slideOverTitle={selectedCA?.descr || t('sshCas.title')}
-        slideOverContent={detailContent}
-        slideOverWidth="lg"
-        onSlideOverClose={() => setSelectedCA(null)}
-      >
-        <ResponsiveDataTable
-          data={filteredCAs}
-          columns={columns}
-          loading={loading}
-          onRowClick={setSelectedCA}
-          selectedId={selectedCA?.id}
-          searchable
-          searchPlaceholder={t('sshCas.searchPlaceholder')}
-          searchKeys={['descr', 'ca_type', 'key_type', 'fingerprint', 'hsm_key_label']}
-          toolbarFilters={[
-            {
-              key: 'ca_type',
-              label: t('common.type'),
-              type: 'multiSelect',
-              value: filterType,
-              onChange: setFilterType,
-              placeholder: t('common.allTypes'),
-              options: [
-                { value: 'user', label: t('sshCas.typeUser') },
-                { value: 'host', label: t('sshCas.typeHost') }
-              ]
-            }
-          ]}
-          filterPresetsKey="ucm-ssh-cas-presets"
-          densityStorageKey="ucm-ssh-cas-density"
-          onApplyFilterPreset={handleApplyFilterPreset}
-          toolbarActions={canWrite('ssh_cas') && (
-            isMobile ? (
-              <div className="flex gap-2">
-                <Button type="button" size="lg" onClick={() => setShowImportModal(true)} className="w-11 h-11 p-0" variant="secondary">
-                  <Upload size={22} weight="bold" />
-                </Button>
-                <Button type="button" size="lg" onClick={() => { setEditingCA(null); setShowModal(true) }} className="w-11 h-11 p-0">
-                  <Plus size={22} weight="bold" />
-                </Button>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <Button type="button" size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
-                  <Upload size={14} weight="bold" />
-                  {t('common.import')}
-                </Button>
-                <Button type="button" size="sm" onClick={() => { setEditingCA(null); setShowModal(true) }}>
-                  <Plus size={14} weight="bold" />
-                  {t('sshCas.createCA')}
-                </Button>
-              </div>
-            )
-          )}
-          rowActions={rowActions}
-          sortable
-          defaultSort={{ key: 'descr', direction: 'asc' }}
-          pagination={true}
-          emptyIcon={Key}
-          emptyTitle={t('sshCas.noData')}
-          emptyDescription={t('sshCas.noDataDescription')}
-          emptyAction={canWrite('ssh_cas') && (
-            <Button type="button" onClick={() => { setEditingCA(null); setShowModal(true) }}>
-              <Plus size={16} /> {t('sshCas.createCA')}
-            </Button>
-          )}
-        />
-      </ResponsiveLayout>
-
-      {/* Create / Edit Modal */}
+    <Zone dock={dock} after={<>
       {showModal && (
-        <SSHCAModal
-          ca={editingCA}
-          onSave={editingCA ? handleUpdate : handleCreate}
-          onClose={() => { setShowModal(false); setEditingCA(null) }}
-        />
+        <SSHCAModal ca={editingCA} onSave={editingCA ? handleUpdate : handleCreate} onClose={() => { setShowModal(false); setEditingCA(null) }} />
       )}
-
-      {/* Import CA Modal */}
-      <Modal open={showImportModal} onOpenChange={(open) => { setShowImportModal(open); if (!open) { setImportCaType('user'); setImportPrivateKey('') } }} title={t('sshCas.importCA')} size="lg">
-        <form onSubmit={handleImportCA} className="p-4 space-y-4">
-          <p className="text-sm text-secondary">{t('sshCas.importCADescription')}</p>
-          <Input label={t('sshCas.description')} name="descr" required />
-          <Select
-            label={t('sshCas.caType')}
-            value={importCaType}
-            onChange={setImportCaType}
-            options={[
-              { value: 'user', label: t('sshCas.typeUser') },
-              { value: 'host', label: t('sshCas.typeHost') },
-            ]}
-          />
-          <Textarea
-            label={t('sshCas.privateKey')}
-            value={importPrivateKey}
-            onChange={(e) => setImportPrivateKey(e.target.value)}
-            placeholder={t('sshCas.privateKeyPlaceholder')}
-            rows={8}
-            required
-          />
-          <Input label={t('common.notes')} name="comment" />
-          <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => setShowImportModal(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit">{t('common.import')}</Button>
-          </div>
-        </form>
-      </Modal>
-    </>
+      <FormModal open={showImportModal} onClose={closeImport} title={t('sshCas.importCA')} subtitle={t('sshCas.importCADescription')} size="lg"
+        onSubmit={handleImportCA} submitLabel={t('common.import')} submitIcon="upload">
+        <Input label={t('sshCas.description')} name="descr" required />
+        <Select label={t('sshCas.caType')} value={importCaType} onChange={setImportCaType}
+          options={[{ value: 'user', label: t('sshCas.typeUser') }, { value: 'host', label: t('sshCas.typeHost') }]} />
+        <Textarea label={t('sshCas.privateKey')} mono value={importPrivateKey} onChange={(e) => setImportPrivateKey(e.target.value)}
+          placeholder={t('sshCas.privateKeyPlaceholder')} rows={8} required />
+        <Input label={t('common.notes')} name="comment" full />
+      </FormModal>
+    </>}>
+      <PageHead title={t('sshCas.title')} total={t('sshCas.subtitle', { count: sshCas.length })} intent={t('sshCas.intent')}
+        actions={<>
+          <Btn tone="quiet" icon="terminal" id="ssh-switch" to="/ssh-certificates">{t('sshCertificates.title')}</Btn>
+          {canWrite('ssh_cas') && <Btn icon="upload" id="ssh-ca-import" write onClick={() => setShowImportModal(true)}>{t('common.import')}</Btn>}
+          {create && <Btn tone="primary" icon="plus" id="ssh-ca-new" onClick={create.onClick}>{create.label}</Btn>}
+        </>} />
+      <ListView label={t('sshCas.title')} caption={t('sshCas.caption')} icon="terminal" rows={paged} loading={loading && !sshCas.length}
+        filters={{ views, active: typeView, onChange: (v) => { setTypeView(v); setPage(1) }, label: t('sshCas.filterByType'),
+          aside: <span id="ssh-cert-total">{t('sshCas.certTotal')} {sshCas.reduce((n, ca) => n + (ca.cert_count || 0), 0)}</span> }}
+        toolbar={(
+          <Toolbar>
+            <SearchField id="ssh-ca-search" name="q" label={t('sshCas.searchPlaceholder')} placeholder={t('sshCas.searchPlaceholder')} value={query}
+              onChange={(v) => { setQuery(v); setPage(1) }} />
+          </Toolbar>
+        )}
+        title={(ca) => ca.descr || t('common.unnamed')} status={() => null} openedId={open?.id} onOpen={openCA}
+        columns={[
+          { id: 'type', label: t('sshCas.caType'), cell: typeLabel },
+          { id: 'key', label: t('sshCas.keyType'), cell: keyCell, grow: true },
+          { id: 'certs', label: t('sshCas.stats.certificates'), cell: (ca) => ca.cert_count || 0, fit: true },
+          { id: 'created', label: t('common.created'), cell: (ca) => formatDate(ca.created_at), muted: true, fit: true },
+        ]}
+        rowActions={(ca) => [
+          ...(canWrite('ssh_cas') ? [{ icon: 'settings', label: t('common.edit'), write: true, onClick: openEdit }] : []),
+          { icon: 'download', label: t('sshCas.downloadPublicKey'), onClick: handleDownloadPublicKey },
+          ...(canDelete('ssh_cas') ? [{ icon: 'block', label: t('common.delete'), write: true, onClick: () => handleDelete(ca) }] : []),
+        ]}
+        empty={narrowed && sshCas.length ? (
+          <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')} onReset={() => { setQuery(''); setTypeView('') }} />
+        ) : (
+          <EmptyBlock id="ssh-cas" icon="terminal" title={t('sshCas.noData')} text={t('sshCas.noDataDescription')} action={create} />
+        )}
+        footer={footer} />
+    </Zone>
   )
 }
 
-// ============= SSH CA FORM MODAL =============
-
-function principalList(ca) {
-  const listed = ca?.allowed_principals
-  if (Array.isArray(listed)) return listed
-  return (listed || '').split(',').map(p => p.trim()).filter(Boolean)
-}
+// ============= SSH CA FORM DIALOG =============
 
 function SSHCAModal({ ca, onSave, onClose }) {
   const { t } = useTranslation()
@@ -728,77 +384,58 @@ function SSHCAModal({ ca, onSave, onClose }) {
     default_ttl: ca?.default_ttl || '',
     max_ttl: ca?.max_ttl || '',
     default_extensions: ca?.default_extensions || ['permit-pty', 'permit-agent-forwarding'],
-    allowed_principals: Array.isArray(ca?.allowed_principals)
-      ? ca.allowed_principals.join(', ')
-      : (ca?.allowed_principals || ''),
+    allowed_principals: Array.isArray(ca?.allowed_principals) ? ca.allowed_principals.join(', ') : (ca?.allowed_principals || ''),
     allow_any_principal: !!ca?.allow_any_principal,
     allow_custom_key_id: !!ca?.allow_custom_key_id,
   })
 
-  const handleChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }))
+  const handleChange = (field, value) => setFormData((prev) => ({ ...prev, [field]: value }))
 
   // FIPS mode on a module without Ed25519: a new CA then defaults to ECDSA P-256
   const { fips, fipsKeys } = useKeyPlatform()
   const eddsaRefused = sshEddsaRefused(fips, fipsKeys)
   useEffect(() => {
     if (!eddsaRefused || ca) return
-    setFormData(prev => (SSH_EDDSA_KEY_TYPES.includes(prev.key_algorithm)
-      ? { ...prev, key_algorithm: SSH_FIPS_DEFAULT_KEY_TYPE } : prev))
+    setFormData((prev) => (SSH_EDDSA_KEY_TYPES.includes(prev.key_algorithm) ? { ...prev, key_algorithm: SSH_FIPS_DEFAULT_KEY_TYPE } : prev))
   }, [eddsaRefused, ca])
 
-  // Providers and keys exist only to pick a key for a NEW CA: an existing one
-  // already names its key, and asking again could offer a different one.
+  // Providers and keys exist only to pick a key for a NEW CA: an existing one already names its key
   useEffect(() => {
-    if (ca || keySource !== 'hsm') return
+    if (ca || keySource !== 'hsm') return undefined
     let live = true
     setHsmProvidersLoading(true)
     hsmService.getProviders()
-      .then(res => { if (live) setHsmProviders((extractData(res) || []).filter(p => p.enabled)) })
+      .then((res) => { if (live) setHsmProviders((extractData(res) || []).filter((p) => p.enabled)) })
       .catch(() => { if (live) setHsmProviders([]) })
       .finally(() => { if (live) setHsmProvidersLoading(false) })
     return () => { live = false }
   }, [ca, keySource])
 
   useEffect(() => {
-    if (ca || keySource !== 'hsm' || !hsmProviderId) return
+    if (ca || keySource !== 'hsm' || !hsmProviderId) return undefined
     let live = true
     setHsmKeysLoading(true)
     // An HSM key backs one authority, X.509 or SSH: only the free ones are offered
     hsmService.getSigningKeys({ providerId: parseInt(hsmProviderId, 10), unused: true })
-      .then(res => { if (live) setHsmKeys(extractData(res) || []) })
+      .then((res) => { if (live) setHsmKeys(extractData(res) || []) })
       .catch(() => { if (live) setHsmKeys([]) })
       .finally(() => { if (live) setHsmKeysLoading(false) })
     return () => { live = false }
   }, [ca, keySource, hsmProviderId])
 
-  const usableHsmKeys = useMemo(() => hsmKeys.filter(k =>
-    k.key_type === 'asymmetric' && ['signing', 'all'].includes(k.purpose)
-    && isUsable(findAlgorithm(k.algorithm), { fips, fipsKeys })
-    && hsmSshKeyType(k.algorithm) !== null
-  ), [hsmKeys, fips])
+  const usableHsmKeys = useMemo(() => hsmKeys.filter((k) => k.key_type === 'asymmetric' && ['signing', 'all'].includes(k.purpose)
+    && isUsable(findAlgorithm(k.algorithm), { fips, fipsKeys }) && hsmSshKeyType(k.algorithm) !== null), [hsmKeys, fips, fipsKeys])
+  const selectedHsmKey = usableHsmKeys.find((k) => String(k.id) === hsmKeyId)
 
-  const selectedHsmKey = usableHsmKeys.find(k => String(k.id) === hsmKeyId)
-  const keyError = fieldErrors.hsm_key
-
-  const toggleExtension = (ext) => {
-    setFormData(prev => {
-      const exts = prev.default_extensions
-      return {
-        ...prev,
-        default_extensions: exts.includes(ext)
-          ? exts.filter(e => e !== ext)
-          : [...exts, ext]
-      }
-    })
-  }
+  const toggleExtension = (ext) => setFormData((prev) => ({
+    ...prev,
+    default_extensions: prev.default_extensions.includes(ext) ? prev.default_extensions.filter((e) => e !== ext) : [...prev.default_extensions, ext],
+  }))
 
   const handleSubmit = async () => {
     setLoading(true)
     try {
-      const principals = formData.allowed_principals
-        .split(',')
-        .map(p => p.trim())
-        .filter(Boolean)
+      const principals = formData.allowed_principals.split(',').map((p) => p.trim()).filter(Boolean)
       const payload = {
         descr: formData.description,
         ca_type: formData.ca_type,
@@ -811,208 +448,95 @@ function SSHCAModal({ ca, onSave, onClose }) {
         allow_any_principal: formData.allow_any_principal,
         allow_custom_key_id: formData.allow_custom_key_id,
       }
-      if (ca || keySource === 'software') {
-        payload.key_type = formData.key_algorithm
-      } else {
-        // An HSM CA: the server reads the key type off the token itself
-        payload.hsm_key_id = parseInt(hsmKeyId, 10)
-      }
+      if (ca || keySource === 'software') payload.key_type = formData.key_algorithm
+      // An HSM CA: the server reads the key type off the token itself
+      else payload.hsm_key_id = parseInt(hsmKeyId, 10)
       setFieldErrors({})
       await onSave(payload)
     } catch (error) {
-      // The page has already shown the message as a toast; it also belongs under
-      // the field the server was complaining about
+      // The page has shown the message as a toast; it also belongs under the field it is about
       if (keySource === 'hsm' && error?.message) setFieldErrors({ hsm_key: error.message })
     } finally {
       setLoading(false)
     }
   }
 
-  const checkboxCls = 'flex items-center gap-1.5 text-sm text-text-primary cursor-pointer select-none'
-
+  const storageHint = ca ? t('sshCas.modal.keyStorageLockedHelp') : !hsmAllowed ? t('sshCas.modal.hsmNeedsRead') : undefined
   return (
-    <FormModal
-      open={true}
-      onClose={onClose}
-      title={ca ? t('sshCas.editCA') : t('sshCas.createCA')}
-      size="lg"
-      onSubmit={handleSubmit}
-      submitLabel={ca ? t('common.save') : t('common.create')}
-      loading={loading}
-      disabled={loading || !formData.description.trim() || (!ca && keySource === 'hsm' && (
-        hsmProvidersLoading || hsmKeysLoading || !hsmProviderId || !hsmKeyId
-      ))}
-    >
-      <Input
-        label={t('sshCas.description')}
-        value={formData.description}
-        onChange={e => handleChange('description', e.target.value)}
-        placeholder={t('sshCas.modal.descriptionPlaceholder')}
-        required
-      />
+    <FormModal open onClose={onClose} title={ca ? t('sshCas.editCA') : t('sshCas.createCA')} size="lg" onSubmit={handleSubmit}
+      submitLabel={ca ? t('common.save') : t('common.create')} loading={loading}
+      disabled={loading || !formData.description.trim() || (!ca && keySource === 'hsm' && (hsmProvidersLoading || hsmKeysLoading || !hsmProviderId || !hsmKeyId))}>
+      <Input label={t('sshCas.description')} value={formData.description} onChange={(e) => handleChange('description', e.target.value)}
+        placeholder={t('sshCas.modal.descriptionPlaceholder')} required full data-autofocus />
 
-      <div>
-        <h3 className="text-sm font-semibold text-text-primary">{t('cas.create.keyStorage')}</h3>
-        <div className="mt-1.5 flex gap-2">
-          {['software', 'hsm'].map(mode => (
-            <label key={mode} className={cn(
-              'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all',
-              (ca || (mode === 'hsm' && !hsmAllowed)) ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
-              keySource === mode
-                ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary font-semibold'
-                : 'border-border hover:border-border-hover text-text-secondary'
-            )}>
-              <input
-                type="radio"
-                name="sshCaKeyStorage"
-                value={mode}
-                className="sr-only"
-                disabled={!!ca || (mode === 'hsm' && !hsmAllowed)}
-                checked={keySource === mode}
-                onChange={() => { setKeySource(mode); setFieldErrors({}) }}
-              />
-              {t(mode === 'hsm' ? 'cas.create.keyStorageHsm' : 'cas.create.keyStorageLocal')}
-            </label>
-          ))}
-        </div>
-        {ca && <p className="mt-1 text-xs text-text-secondary">{t('sshCas.modal.keyStorageLockedHelp')}</p>}
-        {!ca && !hsmAllowed && <p className="mt-1 text-xs text-text-secondary">{t('sshCas.modal.hsmNeedsRead')}</p>}
-      </div>
+      <ChoiceField name="sshCaKeyStorage" legend={t('cas.create.keyStorage')} value={keySource} hint={storageHint}
+        onChange={(mode) => { setKeySource(mode); setFieldErrors({}) }} disabled={!!ca}
+        options={[
+          { value: 'software', label: t('cas.create.keyStorageLocal') },
+          { value: 'hsm', label: t('cas.create.keyStorageHsm'), disabled: !hsmAllowed },
+        ]} />
 
-      <div className="grid grid-cols-2 gap-4">
-        <Select
-          label={t('sshCas.caType')}
-          value={formData.ca_type}
-          onChange={value => { handleChange('ca_type', value); setFieldErrors({}) }}
-          options={[
-            { value: 'user', label: t('sshCas.typeUser') },
-            { value: 'host', label: t('sshCas.typeHost') },
-          ]}
-          disabled={!!ca}
-        />
-        {keySource === 'hsm' && !ca ? (
-          <Select
-            label={t('cas.create.hsmProvider')}
-            value={hsmProviderId}
-            onChange={value => { setHsmProviderId(value); setHsmKeyId(''); setFieldErrors({}) }}
-            options={hsmProviders.map(p => ({ value: String(p.id), label: `${p.name} (${p.provider_type})` }))}
-            placeholder={hsmProvidersLoading ? t('common.loading') : undefined}
-            disabled={hsmProvidersLoading}
-          />
-        ) : (
-          <Select
-            label={t('sshCas.keyAlgorithm')}
-            value={formData.key_algorithm}
-            onChange={value => handleChange('key_algorithm', value)}
-            options={ca ? KEY_ALGORITHM_OPTIONS : sshKeyOptions(KEY_ALGORITHM_OPTIONS, fips, fipsKeys)}
-            disabled={!!ca}
-          />
-        )}
-      </div>
+      <Select label={t('sshCas.caType')} value={formData.ca_type} onChange={(value) => { handleChange('ca_type', value); setFieldErrors({}) }}
+        options={[{ value: 'user', label: t('sshCas.typeUser') }, { value: 'host', label: t('sshCas.typeHost') }]} disabled={!!ca} />
+      {keySource === 'hsm' && !ca ? (
+        <Select label={t('cas.create.hsmProvider')} value={hsmProviderId} onChange={(value) => { setHsmProviderId(value); setHsmKeyId(''); setFieldErrors({}) }}
+          options={hsmProviders.map((p) => ({ value: String(p.id), label: `${p.name} (${p.provider_type})` }))}
+          placeholder={hsmProvidersLoading ? t('common.loading') : undefined} disabled={hsmProvidersLoading} />
+      ) : (
+        <Select label={t('sshCas.keyAlgorithm')} value={formData.key_algorithm} onChange={(value) => handleChange('key_algorithm', value)}
+          options={ca ? KEY_ALGORITHM_OPTIONS : sshKeyOptions(KEY_ALGORITHM_OPTIONS, fips, fipsKeys)} disabled={!!ca} />
+      )}
 
       {/* An HSM-backed CA names the key it signs with; nothing here generates one */}
       {keySource === 'hsm' && !ca && (
         !hsmProvidersLoading && hsmProviders.length === 0 ? (
-          <div className="px-3 py-2 rounded-lg border border-status-warning bg-status-warning-op10 text-xs text-status-warning">
-            {t('cas.create.hsmNoProviders')}
-          </div>
+          <div className="field full"><Notice tone="warn">{t('cas.create.hsmNoProviders')}</Notice></div>
         ) : hsmProviderId && !hsmKeysLoading && usableHsmKeys.length === 0 ? (
-          <div className="px-3 py-2 rounded-lg border border-status-warning bg-status-warning-op10 text-xs text-status-warning">
-            {t('sshCas.modal.hsmNoUsableKeys')}
-          </div>
+          <div className="field full"><Notice tone="warn">{t('sshCas.modal.hsmNoUsableKeys')}</Notice></div>
         ) : (
-          <Select
-            label={t('cas.create.hsmExistingKey')}
-            value={hsmKeyId}
-            onChange={value => { setHsmKeyId(value); setFieldErrors({}) }}
-            options={usableHsmKeys.map(k => ({
-              value: String(k.id),
-              label: `${k.label} (${k.algorithm})`
-            }))}
-            placeholder={hsmKeysLoading ? t('common.loading') : undefined}
-            disabled={!hsmProviderId || hsmKeysLoading}
-            searchable={usableHsmKeys.length > 10}
-            error={keyError}
-            helperText={selectedHsmKey
-              ? t('sshCas.modal.hsmDerivedKey', { keyType: hsmSshKeyType(selectedHsmKey.algorithm) })
-              : t('sshCas.modal.hsmKeyHelper')}
-          />
+          <Select label={t('cas.create.hsmExistingKey')} value={hsmKeyId} onChange={(value) => { setHsmKeyId(value); setFieldErrors({}) }} full
+            options={usableHsmKeys.map((k) => ({ value: String(k.id), label: `${k.label} (${k.algorithm})` }))}
+            placeholder={hsmKeysLoading ? t('common.loading') : undefined} disabled={!hsmProviderId || hsmKeysLoading}
+            error={fieldErrors.hsm_key}
+            helperText={selectedHsmKey ? t('sshCas.modal.hsmDerivedKey', { keyType: hsmSshKeyType(selectedHsmKey.algorithm) }) : t('sshCas.modal.hsmKeyHelper')} />
         )
       )}
 
-      {ca?.key_source === 'hsm' && (
-        <Input label={t('cas.detail.hsmKey')} value={ca.hsm_key_label || '—'} disabled />
-      )}
+      {ca?.key_source === 'hsm' && <Input label={t('cas.detail.hsmKey')} value={ca.hsm_key_label || '—'} disabled full />}
 
-      <div className="grid grid-cols-2 gap-4">
-        <Input
-          label={t('sshCas.defaultTtl')}
-          value={formData.default_ttl}
-          onChange={e => handleChange('default_ttl', e.target.value)}
-          placeholder={t('sshCas.modal.ttlPlaceholder')}
-        />
-        <Input
-          label={t('sshCas.maxTtl')}
-          value={formData.max_ttl}
-          onChange={e => handleChange('max_ttl', e.target.value)}
-          placeholder={t('sshCas.modal.ttlPlaceholder')}
-        />
-      </div>
+      <Input label={t('sshCas.defaultTtl')} value={formData.default_ttl} onChange={(e) => handleChange('default_ttl', e.target.value)} placeholder={t('sshCas.modal.ttlPlaceholder')} />
+      <Input label={t('sshCas.maxTtl')} value={formData.max_ttl} onChange={(e) => handleChange('max_ttl', e.target.value)} placeholder={t('sshCas.modal.ttlPlaceholder')} />
 
-      {/* Default extensions — only for user CAs */}
+      {/* Default extensions: only for user CAs */}
       {formData.ca_type === 'user' && (
-        <div className="border-t border-border pt-4">
-          <label className="block text-xs font-medium text-text-secondary mb-2">
-            {t('sshCas.defaultExtensions')}
-          </label>
-          <div className="flex flex-wrap gap-x-4 gap-y-2">
-            {DEFAULT_EXTENSIONS.map(ext => (
-              <label key={ext.value} className={checkboxCls}>
-                <input
-                  type="checkbox"
-                  checked={formData.default_extensions.includes(ext.value)}
-                  onChange={() => toggleExtension(ext.value)}
-                  className="accent-accent-primary"
-                />
+        <fieldset className="field full">
+          <legend>{t('sshCas.defaultExtensions')}</legend>
+          <div className="choice-grid">
+            {DEFAULT_EXTENSIONS.map((ext) => (
+              <label key={ext.value} className="checkbox-line">
+                <input type="checkbox" checked={formData.default_extensions.includes(ext.value)} onChange={() => toggleExtension(ext.value)} />
                 {t(ext.labelKey)}
               </label>
             ))}
           </div>
-        </div>
+        </fieldset>
       )}
 
-      <Input
-        label={t('sshCas.allowedPrincipals')}
-        value={formData.allowed_principals}
-        onChange={e => handleChange('allowed_principals', e.target.value)}
-        placeholder={t('sshCas.modal.principalsPlaceholder')}
-        helperText={t('sshCas.modal.principalsHelperText')}
-      />
-
-      <div>
-        <label className={checkboxCls}>
-          <input
-            type="checkbox"
-            checked={formData.allow_any_principal}
-            onChange={e => handleChange('allow_any_principal', e.target.checked)}
-            className="accent-accent-primary"
-          />
+      <Input label={t('sshCas.allowedPrincipals')} value={formData.allowed_principals} onChange={(e) => handleChange('allowed_principals', e.target.value)}
+        placeholder={t('sshCas.modal.principalsPlaceholder')} helperText={t('sshCas.modal.principalsHelperText')} full />
+      <div className="field full">
+        <label className="checkbox-line">
+          <input type="checkbox" checked={formData.allow_any_principal} aria-describedby="hint-ssh-any" onChange={(e) => handleChange('allow_any_principal', e.target.checked)} />
           {t('sshCas.modal.allowAnyPrincipal')}
         </label>
-        <p className="mt-1 text-xs text-text-secondary">{t('sshCas.modal.allowAnyPrincipalHelp')}</p>
+        <small id="hint-ssh-any">{t('sshCas.modal.allowAnyPrincipalHelp')}</small>
       </div>
-
-      <div>
-        <label className={checkboxCls}>
-          <input
-            type="checkbox"
-            checked={formData.allow_custom_key_id}
-            onChange={e => handleChange('allow_custom_key_id', e.target.checked)}
-            className="accent-accent-primary"
-          />
+      <div className="field full">
+        <label className="checkbox-line">
+          <input type="checkbox" checked={formData.allow_custom_key_id} aria-describedby="hint-ssh-keyid" onChange={(e) => handleChange('allow_custom_key_id', e.target.checked)} />
           {t('sshCas.modal.allowCustomKeyId')}
         </label>
-        <p className="mt-1 text-xs text-text-secondary">{t('sshCas.modal.allowCustomKeyIdHelp')}</p>
+        <small id="hint-ssh-keyid">{t('sshCas.modal.allowCustomKeyIdHelp')}</small>
       </div>
     </FormModal>
   )

@@ -7061,7 +7061,13 @@
     "anyPrincipal": "Qualquer principal",
     "noPrincipalSignsNothing": "Nenhum principal listado: esta CA não assina nada",
     "keyIdSetByCa": "ID da chave definido pela CA: principals@nome da CA",
-    "keyIdChosenByRequester": "ID da chave escolhido pelo solicitante"
+    "keyIdChosenByRequester": "ID da chave escolhido pelo solicitante",
+    "intent": "The authorities that sign the SSH certificates of accounts and hosts.",
+    "caption": "SSH certificate authorities. Activate a name to open its detail.",
+    "filterByType": "Filter by type",
+    "certTotal": "Certificates signed:",
+    "range": "{{shown}} of {{count}} SSH CAs",
+    "pageRange": "{{start}}–{{end}} of {{count}} SSH CAs"
   },
   "sshCertificates": {
     "title": "Certificados SSH",
@@ -7150,7 +7156,13 @@
     "setupScriptDescription": "Baixe um script shell para configurar seu servidor SSH para confiar nesta CA",
     "importCertificate": "Importar certificado",
     "importCertDescription": "Importar um certificado SSH existente no formato OpenSSH",
-    "certificateDataPlaceholder": "Cole os dados do certificado SSH"
+    "certificateDataPlaceholder": "Cole os dados do certificado SSH",
+    "intent": "The SSH certificates of accounts and hosts, signed by your authorities.",
+    "caption": "SSH certificates. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
+    "searchLabel": "Key ID, principal, serial…",
+    "pageRange": "{{start}}–{{end}} of {{count}} SSH certificates",
+    "grants": "Principals and options"
   },
   "filters": {
     "persistEnabled": "Os filtros serão salvos",

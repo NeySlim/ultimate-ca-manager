@@ -104,7 +104,8 @@ describe('SSHCertificatesPage — opening the certificate just issued or importe
     await waitFor(() => expect(getAll).toHaveBeenCalled())
 
     fireEvent.click(screen.getByText('common.import'))
-    const form = await screen.findByText('sshCertificates.importCertDescription').then(el => el.closest('form'))
+    await screen.findByText('sshCertificates.importCertDescription')
+    const form = document.querySelector('dialog form')
     fireEvent.change(form.querySelector('textarea'), { target: { value: 'ssh-ed25519 CERT' } })
     fireEvent.click(form.querySelector('button[type="submit"]'))
 

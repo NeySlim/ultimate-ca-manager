@@ -82,7 +82,8 @@ describe('SSHCAsPage — opening the CA just created or imported', () => {
     await waitFor(() => expect(getAll).toHaveBeenCalled())
 
     fireEvent.click(screen.getByText('common.import'))
-    const form = await screen.findByText('sshCas.importCADescription').then(el => el.closest('form'))
+    await screen.findByText('sshCas.importCADescription')
+    const form = document.querySelector('dialog form')
     fireEvent.change(form.querySelector('input[name="descr"]'), { target: { value: 'Imported CA Beta' } })
     fireEvent.change(form.querySelector('textarea'), { target: { value: 'PRIVATE KEY DATA' } })
     fireEvent.click(form.querySelector('button[type="submit"]'))

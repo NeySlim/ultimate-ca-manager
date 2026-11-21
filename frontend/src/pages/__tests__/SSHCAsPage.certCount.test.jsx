@@ -2,7 +2,7 @@
  * SSHCAsPage — the certificate count per SSH CA.
  *
  * The page read `certificate_count`; /api/v2/ssh/cas answers `cert_count`. Both the
- * column and the "Certificates" stat tile therefore sat on zero no matter how many
+ * column and the certificate total therefore sat on zero no matter how many
  * certificates a CA had signed.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -42,10 +42,10 @@ describe('SSHCAsPage — certificate counts', () => {
     expect(screen.getByText('5')).toBeInTheDocument()
   })
 
-  it('totals them in the stat tile', async () => {
+  it('totals them beside the type chips', async () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('Users CA')).toBeInTheDocument())
 
-    expect(screen.getByText('12')).toBeInTheDocument()
+    expect(document.getElementById('ssh-cert-total')).toHaveTextContent('sshCas.certTotal 12')
   })
 })

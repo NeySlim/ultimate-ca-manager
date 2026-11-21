@@ -77,10 +77,10 @@ describe('SSHCertificatesPage: sortable columns', () => {
     expect(getAll.mock.calls.map(([params]) => params?.sort_by)).not.toContain(header === 'sshCertificates.caName' ? 'ca_name' : 'principals')
   })
 
-  it('key_id still sorts', async () => {
+  it('key_id still sorts, from the name column', async () => {
     render(<MemoryRouter><SSHCertificatesPage /></MemoryRouter>)
     await screen.findByText('c')
-    fireEvent.click(screen.getAllByText('sshCertificates.keyId').find((el) => el.closest('th')))
+    fireEvent.click(screen.getAllByText('atelier.name').find((el) => el.closest('th')))
     await waitFor(() => expect(getAll.mock.calls.map(([params]) => params?.sort_by)).toContain('key_id'))
   })
 })

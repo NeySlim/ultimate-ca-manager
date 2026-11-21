@@ -7271,7 +7271,13 @@
     "anyPrincipal": "Будь-який principal",
     "noPrincipalSignsNothing": "Жодного principal не вказано: цей CA нічого не підписує",
     "keyIdSetByCa": "ID ключа задає CA: principals@назва CA",
-    "keyIdChosenByRequester": "ID ключа обрав запитувач"
+    "keyIdChosenByRequester": "ID ключа обрав запитувач",
+    "intent": "The authorities that sign the SSH certificates of accounts and hosts.",
+    "caption": "SSH certificate authorities. Activate a name to open its detail.",
+    "filterByType": "Filter by type",
+    "certTotal": "Certificates signed:",
+    "range": "{{shown}} of {{count}} SSH CAs",
+    "pageRange": "{{start}}–{{end}} of {{count}} SSH CAs"
   },
   "sshCertificates": {
     "title": "SSH-сертифікати",
@@ -7362,7 +7368,13 @@
     "setupScriptDescription": "Завантажте shell-скрипт для налаштування вашого SSH-сервера на довіру цьому CA",
     "importCertificate": "Імпортувати сертифікат",
     "importCertDescription": "Імпортувати існуючий SSH сертифікат у форматі OpenSSH",
-    "certificateDataPlaceholder": "Вставте дані SSH сертифіката"
+    "certificateDataPlaceholder": "Вставте дані SSH сертифіката",
+    "intent": "The SSH certificates of accounts and hosts, signed by your authorities.",
+    "caption": "SSH certificates. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
+    "searchLabel": "Key ID, principal, serial…",
+    "pageRange": "{{start}}–{{end}} of {{count}} SSH certificates",
+    "grants": "Principals and options"
   },
   "filters": {
     "persistEnabled": "Фільтри будуть збережені",

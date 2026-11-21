@@ -7274,7 +7274,13 @@
     "anyPrincipal": "Любой принципал",
     "noPrincipalSignsNothing": "Принципалы не указаны: этот ЦС ничего не подписывает",
     "keyIdSetByCa": "Идентификатор ключа задаёт ЦС: принципалы@имя ЦС",
-    "keyIdChosenByRequester": "Идентификатор ключа выбирает заявитель"
+    "keyIdChosenByRequester": "Идентификатор ключа выбирает заявитель",
+    "intent": "Центры, подписывающие SSH-сертификаты учётных записей и хостов.",
+    "caption": "Центры сертификации SSH. Выберите имя, чтобы открыть подробности.",
+    "filterByType": "Фильтр по типу",
+    "certTotal": "Подписано сертификатов:",
+    "range": "{{shown}} из {{count}} ЦС SSH",
+    "pageRange": "{{start}}–{{end}} из {{count}} ЦС SSH"
   },
   "sshCertificates": {
     "title": "Сертификаты SSH",
@@ -7365,7 +7371,13 @@
     "setupScriptDescription": "Скачайте сценарий оболочки, который настроит ваш сервер SSH на доверие к этому ЦС",
     "importCertificate": "Импорт сертификата",
     "importCertDescription": "Импортируйте существующий сертификат SSH в формате OpenSSH",
-    "certificateDataPlaceholder": "Вставьте данные сертификата SSH"
+    "certificateDataPlaceholder": "Вставьте данные сертификата SSH",
+    "intent": "SSH-сертификаты учётных записей и хостов, подписанные вашими центрами.",
+    "caption": "SSH-сертификаты. Выберите имя, чтобы открыть подробности.",
+    "filterByState": "Фильтр по состоянию",
+    "searchLabel": "Идентификатор ключа, принципал, номер…",
+    "pageRange": "{{start}}–{{end}} из {{count}} SSH-сертификатов",
+    "grants": "Принципалы и параметры"
   },
   "filters": {
     "persistEnabled": "Фильтры будут сохранены",

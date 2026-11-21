@@ -7061,7 +7061,13 @@
     "anyPrincipal": "任意主体",
     "noPrincipalSignsNothing": "未列出任何主体：此 CA 不会签署任何证书",
     "keyIdSetByCa": "密钥 ID 由 CA 设置：principals@CA 名称",
-    "keyIdChosenByRequester": "密钥 ID 由请求者选择"
+    "keyIdChosenByRequester": "密钥 ID 由请求者选择",
+    "intent": "为账户和主机签发 SSH 证书的颁发机构。",
+    "caption": "SSH 证书颁发机构。激活名称以打开其详情。",
+    "filterByType": "按类型筛选",
+    "certTotal": "已签发证书：",
+    "range": "{{shown}} / {{count}} 个 SSH CA",
+    "pageRange": "第 {{start}}–{{end}} 个，共 {{count}} 个 SSH CA"
   },
   "sshCertificates": {
     "title": "SSH 证书",
@@ -7150,7 +7156,13 @@
     "setupScriptDescription": "下载 shell 脚本来配置您的 SSH 服务器信任此 CA",
     "importCertificate": "导入证书",
     "importCertDescription": "导入OpenSSH格式的现有SSH证书",
-    "certificateDataPlaceholder": "粘贴SSH证书数据"
+    "certificateDataPlaceholder": "粘贴SSH证书数据",
+    "intent": "由您的颁发机构签发的账户和主机 SSH 证书。",
+    "caption": "SSH 证书。激活名称以打开其详情。",
+    "filterByState": "按状态筛选",
+    "searchLabel": "密钥 ID、主体、序列号…",
+    "pageRange": "第 {{start}}–{{end}} 个，共 {{count}} 个 SSH 证书",
+    "grants": "主体和选项"
   },
   "filters": {
     "persistEnabled": "筛选器将被保存",
