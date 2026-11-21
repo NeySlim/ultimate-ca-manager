@@ -29,8 +29,8 @@ const stored = {
 describe('ProfilesEditor template binding', () => {
   it('shows the bound template of a stored profile and the template column header', () => {
     render(<ProfilesEditor value={stored} onChange={() => {}} templates={templates} />)
-    expect(screen.getByText('acme.profileTemplate')).toBeInTheDocument()
-    expect(screen.getByText('mTLS client')).toBeInTheDocument()
+    expect(screen.getAllByRole('combobox', { name: /acme\.profileTemplate/ })[0]).toHaveValue('3')
+    expect(screen.getAllByText('mTLS client').length).toBeGreaterThan(0)
     // the unbound row shows the "no template" choice
     expect(screen.getAllByText('acme.noTemplate').length).toBeGreaterThan(0)
   })

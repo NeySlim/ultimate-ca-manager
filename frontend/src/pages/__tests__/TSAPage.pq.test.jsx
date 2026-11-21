@@ -84,9 +84,8 @@ import TSAPage from '../TSAPage'
 import { tsaService } from '../../services/tsa.service'
 
 async function openGenerateModal() {
-  render(<MemoryRouter><TSAPage /></MemoryRouter>)
-  const tabs = await screen.findAllByText('tsa.groups.settings')
-  fireEvent.click(tabs[tabs.length - 1])
+  render(<MemoryRouter initialEntries={['/tsa-config?tab=config']}><TSAPage /></MemoryRouter>)
+  await screen.findByText('tsa.signingCertDesc')
   fireEvent.click(await screen.findByText('tsa.signerGenerate'))
   await screen.findByText('tsa.signerGenerateModalDesc')
   return screen.getByLabelText('tsa.signerGenerateKeyType')

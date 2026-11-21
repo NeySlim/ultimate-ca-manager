@@ -1,164 +1,102 @@
+/**
+ * The dock of an order of the ACME client: domains, order facts, the pending challenge (the TXT
+ * record, or the HTTP-01 URL and file), the error, and every action the order allows (verify,
+ * check, finalize, view, download, renew, automatic renewal, delete).
+ */
 import { useTranslation } from 'react-i18next'
-import { Certificate, Globe, PlugsConnected, CheckCircle, Trash, Play, DownloadSimple, Eye, LockKey, ArrowsClockwise } from '@phosphor-icons/react'
-import { Badge, Button, CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader } from '../../components'
-import { cn, formatDate, downloadBlob } from '../../lib/utils'
+import { Btn, Dock, DockBody, Section, Props, Pill } from '../../components/atelier'
+import { downloadBlob } from '../../lib/utils'
+import { stateLabel } from '../../lib/stateLabel'
+import { dateTimeOf } from '../admin/adminDates'
+import { Copyable, Notice } from '../protocols/atelierParts'
+import { http01Url } from '../protocols/protocolStates'
 
-// RFC 8555 §8.3: the CA fetches the key authorization over plain HTTP, port 80.
-// A DNS name never holds ':', so it marks an IPv6 literal even on rows without identifier_type.
-export function http01Url(domain, data) {
-  const host = domain.includes(':') ? `[${domain}]` : domain
-  return `http://${host}/.well-known/acme-challenge/${data.token}`
-}
+const ORDER_TONES = { valid: 'good', issued: 'good', ready: 'good', pending: 'warn', processing: 'warn', validating: 'warn', invalid: 'bad' }
 
-export default function OrderDetailPanel({ order, onDownloadCert, onViewCertificate, onRenewCertificate, onVerifyChallenge, onFinalizeOrder, onDeleteOrder }) {
-  const { t } = useTranslation()
+export default function OrderDetailPanel({ order, onClose, onDownloadCert, onViewCertificate, onRenewCertificate, onVerifyChallenge, onCheckOrderStatus,
+  onFinalizeOrder, onDeleteOrder, onToggleRenewal, canWrite = false, canDelete = false }) {
+  const { t, i18n } = useTranslation()
+  const locale = i18n?.language || 'en'
+  const name = order.primary_domain || order.domains?.[0] || t('common.unknown')
+  const status = String(order.status || '').toLowerCase()
+  const proxy = order.is_proxy_order
+  const pill = <Pill label={stateLabel(t, order.status)} tone={ORDER_TONES[status] || 'muted'} />
+  const issued = status === 'issued' || (status === 'valid' && (order.certificate_id || order.error_message))
 
   return (
-    <div className="p-3 space-y-3">
-      <CompactHeader
-        icon={Certificate}
-        iconClass={cn(
-          order.status === 'valid' || order.status === 'issued' ? "bg-status-success-op20" :
-          order.status === 'invalid' ? "bg-status-error-op20" :
-          order.status === 'pending' ? "bg-status-warning-op20" : "bg-bg-tertiary"
-        )}
-        title={order.primary_domain || order.domains?.[0]}
-        subtitle={`${order.environment} • ${order.challenge_type}`}
-        badge={
-          <Badge 
-            variant={order.status === 'valid' || order.status === 'issued' ? 'success' : 
-                     order.status === 'invalid' ? 'danger' : 
-                     order.status === 'pending' ? 'warning' : 'default'}
-            size="sm"
-          >
-            {order.status}
-          </Badge>
-        }
-      />
-
-      <CompactStats stats={[
-        { icon: Globe, value: `${(order.domains || []).length} ${t('acme.domains').toLowerCase()}` },
-        { icon: PlugsConnected, value: order.dns_provider_name || t('acme.manualDns') },
-      ]} />
-      
-      <CompactSection title={t('acme.domains')}>
-        <div className="space-y-1">
-          {(order.domains || []).map((domain, i) => (
-            <div key={i} className="flex items-center gap-2 text-sm">
-              <Globe size={12} className="text-text-tertiary" />
-              <span className="text-text-primary">{domain}</span>
-            </div>
-          ))}
-        </div>
-      </CompactSection>
-      
-      <CompactSection title={t('acme.orderInfo')}>
-        <CompactGrid>
-          <CompactField autoIcon="environment" label={t('acme.environment')} value={order.environment === 'production' ? t('acme.production') : t('acme.staging')} />
-          <CompactField autoIcon="method" label={t('acme.method')} value={order.challenge_type?.toUpperCase()} />
-          <CompactField autoIcon="provider" label={t('acme.provider')} value={order.dns_provider_name || t('acme.manualDns')} />
-          <CompactField autoIcon="status" label={t('common.status')} value={order.status} />
-          <CompactField autoIcon="created" label={t('common.created')} value={formatDate(order.created_at)} />
-          {order.expires_at && (
-            <CompactField autoIcon="expires" label={t('common.expires')} value={formatDate(order.expires_at)} />
+    <Dock label={t('atelier.detailOf', { name: t('acme.letsEncryptOrders') })} tabsLabel={t('atelier.openItem')} activeKey={order.id}
+      tabs={[{ key: order.id, title: name, icon: 'refresh' }]} onClose={onClose}>
+      <DockBody icon="refresh" title={name} badge={pill} section="order" onSection={() => {}}
+        sectionsLabel={t('atelier.sectionsOf', { name })} sections={[['order', t('acme.orderInfo')]]}
+        actions={<>
+          {!proxy && canWrite && ['pending', 'processing'].includes(status) && <Btn tone="primary" icon="send" id="acme-order-verify" onClick={() => onVerifyChallenge(order)}>{t('acme.verifyChallenge')}</Btn>}
+          {!proxy && canWrite && status === 'validating' && <>
+            <Btn icon="search" onClick={() => onCheckOrderStatus(order)}>{t('acme.checkStatus')}</Btn>
+            <Btn icon="send" onClick={() => onVerifyChallenge(order)}>{t('acme.retryVerification')}</Btn>
+          </>}
+          {!proxy && canWrite && ['ready', 'processing'].includes(status) && <Btn icon="check" onClick={() => onFinalizeOrder(order)}>{t('acme.finalize')}</Btn>}
+          {order.certificate_id && <Btn icon="eye" onClick={() => onViewCertificate(order)}>{t('common.viewCertificate')}</Btn>}
+          {!proxy && canWrite && issued && <Btn icon="refresh" write onClick={() => onRenewCertificate(order)}>{t('acme.renewNow')}</Btn>}
+          {canDelete && <Btn icon="close" id="acme-order-delete" onClick={() => onDeleteOrder(order)}>{t('common.delete')}</Btn>}
+        </>}>
+        <div className="module-detail">
+          <Section title={t('acme.orderInfo')}>
+            <Props items={[
+              [t('acme.domains'), (order.domains || []).join(', ') || name],
+              [t('acme.environment'), t(order.environment === 'production' ? 'acme.production' : 'acme.staging')],
+              [t('acme.method'), order.challenge_type?.toUpperCase() || '—'],
+              [t('acme.provider'), order.dns_provider_name || t('acme.manualDns')],
+              order.is_proxy_order && (order.account_email || order.account_short_id) && [t('acme.account'), order.account_email || `${order.account_short_id}…`],
+              [t('atelier.state'), pill],
+              [t('common.created'), dateTimeOf(order.created_at, locale) || '—'],
+              order.expires_at && [t('common.expires'), dateTimeOf(order.expires_at, locale)],
+              order.renewal_failures > 0 && [t('acme.renewalFailuresLabel'), `${t('acme.renewalFailures', { count: order.renewal_failures })}${order.last_error_at ? ` · ${t('acme.renewalLastFailure', { date: dateTimeOf(order.last_error_at, locale) })}` : ''}`],
+            ]} />
+            {order.error_message && <Notice tone="bad" role="alert">{order.error_message}</Notice>}
+            {order.renewal_retry_daily && <Notice tone="warn">{t('acme.renewalRetryDaily')}</Notice>}
+            {proxy && <Notice>{t('acme.proxyOrderClientDriven')}</Notice>}
+            {!proxy && !order.opened_by_renewal && onToggleRenewal && (
+              <label className="checkbox-line">
+                <input type="checkbox" checked={order.renewal_enabled !== false} disabled={!canWrite || undefined} onChange={(e) => onToggleRenewal(order, e.target.checked)} />
+                {t('acme.orderAutoRenew')}
+              </label>
+            )}
+          </Section>
+          {status === 'pending' && order.challenges && (
+            <Section title={t('acme.pendingChallenge')}>
+              {order.challenge_type === 'http-01' && <p className="muted small">{t('acme.http01Hint')}</p>}
+              {Object.entries(order.challenges).map(([domain, data]) => (
+                <div key={domain} className="acme-challenge">
+                  <Props items={[
+                    [t('acme.domain'), domain],
+                    ...(order.challenge_type === 'dns-01' ? [
+                      [t('acme.dnsRecordName'), <Copyable key="n" value={data.dns_txt_name || data.record_name} label={t('acme.dnsRecordName')} />],
+                      [t('acme.dnsRecordValue'), <Copyable key="v" value={data.dns_txt_value || data.record_value} label={t('acme.dnsRecordValue')} />],
+                    ] : []),
+                    ...(order.challenge_type === 'http-01' && data.token && data.key_authorization ? [
+                      [t('acme.http01Url'), <Copyable key="u" url value={http01Url(domain, data)} label={t('acme.http01Url')} />],
+                      [t('acme.http01FileContent'), <Copyable key="c" value={data.key_authorization} label={t('acme.http01FileContent')} />],
+                    ] : []),
+                  ]} />
+                  {order.challenge_type === 'http-01' && data.token && data.key_authorization && (
+                    <div className="copy-url">
+                      <Btn icon="download" onClick={() => downloadBlob(new Blob([data.key_authorization], { type: 'application/octet-stream' }), data.token)}>{t('acme.http01DownloadFile')}</Btn>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </Section>
           )}
-        </CompactGrid>
-      </CompactSection>
-      
-      {order.status === 'pending' && order.challenges && (
-        <CompactSection title={t('acme.pendingChallenge')}>
-          <div className="space-y-3">
-            {order.challenge_type === 'http-01' && (
-              <p className="text-xs text-text-secondary">{t('acme.http01Hint')}</p>
-            )}
-            {Object.entries(order.challenges).map(([domain, data]) => (
-              <div key={domain} className="p-2 bg-tertiary-op50 rounded-lg border border-border-op50">
-                <p className="text-sm font-medium text-text-primary mb-2">{domain}</p>
-                {order.challenge_type === 'dns-01' && (
-                  <div className="space-y-2 text-xs">
-                    <CompactField autoIcon="dnsRecordName" label={t('acme.dnsRecordName')} value={data.dns_txt_name || data.record_name} mono copyable />
-                    <CompactField autoIcon="dnsRecordValue" label={t('acme.dnsRecordValue')} value={data.dns_txt_value || data.record_value} mono copyable />
-                  </div>
-                )}
-                {order.challenge_type === 'http-01' && data.token && data.key_authorization && (
-                  <div className="space-y-2 text-xs">
-                    <CompactField autoIcon="challengeUrl" label={t('acme.http01Url')} value={http01Url(domain, data)} mono copyable />
-                    <CompactField autoIcon="challengeFileContent" label={t('acme.http01FileContent')} value={data.key_authorization} mono copyable />
-                    <Button type="button" size="sm" variant="secondary" onClick={() => downloadBlob(new Blob([data.key_authorization], { type: 'application/octet-stream' }), data.token)}>
-                      <DownloadSimple size={12} />
-                      {t('acme.http01DownloadFile')}
-                    </Button>
-                  </div>
-                )}
+          {order.certificate_id && (
+            <Section title={t('acme.certificateActions')}>
+              <div className="copy-url">
+                <Btn icon="download" onClick={() => onDownloadCert(order, 'pem', false)}>{t('acme.downloadCert')}</Btn>{' '}
+                <Btn icon="key" onClick={() => onDownloadCert(order, 'pem', true)}>{t('acme.downloadWithKey')}</Btn>
               </div>
-            ))}
-          </div>
-        </CompactSection>
-      )}
-      
-      {order.error_message && (
-        <CompactSection title={t('common.error')}>
-          <div className="p-2 bg-status-error-op10 border border-status-error-op20 rounded-lg">
-            <p className="text-sm text-status-error">{order.error_message}</p>
-          </div>
-        </CompactSection>
-      )}
-      
-      {(order.status === 'valid' || order.status === 'issued') && order.certificate_id && (
-        <CompactSection title={t('acme.certificateActions')}>
-          <div className="grid grid-cols-2 gap-2">
-            <Button type="button" size="sm" variant="secondary" onClick={() => onDownloadCert(order, 'pem', false)}>
-              <DownloadSimple size={12} />
-              {t('acme.downloadCert')}
-            </Button>
-            <Button type="button" size="sm" variant="secondary" onClick={() => onDownloadCert(order, 'pem', true)}>
-              <LockKey size={12} />
-              {t('acme.downloadWithKey')}
-            </Button>
-            <Button type="button" size="sm" variant="secondary" onClick={() => onViewCertificate(order)}>
-              <Eye size={12} />
-              {t('common.viewCertificate')}
-            </Button>
-            {!order.is_proxy_order && (
-              <Button type="button" size="sm" variant="secondary" onClick={() => onRenewCertificate(order)}>
-                <ArrowsClockwise size={12} />
-                {t('acme.renewNow')}
-              </Button>
-            )}
-          </div>
-        </CompactSection>
-      )}
-      
-      {(order.status === 'issued' || (order.status === 'valid' && order.error_message)) && !order.certificate_id && !order.is_proxy_order && (
-        <CompactSection title={t('acme.certificateActions')}>
-          <Button type="button" size="sm" variant="secondary" onClick={() => onRenewCertificate(order)}>
-            <ArrowsClockwise size={12} />
-            {t('acme.renewNow')}
-          </Button>
-        </CompactSection>
-      )}
-
-      {order.is_proxy_order && (
-        <p className="text-xs text-text-tertiary pt-2">{t('acme.proxyOrderClientDriven')}</p>
-      )}
-      <div className="flex flex-wrap gap-2 pt-2">
-        {!order.is_proxy_order && order.status === 'pending' && (
-          <Button type="button" size="sm" onClick={() => onVerifyChallenge(order)}>
-            <Play size={12} />
-            {t('acme.verifyChallenge')}
-          </Button>
-        )}
-        {!order.is_proxy_order && order.status === 'processing' && (
-          <Button type="button" size="sm" onClick={() => onFinalizeOrder(order)}>
-            <CheckCircle size={12} />
-            {t('acme.finalize')}
-          </Button>
-        )}
-        <Button type="button" size="sm" variant="danger" onClick={() => onDeleteOrder(order)}>
-          <Trash size={12} />
-          {t('common.delete')}
-        </Button>
-      </div>
-    </div>
+            </Section>
+          )}
+        </div>
+      </DockBody>
+    </Dock>
   )
 }

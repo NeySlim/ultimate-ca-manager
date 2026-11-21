@@ -383,7 +383,8 @@
     "groups": {
       "letsEncrypt": "Let’s Encrypt",
       "localAcme": "ACME Local",
-      "history": "Historique"
+      "history": "Historique",
+      "client": "Client ACME"
     },
     "challengeValidated": "Challenge validé : commande prête pour finalisation",
     "checkStatus": "Vérifier le statut",
@@ -535,7 +536,9 @@
       "editDomainsTitle": "Modifier les domaines autorisés",
       "domainsSaved": "Domaines autorisés enregistrés",
       "domainsSaveFailed": "Échec de l’enregistrement des domaines autorisés",
-      "deleteFailed": "Échec de la suppression du justificatif EAB"
+      "deleteFailed": "Échec de la suppression du justificatif EAB",
+      "caption": "Identifiants EAB. Activez un nom pour ouvrir son détail.",
+      "noNotes": "Aucune note."
     },
     "termsOfServiceTitlePlaceholder": "Titre des CGU (laisser vide pour masquer)",
     "termsOfServiceBodyPlaceholder": "Rédigez vos conditions ici...\n\nSupporte : **gras**, *italique*, [liens](url), - listes\n\nUtilisez des lignes vides pour les paragraphes.",
@@ -709,7 +712,85 @@
       "portNotListening": "Pas à l’écoute",
       "portInvalid": "Saisissez 0 (désactivé) ou un port de 1024 à 65535.",
       "portRestartRequired": "Redémarrez UCM pour appliquer le nouveau port."
-    }
+    },
+    "unit_one": "{{count}} compte",
+    "unit_other": "{{count}} comptes",
+    "accountsRange_one": "{{shown}} sur {{count}} compte",
+    "accountsRange_other": "{{shown}} sur {{count}} comptes",
+    "accountsCaption": "Comptes ACME. Activez un nom pour ouvrir son détail.",
+    "accountStates": {
+      "valid": "Actifs",
+      "deactivated": "Désactivés",
+      "revoked": "Révoqués"
+    },
+    "filterByState": "Filtrer par état",
+    "copyDirectory": "Copier l’URL du répertoire",
+    "contact": "Contact",
+    "noContact": "Aucun",
+    "createdOn": "Créé le",
+    "accountKey": "Clé du compte",
+    "tabs": {
+      "account": "Compte"
+    },
+    "lastOrder": "Dernière commande",
+    "noneOrder": "Aucune",
+    "orderLine": "Commande {{id}}",
+    "ordersFailing": "{{count}}, dont {{failing}} en échec",
+    "deactivationFinal": "Une désactivation ACME est définitive (RFC 8555, §7.3.6) : le client doit enregistrer un nouveau compte.",
+    "disableAccount": "Désactiver le compte…",
+    "disableTitle": "Désactiver ce compte ACME ?",
+    "disableWarning": "La désactivation est définitive (RFC 8555, §7.3.6) : {{name}} ne pourra plus passer de commande, le client devra enregistrer un nouveau compte.",
+    "disableConfirm": "Désactiver le compte",
+    "challengeTxt": "Enregistrement TXT {{name}}",
+    "challengeAlpn": "Négociation TLS sur {{host}}",
+    "views": {
+      "accounts": "Comptes",
+      "localorders": "Commandes",
+      "localdomains": "Domaines",
+      "eab": "Identifiants EAB",
+      "config": "Réglages du serveur",
+      "letsencrypt": "Réglages du client",
+      "client": "Client ACME",
+      "letsencryptorders": "Commandes du client",
+      "upstream": "AC amont",
+      "dns": "Fournisseurs DNS",
+      "domains": "Domaines du client",
+      "history": "Certificats émis"
+    },
+    "ordersCaption": "Commandes ACME. Activez un nom pour ouvrir son détail.",
+    "deleteOrderOf": "Supprimer la commande de {{domain}}",
+    "domainsCaption": "Domaines. Activez un nom pour ouvrir son détail.",
+    "domainsRange_one": "{{count}} domaine",
+    "domainsRange_other": "{{count}} domaines",
+    "providersCaption": "Fournisseurs DNS. Activez un nom pour ouvrir son détail.",
+    "providersRange_one": "{{count}} fournisseur",
+    "providersRange_other": "{{count}} fournisseurs",
+    "upstreamCaption": "AC amont. Activez un nom pour ouvrir son détail.",
+    "upstreamRange_one": "{{count}} AC amont",
+    "upstreamRange_other": "{{count}} AC amont",
+    "accountUrl": "URL du compte",
+    "clientOrdersRange_one": "{{shown}} sur {{count}} commande",
+    "clientOrdersRange_other": "{{shown}} sur {{count}} commandes",
+    "accountOrCa": "Compte ou AC",
+    "renewalFailuresLabel": "Échecs de renouvellement",
+    "historyCaption": "Certificats émis par ACME. Activez un nom pour ouvrir son détail.",
+    "historyRange": "{{start}}–{{end}} sur {{count}} certificats",
+    "historyTotal_one": "{{count}} certificat",
+    "historyTotal_other": "{{count}} certificats",
+    "historyExportScope": "{{count}} certificats, avec la recherche et les filtres en cours (10 000 au plus).",
+    "removeProfile": "Retirer le profil {{name}}",
+    "boundsError": "Un nombre entier de {{min}} à {{max}}.",
+    "dnsSettings": "Contrôles DNS-01",
+    "keysAndTransport": "Clés et transport",
+    "unregisterProxy": "Désenregistrer",
+    "accountState": {
+      "valid": "Actif",
+      "deactivated": "Désactivé",
+      "revoked": "Révoqué"
+    },
+    "identifier": "Identifiant",
+    "emptyAccountsTitle": "Aucun compte ACME",
+    "emptyAccountsText": "Les clients ACME (certbot, cert-manager, acme.sh) créent leur compte eux-mêmes auprès du répertoire : copiez son URL dans leur configuration."
   },
   "audit": {
     "event": "Événement",
@@ -2461,7 +2542,51 @@
     "namedUrlsOff": "Les chemins CDP/AIA utilisent l’identifiant interne. Activez pour utiliser un slug issu du nom de l’AC dans les nouveaux certificats.",
     "namedUrlsEnable": "Utiliser le nom de l’AC",
     "namedUrlsConfirm": "Activer les URLs de protocole nommées pour « {{name}} » ? Un slug issu du nom de l’AC apparaîtra dans les URLs CDP/AIA des nouveaux certificats émis. Les URLs existantes continuent de fonctionner. Cette option ne pourra plus être désactivée.",
-    "namedUrlsEnabled": "URLs nommées activées : {{slug}}"
+    "namedUrlsEnabled": "URLs nommées activées : {{slug}}",
+    "unit_one": "{{count}} autorité",
+    "unit_other": "{{count}} autorités",
+    "range_one": "{{shown}} sur {{count}} autorité",
+    "range_other": "{{shown}} sur {{count}} autorités",
+    "caption": "CRL / OCSP. Activez un nom pour ouvrir son détail.",
+    "filterByState": "Filtrer par état",
+    "search": "Rechercher une autorité",
+    "createCa": "Créer une AC",
+    "states": {
+      "current": "À jour",
+      "soon": "Moins de 24 h",
+      "expired": "Échue",
+      "none": "Sans CRL"
+    },
+    "numberOf": "n° {{number}}",
+    "ocspActive": "Actif",
+    "ocspInactive": "Inactif",
+    "columns": {
+      "published": "Publiée"
+    },
+    "tabs": {
+      "publication": "Publication"
+    },
+    "responderDisabled": "désactivé",
+    "responderRunning": "en marche",
+    "responderStopped": "arrêté",
+    "responderAside": "Répondeur OCSP : {{state}}, {{count}} requêtes, {{rate}} % en cache",
+    "summaryNone": "Aucune CRL publiée pour cette autorité.",
+    "summaryRevoked_one": "La CRL n° {{number}} liste {{count}} certificat révoqué.",
+    "summaryRevoked_other": "La CRL n° {{number}} liste {{count}} certificats révoqués.",
+    "summary": {
+      "soon": "Sa prochaine mise à jour tombe dans moins de 24 h.",
+      "expired": "Sa date de prochaine mise à jour est passée : régénérez-la."
+    },
+    "days_one": "{{count}} jour",
+    "days_other": "{{count}} jours",
+    "hours_one": "{{count}} heure",
+    "hours_other": "{{count}} heures",
+    "ocspResponderOf": "Répondre en OCSP pour cette autorité",
+    "statsAllAuthorities": "Requêtes et réponses en cache comptent toutes les autorités du répondeur.",
+    "serial": "N° de série {{serial}}",
+    "slug": "Nom dans les URL",
+    "emptyTitle": "Aucune liste de révocation",
+    "emptyText": "Créez d’abord une AC : chaque autorité apparaîtra ici avec sa CRL et son répondeur OCSP."
   },
   "deploy": {
     "title": "Déploiement de certificats",
@@ -3371,7 +3496,7 @@
   "scep": {
     "title": "Protocole SCEP",
     "requests": "Demandes",
-    "challenge": "Mot de passe de challenge",
+    "challenge": "Mot de passe de défi",
     "info": "Informations",
     "scepURL": "URL SCEP",
     "noRequests": "Aucune demande SCEP",
@@ -3477,7 +3602,67 @@
     "profileDeleted": "Profil SCEP supprimé",
     "profileDeleteConfirm": "Supprimer le profil SCEP « {{name}} » ? Les équipements qui s’enrôlent via son URL seront refusés.",
     "profileChallengeRegenerated": "Challenge régénéré et copié dans le presse-papiers",
-    "confirmRegenerateProfileChallenge": "Régénérer le challenge du profil « {{name}} » ? L’actuel cesse de fonctionner immédiatement et tous les appareils configurés avec doivent être mis à jour."
+    "confirmRegenerateProfileChallenge": "Régénérer le challenge du profil « {{name}} » ? L’actuel cesse de fonctionner immédiatement et tous les appareils configurés avec doivent être mis à jour.",
+    "unit_one": "{{count}} profil",
+    "unit_other": "{{count}} profils",
+    "range_one": "{{shown}} sur {{count}} profil",
+    "range_other": "{{shown}} sur {{count}} profils",
+    "requestUnit_one": "{{count}} demande",
+    "requestUnit_other": "{{count}} demandes",
+    "requestRange": "{{start}}–{{end}} sur {{count}} demandes",
+    "intuneUnit_one": "{{count}} inscription",
+    "intuneUnit_other": "{{count}} inscriptions",
+    "intuneRange_one": "{{shown}} sur {{count}} inscription",
+    "intuneRange_other": "{{shown}} sur {{count}} inscriptions",
+    "caption": "Profils SCEP. Activez un nom pour ouvrir son détail.",
+    "requestsCaption": "Demandes SCEP. Activez un sujet pour ouvrir son détail.",
+    "challengesCaption": "Mots de passe de défi des autorités. Activez un nom pour ouvrir son détail.",
+    "intuneCaption": "Inscriptions d’applications Intune. Activez un nom pour ouvrir son détail.",
+    "filterByState": "Filtrer par état",
+    "filters": {
+      "active": "Actifs",
+      "disabled": "Désactivés"
+    },
+    "columns": {
+      "ca": "Autorité",
+      "template": "Modèle",
+      "profile": "Profil"
+    },
+    "tabs": {
+      "profile": "Profil"
+    },
+    "sections": {
+      "enrollment": "Enrôlement",
+      "issuance": "Émission"
+    },
+    "enrollmentUrl": "URL d’enrôlement",
+    "copyUrl": "Copier l’URL",
+    "challengeHidden": "Défini, masqué",
+    "challengeNone": "Aucun",
+    "challengeIntune": "Vérifié par Intune",
+    "challengeSet": "Défini",
+    "disable": "Désactiver",
+    "enable": "Activer",
+    "rotate": "Régénérer le mot de passe…",
+    "rotateTitle": "Régénérer le mot de passe de défi ?",
+    "rotateWarning": "L’ancien mot de passe cesse aussitôt de fonctionner : les équipements de « {{name}} » qui ne l’ont pas encore utilisé devront recevoir le nouveau.",
+    "newChallengeTitle": "Nouveau mot de passe de défi",
+    "newChallengeOnce": "Nouveau mot de passe de « {{name}} », affiché une seule fois :",
+    "newChallengeHint": "Transmettez-le maintenant à l’outil de gestion des équipements : il ne pourra plus être relu.",
+    "profileEnabled": "Profil « {{name}} » activé",
+    "profileDisabled": "Profil « {{name}} » désactivé",
+    "requestNumber": "Demande n° {{id}}",
+    "caWide": "Point de l’autorité",
+    "clientIp": "Adresse du client",
+    "approvedAt": "Approuvée le",
+    "securityDesc": "Approbation, validité des défis et contrôles des messages.",
+    "challengeValidityInvalid": "Un nombre entier d’heures, 1 au moins.",
+    "fixBeforeSaving_one": "{{count}} champ à corriger avant d’enregistrer.",
+    "fixBeforeSaving_other": "{{count}} champs à corriger avant d’enregistrer.",
+    "views": {
+      "challenges": "Défis des autorités"
+    },
+    "emptyProfilesText": "Un profil relie une AC émettrice, un modèle et un mot de passe de défi."
   },
   "session": {
     "expiring": "Session en cours d’expiration",
@@ -6621,7 +6806,29 @@
     "labelName": "Libellé",
     "labelPlaceholder": "ex. agence",
     "responseIncludeChain": "Inclure la chaîne AC dans les réponses d’enrôlement",
-    "responseIncludeChainHelp": "Les réponses RFC 7030 ne contiennent que le certificat émis ; à activer pour les clients legacy qui construisent leur bundle depuis la réponse d’enrôlement au lieu de /cacerts."
+    "responseIncludeChainHelp": "Les réponses RFC 7030 ne contiennent que le certificat émis ; à activer pour les clients legacy qui construisent leur bundle depuis la réponse d’enrôlement au lieu de /cacerts.",
+    "unit_one": "{{count}} point d’enrôlement",
+    "unit_other": "{{count}} points d’enrôlement",
+    "range_one": "{{shown}} sur {{count}} point d’enrôlement",
+    "range_other": "{{shown}} sur {{count}} points d’enrôlement",
+    "caption": "EST. Activez un nom pour ouvrir son détail.",
+    "defaultEndpoint": "Point par défaut",
+    "columns": {
+      "auth": "Authentification"
+    },
+    "auth": {
+      "cert": "Certificat client",
+      "certOrPassword": "Certificat client ou mot de passe"
+    },
+    "aside": "{{total}} enrôlements, {{failed}} en échec",
+    "summaryTotals": "{{total}} enrôlements depuis le début sur tous les points, {{successful}} réussis, {{failed}} en échec.",
+    "labelsRepeated": "Deux libellés sont identiques : renommez-en un avant d’enregistrer.",
+    "removeLabel": "Retirer le libellé {{label}}",
+    "addLabel": "Ajouter un libellé",
+    "passwordKept": "Un mot de passe est enregistré : laissez vide pour le garder.",
+    "views": {
+      "list": "Points d’enrôlement"
+    }
   },
   "discovery": {
     "aboutDiscovery": "À propos de la découverte",
@@ -7336,6 +7543,28 @@
       "management": "Gestion",
       "settings": "Paramètres",
       "info": "Informations"
+    },
+    "serviceName": "Service d’horodatage",
+    "unit_one": "{{count}} service",
+    "unit_other": "{{count}} services",
+    "range_one": "{{shown}} sur {{count}} service",
+    "range_other": "{{shown}} sur {{count}} services",
+    "caption": "TSA. Activez un nom pour ouvrir son détail.",
+    "filterByState": "Filtrer par état",
+    "columns": {
+      "ca": "Autorité",
+      "digest": "Hachage",
+      "policy": "Politique"
+    },
+    "configure": "Configurer",
+    "summaryTotals": "{{total}} demandes reçues depuis le début, {{successful}} servies par un jeton, {{failed}} refusées.",
+    "sections": {
+      "service": "Service",
+      "signer": "Signature des jetons"
+    },
+    "views": {
+      "list": "Services",
+      "config": "Configuration"
     }
   },
   "sshCas": {
@@ -8532,5 +8761,14 @@
     "settingsSections": "Sections des paramètres",
     "pageActions": "Autres actions de la page {{name}}",
     "pageActionsTitle": "Actions de la page"
+  },
+  "protocols": {
+    "copyValue": "Copier {{name}}",
+    "removeUrl": "Retirer {{url}}",
+    "newUrl": "Nouvelle URL : {{name}}",
+    "view": "Vue",
+    "sections_one": "{{count}} section",
+    "sections_other": "{{count}} sections",
+    "sectionsOf": "Sections : {{name}}"
   }
 }

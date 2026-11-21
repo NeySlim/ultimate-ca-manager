@@ -9,7 +9,7 @@ import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key) => key,
+    t: (key, opts) => (opts?.total !== undefined ? `${key}:${opts.total}` : key),
     i18n: { language: 'en', changeLanguage: vi.fn(), on: vi.fn(), off: vi.fn() },
   }),
   Trans: ({ children }) => children,
@@ -89,9 +89,8 @@ const DEDICATED = {
 }
 
 async function openSettingsTab() {
-  render(<MemoryRouter><TSAPage /></MemoryRouter>)
-  const settingsTabs = await screen.findAllByText('tsa.groups.settings')
-  fireEvent.click(settingsTabs[settingsTabs.length - 1])
+  render(<MemoryRouter initialEntries={['/tsa-config?tab=config']}><TSAPage /></MemoryRouter>)
+  await screen.findByText('tsa.signingCertDesc')
   await screen.findByText('tsa.signingCertDesc')
 }
 
@@ -126,9 +125,10 @@ describe('TSAPage warnings and stats', () => {
     expect(screen.queryByText('tsa.policyPlaceholderWarning')).not.toBeInTheDocument()
   })
 
-  it('shows the total the stats API returns', async () => {
+  it('shows the total the stats API returns in the service detail', async () => {
     config.current = DEDICATED
-    await openSettingsTab()
-    expect(screen.getAllByText('17').length).toBeGreaterThan(0)
+    render(<MemoryRouter><TSAPage /></MemoryRouter>)
+    fireEvent.click(await screen.findByText('tsa.serviceName', { selector: '.entity-name' }))
+    expect(await screen.findByText('tsa.summaryTotals:17')).toBeInTheDocument()
   })
 })

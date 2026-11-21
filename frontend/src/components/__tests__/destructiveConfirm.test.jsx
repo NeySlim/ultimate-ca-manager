@@ -53,10 +53,8 @@ vi.mock('../../services', () => ({
   mscaService: mscaMocks,
 }))
 
-import ScepProfilesTab from '../../pages/scep/ScepProfilesTab'
 import { MscaCaControlModal } from '../MscaCaControlModal'
 
-const PROFILE = { id: 3, name: 'Kiosks', url_slug: 'kiosks', ca_refid: 'ca-1', enabled: true }
 
 beforeEach(() => {
   Object.values(notify).forEach(fn => fn.mockReset())
@@ -71,43 +69,8 @@ beforeEach(() => {
   mscaMocks.denyRequest.mockResolvedValue({})
 })
 
-const renderProfiles = () => render(
-  <ScepProfilesTab profiles={[PROFILE]} cas={[]} templates={[]} canWrite onChanged={vi.fn()} />
-)
-
-describe('SCEP profile challenge rotation asks first', () => {
-  it('does not rotate the challenge when the operator declines', async () => {
-    notify.showConfirm.mockResolvedValue(false)
-    renderProfiles()
-    fireEvent.click(screen.getByLabelText('scep.regenerate'))
-
-    await waitFor(() => expect(notify.showConfirm).toHaveBeenCalledTimes(1))
-    expect(scepMocks.regenerateProfileChallenge).not.toHaveBeenCalled()
-  })
-
-  it('rotates it once the operator accepts', async () => {
-    notify.showConfirm.mockResolvedValue(true)
-    renderProfiles()
-    fireEvent.click(screen.getByLabelText('scep.regenerate'))
-
-    await waitFor(() => expect(scepMocks.regenerateProfileChallenge).toHaveBeenCalledWith(PROFILE.id))
-  })
-})
-
-describe('SCEP profile deletion uses the shared mechanism', () => {
-  it('goes through showConfirm rather than the browser dialog', async () => {
-    const browserConfirm = vi.fn(() => true)
-    vi.stubGlobal('confirm', browserConfirm)
-    notify.showConfirm.mockResolvedValue(true)
-    renderProfiles()
-    fireEvent.click(screen.getByLabelText('common.delete'))
-
-    await waitFor(() => expect(scepMocks.deleteProfile).toHaveBeenCalledWith(PROFILE.id))
-    expect(notify.showConfirm).toHaveBeenCalled()
-    expect(browserConfirm).not.toHaveBeenCalled()
-    vi.unstubAllGlobals()
-  })
-})
+// SCEP profiles: rotation waits for the mockup's dialog and deletion goes through showConfirm
+// (pages/__tests__/SCEPPage.atelier.test.jsx).
 
 describe('denying a request on a Microsoft CA asks first', () => {
   const renderModal = () => render(
@@ -154,7 +117,7 @@ describe('the remaining destructive handlers confirm before calling the API', ()
   it.each([
     ['pages/CRLOCSPPage.jsx', 'handleRemoveResponder'],
     ['pages/ACMEPage.jsx', 'handleDeleteCaAccount'],
-    ['pages/SCEPPage.jsx', 'handleRegenerateChallenge'],
+    ['pages/SCEPPage.jsx', 'regenerateCaChallenge'],
   ])('%s → %s', (file, handler) => {
     const body = handlerBody(read(file), handler)
     expect(body).toContain('showConfirm')
@@ -187,7 +150,7 @@ describe('one confirmation mechanism, spelled one way', () => {
   it('leaves no raw window.confirm anywhere in the app', () => {
     const offenders = []
     const files = [
-      'pages/scep/ScepProfilesTab.jsx', 'pages/SCEPPage.jsx', 'pages/CRLOCSPPage.jsx',
+      'pages/scep/ScepProfileForm.jsx', 'pages/SCEPPage.jsx', 'pages/CRLOCSPPage.jsx',
       'pages/ACMEPage.jsx', 'components/MscaCaControlModal.jsx',
     ]
     for (const file of files) {

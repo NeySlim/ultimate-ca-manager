@@ -1,306 +1,147 @@
-import { useMemo, useCallback } from 'react'
+/**
+ * Certificates issued through ACME (the built-in server and the client), drawn as the mockup's
+ * module list with its dock: paged, sorted and filtered by the server (search, source, state, CA);
+ * the export walks every page, in CSV or JSON, as the Activity's export dialog does.
+ */
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Certificate, CheckCircle, XCircle, Clock, ClockCounterClockwise } from '@phosphor-icons/react'
-import { Badge, ResponsiveDataTable } from '../../components'
-import { cn, daysRemaining, formatDate } from '../../lib/utils'
-import CertDetailPanel from './CertDetailPanel'
+import {
+  Btn, Pill, ListView, Toolbar, SearchField, FilterSelect, ToolsDivider, Dock, DockBody, Section, Props, EmptyBlock, NoMatch, AtelierDialog,
+} from '../../components/atelier'
+import { exportToCSV, exportToJSON } from '../../lib/utils'
+import { fetchPages } from '../../lib/fetchAllPages'
+import { dateOf, dateTimeOf } from '../admin/adminDates'
+import { Copyable, Notice } from '../protocols/atelierParts'
+import { SlotDock } from '../protocols/dockSlot'
 
-// The columns the server can sort by; the others are not sortable here
-const SERVER_SORT_KEYS = ['common_name', 'valid_to', 'created_at', 'source']
+const EXPORT_PAGE_SIZE = 100
+const EXPORT_MAX_ROWS = 10000
 
-export default function HistoryTab({ history, total, page, perPage, onPageChange, onPerPageChange, search, onSearchChange, onSortChange, caOptions, exportLoader, filterStatus, onFilterStatusChange, filterCA, onFilterCAChange, filterSource, onFilterSourceChange, selectedCert, onSelectCert }) {
-  const { t } = useTranslation()
+export default function HistoryTab({ history, total, page, perPage, onPageChange, onPerPageChange, search, onSearchChange, sort, onSortChange,
+  caOptions, exportLoader, filterStatus, onFilterStatusChange, filterCA, onFilterCAChange, filterSource, onFilterSourceChange, selectedCert, onSelectCert, loading }) {
+  const { t, i18n } = useTranslation()
+  const locale = i18n?.language || 'en'
+  const [exporting, setExporting] = useState(false)
+  const [format, setFormat] = useState('csv')
+  const [notice, setNotice] = useState(null)
+  const [busy, setBusy] = useState(false)
 
-  const handleApplyFilterPreset = useCallback((filters) => {
-    if (filters.source) onFilterSourceChange(filters.source)
-    else onFilterSourceChange('')
-    if (filters.status) onFilterStatusChange(Array.isArray(filters.status) ? filters.status : [filters.status])
-    else onFilterStatusChange([])
-    if (filters.ca) onFilterCAChange(filters.ca)
-    else onFilterCAChange('')
-  }, [onFilterStatusChange, onFilterCAChange, onFilterSourceChange])
+  const sourceLabel = (r) => (r.source === 'letsencrypt' ? t('acme.letsEncryptLabel')
+    : r.source === 'acme_client' ? (r.ca_account_label || t('certificates.sourceAcmeClient')) : t('acme.localAcmeLabel'))
+  const pill = (r) => <Pill label={t(r.revoked ? 'common.revoked' : 'common.valid')} tone={r.revoked ? 'bad' : 'good'} />
+  const environment = (r) => (!r.environment ? '—' : r.environment === 'local' || r.source === 'acme' ? t('acme.localAcmeLabel')
+    : t(r.environment === 'production' ? 'acme.production' : 'acme.staging'))
+  const pages = Math.max(1, Math.ceil(total / perPage))
+  const start = total ? (page - 1) * perPage + 1 : 0
+  const narrowed = Boolean(search || filterSource || filterCA || filterStatus.length)
+  const columns = [
+    { key: 'common_name', header: t('common.commonName') }, { key: 'issuer', header: t('common.issuer') },
+    { key: 'source', header: t('common.source') }, { key: 'challenge_type', header: t('acme.method') },
+    { key: 'valid_to', header: t('common.expires') }, { key: 'created_at', header: t('common.issued') },
+  ]
 
-  const historyColumns = useMemo(() => [
-    {
-      key: 'common_name',
-      header: t('common.commonName'),
-      priority: 1,
-      sortable: true,
-      render: (value, row) => (
-        <div className="flex items-center gap-2">
-          <div className={cn(
-            "w-6 h-6 rounded-lg flex items-center justify-center shrink-0",
-            row?.revoked ? "icon-bg-orange" : "icon-bg-blue"
-          )}>
-            <Certificate size={14} weight="duotone" />
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="font-medium truncate">{value}</span>
-            {row?.order?.account && (
-              <span className="text-xs text-text-tertiary">via {row.order.account}</span>
-            )}
-          </div>
-        </div>
-      ),
-      mobileRender: (value, row) => (
-        <div className="flex items-center justify-between gap-2 w-full">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className={cn(
-              "w-6 h-6 rounded-lg flex items-center justify-center shrink-0",
-              row?.revoked ? "icon-bg-orange" : "icon-bg-blue"
-            )}>
-              <Certificate size={14} weight="duotone" />
-            </div>
-            <span className="font-medium truncate">{value}</span>
-          </div>
-          <Badge 
-            variant={row?.revoked ? 'danger' : 'success'} 
-            size="sm"
-            icon={row?.revoked ? XCircle : CheckCircle}
-          >
-            {row?.revoked ? t('common.revoked') : t('common.valid')}
-          </Badge>
-        </div>
-      )
-    },
-    {
-      key: 'status',
-      header: t('common.status'),
-      priority: 2,
-      hideOnMobile: true,
-      render: (value, row) => {
-        if (row?.revoked) {
-          return (
-            <Badge variant="danger" size="sm" icon={XCircle} dot>
-              {t('common.revoked')}
-            </Badge>
-          );
-        }
-        const statusConfig = {
-          valid: { variant: 'success', icon: CheckCircle, pulse: true },
-          issued: { variant: 'success', icon: CheckCircle, pulse: false },
-          pending: { variant: 'warning', icon: Clock, pulse: true },
-          processing: { variant: 'info', icon: Clock, pulse: true },
-          ready: { variant: 'info', icon: CheckCircle, pulse: false },
-          invalid: { variant: 'danger', icon: XCircle, pulse: false },
-        };
-        const config = statusConfig[value] || statusConfig.valid;
-        return (
-          <Badge 
-            variant={config.variant} 
-            size="sm"
-            icon={config.icon}
-            dot
-            pulse={config.pulse}
-          >
-            {value ? value.charAt(0).toUpperCase() + value.slice(1) : t('common.valid')}
-          </Badge>
-        );
-      }
-    },
-    {
-      key: 'issuer',
-      header: t('common.issuer'),
-      priority: 3,
-      sortable: false,
-      hideOnMobile: true,
-      render: (value) => (
-        <span className="text-sm text-text-secondary">{value || t('common.unknown')}</span>
-      ),
-      mobileRender: (value) => (
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-text-tertiary">CA:</span>
-          <span className="text-text-secondary truncate">{value || t('common.unknown')}</span>
-        </div>
-      )
-    },
-    {
-      key: 'valid_to',
-      header: t('common.expires'),
-      priority: 4,
-      sortable: true,
-      render: (value) => {
-        if (!value) return <span className="text-text-tertiary">N/A</span>
-        const expires = new Date(value)
-        const now = new Date()
-        const daysLeft = daysRemaining(expires)
-        const isExpiring = daysLeft > 0 && daysLeft < 30
-        const isExpired = daysLeft <= 0
-        return (
-          <div className="flex items-center gap-2">
-            <Clock size={14} className={cn(
-              isExpired ? "text-status-error" : 
-              isExpiring ? "text-status-warning" : 
-              "text-text-tertiary"
-            )} />
-            <div className="flex flex-col">
-              <span className="text-xs text-text-secondary whitespace-nowrap">{formatDate(value)}</span>
-              <span className={cn(
-                "text-xs",
-                isExpired ? "text-status-error" : 
-                isExpiring ? "text-status-warning" : 
-                "text-text-tertiary"
-              )}>
-                {isExpired ? t('common.expired') : t('acme.daysLeft', { count: daysLeft })}
-              </span>
-            </div>
-          </div>
-        )
-      },
-      mobileRender: (value) => {
-        if (!value) return null
-        const expires = new Date(value)
-        const now = new Date()
-        const daysLeft = daysRemaining(expires)
-        const isExpired = daysLeft <= 0
-        return (
-          <div className="flex items-center gap-2 text-xs">
-            <Clock size={12} className="text-text-tertiary" />
-            <span className={isExpired ? "text-status-error" : "text-text-secondary"}>
-              {isExpired ? t('common.expired') : `${daysLeft}d`}
-            </span>
-          </div>
-        )
-      }
-    },
-    {
-      key: 'source',
-      header: t('common.source'),
-      sortable: true,
-      priority: 3,
-      hideOnMobile: true,
-      render: (value, row) => {
-        const isExternal = value === 'letsencrypt' || value === 'acme_client'
-        const label = value === 'letsencrypt'
-          ? t('acme.letsEncryptLabel')
-          : value === 'acme_client'
-            ? (row?.ca_account_label || t('certificates.sourceAcmeClient'))
-            : t('acme.localAcmeLabel')
-        return (
-          <Badge variant={isExternal ? 'green' : 'cyan'} size="sm" dot>
-            {label}
-          </Badge>
-        )
-      }
-    },
-    {
-      key: 'challenge_type',
-      header: t('acme.method'),
-      priority: 4,
-      hideOnMobile: true,
-      render: (value) => (
-        <Badge variant="default" size="sm">
-          {value?.toUpperCase() || 'N/A'}
-        </Badge>
-      )
-    },
-    {
-      key: 'dns_provider',
-      header: t('acme.provider'),
-      priority: 5,
-      hideOnMobile: true,
-      render: (value) => (
-        <span className="text-sm text-text-secondary">{value || '-'}</span>
-      )
-    },
-    {
-      key: 'environment',
-      header: t('acme.environment'),
-      priority: 5,
-      hideOnMobile: true,
-      render: (value, row) => {
-        if (!value) return <span className="text-text-tertiary">-</span>
-        if (value === 'local' || row?.source === 'acme') {
-          return (
-            <Badge variant="cyan" size="sm">
-              {t('acme.localAcmeLabel')}
-            </Badge>
-          )
-        }
-        const isProduction = value === 'production'
-        return (
-          <Badge 
-            variant={isProduction ? 'success' : 'warning'} 
-            size="sm"
-          >
-            {isProduction ? t('acme.production') : t('acme.staging')}
-          </Badge>
-        )
-      }
-    },
-    {
-      key: 'created_at',
-      header: t('common.issued'),
-      priority: 6,
-      sortable: true,
-      hideOnMobile: true,
-      render: (value) => (
-        <span className="text-xs text-text-tertiary whitespace-nowrap">
-          {value ? formatDate(value) : 'N/A'}
-        </span>
-      )
+  const runExport = async () => {
+    setBusy(true)
+    setNotice(null)
+    try {
+      const { rows, complete } = await fetchPages(exportLoader, { perPage: EXPORT_PAGE_SIZE, max: EXPORT_MAX_ROWS })
+      if (!complete) { setNotice(t('table.exportFailed')); return }
+      if (format === 'json') exportToJSON(rows, 'acme-certificates')
+      else exportToCSV(rows, columns, 'acme-certificates')
+      setExporting(false)
+    } catch {
+      setNotice(t('table.exportFailed'))
+    } finally {
+      setBusy(false)
     }
-  ].map((col) => (SERVER_SORT_KEYS.includes(col.key) ? col : { ...col, sortable: false })), [t])
+  }
+
+  const cert = selectedCert
+  const dock = cert && (
+    <Dock label={t('atelier.detailOf', { name: t('common.history') })} tabsLabel={t('atelier.openItem')} activeKey={cert.id}
+      tabs={[{ key: cert.id, title: cert.common_name, icon: 'cert' }]} onClose={() => onSelectCert(null)}>
+      <DockBody icon="cert" title={cert.common_name} badge={pill(cert)} section="cert" onSection={() => {}}
+        sectionsLabel={t('atelier.sectionsOf', { name: cert.common_name })} sections={[['cert', t('atelier.overview')]]}>
+        <div className="module-detail">
+          <Section title={t('common.certificateDetails')}>
+            <Props items={[
+              [t('common.commonName'), cert.common_name], [t('common.serialNumber'), <Copyable key="s" value={cert.serial} label={t('common.serialNumber')} />],
+              [t('common.issuer'), cert.issuer || t('acme.unknownCA')], [t('common.source'), sourceLabel(cert)],
+              [t('common.validFrom'), dateTimeOf(cert.valid_from, locale) || '—'], [t('common.validTo'), dateTimeOf(cert.valid_to, locale) || '—'],
+              [t('common.issued'), dateTimeOf(cert.created_at, locale) || '—'],
+            ]} />
+          </Section>
+          <Section title={t('acme.acmeOrder')}>
+            <Props items={[
+              [t('acme.method'), cert.challenge_type?.toUpperCase() || '—'], [t('acme.provider'), cert.dns_provider || '—'],
+              [t('acme.environment'), environment(cert)],
+              cert.order?.account && [t('acme.account'), <span key="a" className="mono">{cert.order.account}</span>],
+              cert.order?.status && [t('acme.orderStatus'), cert.order.status],
+              cert.order?.order_id && [t('acme.orderId'), <Copyable key="o" value={cert.order.order_id} label={t('acme.orderId')} />],
+            ]} />
+          </Section>
+        </div>
+      </DockBody>
+    </Dock>
+  )
 
   return (
-    <ResponsiveDataTable
-      data={history}
-      columns={historyColumns}
-      columnStorageKey="acme-history-columns"
-      searchable
-      searchPlaceholder={t('common.searchCertificates')}
-      externalSearch={search}
-      onSearchChange={onSearchChange}
-      getRowId={(row) => row.id}
-      onRowClick={onSelectCert}
-      selectedRow={selectedCert}
-      sortable
-      defaultSort={{ key: 'created_at', direction: 'desc' }}
-      onSortChange={onSortChange}
-      pagination={{ page, total, perPage, onChange: onPageChange, onPerPageChange }}
-      exportEnabled
-      exportLoader={exportLoader}
-      exportFilename="acme-certificates"
-      toolbarFilters={[
-        {
-          key: 'source',
-          value: filterSource,
-          onChange: onFilterSourceChange,
-          placeholder: t('acme.allSources'),
-          options: [
-            { value: 'acme', label: t('acme.localAcme') },
-            { value: 'acme_client', label: t('certificates.sourceAcmeClient') },
-            { value: 'letsencrypt', label: t('acme.letsEncrypt') }
-          ]
-        },
-        {
-          key: 'status',
-          label: t('common.status'),
-          type: 'multiSelect',
-          value: filterStatus,
-          onChange: onFilterStatusChange,
-          placeholder: t('common.allStatus'),
-          options: [
-            { value: 'valid', label: t('common.valid') },
-            { value: 'revoked', label: t('common.revoked') }
-          ]
-        },
-        {
-          key: 'ca',
-          value: filterCA,
-          onChange: onFilterCAChange,
-          placeholder: t('acme.allCAs'),
-          options: caOptions
-        }
-      ]}
-      filterPresetsKey="ucm-acme-presets"
-      densityStorageKey="ucm-acme-density"
-      onApplyFilterPreset={handleApplyFilterPreset}
-      emptyState={{
-        icon: ClockCounterClockwise,
-        title: t('acme.noCertificates'),
-        description: t('acme.noCertificatesDesc')
-      }}
-    />
+    <>
+      <ListView label={t('common.history')} caption={t('acme.historyCaption')} icon="cert" rows={history} loading={loading}
+        filters={{
+          views: [{ id: '', label: t('common.all') }, { id: 'valid', label: t('common.valid') }, { id: 'revoked', label: t('common.revoked') }],
+          active: filterStatus.length === 1 ? filterStatus[0] : '', onChange: (v) => onFilterStatusChange(v ? [v] : []), label: t('acme.filterByState'),
+        }}
+        toolbar={(
+          <Toolbar>
+            <SearchField id="acme-history-search" name="q" label={t('common.searchCertificates')} placeholder={t('common.searchCertificates')} value={search} onChange={onSearchChange} />
+            <FilterSelect id="acme-history-source" label={t('common.source')} value={filterSource} onChange={onFilterSourceChange}
+              options={[{ value: '', label: t('acme.allSources') }, { value: 'acme', label: t('acme.localAcme') },
+                { value: 'acme_client', label: t('certificates.sourceAcmeClient') }, { value: 'letsencrypt', label: t('acme.letsEncrypt') }]} />
+            <FilterSelect id="acme-history-ca" label={t('common.issuer')} value={filterCA} onChange={onFilterCAChange}
+              options={[{ value: '', label: t('acme.allCAs') }, ...caOptions]} />
+            <ToolsDivider />
+            <Btn icon="download" id="acme-history-export" onClick={() => { setNotice(null); setExporting(true) }}>{t('table.exportData')}</Btn>
+          </Toolbar>
+        )}
+        title={(r) => r.common_name} status={pill} openedId={cert?.id} onOpen={onSelectCert}
+        nameSort="common_name" sort={sort ? { key: sort.key, asc: sort.direction === 'asc' } : { key: 'created_at', asc: false }}
+        onSort={(key) => onSortChange({ key, direction: sort?.key === key && sort.direction === 'asc' ? 'desc' : 'asc' })}
+        columns={[
+          { id: 'issuer', label: t('common.issuer'), cell: (r) => r.issuer || t('common.unknown'), grow: true },
+          { id: 'source', label: t('common.source'), cell: sourceLabel, sort: 'source' },
+          { id: 'method', label: t('acme.method'), cell: (r) => r.challenge_type?.toUpperCase() || '—' },
+          { id: 'expires', label: t('common.expires'), cell: (r) => dateOf(r.valid_to, locale) || '—', sort: 'valid_to' },
+          { id: 'issued', label: t('common.issued'), cell: (r) => dateOf(r.created_at, locale) || '—', sort: 'created_at' },
+          { status: true },
+        ]}
+        empty={narrowed ? (
+          <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')}
+            onReset={() => { onSearchChange(''); onFilterSourceChange(''); onFilterCAChange(''); onFilterStatusChange([]) }} />
+        ) : <EmptyBlock id="acme-history" icon="cert" title={t('acme.noCertificates')} text={t('acme.noCertificatesDesc')} />}
+        footer={{
+          range: t('acme.historyRange', { start, end: Math.min(page * perPage, total), count: total }),
+          pagination: { page, pages, perPage, onPage: onPageChange, onPerPage: onPerPageChange, jump: pages > 5 },
+        }} />
+      <SlotDock>{dock}</SlotDock>
+      {exporting && (
+        <AtelierDialog size="narrow" title={t('table.exportData')} onClose={() => setExporting(false)} returnTo="acme-history-export">
+          <p className="event-detail">{t('acme.historyExportScope', { count: Math.min(total, EXPORT_MAX_ROWS) })}</p>
+          <div className="format-grid">
+            {['csv', 'json'].map((f) => (
+              <label key={f} className="format-option">
+                <input type="radio" name="acme-history-format" value={f} checked={format === f} onChange={() => setFormat(f)} />
+                <span>{f.toUpperCase()}</span>
+              </label>
+            ))}
+          </div>
+          {notice && <Notice tone="warn" role="alert">{notice}</Notice>}
+          <div className="modal-actions">
+            <Btn onClick={() => setExporting(false)}>{t('common.cancel')}</Btn>
+            <Btn tone="primary" icon="download" write={false} disabled={busy || undefined} onClick={runExport}>{t(format === 'json' ? 'table.exportJSON' : 'table.exportCSV')}</Btn>
+          </div>
+        </AtelierDialog>
+      )}
+    </>
   )
 }

@@ -1,12 +1,14 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash, LockKey, Copy, Clock, Warning, Pencil, Check, X } from '@phosphor-icons/react'
-import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
-import { Button, Badge, Card, Input, Select, Modal, Textarea } from '../../components'
+import { Copy, Warning } from '@phosphor-icons/react'
+import { Button, Input, Modal, Textarea } from '../../components'
+import { Btn, Pill, ListView, Dock, DockBody, Section, Props, EmptyBlock, NoMatch } from '../../components/atelier'
+import { SlotDock } from '../protocols/dockSlot'
+import { Copyable } from '../protocols/atelierParts'
+import { dateOf, dateTimeOf } from '../admin/adminDates'
 import { acmeService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks'
-import { formatDate } from '../../lib/utils'
 
 // null (legacy, unrestricted) and any list holding '*' both mean all domains.
 const isUnrestricted = (domains) => domains == null || domains.includes('*')
@@ -46,7 +48,10 @@ function AllowedDomainsField({ allDomains, onAllDomainsChange, text, onTextChang
 }
 
 export default function EabTab({ eabRequired, onToggleEabRequired, showCreateModal, onCloseCreateModal, canWrite, canDelete }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = i18n?.language || 'en'
+  const [loading, setLoading] = useState(true)
+  const [openId, setOpenId] = useState(null)
   const { showSuccess, showError, showConfirm } = useNotification()
   const { copy } = useClipboard()
 
@@ -76,6 +81,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
     acmeService.listEabCredentials()
       .then(res => setEabCredentials(res.data || []))
       .catch(() => {})
+      .finally(() => setLoading(false))
   }
 
   const filteredEabCredentials = useMemo(() => {
@@ -201,220 +207,94 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
   }
 
   const isCreateOpen = showCreateModal || showLocalCreate
+  const STATUS_TONES = { active: 'good', used: 'muted', revoked: 'bad' }
+  const statusLabel = (c) => t(`acme.eab.status${c.status.charAt(0).toUpperCase() + c.status.slice(1)}`)
+  const pill = (c) => <Pill label={statusLabel(c)} tone={STATUS_TONES[c.status] || 'muted'} />
+  const domainsText = (c) => (isUnrestricted(c.allowed_domains) ? t('acme.eab.allDomains')
+    : c.allowed_domains.length === 0 ? t('acme.eab.noDomains') : c.allowed_domains.join(', '))
+  const open = eabCredentials.find((c) => c.id === openId)
+  const name = (c) => c.label || t('acme.eab.unlabeled')
+  const removeAction = (c) => (c.status === 'active'
+    ? { icon: 'block', label: t('acme.eab.revoke'), onClick: () => handleRevokeEabCredential(c) }
+    : { icon: 'close', label: t('acme.eab.delete'), onClick: () => handleDeleteEabCredential(c) })
+
+  const dock = open && (
+    <Dock label={t('atelier.detailOf', { name: 'EAB' })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
+      tabs={[{ key: open.id, title: name(open), icon: 'lock' }]} onClose={() => setOpenId(null)}>
+      <DockBody icon="lock" title={name(open)} badge={pill(open)} section="cred" onSection={() => {}}
+        sectionsLabel={t('atelier.sectionsOf', { name: name(open) })} sections={[['cred', t('atelier.overview')]]}
+        actions={<>
+          {canWrite && <Btn icon="settings" write id="eab-edit-domains" onClick={() => startEditingDomains(open)}>{t('acme.eab.editDomainsTitle')}</Btn>}
+          {canWrite && <Btn icon="file" write id="eab-edit-notes" onClick={() => startEditingNotes(open)}>{t('acme.eab.editNotesTitle')}</Btn>}
+          {canDelete && open.status === 'active' && <Btn tone="danger" icon="block" onClick={() => handleRevokeEabCredential(open)}>{t('acme.eab.revoke')}</Btn>}
+          {canDelete && open.status !== 'active' && <Btn icon="close" onClick={() => handleDeleteEabCredential(open)}>{t('acme.eab.delete')}</Btn>}
+        </>}>
+        <div className="module-detail">
+          <Section title={t('atelier.properties')}>
+            <Props items={[
+              [t('acme.eab.kid'), <Copyable key="k" value={open.kid} label={t('acme.eab.kid')} />],
+              [t('atelier.state'), pill(open)],
+              [t('acme.eab.allowedDomains'), <span key="d" className="mono" data-testid={`eab-dock-domains-${open.id}`}>{domainsText(open)}</span>],
+              [t('acme.eab.created'), dateTimeOf(open.created_at, locale)],
+              open.expires_at && [t('common.expires'), dateTimeOf(open.expires_at, locale)],
+              open.used_at && [t('acme.eab.usedAt'), dateTimeOf(open.used_at, locale)],
+              open.used_by_account_id && [t('acme.eab.boundTo'), <span key="b" className="mono">{open.used_by_account_id}</span>],
+              open.revoked_at && [t('acme.eab.revokedAt'), dateTimeOf(open.revoked_at, locale)],
+            ]} />
+          </Section>
+          <Section title={t('acme.eab.notes')}>
+            <p className="summary">{open.notes || <span className="muted">{t('acme.eab.noNotes')}</span>}</p>
+          </Section>
+        </div>
+      </DockBody>
+    </Dock>
+  )
 
   return (
     <>
-      <div className="p-4 space-y-4">
-        <Card>
-          <div className="p-4 flex items-center justify-between gap-4">
-            <div className="flex items-start gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-lg icon-bg-violet flex items-center justify-center shrink-0">
-                <LockKey size={20} weight="duotone" />
-              </div>
-              <div className="min-w-0">
-                <div className="font-semibold">{t('acme.eab.requiredTitle')}</div>
-                <div className="text-sm text-text-tertiary mt-1">
-                  {t('acme.eab.requiredDescription')}
-                </div>
-              </div>
+      <ListView label="EAB" caption={t('acme.eab.caption')} icon="lock" rows={filteredEabCredentials} loading={loading}
+        filters={{
+          views: ['', 'active', 'used', 'revoked'].map((s) => ({
+            id: s, label: s ? t(`acme.eab.status${s.charAt(0).toUpperCase() + s.slice(1)}`) : t('common.all'),
+            count: s ? eabCredentials.filter((c) => c.status === s).length : eabCredentials.length,
+          })),
+          active: eabFilterStatus, onChange: setEabFilterStatus, label: t('acme.filterByState'),
+          aside: (
+            <label className="checkbox-line eab-required" title={t('acme.eab.requiredDescription')}>
+              <input type="checkbox" checked={!!eabRequired} disabled={!canWrite || undefined} onChange={(e) => onToggleEabRequired(e.target.checked)} />
+              {t('acme.eab.requiredTitle')}
+            </label>
+          ),
+        }}
+        title={name} status={pill} openedId={openId} onOpen={(c) => setOpenId(c.id)}
+        columns={[
+          { id: 'kid', label: t('acme.eab.kid'), cell: (c) => <span className="mono">{c.kid}</span> },
+          { id: 'domains', label: t('acme.eab.allowedDomains'), cell: (c) => <span data-testid={`eab-domains-${c.id}`}>{domainsText(c)}</span>, grow: true },
+          { id: 'created', label: t('acme.eab.created'), cell: (c) => dateOf(c.created_at, locale) },
+          { status: true },
+        ]}
+        rowActions={canDelete ? (c) => [removeAction(c)] : undefined}
+        empty={eabCredentials.length ? (
+          <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')} onReset={() => setEabFilterStatus('')} />
+        ) : (
+          <EmptyBlock id="acme-eab" icon="lock" title={t('acme.eab.empty')} text={t('acme.eab.emptyDesc')}
+            action={canWrite ? { label: t('acme.eab.new'), icon: 'plus', onClick: () => setShowLocalCreate(true), primary: true } : undefined} />
+        )}
+        footer={{ range: t('acme.eab.totalCount', { count: filteredEabCredentials.length }) }} />
+      <SlotDock>{dock}</SlotDock>
+
+      {editingNotesId !== null && (
+        <Modal open onClose={cancelEditingNotes} title={t('acme.eab.editNotesTitle')}>
+          <div className="p-4 space-y-4">
+            <Textarea label={t('acme.eab.notes')} aria-label={t('acme.eab.notes')} placeholder={t('acme.eab.notesPlaceholder')}
+              value={editingNotesValue} onChange={(e) => setEditingNotesValue(e.target.value)} rows={3} />
+            <div className="flex justify-end gap-2 pt-2 border-t border-border">
+              <Button type="button" variant="secondary" onClick={cancelEditingNotes}>{t('common.cancel')}</Button>
+              <Button type="button" onClick={() => saveNotes(editingNotesId)}>{t('common.save')}</Button>
             </div>
-            <ToggleSwitch
-              checked={eabRequired}
-              onChange={onToggleEabRequired}
-              disabled={!canWrite}
-            />
           </div>
-        </Card>
-
-        <Card>
-          <div className="p-4 border-b border-border flex items-center gap-3">
-            <Select
-              value={eabFilterStatus}
-              onChange={setEabFilterStatus}
-              options={[
-                { value: '', label: t('acme.eab.allStatuses') },
-                { value: 'active', label: t('acme.eab.statusActive') },
-                { value: 'used', label: t('acme.eab.statusUsed') },
-                { value: 'revoked', label: t('acme.eab.statusRevoked') }
-              ]}
-              className="w-44"
-            />
-            <span className="text-sm text-text-tertiary">
-              {t('acme.eab.totalCount', { count: filteredEabCredentials.length })}
-            </span>
-          </div>
-          {filteredEabCredentials.length === 0 ? (
-            <div className="p-8 text-center">
-              <LockKey size={36} className="mx-auto mb-3 text-text-tertiary" weight="duotone" />
-              <div className="font-medium">{t('acme.eab.empty')}</div>
-              <div className="text-sm text-text-tertiary mt-1">{t('acme.eab.emptyDesc')}</div>
-              {canWrite && (
-                <Button type="button" className="mt-4" onClick={() => setShowLocalCreate(true)}>
-                  <Plus size={14} />
-                  {t('acme.eab.new')}
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="divide-y divide-border">
-              {filteredEabCredentials.map(cred => (
-                <div key={cred.id} className="p-4 flex items-start justify-between gap-3 hover:bg-tertiary-op40">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium truncate">{cred.label || t('acme.eab.unlabeled')}</span>
-                      <Badge variant={
-                        cred.status === 'active' ? 'success' :
-                        cred.status === 'used' ? 'info' :
-                        cred.status === 'revoked' ? 'danger' :
-                        'default'
-                      }>
-                        {t(`acme.eab.status${cred.status.charAt(0).toUpperCase() + cred.status.slice(1)}`)}
-                      </Badge>
-                      {cred.expires_at && (
-                        <Badge variant="warning" className="text-xs">
-                          <Clock size={12} /> {formatDate(cred.expires_at)}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="mt-1 flex items-center gap-2 text-xs text-text-tertiary font-mono break-all">
-                      <span>kid:</span>
-                      <span className="select-all">{cred.kid}</span>
-                      <button
-                        type="button"
-                        className="text-accent-primary hover:underline"
-                        onClick={() => { copy(cred.kid); showSuccess(t('acme.eab.kidCopied')) }}
-                        title={t('common.copy')}
-                      >
-                        <Copy size={12} />
-                      </button>
-                    </div>
-                    <div className="mt-1 flex items-start gap-1.5 text-xs text-text-tertiary" data-testid={`eab-domains-${cred.id}`}>
-                      <span>{t('acme.eab.allowedDomains')}:</span>
-                      <span className="font-mono break-all">
-                        {isUnrestricted(cred.allowed_domains)
-                          ? t('acme.eab.allDomains')
-                          : cred.allowed_domains.length === 0
-                            ? t('acme.eab.noDomains')
-                            : cred.allowed_domains.join(', ')}
-                      </span>
-                      {canWrite && (
-                        <button
-                          type="button"
-                          className="shrink-0 text-text-tertiary hover:text-accent-primary mt-0.5"
-                          onClick={() => startEditingDomains(cred)}
-                          title={t('acme.eab.editDomainsTitle')}
-                        >
-                          <Pencil size={12} />
-                        </button>
-                      )}
-                    </div>
-                    <div className="mt-1 text-xs text-text-tertiary">
-                      {t('acme.eab.created')}: {formatDate(cred.created_at)}
-                      {cred.used_at && (
-                        <> · {t('acme.eab.usedAt')}: {formatDate(cred.used_at)}</>
-                      )}
-                      {cred.used_by_account_id && (
-                        <> · {t('acme.eab.boundTo')}: <span className="font-mono">{cred.used_by_account_id.slice(0, 16)}…</span></>
-                      )}
-                      {cred.revoked_at && (
-                        <> · {t('acme.eab.revokedAt')}: {formatDate(cred.revoked_at)}</>
-                      )}
-                    </div>
-
-                    {/* Notes */}
-                    {editingNotesId === cred.id ? (
-                      <div className="mt-2 flex items-center gap-2">
-                        <Input
-                          placeholder={t('acme.eab.notesPlaceholder')}
-                          value={editingNotesValue}
-                          onChange={(e) => setEditingNotesValue(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') saveNotes(cred.id)
-                            if (e.key === 'Escape') cancelEditingNotes()
-                          }}
-                          className="text-xs"
-                          autoFocus
-                        />
-                        <Button type="button" variant="ghost" size="sm" onClick={() => saveNotes(cred.id)} title={t('common.save')}>
-                          <Check size={14} className="text-status-success" />
-                        </Button>
-                        <Button type="button" variant="ghost" size="sm" onClick={cancelEditingNotes} title={t('common.cancel')}>
-                          <X size={14} className="text-text-tertiary" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="mt-1 flex items-start gap-1.5">
-                        {cred.notes ? (
-                          <>
-                            <span className="text-xs text-text-tertiary whitespace-pre-wrap break-words">{cred.notes}</span>
-                            {canWrite && (
-                              <button
-                                type="button"
-                                className="shrink-0 text-text-tertiary hover:text-accent-primary mt-0.5"
-                                onClick={() => startEditingNotes(cred)}
-                                title={t('acme.eab.editNotesTitle')}
-                              >
-                                <Pencil size={12} />
-                              </button>
-                            )}
-                          </>
-                        ) : (
-                          canWrite && (
-                            <button
-                              type="button"
-                              className="text-xs text-text-tertiary hover:text-accent-primary"
-                              onClick={() => startEditingNotes(cred)}
-                            >
-                              + {t('acme.eab.notesPlaceholder')}
-                            </button>
-                          )
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex flex-col gap-1 shrink-0">
-                    {canDelete && cred.status === 'active' && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRevokeEabCredential(cred)}
-                        title={t('acme.eab.revoke')}
-                      >
-                        <Trash size={14} className="text-status-warning" />
-                      </Button>
-                    )}
-                    {canDelete && cred.status === 'revoked' && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteEabCredential(cred)}
-                        title={t('acme.eab.delete')}
-                      >
-                        <Trash size={14} className="text-status-danger" />
-                      </Button>
-                    )}
-                    {canDelete && cred.status === 'used' && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteEabCredential(cred)}
-                        title={t('acme.eab.delete')}
-                      >
-                        <Trash size={14} className="text-status-danger" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-      </div>
+        </Modal>
+      )}
 
       {/* Create EAB Credential Modal */}
       <Modal

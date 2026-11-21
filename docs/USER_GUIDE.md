@@ -172,27 +172,27 @@ Open **Modules** > **PKI** > **Certificate Tools**:
 
 ### ACME
 
-Open **Modules** > **Protocols** > **ACME**. The page covers two modes: the ACME client, which obtains certificates from public CAs such as Let's Encrypt (the **Let's Encrypt**, **Let's Encrypt orders**, **DNS Providers** and **Domains** tabs), and the local ACME server for your own PKI.
+Open **Modules** > **Protocols** > **ACME**. The page opens on the accounts of the local ACME server: a state chip per state, the contact, creation date, state and number of orders of each account. An account opens its detail (**Account**, **Orders**, **Challenges**), with **Disable the account…**, which is final (RFC 8555 §7.3.6). **Copy the directory URL** gives the URL clients use, `https://your-server:8443/acme/directory`.
 
-For the server, open the **Local ACME** tab, enable it and choose the default CA. Clients use `https://your-server:8443/acme/directory`. The **Local Domains**, **Local orders**, **Accounts** and **EAB Credentials** tabs manage the domains it may issue for, the orders, the client accounts and external account bindings. Certificate profiles chosen per order bind a template and a validity. To put UCM in front of a public ACME CA, see [ACME proxy clients](integrations/acme-proxy-clients.md).
+The view menu of the page head reaches the rest of the page. For the server: **Orders**, **Domains** (the domains it may issue for and their CA), **EAB credentials** and **Server settings** (enable it, choose the default CA, certificate profiles chosen per order with a template and a validity). For the ACME client, which obtains certificates from public CAs such as Let's Encrypt: **Client settings** (with the ACME proxy), **Client orders**, **Upstream CAs**, **DNS providers** and **Client domains**. **Issued certificates** lists what both issued. To put UCM in front of a public ACME CA, see [ACME proxy clients](integrations/acme-proxy-clients.md).
 
 ### SCEP
 
-Open **Modules** > **Protocols** > **SCEP**. SCEP enrolls network devices and MDM solutions with a challenge password. The **Configuration** tab enables the server and chooses the CA; the **Challenges** tab shows and regenerates the challenge password of each CA, and the **Information** tab summarizes the setup; devices use `https://your-server:8443/scep/pkiclient.exe`.
+Open **Modules** > **Protocols** > **SCEP**. SCEP enrolls network devices and MDM solutions with a challenge password. The page opens on the profiles, named endpoints each with its own URL (`/scep/<segment>/pkiclient.exe`), CA, template and challenge; a profile opens its detail with **Enable** or **Disable** and **Regenerate the password…**, whose new value is shown once.
 
-The **Profiles** tab creates named endpoints, each with its own URL (`/scep/<segment>/pkiclient.exe`), CA, template and challenge, and the **Intune app registrations** tab lets a profile validate Microsoft Intune challenges (see [Intune SCEP](integrations/intune-scep.md)). The **Requests** tab lists the requests; pending ones are approved or rejected there.
+The view menu of the page head reaches the **Requests** (pending ones are approved or rejected in their detail), the **Challenges of the authorities** (the challenge of each CA, for `https://your-server:8443/scep/pkiclient.exe`), the **Intune app registrations** that let a profile validate Microsoft Intune challenges (see [Intune SCEP](integrations/intune-scep.md)), and the **Configuration**, which enables the server and chooses the CA.
 
 ### EST
 
-Open **Modules** > **Protocols** > **EST**. RFC 7030 enrollment over HTTPS with mutual TLS or HTTP Basic authentication. In the **Settings** tab, enable EST and choose the signing CA and the credentials; **EST Endpoints** lists the URLs, under `https://your-server:8443/.well-known/est`: `/cacerts`, `/simpleenroll`, `/simplereenroll`, `/csrattrs` and `/serverkeygen`.
+Open **Modules** > **Protocols** > **EST**. RFC 7030 enrollment over HTTPS with mutual TLS or HTTP Basic authentication. The page lists the enrollment endpoints, the default one and one per CA label; an endpoint opens its detail with its URLs under `https://your-server:8443/.well-known/est`: `/cacerts`, `/simpleenroll`, `/simplereenroll`, `/csrattrs` and `/serverkeygen`. In the **Configuration** view, enable EST and choose the signing CA, the CA labels and the credentials.
 
 ### TSA
 
-Open **Modules** > **Protocols** > **TSA**. The RFC 3161 time stamp authority: enable it, choose the signing CA and set the policy OID (the default is a placeholder: use one from your organization's arc). A dedicated signing certificate is required by default: until one is set, `/tsa` answers 503. **Generate a signing certificate** issues one from the signing CA, with the timeStamping EKU alone and critical (RFC 3161), and selects it when no usable signer is set. Turning off **Require a dedicated TSA certificate** lets the CA certificate sign, which is not RFC 3161 compliant and which the overview shows as a warning. The **TSA Endpoint** tab shows the URL and OpenSSL examples.
+Open **Modules** > **Protocols** > **TSA**. The RFC 3161 time stamp authority: the page lists the service, and its detail gives the `/tsa` URL and OpenSSL examples. In the **Configuration** view, enable it, choose the signing CA and set the policy OID (the default is a placeholder: use one from your organization's arc). A dedicated signing certificate is required by default: until one is set, `/tsa` answers 503. **Generate a signing certificate** issues one from the signing CA, with the timeStamping EKU alone and critical (RFC 3161), and selects it when no usable signer is set. Turning off **Require a dedicated TSA certificate** lets the CA certificate sign, which is not RFC 3161 compliant and which the overview shows as a warning.
 
 ### CRL & OCSP
 
-Open **Modules** > **Protocols** > **CRL & OCSP**. CRL regeneration is toggled per CA, with manual regeneration, download, validity and CRL distribution point URL. The OCSP responder is served at `https://your-server:8443/ocsp`; its URL and the CA Issuers URL are the ones embedded in issued certificates. A delegated responder certificate can sign the answers instead of the CA key.
+Open **Modules** > **Protocols** > **CRL & OCSP**. The page lists the CAs with their CRL number, publication, next update, OCSP and a state read from the CRL dates. A CA opens its detail: regeneration and download, then the **Publication** (automatic regeneration, validity, schedule, delta CRL, deployment), OCSP and distribution point tabs. The OCSP responder is served at `https://your-server:8443/ocsp`; its URL and the CA Issuers URL are the ones embedded in issued certificates. A delegated responder certificate can sign the answers instead of the CA key.
 
 ### Windows enrollment (XCEP and WSTEP)
 

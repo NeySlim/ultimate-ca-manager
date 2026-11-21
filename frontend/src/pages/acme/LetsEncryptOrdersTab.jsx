@@ -1,248 +1,65 @@
+/**
+ * Orders of the ACME client (Let's Encrypt and the other upstream CAs), drawn as the mockup's module
+ * list with its dock: filtered by state, an order opens its detail and its actions; the renewal
+ * failures stay on the row, a partial list says so.
+ */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  ArrowsClockwise, Certificate, CheckCircle, DownloadSimple, Eye,
-  MagnifyingGlass, Play, Trash, Warning,
-} from '@phosphor-icons/react'
-import { Badge, Button, EmptyState, FilterSelect } from '../../components'
-import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
-import { cn, formatDate } from '../../lib/utils'
+import { ListView, Toolbar, IconBtn, Pill, EmptyBlock, NoMatch } from '../../components/atelier'
+import { stateLabel } from '../../lib/stateLabel'
+import { dateOf } from '../admin/adminDates'
+import { Notice } from '../protocols/atelierParts'
+import { SlotDock } from '../protocols/dockSlot'
+import OrderDetailPanel from './OrderDetailPanel'
 
-const ORDER_STATUSES = [
-  'pending', 'processing', 'validating', 'ready', 'valid', 'issued', 'invalid',
-]
-
-const statusVariant = (status) => {
-  if (status === 'valid' || status === 'issued') return 'success'
-  if (status === 'pending' || status === 'processing' || status === 'validating') return 'warning'
-  if (status === 'ready') return 'info'
-  return 'danger'
-}
+const ORDER_STATUSES = ['pending', 'processing', 'validating', 'ready', 'valid', 'issued', 'invalid']
+const TONES = { valid: 'good', issued: 'good', ready: 'good', pending: 'warn', processing: 'warn', validating: 'warn', invalid: 'bad' }
 
 export default function LetsEncryptOrdersTab({
-  clientOrders = [],
-  partial = null,
-  selectedClientOrder,
-  onSelectOrder,
-  onRefresh,
-  onCheckOrderStatus,
-  onVerifyChallenge,
-  onFinalizeOrder,
-  onViewCertificate,
-  onDownloadCertificate,
-  onRenewCertificate,
-  onDeleteOrder,
-  onToggleRenewal,
-  canDelete = false,
-  canWrite = false,
+  clientOrders = [], partial = null, selectedClientOrder, onSelectOrder, onRefresh, onCheckOrderStatus, onVerifyChallenge, onFinalizeOrder,
+  onViewCertificate, onDownloadCertificate, onRenewCertificate, onDeleteOrder, onToggleRenewal, canDelete = false, canWrite = false, loading = false,
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = i18n?.language || 'en'
   const [status, setStatus] = useState('')
-  const visibleOrders = status
-    ? clientOrders.filter((order) => (order.status || '').toLowerCase() === status)
-    : clientOrders
+  const statusOf = (o) => String(o.status || '').toLowerCase()
+  const visibleOrders = status ? clientOrders.filter((o) => statusOf(o) === status) : clientOrders
+  const present = ORDER_STATUSES.filter((s) => clientOrders.some((o) => statusOf(o) === s))
+  const name = (o) => o.primary_domain || o.domains?.[0] || t('common.unknown')
+  const pill = (o) => <Pill label={stateLabel(t, o.status)} tone={TONES[statusOf(o)] || 'muted'} />
+  const env = (o) => t(o.environment === 'production' ? 'acme.production' : 'acme.staging')
 
   return (
-    <div className="p-4 space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold text-text-primary">{t('acme.letsEncryptOrders')}</h2>
-          <Badge variant="secondary" size="sm">{clientOrders.length}</Badge>
-          <FilterSelect
-            value={status}
-            onChange={setStatus}
-            allLabel={t('common.allStatuses')}
-            options={ORDER_STATUSES.map((value) => ({ value, label: value }))}
-            size="sm"
-          />
-        </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          aria-label={t('common.refresh')}
-          onClick={onRefresh}
-        >
-          <ArrowsClockwise size={14} />
-        </Button>
-      </div>
-
-      {partial && (
-        <p className="flex items-center gap-1.5 text-xs status-warning-text" role="status">
-          <Warning size={14} />
-          {t('acme.ordersListPartial', { loaded: partial.loaded, total: partial.total })}
-        </p>
-      )}
-
-      {clientOrders.length === 0 ? (
-        <EmptyState
-          icon={Certificate}
-          title={t('acme.noCertificateOrders')}
-          description={t('acme.viewHistoryForCertificates')}
-        />
-      ) : visibleOrders.length === 0 ? (
-        <EmptyState icon={Certificate} title={t('common.noResults')} />
-      ) : (
-        <div className="space-y-3">
-          {visibleOrders.map((order) => {
-            const selected = selectedClientOrder?.id === order.id
-            return (
-              <div
-                key={order.id}
-                className={cn(
-                  'p-3 bg-tertiary-op50 rounded-lg border transition-colors cursor-pointer',
-                  selected
-                    ? 'border-accent-primary ring-1 ring-accent-primary-op30'
-                    : 'border-border-op50 hover:border-border'
-                )}
-                onClick={() => onSelectOrder?.(selected ? null : order)}
-              >
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="text-sm font-medium text-text-primary truncate flex-1">
-                    {order.primary_domain || order.domains?.[0] || t('common.unknown')}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {order.renewal_failures > 0 && (
-                      <Badge
-                        variant="warning"
-                        size="sm"
-                        title={[
-                          order.error_message,
-                          order.last_error_at && t('acme.renewalLastFailure', { date: formatDate(order.last_error_at) }),
-                        ].filter(Boolean).join('\n')}
-                      >
-                        {t('acme.renewalFailures', { count: order.renewal_failures })}
-                      </Badge>
-                    )}
-                    <Badge variant={order.environment === 'production' ? 'default' : 'secondary'} size="sm">
-                      {order.environment}
-                    </Badge>
-                    <Badge variant={statusVariant(order.status)} size="sm">{order.status}</Badge>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-text-tertiary">{t('acme.method')}</span>
-                    <span className="text-text-secondary font-medium">
-                      {order.challenge_type || t('common.unknown')}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-text-tertiary">{t('common.created')}</span>
-                    <span className="text-text-secondary">
-                      {order.created_at ? formatDate(order.created_at) : '-'}
-                    </span>
-                  </div>
-                  {order.dns_provider_name && (
-                    <div className="flex justify-between col-span-2">
-                      <span className="text-text-tertiary">{t('acme.dnsProviders')}</span>
-                      <span className="text-text-secondary">{order.dns_provider_name}</span>
-                    </div>
-                  )}
-                  {order.is_proxy_order && (order.account_email || order.account_short_id) && (
-                    <div className="flex justify-between col-span-2">
-                      <span className="text-text-tertiary">{t('acme.account')}</span>
-                      <span className="text-text-secondary truncate max-w-[220px]" title={order.account_id || ''}>
-                        {order.account_email || `${order.account_short_id}…`}
-                      </span>
-                    </div>
-                  )}
-                  {order.error_message && (
-                    <div className="col-span-2 mt-1 pt-1 border-t border-border-op30">
-                      <span className="text-xs status-danger-text">{order.error_message}</span>
-                    </div>
-                  )}
-                  {order.renewal_retry_daily && (
-                    <div className="col-span-2">
-                      <span className="text-xs status-warning-text">{t('acme.renewalRetryDaily')}</span>
-                    </div>
-                  )}
-                </div>
-
-                {selected && (
-                  <div className="mt-3 pt-3 border-t border-border-op30 space-y-2">
-                    {order.expires_at && (
-                      <div className="flex justify-between text-xs">
-                        <span className="text-text-tertiary">{t('common.expires')}</span>
-                        <span className="text-text-secondary">{formatDate(order.expires_at)}</span>
-                      </div>
-                    )}
-                    {order.is_proxy_order && (
-                      <p className="text-xs text-text-tertiary">{t('acme.proxyOrderClientDriven')}</p>
-                    )}
-                    {!order.is_proxy_order && !order.opened_by_renewal && onToggleRenewal && (
-                      <div onClick={(event) => event.stopPropagation()}>
-                        <ToggleSwitch
-                          size="sm"
-                          label={t('acme.orderAutoRenew')}
-                          checked={order.renewal_enabled !== false}
-                          disabled={!canWrite}
-                          onChange={(enabled) => onToggleRenewal(order, enabled)}
-                        />
-                      </div>
-                    )}
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {!order.is_proxy_order && ['pending', 'processing'].includes(order.status) && onVerifyChallenge && (
-                        <Button type="button" variant="secondary" size="sm" onClick={(event) => { event.stopPropagation(); onVerifyChallenge(order) }}>
-                          <Play size={12} />
-                          {t('acme.verifyChallenge')}
-                        </Button>
-                      )}
-                      {!order.is_proxy_order && order.status === 'validating' && (
-                        <>
-                          {onCheckOrderStatus && (
-                            <Button type="button" variant="secondary" size="sm" onClick={(event) => { event.stopPropagation(); onCheckOrderStatus(order) }}>
-                              <MagnifyingGlass size={12} />
-                              {t('acme.checkStatus')}
-                            </Button>
-                          )}
-                          {onVerifyChallenge && (
-                            <Button type="button" variant="secondary" size="sm" onClick={(event) => { event.stopPropagation(); onVerifyChallenge(order) }}>
-                              <Play size={12} />
-                              {t('acme.retryVerification')}
-                            </Button>
-                          )}
-                        </>
-                      )}
-                      {!order.is_proxy_order && order.status === 'ready' && onFinalizeOrder && (
-                        <Button type="button" variant="secondary" size="sm" onClick={(event) => { event.stopPropagation(); onFinalizeOrder(order) }}>
-                          <CheckCircle size={12} />
-                          {t('acme.finalize')}
-                        </Button>
-                      )}
-                      {order.certificate_id && onViewCertificate && (
-                        <Button type="button" variant="secondary" size="sm" onClick={(event) => { event.stopPropagation(); onViewCertificate(order) }}>
-                          <Eye size={12} />
-                          {t('common.viewCertificate')}
-                        </Button>
-                      )}
-                      {order.certificate_id && onDownloadCertificate && (
-                        <Button type="button" variant="secondary" size="sm" onClick={(event) => { event.stopPropagation(); onDownloadCertificate(order) }}>
-                          <DownloadSimple size={12} />
-                          {t('common.download')}
-                        </Button>
-                      )}
-                      {!order.is_proxy_order && (order.status === 'issued' || (order.status === 'valid' && (order.certificate_id || order.error_message))) && onRenewCertificate && (
-                        <Button type="button" variant="secondary" size="sm" onClick={(event) => { event.stopPropagation(); onRenewCertificate(order) }}>
-                          <ArrowsClockwise size={12} />
-                          {t('acme.renew')}
-                        </Button>
-                      )}
-                      {canDelete && onDeleteOrder && (
-                        <Button type="button" variant="danger" size="sm" onClick={(event) => { event.stopPropagation(); onDeleteOrder(order) }}>
-                          <Trash size={12} />
-                          {t('common.delete')}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
+    <>
+      {partial && <Notice tone="warn" role="status">{t('acme.ordersListPartial', { loaded: partial.loaded, total: partial.total })}</Notice>}
+      <ListView label={t('acme.letsEncryptOrders')} caption={t('acme.ordersCaption')} icon="refresh" rows={visibleOrders} loading={loading}
+        filters={{
+          views: [{ id: '', label: t('common.all'), count: clientOrders.length }, ...present.map((s) => ({ id: s, label: stateLabel(t, s), count: clientOrders.filter((o) => statusOf(o) === s).length }))],
+          active: status, onChange: setStatus, label: t('acme.filterByState'),
+        }}
+        toolbar={<Toolbar><IconBtn icon="refresh" label={t('common.refresh')} onClick={onRefresh} /></Toolbar>}
+        title={name} status={pill} openedId={selectedClientOrder?.id} onOpen={onSelectOrder}
+        columns={[
+          { id: 'account', label: t('acme.accountOrCa'), cell: (o) => o.acme_client_account_label || o.account_email || (o.account_short_id ? `${o.account_short_id}…` : '—'), grow: true },
+          { id: 'env', label: t('acme.environment'), cell: env },
+          { id: 'method', label: t('acme.method'), cell: (o) => o.challenge_type?.toUpperCase() || t('common.unknown') },
+          { id: 'created', label: t('common.created'), cell: (o) => dateOf(o.created_at, locale) || '—' },
+          { id: 'failures', label: t('acme.renewalFailuresLabel'), cell: (o) => (o.renewal_failures > 0
+            ? <span className="warn" title={o.error_message || ''}>{t('acme.renewalFailures', { count: o.renewal_failures })}</span> : '—') },
+          { status: true },
+        ]}
+        empty={clientOrders.length ? (
+          <NoMatch title={t('table.noResults')} resetLabel={t('table.clearFilters')} onReset={() => setStatus('')} />
+        ) : <EmptyBlock id="acme-client-orders" icon="refresh" title={t('acme.noCertificateOrders')} text={t('acme.viewHistoryForCertificates')} />}
+        footer={{ range: t('acme.clientOrdersRange', { shown: visibleOrders.length, count: clientOrders.length }) }} />
+      <SlotDock>
+        {selectedClientOrder && (
+          <OrderDetailPanel order={selectedClientOrder} onClose={() => onSelectOrder(null)} onDownloadCert={onDownloadCertificate}
+            onViewCertificate={onViewCertificate} onRenewCertificate={onRenewCertificate} onVerifyChallenge={onVerifyChallenge}
+            onCheckOrderStatus={onCheckOrderStatus} onFinalizeOrder={onFinalizeOrder} onDeleteOrder={onDeleteOrder}
+            onToggleRenewal={onToggleRenewal} canWrite={canWrite} canDelete={canDelete} />
+        )}
+      </SlotDock>
+    </>
   )
 }

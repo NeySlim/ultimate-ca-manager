@@ -3,7 +3,7 @@
  * and confirms with "Désactiver le compte", not a bare "Désactiver".
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { notificationSpies } from './pageRenderingSetup.jsx'
 import { acmeService } from '../../services/acme.service'
@@ -31,23 +31,22 @@ beforeEach(() => {
 
 describe('ACME account deactivation', () => {
   it('asks to deactivate this ACME account and confirms with Deactivate account', async () => {
-    render(<MemoryRouter initialEntries={['/acme?tab=accounts']}><ACMEPage /></MemoryRouter>)
-    const tab = (await screen.findAllByText('acme.accounts'))[0]
-    fireEvent.click(tab)
-    fireEvent.click((await screen.findAllByText(/acct-5|ops@example\.com/))[0])
+    acmeService.deactivateAccount = vi.fn().mockResolvedValue({})
+    render(<MemoryRouter initialEntries={['/acme']}><ACMEPage /></MemoryRouter>)
+    fireEvent.click(await screen.findByRole('button', { name: 'acct/acct-5' }))
     await waitFor(() => expect(acmeService.getAccountById).toHaveBeenCalled())
-    const button = await screen.findByRole('button', { name: /common\.deactivate$/ })
-    fireEvent.click(button)
-    await waitFor(() => expect(notificationSpies.showConfirm).toHaveBeenCalled())
-    expect(notificationSpies.showConfirm.mock.calls[0][1]).toMatchObject({
-      title: 'acme.deactivateAccountTitle', confirmText: 'common.deactivateAccount', variant: 'danger',
-    })
+    fireEvent.click(await screen.findByRole('button', { name: 'acme.disableAccount' }))
+    // The mockup's acmeDisableDialog, then no second question
+    const dialog = await screen.findByRole('dialog', { name: 'acme.disableTitle' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'acme.disableConfirm' }))
+    await waitFor(() => expect(acmeService.deactivateAccount).toHaveBeenCalledWith(5))
+    expect(notificationSpies.showConfirm).not.toHaveBeenCalled()
   })
 
   it('asks the same question for an account at an upstream ACME CA', async () => {
-    acmeService.getCaAccounts = ok([{ id: 9, name: 'Upstream', directory_url: 'https://ca.example/directory', is_registered: true, is_default: true }])
-    render(<MemoryRouter initialEntries={['/acme?tab=letsencrypt']}><ACMEPage /></MemoryRouter>)
-    fireEvent.click(await screen.findByRole('button', { name: 'acme.certificateAuthorities' }))
+    acmeService.getCaAccounts = ok([{ id: 9, label: 'Upstream', name: 'Upstream', directory_url: 'https://ca.example/directory', is_registered: true, is_default: true }])
+    render(<MemoryRouter initialEntries={['/acme?tab=upstream']}><ACMEPage /></MemoryRouter>)
+    fireEvent.click((await screen.findAllByRole('button', { name: /^acme\.openDetail|^Upstream$|atelier.openDetail/ }))[0])
     const button = (await screen.findAllByRole('button', { name: /common\.deactivate$/ }))[0]
     fireEvent.click(button)
     await waitFor(() => expect(notificationSpies.showConfirm).toHaveBeenCalled())

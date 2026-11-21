@@ -20,32 +20,12 @@ vi.mock('../../../contexts', () => ({
   useNotification: () => ({ showSuccess: mocks.showSuccess, showError: mocks.showError }),
 }))
 
-vi.mock('../../../hooks', () => ({
+vi.mock('../../../hooks', async () => ({
+  usePersistedState: (await vi.importActual('../../../hooks/usePersistedState')).usePersistedState,
   useClipboard: () => ({ copy: vi.fn() }),
   usePermission: () => ({ hasPermission: mocks.hasPermission }),
 }))
-
-vi.mock('../../../components', async () => {
-  // Real Compact* components: a mock rendering children would hide the fact
-  // that CompactField only renders its `value`/`children` contract
-  const detailCard = await vi.importActual('../../../components/DetailCard.jsx')
-  return {
-    Badge: ({ children }) => <span>{children}</span>,
-    Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-    Input: ({ value, onChange, helperText, ...props }) => (
-      <>
-        <input aria-label="email-draft" value={value} onChange={onChange} {...props} />
-        {helperText && <span>{helperText}</span>}
-      </>
-    ),
-    StatusIndicator: ({ children }) => <span>{children}</span>,
-    CompactSection: detailCard.CompactSection,
-    CompactGrid: detailCard.CompactGrid,
-    CompactField: detailCard.CompactField,
-    CompactStats: detailCard.CompactStats,
-    CompactHeader: detailCard.CompactHeader,
-  }
-})
+vi.mock('../../../stores/timezoneStore', () => ({ getAppTimezone: () => 'UTC' }))
 
 import AccountDetailPanel from '../AccountDetailPanel'
 import { KEY_ALGORITHMS } from '../../../lib/keyAlgorithms'
@@ -59,19 +39,21 @@ const account = {
   created_at: '2026-01-01T00:00:00Z',
 }
 
+// The account's dock (the mockup's acmeAccountPanel), opened on its Compte tab
 const renderPanel = (props = {}) => render(
   <AccountDetailPanel
     account={account}
     orders={[]}
     challenges={[]}
-    detailTabs={[]}
-    activeDetailTab="account"
-    onDetailTabChange={vi.fn()}
+    section="account"
+    onSection={vi.fn()}
+    onClose={vi.fn()}
     onDeactivate={vi.fn()}
     onDelete={vi.fn()}
     {...props}
   />
 )
+const emailDraft = () => screen.getByLabelText('common.email')
 
 describe('AccountDetailPanel email edit', () => {
   beforeEach(() => {
@@ -79,10 +61,9 @@ describe('AccountDetailPanel email edit', () => {
     mocks.hasPermission.mockReturnValue(true)
   })
 
-  it('renders the current email in the account information grid', () => {
+  it('renders the current email in the account properties', () => {
     renderPanel()
-    // once in the panel header, once in the account information grid
-    expect(screen.getAllByText('old@example.com').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText(/mailto:old@example.com/)).toBeInTheDocument()
   })
 
   it('shows an explicit edit action instead of an icon-only control', () => {
@@ -96,8 +77,8 @@ describe('AccountDetailPanel email edit', () => {
     renderPanel({ onChanged })
 
     fireEvent.click(screen.getByRole('button', { name: 'acme.editEmail' }))
-    fireEvent.change(screen.getByLabelText('email-draft'), { target: { value: 'new@example.com' } })
-    fireEvent.click(screen.getByText('common.save'))
+    fireEvent.change(emailDraft(), { target: { value: 'new@example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }))
 
     await vi.waitFor(() => expect(mocks.patch).toHaveBeenCalledWith(
       '/acme/accounts/acme-1234567890abcdef', { email: 'new@example.com' }
@@ -112,13 +93,33 @@ describe('AccountDetailPanel email edit', () => {
     mocks.hasPermission.mockImplementation((p) => p !== 'write:acme')
     renderPanel()
     expect(screen.queryByRole('button', { name: 'acme.editEmail' })).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('email-draft')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('common.email')).not.toBeInTheDocument()
   })
 
   it('shows the RFC 8555 caveat while editing', () => {
     renderPanel()
     fireEvent.click(screen.getByRole('button', { name: 'acme.editEmail' }))
     expect(screen.getByText('acme.editEmailCaveat')).toBeInTheDocument()
+  })
+})
+
+describe('AccountDetailPanel deactivation', () => {
+  beforeEach(() => mocks.hasPermission.mockReturnValue(true))
+
+  it('asks the mockup question before deactivating, never on its own', async () => {
+    const onDeactivate = vi.fn().mockResolvedValue()
+    renderPanel({ onDeactivate })
+    fireEvent.click(screen.getByRole('button', { name: 'acme.disableAccount' }))
+    expect(onDeactivate).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: 'acme.disableTitle' })).toHaveTextContent('acme.disableWarning')
+    fireEvent.click(screen.getByRole('button', { name: 'acme.disableConfirm' }))
+    await vi.waitFor(() => expect(onDeactivate).toHaveBeenCalledWith(7))
+  })
+
+  it('offers no deactivation for a deactivated account, and says it is final', () => {
+    renderPanel({ account: { ...account, status: 'deactivated' } })
+    expect(screen.queryByRole('button', { name: 'acme.disableAccount' })).toBeNull()
+    expect(screen.getByText('acme.deactivationFinal')).toBeInTheDocument()
   })
 })
 

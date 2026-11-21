@@ -91,9 +91,8 @@ function setConfig(overrides = {}) {
 }
 
 async function openSettingsTab() {
-  render(<MemoryRouter><TSAPage /></MemoryRouter>)
-  const settingsTabs = await screen.findAllByText('tsa.groups.settings')
-  fireEvent.click(settingsTabs[settingsTabs.length - 1])
+  render(<MemoryRouter initialEntries={['/tsa-config?tab=config']}><TSAPage /></MemoryRouter>)
+  await screen.findByText('tsa.signingCertDesc')
 }
 
 describe('TSAPage — dedicated signer certificate (#312)', () => {
@@ -159,7 +158,9 @@ describe('TSAPage — dedicated signer certificate (#312)', () => {
   it('sends signer_cert_refid in the PATCH payload on save', async () => {
     setConfig({ signer_cert_refid: 'cert-ts-1', signer: USABLE_SIGNER })
     await openSettingsTab()
-    fireEvent.click(await screen.findByText('common.saveConfiguration'))
+    // Saving needs a change (the form's save bar): the signer stays in the payload
+    fireEvent.change(screen.getByRole('textbox', { name: 'tsa.policyOid' }), { target: { value: '1.3.6.1.4.1.55555.9' } })
+    fireEvent.click(await screen.findByText('common.save'))
     await waitFor(() => expect(tsaService.updateConfig).toHaveBeenCalled())
     expect(tsaService.updateConfig).toHaveBeenCalledWith(
       expect.objectContaining({ signer_cert_refid: 'cert-ts-1' })

@@ -7,6 +7,7 @@ export default {
       {
         title: 'Gestion des CRL',
         items: [
+          { label: 'Liste et détail', text: 'Chaque autorité avec son numéro de CRL, sa publication, sa prochaine mise à jour, OCSP et un état lu sur les dates de la CRL (À jour, Moins de 24 h, Échue, Sans CRL). Un nom ouvre son détail : Aperçu, Publication (calendrier, CRL delta, déploiement), OCSP (répondeur, répondeur délégué) et Points de distribution (URL nommées, URL CDP, OCSP et CA Issuers, CPS)' },
           { label: 'Auto-régénération', text: 'Activer la régénération automatique des CRL par AC' },
           { label: 'Régénération manuelle', text: 'Forcer la régénération immédiate de la CRL' },
           { label: 'Télécharger la CRL', text: 'Télécharger la CRL au format PEM (fichier .crl) ; la forme DER est servie à l’URL CDP' },

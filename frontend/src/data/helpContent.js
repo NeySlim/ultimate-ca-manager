@@ -543,7 +543,8 @@ export const helpContent = {
         title: 'CRL Management',
         icon: ClockCounterClockwise,
         items: [
-          { label: 'Auto-Regeneration', text: 'Toggle automatic CRL regeneration per CA' },
+          { label: 'List and detail', text: 'Each authority with its CRL number, publication, next update, OCSP and a state read from the CRL dates (Up to date, Under 24 h, Expired, No CRL). A name opens its detail: Overview, Publication (schedule, delta CRL, deployment), OCSP (responder, delegated responder) and Distribution points (named URLs, CDP, OCSP and CA Issuers URLs, CPS)' },
+          { label: 'Auto-Regeneration', text: 'Toggle automatic CRL regeneration per CA, in the Publication tab of its detail' },
           { label: 'Manual Regenerate', text: 'Force CRL regeneration immediately' },
           { label: 'Download CRL', text: 'Download the CRL as PEM (.crl file); the DER form is served at the CDP URL' },
           { label: 'CRL deployment', text: 'Attach an SSH/SFTP target to push every regenerated CRL automatically. Each binding selects PEM or DER, its destination path, optional parent CRLs and its own reload command' },
@@ -585,15 +586,15 @@ export const helpContent = {
     overview: 'SCEP enables network devices (routers, switches, firewalls) and MDM solutions to automatically request and obtain certificates. Devices authenticate using a challenge password.',
     sections: [
       {
-        title: 'Tabs',
+        title: 'Views',
         icon: ListChecks,
         items: [
-          { label: 'Requests', text: 'Pending, approved, and rejected SCEP enrollment requests' },
-          { label: 'Configuration', text: 'SCEP server settings: CA selection, auto-approve' },
-          { label: 'Profiles', text: 'Named enrollment endpoints, each with its own URL, CA, template and challenge' },
+          { label: 'Requests', text: 'Pending, approved and rejected SCEP enrollment requests, filtered by the state chips, searched and paged by the server; a request opens its detail with Approve and Reject' },
+          { label: 'Configuration', text: 'SCEP server settings in a form with its save bar: CA selection, auto-approve, challenge validity (a value outside the server range is refused before saving)' },
+          { label: 'Profiles', text: 'The page opens on the profiles: chips by state (All, Active, Disabled, Intune), then Authority, Template, Intune and State. A name opens its detail with Enable or Disable, Regenerate the password… (the new value is shown once, to copy before closing), Edit and Delete' },
           { label: 'Intune app registrations', text: 'Entra app registrations (tenant ID, client ID, client secret) shared by the profiles that validate Intune challenges; an empty secret on edit keeps the current one, Test connection requests a token and discovers the service without consuming any challenge, and an app still used by a profile cannot be deleted' },
-          { label: 'Challenges', text: 'View and regenerate the challenge passwords for device enrollment' },
-          { label: 'Information', text: 'SCEP endpoint URLs and integration instructions' },
+          { label: 'Challenges of the authorities', text: 'The challenge password of each CA-wide endpoint, in its detail with Copy and Regenerate' },
+          { label: 'Connection details', text: 'At the end of the configuration: the SCEP URL, the supported operations and the Cisco IOS example' },
         ]
       },
       {
@@ -642,11 +643,11 @@ export const helpContent = {
     overview: 'EST (RFC 7030) provides secure certificate enrollment over HTTPS with mutual TLS (mTLS) or HTTP Basic authentication. Ideal for modern enterprise environments requiring standards-based enrollment with strong transport security.',
     sections: [
       {
-        title: 'Tabs',
+        title: 'Views',
         icon: ListChecks,
         items: [
-          { label: 'Settings', text: 'Enable EST, select signing CA, configure authentication credentials and certificate validity' },
-          { label: 'EST Endpoints', text: 'EST endpoint URLs for integration and enrollment statistics' },
+          { label: 'Enrollment endpoints', text: 'The default endpoint and one per CA label (/.well-known/est/<label>/), with Authority, Authentication (client certificate, or client certificate or password once HTTP Basic credentials are saved) and State. An endpoint opens its detail with its five URLs and the enrollment totals' },
+          { label: 'Configuration', text: 'Enable EST, issuing CA, validity, chain in responses, CA labels and HTTP Basic credentials, in a form with its save bar; a repeated label blocks the save' },
         ]
       },
       {
@@ -677,7 +678,7 @@ export const helpContent = {
       'EST is the modern replacement for SCEP: prefer EST for new deployments',
       'Use mTLS authentication for highest security. Basic Auth is a fallback',
       'The /simplereenroll endpoint requires the client to present its current certificate via mTLS',
-      'Copy endpoint URLs from the EST Endpoints tab to configure your EST clients',
+      'Copy endpoint URLs from the detail of an enrollment endpoint to configure your EST clients',
     ],
     warnings: [
       'EST requires HTTPS: the client must trust the UCM server certificate or CA',
@@ -693,11 +694,11 @@ export const helpContent = {
     overview: 'TSA (RFC 3161) provides trusted timestamps that prove a document or hash existed at a specific point in time. Used for code signing, legal compliance, and audit trails.',
     sections: [
       {
-        title: 'Tabs',
+        title: 'Views',
         icon: ListChecks,
         items: [
-          { label: 'Settings', text: 'Enable TSA, select the signing CA, and configure the TSA policy OID' },
-          { label: 'TSA Endpoint', text: 'TSA endpoint URL, usage examples with OpenSSL, and request statistics' },
+          { label: 'Services', text: 'The time-stamping service with its Authority, Hash (the digests a request may carry), Policy and State. Its detail gives the signer, the /tsa URL, the request totals and the OpenSSL usage' },
+          { label: 'Configuration', text: 'Enable TSA, signing CA, policy OID, signing certificate and strict mode, in a form with its save bar; Generate a signing certificate stays in its section' },
         ]
       },
       {
@@ -731,8 +732,8 @@ export const helpContent = {
       'No authentication is required: the TSA endpoint is publicly accessible like CRL/OCSP',
     ],
     warnings: [
-      'A dedicated signing certificate must be set before /tsa signs: generate one on the Settings tab',
-      'openssl ts -verify and jarsigner refuse tokens signed by the CA certificate: RFC 3161 requires a dedicated signer with a critical, exclusive timeStamping EKU. Generate one on the Settings tab',
+      'A dedicated signing certificate must be set before /tsa signs: generate one in the configuration',
+      'openssl ts -verify and jarsigner refuse tokens signed by the CA certificate: RFC 3161 requires a dedicated signer with a critical, exclusive timeStamping EKU. Generate one in the configuration',
       'The TSA endpoint is a public protocol endpoint: do not put sensitive data in timestamp requests',
     ],
     related: ['CAs', 'Certificates', 'CRL & OCSP']
@@ -744,6 +745,16 @@ export const helpContent = {
     subtitle: 'Automated Certificate Management',
     overview: 'UCM supports two ACME modes: ACME client for public certificates from any RFC 8555-compliant CA (Let\'s Encrypt, ZeroSSL, HARICA, etc.), and Local ACME server for internal PKI automation with multi-CA domain mapping.',
     sections: [
+      {
+        title: 'Views',
+        icon: ListChecks,
+        items: [
+          { label: 'Accounts', text: 'The page opens on the server accounts: chips by state, Contact, Created, State and Orders. An account opens its detail on Account, Orders and Challenges, with Disable the account… (final, RFC 8555 §7.3.6) and Delete' },
+          { label: 'Copy the directory URL', text: 'In the page head: the directory URL ACME clients point at' },
+          { label: 'View', text: 'The View menu of the page head reaches the server orders, domains, EAB credentials and settings, the client settings, orders, upstream CAs, DNS providers and domains, and the issued certificates. The address keeps the view (?tab=)' },
+          { label: 'Client settings', text: 'One form saved in one request, the server bounds checked first (renewal from 1 to 60 days, DNS waits, TLS-ALPN port)' },
+        ]
+      },
       {
         title: "Renewal Information (ARI, RFC 9773)",
         content: "The local ACME server advertises a renewalInfo resource so clients learn the ideal moment to renew each certificate.",
@@ -759,7 +770,7 @@ export const helpContent = {
         icon: Globe,
         items: [
           { label: 'Client', text: 'Request certificates from any ACME CA, Let\'s Encrypt, ZeroSSL, HARICA, or custom' },
-          { label: 'Orders tab (v2.219)', text: 'The client orders have their own "Let\'s Encrypt orders" sidebar tab with a visible/total count and a status filter, mirroring the Local orders view' },
+          { label: 'Client orders', text: 'The client orders have their own view, with chips by state, the renewal failures on the row, and their detail with the actions their state allows' },
           { label: 'Certificate Authorities (CA)', text: 'One or more accounts per CA, several accounts can share the same CA directory URL (e.g. two Let\'s Encrypt accounts for administrative separation); an empty Directory URL defaults to Let\'s Encrypt Production' },
           { label: 'Custom Server', text: 'Set a custom ACME directory URL to use any RFC 8555-compliant CA' },
           { label: 'EAB', text: 'External Account Binding support for CAs that require pre-registration (ZeroSSL, HARICA, etc.)' },
@@ -803,7 +814,7 @@ export const helpContent = {
           { label: 'Accounts', text: 'View and manage registered ACME client accounts' },
           { label: 'Account e-mail (v2.218)', text: 'The contact e-mail of a local account can be edited from its detail panel. Per RFC 8555 the contact belongs to the ACME client, so its next account update may overwrite the value' },
           { label: 'History', text: 'Track all ACME certificate issuance orders' },
-                  { label: 'Local orders (v2.217)', text: 'The Local orders tab lists the built-in server orders with a status filter, per-order delete and a purge action; expired non-issued orders are purged automatically every 6 hours, and a default signing digest applies to orders without a profile. Since v2.218 the purge also removes leftover pending sibling challenges of already-validated authorizations, and since v2.252 the expired and used nonces' },
+                  { label: 'Local orders (v2.217)', text: 'The Orders view lists the built-in server orders with a status filter, per-order delete and a purge action; expired non-issued orders are purged automatically every 6 hours, and a default signing digest applies to orders without a profile. Since v2.218 the purge also removes leftover pending sibling challenges of already-validated authorizations, and since v2.252 the expired and used nonces' },
                   { label: 'Profiles and templates (v2.221)', text: 'Certificate profiles (draft-ietf-acme-profiles) are advertised in the directory and selected by the client per order. Each profile sets validity and digest and can bind a certificate template, whose key usage and extended key usage then govern the issued certificate' },
                   { label: 'Default profile', text: 'Most clients request no profile. The default profile, chosen under the profiles, applies to their orders; without one they get 90 days and the default digest' },
                   { label: 'Revocation (v2.248)', text: 'The certificate a client sends to revoke must match the stored one byte for byte. Only an RSA or EC P-256, P-384 or P-521 certificate key can sign the request itself: revoke an ML-DSA, EdDSA or Brainpool certificate with the account that ordered it' },
@@ -878,7 +889,7 @@ export const helpContent = {
         content: 'HTTP-01 and TLS-ALPN-01 validation works out of the box for RFC1918, loopback, .lan / .local / .corp targets, UCM\'s primary deployment model.',
         items: [
           { label: 'Toggle', text: 'ACME → Local ACME → Allow private and internal addresses (default: on)' },
-          { label: 'Toggle', text: 'Let\'s Encrypt tab → Allow loopback ACME CA, opt in for a colocated CA on 127.0.0.1 (default: off)' },
+          { label: 'Toggle', text: 'Client settings → Allow loopback ACME CA, opt in for a colocated CA on 127.0.0.1 (default: off)' },
           { label: 'Always blocked', text: 'Cloud metadata IPs (169.254.169.254, fd00:ec2::254, etc.) are blocked unconditionally' },
         ]
       },

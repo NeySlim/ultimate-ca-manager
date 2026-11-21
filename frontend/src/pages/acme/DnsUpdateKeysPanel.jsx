@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash, Copy, Warning, ShieldCheck, LockKey } from '@phosphor-icons/react'
-import { Button, Badge, Input, Select, Modal, Textarea, Tabs } from '../../components'
+import { Copy, Warning } from '@phosphor-icons/react'
+import { Btn, Icon, Pill, RecordList } from '../../components/atelier'
+import { Button, Input, Select, Modal, Textarea, Tabs } from '../../components'
 import { acmeService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks'
@@ -205,72 +206,49 @@ export default function DnsUpdateKeysPanel({
     )
   }
 
+  // The keys of the account as the mockup's record rows, in a section of the upstream account dock
+  const keyBadge = (key) => <Pill label={key.status === 'active' ? t('acme.dnsUpdate.statusActive') : t('acme.dnsUpdate.statusRevoked')} tone={key.status === 'active' ? 'good' : 'bad'} />
   return (
-    <div className="mt-2 p-3 bg-bg-secondary rounded-lg border border-border space-y-3" data-testid="dns-update-keys-panel">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium text-text-primary flex items-center gap-2">
-          <ShieldCheck size={16} /> {t('acme.dnsUpdate.title')}
-        </p>
-        {canWrite && (
-          <Button type="button" size="sm" disabled={!proxyActive} onClick={() => setShowCreate(true)}>
-            <Plus size={12} /> {t('acme.dnsUpdate.create')}
-          </Button>
-        )}
-      </div>
-      <p className="text-xs text-text-tertiary">{t('acme.dnsUpdate.intro')}</p>
+    <section data-testid="dns-update-keys-panel">
+      <h3 className="section-title">{t('acme.dnsUpdate.title')}</h3>
+      <p className="muted small">{t('acme.dnsUpdate.intro')}</p>
       {!proxyActive && (
-        <p className="text-sm status-warning-text flex items-start gap-2" data-testid="dns-update-proxy-off">
-          <Warning size={16} className="shrink-0 mt-0.5" /> {t('acme.dnsUpdate.proxyOff')}
-        </p>
+        <p className="notice warn" data-testid="dns-update-proxy-off"><Icon name="warning" /><span>{t('acme.dnsUpdate.proxyOff')}</span></p>
       )}
-
-      {keys.length === 0 ? (
-        <p className="text-xs text-text-tertiary py-2 text-center">{t('acme.dnsUpdate.empty')}</p>
-      ) : (
-        <div className="divide-y divide-border">
-          {keys.map((key) => {
-            const cred = key.eab_credential_id ? eabById(key.eab_credential_id) : null
-            return (
-              <div key={key.id} className="py-2 flex items-start justify-between gap-2" data-testid={`dns-update-key-${key.id}`}>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-mono break-all">{key.name}</span>
-                    <Badge variant="secondary" size="sm">{key.algorithm}</Badge>
-                    <Badge variant={key.status === 'active' ? 'success' : 'danger'} size="sm">
-                      {key.status === 'active' ? t('acme.dnsUpdate.statusActive') : t('acme.dnsUpdate.statusRevoked')}
-                    </Badge>
-                    {key.eab_bound && !key.eab_credential_id && (
-                      <Badge variant="warning" size="sm" title={t('acme.dnsUpdate.eabMissingHelp')} data-testid={`dns-update-eab-missing-${key.id}`}>
-                        <Warning size={10} /> {t('acme.dnsUpdate.eabMissing')}
-                      </Badge>
-                    )}
-                    {key.eab_credential_id && (
-                      <Badge variant="outline" size="sm">
-                        <LockKey size={10} /> {cred ? eabLabel(cred) : `EAB #${key.eab_credential_id}`}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="mt-1 text-xs text-text-tertiary">
-                    {t('acme.dnsUpdate.created')}: {formatDate(key.created_at)}
-                    {' · '}{t('acme.dnsUpdate.lastUsed')}: {key.last_used_at ? formatDate(key.last_used_at) : t('acme.dnsUpdate.never')}
-                  </div>
-                  {key.notes && <div className="mt-1 text-xs text-text-tertiary">{key.notes}</div>}
-                </div>
-                <div className="flex gap-1 shrink-0">
-                  {canDelete && key.status === 'active' && (
-                    <Button type="button" variant="ghost" size="sm" onClick={() => handleRevoke(key)} title={t('acme.dnsUpdate.revoke')}>
-                      <Trash size={14} className="text-status-warning" />
-                    </Button>
-                  )}
-                  {canDelete && key.status === 'revoked' && (
-                    <Button type="button" variant="ghost" size="sm" onClick={() => handleDelete(key)} title={t('acme.dnsUpdate.delete')}>
-                      <Trash size={14} className="text-status-danger" />
-                    </Button>
-                  )}
-                </div>
+      <RecordList empty={t('acme.dnsUpdate.empty')}>
+        {keys.map((key) => {
+          const cred = key.eab_credential_id ? eabById(key.eab_credential_id) : null
+          return (
+            <li key={key.id} data-testid={`dns-update-key-${key.id}`}>
+              <div className="rl-main">
+                <strong className="mono">{key.name}</strong>
+                <span className="rl-meta">
+                  <span>{key.algorithm}</span>
+                  {key.eab_credential_id ? <>{' · EAB '}<span>{cred ? eabLabel(cred) : `#${key.eab_credential_id}`}</span></> : ''}
+                  {' · '}{t('acme.dnsUpdate.created')} {formatDate(key.created_at)}
+                  {' · '}{t('acme.dnsUpdate.lastUsed')} {key.last_used_at ? formatDate(key.last_used_at) : t('acme.dnsUpdate.never')}
+                </span>
+                {key.notes && <span className="rl-meta">{key.notes}</span>}
+                {key.eab_bound && !key.eab_credential_id && (
+                  <p className="rl-error" title={t('acme.dnsUpdate.eabMissingHelp')} data-testid={`dns-update-eab-missing-${key.id}`}>
+                    <Icon name="warning" /><span>{t('acme.dnsUpdate.eabMissing')}</span>
+                  </p>
+                )}
               </div>
-            )
-          })}
+              {keyBadge(key)}
+              {canDelete && (
+                <div className="rl-action">
+                  {key.status === 'active' && <Btn icon="block" onClick={() => handleRevoke(key)} title={t('acme.dnsUpdate.revoke')}>{t('acme.dnsUpdate.revoke')}</Btn>}
+                  {key.status === 'revoked' && <Btn icon="close" onClick={() => handleDelete(key)} title={t('acme.dnsUpdate.delete')}>{t('acme.dnsUpdate.delete')}</Btn>}
+                </div>
+              )}
+            </li>
+          )
+        })}
+      </RecordList>
+      {canWrite && (
+        <div className="copy-url">
+          <Btn icon="plus" write disabled={!proxyActive || undefined} onClick={() => setShowCreate(true)}>{t('acme.dnsUpdate.create')}</Btn>
         </div>
       )}
 
@@ -361,6 +339,6 @@ export default function DnsUpdateKeysPanel({
           </div>
         )}
       </Modal>
-    </div>
+    </section>
   )
 }

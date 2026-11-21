@@ -56,6 +56,8 @@ import CRLOCSPPage from '../CRLOCSPPage'
 async function selectCA(name) {
   render(<MemoryRouter><CRLOCSPPage /></MemoryRouter>)
   fireEvent.click((await screen.findAllByText(name))[0])
+  // The schedule lives in the dock's Publication tab
+  fireEvent.click(await screen.findByRole('tab', { name: 'crlOcsp.tabs.publication' }))
   await screen.findByLabelText('crlOcsp.crlValidity')
 }
 

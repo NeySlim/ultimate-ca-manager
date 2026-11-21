@@ -32,6 +32,7 @@ vi.mock('../../components', async (orig) => ({
   ResponsiveLayout: ({ children }) => <div>{children}</div>,
 }))
 
+import { MemoryRouter } from 'react-router-dom'
 import ESTPage from '../ESTPage'
 
 describe('ESTPage label mapping', () => {
@@ -39,18 +40,18 @@ describe('ESTPage label mapping', () => {
     mocks.getConfig.mockResolvedValue({ data: { enabled: true, ca_id: 1, labels: { web: 'ca-sign' } } })
     mocks.getAll.mockResolvedValue({ data: [{ id: 1, refid: 'ca-sign', name: 'Signing CA', has_private_key: true }] })
     mocks.updateConfig.mockResolvedValue({})
-    render(<ESTPage />)
+    render(<MemoryRouter initialEntries={['/est-config?tab=config']}><ESTPage /></MemoryRouter>)
     await screen.findByDisplayValue('web')
-    fireEvent.click(screen.getByText('common.add'))
+    fireEvent.click(screen.getByText('est.addLabel'))
     const keys = () => screen.getAllByPlaceholderText('est.labelPlaceholder')
     fireEvent.change(keys()[1], { target: { value: 'web' } })
 
-    fireEvent.click(screen.getByText('common.saveConfiguration'))
+    fireEvent.click(screen.getByText('common.save'))
     expect(screen.getByText('common.duplicateKey:web')).toBeInTheDocument()
     expect(mocks.updateConfig).not.toHaveBeenCalled()
 
     fireEvent.change(keys()[1], { target: { value: 'mail' } })
-    fireEvent.click(screen.getByText('common.saveConfiguration'))
+    fireEvent.click(screen.getByText('common.save'))
     expect(mocks.updateConfig).toHaveBeenCalledTimes(1)
     expect(mocks.updateConfig.mock.calls[0][0].labels).toEqual({ web: 'ca-sign', mail: '' })
   })

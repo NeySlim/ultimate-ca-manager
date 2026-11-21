@@ -1,56 +1,52 @@
+/**
+ * Domains of the built-in ACME server (the CA and the approval of their orders), drawn as the
+ * mockup's module list with its dock; edit and delete stay on the row and in the dock.
+ */
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash, PencilSimple, GlobeHemisphereWest } from '@phosphor-icons/react'
-import { Button, Badge, ResponsiveDataTable } from '../../components'
+import { Btn, ListView, Dock, DockBody, Section, Props, EmptyBlock, Pill } from '../../components/atelier'
+import { SlotDock } from '../protocols/dockSlot'
 
-export default function LocalDomainsTab({ localDomains, cas, onAdd, onEdit, onDelete, canWrite, canDelete }) {
+export default function LocalDomainsTab({ localDomains, onAdd, onEdit, onDelete, canWrite, canDelete }) {
   const { t } = useTranslation()
-
+  const [openId, setOpenId] = useState(null)
+  const open = localDomains.find((d) => d.id === openId)
+  const approval = (d) => <Pill label={t(d.auto_approve ? 'common.auto' : 'common.manual')} tone={d.auto_approve ? 'good' : 'warn'} icon={d.auto_approve ? 'check' : 'clock'} />
+  const actions = (d) => [
+    ...(canWrite ? [{ icon: 'settings', label: t('common.edit'), onClick: () => onEdit(d), write: true }] : []),
+    ...(canDelete ? [{ icon: 'close', label: t('common.delete'), onClick: () => onDelete(d), write: true }] : []),
+  ]
+  const dock = open && (
+    <Dock label={t('atelier.detailOf', { name: t('acme.localDomains') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
+      tabs={[{ key: open.id, title: open.domain, icon: 'globe' }]} onClose={() => setOpenId(null)}>
+      <DockBody icon="globe" title={open.domain} badge={approval(open)} section="domain" onSection={() => {}}
+        sectionsLabel={t('atelier.sectionsOf', { name: open.domain })} sections={[['domain', t('atelier.overview')]]}
+        actions={<>
+          {canWrite && <Btn icon="settings" write onClick={() => onEdit(open)}>{t('common.edit')}</Btn>}
+          {canDelete && <Btn icon="close" write onClick={() => { onDelete(open); setOpenId(null) }}>{t('common.delete')}</Btn>}
+        </>}>
+        <div className="module-detail">
+          <Section title={t('atelier.properties')}>
+            <Props items={[
+              [t('acme.domain'), <span key="d" className="mono">{open.domain}</span>],
+              [t('acme.issuingCA'), open.issuing_ca_name || t('acme.defaultCA')],
+              [t('acme.autoApprove'), approval(open)],
+            ]} />
+          </Section>
+        </div>
+      </DockBody>
+    </Dock>
+  )
   return (
-    <ResponsiveDataTable
-      data={localDomains}
-      columns={[
-        {
-          key: 'domain',
-          label: t('acme.domain'),
-          sortable: true,
-          render: (val) => (
-            <span className="font-mono text-sm">{val}</span>
-          )
-        },
-        {
-          key: 'issuing_ca_name',
-          label: t('acme.issuingCA'),
-          sortable: true,
-          render: (val) => (
-            <span className="text-text-primary">{val || '-'}</span>
-          )
-        },
-        {
-          key: 'auto_approve',
-          label: t('acme.autoApprove'),
-          render: (val) => (
-            <Badge variant={val ? 'success' : 'warning'}>
-              {val ? t('common.auto') : t('common.manual')}
-            </Badge>
-          )
-        },
-      ]}
-      rowActions={(row) => [
-        ...(canWrite ? [{ label: t('common.edit'), icon: PencilSimple, onClick: () => onEdit(row) }] : []),
-        ...(canDelete ? [{ label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => onDelete(row) }] : []),
-      ]}
-      emptyState={{
-        icon: GlobeHemisphereWest,
-        title: t('acme.noLocalDomains'),
-        description: t('acme.noLocalDomainsDesc'),
-        action: canWrite ? (
-          <Button type="button" onClick={onAdd}>
-            <Plus size={14} />
-            {t('acme.addDomain')}
-          </Button>
-        ) : null
-      }}
-      onRowClick={(row) => onEdit(row)}
-    />
+    <>
+      <ListView label={t('acme.localDomains')} caption={t('acme.domainsCaption')} icon="globe" rows={localDomains}
+        title={(d) => d.domain} status={approval} openedId={openId} onOpen={(d) => setOpenId(d.id)}
+        columns={[{ id: 'ca', label: t('acme.issuingCA'), cell: (d) => d.issuing_ca_name || t('acme.defaultCA'), grow: true }, { status: true }]}
+        rowActions={actions}
+        empty={<EmptyBlock id="acme-local-domains" icon="globe" title={t('acme.noLocalDomains')} text={t('acme.noLocalDomainsDesc')}
+          action={canWrite ? { label: t('acme.addDomain'), icon: 'plus', onClick: onAdd, primary: true } : undefined} />}
+        footer={{ range: t('acme.domainsRange', { count: localDomains.length }) }} />
+      <SlotDock>{dock}</SlotDock>
+    </>
   )
 }

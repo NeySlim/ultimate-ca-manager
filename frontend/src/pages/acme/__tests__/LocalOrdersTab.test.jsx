@@ -15,7 +15,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key, values) => values?.domain ? `${key}:${values.domain}` : key,
+    i18n: { language: 'en' },
   }),
+  initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 
 vi.mock('../../../services', () => ({
@@ -37,6 +39,7 @@ vi.mock('../../../services/apiClient', () => ({
 }))
 
 vi.mock('../../../contexts', () => ({
+  useMobile: () => ({ isMobile: false }),
   useNotification: () => ({
     showConfirm: mocks.showConfirm,
     showSuccess: mocks.showSuccess,
@@ -44,35 +47,18 @@ vi.mock('../../../contexts', () => ({
   }),
 }))
 
-vi.mock('../../../hooks', () => ({
+vi.mock('../../../hooks', async () => ({
+  usePersistedState: (await vi.importActual('../../../hooks/usePersistedState')).usePersistedState,
+  useClipboard: () => ({ copy: vi.fn() }),
   usePermission: () => ({
     canWrite: mocks.canWrite,
     canDelete: mocks.canDelete,
   }),
 }))
-
-vi.mock('../../../components', () => ({
-  Badge: ({ children }) => <span>{children}</span>,
-  Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-  EmptyState: ({ title }) => <div>{title}</div>,
-  FilterSelect: () => <div />,
-  ResponsiveDataTable: ({ columns, data }) => (
-    <div>
-      {data.map((row) => (
-        <div key={row.id}>
-          <span>{row.domain}</span>
-          {columns.map((column) => (
-            <span key={column.key}>
-              {column.render ? column.render(row[column.key], row) : row[column.key]}
-            </span>
-          ))}
-        </div>
-      ))}
-    </div>
-  ),
-}))
+vi.mock('../../../stores/timezoneStore', () => ({ getAppTimezone: () => 'UTC' }))
 
 import LocalOrdersTab from '../LocalOrdersTab'
+import { WithDockSlot } from '../../protocols/__tests__/withDockSlot'
 
 const order = {
   id: 7,
@@ -101,15 +87,15 @@ describe('LocalOrdersTab', () => {
 
   it('hides purge without delete:acme even when write:acme is granted', async () => {
     mocks.canDelete.mockReturnValue(false)
-    render(<LocalOrdersTab />)
+    render(<WithDockSlot><LocalOrdersTab /></WithDockSlot>)
     await screen.findAllByText('example.com')
     expect(screen.queryByText('acme.purgeLocalOrders')).not.toBeInTheDocument()
   })
 
   it('passes translated scope and danger options to delete confirmation', async () => {
-    render(<LocalOrdersTab />)
+    render(<WithDockSlot><LocalOrdersTab /></WithDockSlot>)
     await screen.findAllByText('example.com')
-    fireEvent.click(screen.getByRole('button', { name: 'common.delete' }))
+    fireEvent.click(screen.getByTitle('common.delete'))
 
     await waitFor(() => expect(mocks.showConfirm).toHaveBeenCalledWith(
       'acme.deleteLocalOrderConfirmDesc:example.com',
@@ -123,7 +109,7 @@ describe('LocalOrdersTab', () => {
   })
 
   it('passes translated scope and danger options to purge confirmation', async () => {
-    render(<LocalOrdersTab />)
+    render(<WithDockSlot><LocalOrdersTab /></WithDockSlot>)
     await screen.findAllByText('example.com')
     fireEvent.click(screen.getByText('acme.purgeLocalOrders'))
 
@@ -145,11 +131,11 @@ describe('LocalOrdersTab', () => {
       .mockResolvedValueOnce(response([], 2, 50))
       .mockResolvedValueOnce(response([order], 1, 50))
 
-    render(<LocalOrdersTab />)
+    render(<WithDockSlot><LocalOrdersTab /></WithDockSlot>)
     await screen.findByText('1 / 2')
-    fireEvent.click(screen.getByRole('button', { name: '›' }))
+    fireEvent.click(screen.getByRole('button', { name: 'table.nextPage' }))
     await screen.findByText('2 / 2')
-    fireEvent.click(screen.getByRole('button', { name: 'common.delete' }))
+    fireEvent.click(screen.getByTitle('common.delete'))
 
     await waitFor(() => {
       const urls = mocks.get.mock.calls.map(([url]) => url)

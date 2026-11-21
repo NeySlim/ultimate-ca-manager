@@ -5,6 +5,15 @@ export default {
     overview: 'UCM 支持两种 ACME 模式：ACME 客户端用于从任何符合 RFC 8555 的 CA（Let\'s Encrypt、ZeroSSL、HARICA 等）获取公共证书；本地 ACME 服务器用于内部 PKI 自动化，支持多 CA 域名映射。',
     sections: [
       {
+        title: '视图',
+        items: [
+          { label: '账户', text: '页面首先显示服务器账户：按状态筛选、联系人、创建于、状态和订单。账户打开其详情，含账户、订单和质询选项卡，以及停用账户…（不可撤销，RFC 8555 §7.3.6）和删除' },
+          { label: '复制目录 URL', text: '位于页面标题：ACME 客户端指向的目录 URL' },
+          { label: '视图', text: '页面标题中的视图菜单可前往服务器的订单、域名、EAB 凭据和设置，客户端的设置、订单、上游 CA、DNS 提供商和域名，以及已签发证书。地址会保留视图（?tab=）' },
+          { label: '客户端设置', text: '一个表单，一次请求保存；先检查服务器限制（续期 1 到 60 天、DNS 等待、TLS-ALPN 端口）' },
+        ]
+      },
+      {
         title: "Renewal Information (ARI, RFC 9773)",
         content: "本地 ACME 服务器公布 renewalInfo 资源，使客户端了解每个证书的理想续期时机。",
         items: [
@@ -18,7 +27,7 @@ export default {
         title: 'ACME 客户端',
         items: [
           { label: '客户端', text: '从任何 ACME CA 请求证书，Let\'s Encrypt、ZeroSSL、HARICA 或自定义' },
-          { label: '订单标签页 (v2.219)', text: '客户端订单现在有专属的侧边栏标签页「Let\'s Encrypt orders」，带有可见/总数计数和状态过滤器，与 Local orders 视图保持一致' },
+          { label: '客户端订单', text: '客户端订单有自己的视图，按状态筛选，行内显示续期失败，详情中提供其状态允许的操作' },
           { label: '证书颁发机构 (CA)', text: '每个 CA 可以有多个账户，多个账户可以共享同一个目录 URL（例如两个 Let\'s Encrypt 账户用于管理分离）；目录 URL 留空默认为 Let\'s Encrypt 生产环境' },
           { label: '自定义服务器', text: '设置自定义 ACME 目录 URL 以使用任何符合 RFC 8555 的 CA' },
           { label: 'EAB', text: '支持外部账户绑定，用于需要预注册的 CA（ZeroSSL、HARICA 等）' },
@@ -32,7 +41,7 @@ export default {
           { label: '原地续期 (v2.251)', text: '续期保留证书的 id 和 refid，因此 HTTPS 绑定、部署绑定和 Webhook 会随之更新。先前续期中作为新行导入的证书仍保留在清单中：请手动归档或删除' },
           { label: '中断的订单 (v2.251)', text: '因重启而停在处理中的订单会在约 15 分钟内带着提示信息回到待处理状态，可执行 Verify Challenge。重启或导入失败之前 CA 已签发的证书，可通过 Check Status、完成订单或下一次续期取回' },
           { label: '过期的待处理订单 (v2.251)', text: '续期任务会移除待处理超过 7 天、且其在 CA 的订单已过期或过期时间未知的订单，连同其 TXT 记录，并为每次移除记录审计。验证失败的订单的 TXT 记录在其变为无效后移除' },
-          { label: '订单列表 (v2.251)', text: 'Let\'s Encrypt orders 标签页加载全部订单（最多 5000 个），每次四页，并在 Retry-After 之后重试被 429 拒绝的页。仍缺失的页会保留已获取的订单，并提示列表不完整' },
+          { label: '订单列表 (v2.251)', text: '客户端订单视图加载全部订单（最多 5000 个），每次四页，并在 Retry-After 之后重试被 429 拒绝的页。仍缺失的页会保留已获取的订单，并提示列表不完整' },
           { label: '续期失败 (v2.251)', text: '订单会显示其续期失败次数、最后一次错误及其日期。计划续期失败 5 次后，每天重试一次；每次失败（包括手动续期）都会触发 acme_order.renewal_failed 事件' },
           { label: '按订单自动续期 (v2.251)', text: '选中订单后会显示“自动续期”开关，用于停止或恢复其续期。吊销后删除证书会关闭其订单的续期，并给出提示' },
           { label: '一次一个续期 (v2.251)', text: '续期或完成订单会锁定该订单：此时再启动第二个会得到 409，调度器也会跳过该订单' },
@@ -61,7 +70,7 @@ export default {
           { label: '账户', text: '查看和管理已注册的 ACME 客户端账户' },
           { label: '账户邮箱 (v2.218)', text: '本地账户的联系邮箱可在其详情面板中编辑。根据 RFC 8555，联系信息归 ACME 客户端所有，因此客户端下一次更新账户时可能会覆盖该值' },
           { label: '历史', text: '跟踪所有 ACME 证书签发订单' },
-                  { label: '本地订单 (v2.217)', text: 'Local orders 标签页列出内置服务器的订单，支持状态过滤、单个删除和清理；过期未签发的订单每 6 小时自动清理，无配置文件的订单使用默认签名摘要。自 v2.218 起，清理还会移除已验证授权中残留的 pending 同级质询，自 v2.252 起还会移除已过期和已使用的 nonce' },
+                  { label: '本地订单 (v2.217)', text: '订单视图列出内置服务器的订单，支持状态过滤、单个删除和清理；过期未签发的订单每 6 小时自动清理，无配置文件的订单使用默认签名摘要。自 v2.218 起，清理还会移除已验证授权中残留的 pending 同级质询，自 v2.252 起还会移除已过期和已使用的 nonce' },
                   { label: '配置文件与模板 (v2.221)', text: '证书配置文件（draft-ietf-acme-profiles）在目录中公布，由客户端在每个订单中选择。每个配置文件设定有效期和摘要，并可绑定证书模板，绑定后模板的密钥用法和扩展密钥用法将决定签发的证书' },
                   { label: '默认配置文件', text: '大多数客户端不请求任何配置文件。在配置文件下方选择的默认配置文件会应用于这些订单；未设置时，它们获得 90 天有效期和默认摘要' },
                   { label: '吊销 (v2.248)', text: '客户端发送用于吊销的证书必须与存储的证书逐字节一致。只有 RSA 或 EC P-256、P-384、P-521 证书密钥可以自行签署请求：ML-DSA、EdDSA 或 Brainpool 证书请使用下单的账户吊销' },
@@ -132,7 +141,7 @@ export default {
         content: 'HTTP-01 和 TLS-ALPN-01 验证对 RFC1918、loopback、.lan / .local / .corp 目标开箱即用，UCM 的主要部署模式。',
         items: [
           { label: '开关', text: 'ACME → ACME服务器 → 允许私有和内部地址(默认:开启)' },
-          { label: '开关', text: 'Let\'s Encrypt 标签页 → 允许回环 ACME CA, 用于 127.0.0.1 上的同机 CA（默认：关闭）' },
+          { label: '开关', text: '客户端设置 → 允许回环 ACME CA, 用于 127.0.0.1 上的同机 CA（默认：关闭）' },
           { label: '始终阻止', text: '云元数据 IP(169.254.169.254、fd00:ec2::254 等)无条件阻止' },
         ]
       },
@@ -326,7 +335,7 @@ ACME代理允许内部客户端通过UCM从公共CA（Let's Encrypt、ZeroSSL等
 - 审计和跟踪所有公共证书的签发
 
 ### 配置
-1. 转到 **ACME** → **Let's Encrypt** 选项卡
+1. 打开 **ACME**，视图 **客户端设置**
 2. 滚动到 **ACME代理** 部分
 3. 在 **证书颁发机构 (CA)** 中选择 **上游 CA 账户**（Let's Encrypt、Actalis、ZeroSSL、自定义 URL、EAB）
 4. 点击 **测试连接** 验证与上游 CA 的连接
@@ -336,7 +345,7 @@ ACME代理允许内部客户端通过UCM从公共CA（Let's Encrypt、ZeroSSL等
 ### 专用代理路径（多 CA）
 每个外部 CA 账户可暴露自己的 ACME 代理端点：
 
-1. 打开 **证书颁发机构 (CA)**（同一 Let's Encrypt 选项卡）
+1. 打开 **上游 CA** 视图
 2. 编辑或创建 CA 账户
 3. 启用 **通过 ACME 代理暴露**
 4. 设置唯一的 **代理路径 (slug)**: 如 \`actalis-production\`、\`letsencrypt-staging\`

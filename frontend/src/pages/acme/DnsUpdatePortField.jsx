@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Warning } from '@phosphor-icons/react'
-import { Button, Badge, Input } from '../../components'
+import { Btn, Icon, Pill } from '../../components/atelier'
 import { parseDnsUpdatePort, effectiveDnsUpdatePort } from './dnsUpdatePort'
 
 /**
@@ -45,41 +44,25 @@ export default function DnsUpdatePortField({ clientSettings = {}, canWrite, onSa
     }
   }
 
+  // The mockup's field: label and state, the port, its hint or error, then Enregistrer
+  const state = listening
+    ? <Pill label={t('acme.dnsUpdate.portListening')} tone="good" />
+    : effective === 0 ? <Pill label={t('acme.dnsUpdate.portDisabled')} tone="muted" /> : <Pill label={t('acme.dnsUpdate.portNotListening')} tone="warn" />
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm font-medium text-text-primary">{t('acme.dnsUpdate.portLabel')}</span>
-        {listening
-          ? <Badge variant="success" size="sm">{t('acme.dnsUpdate.portListening')}</Badge>
-          : effective === 0
-            ? <Badge variant="secondary" size="sm">{t('acme.dnsUpdate.portDisabled')}</Badge>
-            : <Badge variant="warning" size="sm">{t('acme.dnsUpdate.portNotListening')}</Badge>}
+    <div className="dns-update-port">
+      <div className="field">
+        <label htmlFor="acme-dns-update-port">{t('acme.dnsUpdate.portLabel')} {state}</label>
+        <input id="acme-dns-update-port" aria-label={t('acme.dnsUpdate.portLabel')} type="number" min="0" max="65535" value={overridden ? String(envPort) : value}
+          onChange={(e) => { setValue(e.target.value); setError('') }} readOnly={overridden} disabled={!canWrite || undefined}
+          aria-invalid={error ? 'true' : undefined} aria-describedby="acme-dns-update-port-hint" />
+        <small id="acme-dns-update-port-hint">{overridden ? t('acme.dnsUpdate.portEnvOverride', { port: envPort }) : t('acme.dnsUpdate.portHelper')}</small>
+        {error && <p className="field-error"><Icon name="warning" /><span>{error}</span></p>}
       </div>
-      <div className="flex items-end gap-2">
-        <div className="flex-1">
-          <Input
-            aria-label={t('acme.dnsUpdate.portLabel')}
-            type="number"
-            min="0"
-            max="65535"
-            value={overridden ? String(envPort) : value}
-            onChange={(e) => { setValue(e.target.value); setError('') }}
-            readOnly={overridden}
-            disabled={!canWrite}
-            error={error}
-            helperText={overridden
-              ? t('acme.dnsUpdate.portEnvOverride', { port: envPort })
-              : t('acme.dnsUpdate.portHelper')}
-          />
-        </div>
-        {canWrite && !overridden && (
-          <Button type="button" size="sm" onClick={save} disabled={busy}>{t('common.save')}</Button>
-        )}
-      </div>
+      {canWrite && !overridden && (
+        <div className="copy-url"><Btn icon="check" write onClick={save} disabled={busy || undefined}>{t('common.save')}</Btn></div>
+      )}
       {restartRequired && (
-        <p className="text-xs status-warning-text flex items-center gap-1" role="status">
-          <Warning size={14} /> {t('acme.dnsUpdate.portRestartRequired')}
-        </p>
+        <p className="notice warn" role="status"><Icon name="warning" /><span>{t('acme.dnsUpdate.portRestartRequired')}</span></p>
       )}
     </div>
   )

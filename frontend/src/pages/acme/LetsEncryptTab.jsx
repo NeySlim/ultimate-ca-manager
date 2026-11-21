@@ -1,486 +1,199 @@
+/**
+ * The ACME client settings and its proxy, drawn as the mockup's settingsView(): a draft saved in
+ * one request (only what changed), the bounds the server applies checked before, and the proxy's
+ * own actions (test, register, unregister, reset) in their section.
+ */
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  Plus, Trash, CheckCircle, ArrowsClockwise, Key, Warning,
-  Copy, CaretRight, LockKey, PlugsConnected, ClockCounterClockwise, Gear, ShieldCheck
-} from '@phosphor-icons/react'
-import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
-import { HelpCard, Button, Badge, CompactSection, Select, Input } from '../../components'
-import { useClipboard } from '../../hooks'
-import { cn, publicBaseUrl } from '../../lib/utils'
-import { ACME_CLIENT_LABELS, groupedOptions, listAlgorithms } from '../../lib/keyAlgorithms'
+import { Btn, SettingsView, Props } from '../../components/atelier'
+import { acmeService } from '../../services'
+import { useNotification } from '../../contexts'
+import { publicBaseUrl } from '../../lib/utils'
+import { ACME_CLIENT_LABELS, groupedOptions, listAlgorithms, isBrainpool } from '../../lib/keyAlgorithms'
 import { useKeyPlatform } from '../../lib/policyAlgorithms'
-import { BrainpoolNotice } from '../../components/BrainpoolNotice'
 import DnsUpdatePortField from './DnsUpdatePortField'
+import { Copyable, Field, Notice } from '../protocols/atelierParts'
 
-export default function LetsEncryptTab({
-  clientSettings,
-  localContactEmail,
-  onLocalContactEmailChange,
-  localProxyUpstreamUrl,
-  onLocalProxyUpstreamUrlChange,
-  proxyEmail,
-  onProxyEmailChange,
-  testingConnection,
-  connectionResult,
-  onBlurSave,
-  onBlurSaveInt,
-  localDnsTimeout,
-  localRenewalDays,
-  onLocalRenewalDaysChange,
-  onLocalDnsTimeoutChange,
-  localDnsDelay,
-  onLocalDnsDelayChange,
-  localDnsNameservers,
-  onLocalDnsNameserversChange,
-  onUpdateClientSetting,
-  onSaveDnsUpdatePort,
-  onRegisterProxy,
-  onUnregisterProxy,
-  onProxyAccountChange,
-  caAccounts = [],
-  onResetProxyAccount,
-  onTestConnection,
-  onRequestCertificate,
-  onRefresh,
-  canWrite,
-}) {
+// Bounds of the integer settings, as the server checks them
+const BOUNDS = { renewal_days: [1, 60, 30], dns_propagation_timeout: [0, 3600, 120], dns_propagation_delay: [0, 300, 10], tls_alpn_port: [1, 65535, 443] }
+const BOOLS = { renewal_enabled: true, verify_ssl: true, debug_logging: false, allow_loopback_upstream: false, proxy_verify_ssl: true, proxy_prune_replaced_certificates: false }
+const TEXTS = { environment: 'staging', email: '', dns01_resolver_mode: 'auto', dns01_nameservers: '', key_type: ACME_CLIENT_LABELS[0], account_key_type: 'ES256' }
+
+const clientDraft = (s) => ({
+  ...Object.fromEntries(Object.entries(TEXTS).map(([k, d]) => [k, s[k] || d])),
+  ...Object.fromEntries(Object.entries(BOOLS).map(([k, d]) => [k, s[k] ?? d])),
+  ...Object.fromEntries(Object.entries(BOUNDS).map(([k, [, , d]]) => [k, String(s[k] ?? d)])),
+  proxy_acme_account_id: s.proxy_acme_account_id != null ? String(s.proxy_acme_account_id) : '',
+})
+
+export default function LetsEncryptTab({ clientSettings, caAccounts = [], canWrite, onSaved, onSaveDnsUpdatePort, onRegisterProxy, onUnregisterProxy,
+  onResetProxyAccount, onTestConnection, testingConnection, connectionResult }) {
   const { t } = useTranslation()
-  const { copy } = useClipboard()
+  const { showSuccess, showError } = useNotification()
   const platform = useKeyPlatform()
+  const [draft, setDraft] = useState(() => clientDraft(clientSettings))
+  const [errors, setErrors] = useState({})
+  const [saving, setSaving] = useState(false)
+  const [announce, setAnnounce] = useState('')
+  const [proxyEmail, setProxyEmail] = useState('')
+  const stateRef = useRef(null)
+  const saved = clientDraft(clientSettings)
+  useEffect(() => { setDraft(clientDraft(clientSettings)) }, [clientSettings])
+
   const clientKeys = listAlgorithms({ labels: ACME_CLIENT_LABELS, ...platform })
   // A saved key this server no longer offers (FIPS mode, build without ML-DSA) fails every order
-  const savedKeyUnavailable = !!clientSettings.key_type && !clientKeys.some(a => a.label === clientSettings.key_type)
+  const savedKeyUnavailable = !!clientSettings.key_type && !clientKeys.some((a) => a.label === clientSettings.key_type)
+  const changed = Object.keys(saved).filter((k) => String(draft[k]) !== String(saved[k]))
+  const off = !canWrite
 
   const proxyAccountId = clientSettings.proxy_acme_account_id ?? null
-  const selectedProxyAccount = caAccounts.find(a => a.id === proxyAccountId)
+  const selected = caAccounts.find((a) => a.id === proxyAccountId)
   const publicProxyBase = publicBaseUrl(clientSettings.acme_proxy_public_base_url, '/acme/proxy')
-  const proxyServerBase = selectedProxyAccount?.proxy_enabled && selectedProxyAccount?.proxy_slug
-    ? `${publicProxyBase}/${selectedProxyAccount.proxy_slug}`
-    : publicProxyBase
-  const proxyDirectoryUrl = `${proxyServerBase}/directory`
-  const enabledProxyAccounts = caAccounts.filter(a => a.proxy_enabled && a.proxy_slug)
-  const proxyAccountOptions = caAccounts.map(a => ({
-    value: String(a.id),
-    label: `${a.label}${a.is_default ? ` (${t('common.default')})` : ''}${a.is_registered ? '' : `: ${t('acme.notRegistered')}`}`,
-  }))
+  const proxyBase = selected?.proxy_enabled && selected?.proxy_slug ? `${publicProxyBase}/${selected.proxy_slug}` : publicProxyBase
+  const proxyDirectoryUrl = `${proxyBase}/directory`
+  const enabledProxyAccounts = caAccounts.filter((a) => a.proxy_enabled && a.proxy_slug)
 
-  return (
-    <div className="p-4 space-y-4">
-      <HelpCard variant="info" title={t('acme.letsEncryptAbout')} compact>
-        {t('acme.letsEncryptAboutDesc')}
-      </HelpCard>
+  const validate = () => {
+    const e = {}
+    for (const [k, [min, max]] of Object.entries(BOUNDS)) {
+      const n = Number(draft[k])
+      if (!Number.isInteger(n) || n < min || n > max) e[k] = t('acme.boundsError', { min, max })
+    }
+    return e
+  }
 
-      {/* Request Certificate Button */}
-      <div className="flex flex-wrap items-center gap-2">
-        {canWrite && (
-          <Button type="button" onClick={onRequestCertificate}>
-            <Plus size={14} />
-            {t('acme.requestCertificate')}
-          </Button>
-        )}
-        <Button type="button" variant="secondary" onClick={onRefresh}>
-          <ArrowsClockwise size={14} />
-          {t('common.refresh')}
-        </Button>
-      </div>
+  const save = async () => {
+    const e = validate()
+    setErrors(e)
+    if (Object.keys(e).length) {
+      setAnnounce(t('scep.fixBeforeSaving', { count: Object.keys(e).length }))
+      requestAnimationFrame(() => document.querySelector('#settings-form [aria-invalid="true"]')?.focus())
+      return
+    }
+    const patch = Object.fromEntries(changed.map((k) => [k, k in BOUNDS ? Number(draft[k]) : k === 'proxy_acme_account_id' ? (draft[k] ? Number(draft[k]) : null) : draft[k]]))
+    setSaving(true)
+    try {
+      await acmeService.updateClientSettings(patch)
+      showSuccess(t('messages.success.update.settings'))
+      setAnnounce(t('messages.success.update.settings'))
+      await onSaved?.()
+      stateRef.current?.focus()
+    } catch (error) {
+      showError(error.message || t('messages.errors.updateFailed.settings'))
+    } finally {
+      setSaving(false)
+    }
+  }
 
-      {/* Info about History tab */}
-      <HelpCard variant="info" compact>
-        <span className="flex items-center gap-2">
-          <ClockCounterClockwise size={16} />
-          {t('acme.viewHistoryForCertificates')}
-        </span>
-      </HelpCard>
-
-      {/* Client Settings */}
-      <CompactSection title={t('acme.clientSettings')} icon={Gear}>
-        <div className="space-y-3">
-          <Select
-            label={t('acme.defaultEnvironment')}
-            value={clientSettings.environment || 'staging'}
-            onChange={(val) => onUpdateClientSetting('environment', val)}
-            disabled={!canWrite}
-            options={[
-              { value: 'staging', label: t('acme.staging') + ' (Test)' },
-              { value: 'production', label: t('acme.production') + ' (Live)' }
-            ]}
-            helperText={t('acme.environmentHelper')}
-          />
-
-          <Input
-            label={t('acme.contactEmail')}
-            type="email"
-            value={localContactEmail}
-            onChange={(e) => onLocalContactEmailChange(e.target.value)}
-            onBlur={() => onBlurSave('email', localContactEmail, onLocalContactEmailChange)}
-            disabled={!canWrite}
-            helperText={t('acme.contactEmailHelper')}
-          />
-
-          <ToggleSwitch
-            checked={clientSettings.renewal_enabled ?? true}
-            onChange={(val) => onUpdateClientSetting('renewal_enabled', val)}
-            disabled={!canWrite}
-            label={t('acme.autoRenewal')}
-            description={t('acme.autoRenewalDesc')}
-          />
-
-          <Input
-            label={t('acme.renewalDays')}
-            type="number"
-            min="1"
-            max="60"
-            value={localRenewalDays}
-            onChange={(e) => onLocalRenewalDaysChange(e.target.value)}
-            onBlur={() => onBlurSaveInt('renewal_days', localRenewalDays, onLocalRenewalDaysChange, { min: 1, max: 60, fallback: 30 })}
-            disabled={!canWrite || clientSettings.renewal_enabled === false}
-            helperText={t('acme.renewalDaysHelper')}
-          />
-
-          <ToggleSwitch
-            checked={clientSettings.verify_ssl ?? true}
-            onChange={(val) => onUpdateClientSetting('verify_ssl', val)}
-            disabled={!canWrite}
-            label={t('sso.verifySsl')}
-          />
-
-          {clientSettings.verify_ssl === false && (
-            <div className="p-3 rounded-lg status-warning-bg status-warning-border border">
-              <p className="text-xs status-warning-text">{t('sso.sslWarning')}</p>
+  const sections = [
+    {
+      id: 'client', label: t('acme.clientSettings'), icon: 'refresh', desc: t('acme.letsEncryptAboutDesc'),
+      groups: [
+        { legend: t('acme.clientSettings'), fields: [
+          { key: 'environment', label: t('acme.defaultEnvironment'), hint: t('acme.environmentHelper'), disabled: off,
+            options: [['staging', `${t('acme.staging')} (Test)`], ['production', `${t('acme.production')} (Live)`]] },
+          { key: 'email', label: t('acme.contactEmail'), hint: t('acme.contactEmailHelper'), type: 'email', disabled: off },
+          { key: 'renewal_enabled', label: t('acme.autoRenewal'), hint: t('acme.autoRenewalDesc'), checkbox: true, disabled: off },
+          { key: 'renewal_days', label: t('acme.renewalDays'), hint: t('acme.renewalDaysHelper'), numeric: true, short: true, disabled: off || !draft.renewal_enabled },
+          { key: 'verify_ssl', label: t('sso.verifySsl'), checkbox: true, disabled: off },
+        ] },
+        { legend: t('acme.dnsSettings'), fields: [
+          { key: 'dns_propagation_timeout', label: t('acme.dnsPropagationTimeout'), hint: t('acme.dnsPropagationTimeoutHelper'), numeric: true, short: true, disabled: off },
+          { key: 'dns_propagation_delay', label: t('acme.dnsPropagationDelay'), hint: t('acme.dnsPropagationDelayHelper'), numeric: true, short: true, disabled: off },
+          { key: 'dns01_resolver_mode', label: t('acme.dnsResolverMode'), hint: t('acme.dnsResolverModeHelper'), disabled: off,
+            options: [['auto', t('acme.dnsResolverModeAuto')], ['system', t('acme.dnsResolverModeSystem')], ['custom', t('acme.dnsResolverModeCustom')]] },
+          ...(draft.dns01_resolver_mode !== 'system' ? [{ key: 'dns01_nameservers', label: t('acme.dnsResolvers'), hint: t('acme.dnsResolversHelper'), placeholder: '10.0.0.53, 127.0.0.1:5353', disabled: off }] : []),
+        ] },
+        { legend: t('acme.keysAndTransport'), fields: [
+          { key: 'key_type', label: t('acme.keyType'), hint: t('acme.keyTypeHelper'), disabled: off,
+            options: groupedOptions(clientKeys, t).map((o) => [o.value, o.label, o.group]) },
+          { key: 'account_key_type', label: t('acme.accountKeyType'), hint: t('acme.accountKeyTypeHelper'), disabled: off,
+            options: [['ES256', 'ECDSA P-256 (ES256)'], ['ES384', 'ECDSA P-384 (ES384)'], ['RS256', 'RSA 2048 (RS256)']] },
+          { key: 'tls_alpn_port', label: t('acme.tlsAlpnPort'), hint: t('acme.tlsAlpnPortHelper'), numeric: true, short: true, disabled: off },
+          { key: 'debug_logging', label: t('acme.debugLogging'), hint: t('acme.debugLoggingDesc'), checkbox: true, disabled: off },
+          { key: 'allow_loopback_upstream', label: t('acme.allowLoopbackUpstream'), hint: t('acme.allowLoopbackUpstreamDesc'), checkbox: true, disabled: off },
+        ] },
+      ],
+      children: <>
+        {draft.verify_ssl === false && <Notice tone="warn">{t('sso.sslWarning')}</Notice>}
+        {savedKeyUnavailable && <Notice tone="bad" role="alert">{t('acme.keyTypeUnavailable', { keyType: clientSettings.key_type })}</Notice>}
+        {isBrainpool(draft.key_type) && <Notice tone="warn" role="note">{t('common.keyGroups.brainpoolWarning')}</Notice>}
+      </>,
+    },
+    {
+      id: 'proxy', label: t('acme.acmeProxy'), icon: 'server', desc: t('acme.proxyUpstreamCAAccountHelper'),
+      groups: [{ legend: t('acme.acmeProxy'), fields: [
+        { key: 'proxy_acme_account_id', label: t('acme.proxyUpstreamCAAccount'), disabled: off || caAccounts.length === 0,
+          hint: caAccounts.length === 0 ? t('acme.proxyNoCaAccounts') : selected?.directory_url,
+          options: [['', t('acme.proxySelectCaAccount')], ...caAccounts.map((a) => [String(a.id),
+            `${a.label}${a.is_default ? ` (${t('common.default')})` : ''}${a.is_registered ? '' : `: ${t('acme.notRegistered')}`}`])] },
+        { key: 'proxy_verify_ssl', label: t('sso.verifySsl'), checkbox: true, disabled: off },
+        { key: 'proxy_prune_replaced_certificates', label: t('acme.proxyPruneReplacedCertificates'), hint: t('acme.proxyPruneReplacedCertificatesDesc'), checkbox: true, disabled: off },
+      ] }],
+      children: (
+        <div className="acme-proxy">
+          {draft.proxy_verify_ssl === false && <Notice tone="warn">{t('sso.sslWarning')}</Notice>}
+          {selected && <p className="muted small">{t('acme.proxyManageCaAccountsHint')}</p>}
+          {proxyAccountId && selected?.is_registered ? (
+            <Notice icon="check">
+              <strong>{t('acme.upstreamAccountRegistered')}</strong>{' '}
+              <span className="mono">{clientSettings.proxy_account_url || selected.account_url || t('acme.accountRegistered')}</span>{' '}
+              ({selected.label}, {selected.email})
+            </Notice>
+          ) : proxyAccountId ? <Notice>{t('acme.upstreamAccountNotRegistered')} {t('acme.willAutoRegister')}</Notice> : null}
+          <div className="settings-test">
+            <Btn icon="send" id="acme-proxy-test" disabled={testingConnection || !proxyAccountId || undefined} onClick={onTestConnection}>{t('acme.testConnection')}</Btn>
+            {connectionResult && (
+              <p className={`test-result ${connectionResult.connected ? 'good' : 'bad'}`} role="status">
+                <span>{connectionResult.connected
+                  ? `${connectionResult.ca_name || t('common.connected')}${connectionResult.eab_required ? ` (${t('acme.eabRequired')})` : ''}`
+                  : connectionResult.error || t('acme.connectionFailed')}</span>
+              </p>
+            )}
+          </div>
+          {canWrite && proxyAccountId && selected?.is_registered && (
+            <div className="copy-url">
+              <Btn icon="refresh" write onClick={onResetProxyAccount}>{t('acme.resetAccount')}</Btn>{' '}
+              <Btn icon="block" write onClick={onUnregisterProxy}>{t('acme.unregisterProxy')}</Btn>
             </div>
           )}
-
-          <Input
-            label={t('acme.dnsPropagationTimeout')}
-            type="number"
-            min="0"
-            max="3600"
-            value={localDnsTimeout}
-            onChange={(e) => onLocalDnsTimeoutChange(e.target.value)}
-            onBlur={() => onBlurSaveInt('dns_propagation_timeout', localDnsTimeout, onLocalDnsTimeoutChange, { min: 0, max: 3600, fallback: 120 })}
-            disabled={!canWrite}
-            helperText={t('acme.dnsPropagationTimeoutHelper')}
-          />
-
-          <Input
-            label={t('acme.dnsPropagationDelay')}
-            type="number"
-            min="0"
-            max="300"
-            value={localDnsDelay}
-            onChange={(e) => onLocalDnsDelayChange(e.target.value)}
-            onBlur={() => onBlurSaveInt('dns_propagation_delay', localDnsDelay, onLocalDnsDelayChange, { min: 0, max: 300, fallback: 10 })}
-            disabled={!canWrite}
-            helperText={t('acme.dnsPropagationDelayHelper')}
-          />
-
-          <Select
-            label={t('acme.dnsResolverMode')}
-            value={clientSettings.dns01_resolver_mode || 'auto'}
-            onChange={(val) => onUpdateClientSetting('dns01_resolver_mode', val)}
-            disabled={!canWrite}
-            options={[
-              { value: 'auto', label: t('acme.dnsResolverModeAuto') },
-              { value: 'system', label: t('acme.dnsResolverModeSystem') },
-              { value: 'custom', label: t('acme.dnsResolverModeCustom') },
-            ]}
-            helperText={t('acme.dnsResolverModeHelper')}
-          />
-
-          {(clientSettings.dns01_resolver_mode || 'auto') !== 'system' && (
-            <Input
-              label={t('acme.dnsResolvers')}
-              value={localDnsNameservers}
-              onChange={(e) => onLocalDnsNameserversChange(e.target.value)}
-              onBlur={() => onBlurSave('dns01_nameservers', localDnsNameservers, onLocalDnsNameserversChange)}
-              placeholder="10.0.0.53, 127.0.0.1:5353"
-              disabled={!canWrite}
-              helperText={t('acme.dnsResolversHelper')}
-            />
+          {canWrite && proxyAccountId && !selected?.is_registered && (
+            <div className="settings-grid">
+              <Field label={t('common.emailAddress')} hint={t('common.emailRequired')} id="acme-proxy-email">
+                {(p) => <input {...p} type="email" value={proxyEmail || selected?.email || ''} placeholder={t('acme.emailPlaceholder')} onChange={(e) => setProxyEmail(e.target.value)} />}
+              </Field>
+              <div className="copy-url"><Btn icon="key" write disabled={(!proxyEmail && !selected?.email) || undefined} onClick={() => onRegisterProxy(proxyEmail)}>{t('acme.registerAccount')}</Btn></div>
+            </div>
           )}
-
-          <ToggleSwitch
-            checked={clientSettings.debug_logging ?? false}
-            onChange={(val) => onUpdateClientSetting('debug_logging', val)}
-            disabled={!canWrite}
-            label={t('acme.debugLogging')}
-            description={t('acme.debugLoggingDesc')}
-          />
-
-          <ToggleSwitch
-            checked={clientSettings.allow_loopback_upstream ?? false}
-            onChange={(val) => onUpdateClientSetting('allow_loopback_upstream', val)}
-            disabled={!canWrite}
-            label={t('acme.allowLoopbackUpstream')}
-            description={t('acme.allowLoopbackUpstreamDesc')}
-          />
-
-          <Input
-            label={t('acme.tlsAlpnPort')}
-            type="number"
-            value={clientSettings.tls_alpn_port ?? 443}
-            onChange={(e) => onUpdateClientSetting('tls_alpn_port', parseInt(e.target.value) || 443)}
-            min="1"
-            max="65535"
-            disabled={!canWrite}
-            helperText={t('acme.tlsAlpnPortHelper')}
-          />
-
-          <Select
-            label={t('acme.keyType')}
-            value={clientSettings.key_type || ACME_CLIENT_LABELS[0]}
-            onChange={(val) => onUpdateClientSetting('key_type', val)}
-            disabled={!canWrite}
-            options={groupedOptions(clientKeys, t)}
-            helperText={t('acme.keyTypeHelper')}
-          />
-          {savedKeyUnavailable && (
-            <p className="flex items-start gap-1.5 text-xs text-status-danger" role="alert">
-              <Warning size={14} className="mt-0.5 shrink-0" />
-              <span>{t('acme.keyTypeUnavailable', { keyType: clientSettings.key_type })}</span>
-            </p>
-          )}
-          <BrainpoolNotice label={clientSettings.key_type} />
-
-          <Select
-            label={t('acme.accountKeyType')}
-            value={clientSettings.account_key_type || 'ES256'}
-            onChange={(val) => onUpdateClientSetting('account_key_type', val)}
-            disabled={!canWrite}
-            options={[
-              { value: 'ES256', label: 'ECDSA P-256 (ES256)' },
-              { value: 'ES384', label: 'ECDSA P-384 (ES384)' },
-              { value: 'RS256', label: 'RSA 2048 (RS256)' },
-            ]}
-            helperText={t('acme.accountKeyTypeHelper')}
-          />
-        </div>
-      </CompactSection>
-
-      {/* ACME Proxy */}
-      <CompactSection title={t('acme.acmeProxy')} icon={ShieldCheck}>
-        <div className="space-y-3">
-          <>
-              <Select
-                label={t('acme.proxyUpstreamCAAccount')}
-                value={proxyAccountId != null ? String(proxyAccountId) : ''}
-                onChange={(val) => onProxyAccountChange(val ? parseInt(val, 10) : null)}
-                disabled={!canWrite || caAccounts.length === 0}
-                options={[
-                  { value: '', label: t('acme.proxySelectCaAccount') },
-                  ...proxyAccountOptions,
-                ]}
-                helperText={
-                  caAccounts.length === 0
-                    ? t('acme.proxyNoCaAccounts')
-                    : t('acme.proxyUpstreamCAAccountHelper')
-                }
-              />
-
-              {selectedProxyAccount && (
-                <p className="text-xs text-text-tertiary font-mono break-all">
-                  {selectedProxyAccount.directory_url}
-                </p>
-              )}
-
-              <ToggleSwitch
-                checked={clientSettings.proxy_verify_ssl ?? true}
-                onChange={(val) => onUpdateClientSetting('proxy_verify_ssl', val)}
-                disabled={!canWrite}
-                label={t('sso.verifySsl')}
-              />
-
-              {clientSettings.proxy_verify_ssl === false && (
-                <div className="p-3 rounded-lg status-warning-bg status-warning-border border">
-                  <p className="text-xs status-warning-text">{t('sso.sslWarning')}</p>
-                </div>
-              )}
-
-              <ToggleSwitch
-                checked={clientSettings.proxy_prune_replaced_certificates ?? false}
-                onChange={(val) => onUpdateClientSetting('proxy_prune_replaced_certificates', val)}
-                disabled={!canWrite}
-                label={t('acme.proxyPruneReplacedCertificates')}
-                description={t('acme.proxyPruneReplacedCertificatesDesc')}
-              />
-
-              {selectedProxyAccount && (
-                <p className="text-xs text-text-tertiary">{t('acme.proxyManageCaAccountsHint')}</p>
-              )}
-
-              <DnsUpdatePortField
-                clientSettings={clientSettings}
-                canWrite={canWrite}
-                onSave={onSaveDnsUpdatePort}
-              />
-
-              {/* Account Registration Status */}
-              {proxyAccountId && selectedProxyAccount?.is_registered ? (() => {
-                const accountUrl = clientSettings.proxy_account_url || selectedProxyAccount.account_url || ''
-
-                return (
-                  <div className="p-3 rounded-lg border status-success-bg status-success-border">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle size={18} className="status-success-text" weight="fill" />
-                        <div>
-                          <p className="text-sm font-medium text-text-primary">
-                            {t('acme.upstreamAccountRegistered')}
-                          </p>
-                          <p className="text-xs text-text-secondary font-mono">
-                            {accountUrl ? `...${accountUrl.slice(-30)}` : t('acme.accountRegistered')}
-                          </p>
-                          <p className="text-xs text-text-tertiary mt-1">{selectedProxyAccount.label}</p>
-                        </div>
-                      </div>
-                      {canWrite && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={onResetProxyAccount}
-                          title={t('acme.resetAccount')}
-                          className="status-danger-text hover:status-danger-bg"
-                        >
-                          <ArrowsClockwise size={14} />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })() : proxyAccountId ? (
-                <div className="p-3 rounded-lg bg-tertiary-op30 border border-border">
-                  <div className="flex items-center gap-2">
-                    <Warning size={18} className="text-text-tertiary" />
-                    <div>
-                      <p className="text-sm text-text-secondary">{t('acme.upstreamAccountNotRegistered')}</p>
-                      <p className="text-xs text-text-tertiary">{t('acme.willAutoRegister')}</p>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              {/* Connection Test */}
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={onTestConnection}
-                  disabled={testingConnection || !proxyAccountId}
-                >
-                  {testingConnection ? <ArrowsClockwise size={14} className="animate-spin" /> : <PlugsConnected size={14} />}
-                  {t('acme.testConnection')}
-                </Button>
-                {connectionResult && (
-                  <span className={cn('text-xs', connectionResult.connected ? 'status-success-text' : 'status-danger-text')}>
-                    {connectionResult.connected
-                      ? `✓ ${connectionResult.ca_name || t('common.connected')}${connectionResult.eab_required ? ` (${t('acme.eabRequired')})` : ''}`
-                      : `✗ ${connectionResult.error || t('acme.connectionFailed')}`}
-                  </span>
-                )}
-              </div>
-
-              {/* Proxy Endpoint & Usage */}
-              <div className="p-3 bg-tertiary-op50 rounded-lg space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-text-secondary">{t('acme.proxyPathUrl')}</p>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => copy(proxyDirectoryUrl)}>
-                    <Copy size={12} />
-                  </Button>
-                </div>
-                <code className="block text-xs text-accent-primary font-mono bg-bg-secondary p-2 rounded break-all">
-                  {proxyDirectoryUrl}
-                </code>
-                {!selectedProxyAccount?.proxy_enabled && (
-                  <>
-                    <p className="text-xs text-text-tertiary">{t('acme.proxyDefaultUrl')}</p>
-                    <code className="block text-xs text-text-secondary font-mono bg-bg-secondary p-2 rounded break-all">
-                      {publicProxyBase}/directory
-                    </code>
-                  </>
-                )}
-                {enabledProxyAccounts.length > 0 && (
-                  <div className="space-y-1 pt-1">
-                    <p className="text-xs font-medium text-text-secondary">{t('acme.proxyEnabledEndpoints')}</p>
-                    {enabledProxyAccounts.map((acct) => (
-                      <div key={acct.id} className="flex items-center justify-between gap-2">
-                        <code className="text-xs text-text-secondary font-mono break-all">
-                          {publicProxyBase}/{acct.proxy_slug}/directory
-                        </code>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => copy(`${publicProxyBase}/${acct.proxy_slug}/directory`)}
-                        >
-                          <Copy size={12} />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <p className="text-xs font-medium text-text-secondary mt-3">{t('acme.proxyUsage')}</p>
-                <pre className="text-xs text-text-primary bg-bg-secondary p-2 rounded overflow-x-auto font-mono whitespace-pre-wrap break-all">
-{`certbot certonly \\
+          <Props items={[
+            [t('acme.proxyPathUrl'), <Copyable key="d" url value={proxyDirectoryUrl} label={t('acme.proxyPathUrl')} />],
+            !selected?.proxy_enabled && [t('acme.proxyDefaultUrl'), <Copyable key="p" url value={`${publicProxyBase}/directory`} label={t('acme.proxyDefaultUrl')} />],
+            ...enabledProxyAccounts.map((a) => [a.label, <Copyable key={a.id} url value={`${publicProxyBase}/${a.proxy_slug}/directory`} label={a.label} />]),
+          ]} />
+          <h3 className="section-title acme-usage-title">{t('acme.proxyUsage')}</h3>
+          <pre className="code-preview">{`certbot certonly \\
   --server ${proxyDirectoryUrl} \\
   --preferred-challenges dns-01 \\
   --authenticator manual \\
   --manual-auth-hook /bin/true \\
   --manual-cleanup-hook /bin/true \\
   --non-interactive --agree-tos -m you@example.com \\
-  -d subdomain.example.com`}
-                </pre>
-                <p className="text-xs text-text-tertiary whitespace-pre-line">{t('acme.proxyUsageNote')}</p>
-              </div>
-
-              {/* Proxy Registration */}
-              {proxyAccountId && selectedProxyAccount?.is_registered ? (
-                <div className="p-3 rounded-lg status-success-bg status-success-border border">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle size={18} className="status-success-text" weight="fill" />
-                      <div>
-                        <p className="text-sm font-medium text-text-primary">{t('acme.proxyRegistered')}</p>
-                        <p className="text-xs text-text-secondary">{selectedProxyAccount.email}</p>
-                      </div>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={onUnregisterProxy}
-                      className="status-danger-text hover:status-danger-bg"
-                    >
-                      <Trash size={14} />
-                    </Button>
-                  </div>
-                </div>
-              ) : proxyAccountId ? (
-                <div className="space-y-3 p-3 bg-tertiary-op30 rounded-lg">
-                  <Input
-                    label={t('common.emailAddress')}
-                    type="email"
-                    value={proxyEmail || selectedProxyAccount?.email || ''}
-                    onChange={(e) => onProxyEmailChange(e.target.value)}
-                    placeholder={t('acme.emailPlaceholder')}
-                    helperText={t('common.emailRequired')}
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={onRegisterProxy}
-                    disabled={!proxyEmail && !selectedProxyAccount?.email}
-                  >
-                    <Key size={14} />
-                    {t('acme.registerAccount')}
-                  </Button>
-                </div>
-              ) : null}
-          </>
+  -d subdomain.example.com`}</pre>
+          <p className="muted small acme-usage-note">{t('acme.proxyUsageNote')}</p>
         </div>
-      </CompactSection>
-    </div>
+      ),
+    },
+    {
+      id: 'dnsupdate', label: t('acme.dnsUpdate.portLabel'), icon: 'plug', desc: t('acme.dnsUpdate.portHelper'),
+      groups: [],
+      children: <fieldset className="settings-group"><legend>{t('acme.dnsUpdate.portLabel')}</legend><DnsUpdatePortField clientSettings={clientSettings} canWrite={canWrite} onSave={onSaveDnsUpdatePort} /></fieldset>,
+    },
+  ]
+
+  return (
+    <SettingsView sections={sections} values={draft} errors={errors} changed={changed}
+      onChange={(k, v) => { setDraft((d) => ({ ...d, [k]: v })); if (errors[k]) setErrors((e) => { const n = { ...e }; delete n[k]; return n }) }}
+      onSave={canWrite ? save : undefined} onReset={() => { setDraft(saved); setErrors({}) }} saving={saving} announce={announce} stateRef={stateRef}
+      tocLabel={t('protocols.sectionsOf', { name: t('acme.views.client') })} />
   )
 }

@@ -2372,7 +2372,8 @@
     "groups": {
       "letsEncrypt": "Let's Encrypt",
       "localAcme": "本地ACME",
-      "history": "历史记录"
+      "history": "历史记录",
+      "client": "ACME 客户端"
     },
     "challengeValidated": "挑战已验证: 订单准备好进行最终化",
     "checkStatus": "检查状态",
@@ -2524,7 +2525,9 @@
       "editDomainsTitle": "编辑允许的域名",
       "domainsSaved": "允许的域名已保存",
       "domainsSaveFailed": "保存允许的域名失败",
-      "deleteFailed": "删除 EAB 凭据失败"
+      "deleteFailed": "删除 EAB 凭据失败",
+      "caption": "EAB 凭据。激活名称以打开详情。",
+      "noNotes": "无备注。"
     },
     "termsOfServiceTitlePlaceholder": "服务条款（留空隐藏）",
     "termsOfServiceBodyPlaceholder": "在此输入条款...\n\n支持：**加粗**, *斜体*, [链接](url), - 列表\n\n空行分隔段落。",
@@ -2698,7 +2701,85 @@
       "portNotListening": "未监听",
       "portInvalid": "请输入 0（禁用）或 1024 到 65535 之间的端口。",
       "portRestartRequired": "请重启 UCM 以应用新端口。"
-    }
+    },
+    "unit_one": "{{count}} 个账户",
+    "unit_other": "{{count}} 个账户",
+    "accountsRange_one": "{{shown}} / {{count}} 个账户",
+    "accountsRange_other": "{{shown}} / {{count}} 个账户",
+    "accountsCaption": "ACME 账户。激活名称以打开详情。",
+    "accountStates": {
+      "valid": "有效",
+      "deactivated": "已停用",
+      "revoked": "已吊销"
+    },
+    "filterByState": "按状态筛选",
+    "copyDirectory": "复制目录 URL",
+    "contact": "联系人",
+    "noContact": "无",
+    "createdOn": "创建于",
+    "accountKey": "账户密钥",
+    "tabs": {
+      "account": "账户"
+    },
+    "lastOrder": "最近订单",
+    "noneOrder": "无",
+    "orderLine": "订单 {{id}}",
+    "ordersFailing": "{{count}}，其中 {{failing}} 个失败",
+    "deactivationFinal": "ACME 停用不可撤销（RFC 8555 §7.3.6）：客户端必须注册新账户。",
+    "disableAccount": "停用账户…",
+    "disableTitle": "停用此 ACME 账户？",
+    "disableWarning": "停用不可撤销（RFC 8555 §7.3.6）：{{name}} 将无法再下单，客户端需要注册新账户。",
+    "disableConfirm": "停用账户",
+    "challengeTxt": "TXT 记录 {{name}}",
+    "challengeAlpn": "在 {{host}} 上进行 TLS 握手",
+    "views": {
+      "accounts": "账户",
+      "localorders": "订单",
+      "localdomains": "域名",
+      "eab": "EAB 凭据",
+      "config": "服务器设置",
+      "letsencrypt": "客户端设置",
+      "client": "ACME 客户端",
+      "letsencryptorders": "客户端订单",
+      "upstream": "上游 CA",
+      "dns": "DNS 提供商",
+      "domains": "客户端域名",
+      "history": "已签发证书"
+    },
+    "ordersCaption": "ACME 订单。激活名称以打开详情。",
+    "deleteOrderOf": "删除 {{domain}} 的订单",
+    "domainsCaption": "域名。激活名称以打开详情。",
+    "domainsRange_one": "{{count}} 个域名",
+    "domainsRange_other": "{{count}} 个域名",
+    "providersCaption": "DNS 提供商。激活名称以打开详情。",
+    "providersRange_one": "{{count}} 个提供商",
+    "providersRange_other": "{{count}} 个提供商",
+    "upstreamCaption": "上游 CA。激活名称以打开详情。",
+    "upstreamRange_one": "{{count}} 个上游 CA",
+    "upstreamRange_other": "{{count}} 个上游 CA",
+    "accountUrl": "账户 URL",
+    "clientOrdersRange_one": "{{shown}} / {{count}} 个订单",
+    "clientOrdersRange_other": "{{shown}} / {{count}} 个订单",
+    "accountOrCa": "账户或 CA",
+    "renewalFailuresLabel": "续期失败",
+    "historyCaption": "通过 ACME 签发的证书。激活名称以打开详情。",
+    "historyRange": "第 {{start}}–{{end}} 个，共 {{count}} 个证书",
+    "historyTotal_one": "{{count}} 个证书",
+    "historyTotal_other": "{{count}} 个证书",
+    "historyExportScope": "{{count}} 个证书，按当前搜索和筛选（最多 10000 个）。",
+    "removeProfile": "移除配置 {{name}}",
+    "boundsError": "{{min}} 到 {{max}} 之间的整数。",
+    "dnsSettings": "DNS-01 检查",
+    "keysAndTransport": "密钥与传输",
+    "unregisterProxy": "取消注册",
+    "accountState": {
+      "valid": "有效",
+      "deactivated": "已停用",
+      "revoked": "已吊销"
+    },
+    "identifier": "标识符",
+    "emptyAccountsTitle": "没有 ACME 账户",
+    "emptyAccountsText": "ACME 客户端（certbot、cert-manager、acme.sh）会自行在目录中创建账户：请将目录 URL 复制到它们的配置中。"
   },
   "scep": {
     "title": "SCEP协议",
@@ -2809,7 +2890,67 @@
     "profileDeleted": "已删除 SCEP 配置文件",
     "profileDeleteConfirm": "删除 SCEP 配置文件“{{name}}”？通过其 URL 注册的设备将被拒绝。",
     "profileChallengeRegenerated": "已重新生成质询并复制到剪贴板",
-    "confirmRegenerateProfileChallenge": "重新生成配置文件“{{name}}”的质询？当前质询将立即失效，所有已配置它的设备都必须更新。"
+    "confirmRegenerateProfileChallenge": "重新生成配置文件“{{name}}”的质询？当前质询将立即失效，所有已配置它的设备都必须更新。",
+    "unit_one": "{{count}} 个配置",
+    "unit_other": "{{count}} 个配置",
+    "range_one": "{{shown}} / {{count}} 个配置",
+    "range_other": "{{shown}} / {{count}} 个配置",
+    "requestUnit_one": "{{count}} 个请求",
+    "requestUnit_other": "{{count}} 个请求",
+    "requestRange": "第 {{start}}–{{end}} 个，共 {{count}} 个请求",
+    "intuneUnit_one": "{{count}} 个注册",
+    "intuneUnit_other": "{{count}} 个注册",
+    "intuneRange_one": "{{shown}} / {{count}} 个注册",
+    "intuneRange_other": "{{shown}} / {{count}} 个注册",
+    "caption": "SCEP 配置。激活名称以打开详情。",
+    "requestsCaption": "SCEP 请求。激活主题以打开详情。",
+    "challengesCaption": "各机构的质询密码。激活名称以打开详情。",
+    "intuneCaption": "Intune 应用注册。激活名称以打开详情。",
+    "filterByState": "按状态筛选",
+    "filters": {
+      "active": "已启用",
+      "disabled": "已禁用"
+    },
+    "columns": {
+      "ca": "机构",
+      "template": "模板",
+      "profile": "配置"
+    },
+    "tabs": {
+      "profile": "配置"
+    },
+    "sections": {
+      "enrollment": "注册",
+      "issuance": "签发"
+    },
+    "enrollmentUrl": "注册 URL",
+    "copyUrl": "复制 URL",
+    "challengeHidden": "已设置，已隐藏",
+    "challengeNone": "无",
+    "challengeIntune": "由 Intune 验证",
+    "challengeSet": "已设置",
+    "disable": "禁用",
+    "enable": "启用",
+    "rotate": "重新生成密码…",
+    "rotateTitle": "重新生成质询密码？",
+    "rotateWarning": "旧密码立即失效：“{{name}}”中尚未使用它的设备需要获取新密码。",
+    "newChallengeTitle": "新的质询密码",
+    "newChallengeOnce": "“{{name}}”的新密码，仅显示一次：",
+    "newChallengeHint": "请立即将其提供给设备管理工具：之后无法再次查看。",
+    "profileEnabled": "配置“{{name}}”已启用",
+    "profileDisabled": "配置“{{name}}”已禁用",
+    "requestNumber": "第 {{id}} 号请求",
+    "caWide": "机构端点",
+    "clientIp": "客户端地址",
+    "approvedAt": "批准时间",
+    "securityDesc": "批准、质询有效期与消息检查。",
+    "challengeValidityInvalid": "整数小时，至少 1。",
+    "fixBeforeSaving_one": "保存前需修正 {{count}} 个字段。",
+    "fixBeforeSaving_other": "保存前需修正 {{count}} 个字段。",
+    "views": {
+      "challenges": "机构质询"
+    },
+    "emptyProfilesText": "配置文件将签发 CA、模板和质询密码关联在一起。"
   },
   "crlOcsp": {
     "subtitle": "{{count}}个活跃CRL",
@@ -2906,7 +3047,51 @@
     "namedUrlsOff": "CDP/AIA 路径使用内部 ID。启用后,新证书将使用由 CA 名称生成的短标识。",
     "namedUrlsEnable": "使用 CA 名称",
     "namedUrlsConfirm": "为“{{name}}”启用命名协议 URL?由 CA 名称生成的短标识将出现在新签发证书的 CDP/AIA URL 中。现有 URL 仍然有效。启用后无法再禁用。",
-    "namedUrlsEnabled": "已启用命名 URL:{{slug}}"
+    "namedUrlsEnabled": "已启用命名 URL:{{slug}}",
+    "unit_one": "{{count}} 个机构",
+    "unit_other": "{{count}} 个机构",
+    "range_one": "{{shown}} / {{count}} 个机构",
+    "range_other": "{{shown}} / {{count}} 个机构",
+    "caption": "CRL / OCSP。激活名称以打开详情。",
+    "filterByState": "按状态筛选",
+    "search": "搜索机构",
+    "createCa": "创建 CA",
+    "states": {
+      "current": "最新",
+      "soon": "不足 24 小时",
+      "expired": "已过期",
+      "none": "无 CRL"
+    },
+    "numberOf": "第 {{number}} 号",
+    "ocspActive": "已启用",
+    "ocspInactive": "未启用",
+    "columns": {
+      "published": "发布时间"
+    },
+    "tabs": {
+      "publication": "发布"
+    },
+    "responderDisabled": "已禁用",
+    "responderRunning": "运行中",
+    "responderStopped": "已停止",
+    "responderAside": "OCSP 响应器：{{state}}，{{count}} 次请求，{{rate}}% 来自缓存",
+    "summaryNone": "此机构尚未发布 CRL。",
+    "summaryRevoked_one": "CRL 第 {{number}} 号列出 {{count}} 个已吊销证书。",
+    "summaryRevoked_other": "CRL 第 {{number}} 号列出 {{count}} 个已吊销证书。",
+    "summary": {
+      "soon": "下次更新在 24 小时内。",
+      "expired": "其下次更新日期已过：请重新生成。"
+    },
+    "days_one": "{{count}} 天",
+    "days_other": "{{count}} 天",
+    "hours_one": "{{count}} 小时",
+    "hours_other": "{{count}} 小时",
+    "ocspResponderOf": "为此机构提供 OCSP 响应",
+    "statsAllAuthorities": "请求和缓存命中统计响应器的所有机构。",
+    "serial": "序列号 {{serial}}",
+    "slug": "URL 中的名称",
+    "emptyTitle": "没有吊销列表",
+    "emptyText": "请先创建一个 CA：每个机构都会在此显示其 CRL 和 OCSP 响应器。"
   },
   "deploy": {
     "title": "证书部署",
@@ -6618,7 +6803,29 @@
     "labelName": "标签",
     "labelPlaceholder": "例如 branch-office",
     "responseIncludeChain": "在注册响应中包含 CA 链",
-    "responseIncludeChainHelp": "RFC 7030 响应仅包含签发的证书；为从注册响应（而非 /cacerts）构建证书包的旧客户端启用。"
+    "responseIncludeChainHelp": "RFC 7030 响应仅包含签发的证书；为从注册响应（而非 /cacerts）构建证书包的旧客户端启用。",
+    "unit_one": "{{count}} 个注册端点",
+    "unit_other": "{{count}} 个注册端点",
+    "range_one": "{{shown}} / {{count}} 个端点",
+    "range_other": "{{shown}} / {{count}} 个端点",
+    "caption": "EST。激活名称以打开详情。",
+    "defaultEndpoint": "默认端点",
+    "columns": {
+      "auth": "认证"
+    },
+    "auth": {
+      "cert": "客户端证书",
+      "certOrPassword": "客户端证书或密码"
+    },
+    "aside": "{{total}} 次注册，{{failed}} 次失败",
+    "summaryTotals": "自启动以来所有端点共 {{total}} 次注册，{{successful}} 次成功，{{failed}} 次失败。",
+    "labelsRepeated": "有两个标签相同：保存前请重命名其中一个。",
+    "removeLabel": "移除标签 {{label}}",
+    "addLabel": "添加标签",
+    "passwordKept": "已保存密码：留空则保留。",
+    "views": {
+      "list": "注册端点"
+    }
   },
   "discovery": {
     "aboutDiscovery": "关于发现",
@@ -7333,6 +7540,28 @@
       "management": "管理",
       "settings": "设置",
       "info": "信息"
+    },
+    "serviceName": "时间戳服务",
+    "unit_one": "{{count}} 个服务",
+    "unit_other": "{{count}} 个服务",
+    "range_one": "{{shown}} / {{count}} 个服务",
+    "range_other": "{{shown}} / {{count}} 个服务",
+    "caption": "TSA。激活名称以打开详情。",
+    "filterByState": "按状态筛选",
+    "columns": {
+      "ca": "机构",
+      "digest": "哈希",
+      "policy": "策略"
+    },
+    "configure": "配置",
+    "summaryTotals": "自启动以来共收到 {{total}} 个请求，{{successful}} 个已签发令牌，{{failed}} 个被拒绝。",
+    "sections": {
+      "service": "服务",
+      "signer": "令牌签名"
+    },
+    "views": {
+      "list": "服务",
+      "config": "配置"
     }
   },
   "sshCas": {
@@ -8529,5 +8758,14 @@
     "settingsSections": "设置分区",
     "pageActions": "{{name}} 页面的其他操作",
     "pageActionsTitle": "页面操作"
+  },
+  "protocols": {
+    "copyValue": "复制{{name}}",
+    "removeUrl": "移除 {{url}}",
+    "newUrl": "新 URL：{{name}}",
+    "view": "视图",
+    "sections_one": "{{count}} 个部分",
+    "sections_other": "{{count}} 个部分",
+    "sectionsOf": "部分：{{name}}"
   }
 }

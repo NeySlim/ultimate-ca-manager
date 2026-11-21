@@ -305,11 +305,11 @@ describe('user guide claims about the bell and SCEP tabs', () => {
     for (const word of ['CSRs', 'trust store', 'SSH']) expect(row, word).toContain(word)
   })
 
-  it('places the SCEP challenge password on the Challenges tab, not Configuration', () => {
-    const para = guide.split('\n').find(l => l.includes('The **Configuration** tab enables the server'))
+  it('places the SCEP challenge password in the Challenges of the authorities view, not Configuration', () => {
+    const para = guide.split('\n').find(l => l.includes('which enables the server and chooses the CA'))
     expect(para).toBeDefined()
-    expect(para).not.toMatch(/holds the challenge password/)
-    expect(para).toContain(`**${en.common.challenges}**`)
+    expect(para).not.toMatch(/Configuration\*\*[^.]*challenge password/)
+    expect(para).toContain(`**${en.scep.views.challenges}**`)
   })
 })
 

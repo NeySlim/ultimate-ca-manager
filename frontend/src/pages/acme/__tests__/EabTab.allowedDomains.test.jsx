@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key) => key }),
+  useTranslation: () => ({ t: (key) => key, i18n: { language: 'en' } }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 
@@ -27,6 +27,7 @@ vi.mock('../../../services', () => ({
 }))
 
 vi.mock('../../../contexts', () => ({
+  useMobile: () => ({ isMobile: false }),
   useNotification: () => ({
     showSuccess: mocks.showSuccess,
     showError: mocks.showError,
@@ -37,8 +38,10 @@ vi.mock('../../../contexts', () => ({
 vi.mock('../../../hooks', () => ({
   useClipboard: () => ({ copy: vi.fn() }),
 }))
+vi.mock('../../../stores/timezoneStore', () => ({ getAppTimezone: () => 'UTC' }))
 
 import EabTab from '../EabTab'
+import { WithDockSlot } from '../../protocols/__tests__/withDockSlot'
 
 const cred = (id, allowed_domains) => ({
   id, kid: `kid-${id}`, label: `cred-${id}`, status: 'active', notes: null,
@@ -46,14 +49,18 @@ const cred = (id, allowed_domains) => ({
 })
 
 const renderTab = (props = {}) => render(
-  <EabTab eabRequired={false} onToggleEabRequired={vi.fn()} showCreateModal={false}
-    onCloseCreateModal={vi.fn()} canWrite canDelete {...props} />,
+  <WithDockSlot>
+    <EabTab eabRequired={false} onToggleEabRequired={vi.fn()} showCreateModal={false}
+      onCloseCreateModal={vi.fn()} canWrite canDelete {...props} />
+  </WithDockSlot>,
 )
 
 const domainsRow = async (id) => within(await screen.findByTestId(`eab-domains-${id}`))
 
+// The credential opens its dock; Modifier les domaines opens the dialog
 const openEdit = async (id) => {
-  fireEvent.click((await domainsRow(id)).getByTitle('acme.eab.editDomainsTitle'))
+  fireEvent.click(await screen.findByRole('button', { name: `cred-${id}` }))
+  fireEvent.click(await screen.findByRole('button', { name: 'acme.eab.editDomainsTitle' }))
   return screen.findByRole('dialog')
 }
 

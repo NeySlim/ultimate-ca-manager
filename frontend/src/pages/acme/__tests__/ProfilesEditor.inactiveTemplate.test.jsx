@@ -8,11 +8,6 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key) => key }),
   initReactI18next: { type: '3rdParty', init: () => {} },
 }))
-vi.mock('../../../components', () => ({
-  Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-  Input: (props) => <input {...props} />,
-  Select: ({ options }) => <ul data-testid="select">{options.map(o => <li key={o.value}>{o.label}</li>)}</ul>,
-}))
 
 import ProfilesEditor from '../ProfilesEditor'
 
@@ -52,5 +47,5 @@ describe('ProfilesEditor with a deactivated template', () => {
   })
 })
 
-// Each row renders a digest select then a template select
-const templateSelects = () => screen.getAllByTestId('select').filter(s => s.textContent.includes('acme.noTemplate'))
+// Each row renders a digest select then a template select (named « acme.profileTemplate N »)
+const templateSelects = () => screen.getAllByRole('combobox', { name: /acme\.profileTemplate/ })

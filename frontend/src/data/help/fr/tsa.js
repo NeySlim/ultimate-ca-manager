@@ -5,10 +5,10 @@ export default {
     overview: 'TSA (RFC 3161) fournit des horodatages de confiance qui prouvent qu’un document ou un hash existait à un moment précis. Utilisé pour la signature de code, la conformité juridique et les pistes d’audit.',
     sections: [
       {
-        title: 'Onglets',
+        title: 'Vues',
         items: [
-          { label: 'Paramètres', text: 'Activer TSA, sélectionner l’AC de signature et configurer l’OID de politique TSA' },
-          { label: "Point d’accès TSA", text: 'URL du point de terminaison TSA, exemples d’utilisation avec OpenSSL et statistiques de requêtes' },
+          { label: 'Services', text: 'Le service d’horodatage avec son Autorité, son Hachage (les empreintes qu’une demande peut porter), sa Politique et son État. Son détail donne le signataire, l’URL /tsa, les totaux de demandes et l’usage d’OpenSSL' },
+          { label: 'Configuration', text: 'Activer TSA, AC de signature, OID de politique, certificat de signature et mode strict, dans un formulaire avec sa barre d’enregistrement ; Générer un certificat de signature reste dans sa section' },
         ]
       },
       {
@@ -40,8 +40,8 @@ export default {
       'Aucune authentification n’est requise : le point de terminaison TSA est accessible publiquement comme CRL/OCSP',
     ],
     warnings: [
-      'Un certificat de signature dédié doit être défini avant que /tsa signe : générez-en un dans l’onglet Paramètres',
-      'openssl ts -verify et jarsigner refusent les jetons signés par le certificat de l’AC : la RFC 3161 exige un signeur dédié avec une EKU timeStamping critique et exclusive. Générez-en un dans l’onglet Paramètres',
+      'Un certificat de signature dédié doit être défini avant que /tsa signe : générez-en un dans la configuration',
+      'openssl ts -verify et jarsigner refusent les jetons signés par le certificat de l’AC : la RFC 3161 exige un signeur dédié avec une EKU timeStamping critique et exclusive. Générez-en un dans la configuration',
       'Le point de terminaison TSA est un point de terminaison de protocole public : ne mettez pas de données sensibles dans les requêtes d’horodatage',
     ],
   },
@@ -61,7 +61,7 @@ L’autorité d’horodatage (TSA) implémente le **RFC 3161** pour fournir des 
 
 ## Configuration
 
-### Onglet Paramètres
+### Configuration
 
 1. **Activer TSA** : Basculer le serveur TSA on ou off
 2. **AC de signature** : Sélectionner quelle autorité de certification signe les jetons d’horodatage
@@ -73,7 +73,7 @@ L’autorité d’horodatage (TSA) implémente le **RFC 3161** pour fournir des 
 La clé privée de l’AC de signature est utilisée pour signer chaque jeton d’horodatage. Bonnes pratiques :
 
 - Utilisez une **sous-AC dédiée** pour l’horodatage plutôt que votre AC racine
-- La RFC 3161 §2.3 exige un signeur dont la seule EKU, critique, est **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8), qu’un certificat d’AC ne peut pas porter sans perdre ses autres usages. Les jetons signés par le certificat de l’AC sont refusés par les vérificateurs stricts : \`openssl ts -verify\` échoue avec « unsuitable certificate purpose » et jarsigner avec « Certificate is not valid for timestamping ». L’onglet Paramètres avertit tant que le certificat de l’AC signe : **générez-y un certificat de signature dédié** pour ces clients
+- La RFC 3161 §2.3 exige un signeur dont la seule EKU, critique, est **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8), qu’un certificat d’AC ne peut pas porter sans perdre ses autres usages. Les jetons signés par le certificat de l’AC sont refusés par les vérificateurs stricts : \`openssl ts -verify\` échoue avec « unsuitable certificate purpose » et jarsigner avec « Certificate is not valid for timestamping ». La configuration avertit tant que le certificat de l’AC signe : **générez-y un certificat de signature dédié** pour ces clients
 - Assurez-vous que le certificat de l’AC a une **validité suffisante** : les horodatages doivent rester vérifiables pendant des années. Une AC hors de sa période de validité ne signe pas : \`/tsa\` répond 503
 - Laissez **Exiger un certificat TSA dédié** activé pour l’imposer au moment de la signature
 
@@ -81,12 +81,12 @@ La clé privée de l’AC de signature est utilisée pour signer chaque jeton d�
 
 L’OID de politique identifie la politique TSA sous laquelle les horodatages sont émis. Il est intégré dans chaque \`TimeStampResp\`.
 
-- Par défaut : \`1.2.3.4.1\` (espace réservé : l’OID d’exemple d’OpenSSL, attribué à personne ; l’onglet Paramètres avertit tant qu’il est utilisé)
+- Par défaut : \`1.2.3.4.1\` (espace réservé : l’OID d’exemple d’OpenSSL, attribué à personne ; la configuration avertit tant qu’il est utilisé)
 - En production, enregistrez un OID sous l’arc de votre organisation ou utilisez-en un de votre CP/CPS
 
-## Onglet Point d’accès TSA
+## Point d’accès
 
-L’onglet Point d’accès TSA affiche :
+Le détail du service affiche :
 
 - **URL du point de terminaison TSA** : URL prête à copier-coller pour la configuration client
 - **Exemples d’utilisation** : Commandes OpenSSL pour créer des requêtes, les envoyer et vérifier les réponses

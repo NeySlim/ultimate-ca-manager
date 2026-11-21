@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Trash, Plus } from '@phosphor-icons/react'
-import { Button, Input, Select } from '../../components'
+import { Icon, IconBtn } from '../../components/atelier'
 
 /**
  * Editor for ACME certificate profiles (draft-ietf-acme-profiles).
@@ -71,68 +70,36 @@ export default function ProfilesEditor({ value, onChange, disabled, templates = 
       .map(tpl => ({ value: String(tpl.id), label: tpl.is_active === false ? `${tpl.name} (${t('common.inactive')})` : tpl.name })),
   ]
 
+  // One row per profile, in the mockup's row list (inputs, then the remove button), labelled for screen readers
   return (
-    <div className="space-y-2">
-      {rows.length > 0 && (
-        <div className="grid grid-cols-[1fr_1.4fr_90px_110px_1.2fr_auto] gap-2 text-xs text-text-secondary">
-          <span>{t('acme.profileName')}</span>
-          <span>{t('common.description')}</span>
-          <span>{t('acme.profileValidity')}</span>
-          <span>{t('acme.profileDigest')}</span>
-          <span>{t('acme.profileTemplate')}</span>
-          <span />
-        </div>
-      )}
-      {rows.map(row => (
-        <div key={row.id} className="grid grid-cols-[1fr_1.4fr_90px_110px_1.2fr_auto] gap-2 items-center">
-          <Input
-            value={row.name}
-            onChange={(e) => updateRow(row.id, { name: e.target.value })}
-            placeholder={t('acme.profileNamePlaceholder')}
-            disabled={disabled}
-          />
-          <Input
-            value={row.description}
-            onChange={(e) => updateRow(row.id, { description: e.target.value })}
-            placeholder={t('acme.profileDescriptionPlaceholder')}
-            disabled={disabled}
-          />
-          <Input
-            type="number"
-            min="1"
-            max="3650"
-            value={row.validity_days}
-            onChange={(e) => updateRow(row.id, { validity_days: e.target.value })}
-            disabled={disabled}
-          />
-          <Select
-            options={DIGESTS.map(d => ({ value: d, label: d }))}
-            value={row.digest}
-            onChange={(val) => updateRow(row.id, { digest: val })}
-            disabled={disabled}
-          />
-          <Select
-            options={templateOptions(row)}
-            value={row.template_id}
-            onChange={(val) => updateRow(row.id, { template_id: val })}
-            placeholder={t('acme.noTemplate')}
-            disabled={disabled}
-          />
-          <Button
-            type="button"
-            variant="danger-soft"
-            size="xs"
-            onClick={() => removeRow(row.id)}
-            disabled={disabled}
-            aria-label={t('common.delete')}
-          >
-            <Trash size={14} />
-          </Button>
-        </div>
-      ))}
-      <Button type="button" variant="secondary" size="xs" onClick={addRow} disabled={disabled}>
-        <Plus size={14} /> {t('acme.addProfile')}
-      </Button>
+    <div className="profiles-editor">
+      <div className="row-list">
+        {rows.map((row, i) => (
+          <div key={row.id} className="profile-row">
+            <label className="sr-only" htmlFor={`acme-profile-name-${i}`}>{t('acme.profileName')} {i + 1}</label>
+            <input id={`acme-profile-name-${i}`} value={row.name} placeholder={t('acme.profileNamePlaceholder')} disabled={disabled || undefined}
+              onChange={(e) => updateRow(row.id, { name: e.target.value })} />
+            <label className="sr-only" htmlFor={`acme-profile-desc-${i}`}>{t('common.description')} {i + 1}</label>
+            <input id={`acme-profile-desc-${i}`} value={row.description} placeholder={t('acme.profileDescriptionPlaceholder')} disabled={disabled || undefined}
+              onChange={(e) => updateRow(row.id, { description: e.target.value })} />
+            <label className="sr-only" htmlFor={`acme-profile-days-${i}`}>{t('acme.profileValidity')} {i + 1}</label>
+            <input id={`acme-profile-days-${i}`} type="number" min="1" max="3650" value={row.validity_days} disabled={disabled || undefined}
+              onChange={(e) => updateRow(row.id, { validity_days: e.target.value })} />
+            <label className="sr-only" htmlFor={`acme-profile-digest-${i}`}>{t('acme.profileDigest')} {i + 1}</label>
+            <select id={`acme-profile-digest-${i}`} value={row.digest} disabled={disabled || undefined} onChange={(e) => updateRow(row.id, { digest: e.target.value })}>
+              {DIGESTS.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+            <label className="sr-only" htmlFor={`acme-profile-template-${i}`}>{t('acme.profileTemplate')} {i + 1}</label>
+            <select id={`acme-profile-template-${i}`} value={row.template_id} disabled={disabled || undefined} onChange={(e) => updateRow(row.id, { template_id: e.target.value })}>
+              {templateOptions(row).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <IconBtn icon="close" label={t('acme.removeProfile', { name: row.name || i + 1 })} disabled={disabled || undefined} onClick={() => removeRow(row.id)} />
+          </div>
+        ))}
+      </div>
+      <button type="button" className="btn quiet add-row" onClick={addRow} disabled={disabled || undefined}>
+        <Icon name="plus" />{t('acme.addProfile')}
+      </button>
     </div>
   )
 }

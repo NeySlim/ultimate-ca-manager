@@ -9,6 +9,7 @@ import './pageRenderingSetup.jsx'
 import ACMEPage from '../ACMEPage'
 import SCEPPage from '../SCEPPage'
 import CRLOCSPPage from '../CRLOCSPPage'
+import { scepService } from '../../services/scep.service'
 
 function TestWrapper({ children, route = '/' }) {
   return <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
@@ -22,17 +23,19 @@ describe('Page Rendering — Protocol pages', () => {
     expect(container.firstChild).toBeTruthy()
   })
 
-  it('ACMEPage exposes a dedicated Let’s Encrypt orders tab', async () => {
+  it('ACMEPage exposes a dedicated Let’s Encrypt orders view', async () => {
     render(<TestWrapper route="/acme"><ACMEPage /></TestWrapper>)
-    expect(await screen.findByText('acme.letsEncryptOrders')).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: 'acme.views.letsencryptorders' })).toBeInTheDocument()
   })
 
   it('SCEPPage offers no CA identifier, which no SCEP exchange used', async () => {
-    render(<TestWrapper route="/scep"><SCEPPage /></TestWrapper>)
-    for (const tab of ['common.config', 'scep.info']) {
-      fireEvent.click((await screen.findAllByText(tab))[0])
-      expect(screen.queryByText('scep.caIdentifier')).toBeNull()
-    }
+    Object.assign(scepService, {
+      getRequests: vi.fn().mockResolvedValue({ data: [] }), getStats: vi.fn().mockResolvedValue({ data: {} }),
+      getProfiles: vi.fn().mockResolvedValue({ data: [] }),
+    })
+    render(<TestWrapper route="/scep-config?tab=config"><SCEPPage /></TestWrapper>)
+    await screen.findByText('scep.supportedOperations', { selector: 'legend' })
+    expect(screen.queryByText('scep.caIdentifier')).toBeNull()
   })
 
   it('SCEPPage renders without crashing', () => {

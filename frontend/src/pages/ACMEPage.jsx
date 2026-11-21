@@ -1,24 +1,28 @@
+/**
+ * ACME: the mockup's acme module, a listView() of the server's accounts (Contact, Créé le, État,
+ * Commandes) with its dock (Compte, Commandes, Défis) and the Désactiver le compte… dialog, and the
+ * Copier l'URL du répertoire action of its head. What the product has more takes the same list and
+ * dock, or the mockup's settingsView(), behind the page switch: the server's orders, local domains,
+ * EAB credentials and settings; the client's settings, orders, upstream CAs, DNS providers and
+ * domains; the history of ACME certificates. The client of an account, its EAB binding, its last
+ * order in the list and its journal (M01), the failure of a challenge (M02) and the revocation of
+ * an order's certificate (M03) are functions the product lacks.
+ */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  Key, Plus, CheckCircle, ShieldCheck,
-  Globe, Lightning, Database, Gear, ClockCounterClockwise,
-  ArrowsClockwise, Warning, LockKey, GlobeHemisphereWest, PlugsConnected
-} from '@phosphor-icons/react'
-import {
-  ResponsiveLayout,
-  Button, Badge, Card, Modal, HelpCard,
-  LoadingSpinner, StatusIndicator,
-  CompactStats, CompactHeader
-} from '../components'
+import { useSearchParams } from 'react-router-dom'
+import { Warning } from '@phosphor-icons/react'
+import { Modal, Button } from '../components'
+import { Zone, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, ListView, SkeletonPanel, EmptyBlock, NoMatch, LoadError, LoadCause } from '../components/atelier'
 import { acmeService, casService, certificatesService, templatesService } from '../services'
 import { useNotification } from '../contexts'
-import { usePermission } from '../hooks'
+import { usePermission, useClipboard } from '../hooks'
 import { useLinkedId } from '../hooks/useLinkedId'
-import { useSearchParams } from 'react-router-dom'
 import { stateLabel } from '../lib/stateLabel'
-import { formatDate, downloadBlob, publicBaseUrl } from '../lib/utils'
-import AccountDetailPanel from './acme/AccountDetailPanel'
+import { downloadBlob, publicBaseUrl } from '../lib/utils'
+import { fetchPages } from '../lib/fetchAllPages'
+import { dateOf } from './admin/adminDates'
+import AccountDock from './acme/AccountDetailPanel'
 import LetsEncryptTab from './acme/LetsEncryptTab'
 import LetsEncryptOrdersTab from './acme/LetsEncryptOrdersTab'
 import ConfigTab from './acme/ConfigTab'
@@ -26,11 +30,8 @@ import DnsProvidersTab from './acme/DnsProvidersTab'
 import DomainsTab from './acme/DomainsTab'
 import LocalDomainsTab from './acme/LocalDomainsTab'
 import LocalOrdersTab from './acme/LocalOrdersTab'
-import AccountsTab from './acme/AccountsTab'
 import EabTab from './acme/EabTab'
 import HistoryTab from './acme/HistoryTab'
-import CertDetailPanel from './acme/CertDetailPanel'
-import OrderDetailPanel from './acme/OrderDetailPanel'
 import CreateAccountForm from './acme/CreateAccountForm'
 import RequestCertificateForm from './acme/RequestCertificateForm'
 import CaAccountsManager from './acme/CaAccountsManager'
@@ -38,18 +39,24 @@ import { effectiveDnsUpdatePort, settingsAfterPortSave } from './acme/dnsUpdateP
 import DnsProviderForm from './acme/DnsProviderForm'
 import DomainForm from './acme/DomainForm'
 import LocalDomainForm from './acme/LocalDomainForm'
-import { fetchPages } from '../lib/fetchAllPages'
+import { ViewSwitch } from './protocols/atelierParts'
+import { DockSlot, DockSlotProvider, SlotDock } from './protocols/dockSlot'
+import { ACCOUNT_TONES, accountLabel, accountContact } from './protocols/protocolStates'
 
 // The order list pages by 100 rows; the tab shows and filters all of them
 const CLIENT_ORDERS_MAX = 5000
 
-const ACME_TABS = ['letsencrypt', 'letsencryptorders', 'dns', 'domains', 'config', 'localdomains',
-  'localorders', 'accounts', 'eab', 'history']
+// The views keep the former tab names of /acme?tab=…: the accounts (the mockup's list) open first
+const SERVER_VIEWS = ['accounts', 'localorders', 'localdomains', 'eab', 'config']
+const CLIENT_VIEWS = ['letsencrypt', 'letsencryptorders', 'upstream', 'dns', 'domains']
+const ACME_TABS = [...SERVER_VIEWS, ...CLIENT_VIEWS, 'history']
 
 export default function ACMEPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = i18n?.language || 'en'
   const { showSuccess, showError, showConfirm, showWarning, showInfo } = useNotification()
-  const { canWrite, canDelete } = usePermission()
+  const { canWrite, canDelete, hasPermission } = usePermission()
+  const { copy } = useClipboard()
 
   // Data states - ACME Server
   const [accounts, setAccounts] = useState([])
@@ -58,12 +65,14 @@ export default function ACMEPage() {
   const [orders, setOrders] = useState([])
   const [challenges, setChallenges] = useState([])
   const [acmeSettings, setAcmeSettings] = useState({})
+  const [serverSaved, setServerSaved] = useState({})
   // Profiles as the server holds them: its template bindings decide what stays offered
   const [savedProfiles, setSavedProfiles] = useState({})
   const [cas, setCas] = useState([])
   const [history, setHistory] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(true)
 
-  // Data states - Let's Encrypt Client
+  // Data states - ACME client
   const [clientOrders, setClientOrders] = useState([])
   const [clientOrdersPartial, setClientOrdersPartial] = useState(null)
   const [clientSettings, setClientSettings] = useState({})
@@ -78,12 +87,19 @@ export default function ACMEPage() {
 
   // UI states
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
   const [saving, setSaving] = useState(false)
-  // /acme?tab=<tab>&order=N: the tab, and the order it holds
-  const [searchParams] = useSearchParams()
+  // /acme?tab=<view>&order=N: the view, and the order it holds
+  const [searchParams, setSearchParams] = useSearchParams()
   const linkedTab = searchParams.get('tab')
   const linkedOrder = useLinkedId('order')
-  const [activeTab, setActiveTab] = useState(ACME_TABS.includes(linkedTab) ? linkedTab : 'letsencrypt')
+  const activeTab = ACME_TABS.includes(linkedTab) ? linkedTab : 'accounts'
+  const setActiveTab = (tab) => {
+    setSelectedClientOrder(null)
+    setSelectedAccount(null)
+    setSelectedCert(null)
+    setSearchParams(tab === 'accounts' ? {} : { tab }, { replace: true })
+  }
   const [linkedLocalOrder, setLinkedLocalOrder] = useState(null)
   const [activeDetailTab, setActiveDetailTab] = useState('account')
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -95,21 +111,12 @@ export default function ACMEPage() {
   const [showLocalDomainModal, setShowLocalDomainModal] = useState(false)
   const [selectedLocalDomain, setSelectedLocalDomain] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [accountState, setAccountState] = useState('')
   const [revokeSuperseded, setRevokeSuperseded] = useState(false)
-  const [eabHmacInput, setEabHmacInput] = useState(null)
+  const [, setEabHmacInput] = useState(null)
   const [showRevokeConfirm, setShowRevokeConfirm] = useState(false)
-  const [proxyEmail, setProxyEmail] = useState('')
   const [openEabCreate, setOpenEabCreate] = useState(false)
-
-  // Local state for text inputs (saved on blur, not on every keystroke)
-  const [localContactEmail, setLocalContactEmail] = useState('')
-  const [localDirectoryUrl, setLocalDirectoryUrl] = useState('')
-  const [localEabKid, setLocalEabKid] = useState('')
-  const [localProxyUpstreamUrl, setLocalProxyUpstreamUrl] = useState('')
-  const [localDnsTimeout, setLocalDnsTimeout] = useState('')
-  const [localRenewalDays, setLocalRenewalDays] = useState('30')
-  const [localDnsDelay, setLocalDnsDelay] = useState('')
-  const [localDnsNameservers, setLocalDnsNameservers] = useState('')
+  const [upstreamCreate, setUpstreamCreate] = useState(0)
   const [testingConnection, setTestingConnection] = useState(false)
   const [connectionResult, setConnectionResult] = useState(null)
 
@@ -125,12 +132,8 @@ export default function ACMEPage() {
   const [historySearch, setHistorySearch] = useState('')
   const [historySort, setHistorySort] = useState(null)
 
-  // EAB — only required flag stays in parent; credentials state lives in EabTab
+  // EAB: only the required flag stays in the page; the credentials live in EabTab
   const [eabRequired, setEabRequired] = useState(false)
-
-  // Pagination
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(25)
 
   useEffect(() => {
     loadData()
@@ -228,6 +231,8 @@ export default function ACMEPage() {
       setHistoryCAs((res.meta?.cas || []).map((name) => ({ value: name, label: name })))
     } catch (error) {
       if (seq === historySeq.current) notifyRef.current(error.message)
+    } finally {
+      if (seq === historySeq.current) setHistoryLoading(false)
     }
   }, [historyParams, historyPage, historyPerPage])
   const notifyRef = useRef(() => {})
@@ -241,6 +246,7 @@ export default function ACMEPage() {
 
   const loadData = async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const [accountsRes, settingsRes, casRes, clientOrdersRes, clientSettingsRes, dnsProvidersRes, dnsTypesRes, domainsRes, localDomainsRes, eabReqRes, caAccountsRes] = await Promise.all([
         acmeService.getAccounts(),
@@ -259,6 +265,7 @@ export default function ACMEPage() {
       ])
       setAccounts(accountsRes.data || accountsRes.accounts || [])
       setAcmeSettings(settingsRes.data || settingsRes || {})
+      setServerSaved(settingsRes.data || settingsRes || {})
       setSavedProfiles((settingsRes.data || settingsRes || {}).profiles || {})
       setCas(casRes.data || casRes.cas || [])
       setClientOrders(clientOrdersRes.data || [])
@@ -268,23 +275,13 @@ export default function ACMEPage() {
       setEabHmacInput(null)
       setEabRequired(!!(eabReqRes.data?.eab_required))
       
-      // Sync local text input state from loaded settings
-      const cs = clientSettingsRes.data || {}
-      setLocalContactEmail(cs.email || '')
-      setLocalDirectoryUrl(cs.directory_url || '')
-      setLocalEabKid(cs.eab_kid || '')
-      setLocalProxyUpstreamUrl(cs.proxy_upstream_url || '')
-      setLocalDnsTimeout(String(cs.dns_propagation_timeout ?? 120))
-      setLocalRenewalDays(String(cs.renewal_days ?? 30))
-      setLocalDnsDelay(String(cs.dns_propagation_delay ?? 10))
-      setLocalDnsNameservers(cs.dns01_nameservers || '')
-      
       setDnsProviders(dnsProvidersRes.data || [])
       setDnsProviderTypes(dnsTypesRes.data || [])
       setAcmeDomains(domainsRes.data || [])
       setLocalDomains(localDomainsRes.data || [])
       loadHistoryRef.current()
     } catch (error) {
+      setLoadError(error)
       showError(error.message || t('messages.errors.loadFailed.acme'))
     } finally {
       setLoading(false)
@@ -314,6 +311,7 @@ export default function ACMEPage() {
     try {
       await acmeService.updateSettings(acmeSettings)
       setSavedProfiles(acmeSettings.profiles || {})
+      setServerSaved(acmeSettings)
       showSuccess(t('messages.success.update.settings'))
     } catch (error) {
       showError(error.message || t('messages.errors.updateFailed.settings'))
@@ -330,10 +328,10 @@ export default function ACMEPage() {
   // Let's Encrypt Proxy Handlers
   // =========================================================================
 
-  const handleRegisterProxy = async () => {
+  const handleRegisterProxy = async (typedEmail) => {
     const accountId = clientSettings.proxy_acme_account_id
     const selected = caAccounts.find(a => a.id === accountId)
-    const email = (proxyEmail || selected?.email || '').trim()
+    const email = (typedEmail || selected?.email || '').trim()
     if (!accountId) {
       showError(t('acme.proxySelectCaAccount'))
       return
@@ -345,7 +343,6 @@ export default function ACMEPage() {
     try {
       await acmeService.registerProxy(email, accountId)
       showSuccess(t('acme.proxyRegisteredSuccess'))
-      setProxyEmail('')
       loadData()
     } catch (error) {
       showError(error.message || t('acme.proxyRegistrationFailed'))
@@ -361,30 +358,6 @@ export default function ACMEPage() {
       loadData()
     } catch (error) {
       showError(error.message || t('acme.proxyUnregistrationFailed'))
-    }
-  }
-
-  const handleProxyAccountChange = async (accountId) => {
-    try {
-      setConnectionResult(null)
-      await acmeService.updateClientSettings({ proxy_acme_account_id: accountId || null })
-      loadData()
-    } catch (error) {
-      showError(error.message || t('messages.errors.updateFailed.settings'))
-      loadData()
-    }
-  }
-
-  const handleProxyModeChange = async (mode) => {
-    try {
-      setClientSettings(prev => ({ ...prev, proxy_upstream_mode: mode, proxy_account_registered: false, proxy_account_url: null, proxy_upstream_url: '' }))
-      setConnectionResult(null)
-      setLocalProxyUpstreamUrl('')
-      await acmeService.updateClientSettings({ proxy_upstream_mode: mode })
-      loadData()
-    } catch (error) {
-      showError(error.message || t('messages.errors.updateFailed.settings'))
-      loadData()
     }
   }
 
@@ -419,48 +392,6 @@ export default function ACMEPage() {
   // Let's Encrypt Client Handlers
   // =========================================================================
   
-  const handleUpdateClientSetting = async (key, value) => {
-    try {
-      const updated = { ...clientSettings, [key]: value }
-      setClientSettings(updated)
-      await acmeService.updateClientSettings({ [key]: value })
-    } catch (error) {
-      showError(error.message || t('messages.errors.updateFailed.settings'))
-      loadData() // Revert on error
-    }
-  }
-
-  // Save text input on blur (avoids saving on every keystroke)
-  const handleBlurSave = async (key, value, localSetter) => {
-    // Only save if value actually changed
-    if (value === (clientSettings[key] || '')) return
-    try {
-      await acmeService.updateClientSettings({ [key]: value })
-      setClientSettings(prev => ({ ...prev, [key]: value }))
-    } catch (error) {
-      showError(error.message || t('messages.errors.updateFailed.settings'))
-      // Revert local state on error
-      localSetter(clientSettings[key] || '')
-    }
-  }
-
-  // Save a bounded integer field on blur (clamps client-side; matches the
-  // server-side validation so a rejected value is never sent).
-  const handleBlurSaveInt = async (key, rawValue, localSetter, { min = 0, max = 3600, fallback = 0 } = {}) => {
-    let parsed = parseInt(rawValue, 10)
-    if (Number.isNaN(parsed)) parsed = fallback
-    parsed = Math.max(min, Math.min(max, parsed))
-    localSetter(String(parsed)) // normalize the field even on success
-    if (parsed === clientSettings[key]) return
-    try {
-      await acmeService.updateClientSettings({ [key]: parsed })
-      setClientSettings(prev => ({ ...prev, [key]: parsed }))
-    } catch (error) {
-      showError(error.message || t('messages.errors.updateFailed.settings'))
-      localSetter(String(clientSettings[key] ?? fallback))
-    }
-  }
-
   // The DNS UPDATE listener port is read at start: the response says if a restart is needed.
   const handleSaveDnsUpdatePort = async (port) => {
     try {
@@ -830,13 +761,8 @@ export default function ACMEPage() {
     }
   }
 
+  // The account dock has asked (the mockup's acmeDisableDialog): no second question here
   const handleDeactivate = async (id) => {
-    const confirmed = await showConfirm(t('acme.confirmDeactivate'), {
-      title: t('acme.deactivateAccountTitle'),
-      confirmText: t('common.deactivateAccount'),
-      variant: 'danger'
-    })
-    if (!confirmed) return
     try {
       await acmeService.deactivateAccount(id)
       showSuccess(t('acme.accountDeactivatedSuccess'))
@@ -977,469 +903,154 @@ export default function ACMEPage() {
     }
   }
 
-  // Computed stats
-  const stats = useMemo(() => ({
-    total: accounts.length,
-    active: accounts.filter(a => a.status === 'valid').length,
-    orders: orders.length,
-    pending: challenges.filter(c => c.status === 'pending').length
-  }), [accounts, orders, challenges])
-
-  // Filtered accounts
-  const filteredAccounts = useMemo(() => {
-    if (!searchQuery) return accounts
-    const q = searchQuery.toLowerCase()
-    return accounts.filter(a => 
-      a.email?.toLowerCase().includes(q) ||
-      a.contact?.[0]?.toLowerCase().includes(q)
-    )
+  // ── The accounts of the server (the mockup's list) ──
+  // The mockup's chips Actifs and Désactivés always, Révoqués when an account is (Avec échec needs the orders per account, M01)
+  const accountStates = ['valid', 'deactivated', ...(accounts.some((a) => a.status === 'revoked') ? ['revoked'] : [])]
+  const searchedAccounts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    return accounts.filter((a) => !q || [accountContact(a), a.account_id, a.key_type].some((v) => String(v || '').toLowerCase().includes(q)))
   }, [accounts, searchQuery])
+  const shownAccounts = searchedAccounts.filter((a) => !accountState || a.status === accountState)
+  const accountPill = (a) => <Pill label={t(`acme.accountState.${a.status}`, { defaultValue: stateLabel(t, a.status) })} tone={ACCOUNT_TONES[a.status] || 'muted'} />
+  const acmePublicBase = publicBaseUrl(acmeSettings.acme_public_base_url, '/acme')
+  const directoryUrl = `${acmePublicBase}/directory`
 
-  // Table columns for accounts
-  const accountColumns = useMemo(() => [
-    {
-      key: 'email',
-      header: t('common.email'),
-      priority: 1,
-      render: (_, row) => (
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 icon-bg-emerald">
-            <Key size={14} weight="duotone" />
-          </div>
-          <span className="font-medium text-text-primary">
-            {row.contact?.[0]?.replace('mailto:', '') || row.email || `Account #${row.id}`}
-          </span>
-        </div>
-      ),
-      mobileRender: (_, row) => (
-        <div className="flex items-center justify-between gap-2 w-full">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 icon-bg-emerald">
-              <Key size={14} weight="duotone" />
-            </div>
-            <span className="font-medium truncate">
-              {row.contact?.[0]?.replace('mailto:', '') || row.email || `Account #${row.id}`}
-            </span>
-          </div>
-          <Badge variant={row.status === 'valid' ? 'success' : 'orange'} size="sm" dot>
-            {row.status}
-          </Badge>
-        </div>
-      )
-    },
-    {
-      key: 'status',
-      header: t('common.status'),
-      priority: 2,
-      hideOnMobile: true,
-      render: (val) => (
-        <Badge variant={val === 'valid' ? 'success' : 'orange'} size="sm" dot pulse={val === 'valid'}>
-          {val === 'valid' && <CheckCircle size={10} weight="fill" />}
-          {val}
-        </Badge>
-      )
-    },
-    {
-      key: 'created_at',
-      header: t('common.created'),
-      priority: 3,
-      hideOnMobile: true,
-      render: (val) => formatDate(val),
-      mobileRender: (val) => (
-        <div className="text-xs text-text-tertiary">
-          {t('common.created')}: <span className="text-text-secondary">{formatDate(val)}</span>
-        </div>
-      )
-    }
-  ], [t])
-
-  // Main tabs
-  const tabs = [
-    { id: 'letsencrypt', label: t('acme.letsEncrypt'), icon: Globe },
-    { id: 'letsencryptorders', label: t('acme.letsEncryptOrders'), icon: ClockCounterClockwise, count: clientOrders.length },
-    { id: 'dns', label: t('acme.dnsProviders'), icon: PlugsConnected, count: dnsProviders.length },
-    { id: 'domains', label: t('acme.domains'), icon: GlobeHemisphereWest, count: acmeDomains.length },
-    { id: 'config', label: t('acme.server'), icon: Gear },
-    { id: 'localdomains', label: t('acme.localDomains'), icon: GlobeHemisphereWest, count: localDomains.length },
-    { id: 'localorders', label: t('acme.localOrders'), icon: ClockCounterClockwise },
-    { id: 'accounts', label: t('acme.accounts'), icon: Key, count: accounts.length },
-    { id: 'eab', label: t('acme.eab.tab'), icon: LockKey },
-    { id: 'history', label: t('common.history'), icon: ClockCounterClockwise, count: historyTotal }
-  ]
-
-  // Detail tabs (when account selected)
-  const detailTabs = [
-    { id: 'account', label: t('common.details'), icon: Key },
-    { id: 'orders', label: t('acme.orders'), icon: Globe, count: orders.length },
-    { id: 'challenges', label: t('common.challenges'), icon: ShieldCheck, count: challenges.length }
-  ]
-
-  // Header actions
-  const headerActions = (
-    <>
-      <Button type="button" variant="secondary" size="sm" onClick={loadData} className="hidden md:inline-flex">
-        <ArrowsClockwise size={14} />
-        {t('common.refresh')}
-      </Button>
-      {activeTab === 'accounts' && canWrite('acme') && (
-        <Button type="button" size="sm" onClick={() => setShowCreateModal(true)}>
-          <Plus size={14} />
-          <span className="hidden sm:inline">{t('acme.newAccount')}</span>
-        </Button>
+  const accountsView = (
+    <ListView label="ACME" caption={t('acme.accountsCaption')} icon="refresh" rows={shownAccounts} loading={loading}
+      filters={{
+        views: [{ id: '', label: t('common.all'), count: searchedAccounts.length },
+          ...accountStates.map((s) => ({ id: s, label: t(`acme.accountStates.${s}`), count: searchedAccounts.filter((a) => a.status === s).length }))],
+        active: accountState, onChange: setAccountState, label: t('acme.filterByState'),
+      }}
+      toolbar={(
+        <Toolbar>
+          <SearchField id="acme-account-search" name="q" label={t('acme.searchAccounts')} placeholder={t('acme.searchAccounts')} value={searchQuery} onChange={setSearchQuery} />
+          <IconBtn icon="refresh" label={t('common.refresh')} onClick={loadData} />
+        </Toolbar>
       )}
-      {activeTab === 'domains' && canWrite('acme') && (
-        <Button type="button" size="sm" onClick={() => { setSelectedAcmeDomain(null); setShowDomainModal(true) }}>
-          <Plus size={14} />
-          <span className="hidden sm:inline">{t('acme.addDomain')}</span>
-        </Button>
+      title={accountLabel} status={accountPill} openedId={selectedAccount?.id} onOpen={selectAccount}
+      error={loadError && (
+        <LoadError id="acme" title={t('messages.errors.loadFailed.acme')} onRetry={loadData} journal={hasPermission('read:audit') ? '/audit' : undefined}
+          cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/acme/accounts', message: loadError.message }} />} />
       )}
-      {activeTab === 'localdomains' && canWrite('acme') && (
-        <Button type="button" size="sm" onClick={() => { setSelectedLocalDomain(null); setShowLocalDomainModal(true) }}>
-          <Plus size={14} />
-          <span className="hidden sm:inline">{t('acme.addDomain')}</span>
-        </Button>
+      columns={[
+        { id: 'contact', label: t('acme.contact'), cell: (a) => accountContact(a) || <span className="muted">{t('acme.noContact')}</span>, grow: true },
+        { id: 'created', label: t('acme.createdOn'), cell: (a) => dateOf(a.created_at, locale) || '—', muted: true },
+        { status: true },
+        { id: 'orders', label: t('acme.orders'), cell: (a) => String(a.orders_count ?? 0) },
+      ]}
+      empty={accounts.length ? (
+        <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')} onReset={() => { setSearchQuery(''); setAccountState('') }} />
+      ) : (
+        <EmptyBlock id="acme" icon="refresh" title={t('acme.emptyAccountsTitle')} text={t('acme.emptyAccountsText')}
+          action={{ label: t('acme.copyDirectory'), icon: 'copy', onClick: async () => { if (await copy(directoryUrl)) showSuccess(t('common.copied')) } }} />
       )}
-      {activeTab === 'eab' && canWrite('acme') && (
-        <Button type="button" size="sm" onClick={() => setOpenEabCreate(true)}>
-          <Plus size={14} />
-          <span className="hidden sm:inline">{t('acme.eab.new')}</span>
-        </Button>
-      )}
-    </>
+      footer={{ range: t('acme.accountsRange', { shown: shownAccounts.length, count: accounts.length }) }} />
   )
 
-  // Help content
-  const helpContent = (
-    <div className="p-4 space-y-4">
-      <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary-op5 to-transparent">
-        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-          <Database size={16} className="text-accent-primary" />
-          {t('acme.statistics')}
-        </h3>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-            <p className="text-2xl font-bold text-text-primary">{stats.total}</p>
-            <p className="text-xs text-text-secondary">{t('acme.accounts')}</p>
-          </div>
-          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-            <p className="text-2xl font-bold status-success-text">{stats.active}</p>
-            <p className="text-xs text-text-secondary">{t('common.active')}</p>
-          </div>
-          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-            <p className="text-2xl font-bold text-accent-primary">{stats.orders}</p>
-            <p className="text-xs text-text-secondary">{t('acme.orders')}</p>
-          </div>
-          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-            <p className="text-2xl font-bold status-warning-text">{stats.pending}</p>
-            <p className="text-xs text-text-secondary">{t('common.pending')}</p>
-          </div>
-        </div>
-      </Card>
-
-      <Card className={`p-4 space-y-3 ${acmeSettings.enabled ? 'stat-card-success' : 'stat-card-warning'}`}>
-        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-          <Lightning size={16} className="text-accent-primary" />
-          {t('acme.serverStatus')}
-        </h3>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-text-secondary">{t('acme.acmeServer')}</span>
-            <StatusIndicator status={acmeSettings.enabled ? 'success' : 'warning'}>
-              {acmeSettings.enabled ? t('common.enabled') : t('common.disabled')}
-            </StatusIndicator>
-          </div>
-        </div>
-      </Card>
-
-      <div className="space-y-3">
-        <HelpCard variant="info" title={t('common.aboutAcme')}>
-          {t('acme.aboutAcmeInfo')}
-        </HelpCard>
-
-        <HelpCard variant="info" title={t('acme.localDomains')}>
-          {t('acme.localDomainsHelp')}
-        </HelpCard>
-
-        <HelpCard variant="warning" title={t('common.warning')}>
-          {t('acme.accountSecurityWarning')}
-        </HelpCard>
-      </div>
-    </div>
-  )
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full w-full">
-        <LoadingSpinner />
-      </div>
-    )
+  const views = {
+    accounts: <>{accountsView}<SlotDock>{selectedAccount && (
+      <AccountDock account={selectedAccount} orders={orders} challenges={challenges} section={activeDetailTab} onSection={setActiveDetailTab}
+        onClose={() => setSelectedAccount(null)} onDeactivate={handleDeactivate} onDelete={handleDelete}
+        onChanged={(updated) => { setSelectedAccount(updated); loadData() }} />
+    )}</SlotDock></>,
+    localorders: <LocalOrdersTab linkedOrder={linkedLocalOrder} onCloseLinked={() => setLinkedLocalOrder(null)} />,
+    localdomains: (
+      <LocalDomainsTab localDomains={localDomains} cas={cas} onAdd={() => { setSelectedLocalDomain(null); setShowLocalDomainModal(true) }}
+        onEdit={(d) => { setSelectedLocalDomain(d); setShowLocalDomainModal(true) }} onDelete={handleDeleteLocalDomain}
+        canWrite={canWrite('acme')} canDelete={canDelete('acme')} />
+    ),
+    eab: (
+      <EabTab eabRequired={eabRequired} onToggleEabRequired={handleToggleEabRequired} showCreateModal={openEabCreate}
+        onCloseCreateModal={() => setOpenEabCreate(false)} canWrite={canWrite('acme')} canDelete={canDelete('acme')} />
+    ),
+    config: loading ? <SkeletonPanel label={t('common.loading')} /> : (
+      <ConfigTab acmeSettings={acmeSettings} saved={serverSaved} savedProfiles={savedProfiles} cas={cas} templates={templates}
+        updateSetting={updateSetting} onSaveConfig={handleSaveConfig} onReset={() => { setAcmeSettings(serverSaved); setRevokeSuperseded(false) }}
+        saving={saving} revokeSuperseded={revokeSuperseded} onRevokeSupersededChange={setRevokeSuperseded}
+        onToggleRevokeOnRenewal={handleToggleRevokeOnRenewal} canWrite={canWrite('acme')} />
+    ),
+    letsencrypt: loading ? <SkeletonPanel label={t('common.loading')} /> : (
+      <LetsEncryptTab clientSettings={clientSettings} caAccounts={caAccounts} canWrite={canWrite('acme')} onSaved={() => { setConnectionResult(null); return loadData() }}
+        onSaveDnsUpdatePort={handleSaveDnsUpdatePort} onRegisterProxy={handleRegisterProxy} onUnregisterProxy={handleUnregisterProxy}
+        onResetProxyAccount={handleResetProxyAccount} onTestConnection={handleTestConnection} testingConnection={testingConnection} connectionResult={connectionResult} />
+    ),
+    letsencryptorders: (
+      <LetsEncryptOrdersTab clientOrders={clientOrders} partial={clientOrdersPartial} loading={loading} selectedClientOrder={selectedClientOrder}
+        onSelectOrder={setSelectedClientOrder} onRefresh={loadData} onCheckOrderStatus={handleCheckOrderStatus} onVerifyChallenge={handleVerifyChallenge}
+        onFinalizeOrder={handleFinalizeOrder} onViewCertificate={handleViewCertificate} onDownloadCertificate={handleDownloadCertificate}
+        onRenewCertificate={handleRenewCertificate} onDeleteOrder={handleDeleteClientOrder} onToggleRenewal={handleToggleOrderRenewal}
+        canDelete={canDelete('acme')} canWrite={canWrite('acme')} />
+    ),
+    upstream: (
+      <CaAccountsManager accounts={caAccounts} proxyPublicBase={publicBaseUrl(clientSettings.acme_proxy_public_base_url, '/acme/proxy')}
+        dnsUpdatePort={effectiveDnsUpdatePort(clientSettings)} canWrite={canWrite('acme')} canDelete={canDelete('acme')} createSignal={upstreamCreate}
+        onCreate={handleCreateCaAccount} onUpdate={handleUpdateCaAccount} onDelete={handleDeleteCaAccount} onDeactivate={handleDeactivateCaAccount}
+        onSetDefault={handleSetDefaultCaAccount} onRegister={handleRegisterCaAccount} />
+    ),
+    dns: (
+      <DnsProvidersTab dnsProviders={dnsProviders} onAddProvider={() => { setSelectedDnsProvider(null); setShowDnsProviderModal(true) }}
+        onEditProvider={(p) => { setSelectedDnsProvider(p); setShowDnsProviderModal(true) }} onTestProvider={handleTestDnsProvider}
+        onDeleteProvider={handleDeleteDnsProvider} canWrite={canWrite('acme')} canDelete={canDelete('acme')} />
+    ),
+    domains: (
+      <DomainsTab acmeDomains={acmeDomains} dnsProviders={dnsProviders} cas={cas} onAdd={() => { setSelectedAcmeDomain(null); setShowDomainModal(true) }}
+        onEdit={(d) => { setSelectedAcmeDomain(d); setShowDomainModal(true) }} onDelete={handleDeleteDomain} onTest={handleTestDomainAccess}
+        canWrite={canWrite('acme')} canDelete={canDelete('acme')} />
+    ),
+    history: (
+      <HistoryTab history={history} total={historyTotal} loading={historyLoading} page={historyPage} perPage={historyPerPage} onPageChange={setHistoryPage}
+        onPerPageChange={(v) => { setHistoryPerPage(v); setHistoryPage(1) }} search={historySearch}
+        onSearchChange={(v) => { setHistorySearch(v); setHistoryPage(1) }} sort={historySort} onSortChange={(next) => { setHistorySort(next); setHistoryPage(1) }}
+        caOptions={historyCAs} exportLoader={exportHistory} filterStatus={historyFilterStatus}
+        onFilterStatusChange={(v) => { setHistoryFilterStatus(v); setHistoryPage(1) }} filterCA={historyFilterCA}
+        onFilterCAChange={(v) => { setHistoryFilterCA(v); setHistoryPage(1) }} filterSource={historyFilterSource}
+        onFilterSourceChange={(v) => { setHistoryFilterSource(v); setHistoryPage(1) }} selectedCert={selectedCert} onSelectCert={setSelectedCert} />
+    ),
   }
 
+  const totals = {
+    accounts: t('acme.unit', { count: accounts.length }),
+    localorders: t('acme.views.localorders'),
+    localdomains: t('acme.domainsRange', { count: localDomains.length }),
+    eab: t('acme.views.eab'),
+    config: t('protocols.sections', { count: 8 }),
+    letsencrypt: t('protocols.sections', { count: 3 }),
+    letsencryptorders: t('acme.clientOrdersRange', { shown: clientOrders.length, count: clientOrders.length }),
+    upstream: t('acme.upstreamRange', { count: caAccounts.length }),
+    dns: t('acme.providersRange', { count: dnsProviders.length }),
+    domains: t('acme.domainsRange', { count: acmeDomains.length }),
+    history: t('acme.historyTotal', { count: historyTotal }),
+  }
+  const w = canWrite('acme')
+  const create = {
+    accounts: w && <Btn tone="primary" icon="plus" id="acme-new-account" onClick={() => setShowCreateModal(true)}>{t('acme.newAccount')}</Btn>,
+    localdomains: w && <Btn tone="primary" icon="plus" onClick={() => { setSelectedLocalDomain(null); setShowLocalDomainModal(true) }}>{t('acme.addDomain')}</Btn>,
+    eab: w && <Btn tone="primary" icon="plus" onClick={() => setOpenEabCreate(true)}>{t('acme.eab.new')}</Btn>,
+    letsencrypt: w && <Btn tone="primary" icon="plus" id="acme-request" onClick={() => setShowRequestModal(true)}>{t('acme.requestCertificate')}</Btn>,
+    letsencryptorders: w && <Btn tone="primary" icon="plus" onClick={() => setShowRequestModal(true)}>{t('acme.requestCertificate')}</Btn>,
+    upstream: w && <Btn tone="primary" icon="plus" onClick={() => setUpstreamCreate((n) => n + 1)}>{t('acme.addCertificateAuthority')}</Btn>,
+    dns: w && <Btn tone="primary" icon="plus" onClick={() => { setSelectedDnsProvider(null); setShowDnsProviderModal(true) }}>{t('common.addDnsProvider')}</Btn>,
+    domains: w && <Btn tone="primary" icon="plus" onClick={() => { setSelectedAcmeDomain(null); setShowDomainModal(true) }}>{t('acme.addDomain')}</Btn>,
+  }[activeTab]
+  const option = (v) => ({ value: v, label: t(`acme.views.${v}`) })
+
   return (
-    <>
-      <ResponsiveLayout
-        title={t('acme.title')}
-        subtitle={t('acme.subtitle', { count: accounts.length })}
-        icon={Lightning}
-        stats={[
-          { icon: Key, label: t('acme.accounts'), value: accounts.length },
-          { icon: CheckCircle, label: t('common.active'), value: stats.active, variant: 'success' },
-          { icon: ClockCounterClockwise, label: t('common.certificates'), value: historyTotal, variant: 'primary' },
-        ]}
-        tabs={tabs}
-        activeTab={activeTab}
-        tabLayout="sidebar"
-        sidebarContentClass=""
-        tabGroups={[
-          { labelKey: 'acme.groups.letsEncrypt', tabs: ['letsencrypt', 'letsencryptorders', 'dns', 'domains'], color: 'icon-bg-emerald' },
-          { labelKey: 'acme.groups.localAcme', tabs: ['config', 'localdomains', 'localorders', 'accounts', 'eab'], color: 'icon-bg-violet' },
-          { labelKey: 'acme.groups.history', tabs: ['history'], color: 'icon-bg-blue' },
-        ]}
-        onTabChange={(tab) => {
-          setActiveTab(tab)
-          // Clear selections when changing tabs
-          setSelectedClientOrder(null)
-          setSelectedAccount(null)
-          setSelectedCert(null)
-        }}
-        actions={headerActions}
-        helpPageKey="acme"
-        
-        // Split view for client orders, local accounts and certificate history
-        splitView={activeTab === 'letsencryptorders' || activeTab === 'accounts' || activeTab === 'history'}
-        slideOverOpen={
-          activeTab === 'letsencryptorders' ? !!selectedClientOrder :
-          activeTab === 'accounts' ? !!selectedAccount :
-          !!selectedCert
-        }
-        slideOverTitle={
-          activeTab === 'letsencryptorders'
-            ? (selectedClientOrder?.primary_domain || t('acme.orderDetails'))
-            : activeTab === 'accounts'
-              ? (selectedAccount?.email || t('common.details'))
-              : (selectedCert?.common_name || t('common.certificateDetails'))
-        }
-        slideOverContent={
-          activeTab === 'letsencryptorders' ? (
-            <OrderDetailPanel
-              order={selectedClientOrder}
-              onDownloadCert={handleDownloadCertificate}
-              onViewCertificate={handleViewCertificate}
-              onRenewCertificate={handleRenewCertificate}
-              onVerifyChallenge={handleVerifyChallenge}
-              onFinalizeOrder={handleFinalizeOrder}
-              onDeleteOrder={handleDeleteClientOrder}
-            />
-          ) : activeTab === 'accounts' ? (
-            <AccountDetailPanel
-              account={selectedAccount}
-              detailTabs={detailTabs}
-              activeDetailTab={activeDetailTab}
-              onDeactivate={handleDeactivate}
-              onDelete={handleDelete}
-              onDetailTabChange={setActiveDetailTab}
-              orders={orders}
-              challenges={challenges}
-              onChanged={(updatedAccount) => {
-                setSelectedAccount(updatedAccount)
-                loadData()
-              }}
-            />
-          ) : (
-            <CertDetailPanel cert={selectedCert} />
-          )
-        }
-        onSlideOverClose={() => {
-          if (activeTab === 'letsencryptorders') {
-            setSelectedClientOrder(null)
-          } else if (activeTab === 'accounts') {
-            setSelectedAccount(null)
-          } else {
-            setSelectedCert(null)
-          }
-        }}
-      >
-        {activeTab === 'letsencrypt' && (
-          <>
-          <LetsEncryptTab
-            clientSettings={clientSettings}
-            localContactEmail={localContactEmail}
-            onLocalContactEmailChange={setLocalContactEmail}
-            localDirectoryUrl={localDirectoryUrl}
-            onLocalDirectoryUrlChange={setLocalDirectoryUrl}
-            localEabKid={localEabKid}
-            onLocalEabKidChange={setLocalEabKid}
-            localProxyUpstreamUrl={localProxyUpstreamUrl}
-            onLocalProxyUpstreamUrlChange={setLocalProxyUpstreamUrl}
-            eabHmacInput={eabHmacInput}
-            onEabHmacInputChange={setEabHmacInput}
-            proxyEmail={proxyEmail}
-            onProxyEmailChange={setProxyEmail}
-            testingConnection={testingConnection}
-            connectionResult={connectionResult}
-            onBlurSave={handleBlurSave}
-            onBlurSaveInt={handleBlurSaveInt}
-            localDnsTimeout={localDnsTimeout}
-            localRenewalDays={localRenewalDays}
-            onLocalRenewalDaysChange={setLocalRenewalDays}
-            onLocalDnsTimeoutChange={setLocalDnsTimeout}
-            localDnsDelay={localDnsDelay}
-            onLocalDnsDelayChange={setLocalDnsDelay}
-            localDnsNameservers={localDnsNameservers}
-            onLocalDnsNameserversChange={setLocalDnsNameservers}
-            onUpdateClientSetting={handleUpdateClientSetting}
-            onSaveDnsUpdatePort={handleSaveDnsUpdatePort}
-            onRegisterProxy={handleRegisterProxy}
-            onUnregisterProxy={handleUnregisterProxy}
-            onProxyAccountChange={handleProxyAccountChange}
-            caAccounts={caAccounts}
-            onResetProxyAccount={handleResetProxyAccount}
-            onTestConnection={handleTestConnection}
-            onRequestCertificate={() => setShowRequestModal(true)}
-            onRefresh={loadData}
-            canWrite={canWrite('acme')}
-          />
-          <div className="px-4 pb-4">
-            <CaAccountsManager
-              accounts={caAccounts}
-              proxyPublicBase={publicBaseUrl(clientSettings.acme_proxy_public_base_url, '/acme/proxy')}
-              dnsUpdatePort={effectiveDnsUpdatePort(clientSettings)}
-              canWrite={canWrite('acme')}
-              canDelete={canDelete('acme')}
-              onCreate={handleCreateCaAccount}
-              onUpdate={handleUpdateCaAccount}
-              onDelete={handleDeleteCaAccount}
-              onDeactivate={handleDeactivateCaAccount}
-              onSetDefault={handleSetDefaultCaAccount}
-              onRegister={handleRegisterCaAccount}
-            />
-          </div>
-          </>
-        )}
-        {activeTab === 'letsencryptorders' && (
-          <LetsEncryptOrdersTab
-            clientOrders={clientOrders}
-            partial={clientOrdersPartial}
-            selectedClientOrder={selectedClientOrder}
-            onSelectOrder={setSelectedClientOrder}
-            onRefresh={loadData}
-            onCheckOrderStatus={handleCheckOrderStatus}
-            onVerifyChallenge={handleVerifyChallenge}
-            onFinalizeOrder={handleFinalizeOrder}
-            onViewCertificate={handleViewCertificate}
-            onDownloadCertificate={handleDownloadCertificate}
-            onRenewCertificate={handleRenewCertificate}
-            onDeleteOrder={handleDeleteClientOrder}
-            onToggleRenewal={handleToggleOrderRenewal}
-            canDelete={canDelete('acme')}
-            canWrite={canWrite('acme')}
-          />
-        )}
-        {activeTab === 'dns' && (
-          <DnsProvidersTab
-            dnsProviders={dnsProviders}
-            onAddProvider={() => { setSelectedDnsProvider(null); setShowDnsProviderModal(true) }}
-            onEditProvider={(p) => { setSelectedDnsProvider(p); setShowDnsProviderModal(true) }}
-            onTestProvider={handleTestDnsProvider}
-            onDeleteProvider={handleDeleteDnsProvider}
-            canWrite={canWrite('acme')}
-            canDelete={canDelete('acme')}
-          />
-        )}
-        {activeTab === 'domains' && (
-          <DomainsTab
-            acmeDomains={acmeDomains}
-            dnsProviders={dnsProviders}
-            cas={cas}
-            onAdd={() => { setSelectedAcmeDomain(null); setShowDomainModal(true) }}
-            onEdit={(d) => { setSelectedAcmeDomain(d); setShowDomainModal(true) }}
-            onDelete={handleDeleteDomain}
-            onTest={handleTestDomainAccess}
-            canWrite={canWrite('acme')}
-            canDelete={canDelete('acme')}
-          />
-        )}
-        {activeTab === 'config' && (
-          <ConfigTab
-            acmeSettings={acmeSettings}
-            savedProfiles={savedProfiles}
-            cas={cas}
-            templates={templates}
-            updateSetting={updateSetting}
-            onSaveConfig={handleSaveConfig}
-            saving={saving}
-            revokeSuperseded={revokeSuperseded}
-            onRevokeSupersededChange={setRevokeSuperseded}
-            onToggleRevokeOnRenewal={handleToggleRevokeOnRenewal}
-            canWrite={canWrite('acme')}
-          />
-        )}
-        {activeTab === 'localorders' && (
-        <LocalOrdersTab linkedOrder={linkedLocalOrder} onCloseLinked={() => setLinkedLocalOrder(null)} />
-      )}
-
-      {activeTab === 'localdomains' && (
-          <LocalDomainsTab
-            localDomains={localDomains}
-            cas={cas}
-            onAdd={() => { setSelectedLocalDomain(null); setShowLocalDomainModal(true) }}
-            onEdit={(d) => { setSelectedLocalDomain(d); setShowLocalDomainModal(true) }}
-            onDelete={handleDeleteLocalDomain}
-            canWrite={canWrite('acme')}
-            canDelete={canDelete('acme')}
-          />
-        )}
-        {activeTab === 'accounts' && (
-          <AccountsTab
-            accounts={filteredAccounts}
-            selectedAccount={selectedAccount}
-            onSelectAccount={selectAccount}
-            searchQuery={searchQuery}
-            onSearch={setSearchQuery}
-            columns={accountColumns}
-            page={page}
-            perPage={perPage}
-            onPageChange={setPage}
-            onPerPageChange={setPerPage}
-            canWrite={canWrite('acme')}
-            onShowCreateModal={() => setShowCreateModal(true)}
-          />
-        )}
-        {activeTab === 'eab' && (
-          <EabTab
-            eabRequired={eabRequired}
-            onToggleEabRequired={handleToggleEabRequired}
-            showCreateModal={openEabCreate}
-            onCloseCreateModal={() => setOpenEabCreate(false)}
-            canWrite={canWrite('acme')}
-            canDelete={canDelete('acme')}
-          />
-        )}
-        {activeTab === 'history' && (
-          <HistoryTab
-            history={history}
-            total={historyTotal}
-            page={historyPage}
-            perPage={historyPerPage}
-            onPageChange={setHistoryPage}
-            onPerPageChange={(v) => { setHistoryPerPage(v); setHistoryPage(1) }}
-            search={historySearch}
-            onSearchChange={(v) => { setHistorySearch(v); setHistoryPage(1) }}
-            onSortChange={(next) => { setHistorySort(next); setHistoryPage(1) }}
-            caOptions={historyCAs}
-            exportLoader={exportHistory}
-            filterStatus={historyFilterStatus}
-            onFilterStatusChange={(v) => { setHistoryFilterStatus(v); setHistoryPage(1) }}
-            filterCA={historyFilterCA}
-            onFilterCAChange={(v) => { setHistoryFilterCA(v); setHistoryPage(1) }}
-            filterSource={historyFilterSource}
-            onFilterSourceChange={(v) => { setHistoryFilterSource(v); setHistoryPage(1) }}
-            selectedCert={selectedCert}
-            onSelectCert={setSelectedCert}
-          />
-        )}
-      </ResponsiveLayout>
-
+    <DockSlotProvider>
+      <Zone dock={<DockSlot />}>
+        <PageHead title="ACME" total={totals[activeTab]} intent={t('shell.moduleDesc.acme')}
+          actions={<>
+            <Btn icon="copy" id="acme-copy-directory" onClick={async () => { if (await copy(directoryUrl)) showSuccess(t('common.copied')) }}>{t('acme.copyDirectory')}</Btn>
+            <ViewSwitch id="acme-view" label={t('protocols.view')} value={activeTab} onChange={setActiveTab}
+              groups={[
+                { label: t('acme.groups.localAcme'), options: SERVER_VIEWS.map(option) },
+                { label: t('acme.groups.client'), options: CLIENT_VIEWS.map(option) },
+                { label: t('acme.groups.history'), options: [option('history')] },
+              ]} />
+            {create || null}
+          </>} />
+        {views[activeTab]}
+      </Zone>
       {/* Create Account Modal */}
       <Modal
         open={showCreateModal}
@@ -1594,7 +1205,6 @@ export default function ACMEPage() {
           </div>
         </div>
       </Modal>
-    </>
+    </DockSlotProvider>
   )
 }
-

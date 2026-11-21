@@ -4,11 +4,13 @@ import { fireEvent, render, screen } from '@testing-library/react'
 const mocks = vi.hoisted(() => ({ downloadBlob: vi.fn() }))
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key) => key }),
+  useTranslation: () => ({ t: (key) => key, i18n: { language: 'en' } }),
+  initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 
 vi.mock('../../../contexts', () => ({
   useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn() }),
+  useMobile: () => ({ isMobile: false }),
 }))
 
 vi.mock('../../../hooks', () => ({
@@ -20,20 +22,10 @@ vi.mock('../../../lib/utils', async () => ({
   downloadBlob: mocks.downloadBlob,
 }))
 
-vi.mock('../../../components', async () => {
-  const detailCard = await vi.importActual('../../../components/DetailCard.jsx')
-  return {
-    Badge: ({ children }) => <span>{children}</span>,
-    Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-    CompactSection: detailCard.CompactSection,
-    CompactGrid: detailCard.CompactGrid,
-    CompactField: detailCard.CompactField,
-    CompactStats: detailCard.CompactStats,
-    CompactHeader: detailCard.CompactHeader,
-  }
-})
+vi.mock('../../../stores/timezoneStore', () => ({ getAppTimezone: () => 'UTC' }))
 
-import OrderDetailPanel, { http01Url } from '../OrderDetailPanel'
+import OrderDetailPanel from '../OrderDetailPanel'
+import { http01Url } from '../../protocols/protocolStates'
 
 const order = (challenge_type, challenges) => ({
   id: 1,
@@ -52,7 +44,7 @@ const http01 = {
 
 const noop = () => {}
 const renderPanel = (o) => render(
-  <OrderDetailPanel order={o} onDownloadCert={noop} onViewCertificate={noop}
+  <OrderDetailPanel order={o} onClose={noop} onDownloadCert={noop} onViewCertificate={noop} canWrite
     onRenewCertificate={noop} onVerifyChallenge={noop} onFinalizeOrder={noop} onDeleteOrder={noop} />
 )
 

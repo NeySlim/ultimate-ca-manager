@@ -11,19 +11,6 @@ vi.mock('react-i18next', () => ({
 }))
 vi.mock('../ProfilesEditor', () => ({ default: () => null }))
 // A native select exposes the options and the helper text that the real one hides in a portal.
-vi.mock('../../../components', async (orig) => ({
-  ...(await orig()),
-  Select: ({ label, options = [], value, helperText }) => (
-    <div data-testid={`field-${label}`}>
-      <select aria-label={label} value={value ?? ''} onChange={() => {}}>
-        <option value="">-</option>
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      {helperText && <p>{helperText}</p>}
-    </div>
-  ),
-}))
-
 import ConfigTab from '../ConfigTab'
 
 const CAS = [
@@ -35,7 +22,8 @@ const CAS = [
 function renderTab(issuing_ca_id) {
   render(<ConfigTab acmeSettings={{ enabled: true, profiles: {}, issuing_ca_id }} cas={CAS}
     updateSetting={vi.fn()} canWrite />)
-  const field = screen.getByTestId('field-acme.defaultIssuingCA')
+  // The settings form's own select, in its .field with the hint
+  const field = screen.getByRole('combobox', { name: 'acme.defaultIssuingCA' }).closest('.field')
   return {
     field,
     labels: within(field).getAllByRole('option').filter((o) => o.value !== '').map((o) => o.textContent),

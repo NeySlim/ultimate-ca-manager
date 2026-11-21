@@ -2468,7 +2468,8 @@
     "groups": {
       "letsEncrypt": "Let's Encrypt",
       "localAcme": "Локальный ACME",
-      "history": "История"
+      "history": "История",
+      "client": "Клиент ACME"
     },
     "challengeValidated": "Проверка пройдена: заказ готов к завершению",
     "checkStatus": "Проверить статус",
@@ -2620,7 +2621,9 @@
       "editDomainsTitle": "Изменение разрешённых доменов",
       "domainsSaved": "Разрешённые домены сохранены",
       "domainsSaveFailed": "Не удалось сохранить разрешённые домены",
-      "deleteFailed": "Не удалось удалить учётные данные EAB"
+      "deleteFailed": "Не удалось удалить учётные данные EAB",
+      "caption": "Учётные данные EAB. Активируйте имя, чтобы открыть подробности.",
+      "noNotes": "Нет заметки."
     },
     "termsOfServiceTitlePlaceholder": "Условия использования (оставьте пустым, чтобы скрыть)",
     "termsOfServiceBodyPlaceholder": "Напишите здесь условия...\n\nПоддерживается: **жирный**, *курсив*, [ссылки](url), - списки\n\nДля абзацев используйте две пустые строки.",
@@ -2794,7 +2797,99 @@
       "portNotListening": "Не слушает",
       "portInvalid": "Введите 0 (отключено) или порт от 1024 до 65535.",
       "portRestartRequired": "Перезапустите UCM, чтобы применить новый порт."
-    }
+    },
+    "unit_one": "{{count}} учётная запись",
+    "unit_other": "{{count}} учётной записи",
+    "unit_few": "{{count}} учётные записи",
+    "unit_many": "{{count}} учётных записей",
+    "accountsRange_one": "{{shown}} из {{count}} учётной записи",
+    "accountsRange_other": "{{shown}} из {{count}} учётных записей",
+    "accountsRange_few": "{{shown}} из {{count}} учётных записей",
+    "accountsRange_many": "{{shown}} из {{count}} учётных записей",
+    "accountsCaption": "Учётные записи ACME. Активируйте имя, чтобы открыть подробности.",
+    "accountStates": {
+      "valid": "Активные",
+      "deactivated": "Отключённые",
+      "revoked": "Отозванные"
+    },
+    "filterByState": "Фильтр по состоянию",
+    "copyDirectory": "Копировать URL каталога",
+    "contact": "Контакт",
+    "noContact": "Нет",
+    "createdOn": "Создан",
+    "accountKey": "Ключ учётной записи",
+    "tabs": {
+      "account": "Учётная запись"
+    },
+    "lastOrder": "Последний заказ",
+    "noneOrder": "Нет",
+    "orderLine": "Заказ {{id}}",
+    "ordersFailing": "{{count}}, из них с ошибкой: {{failing}}",
+    "deactivationFinal": "Деактивация ACME окончательна (RFC 8555, §7.3.6): клиенту нужно зарегистрировать новую учётную запись.",
+    "disableAccount": "Отключить учётную запись…",
+    "disableTitle": "Отключить эту учётную запись ACME?",
+    "disableWarning": "Деактивация окончательна (RFC 8555, §7.3.6): {{name}} больше не сможет размещать заказы, клиенту придётся зарегистрировать новую учётную запись.",
+    "disableConfirm": "Отключить учётную запись",
+    "challengeTxt": "Запись TXT {{name}}",
+    "challengeAlpn": "TLS-рукопожатие на {{host}}",
+    "views": {
+      "accounts": "Учётные записи",
+      "localorders": "Заказы",
+      "localdomains": "Домены",
+      "eab": "Учётные данные EAB",
+      "config": "Настройки сервера",
+      "letsencrypt": "Настройки клиента",
+      "client": "Клиент ACME",
+      "letsencryptorders": "Заказы клиента",
+      "upstream": "Вышестоящие ЦС",
+      "dns": "DNS-провайдеры",
+      "domains": "Домены клиента",
+      "history": "Выпущенные сертификаты"
+    },
+    "ordersCaption": "Заказы ACME. Активируйте имя, чтобы открыть подробности.",
+    "deleteOrderOf": "Удалить заказ для {{domain}}",
+    "domainsCaption": "Домены. Активируйте имя, чтобы открыть подробности.",
+    "domainsRange_one": "{{count}} домен",
+    "domainsRange_other": "{{count}} домена",
+    "domainsRange_few": "{{count}} домена",
+    "domainsRange_many": "{{count}} доменов",
+    "providersCaption": "DNS-провайдеры. Активируйте имя, чтобы открыть подробности.",
+    "providersRange_one": "{{count}} провайдер",
+    "providersRange_other": "{{count}} провайдера",
+    "providersRange_few": "{{count}} провайдера",
+    "providersRange_many": "{{count}} провайдеров",
+    "upstreamCaption": "Вышестоящие ЦС. Активируйте имя, чтобы открыть подробности.",
+    "upstreamRange_one": "{{count}} вышестоящий ЦС",
+    "upstreamRange_other": "{{count}} вышестоящего ЦС",
+    "upstreamRange_few": "{{count}} вышестоящих ЦС",
+    "upstreamRange_many": "{{count}} вышестоящих ЦС",
+    "accountUrl": "URL учётной записи",
+    "clientOrdersRange_one": "{{shown}} из {{count}} заказа",
+    "clientOrdersRange_other": "{{shown}} из {{count}} заказов",
+    "clientOrdersRange_few": "{{shown}} из {{count}} заказов",
+    "clientOrdersRange_many": "{{shown}} из {{count}} заказов",
+    "accountOrCa": "Учётная запись или ЦС",
+    "renewalFailuresLabel": "Сбои продления",
+    "historyCaption": "Сертификаты, выпущенные через ACME. Активируйте имя, чтобы открыть подробности.",
+    "historyRange": "{{start}}–{{end}} из {{count}} сертификатов",
+    "historyTotal_one": "{{count}} сертификат",
+    "historyTotal_other": "{{count}} сертификата",
+    "historyTotal_few": "{{count}} сертификата",
+    "historyTotal_many": "{{count}} сертификатов",
+    "historyExportScope": "Сертификатов: {{count}}, с текущим поиском и фильтрами (не более 10 000).",
+    "removeProfile": "Удалить профиль {{name}}",
+    "boundsError": "Целое число от {{min}} до {{max}}.",
+    "dnsSettings": "Проверки DNS-01",
+    "keysAndTransport": "Ключи и транспорт",
+    "unregisterProxy": "Отменить регистрацию",
+    "accountState": {
+      "valid": "Активна",
+      "deactivated": "Отключена",
+      "revoked": "Отозвана"
+    },
+    "identifier": "Идентификатор",
+    "emptyAccountsTitle": "Нет учётных записей ACME",
+    "emptyAccountsText": "Клиенты ACME (certbot, cert-manager, acme.sh) сами создают учётную запись в каталоге: скопируйте его URL в их конфигурацию."
   },
   "scep": {
     "title": "Протокол SCEP",
@@ -2905,7 +3000,79 @@
     "profileDeleted": "Профиль SCEP удалён",
     "profileDeleteConfirm": "Удалить профиль SCEP «{{name}}»? Устройствам, регистрирующимся по его URL, будет отказано.",
     "profileChallengeRegenerated": "Пароль проверки создан заново и скопирован в буфер обмена",
-    "confirmRegenerateProfileChallenge": "Создать новый пароль проверки для профиля «{{name}}»? Текущий перестанет работать сразу, и все устройства, настроенные с ним, придётся обновить."
+    "confirmRegenerateProfileChallenge": "Создать новый пароль проверки для профиля «{{name}}»? Текущий перестанет работать сразу, и все устройства, настроенные с ним, придётся обновить.",
+    "unit_one": "{{count}} профиль",
+    "unit_other": "{{count}} профиля",
+    "unit_few": "{{count}} профиля",
+    "unit_many": "{{count}} профилей",
+    "range_one": "{{shown}} из {{count}} профиля",
+    "range_other": "{{shown}} из {{count}} профилей",
+    "range_few": "{{shown}} из {{count}} профилей",
+    "range_many": "{{shown}} из {{count}} профилей",
+    "requestUnit_one": "{{count}} запрос",
+    "requestUnit_other": "{{count}} запроса",
+    "requestUnit_few": "{{count}} запроса",
+    "requestUnit_many": "{{count}} запросов",
+    "requestRange": "{{start}}–{{end}} из {{count}} запросов",
+    "intuneUnit_one": "{{count}} регистрация",
+    "intuneUnit_other": "{{count}} регистрации",
+    "intuneUnit_few": "{{count}} регистрации",
+    "intuneUnit_many": "{{count}} регистраций",
+    "intuneRange_one": "{{shown}} из {{count}} регистрации",
+    "intuneRange_other": "{{shown}} из {{count}} регистраций",
+    "intuneRange_few": "{{shown}} из {{count}} регистраций",
+    "intuneRange_many": "{{shown}} из {{count}} регистраций",
+    "caption": "Профили SCEP. Активируйте имя, чтобы открыть подробности.",
+    "requestsCaption": "Запросы SCEP. Активируйте субъект, чтобы открыть подробности.",
+    "challengesCaption": "Пароли запроса центров. Активируйте имя, чтобы открыть подробности.",
+    "intuneCaption": "Регистрации приложений Intune. Активируйте имя, чтобы открыть подробности.",
+    "filterByState": "Фильтр по состоянию",
+    "filters": {
+      "active": "Активные",
+      "disabled": "Отключённые"
+    },
+    "columns": {
+      "ca": "Центр",
+      "template": "Шаблон",
+      "profile": "Профиль"
+    },
+    "tabs": {
+      "profile": "Профиль"
+    },
+    "sections": {
+      "enrollment": "Регистрация",
+      "issuance": "Выпуск"
+    },
+    "enrollmentUrl": "URL регистрации",
+    "copyUrl": "Копировать URL",
+    "challengeHidden": "Задан, скрыт",
+    "challengeNone": "Нет",
+    "challengeIntune": "Проверяется Intune",
+    "challengeSet": "Задан",
+    "disable": "Отключить",
+    "enable": "Включить",
+    "rotate": "Перевыпустить пароль…",
+    "rotateTitle": "Перевыпустить пароль запроса?",
+    "rotateWarning": "Старый пароль сразу перестаёт действовать: устройствам профиля «{{name}}», которые ещё не использовали его, понадобится новый.",
+    "newChallengeTitle": "Новый пароль запроса",
+    "newChallengeOnce": "Новый пароль профиля «{{name}}», показывается один раз:",
+    "newChallengeHint": "Передайте его в систему управления устройствами сейчас: прочитать его снова будет нельзя.",
+    "profileEnabled": "Профиль «{{name}}» включён",
+    "profileDisabled": "Профиль «{{name}}» отключён",
+    "requestNumber": "Запрос № {{id}}",
+    "caWide": "Точка центра",
+    "clientIp": "Адрес клиента",
+    "approvedAt": "Одобрен",
+    "securityDesc": "Одобрение, срок действия запросов и проверки сообщений.",
+    "challengeValidityInvalid": "Целое число часов, не меньше 1.",
+    "fixBeforeSaving_one": "{{count}} поле нужно исправить перед сохранением.",
+    "fixBeforeSaving_other": "{{count}} поля нужно исправить перед сохранением.",
+    "fixBeforeSaving_few": "{{count}} поля нужно исправить перед сохранением.",
+    "fixBeforeSaving_many": "{{count}} полей нужно исправить перед сохранением.",
+    "views": {
+      "challenges": "Пароли центров"
+    },
+    "emptyProfilesText": "Профиль связывает выдающий ЦС, шаблон и пароль проверки."
   },
   "crlOcsp": {
     "subtitle": "Активных CRL: {{count}}",
@@ -3002,7 +3169,61 @@
     "namedUrlsOff": "Пути CDP/AIA используют внутренний идентификатор. Включите, чтобы в новых сертификатах использовался слаг из имени ЦС.",
     "namedUrlsEnable": "Использовать имя ЦС",
     "namedUrlsConfirm": "Включить именованные URL протоколов для «{{name}}»? В URL CDP/AIA вновь выпущенных сертификатов появится слаг, образованный от имени ЦС. Существующие URL продолжат работать. Отключить это позже нельзя.",
-    "namedUrlsEnabled": "Именованные URL включены: {{slug}}"
+    "namedUrlsEnabled": "Именованные URL включены: {{slug}}",
+    "unit_one": "{{count}} центр",
+    "unit_other": "{{count}} центра",
+    "unit_few": "{{count}} центра",
+    "unit_many": "{{count}} центров",
+    "range_one": "{{shown}} из {{count}} центра",
+    "range_other": "{{shown}} из {{count}} центров",
+    "range_few": "{{shown}} из {{count}} центров",
+    "range_many": "{{shown}} из {{count}} центров",
+    "caption": "CRL / OCSP. Активируйте имя, чтобы открыть подробности.",
+    "filterByState": "Фильтр по состоянию",
+    "search": "Поиск центров",
+    "createCa": "Создать ЦС",
+    "states": {
+      "current": "Актуальна",
+      "soon": "Менее 24 ч",
+      "expired": "Просрочена",
+      "none": "Без CRL"
+    },
+    "numberOf": "№ {{number}}",
+    "ocspActive": "Активен",
+    "ocspInactive": "Неактивен",
+    "columns": {
+      "published": "Опубликована"
+    },
+    "tabs": {
+      "publication": "Публикация"
+    },
+    "responderDisabled": "отключён",
+    "responderRunning": "работает",
+    "responderStopped": "остановлен",
+    "responderAside": "OCSP-ответчик: {{state}}, запросов: {{count}}, из кэша {{rate}} %",
+    "summaryNone": "Для этого центра CRL ещё не опубликован.",
+    "summaryRevoked_one": "CRL № {{number}} содержит {{count}} отозванный сертификат.",
+    "summaryRevoked_other": "CRL № {{number}} содержит {{count}} отозванных сертификата.",
+    "summaryRevoked_few": "CRL № {{number}} содержит {{count}} отозванных сертификата.",
+    "summaryRevoked_many": "CRL № {{number}} содержит {{count}} отозванных сертификатов.",
+    "summary": {
+      "soon": "Следующее обновление менее чем через 24 ч.",
+      "expired": "Дата следующего обновления прошла: перевыпустите его."
+    },
+    "days_one": "{{count}} день",
+    "days_other": "{{count}} дня",
+    "days_few": "{{count}} дня",
+    "days_many": "{{count}} дней",
+    "hours_one": "{{count}} час",
+    "hours_other": "{{count}} часа",
+    "hours_few": "{{count}} часа",
+    "hours_many": "{{count}} часов",
+    "ocspResponderOf": "Отвечать по OCSP для этого центра",
+    "statsAllAuthorities": "Запросы и попадания в кэш учитывают все центры ответчика.",
+    "serial": "Серийный № {{serial}}",
+    "slug": "Имя в URL",
+    "emptyTitle": "Нет списков отзыва",
+    "emptyText": "Сначала создайте ЦС: каждый центр появится здесь со своим CRL и OCSP-ответчиком."
   },
   "deploy": {
     "title": "Развёртывание сертификатов",
@@ -6863,7 +7084,33 @@
     "labelName": "Метка",
     "labelPlaceholder": "например, branch-office",
     "responseIncludeChain": "Включать цепочку ЦС в ответы на регистрацию",
-    "responseIncludeChainHelp": "Ответы RFC 7030 содержат только выпущенный сертификат; включите для устаревших клиентов, которые собирают набор из ответа на регистрацию, а не из /cacerts."
+    "responseIncludeChainHelp": "Ответы RFC 7030 содержат только выпущенный сертификат; включите для устаревших клиентов, которые собирают набор из ответа на регистрацию, а не из /cacerts.",
+    "unit_one": "{{count}} точка регистрации",
+    "unit_other": "{{count}} точки регистрации",
+    "unit_few": "{{count}} точки регистрации",
+    "unit_many": "{{count}} точек регистрации",
+    "range_one": "{{shown}} из {{count}} точки",
+    "range_other": "{{shown}} из {{count}} точек",
+    "range_few": "{{shown}} из {{count}} точек",
+    "range_many": "{{shown}} из {{count}} точек",
+    "caption": "EST. Активируйте имя, чтобы открыть подробности.",
+    "defaultEndpoint": "Точка по умолчанию",
+    "columns": {
+      "auth": "Аутентификация"
+    },
+    "auth": {
+      "cert": "Клиентский сертификат",
+      "certOrPassword": "Клиентский сертификат или пароль"
+    },
+    "aside": "Регистраций: {{total}}, с ошибкой: {{failed}}",
+    "summaryTotals": "Регистраций с начала работы на всех точках: {{total}}, успешных: {{successful}}, с ошибкой: {{failed}}.",
+    "labelsRepeated": "Две метки совпадают: переименуйте одну перед сохранением.",
+    "removeLabel": "Удалить метку {{label}}",
+    "addLabel": "Добавить метку",
+    "passwordKept": "Пароль сохранён: оставьте поле пустым, чтобы сохранить его.",
+    "views": {
+      "list": "Точки регистрации"
+    }
   },
   "discovery": {
     "aboutDiscovery": "Об обнаружении",
@@ -7594,6 +7841,32 @@
       "management": "Управление",
       "settings": "Настройки",
       "info": "Информация"
+    },
+    "serviceName": "Служба меток времени",
+    "unit_one": "{{count}} служба",
+    "unit_other": "{{count}} службы",
+    "unit_few": "{{count}} службы",
+    "unit_many": "{{count}} служб",
+    "range_one": "{{shown}} из {{count}} службы",
+    "range_other": "{{shown}} из {{count}} служб",
+    "range_few": "{{shown}} из {{count}} служб",
+    "range_many": "{{shown}} из {{count}} служб",
+    "caption": "TSA. Активируйте имя, чтобы открыть подробности.",
+    "filterByState": "Фильтр по состоянию",
+    "columns": {
+      "ca": "Центр",
+      "digest": "Хеш",
+      "policy": "Политика"
+    },
+    "configure": "Настроить",
+    "summaryTotals": "Получено запросов с начала работы: {{total}}, выдано меток: {{successful}}, отклонено: {{failed}}.",
+    "sections": {
+      "service": "Служба",
+      "signer": "Подпись меток"
+    },
+    "views": {
+      "list": "Службы",
+      "config": "Конфигурация"
     }
   },
   "sshCas": {
@@ -8914,5 +9187,16 @@
     "settingsSections": "Разделы параметров",
     "pageActions": "Другие действия страницы {{name}}",
     "pageActionsTitle": "Действия страницы"
+  },
+  "protocols": {
+    "copyValue": "Копировать: {{name}}",
+    "removeUrl": "Удалить {{url}}",
+    "newUrl": "Новый URL: {{name}}",
+    "view": "Вид",
+    "sections_one": "{{count}} раздел",
+    "sections_other": "{{count}} раздела",
+    "sections_few": "{{count}} раздела",
+    "sections_many": "{{count}} разделов",
+    "sectionsOf": "Разделы: {{name}}"
   }
 }

@@ -88,9 +88,8 @@ const STRICT_NO_SIGNER = {
 }
 
 async function openSettingsTab() {
-  render(<MemoryRouter><TSAPage /></MemoryRouter>)
-  const settingsTabs = await screen.findAllByText('tsa.groups.settings')
-  fireEvent.click(settingsTabs[settingsTabs.length - 1])
+  render(<MemoryRouter initialEntries={['/tsa-config?tab=config']}><TSAPage /></MemoryRouter>)
+  await screen.findByText('tsa.signingCertDesc')
   await screen.findByText('tsa.signingCertDesc')
 }
 
@@ -118,8 +117,8 @@ describe('TSAPage strict mode by default', () => {
   it('keeps the strict mode on when a signer is picked', async () => {
     config.current = STRICT_NO_SIGNER
     await openSettingsTab()
-    fireEvent.change(screen.getByLabelText('tsa.signingCert'), { target: { value: 'cert-ts-1' } })
-    fireEvent.click(screen.getByText('common.saveConfiguration'))
+    fireEvent.change(screen.getByRole('combobox', { name: 'tsa.signingCert' }), { target: { value: 'cert-ts-1' } })
+    fireEvent.click(screen.getByText('common.save'))
     await waitFor(() => expect(tsaService.updateConfig).toHaveBeenCalled())
     expect(tsaService.updateConfig).toHaveBeenLastCalledWith(
       expect.objectContaining({ signer_cert_refid: 'cert-ts-1', require_dedicated_cert: true }))

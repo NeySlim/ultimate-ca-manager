@@ -5,14 +5,14 @@ export default {
     overview: 'SCEP permet aux appareils réseau (routeurs, commutateurs, pare-feu) et aux solutions MDM de demander et d’obtenir automatiquement des certificats. Les appareils s’authentifient à l’aide d’un mot de passe de défi.',
     sections: [
       {
-        title: 'Onglets',
+        title: 'Vues',
         items: [
-          { label: 'Requêtes', text: 'Requêtes d’inscription SCEP en attente, approuvées et rejetées' },
-          { label: 'Configuration', text: 'Paramètres du serveur SCEP : sélection d’AC, approbation automatique' },
-          { label: 'Profils', text: 'Endpoints d’enrôlement nommés, chacun avec sa propre URL, AC, template et challenge' },
+          { label: 'Requêtes', text: 'Requêtes d’inscription SCEP en attente, approuvées et rejetées, filtrées par les puces d’état, recherchées et paginées par le serveur ; une requête ouvre son détail avec Approuver et Rejeter' },
+          { label: 'Configuration', text: 'Paramètres du serveur SCEP dans un formulaire avec sa barre d’enregistrement : sélection d’AC, approbation automatique, validité du mot de passe de défi (une valeur hors des bornes du serveur est refusée avant l’enregistrement)' },
+          { label: 'Profils', text: 'La page s’ouvre sur les profils : puces par état (Tous, Actifs, Désactivés, Intune), puis Autorité, Modèle, Intune et État. Un nom ouvre son détail avec Activer ou Désactiver, Régénérer le mot de passe… (la nouvelle valeur est affichée une seule fois, à copier avant de fermer), Modifier et Supprimer' },
           { label: 'Inscriptions d’application Intune', text: 'Inscriptions d’application Entra (ID de locataire, ID client, secret client) partagées par les profils qui valident les challenges Intune ; un secret vide à l’édition conserve l’actuel, Tester la connexion demande un jeton et découvre le service sans consommer de challenge, et une app encore utilisée par un profil ne peut pas être supprimée' },
-          { label: 'Défis', text: 'Afficher et régénérer les mots de passe de défi pour l’inscription des appareils' },
-          { label: 'Informations', text: 'URL des points de terminaison SCEP et instructions d’intégration' },
+          { label: 'Défis des autorités', text: 'Le mot de passe de défi du point d’enrôlement de chaque AC, dans son détail avec Copier et Régénérer' },
+          { label: 'Détails de connexion', text: 'À la fin de la configuration : l’URL SCEP, les opérations prises en charge et l’exemple Cisco IOS' },
         ]
       },
       {
@@ -57,7 +57,7 @@ export default {
 
 Le protocole d’inscription de certificat simplifié (SCEP) permet aux appareils réseau : routeurs, commutateurs, pare-feu, terminaux gérés par MDM, de demander et d’obtenir automatiquement des certificats.
 
-## Onglets
+## Vues
 
 ### Requêtes
 Voir toutes les requêtes d’inscription SCEP :
@@ -89,7 +89,7 @@ Chaque profil est lié à :
 Pointez chaque flotte d’appareils, profil MDM ou tenant vers sa propre URL de profil. L’endpoint \`/scep/pkiclient.exe\` sans segment continue de servir la configuration globale sans changement.
 
 ### Mots de passe de défi
-L’onglet **Défis** affiche les mots de passe de défi. Les appareils doivent inclure un mot de passe de défi valide dans leur requête d’inscription pour s’authentifier.
+La vue **Défis des autorités** affiche les mots de passe de défi. Les appareils doivent inclure un mot de passe de défi valide dans leur requête d’inscription pour s’authentifier.
 
 - **Voir le mot de passe** : Afficher le défi actuel pour une AC
 - **Régénérer** : Créer un nouveau mot de passe de défi (invalide l’ancien pour les nouvelles inscriptions)

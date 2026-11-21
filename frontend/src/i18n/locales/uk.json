@@ -2468,7 +2468,8 @@
     "groups": {
       "letsEncrypt": "Let's Encrypt",
       "localAcme": "Локальний ACME",
-      "history": "Історія"
+      "history": "Історія",
+      "client": "ACME client"
     },
     "challengeValidated": "Виклик підтверджено: замовлення готове до завершення",
     "checkStatus": "Перевірити статус",
@@ -2620,7 +2621,9 @@
       "editDomainsTitle": "Редагувати дозволені домени",
       "domainsSaved": "Дозволені домени збережено",
       "domainsSaveFailed": "Не вдалося зберегти дозволені домени",
-      "deleteFailed": "Не вдалося видалити облікові дані EAB"
+      "deleteFailed": "Не вдалося видалити облікові дані EAB",
+      "caption": "EAB credentials. Activate a name to open its detail.",
+      "noNotes": "No note."
     },
     "termsOfServiceTitlePlaceholder": "Умови надання послуг (залиште порожнім для приховування)",
     "termsOfServiceBodyPlaceholder": "Напишіть свої умови тут...\n\nПідтримує: **жирний**, *курсив*, [посилання](url), - списки\n\nВикористовуйте порожні рядки для абзаців.",
@@ -2794,7 +2797,99 @@
       "portNotListening": "Не слухає",
       "portInvalid": "Введіть 0 (вимкнено) або порт від 1024 до 65535.",
       "portRestartRequired": "Перезапустіть UCM, щоб застосувати новий порт."
-    }
+    },
+    "unit_one": "{{count}} account",
+    "unit_other": "{{count}} accounts",
+    "unit_few": "{{count}} accounts",
+    "unit_many": "{{count}} accounts",
+    "accountsRange_one": "{{shown}} of {{count}} account",
+    "accountsRange_other": "{{shown}} of {{count}} accounts",
+    "accountsRange_few": "{{shown}} of {{count}} accounts",
+    "accountsRange_many": "{{shown}} of {{count}} accounts",
+    "accountsCaption": "ACME accounts. Activate a name to open its detail.",
+    "accountStates": {
+      "valid": "Active",
+      "deactivated": "Disabled",
+      "revoked": "Revoked"
+    },
+    "filterByState": "Filter by state",
+    "copyDirectory": "Copy the directory URL",
+    "contact": "Contact",
+    "noContact": "None",
+    "createdOn": "Created",
+    "accountKey": "Account key",
+    "tabs": {
+      "account": "Account"
+    },
+    "lastOrder": "Last order",
+    "noneOrder": "None",
+    "orderLine": "Order {{id}}",
+    "ordersFailing": "{{count}}, {{failing}} failed",
+    "deactivationFinal": "An ACME deactivation is final (RFC 8555, §7.3.6): the client must register a new account.",
+    "disableAccount": "Disable the account…",
+    "disableTitle": "Disable this ACME account?",
+    "disableWarning": "The deactivation is final (RFC 8555, §7.3.6): {{name}} will no longer place orders, the client will have to register a new account.",
+    "disableConfirm": "Disable the account",
+    "challengeTxt": "TXT record {{name}}",
+    "challengeAlpn": "TLS handshake on {{host}}",
+    "views": {
+      "accounts": "Accounts",
+      "localorders": "Orders",
+      "localdomains": "Domains",
+      "eab": "EAB credentials",
+      "config": "Server settings",
+      "letsencrypt": "Client settings",
+      "client": "ACME client",
+      "letsencryptorders": "Client orders",
+      "upstream": "Upstream CAs",
+      "dns": "DNS providers",
+      "domains": "Client domains",
+      "history": "Issued certificates"
+    },
+    "ordersCaption": "ACME orders. Activate a name to open its detail.",
+    "deleteOrderOf": "Delete the order of {{domain}}",
+    "domainsCaption": "Domains. Activate a name to open its detail.",
+    "domainsRange_one": "{{count}} domain",
+    "domainsRange_other": "{{count}} domains",
+    "domainsRange_few": "{{count}} domains",
+    "domainsRange_many": "{{count}} domains",
+    "providersCaption": "DNS providers. Activate a name to open its detail.",
+    "providersRange_one": "{{count}} provider",
+    "providersRange_other": "{{count}} providers",
+    "providersRange_few": "{{count}} providers",
+    "providersRange_many": "{{count}} providers",
+    "upstreamCaption": "Upstream CAs. Activate a name to open its detail.",
+    "upstreamRange_one": "{{count}} upstream CA",
+    "upstreamRange_other": "{{count}} upstream CAs",
+    "upstreamRange_few": "{{count}} upstream CAs",
+    "upstreamRange_many": "{{count}} upstream CAs",
+    "accountUrl": "Account URL",
+    "clientOrdersRange_one": "{{shown}} of {{count}} order",
+    "clientOrdersRange_other": "{{shown}} of {{count}} orders",
+    "clientOrdersRange_few": "{{shown}} of {{count}} orders",
+    "clientOrdersRange_many": "{{shown}} of {{count}} orders",
+    "accountOrCa": "Account or CA",
+    "renewalFailuresLabel": "Renewal failures",
+    "historyCaption": "Certificates issued through ACME. Activate a name to open its detail.",
+    "historyRange": "{{start}}–{{end}} of {{count}} certificates",
+    "historyTotal_one": "{{count}} certificate",
+    "historyTotal_other": "{{count}} certificates",
+    "historyTotal_few": "{{count}} certificates",
+    "historyTotal_many": "{{count}} certificates",
+    "historyExportScope": "{{count}} certificates, with the search and filters in use (10,000 at most).",
+    "removeProfile": "Remove profile {{name}}",
+    "boundsError": "A whole number from {{min}} to {{max}}.",
+    "dnsSettings": "DNS-01 checks",
+    "keysAndTransport": "Keys and transport",
+    "unregisterProxy": "Unregister",
+    "accountState": {
+      "valid": "Active",
+      "deactivated": "Disabled",
+      "revoked": "Revoked"
+    },
+    "identifier": "Identifier",
+    "emptyAccountsTitle": "No ACME account",
+    "emptyAccountsText": "ACME clients (certbot, cert-manager, acme.sh) create their account themselves with the directory: copy its URL into their configuration."
   },
   "scep": {
     "title": "Протокол SCEP",
@@ -2905,7 +3000,79 @@
     "profileDeleted": "Профіль SCEP видалено",
     "profileDeleteConfirm": "Видалити профіль SCEP «{{name}}»? Пристрої, що реєструються через його URL, буде відхилено.",
     "profileChallengeRegenerated": "Challenge перегенеровано та скопійовано в буфер обміну",
-    "confirmRegenerateProfileChallenge": "Перегенерувати challenge для профілю «{{name}}»? Поточний одразу перестане діяти, і всі налаштовані з ним пристрої потрібно буде оновити."
+    "confirmRegenerateProfileChallenge": "Перегенерувати challenge для профілю «{{name}}»? Поточний одразу перестане діяти, і всі налаштовані з ним пристрої потрібно буде оновити.",
+    "unit_one": "{{count}} profile",
+    "unit_other": "{{count}} profiles",
+    "unit_few": "{{count}} profiles",
+    "unit_many": "{{count}} profiles",
+    "range_one": "{{shown}} of {{count}} profile",
+    "range_other": "{{shown}} of {{count}} profiles",
+    "range_few": "{{shown}} of {{count}} profiles",
+    "range_many": "{{shown}} of {{count}} profiles",
+    "requestUnit_one": "{{count}} request",
+    "requestUnit_other": "{{count}} requests",
+    "requestUnit_few": "{{count}} requests",
+    "requestUnit_many": "{{count}} requests",
+    "requestRange": "{{start}}–{{end}} of {{count}} requests",
+    "intuneUnit_one": "{{count}} registration",
+    "intuneUnit_other": "{{count}} registrations",
+    "intuneUnit_few": "{{count}} registrations",
+    "intuneUnit_many": "{{count}} registrations",
+    "intuneRange_one": "{{shown}} of {{count}} registration",
+    "intuneRange_other": "{{shown}} of {{count}} registrations",
+    "intuneRange_few": "{{shown}} of {{count}} registrations",
+    "intuneRange_many": "{{shown}} of {{count}} registrations",
+    "caption": "SCEP profiles. Activate a name to open its detail.",
+    "requestsCaption": "SCEP requests. Activate a subject to open its detail.",
+    "challengesCaption": "Challenge passwords of the authorities. Activate a name to open its detail.",
+    "intuneCaption": "Intune app registrations. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
+    "filters": {
+      "active": "Active",
+      "disabled": "Disabled"
+    },
+    "columns": {
+      "ca": "Authority",
+      "template": "Template",
+      "profile": "Profile"
+    },
+    "tabs": {
+      "profile": "Profile"
+    },
+    "sections": {
+      "enrollment": "Enrollment",
+      "issuance": "Issuance"
+    },
+    "enrollmentUrl": "Enrollment URL",
+    "copyUrl": "Copy the URL",
+    "challengeHidden": "Set, hidden",
+    "challengeNone": "None",
+    "challengeIntune": "Checked by Intune",
+    "challengeSet": "Set",
+    "disable": "Disable",
+    "enable": "Enable",
+    "rotate": "Regenerate the password…",
+    "rotateTitle": "Regenerate the challenge password?",
+    "rotateWarning": "The old password stops working at once: the devices of “{{name}}” that have not used it yet will need the new one.",
+    "newChallengeTitle": "New challenge password",
+    "newChallengeOnce": "New password of “{{name}}”, shown once:",
+    "newChallengeHint": "Give it to the device management tool now: it cannot be read again.",
+    "profileEnabled": "Profile “{{name}}” enabled",
+    "profileDisabled": "Profile “{{name}}” disabled",
+    "requestNumber": "Request no. {{id}}",
+    "caWide": "Authority endpoint",
+    "clientIp": "Client address",
+    "approvedAt": "Approved",
+    "securityDesc": "Approval, challenge validity and message checks.",
+    "challengeValidityInvalid": "A whole number of hours, 1 at least.",
+    "fixBeforeSaving_one": "{{count}} field to fix before saving.",
+    "fixBeforeSaving_other": "{{count}} fields to fix before saving.",
+    "fixBeforeSaving_few": "{{count}} fields to fix before saving.",
+    "fixBeforeSaving_many": "{{count}} fields to fix before saving.",
+    "views": {
+      "challenges": "Challenges of the authorities"
+    },
+    "emptyProfilesText": "A profile links an issuing CA, a template and a challenge password."
   },
   "crlOcsp": {
     "subtitle": "{{count}} активних CRL",
@@ -3002,7 +3169,61 @@
     "namedUrlsOff": "Шляхи CDP/AIA використовують внутрішній id. Увімкніть, щоб використовувати слаг з назви CA у нових сертифікатах.",
     "namedUrlsEnable": "Використовувати назву CA",
     "namedUrlsConfirm": "Увімкнути іменовані URL протоколів для «{{name}}»? Слаг з назви CA з'явиться в URL CDP/AIA нових виданих сертифікатів. Наявні URL продовжать працювати. Пізніше вимкнути це буде неможливо.",
-    "namedUrlsEnabled": "Іменовані URL увімкнено: {{slug}}"
+    "namedUrlsEnabled": "Іменовані URL увімкнено: {{slug}}",
+    "unit_one": "{{count}} authority",
+    "unit_other": "{{count}} authorities",
+    "unit_few": "{{count}} authorities",
+    "unit_many": "{{count}} authorities",
+    "range_one": "{{shown}} of {{count}} authority",
+    "range_other": "{{shown}} of {{count}} authorities",
+    "range_few": "{{shown}} of {{count}} authorities",
+    "range_many": "{{shown}} of {{count}} authorities",
+    "caption": "CRL / OCSP. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
+    "search": "Search authorities",
+    "createCa": "Create an authority",
+    "states": {
+      "current": "Up to date",
+      "soon": "Under 24 h",
+      "expired": "Expired",
+      "none": "No CRL"
+    },
+    "numberOf": "No. {{number}}",
+    "ocspActive": "Active",
+    "ocspInactive": "Inactive",
+    "columns": {
+      "published": "Published"
+    },
+    "tabs": {
+      "publication": "Publication"
+    },
+    "responderDisabled": "disabled",
+    "responderRunning": "running",
+    "responderStopped": "stopped",
+    "responderAside": "OCSP responder: {{state}}, {{count}} requests, {{rate}} % from cache",
+    "summaryNone": "No CRL published yet for this authority.",
+    "summaryRevoked_one": "CRL no. {{number}} lists {{count}} revoked certificate.",
+    "summaryRevoked_other": "CRL no. {{number}} lists {{count}} revoked certificates.",
+    "summaryRevoked_few": "CRL no. {{number}} lists {{count}} revoked certificates.",
+    "summaryRevoked_many": "CRL no. {{number}} lists {{count}} revoked certificates.",
+    "summary": {
+      "soon": "Its next update falls within 24 hours.",
+      "expired": "Its next update date has passed: regenerate it."
+    },
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "days_few": "{{count}} days",
+    "days_many": "{{count}} days",
+    "hours_one": "{{count}} hour",
+    "hours_other": "{{count}} hours",
+    "hours_few": "{{count}} hours",
+    "hours_many": "{{count}} hours",
+    "ocspResponderOf": "Answer OCSP for this authority",
+    "statsAllAuthorities": "Requests and cache hits count every authority of the responder.",
+    "serial": "Serial {{serial}}",
+    "slug": "Name in the URLs",
+    "emptyTitle": "No revocation list",
+    "emptyText": "Create an authority first: each one will show here with its CRL and its OCSP responder."
   },
   "deploy": {
     "title": "Розгортання сертифікатів",
@@ -6860,7 +7081,33 @@
     "labelName": "Мітка",
     "labelPlaceholder": "напр. filiya",
     "responseIncludeChain": "Додавати ланцюжок CA у відповіді реєстрації",
-    "responseIncludeChainHelp": "Відповіді RFC 7030 містять лише випущений сертифікат; увімкніть для застарілих клієнтів, які будують пакет із відповіді замість /cacerts."
+    "responseIncludeChainHelp": "Відповіді RFC 7030 містять лише випущений сертифікат; увімкніть для застарілих клієнтів, які будують пакет із відповіді замість /cacerts.",
+    "unit_one": "{{count}} enrollment endpoint",
+    "unit_other": "{{count}} enrollment endpoints",
+    "unit_few": "{{count}} enrollment endpoints",
+    "unit_many": "{{count}} enrollment endpoints",
+    "range_one": "{{shown}} of {{count}} endpoint",
+    "range_other": "{{shown}} of {{count}} endpoints",
+    "range_few": "{{shown}} of {{count}} endpoints",
+    "range_many": "{{shown}} of {{count}} endpoints",
+    "caption": "EST. Activate a name to open its detail.",
+    "defaultEndpoint": "Default endpoint",
+    "columns": {
+      "auth": "Authentication"
+    },
+    "auth": {
+      "cert": "Client certificate",
+      "certOrPassword": "Client certificate or password"
+    },
+    "aside": "{{total}} enrollments, {{failed}} failed",
+    "summaryTotals": "{{total}} enrollments since the start on every endpoint, {{successful}} succeeded, {{failed}} failed.",
+    "labelsRepeated": "Two labels are the same: rename one before saving.",
+    "removeLabel": "Remove label {{label}}",
+    "addLabel": "Add a label",
+    "passwordKept": "A password is saved: leave empty to keep it.",
+    "views": {
+      "list": "Endpoints"
+    }
   },
   "discovery": {
     "aboutDiscovery": "Про виявлення",
@@ -7591,6 +7838,32 @@
       "management": "Керування",
       "settings": "Налаштування",
       "info": "Інформація"
+    },
+    "serviceName": "Time-stamping service",
+    "unit_one": "{{count}} service",
+    "unit_other": "{{count}} services",
+    "unit_few": "{{count}} services",
+    "unit_many": "{{count}} services",
+    "range_one": "{{shown}} of {{count}} service",
+    "range_other": "{{shown}} of {{count}} services",
+    "range_few": "{{shown}} of {{count}} services",
+    "range_many": "{{shown}} of {{count}} services",
+    "caption": "TSA. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
+    "columns": {
+      "ca": "Authority",
+      "digest": "Hash",
+      "policy": "Policy"
+    },
+    "configure": "Configure",
+    "summaryTotals": "{{total}} requests received since the start, {{successful}} answered with a token, {{failed}} refused.",
+    "sections": {
+      "service": "Service",
+      "signer": "Token signing"
+    },
+    "views": {
+      "list": "Services",
+      "config": "Configuration"
     }
   },
   "sshCas": {
@@ -8911,5 +9184,16 @@
     "settingsSections": "Settings sections",
     "pageActions": "Other actions of {{name}}",
     "pageActionsTitle": "Page actions"
+  },
+  "protocols": {
+    "copyValue": "Copy {{name}}",
+    "removeUrl": "Remove {{url}}",
+    "newUrl": "New URL: {{name}}",
+    "view": "View",
+    "sections_one": "{{count}} section",
+    "sections_other": "{{count}} sections",
+    "sections_few": "{{count}} sections",
+    "sections_many": "{{count}} sections",
+    "sectionsOf": "Sections: {{name}}"
   }
 }

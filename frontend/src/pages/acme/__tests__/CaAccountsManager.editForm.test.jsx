@@ -7,9 +7,11 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key) => key }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
+vi.mock('../../../contexts', () => ({ useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn() }), useMobile: () => ({ isMobile: false }) }))
 vi.mock('../DnsUpdateKeysPanel', () => ({ default: () => null }))
 
 import CaAccountsManager from '../CaAccountsManager'
+import { WithDockSlot } from '../../protocols/__tests__/withDockSlot'
 import { blockedWhileSuspended } from '../../../components/shell/__tests__/writeGuardProbe'
 
 const account = (extra = {}) => ({
@@ -19,8 +21,9 @@ const account = (extra = {}) => ({
 
 const edit = async (acct, onUpdate = vi.fn().mockResolvedValue({})) => {
   const user = userEvent.setup()
-  render(<CaAccountsManager accounts={[acct]} canWrite canDelete onUpdate={onUpdate} />)
-  await user.click(screen.getByRole('button', { name: /common.edit/ }))
+  render(<WithDockSlot><CaAccountsManager accounts={[acct]} canWrite canDelete onUpdate={onUpdate} /></WithDockSlot>)
+  await user.click(screen.getByRole('button', { name: 'Actalis' }))
+  await user.click(await screen.findByRole('button', { name: /common.edit/ }))
   return { user, onUpdate }
 }
 
@@ -47,9 +50,10 @@ describe('CaAccountsManager edit form', () => {
 })
 
 describe('CaAccountsManager write guard', () => {
-  it('suspends Set as default and Edit with the other writes', () => {
-    render(<CaAccountsManager accounts={[account()]} canWrite canDelete onUpdate={vi.fn()} onSetDefault={vi.fn()} />)
-    expect(blockedWhileSuspended(screen.getByRole('button', { name: /acme.setDefault/ }))).toBe(true)
+  it('suspends Set as default and Edit with the other writes', async () => {
+    render(<WithDockSlot><CaAccountsManager accounts={[account()]} canWrite canDelete onUpdate={vi.fn()} onSetDefault={vi.fn()} /></WithDockSlot>)
+    screen.getByRole('button', { name: 'Actalis' }).click()
+    expect(blockedWhileSuspended(await screen.findByRole('button', { name: /acme.setDefault/ }))).toBe(true)
     expect(blockedWhileSuspended(screen.getByRole('button', { name: /common.edit/ }))).toBe(true)
   })
 })

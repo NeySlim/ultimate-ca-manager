@@ -128,3 +128,15 @@
 .atl .auth-qr img{display:block;width:176px;height:176px}
 .atl .backup-codes{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin:0;padding:10px 12px;list-style:none;background:var(--raised);border-radius:6px}
 @media(max-width:800px){.atl .auth-tools{gap:4px}.atl .auth-tools .shell-icon-btn{width:40px;height:40px;min-width:40px;min-height:40px}.atl .auth-tools .shell-pop{position:absolute;top:calc(100% + 8px);right:0;left:auto;width:220px;max-width:calc(100vw - 24px)}}
+/* Protocol pages: a form inside a dock section keeps the mockup's 12 px rhythm around it (the mockup's docks hold no form). */
+.atl .module-detail .dock-form{margin:12px 0}
+/* The page switch of a protocol page that holds more than the mockup's list, in the page head. */
+.atl .page-head .view-switch{min-height:34px;max-width:240px}
+/* ACME server profiles: one row of six controls (name, description, validity, digest, template, remove); one column on a phone. */
+.atl .profile-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) 90px 110px minmax(0,1.2fr) 36px;gap:8px;align-items:center}
+.atl .profile-row .icon-btn{width:36px;min-height:36px}
+@media(max-width:800px){.atl .profile-row{grid-template-columns:minmax(0,1fr) 40px}.atl .profile-row>:not(.icon-btn):not(.sr-only){grid-column:1}}
+/* On a phone the switch and its action go under the title, which keeps the full width as in the mockup. */
+@media(max-width:800px){.atl .page-head:has(.view-switch){flex-wrap:wrap}.atl .page-head:has(.view-switch)>div:first-child,.atl .page-head:has(.view-switch)>.actions{flex-basis:100%}.atl .page-head .actions .view-switch{flex:1;max-width:none;min-height:40px}}
+/* The dock slot of a page whose views draw their own dock: no box, the dock inside lays out as the mockup's #inspector. */
+.atl .dock-slot{display:contents}

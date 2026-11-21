@@ -42,7 +42,7 @@ vi.mock('../../../components/ui/ToggleSwitch', () => ({
   ),
 }))
 
-import ScepProfilesTab from '../ScepProfilesTab'
+import ScepProfileForm from '../ScepProfileForm'
 
 const CAS = [{ id: 3, refid: 'ca-3', descr: 'Issuing CA' }]
 const APPS = [
@@ -50,7 +50,9 @@ const APPS = [
   { id: 8, name: 'Lab Intune', tenant_id: 'lab.onmicrosoft.com' },
 ]
 
-describe('ScepProfilesTab picks an Intune app registration', () => {
+const onClose = vi.fn()
+
+describe('ScepProfileForm picks an Intune app registration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.getIntuneApps.mockResolvedValue({ data: APPS })
@@ -60,9 +62,7 @@ describe('ScepProfilesTab picks an Intune app registration', () => {
 
   it('offers the registrations, no test button, and submits the chosen id, never the credentials', async () => {
     const onManage = vi.fn()
-    render(<ScepProfilesTab profiles={[]} cas={CAS} templates={[]} canWrite
-                            onChanged={vi.fn()} onManageIntuneApps={onManage} />)
-    fireEvent.click(screen.getByText('scep.newProfile'))
+    render(<ScepProfileForm profile={null} cas={CAS} templates={[]} onClose={onClose} onSaved={vi.fn()} onManageIntuneApps={onManage} />)
     await screen.findByRole('dialog')
     await waitFor(() => expect(mocks.getIntuneApps).toHaveBeenCalled())
 
@@ -88,8 +88,7 @@ describe('ScepProfilesTab picks an Intune app registration', () => {
   })
 
   it('a profile with Intune off sends no registration', async () => {
-    render(<ScepProfilesTab profiles={[]} cas={CAS} templates={[]} canWrite onChanged={vi.fn()} />)
-    fireEvent.click(screen.getByText('scep.newProfile'))
+    render(<ScepProfileForm profile={null} cas={CAS} templates={[]} onClose={onClose} onSaved={vi.fn()} />)
     await screen.findByRole('dialog')
     fireEvent.change(screen.getByLabelText('common.name'), { target: { value: 'Static' } })
     fireEvent.change(screen.getByLabelText('common.certificateAuthority'), { target: { value: '3' } })
@@ -100,13 +99,12 @@ describe('ScepProfilesTab picks an Intune app registration', () => {
 
   it('the manage link closes the form and opens the registrations tab', async () => {
     const onManage = vi.fn()
-    render(<ScepProfilesTab profiles={[]} cas={CAS} templates={[]} canWrite
-                            onChanged={vi.fn()} onManageIntuneApps={onManage} />)
-    fireEvent.click(screen.getByText('scep.newProfile'))
+    render(<ScepProfileForm profile={null} cas={CAS} templates={[]} onClose={onClose} onSaved={vi.fn()} onManageIntuneApps={onManage} />)
     await screen.findByRole('dialog')
     fireEvent.click(screen.getByLabelText('scep.intuneEnabled'))
     fireEvent.click(await screen.findByText('scep.manageIntuneApps'))
     expect(onManage).toHaveBeenCalled()
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    // The page closes the form: it asked to be closed
+    expect(onClose).toHaveBeenCalled()
   })
 })

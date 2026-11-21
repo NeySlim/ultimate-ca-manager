@@ -70,13 +70,10 @@ describe.each([
     expect(handlers.onEdit).not.toHaveBeenCalled()
   })
 
-  it('leaves the actions out of the columns, which is what the card view drops', () => {
+  it('keeps the actions in the actions column, before the chevron', () => {
     renderTab()
-    const headers = [...document.querySelectorAll('thead th')]
-    const actionHeader = headers.find(th => th.textContent.trim() === '')
-    expect(actionHeader).toBeTruthy()
-    // rowActions gets a header sized by its content rather than by a share of the
-    // table: that is the class the component gives it.
-    expect(actionHeader.className).toMatch(/whitespace-nowrap/)
+    const actions = document.querySelector('tbody .table-actions')
+    expect(actions).toBeTruthy()
+    for (const label of expected) expect(actions.querySelector(`[title="${label}"]`)).toBeTruthy()
   })
 })
