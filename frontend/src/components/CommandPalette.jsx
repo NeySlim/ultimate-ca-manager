@@ -1,28 +1,17 @@
 /**
- * Command Palette Component - Global search with Cmd+K
+ * Search and navigation (Ctrl K), the mockup's command(): its narrow dialog, a search field, then one
+ * flat list of results (records found on the server, favourites, recent items, pages and actions),
+ * each with its icon, its name and a hint. Arrows move between the field and the results.
  */
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useOpenEntity } from '../hooks/useOpenEntity'
-import * as Dialog from '@radix-ui/react-dialog'
-import {
-  MagnifyingGlass,
-  Certificate,
-  ShieldCheck,
-  FileText,
-  List,
-  User,
-  ArrowRight,
-  Clock,
-  Star,
-  Spinner,
-  Database
-} from '@phosphor-icons/react'
-import { cn } from '../lib/utils'
 import { useTranslation } from 'react-i18next'
+import { AtelierDialog } from './atelier/AtelierDialog'
+import { Icon } from './atelier/Icon'
 import { useAllRecentHistory, useAllFavorites } from '../hooks'
 import { searchService } from '../services'
-import { paletteCommands } from '../navigation/registry'
+import { glyphOf, moduleForPath, paletteCommands } from '../navigation/registry'
 
 const COMMANDS = paletteCommands()
 
@@ -34,7 +23,6 @@ export function CommandPalette({ open, onOpenChange }) {
   const openedInspector = useRef(false)
   const { t } = useTranslation()
   const [search, setSearch] = useState('')
-  const [selectedIndex, setSelectedIndex] = useState(0)
   const [searchResults, setSearchResults] = useState(null)
   const [isSearching, setIsSearching] = useState(false)
   const inputRef = useRef(null)
@@ -43,15 +31,15 @@ export function CommandPalette({ open, onOpenChange }) {
   const { allRecent, refreshHistory } = useAllRecentHistory()
   const { allFavorites, refreshFavorites } = useAllFavorites()
 
-  // Get icon for recent item type
+  // The mockup's icon of a record type
   const getTypeIcon = (type) => {
     switch (type) {
-      case 'certificates': case 'certificate': return Certificate
-      case 'cas': case 'ca': return ShieldCheck
-      case 'users': case 'user': return User
-      case 'csrs': case 'csr': return FileText
-      case 'templates': case 'template': return List
-      default: return Clock
+      case 'certificates': case 'certificate': return 'cert'
+      case 'cas': case 'ca': return 'shield'
+      case 'users': case 'user': return 'users'
+      case 'csrs': case 'csr': return 'file'
+      case 'templates': case 'template': return 'template'
+      default: return 'clock'
     }
   }
   
@@ -91,7 +79,7 @@ export function CommandPalette({ open, onOpenChange }) {
     try {
       const results = await searchService.globalSearch(query, 5)
       setSearchResults(results)
-    } catch (error) {
+    } catch {
       setSearchResults(null)
     } finally {
       setIsSearching(false)
@@ -166,385 +154,92 @@ export function CommandPalette({ open, onOpenChange }) {
     ).slice(0, 5)
   }, [search, allFavorites])
 
-  // Group by category (using translated category key as group key)
-  const groupedCommands = useMemo(() => {
-    const groups = {}
-    filteredCommands.forEach(cmd => {
-      const catLabel = t(cmd.categoryKey)
-      if (!groups[catLabel]) groups[catLabel] = []
-      groups[catLabel].push(cmd)
-    })
-    return groups
-  }, [filteredCommands, t])
-
-  // Reset selection when search changes
-  useEffect(() => {
-    setSelectedIndex(0)
-  }, [search])
-
   // Focus input when opened
   useEffect(() => {
     if (open) {
       setSearch('')
-      setSelectedIndex(0)
       setTimeout(() => inputRef.current?.focus(), 0)
     }
   }, [open])
 
-  // Scroll selected item into view
-  useEffect(() => {
-    if (listRef.current && filteredCommands.length > 0) {
-      const items = listRef.current.querySelectorAll('[data-command-item]')
-      items[selectedIndex]?.scrollIntoView({ block: 'nearest' })
-    }
-  }, [selectedIndex, filteredCommands.length])
-
   const executeCommand = (command) => {
     onOpenChange(false)
     navigate(command.path)
-    // TODO: Handle action parameter for specific actions
   }
 
-  const handleKeyDown = (e) => {
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault()
-        setSelectedIndex(i => Math.min(i + 1, filteredCommands.length - 1))
-        break
-      case 'ArrowUp':
-        e.preventDefault()
-        setSelectedIndex(i => Math.max(i - 1, 0))
-        break
-      case 'Enter':
-        e.preventDefault()
-        if (filteredCommands[selectedIndex]) {
-          executeCommand(filteredCommands[selectedIndex])
-        }
-        break
-      case 'Escape':
-        onOpenChange(false)
-        break
+  // One flat list, in the order of the former sections: records found, favourites, recent items, pages and actions
+  const SEARCHED = [
+    ['certificates', 'certificate', (i) => i.subject || i.status],
+    ['cas', 'ca', (i) => i.subject],
+    ['users', 'user', (i) => i.email || i.role],
+    ['templates', 'template', (i) => i.description],
+    ['csrs', 'csr', (i) => i.subject || i.status],
+  ]
+  const results = [
+    ...SEARCHED.flatMap(([key, type, hint]) => (searchResults?.[key] || []).map(item => ({
+      key: `${type}-${item.id}`, icon: getTypeIcon(type), name: item.name, hint: hint(item) || t(`commandPalette.searchSections.${key === 'cas' ? 'certificateAuthorities' : key}`),
+      run: () => openItem(type, item.id),
+    }))),
+    ...filteredFavorites.map(item => ({
+      key: `fav-${item.type}-${item.id}`, icon: getTypeIcon(item.type), name: item.name, hint: item.subtitle || t('commandPalette.favorites'),
+      run: () => openItem(item.type, item.id),
+    })),
+    ...filteredRecent.map(item => ({
+      key: `recent-${item.type}-${item.id}`, icon: getTypeIcon(item.type), name: item.name, hint: item.subtitle || t('commandPalette.recent'),
+      run: () => openItem(item.type, item.id),
+    })),
+    ...filteredCommands.map(cmd => ({
+      key: `cmd-${cmd.id}`, icon: cmd.action === 'new' || cmd.action === 'upload' ? 'plus' : glyphOf(moduleForPath(cmd.path.split('?')[0])),
+      name: t(cmd.labelKey), hint: t(cmd.categoryKey), run: () => executeCommand(cmd),
+    })),
+  ]
+
+  const resultButtons = () => [...(listRef.current?.querySelectorAll('.command-result') || [])]
+  // The mockup's keys: the down arrow from the field goes to the first result; arrows move between results,
+  // up from the first one back to the field; Enter in the field runs the first result
+  const onKeyDown = (e) => {
+    const buttons = resultButtons()
+    const i = buttons.indexOf(document.activeElement)
+    if (e.key === 'ArrowDown') {
+      if (!buttons.length) return
+      e.preventDefault()
+      buttons[Math.min(i + 1, buttons.length - 1)].focus()
+    } else if (e.key === 'ArrowUp' && i >= 0) {
+      e.preventDefault()
+      if (i === 0) inputRef.current?.focus()
+      else buttons[i - 1].focus()
+    } else if (e.key === 'Enter' && e.target === inputRef.current && results[0]) {
+      e.preventDefault()
+      results[0].run()
     }
   }
 
-  let itemIndex = -1
+  // The control focused before the palette opened (read before the dialog takes the focus)
+  const wasOpen = useRef(false)
+  if (open && !wasOpen.current) { returnTo.current = document.activeElement; openedInspector.current = false }
+  wasOpen.current = open
 
+  if (!open) return null
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-scrim-60 backdrop-blur-sm z-[300]" />
-        <Dialog.Content
-          className="fixed top-[20%] left-1/2 -translate-x-1/2 w-full max-w-lg bg-bg-secondary border border-border rounded-lg shadow-2xl z-[301] overflow-hidden"
-          onKeyDown={handleKeyDown}
-          onOpenAutoFocus={() => { returnTo.current = document.activeElement; openedInspector.current = false }}
-          onCloseAutoFocus={(e) => { if (openedInspector.current) e.preventDefault() }}
-          aria-describedby={undefined}
-        >
-          {/* Search Input */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-            {isSearching ? (
-              <Spinner size={18} className="text-accent-primary animate-spin" />
-            ) : (
-              <MagnifyingGlass size={18} className="text-text-tertiary" />
-            )}
-            <input
-              ref={inputRef}
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder={t('commandPalette.searchPlaceholder')}
-              className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-tertiary outline-none"
-            />
-            <kbd className="px-1.5 py-0.5 text-2xs bg-bg-tertiary border border-border rounded text-text-tertiary">
-              ESC
-            </kbd>
-          </div>
-
-          {/* Commands List */}
-          <div ref={listRef} className="max-h-80 overflow-auto p-2">
-            {/* Database Search Results */}
-            {searchResults && (
-              <>
-                {/* Certificates */}
-                {searchResults.certificates?.length > 0 && (
-                  <div className="mb-2">
-                    <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
-                      <Certificate size={10} />
-                      {t('commandPalette.searchSections.certificates')} ({searchResults.certificates.length})
-                    </div>
-                    {searchResults.certificates.map(item => (
-                      <button
-                        key={`cert-${item.id}`}
-                        onClick={() => {
-                          openItem('certificate', item.id)
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
-                      >
-                        <Certificate size={16} weight="duotone" className="text-accent-primary" />
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm block truncate">{item.name}</span>
-                          <span className="text-2xs text-text-tertiary truncate block">{item.subject}</span>
-                        </div>
-                        <span className={cn(
-                          'text-2xs px-1.5 py-0.5 rounded',
-                          item.status === 'valid' ? 'badge-bg-green' :
-                          item.status === 'expired' ? 'alert-bg-red' :
-                          'badge-bg-amber'
-                        )}>{item.status}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* CAs */}
-                {searchResults.cas?.length > 0 && (
-                  <div className="mb-2">
-                    <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
-                      <ShieldCheck size={10} />
-                      {t('commandPalette.searchSections.certificateAuthorities')} ({searchResults.cas.length})
-                    </div>
-                    {searchResults.cas.map(item => (
-                      <button
-                        key={`ca-${item.id}`}
-                        onClick={() => {
-                          openItem('ca', item.id)
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
-                      >
-                        <ShieldCheck size={16} weight="duotone" className="text-accent-pro" />
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm block truncate">{item.name}</span>
-                          <span className="text-2xs text-text-tertiary truncate block">{item.subject}</span>
-                        </div>
-                        {item.is_root && (
-                          <span className="text-2xs px-1.5 py-0.5 rounded badge-bg-violet">Root</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Users */}
-                {searchResults.users?.length > 0 && (
-                  <div className="mb-2">
-                    <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
-                      <User size={10} />
-                      {t('commandPalette.searchSections.users')} ({searchResults.users.length})
-                    </div>
-                    {searchResults.users.map(item => (
-                      <button
-                        key={`user-${item.id}`}
-                        onClick={() => {
-                          navigate(`/users?selected=${item.id}`)
-                          onOpenChange(false)
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
-                      >
-                        <User size={16} weight="duotone" className="text-status-success" />
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm block truncate">{item.name}</span>
-                          <span className="text-2xs text-text-tertiary truncate block">{item.email}</span>
-                        </div>
-                        <span className="text-2xs px-1.5 py-0.5 rounded bg-bg-tertiary">{item.role}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Templates */}
-                {searchResults.templates?.length > 0 && (
-                  <div className="mb-2">
-                    <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
-                      <List size={10} />
-                      {t('commandPalette.searchSections.templates')} ({searchResults.templates.length})
-                    </div>
-                    {searchResults.templates.map(item => (
-                      <button
-                        key={`tpl-${item.id}`}
-                        onClick={() => {
-                          navigate(`/templates?selected=${item.id}`)
-                          onOpenChange(false)
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
-                      >
-                        <List size={16} weight="duotone" className="text-status-warning" />
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm block truncate">{item.name}</span>
-                          <span className="text-2xs text-text-tertiary truncate block">{item.description}</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* CSRs */}
-                {searchResults.csrs?.length > 0 && (
-                  <div className="mb-2">
-                    <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
-                      <FileText size={10} />
-                      {t('commandPalette.searchSections.csrs')} ({searchResults.csrs.length})
-                    </div>
-                    {searchResults.csrs.map(item => (
-                      <button
-                        key={`csr-${item.id}`}
-                        onClick={() => {
-                          navigate(`/csrs?selected=${item.id}`)
-                          onOpenChange(false)
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
-                      >
-                        <FileText size={16} weight="duotone" className="text-accent-primary" />
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm block truncate">{item.name}</span>
-                          <span className="text-2xs text-text-tertiary truncate block">{item.subject}</span>
-                        </div>
-                        <span className="text-2xs px-1.5 py-0.5 rounded bg-bg-tertiary">{item.status}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* No results message */}
-                {searchResults.certificates?.length === 0 && 
-                 searchResults.cas?.length === 0 && 
-                 searchResults.users?.length === 0 && 
-                 searchResults.templates?.length === 0 && 
-                 searchResults.csrs?.length === 0 && (
-                  <div className="px-3 py-4 text-center text-text-tertiary text-sm">
-                    <Database size={24} className="mx-auto mb-2 opacity-50" />
-                    {t('commandPalette.noResultsInDatabase')}
-                  </div>
-                )}
-
-                {/* Separator */}
-                {(searchResults.certificates?.length > 0 || searchResults.cas?.length > 0 || 
-                  searchResults.users?.length > 0 || searchResults.templates?.length > 0 || 
-                  searchResults.csrs?.length > 0) && filteredCommands.length > 0 && (
-                  <div className="border-t border-border my-2" />
-                )}
-              </>
-            )}
-
-            {/* Favorites Section */}
-            {filteredFavorites.length > 0 && !searchResults && (
-              <div className="mb-2">
-                <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
-                  <Star size={10} weight="fill" className="text-status-warning" />
-                  {t('commandPalette.favorites')}
-                </div>
-                {filteredFavorites.map(item => {
-                  const Icon = getTypeIcon(item.type)
-                  return (
-                    <button
-                      key={`fav-${item.type}-${item.id}`}
-                      onClick={() => {
-                        openItem(item.type, item.id)
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
-                    >
-                      <Icon size={16} weight="duotone" />
-                      <div className="flex-1 min-w-0">
-                        <span className="text-sm block truncate">{item.name}</span>
-                        {item.subtitle && (
-                          <span className="text-2xs text-text-tertiary truncate block">{item.subtitle}</span>
-                        )}
-                      </div>
-                      <Star size={12} weight="fill" className="text-status-warning" />
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-            
-            {/* Recent Items Section */}
-            {filteredRecent.length > 0 && (
-              <div className="mb-2">
-                <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
-                  <Clock size={10} />
-                  {t('commandPalette.recent')}
-                </div>
-                {filteredRecent.map(item => {
-                  const Icon = getTypeIcon(item.type)
-                  return (
-                    <button
-                      key={`recent-${item.type}-${item.id}`}
-                      onClick={() => {
-                        openItem(item.type, item.id)
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
-                    >
-                      <Icon size={16} weight="duotone" />
-                      <div className="flex-1 min-w-0">
-                        <span className="text-sm block truncate">{item.name}</span>
-                        {item.subtitle && (
-                          <span className="text-2xs text-text-tertiary truncate block">{item.subtitle}</span>
-                        )}
-                      </div>
-                      <span className="text-2xs text-text-tertiary capitalize">{item.type}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-            
-            {filteredCommands.length === 0 && filteredRecent.length === 0 && filteredFavorites.length === 0 ? (
-              <div className="px-3 py-8 text-center text-text-tertiary text-sm">
-                {t('commandPalette.noCommandsFound')}
-              </div>
-            ) : (
-              Object.entries(groupedCommands).map(([category, commands]) => (
-                <div key={category} className="mb-2">
-                  <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider">
-                    {category}
-                  </div>
-                  {commands.map(cmd => {
-                    itemIndex++
-                    const currentIndex = itemIndex
-                    const Icon = cmd.icon
-                    return (
-                      <button
-                        key={cmd.id}
-                        data-command-item
-                        onClick={() => executeCommand(cmd)}
-                        onMouseEnter={() => setSelectedIndex(currentIndex)}
-                        className={cn(
-                          "w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors",
-                          currentIndex === selectedIndex
-                            ? "bg-accent-primary-op15 text-accent-primary"
-                            : "text-text-secondary hover:bg-bg-tertiary"
-                        )}
-                      >
-                        <Icon size={16} weight="duotone" />
-                        <span className="flex-1 text-sm">{t(cmd.labelKey)}</span>
-                        {currentIndex === selectedIndex && (
-                          <ArrowRight size={14} className="text-accent-primary" />
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="px-4 py-2 border-t border-border bg-tertiary-op50 flex items-center gap-4 text-2xs text-text-tertiary">
-            <span className="flex items-center gap-1">
-              <kbd className="px-1 py-0.5 bg-bg-tertiary border border-border rounded">↑↓</kbd>
-              {t('commandPalette.navigate')}
-            </span>
-            <span className="flex items-center gap-1">
-              <kbd className="px-1 py-0.5 bg-bg-tertiary border border-border rounded">↵</kbd>
-              {t('commandPalette.select')}
-            </span>
-            <span className="flex items-center gap-1">
-              <kbd className="px-1 py-0.5 bg-bg-tertiary border border-border rounded">esc</kbd>
-              {t('common.close')}
-            </span>
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <AtelierDialog title={t('shell.search')} subtitle={t('commandPalette.subtitle')} size="narrow" testId="command-palette"
+      onClose={() => onOpenChange(false)} skipReturn={() => openedInspector.current}>
+        <label className="command-search">
+          <Icon name="search" />
+          <span className="sr-only">{t('commandPalette.searchLabel')}</span>
+          <input ref={inputRef} id="command-search" type="search" name="command" autoComplete="off" data-autofocus=""
+            placeholder={t('commandPalette.searchPlaceholder')} value={search} onChange={e => setSearch(e.target.value)} onKeyDown={onKeyDown} />
+        </label>
+        <div className="command-results" id="command-results" ref={listRef} aria-busy={isSearching || undefined} onKeyDown={onKeyDown}>
+          {results.map(r => (
+            <button key={r.key} type="button" className="command-result" onClick={r.run}>
+              <Icon name={r.icon} /><span className="name">{r.name}</span>{r.hint && <span className="hint">{r.hint}</span>}
+            </button>
+          ))}
+          {results.length === 0 && !isSearching && (
+            <p className="muted" style={{ padding: 16 }}>{t('commandPalette.noCommandsFound')}</p>
+          )}
+        </div>
+    </AtelierDialog>
   )
 }
 

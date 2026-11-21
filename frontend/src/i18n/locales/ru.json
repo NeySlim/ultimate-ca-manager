@@ -479,12 +479,11 @@
   },
   "commandPalette": {
     "searchPlaceholder": "Поиск команд, сертификатов, ЦС, пользователей...",
+    "searchLabel": "Найти команду или сертификат",
+    "subtitle": "Сертификаты, центры сертификации и навигация по консоли",
     "noCommandsFound": "Команды не найдены",
-    "noResultsInDatabase": "В базе данных ничего не найдено",
     "favorites": "Избранное",
     "recent": "Недавние",
-    "navigate": "Перейти",
-    "select": "Выбрать",
     "searchSections": {
       "certificates": "Сертификаты",
       "certificateAuthorities": "Центры сертификации",
