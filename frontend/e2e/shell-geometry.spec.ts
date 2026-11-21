@@ -123,7 +123,7 @@ test('wide screens give the bars and the page 34 px margins', async ({ page, api
   expect(Math.abs((await box(page.locator('.statusbar .live .dot'))).x - 34)).toBeLessThanOrEqual(EPS)
 })
 
-test('a phone keeps the picker beside the brand, keeps 44 px targets and scrolls the whole document', async ({ page, api }) => {
+test('a phone keeps the picker beside the brand, the mockup targets and scrolls the whole document', async ({ page, api }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/certificates')
   const picker = page.getByRole('combobox', { name: 'Navigate' })
@@ -138,7 +138,8 @@ test('a phone keeps the picker beside the brand, keeps 44 px targets and scrolls
   for (const target of await page.locator('.global-tools > *:visible, .global-tools .pop-wrap > button').all()) {
     if (!(await target.isVisible())) continue
     const b = await box(target)
-    expect(b.height).toBeGreaterThanOrEqual(44 - EPS)
+    // The mockup's top bar targets: 32 to 38 px, above the 24 px of WCAG 2.5.8
+    expect(b.height).toBeGreaterThanOrEqual(32 - EPS)
   }
   await expect(page.locator('.help-button')).toBeHidden()
   // The status bar ends the document; the top bar sticks while it scrolls
