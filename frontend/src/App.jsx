@@ -11,7 +11,6 @@ import { AppShell, ErrorBoundary, LoadingSpinner, SessionWarning, ForcePasswordC
 const LoginPage = lazyWithRetry(() => import('./pages/LoginPage'))
 const ForgotPasswordPage = lazyWithRetry(() => import('./pages/ForgotPasswordPage'))
 const ResetPasswordPage = lazyWithRetry(() => import('./pages/ResetPasswordPage'))
-const DevShowcasePage = lazyWithRetry(() => import('./pages/DevShowcasePage'))
 // The Atelier gabarits drawn with the mockup's records: a development build only (dev server, or `vite build --mode gabarits`)
 const GABARITS = import.meta.env.DEV || import.meta.env.MODE === 'gabarits'
 const GabaritsPage = GABARITS ? lazyWithRetry(() => import('./pages/dev/GabaritsPage')) : null
@@ -139,8 +138,7 @@ export function AppRoutes() {
         
         <Route element={<AppShell />}>
           {moduleRoutes()}
-          {/* Component showcase: accessible by URL only, not a module */}
-          <Route path="/dev/components" element={<ProtectedRoute><DevShowcasePage /></ProtectedRoute>} />
+          {/* The Atelier gabarits: accessible by URL only, not a module */}
           {GabaritsPage && <Route path="/dev/gabarits" element={<ProtectedRoute><GabaritsPage /></ProtectedRoute>} />}
         </Route>
         

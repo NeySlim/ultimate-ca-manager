@@ -9,11 +9,6 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key) => key }),
 }))
 
-vi.mock('../ui/Select', () => ({
-  Select: ({ options = [] }) => (
-    <select>{options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
-  ),
-}))
 
 vi.mock('../Modal', () => ({
   Modal: ({ open, children }) => (open ? <div>{children}</div> : null),

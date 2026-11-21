@@ -1,52 +1,26 @@
 /**
- * Settings Page - Horizontal tabs for desktop, scrollable for mobile
- * Uses DetailCard design system
+ * Settings page, on the mockup's sectioned form (settingsView()): the table of contents, the
+ * stacked section frames, then the save bar.
  */
 import { withoutAdminOnly } from './settings/adminOnlySettings'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
-import ReactMarkdown from 'react-markdown'
-import { 
-  Database, ListBullets, FloppyDisk, 
-  Envelope, Download, Trash, HardDrives, Lock, Palette, Sun, Moon, Desktop, Info,
-  Timer, Clock, WarningCircle, UploadSimple, Certificate, Eye, ArrowsClockwise, Rocket,
-  Plus, PencilSimple, TestTube, Lightning, Globe, Shield, CheckCircle, XCircle, MagnifyingGlass,
-  Bell, Copy, Power, ArrowClockwise, LockKey, Warning, User, GithubLogo,
-  Plugs, UsersThree, UserPlus, TreeStructure, CaretDown, Play,
-  WindowsLogo, ClockClockwise, IdentificationBadge, CloudArrowUp,
-  SlidersHorizontal, PaperPlaneTilt, Archive,
-} from '@phosphor-icons/react'
-import {
-  Button, Input, Select, Textarea, Card, EmptyState, ConfirmModal,
-  LoadingSpinner, FileUpload, Modal, HelpCard, Logo,
-  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
-  CompactSection,
-  UpdateChecker, ServiceReconnectOverlay
-} from '../components'
+import { ListBullets, Download, HardDrives, Lock, Palette, Info, Timer, WarningCircle, Certificate, Eye, Rocket, CheckCircle, Bell, LockKey, UsersThree, WindowsLogo, ClockClockwise, IdentificationBadge, CloudArrowUp, SlidersHorizontal, PaperPlaneTilt, Archive } from '@phosphor-icons/react'
+import { Button, Input, ConfirmModal, LoadingSpinner, Modal, ServiceReconnectOverlay } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
 import CertificatePickerModal from '../components/CertificatePickerModal'
-import CertificateInput from '../components/CertificateInput'
-import LanguageSelector from '../components/ui/LanguageSelector'
 import { settingsService, systemService, casService, ssoService, mtlsService, mscaService, auditService } from '../services'
 import { holdSignOut } from '../services/apiClient'
 import { useAuth, useNotification, useMobile } from '../contexts'
 import { useServiceReconnect } from '../hooks'
 import { usePermission, useJob, isTransientError, jobPercent } from '../hooks'
 import { acceptedJob } from '../services/jobs.service'
-import { formatDate , downloadBlob} from '../lib/utils'
-import {  } from '../contexts/ThemeContext'
-import {  } from '../components/ui/ToggleSwitch'
-import TagsInput from '../components/ui/TagsInput'
-import EmailTemplateWindow from '../components/EmailTemplateWindow'
-import DatabaseBackendSection from './settings/DatabaseBackendSection'
-import ServiceStatusWidget from './settings/ServiceStatusWidget'
+import { formatDate, downloadBlob } from '../lib/utils'
 import AboutSection from './settings/AboutSection'
 import { expiryCheckOutcome } from './settings/expiryCheck'
 import { addCtLogUrl, removeCtLogUrl } from './settings/ctLogUrls'
 import AppearanceSettings from './settings/AppearanceSettings'
-import CopyableUrl from './settings/CopyableUrl'
-import MappingEditor from './settings/MappingEditor'
 import SsoProviderForm from './settings/SsoProviderForm'
 import WebhookForm from './settings/WebhookForm'
 import MscaConnectionForm from './settings/MscaConnectionForm'
@@ -150,14 +124,6 @@ const bulkKeys = (draft, saved) => [...new Set([...Object.keys(saved || {}), ...
   .filter((k) => !k.startsWith('_') && !EMAIL_KEYS.includes(k) && !EMAIL_STATE_KEYS.includes(k))
 const MTLS_KEYS = ['enabled', 'required', 'trusted_ca_id']
 const pick = (obj, keys) => Object.fromEntries(keys.filter((k) => k in (obj || {})).map((k) => [k, obj[k]]))
-
-// SSO Provider type icons
-const SSO_PROVIDER_ICONS = {
-  ldap: Database,
-  oauth2: Globe,
-  saml: Shield,
-}
-
 
 // Backup password rules, mirrored from the server (services/backup):
 // at least 12 characters, and at least 8 distinct ones, relaxed to 6 for a
@@ -2241,41 +2207,6 @@ export default function SettingsPage() {
         return null
     }
   }
-
-  // Help content for modal
-  const helpContent = (
-    <div className="space-y-4">
-      <HelpCard variant="info" title={t('settings.helpGeneral')}>
-        Configure your UCM instance name, base URL, session timeout, and timezone.
-        These settings affect all users and system behavior.
-      </HelpCard>
-      
-      <HelpCard variant="tip" title={t('settings.helpEmail')}>
-        Configure SMTP settings to enable email notifications for certificate
-        expiration alerts and system events. Test your configuration before saving.
-      </HelpCard>
-
-      <HelpCard variant="warning" title={t('common.securitySettings')}>
-        Security settings like 2FA enforcement and password policies affect all users.
-        Changes take effect immediately - users may need to update their credentials.
-      </HelpCard>
-
-      <HelpCard variant="info" title={t('settings.helpBackup')}>
-        Create encrypted backups of all data including certificates, CAs, users, 
-        and settings. Store backup passwords securely - they cannot be recovered.
-      </HelpCard>
-
-      <HelpCard variant="tip" title={t('settings.helpDatabase')}>
-        Optimize database performance, check integrity, or export data.
-        The danger zone allows complete database reset - use with extreme caution.
-      </HelpCard>
-
-      <HelpCard variant="info" title={t('settings.https')}>
-        Manage the SSL/TLS certificate used by UCM. You can use a certificate
-        from your PKI or generate a self-signed certificate for testing.
-      </HelpCard>
-    </div>
-  )
 
   // Sections in the order of the table of contents (permission-gated ones hidden from other roles)
   const allowed = SETTINGS_CATEGORIES.filter(cat => !cat.permission || [].concat(cat.permission).some(hasPermission))

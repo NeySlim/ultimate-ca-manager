@@ -1,93 +1,23 @@
 /**
- * Components - Centralized exports
- * 
- * Main components: ResponsiveLayout + ResponsiveDataTable
- * Detail panels: CompactHeader, CompactSection, CompactGrid, CompactField, CompactStats
+ * Components imported by name from the folder: the shell's pieces, then the product's own
+ * dialogs and controls still in use.
  */
-
-// Layout
 export { AppShell } from './AppShell'
-export { BottomSheet } from './BottomSheet'
-export { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
-
-// UI Components
-export { Card } from './Card'
-export { Button } from './Button'
-export { Badge, CATypeIcon } from './Badge'
-export { IconBadge, IconAvatar } from './IconBadge'
-export { TreeView } from './TreeView'
-export { SearchBar } from './SearchBar'
-export { Modal } from './Modal'
-export { UpdatePopup } from './UpdatePopup'
-export { KofiSupportCard } from './KofiSupportCard'
-export { Form } from './Form'
-export { FormModal, ConfirmModal } from './FormModal'
-export { MemberTransferModal } from './MemberTransferModal'
-export { Input } from './Input'
-export { SelectComponent as Select } from './Select'
-export { Select as RadixSelect, FilterSelect, FormSelect } from './ui/Select'
-export { MultiSelectFilter } from './ui/MultiSelectFilter'
-export { Textarea } from './Textarea'
-export { DatePicker } from './DatePicker'
-export { FileUpload } from './FileUpload'
-export { Dropdown } from './Dropdown'
-export { ExportActions } from './ExportActions'
-export { ExportModal } from './ExportModal'
-export { TabsComponent as Tabs } from './Tabs'
-export { TooltipComponent as Tooltip, HelpTooltip } from './Tooltip'
-export { HelpCard } from './HelpCard'
-export { StatusIndicator } from './StatusIndicator'
-export { LoadingSpinner } from './LoadingSpinner'
-export { EmptyState } from './EmptyState'
-export { Pagination } from './Pagination'
-export { Logo } from './Logo'
-export { PermissionsDisplay } from './PermissionsDisplay'
 export { ErrorBoundary } from './ErrorBoundary'
-export { KeyIndicator } from './ui/KeyIndicator'
-export { WebSocketIndicator } from './WebSocketIndicator'
-
-// Hooks
-export { useAutoPageSize } from '../hooks/useAutoPageSize'
-
-// Detail Card Components - for slide-over panels
-export { 
-  DetailHeader, 
-  DetailSection, 
-  DetailGrid, 
-  DetailField, 
-  DetailDivider,
-  DetailContent,
-  DetailTabs,
-  CompactSection,
-  CompactGrid,
-  CompactField,
-  CompactStats,
-  CompactActions,
-  CompactHeader
-} from './DetailCard'
-
-export { CertificateLintModal } from './CertificateLintModal'
-export { KeyRecoveryRequestModal } from './KeyRecoveryRequestModal'
-export { TemplatePreviewModal } from './TemplatePreviewModal'
-export { EkuMultiSelect } from './EkuMultiSelect'
-
-// Filter components
-export { FilterPanel, FilterChips, FilterButton } from './FilterPanel'
-export { ActionBar, HeaderBar } from './ActionBar'
-
-// Responsive Components - MAIN BUILDING BLOCKS
-export { ResponsiveLayout, ResponsiveDataTable } from './ui/responsive'
-
-// List template: page head, state tabs, pills, due dates
-export { PageHead, ListButton, StateTabs, StatusPill, SourceLabel, EntityName, RowMark, DueDate } from './list'
-export { MobileCard, SimpleMobileCard } from './ui/MobileCard'
-export { UnifiedPageHeader } from './ui/UnifiedPageHeader'
-export { RichStatsBar } from './ui/RichStatsBar'
-
-export { UpdateChecker } from './UpdateChecker'
-export { ServiceReconnectOverlay } from './ServiceReconnectOverlay'
-export { SafeModeOverlay } from './SafeModeOverlay'
+export { LoadingSpinner } from './LoadingSpinner'
 export { SessionWarning } from './SessionWarning'
 export { ForcePasswordChange } from './ForcePasswordChange'
 export { ForceEnroll2FA } from './ForceEnroll2FA'
+export { SafeModeOverlay } from './SafeModeOverlay'
 export { InspectorCloseOnNavigate } from './inspector/InspectorCloseOnNavigate'
+export { ServiceReconnectOverlay } from './ServiceReconnectOverlay'
+
+export { Button } from './Button'
+export { Badge } from './Badge'
+export { Input } from './Input'
+export { EmptyState } from './EmptyState'
+export { Modal } from './Modal'
+export { ConfirmModal } from './FormModal'
+export { MemberTransferModal } from './MemberTransferModal'
+export { TemplatePreviewModal } from './TemplatePreviewModal'
+export { EkuMultiSelect } from './EkuMultiSelect'

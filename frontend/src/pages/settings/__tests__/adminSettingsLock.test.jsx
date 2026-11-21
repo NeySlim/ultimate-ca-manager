@@ -31,11 +31,6 @@ vi.mock('../../../components', () => ({
   DetailContent: ({ children }) => <div>{children}</div>,
 }))
 
-vi.mock('../../../components/ui/ToggleSwitch', () => ({
-  ToggleSwitch: ({ label, checked, disabled }) => (
-    <button type="button" role="switch" aria-label={label} aria-checked={checked} disabled={disabled} />
-  ),
-}))
 vi.mock('../../../contexts', () => ({ useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn() }) }))
 vi.mock('../../../services', () => ({
   certificatesService: { getAll: vi.fn() },

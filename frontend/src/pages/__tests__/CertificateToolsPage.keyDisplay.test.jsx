@@ -29,9 +29,6 @@ vi.mock('../../contexts', () => ({
   useMobile: () => ({ isMobile: false, isTablet: false, isDesktop: true }),
 }))
 vi.mock('../../hooks', () => ({ useClipboard: () => ({ copy: vi.fn() }) }))
-vi.mock('../../components/ui/responsive', () => ({
-  ResponsiveLayout: ({ children }) => <div>{children}</div>,
-}))
 
 const decoded = vi.hoisted(() => ({ data: null }))
 vi.mock('../../services', () => ({

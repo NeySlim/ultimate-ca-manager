@@ -12,7 +12,6 @@ vi.mock('react-i18next', () => ({
 import { Input } from '../Input'
 import { Textarea } from '../Textarea'
 import { SelectComponent } from '../Select'
-import { Select as UiSelect } from '../ui/Select'
 
 describe('Atelier fields', () => {
   it('Input: the error is at the field, linked to it, and replaces the hint', () => {
@@ -51,13 +50,5 @@ describe('Atelier fields', () => {
     const trigger = screen.getByRole('combobox')
     expect(trigger.className).toContain('ui-select-trigger')
     expect(trigger).toHaveAttribute('aria-invalid', 'true')
-  })
-
-  it('ui/Select: only the form variant takes the field geometry, filters keep theirs', () => {
-    const { unmount } = render(<UiSelect label="Kind" options={[{ value: 'a', label: 'A' }]} />)
-    expect(screen.getByRole('combobox').className).toContain('ui-select-trigger')
-    unmount()
-    render(<UiSelect variant="filter" options={[{ value: 'a', label: 'A' }]} />)
-    expect(screen.getByRole('combobox').className).not.toContain('ui-select-trigger')
   })
 })
