@@ -1860,7 +1860,7 @@ Lines are shown newest first, and every filter is applied on the server, so a fi
 
 ## Sources
 
-**Source** and **Component** live in the Filters panel: pick the log, then narrow it to one subsystem.
+**Source** and **Component** live in the **Filters** dialog: pick the log, then narrow it to one subsystem. Each filter chosen shows under the toolbar, and its cross removes it.
 
 - **Application**: UCM's own log. This is the only source with components.
 - **Access**: the gunicorn access log, holding HTTP requests and status codes. Native installs only.
@@ -1899,7 +1899,7 @@ Polls every five seconds. It clears the date window, which asks the opposite que
 
 ## Copy
 
-**Copy all** takes every line on screen. Tick the box beside any line and it becomes **Copy selected**. Both copy a line the way the file writes it: time, component, level, message. What lands on the clipboard reads as a log, and pasting it back into this page parses as one.
+**Copy all**, in the page head, takes every line on screen. Tick the box beside any line and the selection bar offers **Copy selected**. Both copy a line the way the file writes it: time, component, level, message. What lands on the clipboard reads as a log, and pasting it back into this page parses as one.
 
 ## Reading the footer
 
@@ -3616,8 +3616,8 @@ Malformed values are rejected with an error naming the accepted formats.
 
 UCM generates a POSIX shell script that automatically configures your server:
 
-1. Open the CA detail panel
-2. Click **Download Setup Script**
+1. Open the CA, then its **Quick Install** tab
+2. Click **Download .sh (Linux/macOS)**
 3. Transfer the script to your server
 4. Run it:
 

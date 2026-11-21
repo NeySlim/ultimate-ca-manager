@@ -7202,7 +7202,13 @@
     "anyPrincipal": "Tout principal",
     "noPrincipalSignsNothing": "Aucun principal listé : cette AC ne signe rien",
     "keyIdSetByCa": "Identifiant de clé défini par l’AC : principals@nom de l’AC",
-    "keyIdChosenByRequester": "Identifiant de clé choisi par le demandeur"
+    "keyIdChosenByRequester": "Identifiant de clé choisi par le demandeur",
+    "intent": "Les autorités qui signent les certificats SSH des comptes et des hôtes.",
+    "caption": "Autorités de certification SSH. Activez un nom pour ouvrir son détail.",
+    "filterByType": "Filtrer par type",
+    "certTotal": "Certificats signés :",
+    "range": "{{shown}} sur {{count}} AC SSH",
+    "pageRange": "{{start}}–{{end}} sur {{count}} AC SSH"
   },
   "sshCertificates": {
     "title": "Certificats SSH",
@@ -7291,7 +7297,13 @@
     "setupScriptDescription": "Téléchargez un script shell pour configurer votre serveur SSH à faire confiance à cette AC",
     "importCertificate": "Importer un certificat",
     "importCertDescription": "Importer un certificat SSH existant au format OpenSSH",
-    "certificateDataPlaceholder": "Collez les données du certificat SSH"
+    "certificateDataPlaceholder": "Collez les données du certificat SSH",
+    "intent": "Les certificats SSH des comptes et des hôtes, signés par vos autorités.",
+    "caption": "Certificats SSH. Activez un nom pour ouvrir son détail.",
+    "filterByState": "Filtrer par état",
+    "searchLabel": "Identifiant de clé, principal, numéro…",
+    "pageRange": "{{start}}–{{end}} sur {{count}} certificats SSH",
+    "grants": "Principaux et options"
   },
   "filters": {
     "persistEnabled": "Les filtres seront sauvegardés",
@@ -7559,7 +7571,29 @@
     "scanCap": "Seule la partie la plus récente du fichier a été lue",
     "linesOpt": "{{count}} lignes",
     "filters": "Filtres",
-    "exclude": "Exclure"
+    "exclude": "Exclure",
+    "unit_one": "{{count, number}} ligne",
+    "unit_other": "{{count, number}} lignes",
+    "matched_one": "{{count, number}} ligne correspondante",
+    "matched_other": "{{count, number}} lignes correspondantes",
+    "range_one": "{{count, number}} ligne affichée",
+    "range_other": "{{count, number}} lignes affichées",
+    "selected_one": "{{count, number}} ligne sélectionnée",
+    "selected_other": "{{count, number}} lignes sélectionnées",
+    "errorCount": "Erreurs : {{count}}",
+    "warningCount": "Avertissements : {{count}}",
+    "componentCount": "Composants : {{count}}",
+    "following": "En direct : relu toutes les 5 secondes",
+    "regionLabel": "Tableau : journaux système",
+    "caption": "Lignes du journal du serveur, la plus récente en premier.",
+    "chipSource": "Source : {{source}}",
+    "chipComponent": "Composant : {{component}}",
+    "chipFrom": "Du {{date}}",
+    "chipTo": "Au {{date}}",
+    "chipExclude": "Sans « {{text}} »",
+    "refresh": "Actualiser le journal",
+    "filtersIntent": "Source, composant, période et exclusion, appliqués par le serveur",
+    "excludeHint": "Les lignes qui contiennent ce texte sont écartées ; du texte simple, pas un motif."
   },
   "chainUsage": {
     "title": "Chaîne encore liée à cette AC",

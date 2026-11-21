@@ -7199,7 +7199,13 @@
     "anyPrincipal": "任意主体",
     "noPrincipalSignsNothing": "未列出任何主体：此 CA 不会签署任何证书",
     "keyIdSetByCa": "密钥 ID 由 CA 设置：principals@CA 名称",
-    "keyIdChosenByRequester": "密钥 ID 由请求者选择"
+    "keyIdChosenByRequester": "密钥 ID 由请求者选择",
+    "intent": "为账户和主机签发 SSH 证书的颁发机构。",
+    "caption": "SSH 证书颁发机构。激活名称以打开其详情。",
+    "filterByType": "按类型筛选",
+    "certTotal": "已签发证书：",
+    "range": "{{shown}} / {{count}} 个 SSH CA",
+    "pageRange": "第 {{start}}–{{end}} 个，共 {{count}} 个 SSH CA"
   },
   "sshCertificates": {
     "title": "SSH 证书",
@@ -7288,7 +7294,13 @@
     "setupScriptDescription": "下载 shell 脚本来配置您的 SSH 服务器信任此 CA",
     "importCertificate": "导入证书",
     "importCertDescription": "导入OpenSSH格式的现有SSH证书",
-    "certificateDataPlaceholder": "粘贴SSH证书数据"
+    "certificateDataPlaceholder": "粘贴SSH证书数据",
+    "intent": "由您的颁发机构签发的账户和主机 SSH 证书。",
+    "caption": "SSH 证书。激活名称以打开其详情。",
+    "filterByState": "按状态筛选",
+    "searchLabel": "密钥 ID、主体、序列号…",
+    "pageRange": "第 {{start}}–{{end}} 个，共 {{count}} 个 SSH 证书",
+    "grants": "主体和选项"
   },
   "filters": {
     "persistEnabled": "筛选器将被保存",
@@ -7556,7 +7568,29 @@
     "scanCap": "仅读取了文件最新的部分",
     "linesOpt": "{{count}} 行",
     "filters": "筛选",
-    "exclude": "排除"
+    "exclude": "排除",
+    "unit_one": "{{count, number}} 行",
+    "unit_other": "{{count, number}} 行",
+    "matched_one": "{{count, number}} 行匹配",
+    "matched_other": "{{count, number}} 行匹配",
+    "range_one": "显示 {{count, number}} 行",
+    "range_other": "显示 {{count, number}} 行",
+    "selected_one": "已选择 {{count, number}} 行",
+    "selected_other": "已选择 {{count, number}} 行",
+    "errorCount": "错误：{{count}}",
+    "warningCount": "警告：{{count}}",
+    "componentCount": "组件：{{count}}",
+    "following": "实时：每 5 秒重新读取",
+    "regionLabel": "表格：系统日志",
+    "caption": "服务器日志行，最新的在前。",
+    "chipSource": "来源：{{source}}",
+    "chipComponent": "组件：{{component}}",
+    "chipFrom": "自 {{date}}",
+    "chipTo": "至 {{date}}",
+    "chipExclude": "排除“{{text}}”",
+    "refresh": "刷新日志",
+    "filtersIntent": "来源、组件、时间范围和排除项，由服务器应用",
+    "excludeHint": "包含此文本的行将被排除；纯文本，不是模式。"
   },
   "chainUsage": {
     "title": "仍链接到此 CA",

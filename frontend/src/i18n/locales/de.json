@@ -7199,7 +7199,13 @@
     "anyPrincipal": "Beliebiger Principal",
     "noPrincipalSignsNothing": "Kein Principal aufgeführt: Diese CA signiert nichts",
     "keyIdSetByCa": "Schlüssel-ID von der CA festgelegt: principals@CA-Name",
-    "keyIdChosenByRequester": "Schlüssel-ID vom Anfragenden gewählt"
+    "keyIdChosenByRequester": "Schlüssel-ID vom Anfragenden gewählt",
+    "intent": "The authorities that sign the SSH certificates of accounts and hosts.",
+    "caption": "SSH certificate authorities. Activate a name to open its detail.",
+    "filterByType": "Filter by type",
+    "certTotal": "Certificates signed:",
+    "range": "{{shown}} of {{count}} SSH CAs",
+    "pageRange": "{{start}}–{{end}} of {{count}} SSH CAs"
   },
   "sshCertificates": {
     "title": "SSH-Zertifikate",
@@ -7288,7 +7294,13 @@
     "setupScriptDescription": "Laden Sie ein Shell-Skript herunter, um Ihren SSH-Server für das Vertrauen in diese CA zu konfigurieren",
     "importCertificate": "Zertifikat importieren",
     "importCertDescription": "Vorhandenes SSH-Zertifikat im OpenSSH-Format importieren",
-    "certificateDataPlaceholder": "SSH-Zertifikatsdaten einfügen"
+    "certificateDataPlaceholder": "SSH-Zertifikatsdaten einfügen",
+    "intent": "The SSH certificates of accounts and hosts, signed by your authorities.",
+    "caption": "SSH certificates. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
+    "searchLabel": "Key ID, principal, serial…",
+    "pageRange": "{{start}}–{{end}} of {{count}} SSH certificates",
+    "grants": "Principals and options"
   },
   "filters": {
     "persistEnabled": "Filter werden gespeichert",
@@ -7556,7 +7568,29 @@
     "scanCap": "Nur der neueste Teil der Datei wurde gelesen",
     "linesOpt": "{{count}} Zeilen",
     "filters": "Filter",
-    "exclude": "Ausschließen"
+    "exclude": "Ausschließen",
+    "unit_one": "{{count, number}} line",
+    "unit_other": "{{count, number}} lines",
+    "matched_one": "{{count, number}} matching line",
+    "matched_other": "{{count, number}} matching lines",
+    "range_one": "{{count, number}} line shown",
+    "range_other": "{{count, number}} lines shown",
+    "selected_one": "{{count, number}} line selected",
+    "selected_other": "{{count, number}} lines selected",
+    "errorCount": "Errors: {{count}}",
+    "warningCount": "Warnings: {{count}}",
+    "componentCount": "Components: {{count}}",
+    "following": "Live: read again every 5 seconds",
+    "regionLabel": "Table: system logs",
+    "caption": "Lines of the server log, newest first.",
+    "chipSource": "Source: {{source}}",
+    "chipComponent": "Component: {{component}}",
+    "chipFrom": "From {{date}}",
+    "chipTo": "To {{date}}",
+    "chipExclude": "Without “{{text}}”",
+    "refresh": "Refresh the log",
+    "filtersIntent": "Source, component, time window and exclusion, applied by the server",
+    "excludeHint": "Lines containing this text are left out; plain text, not a pattern."
   },
   "chainUsage": {
     "title": "Weiterhin mit dieser CA verkettet",

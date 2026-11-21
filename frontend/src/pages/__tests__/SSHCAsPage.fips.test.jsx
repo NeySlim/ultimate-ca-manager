@@ -4,7 +4,6 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
@@ -102,15 +101,9 @@ describe('SSHCAsPage RSA key size', () => {
   })
 
   it('offers no size the server ignored: RSA CAs are 4096-bit', async () => {
-    Element.prototype.hasPointerCapture = Element.prototype.hasPointerCapture || (() => false)
-    Element.prototype.setPointerCapture = Element.prototype.setPointerCapture || (() => {})
-    Element.prototype.releasePointerCapture = Element.prototype.releasePointerCapture || (() => {})
-    Element.prototype.scrollIntoView = Element.prototype.scrollIntoView || (() => {})
-    const user = userEvent.setup()
     const form = await createCa()
-    const trigger = [...form.querySelectorAll('[role="combobox"]')].find(el => el.textContent.includes('Ed25519'))
-    await user.click(trigger)
-    await user.click(await screen.findByRole('option', { name: /^RSA/ }))
+    fireEvent.change(screen.getByLabelText('sshCas.keyAlgorithm'), { target: { value: 'rsa' } })
+    expect(screen.getByLabelText('sshCas.keyAlgorithm').selectedOptions[0].textContent).toBe('RSA 4096')
     expect(screen.queryByText('sshCas.keySize')).toBeNull()
     fireEvent.click(form.querySelector('button[type="submit"]'))
     await waitFor(() => expect(create).toHaveBeenCalled())

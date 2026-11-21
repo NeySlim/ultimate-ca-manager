@@ -1,26 +1,21 @@
 /**
- * SSHCertificatesPage - SSH Certificate management
- * Pattern: ResponsiveLayout + ResponsiveDataTable + Modal actions
- *
- * CRUD + Issue page for SSH certificates (sign public key or generate key pair)
+ * Certificats SSH: the mockup's ssh module, a simplePage() list (Type, Principaux, Expiration,
+ * Autorité, État) with its one-object dock, on the server's pages of SSH certificates. What the
+ * product has more (state chips with the server's counts, type and CA filters, server sort and
+ * pages, issue by signing a key or generating a pair, import, export, revocation and removal)
+ * takes the mockup's chips, toolbar, sortable headers, footer, dock actions and form dialogs.
  */
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  Certificate, Key, Terminal, User, ShieldCheck,
-  Plus, Trash, Warning, Download, Copy, Upload,
-  Clock, CheckCircle, XCircle,
-  CaretDown, CaretUp, Info
-} from '@phosphor-icons/react'
-import {
-  ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Input, Select, Textarea,
-  CompactSection, CompactGrid, CompactField, CompactHeader
-} from '../components'
+  Zone, Icon, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody,
+  Section, Props, EmptyBlock, NoMatch, Input, Select, Textarea, ChoiceField, AtelierDialog, Notice,
+} from '../components/atelier'
 import { sshCertificatesService, sshCasService } from '../services'
-import { useNotification, useMobile } from '../contexts'
+import { useNotification } from '../contexts'
 import { usePermission, useWebSocket, useClipboard, usePersistedState } from '../hooks'
-import { formatDate , downloadBlob} from '../lib/utils'
+import { formatDate, downloadBlob } from '../lib/utils'
 import { sanitizeDownloadName } from '../lib/filename'
 import { SSH_EDDSA_KEY_TYPES, SSH_FIPS_DEFAULT_KEY_TYPE, sshEddsaRefused, sshKeyOptions, useKeyPlatform } from '../lib/policyAlgorithms'
 
@@ -51,23 +46,27 @@ const DEFAULT_EXTENSIONS = [
   'permit-user-rc',
 ]
 
+// The columns the server sorts (the others ask nothing of it)
+const SORTS = { name: 'key_id', type: 'cert_type', expires: 'valid_to' }
+
 // ============= STATUS HELPER =============
 
 function getStatus(cert, t) {
-  if (cert.revoked || cert.status === 'revoked') return { key: 'revoked', label: t('sshCertificates.statusRevoked'), variant: 'danger', icon: XCircle }
-  if (cert.status === 'expired') return { key: 'expired', label: t('sshCertificates.statusExpired'), variant: 'warning', icon: Clock }
+  if (cert.revoked || cert.status === 'revoked') return { key: 'revoked', label: t('sshCertificates.statusRevoked'), tone: 'bad', icon: 'block' }
+  if (cert.status === 'expired') return { key: 'expired', label: t('sshCertificates.statusExpired'), tone: 'warn', icon: 'clock' }
   if (cert.valid_to) {
     const validTo = new Date(cert.valid_to).getTime()
-    if (!isNaN(validTo) && Date.now() > validTo) return { key: 'expired', label: t('sshCertificates.statusExpired'), variant: 'warning', icon: Clock }
+    if (!isNaN(validTo) && Date.now() > validTo) return { key: 'expired', label: t('sshCertificates.statusExpired'), tone: 'warn', icon: 'clock' }
   }
-  return { key: 'valid', label: t('sshCertificates.statusValid'), variant: 'success', icon: CheckCircle }
+  return { key: 'valid', label: t('sshCertificates.statusValid'), tone: 'good', icon: 'check' }
 }
+
+const listOf = (value) => (Array.isArray(value) ? value : value ? String(value).split(',') : []).map((v) => String(v).trim()).filter(Boolean)
 
 // ============= MAIN COMPONENT =============
 
 export default function SSHCertificatesPage() {
   const { t } = useTranslation()
-  const { isMobile } = useMobile()
   const navigate = useNavigate()
   const { id: urlCertId } = useParams()
   const { showSuccess, showError, showConfirm } = useNotification()
@@ -77,53 +76,40 @@ export default function SSHCertificatesPage() {
   const { copy: clipboardCopy } = useClipboard()
   const { muteToasts } = useWebSocket()
 
-  // Data
   const [certificates, setCertificates] = useState([])
   const [cas, setCas] = useState([])
   const [loading, setLoading] = useState(true)
   const [certStats, setCertStats] = useState({ valid: 0, expired: 0, revoked: 0, total: 0 })
-
-  // Selection
   const [selectedCert, setSelectedCert] = useState(null)
+  const [section, setSection] = useState('overview')
 
-  // Modals
-  const [showIssueModal, setShowIssueModal] = useState(false)
-  const [showRevokeModal, setShowRevokeModal] = useState(false)
+  const [dialog, setDialog] = useState(null)
   const [revokingCert, setRevokingCert] = useState(null)
-  const [showImportModal, setShowImportModal] = useState(false)
   const [importCertData, setImportCertData] = useState('')
 
-  // Pagination & Sort
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(25)
   const [total, setTotal] = useState(0)
   const [sortBy, setSortBy] = useState('id')
   const [sortOrder, setSortOrder] = useState('desc')
 
-  // Filters
-  const [filterStatus, setFilterStatus] = usePersistedState('ucm-filter-ssh-certs-status', [])
-  const [filterType, setFilterType] = usePersistedState('ucm-filter-ssh-certs-type', [])
-  const [filterCA, setFilterCA] = usePersistedState('ucm-filter-ssh-certs-ca', [])
+  const [filterStatus, setFilterStatus] = usePersistedState('ucm-ssh-certs-state', '')
+  const [filterType, setFilterType] = usePersistedState('ucm-ssh-certs-type', '')
+  const [filterCA, setFilterCA] = usePersistedState('ucm-ssh-certs-ca', '')
   const [searchValue, setSearchValue] = useState('')
 
   // ============= DATA LOADING =============
 
   const requestSeq = useRef(0)
   const loadData = useCallback(async () => {
-    // A reload started earlier must not overwrite a later one (filter changed
-    // while an action's reload was in flight)
+    // A reload started earlier must not overwrite a later one
     const seq = ++requestSeq.current
     try {
       setLoading(true)
-      const params = {
-        page,
-        per_page: perPage,
-        sort_by: sortBy,
-        sort_order: sortOrder,
-      }
-      if (filterStatus.length > 0) params.status = filterStatus
-      if (filterType.length > 0) params.type = filterType
-      if (filterCA.length > 0) params.ca_id = filterCA
+      const params = { page, per_page: perPage, sort_by: sortBy, sort_order: sortOrder }
+      if (filterStatus) params.status = [filterStatus]
+      if (filterType) params.type = [filterType]
+      if (filterCA) params.ca_id = [filterCA]
       if (searchValue) params.search = searchValue
 
       const [certsRes, casRes, statsRes] = await Promise.all([
@@ -147,53 +133,21 @@ export default function SSHCertificatesPage() {
     } finally {
       if (seq === requestSeq.current) setLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, perPage, sortBy, sortOrder, JSON.stringify(filterStatus), JSON.stringify(filterType), JSON.stringify(filterCA), searchValue, canListSshCas, showError, t])
+  }, [page, perPage, sortBy, sortOrder, filterStatus, filterType, filterCA, searchValue, canListSshCas, showError, t])
 
-  useEffect(() => {
-    loadData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadData])
+  useEffect(() => { loadData() }, [loadData])
 
-  // No 'ucm:data-changed' listener here: nothing dispatches an SSH type, SSH
-  // certificates are never opened in a floating detail window, and the page's
-  // own actions call loadData() directly. Listening for 'certificate' instead
-  // would reload this list on unrelated X.509 events.
-
-  // Deep-link URL handling
+  // Deep link: /ssh/certificates/:id opens that certificate once the page holds it
   useEffect(() => {
     if (urlCertId && !loading && certificates.length > 0) {
       const id = parseInt(urlCertId, 10)
       if (!isNaN(id)) {
-        const found = certificates.find(c => c.id === id)
+        const found = certificates.find((c) => c.id === id)
         if (found) setSelectedCert(found)
-        navigate('/ssh-certificates', { replace: true })
+        navigate('/ssh/certificates', { replace: true })
       }
     }
-  }, [urlCertId, loading, certificates.length])
-
-  // ============= STATS =============
-
-  const stats = useMemo(() => [
-    { icon: CheckCircle, label: t('sshCertificates.stats.active'), value: certStats.valid || 0, variant: 'success', filterValue: 'valid' },
-    { icon: Clock, label: t('sshCertificates.stats.expired'), value: certStats.expired || 0, variant: 'warning', filterValue: 'expired' },
-    { icon: XCircle, label: t('sshCertificates.stats.revoked'), value: certStats.revoked || 0, variant: 'danger', filterValue: 'revoked' },
-    { icon: Certificate, label: t('sshCertificates.stats.total'), value: certStats.total || 0, variant: 'primary', filterValue: '' },
-  ], [certStats, t])
-
-  const handleStatClick = useCallback((filterValue) => {
-    setPage(1)
-    if (filterValue === '') {
-      setFilterStatus([])
-    } else {
-      setFilterStatus(prev => {
-        if (prev.includes(filterValue)) {
-          return prev.filter(v => v !== filterValue)
-        }
-        return [...prev, filterValue]
-      })
-    }
-  }, [])
+  }, [urlCertId, loading, certificates.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ============= ACTIONS =============
 
@@ -205,11 +159,10 @@ export default function SSHCertificatesPage() {
       setSelectedCert(cert)
     }
   }, [])
+  const openCert = (cert) => { if (selectedCert?.id !== cert.id) setSection('overview'); handleSelectCert(cert) }
 
-  const handleRevoke = useCallback((cert) => {
-    setRevokingCert(cert)
-    setShowRevokeModal(true)
-  }, [])
+  const handleRevoke = (cert) => { setRevokingCert(cert); setDialog('revoke') }
+  const closeRevoke = () => { setDialog(null); setRevokingCert(null) }
 
   const handleRevokeSubmit = async (reason) => {
     if (!revokingCert) return
@@ -222,12 +175,11 @@ export default function SSHCertificatesPage() {
         ? t('messages.success.revoke.sshCertificate')
         : (res.data.revoked_by || []).length > 1
           ? t('sshCertificates.revokedWithKeyIdAndSerials', { keyId: revokingCert.key_id })
-        : revokingCert.serial
-          ? t('sshCertificates.revokedWithShared', { serial: revokingCert.serial })
-          : t('sshCertificates.revokedWithKeyId', { keyId: revokingCert.key_id }))
-      setShowRevokeModal(false)
-      setRevokingCert(null)
+          : revokingCert.serial
+            ? t('sshCertificates.revokedWithShared', { serial: revokingCert.serial })
+            : t('sshCertificates.revokedWithKeyId', { keyId: revokingCert.key_id }))
       if (selectedCert?.id === revokingCert.id) setSelectedCert(null)
+      closeRevoke()
       loadData()
     } catch (error) {
       showError(error.message || t('common.operationFailed'))
@@ -236,9 +188,7 @@ export default function SSHCertificatesPage() {
 
   const handleDelete = async (cert) => {
     const confirmed = await showConfirm(t('sshCertificates.deleteConfirm'), {
-      title: t('sshCertificates.deleteCertificate'),
-      confirmText: t('common.delete'),
-      variant: 'danger',
+      title: t('sshCertificates.deleteCertificate'), confirmText: t('common.delete'), variant: 'danger',
     })
     if (!confirmed) return
     try {
@@ -256,32 +206,26 @@ export default function SSHCertificatesPage() {
     try {
       const res = await sshCertificatesService.export(cert.id)
       const text = typeof res === 'string' ? res : (res.data?.certificate || res.data || JSON.stringify(res))
-      const blob = new Blob([text], { type: 'text/plain' })
-      downloadBlob(blob, sanitizeDownloadName(cert.key_id || t('sshCertificates.export.filename'), '-cert.pub'))
+      downloadBlob(new Blob([text], { type: 'text/plain' }), sanitizeDownloadName(cert.key_id || t('sshCertificates.export.filename'), '-cert.pub'))
       showSuccess(t('sshCertificates.export.success'))
     } catch (error) {
       showError(error.message || t('common.operationFailed'))
     }
   }
 
-  const handleCopyText = useCallback((text) => {
+  const handleCopyText = (text) => {
     clipboardCopy(text)
     showSuccess(t('common.copied'))
-  }, [clipboardCopy, showSuccess, t])
+  }
 
   const handleIssueSubmit = async (data) => {
     try {
       muteToasts()
       const { mode, ...payload } = data
-      let res
-      if (mode === 'generate') {
-        res = await sshCertificatesService.generate(payload)
-      } else {
-        res = await sshCertificatesService.sign(payload)
-      }
+      const res = mode === 'generate' ? await sshCertificatesService.generate(payload) : await sshCertificatesService.sign(payload)
       showSuccess(t('messages.success.create.sshCertificate'))
       loadData()
-      // Behind the modal, which shows a generated key only once
+      // Behind the dialog, which shows a generated key only once
       if (res?.data?.id) handleSelectCert(res.data)
       return res
     } catch (error) {
@@ -290,18 +234,15 @@ export default function SSHCertificatesPage() {
     }
   }
 
+  const closeImport = () => { setDialog(null); setImportCertData('') }
   const handleImportCert = async (e) => {
     e.preventDefault()
     const formData = new FormData(e.target)
     try {
       muteToasts()
-      const response = await sshCertificatesService.importCertificate({
-        certificate: importCertData,
-        descr: formData.get('descr'),
-      })
+      const response = await sshCertificatesService.importCertificate({ certificate: importCertData, descr: formData.get('descr') })
       showSuccess(t('messages.success.create.sshCertificate'))
-      setShowImportModal(false)
-      setImportCertData('')
+      closeImport()
       loadData()
       if (response?.data?.id) handleSelectCert(response.data)
     } catch (error) {
@@ -309,512 +250,176 @@ export default function SSHCertificatesPage() {
     }
   }
 
-  // ============= SORT HANDLER =============
-
-  const handleSortChange = useCallback((newSort) => {
+  // A header click sorts by that column, again reverses it
+  const handleSort = (key) => {
     setPage(1)
-    if (newSort) {
-      setSortBy(newSort.key)
-      setSortOrder(newSort.direction)
-    } else {
-      setSortBy('id')
-      setSortOrder('desc')
-    }
-  }, [])
+    if (sortBy === key) setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'))
+    else { setSortBy(key); setSortOrder('asc') }
+  }
 
-  // ============= FILTER PRESETS =============
+  // ============= LIST =============
 
-  const handleApplyFilterPreset = useCallback((filters) => {
-    setPage(1)
-    setFilterStatus(filters.status ? (Array.isArray(filters.status) ? filters.status : [filters.status]) : [])
-    setFilterType(filters.type ? (Array.isArray(filters.type) ? filters.type : [filters.type]) : [])
-    setFilterCA(filters.ca || '')
-  }, [])
+  const typeLabel = (c) => (c.cert_type === 'host' ? t('sshCertificates.typeHost') : t('sshCertificates.typeUser'))
+  const statusPill = (c) => { const s = getStatus(c, t); return <Pill label={s.label} tone={s.tone} icon={s.icon} /> }
+  const principalsCell = (c) => {
+    const list = listOf(c.principals)
+    if (!list.length) return '—'
+    return list.length > 2 ? `${list.slice(0, 2).join(', ')} +${list.length - 2}` : list.join(', ')
+  }
+  const views = [
+    { id: '', label: t('common.all'), count: certStats.total || 0 },
+    { id: 'valid', label: t('sshCertificates.statusValid'), count: certStats.valid || 0 },
+    { id: 'expired', label: t('sshCertificates.statusExpired'), count: certStats.expired || 0, warn: (certStats.expired || 0) > 0 },
+    { id: 'revoked', label: t('sshCertificates.statusRevoked'), count: certStats.revoked || 0 },
+  ]
+  const narrowed = Boolean(searchValue || filterStatus || filterType || filterCA)
+  const pages = Math.max(1, Math.ceil(total / perPage))
+  const issue = canWrite('ssh') ? { label: t('sshCertificates.issueCertificate'), icon: 'plus', onClick: () => setDialog('issue'), primary: true } : undefined
+  const changeFilter = (set) => (v) => { set(v); setPage(1) }
 
-  // ============= COLUMNS =============
+  const open = selectedCert
+  const openStatus = open && getStatus(open, t)
+  const criticalOptions = open?.critical_options && typeof open.critical_options === 'object' ? Object.entries(open.critical_options) : []
+  const extensions = open ? (Array.isArray(open.extensions) ? open.extensions : open.extensions ? Object.keys(open.extensions) : []) : []
 
-  const columns = useMemo(() => [
-    {
-      key: 'key_id',
-      header: t('sshCertificates.keyId'),
-      priority: 1,
-      sortable: true,
-      render: (val, row) => {
-        const status = getStatus(row, t)
-        return (
-          <div className="flex items-center gap-2">
-            <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-              row.cert_type === 'host' ? 'icon-bg-violet' : 'icon-bg-blue'
-            }`}>
-              {row.cert_type === 'host'
-                ? <Terminal size={14} weight="duotone" />
-                : <User size={14} weight="duotone" />}
-            </div>
-            <span className="font-medium truncate">{val || t('common.unnamed')}</span>
-            {row.serial_shared_with?.length > 0 && (
-              <Badge variant="warning" size="sm" icon={Warning}>{t('sshCertificates.serialShared')}</Badge>
-            )}
-          </div>
-        )
-      },
-      mobileRender: (val, row) => {
-        const status = getStatus(row, t)
-        return (
-          <div className="flex items-center justify-between gap-2 w-full">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-                row.cert_type === 'host' ? 'icon-bg-violet' : 'icon-bg-blue'
-              }`}>
-                {row.cert_type === 'host'
-                  ? <Terminal size={14} weight="duotone" />
-                  : <User size={14} weight="duotone" />}
-              </div>
-              <span className="font-medium truncate">{val || t('common.unnamed')}</span>
-            </div>
-            <Badge variant={status.variant} size="sm" dot>
-              {status.label}
-            </Badge>
-          </div>
-        )
-      },
-    },
-    {
-      key: 'cert_type',
-      header: t('sshCertificates.certType'),
-      priority: 2,
-      sortable: true,
-      hideOnMobile: true,
-      render: (val) => (
-        <Badge
-          variant={val === 'host' ? 'violet' : 'cyan'}
-          size="sm"
-          icon={val === 'host' ? Terminal : User}
-        >
-          {val === 'host' ? t('sshCertificates.typeHost') : t('sshCertificates.typeUser')}
-        </Badge>
-      ),
-    },
-    {
-      key: 'principals',
-      header: t('sshCertificates.principals'),
-      priority: 3,
-      // Not in the server's sort list: a click would change nothing
-      sortable: false,
-      hideOnMobile: true,
-      render: (val) => {
-        const principals = Array.isArray(val) ? val : (val ? String(val).split(',') : [])
-        if (principals.length === 0) return <span className="text-xs text-text-tertiary">—</span>
-        return (
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-text-secondary truncate max-w-[160px]">
-              {principals.slice(0, 2).join(', ')}
-            </span>
-            {principals.length > 2 && (
-              <Badge variant="secondary" size="sm">+{principals.length - 2}</Badge>
-            )}
-          </div>
-        )
-      },
-    },
-    {
-      key: 'valid_to',
-      header: t('sshCertificates.validTo'),
-      priority: 4,
-      sortable: true,
-      hideOnMobile: true,
-      render: (val, row) => {
-        const status = getStatus(row, t)
-        return (
-          <span className={`text-xs whitespace-nowrap ${
-            status.key === 'expired' ? 'text-status-warning' : 'text-text-secondary'
-          }`}>
-            {val ? formatDate(val) : '—'}
-          </span>
-        )
-      },
-    },
-    {
-      key: 'status_display',
-      header: t('common.status'),
-      priority: 2,
-      sortable: false,
-      hideOnMobile: true,
-      render: (_, row) => {
-        const status = getStatus(row, t)
-        const Icon = status.icon
-        return (
-          <Badge variant={status.variant} size="sm" icon={Icon} dot pulse={status.key === 'valid'}>
-            {status.label}
-          </Badge>
-        )
-      },
-    },
-    {
-      key: 'ca_name',
-      header: t('sshCertificates.caName'),
-      priority: 5,
-      sortable: false,
-      hideOnMobile: true,
-      render: (val) => (
-        <span className="text-xs text-text-secondary truncate">
-          {val || '—'}
-        </span>
-      ),
-    },
-  ], [t])
-
-  // ============= ROW ACTIONS =============
-
-  const rowActions = useCallback((row) => {
-    const status = getStatus(row, t)
-    return [
-      { label: t('common.details'), icon: Info, onClick: () => handleSelectCert(row) },
-      { label: t('common.export'), icon: Download, onClick: () => handleExport(row) },
-      ...(canWrite('ssh') && status.key === 'valid' ? [
-        { label: t('sshCertificates.revokeCertificate'), icon: Warning, variant: 'danger', onClick: () => handleRevoke(row) },
-      ] : []),
-      ...(canDelete('ssh') ? [
-        { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDelete(row) },
-      ] : []),
-    ]
-  }, [canWrite, canDelete, t])
-
-  // ============= DETAIL PANEL =============
-
-  const detailContent = selectedCert && (
-    <div className="p-3 space-y-4">
-      <CompactHeader
-        icon={selectedCert.cert_type === 'host' ? Terminal : User}
-        iconClass={selectedCert.cert_type === 'host' ? 'icon-bg-violet' : 'icon-bg-blue'}
-        title={selectedCert.key_id || t('common.unnamed')}
-        subtitle={selectedCert.ca_name || t('sshCertificates.caName')}
-        badge={(() => {
-          const status = getStatus(selectedCert, t)
-          return <Badge variant={status.variant} size="sm" icon={status.icon}>{status.label}</Badge>
-        })()}
-      />
-
-      {/* Actions */}
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" size="sm" variant="secondary" onClick={() => handleExport(selectedCert)}>
-          <Download size={14} /> {t('common.export')}
-        </Button>
-        {canWrite('ssh') && getStatus(selectedCert, t).key === 'valid' && (
-          <Button type="button" size="sm" variant="danger" onClick={() => handleRevoke(selectedCert)}>
-            <Warning size={14} /> {t('sshCertificates.revokeCertificate')}
-          </Button>
-        )}
-        {canDelete('ssh') && (
-          <Button type="button" size="sm" variant="danger" onClick={() => handleDelete(selectedCert)}>
-            <Trash size={14} /> {t('common.delete')}
-          </Button>
-        )}
-      </div>
-
-      {/* Another certificate of the CA holds this serial: the KRL revokes by serial */}
-      {selectedCert.serial_shared_with?.length > 0 && (
-        <div className="p-3 rounded-lg bg-status-warning-op10 border border-status-warning-op30">
-          <div className="flex items-start gap-2 text-status-warning text-xs">
-            <Warning size={16} className="shrink-0" />
-            <span>{t('sshCertificates.serialSharedDetail', { serial: selectedCert.serial })}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Certificate Information */}
-      <CompactSection title={t('sshCertificates.certInformation')} icon={Certificate}>
-        <CompactGrid columns={2}>
-          <CompactField autoIcon="type" label={t('sshCertificates.certType')} value={
-            selectedCert.cert_type === 'host' ? t('sshCertificates.typeHost') : t('sshCertificates.typeUser')
-          } />
-          <CompactField autoIcon="serial" label={t('sshCertificates.serial')} value={selectedCert.serial || '—'} mono copyable />
-          <CompactField autoIcon="key" label={t('sshCertificates.keyId')} value={selectedCert.key_id || '—'} copyable />
-          <CompactField autoIcon="keyType" label={t('common.keyType')} value={selectedCert.key_type || '—'} />
-        </CompactGrid>
-        {selectedCert.fingerprint && (
-          <div className="mt-2">
-            <div className="text-xs text-text-tertiary mb-0.5">{t('sshCertificates.fingerprint')}</div>
-            <div
-              className="font-mono text-2xs text-text-secondary break-all bg-tertiary-op50 p-1.5 rounded cursor-pointer hover:bg-tertiary-op80 transition-colors"
-              onClick={() => handleCopyText(selectedCert.fingerprint)}
-              title={t('common.copy')}
-            >
-              {selectedCert.fingerprint}
-            </div>
-          </div>
-        )}
-      </CompactSection>
-
-      {/* Validity */}
-      <CompactSection title={t('sshCertificates.validityInfo')} icon={Clock}>
-        <CompactGrid columns={2}>
-          <CompactField
-            autoIcon="validFrom"
-            label={t('sshCertificates.validFrom')}
-            value={selectedCert.valid_from ? formatDate(selectedCert.valid_from) : '—'}
-          />
-          <CompactField
-            autoIcon="validUntil"
-            label={t('sshCertificates.validTo')}
-            value={selectedCert.valid_to ? formatDate(selectedCert.valid_to) : '—'}
-          />
-        </CompactGrid>
-      </CompactSection>
-
-      {/* CA Information */}
-      <CompactSection title={t('sshCertificates.caInfo')} icon={ShieldCheck}>
-        <CompactGrid columns={1}>
-          <CompactField autoIcon="ca" label={t('sshCertificates.caName')} value={selectedCert.ca_name || '—'} />
-          {selectedCert.ca_fingerprint && (
-            <CompactField autoIcon="fingerprint" label={t('sshCertificates.caFingerprint')} value={selectedCert.ca_fingerprint} mono copyable />
+  const dock = open && (
+    <Dock label={t('atelier.detailOf', { name: t('sshCertificates.title') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
+      tabs={[{ key: open.id, title: open.key_id || t('common.unnamed'), icon: 'terminal' }]} onClose={() => setSelectedCert(null)}>
+      <DockBody icon="terminal" title={open.key_id || t('common.unnamed')} badge={statusPill(open)}
+        section={section} onSection={setSection} sectionsLabel={t('atelier.sectionsOf', { name: open.key_id || '' })}
+        sections={[['overview', t('atelier.overview')], ['grants', t('sshCertificates.grants')], ['certificate', t('sshCertificates.certificate')]]}
+        actions={<>
+          <Btn icon="download" id="ssh-cert-export" onClick={() => handleExport(open)}>{t('common.export')}</Btn>
+          {canWrite('ssh') && openStatus.key === 'valid' && (
+            <Btn tone="danger" icon="block" id="ssh-cert-revoke" onClick={() => handleRevoke(open)}>{t('sshCertificates.revokeCertificate')}</Btn>
           )}
-        </CompactGrid>
-      </CompactSection>
-
-      {/* Principals */}
-      {(() => {
-        const principals = Array.isArray(selectedCert.principals)
-          ? selectedCert.principals
-          : (selectedCert.principals ? String(selectedCert.principals).split(',') : [])
-        if (principals.length === 0) return null
-        return (
-          <CompactSection title={t('sshCertificates.principals')} icon={User}>
-            <div className="flex flex-wrap gap-1">
-              {principals.map(p => (
-                <Badge key={p} variant="cyan" size="sm">{p.trim()}</Badge>
-              ))}
-            </div>
-          </CompactSection>
-        )
-      })()}
-
-      {/* Extensions */}
-      {(() => {
-        const extensions = Array.isArray(selectedCert.extensions)
-          ? selectedCert.extensions
-          : (selectedCert.extensions ? Object.keys(selectedCert.extensions) : [])
-        if (extensions.length === 0) return null
-        return (
-          <CompactSection title={t('sshCertificates.extensions')} icon={ShieldCheck} collapsible defaultOpen={false}>
-            <div className="flex flex-wrap gap-1">
-              {extensions.map(ext => (
-                <Badge key={ext} variant="emerald" size="sm">{ext}</Badge>
-              ))}
-            </div>
-          </CompactSection>
-        )
-      })()}
-
-      {/* Critical Options */}
-      {(() => {
-        const opts = selectedCert.critical_options
-        if (!opts || (typeof opts === 'object' && Object.keys(opts).length === 0)) return null
-        const entries = typeof opts === 'object' ? Object.entries(opts) : []
-        if (entries.length === 0) return null
-        return (
-          <CompactSection title={t('sshCertificates.criticalOptions')} icon={Warning} collapsible defaultOpen={false}>
-            <CompactGrid columns={1}>
-              {entries.map(([key, value]) => (
-                <CompactField key={key} autoIcon="config" label={key} value={String(value)} mono />
-              ))}
-            </CompactGrid>
-          </CompactSection>
-        )
-      })()}
-
-      {/* Certificate Text */}
-      {selectedCert.certificate && (
-        <CompactSection title={t('sshCertificates.certificateText')} icon={Key} collapsible defaultOpen={false}>
-          <div className="relative">
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="absolute top-1 right-1 z-10"
-              onClick={() => handleCopyText(selectedCert.certificate)}
-            >
-              <Copy size={12} />
-            </Button>
-            <pre className="font-mono text-2xs text-text-secondary break-all bg-tertiary-op50 p-2 rounded overflow-x-auto max-h-48 whitespace-pre-wrap">
-              {selectedCert.certificate}
-            </pre>
+          {canDelete('ssh') && <Btn tone="danger" icon="block" id="ssh-cert-delete" onClick={() => handleDelete(open)}>{t('common.delete')}</Btn>}
+        </>}>
+        {section === 'overview' && (
+          <div className="module-detail">
+            {/* Another certificate of the CA holds this serial: the KRL revokes by serial */}
+            {open.serial_shared_with?.length > 0 && <Notice tone="warn">{t('sshCertificates.serialSharedDetail', { serial: open.serial })}</Notice>}
+            <Section title={t('atelier.properties')}>
+              <Props items={[
+                [t('sshCertificates.certType'), typeLabel(open)],
+                [t('sshCertificates.keyId'), open.key_id || '—'],
+                [t('sshCertificates.serial'), <span key="s" className="mono">{open.serial ?? '—'}</span>],
+                [t('common.keyType'), open.key_type || '—'],
+                [t('sshCertificates.fingerprint'), open.fingerprint ? (
+                  <button key="f" type="button" className="text-link mono" title={t('common.copy')} onClick={() => handleCopyText(open.fingerprint)}>{open.fingerprint}</button>
+                ) : '—'],
+                [t('sshCertificates.validFrom'), open.valid_from ? formatDate(open.valid_from) : '—'],
+                [t('sshCertificates.validTo'), open.valid_to ? formatDate(open.valid_to) : '—'],
+                [t('atelier.state'), statusPill(open)],
+              ]} />
+            </Section>
+            <Section title={t('sshCertificates.caInfo')}>
+              <Props items={[
+                [t('sshCertificates.caName'), open.ca_name || '—'],
+                open.ca_fingerprint && [t('sshCertificates.caFingerprint'), <span key="cf" className="mono">{open.ca_fingerprint}</span>],
+              ]} />
+            </Section>
           </div>
-        </CompactSection>
-      )}
-    </div>
+        )}
+        {section === 'grants' && (
+          <div className="module-detail">
+            <Section title={t('sshCertificates.grants')}>
+              <Props items={[
+                [t('sshCertificates.principals'), listOf(open.principals).join(', ') || '—'],
+                [t('sshCertificates.extensions'), extensions.join(', ') || '—'],
+                ...criticalOptions.map(([key, value]) => [key, <span key={key} className="mono">{String(value)}</span>]),
+              ]} />
+            </Section>
+          </div>
+        )}
+        {section === 'certificate' && (
+          <div className="module-detail">
+            <Section title={t('sshCertificates.certificateText')}>
+              {open.certificate ? <>
+                <pre className="mono public-key">{open.certificate}</pre>
+                <p className="copy-url"><Btn icon="copy" onClick={() => handleCopyText(open.certificate)}>{t('common.copy')}</Btn></p>
+              </> : <p className="muted small">—</p>}
+            </Section>
+          </div>
+        )}
+      </DockBody>
+    </Dock>
   )
 
-  // ============= RENDER =============
-
   return (
-    <>
-      <ResponsiveLayout
-        title={t('sshCertificates.title')}
-        subtitle={t('sshCertificates.subtitle', { count: total })}
-        icon={Certificate}
-        stats={stats}
-        onStatClick={handleStatClick}
-        activeStatFilter={filterStatus}
-        helpPageKey="sshCertificates"
-        splitView={true}
-        splitEmptyContent={
-          <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
-              <Certificate size={24} className="text-text-tertiary" weight="duotone" />
+    <Zone dock={dock} after={<>
+      {dialog === 'issue' && (
+        <AtelierDialog title={t('sshCertificates.issueCertificate')} size="wide" onClose={() => setDialog(null)} returnTo="ssh-cert-new">
+          <IssueCertificateForm cas={cas} canListCas={canListSshCas} onSubmit={handleIssueSubmit} onCancel={() => setDialog(null)} />
+        </AtelierDialog>
+      )}
+      {dialog === 'import' && (
+        <AtelierDialog title={t('sshCertificates.importCertificate')} subtitle={t('sshCertificates.importCertDescription')} size="wide" onClose={closeImport}>
+          <form onSubmit={handleImportCert}>
+            <div className="form-fields">
+              <Textarea label={t('sshCertificates.certificateText')} mono value={importCertData} onChange={(e) => setImportCertData(e.target.value)}
+                placeholder={t('sshCertificates.certificateDataPlaceholder')} rows={8} required />
+              <Input label={t('common.description')} name="descr" full />
             </div>
-            <p className="text-sm text-text-secondary">{t('sshCertificates.noData')}</p>
-          </div>
-        }
-        slideOverOpen={!!selectedCert}
-        slideOverTitle={selectedCert?.key_id || t('common.details')}
-        slideOverContent={detailContent}
-        slideOverWidth="lg"
-        onSlideOverClose={() => setSelectedCert(null)}
-      >
-        <ResponsiveDataTable
-          data={certificates}
-          columns={columns}
-          loading={loading}
-          onRowClick={handleSelectCert}
-          selectedId={selectedCert?.id}
-          searchable
-          searchPlaceholder={`${t('common.search')} ${t('sshCertificates.title').toLowerCase()}...`}
-          externalSearch={searchValue}
-          onSearchChange={(v) => { setSearchValue(v); setPage(1) }}
-          toolbarFilters={[
-            {
-              key: 'type',
-              label: t('common.type'),
-              type: 'multiSelect',
-              value: filterType,
-              onChange: (v) => { setFilterType(v); setPage(1) },
-              placeholder: t('common.allTypes'),
-              options: [
-                { value: 'user', label: t('sshCertificates.typeUser') },
-                { value: 'host', label: t('sshCertificates.typeHost') },
-              ],
-            },
-            {
-              key: 'status',
-              label: t('common.status'),
-              type: 'multiSelect',
-              value: filterStatus,
-              onChange: (v) => { setFilterStatus(v); setPage(1) },
-              placeholder: t('common.allStatus'),
-              options: [
-                { value: 'valid', label: t('sshCertificates.statusValid') },
-                { value: 'expired', label: t('sshCertificates.statusExpired') },
-                { value: 'revoked', label: t('sshCertificates.statusRevoked') },
-              ],
-            },
-            ...(cas.length > 0 ? [{
-              key: 'ca',
-              type: 'multiSelect',
-              value: filterCA,
-              onChange: (v) => { setFilterCA(v); setPage(1) },
-              placeholder: t('common.allCAs'),
-              options: cas.map(ca => ({ value: String(ca.id), label: ca.name })),
-            }] : []),
-          ]}
-          toolbarActions={canWrite('ssh') && (
-            isMobile ? (
-              <div className="flex gap-2">
-                <Button type="button" size="lg" onClick={() => setShowImportModal(true)} className="w-11 h-11 p-0" variant="secondary">
-                  <Upload size={22} weight="bold" />
-                </Button>
-                <Button type="button" size="lg" onClick={() => setShowIssueModal(true)} className="w-11 h-11 p-0">
-                  <Plus size={22} weight="bold" />
-                </Button>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <Button type="button" size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
-                  <Upload size={14} weight="bold" />
-                  {t('common.import')}
-                </Button>
-                <Button type="button" size="sm" onClick={() => setShowIssueModal(true)}>
-                  <Plus size={14} weight="bold" />
-                  {t('sshCertificates.issueCertificate')}
-                </Button>
-              </div>
-            )
-          )}
-          sortable
-          defaultSort={{ key: 'id', direction: 'desc' }}
-          onSortChange={handleSortChange}
-          rowActions={rowActions}
-          pagination={{
-            page,
-            total,
-            perPage,
-            onChange: setPage,
-            onPerPageChange: (v) => { setPerPage(v); setPage(1) },
-          }}
-          emptyIcon={Certificate}
-          emptyTitle={t('sshCertificates.noData')}
-          emptyDescription={t('sshCertificates.noDataDescription')}
-          emptyAction={canWrite('ssh') && (
-            <Button type="button" onClick={() => setShowIssueModal(true)}>
-              <Plus size={16} /> {t('sshCertificates.issueCertificate')}
-            </Button>
-          )}
-          filterPresetsKey="ucm-ssh-certs-presets"
-          densityStorageKey="ucm-ssh-certs-density"
-          onApplyFilterPreset={handleApplyFilterPreset}
-        />
-      </ResponsiveLayout>
-
-      {/* Issue Certificate Modal */}
-      <Modal
-        open={showIssueModal}
-        onOpenChange={(open) => { setShowIssueModal(open) }}
-        title={t('sshCertificates.issueCertificate')}
-        size="xl"
-      >
-        <IssueCertificateForm
-          cas={cas}
-          canListCas={canListSshCas}
-          onSubmit={handleIssueSubmit}
-          onCancel={() => setShowIssueModal(false)}
-        />
-      </Modal>
-
-      {/* Import Certificate Modal */}
-      <Modal open={showImportModal} onOpenChange={(open) => { setShowImportModal(open); if (!open) setImportCertData('') }} title={t('sshCertificates.importCertificate')} size="lg">
-        <form onSubmit={handleImportCert} className="p-4 space-y-4">
-          <p className="text-sm text-secondary">{t('sshCertificates.importCertDescription')}</p>
-          <Textarea
-            label={t('sshCertificates.certificateText')}
-            value={importCertData}
-            onChange={(e) => setImportCertData(e.target.value)}
-            placeholder={t('sshCertificates.certificateDataPlaceholder')}
-            rows={8}
-            required
-          />
-          <Input label={t('common.description')} name="descr" />
-          <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => setShowImportModal(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit">{t('common.import')}</Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Revoke Certificate Modal */}
-      <Modal
-        open={showRevokeModal}
-        onOpenChange={(open) => { setShowRevokeModal(open); if (!open) setRevokingCert(null) }}
-        title={t('sshCertificates.revokeCertificate')}
-        size="md"
-      >
-        <RevokeCertificateForm
-          cert={revokingCert}
-          onSubmit={handleRevokeSubmit}
-          onCancel={() => { setShowRevokeModal(false); setRevokingCert(null) }}
-        />
-      </Modal>
-    </>
+            <div className="modal-actions">
+              <button type="button" className="btn" data-action="close-modal" onClick={closeImport}>{t('common.cancel')}</button>
+              <Btn type="submit" tone="primary" icon="upload">{t('common.import')}</Btn>
+            </div>
+          </form>
+        </AtelierDialog>
+      )}
+      {dialog === 'revoke' && revokingCert && (
+        <AtelierDialog title={t('sshCertificates.revokeCertificate')} subtitle={revokingCert.key_id} size="narrow" onClose={closeRevoke} returnTo="ssh-cert-revoke">
+          <RevokeCertificateForm cert={revokingCert} onSubmit={handleRevokeSubmit} onCancel={closeRevoke} />
+        </AtelierDialog>
+      )}
+    </>}>
+      <PageHead title={t('sshCertificates.title')} total={t('sshCertificates.subtitle', { count: total })} intent={t('sshCertificates.intent')}
+        actions={<>
+          <Btn tone="quiet" icon="terminal" id="ssh-switch" to="/ssh/cas">{t('sshCas.title')}</Btn>
+          {canWrite('ssh') && <Btn icon="upload" id="ssh-cert-import" write onClick={() => setDialog('import')}>{t('common.import')}</Btn>}
+          {issue && <Btn tone="primary" icon="plus" id="ssh-cert-new" onClick={issue.onClick}>{issue.label}</Btn>}
+        </>} />
+      <ListView label={t('sshCertificates.title')} caption={t('sshCertificates.caption')} icon="terminal" rows={certificates} loading={loading && !certificates.length}
+        filters={{ views, active: filterStatus, onChange: changeFilter(setFilterStatus), label: t('sshCertificates.filterByState') }}
+        toolbar={(
+          <Toolbar>
+            <SearchField id="ssh-cert-search" name="q" label={t('sshCertificates.searchLabel')} placeholder={t('sshCertificates.searchLabel')} value={searchValue}
+              onChange={changeFilter(setSearchValue)} />
+            <FilterSelect id="ssh-cert-type" label={t('sshCertificates.certType')} value={filterType} onChange={changeFilter(setFilterType)}
+              options={[{ value: '', label: t('common.allTypes') }, { value: 'user', label: t('sshCertificates.typeUser') }, { value: 'host', label: t('sshCertificates.typeHost') }]} />
+            {cas.length > 0 && (
+              <FilterSelect id="ssh-cert-ca" label={t('sshCertificates.caName')} value={filterCA} onChange={changeFilter(setFilterCA)}
+                options={[{ value: '', label: t('common.allCAs') }, ...cas.map((ca) => ({ value: String(ca.id), label: ca.name || ca.descr }))]} />
+            )}
+          </Toolbar>
+        )}
+        title={(c) => c.key_id || t('common.unnamed')} status={statusPill} openedId={open?.id} onOpen={openCert}
+        sort={{ key: sortBy, asc: sortOrder === 'asc' }} onSort={handleSort} nameSort={SORTS.name}
+        nameExtra={(c) => (c.serial_shared_with?.length > 0 ? <> <Pill label={t('sshCertificates.serialShared')} tone="warn" icon="warning" /></> : null)}
+        columns={[
+          { id: 'type', label: t('sshCertificates.certType'), cell: typeLabel, sort: SORTS.type },
+          { id: 'principals', label: t('sshCertificates.principals'), cell: principalsCell, grow: true },
+          { id: 'expires', label: t('sshCertificates.validTo'), cell: (c) => (c.valid_to ? formatDate(c.valid_to) : '—'), fit: true, sort: SORTS.expires },
+          { id: 'ca', label: t('sshCertificates.caName'), cell: (c) => c.ca_name || '—', muted: true },
+          { status: true },
+        ]}
+        rowActions={(c) => [
+          { icon: 'download', label: t('common.export'), onClick: handleExport },
+          ...(canWrite('ssh') && getStatus(c, t).key === 'valid' ? [{ icon: 'block', label: t('sshCertificates.revokeCertificate'), write: true, onClick: handleRevoke }] : []),
+          ...(canDelete('ssh') ? [{ icon: 'close', label: t('common.delete'), write: true, onClick: handleDelete }] : []),
+        ]}
+        empty={narrowed ? (
+          <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')}
+            onReset={() => { setSearchValue(''); setFilterStatus(''); setFilterType(''); setFilterCA(''); setPage(1) }} />
+        ) : (
+          <EmptyBlock id="ssh-certs" icon="terminal" title={t('sshCertificates.noData')} text={t('sshCertificates.noDataDescription')} action={issue} />
+        )}
+        footer={total > 0 ? {
+          range: t('sshCertificates.pageRange', { start: (page - 1) * perPage + 1, end: Math.min(page * perPage, total), count: total }),
+          pagination: { page, pages, perPage, sizes: [10, 25, 50, 100], onPage: setPage, onPerPage: (n) => { setPerPage(n); setPage(1) } },
+        } : undefined} />
+    </Zone>
   )
 }
 
@@ -825,7 +430,6 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
 
-  // Form state
   const [mode, setMode] = useState('sign')
   const [caId, setCaId] = useState('')
   const [certType, setCertType] = useState('user')
@@ -836,7 +440,7 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
   const { fips, fipsKeys } = useKeyPlatform()
   const eddsaRefused = sshEddsaRefused(fips, fipsKeys)
   useEffect(() => {
-    if (eddsaRefused) setKeyAlgorithm(prev => (SSH_EDDSA_KEY_TYPES.includes(prev) ? SSH_FIPS_DEFAULT_KEY_TYPE : prev))
+    if (eddsaRefused) setKeyAlgorithm((prev) => (SSH_EDDSA_KEY_TYPES.includes(prev) ? SSH_FIPS_DEFAULT_KEY_TYPE : prev))
   }, [eddsaRefused])
   const [principalsText, setPrincipalsText] = useState('')
   const [validityPreset, setValidityPreset] = useState('24h')
@@ -847,348 +451,139 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
   const [forceCommand, setForceCommand] = useState('')
   const [sourceAddress, setSourceAddress] = useState('')
 
-  // Set first CA as default
+  // The first CA by default
   useEffect(() => {
-    if (cas.length > 0 && !caId) {
-      setCaId(String(cas[0].id))
-    }
-  }, [cas])
+    if (cas.length > 0 && !caId) setCaId(String(cas[0].id))
+  }, [cas]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const selectedCa = cas.find(c => String(c.id) === String(caId))
+  const selectedCa = cas.find((c) => String(c.id) === String(caId))
   const customKeyId = !!selectedCa?.allow_custom_key_id
-  const principalNames = principalsText.split(',').map(p => p.trim()).filter(Boolean)
+  const principalNames = principalsText.split(',').map((p) => p.trim()).filter(Boolean)
   // What the CA writes when the requester sets nothing, as signing.py does
   const defaultKeyId = selectedCa && principalNames.length ? `${principalNames.join(',')}@${selectedCa.descr}` : ''
 
-  // Keep the certificate type in line with the selected CA's ca_type
+  // The certificate type follows the selected CA's ca_type
   useEffect(() => {
     if (!caId) return
-    const ca = cas.find(c => String(c.id) === String(caId))
+    const ca = cas.find((c) => String(c.id) === String(caId))
     if (ca?.ca_type && ca.ca_type !== certType) setCertType(ca.ca_type)
-  }, [caId, cas])
+  }, [caId, cas]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const toggleExtension = (ext) => {
-    setExtensions(prev =>
-      prev.includes(ext) ? prev.filter(e => e !== ext) : [...prev, ext]
-    )
-  }
+  const toggleExtension = (ext) => setExtensions((prev) => (prev.includes(ext) ? prev.filter((e) => e !== ext) : [...prev, ext]))
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!caId) return
     if (mode === 'sign' && !publicKey.trim()) return
-
     setLoading(true)
     try {
-      const principals = principalNames
-
-      // Convert validity preset to seconds for backend
-      const preset = VALIDITY_PRESETS.find(p => p.value === validityPreset)
-      const validitySeconds = preset?.seconds || null
-
+      const preset = VALIDITY_PRESETS.find((p) => p.value === validityPreset)
       const data = {
         mode,
         ca_id: parseInt(caId, 10),
         cert_type: certType,
-        principals,
+        principals: principalNames,
         extensions: certType === 'user' ? extensions : [],
       }
-
       if (customKeyId && keyId.trim()) data.key_id = keyId.trim()
-
-      if (validitySeconds) {
-        data.validity_seconds = validitySeconds
-      }
-
-      if (mode === 'sign') {
-        data.public_key = publicKey.trim()
-      } else {
-        data.key_type = keyAlgorithm
-      }
-
+      if (preset?.seconds) data.validity_seconds = preset.seconds
+      if (mode === 'sign') data.public_key = publicKey.trim()
+      else data.key_type = keyAlgorithm
       if (validityPreset === 'custom') {
         // The inputs hold local time without an offset: the server reads UTC
         if (customFrom) data.valid_from = new Date(customFrom).toISOString()
         if (customTo) data.valid_to = new Date(customTo).toISOString()
       }
-
-      const criticalOptions = {}
-      if (certType === 'user' && forceCommand.trim()) criticalOptions['force-command'] = forceCommand.trim()
-      if (certType === 'user' && sourceAddress.trim()) criticalOptions['source-address'] = sourceAddress.trim()
-      if (Object.keys(criticalOptions).length > 0) {
-        data.critical_options = criticalOptions
-      }
+      const critical = {}
+      if (certType === 'user' && forceCommand.trim()) critical['force-command'] = forceCommand.trim()
+      if (certType === 'user' && sourceAddress.trim()) critical['source-address'] = sourceAddress.trim()
+      if (Object.keys(critical).length > 0) data.critical_options = critical
 
       const res = await onSubmit(data)
-      if (res?.data) {
-        setResult({ ...res.data, _mode: mode })
-      } else {
-        onCancel()
-      }
+      if (res?.data) setResult({ ...res.data, _mode: mode })
+      else onCancel()
     } catch {
-      // error handled by parent
+      // the page has shown the error
     } finally {
       setLoading(false)
     }
   }
 
-  // Show generated result after successful key pair generation
-  if (result) {
-    return <GeneratedResultView result={result} onClose={onCancel} />
-  }
-
-  const caOptions = cas.map(ca => ({ value: String(ca.id), label: ca.name }))
+  if (result) return <GeneratedResultView result={result} onClose={onCancel} />
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4">
-      {/* Issue Mode */}
-      <div>
-        <label className="block text-xs font-medium text-text-primary mb-2">
-          {t('sshCertificates.issueMode')}
-        </label>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setMode('sign')}
-            className={`flex-1 px-3 py-2 text-sm rounded-lg border transition-colors ${
-              mode === 'sign'
-                ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary font-medium'
-                : 'border-border bg-bg-secondary text-text-secondary hover:bg-bg-tertiary'
-            }`}
-          >
-            <Key size={16} className="inline-block mr-1.5 -mt-0.5" />
-            {t('sshCertificates.signPublicKey')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('generate')}
-            className={`flex-1 px-3 py-2 text-sm rounded-lg border transition-colors ${
-              mode === 'generate'
-                ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary font-medium'
-                : 'border-border bg-bg-secondary text-text-secondary hover:bg-bg-tertiary'
-            }`}
-          >
-            <Certificate size={16} className="inline-block mr-1.5 -mt-0.5" />
-            {t('sshCertificates.generateKeyPair')}
-          </button>
-        </div>
-      </div>
+    <form onSubmit={handleSubmit}>
+      <div className="form-fields">
+        <ChoiceField name="sshIssueMode" legend={t('sshCertificates.issueMode')} value={mode} onChange={setMode}
+          options={[{ value: 'sign', label: t('sshCertificates.signPublicKey') }, { value: 'generate', label: t('sshCertificates.generateKeyPair') }]} />
+        <Select label={t('sshCertificates.selectCa')} value={caId} onChange={setCaId} options={cas.map((ca) => ({ value: String(ca.id), label: ca.name }))}
+          placeholder={t('sshCertificates.selectCa')} error={!canListCas ? t('sshCertificates.issueNeedsCaRead') : undefined} />
+        <Select label={t('sshCertificates.certType')} value={certType} onChange={setCertType}
+          options={[{ value: 'user', label: t('sshCertificates.typeUser') }, { value: 'host', label: t('sshCertificates.typeHost') }]} />
 
-      {/* SSH CA Selection */}
-      <div>
-        <label className="block text-xs font-medium text-text-primary mb-1">
-          {t('sshCertificates.selectCa')} <span className="text-status-danger">*</span>
-        </label>
-        <Select
-          value={caId}
-          onChange={setCaId}
-          options={caOptions}
-          placeholder={t('sshCertificates.selectCa')}
-        />
-        {!canListCas && (
-          <p className="mt-1 text-xs text-status-danger" role="alert">{t('sshCertificates.issueNeedsCaRead')}</p>
-        )}
-      </div>
-
-      {/* Certificate Type */}
-      <div>
-        <label className="block text-xs font-medium text-text-primary mb-1">
-          {t('sshCertificates.certType')} <span className="text-status-danger">*</span>
-        </label>
-        <Select
-          value={certType}
-          onChange={setCertType}
-          options={[
-            { value: 'user', label: t('sshCertificates.typeUser') },
-            { value: 'host', label: t('sshCertificates.typeHost') },
-          ]}
-        />
-      </div>
-
-      {/* Key ID: chosen only where the CA allows it, else set by the CA */}
-      <div>
-        <label className="block text-xs font-medium text-text-primary mb-1">
-          {t('sshCertificates.keyId')}
-        </label>
+        {/* Key ID: chosen only where the CA allows it, else set by the CA */}
         {customKeyId ? (
-          <Input
-            value={keyId}
-            onChange={(e) => setKeyId(e.target.value)}
-            placeholder={defaultKeyId || t('sshCertificates.modal.keyIdPlaceholder')}
-            aria-label={t('sshCertificates.keyId')}
-          />
+          <Input label={t('sshCertificates.keyId')} value={keyId} onChange={(e) => setKeyId(e.target.value)}
+            placeholder={defaultKeyId || t('sshCertificates.modal.keyIdPlaceholder')} full />
         ) : (
-          <p className="text-xs text-text-secondary" data-testid="ssh-key-id-set-by-ca">
-            {defaultKeyId
-              ? t('sshCertificates.modal.keyIdSetByCa', { keyId: defaultKeyId })
-              : t('sshCertificates.modal.keyIdSetByCaPending')}
-          </p>
+          <div className="field full">
+            <span>{t('sshCertificates.keyId')}</span>
+            <small data-testid="ssh-key-id-set-by-ca">
+              {defaultKeyId ? t('sshCertificates.modal.keyIdSetByCa', { keyId: defaultKeyId }) : t('sshCertificates.modal.keyIdSetByCaPending')}
+            </small>
+          </div>
         )}
-      </div>
 
-      {/* Public Key (Sign mode) */}
-      {mode === 'sign' && (
-        <div>
-          <label className="block text-xs font-medium text-text-primary mb-1">
-            {t('sshCertificates.publicKey')} <span className="text-status-danger">*</span>
-          </label>
-          <Textarea
-            value={publicKey}
-            onChange={(e) => setPublicKey(e.target.value)}
-            placeholder={t('sshCertificates.modal.publicKeyPlaceholder')}
-            rows={3}
-            className="font-mono text-xs"
-            required
-          />
-        </div>
-      )}
+        {mode === 'sign' ? (
+          <Textarea label={t('sshCertificates.publicKey')} mono value={publicKey} onChange={(e) => setPublicKey(e.target.value)}
+            placeholder={t('sshCertificates.modal.publicKeyPlaceholder')} rows={3} required />
+        ) : (
+          <Select label={t('common.keyAlgorithm')} value={keyAlgorithm} onChange={setKeyAlgorithm} options={sshKeyOptions(KEY_ALGORITHMS, fips, fipsKeys)} />
+        )}
 
-      {/* Key Algorithm (Generate mode) */}
-      {mode === 'generate' && (
-        <div>
-          <label className="block text-xs font-medium text-text-primary mb-1">
-            {t('common.keyAlgorithm')}
-          </label>
-          <Select
-            value={keyAlgorithm}
-            onChange={setKeyAlgorithm}
-            options={sshKeyOptions(KEY_ALGORITHMS, fips, fipsKeys)}
-          />
-        </div>
-      )}
+        <Input label={t('sshCertificates.principals')} value={principalsText} onChange={(e) => setPrincipalsText(e.target.value)}
+          placeholder={t('sshCertificates.modal.principalsPlaceholder')} />
+        <Select label={t('sshCertificates.validityPreset')} value={validityPreset} onChange={setValidityPreset}
+          options={VALIDITY_PRESETS.map((p) => ({ value: p.value, label: t(`sshCertificates.presets.${p.value}`) }))} />
+        {validityPreset === 'custom' && <>
+          <Input type="datetime-local" label={t('sshCertificates.validFrom')} value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
+          <Input type="datetime-local" label={t('sshCertificates.validTo')} required value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
+        </>}
 
-      {/* Principals */}
-      <div>
-        <label className="block text-xs font-medium text-text-primary mb-1">
-          {t('sshCertificates.principals')}
-        </label>
-        <Input
-          value={principalsText}
-          onChange={(e) => setPrincipalsText(e.target.value)}
-          placeholder={t('sshCertificates.modal.principalsPlaceholder')}
-        />
-      </div>
-
-      {/* Validity Preset */}
-      <div>
-        <label className="block text-xs font-medium text-text-primary mb-1">
-          {t('sshCertificates.validityPreset')}
-        </label>
-        <Select
-          value={validityPreset}
-          onChange={setValidityPreset}
-          options={VALIDITY_PRESETS.map(p => ({
-            value: p.value,
-            label: t(`sshCertificates.presets.${p.value}`),
-          }))}
-        />
-      </div>
-
-      {/* Custom Validity */}
-      {validityPreset === 'custom' && (
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-text-primary mb-1">
-              {t('sshCertificates.validFrom')}
-            </label>
-            <Input
-              type="datetime-local"
-              value={customFrom}
-              onChange={(e) => setCustomFrom(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-text-primary mb-1">
-              {t('sshCertificates.validTo')}
-            </label>
-            <Input
-              type="datetime-local"
-              required
-              value={customTo}
-              onChange={(e) => setCustomTo(e.target.value)}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Extensions (user certs only) */}
-      {certType === 'user' && (
-        <div>
-          <label className="block text-xs font-medium text-text-primary mb-2">
-            {t('sshCertificates.extensions')}
-          </label>
-          <div className="space-y-1.5">
-            {DEFAULT_EXTENSIONS.map(ext => (
-              <label key={ext} className="flex items-center gap-2 text-sm text-text-primary cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={extensions.includes(ext)}
-                  onChange={() => toggleExtension(ext)}
-                  className="rounded border-border"
-                />
-                <span className="font-mono text-xs">{ext}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Critical Options (collapsible): OpenSSH defines none for host certificates */}
-      {certType === 'user' && (
-      <div>
-        <button
-          type="button"
-          onClick={() => setShowCriticalOptions(!showCriticalOptions)}
-          className="flex items-center gap-1.5 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors"
-        >
-          {showCriticalOptions ? <CaretUp size={12} /> : <CaretDown size={12} />}
-          {t('sshCertificates.criticalOptions')}
-        </button>
-        {showCriticalOptions && (
-          <div className="mt-2 space-y-3 pl-4 border-l-2 border-border">
-            <div>
-              <label className="block text-xs font-medium text-text-primary mb-1">
-                {t('sshCertificates.forceCommand')}
-              </label>
-              <Input
-                value={forceCommand}
-                onChange={(e) => setForceCommand(e.target.value)}
-                placeholder="e.g. /usr/bin/rsync"
-              />
+        {/* Extensions: user certificates only */}
+        {certType === 'user' && (
+          <fieldset className="field full">
+            <legend>{t('sshCertificates.extensions')}</legend>
+            <div className="choice-grid">
+              {DEFAULT_EXTENSIONS.map((ext) => (
+                <label key={ext} className="checkbox-line">
+                  <input type="checkbox" checked={extensions.includes(ext)} onChange={() => toggleExtension(ext)} />
+                  <span className="mono">{ext}</span>
+                </label>
+              ))}
             </div>
-            <div>
-              <label className="block text-xs font-medium text-text-primary mb-1">
-                {t('sshCertificates.sourceAddress')}
-              </label>
-              <Input
-                value={sourceAddress}
-                onChange={(e) => setSourceAddress(e.target.value)}
-                placeholder="e.g. 10.0.0.0/8,192.168.1.0/24"
-              />
+          </fieldset>
+        )}
+
+        {/* Critical options, folded as the mockup's Avancé: OpenSSH defines none for host certificates */}
+        {certType === 'user' && (
+          <div className="field full advanced">
+            <button type="button" className="advanced-toggle" id="ssh-critical-toggle" aria-expanded={showCriticalOptions} aria-controls="ssh-critical-panel"
+              onClick={() => setShowCriticalOptions((v) => !v)}>
+              <Icon name={showCriticalOptions ? 'down' : 'right'} /><span>{t('sshCertificates.criticalOptions')}</span>
+            </button>
+            <div className="advanced-panel" id="ssh-critical-panel" hidden={!showCriticalOptions}>
+              <Input label={t('sshCertificates.forceCommand')} value={forceCommand} onChange={(e) => setForceCommand(e.target.value)} placeholder="e.g. /usr/bin/rsync" />
+              <Input label={t('sshCertificates.sourceAddress')} value={sourceAddress} onChange={(e) => setSourceAddress(e.target.value)} placeholder="e.g. 10.0.0.0/8,192.168.1.0/24" />
             </div>
           </div>
         )}
       </div>
-      )}
-
-      {/* Submit */}
-      <div className="flex justify-end gap-2 pt-4 border-t border-border">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          {t('common.cancel')}
-        </Button>
-        <Button type="submit" disabled={loading || !caId || (mode === 'sign' && !publicKey.trim())}>
-          {loading ? (
-            <span className="flex items-center gap-2">
-              <span className="w-3.5 h-3.5 border-2 spinner-on-accent rounded-full animate-spin" />
-              {t('sshCertificates.issueCertificate')}
-            </span>
-          ) : (
-            <>
-              <Certificate size={14} />
-              {t('sshCertificates.issueCertificate')}
-            </>
-          )}
-        </Button>
+      <div className="modal-actions">
+        <button type="button" className="btn" data-action="close-modal" onClick={onCancel}>{t('common.cancel')}</button>
+        <Btn type="submit" tone="primary" icon="terminal" disabled={loading || !caId || (mode === 'sign' && !publicKey.trim()) || undefined}>
+          {t('sshCertificates.issueCertificate')}
+        </Btn>
       </div>
     </form>
   )
@@ -1201,108 +596,32 @@ function GeneratedResultView({ result, onClose }) {
   const { showSuccess } = useNotification()
   const { copy: clipboardCopy } = useClipboard()
   const isGenerated = result._mode === 'generate'
-
-  const handleCopy = (text) => {
-    clipboardCopy(text)
-    showSuccess(t('common.copied'))
-  }
-
-  const handleDownload = (content, filename) => {
-    const blob = new Blob([content], { type: 'text/plain' })
-    downloadBlob(blob, filename)
-  }
-
   const keyId = result.key_id || 'ssh_cert'
+  const copy = (text) => { clipboardCopy(text); showSuccess(t('common.copied')) }
+  const download = (content, filename) => downloadBlob(new Blob([content], { type: 'text/plain' }), filename)
+
+  const block = (label, text, filename, id) => (
+    <section className="field full" aria-labelledby={id}>
+      <span id={id}>{label}</span>
+      <pre className="mono public-key">{text}</pre>
+      <div className="copy-url">
+        <Btn icon="download" onClick={() => download(text, filename)}>{t('common.download')}</Btn>{' '}
+        <IconBtn icon="copy" label={t('common.copy')} onClick={() => copy(text)} />
+      </div>
+    </section>
+  )
 
   return (
-    <div className="p-4 space-y-4">
-      {/* Success banner */}
-      <div className="p-3 rounded-lg bg-status-success-op10 border border-status-success-op30">
-        <div className="flex items-center gap-2 text-status-success text-xs font-medium">
-          <CheckCircle size={16} />
-          {t('sshCertificates.certificateIssued')}
-        </div>
+    <div>
+      <div className="notice"><Icon name="check" /><span>{t('sshCertificates.certificateIssued')}</span></div>
+      {isGenerated && result.private_key && <Notice tone="warn">{t('sshCertificates.privateKeyWarning')}</Notice>}
+      <div className="form-fields">
+        {isGenerated && result.private_key && block(t('sshCertificates.generatedPrivateKey'), result.private_key, sanitizeDownloadName(keyId, ''), 'ssh-result-key')}
+        {result.certificate && block(t('sshCertificates.generatedCertificate'), result.certificate, sanitizeDownloadName(keyId, '-cert.pub'), 'ssh-result-cert')}
+        {result.public_key && block(t('sshCertificates.publicKey'), result.public_key, sanitizeDownloadName(keyId, '.pub'), 'ssh-result-pub')}
       </div>
-
-      {/* Private Key (generate mode only) */}
-      {isGenerated && result.private_key && (
-        <>
-          <div className="p-3 rounded-lg bg-status-warning-op10 border border-status-warning-op30">
-            <div className="flex items-center gap-2 text-status-warning text-xs font-medium">
-              <Warning size={16} />
-              {t('sshCertificates.privateKeyWarning')}
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-medium text-text-primary">
-                {t('sshCertificates.generatedPrivateKey')}
-              </label>
-              <div className="flex items-center gap-1">
-                <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.private_key, sanitizeDownloadName(keyId, ''))}>
-                  <Download size={12} /> {t('common.download')}
-                </Button>
-                <Button type="button" size="sm" variant="ghost" onClick={() => handleCopy(result.private_key)}>
-                  <Copy size={12} /> {t('common.copy')}
-                </Button>
-              </div>
-            </div>
-            <pre className="font-mono text-2xs text-text-secondary bg-tertiary-op50 p-2 rounded overflow-x-auto max-h-40 whitespace-pre-wrap break-all">
-              {result.private_key}
-            </pre>
-          </div>
-        </>
-      )}
-
-      {/* Certificate */}
-      {result.certificate && (
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-xs font-medium text-text-primary">
-              {t('sshCertificates.generatedCertificate')}
-            </label>
-            <div className="flex items-center gap-1">
-              <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.certificate, sanitizeDownloadName(keyId, '-cert.pub'))}>
-                <Download size={12} /> {t('common.download')}
-              </Button>
-              <Button type="button" size="sm" variant="ghost" onClick={() => handleCopy(result.certificate)}>
-                <Copy size={12} /> {t('common.copy')}
-              </Button>
-            </div>
-          </div>
-          <pre className="font-mono text-2xs text-text-secondary bg-tertiary-op50 p-2 rounded overflow-x-auto max-h-40 whitespace-pre-wrap break-all">
-            {result.certificate}
-          </pre>
-        </div>
-      )}
-
-      {/* Public Key */}
-      {result.public_key && (
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-xs font-medium text-text-primary">
-              {t('sshCertificates.publicKey')}
-            </label>
-            <div className="flex items-center gap-1">
-              <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(result.public_key, sanitizeDownloadName(keyId, '.pub'))}>
-                <Download size={12} /> {t('common.download')}
-              </Button>
-              <Button type="button" size="sm" variant="ghost" onClick={() => handleCopy(result.public_key)}>
-                <Copy size={12} /> {t('common.copy')}
-              </Button>
-            </div>
-          </div>
-          <pre className="font-mono text-2xs text-text-secondary bg-tertiary-op50 p-2 rounded overflow-x-auto max-h-20 whitespace-pre-wrap break-all">
-            {result.public_key}
-          </pre>
-        </div>
-      )}
-
-      <div className="flex justify-end pt-4 border-t border-border">
-        <Button type="button" onClick={onClose}>
-          {t('common.close')}
-        </Button>
+      <div className="modal-actions">
+        <Btn tone="primary" write={false} data-action="close-modal" onClick={onClose}>{t('common.close')}</Btn>
       </div>
     </div>
   )
@@ -1326,60 +645,22 @@ function RevokeCertificateForm({ cert, onSubmit, onCancel }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4">
-      <div className="p-3 rounded-lg bg-status-danger-op10 border border-status-danger-op30">
-        <div className="flex items-center gap-2 text-status-danger text-xs font-medium">
-          <Warning size={16} />
-          {t('sshCertificates.revokeConfirm')}
-        </div>
-        {cert?.serial_shared_with?.length > 0 && (
-          <p className="mt-2 text-xs text-status-danger">
-            {t('sshCertificates.revokeSharedSerial', { serial: cert.serial })}
-          </p>
-        )}
-        {cert && cert.serial === 0 && (
-          <p className="mt-2 text-xs text-status-danger">
-            {t('sshCertificates.revokeSerialZero', { keyId: cert.key_id })}
-          </p>
-        )}
+    <form onSubmit={handleSubmit}>
+      <div className="notice bad" role="alert">
+        <Icon name="warning" />
+        <span>
+          <span>{t('sshCertificates.revokeConfirm')}</span>
+          {cert?.serial_shared_with?.length > 0 && <>{' '}<span>{t('sshCertificates.revokeSharedSerial', { serial: cert.serial })}</span></>}
+          {cert && cert.serial === 0 && <>{' '}<span>{t('sshCertificates.revokeSerialZero', { keyId: cert.key_id })}</span></>}
+        </span>
       </div>
-
-      {cert && (
-        <div className="text-sm text-text-secondary">
-          <span className="font-medium text-text-primary">{t('sshCertificates.keyId')}:</span>{' '}
-          <span className="font-mono">{cert.key_id}</span>
-        </div>
-      )}
-
-      <div>
-        <label className="block text-xs font-medium text-text-primary mb-1">
-          {t('sshCertificates.revokeReason')}
-        </label>
-        <Textarea
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder={t('sshCertificates.revokeReasonPlaceholder')}
-          rows={3}
-        />
+      <div className="form-fields">
+        <Textarea label={t('sshCertificates.revokeReason')} value={reason} onChange={(e) => setReason(e.target.value)}
+          placeholder={t('sshCertificates.revokeReasonPlaceholder')} rows={3} data-autofocus />
       </div>
-
-      <div className="flex justify-end gap-2 pt-4 border-t border-border">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          {t('common.cancel')}
-        </Button>
-        <Button type="submit" variant="danger" disabled={loading}>
-          {loading ? (
-            <span className="flex items-center gap-2">
-              <span className="w-3.5 h-3.5 border-2 spinner-on-accent rounded-full animate-spin" />
-              {t('sshCertificates.revokeCertificate')}
-            </span>
-          ) : (
-            <>
-              <Warning size={14} />
-              {t('sshCertificates.revokeCertificate')}
-            </>
-          )}
-        </Button>
+      <div className="modal-actions">
+        <button type="button" className="btn" data-action="close-modal" onClick={onCancel}>{t('common.cancel')}</button>
+        <Btn type="submit" tone="danger" icon="block" disabled={loading || undefined}>{t('sshCertificates.revokeCertificate')}</Btn>
       </div>
     </form>
   )

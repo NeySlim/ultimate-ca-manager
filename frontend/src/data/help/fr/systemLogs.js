@@ -30,6 +30,7 @@ export default {
         items: [
           "Interroge toutes les cinq secondes ; la ligne la plus récente est la première",
           "Efface la fenêtre de dates, qui pose la question inverse",
+          "Le bouton Journaux en direct reste enfoncé tant qu’il interroge",
         ]
       },
     ],
@@ -55,7 +56,7 @@ Les lignes sont affichées de la plus récente à la plus ancienne, et tous les 
 
 ## Sources
 
-**Source** et **Composant** sont dans le panneau de filtres : choisissez le journal, puis restreignez à un sous-système.
+**Source** et **Composant** sont dans la fenêtre **Filtres** : choisissez le journal, puis restreignez à un sous-système. Chaque filtre choisi s’affiche sous la barre d’outils, et sa croix le retire.
 
 - **Application** : le journal propre à UCM. Seule source à porter des composants.
 - **Accès** : le journal d’accès Gunicorn, qui contient les requêtes HTTP et les codes de statut. Installations natives uniquement.
@@ -94,7 +95,7 @@ Interroge toutes les cinq secondes. Efface la fenêtre de dates, qui pose la que
 
 ## Copier
 
-**Tout copier** prend toutes les lignes affichées. Cochez la case à côté d’une ligne et l’action devient **Copier la sélection**. Les deux copient une ligne telle que le fichier l’écrit : heure, composant, niveau, message. Ce qui arrive dans le presse-papiers se lit comme un journal, et le recoller dans cette page s’analyse comme tel.
+**Tout copier**, dans l’en-tête de la page, prend toutes les lignes affichées. Cochez la case à côté d’une ligne et la barre de sélection propose **Copier la sélection**. Les deux copient une ligne telle que le fichier l’écrit : heure, composant, niveau, message. Ce qui arrive dans le presse-papiers se lit comme un journal, et le recoller dans cette page s’analyse comme tel.
 
 ## Lire le pied de page
 

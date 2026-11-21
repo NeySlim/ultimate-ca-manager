@@ -62,27 +62,15 @@ const CARD_KEYS = [
   { id: 15, label: 'wrap-key', algorithm: 'RSA-2048', key_type: 'symmetric', purpose: 'decrypt' },
 ]
 
-beforeEach(() => {
-  // Radix Select needs these in jsdom
-  Element.prototype.hasPointerCapture = () => false
-  Element.prototype.setPointerCapture = () => {}
-  Element.prototype.releasePointerCapture = () => {}
-  Element.prototype.scrollIntoView = () => {}
-})
-
-/** The Radix trigger of the Select whose label is `labelKey` */
+/** The native select whose label is `labelKey` (the mockup's `.field`) */
 function comboboxFor(form, labelKey) {
-  for (const el of form.querySelectorAll('[role="combobox"]')) {
-    const label = [...(el.parentElement?.children || [])]
-      .find(c => c.tagName === 'LABEL' && c.textContent.trim() === labelKey)
-    if (label) return el
-  }
-  return null
+  const label = [...form.querySelectorAll('label')].find((l) => l.textContent.trim() === labelKey)
+  return label ? form.querySelector(`#${CSS.escape(label.htmlFor)}`) : null
 }
 
-async function pickOption(trigger, name) {
-  await userEvent.click(trigger)
-  await userEvent.click(await screen.findByRole('option', { name }))
+async function pickOption(select, name) {
+  const option = [...select.options].find((o) => (name instanceof RegExp ? name.test(o.textContent) : o.textContent === name))
+  await userEvent.selectOptions(select, option)
 }
 
 async function openCreateModal() {
@@ -127,9 +115,7 @@ describe('SSHCAsPage SSH CA on HSM', () => {
 
   it('offers only the key types OpenSSH certificates know', async () => {
     const form = await openHsmMode()
-    await userEvent.click(comboboxFor(form, 'cas.create.hsmExistingKey'))
-    const names = (await screen.findAllByRole('option')).map(o => o.textContent)
-    await userEvent.keyboard('{Escape}')
+    const names = [...comboboxFor(form, 'cas.create.hsmExistingKey').options].map(o => o.textContent)
     expect(names).toEqual(expect.arrayContaining(['piv-sign (EC-P384)', 'piv-auth (RSA-4096)']))
     expect(names).not.toEqual(expect.arrayContaining(
       ['ssh-slot (ED25519)', 'bp-key (EC-BP256)', 'wrap-key (RSA-2048)']))

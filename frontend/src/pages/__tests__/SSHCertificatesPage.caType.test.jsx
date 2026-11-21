@@ -2,7 +2,7 @@
  * SSHCertificatesPage: the certificate type follows the type of the selected CA.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 // Stable across renders: t and showError are loader dependencies, a fresh one reloads in a loop
@@ -95,10 +95,8 @@ describe('SSHCertificatesPage: certificate type follows the CA', () => {
   it('follows the CA the user picks in the selector', async () => {
     casGetAll.mockResolvedValue({ data: [USER_CA, HOST_CA] })
     const form = await openForm()
-    const triggers = form.querySelectorAll('[role="combobox"]')
-    fireEvent.keyDown(triggers[0], { key: 'Enter' })
-    fireEvent.click(await screen.findByRole('option', { name: 'Hosts CA' }))
-    await waitFor(() => expect(form.querySelectorAll('[role="combobox"]')[1]).toHaveTextContent('sshCertificates.typeHost'))
+    fireEvent.change(within(form).getByLabelText('sshCertificates.selectCa'), { target: { value: String(HOST_CA.id) } })
+    await waitFor(() => expect(within(form).getByLabelText('sshCertificates.certType')).toHaveValue('host'))
     expect(await submitAndGetType(form)).toBe('host')
   })
 
