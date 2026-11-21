@@ -127,14 +127,14 @@ describe('the journal as the mockup draws it', () => {
     expect(screen.getByText(/audit\.pageRange.*"from":"1".*"to":"50"/)).toBeInTheDocument()
     // the sizes the former list offered
     expect(within(screen.getByRole('combobox', { name: 'audit.perPageLabel' })).getAllByRole('option').map((o) => o.value)).toEqual(['10', '25', '50', '100'])
-    fireEvent.click(screen.getByRole('button', { name: 'audit.nextPage' }))
+    fireEvent.click(screen.getByRole('button', { name: 'table.nextPage' }))
     await waitFor(() => expect(lastList()).toMatchObject({ page: 2, per_page: 50 }))
     fireEvent.change(screen.getByRole('combobox', { name: 'audit.perPageLabel' }), { target: { value: '25' } })
     await waitFor(() => expect(lastList()).toMatchObject({ page: 1, per_page: 25 }))
     fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '4' } })
-    fireEvent.click(screen.getByRole('button', { name: 'audit.pageGo' }))
+    fireEvent.click(screen.getByRole('button', { name: 'table.goToPage' }))
     await waitFor(() => expect(lastList()).toMatchObject({ page: 4, per_page: 25 }))
-    expect(screen.getByRole('button', { name: 'audit.prevPage' })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: 'table.previousPage' })).not.toBeDisabled()
   })
 
   it('refreshes the list on demand', async () => {
@@ -275,9 +275,9 @@ describe('the filters the toolbar has no room for', () => {
       date_from: '2026-11-01', date_to: '2026-11-08', username: 'alice', success: 'false', action: ['user_create'], page: 1,
     }))
     fireEvent.click(within(d).getByRole('button', { name: 'audit.done' }))
-    const chips = screen.getByRole('group', { name: 'audit.activeFilters' })
+    const chips = screen.getByRole('group', { name: 'table.activeFilters' })
     expect(within(chips).getAllByRole('button')).toHaveLength(5)
-    fireEvent.click(within(chips).getByRole('button', { name: /audit\.removeFilter.*audit\.chipUser/ }))
+    fireEvent.click(within(chips).getByRole('button', { name: /table\.removeFilter.*audit\.chipUser/ }))
     await waitFor(() => expect(lastList().username).toBeUndefined())
   })
 

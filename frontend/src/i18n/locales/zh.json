@@ -3080,9 +3080,6 @@
     "resultsFailed": "失败",
     "filters": "筛选",
     "refresh": "刷新日志",
-    "activeFilters": "已启用的筛选",
-    "removeFilter": "移除筛选 {{label}}",
-    "removeFilterShort": "移除此筛选",
     "chipFrom": "从 {{date}}",
     "chipTo": "至 {{date}}",
     "chipAction": "操作：{{action}}",
@@ -3110,12 +3107,6 @@
     "pageRange_one": "第 {{from}}–{{to}} 个，共 {{count, number}} 个事件",
     "pageRange_other": "第 {{from}}–{{to}} 个，共 {{count, number}} 个事件",
     "perPageLabel": "每页事件数",
-    "perPage": "{{n}} / 页",
-    "prevPage": "上一页",
-    "nextPage": "下一页",
-    "pageWord": "页",
-    "pageTotal": "共 {{total}}",
-    "pageGo": "前往",
     "dateTime": "日期 / 时间",
     "client": "客户端",
     "copyIp": "复制 IP 地址",
@@ -8027,5 +8018,23 @@
       "requests_one": "{{count}} 个请求",
       "requests_other": "{{count}} 个请求"
     }
+  },
+  "atelier": {
+    "name": "名称",
+    "state": "状态",
+    "tableOf": "表格：{{name}}",
+    "openDetail": "打开 {{name}} 的详情",
+    "resizeColumn": "拖动以设置宽度，双击恢复",
+    "properties": "属性",
+    "summary": "摘要",
+    "overview": "概览",
+    "cardOptions": "{{name}} 卡片选项",
+    "cardOptionsTitle": "卡片选项",
+    "hideCard": "隐藏卡片",
+    "customizeCards": "自定义卡片…",
+    "openItem": "已打开的项目",
+    "detailOf": "详情：{{name}}",
+    "sectionsOf": "分区：{{name}}",
+    "settingsSections": "设置分区"
   }
 }

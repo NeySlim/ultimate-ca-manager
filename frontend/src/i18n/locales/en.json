@@ -3080,9 +3080,6 @@
     "resultsFailed": "Failed",
     "filters": "Filters",
     "refresh": "Refresh the log",
-    "activeFilters": "Active filters",
-    "removeFilter": "Remove the filter {{label}}",
-    "removeFilterShort": "Remove this filter",
     "chipFrom": "From {{date}}",
     "chipTo": "To {{date}}",
     "chipAction": "Action: {{action}}",
@@ -3110,12 +3107,6 @@
     "pageRange_one": "{{from}}–{{to}} of {{count, number}} event",
     "pageRange_other": "{{from}}–{{to}} of {{count, number}} events",
     "perPageLabel": "Events per page",
-    "perPage": "{{n}} / page",
-    "prevPage": "Previous page",
-    "nextPage": "Next page",
-    "pageWord": "Page",
-    "pageTotal": "of {{total}}",
-    "pageGo": "Go",
     "dateTime": "Date / time",
     "client": "Client",
     "copyIp": "Copy the IP address",
@@ -8030,5 +8021,23 @@
       "requests_one": "{{count}} request",
       "requests_other": "{{count}} requests"
     }
+  },
+  "atelier": {
+    "name": "Name",
+    "state": "State",
+    "tableOf": "Table: {{name}}",
+    "openDetail": "Open the detail of {{name}}",
+    "resizeColumn": "Drag to set the width, double-click to reset it",
+    "properties": "Properties",
+    "summary": "Summary",
+    "overview": "Overview",
+    "cardOptions": "Options of the {{name}} card",
+    "cardOptionsTitle": "Card options",
+    "hideCard": "Hide the card",
+    "customizeCards": "Customise the cards…",
+    "openItem": "Open item",
+    "detailOf": "Detail: {{name}}",
+    "sectionsOf": "Sections: {{name}}",
+    "settingsSections": "Settings sections"
   }
 }

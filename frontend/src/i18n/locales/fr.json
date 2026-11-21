@@ -758,9 +758,6 @@
     "resultsFailed": "Échecs",
     "filters": "Filtres",
     "refresh": "Actualiser le journal",
-    "activeFilters": "Filtres actifs",
-    "removeFilter": "Retirer le filtre {{label}}",
-    "removeFilterShort": "Retirer ce filtre",
     "chipFrom": "Du {{date}}",
     "chipTo": "Au {{date}}",
     "chipAction": "Action : {{action}}",
@@ -788,12 +785,6 @@
     "pageRange_one": "{{from}}–{{to}} sur {{count, number}} événement",
     "pageRange_other": "{{from}}–{{to}} sur {{count, number}} événements",
     "perPageLabel": "Événements par page",
-    "perPage": "{{n}} / page",
-    "prevPage": "Page précédente",
-    "nextPage": "Page suivante",
-    "pageWord": "Page",
-    "pageTotal": "sur {{total}}",
-    "pageGo": "Aller",
     "dateTime": "Date / heure",
     "client": "Client",
     "copyIp": "Copier l’adresse IP",
@@ -8030,5 +8021,23 @@
       "requests_one": "{{count}} demande",
       "requests_other": "{{count}} demandes"
     }
+  },
+  "atelier": {
+    "name": "Nom",
+    "state": "État",
+    "tableOf": "Tableau : {{name}}",
+    "openDetail": "Ouvrir le détail de {{name}}",
+    "resizeColumn": "Glisser pour régler la largeur, double-clic pour la remettre",
+    "properties": "Propriétés",
+    "summary": "Résumé",
+    "overview": "Aperçu",
+    "cardOptions": "Options de la carte {{name}}",
+    "cardOptionsTitle": "Options de la carte",
+    "hideCard": "Masquer la carte",
+    "customizeCards": "Personnaliser les cartes…",
+    "openItem": "Élément ouvert",
+    "detailOf": "Détail : {{name}}",
+    "sectionsOf": "Sections : {{name}}",
+    "settingsSections": "Sections des paramètres"
   }
 }

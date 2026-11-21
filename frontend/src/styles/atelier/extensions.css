@@ -1,0 +1,9 @@
+/*
+ * What the product has and the Atelier mockup has not, drawn for the zones copied from it; not
+ * copies. A column's width set by hand: the grip at the right edge of its header.
+ */
+.atl th:has(>.col-resize){position:relative}
+.atl th>.col-resize{position:absolute;top:0;right:0;bottom:0;width:6px;cursor:col-resize;touch-action:none}
+.atl th>.col-resize:hover{background:var(--line)}
+/* The mockup's #app wraps the zone's stage so that its rules on #app.dock-right apply; it draws no box. */
+.atl #app.zone-app{display:contents}
