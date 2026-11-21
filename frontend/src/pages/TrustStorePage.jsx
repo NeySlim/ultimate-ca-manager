@@ -425,7 +425,7 @@ export default function TrustStorePage() {
   const rows = filteredCertificates
   const narrowed = Boolean(query.trim() || purpose || active)
   const write = canWrite('truststore')
-  const add = write ? { label: t('trustStore.addCertificate'), icon: 'plus', onClick: handleOpenAddModal, primary: true } : undefined
+  const add = write ? { label: t('trustStore.addCertificate'), icon: 'plus', onClick: handleOpenAddModal, write: true } : undefined
   const selection = canDelete('truststore') ? {
     selected: selectedIds,
     onToggle: (id) => setSelectedIds((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next }),
@@ -536,7 +536,7 @@ export default function TrustStorePage() {
           <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')}
             onReset={() => { setQuery(''); setPurpose(''); setState('') }} />
         ) : (
-          <EmptyBlock id="truststore" icon="anchor" title={t('trustStore.noCertificates')} text={t('trustStore.addCertificatesForChain')} action={add} />
+          <EmptyBlock id="truststore" icon="anchor" title={t('trustStore.module.emptyTitle')} text={t('trustStore.addCertificatesForChain')} action={add} />
         )}
         footer={{ range: t('trustStore.module.range', { shown: rows.length, count: certificates.length }) }} />
     </Zone>

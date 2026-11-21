@@ -1658,7 +1658,9 @@
       "noSans": "无备用名称。",
       "moreActions": "{{name}} 的其他操作",
       "actionsTitle": "请求操作",
-      "details": "详情"
+      "details": "详情",
+      "emptyTitle": "没有签名请求",
+      "emptyText": "团队或协议提交的 CSR 会到达这里等待检查。您也可以将 CSR 粘贴到签发表单中。"
     }
   },
   "templates": {
@@ -3017,7 +3019,8 @@
       "selected_other": "已选择 {{count, number}} 个信任锚",
       "caption": "Trust Store。激活名称以打开其详情。",
       "filterByState": "按状态筛选",
-      "filterByType": "按类型筛选"
+      "filterByType": "按类型筛选",
+      "emptyTitle": "没有外部信任锚"
     }
   },
   "importExport": {

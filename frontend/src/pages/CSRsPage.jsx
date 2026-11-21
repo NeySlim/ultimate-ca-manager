@@ -1262,8 +1262,8 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
   const emptyBlock = narrowed ? (
     <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')} onReset={() => setSearchInput('')} />
   ) : (
-    <EmptyBlock id="csrs" icon="file" title={pendingEmpty ? t('csrs.noPendingCSRs') : t('csrs.noSignedCertificates')}
-      text={pendingEmpty ? t('csrs.uploadToStart') : t('csrs.signToSee')}
+    <EmptyBlock id="csrs" icon="file" title={pendingEmpty ? t('csrs.module.emptyTitle') : t('csrs.noSignedCertificates')}
+      text={pendingEmpty ? t('csrs.module.emptyText') : t('csrs.signToSee')}
       action={pendingEmpty && write ? { label: t('csrs.importCSR'), icon: 'upload', onClick: () => setShowImportModal(true), write: true } : undefined} />
   )
 

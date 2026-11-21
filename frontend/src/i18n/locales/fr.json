@@ -2581,7 +2581,9 @@
       "noSans": "Aucun nom alternatif.",
       "moreActions": "Autres actions de {{name}}",
       "actionsTitle": "Actions de la demande",
-      "details": "Détails"
+      "details": "Détails",
+      "emptyTitle": "Aucune demande de signature",
+      "emptyText": "Les CSR déposées par les équipes ou par les protocoles arrivent ici pour vérification. Vous pouvez aussi coller une CSR dans le formulaire d’émission."
     }
   },
   "dashboard": {
@@ -5084,7 +5086,8 @@
       "selected_other": "{{count, number}} ancres sélectionnées",
       "caption": "Trust Store. Activez un nom pour ouvrir son détail.",
       "filterByState": "Filtrer par état",
-      "filterByType": "Filtrer par type"
+      "filterByType": "Filtrer par type",
+      "emptyTitle": "Aucune ancre de confiance externe"
     }
   },
   "users": {

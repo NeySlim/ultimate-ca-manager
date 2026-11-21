@@ -1718,7 +1718,9 @@
       "noSans": "No alternative name.",
       "moreActions": "Other actions for {{name}}",
       "actionsTitle": "Request actions",
-      "details": "Details"
+      "details": "Details",
+      "emptyTitle": "No signing request",
+      "emptyText": "CSRs submitted by teams or by the protocols arrive here to be checked. You can also paste a CSR into the issue form."
     }
   },
   "templates": {
@@ -3121,7 +3123,8 @@
       "selected_many": "{{count, number}} anchors selected",
       "caption": "Trust Store. Activate a name to open its detail.",
       "filterByState": "Filter by state",
-      "filterByType": "Filter by type"
+      "filterByType": "Filter by type",
+      "emptyTitle": "No external trust anchor"
     }
   },
   "importExport": {

@@ -301,7 +301,7 @@ export default function TemplatesPage() {
   ]
   const narrowed = Boolean(query.trim() || source || active)
   const write = canWrite('templates')
-  const create = write ? { label: t('templates.createTemplate'), icon: 'plus', onClick: () => { setEditingTemplate(null); setShowTemplateModal(true) }, primary: true } : undefined
+  const create = write ? { label: t('templates.createTemplate'), icon: 'plus', onClick: () => { setEditingTemplate(null); setShowTemplateModal(true) }, write: true } : undefined
 
   // An open system template leaves the dock when the system templates are filtered out
   useEffect(() => {
