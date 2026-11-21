@@ -113,3 +113,41 @@ describe('ResponsiveDataTable variant="list" on a phone', () => {
     expect(screen.getByTestId('list-empty')).toHaveTextContent('Nothing yet')
   })
 })
+
+describe('records that open from anywhere (cardChevron)', () => {
+  it('carries the chevron of the row at the right of the first line, and the certificates\' records keep none', () => {
+    const { unmount } = render(<Harness />)
+    expect(screen.queryByRole('button', { name: 'table.openRow:{"name":"web.example.com"}' })).toBeNull()
+    expect(record('web.example.com')).not.toHaveClass('is-opening')
+    unmount()
+    render(<Harness cardChevron />)
+    const chevron = within(record('web.example.com')).getByRole('button', { name: 'table.openRow:{"name":"web.example.com"}' })
+    expect(chevron).toHaveAttribute('type', 'button')
+    expect(chevron.parentElement).toHaveClass('lv-mrecord-top')
+    expect(chevron.parentElement.lastElementChild).toBe(chevron)
+  })
+
+  it('opens from the record, the name or the chevron, once per click; the checkbox only ticks', () => {
+    const onRowClick = vi.fn()
+    render(<Harness cardChevron onRowClick={onRowClick} />)
+    fireEvent.click(record('web.example.com').querySelector('.lv-mrecord-meta'))
+    expect(onRowClick).toHaveBeenCalledTimes(1)
+    expect(onRowClick).toHaveBeenLastCalledWith(ROWS[0])
+    fireEvent.click(within(record('api.example.com')).getByRole('button', { name: 'table.openRow:{"name":"api.example.com"}' }))
+    fireEvent.click(within(record('api.example.com')).getByRole('button', { name: 'api.example.com' }))
+    expect(onRowClick).toHaveBeenCalledTimes(3)
+    expect(onRowClick).toHaveBeenLastCalledWith(ROWS[1])
+    onRowClick.mockClear()
+    fireEvent.click(within(record('api.example.com')).getByRole('checkbox'))
+    expect(onRowClick).not.toHaveBeenCalled()
+  })
+
+  it('opens nothing while a selection is being made', () => {
+    const onRowClick = vi.fn()
+    render(<Harness cardChevron onRowClick={onRowClick} />)
+    fireEvent.click(within(record('api.example.com')).getByRole('checkbox'))
+    fireEvent.click(record('web.example.com').querySelector('.lv-mrecord-status'))
+    expect(within(record('web.example.com')).getByRole('button', { name: 'table.openRow:{"name":"web.example.com"}' })).toBeDisabled()
+    expect(onRowClick).not.toHaveBeenCalled()
+  })
+})

@@ -44,3 +44,50 @@ describe('ResponsiveDataTable table view', () => {
     expect(onSelectionChange).toHaveBeenCalled()
   })
 })
+
+describe('ResponsiveDataTable table view: column widths', () => {
+  const wide = [
+    { key: 'common_name', header: 'Name' },
+    { key: 'status', header: 'Status' },
+    { key: 'created_at', header: 'Created' },
+    { key: 'description', header: 'Description', size: 2 },
+    { key: 'logger', header: 'Component' },
+    { key: 'mystery', header: 'Unknown' },
+    { key: 'note_count', header: 'Forced', fit: false },
+    { key: 'cn', header: 'Forced fit', fit: true },
+    { key: 'type', header: 'Fixed', width: '80px' },
+  ]
+  const cells = (table) => [...table.querySelectorAll('thead th')].map((th) => [th.textContent, th.className.match(/\b(fit|share)\b/)?.[1] || '', th.style.width])
+
+  it('sizes the short fixed-format columns to their content and shares the rest among the others by weight', () => {
+    render(<ResponsiveDataTable data={[{ id: 1, common_name: 'web', status: 'Valid', created_at: '2026-01-01', description: 'd', logger: 'api', mystery: 'x', note_count: 1, cn: 'c', type: 't' }]} columns={wide} />)
+    const table = screen.getByRole('table')
+    // weights 3, 2 (its size), 1.5 and 1 share the room the fitted columns leave;
+    // the browser lays the table out from the contents, no longer from fixed shares
+    expect(table.style.tableLayout).toBe('')
+    expect(cells(table)).toEqual([
+      ['Name', 'share', '40%'],
+      ['Status', 'fit', ''],
+      ['Created', 'fit', ''],
+      ['Description', 'share', '26.67%'],
+      ['Component', 'fit', ''],
+      ['Unknown', 'share', '20%'],
+      ['Forced', 'share', '13.33%'],
+      ['Forced fit', 'fit', ''],
+      ['Fixed', '', '80px'],
+    ])
+    // the body cells carry the class of their column
+    const row = table.querySelector('tbody tr')
+    expect([...row.children].map((td) => td.className.match(/\b(fit|share)\b/)?.[1] || '')).toEqual(['share', 'fit', 'fit', 'share', 'fit', 'share', 'share', 'fit', ''])
+  })
+
+  it('keeps a width set by hand in pixels', () => {
+    localStorage.setItem('ucm-widths-test-widths', JSON.stringify({ status: 140 }))
+    render(<ResponsiveDataTable data={[{ id: 1, common_name: 'web', status: 'Valid' }]} columns={wide.slice(0, 2)} columnStorageKey="ucm-widths-test" />)
+    const status = screen.getByRole('columnheader', { name: 'Status' })
+    expect(status.style.width).toBe('140px')
+    expect(status.className).not.toMatch(/\b(fit|share)\b/)
+    localStorage.removeItem('ucm-widths-test-widths')
+  })
+})
+

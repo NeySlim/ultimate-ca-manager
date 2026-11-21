@@ -152,12 +152,12 @@ export default function SchedulerSection({ hasPermission }) {
               <thead>
                 <tr>
                   <th>{t('scheduler.colTask')}</th>
-                  <th>{t('scheduler.colSchedule')}</th>
-                  <th>{t('scheduler.colLastRun')}</th>
-                  <th>{t('scheduler.colNextRun')}</th>
-                  <th>{t('scheduler.colDuration')}</th>
-                  <th className="text-right">{t('scheduler.colRuns')}</th>
-                  {canRun && <th />}
+                  <th className="fit">{t('scheduler.colSchedule')}</th>
+                  <th className="fit">{t('scheduler.colLastRun')}</th>
+                  <th className="fit">{t('scheduler.colNextRun')}</th>
+                  <th className="fit">{t('scheduler.colDuration')}</th>
+                  <th className="fit text-right">{t('scheduler.colRuns')}</th>
+                  {canRun && <th className="fit" />}
                 </tr>
               </thead>
               <tbody>
@@ -188,13 +188,13 @@ export default function SchedulerSection({ hasPermission }) {
                         </div>
                       </div>
                     </td>
-                    <td className="text-text-secondary">{humanizeInterval(task.interval, t)}</td>
-                    <td className="text-text-secondary">{compactRun(task.last_run, t) || '—'}</td>
-                    <td className="text-text-secondary">{compactRun(task.next_run, t) || '—'}</td>
-                    <td className="text-text-secondary tabular-nums">{fmtDuration(task.last_duration_ms, i18n?.language)}</td>
-                    <td className="text-right text-text-secondary tabular-nums">{task.run_count}</td>
+                    <td className="fit text-text-secondary">{humanizeInterval(task.interval, t)}</td>
+                    <td className="fit text-text-secondary">{compactRun(task.last_run, t) || '—'}</td>
+                    <td className="fit text-text-secondary">{compactRun(task.next_run, t) || '—'}</td>
+                    <td className="fit text-text-secondary tabular-nums">{fmtDuration(task.last_duration_ms, i18n?.language)}</td>
+                    <td className="fit text-right text-text-secondary tabular-nums">{task.run_count}</td>
                     {canRun && (
-                      <td className="text-right">
+                      <td className="fit text-right">
                         <RunButton busy={!!running[task.name]} onRun={() => handleRun(task.name, taskLabel(t, task))}>
                           {t('scheduler.runNow')}
                         </RunButton>
