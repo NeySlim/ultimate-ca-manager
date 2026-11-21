@@ -3081,6 +3081,7 @@
     "privateKeysMatched": "clé(s) privée(s) associée(s)",
     "importMore": "Importer d’autres",
     "allFormats": "Tous les formats : PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
+    "dropFileHere": "Déposez un fichier ici ou",
     "filePassword": "Mot de passe de déchiffrement pour ce fichier",
     "useGlobalPassword": "Utiliser le même mot de passe pour tous les fichiers",
     "typeCaCertificate": "Certificat AC",

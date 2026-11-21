@@ -5243,6 +5243,7 @@
     "privateKeysMatched": "個の秘密鍵が一致しました",
     "importMore": "さらにインポート",
     "allFormats": "全形式対応: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
+    "dropFileHere": "Drop a file here or",
     "filePassword": "このファイルの復号パスワード",
     "useGlobalPassword": "すべてのファイルに同じパスワードを使用",
     "typeCaCertificate": "CA証明書",

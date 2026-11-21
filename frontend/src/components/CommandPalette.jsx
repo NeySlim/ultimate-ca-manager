@@ -173,7 +173,7 @@ export function CommandPalette({ open, onOpenChange, can, onOpenHelp }) {
     navigate(command.path)
   }
 
-  // One flat list, in the order of the former sections: records found, favourites, recent items, pages and actions
+  // One flat list, in the order of the former sections: records found, favourites, recent items, pages and actions, help
   const SEARCHED = [
     ['certificates', 'certificate', (i) => i.subject || i.status],
     ['cas', 'ca', (i) => i.subject],
@@ -199,14 +199,15 @@ export function CommandPalette({ open, onOpenChange, can, onOpenHelp }) {
       key: `recent-${item.type}-${item.id}`, icon: getTypeIcon(item.type), name: item.name, hint: item.subtitle || t('commandPalette.recent'),
       run: () => openItem(item.type, item.id),
     })),
-    ...(onOpenHelp && [t('commandPalette.pageHelp'), t('common.help')].some(s => !search || s.toLowerCase().includes(lower)) ? [{
-      key: 'page-help', icon: 'help', name: t('commandPalette.pageHelp'), hint: t('common.help'),
-      run: () => { onOpenChange(false); onOpenHelp() },
-    }] : []),
     ...filteredCommands.map(cmd => ({
       key: `cmd-${cmd.id}`, icon: cmd.action === 'new' || cmd.action === 'upload' ? 'plus' : glyphOf(moduleForPath(cmd.path.split('?')[0])),
       name: t(cmd.labelKey), hint: t(cmd.categoryKey), run: () => executeCommand(cmd),
     })),
+    // The page's help (absent from the mockup's palette): on a matching search only, after the pages and modules
+    ...(onOpenHelp && search && [t('commandPalette.pageHelp'), t('common.help')].some(s => s.toLowerCase().includes(lower)) ? [{
+      key: 'page-help', icon: 'help', name: t('commandPalette.pageHelp'), hint: t('common.help'),
+      run: () => { onOpenChange(false); onOpenHelp() },
+    }] : []),
   ]
 
   const resultButtons = () => [...(listRef.current?.querySelectorAll('.command-result') || [])]

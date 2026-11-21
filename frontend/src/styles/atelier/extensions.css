@@ -223,5 +223,10 @@
 .atl .compare-table.group-perms{min-width:0}
 .atl .group-perms th:not(:first-child),.atl .group-perms td:not(:first-child){width:84px;text-align:center}
 .atl .group-perms td{padding:8px}
-/* A module table with a checkbox column (absent from the mockup's modules) gives it the Certificates table's 40 px and 6 px. */
-.atl .module-table:has(>thead>tr>th:first-child>.check-hit) th:first-child,.atl .module-table:has(>thead>tr>th:first-child>.check-hit) td:first-child{width:40px;padding:0 6px}
+/* A module table with a checkbox column (absent from the mockup's modules) gives it the Certificates table's 40 px and 6 px;
+   a spanning cell (the empty state's message) keeps the table's own padding. */
+.atl .module-table:has(>thead>tr>th:first-child>.check-hit) th:first-child,.atl .module-table:has(>thead>tr>th:first-child>.check-hit) td:first-child:not([colspan]){width:40px;padding:0 6px}
+/* Import: the file field says it takes dropped files, in the dashed box of the mockup's empty dashboard slot */
+.atl .drop-zone{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;padding:14px;border:1px dashed var(--control);border-radius:5px;color:var(--muted)}
+/* Files dragged over the field: the box takes the accent and the selected row's background */
+.atl .field.dragover .drop-zone{border-color:var(--accent);background:var(--selected)}

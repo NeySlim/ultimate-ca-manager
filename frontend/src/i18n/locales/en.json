@@ -5243,6 +5243,7 @@
     "privateKeysMatched": "private key(s) matched",
     "importMore": "Import More",
     "allFormats": "All formats: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
+    "dropFileHere": "Drop a file here or",
     "filePassword": "Decryption password for this file",
     "useGlobalPassword": "Use same password for all files",
     "typeCaCertificate": "CA Certificate",
