@@ -21,8 +21,7 @@ import { EventDialog } from './activity/EventDialog'
 import { ExportDialog, ActionsDialog, CleanupDialog } from './activity/JournalDialogs'
 import { FiltersDialog } from './activity/FiltersDialog'
 import '../styles/atelier/scope.css'
-import '../styles/atelier/activity.css'
-import '../styles/atelier/records.css'
+import '../styles/atelier/maquette.css'
 import { useMobile } from '../contexts/MobileContext'
 
 const PAGE_SIZES = [10, 25, 50, 100]
