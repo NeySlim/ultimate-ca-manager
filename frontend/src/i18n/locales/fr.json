@@ -8326,6 +8326,8 @@
     "wholeGuide": "Tout le guide",
     "skip": "Aller au chapitre",
     "openInTab": "Ouvrir dans un nouvel onglet",
+    "onThisPage": "Sur cette page",
+    "breadcrumbLabel": "Fil d’Ariane",
     "paletteEntry": "Guide",
     "paletteHint": "S’ouvre dans un nouvel onglet",
     "searchLabel": "Chercher dans tout le guide",
