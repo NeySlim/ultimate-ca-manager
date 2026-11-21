@@ -1647,7 +1647,13 @@
       "emptyText": "团队或协议提交的 CSR 会到达这里等待检查。您也可以将 CSR 粘贴到签发表单中。"
     },
     "signWith": "签名方式",
-    "uploadTooLarge": "文件超过 1 MB。"
+    "uploadTooLarge": "文件超过 1 MB。",
+    "keyCurveNistP256": "NIST P-256 (ECDSA)",
+    "keyCurveNistP384": "NIST P-384 (ECDSA)",
+    "keyCurveNistP521": "NIST P-521 (ECDSA)",
+    "keyRsa2048": "RSA 2048",
+    "keyRsa3072": "RSA 3072",
+    "keyRsa4096": "RSA 4096"
   },
   "templates": {
     "template": "模板",
@@ -3035,7 +3041,9 @@
     "openRenewed": "打开续期后的证书",
     "reattach": "重新绑定到续期后的证书",
     "reattached": "{{name}} 现在部署续期后的证书",
-    "reattachFailed": "无法重新绑定部署"
+    "reattachFailed": "无法重新绑定部署",
+    "kind_http": "HTTP API",
+    "kind_ssh": "SSH / SFTP"
   },
   "crlDeploy": {
     "title": "CRL 部署",
@@ -3394,7 +3402,9 @@
       "settings": "设置",
       "setup": "配置",
       "system": "系统"
-    }
+    },
+    "format_csv": "每个事件一行",
+    "format_json": "结构化数据"
   },
   "settings": {
     "appearanceSubtitle": "自定义UCM的外观和语言。",
@@ -6371,7 +6381,9 @@
       "range_other": "{{start}}–{{end}} / 共 {{count, number}} 个证书",
       "caption": "用户证书。激活名称以打开其详情。",
       "filterByState": "按状态筛选",
-      "orphan": "无证书"
+      "orphan": "无证书",
+      "format_csv": "每个证书一行",
+      "format_json": "结构化数据"
     }
   },
   "est": {
@@ -7012,7 +7024,8 @@
       "userCertificates": "Go to User Certificates",
       "tsa": "Go to TSA",
       "keyRecovery": "Go to Key Recovery",
-      "logs": "Go to System Logs"
+      "logs": "Go to System Logs",
+      "crlOcsp": "前往CRL/OCSP"
     },
     "actions": {
       "newCertificate": "签发新证书",
@@ -7413,7 +7426,10 @@
       "info": "信息"
     },
     "etsiNote": "ETSI 规则适用于合格证书和与 eIDAS 相关的证书；其他证书可能出现不适用的结果。",
-    "profileLabel": "配置文件"
+    "profileLabel": "配置文件",
+    "profile_cabf": "CA/浏览器论坛",
+    "profile_etsi": "ETSI (EN 319 412)",
+    "profile_rfc5280": "RFC 5280"
   },
   "keyRecovery": {
     "title": "密钥恢复",

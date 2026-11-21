@@ -1647,7 +1647,13 @@
       "emptyText": "CSRs submitted by teams or by the protocols arrive here to be checked. You can also paste a CSR into the issue form."
     },
     "signWith": "Sign with",
-    "uploadTooLarge": "The file is larger than 1 MB."
+    "uploadTooLarge": "The file is larger than 1 MB.",
+    "keyCurveNistP256": "NIST P-256 (ECDSA)",
+    "keyCurveNistP384": "NIST P-384 (ECDSA)",
+    "keyCurveNistP521": "NIST P-521 (ECDSA)",
+    "keyRsa2048": "RSA 2048",
+    "keyRsa3072": "RSA 3072",
+    "keyRsa4096": "RSA 4096"
   },
   "templates": {
     "template": "Modelo",
@@ -3035,7 +3041,9 @@
     "openRenewed": "Abrir o certificado renovado",
     "reattach": "Vincular ao certificado renovado",
     "reattached": "{{name}} agora implanta o certificado renovado",
-    "reattachFailed": "Não foi possível vincular novamente a implantação"
+    "reattachFailed": "Não foi possível vincular novamente a implantação",
+    "kind_http": "API HTTP",
+    "kind_ssh": "SSH / SFTP"
   },
   "crlDeploy": {
     "title": "Implantação de CRL",
@@ -3394,7 +3402,9 @@
       "settings": "Settings",
       "setup": "Configuration",
       "system": "System"
-    }
+    },
+    "format_csv": "One row per event",
+    "format_json": "Structured data"
   },
   "settings": {
     "appearanceSubtitle": "Personalize a aparência e o idioma do UCM",
@@ -6371,7 +6381,9 @@
       "range_other": "{{start}}–{{end}} of {{count, number}} certificates",
       "caption": "User certificates. Activate a name to open its detail.",
       "filterByState": "Filter by state",
-      "orphan": "No certificate"
+      "orphan": "No certificate",
+      "format_csv": "One row per certificate",
+      "format_json": "Structured data"
     }
   },
   "est": {
@@ -7012,7 +7024,8 @@
       "userCertificates": "Go to User Certificates",
       "tsa": "Go to TSA",
       "keyRecovery": "Go to Key Recovery",
-      "logs": "Go to System Logs"
+      "logs": "Go to System Logs",
+      "crlOcsp": "Ir para CRL/OCSP"
     },
     "actions": {
       "newCertificate": "Emitir novo certificado",
@@ -7413,7 +7426,10 @@
       "info": "Informação"
     },
     "etsiNote": "As regras ETSI aplicam-se a certificados qualificados e relacionados com o eIDAS; outros certificados podem gerar achados que não se aplicam.",
-    "profileLabel": "Profile"
+    "profileLabel": "Profile",
+    "profile_cabf": "CA/Browser Forum",
+    "profile_etsi": "ETSI (EN 319 412)",
+    "profile_rfc5280": "RFC 5280"
   },
   "keyRecovery": {
     "title": "Recuperação de chaves",

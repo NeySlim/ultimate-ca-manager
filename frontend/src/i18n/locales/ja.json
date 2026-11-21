@@ -1647,7 +1647,13 @@
       "emptyText": "CSRs submitted by teams or by the protocols arrive here to be checked. You can also paste a CSR into the issue form."
     },
     "signWith": "Sign with",
-    "uploadTooLarge": "The file is larger than 1 MB."
+    "uploadTooLarge": "The file is larger than 1 MB.",
+    "keyCurveNistP256": "NIST P-256 (ECDSA)",
+    "keyCurveNistP384": "NIST P-384 (ECDSA)",
+    "keyCurveNistP521": "NIST P-521 (ECDSA)",
+    "keyRsa2048": "RSA 2048",
+    "keyRsa3072": "RSA 3072",
+    "keyRsa4096": "RSA 4096"
   },
   "templates": {
     "template": "テンプレート",
@@ -3035,7 +3041,9 @@
     "openRenewed": "更新後の証明書を開く",
     "reattach": "更新後の証明書に再バインド",
     "reattached": "{{name}} は更新後の証明書をデプロイするようになりました",
-    "reattachFailed": "デプロイを再バインドできませんでした"
+    "reattachFailed": "デプロイを再バインドできませんでした",
+    "kind_http": "HTTP API",
+    "kind_ssh": "SSH / SFTP"
   },
   "crlDeploy": {
     "title": "CRL デプロイ",
@@ -3394,7 +3402,9 @@
       "settings": "Settings",
       "setup": "Configuration",
       "system": "System"
-    }
+    },
+    "format_csv": "One row per event",
+    "format_json": "Structured data"
   },
   "settings": {
     "appearanceSubtitle": "UCMの外観と言語をカスタマイズ",
@@ -6371,7 +6381,9 @@
       "range_other": "{{start}}–{{end}} of {{count, number}} certificates",
       "caption": "User certificates. Activate a name to open its detail.",
       "filterByState": "Filter by state",
-      "orphan": "No certificate"
+      "orphan": "No certificate",
+      "format_csv": "One row per certificate",
+      "format_json": "Structured data"
     }
   },
   "est": {
@@ -7012,7 +7024,8 @@
       "userCertificates": "Go to User Certificates",
       "tsa": "Go to TSA",
       "keyRecovery": "Go to Key Recovery",
-      "logs": "Go to System Logs"
+      "logs": "Go to System Logs",
+      "crlOcsp": "CRL/OCSPへ"
     },
     "actions": {
       "newCertificate": "新しい証明書を発行",
@@ -7413,7 +7426,10 @@
       "info": "情報"
     },
     "etsiNote": "ETSI のルールは適格証明書および eIDAS 関連の証明書に適用されます。それ以外の証明書では該当しない指摘が出る場合があります。",
-    "profileLabel": "Profile"
+    "profileLabel": "Profile",
+    "profile_cabf": "CA/Browser Forum",
+    "profile_etsi": "ETSI (EN 319 412)",
+    "profile_rfc5280": "RFC 5280"
   },
   "keyRecovery": {
     "title": "鍵リカバリ",

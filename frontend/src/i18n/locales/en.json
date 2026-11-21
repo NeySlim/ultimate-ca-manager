@@ -1647,7 +1647,13 @@
       "emptyText": "CSRs submitted by teams or by the protocols arrive here to be checked. You can also paste a CSR into the issue form."
     },
     "signWith": "Sign with",
-    "uploadTooLarge": "The file is larger than 1 MB."
+    "uploadTooLarge": "The file is larger than 1 MB.",
+    "keyCurveNistP256": "NIST P-256 (ECDSA)",
+    "keyCurveNistP384": "NIST P-384 (ECDSA)",
+    "keyCurveNistP521": "NIST P-521 (ECDSA)",
+    "keyRsa2048": "RSA 2048",
+    "keyRsa3072": "RSA 3072",
+    "keyRsa4096": "RSA 4096"
   },
   "templates": {
     "template": "Template",
@@ -3035,7 +3041,9 @@
     "openRenewed": "Open the renewed certificate",
     "reattach": "Reattach to the renewed certificate",
     "reattached": "{{name}} now deploys the renewed certificate",
-    "reattachFailed": "Could not reattach the deployment"
+    "reattachFailed": "Could not reattach the deployment",
+    "kind_http": "HTTP API",
+    "kind_ssh": "SSH / SFTP"
   },
   "crlDeploy": {
     "title": "CRL Deployment",
@@ -3394,7 +3402,9 @@
       "settings": "Settings",
       "setup": "Configuration",
       "system": "System"
-    }
+    },
+    "format_csv": "One row per event",
+    "format_json": "Structured data"
   },
   "settings": {
     "appearanceSubtitle": "Customize UCM appearance and language.",
@@ -6371,7 +6381,9 @@
       "range_other": "{{start}}–{{end}} of {{count, number}} certificates",
       "caption": "User certificates. Activate a name to open its detail.",
       "filterByState": "Filter by state",
-      "orphan": "No certificate"
+      "orphan": "No certificate",
+      "format_csv": "One row per certificate",
+      "format_json": "Structured data"
     }
   },
   "est": {
@@ -7012,7 +7024,8 @@
       "userCertificates": "Go to User Certificates",
       "tsa": "Go to TSA",
       "keyRecovery": "Go to Key Recovery",
-      "logs": "Go to System Logs"
+      "logs": "Go to System Logs",
+      "crlOcsp": "Go to CRL/OCSP"
     },
     "actions": {
       "newCertificate": "Issue New Certificate",
@@ -7413,7 +7426,10 @@
       "info": "Info"
     },
     "etsiNote": "ETSI rules apply to qualified and eIDAS-related certificates; other certificates may raise findings that do not apply.",
-    "profileLabel": "Profile"
+    "profileLabel": "Profile",
+    "profile_cabf": "CA/Browser Forum",
+    "profile_etsi": "ETSI (EN 319 412)",
+    "profile_rfc5280": "RFC 5280"
   },
   "keyRecovery": {
     "title": "Key Recovery",

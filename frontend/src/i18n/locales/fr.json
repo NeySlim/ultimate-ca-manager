@@ -906,7 +906,9 @@
       "settings": "Paramètres",
       "setup": "Configuration",
       "system": "Système"
-    }
+    },
+    "format_csv": "Une ligne par événement",
+    "format_json": "Données structurées"
   },
   "auth": {
     "continue": "Continuer",
@@ -2614,7 +2616,9 @@
     "openRenewed": "Ouvrir le certificat renouvelé",
     "reattach": "Rattacher au certificat renouvelé",
     "reattached": "{{name}} déploie désormais le certificat renouvelé",
-    "reattachFailed": "Impossible de rattacher le déploiement"
+    "reattachFailed": "Impossible de rattacher le déploiement",
+    "kind_http": "API HTTP",
+    "kind_ssh": "SSH / SFTP"
   },
   "csrs": {
     "uploadCSR": "Téléverser une CSR",
@@ -2708,7 +2712,13 @@
       "emptyText": "Les CSR déposées par les équipes ou par les protocoles arrivent ici pour vérification. Vous pouvez aussi coller une CSR dans le formulaire d’émission."
     },
     "signWith": "Signer avec",
-    "uploadTooLarge": "Le fichier dépasse 1 Mo."
+    "uploadTooLarge": "Le fichier dépasse 1 Mo.",
+    "keyCurveNistP256": "NIST P-256 (ECDSA)",
+    "keyCurveNistP384": "NIST P-384 (ECDSA)",
+    "keyCurveNistP521": "NIST P-521 (ECDSA)",
+    "keyRsa2048": "RSA 2048",
+    "keyRsa3072": "RSA 3072",
+    "keyRsa4096": "RSA 4096"
   },
   "dashboard": {
     "welcome": "Bienvenue sur UCM",
@@ -6371,7 +6381,9 @@
       "range_other": "{{start}}–{{end}} sur {{count, number}} certificats",
       "caption": "Certificats utilisateurs. Activez un nom pour ouvrir son détail.",
       "filterByState": "Filtrer par état",
-      "orphan": "Sans certificat"
+      "orphan": "Sans certificat",
+      "format_csv": "Une ligne par certificat",
+      "format_json": "Données structurées"
     }
   },
   "est": {
@@ -7012,7 +7024,8 @@
       "userCertificates": "Aller aux certificats utilisateur",
       "tsa": "Aller à TSA",
       "keyRecovery": "Aller à la récupération de clés",
-      "logs": "Aller aux journaux système"
+      "logs": "Aller aux journaux système",
+      "crlOcsp": "Aller à CRL/OCSP"
     },
     "actions": {
       "newCertificate": "Émettre un nouveau certificat",
@@ -7413,7 +7426,10 @@
       "notice": "Remarque",
       "info": "Info"
     },
-    "profileLabel": "Profil"
+    "profileLabel": "Profil",
+    "profile_cabf": "CA/Browser Forum",
+    "profile_etsi": "ETSI (EN 319 412)",
+    "profile_rfc5280": "RFC 5280"
   },
   "keyRecovery": {
     "title": "Récupération de clés",
