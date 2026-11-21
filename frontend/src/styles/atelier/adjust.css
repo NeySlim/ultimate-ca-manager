@@ -36,8 +36,8 @@
 /* The bar never grows past the window and its tools never give way: the links take what is left. */
 @media(min-width:801px){:root .atl .masthead{min-width:0}:root .atl .masthead .global-tools{flex-shrink:0}:root .atl .main-nav{min-width:0}}
 /* Short of room (shell/useNavRoom.js) the links' side padding tightens, the underline with it; */
-:root .atl .main-nav[style*="--nav-pad"]>:is(a,button){padding-left:var(--nav-pad);padding-right:var(--nav-pad)}
-:root .atl .main-nav[style*="--nav-pad"] .active:after{left:var(--nav-pad);right:var(--nav-pad)}
+:root .atl .main-nav[style*="--nav-pad"]>:is(a,button){padding-left:var(--nav-pad,12px);padding-right:var(--nav-pad,12px)}
+:root .atl .main-nav[style*="--nav-pad"] .active:after{left:var(--nav-pad,12px);right:var(--nav-pad,12px)}
 /* then the pinned labels end in an ellipsis, then the pinned links fold away into the Modules menu. */
 :root .atl .main-nav>.pinned-link,:root .atl .main-nav .pin-label{min-width:0}
 :root .atl .main-nav[data-room=fold]>.pinned-link{display:none}
