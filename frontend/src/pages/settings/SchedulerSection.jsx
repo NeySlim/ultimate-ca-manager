@@ -188,13 +188,13 @@ export default function SchedulerSection({ hasPermission }) {
                         </div>
                       </div>
                     </td>
-                    <td className="fit text-text-secondary">{humanizeInterval(task.interval, t)}</td>
-                    <td className="fit text-text-secondary">{compactRun(task.last_run, t) || '—'}</td>
-                    <td className="fit text-text-secondary">{compactRun(task.next_run, t) || '—'}</td>
-                    <td className="fit text-text-secondary tabular-nums">{fmtDuration(task.last_duration_ms, i18n?.language)}</td>
-                    <td className="fit text-right text-text-secondary tabular-nums">{task.run_count}</td>
+                    <td className="fit text-text-secondary" data-label={t('scheduler.colSchedule')}>{humanizeInterval(task.interval, t)}</td>
+                    <td className="fit text-text-secondary" data-label={t('scheduler.colLastRun')}>{compactRun(task.last_run, t) || '—'}</td>
+                    <td className="fit text-text-secondary" data-label={t('scheduler.colNextRun')}>{compactRun(task.next_run, t) || '—'}</td>
+                    <td className="fit text-text-secondary tabular-nums" data-label={t('scheduler.colDuration')}>{fmtDuration(task.last_duration_ms, i18n?.language)}</td>
+                    <td className="fit text-right text-text-secondary tabular-nums" data-label={t('scheduler.colRuns')}>{task.run_count}</td>
                     {canRun && (
-                      <td className="fit text-right">
+                      <td className="fit text-right sf-task-run">
                         <RunButton busy={!!running[task.name]} onRun={() => handleRun(task.name, taskLabel(t, task))}>
                           {t('scheduler.runNow')}
                         </RunButton>
