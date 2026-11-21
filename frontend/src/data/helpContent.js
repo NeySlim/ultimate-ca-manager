@@ -126,7 +126,7 @@ export const helpContent = {
         title: 'First run',
         icon: Stack,
         items: [
-          { label: 'Initial setup', text: 'On an instance without any CA nor certificate, administrators see the Initial setup card on the overview and on the certificate list: a root, an issuing CA, a protocol' },
+          { label: 'Initial setup', text: 'On an instance without any CA nor certificate, administrators see the Initial setup assistant on the overview and on the certificate list: a root, an issuing CA, a protocol. Until its steps are done, the empty certificate list and the empty Authorities page offer Open the setup assistant' },
           { label: 'Steps', text: 'Each step opens the screen that does it, and is ticked once what it creates exists' },
           { label: 'Later and Hide', text: 'Later folds the card into one line and Resume opens it again; Hide closes a finished setup, which is not shown again' },
         ]
@@ -366,7 +366,7 @@ export const helpContent = {
     ],
     tips: [
       'Star ⭐ important certificates to add them to your favorites list',
-      'The tabs above the list filter by state and count each one; the tab is part of the address, so a reload or a shared link keeps it. The search, the sort, the page and the CA, source and template filters are part of the address too; a bare address applies the CA, source and template filters saved in this browser',
+      'The tabs above the list filter by state and count each one; the tab is part of the address, so a reload or a shared link keeps it. The search, the sort, the page and the CA, source and template filters are part of the address too; a bare address shows the whole list, the browser keeping no filter aside. The certificates open in the inspector are part of the address as well (item for the one shown, open when there are several), so a reload reopens each of them',
       'Only the name and the chevron open a certificate in the inspector; a row keeps one action, Export. The inspector heading has Export and Renew; its ⋯ opens the Certificate actions dialog: copy the common name, view its activity in the audit log, revoke, then lint, key upload, rename, favorites, adding the issuing CA to the trust store, and delete. Tick rows to compare two certificates or to export them; while rows are ticked, names and row actions wait. Inspect the authority, in the chain, opens it on the Authorities page. Escape closes the inspector from anywhere on the page',
       'The Expiry column gives days below 60, then months, then years and months (45 d, 16 mo, 1 y 4 mo, 9 y, Expired); hover it for the exact date and time. The list shows 12 certificates a page by default (25, 50 or 100 on choice, remembered), with a page number field beyond 20 pages. Columns opens a dialog to choose the columns; the name and the state always show. The density button switches the rows between 36 and 44 px, on every list of the interface. Under 800 px wide, each certificate is a record with its state and expiry date, and the inspector takes the whole screen; the page scrolls down to its pages. Below 1000 px wide the overview keeps two columns, the chain staying in its own tab',
       'Renewing keeps the same record (id, refid, creation date). Renew from the page generates a new key; the automatic renewal keeps the key. A certificate whose key UCM does not hold (SCEP, EST, WSTEP or ACME enrolment, import without the key) is refused (409): renew it through its protocol or sign a new request',
