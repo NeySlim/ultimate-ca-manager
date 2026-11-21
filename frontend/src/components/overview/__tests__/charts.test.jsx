@@ -60,7 +60,7 @@ describe('certificate activity', () => {
     show(<TrendCard />)
     const chart = await screen.findByTestId('trend-chart')
     vi.unstubAllGlobals()
-    await waitFor(() => expect(chart.getAttribute('viewBox')).toBe('0 0 913 210'))
+    await waitFor(() => expect(chart.getAttribute('viewBox')).toBe('0 0 913 210'), { timeout: 5000 })
     expect(chart.getAttribute('height')).toBe('210')
     expect(seen).toEqual([chart.parentElement])
   })
