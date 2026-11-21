@@ -147,7 +147,7 @@ export function useApprovalDecision({ onDone, refocus } = {}) {
       {outcome ? (
         <BulkOutcome outcome={outcome} nameOf={(req) => `#${req.id} · ${requestTitle(req, t)}`} onClose={dismiss} />
       ) : (
-        <form noValidate onSubmit={(e) => { e.preventDefault(); confirm() }}>
+        <>
           <div className="review-summary">
             <ul className="decision-list" data-testid="decision-list">
               {ask.requests.map((req) => (
@@ -177,12 +177,12 @@ export function useApprovalDecision({ onDone, refocus } = {}) {
           </div>
           <div className="modal-actions">
             <Btn data-action="close-modal" onClick={dismiss}>{t('common.cancel')}</Btn>
-            <Btn type="submit" tone={approve ? 'primary' : 'danger'} icon={approve ? 'check' : 'block'} disabled={busy || undefined}
+            <Btn tone={approve ? 'primary' : 'danger'} icon={approve ? 'check' : 'block'} disabled={busy || undefined} onClick={confirm}
               data-confirm-decision={approve ? 'approve' : 'refuse'} data-testid="decision-confirm">
               {t(approve ? 'approvals.work.approve' : 'approvals.work.reject')}{many ? ` (${ask.requests.length})` : ''}
             </Btn>
           </div>
-        </form>
+        </>
       )}
     </AtelierDialog>
   )

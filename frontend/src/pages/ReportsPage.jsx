@@ -119,7 +119,6 @@ export default function ReportsPage() {
           </>
         )} />
       <WorkView
-        label={t('reports.title')}
         state={state}
         error={(
           <LoadError id="reports" title={t('reports.loadFailed')} onRetry={() => load()} journal={hasPermission('read:audit') && '/audit'}

@@ -144,7 +144,6 @@ export default function ApprovalsPage() {
       <PageHead title={t('common.approvals')} total={state === 'ready' ? t('approvals.work.total', { count: pending.length }) : ''}
         intent={t('approvals.work.intent')} />
       <WorkView
-        label={t('common.approvals')}
         state={state}
         error={(
           <LoadError id="approvals" title={t('approvals.loadFailed')} onRetry={() => load()} journal={hasPermission('read:audit') && '/audit'}

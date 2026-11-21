@@ -252,14 +252,14 @@ export default function DiscoveryPage() {
       {progressNote}
 
       {view === 'profiles' && (
-        <ListView label={t('discovery.scans.title')} caption={t('discovery.scans.caption')} icon="radar" rows={scanRows} loading={loading}
+        <ListView label={t('shell.moduleLabel.discovery')} caption={t('discovery.scans.caption')} icon="radar" rows={scanRows} loading={loading}
           filters={{ views: [{ id: '', label: t('common.all'), count: scanSearched.length },
             ...scanPresent.map((s) => ({ id: s, label: t(`discovery.scans.state.${s}`), count: scanSearched.filter((p) => stateOfScan(p) === s).length }))],
-          active: scanActive, onChange: setScanView, label: t('discovery.filterByStatus') }}
+          active: scanActive, onChange: setScanView, label: t('discovery.filterByState') }}
           toolbar={<Toolbar>{search('scan-search', t('discovery.searchProfiles'))}</Toolbar>}
           title={(p) => p.name} status={(p) => <ScanPill state={stateOfScan(p)} />} openedId={openedId} onOpen={open('profiles')}
           columns={[
-            { id: 'range', label: t('discovery.form.range'), cell: (p) => <span className="mono">{facts.range(p)}</span>, grow: true },
+            { id: 'range', label: t('discovery.form.range'), cell: (p) => facts.range(p), grow: true },
             { id: 'found', label: t('discovery.scans.found'), cell: (p) => facts.found(p, last.get(p.id)) },
             { id: 'last', label: t('discovery.scans.last'), cell: (p) => facts.last(p, last.get(p.id)) },
             { status: true },
@@ -278,7 +278,7 @@ export default function DiscoveryPage() {
             { id: 'managed', label: t('discovery.found.state.managed'), count: stats.managed ?? 0 },
             { id: 'unmanaged', label: t('discovery.found.state.unmanaged'), count: stats.unmanaged ?? 0 },
             ...(stats.errors > 0 ? [{ id: 'error', label: t('discovery.found.state.error'), count: stats.errors, warn: true }] : []),
-          ], active: foundView, onChange: (v) => { setFoundView(v); setPage(1) }, label: t('discovery.filterByStatus') }}
+          ], active: foundView, onChange: (v) => { setFoundView(v); setPage(1) }, label: t('discovery.filterByState') }}
           toolbar={(
             <Toolbar>
               {search('found-search', t('discovery.searchDiscovered'))}
@@ -314,7 +314,7 @@ export default function DiscoveryPage() {
         <ListView label={t('discovery.views.history')} caption={t('discovery.runs.caption')} icon="clock" rows={runRows} loading={loading}
           filters={{ views: [{ id: '', label: t('common.all'), count: runSearched.length },
             ...runPresent.map((s) => ({ id: s, label: t(`discovery.runs.state.${s}`), count: runSearched.filter((r) => runState(r) === s).length }))],
-          active: runActive, onChange: setRunView, label: t('discovery.filterByStatus') }}
+          active: runActive, onChange: setRunView, label: t('discovery.filterByState') }}
           toolbar={(
             <Toolbar>
               {search('run-search', t('discovery.searchHistory'))}

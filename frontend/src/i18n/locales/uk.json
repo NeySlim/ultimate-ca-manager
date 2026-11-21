@@ -6650,7 +6650,7 @@
     "exportFailed": "Помилка експорту",
     "exportSuccess": "Експорт завершено",
     "filterByProfile": "Фільтр за профілем",
-    "filterByStatus": "Фільтр за статусом",
+    "filterByState": "Filter by state",
     "firstSeen": "Перше виявлення",
     "groups": {
       "monitoring": "Моніторинг",
@@ -6768,7 +6768,6 @@
       "history": "Run history"
     },
     "scans": {
-      "title": "Analyses",
       "unit_one": "{{count}} analysis",
       "unit_few": "{{count}} analyses",
       "unit_many": "{{count}} analyses",
@@ -6803,7 +6802,6 @@
       "progress": "Scan in progress: {{scanned}} of {{total}} targets, {{found}} certificates found."
     },
     "found": {
-      "title": "Found certificates",
       "unit_one": "{{count}} certificate",
       "unit_few": "{{count}} certificates",
       "unit_many": "{{count}} certificates",
@@ -6826,7 +6824,6 @@
       "purged": "Found certificates deleted"
     },
     "runs": {
-      "title": "Run history",
       "unit_one": "{{count}} run",
       "unit_few": "{{count}} runs",
       "unit_many": "{{count}} runs",

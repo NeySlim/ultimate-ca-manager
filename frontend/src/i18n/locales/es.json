@@ -6442,7 +6442,7 @@
     "exportFailed": "Error en la exportación",
     "exportSuccess": "Exportación completada",
     "filterByProfile": "Filtrar por perfil",
-    "filterByStatus": "Filtrar por estado",
+    "filterByState": "Filter by state",
     "firstSeen": "Primera detección",
     "groups": {
       "monitoring": "Monitoreo",
@@ -6560,7 +6560,6 @@
       "history": "Run history"
     },
     "scans": {
-      "title": "Analyses",
       "unit_one": "{{count}} analysis",
       "unit_other": "{{count}} analyses",
       "range_one": "{{shown}} of {{count}} analysis",
@@ -6591,7 +6590,6 @@
       "progress": "Scan in progress: {{scanned}} of {{total}} targets, {{found}} certificates found."
     },
     "found": {
-      "title": "Found certificates",
       "unit_one": "{{count}} certificate",
       "unit_other": "{{count}} certificates",
       "range": "{{start}}–{{end}} of {{count}}",
@@ -6610,7 +6608,6 @@
       "purged": "Found certificates deleted"
     },
     "runs": {
-      "title": "Run history",
       "unit_one": "{{count}} run",
       "unit_other": "{{count}} runs",
       "range_one": "{{shown}} of {{count}} run",

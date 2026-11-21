@@ -6653,7 +6653,7 @@
     "exportFailed": "Не удалось выполнить экспорт",
     "exportSuccess": "Экспорт завершён",
     "filterByProfile": "Фильтр по профилю",
-    "filterByStatus": "Фильтр по статусу",
+    "filterByState": "Фильтр по состоянию",
     "firstSeen": "Впервые виден",
     "groups": {
       "monitoring": "Мониторинг",
@@ -6771,7 +6771,6 @@
       "history": "История запусков"
     },
     "scans": {
-      "title": "Анализы",
       "unit_one": "{{count}} анализ",
       "unit_few": "{{count}} анализа",
       "unit_many": "{{count}} анализов",
@@ -6806,7 +6805,6 @@
       "progress": "Идёт сканирование: {{scanned}} из {{total}} целей, найдено сертификатов: {{found}}."
     },
     "found": {
-      "title": "Найденные сертификаты",
       "unit_one": "{{count}} сертификат",
       "unit_few": "{{count}} сертификата",
       "unit_many": "{{count}} сертификатов",
@@ -6829,7 +6827,6 @@
       "purged": "Найденные сертификаты удалены"
     },
     "runs": {
-      "title": "История запусков",
       "unit_one": "{{count}} запуск",
       "unit_few": "{{count}} запуска",
       "unit_many": "{{count}} запусков",

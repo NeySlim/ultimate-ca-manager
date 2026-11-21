@@ -154,7 +154,6 @@ export default function KeyRecoveryPage() {
       <PageHead title={t('keyRecovery.title')} total={state === 'ready' ? t('keyRecovery.work.total', { count: open_ }) : ''}
         intent={t('keyRecovery.work.intent')} />
       <WorkView
-        label={t('keyRecovery.title')}
         state={state}
         error={(
           <LoadError id="key-recovery" title={t('keyRecovery.loadFailed')} onRetry={() => load()} journal={hasPermission('read:audit') && '/audit'}

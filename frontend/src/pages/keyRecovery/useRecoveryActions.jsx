@@ -151,7 +151,7 @@ export function useRecoveryActions({ onDone, refocus } = {}) {
           {actions(<Btn type="submit" tone="primary" icon="download" disabled={busy || undefined}>{t('keyRecovery.download')}</Btn>)}
         </form>
       ) : (
-        <form noValidate onSubmit={(e) => { e.preventDefault(); decide() }}>
+        <>
           {list(ask.requests)}
           <div className="field decision-field">
             <label htmlFor="recovery-note">
@@ -172,12 +172,12 @@ export function useRecoveryActions({ onDone, refocus } = {}) {
             <Icon name="help" />{t(`keyRecovery.work.dialog.${kind === 'approve' ? 'approveNote' : 'rejectNote'}${many ? 'Many' : ''}`)}
           </div>
           {actions(
-            <Btn type="submit" tone={kind === 'approve' ? 'primary' : 'danger'} icon={kind === 'approve' ? 'check' : 'block'}
-              disabled={busy || undefined} data-testid="recovery-confirm">
+            <Btn tone={kind === 'approve' ? 'primary' : 'danger'} icon={kind === 'approve' ? 'check' : 'block'}
+              disabled={busy || undefined} onClick={decide} data-testid="recovery-confirm">
               {t(kind === 'approve' ? 'keyRecovery.work.approve' : 'keyRecovery.work.reject')}{many ? ` (${ask.requests.length})` : ''}
             </Btn>,
           )}
-        </form>
+        </>
       )}
     </AtelierDialog>
   )

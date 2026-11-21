@@ -6445,7 +6445,7 @@
     "exportFailed": "Échec de l’export",
     "exportSuccess": "Export terminé",
     "filterByProfile": "Filtrer par profil",
-    "filterByStatus": "Filtrer par statut",
+    "filterByState": "Filtrer par état",
     "firstSeen": "Première détection",
     "groups": {
       "monitoring": "Surveillance",
@@ -6563,7 +6563,6 @@
       "history": "Historique des analyses"
     },
     "scans": {
-      "title": "Analyses",
       "unit_one": "{{count}} analyse",
       "unit_other": "{{count}} analyses",
       "range_one": "{{shown}} sur {{count}} analyse",
@@ -6594,7 +6593,6 @@
       "progress": "Analyse en cours : {{scanned}} cibles sur {{total}}, {{found}} certificats trouvés."
     },
     "found": {
-      "title": "Certificats trouvés",
       "unit_one": "{{count}} certificat",
       "unit_other": "{{count}} certificats",
       "range": "{{start}}–{{end}} sur {{count}}",
@@ -6613,7 +6611,6 @@
       "purged": "Certificats trouvés supprimés"
     },
     "runs": {
-      "title": "Historique des analyses",
       "unit_one": "{{count}} exécution",
       "unit_other": "{{count}} exécutions",
       "range_one": "{{shown}} sur {{count}} exécution",

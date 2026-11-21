@@ -6442,7 +6442,7 @@
     "exportFailed": "导出失败",
     "exportSuccess": "导出完成",
     "filterByProfile": "按配置筛选",
-    "filterByStatus": "按状态筛选",
+    "filterByState": "按状态筛选",
     "firstSeen": "首次发现",
     "groups": {
       "monitoring": "监控",
@@ -6560,7 +6560,6 @@
       "history": "运行历史"
     },
     "scans": {
-      "title": "分析",
       "unit_one": "{{count}} 项分析",
       "unit_other": "{{count}} 项分析",
       "range_one": "{{shown}} / {{count}} 项分析",
@@ -6591,7 +6590,6 @@
       "progress": "正在扫描：{{scanned}} / {{total}} 个目标，已发现 {{found}} 个证书。"
     },
     "found": {
-      "title": "已发现证书",
       "unit_one": "{{count}} 个证书",
       "unit_other": "{{count}} 个证书",
       "range": "{{start}}–{{end}} / {{count}}",
@@ -6610,7 +6608,6 @@
       "purged": "已删除已发现证书"
     },
     "runs": {
-      "title": "运行历史",
       "unit_one": "{{count}} 次运行",
       "unit_other": "{{count}} 次运行",
       "range_one": "{{shown}} / {{count}} 次运行",

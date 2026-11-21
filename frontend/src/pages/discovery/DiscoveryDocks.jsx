@@ -36,7 +36,7 @@ export function ScanDock({ profile, run, runs, state, section, onSection, onClos
   const facts = useScanFacts()
   const own = runs.filter((r) => r.scan_profile_id === profile.id)
   return (
-    <Dock label={t('atelier.detailOf', { name: t('discovery.scans.title') })} tabsLabel={t('atelier.openItem')} activeKey={profile.id}
+    <Dock label={t('atelier.detailOf', { name: t('shell.moduleLabel.discovery') })} tabsLabel={t('atelier.openItem')} activeKey={profile.id}
       tabs={[{ key: profile.id, title: profile.name, icon: 'radar' }]} onClose={onClose}>
       <DockBody icon="radar" title={profile.name} badge={<ScanPill state={state} />} actions={actions}
         sections={[['overview', t('atelier.overview')], ['runs', t('discovery.scans.runsTab')]]}
@@ -52,14 +52,14 @@ export function ScanDock({ profile, run, runs, state, section, onSection, onClos
           <div className="module-detail">
             <Section title={t('atelier.properties')}>
               <Props items={[
-                [t('discovery.form.range'), mono(targetsOf(profile).join(', ') || '—')],
-                [t('discovery.ports'), mono(portsOf(profile).join(', '))],
+                [t('discovery.form.range'), targetsOf(profile).join(', ') || '—'],
                 [t('discovery.scans.found'), facts.found(profile, run)],
                 [t('discovery.scans.last'), facts.last(profile, run)],
+                [t('atelier.state'), <ScanPill state={state} />],
+                [t('discovery.ports'), portsOf(profile).join(', ')],
                 [t('discovery.schedule'), facts.schedule(profile)],
                 profile.schedule_enabled && profile.next_scan_at && [t('discovery.scans.next'), when(profile.next_scan_at)],
                 profile.notify_email && [t('discovery.notifyEmail'), profile.notify_email],
-                [t('atelier.state'), <ScanPill state={state} />],
               ]} />
             </Section>
             <Section title={t('atelier.summary')}>
@@ -76,7 +76,7 @@ export function RunDock({ run, onClose }) {
   const { t } = useTranslation()
   const title = runTitle(run, t)
   return (
-    <Dock label={t('atelier.detailOf', { name: t('discovery.runs.title') })} tabsLabel={t('atelier.openItem')} activeKey={run.id}
+    <Dock label={t('atelier.detailOf', { name: t('shell.moduleLabel.discovery') })} tabsLabel={t('atelier.openItem')} activeKey={run.id}
       tabs={[{ key: run.id, title, icon: 'clock' }]} onClose={onClose}>
       <DockBody icon="clock" title={title} badge={<RunPill run={run} />}
         sections={[['overview', t('atelier.overview')]]} section="overview" onSection={() => {}} sectionsLabel={t('atelier.sectionsOf', { name: title })}>
@@ -122,7 +122,7 @@ export function FoundDock({ cert, onClose, actions }) {
   }
   const exts = extensionRows(c.extensions)
   return (
-    <Dock label={t('atelier.detailOf', { name: t('discovery.found.title') })} tabsLabel={t('atelier.openItem')} activeKey={cert.id}
+    <Dock label={t('atelier.detailOf', { name: t('shell.moduleLabel.discovery') })} tabsLabel={t('atelier.openItem')} activeKey={cert.id}
       tabs={[{ key: cert.id, title, icon: 'cert' }]} onClose={onClose}>
       <DockBody icon="cert" title={title} badge={<FoundPill cert={cert} />} actions={actions}
         sections={[['overview', t('atelier.overview')]]} section="overview" onSection={() => {}} sectionsLabel={t('atelier.sectionsOf', { name: title })}>
