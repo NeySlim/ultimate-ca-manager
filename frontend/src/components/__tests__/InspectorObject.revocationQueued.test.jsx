@@ -60,7 +60,7 @@ async function revokeThenDelete(revokeResult) {
   render(<InspectorObject entry={WINDOW} onTitle={() => {}} />, { wrapper: MemoryRouter })
   await screen.findAllByText('web.example.com')
   await chooseMoreAction('common.delete')
-  fireEvent.submit(await screen.findByText('revocation.confirm').then(el => el.closest('form')))
+  fireEvent.click(await screen.findByRole('button', { name: 'revocation.confirm' }))
   await waitFor(() => expect(certificatesService.revoke).toHaveBeenCalledTimes(1))
   return certificatesService
 }

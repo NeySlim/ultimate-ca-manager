@@ -3,7 +3,7 @@
  * opens in a window, the export offers the bundle, and the revocation answer
  * about the linked certificate reaches the service.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -83,8 +83,8 @@ describe('InspectorObject of a hybrid pair member', () => {
   it('keeps the linked certificate valid when unchecked', async () => {
     await open()
     await chooseMoreAction('inspector.cert.revokeAction')
-    fireEvent.click(await screen.findByLabelText('revocation.revokeRelated'))
-    fireEvent.submit(screen.getByTestId('revoke-form'))
+    fireEvent.click(await screen.findByRole('checkbox', { name: /^revocation\.revokeRelated/ }))
+    fireEvent.click(within(screen.getByTestId('revoke-dialog')).getByRole('button', { name: 'revocation.confirm' }))
     await waitFor(() => expect(mocks.certificatesService.revoke)
       .toHaveBeenCalledWith(4, 'unspecified', { revokeRelated: false }))
   })
@@ -93,8 +93,8 @@ describe('InspectorObject of a hybrid pair member', () => {
     mocks.certificatesService.revoke.mockResolvedValue({ data: { id: 4, revoked: true, related_revoked: 5 } })
     await open()
     await chooseMoreAction('inspector.cert.revokeAction')
-    expect(await screen.findByLabelText('revocation.revokeRelated')).toBeChecked()
-    fireEvent.submit(screen.getByTestId('revoke-form'))
+    expect(await screen.findByRole('checkbox', { name: /^revocation\.revokeRelated/ })).toBeChecked()
+    fireEvent.click(within(screen.getByTestId('revoke-dialog')).getByRole('button', { name: 'revocation.confirm' }))
     await waitFor(() => expect(mocks.notify.showSuccess).toHaveBeenCalledWith('revocation.revokedWithRelated'))
     expect(mocks.notify.showWarning).not.toHaveBeenCalled()
   })
@@ -119,8 +119,8 @@ describe('InspectorObject of a hybrid pair member', () => {
     mocks.certificatesService.revoke.mockResolvedValue({ data: { id: 4, revoked: true, related_not_revoked: 5 } })
     await open()
     await chooseMoreAction('inspector.cert.revokeAction')
-    await screen.findByLabelText('revocation.revokeRelated')
-    fireEvent.submit(screen.getByTestId('revoke-form'))
+    await screen.findByRole('checkbox', { name: /^revocation\.revokeRelated/ })
+    fireEvent.click(within(screen.getByTestId('revoke-dialog')).getByRole('button', { name: 'revocation.confirm' }))
     await waitFor(() => expect(mocks.notify.showWarning).toHaveBeenCalledWith('revocation.relatedRevokeFailed'))
     expect(mocks.notify.showWarning).not.toHaveBeenCalledWith('revocation.relatedNotRevoked')
   })
@@ -128,8 +128,8 @@ describe('InspectorObject of a hybrid pair member', () => {
   it('warns when the linked certificate was not revoked', async () => {
     await open()
     await chooseMoreAction('inspector.cert.revokeAction')
-    await screen.findByLabelText('revocation.revokeRelated')
-    fireEvent.submit(screen.getByTestId('revoke-form'))
+    await screen.findByRole('checkbox', { name: /^revocation\.revokeRelated/ })
+    fireEvent.click(within(screen.getByTestId('revoke-dialog')).getByRole('button', { name: 'revocation.confirm' }))
     await waitFor(() => expect(mocks.notify.showWarning).toHaveBeenCalledWith('revocation.relatedNotRevoked'))
   })
 
@@ -142,7 +142,7 @@ describe('InspectorObject of a hybrid pair member', () => {
     await open()
     fireEvent.click(screen.getByText('Export'))
     fireEvent.click(screen.getByText('export.formats.hybridBundle').closest('label').querySelector('input'))
-    fireEvent.submit(screen.getByText('PEM').closest('form'))
+    fireEvent.click(screen.getByRole('button', { name: 'export.download' }))
     await waitFor(() => expect(mocks.notify.showError).toHaveBeenCalledWith(toast))
   })
 })

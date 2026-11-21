@@ -12,7 +12,7 @@ import { CloudArrowUp, Plus, Trash, ArrowsClockwise, PencilSimple, Warning, Link
 import { Badge } from '../Badge'
 import { Button } from '../Button'
 import { CompactSection } from '../DetailCard'
-import { Modal } from '../Modal'
+import { AtelierDialog, Icon } from '../atelier'
 import { ChainVariantSelect, variantLabel } from '../ChainVariantSelect'
 import { fetchChainVariants } from '../../lib/crossCertificates'
 import { deployService } from '../../services'
@@ -296,107 +296,92 @@ export function CertDeploySection({ certificate }) {
         </div>
       </CompactSection>
 
-      <Modal open={addOpen} onOpenChange={(v) => {
-               if (!v && !saving) { setAddOpen(false); setEditing(null) }
-             }}
-             title={editing
-               ? t('deploy.editDeploymentFor', { name: certificateName })
-               : t('deploy.attachTargetFor', { name: certificateName })} size="md">
-        <form onSubmit={handleAdd} className="p-4 space-y-3">
-          <div className="space-y-1">
-            <label className="block text-xs font-medium text-text-secondary">{t('deploy.target')}</label>
-            <select className="ui-control w-full"
-                    value={form.target_id} onChange={field('target_id')} required disabled={Boolean(editing)}>
-              {editing ? (
-                <option value={editing.target_id}>{editing.target_name} ({editing.target_host})</option>
-              ) : (
-                <>
-                  <option value="" disabled>{t('deploy.selectTarget')}</option>
-                  {targets.map(target => (
-                    <option key={target.id} value={target.id}>
-                      {target.name} ({target.kind === 'http' ? `${target.http_method} ${target.url}` : `${target.username}@${target.host}`})
-                    </option>
-                  ))}
-                </>
-              )}
-            </select>
-            {!editing && targets.length === 0 && (
-              <p className="text-2xs text-text-tertiary">{t('deploy.noAvailableTargets')}</p>
-            )}
-          </div>
-          {httpTarget && (
-            <p className="text-xs text-text-secondary p-3 bg-bg-tertiary border border-border rounded-md">
-              {t('deploy.httpBindingHint', { chainVariable: '{{chain_pem}}', fullchainVariable: '{{fullchain_pem}}' })}
-              {selectedTarget?.allow_private_key && ` ${t('deploy.httpBindingKeyHint')}`}
-            </p>
-          )}
-          {!httpTarget && (<>
-          <div className="space-y-1">
-            <label className="block text-xs font-medium text-text-secondary">{t('deploy.certPath')}</label>
-            <input className="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm font-mono text-text-primary focus:outline-none focus:border-accent-primary"
-                   placeholder="/etc/ssl/certs/app.pem" value={form.cert_path} onChange={field('cert_path')} />
-          </div>
-          <div className="space-y-1">
-            <label className="block text-xs font-medium text-text-secondary">{t('deploy.keyPath')}</label>
-            <input className="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm font-mono text-text-primary focus:outline-none focus:border-accent-primary"
-                   placeholder="/etc/ssl/private/app.key" value={form.key_path} onChange={field('key_path')}
-                   disabled={!certificate.has_private_key} />
-            {!certificate.has_private_key && (
-              <p className="text-2xs text-text-tertiary">{t('deploy.noKeyInUcm')}</p>
-            )}
-          </div>
-          <div className="space-y-1">
-            <label className="block text-xs font-medium text-text-secondary">{t('deploy.fullchainPath')}</label>
-            <input className="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm font-mono text-text-primary focus:outline-none focus:border-accent-primary"
-                   placeholder="/etc/ssl/certs/app-fullchain.pem" value={form.fullchain_path} onChange={field('fullchain_path')} />
-          </div>
-          </>)}
-          {(httpTarget || form.fullchain_path.trim()) && (
-            <label className="flex items-start gap-3 p-3 bg-bg-tertiary border border-border rounded-md cursor-pointer">
-              <input type="checkbox" className="mt-0.5 w-4 h-4 accent-accent-primary"
-                     checked={form.include_root}
-                     onChange={(e) => setForm({ ...form, include_root: e.target.checked })} />
-              <div>
-                <div className="text-sm text-text-primary">{t('export.includeRoot')}</div>
-                <div className="text-xs text-text-tertiary">{t('export.includeRootDesc')}</div>
+      {addOpen && (
+        <AtelierDialog onClose={() => { if (!saving) { setAddOpen(false); setEditing(null) } }} testId="deploy-attach-dialog"
+          title={editing ? t('deploy.editDeploymentFor', { name: certificateName }) : t('deploy.attachTargetFor', { name: certificateName })}>
+          <form onSubmit={handleAdd}>
+            <div className="form-fields">
+              <div className="field full">
+                <label htmlFor="deploy-target">{t('deploy.target')}</label>
+                <select id="deploy-target" value={form.target_id} onChange={field('target_id')} required disabled={Boolean(editing)}
+                  aria-describedby={!editing && targets.length === 0 ? 'hint-deploy-target' : undefined}>
+                  {editing ? (
+                    <option value={editing.target_id}>{editing.target_name} ({editing.target_host})</option>
+                  ) : (
+                    <>
+                      <option value="" disabled>{t('deploy.selectTarget')}</option>
+                      {targets.map(target => (
+                        <option key={target.id} value={target.id}>
+                          {target.name} ({target.kind === 'http' ? `${target.http_method} ${target.url}` : `${target.username}@${target.host}`})
+                        </option>
+                      ))}
+                    </>
+                  )}
+                </select>
+                {!editing && targets.length === 0 && <small id="hint-deploy-target">{t('deploy.noAvailableTargets')}</small>}
               </div>
-            </label>
-          )}
-          {(httpTarget || form.fullchain_path.trim()) && chainVariants.length > 1 && (
-            <div className="space-y-1">
-              <label htmlFor="deploy-chain-variant" className="block text-xs font-medium text-text-secondary">
-                {t('chainVariant.label')}
-              </label>
-              <ChainVariantSelect id="deploy-chain-variant" variants={chainVariants} disableUnservable
-                                  value={form.chain_variant}
-                                  onChange={(value) => setForm({ ...form, chain_variant: value })} />
-              <p className="text-2xs text-text-tertiary">{t('chainVariant.deployHint')}</p>
+              {httpTarget && (
+                <p className="notice">
+                  <Icon name="help" />
+                  <span>
+                    {t('deploy.httpBindingHint', { chainVariable: '{{chain_pem}}', fullchainVariable: '{{fullchain_pem}}' })}
+                    {selectedTarget?.allow_private_key && ` ${t('deploy.httpBindingKeyHint')}`}
+                  </span>
+                </p>
+              )}
+              {!httpTarget && (<>
+                <div className="field full">
+                  <label htmlFor="deploy-cert-path">{t('deploy.certPath')}</label>
+                  <input id="deploy-cert-path" className="mono" autoComplete="off" spellCheck={false} placeholder="/etc/ssl/certs/app.pem" value={form.cert_path} onChange={field('cert_path')} />
+                </div>
+                <div className="field full">
+                  <label htmlFor="deploy-key-path">{t('deploy.keyPath')}</label>
+                  <input id="deploy-key-path" className="mono" autoComplete="off" spellCheck={false} placeholder="/etc/ssl/private/app.key" value={form.key_path} onChange={field('key_path')}
+                    disabled={!certificate.has_private_key} aria-describedby={!certificate.has_private_key ? 'hint-deploy-key-path' : undefined} />
+                  {!certificate.has_private_key && <small id="hint-deploy-key-path">{t('deploy.noKeyInUcm')}</small>}
+                </div>
+                <div className="field full">
+                  <label htmlFor="deploy-fullchain-path">{t('deploy.fullchainPath')}</label>
+                  <input id="deploy-fullchain-path" className="mono" autoComplete="off" spellCheck={false} placeholder="/etc/ssl/certs/app-fullchain.pem" value={form.fullchain_path} onChange={field('fullchain_path')} />
+                </div>
+              </>)}
+              {(httpTarget || form.fullchain_path.trim()) && (
+                <div className="field full">
+                  <label className="checkbox-line">
+                    <input type="checkbox" checked={form.include_root} aria-describedby="hint-deploy-root"
+                      onChange={(e) => setForm({ ...form, include_root: e.target.checked })} />
+                    {t('export.includeRoot')}
+                  </label>
+                  <small id="hint-deploy-root">{t('export.includeRootDesc')}</small>
+                </div>
+              )}
+              {(httpTarget || form.fullchain_path.trim()) && chainVariants.length > 1 && (
+                <div className="field full">
+                  <label htmlFor="deploy-chain-variant">{t('chainVariant.label')}</label>
+                  <ChainVariantSelect id="deploy-chain-variant" variants={chainVariants} disableUnservable
+                    value={form.chain_variant} onChange={(value) => setForm({ ...form, chain_variant: value })} />
+                  <small>{t('chainVariant.deployHint')}</small>
+                </div>
+              )}
+              {!httpTarget && (
+                <div className="field full">
+                  <label htmlFor="deploy-reload">{t('deploy.reloadCommand')}</label>
+                  <input id="deploy-reload" className="mono" autoComplete="off" spellCheck={false} placeholder="/usr/sbin/nginx -t && /usr/sbin/nginx -s reload"
+                    value={form.reload_command} onChange={field('reload_command')} maxLength={512} aria-describedby="hint-deploy-reload" />
+                  <small id="hint-deploy-reload">{t('deploy.reloadCommandHint')}</small>
+                </div>
+              )}
             </div>
-          )}
-          {!httpTarget && (
-          <div className="space-y-1">
-            <label className="block text-xs font-medium text-text-secondary">
-              {t('deploy.reloadCommand')}
-            </label>
-            <input className="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm font-mono text-text-primary focus:outline-none focus:border-accent-primary"
-                   placeholder="/usr/sbin/nginx -t && /usr/sbin/nginx -s reload"
-                   value={form.reload_command} onChange={field('reload_command')} maxLength={512} />
-            <p className="text-2xs text-text-tertiary">{t('deploy.reloadCommandHint')}</p>
-          </div>
-          )}
-          {!httpTarget && <p className="text-2xs text-text-tertiary">{t('deploy.pathsHint')}</p>}
-          <div className="flex justify-end gap-2 pt-3 border-t border-border">
-            <Button type="button" variant="secondary"
-                    onClick={() => { setAddOpen(false); setEditing(null) }} disabled={saving}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit" variant="primary" loading={saving}
-                    disabled={!form.target_id || !(httpTarget || hasPath)}>
-              {editing ? t('common.save') : t('deploy.attach')}
-            </Button>
-          </div>
-        </form>
-      </Modal>
+            {!httpTarget && <p className="small muted" style={{ marginTop: 16 }}>{t('deploy.pathsHint')}</p>}
+            <div className="modal-actions">
+              <button type="button" className="btn" onClick={() => { setAddOpen(false); setEditing(null) }} disabled={saving || undefined}>{t('common.cancel')}</button>
+              <button type="submit" className="btn primary" disabled={saving || !form.target_id || !(httpTarget || hasPath) || undefined}>
+                {saving ? t('common.loading') : editing ? t('common.save') : t('deploy.attach')}
+              </button>
+            </div>
+          </form>
+        </AtelierDialog>
+      )}
     </>
   )
 }

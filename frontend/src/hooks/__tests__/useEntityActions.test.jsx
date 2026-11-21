@@ -197,15 +197,17 @@ describe('key export', () => {
     fireEvent.click(screen.getByText('go'))
   }
 
-  it('hides key formats without read:private_keys', () => {
+  const radio = (label) => screen.getByText(label).closest('label').querySelector('input[type="radio"]')
+
+  it('refuses key formats without read:private_keys', () => {
     open(rights(['write:certificates']))
-    expect(screen.queryByText('PKCS#12')).toBeNull()
-    expect(screen.getByText('PEM')).toBeInTheDocument()
+    expect(radio('PKCS#12')).toBeDisabled()
+    expect(radio('PEM')).toBeEnabled()
   })
 
   it('offers them with read:private_keys', () => {
     open(rights(['write:certificates'], ['read:private_keys']))
-    expect(screen.getByText('PKCS#12')).toBeInTheDocument()
+    expect(radio('PKCS#12')).toBeEnabled()
   })
 })
 

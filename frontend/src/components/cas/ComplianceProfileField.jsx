@@ -6,9 +6,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SideField, SideAction } from './SideField'
-import { Button } from '../Button'
-import { Modal } from '../Modal'
-import { SelectComponent as Select } from '../Select'
+import { AtelierDialog, Icon } from '../atelier'
+import { Select } from '../atelier/Form'
 import PreflightReport from '../PreflightReport'
 import { casService, systemService } from '../../services'
 import { useNotification } from '../../contexts/NotificationContext'
@@ -129,35 +128,32 @@ function AttachProfileDialog({ ca, current, profiles, onClose, onConfirm }) {
     .map(n => ({ value: n, label: profileLabel(n, profiles) }))
   const label = profile ? profileLabel(profile, profiles) : ''
 
+  const close = () => { if (!saving) onClose() }
+
   return (
-    <Modal open onOpenChange={(v) => { if (!v && !saving) onClose() }} title={t('cas.complianceProfile')} size="md">
-      <div className="p-4 space-y-4">
-        <Select
-          label={t('cas.compliance.pickProfile')}
-          options={options}
-          value={profile}
-          placeholder={t('cas.compliance.pickPlaceholder')}
-          onChange={setProfile}
-        />
-        {checking && <p className="text-xs text-text-secondary">{t('cas.compliance.checking')}</p>}
-        {checkError && <p role="alert" className="text-sm status-danger-text">{checkError}</p>}
-        {report && (
-          <PreflightReport report={report} testId="compliance-attach-report" verdict={VERDICT} />
-        )}
-        {report && (
-          <p className="text-xs text-text-primary" data-testid="compliance-attach-statement">
-            {t('cas.compliance.confirmAttach', { profile: label })}
-          </p>
-        )}
-        <div className="flex justify-end gap-2 pt-3 border-t border-border">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
-            {t('common.cancel')}
-          </Button>
-          <Button type="button" variant="primary" onClick={confirm} loading={saving} disabled={!report || checking || saving}>
-            {t('cas.compliance.confirmButton', { profile: label })}
-          </Button>
-        </div>
+    <AtelierDialog title={t('cas.complianceProfile')} onClose={close} testId="compliance-attach-dialog">
+      <div className="form-fields">
+        <Select id="compliance-profile-pick" label={t('cas.compliance.pickProfile')} options={options} value={profile} full
+          placeholder={t('cas.compliance.pickPlaceholder')} onChange={setProfile} data-autofocus="" />
       </div>
-    </Modal>
+      {checking && <p className="small muted" role="status" style={{ marginTop: 16 }}>{t('cas.compliance.checking')}</p>}
+      {checkError && <p role="alert" className="field-error" style={{ marginTop: 16 }}><Icon name="warning" /><span>{checkError}</span></p>}
+      {report && (
+        <div style={{ marginTop: 18 }}>
+          <PreflightReport atelier report={report} testId="compliance-attach-report" verdict={VERDICT} />
+        </div>
+      )}
+      {report && (
+        <p className="event-detail" style={{ marginTop: 16 }} data-testid="compliance-attach-statement">
+          {t('cas.compliance.confirmAttach', { profile: label })}
+        </p>
+      )}
+      <div className="modal-actions">
+        <button type="button" className="btn" onClick={close} disabled={saving || undefined}>{t('common.cancel')}</button>
+        <button type="button" className="btn primary" data-write="" onClick={confirm} disabled={!report || checking || saving || undefined}>
+          {saving ? t('common.loading') : t('cas.compliance.confirmButton', { profile: label })}
+        </button>
+      </div>
+    </AtelierDialog>
   )
 }

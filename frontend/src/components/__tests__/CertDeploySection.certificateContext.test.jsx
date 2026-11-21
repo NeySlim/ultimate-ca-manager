@@ -24,12 +24,6 @@ vi.mock('../../hooks', () => ({
 
 vi.mock('../../services', () => ({ deployService: mocks }))
 
-vi.mock('../Modal', () => ({
-  Modal: ({ open, title, children }) => open
-    ? <div role="dialog"><div data-testid="modal-title">{title}</div>{children}</div>
-    : null,
-}))
-
 import { CertDeploySection } from '../deploy/CertDeploySection'
 
 async function openAttachDialog(certificate) {
@@ -53,8 +47,7 @@ describe('CertDeploySection certificate context', () => {
       has_private_key: true,
     })
 
-    expect(screen.getByTestId('modal-title')).toHaveTextContent(
-      'deploy.attachTargetFor|npm.lan')
+    expect(screen.getByRole('dialog', { name: 'deploy.attachTargetFor|npm.lan' })).toHaveAttribute('data-testid', 'deploy-attach-dialog')
   })
 
   it('falls back to the certificate description when no common name is available', async () => {
@@ -64,7 +57,6 @@ describe('CertDeploySection certificate context', () => {
       has_private_key: false,
     })
 
-    expect(screen.getByTestId('modal-title')).toHaveTextContent(
-      'deploy.attachTargetFor|Imported appliance certificate')
+    expect(screen.getByRole('dialog', { name: 'deploy.attachTargetFor|Imported appliance certificate' })).toBeInTheDocument()
   })
 })

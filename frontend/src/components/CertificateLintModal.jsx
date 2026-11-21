@@ -1,22 +1,23 @@
+/**
+ * Conformance lint of a certificate in the mockup's modal(): the profiles as a `.segmented` group,
+ * the count of each severity in pills, then the findings as the mockup's record list.
+ */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ShieldCheck, ShieldWarning, CheckCircle, Warning } from '@phosphor-icons/react'
-import { Modal } from './Modal'
-import { Button } from './Button'
-import { Badge } from './Badge'
+import { AtelierDialog, Icon, Pill, RecordList, RecordRow } from './atelier'
 import { useNotification } from '../contexts'
 import { certificatesService } from '../services'
 
-const SEVERITY_VARIANT = {
-  fatal: 'danger',
-  error: 'danger',
-  warning: 'warning',
-  notice: 'info',
-  info: 'secondary',
-}
+const SEVERITY_TONE = { fatal: 'bad', error: 'bad', warning: 'warn', notice: 'muted', info: 'muted' }
 const SEVERITY_ORDER = ['fatal', 'error', 'warning', 'notice', 'info']
+const PROFILES = ['rfc5280', 'cabf', 'etsi']
 
 export function CertificateLintModal({ certId, certName, open, onClose }) {
+  if (!open) return null
+  return <LintBody certId={certId} certName={certName} onClose={onClose} />
+}
+
+function LintBody({ certId, certName, onClose }) {
   const { t } = useTranslation()
   const { showError } = useNotification()
   const [profile, setProfile] = useState('rfc5280')
@@ -46,95 +47,51 @@ export function CertificateLintModal({ certId, certName, open, onClose }) {
     }
   }, [certId, t])
 
-  useEffect(() => {
-    if (open) run(profile)
-  }, [open, profile, run])
+  useEffect(() => { run(profile) }, [profile, run])
 
   const summary = result?.summary || {}
   const findings = result?.findings || []
+  const about = [result?.detected_type, (result?.linters || []).join(', ')].filter(Boolean)
 
   return (
-    <Modal open={open} onClose={onClose}
-           title={certName ? t('lint.title', { name: certName }) : t('lint.titleGeneric')}>
-      <div className="space-y-3">
-        <p className="text-xs text-text-secondary">{t('lint.subtitle')}</p>
-
-        {/* Profile toggle */}
-        <div className="flex items-center gap-1">
-          {['rfc5280', 'cabf', 'etsi'].map((p) => (
-            <Button key={p} type="button" size="sm"
-                    variant={profile === p ? 'primary' : 'secondary'}
-                    onClick={() => setProfile(p)} disabled={loading}>
-              {t(`lint.profile_${p}`)}
-            </Button>
-          ))}
-        </div>
-
+    <AtelierDialog title={certName ? t('lint.title', { name: certName }) : t('lint.titleGeneric')} subtitle={t('lint.subtitle')} onClose={onClose} testId="lint-dialog">
+      <div className="segmented" role="group" aria-label={t('lint.profileLabel')}>
+        {PROFILES.map((p) => (
+          <button key={p} type="button" aria-pressed={profile === p} disabled={loading || undefined} onClick={() => setProfile(p)}>{t(`lint.profile_${p}`)}</button>
+        ))}
+      </div>
+      <div style={{ marginTop: 18 }}>
         {loading ? (
-          <div className="p-6 text-center text-sm text-text-secondary">{t('common.loading')}</div>
+          <p className="small muted" role="status">{t('common.loading')}</p>
         ) : !available ? (
-          <div className="p-6 text-center space-y-1">
-            <ShieldWarning size={28} className="mx-auto text-text-tertiary" />
-            <p className="text-sm text-text-primary">{t('lint.unavailable')}</p>
-            <p className="text-xs text-text-tertiary">{t('lint.unavailableHint')}</p>
-          </div>
+          <div className="notice warn"><Icon name="warning" /><span>{t('lint.unavailable')}. {t('lint.unavailableHint')}</span></div>
         ) : (
           <>
-            {/* Summary */}
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {SEVERITY_ORDER.map((s) => (
-                  summary[s] ? (
-                    <Badge key={s} variant={SEVERITY_VARIANT[s]} size="sm">
-                      {summary[s]} {t(`lint.severity.${s}`)}
-                    </Badge>
-                  ) : null
-                ))}
-                {findings.length === 0 && (
-                  <span className="flex items-center gap-1 text-sm text-status-success">
-                    <CheckCircle size={16} weight="fill" /> {t('lint.clean')}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2 text-2xs text-text-tertiary">
-                {result?.detected_type && (
-                  <span title={t('lint.detectedType')}>{result.detected_type}</span>
-                )}
-                {(result?.linters || []).length > 0 && (
-                  <span className="font-mono">{(result.linters || []).join(', ')}</span>
-                )}
-              </div>
+            <div className="ca-badges" style={{ marginBottom: 10 }}>
+              {SEVERITY_ORDER.map((s) => (summary[s] ? <Pill key={s} tone={SEVERITY_TONE[s]} label={`${summary[s]} ${t(`lint.severity.${s}`)}`} /> : null))}
+              {findings.length === 0 && <Pill tone="good" label={t('lint.clean')} />}
+              {about.length > 0 && <span className="small muted mono" title={result?.detected_type ? t('lint.detectedType') : undefined}>{about.join(' · ')}</span>}
             </div>
-
-            {/* Findings */}
             {findings.length > 0 && (
-              <div className="max-h-[50vh] overflow-y-auto border border-border rounded-lg divide-y divide-border-op30">
+              <RecordList>
                 {findings.map((f, i) => (
-                  <div key={`${f.code}-${i}`} className="p-2.5 flex items-start gap-2">
-                    <Badge variant={SEVERITY_VARIANT[f.severity] || 'secondary'} size="sm">
-                      {t(`lint.severity.${f.severity}`)}
-                    </Badge>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-mono text-xs text-text-primary break-all">{f.code}</p>
-                      {f.message && <p className="text-xs text-text-secondary mt-0.5">{f.message}</p>}
-                      {f.node && <p className="text-3xs text-text-tertiary font-mono mt-0.5 truncate" title={f.node}>{f.node}</p>}
-                    </div>
-                    <span className="text-3xs text-text-tertiary uppercase">{f.source}</span>
-                  </div>
+                  <RecordRow key={`${f.code}-${i}`} title={<span className="mono">{f.code}</span>}
+                    meta={[f.message, f.source && f.source.toUpperCase()].filter(Boolean).join(' · ')}
+                    extra={f.node && <span className="rl-meta mono" title={f.node}>{f.node}</span>}
+                    badge={<Pill tone={SEVERITY_TONE[f.severity] || 'muted'} label={t(`lint.severity.${f.severity}`)} />} />
                 ))}
-              </div>
+              </RecordList>
             )}
-
             {(profile === 'cabf' || profile === 'etsi') && findings.length > 0 && (
-              <p className="flex items-start gap-1.5 text-2xs text-text-tertiary">
-                <Warning size={13} className="mt-0.5 shrink-0" />
-                {profile === 'etsi' ? t('lint.etsiNote') : t('lint.cabfNote')}
-              </p>
+              <p className="small muted" style={{ marginTop: 14 }}>{profile === 'etsi' ? t('lint.etsiNote') : t('lint.cabfNote')}</p>
             )}
           </>
         )}
       </div>
-    </Modal>
+      <div className="modal-actions">
+        <button type="button" className="btn primary" data-action="close-modal" data-write="false" onClick={onClose}>{t('common.close')}</button>
+      </div>
+    </AtelierDialog>
   )
 }
 

@@ -5,15 +5,19 @@
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { UploadSimple } from '@phosphor-icons/react'
-import { Modal } from '../Modal'
-import { Button } from '../Button'
+import { AtelierDialog, Icon } from '../atelier'
 import { casService } from '../../services'
 import { useNotification } from '../../contexts'
 import { extractData } from '../../lib/utils'
 import { certificateFileToPem } from '../../lib/crossCertificates'
 
-export function RestorePrimaryModal({ open, onClose, ca, onDone }) {
+export function RestorePrimaryModal(props) {
+  if (!props.open) return null
+  return <RestoreBody {...props} />
+}
+
+// The mockup's modal(): the hint, the PEM or a file, Annuler and the primary restore; not closed while it runs
+function RestoreBody({ onClose, ca, onDone }) {
   const { t } = useTranslation()
   const { showSuccess, showError, showWarning } = useNotification()
   const [pem, setPem] = useState('')
@@ -28,37 +32,36 @@ export function RestorePrimaryModal({ open, onClose, ca, onDone }) {
       const res = await casService.restorePrimary(ca.id, certificate)
       for (const w of extractData(res)?.warnings || []) showWarning(w)
       showSuccess(t('crossCerts.restored'))
-      setPem(''); setFile(null)
       onDone?.()
       onClose()
     } catch (err) {
       showError(err?.message || t('crossCerts.restoreFailed'))
-    } finally {
       setBusy(false)
     }
   }
+  const close = () => { if (!busy) onClose() }
 
   return (
-    <Modal open={open} onOpenChange={(v) => !v && !busy && onClose()}
-           title={`${t('crossCerts.restorePrimary')}: ${ca?.name || ca?.descr || ''}`} size="md">
-      <form onSubmit={submit} className="p-4 space-y-3">
-        <p className="text-xs text-text-secondary">{t('crossCerts.restoreHint')}</p>
-        <textarea className="w-full h-32 px-3 py-2 bg-bg-tertiary border border-border rounded-md text-xs font-mono text-text-primary resize-y focus:outline-none focus:border-accent-primary"
-                  spellCheck={false} placeholder="-----BEGIN CERTIFICATE-----" value={pem}
-                  onChange={(e) => { setPem(e.target.value); if (e.target.value) setFile(null) }} />
-        <label className="flex items-center gap-2 px-3 py-2 bg-bg-tertiary border border-border rounded-md cursor-pointer">
-          <UploadSimple size={16} className="text-text-tertiary" />
-          <span className="text-sm text-text-primary truncate">{file ? file.name : t('cas.uploadCertPick')}</span>
-          <input type="file" className="hidden" accept=".pem,.crt,.cer,.der"
-                 onChange={(e) => { const f = e.target.files?.[0] || null; setFile(f); if (f) setPem('') }} />
-        </label>
-        <div className="flex justify-end gap-2 pt-3 border-t border-border">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t('common.cancel')}</Button>
-          <Button type="submit" variant="primary" loading={busy} disabled={!pem.trim() && !file}>
-            {t('crossCerts.restorePrimary')}
-          </Button>
+    <AtelierDialog title={`${t('crossCerts.restorePrimary')}: ${ca?.name || ca?.descr || ''}`} size="narrow" onClose={close} testId="restore-primary-dialog">
+      <form onSubmit={submit}>
+        <p className="notice"><Icon name="cert" /><span>{t('crossCerts.restoreHint')}</span></p>
+        <div className="form-fields">
+          <div className="field full">
+            <label htmlFor="ucm-restore-primary-pem">{t('cas.uploadCertPaste')}</label>
+            <textarea id="ucm-restore-primary-pem" className="mono" rows={6} spellCheck={false} placeholder="-----BEGIN CERTIFICATE-----" value={pem}
+              onChange={(e) => { setPem(e.target.value); if (e.target.value) setFile(null) }} />
+          </div>
+          <div className="field full">
+            <label htmlFor="ucm-restore-primary-file">{t('cas.uploadCertPick')}</label>
+            <input id="ucm-restore-primary-file" type="file" accept=".pem,.crt,.cer,.der"
+              onChange={(e) => { const f = e.target.files?.[0] || null; setFile(f); if (f) setPem('') }} />
+          </div>
+        </div>
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={close} disabled={busy || undefined}>{t('common.cancel')}</button>
+          <button type="submit" className="btn primary" disabled={busy || (!pem.trim() && !file) || undefined}>{busy ? t('common.loading') : t('crossCerts.restorePrimary')}</button>
         </div>
       </form>
-    </Modal>
+    </AtelierDialog>
   )
 }

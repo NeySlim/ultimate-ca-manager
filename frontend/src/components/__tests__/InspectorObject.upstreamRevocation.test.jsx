@@ -2,7 +2,7 @@
  * A revocation from the certificate inspector that the issuing CA did not confirm
  * (ACME upstream, Microsoft CA): the server's warning is shown, not a plain success.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -47,7 +47,7 @@ const revokeFromInspector = async () => {
   render(<InspectorObject entry={WINDOW} onTitle={() => {}} />, { wrapper: MemoryRouter })
   await screen.findAllByText('web.example.com')
   await chooseMoreAction('inspector.cert.revokeAction')
-  fireEvent.submit(await screen.findByTestId('revoke-form'))
+  fireEvent.click(within(await screen.findByTestId('revoke-dialog')).getByRole('button', { name: 'revocation.confirm' }))
   await waitFor(() => expect(mocks.certificatesService.revoke).toHaveBeenCalled())
 }
 

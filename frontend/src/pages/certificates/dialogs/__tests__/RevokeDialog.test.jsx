@@ -8,7 +8,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { RevokeCertificateModal, REVOCATION_REASONS } from '../RevokeCertificateModal'
+import { RevokeDialog as RevokeCertificateModal } from '../RevokeDialog'
+import { REVOCATION_REASONS } from '../../../../lib/revocationReasons'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key) => key }),
@@ -16,7 +17,7 @@ vi.mock('react-i18next', () => ({
   Trans: ({ children }) => children,
 }))
 
-describe('RevokeCertificateModal', () => {
+describe('RevokeDialog', () => {
   it('offers every RFC 5280 reason, unspecified first and selected', () => {
     render(<RevokeCertificateModal open onClose={() => {}} onConfirm={() => {}} certificate={{ name: 'web.example.com' }} />)
     const select = screen.getByTestId('revoke-reason')
@@ -24,7 +25,7 @@ describe('RevokeCertificateModal', () => {
     expect(values).toEqual(REVOCATION_REASONS)
     expect(values[0]).toBe('unspecified')
     expect(select.value).toBe('unspecified')
-    expect(screen.getByText('revocation.hints.unspecified')).toBeInTheDocument()
+    expect(screen.getByText('revocation.hints.unspecified', { exact: false })).toBeInTheDocument()
     expect(screen.getByText('web.example.com')).toBeInTheDocument()
   })
 
@@ -32,16 +33,16 @@ describe('RevokeCertificateModal', () => {
     const onConfirm = vi.fn()
     render(<RevokeCertificateModal open onClose={() => {}} onConfirm={onConfirm} certificate={{ name: 'x' }} />)
     fireEvent.change(screen.getByTestId('revoke-reason'), { target: { value: 'keyCompromise' } })
-    expect(screen.getByText('revocation.hints.keyCompromise')).toBeInTheDocument()
-    fireEvent.submit(screen.getByTestId('revoke-form'))
+    expect(screen.getByText('revocation.hints.keyCompromise', { exact: false })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'revocation.confirm' }))
     expect(onConfirm).toHaveBeenCalledWith('keyCompromise')
   })
 
   it('shows the Microsoft CA warning only for AD CS certificates', () => {
     const { rerender } = render(<RevokeCertificateModal open onClose={() => {}} onConfirm={() => {}} certificate={{ name: 'x', source: 'msca' }} />)
-    expect(screen.getByText('certificates.revokeMscaWarning')).toBeInTheDocument()
+    expect(screen.getByText('certificates.revokeMscaWarning', { exact: false })).toBeInTheDocument()
     rerender(<RevokeCertificateModal open onClose={() => {}} onConfirm={() => {}} certificate={{ name: 'x', source: 'acme' }} />)
-    expect(screen.queryByText('certificates.revokeMscaWarning')).toBeNull()
+    expect(screen.queryByText('certificates.revokeMscaWarning', { exact: false })).toBeNull()
   })
 
   it('resets to unspecified when reopened', () => {
@@ -54,20 +55,21 @@ describe('RevokeCertificateModal', () => {
 
   it('is the mockup dialog: its question, an amber notice, the name, « Motif » and one note', () => {
     render(<RevokeCertificateModal open onClose={() => {}} onConfirm={() => {}} certificate={{ name: 'web.example.com' }} />)
-    expect(screen.getByRole('heading', { name: 'revocation.dialogTitle' })).toBeInTheDocument()
-    expect(screen.getByText('revocation.notice').closest('.ui-notice')).toHaveClass('is-warn')
-    expect(screen.getByLabelText('revocation.reason')).toHaveClass('ui-control')
-    const note = screen.getByText('revocation.hints.unspecified').closest('p')
-    expect(note).toHaveClass('ui-revoke-note')
+    expect(screen.getByRole('dialog', { name: 'revocation.dialogTitle' })).toHaveClass('narrow')
+    expect(screen.getByText('revocation.notice', { exact: false }).closest('.notice')).toHaveClass('warn')
+    expect(screen.getByLabelText('revocation.reason').closest('label')).toHaveClass('field')
+    const note = screen.getByText('revocation.hints.unspecified', { exact: false })
+    expect(note).toHaveClass('small', 'muted')
     expect(note).toHaveTextContent('revocation.reasonHelp')
-    expect(document.querySelector('.uppercase')).toBeNull()
+    expect(screen.getByRole('button', { name: 'revocation.confirm' })).toHaveClass('btn', 'danger')
   })
 
   it('keeps the title and notice a CA revocation passes', () => {
     render(<RevokeCertificateModal open onClose={() => {}} onConfirm={() => {}} certificate={{ name: 'Sub CA' }}
       title="Revoke CA" warning="CA warning" allowHold={false} />)
     expect(screen.getByRole('heading', { name: 'Revoke CA' })).toBeInTheDocument()
-    expect(screen.getByText('CA warning').closest('.ui-notice')).toHaveClass('is-warn')
+    expect(screen.getByText('CA warning', { exact: false }).closest('.notice')).toHaveClass('warn')
+    expect(screen.queryByRole('option', { name: 'revocation.reasons.certificateHold' })).toBeNull()
     expect(screen.getByText('revocation.reasonHelpNoHold', { exact: false })).toBeInTheDocument()
   })
 })
