@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom'
-import { useDockParam, useDockSelection } from '../useDockParam'
+import { useDockParam, useDockSelection, useDockId } from '../useDockParam'
 
 let nav
 function Where() {
@@ -169,5 +169,31 @@ describe('useDockSelection', () => {
     )
     await waitFor(() => expect(url()).toBe('/t'))
     expect(screen.getByTestId('sel')).toHaveTextContent('none')
+  })
+})
+
+function Ids() {
+  const { openId, setOpenId } = useDockId()
+  return (
+    <div>
+      <span data-testid="id">{JSON.stringify(openId)}</span>
+      <button type="button" onClick={() => setOpenId(12)}>twelve</button>
+      <button type="button" onClick={() => setOpenId('iot')}>iot</button>
+      <button type="button" onClick={() => setOpenId(null)}>none</button>
+    </div>
+  )
+}
+
+describe('useDockId', () => {
+  it('reads a number back as a number, a name as a name, and null closes', async () => {
+    at('/x', <Ids />)
+    fireEvent.click(screen.getByText('twelve'))
+    expect(screen.getByTestId('id')).toHaveTextContent('12')
+    expect(screen.getByTestId('id').textContent).toBe('12')
+    fireEvent.click(screen.getByText('iot'))
+    expect(screen.getByTestId('id').textContent).toBe('"iot"')
+    fireEvent.click(screen.getByText('none'))
+    await waitFor(() => expect(url()).toBe('/x'))
+    expect(screen.getByTestId('id').textContent).toBe('null')
   })
 })

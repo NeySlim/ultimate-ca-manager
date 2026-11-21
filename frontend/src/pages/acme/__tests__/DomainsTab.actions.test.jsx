@@ -11,11 +11,14 @@
  * table, and rendered inside the card on a narrow screen.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 
 // The shared page setup keeps i18n working while stubbing the services away.
 import '../../__tests__/pageRenderingSetup.jsx'
 
+import { renderAtUrl } from '../../../test/dockUrl'
+import { WithDockSlot } from '../../protocols/__tests__/withDockSlot'
 import DomainsTab from '../DomainsTab'
 import LocalDomainsTab from '../LocalDomainsTab'
 
@@ -40,7 +43,7 @@ describe.each([
     handlers.onEdit = vi.fn()
     handlers.onDelete = vi.fn()
     handlers.onTest = vi.fn()
-    return render(
+    return render(<MemoryRouter>
       <Tab
         acmeDomains={data}
         localDomains={data}
@@ -53,7 +56,7 @@ describe.each([
         canWrite
         canDelete
       />
-    )
+    </MemoryRouter>)
   }
 
   beforeEach(() => vi.clearAllMocks())
@@ -75,5 +78,20 @@ describe.each([
     const actions = document.querySelector('tbody .table-actions')
     expect(actions).toBeTruthy()
     for (const label of expected) expect(actions.querySelector(`[title="${label}"]`)).toBeTruthy()
+  })
+})
+
+describe.each([
+  ['DomainsTab', DomainsTab, DOMAINS[0].domain],
+  ['LocalDomainsTab', LocalDomainsTab, LOCAL_DOMAINS[0].domain],
+])('%s dock in the URL', (_name, Tab, name) => {
+  it('writes the domain opened and reopens it on reload', async () => {
+    const props = { acmeDomains: DOMAINS, localDomains: LOCAL_DOMAINS, dnsProviders: [], cas: [], onAdd: vi.fn(), onEdit: vi.fn(), onDelete: vi.fn(), onTest: vi.fn(), canWrite: true, canDelete: true }
+    const r = renderAtUrl(<WithDockSlot><Tab {...props} /></WithDockSlot>, '/acme?tab=domains')
+    fireEvent.click(screen.getByRole('button', { name }))
+    expect(r.where()).toBe('/acme?tab=domains&item=1')
+    r.unmount()
+    const again = renderAtUrl(<WithDockSlot><Tab {...props} /></WithDockSlot>, '/acme?tab=domains&item=1')
+    expect(within(await again.dock()).getByRole('heading', { level: 2 })).toHaveTextContent(name)
   })
 })

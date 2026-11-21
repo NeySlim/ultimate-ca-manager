@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Input, Modal, Textarea, ToggleSwitch } from '../../components/atelier/Form'
 import { Btn, Icon, IconBtn, Pill, ListView, Dock, DockBody, Section, Props, EmptyBlock, NoMatch } from '../../components/atelier'
+import { useDockId } from '../../components/atelier/useDockParam'
 import { SlotDock } from '../protocols/dockSlot'
 import { Copyable } from '../protocols/atelierParts'
 import { dateOf, dateTimeOf } from '../admin/adminDates'
@@ -33,7 +34,8 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
   const { t, i18n } = useTranslation()
   const locale = i18n?.language || 'en'
   const [loading, setLoading] = useState(true)
-  const [openId, setOpenId] = useState(null)
+  // The open object lives in the URL (`item`)
+  const { openId, setOpenId } = useDockId()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { copy } = useClipboard()
 

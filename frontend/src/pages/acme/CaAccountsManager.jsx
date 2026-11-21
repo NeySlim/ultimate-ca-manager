@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Input, SecretInput, Select, Textarea, ToggleSwitch, Modal } from '../../components/atelier/Form'
 import { Btn, Pill, ListView, Dock, DockBody, Section, Props, EmptyBlock } from '../../components/atelier'
+import { useDockId } from '../../components/atelier/useDockParam'
 import { SlotDock } from '../protocols/dockSlot'
 import { Copyable, YesNo } from '../protocols/atelierParts'
 import DnsUpdateKeysPanel from './DnsUpdateKeysPanel'
@@ -50,8 +51,8 @@ export default function CaAccountsManager({
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [busy, setBusy] = useState(false)
-  const [openId, setOpenId] = useState(null)
-  const [section, setSection] = useState('overview')
+  // The open account and its section live in the URL (`item`, `section`)
+  const { openId, setOpenId, section, setSection } = useDockId({ sections: ['overview', 'dnsupdate'] })
 
   const openCreate = () => {
     setEditingId(null)

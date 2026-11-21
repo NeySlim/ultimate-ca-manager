@@ -2,14 +2,15 @@
  * Domains of the built-in ACME server (the CA and the approval of their orders), drawn as the
  * mockup's module list with its dock; edit and delete stay on the row and in the dock.
  */
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Btn, ListView, Dock, DockBody, Section, Props, EmptyBlock, Pill } from '../../components/atelier'
+import { useDockId } from '../../components/atelier/useDockParam'
 import { SlotDock } from '../protocols/dockSlot'
 
 export default function LocalDomainsTab({ localDomains, onAdd, onEdit, onDelete, canWrite, canDelete }) {
   const { t } = useTranslation()
-  const [openId, setOpenId] = useState(null)
+  // The open object lives in the URL (`item`)
+  const { openId, setOpenId } = useDockId()
   const open = localDomains.find((d) => d.id === openId)
   const approval = (d) => <Pill label={t(d.auto_approve ? 'common.auto' : 'common.manual')} tone={d.auto_approve ? 'good' : 'warn'} icon={d.auto_approve ? 'check' : 'clock'} />
   const actions = (d) => [

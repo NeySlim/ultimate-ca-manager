@@ -123,4 +123,15 @@ export function useDockSelection(items, { key = (x) => x?.id, ready = true, load
   return { ...dock, selected, select, hold }
 }
 
+/**
+ * A page's open id held by the URL, in place of `useState(null)`: `setOpenId(id)` opens, `setOpenId(null)` closes.
+ * The id reads back as the API holds it (a number when it is one).
+ */
+export function useDockId(opts) {
+  const dock = useDockParam(opts)
+  const { open, close } = dock
+  const setOpenId = useCallback((id) => (id == null ? close() : open(id)), [open, close])
+  return { ...dock, openId: dock.item == null ? null : asId(dock.item), setOpenId }
+}
+
 export default useDockParam
