@@ -26,17 +26,17 @@ export function MtlsCertificateDialog({
   ].filter(Boolean)
   const cancel = <button type="button" className="btn" data-action="close-modal" onClick={onClose}>{t('common.cancel')}</button>
   const submit = (fn) => (e) => { e.preventDefault(); if (!busy) fn() }
+  // The way heads each form's fields, so the mockup's gap of .form-fields falls between them
+  const way = <SegmentedField id="mtls-way" label={t('account.mtlsWay')} options={ways} pressed={(v) => v === mode} onPick={onTab} />
 
   return (
     <AtelierDialog title={title} size="narrow" onClose={onClose} testId="mtls-dialog">
       {result || (
         <>
-          <div className="form-fields">
-            <SegmentedField id="mtls-way" label={t('account.mtlsWay')} options={ways} pressed={(v) => v === mode} onPick={onTab} />
-          </div>
           {mode === 'generate' && (
             <form onSubmit={submit(onGenerate)} noValidate>
               <div className="form-fields">
+                {way}
                 <Input id="mtls-name" data-autofocus full label={t('account.mtlsCertName')} value={generateForm.name} placeholder={namePlaceholder}
                   onChange={(e) => setGenerateForm((prev) => ({ ...prev, name: e.target.value }))} />
                 {caPicker}
@@ -52,6 +52,7 @@ export function MtlsCertificateDialog({
           {mode === 'import' && (
             <form onSubmit={submit(onImport)} noValidate>
               <div className="form-fields">
+                {way}
                 <Input id="mtls-import-name" data-autofocus full label={t('account.mtlsCertName')} value={importForm.name} placeholder={t('account.mtlsImportNamePlaceholder')}
                   onChange={(e) => setImportForm((prev) => ({ ...prev, name: e.target.value }))} />
                 <PemField id="mtls-pem" label={t('account.mtlsPemData')} value={importForm.pem} accept=".pem,.crt,.cer" rows={6}
@@ -67,6 +68,7 @@ export function MtlsCertificateDialog({
           {mode === 'assign' && (
             <form onSubmit={submit(onAssign)} noValidate>
               <div className="form-fields">
+                {way}
                 {assign.loading ? (
                   <div className="field full"><SkeletonPanel label={t('common.loading')} /></div>
                 ) : assign.certs.length === 0 ? (
