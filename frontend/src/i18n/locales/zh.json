@@ -2004,7 +2004,14 @@
     "pageRange_other": "{{start}}–{{end}} / 共 {{count}} 个组",
     "caption": "组。激活名称以打开其详情。",
     "search": "名称、描述…",
-    "manageMembers": "管理成员"
+    "manageMembers": "管理成员",
+    "resource": "Resource",
+    "actions": {
+      "read": "Read",
+      "write": "Write",
+      "delete": "Delete"
+    },
+    "grant": "{{action}}: {{resource}}"
   },
   "acme": {
     "title": "ACME协议",
@@ -7009,39 +7016,6 @@
     "source": "Certificate source"
   },
   "commands": {
-    "nav": {
-      "dashboard": "前往仪表板",
-      "certificates": "前往证书",
-      "cas": "前往CA",
-      "csrs": "前往CSR",
-      "templates": "前往模板",
-      "users": "前往用户",
-      "acme": "前往ACME",
-      "scep": "前往SCEP",
-      "est": "前往EST",
-      "operations": "前往操作",
-      "tools": "前往证书工具",
-      "audit": "前往审计日志",
-      "settings": "前往设置",
-      "account": "前往账户",
-      "groups": "前往群组",
-      "rbac": "前往RBAC",
-      "sso": "前往SSO",
-      "hsm": "前往HSM",
-      "policies": "前往策略",
-      "approvals": "前往审批",
-      "reports": "前往报告",
-      "discovery": "前往发现",
-      "msca": "前往MS CA",
-      "sshCas": "SSH 证书颁发机构",
-      "sshCertificates": "SSH 证书",
-      "trustStore": "Go to Trust Store",
-      "userCertificates": "Go to User Certificates",
-      "tsa": "Go to TSA",
-      "keyRecovery": "Go to Key Recovery",
-      "logs": "Go to System Logs",
-      "crlOcsp": "前往CRL/OCSP"
-    },
     "actions": {
       "newCertificate": "签发新证书",
       "newCA": "创建新CA",
@@ -7049,9 +7023,7 @@
     },
     "categories": {
       "navigation": "导航",
-      "actions": "操作",
-      "proFeatures": "专业功能",
-      "governance": "治理"
+      "actions": "操作"
     }
   },
   "passwordStrength": {

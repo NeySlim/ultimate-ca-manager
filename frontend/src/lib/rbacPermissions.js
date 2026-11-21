@@ -5,6 +5,7 @@
 
 // Resource -> i18n key of its label, in display order
 const CATEGORY_LABELS = [
+  ['dashboard', 'shell.bar.dashboard'],
   ['certificates', 'rbac.categories.certificates'],
   ['private_keys', 'common.privateKey'],
   ['cas', 'rbac.categories.certificateAuthorities'],

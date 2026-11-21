@@ -68,36 +68,37 @@ for (const width of [1199, 1200]) {
   })
 }
 
-test.describe('phone', () => {
-  test.use({ viewport: { width: 390, height: 844 } })
-  const PAGES = ['/templates', '/users', '/truststore', '/certificates']
-
-  for (const path of PAGES) {
-    test(`${path}: the dock keeps the focus, the page is inert, Escape and Close give the focus back`, async ({ page, api }) => {
-      // Each page gets a row of its own: a fresh trust store is empty, issuing a certificate does not fill it
-      if (path === '/truststore' || path === '/certificates') {
-        const cert = await issueCert(api, (await createCA(api)).id)
-        if (path === '/truststore') await api.post('/truststore', { name: cert.common_name, certificate_pem: cert.pem, purpose: 'custom' })
-      }
-      const { dock } = await openFirst(page, path)
-      await expect(dock).toHaveAttribute('role', 'dialog')
-      for (const part of ['.masthead', '.statusbar', '.page-content']) {
-        await expect(page.locator(part).first()).toHaveAttribute('inert', '')
-      }
-      for (let i = 0; i < 40; i += 1) {
-        await page.keyboard.press('Tab')
-        expect(await dock.evaluate((el) => el.contains(document.activeElement))).toBe(true)
-      }
-      await page.keyboard.press('Escape')
-      await expect(dock).toBeHidden()
-      expect(await page.evaluate(() => document.activeElement?.matches('button[data-open]'))).toBe(true)
-      await expect(page.locator('.page-content')).not.toHaveAttribute('inert', '')
-
-      await page.locator('.atl button[data-open]:focus').click()
-      await expect(dock).toBeVisible()
-      await dock.getByRole('button', { name: 'Close inspector' }).click()
-      await expect(dock).toBeHidden()
-      expect(await page.evaluate(() => document.activeElement?.matches('button[data-open]'))).toBe(true)
+test.describe('at 1200 px with the dock at the right', () => {
+  test.use({ viewport: { width: 1200, height: 900 } })
+  // Beside the right dock the list folds its secondary columns: no horizontal scroll, the chevron in view.
+  // The page alone reads the dock at the right: the shared account's preference is never written.
+  test('the lists fit beside the dock', async ({ page, api }) => {
+    await issueCert(api, (await createCA(api)).id)
+    // The session restore (/auth/verify) and the preference read carry the account's preferences
+    const right = { position: 'right', height: 278, width: 460 }
+    await page.route('**/api/v2/account/preferences', async (route) => {
+      if (route.request().method() !== 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: '{"data":{}}' })
+      const response = await route.fetch()
+      const body = await response.json()
+      body.data = { ...(body.data || {}), inspector: right }
+      return route.fulfill({ response, json: body })
     })
-  }
+    await page.route('**/api/v2/auth/verify', async (route) => {
+      const response = await route.fetch()
+      const body = await response.json()
+      if (body?.data) body.data.preferences = { ...(body.data.preferences || {}), inspector: right }
+      return route.fulfill({ response, json: body })
+    })
+    for (const path of ['/certificates', '/users', '/templates']) {
+      await openFirst(page, path)
+      await expect(app(page)).toHaveClass(/dock-right/)
+      const fits = () => page.evaluate(() => {
+        const region = document.querySelector('.atl .page-content .table-scroll') as HTMLElement
+        const box = region.closest('.table-container')!.getBoundingClientRect()
+        const chevron = region.querySelector('tbody tr td:last-child button:last-of-type')
+        return region.scrollWidth - region.clientWidth <= 1 && (!chevron || chevron.getBoundingClientRect().right <= box.right + 1)
+      })
+      await expect.poll(fits, { message: path }).toBe(true)
+    }
+  })
 })

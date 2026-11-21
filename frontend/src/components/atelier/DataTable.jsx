@@ -6,7 +6,7 @@
  * 'certificates' (.cert-table), 'module' (.cert-table.module-table) or 'audit' (.audit-table).
  * A record that opens keeps its chevron on screen and opens from anywhere on it (adjust.css).
  */
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMobile } from '../../contexts/MobileContext'
 import { Icon } from './Icon'
@@ -31,10 +31,50 @@ function cellClass(col, kind) {
   return join(...tones)
 }
 
+/** The columns that may fold, first to go first: a column's `fold` rank (higher folds earlier), else its place
+ * from the right; the entity and a column with `fold: false` never fold. */
+export function foldOrder(columns) {
+  return columns
+    .map((c, i) => ({ id: c.id, rank: c.fold ?? i, keep: c.entity || c.fold === false }))
+    .filter((c) => !c.keep)
+    .sort((a, b) => b.rank - a.rank)
+    .map((c) => c.id)
+}
+
+/**
+ * Beside the dock anchored at the right (#app.dock-right), the list folds its secondary columns one by one
+ * until the table fits its region: no horizontal scroll, the actions and the chevron in view. The region
+ * widening or the rows changing unfolds them all and measures again, before the browser paints.
+ */
+function useFoldedColumns(scrollRef, columns, rowsKey, active) {
+  const [count, setCount] = useState(0)
+  const [width, setWidth] = useState(0)
+  const order = foldOrder(columns)
+  const key = `${order.join(',')}|${rowsKey}|${width}`
+  const measured = useRef(key)
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!active || !el || typeof ResizeObserver === 'undefined') return undefined
+    const observer = new ResizeObserver(() => setWidth(el.clientWidth))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [active, scrollRef])
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    const right = active && !!el?.closest('.dock-right')
+    if (!right || measured.current !== key) {
+      measured.current = key
+      if (count) { setCount(0); return }
+    }
+    if (right && count < order.length && el.scrollWidth > el.clientWidth + 1) setCount(count + 1)
+  })
+  return new Set(order.slice(0, count))
+}
+
 /**
  * @param {object} p
  * @param {'certificates'|'module'|'audit'} p.kind
- * @param {Array} p.columns  { id, label, sort?, entity?, resource?, grow?, tone?, fit?, cell(row), title?(row), icon?(row), extra?(row), skeleton? }
+ * @param {Array} p.columns  { id, label, sort?, entity?, resource?, grow?, tone?, fit?, fold?, cell(row), title?(row), icon?(row), extra?(row), skeleton? }
  * @param {Array} p.rows
  * @param {(row) => string} p.rowLabel  names a row in the labels of its checkbox, actions and chevron
  * @param {(row) => void} [p.onOpen]  the entity button and the chevron open the row; with `rowOpens`, the whole row too
@@ -43,7 +83,7 @@ function cellClass(col, kind) {
  * @param {(row) => {description?, meta?: Array, status?, end?, note?}} [p.card]  the phone record
  */
 export function DataTable({
-  kind = 'certificates', scrollId, label, caption, columns, rows = [], rowKey = (r) => r.id, rowLabel = (r) => String(r.id),
+  kind = 'certificates', scrollId, label, caption, columns: allColumns, rows = [], rowKey = (r) => r.id, rowLabel = (r) => String(r.id),
   onOpen, openLabel, openedId, rowOpens = false, selection, rowActions, sort, onSort, loading = false, skeletonRows = 12,
   empty, card, footer, actionsLabel, columnWidths, onColumnWidth, recordsId,
 }) {
@@ -58,8 +98,11 @@ export function DataTable({
   const master = useRef(null)
   useEffect(() => { if (master.current) master.current.indeterminate = pageSome && !pageAll }, [pageSome, pageAll])
   const chevronLabel = (row) => (openLabel ? openLabel(row) : t('table.openRow', { name: rowLabel(row) }))
-  const colSpan = columns.length + (selection ? 1 : 0) + (hasActions ? 1 : 0)
   const firstRead = loading && !rows.length
+  const scrollRef = useRef(null)
+  const folded = useFoldedColumns(scrollRef, allColumns, rows.map(rowKey).join(','), !(isMobile && card))
+  const columns = folded.size ? allColumns.filter((c) => !folded.has(c.id)) : allColumns
+  const colSpan = columns.length + (selection ? 1 : 0) + (hasActions ? 1 : 0)
 
   const openButton = (row, col) => {
     const name = col.cell(row)
@@ -99,7 +142,7 @@ export function DataTable({
           )) : empty}
         </div>
       ) : (
-        <div className="table-scroll" id={scrollId} role="region" tabIndex={0} aria-label={label}>
+        <div className="table-scroll" ref={scrollRef} id={scrollId} role="region" tabIndex={0} aria-label={label}>
           <table className={k.table}>
             {caption && <caption className="sr-only">{caption}</caption>}
             <thead>

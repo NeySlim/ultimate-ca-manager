@@ -93,8 +93,9 @@
 /* A page action the mockup's phone head hides (every button but the primary one) keeps a way in under the queue. */
 .atl .phone-only{display:none}
 @media (max-width:800px){.atl .phone-only{display:flex;flex-wrap:wrap;gap:8px}}
-/* A mockup text-link button the product renders as a link (it navigates): the button's box. */
-.atl a.text-link[data-link]{display:inline-block}
+/* A mockup text-link button the product renders as a link (it navigates): the button's box, above the scope's revert and
+   under a context which lays its links out (.card-tools, .health-foot). */
+.atl a:where(.text-link[data-link]){display:inline-block}
 /* A phone-only action of the product (no counterpart in the mockup) takes the mockup's 40 px phone controls. */
 @media (max-width:800px){.atl .phone-only .btn{min-height:40px}}
 /* A toast keeps the lines of its message; one that stays takes the rule and icon of its type, the mockup's failure toast for an error. */
@@ -233,3 +234,9 @@
 .atl pre.template-preview{margin:0;overflow:auto}
 /* Inspector, deployments: the binding a work-queue link names, marked as the mockup's current setup step. */
 .atl .record-list>li[aria-current=true]{background:var(--selected)}
+/* Users, group dialog: the permission grid (absent from the mockup) in its compare table, a box per action column. */
+.atl .compare-table.group-perms{min-width:0}
+.atl .group-perms th:not(:first-child),.atl .group-perms td:not(:first-child){width:84px;text-align:center}
+.atl .group-perms td{padding:8px}
+/* A module table with a checkbox column (absent from the mockup's modules) gives it the Certificates table's 40 px and 6 px. */
+.atl .module-table:has(>thead>tr>th:first-child>.check-hit) th:first-child,.atl .module-table:has(>thead>tr>th:first-child>.check-hit) td:first-child{width:40px;padding:0 6px}

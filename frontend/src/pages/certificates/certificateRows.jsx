@@ -31,25 +31,26 @@ function marks(row, t) {
 }
 
 /** The columns of the certificates table; `sort` names the server order a header asks for. */
+// `fold`: beside the right dock the list folds the highest first (DataTable); the name and the state stay
 export function certificateColumns(t) {
   return [
     { id: 'name', label: t('common.commonName'), sort: 'name', entity: true, always: true, icon: () => 'cert', cell: (r) => r.cn,
       extra: (r) => marks(r, t), skeleton: { base: 55, spread: 35 } },
-    { id: 'description', label: t('common.description'), sort: 'description', grow: true, tone: 'muted', cell: (r) => r.subtitle || '',
+    { id: 'description', label: t('common.description'), sort: 'description', grow: true, fold: 5, tone: 'muted', cell: (r) => r.subtitle || '',
       title: (r) => r.subtitle || '', skeleton: { base: 45, spread: 40 } },
-    { id: 'status', label: t('certificates.state'), sort: 'status', always: true, cell: (r) => <CertBadge cert={r} t={t} />, skeleton: { width: '74px', kind: 'pill' } },
-    { id: 'ca', label: t('common.issuer'), sort: 'ca', tone: 'muted', cell: (r) => issuerOf(r) || '—', title: (r) => issuerOf(r), skeleton: { base: 50, spread: 40 } },
-    { id: 'source', label: t('certificates.source'), cell: (r) => <span className="source-label"><Icon name={sourceIconOf(r)} />{sourceLabel(sourceOf(r), t)}</span>, skeleton: { width: '52px' } },
-    { id: 'expiry', label: t('certificates.expiry'), sort: 'days', cell: (r) => <ExpiryCell row={r} t={t} />, skeleton: { width: '92px' } },
-    { id: 'key', label: t('common.keyAlgorithm'), sort: 'key', tone: ['small', 'muted'], cell: (r) => certificateKeyLabel(r, t) || '—', skeleton: { width: '70px' } },
-    { id: 'grade', label: t('certificates.complianceColumn'), sort: 'grade', defaultHidden: true, skeleton: { width: '20px' },
+    { id: 'status', label: t('certificates.state'), sort: 'status', always: true, fold: false, cell: (r) => <CertBadge cert={r} t={t} />, skeleton: { width: '74px', kind: 'pill' } },
+    { id: 'ca', label: t('common.issuer'), sort: 'ca', tone: 'muted', fold: 4, cell: (r) => issuerOf(r) || '—', title: (r) => issuerOf(r), skeleton: { base: 50, spread: 40 } },
+    { id: 'source', label: t('certificates.source'), fold: 6, cell: (r) => <span className="source-label"><Icon name={sourceIconOf(r)} />{sourceLabel(sourceOf(r), t)}</span>, skeleton: { width: '52px' } },
+    { id: 'expiry', label: t('certificates.expiry'), sort: 'days', fold: 3, cell: (r) => <ExpiryCell row={r} t={t} />, skeleton: { width: '92px' } },
+    { id: 'key', label: t('common.keyAlgorithm'), sort: 'key', fold: 7, tone: ['small', 'muted'], cell: (r) => certificateKeyLabel(r, t) || '—', skeleton: { width: '70px' } },
+    { id: 'grade', label: t('certificates.complianceColumn'), sort: 'grade', defaultHidden: true, fold: 8, skeleton: { width: '20px' },
       cell: (r) => {
         const grade = GRADE_TONES[r.compliance_grade] ? r.compliance_grade : 'F'
         return <span className={`grade ${GRADE_TONES[grade]}`} title={`${r.compliance_score ?? 0}/100`}>{grade}</span>
       } },
-    { id: 'pair', label: t('certificates.hybrid.column'), defaultHidden: true, tone: 'muted', skeleton: { width: '40px' },
+    { id: 'pair', label: t('certificates.hybrid.column'), defaultHidden: true, fold: 9, tone: 'muted', skeleton: { width: '40px' },
       cell: (r) => (r.related_certificate_id == null ? '—' : <span title={t(roleKey(r))}>{t('certificates.hybrid.linked')}</span>) },
-    { id: 'created', label: t('common.created'), sort: 'created', defaultHidden: true, tone: ['small', 'muted'], skeleton: { width: '70px' },
+    { id: 'created', label: t('common.created'), sort: 'created', defaultHidden: true, fold: 10, tone: ['small', 'muted'], skeleton: { width: '70px' },
       cell: (r) => formatDate(r.created_at, { time: false }) },
   ]
 }

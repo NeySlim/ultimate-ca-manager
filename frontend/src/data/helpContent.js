@@ -65,7 +65,7 @@ export const helpContent = {
         title: 'Search and shortcuts',
         icon: Stack,
         items: [
-          { label: 'Search', text: 'Press Ctrl K (Cmd K on macOS) or select the search field to jump to any page of the menu you may open, run an action (Issue New Certificate opens its form), or find a certificate, an authority, a user, a template, an ACME account or a SCEP profile. Down Arrow moves from the field to the results, Up Arrow from the first result back to the field, and Enter in the field opens the first result. An object found opens in the detail of its page' },
+          { label: 'Search', text: 'Press Ctrl K (Cmd K on macOS) or select the search field to jump to any page of the menu you may open (listed under its menu name, its menu group as the hint), run an action (Issue New Certificate opens its form), or find a certificate, an authority, a user, a template, an ACME account or a SCEP profile. Down Arrow moves from the field to the results, Up Arrow from the first result back to the field, and Enter in the field opens the first result. An object found opens in the detail of its page' },
           { label: 'Address', text: 'The object open in a page\'s detail dock and its section are part of the address: a reload or a shared link reopens them, and the browser\'s Back closes the dock' },
           { label: 'Help', text: 'Press ? outside a text field, or select the help button of the bar, to open the help of the current page; on a narrow screen, where the bar has no help button, search Help for this page' },
           { label: 'Phone width', text: 'The top bar shows a single list of pages instead of the links and the menu' },
@@ -1014,7 +1014,7 @@ export const helpContent = {
         icon: UsersFour,
         items: [
           { label: 'Create Group', text: 'Define a group and assign members' },
-          { label: 'Group Permissions', text: 'A group grants a set of permissions, every member receives them on top of their own role' },
+          { label: 'Group Permissions', text: 'A group grants a set of permissions, ticked in a grid of resources by Read, Write and Delete; every member receives them on top of their own role' },
           { label: 'Member Management', text: 'Add or remove users from groups' },
         ]
       },

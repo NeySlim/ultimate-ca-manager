@@ -27,6 +27,12 @@ describe('custom role matrix follows the server list', () => {
     ])
   })
 
+  it('labels the overview as the bar names it, first', () => {
+    expect(groupPermissions(['read:certificates', 'read:dashboard']).map(g => [g.key, g.labelKey])).toEqual([
+      ['dashboard', 'shell.bar.dashboard'], ['certificates', 'rbac.categories.certificates'],
+    ])
+  })
+
   it('labels an unknown resource by its name rather than dropping it', () => {
     const [group] = groupPermissions(['read:widgets'])
     expect(group).toMatchObject({ key: 'widgets', labelKey: null, label: 'widgets' })

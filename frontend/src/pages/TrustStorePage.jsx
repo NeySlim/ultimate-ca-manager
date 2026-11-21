@@ -29,6 +29,9 @@ import { dateOf, dateTimeOf } from './admin/adminDates'
 import { PemPanel } from './certificates/inspector/PemPanel'
 import { PhoneMoreActions } from './pki/PhoneMoreActions'
 
+// A managed CA is a root when its certificate is self-issued, as the CA page reads it (CASide)
+const isRootCa = (ca) => Boolean(ca && (ca.type === 'root' || ca.is_root))
+
 // The anchor types the server stores (purpose), in the order of the type filter
 const BY_NAME = { key: 'name', asc: true }
 const PURPOSES = ['root_ca', 'intermediate_ca', 'client_auth', 'code_signing', 'system', 'custom']
@@ -179,7 +182,7 @@ export default function TrustStorePage() {
             name: ca?.descr || ca?.common_name || `CA-${caId}`,
             description: ca?.organization || '',
             certificate_pem: pemText,
-            purpose: ca?.is_root ? 'root_ca' : 'intermediate_ca',
+            purpose: isRootCa(ca) ? 'root_ca' : 'intermediate_ca',
             notes: t('trustStore.addedFromManaged')
           })
           added++
@@ -317,7 +320,7 @@ export default function TrustStorePage() {
                     <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
                       {ca.descr || ca.common_name}{ca.organization && <span className="muted"> · {ca.organization}</span>}
                     </span>
-                    <Pill tone="muted" icon="shield" label={ca.is_root ? 'Root' : 'Inter'} />
+                    <Pill tone="muted" icon="shield" label={t(isRootCa(ca) ? 'common.rootCA' : 'common.intermediateCA')} />
                     {ca.alreadyInTruststore && <Pill tone="good" label={t('trustStore.alreadyInTruststore')} />}
                   </label>
                 ))}

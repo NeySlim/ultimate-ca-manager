@@ -15,7 +15,7 @@ vi.mock('react-i18next', () => ({
 }))
 const m = vi.hoisted(() => ({
   update: vi.fn(), getAll: vi.fn(), getApiKeys: vi.fn(), effective: vi.fn(), catalog: vi.fn(), download: vi.fn(),
-  groupById: vi.fn(), write: true, del: true,
+  groupById: vi.fn(), create: vi.fn(), write: true, del: true,
 }))
 const stable = vi.hoisted(() => ({
   i18n: { t: (k, o) => (o ? `${k} ${JSON.stringify(o)}` : k), i18n: { language: 'fr', changeLanguage: () => {}, on: () => {}, off: () => {} } },
@@ -45,8 +45,8 @@ vi.mock('../../services', () => ({
   },
   groupsService: {
     getAll: () => Promise.resolve({ data: [{ id: 3, name: 'pki-ops', description: 'Exploitation', member_count: 1 }] }),
-    getById: (...a) => m.groupById(...a),
-    getAvailablePermissions: () => Promise.resolve({ data: ['read:certificates', 'write:certificates', 'read:cas'] }),
+    getById: (...a) => m.groupById(...a), create: (...a) => m.create(...a),
+    getAvailablePermissions: () => Promise.resolve({ data: ['read:cas', 'read:certificates', 'write:certificates'] }),
   },
   rolesService: {
     getAll: () => Promise.resolve({ data: [] }), listRoles: () => Promise.resolve({ data: [] }),
@@ -285,15 +285,30 @@ describe('the account and group dialogs', () => {
       .toEqual([['btn', 'common.cancel'], ['btn primary', 'common.create']])
   })
 
-  it('lists the group permissions as check lines, by resource', async () => {
+  it('grants the group permissions in a table of named resources and the read, write and delete columns', async () => {
+    m.create.mockResolvedValue({})
     page()
     await screen.findByRole('button', { name: 'Chloé Durand' })
     fireEvent.click(screen.getByRole('button', { name: 'common.groups' }))
     await screen.findByRole('button', { name: 'pki-ops' })
     fireEvent.click(screen.getByRole('button', { name: 'groups.createGroup' }))
     const dialog = await waitFor(() => { const d = document.querySelector('dialog'); expect(d).toBeTruthy(); return d })
-    const certs = await within(dialog).findByRole('group', { name: 'certificates' })
-    expect([...certs.querySelectorAll('label.checkbox-line')].map((l) => l.textContent)).toEqual(['read:certificates', 'write:certificates'])
+    const table = await within(dialog).findByRole('table', { name: 'groups.permissions' })
+    expect(within(table).getAllByRole('columnheader').map((h) => h.textContent))
+      .toEqual(['groups.resource', 'groups.actions.read', 'groups.actions.write', 'groups.actions.delete'])
+    // One row per resource, named as the RBAC page names it, a box only where the action is grantable
+    expect(within(table).getAllByRole('rowheader').map((h) => h.textContent)).toEqual(['rbac.categories.certificates', 'rbac.categories.certificateAuthorities'])
+    const certs = within(table).getByRole('rowheader', { name: 'rbac.categories.certificates' }).closest('tr')
+    expect(within(certs).getAllByRole('checkbox').map((c) => c.getAttribute('aria-label'))).toEqual([
+      'groups.grant {"action":"groups.actions.read","resource":"rbac.categories.certificates"}',
+      'groups.grant {"action":"groups.actions.write","resource":"rbac.categories.certificates"}',
+    ])
+    expect(certs.querySelectorAll('td')).toHaveLength(3)
+    expect(dialog.textContent).not.toContain('read:certificates')
+    fireEvent.change(within(dialog).getByLabelText('groups.groupName'), { target: { value: 'ops' } })
+    fireEvent.click(within(certs).getAllByRole('checkbox')[1])
+    fireEvent.click(within(dialog).getByRole('button', { name: 'common.create' }))
+    await waitFor(() => expect(m.create).toHaveBeenCalledWith({ name: 'ops', description: '', permissions: ['write:certificates'] }))
   })
 })
 

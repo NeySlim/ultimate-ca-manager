@@ -2004,7 +2004,14 @@
     "pageRange_other": "{{start}}–{{end}} of {{count}} groups",
     "caption": "Groups. Activate a name to open its detail.",
     "search": "Name, description…",
-    "manageMembers": "Manage members"
+    "manageMembers": "Manage members",
+    "resource": "Resource",
+    "actions": {
+      "read": "Read",
+      "write": "Write",
+      "delete": "Delete"
+    },
+    "grant": "{{action}}: {{resource}}"
   },
   "acme": {
     "title": "ACMEプロトコル",
@@ -7009,39 +7016,6 @@
     "source": "Certificate source"
   },
   "commands": {
-    "nav": {
-      "dashboard": "ダッシュボードへ",
-      "certificates": "証明書へ",
-      "cas": "CAへ",
-      "csrs": "CSRへ",
-      "templates": "テンプレートへ",
-      "users": "ユーザーへ",
-      "acme": "ACMEへ",
-      "scep": "SCEPへ",
-      "est": "ESTへ",
-      "operations": "オペレーションへ",
-      "tools": "証明書ツールへ",
-      "audit": "監査ログへ",
-      "settings": "設定へ",
-      "account": "アカウントへ",
-      "groups": "グループへ",
-      "rbac": "RBACへ",
-      "sso": "SSOへ",
-      "hsm": "HSMへ",
-      "policies": "ポリシーへ",
-      "approvals": "承認へ",
-      "reports": "レポートへ",
-      "discovery": "ディスカバリーへ",
-      "msca": "MS CAへ",
-      "sshCas": "SSH CAへ",
-      "sshCertificates": "SSH証明書へ",
-      "trustStore": "Go to Trust Store",
-      "userCertificates": "Go to User Certificates",
-      "tsa": "Go to TSA",
-      "keyRecovery": "Go to Key Recovery",
-      "logs": "Go to System Logs",
-      "crlOcsp": "CRL/OCSPへ"
-    },
     "actions": {
       "newCertificate": "新しい証明書を発行",
       "newCA": "新しいCAを作成",
@@ -7049,9 +7023,7 @@
     },
     "categories": {
       "navigation": "ナビゲーション",
-      "actions": "アクション",
-      "proFeatures": "Pro機能",
-      "governance": "ガバナンス"
+      "actions": "アクション"
     }
   },
   "passwordStrength": {
