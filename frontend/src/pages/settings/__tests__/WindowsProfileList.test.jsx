@@ -30,17 +30,6 @@ vi.mock('../../../contexts', () => ({
 vi.mock('../../../services', () => ({
   windowsProfilesService: { list: mocks.list, update: vi.fn(), remove: vi.fn() },
 }))
-// A native select exposes the options the real one hides in a portal.
-vi.mock('../../../components/ui/Select', async (orig) => ({
-  ...(await orig()),
-  FilterSelect: ({ options = [], value, onChange, placeholder }) => (
-    <select aria-label={placeholder} value={value ?? ''} onChange={(e) => onChange(e.target.value)}>
-      <option value="">-</option>
-      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
-  ),
-}))
-
 import WindowsProfileList from '../WindowsProfileList'
 
 const PROFILES = Array.from({ length: 150 }, (_, i) => ({
@@ -87,9 +76,9 @@ describe('WindowsProfileList', () => {
   it('sends the state and the CA to the server and goes back to the first page', async () => {
     renderList()
     await screen.findByText('profile-001')
-    fireEvent.change(screen.getByLabelText('common.allStatus'), { target: { value: 'keytab_missing' } })
+    fireEvent.change(screen.getByLabelText('common.status'), { target: { value: 'keytab_missing' } })
     await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith({ page: 1, per_page: 25, state: 'keytab_missing' }))
-    fireEvent.change(screen.getByLabelText('xcepWstep.allCas'), { target: { value: 'ca-refid-1' } })
+    fireEvent.change(screen.getByLabelText('xcepWstep.issuingCa'), { target: { value: 'ca-refid-1' } })
     await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith(
       { page: 1, per_page: 25, ca: 'ca-refid-1', state: 'keytab_missing' }))
   })
@@ -97,7 +86,7 @@ describe('WindowsProfileList', () => {
   it('offers the four states', async () => {
     renderList()
     await screen.findByText('profile-001')
-    const options = [...screen.getByLabelText('common.allStatus').querySelectorAll('option')].map(o => o.value).filter(Boolean)
+    const options = [...screen.getByLabelText('common.status').querySelectorAll('option')].map(o => o.value).filter(Boolean)
     expect(options).toEqual(['complete', 'keytab_missing', 'connector_failing', 'disabled'])
   })
 
@@ -122,5 +111,17 @@ describe('WindowsProfileList', () => {
     // 25 rows, the default among them
     expect(screen.getAllByTitle('common.disable')).toHaveLength(25)
     expect(screen.getAllByTitle('common.delete')).toHaveLength(24)
+  })
+
+  it('offers one Add button: the empty block holds it, the list keeps it under the rows', async () => {
+    mocks.list.mockImplementation(async () => ({ data: [], meta: { total: 0 } }))
+    const { unmount } = renderList()
+    await screen.findByText('xcepWstep.noProfiles')
+    expect(screen.getAllByRole('button', { name: 'xcepWstep.addProfile' })).toHaveLength(1)
+    unmount()
+    mocks.list.mockImplementation(async ({ page, per_page: perPage }) => ({ data: PROFILES.slice(0, perPage), meta: { total: PROFILES.length, page } }))
+    renderList()
+    await screen.findByText('profile-001')
+    expect(screen.getAllByRole('button', { name: 'xcepWstep.addProfile' })).toHaveLength(1)
   })
 })

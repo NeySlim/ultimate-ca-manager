@@ -1,91 +1,44 @@
 import { useTranslation } from 'react-i18next'
-import { Trash, Plus } from '@phosphor-icons/react'
-import { Button, Input } from '../../components'
-import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
-import { FormGroup } from '../../components/sectioned'
+import { Btn, IconBtn, RecordList, RecordRow, SkeletonPanel } from '../../components/atelier'
+import { Input, ToggleSwitch, Notice } from '../../components/atelier/Form'
+import { SettingsGroup } from '../../components/atelier/SettingsView'
 
 export default function CTSection({ ctSettings, setCtSettings, ctLoading, ctNewLogUrl, setCtNewLogUrl, handleCtAddLogUrl, handleCtRemoveLogUrl }) {
   const { t } = useTranslation()
+  if (ctLoading) return <SkeletonPanel label={t('common.loading')} />
+  const set = (key) => (val) => setCtSettings(prev => ({ ...prev, [key]: val }))
   return (
     <>
-
-      {ctLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="w-6 h-6 border-2 border-accent-primary-op30 border-t-accent-primary rounded-full animate-spin" />
+      {/* The logs as the mockup's record list; a new one typed in a full-width field, its button under it */}
+      <SettingsGroup legend={t('settings.ct')} grid={false}>
+        {ctSettings.log_urls?.length > 0 && (
+          <RecordList label={t('settings.ctLogUrls')}>
+            {ctSettings.log_urls.map((url, i) => (
+              <RecordRow key={i} title={<span className="mono">{url}</span>}
+                action={<IconBtn icon="close" write label={`${t('common.delete')} ${url}`} title={t('common.delete')} onClick={() => handleCtRemoveLogUrl(i)} />} />
+            ))}
+          </RecordList>
+        )}
+        <div className="settings-grid">
+          <Input id="set-ct_log_url" full label={t('settings.ctLogUrls')} value={ctNewLogUrl} onChange={(e) => setCtNewLogUrl(e.target.value)}
+            placeholder="https://ct.googleapis.com/logs/us1/argon2027h1/"
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCtAddLogUrl() } }} />
         </div>
-      ) : (
-        <FormGroup title={t('settings.ct')}>
-          <div className="space-y-4">
-            {/* The logs as the mockup's record list; a new one typed in a full-width field, its button under it */}
-            <div className="sf-stack">
-              {ctSettings.log_urls?.length > 0 && (
-                <ul className="sf-records" aria-label={t('settings.ctLogUrls')}>
-                  {ctSettings.log_urls.map((url, i) => (
-                    <li key={i}>
-                      <div className="sf-record-main"><span className="sf-copy-value">{url}</span></div>
-                      <div className="sf-record-actions">
-                        <Button type="button" variant="danger" onClick={() => handleCtRemoveLogUrl(i)}
-                          aria-label={`${t('common.delete')} ${url}`} title={t('common.delete')}>
-                          <Trash size={16} />
-                        </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <div className="sf-grid">
-                <Input
-                  label={t('settings.ctLogUrls')}
-                  value={ctNewLogUrl}
-                  onChange={(e) => setCtNewLogUrl(e.target.value)}
-                  placeholder="https://ct.googleapis.com/logs/us1/argon2027h1/"
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCtAddLogUrl() } }}
-                />
-              </div>
-              <div className="sf-actions-row">
-                <Button type="button" variant="secondary" onClick={handleCtAddLogUrl} data-write>
-                  <Plus size={16} />
-                  {t('settings.ctAddLogUrl')}
-                </Button>
-              </div>
-            </div>
-
-            <ToggleSwitch
-              label={t('settings.ctAutoSubmit')}
-              checked={ctSettings.auto_submit}
-              onChange={(val) => setCtSettings(prev => ({ ...prev, auto_submit: val }))}
-            />
-
-            <ToggleSwitch
-              label={t('settings.ctEnabled')}
-              checked={ctSettings.enabled}
-              onChange={(val) => setCtSettings(prev => ({ ...prev, enabled: val }))}
-            />
-
-            {ctSettings.enabled && (
-              <ToggleSwitch
-                label={t('settings.ctEmbedSct')}
-                checked={ctSettings.embed_sct ?? false}
-                onChange={(val) => setCtSettings(prev => ({ ...prev, embed_sct: val }))}
-              />
-            )}
-
-            {ctSettings.enabled && ctSettings.embed_sct && (
-              <>
-                <ToggleSwitch
-                  label={t('settings.ctRequired')}
-                  checked={ctSettings.required ?? false}
-                  onChange={(val) => setCtSettings(prev => ({ ...prev, required: val }))}
-                />
-                {ctSettings.required && (
-                  <p className="text-xs text-status-warning">{t('settings.ctRequiredWarning')}</p>
-                )}
-              </>
-            )}
-
-          </div>
-        </FormGroup>
-      )}
+        <div className="settings-actions">
+          <Btn icon="plus" write onClick={handleCtAddLogUrl}>{t('settings.ctAddLogUrl')}</Btn>
+        </div>
+        <div className="settings-grid">
+          <ToggleSwitch id="set-ct_auto_submit" label={t('settings.ctAutoSubmit')} checked={ctSettings.auto_submit} onChange={set('auto_submit')} />
+          <ToggleSwitch id="set-ct_enabled" label={t('settings.ctEnabled')} checked={ctSettings.enabled} onChange={set('enabled')} />
+          {ctSettings.enabled && (
+            <ToggleSwitch id="set-ct_embed_sct" label={t('settings.ctEmbedSct')} checked={ctSettings.embed_sct ?? false} onChange={set('embed_sct')} />
+          )}
+          {ctSettings.enabled && ctSettings.embed_sct && (
+            <ToggleSwitch id="set-ct_required" label={t('settings.ctRequired')} checked={ctSettings.required ?? false} onChange={set('required')} />
+          )}
+          {ctSettings.enabled && ctSettings.embed_sct && ctSettings.required && <Notice tone="warn">{t('settings.ctRequiredWarning')}</Notice>}
+        </div>
+      </SettingsGroup>
     </>
   )
 }

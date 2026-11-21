@@ -1,20 +1,20 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, PencilSimple, Power, Trash, WindowsLogo } from '@phosphor-icons/react'
-import { Badge, Button, ResponsiveDataTable } from '../../components'
+import { Btn, ListView, Toolbar, SearchField, FilterSelect, EmptyBlock, NoMatch, Pill } from '../../components/atelier'
 import { windowsProfilesService } from '../../services'
 import { useNotification } from '../../contexts'
 import { PROFILE_STATES } from '../../lib/windowsProfile'
 
 const DEBOUNCE_MS = 300
-const STATE_VARIANT = { complete: 'success', keytab_missing: 'warning', connector_failing: 'danger', disabled: 'secondary' }
+const STATE_TONE = { complete: 'good', keytab_missing: 'warn', connector_failing: 'bad', disabled: 'muted' }
 
 /**
  * The profiles, one server page at a time: the name or realm search, the CA and the state go to
- * the server, so 150 profiles cost one page. `reloadKey` makes the list read again.
+ * the server, so 150 profiles cost one page. `reloadKey` makes the list read again. Drawn as the
+ * mockup's module list: the name opens the profile, the footer pages the server's list.
  */
 export default function WindowsProfileList({ cas, canWrite, onEdit, onCreate, reloadKey }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { showSuccess, showError, showConfirm } = useNotification()
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
@@ -80,102 +80,64 @@ export default function WindowsProfileList({ cas, canWrite, onEdit, onCreate, re
     }
   }
 
-  const columns = useMemo(() => [
-    {
-      key: 'name',
-      header: t('xcepWstep.profileName'),
-      priority: 1,
-      render: (value, row) => (
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-text-primary truncate">{value}</span>
-            {row.is_default && <Badge variant="info" size="sm">{t('xcepWstep.defaultBadge')}</Badge>}
-          </div>
-          {!row.realm && row.is_default && (
-            <div className="text-xs status-warning-text">{t('xcepWstep.noRealmKerberosRefused', { name: row.name })}</div>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'realm',
-      header: t('xcepWstep.realm'),
-      priority: 2,
-      render: (value) => value
-        ? <span className="font-mono text-xs">{value}</span>
-        : <Badge variant="warning" size="sm">{t('xcepWstep.realmUnset')}</Badge>,
-    },
-    {
-      key: 'issuing_ca_name',
-      header: t('xcepWstep.issuingCa'),
-      hideOnMobile: true,
-      render: (value) => value || <span className="text-text-tertiary">-</span>,
-    },
-    {
-      key: 'connector_name',
-      header: t('xcepWstep.connector'),
-      hideOnMobile: true,
-      render: (value, row) => value
-        ? (
-          <span className="flex items-center gap-1">
-            {value}
-            {row.connector_health === 'down' && <Badge variant="danger" size="sm">{t('adConnector.healthStateDown')}</Badge>}
-          </span>
-        )
-        : <span className="text-text-tertiary">{t('xcepWstep.noConnector')}</span>,
-    },
-    {
-      key: 'state',
-      header: t('common.status'),
-      priority: 3,
-      render: (value) => <Badge variant={STATE_VARIANT[value] || 'secondary'} size="sm">{t(`xcepWstep.state.${value}`)}</Badge>,
-    },
-  ], [t])
-
   const rowActions = (row) => canWrite ? [
-    { label: t('common.edit'), icon: PencilSimple, onClick: () => onEdit(row) },
-    { label: row.enabled ? t('common.disable') : t('common.enable'), icon: Power, onClick: () => toggle(row) },
-    ...(row.is_default ? [] : [{ label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => remove(row) }]),
-  ] : [{ label: t('xcepWstep.viewProfile'), icon: PencilSimple, onClick: () => onEdit(row) }]
+    { icon: row.enabled ? 'block' : 'check', label: row.enabled ? t('common.disable') : t('common.enable'), write: true, onClick: () => toggle(row) },
+    ...(row.is_default ? [] : [{ icon: 'close', label: t('common.delete'), write: true, onClick: () => remove(row) }]),
+  ] : []
 
   const caOptions = (cas || []).filter(c => c.refid).map(c => ({ value: c.refid, label: c.descr || c.common_name }))
+  const pages = Math.max(1, Math.ceil(total / perPage))
+  const number = new Intl.NumberFormat(i18n?.language || undefined)
+  const filtered = Boolean(query || ca || state)
+  const resetFilters = () => { clearTimeout(timer.current); setSearch(''); setQuery(''); setCa(''); setState(''); setPage(1) }
 
   return (
-    <ResponsiveDataTable
-      data={rows}
-      columns={columns}
-      keyField="id"
-      loading={loading}
-      onRowClick={onEdit}
-      rowActions={rowActions}
-      searchable
-      externalSearch={search}
-      onSearchChange={changeSearch}
-      searchPlaceholder={t('xcepWstep.searchPlaceholder')}
-      toolbarFilters={[
-        {
-          key: 'ca', label: t('xcepWstep.issuingCa'), value: ca, placeholder: t('xcepWstep.allCas'), options: caOptions,
-          onChange: (v) => { setCa(v); setPage(1) },
-        },
-        {
-          key: 'state', label: t('common.status'), value: state, placeholder: t('common.allStatus'),
-          options: PROFILE_STATES.map(value => ({ value, label: t(`xcepWstep.state.${value}`) })),
-          onChange: (v) => { setState(v); setPage(1) },
-        },
-      ]}
-      toolbarActions={canWrite ? (
-        <Button type="button" size="sm" onClick={onCreate}>
-          <Plus size={14} /> {t('xcepWstep.addProfile')}
-        </Button>
-      ) : undefined}
-      pagination={{
-        page, total, perPage,
-        onChange: setPage,
-        onPerPageChange: (value) => { setPerPage(value); setPage(1) },
-      }}
-      emptyIcon={WindowsLogo}
-      emptyTitle={t('xcepWstep.noProfiles')}
-      emptyDescription={t('xcepWstep.noProfilesDesc')}
-    />
+    <>
+      <ListView label={t('xcepWstep.profilesTitle')} icon="monitor" rows={rows} loading={loading}
+        title={(row) => row.name} status={(row) => <Pill tone={STATE_TONE[row.state] || 'muted'} label={t(`xcepWstep.state.${row.state}`)} />}
+        nameExtra={(row) => (
+          <>
+            {row.is_default && <> <Pill icon="pin" label={t('xcepWstep.defaultBadge')} /></>}
+            {!row.realm && row.is_default && <span className="rl-meta warn">{t('xcepWstep.noRealmKerberosRefused', { name: row.name })}</span>}
+          </>
+        )}
+        onOpen={onEdit}
+        toolbar={(
+          <Toolbar>
+            <SearchField id="windows-profile-search" label={t('common.search')} placeholder={t('xcepWstep.searchPlaceholder')} value={search} onChange={changeSearch} />
+            <FilterSelect id="windows-profile-ca" label={t('xcepWstep.issuingCa')} value={ca} onChange={(v) => { setCa(v); setPage(1) }}
+              options={[{ value: '', label: t('xcepWstep.allCas') }, ...caOptions]} />
+            <FilterSelect id="windows-profile-state" label={t('common.status')} value={state} onChange={(v) => { setState(v); setPage(1) }}
+              options={[{ value: '', label: t('common.allStatus') }, ...PROFILE_STATES.map(value => ({ value, label: t(`xcepWstep.state.${value}`) }))]} />
+          </Toolbar>
+        )}
+        columns={[
+          { id: 'realm', label: t('xcepWstep.realm'), cell: (row) => (row.realm
+            ? <span className="mono">{row.realm}</span>
+            : <Pill tone="warn" label={t('xcepWstep.realmUnset')} />) },
+          { id: 'ca', label: t('xcepWstep.issuingCa'), cell: (row) => row.issuing_ca_name || '—', grow: true },
+          { id: 'connector', label: t('xcepWstep.connector'), cell: (row) => (row.connector_name
+            ? <>{row.connector_name}{row.connector_health === 'down' && <> <Pill tone="bad" label={t('adConnector.healthStateDown')} /></>}</>
+            : <span className="muted">{t('xcepWstep.noConnector')}</span>) },
+          { status: true },
+        ]}
+        rowActions={rowActions}
+        empty={filtered ? (
+          <NoMatch title={t('common.noResults')} resetLabel={t('table.clearFilters')} onReset={resetFilters} />
+        ) : (
+          <EmptyBlock id="windows-profiles" icon="monitor" title={t('xcepWstep.noProfiles')} text={t('xcepWstep.noProfilesDesc')}
+            action={canWrite ? { label: t('xcepWstep.addProfile'), icon: 'plus', onClick: onCreate, primary: true } : undefined} />
+        )}
+        footer={total > 0 ? {
+          range: t('table.range', { start: number.format((page - 1) * perPage + 1), end: number.format(Math.min(page * perPage, total)), total }),
+          pagination: { page, pages, perPage, onPage: setPage, onPerPage: (value) => { setPerPage(value); setPage(1) } },
+        } : undefined} />
+      {/* An empty list without filters offers Add in its empty block, not twice */}
+      {canWrite && (loading || filtered || rows.length > 0) && (
+        <div className="settings-actions">
+          <Btn tone="primary" icon="plus" onClick={onCreate}>{t('xcepWstep.addProfile')}</Btn>
+        </div>
+      )}
+    </>
   )
 }

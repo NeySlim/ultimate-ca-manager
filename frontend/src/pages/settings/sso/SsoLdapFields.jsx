@@ -1,18 +1,18 @@
 import { useTranslation } from 'react-i18next'
-import { Plugs, MagnifyingGlass, UsersThree, UserPlus, Play, ShieldWarning } from '@phosphor-icons/react'
-import { Button, Input, Select, LoadingSpinner, CompactSection } from '../../../components'
-import { ToggleSwitch } from '../../../components/ui/ToggleSwitch'
+import { Btn } from '../../../components/atelier'
+import { Input, NumberInput, SecretInput, Select, ToggleSwitch, Fold, Notice } from '../../../components/atelier/Form'
 import RoleMappingEditor from '../RoleMappingEditor'
 import ProvisioningNotice, { hasRoleRules } from './ProvisioningNotice'
 import MappingTestResult from './MappingTestResult'
 import TestConnectionButton from './TestConnectionButton'
+import { shownNumber, typedNumber } from '../numberFields'
 
 export default function SsoLdapFields({
   formData,
   handleChange,
   provider,
   testingConnection,
-  connectionBadge,
+  connectionStatus,
   testMappingUsername,
   setTestMappingUsername,
   testingMapping,
@@ -27,6 +27,7 @@ export default function SsoLdapFields({
   secretProps,
 }) {
   const { t } = useTranslation()
+  const ad = formData._directoryType === 'ad'
 
   const handleDirectoryType = (value) => {
     handleChange('_directoryType', value)
@@ -58,243 +59,112 @@ export default function SsoLdapFields({
   }
 
   return (
-    <div className="space-y-3">
-      {/* Connection */}
-      <CompactSection
-        title={<span className="flex items-center">{t('sso.connectionSection')}{connectionBadge}</span>}
-        icon={Plugs}
-        collapsible
-        defaultOpen
-      >
-        <div className="space-y-3">
-          <Select
-            label={t('sso.directoryType')}
-            value={formData._directoryType || 'custom'}
-            onChange={handleDirectoryType}
-            options={[
-              { value: 'openldap', label: t('sso.ldapTypes.openldap') },
-              { value: 'ad', label: t('sso.ldapTypes.activeDirectory') },
-              { value: 'custom', label: t('common.custom') },
-            ]}
-          />
-          <div className="grid grid-cols-3 gap-4">
-            <Input
-              label={t('sso.ldapServer')}
-              value={formData.ldap_server}
-              onChange={e => handleChange('ldap_server', e.target.value)}
-              placeholder={formData._directoryType === 'ad' ? 'dc.example.com' : 'ldap.example.com'}
-              className="col-span-2"
-            />
-            <Input
-              label={t('common.portLabel')}
-              type="number"
-              value={formData.ldap_port}
-              onChange={e => handleChange('ldap_port', parseInt(e.target.value))}
-            />
-          </div>
-          <ToggleSwitch
-            checked={formData.ldap_use_ssl}
-            onChange={(val) => {
-              handleChange('ldap_use_ssl', val)
-              if (formData._directoryType === 'ad') handleChange('ldap_port', val ? 636 : 389)
-            }}
-            label={t('sso.ldapUseSsl')}
-            size="sm"
-          />
-          {!formData.ldap_use_ssl && (
-            <ToggleSwitch
-              checked={formData.ldap_start_tls}
-              onChange={(val) => handleChange('ldap_start_tls', val)}
-              label={t('sso.ldapStartTls')}
-              description={t('sso.ldapStartTlsHelp')}
-              size="sm"
-            />
-          )}
-          {!formData.ldap_use_ssl && !formData.ldap_start_tls && (
-            <p className="text-xs text-status-warning">{t('sso.ldapPlainWarning')}</p>
-          )}
-          {(formData.ldap_use_ssl || formData.ldap_start_tls) && (
-            <>
-              <ToggleSwitch
-                checked={formData.ldap_verify_ssl}
-                onChange={(val) => handleChange('ldap_verify_ssl', val)}
-                label={t('sso.verifySsl')}
-                size="sm"
-              />
-              {!formData.ldap_verify_ssl && (
-                <p className="text-xs text-status-warning">{t('sso.sslWarning')}</p>
-              )}
-            </>
-          )}
-          <Input
-            label={t('sso.bindDn')}
-            value={formData.ldap_bind_dn}
-            onChange={e => handleChange('ldap_bind_dn', e.target.value)}
-            placeholder={formData._directoryType === 'ad' ? 'CN=svc-ldap,OU=Service Accounts,DC=example,DC=com' : t('sso.bindDnPlaceholder')}
-          />
-          <Input
-            label={t('sso.bindPassword')}
-            type="password"
-            noAutofill
-            value={formData.ldap_bind_password}
-            onChange={e => handleChange('ldap_bind_password', e.target.value)}
-            hasExistingValue={!!provider?.ldap_bind_password}
-            {...secretProps}
-          />
-          <Input
-            label={t('sso.baseDn')}
-            value={formData.ldap_base_dn}
-            onChange={e => handleChange('ldap_base_dn', e.target.value)}
-            placeholder={formData._directoryType === 'ad' ? 'DC=example,DC=com' : t('sso.baseDnPlaceholder')}
-          />
-          {provider?.id && (
-            <TestConnectionButton onClick={handleTestConnection} testing={testingConnection} dirty={dirty} icon={Plugs} />
-          )}
-        </div>
-      </CompactSection>
+    <>
+      <Fold title={t('sso.connectionSection')} defaultOpen>
+        <Select id="sso-ldap-directory" label={t('sso.directoryType')} value={formData._directoryType || 'custom'} onChange={handleDirectoryType}
+          options={[
+            { value: 'openldap', label: t('sso.ldapTypes.openldap') },
+            { value: 'ad', label: t('sso.ldapTypes.activeDirectory') },
+            { value: 'custom', label: t('common.custom') },
+          ]} />
+        <Input id="sso-ldap-server" label={t('sso.ldapServer')} value={formData.ldap_server}
+          onChange={e => handleChange('ldap_server', e.target.value)} placeholder={ad ? 'dc.example.com' : 'ldap.example.com'} />
+        <NumberInput id="sso-ldap-port" label={t('common.portLabel')} value={shownNumber(formData.ldap_port)}
+          onChange={e => handleChange('ldap_port', typedNumber(e))} />
+        <ToggleSwitch checked={formData.ldap_use_ssl} label={t('sso.ldapUseSsl')}
+          onChange={(val) => {
+            handleChange('ldap_use_ssl', val)
+            if (ad) handleChange('ldap_port', val ? 636 : 389)
+          }} />
+        {!formData.ldap_use_ssl && (
+          <ToggleSwitch checked={formData.ldap_start_tls} onChange={(val) => handleChange('ldap_start_tls', val)}
+            label={t('sso.ldapStartTls')} description={t('sso.ldapStartTlsHelp')} />
+        )}
+        {!formData.ldap_use_ssl && !formData.ldap_start_tls && <Notice tone="warn">{t('sso.ldapPlainWarning')}</Notice>}
+        {(formData.ldap_use_ssl || formData.ldap_start_tls) && (
+          <>
+            <ToggleSwitch checked={formData.ldap_verify_ssl} onChange={(val) => handleChange('ldap_verify_ssl', val)} label={t('sso.verifySsl')} />
+            {!formData.ldap_verify_ssl && <Notice tone="warn">{t('sso.sslWarning')}</Notice>}
+          </>
+        )}
+        <Input id="sso-ldap-bind-dn" full label={t('sso.bindDn')} value={formData.ldap_bind_dn}
+          onChange={e => handleChange('ldap_bind_dn', e.target.value)}
+          placeholder={ad ? 'CN=svc-ldap,OU=Service Accounts,DC=example,DC=com' : t('sso.bindDnPlaceholder')} />
+        <SecretInput id="sso-ldap-bind-password" label={t('sso.bindPassword')} value={formData.ldap_bind_password}
+          onChange={e => handleChange('ldap_bind_password', e.target.value)} hasExistingValue={!!provider?.ldap_bind_password} {...secretProps} />
+        <Input id="sso-ldap-base-dn" label={t('sso.baseDn')} value={formData.ldap_base_dn}
+          onChange={e => handleChange('ldap_base_dn', e.target.value)} placeholder={ad ? 'DC=example,DC=com' : t('sso.baseDnPlaceholder')} />
+        {provider?.id && (
+          <TestConnectionButton onClick={handleTestConnection} testing={testingConnection} dirty={dirty} status={connectionStatus} />
+        )}
+      </Fold>
 
-      {/* User Search */}
-      <CompactSection title={t('sso.userSearchSection')} icon={MagnifyingGlass} collapsible defaultOpen={false}>
-        <div className="space-y-3">
-          <Input
-            label={t('sso.userFilter')}
-            value={formData.ldap_user_filter}
-            onChange={e => handleChange('ldap_user_filter', e.target.value)}
-            placeholder={formData._directoryType === 'ad' ? '(sAMAccountName={username})' : t('sso.userFilterPlaceholder')}
-          />
-          <div className="grid grid-cols-3 gap-4">
-            <Input label={t('sso.usernameAttr')} value={formData.ldap_username_attr} onChange={e => handleChange('ldap_username_attr', e.target.value)} placeholder={formData._directoryType === 'ad' ? 'sAMAccountName' : 'uid'} />
-            <Input label={t('sso.emailAttr')} value={formData.ldap_email_attr} onChange={e => handleChange('ldap_email_attr', e.target.value)} placeholder="mail" />
-            <Input label={t('sso.fullnameAttr')} value={formData.ldap_fullname_attr} onChange={e => handleChange('ldap_fullname_attr', e.target.value)} placeholder={formData._directoryType === 'ad' ? 'displayName' : 'cn'} />
-          </div>
-          <Input
-            label={t('sso.uidAttr')}
-            value={formData.ldap_uid_attr || ''}
-            onChange={e => handleChange('ldap_uid_attr', e.target.value)}
-            placeholder={formData._directoryType === 'ad' ? 'objectGUID' : 'entryUUID'}
-            helperText={t('sso.uidAttrHelp')}
-          />
-          <Input
-            label={t('sso.accountStatusAttr')}
-            value={formData.account_status_attr || ''}
-            onChange={e => handleChange('account_status_attr', e.target.value)}
-            placeholder={formData._directoryType === 'ad' ? 'userAccountControl' : 'accountStatus'}
-          />
-        </div>
-      </CompactSection>
+      <Fold title={t('sso.userSearchSection')}>
+        <Input id="sso-ldap-user-filter" full label={t('sso.userFilter')} value={formData.ldap_user_filter}
+          onChange={e => handleChange('ldap_user_filter', e.target.value)}
+          placeholder={ad ? '(sAMAccountName={username})' : t('sso.userFilterPlaceholder')} />
+        <Input id="sso-ldap-username-attr" label={t('sso.usernameAttr')} value={formData.ldap_username_attr}
+          onChange={e => handleChange('ldap_username_attr', e.target.value)} placeholder={ad ? 'sAMAccountName' : 'uid'} />
+        <Input id="sso-ldap-email-attr" label={t('sso.emailAttr')} value={formData.ldap_email_attr}
+          onChange={e => handleChange('ldap_email_attr', e.target.value)} placeholder="mail" />
+        <Input id="sso-ldap-fullname-attr" label={t('sso.fullnameAttr')} value={formData.ldap_fullname_attr}
+          onChange={e => handleChange('ldap_fullname_attr', e.target.value)} placeholder={ad ? 'displayName' : 'cn'} />
+        <Input id="sso-ldap-uid-attr" label={t('sso.uidAttr')} value={formData.ldap_uid_attr || ''}
+          onChange={e => handleChange('ldap_uid_attr', e.target.value)} placeholder={ad ? 'objectGUID' : 'entryUUID'} hint={t('sso.uidAttrHelp')} />
+        <Input id="sso-ldap-status-attr" label={t('sso.accountStatusAttr')} value={formData.account_status_attr || ''}
+          onChange={e => handleChange('account_status_attr', e.target.value)} placeholder={ad ? 'userAccountControl' : 'accountStatus'} />
+      </Fold>
 
-      {/* Groups & Role Mapping */}
-      <CompactSection title={t('sso.groupsRolesSection')} icon={UsersThree} collapsible defaultOpen={false}>
-        <div className="space-y-3">
-          {/* Default-deny: Required groups */}
-          <div className="p-3 rounded-lg border border-border bg-bg-tertiary">
-            <div className="flex items-center gap-2 mb-1">
-              <ShieldWarning size={16} className="text-status-warning" />
-              <p className="text-sm font-medium text-text-secondary">{t('sso.requiredGroups')}</p>
+      <Fold title={t('sso.groupsRolesSection')}>
+        {/* Default-deny: the groups a user must belong to */}
+        <Input id="sso-ldap-required-groups" full label={t('sso.requiredGroups')} value={formData.ldap_required_groups || ''}
+          onChange={e => handleChange('ldap_required_groups', e.target.value)} placeholder={t('sso.requiredGroupsPlaceholder')}
+          hint={t('sso.requiredGroupsHelp')} />
+        <Input id="sso-ldap-group-filter" label={t('sso.groupFilter')} value={formData.ldap_group_filter}
+          onChange={e => handleChange('ldap_group_filter', e.target.value)}
+          placeholder={ad ? '(objectClass=group)' : t('sso.groupFilterPlaceholder')} />
+        <Select id="sso-ldap-member-attr" label={t('sso.groupMemberAttr')} value={formData.ldap_group_member_attr || 'member'}
+          onChange={value => handleChange('ldap_group_member_attr', value)}
+          options={[
+            { value: 'memberOf', label: t('sso.ldapGroupAttrs.memberOf') },
+            { value: 'member', label: t('sso.ldapGroupAttrs.member') },
+            { value: 'uniqueMember', label: t('sso.ldapGroupAttrs.uniqueMember') },
+          ]} />
+        <ToggleSwitch checked={formData.ldap_nested_groups === true} onChange={(val) => handleChange('ldap_nested_groups', val)}
+          label={t('sso.ldapNestedGroups')} description={t('sso.ldapNestedGroupsHelp')} />
+        {formData.ldap_nested_groups === true && <Notice tone="warn">{t('sso.ldapNestedGroupsWarning')}</Notice>}
+        {/* With the nested option, the parent groups are searched under this base, memberOf included */}
+        {((formData.ldap_group_member_attr || 'member') !== 'memberOf' || formData.ldap_nested_groups === true) && (
+          <Input id="sso-ldap-group-base" label={t('sso.groupBaseDn')} value={formData.ldap_group_base_dn || ''}
+            onChange={e => handleChange('ldap_group_base_dn', e.target.value)} placeholder="ou=groups,dc=example,dc=com"
+            hint={t('sso.groupBaseDnHelp')} />
+        )}
+        <Select id="sso-ldap-default-role" label={t('sso.defaultRole')} value={formData.default_role}
+          onChange={value => handleChange('default_role', value)} options={defaultRoleOptions} />
+        <RoleMappingEditor legend={t('sso.roleMapping')} hint={t('sso.roleMappingHelp')}
+          value={formData.role_mapping} onChange={val => handleChange('role_mapping', val)}
+          keyLabel={t('sso.externalGroup')} keyPlaceholder="e.g., pki-admins" roleOptions={roleOptions} customRoles={customRoles} />
+        {provider?.id && (
+          <>
+            <div className="settings-test">
+              <Input id="sso-test-mapping-user" label={t('sso.testMapping')} hint={t('sso.testMappingDesc')} value={testMappingUsername}
+                onChange={e => setTestMappingUsername(e.target.value)} placeholder={t('sso.testMappingUserPlaceholder')} />
+              <Btn icon="users" onClick={handleTestMapping} disabled={testingMapping || !testMappingUsername.trim() || undefined}>
+                {testingMapping ? t('common.testing') : t('sso.testMappingRun')}
+              </Btn>
             </div>
-            <p className="text-xs text-text-tertiary mb-2">{t('sso.requiredGroupsHelp')}</p>
-            <Input
-              value={formData.ldap_required_groups || ''}
-              onChange={e => handleChange('ldap_required_groups', e.target.value)}
-              placeholder={t('sso.requiredGroupsPlaceholder')}
-            />
-          </div>
-          <Input
-            label={t('sso.groupFilter')}
-            value={formData.ldap_group_filter}
-            onChange={e => handleChange('ldap_group_filter', e.target.value)}
-            placeholder={formData._directoryType === 'ad' ? '(objectClass=group)' : t('sso.groupFilterPlaceholder')}
-          />
-          <Select
-            label={t('sso.groupMemberAttr')}
-            value={formData.ldap_group_member_attr || 'member'}
-            onChange={value => handleChange('ldap_group_member_attr', value)}
-            options={[
-              { value: 'memberOf', label: t('sso.ldapGroupAttrs.memberOf') },
-              { value: 'member', label: t('sso.ldapGroupAttrs.member') },
-              { value: 'uniqueMember', label: t('sso.ldapGroupAttrs.uniqueMember') },
-            ]}
-          />
-          <ToggleSwitch
-            checked={formData.ldap_nested_groups === true}
-            onChange={(val) => handleChange('ldap_nested_groups', val)}
-            label={t('sso.ldapNestedGroups')}
-            description={t('sso.ldapNestedGroupsHelp')}
-            size="sm"
-          />
-          {formData.ldap_nested_groups === true && (
-            <p className="text-xs text-status-warning">{t('sso.ldapNestedGroupsWarning')}</p>
-          )}
-          {/* With the nested option, the parent groups are searched under this base, memberOf included */}
-          {((formData.ldap_group_member_attr || 'member') !== 'memberOf' || formData.ldap_nested_groups === true) && (
-            <Input
-              label={t('sso.groupBaseDn')}
-              value={formData.ldap_group_base_dn || ''}
-              onChange={e => handleChange('ldap_group_base_dn', e.target.value)}
-              placeholder="ou=groups,dc=example,dc=com"
-              helperText={t('sso.groupBaseDnHelp')}
-            />
-          )}
-          <Select
-            label={t('sso.defaultRole')}
-            value={formData.default_role}
-            onChange={value => handleChange('default_role', value)}
-            options={defaultRoleOptions}
-          />
-          <div className="pt-1">
-            <p className="text-xs font-medium text-text-secondary mb-2">{t('sso.roleMapping')}</p>
-            <p className="text-xs text-text-tertiary mb-2">{t('sso.roleMappingHelp')}</p>
-            <RoleMappingEditor
-              value={formData.role_mapping}
-              onChange={val => handleChange('role_mapping', val)}
-              keyLabel={t('sso.externalGroup')}
-              keyPlaceholder="e.g., pki-admins"
-              roleOptions={roleOptions}
-              customRoles={customRoles}
-            />
-          </div>
-          {provider?.id && (
-            <div className="pt-2 border-t border-border">
-              <p className="text-xs text-text-tertiary mb-2">{t('sso.testMappingDesc')}</p>
-              <div className="flex gap-2">
-                <Input
-                  value={testMappingUsername}
-                  onChange={e => setTestMappingUsername(e.target.value)}
-                  placeholder={t('sso.testMappingUserPlaceholder')}
-                  className="flex-1"
-                  size="sm"
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleTestMapping}
-                  disabled={testingMapping || !testMappingUsername.trim()}
-                  className="gap-1 whitespace-nowrap"
-                >
-                  {testingMapping ? <LoadingSpinner size="xs" /> : <Play size={14} />}
-                  {t('sso.testMappingRun')}
-                </Button>
-              </div>
-              {testMappingResult && (
-                <div className="mt-2 p-2.5 rounded-lg border border-border bg-bg-secondary text-xs space-y-1">
-                  <MappingTestResult result={testMappingResult} />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </CompactSection>
+            {testMappingResult && <MappingTestResult result={testMappingResult} />}
+          </>
+        )}
+      </Fold>
 
-      {/* Provisioning */}
-      <CompactSection title={t('sso.provisioningSection')} icon={UserPlus} collapsible defaultOpen={!hasRoleRules(formData.role_mapping)}>
-        <div className="space-y-2">
-          <ProvisioningNotice formData={formData} />
-          <ToggleSwitch checked={formData.auto_create_users} onChange={(val) => handleChange('auto_create_users', val)} label={t('sso.autoCreateUsers')} />
-          <ToggleSwitch checked={formData.auto_update_users} onChange={(val) => handleChange('auto_update_users', val)} label={t('sso.autoUpdateUsers')} />
-          <ToggleSwitch checked={formData.sync_role_on_login} onChange={(val) => handleChange('sync_role_on_login', val)} label={t('sso.syncRoleOnLogin')} description={t('sso.syncRoleOnLoginHelp')} />
-        </div>
-      </CompactSection>
-    </div>
+      <Fold title={t('sso.provisioningSection')} defaultOpen={!hasRoleRules(formData.role_mapping)}>
+        <ProvisioningNotice formData={formData} />
+        <ToggleSwitch checked={formData.auto_create_users} onChange={(val) => handleChange('auto_create_users', val)} label={t('sso.autoCreateUsers')} />
+        <ToggleSwitch checked={formData.auto_update_users} onChange={(val) => handleChange('auto_update_users', val)} label={t('sso.autoUpdateUsers')} />
+        <ToggleSwitch checked={formData.sync_role_on_login} onChange={(val) => handleChange('sync_role_on_login', val)}
+          label={t('sso.syncRoleOnLogin')} description={t('sso.syncRoleOnLoginHelp')} />
+      </Fold>
+    </>
   )
 }

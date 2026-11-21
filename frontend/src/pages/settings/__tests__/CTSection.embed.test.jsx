@@ -5,18 +5,6 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key) => key }),
 }))
 
-vi.mock('../../../components', () => ({
-  Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-  Input: (props) => <input {...props} />,
-  DetailHeader: ({ title }) => <header>{title}</header>,
-  DetailSection: ({ children }) => <section>{children}</section>,
-  DetailContent: ({ children }) => <div>{children}</div>,
-}))
-
-vi.mock('../../../components/ui/ToggleSwitch', () => ({
-  ToggleSwitch: ({ label }) => <label>{label}</label>,
-}))
-
 import CTSection from '../CTSection'
 import { blockedWhileSuspended } from '../../../components/shell/__tests__/writeGuardProbe'
 
@@ -44,5 +32,12 @@ describe('CTSection write guard', () => {
   it('suspends Add a CT log URL with the other writes', () => {
     renderWith({ enabled: true, embed_sct: false, required: false, log_urls: [] })
     expect(blockedWhileSuspended(screen.getByText('settings.ctAddLogUrl').closest('button'))).toBe(true)
+  })
+
+  it('names the list of logs and offers to remove each one', () => {
+    renderWith({ enabled: false, log_urls: ['https://log.example/ct/'] })
+    const list = screen.getByRole('list', { name: 'settings.ctLogUrls' })
+    expect(list).toHaveTextContent('https://log.example/ct/')
+    expect(screen.getByRole('button', { name: 'common.delete https://log.example/ct/' })).toBeInTheDocument()
   })
 })

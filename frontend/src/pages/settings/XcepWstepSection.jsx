@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Modal } from '../../components'
+import { Modal } from '../../components/atelier/Form'
+import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { casService } from '../../services'
 import WindowsSettingsPanel from './WindowsSettingsPanel'
 import WindowsProfileList from './WindowsProfileList'
 import WindowsProfileEditor from './WindowsProfileEditor'
-import { FormGroup } from '../../components/sectioned'
 
 /** Windows autoenrollment: the shared switches, then the enrollment profiles, one per realm. */
 export default function XcepWstepSection({ hasPermission }) {
@@ -27,11 +27,9 @@ export default function XcepWstepSection({ hasPermission }) {
 
   return (
     <>
-
       <WindowsSettingsPanel hasPermission={hasPermission} />
 
-      <FormGroup title={t('xcepWstep.profilesTitle')}>
-        <p className="text-xs text-text-secondary mb-3">{t('xcepWstep.profilesDescription')}</p>
+      <SettingsGroup legend={t('xcepWstep.profilesTitle')} hint={t('xcepWstep.profilesDescription')} grid={false}>
         <WindowsProfileList
           cas={cas}
           canWrite={canWrite}
@@ -39,7 +37,7 @@ export default function XcepWstepSection({ hasPermission }) {
           onEdit={setEditing}
           onCreate={() => setEditing({})}
         />
-      </FormGroup>
+      </SettingsGroup>
 
       <Modal
         open={Boolean(editing)}

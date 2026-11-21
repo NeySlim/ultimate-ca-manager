@@ -35,7 +35,7 @@ function Harness({ initial, onEmit, customRoles = ['Cert Ops', 'Helpdesk'] }) {
   )
 }
 
-const triggers = () => screen.getAllByRole('combobox').map(c => c.textContent)
+const triggers = () => screen.getAllByRole('combobox').map(c => c.selectedOptions[0]?.textContent)
 
 describe('serialization', () => {
   it('writes a plain string when only the base role is set', () => {

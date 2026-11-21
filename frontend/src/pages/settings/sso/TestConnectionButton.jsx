@@ -1,16 +1,20 @@
 import { useTranslation } from 'react-i18next'
-import { Button, LoadingSpinner } from '../../../components'
+import { Btn, Icon } from '../../../components/atelier'
 
-/** The connection test runs on the SAVED provider: it waits for unsaved edits to be saved. */
-export default function TestConnectionButton({ onClick, testing, dirty, icon: Icon }) {
+/**
+ * The connection test of a provider (`.settings-test` of the mockup): it runs on the SAVED
+ * provider, so it waits for unsaved edits to be saved; its outcome follows the button.
+ */
+export default function TestConnectionButton({ onClick, testing, dirty, status }) {
   const { t } = useTranslation()
   return (
-    <div className="space-y-1">
-      <Button type="button" variant="secondary" size="sm" onClick={onClick} disabled={testing || dirty} className="gap-1.5">
-        {testing ? <LoadingSpinner size="xs" /> : <Icon size={14} />}
-        {t('sso.testConnection')}
-      </Button>
-      {dirty && <p className="text-xs text-text-tertiary">{t('sso.saveBeforeTest')}</p>}
+    <div className="settings-test">
+      <Btn icon="send" onClick={onClick} disabled={testing || dirty || undefined}>
+        {testing ? t('common.testing') : t('sso.testConnection')}
+      </Btn>
+      {status === 'success' && <p className="test-result good" role="status"><Icon name="check" /><span>{t('sso.testConnectionSuccess')}</span></p>}
+      {status === 'error' && <p className="test-result bad" role="status"><Icon name="warning" /><span>{t('sso.testConnectionFailed')}</span></p>}
+      {dirty && <p className="test-result muted"><Icon name="help" /><span>{t('sso.saveBeforeTest')}</span></p>}
     </div>
   )
 }

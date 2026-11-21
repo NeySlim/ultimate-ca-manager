@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Trash, Plus } from '@phosphor-icons/react'
-import { Button, Input, Select } from '../../components'
+import { Icon } from '../../components/atelier/Icon'
+import { FieldError } from '../../components/atelier/SettingsView'
 
 // Rows carry a stable id so editing a key neither reorders the list nor
 // collides with another entry mid-typing (#222). The object shape expected
@@ -25,8 +25,13 @@ const repeatedRows = (rows) => {
   return repeated
 }
 
-export default function MappingEditor({ value, onChange, keyLabel, valueLabel, keyPlaceholder, valuePlaceholder, valueOptions }) {
+/**
+ * Key/value rows as the issue form's extension rows (`fieldset.field.full`, `.row-list` of
+ * `.ext-row`, « Ajouter » under them; `fixed` keeps the mockup's three columns); each control is named by its column and its row.
+ */
+export default function MappingEditor({ value, onChange, legend, hint, keyLabel, valueLabel, keyPlaceholder, valuePlaceholder, valueOptions }) {
   const { t } = useTranslation()
+  const uid = useId().replace(/:/g, '')
   const [rows, setRows] = useState(() => toRows(value))
   const lastEmitted = useRef(JSON.stringify(value || {}))
 
@@ -53,46 +58,39 @@ export default function MappingEditor({ value, onChange, keyLabel, valueLabel, k
   const repeated = repeatedRows(rows)
 
   return (
-    <div className="space-y-2">
-      <div className="grid grid-cols-[1fr_1fr_auto] gap-2 text-xs text-text-secondary">
-        <span>{keyLabel}</span><span>{valueLabel}</span><span />
+    <fieldset className="field full" aria-describedby={hint ? `hint-${uid}` : undefined}>
+      {legend && <legend>{legend}</legend>}
+      {hint && <small id={`hint-${uid}`}>{hint}</small>}
+      <div className="row-list">
+        {rows.map((row, i) => {
+          const duplicate = repeated.has(row.id) ? t('common.duplicateKey', { key: row.key }) : ''
+          const kid = `${uid}-key-${row.id}`
+          const vid = `${uid}-val-${row.id}`
+          return (
+            <div key={row.id} className="ext-row fixed">
+              <label className="sr-only" htmlFor={kid}>{`${keyLabel} ${i + 1}`}</label>
+              <input id={kid} name="extOid" ref={el => el?.setCustomValidity(duplicate)} value={row.key} placeholder={keyPlaceholder}
+                autoComplete="off" spellCheck={false} aria-invalid={duplicate ? 'true' : undefined}
+                aria-describedby={duplicate ? `err-${kid}` : undefined}
+                onChange={e => updateRow(row.id, { key: e.target.value })} />
+              <label className="sr-only" htmlFor={vid}>{`${valueLabel} ${i + 1}`}</label>
+              {valueOptions ? (
+                <select id={vid} name="extValue" value={row.val} onChange={e => updateRow(row.id, { val: e.target.value })}>
+                  {valueOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              ) : (
+                <input id={vid} name="extValue" value={row.val} placeholder={valuePlaceholder} autoComplete="off" spellCheck={false}
+                  onChange={e => updateRow(row.id, { val: e.target.value })} />
+              )}
+              <button type="button" className="icon-btn" aria-label={t('common.remove')} title={t('common.remove')} onClick={() => removeRow(row.id)}>
+                <Icon name="close" />
+              </button>
+              {duplicate && <FieldError id={`err-${kid}`} message={duplicate} />}
+            </div>
+          )
+        })}
       </div>
-      {rows.map(row => {
-        const duplicate = repeated.has(row.id) ? t('common.duplicateKey', { key: row.key }) : ''
-        return (
-        <div key={row.id} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-start">
-          <Input
-            ref={el => el?.setCustomValidity(duplicate)}
-            value={row.key}
-            onChange={e => updateRow(row.id, { key: e.target.value })}
-            placeholder={keyPlaceholder}
-            error={duplicate || undefined}
-            size="sm"
-          />
-          {valueOptions ? (
-            <Select
-              value={row.val}
-              onChange={val => updateRow(row.id, { val })}
-              options={valueOptions}
-              size="sm"
-            />
-          ) : (
-            <Input
-              value={row.val}
-              onChange={e => updateRow(row.id, { val: e.target.value })}
-              placeholder={valuePlaceholder}
-              size="sm"
-            />
-          )}
-          <Button type="button" size="sm" variant="ghost" onClick={() => removeRow(row.id)} aria-label={t('common.remove')}>
-            <Trash size={14} className="text-status-danger" />
-          </Button>
-        </div>
-        )
-      })}
-      <Button size="sm" variant="secondary" onClick={addRow} type="button">
-        <Plus size={14} /> {t('common.add')}
-      </Button>
-    </div>
+      <button type="button" className="btn quiet add-row" onClick={addRow}><Icon name="plus" />{t('common.add')}</button>
+    </fieldset>
   )
 }

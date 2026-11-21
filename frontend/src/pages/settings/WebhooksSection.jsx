@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bell, TestTube, ArrowsClockwise, Lightning, PencilSimple, Trash, Plus, ClockCounterClockwise } from '@phosphor-icons/react'
-import { Button, Badge, EmptyState } from '../../components'
+import { Btn, IconBtn, Pill, RecordList, RecordRow, SkeletonPanel, EmptyBlock } from '../../components/atelier'
+import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { webhookEventLabel } from './WebhookForm'
 import WebhookDeliveriesModal from './WebhookDeliveriesModal'
-import { FormGroup } from '../../components/sectioned'
 
 export default function WebhooksSection({ webhooks, webhooksLoading, webhookTesting, handleWebhookCreate, handleWebhookEdit, handleWebhookToggle, handleWebhookTest, setWebhookConfirmDelete, hasPermission }) {
   const { t } = useTranslation()
@@ -12,83 +11,56 @@ export default function WebhooksSection({ webhooks, webhooksLoading, webhookTest
   // Test, enable and edit write a webhook (write:settings), deleting one is delete:settings
   const canWrite = hasPermission('write:settings')
   const canDelete = hasPermission('delete:settings')
-  return (
-    <>
-
-      {webhooksLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="w-6 h-6 border-2 border-accent-primary-op30 border-t-accent-primary rounded-full animate-spin" />
-        </div>
-      ) : webhooks.length === 0 ? (
-        <EmptyState
-          icon={Bell}
-          title={t('webhooks.noWebhooks')}
-          description={t('webhooks.noWebhooksDescription')}
-          action={{ label: t('webhooks.addWebhook'), onClick: handleWebhookCreate, write: true }}
-        />
-      ) : (
-        <FormGroup
-          title={t('webhooks.configuredWebhooks')}
-          actions={hasPermission('admin:system') ? (
-            <Button type="button" variant="secondary" onClick={handleWebhookCreate} data-write>
-              <Plus size={16} />
-              {t('webhooks.addWebhook')}
-            </Button>
-          ) : null}
-        >
-          {/* The mockup's record list: name and state, address and events, then the actions */}
-          <ul className="sf-records">
-            {webhooks.map(webhook => (
-              <li key={webhook.id}>
-                <div className="sf-record-main">
-                  <span className="sf-record-title">
-                    <strong>{webhook.name}</strong>
-                    <Badge variant={webhook.enabled ? 'success' : 'secondary'} size="sm">
-                      {webhook.enabled ? t('common.enabled') : t('common.disabled')}
-                    </Badge>
+  let body
+  if (webhooksLoading) body = <SkeletonPanel label={t('common.loading')} />
+  else if (webhooks.length === 0) {
+    body = (
+      <EmptyBlock id="webhooks" icon="bell" title={t('webhooks.noWebhooks')} text={t('webhooks.noWebhooksDescription')}
+        action={{ label: t('webhooks.addWebhook'), icon: 'plus', onClick: handleWebhookCreate, primary: true }} />
+    )
+  } else {
+    // The mockup's record list: name and state, address and events, then the actions
+    body = (
+      <SettingsGroup legend={t('webhooks.configuredWebhooks')} grid={false}>
+        <RecordList>
+          {webhooks.map(webhook => {
+            const events = webhook.events || []
+            return (
+              <RecordRow key={webhook.id} title={webhook.name}
+                meta={<span className="mono">{webhook.url}</span>}
+                extra={events.length > 0 && (
+                  <span className="rl-meta">
+                    {events.slice(0, 3).map(ev => webhookEventLabel(t, ev)).join(', ')}
+                    {events.length > 3 && ` +${events.length - 3}`}
                   </span>
-                  <span className="sf-record-meta">{webhook.url}</span>
-                  {(webhook.events || []).length > 0 && (
-                    <span className="sf-record-meta">
-                      {(webhook.events || []).slice(0, 3).map(ev => webhookEventLabel(t, ev)).join(', ')}
-                      {(webhook.events || []).length > 3 && ` +${webhook.events.length - 3}`}
-                    </span>
-                  )}
-                </div>
-                <div className="sf-record-actions">
-                  <Button type="button" variant="secondary" onClick={() => setDeliveriesFor(webhook)}
-                    aria-label={t('webhooks.deliveries.title', { name: webhook.name })} title={t('webhooks.deliveries.title', { name: webhook.name })}>
-                    <ClockCounterClockwise size={16} />
-                  </Button>
+                )}
+                badge={<Pill tone={webhook.enabled ? 'good' : 'muted'} label={webhook.enabled ? t('common.enabled') : t('common.disabled')} />}
+                action={<>
+                  <IconBtn icon="clock" label={t('webhooks.deliveries.title', { name: webhook.name })} onClick={() => setDeliveriesFor(webhook)} />
                   {canWrite && (
                     <>
-                      <Button type="button" variant="secondary" onClick={() => handleWebhookTest(webhook)} disabled={webhookTesting === webhook.id}
-                        aria-label={t('webhooks.test')} title={t('webhooks.test')}>
-                        {webhookTesting === webhook.id ? <ArrowsClockwise size={16} className="animate-spin" /> : <TestTube size={16} />}
-                      </Button>
-                      <Button type="button" variant="secondary" onClick={() => handleWebhookToggle(webhook)}
-                        aria-label={webhook.enabled ? t('common.disable') : t('common.enable')} title={webhook.enabled ? t('common.disable') : t('common.enable')}>
-                        <Lightning size={16} />
-                      </Button>
-                      <Button type="button" variant="secondary" onClick={() => handleWebhookEdit(webhook)}
-                        aria-label={t('common.edit')} title={t('common.edit')}>
-                        <PencilSimple size={16} />
-                      </Button>
+                      <IconBtn icon="send" label={t('webhooks.test')} disabled={webhookTesting === webhook.id || undefined} onClick={() => handleWebhookTest(webhook)} />
+                      <IconBtn icon={webhook.enabled ? 'block' : 'check'} write label={webhook.enabled ? t('common.disable') : t('common.enable')}
+                        onClick={() => handleWebhookToggle(webhook)} />
+                      <IconBtn icon="settings" label={t('common.edit')} onClick={() => handleWebhookEdit(webhook)} />
                     </>
                   )}
-                  {canDelete && (
-                    <Button type="button" variant="danger" onClick={() => setWebhookConfirmDelete(webhook)}
-                      aria-label={t('common.delete')} title={t('common.delete')}>
-                      <Trash size={16} />
-                    </Button>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </FormGroup>
-      )}
-
+                  {canDelete && <IconBtn icon="close" write label={t('common.delete')} onClick={() => setWebhookConfirmDelete(webhook)} />}
+                </>} />
+            )
+          })}
+        </RecordList>
+        {hasPermission('admin:system') && (
+          <div className="settings-actions">
+            <Btn tone="primary" icon="plus" onClick={handleWebhookCreate}>{t('webhooks.addWebhook')}</Btn>
+          </div>
+        )}
+      </SettingsGroup>
+    )
+  }
+  return (
+    <>
+      {body}
       <WebhookDeliveriesModal
         webhook={deliveriesFor}
         onClose={() => setDeliveriesFor(null)}

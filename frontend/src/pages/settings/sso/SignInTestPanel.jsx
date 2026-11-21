@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SignIn } from '@phosphor-icons/react'
-import { Button, LoadingSpinner } from '../../../components'
+import { Btn, Icon } from '../../../components/atelier'
+import { Notice } from '../../../components/atelier/Form'
 import { ssoService } from '../../../services'
 import SignInTestReport from './SignInTestReport'
 import { LAUNCH_PATH, openChannel, randomKey } from './signInTestChannel'
@@ -136,36 +136,25 @@ export default function SignInTestPanel({ provider, dirty, formData, handleChang
     setPhase('confirm')
   }
 
+  // The mockup's settings test: the button, then the state of the run or the hint at rest
+  const failure = { expired: 'sso.signInTestExpired', failed: 'sso.signInTestFailed', blocked: 'sso.signInTestPopupBlocked' }[phase]
   return (
-    <div className="space-y-2">
-      <p className="text-xs text-text-tertiary">{t('sso.signInTestDesc')}</p>
-      {phase === 'confirm' && (
-        <div role="alert" className="p-2.5 rounded-lg bg-accent-warning-op10 border border-accent-warning-op30 text-xs status-warning-text">
-          {t('sso.signInTestUnsaved')}
-        </div>
-      )}
-      <Button type="button" variant="secondary" size="sm" onClick={onClick}
-        className="gap-1.5">
-        <SignIn size={14} />
-        {phase === 'confirm' ? t('sso.signInTestRunSaved') : t('sso.signInTest')}
-      </Button>
-      {busy && (
-        <div className="flex items-center gap-2 text-xs text-text-tertiary">
-          <LoadingSpinner size="xs" />
-          <p role="status">{t('sso.signInTestWaiting')}</p>
-          <button type="button" onClick={cancel} className="text-accent-primary hover:underline">
-            {t('sso.signInTestCancel')}
-          </button>
-        </div>
-      )}
-      {phase === 'expired' && <p role="status" className="text-xs text-status-error">{t('sso.signInTestExpired')}</p>}
-      {phase === 'failed' && <p role="status" className="text-xs text-status-error">{t('sso.signInTestFailed')}</p>}
-      {phase === 'blocked' && <p role="status" className="text-xs text-status-error">{t('sso.signInTestPopupBlocked')}</p>}
-      {phase === 'done' && report && (
-        <div className="p-2.5 rounded-lg border border-border bg-bg-secondary text-xs">
-          <SignInTestReport report={report} formData={formData} handleChange={handleChange} />
-        </div>
-      )}
-    </div>
+    <>
+      {phase === 'confirm' && <Notice tone="warn" role="alert">{t('sso.signInTestUnsaved')}</Notice>}
+      <div className="settings-test">
+        <Btn icon="arrow" onClick={onClick}>{phase === 'confirm' ? t('sso.signInTestRunSaved') : t('sso.signInTest')}</Btn>
+        {busy ? (
+          <p className="test-result muted">
+            <Icon name="clock" /><span role="status">{t('sso.signInTestWaiting')}</span>{' '}
+            <button type="button" className="text-link" onClick={cancel}>{t('sso.signInTestCancel')}</button>
+          </p>
+        ) : failure ? (
+          <p className="test-result bad" role="status"><Icon name="warning" /><span>{t(failure)}</span></p>
+        ) : (
+          <p className="test-result muted"><Icon name="help" /><span>{t('sso.signInTestDesc')}</span></p>
+        )}
+      </div>
+      {phase === 'done' && report && <SignInTestReport report={report} formData={formData} handleChange={handleChange} />}
+    </>
   )
 }

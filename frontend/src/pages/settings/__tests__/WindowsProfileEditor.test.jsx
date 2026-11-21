@@ -43,35 +43,12 @@ vi.mock('../../../services', () => ({
   adConnectorsService: { list: mocks.connectors },
   templatesService: { getAll: mocks.templates },
 }))
-// A native select exposes the options and the helper text that the real one hides in a portal.
-vi.mock('../../../components', async (orig) => {
-  // The real Input and Textarea wrap a plain control; the label and the error are all that matter here
-  const field = (Tag) => ({ label, error, helperText: _h, hasExistingValue: _e, ...props }) => (
-    <>
-      <Tag aria-label={label} {...props} />
-      {error && <p>{error}</p>}
-    </>
-  )
-  return {
-  ...(await orig()),
-  Input: field('input'),
-  Textarea: field('textarea'),
-  Select: ({ label, options = [], value, onChange, helperText }) => (
-    <div data-testid={`field-${label}`}>
-      <select aria-label={label} value={value ?? ''} onChange={(e) => onChange(e.target.value)}>
-        <option value="">-</option>
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      {helperText && <p>{helperText}</p>}
-    </div>
-  ),
-  }
-})
-vi.mock('../../../components/FileUpload', () => ({
-  FileUpload: ({ onFileSelect }) => (
-    <button type="button" onClick={() => onFileSelect(mocks.picked.file)}>pick-keytab</button>
-  ),
-}))
+// The keytab is a native file input: choosing a file fires its change
+const keytabInput = () => screen.queryByLabelText('xcepWstep.keytabReplace')
+const pickKeytab = async () => {
+  const input = await screen.findByLabelText('xcepWstep.keytabReplace')
+  fireEvent.change(input, { target: { files: [mocks.picked.file] } })
+}
 
 import WindowsProfileEditor from '../WindowsProfileEditor'
 
@@ -174,8 +151,7 @@ describe('keytab', () => {
       foreign_entries: ['HTTP/ucm.example@OTHER.EXAMPLE'],
     } })
     renderEditor()
-    await screen.findByText('pick-keytab')
-    fireEvent.click(screen.getByText('pick-keytab'))
+    await pickKeytab()
     await waitFor(() => expect(mocks.uploadKeytab).toHaveBeenCalledWith(7, mocks.picked.file, { dryRun: true }))
     expect(await screen.findByText('xcepWstep.keytabPreview')).toBeInTheDocument()
     expect(screen.getByText('OTHER.EXAMPLE')).toBeInTheDocument()
@@ -185,8 +161,7 @@ describe('keytab', () => {
   it('stores the file with the profile on Save', async () => {
     mocks.uploadKeytab.mockResolvedValue({ data: { keytab_entries: [], realms: [], foreign_entries: [] } })
     renderEditor()
-    await screen.findByText('pick-keytab')
-    fireEvent.click(screen.getByText('pick-keytab'))
+    await pickKeytab()
     await waitFor(() => expect(mocks.uploadKeytab).toHaveBeenCalledTimes(1))
     fireEvent.click(screen.getByText('common.save'))
     await waitFor(() => expect(mocks.uploadKeytab).toHaveBeenCalledTimes(2))
@@ -200,7 +175,7 @@ describe('keytab permission', () => {
     await screen.findByDisplayValue('corp')
     await loaded()
     expect(screen.getByText('common.save')).toBeInTheDocument()
-    expect(screen.queryByText('pick-keytab')).toBeNull()
+    expect(keytabInput()).toBeNull()
   })
 })
 
@@ -212,11 +187,10 @@ describe('keytab permission lost after the pick', () => {
         <WindowsProfileEditor profile={{ id: 7, name: 'corp' }} cas={CAS} canWrite onSaved={vi.fn()} onCancel={vi.fn()} {...props} />
       </MemoryRouter>)
     const { rerender } = render(element({ canUploadKeytab: true }))
-    await screen.findByText('pick-keytab')
-    fireEvent.click(screen.getByText('pick-keytab'))
+    await pickKeytab()
     await waitFor(() => expect(mocks.uploadKeytab).toHaveBeenCalledTimes(1))
     rerender(element({ canUploadKeytab: false }))
-    expect(screen.queryByText('pick-keytab')).toBeNull()
+    expect(keytabInput()).toBeNull()
     fireEvent.click(screen.getByText('common.save'))
     await waitFor(() => expect(mocks.update).toHaveBeenCalled())
     expect(mocks.uploadKeytab).toHaveBeenCalledTimes(1)
@@ -232,11 +206,11 @@ describe('checklist', () => {
     await screen.findByDisplayValue('corp')
     await loaded()
     for (const key of ['realm', 'issuingCa', 'keytab', 'enabled']) {
-      const row = checklist().getByText(`xcepWstep.checklist.${key}`).closest('div').parentElement
-      expect(row.querySelector('.text-status-warning')).not.toBeNull()
+      const row = checklist().getByText(`xcepWstep.checklist.${key}`).closest('li')
+      expect(row.querySelector('.badge.warn')).not.toBeNull()
     }
-    const templates = checklist().getByText('xcepWstep.checklist.templates|count=1').closest('div').parentElement
-    expect(templates.querySelector('.text-status-success')).not.toBeNull()
+    const templates = checklist().getByText('xcepWstep.checklist.templates|count=1').closest('li')
+    expect(templates.querySelector('.badge.good')).not.toBeNull()
   })
 
   it('warns in the checklist when the server says the realm and the connector domain differ', async () => {
@@ -244,8 +218,8 @@ describe('checklist', () => {
     renderEditor()
     await screen.findByDisplayValue('corp')
     await loaded()
-    const row = checklist().getByText('xcepWstep.checklist.connectorDomain').closest('div').parentElement
-    expect(row.querySelector('.text-status-warning')).not.toBeNull()
+    const row = checklist().getByText('xcepWstep.checklist.connectorDomain').closest('li')
+    expect(row.querySelector('.badge.warn')).not.toBeNull()
   })
 
   it('judges an edited realm against the connector, not by the saved flag', async () => {
@@ -257,15 +231,15 @@ describe('checklist', () => {
     await screen.findByDisplayValue('corp')
     await loaded()
     fireEvent.change(realmInput(), { target: { value: 'B.EXAMPLE' } })
-    const row = checklist().getByText('xcepWstep.checklist.connectorDomain').closest('div').parentElement
-    expect(row.querySelector('.text-status-warning')).toBeNull()
+    const row = checklist().getByText('xcepWstep.checklist.connectorDomain').closest('li')
+    expect(row.querySelector('.badge.warn')).toBeNull()
   })
 
   it('shows a complete profile as complete', async () => {
     renderEditor()
     await screen.findByDisplayValue('corp')
     await loaded()
-    expect(screen.getByTestId('profile-checklist').querySelector('.text-status-warning')).toBeNull()
+    expect(screen.getByTestId('profile-checklist').querySelector('.badge.warn')).toBeNull()
   })
 })
 
@@ -313,7 +287,7 @@ describe('CA pickers', () => {
     renderEditor()
     await screen.findByDisplayValue('corp')
     await loaded()
-    const field = screen.getAllByTestId('field-xcepWstep.issuingCa')[0]
+    const field = screen.getByLabelText('xcepWstep.issuingCa').closest('.field')
     const labels = within(field).getAllByRole('option').filter(o => o.value !== '').map(o => o.textContent)
     expect(labels).toEqual(['Signing CA', 'Keyless root'])
     expect(field).toHaveTextContent('cas.notListedForSigning|count=1')

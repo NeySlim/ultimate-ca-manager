@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Warning } from '@phosphor-icons/react'
+import { Notice } from '../../../components/atelier/Form'
 
 /** Whether the role mapping has at least one rule (blank editor rows do not count). */
 export function hasRoleRules(roleMapping) {
@@ -10,22 +10,12 @@ export function hasRoleRules(roleMapping) {
 export default function ProvisioningNotice({ formData }) {
   const { t } = useTranslation()
   if (hasRoleRules(formData.role_mapping)) {
-    return (
-      <div className="text-xs text-text-tertiary space-y-1">
-        <p>{t('sso.provisioningRulesNotice')}</p>
-        <p>{t('sso.provisioningRefusalAudited')}</p>
-      </div>
-    )
+    return <Notice><span>{t('sso.provisioningRulesNotice')}</span>{' '}<span>{t('sso.provisioningRefusalAudited')}</span></Notice>
   }
   const role = formData.default_role
   return (
-    <div role="status" className="p-3 rounded-lg bg-accent-warning-op10 border border-accent-warning-op30 text-xs status-warning-text flex gap-2">
-      <Warning size={16} className="shrink-0 mt-0.5" />
-      <span>
-        {role
-          ? t('sso.provisioningNoRulesNotice', { role: t(`common.${role}`) })
-          : t('sso.provisioningNobodyNotice')}
-      </span>
-    </div>
+    <Notice tone="warn" role="status">
+      {role ? t('sso.provisioningNoRulesNotice', { role: t(`common.${role}`) }) : t('sso.provisioningNobodyNotice')}
+    </Notice>
   )
 }

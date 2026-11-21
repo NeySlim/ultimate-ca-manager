@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Eye, EyeSlash, CheckCircle, WarningCircle, X } from '@phosphor-icons/react'
-import { Button, Input, Select } from '../../components'
-import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
+import { Btn, Icon, Pill } from '../../components/atelier'
+import { Input, SecretInput, Select, ToggleSwitch, Notice } from '../../components/atelier/Form'
+import { FieldError } from '../../components/atelier/SettingsView'
 import { changedTargets, secretRequiredForTarget } from '../../lib/secretTarget'
 
 const WEBHOOK_EVENTS = [
@@ -295,293 +295,108 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
     formData.auth_token.length === 0 &&
     !tokenMustRetype
 
+  const tokenError = validationErrors.auth_token || (tokenMustRetype ? t('common.secretRequiredForTarget') : undefined)
+  // The token: « set » with its clear action while one is stored and nothing is typed, else the field
+  const tokenField = showTokenSetBadge ? (
+    <div className="field">
+      <span>{t('webhooks.auth.token.label')}{' '}<Pill tone="good" label={t('common.set')} /></span>
+      <small>{t('webhooks.auth.token.set')}</small>
+      <button type="button" className="text-link bad" onClick={handleClearToken}>
+        <Icon name="close" />{t('webhooks.auth.token.clear')}
+      </button>
+    </div>
+  ) : (
+    <SecretInput id="webhook-token" label={t('webhooks.auth.token.label')} value={formData.auth_token}
+      onChange={e => handleChange('auth_token', e.target.value)} placeholder={t('webhooks.auth.token.placeholder')}
+      error={tokenError} hint={showTokenByteCount ? `${tokenBytes} / ${TOKEN_MAX_BYTES} bytes` : undefined} />
+  )
+
+  // The mockup's dialog form: the endpoint, its authentication and its events in `.form-fields`, then the actions
   return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4">
-      <Input
-        label={t('common.name')}
-        value={formData.name}
-        onChange={e => handleChange('name', e.target.value)}
-        required
-        placeholder={t('webhooks.namePlaceholder')}
-      />
-      <Input
-        label="URL"
-        value={formData.url}
-        onChange={e => handleChange('url', e.target.value)}
-        required
-        placeholder="https://example.com/webhook"
-      />
-      {webhook?.custom_headers_set && (
-        <div className="space-y-1.5">
-          <p className="text-xs text-text-tertiary">{t('webhooks.customHeadersSet')}</p>
-          {urlMoved && (
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={formData.drop_custom_headers}
-                onChange={e => handleChange('drop_custom_headers', e.target.checked)}
-                className="rounded"
-              />
-              {t('webhooks.dropCustomHeaders')}
-            </label>
-          )}
-          {headersMustGo && <p className="text-xs status-danger-text">{t('webhooks.customHeadersFollowUrl')}</p>}
-        </div>
-      )}
-      <Input
-        label={t('webhooks.caFilter')}
-        value={formData.ca_filter}
-        onChange={e => handleChange('ca_filter', e.target.value)}
-        placeholder={t('webhooks.caFilterPlaceholder')}
-      />
-
-      {/* Authentication section */}
-      <div className="space-y-3 rounded-lg border border-border p-3 bg-tertiary-50">
-        <p className="text-sm font-medium text-text-primary">{t('webhooks.auth.title')}</p>
-
-        <Select
-          label={t('webhooks.auth.type.label')}
-          value={formData.auth_type}
-          onChange={handleAuthTypeChange}
-          options={AUTH_TYPE_OPTIONS.map(o => ({ value: o.value, label: t(o.labelKey) }))}
-        />
-
-        {/* Bearer token */}
-        {formData.auth_type === 'bearer' && (
-          <div className="space-y-2">
-            {showTokenSetBadge ? (
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-text-secondary">
-                  <span className="flex items-center gap-1">
-                    {t('webhooks.auth.token.label')}
-                    <span className="inline-flex items-center gap-1 px-1.5 text-xs font-medium bg-status-success-op20 text-status-success rounded leading-[16px]">
-                      <CheckCircle size={10} weight="fill" />
-                      {t('common.set')}
-                    </span>
-                  </span>
-                </label>
-                <p className="text-xs text-text-tertiary italic">{t('webhooks.auth.token.set')}</p>
-                <button
-                  type="button"
-                  onClick={handleClearToken}
-                  className="flex items-center gap-1 text-xs text-accent-danger hover:underline"
-                >
-                  <X size={12} />{t('webhooks.auth.token.clear')}
-                </button>
-              </div>
-            ) : (
-              <Input
-                label={t('webhooks.auth.token.label')}
-                type="password"
-                value={formData.auth_token}
-                onChange={e => handleChange('auth_token', e.target.value)}
-                placeholder={t('webhooks.auth.token.placeholder')}
-                error={validationErrors.auth_token || (tokenMustRetype ? t('common.secretRequiredForTarget') : undefined)}
-                helperText={showTokenByteCount ? `${tokenBytes} / ${TOKEN_MAX_BYTES} bytes` : undefined}
-              />
+    <form onSubmit={handleSubmit}>
+      <div className="form-fields">
+        <Input id="webhook-name" label={t('common.name')} value={formData.name} onChange={e => handleChange('name', e.target.value)}
+          required placeholder={t('webhooks.namePlaceholder')} data-autofocus="" />
+        <Input id="webhook-url" label="URL" value={formData.url} onChange={e => handleChange('url', e.target.value)}
+          required placeholder="https://example.com/webhook" />
+        {webhook?.custom_headers_set && (
+          <div className="field full">
+            <small>{t('webhooks.customHeadersSet')}</small>
+            {urlMoved && (
+              <label className="checkbox-line">
+                <input type="checkbox" checked={formData.drop_custom_headers} onChange={e => handleChange('drop_custom_headers', e.target.checked)} />
+                {t('webhooks.dropCustomHeaders')}
+              </label>
             )}
+            {headersMustGo && <FieldError id="err-webhook-headers" message={t('webhooks.customHeadersFollowUrl')} />}
           </div>
         )}
+        <Input id="webhook-ca-filter" full label={t('webhooks.caFilter')} value={formData.ca_filter} onChange={e => handleChange('ca_filter', e.target.value)}
+          placeholder={t('webhooks.caFilterPlaceholder')} />
 
-        {/* Basic auth */}
-        {formData.auth_type === 'basic' && (
-          <div className="space-y-2">
-            <Input
-              label={t('webhooks.auth.username.label')}
-              value={formData.auth_username}
-              onChange={e => handleChange('auth_username', e.target.value)}
-              placeholder="username"
-              error={validationErrors.auth_username}
-            />
-            {showTokenSetBadge ? (
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-text-secondary">
-                  <span className="flex items-center gap-1">
-                    {t('webhooks.auth.token.label')}
-                    <span className="inline-flex items-center gap-1 px-1.5 text-xs font-medium bg-status-success-op20 text-status-success rounded leading-[16px]">
-                      <CheckCircle size={10} weight="fill" />
-                      {t('common.set')}
-                    </span>
-                  </span>
-                </label>
-                <p className="text-xs text-text-tertiary italic">{t('webhooks.auth.token.set')}</p>
-                <button
-                  type="button"
-                  onClick={handleClearToken}
-                  className="flex items-center gap-1 text-xs text-accent-danger hover:underline"
-                >
-                  <X size={12} />{t('webhooks.auth.token.clear')}
-                </button>
-              </div>
-            ) : (
-              <Input
-                label={t('webhooks.auth.token.label')}
-                type="password"
-                value={formData.auth_token}
-                onChange={e => handleChange('auth_token', e.target.value)}
-                placeholder={t('webhooks.auth.token.placeholder')}
-                error={validationErrors.auth_token || (tokenMustRetype ? t('common.secretRequiredForTarget') : undefined)}
-                helperText={showTokenByteCount ? `${tokenBytes} / ${TOKEN_MAX_BYTES} bytes` : undefined}
-              />
+        {/* Authentication */}
+        <fieldset className="field full">
+          <legend>{t('webhooks.auth.title')}</legend>
+          <div className="form-fields">
+            <Select id="webhook-auth-type" label={t('webhooks.auth.type.label')} value={formData.auth_type} onChange={handleAuthTypeChange}
+              options={AUTH_TYPE_OPTIONS.map(o => ({ value: o.value, label: t(o.labelKey) }))} />
+            {formData.auth_type === 'basic' && (
+              <Input id="webhook-auth-user" label={t('webhooks.auth.username.label')} value={formData.auth_username}
+                onChange={e => handleChange('auth_username', e.target.value)} placeholder="username" error={validationErrors.auth_username} />
             )}
-          </div>
-        )}
+            {(formData.auth_type === 'api_key' || formData.auth_type === 'custom') && (
+              <Input id="webhook-auth-header" label={t('webhooks.auth.headerName.label')} value={formData.auth_header_name}
+                onChange={e => handleChange('auth_header_name', e.target.value)}
+                placeholder={formData.auth_type === 'custom' ? 'Authorization' : t('webhooks.auth.headerName.placeholder')}
+                error={validationErrors.auth_header_name} />
+            )}
+            {showHeaderNameAuthorizationWarning && <Notice tone="warn">{t('webhooks.auth.apiKey.authorizationWarning')}</Notice>}
+            {formData.auth_type !== 'none' && tokenField}
+            {formData.auth_type === 'custom' && <Notice>{t('webhooks.auth.custom.helper')}</Notice>}
 
-        {/* API Key */}
-        {formData.auth_type === 'api_key' && (
-          <div className="space-y-2">
-            <Input
-              label={t('webhooks.auth.headerName.label')}
-              value={formData.auth_header_name}
-              onChange={e => handleChange('auth_header_name', e.target.value)}
-              placeholder={t('webhooks.auth.headerName.placeholder')}
-              error={validationErrors.auth_header_name}
-            />
-            {showHeaderNameAuthorizationWarning && (
-              <div className="flex items-start gap-2 text-xs text-accent-warning p-2 rounded-md bg-status-warning-op10 border border-status-warning-op30">
-                <WarningCircle size={14} className="flex-shrink-0 mt-0.5" />
-                <span>{t('webhooks.auth.apiKey.authorizationWarning')}</span>
+            {/* The header the request will carry, masked unless revealed */}
+            {preview && (
+              <div className="field full" data-testid="auth-preview">
+                <div className="label-row">
+                  <span>{t('webhooks.auth.preview.title')}</span>
+                  {preview.revealedValue && (
+                    <button type="button" className="text-link" onClick={() => setPreviewRevealed(prev => !prev)}>
+                      <Icon name={previewRevealed ? 'hide' : 'eye'} />{previewRevealed ? t('webhooks.auth.preview.hide') : t('webhooks.auth.preview.reveal')}
+                    </button>
+                  )}
+                </div>
+                <div className="command-line"><code>
+                  <span>{preview.headerName}</span><span className="muted">: </span>
+                  <span>{previewRevealed && preview.revealedValue ? preview.revealedValue : preview.maskedValue}</span>
+                </code></div>
               </div>
             )}
-            {showTokenSetBadge ? (
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-text-secondary">
-                  <span className="flex items-center gap-1">
-                    {t('webhooks.auth.token.label')}
-                    <span className="inline-flex items-center gap-1 px-1.5 text-xs font-medium bg-status-success-op20 text-status-success rounded leading-[16px]">
-                      <CheckCircle size={10} weight="fill" />
-                      {t('common.set')}
-                    </span>
-                  </span>
-                </label>
-                <p className="text-xs text-text-tertiary italic">{t('webhooks.auth.token.set')}</p>
-                <button
-                  type="button"
-                  onClick={handleClearToken}
-                  className="flex items-center gap-1 text-xs text-accent-danger hover:underline"
-                >
-                  <X size={12} />{t('webhooks.auth.token.clear')}
-                </button>
-              </div>
-            ) : (
-              <Input
-                label={t('webhooks.auth.token.label')}
-                type="password"
-                value={formData.auth_token}
-                onChange={e => handleChange('auth_token', e.target.value)}
-                placeholder={t('webhooks.auth.token.placeholder')}
-                error={validationErrors.auth_token || (tokenMustRetype ? t('common.secretRequiredForTarget') : undefined)}
-                helperText={showTokenByteCount ? `${tokenBytes} / ${TOKEN_MAX_BYTES} bytes` : undefined}
-              />
-            )}
           </div>
-        )}
+        </fieldset>
 
-        {/* Custom header */}
-        {formData.auth_type === 'custom' && (
-          <div className="space-y-2">
-            <Input
-              label={t('webhooks.auth.headerName.label')}
-              value={formData.auth_header_name}
-              onChange={e => handleChange('auth_header_name', e.target.value)}
-              placeholder="Authorization"
-              error={validationErrors.auth_header_name}
-            />
-            {showTokenSetBadge ? (
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-text-secondary">
-                  <span className="flex items-center gap-1">
-                    {t('webhooks.auth.token.label')}
-                    <span className="inline-flex items-center gap-1 px-1.5 text-xs font-medium bg-status-success-op20 text-status-success rounded leading-[16px]">
-                      <CheckCircle size={10} weight="fill" />
-                      {t('common.set')}
-                    </span>
-                  </span>
-                </label>
-                <p className="text-xs text-text-tertiary italic">{t('webhooks.auth.token.set')}</p>
-                <button
-                  type="button"
-                  onClick={handleClearToken}
-                  className="flex items-center gap-1 text-xs text-accent-danger hover:underline"
-                >
-                  <X size={12} />{t('webhooks.auth.token.clear')}
-                </button>
-              </div>
-            ) : (
-              <Input
-                label={t('webhooks.auth.token.label')}
-                type="password"
-                value={formData.auth_token}
-                onChange={e => handleChange('auth_token', e.target.value)}
-                placeholder={t('webhooks.auth.token.placeholder')}
-                error={validationErrors.auth_token || (tokenMustRetype ? t('common.secretRequiredForTarget') : undefined)}
-                helperText={showTokenByteCount ? `${tokenBytes} / ${TOKEN_MAX_BYTES} bytes` : undefined}
-              />
-            )}
-            <p className="text-xs text-text-tertiary">{t('webhooks.auth.custom.helper')}</p>
+        <fieldset className="field full">
+          <legend className="label-row">
+            <span>{t('webhooks.events')}</span>
+            <button type="button" className="text-link" onClick={toggleAllEvents}>
+              {formData.events.length === WEBHOOK_EVENTS.length ? t('common.deselectAll') : t('common.selectAll')}
+            </button>
+          </legend>
+          <div className="eku-list two-columns">
+            {WEBHOOK_EVENTS.map(event => (
+              <label key={event} className="checkbox-line">
+                <input type="checkbox" checked={formData.events.includes(event)} onChange={() => toggleEvent(event)} />
+                <span>{webhookEventLabel(t, event)}<small className="mono">{event}</small></span>
+              </label>
+            ))}
           </div>
-        )}
+        </fieldset>
 
-        {/* Preview panel */}
-        {preview && (
-          <div className="rounded-md border border-border bg-bg-tertiary p-3 space-y-2" data-testid="auth-preview">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-text-secondary">{t('webhooks.auth.preview.title')}</span>
-              {preview.revealedValue && (
-                <button
-                  type="button"
-                  onClick={() => setPreviewRevealed(prev => !prev)}
-                  className="flex items-center gap-1 text-xs text-accent-primary hover:underline"
-                >
-                  {previewRevealed
-                    ? <><EyeSlash size={12} />{t('webhooks.auth.preview.hide')}</>
-                    : <><Eye size={12} />{t('webhooks.auth.preview.reveal')}</>
-                  }
-                </button>
-              )}
-            </div>
-            <code className="block text-xs font-mono text-text-primary bg-tertiary-50 rounded px-2 py-1.5 break-all">
-              <span className="text-accent-pro">{preview.headerName}</span>
-              <span className="text-text-tertiary">: </span>
-              <span>{previewRevealed && preview.revealedValue ? preview.revealedValue : preview.maskedValue}</span>
-            </code>
-          </div>
-        )}
+        <ToggleSwitch checked={formData.enabled} onChange={(val) => handleChange('enabled', val)} label={t('webhooks.enableOnCreate')} />
       </div>
 
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="text-sm font-medium text-text-primary">{t('webhooks.events')}</label>
-          <button type="button" onClick={toggleAllEvents} className="text-xs text-accent-primary hover:underline">
-            {formData.events.length === WEBHOOK_EVENTS.length ? t('common.deselectAll') : t('common.selectAll')}
-          </button>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {WEBHOOK_EVENTS.map(event => (
-            <label key={event} className="flex items-center gap-2 p-2 rounded-lg bg-tertiary-50 border border-border-op30 cursor-pointer hover:border-accent-primary-op50 transition-colors">
-              <input
-                type="checkbox"
-                checked={formData.events.includes(event)}
-                onChange={() => toggleEvent(event)}
-                className="rounded border-border bg-bg-tertiary"
-              />
-              <span className="text-xs text-text-primary">{webhookEventLabel(t, event)}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <ToggleSwitch
-        checked={formData.enabled}
-        onChange={(val) => handleChange('enabled', val)}
-        label={t('webhooks.enableOnCreate')}
-      />
-
-      <div className="flex justify-end gap-2 pt-4 border-t border-border">
-        <Button type="button" variant="secondary" onClick={onCancel}>{t('common.cancel')}</Button>
-        <Button type="submit">
-          {isEditing ? t('common.save') : t('common.create')}
-        </Button>
+      <div className="modal-actions">
+        <button type="button" className="btn" data-action="close-modal" onClick={onCancel}>{t('common.cancel')}</button>
+        <Btn type="submit" tone="primary" icon="check">{isEditing ? t('common.save') : t('common.create')}</Btn>
       </div>
     </form>
   )

@@ -38,7 +38,7 @@ describe('settings record lists', () => {
     sso(can('read:sso', 'write:sso', 'delete:sso'))
     const items = screen.getAllByRole('listitem')
     expect(items).toHaveLength(3)
-    expect(items[0].closest('ul')).toHaveClass('sf-records')
+    expect(items[0].closest('ul')).toHaveClass('record-list')
     for (const name of ['sso.testConnection', 'sso.disable', 'common.edit', 'common.delete']) {
       expect(within(items[0]).getByRole('button', { name })).toBeInTheDocument()
     }
@@ -62,7 +62,7 @@ describe('settings record lists', () => {
   it('lists the Microsoft AC connections, edit kept from a reader', () => {
     msca(can('read:settings'))
     const [row] = screen.getAllByRole('listitem')
-    expect(row.closest('ul')).toHaveClass('sf-records')
+    expect(row.closest('ul')).toHaveClass('record-list')
     expect(row).toHaveTextContent('dc.example.com')
     expect(within(row).queryByRole('button', { name: 'common.edit' })).toBeNull()
   })

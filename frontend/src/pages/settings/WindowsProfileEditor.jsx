@@ -1,10 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { ArrowsClockwise, FloppyDisk, CheckCircle, WarningCircle, ListChecks, Key } from '@phosphor-icons/react'
-import { Badge, Button, Input, Select, Textarea, HelpCard } from '../../components'
-import { FileUpload } from '../../components/FileUpload'
-import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
+import { Btn, Pill, RecordList, RecordRow } from '../../components/atelier'
+import { Input, NumberInput, SecretInput, Select, Textarea, ToggleSwitch, Notice } from '../../components/atelier/Form'
+import { FieldError } from '../../components/atelier/SettingsView'
 import { windowsProfilesService, adConnectorsService, templatesService } from '../../services'
 import { useNotification } from '../../contexts'
 import { pickerCas, unlistedPickerCas } from '../../lib/caSelection'
@@ -18,45 +17,30 @@ const EMPTY = {
   xcep_username: '', wstep_username: '', is_default: false, renewal_ca_refids: [],
 }
 
-function ChecklistRow({ ok, label, action, onAction }) {
-  return (
-    <div className="flex items-center justify-between gap-2 py-1">
-      <div className="flex items-center gap-2">
-        {ok
-          ? <CheckCircle size={16} weight="fill" className="text-status-success shrink-0" />
-          : <WarningCircle size={16} weight="fill" className="text-status-warning shrink-0" />}
-        <span className="text-sm text-text-primary">{label}</span>
-      </div>
-      {!ok && action && <Button type="button" size="sm" variant="ghost" onClick={onAction}>{action}</Button>}
-    </div>
-  )
-}
+// The keytab a profile accepts: Kerberos keytabs are small, the server refuses more
+const KEYTAB_MAX = 256 * 1024
 
 /** The keytab entries of a profile, grouped by realm, the realm that is not the profile's flagged. */
 export function KeytabEntries({ entries, profileRealm }) {
   const { t } = useTranslation()
   const groups = groupEntriesByRealm(entries)
   const foreign = new Set(foreignRealms(entries, profileRealm))
-  if (!groups.length) return <p className="text-xs text-text-tertiary">{t('xcepWstep.keytabNoEntries')}</p>
+  if (!groups.length) return <p className="muted small">{t('xcepWstep.keytabNoEntries')}</p>
   return (
-    <div className="space-y-2" data-testid="keytab-entries">
-      {groups.map(({ realm, entries: list }) => (
-        <div key={realm}>
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-xs font-medium text-text-primary">{realm}</span>
-            <Badge variant={foreign.has(realm) ? 'danger' : 'success'} size="sm">
-              {foreign.has(realm) ? t('xcepWstep.keytabRealmDiffers', { realm: profileRealm || '-' }) : t('xcepWstep.keytabRealmMatches')}
-            </Badge>
-          </div>
-          <ul className="pl-4 text-xs text-text-secondary">
-            {list.map((entry, index) => (
-              <li key={`${entry.principal}-${entry.kvno}-${entry.enctype}-${index}`} className="font-mono break-all">
+    <div data-testid="keytab-entries">
+      <RecordList>
+        {groups.map(({ realm, entries: list }) => (
+          <RecordRow key={realm} title={<span className="mono">{realm}</span>}
+            extra={list.map((entry, index) => (
+              <span key={`${entry.principal}-${entry.kvno}-${entry.enctype}-${index}`} className="rl-meta mono">
                 {entry.principal} (kvno {entry.kvno}, etype {entry.enctype})
-              </li>
+              </span>
             ))}
-          </ul>
-        </div>
-      ))}
+            badge={foreign.has(realm)
+              ? <Pill tone="bad" label={t('xcepWstep.keytabRealmDiffers', { realm: profileRealm || '-' })} />
+              : <Pill tone="good" label={t('xcepWstep.keytabRealmMatches')} />} />
+        ))}
+      </RecordList>
     </div>
   )
 }
@@ -73,6 +57,7 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
   const [saving, setSaving] = useState(false)
   const [keytabFile, setKeytabFile] = useState(null)
   const [keytabPreview, setKeytabPreview] = useState(null)
+  const [keytabError, setKeytabError] = useState(null)
   const [touched, setTouched] = useState(false)
   // Offered only while the server says no profile is the default; unknown counts as one existing
   const [noDefault, setNoDefault] = useState(false)
@@ -141,6 +126,13 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
     { autoenrollTemplates })
 
   const pickKeytab = async (file) => {
+    setKeytabError(null)
+    if (file && file.size > KEYTAB_MAX) {
+      setKeytabFile(null)
+      setKeytabPreview(null)
+      setKeytabError(t('xcepWstep.keytabTooLarge'))
+      return
+    }
     setKeytabFile(file)
     setKeytabPreview(null)
     if (!file || isNew) return
@@ -216,238 +208,146 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
     form.template_ids.includes(id) ? form.template_ids.filter(x => x !== id) : [...form.template_ids, id])
   const storedEntries = detail?.keytab_entries || []
 
+  // The mockup's dialog form: the profile's fields in `.form-fields`, the keytab and the checklist as record lists
   return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4">
-      {!form.enabled && !isNew && (
-        <HelpCard variant="warning" title={t('xcepWstep.disabledTitle')}>
-          {t('xcepWstep.disabledKeepsKeys')}
-        </HelpCard>
-      )}
-      {!isNew && detail?.is_default && !detail.realm && (
-        <HelpCard variant="warning" title={t('xcepWstep.noRealmTitle')}>
-          {t('xcepWstep.noRealmKerberosRefused', { name: detail.name })}
-        </HelpCard>
-      )}
+    <form onSubmit={handleSubmit}>
+      <div className="form-fields">
+        {!form.enabled && !isNew && (
+          <Notice tone="warn"><strong>{t('xcepWstep.disabledTitle')}</strong>{' '}{t('xcepWstep.disabledKeepsKeys')}</Notice>
+        )}
+        {!isNew && detail?.is_default && !detail.realm && (
+          <Notice tone="warn"><strong>{t('xcepWstep.noRealmTitle')}</strong>{' '}{t('xcepWstep.noRealmKerberosRefused', { name: detail.name })}</Notice>
+        )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Input
-          label={t('xcepWstep.profileName')}
-          value={form.name}
-          onChange={(e) => update('name')(e.target.value)}
-          maxLength={100}
-          required
-          disabled={readOnly}
-        />
-        <Input
-          label={t('xcepWstep.realm')}
-          value={form.realm}
-          onChange={(e) => update('realm')(e.target.value)}
-          onBlur={() => setTouched(true)}
-          placeholder="CORP.EXAMPLE"
-          error={realmError}
-          helperText={t('xcepWstep.realmHelp')}
-          disabled={readOnly}
-        />
-      </div>
+        <Input id="wp-name" label={t('xcepWstep.profileName')} value={form.name} onChange={(e) => update('name')(e.target.value)}
+          maxLength={100} required disabled={readOnly} data-autofocus="" />
+        <Input id="wp-realm" label={t('xcepWstep.realm')} value={form.realm} onChange={(e) => update('realm')(e.target.value)}
+          onBlur={() => setTouched(true)} placeholder="CORP.EXAMPLE" error={realmError} hint={t('xcepWstep.realmHelp')} disabled={readOnly} />
 
-      <ToggleSwitch
-        label={t('common.enabled')}
-        checked={form.enabled}
-        onChange={update('enabled')}
-        disabled={readOnly}
-      />
+        <ToggleSwitch label={t('common.enabled')} checked={form.enabled} onChange={update('enabled')} disabled={readOnly} />
+        {offerDefault && (
+          <ToggleSwitch label={t('xcepWstep.makeDefault')} description={t('xcepWstep.makeDefaultHelp')}
+            checked={form.is_default} onChange={update('is_default')} disabled={readOnly} />
+        )}
 
-      {offerDefault && (
-        <label className="flex items-start gap-2 text-sm text-text-primary">
-          <input
-            type="checkbox"
-            className="rounded mt-0.5"
-            checked={form.is_default}
-            onChange={(e) => update('is_default')(e.target.checked)}
-            disabled={readOnly}
-          />
-          <span>
-            {t('xcepWstep.makeDefault')}
-            <span className="block text-xs text-text-tertiary">{t('xcepWstep.makeDefaultHelp')}</span>
-          </span>
-        </label>
-      )}
+        <Select id="wp-connector" full label={t('xcepWstep.connector')} value={form.connector_id ? String(form.connector_id) : ''}
+          onChange={(v) => update('connector_id')(v ? parseInt(v, 10) : null)}
+          options={[{ value: '', label: t('xcepWstep.noConnector') },
+            ...connectors.map(c => ({ value: String(c.id), label: c.realm ? `${c.name} (${c.realm})` : c.name }))]}
+          disabled={readOnly} />
+        {realmMismatch && (
+          <Notice tone="warn" role="status">{t('xcepWstep.connectorRealmDiffers', { connector: connectorRealm, realm: form.realm.trim() })}</Notice>
+        )}
 
-      <Select
-        label={t('xcepWstep.connector')}
-        value={form.connector_id ? String(form.connector_id) : ''}
-        onChange={(v) => update('connector_id')(v ? parseInt(v, 10) : null)}
-        options={connectors.map(c => ({ value: String(c.id), label: c.realm ? `${c.name} (${c.realm})` : c.name }))}
-        placeholder={t('xcepWstep.noConnector')}
-        disabled={readOnly}
-      />
-      {realmMismatch && (
-        <p className="text-xs status-warning-text" role="status">
-          {t('xcepWstep.connectorRealmDiffers', { connector: connectorRealm, realm: form.realm.trim() })}
-        </p>
-      )}
+        <Select id="wp-issuing-ca" label={t('xcepWstep.issuingCa')} value={form.issuing_ca_refid} onChange={update('issuing_ca_refid')}
+          options={caOptions} hint={caHelp} placeholder={t('xcepWstep.selectCa')} disabled={readOnly} />
+        <Select id="wp-policy-ca" label={t('xcepWstep.policyCa')} value={form.policy_ca_refid} onChange={update('policy_ca_refid')}
+          options={[{ value: '', label: t('xcepWstep.policyCaSame') }, ...caOptions]} hint={caHelp} disabled={readOnly} />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Select
-          label={t('xcepWstep.issuingCa')}
-          value={form.issuing_ca_refid}
-          onChange={update('issuing_ca_refid')}
-          options={caOptions}
-          helperText={caHelp}
-          placeholder={t('xcepWstep.selectCa')}
-          disabled={readOnly}
-        />
-        <Select
-          label={t('xcepWstep.policyCa')}
-          value={form.policy_ca_refid}
-          onChange={update('policy_ca_refid')}
-          options={caOptions}
-          helperText={caHelp}
-          placeholder={t('xcepWstep.policyCaSame')}
-          disabled={readOnly}
-        />
-      </div>
+        {!isNew && (
+          <fieldset className="field full" aria-describedby="hint-wp-renewal">
+            <legend>{t('xcepWstep.renewalCas')}</legend>
+            <small id="hint-wp-renewal">{t('xcepWstep.renewalCasHelp')}</small>
+            <RecordList empty={t('xcepWstep.renewalCasNone')}>
+              {form.renewal_ca_refids.length > 0 && (detail?.renewal_cas || []).filter(ca => form.renewal_ca_refids.includes(ca.refid)).map(ca => (
+                <RecordRow key={ca.refid} title={ca.name || `${t('xcepWstep.renewalCaDeleted')} (${ca.refid})`}
+                  action={<Btn disabled={readOnly || undefined}
+                    onClick={() => update('renewal_ca_refids')(form.renewal_ca_refids.filter(r => r !== ca.refid))}>
+                    {t('xcepWstep.renewalCaRemove')}
+                  </Btn>} />
+              ))}
+            </RecordList>
+          </fieldset>
+        )}
 
-      {!isNew && (
-        <div>
-          <p className="text-xs font-medium text-text-secondary mb-1">{t('xcepWstep.renewalCas')}</p>
-          <p className="text-xs text-text-tertiary mb-2">{t('xcepWstep.renewalCasHelp')}</p>
-          {form.renewal_ca_refids.length === 0
-            ? <p className="text-xs text-text-tertiary">{t('xcepWstep.renewalCasNone')}</p>
+        <NumberInput id="wp-validity" label={t('xcepWstep.validityDays')} value={form.validity_days}
+          onChange={(e) => update('validity_days')(e.target.value)} disabled={readOnly} />
+        <Input id="wp-group" label={t('xcepWstep.allowedGroup')} value={form.allowed_ad_group}
+          onChange={(e) => update('allowed_ad_group')(e.target.value)} hint={t('xcepWstep.allowedGroupHelp')} disabled={readOnly} />
+
+        <fieldset className="field full" aria-describedby="hint-wp-templates">
+          <legend>{t('xcepWstep.templates')}</legend>
+          <small id="hint-wp-templates">{t('xcepWstep.templatesHelp')}</small>
+          {templates.length === 0
+            ? <p className="muted small">{t('xcepWstep.noTemplates')}</p>
             : (
-              <ul className="border border-border rounded-lg p-2 space-y-1">
-                {(detail?.renewal_cas || []).filter(ca => form.renewal_ca_refids.includes(ca.refid)).map(ca => (
-                  <li key={ca.refid} className="flex items-center justify-between gap-2 text-sm">
-                    <span>{ca.name || `${t('xcepWstep.renewalCaDeleted')} (${ca.refid})`}</span>
-                    <Button type="button" size="sm" variant="ghost" disabled={readOnly}
-                      onClick={() => update('renewal_ca_refids')(form.renewal_ca_refids.filter(r => r !== ca.refid))}>
-                      {t('xcepWstep.renewalCaRemove')}
-                    </Button>
-                  </li>
+              <div className="columns-list">
+                {templates.map(tpl => (
+                  <label key={tpl.id} className="checkbox-line">
+                    <input type="checkbox" checked={form.template_ids.includes(tpl.id)} onChange={() => toggleTemplate(tpl.id)} disabled={readOnly} />
+                    {tpl.name}
+                  </label>
                 ))}
-              </ul>
+              </div>
             )}
-        </div>
-      )}
+        </fieldset>
 
-      <Input
-        label={t('xcepWstep.validityDays')}
-        type="number"
-        value={form.validity_days}
-        onChange={(e) => update('validity_days')(e.target.value)}
-        disabled={readOnly}
-      />
+        <Textarea id="wp-pinned" label={t('xcepWstep.pinnedFields')} value={form.pinned_subject_fields}
+          onChange={(e) => update('pinned_subject_fields')(e.target.value)} rows={3} placeholder='{"O": "Example Corp"}' mono
+          hint={t('xcepWstep.pinnedFieldsHelp')} disabled={readOnly} />
 
-      <div>
-        <p className="text-xs font-medium text-text-secondary mb-1">{t('xcepWstep.templates')}</p>
-        <p className="text-xs text-text-tertiary mb-2">{t('xcepWstep.templatesHelp')}</p>
-        <div className="max-h-40 overflow-y-auto border border-border rounded-lg p-2 space-y-1">
-          {templates.length === 0 && <p className="text-xs text-text-tertiary">{t('xcepWstep.noTemplates')}</p>}
-          {templates.map(tpl => (
-            <label key={tpl.id} className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="rounded"
-                checked={form.template_ids.includes(tpl.id)}
-                onChange={() => toggleTemplate(tpl.id)}
-                disabled={readOnly}
-              />
-              {tpl.name}
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <Input
-        label={t('xcepWstep.allowedGroup')}
-        value={form.allowed_ad_group}
-        onChange={(e) => update('allowed_ad_group')(e.target.value)}
-        helperText={t('xcepWstep.allowedGroupHelp')}
-        disabled={readOnly}
-      />
-      <Textarea
-        label={t('xcepWstep.pinnedFields')}
-        value={form.pinned_subject_fields}
-        onChange={(e) => update('pinned_subject_fields')(e.target.value)}
-        rows={3}
-        placeholder='{"O": "Example Corp"}'
-        className="font-mono text-xs"
-        helperText={t('xcepWstep.pinnedFieldsHelp')}
-        disabled={readOnly}
-      />
-
-      {isDefault && (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Input label={`${t('xcepWstep.xcepTitle')}${t('work.sep')}${t('common.username')}`} value={form.xcep_username}
-          onChange={(e) => update('xcep_username')(e.target.value)} disabled={readOnly} />
-        <Input label={`${t('xcepWstep.xcepTitle')}${t('work.sep')}${t('common.password')}`} type="password" value={form.xcep_password || ''}
-          onChange={(e) => update('xcep_password')(e.target.value)}
-          placeholder={detail?.xcep_password_set ? '••••••••' : ''} disabled={readOnly} />
-        <Input label={`${t('xcepWstep.wstepTitle')}${t('work.sep')}${t('common.username')}`} value={form.wstep_username}
-          onChange={(e) => update('wstep_username')(e.target.value)} disabled={readOnly} />
-        <Input label={`${t('xcepWstep.wstepTitle')}${t('work.sep')}${t('common.password')}`} type="password" value={form.wstep_password || ''}
-          onChange={(e) => update('wstep_password')(e.target.value)}
-          placeholder={detail?.wstep_password_set ? '••••••••' : ''} disabled={readOnly} />
-      </div>
-      )}
-
-      <div className="space-y-2 border border-border rounded-lg p-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
-          <Key size={16} /> {t('xcepWstep.keytab')}
-          {detail?.keytab_set
-            ? <Badge variant="success" size="sm">{t('xcepWstep.keytabSet')}</Badge>
-            : <Badge variant="warning" size="sm">{t('xcepWstep.keytabNotSet')}</Badge>}
-        </div>
-        {detail?.keytab_error && <p className="text-xs status-danger-text">{detail.keytab_error}</p>}
-        {storedEntries.length > 0 && <KeytabEntries entries={storedEntries} profileRealm={detail?.realm} />}
-        {canWrite && canUploadKeytab && (
-          <FileUpload
-            label={t('xcepWstep.keytabReplace')}
-            accept=".keytab,.kt"
-            compact
-            maxSize={256 * 1024}
-            helperText={keytabFile ? t('xcepWstep.keytabSelected', { name: keytabFile.name }) : t('xcepWstep.keytabHelp')}
-            onFileSelect={pickKeytab}
-          />
+        {isDefault && (
+          <>
+            <Input id="wp-xcep-user" label={`${t('xcepWstep.xcepTitle')}${t('work.sep')}${t('common.username')}`} value={form.xcep_username}
+              onChange={(e) => update('xcep_username')(e.target.value)} disabled={readOnly} />
+            <SecretInput id="wp-xcep-password" label={`${t('xcepWstep.xcepTitle')}${t('work.sep')}${t('common.password')}`} value={form.xcep_password || ''}
+              onChange={(e) => update('xcep_password')(e.target.value)} placeholder={detail?.xcep_password_set ? '••••••••' : ''} disabled={readOnly} />
+            <Input id="wp-wstep-user" label={`${t('xcepWstep.wstepTitle')}${t('work.sep')}${t('common.username')}`} value={form.wstep_username}
+              onChange={(e) => update('wstep_username')(e.target.value)} disabled={readOnly} />
+            <SecretInput id="wp-wstep-password" label={`${t('xcepWstep.wstepTitle')}${t('work.sep')}${t('common.password')}`} value={form.wstep_password || ''}
+              onChange={(e) => update('wstep_password')(e.target.value)} placeholder={detail?.wstep_password_set ? '••••••••' : ''} disabled={readOnly} />
+          </>
         )}
-        {keytabPreview && (
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-text-secondary">{t('xcepWstep.keytabPreview')}</p>
-            <KeytabEntries entries={keytabPreview.keytab_entries} profileRealm={keytabPreview.profile_realm} />
-            {keytabPreview.foreign_entries?.length > 0 && (
-              <p className="text-xs status-danger-text" role="alert">
-                {t('xcepWstep.keytabForeign', { entries: keytabPreview.foreign_entries.join(', ') })}
-              </p>
-            )}
+
+        <fieldset className="field full">
+          <legend>
+            {t('xcepWstep.keytab')}{' '}
+            {detail?.keytab_set ? <Pill tone="good" label={t('xcepWstep.keytabSet')} /> : <Pill tone="warn" label={t('xcepWstep.keytabNotSet')} />}
+          </legend>
+          {detail?.keytab_error && <FieldError id="err-wp-keytab-stored" message={detail.keytab_error} />}
+          {storedEntries.length > 0 && <KeytabEntries entries={storedEntries} profileRealm={detail?.realm} />}
+          {canWrite && canUploadKeytab && (
+            <div className="field">
+              <label htmlFor="wp-keytab">{t('xcepWstep.keytabReplace')}</label>
+              <input id="wp-keytab" type="file" accept=".keytab,.kt" aria-describedby="hint-wp-keytab"
+                aria-invalid={keytabError ? 'true' : undefined} onChange={(e) => pickKeytab(e.target.files?.[0] || null)} />
+              <small id="hint-wp-keytab">{keytabFile ? t('xcepWstep.keytabSelected', { name: keytabFile.name }) : t('xcepWstep.keytabHelp')}</small>
+              {keytabError && <FieldError id="err-wp-keytab" message={keytabError} />}
+            </div>
+          )}
+          {keytabPreview && (
+            <>
+              <small>{t('xcepWstep.keytabPreview')}</small>
+              <KeytabEntries entries={keytabPreview.keytab_entries} profileRealm={keytabPreview.profile_realm} />
+              {keytabPreview.foreign_entries?.length > 0 && (
+                <Notice tone="bad">{t('xcepWstep.keytabForeign', { entries: keytabPreview.foreign_entries.join(', ') })}</Notice>
+              )}
+            </>
+          )}
+          {isNew && keytabFile && <small>{t('xcepWstep.keytabAfterSave')}</small>}
+        </fieldset>
+
+        <fieldset className="field full">
+          <legend>{t('xcepWstep.checklistTitle')}</legend>
+          <div data-testid="profile-checklist">
+            <RecordList>
+              {checklist.map(item => (
+                <RecordRow key={item.key}
+                  title={t(`xcepWstep.checklist.${item.key}`, item.count === undefined ? undefined : { count: item.count })}
+                  badge={item.ok ? <Pill tone="good" label={t('common.ok')} /> : <Pill tone="warn" label={t('xcepWstep.checklistMissing')} />}
+                  action={!item.ok && item.key === 'templates'
+                    ? <Btn onClick={() => navigate('/templates')}>{t('common.configure')}</Btn>
+                    : null} />
+              ))}
+            </RecordList>
           </div>
-        )}
-        {isNew && keytabFile && <p className="text-xs text-text-tertiary">{t('xcepWstep.keytabAfterSave')}</p>}
+        </fieldset>
       </div>
 
-      <div className="border border-border rounded-lg p-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1">
-          <ListChecks size={16} /> {t('xcepWstep.checklistTitle')}
-        </div>
-        <div data-testid="profile-checklist">
-          {checklist.map(item => (
-            <ChecklistRow
-              key={item.key}
-              ok={item.ok}
-              label={t(`xcepWstep.checklist.${item.key}`, item.count === undefined ? undefined : { count: item.count })}
-              action={item.key === 'templates' ? t('common.configure') : undefined}
-              onAction={item.key === 'templates' ? () => navigate('/templates') : undefined}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="flex justify-end gap-2 pt-4 border-t border-border">
-        <Button type="button" variant="secondary" onClick={onCancel}>{t('common.cancel')}</Button>
+      <div className="modal-actions">
+        <button type="button" className="btn" data-action="close-modal" onClick={onCancel}>{t('common.cancel')}</button>
         {canWrite && (
-          <Button type="submit" disabled={saving}>
-            {saving ? <ArrowsClockwise size={14} className="animate-spin" /> : <FloppyDisk size={14} />}
-            {t('common.save')}
-          </Button>
+          <Btn type="submit" tone="primary" icon="check" disabled={saving || undefined}>{t('common.save')}</Btn>
         )}
       </div>
     </form>
