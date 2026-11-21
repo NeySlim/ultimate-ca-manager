@@ -42,6 +42,8 @@ vi.mock('../../contexts', () => ({
   }),
 }))
 
+vi.mock('../../hooks/useOpenEntity', () => ({ useOpenEntity: () => vi.fn() }))
+
 vi.mock('../../contexts/MobileContext', () => ({
   useMobile: () => ({ isMobile: false, isTablet: false }),
 }))
@@ -78,7 +80,7 @@ const OPERATOR_WRITE_CERTIFICATES = [
 ]
 
 async function renderPage() {
-  render(<MemoryRouter><DiscoveryPage /></MemoryRouter>)
+  render(<MemoryRouter initialEntries={['/discovery?tab=discovered']}><DiscoveryPage /></MemoryRouter>)
   // Wait for the results to land: the toolbar actions only render once the
   // table has rows, so asserting before that would pass on an empty page.
   await screen.findAllByText('10.0.0.5:443')
@@ -90,8 +92,8 @@ describe('DiscoveryPage — scan actions follow admin:system', () => {
   it('offers no scan or purge to an operator', async () => {
     authState.permissions = [...OPERATOR_WRITE_CERTIFICATES]
     await renderPage()
-    expect(screen.queryByText('discovery.quickScan')).not.toBeInTheDocument()
-    expect(screen.queryByText('discovery.deleteAll')).not.toBeInTheDocument()
+    expect(screen.queryByText('discovery.quickScanAsk')).not.toBeInTheDocument()
+    expect(screen.queryByText('discovery.deleteAll…')).not.toBeInTheDocument()
     expect(screen.queryByText('discovery.bulkResolveDns')).not.toBeInTheDocument()
   })
 
@@ -104,14 +106,14 @@ describe('DiscoveryPage — scan actions follow admin:system', () => {
   it('offers them to the admin wildcard', async () => {
     authState.permissions = ['*']
     await renderPage()
-    expect(await screen.findByText('discovery.quickScan')).toBeInTheDocument()
-    expect(screen.getByText('discovery.deleteAll')).toBeInTheDocument()
+    expect((await screen.findAllByText('discovery.quickScanAsk')).length).toBeGreaterThan(0)
+    expect(screen.getByText('discovery.deleteAll…')).toBeInTheDocument()
     expect(screen.getByText('discovery.bulkResolveDns')).toBeInTheDocument()
   })
 
   it('offers them to a custom role holding admin:system', async () => {
     authState.permissions = [...OPERATOR_WRITE_CERTIFICATES, 'admin:system']
     await renderPage()
-    expect(await screen.findByText('discovery.quickScan')).toBeInTheDocument()
+    expect((await screen.findAllByText('discovery.quickScanAsk')).length).toBeGreaterThan(0)
   })
 })

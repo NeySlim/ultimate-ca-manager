@@ -6552,7 +6552,114 @@
     "helpExport": "Exporte certificados descobertos como CSV ou JSON. Aplique filtros primeiro para exportar apenas o subconjunto necessário.",
     "helpExportTitle": "Exportar Resultados",
     "helpSecurity": "O Discovery bloqueia endereços internos/loopback para proteção SSRF. Os alvos são validados antes da varredura. Todas as ações são registradas em auditoria.",
-    "helpSecurityTitle": "Segurança"
+    "helpSecurityTitle": "Segurança",
+    "quickScanAsk": "Quick scan…",
+    "views": {
+      "profiles": "Analyses",
+      "discovered": "Found certificates",
+      "history": "Run history"
+    },
+    "scans": {
+      "title": "Analyses",
+      "unit_one": "{{count}} analysis",
+      "unit_other": "{{count}} analyses",
+      "range_one": "{{shown}} of {{count}} analysis",
+      "range_other": "{{shown}} of {{count}} analyses",
+      "caption": "Network analyses. Activate a name to open its detail.",
+      "create": "New analysis…",
+      "found": "Found",
+      "foundNew": "{{count}}, {{fresh}} new",
+      "last": "Last analysis",
+      "next": "Next analysis",
+      "notScanned": "Not analysed",
+      "interrupted": "Interrupted",
+      "plannedOn": "Planned on {{date}}",
+      "state": {
+        "running": "Running",
+        "done": "Completed",
+        "failed": "Failed",
+        "scheduled": "Scheduled",
+        "never": "Never run"
+      },
+      "noDescription": "No description.",
+      "runsTab": "Runs",
+      "runNow": "Analyse now",
+      "remove": "Delete the analysis",
+      "removeText": "The analysis and its schedule are deleted. The certificates it found stay in the found certificates.",
+      "empty": "No network analysis",
+      "emptyText": "An analysis lists the certificates exposed on a range of addresses, for example 192.0.2.0/24, to match them with the inventory.",
+      "progress": "Scan in progress: {{scanned}} of {{total}} targets, {{found}} certificates found."
+    },
+    "found": {
+      "title": "Found certificates",
+      "unit_one": "{{count}} certificate",
+      "unit_other": "{{count}} certificates",
+      "range": "{{start}}–{{end}} of {{count}}",
+      "intent": "The certificates the analyses met on the network, matched with the inventory.",
+      "caption": "Found certificates. Activate a name to open its detail.",
+      "state": {
+        "managed": "In UCM",
+        "unmanaged": "Unknown to UCM",
+        "error": "Unreachable"
+      },
+      "inInventory": "In the inventory",
+      "inDays_one": "in {{count}} day",
+      "inDays_other": "in {{count}} days",
+      "extensions": "Extensions",
+      "remove": "Delete the found certificate",
+      "purged": "Found certificates deleted"
+    },
+    "runs": {
+      "title": "Run history",
+      "unit_one": "{{count}} run",
+      "unit_other": "{{count}} runs",
+      "range_one": "{{shown}} of {{count}} run",
+      "range_other": "{{shown}} of {{count}} runs",
+      "intent": "Every run of an analysis or a quick scan, newest first.",
+      "caption": "Runs. Activate a name to open its detail.",
+      "summary": "{{count}} certificates on {{targets}} targets",
+      "new": "New",
+      "changed": "Changed",
+      "trigger": "Started by",
+      "by": {
+        "manual": "Manual",
+        "scheduled": "Schedule"
+      },
+      "state": {
+        "running": "Running",
+        "completed": "Completed",
+        "failed": "Failed"
+      }
+    },
+    "form": {
+      "range": "Range",
+      "rangeHint": "One host name, address or IPv4 range per line, for example 192.0.2.0/24; a port can follow, as in mail.example.com:465.",
+      "nameRequired": "Name the analysis.",
+      "targetsRequired": "Give at least one host, address or range.",
+      "problem": {
+        "wildcard": "{{target}}: a DNS wildcard names no host; list the hosts.",
+        "ipv6Range": "{{target}}: IPv6 ranges are not scanned; list the addresses.",
+        "tooWide": "{{target}}: the range holds more than {{max}} hosts.",
+        "format": "{{target}}: not a host name, an address or a range."
+      },
+      "preset": "Common ports",
+      "presetOther": "Ports typed",
+      "presets": {
+        "https": "HTTPS (443)",
+        "alt": "HTTPS and 8443",
+        "common": "Every common TLS port"
+      },
+      "every": {
+        "0": "Manual only",
+        "60": "Every hour",
+        "360": "Every 6 hours",
+        "720": "Every 12 hours",
+        "1440": "Every day",
+        "10080": "Every week"
+      },
+      "timeoutHint": "Seconds per connection, 1 to 30.",
+      "workersHint": "Connections at once, 1 to 50."
+    }
   },
   "compliance": {
     "title": "Pontuação de conformidade",

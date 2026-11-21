@@ -6552,7 +6552,114 @@
     "helpExport": "将发现的证书导出为CSV或JSON。先应用筛选器以仅导出所需的子集。",
     "helpExportTitle": "导出结果",
     "helpSecurity": "Discovery阻止内部/回环地址以防止SSRF攻击。目标在扫描前经过验证。所有扫描操作都记录在审计日志中。",
-    "helpSecurityTitle": "安全"
+    "helpSecurityTitle": "安全",
+    "quickScanAsk": "快速扫描…",
+    "views": {
+      "profiles": "分析",
+      "discovered": "已发现证书",
+      "history": "运行历史"
+    },
+    "scans": {
+      "title": "分析",
+      "unit_one": "{{count}} 项分析",
+      "unit_other": "{{count}} 项分析",
+      "range_one": "{{shown}} / {{count}} 项分析",
+      "range_other": "{{shown}} / {{count}} 项分析",
+      "caption": "网络分析。激活名称以打开其详情。",
+      "create": "新建分析…",
+      "found": "已发现",
+      "foundNew": "{{count}}，其中 {{fresh}} 个新证书",
+      "last": "上次分析",
+      "next": "下次分析",
+      "notScanned": "未分析",
+      "interrupted": "已中断",
+      "plannedOn": "计划于 {{date}}",
+      "state": {
+        "running": "进行中",
+        "done": "已完成",
+        "failed": "失败",
+        "scheduled": "已计划",
+        "never": "从未运行"
+      },
+      "noDescription": "无描述。",
+      "runsTab": "运行记录",
+      "runNow": "立即分析",
+      "remove": "删除分析",
+      "removeText": "将删除该分析及其计划。它发现的证书仍保留在已发现证书中。",
+      "empty": "没有网络分析",
+      "emptyText": "分析会列出某个地址范围（例如 192.0.2.0/24）上暴露的证书，以便将其与清单关联。",
+      "progress": "正在扫描：{{scanned}} / {{total}} 个目标，已发现 {{found}} 个证书。"
+    },
+    "found": {
+      "title": "已发现证书",
+      "unit_one": "{{count}} 个证书",
+      "unit_other": "{{count}} 个证书",
+      "range": "{{start}}–{{end}} / {{count}}",
+      "intent": "分析在网络上发现的证书，并与清单比对。",
+      "caption": "已发现证书。激活名称以打开其详情。",
+      "state": {
+        "managed": "在 UCM 中",
+        "unmanaged": "UCM 未知",
+        "error": "无法访问"
+      },
+      "inInventory": "清单中的证书",
+      "inDays_one": "{{count}} 天后",
+      "inDays_other": "{{count}} 天后",
+      "extensions": "扩展",
+      "remove": "删除已发现证书",
+      "purged": "已删除已发现证书"
+    },
+    "runs": {
+      "title": "运行历史",
+      "unit_one": "{{count}} 次运行",
+      "unit_other": "{{count}} 次运行",
+      "range_one": "{{shown}} / {{count}} 次运行",
+      "range_other": "{{shown}} / {{count}} 次运行",
+      "intent": "每次分析或快速扫描的运行记录，最新的在前。",
+      "caption": "运行记录。激活名称以打开其详情。",
+      "summary": "{{targets}} 个目标上的 {{count}} 个证书",
+      "new": "新增",
+      "changed": "已变更",
+      "trigger": "触发方式",
+      "by": {
+        "manual": "手动",
+        "scheduled": "计划"
+      },
+      "state": {
+        "running": "进行中",
+        "completed": "已完成",
+        "failed": "失败"
+      }
+    },
+    "form": {
+      "range": "范围",
+      "rangeHint": "每行一个主机名、地址或 IPv4 范围，例如 192.0.2.0/24；可附加端口，如 mail.example.com:465。",
+      "nameRequired": "请为分析命名。",
+      "targetsRequired": "请至少提供一个主机、地址或范围。",
+      "problem": {
+        "wildcard": "{{target}}：DNS 通配符不指向任何主机，请列出具体主机。",
+        "ipv6Range": "{{target}}：不扫描 IPv6 范围，请列出具体地址。",
+        "tooWide": "{{target}}：该范围超过 {{max}} 台主机。",
+        "format": "{{target}}：不是主机名、地址或范围。"
+      },
+      "preset": "常用端口",
+      "presetOther": "手动输入的端口",
+      "presets": {
+        "https": "HTTPS (443)",
+        "alt": "HTTPS 和 8443",
+        "common": "所有常用 TLS 端口"
+      },
+      "every": {
+        "0": "仅手动",
+        "60": "每小时",
+        "360": "每 6 小时",
+        "720": "每 12 小时",
+        "1440": "每天",
+        "10080": "每周"
+      },
+      "timeoutHint": "每个连接的秒数，1 到 30。",
+      "workersHint": "同时连接数，1 到 50。"
+    }
   },
   "compliance": {
     "title": "合规评分",

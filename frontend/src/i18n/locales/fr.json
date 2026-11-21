@@ -6555,7 +6555,114 @@
     "helpExport": "Exportez les certificats découverts en CSV ou JSON. Appliquez d’abord les filtres pour n’exporter que le sous-ensemble nécessaire.",
     "helpExportTitle": "Exporter les Résultats",
     "helpSecurity": "Le Discovery bloque les adresses internes/bouclage pour la protection SSRF. Les cibles sont validées avant le scan. Toutes les actions sont journalisées.",
-    "helpSecurityTitle": "Sécurité"
+    "helpSecurityTitle": "Sécurité",
+    "quickScanAsk": "Analyse rapide…",
+    "views": {
+      "profiles": "Analyses",
+      "discovered": "Certificats trouvés",
+      "history": "Historique des analyses"
+    },
+    "scans": {
+      "title": "Analyses",
+      "unit_one": "{{count}} analyse",
+      "unit_other": "{{count}} analyses",
+      "range_one": "{{shown}} sur {{count}} analyse",
+      "range_other": "{{shown}} sur {{count}} analyses",
+      "caption": "Analyses du réseau. Activez un nom pour ouvrir son détail.",
+      "create": "Nouvelle analyse…",
+      "found": "Trouvés",
+      "foundNew": "{{count}}, dont {{fresh}} nouveaux",
+      "last": "Dernière analyse",
+      "next": "Prochaine analyse",
+      "notScanned": "Non analysé",
+      "interrupted": "Interrompue",
+      "plannedOn": "Planifiée le {{date}}",
+      "state": {
+        "running": "En cours",
+        "done": "Terminée",
+        "failed": "En échec",
+        "scheduled": "Planifiée",
+        "never": "Jamais lancée"
+      },
+      "noDescription": "Aucune description.",
+      "runsTab": "Exécutions",
+      "runNow": "Analyser maintenant",
+      "remove": "Supprimer l’analyse",
+      "removeText": "L’analyse et sa planification sont supprimées. Les certificats qu’elle a trouvés restent dans les certificats trouvés.",
+      "empty": "Aucune analyse du réseau",
+      "emptyText": "Une analyse recense les certificats exposés sur une plage d’adresses, par exemple 192.0.2.0/24, pour les rattacher à l’inventaire.",
+      "progress": "Analyse en cours : {{scanned}} cibles sur {{total}}, {{found}} certificats trouvés."
+    },
+    "found": {
+      "title": "Certificats trouvés",
+      "unit_one": "{{count}} certificat",
+      "unit_other": "{{count}} certificats",
+      "range": "{{start}}–{{end}} sur {{count}}",
+      "intent": "Les certificats rencontrés sur le réseau par les analyses, rapprochés de l’inventaire.",
+      "caption": "Certificats trouvés. Activez un nom pour ouvrir son détail.",
+      "state": {
+        "managed": "Dans UCM",
+        "unmanaged": "Inconnu d’UCM",
+        "error": "Injoignable"
+      },
+      "inInventory": "Dans l’inventaire",
+      "inDays_one": "dans {{count}} jour",
+      "inDays_other": "dans {{count}} jours",
+      "extensions": "Extensions",
+      "remove": "Supprimer le certificat trouvé",
+      "purged": "Certificats trouvés supprimés"
+    },
+    "runs": {
+      "title": "Historique des analyses",
+      "unit_one": "{{count}} exécution",
+      "unit_other": "{{count}} exécutions",
+      "range_one": "{{shown}} sur {{count}} exécution",
+      "range_other": "{{shown}} sur {{count}} exécutions",
+      "intent": "Chaque exécution d’une analyse ou d’une analyse rapide, de la plus récente à la plus ancienne.",
+      "caption": "Exécutions. Activez un nom pour ouvrir son détail.",
+      "summary": "{{count}} certificats sur {{targets}} cibles",
+      "new": "Nouveaux",
+      "changed": "Modifiés",
+      "trigger": "Lancée par",
+      "by": {
+        "manual": "Manuelle",
+        "scheduled": "Planification"
+      },
+      "state": {
+        "running": "En cours",
+        "completed": "Terminée",
+        "failed": "En échec"
+      }
+    },
+    "form": {
+      "range": "Plage",
+      "rangeHint": "Un nom d’hôte, une adresse ou une plage IPv4 par ligne, par exemple 192.0.2.0/24 ; un port peut suivre, comme mail.example.com:465.",
+      "nameRequired": "Nommez l’analyse.",
+      "targetsRequired": "Indiquez au moins un hôte, une adresse ou une plage.",
+      "problem": {
+        "wildcard": "{{target}} : un joker DNS ne nomme aucun hôte ; indiquez les hôtes.",
+        "ipv6Range": "{{target}} : les plages IPv6 ne sont pas analysées ; indiquez les adresses.",
+        "tooWide": "{{target}} : la plage compte plus de {{max}} hôtes.",
+        "format": "{{target}} : ni un nom d’hôte, ni une adresse, ni une plage."
+      },
+      "preset": "Ports courants",
+      "presetOther": "Ports saisis",
+      "presets": {
+        "https": "HTTPS (443)",
+        "alt": "HTTPS et 8443",
+        "common": "Tous les ports TLS courants"
+      },
+      "every": {
+        "0": "Manuelle seulement",
+        "60": "Toutes les heures",
+        "360": "Toutes les 6 heures",
+        "720": "Toutes les 12 heures",
+        "1440": "Tous les jours",
+        "10080": "Toutes les semaines"
+      },
+      "timeoutHint": "Secondes par connexion, de 1 à 30.",
+      "workersHint": "Connexions simultanées, de 1 à 50."
+    }
   },
   "compliance": {
     "title": "Score de conformité",

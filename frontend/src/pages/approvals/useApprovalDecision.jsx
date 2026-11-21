@@ -5,7 +5,7 @@
  * each case (issued, revoked, deferred to the client, closed, failed) and opens what it
  * issued; several end on one message, or on a line-by-line outcome when one failed.
  */
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AtelierDialog, Btn, Icon } from '../../components/atelier'
 import { BulkOutcome, runEach } from '../../components/work'
@@ -50,7 +50,10 @@ export function useApprovalDecision({ onDone, refocus } = {}) {
   const close = () => { setAsk(null); setOutcome(null); setComment('') }
   // Leaving without deciding: the dialog gives the focus back to its opener; after a decision, to the
   // queue (the action of the row now at the same place), once the dialog's own return has run
-  const settle = () => requestAnimationFrame(() => requestAnimationFrame(() => (refocus ? refocus() : undefined)))
+  // The queue's focus once the dialog's own return ran; dropped if the page went away meanwhile
+  const frame = useRef(0)
+  useEffect(() => () => cancelAnimationFrame(frame.current), [])
+  const settle = () => { frame.current = requestAnimationFrame(() => { frame.current = requestAnimationFrame(() => refocus?.()) }) }
   const dismiss = () => {
     const decided = !!outcome
     close()

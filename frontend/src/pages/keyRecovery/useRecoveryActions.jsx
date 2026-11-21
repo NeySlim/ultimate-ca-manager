@@ -5,7 +5,7 @@
  * password-protected PKCS#12 download, one request at a time. Several decisions end on
  * one message, or on a line-by-line outcome when one failed.
  */
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AtelierDialog, Btn, Icon } from '../../components/atelier'
 import { BulkOutcome, runEach } from '../../components/work'
@@ -37,7 +37,10 @@ export function useRecoveryActions({ onDone, refocus } = {}) {
   const close = () => { setAsk(null); setOutcome(null); setPassword(''); setNote('') }
   // Leaving without acting: the dialog gives the focus back to its opener; after an action, to the
   // queue (the row now at the same place), once the dialog's own return has run
-  const settle = () => requestAnimationFrame(() => requestAnimationFrame(() => (refocus ? refocus() : undefined)))
+  // The queue's focus once the dialog's own return ran; dropped if the page went away meanwhile
+  const frame = useRef(0)
+  useEffect(() => () => cancelAnimationFrame(frame.current), [])
+  const settle = () => { frame.current = requestAnimationFrame(() => { frame.current = requestAnimationFrame(() => refocus?.()) }) }
   const dismiss = () => {
     const acted = !!outcome
     close()
