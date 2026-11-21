@@ -483,6 +483,8 @@
     "searchLabel": "Найти команду или сертификат",
     "subtitle": "Сертификаты, центры сертификации и навигация по консоли",
     "noCommandsFound": "Команды не найдены",
+    "acmeAccount": "Учётная запись ACME",
+    "scepProfile": "Профиль SCEP",
     "favorites": "Избранное",
     "recent": "Недавние",
     "searchSections": {
@@ -7793,7 +7795,12 @@
       "crlOcsp": "Перейти к CRL/OCSP",
       "msca": "Перейти к MS CA",
       "sshCas": "ЦС SSH",
-      "sshCertificates": "Сертификаты SSH"
+      "sshCertificates": "Сертификаты SSH",
+      "trustStore": "Перейти к хранилищу доверия",
+      "userCertificates": "Перейти к сертификатам пользователей",
+      "tsa": "Перейти к TSA",
+      "keyRecovery": "Перейти к восстановлению ключей",
+      "logs": "Перейти к системным журналам"
     },
     "actions": {
       "newCertificate": "Выпустить новый сертификат",

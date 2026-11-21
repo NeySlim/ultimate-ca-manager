@@ -11,11 +11,16 @@ import { AtelierDialog } from './atelier/AtelierDialog'
 import { Icon } from './atelier/Icon'
 import { useAllRecentHistory, useAllFavorites } from '../hooks'
 import { searchService } from '../services'
-import { glyphOf, moduleForPath, paletteCommands } from '../navigation/registry'
+import { glyphOf, moduleById, moduleForPath, paletteCommands } from '../navigation/registry'
 
-const COMMANDS = paletteCommands()
+// ACME accounts and SCEP profiles found by the search: [result group, hint, page, glyph]
+const PROTOCOL_OBJECTS = [
+  ['acme_accounts', 'commandPalette.acmeAccount', moduleById('acme').path, glyphOf(moduleById('acme'))],
+  ['scep_profiles', 'commandPalette.scepProfile', moduleById('scep').path, glyphOf(moduleById('scep'))],
+]
 
-export function CommandPalette({ open, onOpenChange }) {
+/** `can` ({ isAdmin, hasPermission }) keeps the pages and actions the account may open; omitted, all of them. */
+export function CommandPalette({ open, onOpenChange, can }) {
   const navigate = useNavigate()
   const openInInspector = useOpenEntity()
   // The control focused before the palette opened, and whether the palette handed over to the inspector
@@ -117,16 +122,13 @@ export function CommandPalette({ open, onOpenChange }) {
     }
   }, [open, refreshHistory, refreshFavorites])
 
-  // Filter commands based on search - all commands now available
-  const filteredCommands = useMemo(() => {
-    if (!search) return COMMANDS
-    
-    const lower = search.toLowerCase()
-    return COMMANDS.filter(cmd => 
-      t(cmd.labelKey).toLowerCase().includes(lower) ||
-      t(cmd.categoryKey).toLowerCase().includes(lower)
-    )
-  }, [search, t])
+  // The pages and actions the account may open (a few dozen entries, listed again on each render)
+  const commands = paletteCommands(can)
+  const lower = search.toLowerCase()
+  const filteredCommands = !search ? commands : commands.filter(cmd =>
+    t(cmd.labelKey).toLowerCase().includes(lower) ||
+    t(cmd.categoryKey).toLowerCase().includes(lower)
+  )
   
   // Filter recent items based on search
   const filteredRecent = useMemo(() => {
@@ -179,6 +181,11 @@ export function CommandPalette({ open, onOpenChange }) {
     ...SEARCHED.flatMap(([key, type, hint]) => (searchResults?.[key] || []).map(item => ({
       key: `${type}-${item.id}`, icon: getTypeIcon(type), name: item.name, hint: hint(item) || t(`commandPalette.searchSections.${key === 'cas' ? 'certificateAuthorities' : key}`),
       run: () => openItem(type, item.id),
+    }))),
+    // The mockup's module objects (M:741): named by their type, opened in their page's dock (`?item=`)
+    ...PROTOCOL_OBJECTS.flatMap(([key, hint, path, glyph]) => (searchResults?.[key] || []).map(item => ({
+      key: `${key}-${item.id}`, icon: glyph, name: item.name, hint: t(hint),
+      run: () => { onOpenChange(false); navigate(`${path}?item=${encodeURIComponent(item.id)}`) },
     }))),
     ...filteredFavorites.map(item => ({
       key: `fav-${item.type}-${item.id}`, icon: getTypeIcon(item.type), name: item.name, hint: item.subtitle || t('commandPalette.favorites'),

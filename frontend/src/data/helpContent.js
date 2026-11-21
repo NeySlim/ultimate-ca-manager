@@ -65,7 +65,7 @@ export const helpContent = {
         title: 'Search and shortcuts',
         icon: Stack,
         items: [
-          { label: 'Search', text: 'Press Ctrl K (Cmd K on macOS) or select the search field to jump to a page or find a certificate. Down Arrow moves from the field to the results, Up Arrow from the first result back to the field, and Enter in the field opens the first result' },
+          { label: 'Search', text: 'Press Ctrl K (Cmd K on macOS) or select the search field to jump to any page of the menu you may open, run an action (Issue New Certificate opens its form), or find a certificate, an authority, a user, a template, an ACME account or a SCEP profile. Down Arrow moves from the field to the results, Up Arrow from the first result back to the field, and Enter in the field opens the first result' },
           { label: 'Help', text: 'Press ? outside a text field to open the help of the current page' },
           { label: 'Phone width', text: 'The top bar shows a single list of pages instead of the links and the menu' },
         ]

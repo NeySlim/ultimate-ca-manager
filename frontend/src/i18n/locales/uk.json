@@ -483,6 +483,8 @@
     "searchLabel": "Search for a command or a certificate",
     "subtitle": "Certificates, authorities and console navigation",
     "noCommandsFound": "Команди не знайдено",
+    "acmeAccount": "ACME account",
+    "scepProfile": "SCEP profile",
     "favorites": "Обрані",
     "recent": "Останні",
     "searchSections": {
@@ -7790,7 +7792,12 @@
       "crlOcsp": "Перейти до CRL/OCSP",
       "msca": "Перейти до MS CA",
       "sshCas": "SSH ЦС",
-      "sshCertificates": "SSH-сертифікати"
+      "sshCertificates": "SSH-сертифікати",
+      "trustStore": "Go to Trust Store",
+      "userCertificates": "Go to User Certificates",
+      "tsa": "Go to TSA",
+      "keyRecovery": "Go to Key Recovery",
+      "logs": "Go to System Logs"
     },
     "actions": {
       "newCertificate": "Видати новий сертифікат",

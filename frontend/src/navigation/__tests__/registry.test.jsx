@@ -317,15 +317,38 @@ describe('moduleForPath', () => {
 })
 
 describe('palette', () => {
-  it('offers the same commands, in the same order, as before the registry', () => {
+  it('offers every page of the menu, then the actions (M:1305)', () => {
     expect(paletteCommands().map(c => `${c.id} ${c.path}`)).toEqual([
       'dashboard /', 'certificates /certificates', 'cas /cas', 'csrs /csrs', 'templates /templates',
-      'users /users', 'acme /acme', 'scep /scep-config', 'est /est-config', 'import /operations',
-      'tools /tools', 'audit /audit', 'settings /settings', 'account /account', 'groups /users?tab=groups',
-      'rbac /rbac', 'sso /sso', 'hsm /hsm', 'policies /policies', 'approvals /approvals', 'reports /reports',
+      'truststore /truststore', 'user-certificates /user-certificates',
+      'users /users', 'acme /acme', 'scep /scep-config', 'est /est-config', 'tsa /tsa-config', 'crl-ocsp /crl-ocsp',
+      'import /operations', 'tools /tools', 'audit /audit', 'logs /logs', 'settings /settings', 'account /account',
+      'groups /users?tab=groups', 'rbac /rbac', 'sso /sso', 'hsm /hsm', 'policies /policies', 'approvals /approvals',
+      'keyRecovery /key-recovery', 'reports /reports', 'discovery /discovery',
       'ssh-cas /ssh/cas', 'ssh-certificates /ssh/certificates',
-      'new-cert /certificates', 'new-ca /cas', 'upload-csr /csrs',
+      'new-cert /certificates?action=create', 'new-ca /cas?action=create', 'upload-csr /csrs?action=upload',
     ])
     expect(paletteCommands().filter(c => c.pro).map(c => c.id)).toEqual(['rbac', 'sso', 'hsm'])
+  })
+
+  it('every page of the Modules menu and of the bar is in the palette', () => {
+    const listed = new Set(paletteCommands().map(c => c.path.split('?')[0]))
+    for (const m of MODULES.filter(m => m.group || MAIN_IDS.includes(m.id))) expect(listed.has(m.path), m.id).toBe(true)
+  })
+
+  it('lists only the pages and actions the account may use, as the Modules menu does', () => {
+    const ids = (can) => paletteCommands(can).map(c => c.id)
+    const viewer = makeCan(['read:certificates', 'read:cas', 'read:csrs', 'read:templates', 'read:truststore'])
+    expect(ids(viewer)).toEqual([
+      'dashboard', 'certificates', 'cas', 'csrs', 'templates', 'truststore', 'tools', 'account', 'discovery',
+    ])
+    expect(ids(makeCan(['read:certificates', 'write:certificates', 'read:acme']))).toEqual(
+      expect.arrayContaining(['acme', 'discovery', 'new-cert']))
+    expect(ids(makeCan(['read:certificates', 'write:certificates']))).not.toContain('new-ca')
+    expect(ids(makeCan(['read:csrs', 'write:csrs']))).toContain('upload-csr')
+    // The admin-only pages and their aliases (groups, SSO) go with the admin guard
+    expect(ids(makeCan(['read:certificates']))).not.toEqual(expect.arrayContaining(['logs']))
+    expect(ids(makeCan(['read:certificates'])).some(id => ['groups', 'sso', 'logs', 'users'].includes(id))).toBe(false)
+    expect(ids(adminCan)).toEqual(ids())
   })
 })

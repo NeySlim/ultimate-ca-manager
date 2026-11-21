@@ -481,6 +481,8 @@
     "searchLabel": "Search for a command or a certificate",
     "subtitle": "Certificates, authorities and console navigation",
     "noCommandsFound": "Nessun comando trovato",
+    "acmeAccount": "ACME account",
+    "scepProfile": "SCEP profile",
     "favorites": "Preferiti",
     "recent": "Recenti",
     "searchSections": {
@@ -7492,7 +7494,12 @@
       "crlOcsp": "Vai a CRL/OCSP",
       "msca": "Vai a MS CA",
       "sshCas": "CA SSH",
-      "sshCertificates": "Certificati SSH"
+      "sshCertificates": "Certificati SSH",
+      "trustStore": "Go to Trust Store",
+      "userCertificates": "Go to User Certificates",
+      "tsa": "Go to TSA",
+      "keyRecovery": "Go to Key Recovery",
+      "logs": "Go to System Logs"
     },
     "actions": {
       "newCertificate": "Emetti nuovo certificato",

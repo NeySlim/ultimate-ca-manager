@@ -16,7 +16,7 @@ export default {
       {
         title: 'Recherche et raccourcis',
         items: [
-          { label: 'Recherche', text: 'Appuyez sur Ctrl K (Cmd K sur macOS) ou sélectionnez le champ de recherche pour aller à une page ou trouver un certificat. Flèche bas passe du champ aux résultats, Flèche haut ramène du premier résultat au champ, et Entrée dans le champ ouvre le premier résultat' },
+          { label: 'Recherche', text: 'Appuyez sur Ctrl K (Cmd K sur macOS) ou sélectionnez le champ de recherche pour aller à toute page du menu que vous pouvez ouvrir, lancer une action (Émettre un certificat ouvre son formulaire) ou trouver un certificat, une AC, un utilisateur, un modèle, un compte ACME ou un profil SCEP. Flèche bas passe du champ aux résultats, Flèche haut ramène du premier résultat au champ, et Entrée dans le champ ouvre le premier résultat' },
           { label: 'Aide', text: 'Appuyez sur ? hors d’un champ de texte pour ouvrir l’aide de la page courante' },
           { label: 'Largeur téléphone', text: 'La barre supérieure affiche une seule liste de pages au lieu des liens et du menu' },
         ]

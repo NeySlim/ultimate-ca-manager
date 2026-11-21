@@ -3340,6 +3340,8 @@
     "searchLabel": "Rechercher une commande ou un certificat",
     "subtitle": "Certificats, autorités et navigation de la console",
     "noCommandsFound": "Aucun résultat. Essayez un nom de certificat ou de page.",
+    "acmeAccount": "Compte ACME",
+    "scepProfile": "Profil SCEP",
     "favorites": "Favoris",
     "recent": "Récents",
     "searchSections": {
@@ -7495,7 +7497,12 @@
       "crlOcsp": "Aller à CRL/OCSP",
       "msca": "Aller à l’AC Microsoft",
       "sshCas": "AC SSH",
-      "sshCertificates": "Certificats SSH"
+      "sshCertificates": "Certificats SSH",
+      "trustStore": "Aller au magasin de confiance",
+      "userCertificates": "Aller aux certificats utilisateur",
+      "tsa": "Aller à TSA",
+      "keyRecovery": "Aller à la récupération de clés",
+      "logs": "Aller aux journaux système"
     },
     "actions": {
       "newCertificate": "Émettre un nouveau certificat",

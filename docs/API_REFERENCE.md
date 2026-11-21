@@ -4040,11 +4040,15 @@ GET /api/v2/search?q=example.com&limit=20
   "data": {
     "certificates": [...],
     "cas": [...],
-    "csrs": [...],
-    "users": [...]
+    "users": [...],
+    "templates": [...],
+    "acme_accounts": [...],
+    "scep_profiles": [...]
   }
 }
 ```
+
+`users` needs `read:users`, `acme_accounts` (matched on contact and account ID, named by the first contact) needs `read:acme`, and `scep_profiles` (matched on name, URL path and description) needs `read:scep`; without the permission the group is empty.
 
 ---
 

@@ -172,6 +172,7 @@ export function AppShell() {
       <CommandPalette
         open={commandPaletteOpen}
         onOpenChange={setPalette}
+        can={can}
       />
 
       {/* Help Panel (floating desktop / bottom sheet mobile) */}
