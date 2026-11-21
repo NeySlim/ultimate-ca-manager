@@ -393,7 +393,7 @@ Star ⭐ important certificates to bookmark them. Favorites are listed in the co
 
 ## Comparing Certificates
 
-Tick two certificates in the list and click **Compare** in the selection bar to see a side-by-side diff of their Subject, SANs, Key Usage, validity, and extensions. With one certificate ticked, the dialog lets you choose the other.
+Tick two certificates in the list and click **Compare** in the selection bar to see them side by side: state, description, authority, key algorithm, expiry, source, template, alternative names and whether UCM holds the private key, the rows that differ highlighted.
 
 ## Filtering & Search
 
@@ -401,7 +401,9 @@ Tick two certificates in the list and click **Compare** in the selection bar to 
 - **CA filter**: Show certificates from a specific CA
 - **Source filter**: Filter by how the certificate entered UCM (issued, imported, ACME, SCEP, etc.)
 - **Template filter**: Find certificates **modified from template**: issued from a template but with the key type or validity explicitly overridden at request time. The divergent fields are listed on the certificate detail; the record is frozen at issuance
-- **Text search**: Search by subject, issuer, display name or serial number (SANs are not searched)
+- **Text search**: Search by subject, issuer, display name or serial number (SANs are not searched); the search runs once you stop typing and says how many results it found
+- **Saved filters**: the filter button at the end of the toolbar saves the search, the state and the filters under a name in this browser, and applies a saved set again
+- **Export the list**: the export button of the toolbar exports every result, the selection bar's **Export…** the ticked certificates: in PEM, or their metadata in CSV or JSON. Once the whole page is ticked, **Select all N results** extends the selection to every result
 - **Sorting**: By name, expiry date, creation date, status
 - **Columns**: Common name, description, state, issuer, source, expiry and key algorithm by default; the **Columns** button adds the compliance grade, the hybrid link and the creation date
 - **Row actions**: Export on the row; the other actions in the inspector a click on the row opens: Export and Renew in its heading, Rename, Revoke, Delete and the rest in its ⋯ menu

@@ -150,7 +150,7 @@ test('a phone reads the whole page name in the picker, keeps 44 px targets and s
 test('offline, the banner says so and the write buttons wait for the network', async ({ page, context, api }) => {
   await page.setViewportSize({ width: 1600, height: 1000 })
   await page.goto('/certificates')
-  const issue = page.locator('.lv-head .lv-btn.is-primary')
+  const issue = page.locator('.atl .page-head .btn.primary')
   await expect(issue).toBeEnabled()
   await context.setOffline(true)
   try {

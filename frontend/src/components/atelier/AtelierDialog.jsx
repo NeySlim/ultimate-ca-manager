@@ -10,13 +10,17 @@ import { useTranslation } from 'react-i18next'
 import { Icon } from './Icon'
 import { AtlScopeContext } from './scope'
 import { escapeYielded } from '../list/dialogEscape'
-import '../../styles/atelier/scope.css'
-import '../../styles/atelier/maquette.css'
-import '../../styles/atelier/extensions.css'
+
+// Outside a zone the stylesheets come on demand: imported statically here they would join the
+// shell's own sheet, ahead of its global rules, and lose to them (scope.css reverts at zero weight)
+const loadSheets = () => Promise.all([
+  import('../../styles/atelier/scope.css'), import('../../styles/atelier/maquette.css'), import('../../styles/atelier/extensions.css'),
+])
 
 export function AtelierDialog(props) {
   // Outside a zone (a dialog of the shell's inspector), the dialog carries the zone's scope itself
   const inZone = useContext(AtlScopeContext)
+  useEffect(() => { if (!inZone) loadSheets().catch(() => {}) }, [inZone])
   if (inZone) return <ModalDialog {...props} />
   return <div className="atl atl-island"><AtlScopeContext.Provider value><ModalDialog {...props} /></AtlScopeContext.Provider></div>
 }

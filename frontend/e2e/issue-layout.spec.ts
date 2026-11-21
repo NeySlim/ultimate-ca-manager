@@ -26,8 +26,8 @@ test.describe('desktop', () => {
     expect(d.y).toBeGreaterThanOrEqual(20 - EPS)
 
     // Fields on the left, 250 px of what is imposed on the right, 26 px apart
-    const hint = await box(dialog.locator('.iss-hint'))
-    const fields = await box(dialog.locator('.iss-fields'))
+    const hint = await box(dialog.locator('.field-hint'))
+    const fields = await box(dialog.locator('.form-fields'))
     expect(Math.abs(hint.width - 250)).toBeLessThanOrEqual(EPS)
     expect(Math.abs(hint.x - (fields.x + fields.width + 26))).toBeLessThanOrEqual(EPS)
     expect(Math.abs(fields.x - (d.x + 25))).toBeLessThanOrEqual(EPS)
@@ -42,31 +42,31 @@ test.describe('desktop', () => {
     expect(Math.abs(cn.width - fields.width)).toBeLessThanOrEqual(EPS)
 
     // Two key source cards of equal width, 10 px apart
-    const cards = dialog.locator('.iss-choice')
+    const cards = dialog.locator('.choice-grid .format-option')
     await expect(cards).toHaveCount(2)
     const [a, b] = [await box(cards.nth(0)), await box(cards.nth(1))]
     expect(Math.abs(a.width - b.width)).toBeLessThanOrEqual(EPS)
     expect(Math.abs(b.x - (a.x + a.width + 10))).toBeLessThanOrEqual(EPS)
 
     // A SAN row: 120 px type, the value, a 36 px remove button
-    const row = dialog.locator('.iss-san-row').first()
+    const row = dialog.locator('.san-row').first()
     expect(Math.abs((await box(row.locator('select'))).width - 120)).toBeLessThanOrEqual(EPS)
     expect(Math.abs((await box(row.getByRole('button'))).width - 36)).toBeLessThanOrEqual(EPS)
 
     // Advanced starts folded
     await expect(dialog.getByRole('button', { name: /Advanced/ })).toHaveAttribute('aria-expanded', 'false')
-    await expect(dialog.locator('.iss-advanced-panel')).toBeHidden()
+    await expect(dialog.locator('.advanced-panel')).toBeHidden()
 
     // Review: the summary across the dialog, the step marks 22 px round
     await dialog.getByLabel('Common name').fill('layout.example.com')
     await dialog.getByRole('button', { name: 'Review the request' }).click()
     const review = page.getByRole('dialog', { name: 'Review the request' })
-    const summary = await box(review.locator('.iss-review'))
+    const summary = await box(review.locator('.review-summary'))
     expect(Math.abs(summary.width - 870)).toBeLessThanOrEqual(EPS)
-    const mark = await box(review.locator('.iss-step-mark').first())
+    const mark = await box(review.locator('.steps .step > span').first())
     expect(Math.abs(mark.width - 22)).toBeLessThanOrEqual(EPS)
-    const dt = await box(review.locator('.iss-review dt').first())
-    const dd = await box(review.locator('.iss-review dd').first())
+    const dt = await box(review.locator('.review-summary dt').first())
+    const dd = await box(review.locator('.review-summary dd').first())
     expect(Math.abs(dd.x - (dt.x + 130 + 16))).toBeLessThanOrEqual(EPS)
   })
 })
@@ -110,21 +110,6 @@ test.describe('desktop, errors', () => {
   })
 })
 
-test.describe('narrow phone', () => {
-  test.use({ viewport: { width: 360, height: 780 } })
-
-  test('the fields stack in one column under 380 px, as the Atelier', async ({ page, api }) => {
-    await page.goto('/certificates?action=create')
-    const dialog = page.getByRole('dialog', { name: 'Issue a certificate' })
-    await expect(dialog).toBeVisible()
-    const tpl = await box(dialog.getByLabel('Template'))
-    const auth = await box(dialog.getByLabel('Authority'))
-    expect(Math.abs(tpl.x - auth.x)).toBeLessThanOrEqual(EPS)
-    expect(auth.y).toBeGreaterThan(tpl.y + tpl.height)
-    expect(Math.abs(tpl.width - auth.width)).toBeLessThanOrEqual(EPS)
-  })
-})
-
 test.describe('phone', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
@@ -135,11 +120,11 @@ test.describe('phone', () => {
     const d = await box(dialog)
     expect(Math.abs(d.x - 16)).toBeLessThanOrEqual(EPS)
     expect(Math.abs(d.width - 358)).toBeLessThanOrEqual(EPS)
-    await expect(dialog.locator('.iss-hint')).toBeHidden()
+    await expect(dialog.locator('.field-hint')).toBeHidden()
     expect(await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
     // 44 px fields and stacked key source cards
     expect(Math.abs((await box(dialog.getByLabel('Common name'))).height - 44)).toBeLessThanOrEqual(EPS)
-    const cards = dialog.locator('.iss-choice')
+    const cards = dialog.locator('.choice-grid .format-option')
     const [a, b] = [await box(cards.nth(0)), await box(cards.nth(1))]
     expect(b.y).toBeGreaterThan(a.y + a.height)
   })

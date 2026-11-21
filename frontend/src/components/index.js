@@ -70,7 +70,6 @@ export {
 // Certificate Details (reusable)
 export { CertificatePanel } from './detail/CertificatePanel'
 export { CertificateExtensions, SubjectAltNames } from './detail/CertificateExtensions'
-export { CertificateCompareModal } from './CertificateCompareModal'
 export { CertificateLintModal } from './CertificateLintModal'
 export { KeyRecoveryRequestModal } from './KeyRecoveryRequestModal'
 export { TemplatePreviewModal } from './TemplatePreviewModal'

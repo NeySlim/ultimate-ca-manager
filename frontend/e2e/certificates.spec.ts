@@ -12,7 +12,8 @@ async function openInInspector(page, cn: string) {
   await page.getByRole('main').getByRole('searchbox').fill(cn)
   // The name is the button that opens the row; the row's other controls carry the name too
   await page.getByRole('main').getByRole('button', { name: cn, exact: true }).click()
-  const panel = page.getByRole('tabpanel', { name: cn })
+  // The zone's inspector (the mockup's #inspector): its heading names the certificate
+  const panel = page.locator('#inspector')
   await expect(panel.getByRole('heading', { name: cn })).toBeVisible()
   return panel
 }

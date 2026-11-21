@@ -4,7 +4,7 @@
  * A form closed without issuing keeps its draft for the next opening of the same operation.
  */
 import { Fragment, useState, useEffect, useMemo, useRef, useId } from 'react'
-import { Icon } from '../../components/atelier'
+import { Icon } from '../../components/atelier/Icon'
 import { templatesService, ekuService, toolsService } from '../../services'
 import { getSanValidationError, getAutoSansFromCn } from '../../lib/sanValidate'
 import { hiddenFromIssuance, listedForIssuance, signingCas, unlistedSigningCas } from '../../lib/caSelection'

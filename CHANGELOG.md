@@ -92,6 +92,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- **The Certificates page is the Atelier one.** The list, its inspector, the actions menu, the issue form and the export, revocation and comparison dialogs are drawn as the mockup draws them; the export of the list and of a selection offers the certificates in PEM or their metadata in CSV or JSON, every result once the whole page is ticked, and the saved filters sit behind a toolbar button.
 - **The Activity page is the Atelier journal.** The audit log shows the mockup's toolbar, summary, rows and entry detail, with the operation type as a filter, the dates, user, result, action codes and saved filters under Filters, CSV or JSON export under Export the log, and the integrity check and clean-up in its « ⋯ » menu. Its rows keep the mockup's height: the density switch is gone.
 - **Tables give their room to the long columns, and a phone shows cards.** Short columns (time, user, result, state, dates, counts, actions) take the width of their content in the Activity journal, the scheduler and the tables of the module pages, the free-text columns sharing the rest. On a phone the Activity journal and the CA list show one card per entry, opened by a tap anywhere on it, its chevron on screen; the journal no longer scrolls sideways.
 - **The Activity journal's times use the mockup's Fira Code face.** Its monospaced cells fell back to the browser's own monospace font.
