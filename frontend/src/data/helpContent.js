@@ -1033,9 +1033,9 @@ export const helpContent = {
         icon: Key,
         items: [
           { label: 'Create Role', text: 'Define a new role with a name and description' },
-          { label: 'Permission Matrix', text: 'Check/uncheck permissions by category (CAs, Certs, Private Keys, etc.)' },
-          { label: 'Coverage', text: 'A bar and an n/N count of the permissions granted to the role' },
-          { label: 'User Count', text: 'See how many users are assigned to each role' },
+          { label: 'Permission Matrix', text: 'The Permissions tab of a custom role lists each resource with its actions as check boxes; the box of a resource grants or removes all of them, and Save changes records the role' },
+          { label: 'Coverage', text: 'The Overview tab gives the n/N count of the permissions granted to the role' },
+          { label: 'User Count', text: 'The Users column gives the accounts holding each role; the System and Custom chips above the list narrow it' },
           { label: 'System role permissions', text: 'A system role shows the permissions UCM applies to it; Admin shows every permission of the matrix' },
           { label: 'SSH CA permissions (v2.248)', text: 'read:ssh_cas, write:ssh_cas and delete:ssh_cas govern SSH CAs, so write:ssh no longer creates or edits them. Roles, groups and API keys holding an SSH permission received the matching one on upgrade' },
         ]

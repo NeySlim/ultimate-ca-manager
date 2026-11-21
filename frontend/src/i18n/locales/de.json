@@ -4396,7 +4396,14 @@
       "delete:ssh_cas": "SSH-CAs löschen"
     },
     "ignoredPermissions": "Ignorierte Berechtigungen",
-    "ignoredPermissionsHint": "In dieser Rolle gespeichert, aber nicht angewendet: Administratoren vorbehalten oder unbekannt. Sie bleiben unverändert erhalten."
+    "ignoredPermissionsHint": "In dieser Rolle gespeichert, aber nicht angewendet: Administratoren vorbehalten oder unbekannt. Sie bleiben unverändert erhalten.",
+    "unit_one": "{{count}} role",
+    "unit_other": "{{count}} roles",
+    "range_one": "{{shown}} of {{count}} role",
+    "range_other": "{{shown}} of {{count}} roles",
+    "caption": "Roles. Activate a name to open its detail.",
+    "filterByType": "Filter by type",
+    "allOf": "All of {{name}}"
   },
   "hsm": {
     "statusUnavailable": "HSM-Funktionen sind nicht verfügbar",

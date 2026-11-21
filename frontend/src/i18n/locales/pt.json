@@ -4396,7 +4396,14 @@
       "delete:ssh_cas": "Excluir CAs SSH"
     },
     "ignoredPermissions": "Permissões ignoradas",
-    "ignoredPermissionsHint": "Armazenadas nesta função, mas não aplicadas: reservadas aos administradores ou desconhecidas. São mantidas como estão."
+    "ignoredPermissionsHint": "Armazenadas nesta função, mas não aplicadas: reservadas aos administradores ou desconhecidas. São mantidas como estão.",
+    "unit_one": "{{count}} role",
+    "unit_other": "{{count}} roles",
+    "range_one": "{{shown}} of {{count}} role",
+    "range_other": "{{shown}} of {{count}} roles",
+    "caption": "Roles. Activate a name to open its detail.",
+    "filterByType": "Filter by type",
+    "allOf": "All of {{name}}"
   },
   "hsm": {
     "statusUnavailable": "Funcionalidades HSM não estão disponíveis",

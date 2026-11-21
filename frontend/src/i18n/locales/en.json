@@ -4398,7 +4398,14 @@
       "delete:ssh_cas": "Delete SSH CAs"
     },
     "ignoredPermissions": "Ignored permissions",
-    "ignoredPermissionsHint": "Stored on this role but not applied: reserved for administrators or unknown. They are kept as they are."
+    "ignoredPermissionsHint": "Stored on this role but not applied: reserved for administrators or unknown. They are kept as they are.",
+    "unit_one": "{{count}} role",
+    "unit_other": "{{count}} roles",
+    "range_one": "{{shown}} of {{count}} role",
+    "range_other": "{{shown}} of {{count}} roles",
+    "caption": "Roles. Activate a name to open its detail.",
+    "filterByType": "Filter by type",
+    "allOf": "All of {{name}}"
   },
   "hsm": {
     "statusUnavailable": "HSM features are not available",

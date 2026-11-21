@@ -1,46 +1,55 @@
 /**
- * RBAC Management Page
- * Role-Based Access Control with custom roles and permissions
- * 
- * Migrated to ResponsiveLayout for consistent UX
+ * Roles: no screen of the mockup, drawn as its module list (the users module's frame): the roles
+ * with System and Custom chips, then a role's dock, its overview and its permissions, which a
+ * custom role edits as check boxes and a system role only reads. The creation form stays the
+ * product's dialog.
  */
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { 
-  Shield, Plus, Trash, Lock, CheckCircle, XCircle, Warning, UsersThree
-} from '@phosphor-icons/react'
+import { Input, FormModal, FormSelect } from '../components'
 import {
-  Badge, Button, Input, FormModal,
-  CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader,
-  FormSelect
-} from '../components'
-import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
-import { useNotification, useMobile } from '../contexts'
+  Zone, Icon, Btn, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody, Section, Props,
+  EmptyBlock, NoMatch, LoadError, LoadCause,
+} from '../components/atelier'
+import { useNotification } from '../contexts'
 import { useModals, usePersistedState } from '../hooks'
 import { rolesService } from '../services'
 import {
   groupPermissions, normalizePermissions, ignoredPermissions, appliedPermissions,
 } from '../lib/rbacPermissions'
 
+/** A resource's check box: checked when every action is, mixed when only some are. */
+function CategoryBox({ label, all, some, disabled, onChange }) {
+  const ref = useRef(null)
+  useEffect(() => { if (ref.current) ref.current.indeterminate = some && !all }, [some, all])
+  return (
+    <label className="checkbox-line">
+      <input ref={ref} type="checkbox" checked={all} disabled={disabled} onChange={onChange} />
+      <strong>{label}</strong>
+    </label>
+  )
+}
+
 export default function RBACPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { modals, open: openModal, close: closeModal } = useModals(['create'])
-  const { isMobile } = useMobile()
-  
+
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
   const [roles, setRoles] = useState([])
   // What a custom role may grant, as the server enforces it
   const [grantable, setGrantable] = useState([])
   const categories = useMemo(() => groupPermissions(grantable), [grantable])
-  const totalPermissions = grantable.length || 1
   const [selectedRole, setSelectedRole] = useState(null)
+  const [section, setSection] = useState('overview')
   // Legacy names normalised once, so toggles and display read the same list
   const selectRole = useCallback((role) => {
     setSelectedRole(role ? { ...role, permissions: normalizePermissions(role.permissions) } : null)
   }, [])
-  const [filterType, setFilterType] = usePersistedState('ucm-filter-rbac-type', [])
-  
+  const [kind, setKind] = usePersistedState('ucm-rbac-kind', '')
+  const [query, setQuery] = useState('')
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -49,17 +58,10 @@ export default function RBACPage() {
     is_system: false
   })
 
-  useEffect(() => {
-    loadRoles()
-  }, [])
-
-  const handleApplyFilterPreset = useCallback((filters) => {
-    if (filters.is_system) setFilterType(Array.isArray(filters.is_system) ? filters.is_system : [filters.is_system])
-    else setFilterType([])
-  }, [])
-
-  const loadRoles = async () => {
-    setLoading(true)
+  // The latest notifier, so a provider that renders a new one each time does not reload the roles
+  const notify = useRef(showError)
+  notify.current = showError
+  const loadRoles = useCallback(async () => {
     try {
       const [res, perms] = await Promise.all([
         rolesService.listRoles(),
@@ -67,12 +69,17 @@ export default function RBACPage() {
       ])
       setRoles(res.data || [])
       setGrantable(perms.data || [])
+      setLoadError(null)
     } catch (error) {
-      showError(t('messages.errors.loadFailed.roles'))
+      setLoadError(error)
+      notify.current(t('messages.errors.loadFailed.roles'))
     } finally {
       setLoading(false)
     }
-  }
+  }, [t])
+
+  // Loaded once on mount; later loads follow a change made here
+  useEffect(() => { loadRoles() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCreate = async () => {
     try {
@@ -137,338 +144,98 @@ export default function RBACPage() {
     setSelectedRole({ ...selectedRole, permissions: updated })
   }
 
-  // Table columns with icon-bg classes
-  const columns = [
-    {
-      key: 'name',
-      header: t('rbac.roleName'),
-      priority: 1,
-      sortable: true,
-      render: (val, row) => (
-        <div className="flex items-center gap-2">
-          <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-            row.is_system ? 'icon-bg-amber' : 'icon-bg-violet'
-          }`}>
-            {row.is_system ? <Lock size={14} weight="duotone" /> : <Shield size={14} weight="duotone" />}
-          </div>
-          <span className="font-medium truncate">{val}</span>
-        </div>
-      ),
-      mobileRender: (val, row) => (
-        <div className="flex items-center justify-between gap-2 w-full">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-              row.is_system ? 'icon-bg-amber' : 'icon-bg-violet'
-            }`}>
-              {row.is_system ? <Lock size={14} weight="duotone" /> : <Shield size={14} weight="duotone" />}
-            </div>
-            <span className="font-medium truncate">{val}</span>
-          </div>
-          <Badge variant={row.is_system ? 'warning' : 'success'} size="sm" dot>
-            {row.is_system ? t('common.system') : t('common.custom')}
-          </Badge>
-        </div>
-      )
-    },
-    {
-      key: 'is_system',
-      header: t('common.type'),
-      priority: 2,
-      sortable: true,
-      hideOnMobile: true,
-      render: (val) => (
-        <Badge variant={val ? 'warning' : 'success'} size="sm" dot>
-          {val ? t('common.system') : t('common.custom')}
-        </Badge>
-      )
-    },
-    {
-      key: 'inherits_from',
-      header: t('rbac.inherits'),
-      priority: 3,
-      hideOnMobile: true,
-      render: (val, row) => val ? (
-        <Badge variant="cyan" size="sm" icon={Shield}>
-          {row.parent_name || `#${val}`}
-        </Badge>
-      ) : (
-        <span className="text-text-tertiary text-xs">—</span>
-      )
-    },
-    {
-      key: 'permissions',
-      header: t('common.permissions'),
-      priority: 2,
-      hideOnMobile: true,
-      render: (val, row) => {
-        const permCount = row.all_permissions?.length ?? 0
-        const percentage = Math.round((permCount / totalPermissions) * 100)
-        return (
-          <div className="flex items-center gap-2">
-            <div className="w-16 h-1.5 bg-bg-tertiary rounded-full overflow-hidden">
-              <div className="h-full bg-accent-primary transition-all" style={{ width: `${percentage}%` }} />
-            </div>
-            <span className="text-xs text-text-secondary">{permCount}</span>
-          </div>
-        )
-      },
-      mobileRender: (val, row) => {
-        const permCount = row.all_permissions?.length ?? 0
-        return (
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-text-tertiary">{t('common.permissions')}:</span>
-            <span className="text-text-secondary">{permCount}</span>
-          </div>
-        )
-      }
-    },
-    {
-      key: 'user_count',
-      header: t('common.users'),
-      priority: 3,
-      hideOnMobile: true,
-      render: (val) => (
-        <Badge variant={val > 0 ? 'primary' : 'secondary'} size="sm">
-          {val || 0}
-        </Badge>
-      )
-    }
+  const typeOf = (r) => (r.is_system ? 'system' : 'custom')
+  const pill = (r) => <Pill label={t(r.is_system ? 'common.system' : 'common.custom')} tone={r.is_system ? 'muted' : 'good'} />
+  const searched = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return roles.filter((r) => !q || [r.name, r.description].some((v) => String(v || '').toLowerCase().includes(q)))
+  }, [roles, query])
+  const rows = searched.filter((r) => !kind || typeOf(r) === kind)
+  const views = [
+    { id: '', label: t('common.all'), count: searched.length },
+    { id: 'system', label: t('common.system'), count: searched.filter((r) => r.is_system).length },
+    { id: 'custom', label: t('common.custom'), count: searched.filter((r) => !r.is_system).length },
   ]
+  const narrowed = Boolean(query.trim() || kind)
+  const create = { label: t('rbac.createRole'), icon: 'plus', onClick: () => openModal('create'), primary: true }
+  const parentOf = (r) => (r.inherits_from ? (r.parent_name || `#${r.inherits_from}`) : '—')
 
-  const rowActions = (row) => row.is_system ? [] : [
-    { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDelete(row) }
-  ]
+  const role = selectedRole
+  const direct = role ? appliedPermissions(role.permissions, grantable) : []
+  const all = role ? (role.all_permissions || direct) : []
+  const ignored = role ? ignoredPermissions(role.permissions, grantable) : []
 
-  const stats = useMemo(() => {
-    const systemRoles = roles.filter(r => r.is_system).length
-    const customRoles = roles.filter(r => !r.is_system).length
-    // Every user holds exactly one built-in role, so system roles count each user once.
-    const totalUsers = roles.filter(r => r.is_system).reduce((acc, r) => acc + (r.user_count || 0), 0)
-    return [
-      { label: t('common.total'), value: roles.length, icon: Shield, variant: 'primary' },
-      { label: t('common.system'), value: systemRoles, icon: Lock, variant: 'warning' },
-      { label: t('common.custom'), value: customRoles, icon: Shield, variant: 'success' },
-      { label: t('common.users'), value: totalUsers, icon: UsersThree, variant: 'cyan' },
-    ]
-  }, [roles, t])
-
-  const filteredRoles = useMemo(() => {
-    if (filterType.length === 0) return roles
-    return roles.filter(r => {
-      const val = r.is_system ? 'true' : 'false'
-      return filterType.includes(val)
-    })
-  }, [roles, filterType])
-
-  // Help content
-  // Help content now provided via FloatingHelpPanel (helpPageKey="rbac")
-
-  // Details panel content
-  const renderDetails = (role) => (
-    <div className="p-3 space-y-3">
-      <CompactHeader
-        icon={role.is_system ? Lock : Shield}
-        iconClass={role.is_system ? 'icon-bg-amber' : 'icon-bg-violet'}
-        title={role.name}
-        subtitle={role.description || t('rbac.noDescription')}
-        badge={
-          <Badge variant={role.is_system ? 'secondary' : 'primary'} size="sm">
-            {role.is_system ? t('common.system') : t('common.custom')}
-          </Badge>
-        }
-      />
-
-      <CompactStats stats={[
-        { icon: CheckCircle, value: t('rbac.permissionCount', { count: appliedPermissions(role.permissions, grantable).length }) },
-        { icon: UsersThree, value: t('rbac.userCount', { count: role.user_count || 0 }) },
-      ]} />
-
-      {!role.is_system && (
-        <div className="flex gap-2">
-          <Button type="button" size="sm" className="flex-1" onClick={handleUpdate}>
-            <CheckCircle size={14} /> {t('common.saveChanges')}
-          </Button>
-          <Button type="button" size="sm" variant="danger" onClick={() => handleDelete(role)}>
-            <Trash size={14} />
-          </Button>
-        </div>
-      )}
-
-      {role.is_system && (
-        <div className="p-3 rounded-lg status-warning-bg status-warning-border border">
-          <div className="flex items-center gap-2 status-warning-text text-xs">
-            <Warning size={14} />
-            <span>{t('rbac.systemRoleWarning')}</span>
+  const dock = role && (
+    <Dock label={t('atelier.detailOf', { name: t('common.rbac') })} tabsLabel={t('atelier.openItem')} activeKey={role.id}
+      tabs={[{ key: role.id, title: role.name, icon: role.is_system ? 'lock' : 'shield' }]} onClose={() => setSelectedRole(null)}>
+      <DockBody icon={role.is_system ? 'lock' : 'shield'} title={role.name} badge={pill(role)} section={section} onSection={setSection}
+        sectionsLabel={t('atelier.sectionsOf', { name: role.name })}
+        sections={[['overview', t('atelier.overview')], ['permissions', t('common.permissions')]]}
+        actions={!role.is_system && <>
+          <Btn tone="primary" icon="check" id="rbac-save" write onClick={handleUpdate}>{t('common.saveChanges')}</Btn>
+          <Btn tone="danger" icon="block" id="rbac-delete" onClick={() => handleDelete(role)}>{t('common.delete')}</Btn>
+        </>}>
+        {role.is_system && <p className="notice warn" id="rbac-system"><Icon name="lock" /><span>{t('rbac.systemRoleWarning')}</span></p>}
+        {section === 'overview' && (
+          <div className="module-detail">
+            <Section title={t('atelier.properties')}>
+              <Props items={[
+                [t('common.type'), pill(role)],
+                [t('rbac.inheritsFrom'), parentOf(role)],
+                [t('common.users'), t('rbac.userCount', { count: role.user_count || 0 })],
+                [t('common.permissions'), `${direct.length}/${grantable.length}`],
+              ]} />
+            </Section>
+            <Section title={t('atelier.summary')}>
+              <p className="summary">{role.description || t('rbac.noDescription')}</p>
+            </Section>
           </div>
-        </div>
-      )}
-
-      <CompactSection title={t('rbac.roleInformation')}>
-        <CompactGrid>
-          <CompactField autoIcon="name" label={t('common.name')} value={role.name} />
-          <CompactField autoIcon="type" label={t('common.type')} value={role.is_system ? t('common.system') : t('common.custom')} />
-          {role.inherits_from && (
-            <CompactField autoIcon="inheritsFrom" label={t('rbac.inheritsFrom')} value={role.parent_name || `Role #${role.inherits_from}`} />
-          )}
-        </CompactGrid>
-        {role.description && <p className="text-xs text-text-secondary mt-2">{role.description}</p>}
-      </CompactSection>
-
-      <CompactSection title={t('common.permissions')}>
-        <div className="space-y-4">
-          {categories.map(category => {
-            const key = category.key
-            const categoryPerms = category.permissions
-            const directPerms = appliedPermissions(role.permissions, grantable)
-            const allPerms = role.all_permissions || directPerms
-            const allSelected = categoryPerms.every(p => allPerms.includes(p))
-            const someSelected = categoryPerms.some(p => allPerms.includes(p))
-
-            return (
-              <div key={key} className="border-b border-border-op30 pb-3 last:border-0 last:pb-0">
-                <button
-                  onClick={() => toggleCategoryPermissions(key)}
-                  disabled={role.is_system}
-                  className="flex items-center gap-2 mb-2 text-xs font-medium text-text-primary hover:text-accent-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {allSelected ? (
-                    <CheckCircle size={14} weight="fill" className="status-success-text" />
-                  ) : someSelected ? (
-                    <CheckCircle size={14} weight="duotone" className="status-warning-text" />
-                  ) : (
-                    <XCircle size={14} weight="duotone" className="text-text-tertiary" />
-                  )}
-                  {category.labelKey ? t(category.labelKey) : category.label}
-                </button>
-                <div className="flex flex-wrap gap-1.5 pl-5">
-                  {categoryPerms.map(perm => {
-                    const isDirect = directPerms.includes(perm)
-                    const isInherited = !isDirect && allPerms.includes(perm)
-                    const permLabel = perm.split(':')[0]
-                    return (
-                      <button
-                        key={perm}
-                        onClick={() => togglePermission(perm)}
-                        disabled={role.is_system || isInherited}
-                  title={isInherited ? t('rbac.inherited', { name: role.parent_name }) : undefined}
-                        className={`flex items-center gap-1 px-2 py-1 rounded text-2xs transition-all ${
-                          isDirect
-                            ? 'status-success-bg status-success-text status-success-border border'
-                            : isInherited
-                            ? 'status-primary-bg status-primary-text border border-dashed border-accent-primary-op30'
-                            : 'bg-bg-tertiary text-text-secondary hover:bg-tertiary-op80'
-                        } disabled:opacity-50 disabled:cursor-not-allowed`}
-                      >
-                        {isDirect ? <CheckCircle size={10} weight="fill" /> : isInherited ? <CheckCircle size={10} weight="duotone" /> : <XCircle size={10} />}
-                        {permLabel}
-                        {isInherited && <span className="opacity-60">↑</span>}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </CompactSection>
-
-      {ignoredPermissions(role.permissions, grantable).length > 0 && (
-        <CompactSection title={t('rbac.ignoredPermissions')}>
-          <p className="text-xs text-text-secondary mb-2">{t('rbac.ignoredPermissionsHint')}</p>
-          <div className="flex flex-wrap gap-1.5" data-testid="rbac-ignored-permissions">
-            {ignoredPermissions(role.permissions, grantable).map(perm => (
-              <span key={perm} className="px-2 py-1 rounded text-2xs bg-bg-tertiary text-text-tertiary">
-                {perm}
-              </span>
-            ))}
+        )}
+        {section === 'permissions' && (
+          <div className="module-detail rbac-perms">
+            {categories.map((category) => {
+              const perms = category.permissions
+              return (
+                <Section key={category.key} title={category.labelKey ? t(category.labelKey) : category.label}>
+                  <CategoryBox label={t('rbac.allOf', { name: category.labelKey ? t(category.labelKey) : category.label })}
+                    all={perms.every((p) => all.includes(p))} some={perms.some((p) => all.includes(p))}
+                    disabled={role.is_system} onChange={() => toggleCategoryPermissions(category.key)} />
+                  <ul className="perm-list">
+                    {perms.map((perm) => {
+                      const isDirect = direct.includes(perm)
+                      const isInherited = !isDirect && all.includes(perm)
+                      return (
+                        <li key={perm}>
+                          <label className="checkbox-line">
+                            <input type="checkbox" checked={isDirect || isInherited} disabled={role.is_system || isInherited}
+                              onChange={() => togglePermission(perm)} />
+                            {perm.split(':')[0]}
+                          </label>
+                          <span className="mono">{perm}</span>
+                          {isInherited && <span className="small muted">{t('rbac.inherited', { name: role.parent_name })}</span>}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </Section>
+              )
+            })}
+            {ignored.length > 0 && (
+              <Section title={t('rbac.ignoredPermissions')}>
+                <p className="small muted perm-intro">{t('rbac.ignoredPermissionsHint')}</p>
+                <ul className="perm-list" data-testid="rbac-ignored-permissions">
+                  {ignored.map((perm) => <li key={perm}><span className="flag muted"><Icon name="block" />{t('users.notAllowed')}</span><span className="mono">{perm}</span></li>)}
+                </ul>
+              </Section>
+            )}
           </div>
-        </CompactSection>
-      )}
-
-      <CompactSection title={t('rbac.coverage')}>
-        <div className="flex items-center gap-4">
-          <div className="flex-1 bg-bg-tertiary rounded-full h-2 overflow-hidden">
-            <div className="h-full bg-accent-primary transition-all" style={{ width: `${(appliedPermissions(role.permissions, grantable).length / totalPermissions) * 100}%` }} />
-          </div>
-          <span className="text-xs text-text-secondary">{appliedPermissions(role.permissions, grantable).length}/{grantable.length}</span>
-        </div>
-      </CompactSection>
-    </div>
+        )}
+      </DockBody>
+    </Dock>
   )
 
   return (
-    <>
-      <ResponsiveLayout
-        title={t('rbac.title')}
-        subtitle={t('rbac.subtitle', { count: roles.length })}
-        icon={Shield}
-        stats={stats}
-        helpPageKey="rbac"
-        splitView={true}
-        splitEmptyContent={
-          <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
-              <Shield size={24} className="text-text-tertiary" weight="duotone" />
-            </div>
-            <p className="text-sm text-text-secondary">{t('rbac.selectRole')}</p>
-          </div>
-        }
-        slideOverOpen={!!selectedRole}
-        slideOverTitle={selectedRole?.name || t('rbac.roleDetails')}
-        slideOverContent={selectedRole && renderDetails(selectedRole)}
-        slideOverWidth="lg"
-        onSlideOverClose={() => setSelectedRole(null)}
-      >
-        <div className="flex flex-col h-full min-h-0">
-          <ResponsiveDataTable
-            data={filteredRoles}
-            columns={columns}
-            loading={loading}
-            onRowClick={selectRole}
-            selectedId={selectedRole?.id}
-            searchable
-            searchPlaceholder={t('rbac.searchRoles')}
-            searchKeys={['name', 'description']}
-            toolbarFilters={[
-              {
-                key: 'is_system',
-                label: t('common.type'),
-                type: 'multiSelect',
-                value: filterType,
-                onChange: setFilterType,
-                placeholder: t('common.allTypes'),
-                options: [
-                  { value: 'true', label: t('common.system') },
-                  { value: 'false', label: t('common.custom') }
-                ]
-              }
-            ]}
-            filterPresetsKey="ucm-rbac-presets"
-            densityStorageKey="ucm-rbac-density"
-            onApplyFilterPreset={handleApplyFilterPreset}
-            toolbarActions={
-              isMobile ? (
-                <Button type="button" size="lg" onClick={() => openModal('create')} className="w-11 h-11 p-0">
-                  <Plus size={22} weight="bold" />
-                </Button>
-              ) : (
-                <Button type="button" size="sm" onClick={() => openModal('create')}>
-                  <Plus size={16} /> {t('rbac.createRole')}
-                </Button>
-              )
-            }
-            emptyIcon={Shield}
-            emptyTitle={t('rbac.noRoles')}
-            emptyDescription={t('rbac.noRolesDescription')}
-            emptyAction={
-              <Button type="button" onClick={() => openModal('create')}>
-                <Plus size={16} /> {t('rbac.createRole')}
-              </Button>
-            }
-          />
-        </div>
-      </ResponsiveLayout>
-
+    <Zone dock={dock} after={(
       <FormModal
         open={modals.create}
         onClose={() => closeModal('create')}
@@ -503,6 +270,35 @@ export default function RBACPage() {
           hint={t('rbac.inheritHint')}
         />
       </FormModal>
-    </>
+    )}>
+      <PageHead title={t('common.rbac')} total={t('rbac.unit', { count: roles.length })} intent={t('shell.moduleDesc.rbac')}
+        actions={<Btn tone="primary" icon="plus" id="rbac-new" onClick={create.onClick}>{create.label}</Btn>} />
+      <ListView label={t('common.rbac')} caption={t('rbac.caption')} icon="shield" rows={rows} loading={loading}
+        filters={{ views, active: kind, onChange: setKind, label: t('rbac.filterByType') }}
+        toolbar={(
+          <Toolbar>
+            <SearchField id="rbac-search" name="q" label={t('rbac.searchRoles')} placeholder={t('rbac.searchRoles')} value={query} onChange={setQuery} />
+          </Toolbar>
+        )}
+        title={(r) => r.name} status={pill} openedId={role?.id} onOpen={(r) => { setSection('overview'); selectRole(r) }}
+        columns={[
+          { id: 'description', label: t('common.description'), cell: (r) => r.description || '—', grow: true, muted: true },
+          { id: 'inherits', label: t('rbac.inheritsFrom'), cell: parentOf },
+          { id: 'permissions', label: t('common.permissions'), cell: (r) => String(r.all_permissions?.length ?? 0) },
+          { id: 'users', label: t('common.users'), cell: (r) => String(r.user_count || 0) },
+          { status: true },
+        ]}
+        error={loadError && (
+          <LoadError id="rbac" title={t('messages.errors.loadFailed.roles')} onRetry={() => { setLoading(true); loadRoles() }}
+            cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/rbac/roles', message: loadError.message }} />} />
+        )}
+        empty={narrowed && roles.length ? (
+          <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')}
+            onReset={() => { setQuery(''); setKind('') }} />
+        ) : (
+          <EmptyBlock id="rbac" icon="shield" title={t('rbac.noRoles')} text={t('rbac.noRolesDescription')} action={create} />
+        )}
+        footer={{ range: t('rbac.range', { shown: rows.length, count: roles.length }) }} />
+    </Zone>
   )
 }

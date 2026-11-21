@@ -4496,7 +4496,18 @@
       "delete:ssh_cas": "Видаляти SSH ЦС"
     },
     "ignoredPermissions": "Ігноровані дозволи",
-    "ignoredPermissionsHint": "Збережені в цій ролі, але не застосовуються: зарезервовані для адміністраторів або невідомі. Вони зберігаються без змін."
+    "ignoredPermissionsHint": "Збережені в цій ролі, але не застосовуються: зарезервовані для адміністраторів або невідомі. Вони зберігаються без змін.",
+    "unit_one": "{{count}} role",
+    "unit_other": "{{count}} roles",
+    "unit_few": "{{count}} roles",
+    "unit_many": "{{count}} roles",
+    "range_one": "{{shown}} of {{count}} role",
+    "range_other": "{{shown}} of {{count}} roles",
+    "range_few": "{{shown}} of {{count}} roles",
+    "range_many": "{{shown}} of {{count}} roles",
+    "caption": "Roles. Activate a name to open its detail.",
+    "filterByType": "Filter by type",
+    "allOf": "All of {{name}}"
   },
   "hsm": {
     "statusUnavailable": "Функції HSM недоступні",

@@ -4398,7 +4398,14 @@
       "delete:ssh_cas": "SSH CAを削除"
     },
     "ignoredPermissions": "無視される権限",
-    "ignoredPermissionsHint": "このロールに保存されていますが適用されません（管理者専用または不明な権限）。そのまま保持されます。"
+    "ignoredPermissionsHint": "このロールに保存されていますが適用されません（管理者専用または不明な権限）。そのまま保持されます。",
+    "unit_one": "{{count}} role",
+    "unit_other": "{{count}} roles",
+    "range_one": "{{shown}} of {{count}} role",
+    "range_other": "{{shown}} of {{count}} roles",
+    "caption": "Roles. Activate a name to open its detail.",
+    "filterByType": "Filter by type",
+    "allOf": "All of {{name}}"
   },
   "hsm": {
     "statusUnavailable": "HSM機能は利用できません",

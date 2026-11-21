@@ -3199,7 +3199,14 @@
       "delete:ssh_cas": "Supprimer des AC SSH"
     },
     "ignoredPermissions": "Permissions ignorées",
-    "ignoredPermissionsHint": "Enregistrées sur ce rôle mais non appliquées : réservées aux administrateurs ou inconnues. Elles sont conservées telles quelles."
+    "ignoredPermissionsHint": "Enregistrées sur ce rôle mais non appliquées : réservées aux administrateurs ou inconnues. Elles sont conservées telles quelles.",
+    "unit_one": "{{count}} rôle",
+    "unit_other": "{{count}} rôles",
+    "range_one": "{{shown}} sur {{count}} rôle",
+    "range_other": "{{shown}} sur {{count}} rôles",
+    "caption": "Rôles. Activez un nom pour ouvrir son détail.",
+    "filterByType": "Filtrer par type",
+    "allOf": "Tout {{name}}"
   },
   "scep": {
     "title": "Protocole SCEP",

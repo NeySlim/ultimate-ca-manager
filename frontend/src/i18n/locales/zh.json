@@ -4396,7 +4396,14 @@
       "delete:ssh_cas": "删除SSH CA"
     },
     "ignoredPermissions": "已忽略的权限",
-    "ignoredPermissionsHint": "已保存在此角色中但不生效：仅限管理员或未知的权限。它们会按原样保留。"
+    "ignoredPermissionsHint": "已保存在此角色中但不生效：仅限管理员或未知的权限。它们会按原样保留。",
+    "unit_one": "{{count}} 个角色",
+    "unit_other": "{{count}} 个角色",
+    "range_one": "{{shown}} / 共 {{count}} 个角色",
+    "range_other": "{{shown}} / 共 {{count}} 个角色",
+    "caption": "角色。激活名称以打开其详情。",
+    "filterByType": "按类型筛选",
+    "allOf": "全部 {{name}}"
   },
   "hsm": {
     "statusUnavailable": "HSM功能不可用",
