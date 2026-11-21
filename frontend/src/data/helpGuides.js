@@ -88,7 +88,7 @@ The default view. Each root that heads a hierarchy is drawn with its sub-authori
 Browses the hierarchy level by level, one column per level: select a CA to see the CAs below it.
 
 ### List View
-Flat table with sortable columns. A row carries one action (download the certificate) and a chevron that opens the detail, where the other actions are.
+Flat table with sortable columns. A row carries one action (download the certificate) and a chevron that opens the detail, where the other actions are. On a phone each CA is a card with the same facts and its chevron; a tap anywhere on it opens the detail, where **Export** downloads the certificate.
 
 ## Creating a CA
 
@@ -1930,6 +1930,8 @@ Each row shows the time (the day too when it is not today), the operation (its t
 - **IP address** and **Client** (user agent), when they were recorded
 
 When the entry names a certificate or an authority, **Inspect the certificate** (or **View the authority**) opens it in the inspector.
+
+On a phone each entry is a card with the same facts: a tap anywhere on it, or on its arrow, opens the detail.
 
 ## Finding entries
 

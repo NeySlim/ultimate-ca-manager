@@ -1,14 +1,24 @@
 /**
  * CAs page: flat list, on the list template (one action per row and a chevron;
- * everything else lives in the detail).
+ * everything else lives in the detail). On a phone each CA is a record that opens
+ * its detail, with the same facts as the row and the chevron at its right.
  */
-import { useMemo } from 'react'
+import { useMemo, useCallback } from 'react'
 import { ShieldCheck, TreeStructure, DownloadSimple } from '@phosphor-icons/react'
 import { ResponsiveDataTable } from '../../components/ui/responsive'
 import { EntityName, DueDate } from '../../components/list'
 import { EXPIRY_WINDOW_DAYS } from '../../lib/expiry'
 import { caState, nameOfCA } from './caTree'
 import { CAStatePill, CAMarks } from './CAState'
+
+const dueOf = (row) => (row.state === 'pending' || !row.valid_to ? null : (
+  <DueDate
+    date={row.valid_to}
+    warnDays={EXPIRY_WINDOW_DAYS}
+    tone={row.state === 'revoked' ? '' : undefined}
+    relative={row.state === 'revoked' ? null : undefined}
+  />
+))
 
 export function ListView({ cas, allCAs, selectedId, onSelect, onDownload, loading, emptyTitle, t }) {
   const rows = useMemo(() => {
@@ -59,17 +69,23 @@ export function ListView({ cas, allCAs, selectedId, onSelect, onDownload, loadin
       key: 'valid_to',
       header: t('common.expires'),
       priority: 4,
-      render: (val, row) => (row.state === 'pending' || !val ? '—' : (
-        <DueDate
-          date={val}
-          warnDays={EXPIRY_WINDOW_DAYS}
-          tone={row.state === 'revoked' ? '' : undefined}
-          relative={row.state === 'revoked' ? null : undefined}
-        />
-      )),
+      render: (val, row) => dueOf(row) || '—',
     },
     { key: 'key_algorithm', header: t('common.algorithm'), muted: true, small: true, hideOnMobile: true, render: (val, row) => val || row.key_type || '—' },
   ], [t])
+
+  const card = useCallback((row) => ({
+    meta: [
+      row.type_label,
+      row.parent_name,
+      t('cas.certificateCount', { count: row.certs }),
+      row.key_algorithm || row.key_type,
+      // the row's marks, icons named for assistive technology as in the table
+      <CAMarks key="marks" ca={row} t={t} orphan={row.orphan} compact />,
+    ],
+    status: <CAStatePill ca={row} t={t} />,
+    end: dueOf(row),
+  }), [t])
 
   return (
     <ResponsiveDataTable
@@ -78,6 +94,8 @@ export function ListView({ cas, allCAs, selectedId, onSelect, onDownload, loadin
       columns={columns}
       loading={loading}
       onRowClick={onSelect}
+      card={card}
+      cardChevron
       selectedId={selectedId}
       rowLabel={(row) => row.label}
       tableLabel={t('common.cas')}

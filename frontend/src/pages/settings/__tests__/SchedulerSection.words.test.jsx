@@ -63,6 +63,16 @@ describe('SchedulerSection words', () => {
   })
 })
 
+describe('SchedulerSection column widths', () => {
+  it('sizes the schedule, run, duration, count and action columns to their content; the task takes the rest', async () => {
+    render(<SchedulerSection hasPermission={() => true} />)
+    const row = (await screen.findByText('tr(scheduler.tasks.scheduled_backup)')).closest('tr')
+    const table = row.closest('table')
+    expect([...table.querySelectorAll('thead th')].map((th) => th.classList.contains('fit'))).toEqual([false, true, true, true, true, true, true])
+    expect([...row.children].map((td) => td.classList.contains('fit'))).toEqual([false, true, true, true, true, true, true])
+  })
+})
+
 describe('SchedulerSection write guard', () => {
   it('suspends Run with the other writes', async () => {
     render(<SchedulerSection hasPermission={() => true} />)

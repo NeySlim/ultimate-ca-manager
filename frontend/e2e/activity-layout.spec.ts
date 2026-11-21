@@ -53,14 +53,14 @@ test.describe('desktop', () => {
 test.describe('phone', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
-  test('the journal scrolls sideways in its frame and hides the head\'s export', async ({ page, api }) => {
+  test('the journal shows records, not a table scrolling sideways, and hides the head\'s export', async ({ page, api }) => {
     expect(api).toBeTruthy()
     await page.goto('/audit')
     const main = page.getByRole('main')
-    await expect(main.locator('.audit-table tbody tr:not(.sk-row)').first()).toBeVisible()
-    expect(Math.round((await box(main.locator('.audit-table'))).width)).toBeGreaterThanOrEqual(750)
-    const scroller = main.locator('#audit-scroll')
-    expect(await scroller.evaluate(el => el.scrollWidth > el.clientWidth)).toBe(true)
+    // one record per entry, as the mockup's mobile list (activity-columns.spec.ts measures them)
+    await expect(main.locator('.mobile-record:not(.sk-record)').first()).toBeVisible()
+    await expect(main.locator('.audit-table')).toHaveCount(0)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
     await expect(main.getByRole('button', { name: /Export the log|Exporter le journal/ })).toBeHidden()
     // the export stays reachable from the « ⋯ » menu
     await main.locator('[data-action=journal-menu]').click()

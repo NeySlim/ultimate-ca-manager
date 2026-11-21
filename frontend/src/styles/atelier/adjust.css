@@ -1,0 +1,24 @@
+/*
+ * Deviations from the Atelier mockup asked by the maintainer, common to every zone; not copies.
+ * Each selector starts with :root so it outranks the copied rule it amends whatever the order
+ * in which the zones' stylesheets load.
+ */
+
+/* A short fixed-format column (time, user, result, state, actions, chevron) takes the width of
+   its content; the free-text columns share the rest. */
+:root .atl .table-container :is(th,td).fit,:root .ui-table :is(th,td).fit{width:1px;white-space:nowrap}
+/* The product's own tables (.ui-table) shorten a long value by an ellipsis: a fitted column stops
+   at 320 px, a shared one takes its share and no more. */
+:root .ui-table :is(th,td).fit{max-width:320px}
+:root .ui-table :is(th,td).share{max-width:0}
+
+/* On a phone a row that opens a detail is a record (the mockup's mobile list): the whole record
+   opens it, and its chevron stays on screen at the right, a 44 px target. */
+:root .atl .mobile-record.opens{cursor:pointer}
+:root .atl .mobile-record .row-top>.icon-btn{width:44px;min-height:44px;flex-shrink:0}
+/* Without a checkbox the record starts at its left edge, as the mockup's module records do. */
+:root .atl .mobile-record:not(:has(.check-hit)) :is(.row-meta,.row-status){margin-left:0}
+/* The same for the list template's records (components/list), outside the copied zones. */
+:root .lv-mrecord.is-opening{cursor:pointer}
+:root .lv-mrecord .lv-mrecord-open{width:44px;height:44px;flex-shrink:0}
+:root .lv-mrecord:not(:has(.lv-check-hit)) :is(.lv-mrecord-desc,.lv-mrecord-meta,.lv-mrecord-status){margin-left:0}

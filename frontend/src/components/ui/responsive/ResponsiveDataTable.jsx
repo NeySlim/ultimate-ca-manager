@@ -120,6 +120,7 @@ export function ResponsiveDataTable({
   openFromName = false, // list template: only the name and the chevron open a row
   lockRowsOnSelect = false, // list template: names and row actions wait while rows are ticked
   card, // list template on a phone: row => { description, meta, status, end } draws Atelier records
+  cardChevron = false, // the records open from anywhere and carry the chevron of the table's rows
   noMatch, // list template, nothing matches the filters: { title, description, action }
   columnsNote, // list template: the sentence of the columns dialog
   selectionLabel, // list template: (count, { pageAll }) => words of the selection bar; pageAll: the selection is the page
@@ -850,6 +851,7 @@ export function ResponsiveDataTable({
           <ListCards
             data={paginatedData}
             card={card}
+            chevron={cardChevron}
             rowLabel={rowLabel}
             label={tableLabel}
             onRowClick={onRowClick}
@@ -1487,6 +1489,23 @@ function SearchBar({
 // DESKTOP TABLE
 // =============================================================================
 
+// Words of a column key: free text takes a share of the row, a short fixed format its content
+const SHARE_WORDS = new Set(['name', 'cn', 'subject', 'description', 'descr', 'email', 'domain', 'domains', 'issuer',
+  'organization', 'message', 'host', 'hostname', 'fingerprint', 'url', 'path', 'details', 'detail', 'label', 'title',
+  'comment', 'note', 'notes', 'scope', 'reason', 'target', 'targets', 'subjects', 'sans', 'san'])
+const FIT_WORDS = new Set(['status', 'state', 'type', 'role', 'active', 'enabled', 'date', 'created', 'updated', 'expires',
+  'expiry', 'valid', 'login', 'timestamp', 'time', 'at', 'serial', 'id', 'count', 'days', 'priority', 'used', 'revoked',
+  'level', 'duration', 'runs', 'algorithm', 'size', 'version', 'source', 'keys', 'users', 'mode', 'method', 'port',
+  'ts', 'after', 'before', 'minutes', 'seconds', 'found', 'scanned', 'approval', 'system', 'owner', 'purpose', 'logger'])
+
+/** A column takes the width of its content: `fit` says so, else its key names a short fixed format. */
+function fitsContent(col) {
+  if (col.fit !== undefined) return Boolean(col.fit)
+  const words = String(col.key || '').replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+  if (words.some((w) => SHARE_WORDS.has(w))) return false
+  return words.some((w) => FIT_WORDS.has(w))
+}
+
 function DesktopTable({
   data,
   columns,
@@ -1526,10 +1545,9 @@ function DesktopTable({
   }
   const dStyle = densityStyles[density] || densityStyles.compact
   
-  // Column sizing: table-layout:fixed with proportional widths
-  // Each column gets a "size" weight. Total weights are summed and each column
-  // gets a percentage of the available space. This is how TanStack Table works.
-  // User-resized columns use exact px widths, remaining space is redistributed.
+  // Column sizing: a short fixed-format column (state, date, count...) takes the width of
+  // its content (`fit`); the other columns share the rest by their "size" weight, their
+  // content shortened by an ellipsis (`share`). User-resized columns use exact px widths.
   // Width of the row-actions column, from what it actually holds: each button is
   // w-6 with a gap-0.5 between them, inside a px-2 cell. Without reserving it the
   // data columns take the whole 100% and the buttons overlap the last one.
@@ -1566,10 +1584,11 @@ function DesktopTable({
     }
     // Column has explicit width (e.g. '120px', '80px') — lock it
     if (col.width) return { width: col.width, minWidth: col.width, maxWidth: col.width }
+    if (fitsContent(col)) return undefined
     // Use proportional sizing based on column "size" hint or smart defaults
     const size = col.size || getDefaultColumnSize(col)
     const totalSize = columns.reduce((sum, c) => {
-      if (columnWidths[c.key] || c.width) return sum // fixed-width cols excluded from proportion
+      if (columnWidths[c.key] || c.width || fitsContent(c)) return sum // fixed and fitted cols excluded from proportion
       return sum + (c.size || getDefaultColumnSize(c))
     }, 0)
     if (totalSize > 0) {
@@ -1594,6 +1613,12 @@ function DesktopTable({
     return 1.5
   }
   
+  // The class of a column's cells: content width, or a share of the rest
+  const sizeClass = (col) => {
+    if (columnWidths[col.key] || col.width) return undefined
+    return fitsContent(col) ? 'fit' : 'share'
+  }
+
   // Handle resize start
   const handleResizeStart = useCallback((e, colKey) => {
     e.preventDefault()
@@ -1635,7 +1660,7 @@ function DesktopTable({
     <div className="flex-1 overflow-auto" ref={tableRef}>
       <table 
         className={cn("ui-table", resizingColumn && "select-none")} 
-        style={{ tableLayout: 'fixed', borderCollapse: 'separate', borderSpacing: 0, '--ui-row': dStyle.row }}
+        style={{ borderCollapse: 'separate', borderSpacing: 0, '--ui-row': dStyle.row }}
       >
         {/* Header: the mockup's table view, 34 px on the raised surface */}
         <thead className="sticky top-0 z-10">
@@ -1660,6 +1685,7 @@ function DesktopTable({
                   style={style}
                   className={cn(
                     'text-left relative group',
+                    sizeClass(col),
                     col.compact && '!px-1',
                     sortable && col.sortable !== false && 'cursor-pointer hover:text-text-primary',
                     sort?.key === col.key && '!text-text-primary'
@@ -1741,6 +1767,7 @@ function DesktopTable({
                       key={col.key}
                       style={style}
                       className={cn(
+                        sizeClass(col),
                         col.compact && '!px-1',
                         col.mono && "font-mono",
                         col.className

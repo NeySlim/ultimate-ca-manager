@@ -12,7 +12,7 @@ export default {
           { label: 'Clavier', text: 'Dans l’arbre, les flèches déplacent, droite et gauche déplient et replient, Entrée ouvre l’AC dans le panneau de détail' },
           { label: 'Recherche', text: 'Filtre les trois vues sur le nom, le nom commun et le sujet ; l’arbre garde la branche qui mène à chaque résultat' },
           { label: 'Vue colonnes', text: 'Hiérarchie parcourue niveau par niveau, une colonne par niveau' },
-          { label: 'Vue liste', text: 'Tableau plat triable : une action par ligne (télécharger le certificat) et un chevron qui ouvre le détail' },
+          { label: 'Vue liste', text: 'Tableau plat triable : une action par ligne (télécharger le certificat) et un chevron qui ouvre le détail ; sur un téléphone, chaque AC est une carte qui s’ouvre d’un appui n’importe où, son export dans le détail' },
         ]
       },
       {
@@ -143,7 +143,7 @@ La vue par défaut. Chaque racine à la tête d’une hiérarchie est dessinée 
 Parcourt la hiérarchie niveau par niveau, une colonne par niveau : sélectionnez une AC pour voir celles qui sont en dessous.
 
 ### Vue liste
-Tableau plat avec colonnes triables. Une ligne porte une action (télécharger le certificat) et un chevron qui ouvre le détail, où se trouvent les autres actions.
+Tableau plat avec colonnes triables. Une ligne porte une action (télécharger le certificat) et un chevron qui ouvre le détail, où se trouvent les autres actions. Sur un téléphone, chaque AC est une carte qui montre les mêmes informations et son chevron ; un appui n’importe où sur elle ouvre le détail, où **Exporter** télécharge le certificat.
 
 ## Créer une AC
 
