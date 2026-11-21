@@ -46,6 +46,7 @@ const svc = vi.hoisted(() => ({
 const cas = vi.hoisted(() => ({ getAll: vi.fn(), update: vi.fn() }))
 vi.mock('../../services', () => ({ casService: cas, crlService: svc }))
 
+import { renderAtUrl } from '../../test/dockUrl'
 import CRLOCSPPage from '../CRLOCSPPage'
 import { crlState } from '../protocols/protocolStates'
 
@@ -192,5 +193,23 @@ describe('the CRL / OCSP states', () => {
     page()
     expect(await screen.findByText('crlOcsp.emptyTitle')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'crlOcsp.createCa' })).toHaveAttribute('href', '/cas')
+  })
+})
+
+describe('the CRL dock in the URL', () => {
+  it('reopens the authority and section of the URL with its CRL, then writes the one opened', async () => {
+    const r = renderAtUrl(<CRLOCSPPage />, '/crl-ocsp?item=2&section=distribution')
+    const dock = await r.dock()
+    expect(within(dock).getByRole('tab', { name: 'crlOcsp.cdpNote' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(dock).getByRole('heading', { level: 2 })).toHaveTextContent('Internal CA')
+    await waitFor(() => expect(svc.getForCA).toHaveBeenCalledWith(2))
+    fireEvent.click(screen.getByRole('button', { name: 'Services CA' }))
+    expect(r.where()).toBe('/crl-ocsp?item=1')
+  })
+
+  it('turns the work queue\'s ?ca= into the dock\'s item on the publication section', async () => {
+    const r = renderAtUrl(<CRLOCSPPage />, '/crl-ocsp?ca=3')
+    await waitFor(() => expect(r.where()).toBe('/crl-ocsp?item=3&section=publication'))
+    expect(within(await r.dock()).getByRole('tab', { name: 'crlOcsp.tabs.publication' })).toHaveAttribute('aria-selected', 'true')
   })
 })

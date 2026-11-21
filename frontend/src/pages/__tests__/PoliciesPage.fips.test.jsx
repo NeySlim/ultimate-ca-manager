@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 
 const mocks = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), update: vi.fn(), getEffective: vi.fn() }))
 
@@ -38,7 +39,7 @@ describe('PoliciesPage FIPS system policy (#399)', () => {
   it('shows the read-only notice and hides EdDSA keys in FIPS mode', async () => {
     mocks.list.mockResolvedValue({ data: [] })
     mocks.getEffective.mockResolvedValue({ data: { allowed_key_types: ['RSA-2048'], allowed_digests: ['sha256'], fips: true } })
-    render(<PoliciesPage />)
+    render(<MemoryRouter><PoliciesPage /></MemoryRouter>)
     expect(await screen.findByText('policies.fipsRulesTitle')).toBeTruthy()
     fireEvent.click(screen.getAllByText('policies.createPolicy')[0])
     expect(screen.getByText('common.keyTypes.rsa2048')).toBeTruthy()
@@ -50,7 +51,7 @@ describe('PoliciesPage FIPS system policy (#399)', () => {
     mocks.list.mockResolvedValue({ data: [{ id: 3, name: 'Legacy', policy_type: 'issuance', rules: { allowed_key_types: ['RSA-2048', 'ED25519'] } }] })
     mocks.getEffective.mockResolvedValue({ data: { allowed_key_types: ['RSA-2048'], allowed_digests: null, fips: true } })
     mocks.update.mockResolvedValue({ data: { id: 3 } })
-    render(<PoliciesPage />)
+    render(<MemoryRouter><PoliciesPage /></MemoryRouter>)
     await screen.findByText('policies.fipsRulesTitle')
     fireEvent.click(await screen.findByRole('button', { name: 'Legacy' }))
     fireEvent.click(await screen.findByRole('button', { name: 'common.edit' }))
@@ -64,7 +65,7 @@ describe('PoliciesPage FIPS system policy (#399)', () => {
   it('shows no notice and every key type outside FIPS mode', async () => {
     mocks.list.mockResolvedValue({ data: [] })
     mocks.getEffective.mockResolvedValue({ data: { allowed_key_types: null, allowed_digests: null } })
-    render(<PoliciesPage />)
+    render(<MemoryRouter><PoliciesPage /></MemoryRouter>)
     fireEvent.click((await screen.findAllByText('policies.createPolicy'))[0])
     await waitFor(() => expect(mocks.getEffective).toHaveBeenCalled())
     expect(screen.getByText('common.keyTypes.ed25519')).toBeTruthy()

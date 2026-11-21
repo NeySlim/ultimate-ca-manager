@@ -34,6 +34,7 @@ vi.mock('../../services', () => ({
   },
 }))
 
+import { renderAtUrl } from '../../test/dockUrl'
 import RBACPage from '../RBACPage'
 
 const ROLES = [
@@ -98,5 +99,16 @@ describe('the role dock', () => {
     expect(stable.remove).not.toHaveBeenCalled()
     fireEvent.click(within(dock()).getByRole('button', { name: 'common.delete' }))
     await waitFor(() => expect(stable.remove).toHaveBeenCalledWith(2))
+  })
+})
+
+describe('the role dock in the URL', () => {
+  it('reopens the role and section of the URL, then writes the one opened', async () => {
+    const r = renderAtUrl(<RBACPage />, '/rbac?item=2&section=permissions')
+    const dock = await r.dock()
+    expect(within(dock).getByRole('tab', { name: 'common.permissions' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(dock).getByRole('heading', { level: 2 })).toHaveTextContent('Cert Team')
+    fireEvent.click(screen.getByRole('button', { name: 'Viewer' }))
+    expect(r.where()).toBe('/rbac?item=1')
   })
 })

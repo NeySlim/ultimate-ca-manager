@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 
 const mocks = vi.hoisted(() => ({ create: vi.fn(), list: vi.fn(), update: vi.fn() }))
 
@@ -35,7 +36,7 @@ import PoliciesPage from '../PoliciesPage'
 async function editedRules(rules) {
   mocks.list.mockResolvedValue({ data: [{ id: 9, name: 'Api', operations: ['issuance'], rules }] })
   mocks.update.mockResolvedValue({ data: { id: 9 } })
-  render(<PoliciesPage />)
+  render(<MemoryRouter><PoliciesPage /></MemoryRouter>)
   fireEvent.click(await screen.findByRole('button', { name: 'Api' }))
   fireEvent.click(await screen.findByRole('button', { name: 'common.edit' }))
   fireEvent.click(screen.getByText('SHA-512'))

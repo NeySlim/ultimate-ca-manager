@@ -43,6 +43,7 @@ vi.mock('../../services', () => ({
 }))
 vi.mock('../../components/SmartImport', () => ({ SmartImportModal: () => null }))
 
+import { renderAtUrl } from '../../test/dockUrl'
 import TrustStorePage from '../TrustStorePage'
 
 const ROWS = [
@@ -117,5 +118,18 @@ describe('Trust anchor dock', () => {
     const dock = await waitFor(() => { const d = container.querySelector('#inspector'); expect(d).toBeTruthy(); return d })
     expect(dock.querySelector('#truststore-delete')).toBeNull()
     expect(dock.querySelector('#truststore-export')).toBeTruthy()
+  })
+})
+
+describe('the anchor dock in the URL', () => {
+  it('reopens the anchor and section of the URL, then writes the one opened', async () => {
+    const r = renderAtUrl(<TrustStorePage />, '/truststore?item=2&section=details')
+    const dock = await r.dock()
+    await waitFor(() => expect(within(dock).getByRole('heading', { level: 2 })).toHaveTextContent('Old proxy'))
+    expect(within(dock).getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Bank Root' }))
+    expect(r.where()).toBe('/truststore?item=1')
+    fireEvent.click(within(await r.dock()).getByRole('tab', { name: 'PEM' }))
+    expect(r.where()).toBe('/truststore?item=1&section=pem')
   })
 })

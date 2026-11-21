@@ -13,6 +13,7 @@ import {
 import { FormModal, Input, SecretInput, Select, Textarea, ToggleSwitch } from '../components/atelier/Form'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard, usePersistedState } from '../hooks'
+import { useDockSelection } from '../components/atelier/useDockParam'
 import { hsmService } from '../services'
 import { secretInputProps } from '../lib/secretTarget'
 import { KEY_GROUPS, listAlgorithms } from '../lib/keyAlgorithms'
@@ -133,6 +134,8 @@ function Pkcs11Notice({ status }) {
   )
 }
 
+const HSM_SECTIONS = ['overview', 'keys', 'config']
+
 export default function HSMPage() {
   const { t, i18n } = useTranslation()
   const locale = i18n.language || 'en'
@@ -143,10 +146,12 @@ export default function HSMPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
   const [hsmStatus, setHsmStatus] = useState(null)
-  const [openId, setOpenId] = useState(null)
   const [detail, setDetail] = useState(null)
   const [keys, setKeys] = useState([])
-  const [section, setSection] = useState('overview')
+  // The open provider and its section live in the URL (`item`, `section`)
+  const hsmDock = useDockSelection(providers, { ready: !loading && !loadError, sections: HSM_SECTIONS })
+  const openId = hsmDock.selected?.id ?? null
+  const { section, setSection } = hsmDock
   const [modal, setModal] = useState(null)
   const [testing, setTesting] = useState(false)
   const [syncingId, setSyncingId] = useState(null)
@@ -187,8 +192,8 @@ export default function HSMPage() {
   }, [openId])
 
   const openProvider = (p) => {
-    if (p.id !== openId) { setSection('overview'); setDetail(null) }
-    setOpenId(p.id)
+    if (p.id !== openId) setDetail(null)
+    hsmDock.select(p)
   }
 
   const handleEdit = async (provider) => {
@@ -207,7 +212,7 @@ export default function HSMPage() {
     try {
       await hsmService.deleteProvider(provider.id)
       showSuccess(t('messages.success.delete.provider'))
-      setOpenId(null)
+      hsmDock.select(null)
       loadData()
     } catch (error) {
       showError(error.message || t('messages.errors.deleteFailed.provider'))
@@ -317,7 +322,7 @@ export default function HSMPage() {
 
   const dock = open && (
     <Dock label={t('atelier.detailOf', { name: t('shell.moduleLabel.hsm') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
-      tabs={[{ key: open.id, title: open.name, icon: 'chip' }]} onClose={() => setOpenId(null)}>
+      tabs={[{ key: open.id, title: open.name, icon: 'chip' }]} onClose={() => hsmDock.select(null)}>
       <DockBody icon="chip" title={open.name} badge={pill(open)} section={section} onSection={setSection}
         sectionsLabel={t('atelier.sectionsOf', { name: open.name })}
         sections={[['overview', t('atelier.overview')], ['keys', t('hsm.hsmKeys')], ['config', t('common.config')]]}

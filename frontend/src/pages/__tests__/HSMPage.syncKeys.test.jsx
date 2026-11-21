@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -53,7 +54,7 @@ import HSMPage, { syncKeysMessage } from '../HSMPage'
 const PROVIDER = { id: 5, name: 'Token', provider_type: 'pkcs11', enabled: true, key_count: 2 }
 
 async function openProvider() {
-  render(<HSMPage />)
+  render(<MemoryRouter><HSMPage /></MemoryRouter>)
   fireEvent.click(await screen.findByText('Token'))
   return screen.findByRole('button', { name: /common\.syncKeys/ })
 }

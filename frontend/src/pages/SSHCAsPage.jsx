@@ -14,6 +14,7 @@ import {
 import { sshCasService, hsmService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard, useCRUDPage } from '../hooks'
+import { useDockSelection } from '../components/atelier/useDockParam'
 import { formatDate, downloadBlob, extractData } from '../lib/utils'
 import { SSH_EDDSA_KEY_TYPES, SSH_FIPS_DEFAULT_KEY_TYPE, sshEddsaRefused, sshKeyOptions, useKeyPlatform } from '../lib/policyAlgorithms'
 import { findAlgorithm, isUsable, GROUP_RSA, GROUP_NIST } from '../lib/keyAlgorithms'
@@ -52,6 +53,8 @@ function principalList(ca) {
   return (listed || '').split(',').map((p) => p.trim()).filter(Boolean)
 }
 
+const SSH_CA_SECTIONS = ['overview', 'install', 'config', 'key']
+
 export default function SSHCAsPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showConfirm } = useNotification()
@@ -64,7 +67,6 @@ export default function SSHCAsPage() {
   }, [])
   const {
     items: sshCas, loading,
-    selectedItem: selectedCA, setSelectedItem: setSelectedCA,
     showModal, setShowModal,
     editing: editingCA, setEditing: setEditingCA,
     loadData,
@@ -75,7 +77,8 @@ export default function SSHCAsPage() {
   const [importPrivateKey, setImportPrivateKey] = useState('')
   const [query, setQuery] = useState('')
   const [typeView, setTypeView] = useState('')
-  const [section, setSection] = useState('overview')
+  // The open authority and its section live in the URL (`item`, `section`)
+  const { selected: selectedCA, select: setSelectedCA, section, setSection } = useDockSelection(sshCas, { ready: !loading, sections: SSH_CA_SECTIONS })
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(PAGE_SIZE)
 

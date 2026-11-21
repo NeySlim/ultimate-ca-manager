@@ -32,6 +32,7 @@ vi.mock('../../services', () => ({
   policiesService: { getEffective: vi.fn().mockResolvedValue({ data: {} }) },
 }))
 
+import { renderAtUrl } from '../../test/dockUrl'
 import SSHCAsPage from '../SSHCAsPage'
 
 const USERS = { id: 1, refid: 'r-users', descr: 'Users CA', ca_type: 'user', key_type: 'ssh-ed25519', fingerprint: 'SHA256:aaa', cert_count: 7,
@@ -120,5 +121,18 @@ describe('the SSH CA dock', () => {
     expect(dialog).toHaveClass('wide')
     expect(within(dialog).getByLabelText('sshCas.privateKey')).toHaveClass('mono')
     expect(dialog.querySelector('.modal-actions .btn.primary')).toHaveTextContent('common.import')
+  })
+})
+
+describe('the SSH CA dock in the URL', () => {
+  it('reopens the authority and section of the URL, then writes the one opened', async () => {
+    const r = renderAtUrl(<SSHCAsPage />, '/ssh/cas?item=2&section=config')
+    const dock = await r.dock()
+    expect(within(dock).getByRole('tab', { name: 'sshCas.configuration' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(dock).getByRole('heading', { level: 2 })).toHaveTextContent('Hosts CA')
+    fireEvent.click(screen.getByRole('button', { name: 'Users CA' }))
+    expect(r.where()).toBe('/ssh/cas?item=1')
+    fireEvent.click(within(await r.dock()).getByRole('tab', { name: 'sshCas.quickInstall' }))
+    expect(r.where()).toBe('/ssh/cas?item=1&section=install')
   })
 })
