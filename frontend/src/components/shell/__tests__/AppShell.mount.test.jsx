@@ -1,5 +1,5 @@
 /** The shell around the page: bar, status bar, search entries, help, and the overlays it keeps mounted. */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
 import { lazy, Suspense } from 'react'
 import { render, screen, within, act, waitFor, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -50,6 +50,10 @@ import { helpContent } from '../../../data/helpContent'
 import { Zone } from '../../atelier/Zone'
 import { resetHealthForTests } from '../health'
 import { InspectorProvider, useInspector } from '../../../contexts/InspectorContext'
+import { loadEnglishHelp } from '../../../data/helpData'
+
+// The English help is a chunk of its own: loaded once, the dialog opens at once
+beforeAll(async () => { await loadEnglishHelp() })
 
 let inspector
 function Grab() {
