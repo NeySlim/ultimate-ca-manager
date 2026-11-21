@@ -1,23 +1,23 @@
 /**
- * Bottom bar: what /health reports (version, service state, HA node and cluster) in one line,
+ * Bottom bar, the mockup's footer.statusbar: what /health reports (version, service state, HA node and cluster) in one line,
  * the live connection, the pending approvals (read:approvals) and the shortcuts (search,
  * close the inspector). Nothing is shown for a field the API omits.
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { ArrowsClockwise, Check, CheckCircle, Warning } from '@phosphor-icons/react'
+import { Icon } from '../atelier/Icon'
 import { WebSocketIndicator } from '../WebSocketIndicator'
 import { approvalsService } from '../../services/approvals.service'
 import { haState, useHealth } from './health'
 
 const APPROVALS_POLL_MS = 60000
 
-/** The cluster in a few words, as the mockup's indicator: all current, nodes late, or maintenance. */
+/** The cluster in a few words, the mockup's haIndicator(): all current, nodes late, or maintenance. */
 function haSummary(ha, t) {
-  if (ha.maintenance) return ['warn', ArrowsClockwise, t('shell.haMaintenanceShort')]
-  if (ha.stale > 0) return ['warn', Warning, t('shell.haLate', { count: ha.stale })]
-  if (ha.nodes !== null) return ['good', Check, t('shell.haNodes', { count: ha.nodes })]
+  if (ha.maintenance) return ['warn', 'refresh', t('shell.haMaintenanceShort')]
+  if (ha.stale > 0) return ['warn', 'warning', t('shell.haLate', { count: ha.stale })]
+  if (ha.nodes !== null) return ['good', 'check', t('shell.haNodes', { count: ha.nodes })]
   return null
 }
 
@@ -51,51 +51,43 @@ export function StatusBar({ onShowNodes, can }) {
     tone = health.safe_mode ? 'warn' : 'good'
     text = health.safe_mode ? t('shell.statusSafeMode') : t('shell.statusRunning')
   }
-  // One sentence, as the mockup's "UCM 2.253 · SQLite · Simulation locale"
-  const line = [health?.version && t('shell.version', { version: health.version }), text].filter(Boolean).join(' · ')
-
   const ha = haState(health)
+  // One sentence, as the mockup's "UCM 2.253 · SQLite · Simulation locale"; in HA, the node that answered
+  // and its role follow it, a part a phone keeps out of sight (shell.css)
+  const line = [health?.version && t('shell.version', { version: health.version }), text].filter(Boolean).join(' · ')
+  const node = [ha?.node && t('shell.haNode', { node: ha.node }), ha?.leader === true && t('shell.haLeader'), ha?.leader === false && t('shell.haFollower')]
+    .filter(Boolean)
   const summary = ha && haSummary(ha, t)
 
   const indicator = summary && (() => {
-    const [haTone, Icon, label] = summary
-    const inner = <><Icon size={14} aria-hidden="true" /><span>{label}</span></>
+    const [haTone, icon, label] = summary
+    const inner = <><Icon name={icon} /><span>{label}</span></>
     return onShowNodes ? (
-      <button type="button" className={`shell-ha-link is-${haTone}`} aria-haspopup="dialog"
+      <button type="button" className={`ha-link ${haTone}`} id="ha-button" data-action="nodes" aria-haspopup="dialog"
         aria-label={t('shell.haIndicatorLabel', { state: label })} onClick={onShowNodes}>
         {inner}
       </button>
-    ) : <span className={`shell-ha-link is-${haTone}`}>{inner}</span>
+    ) : <span className={`ha-link ${haTone}`} id="ha-button">{inner}</span>
   })()
 
   return (
-    <footer className="shell-statusbar">
-      <span className="shell-status-live">
-        <span className="shell-status-text" role="status">
-          <i className={`shell-dot is-${tone}`} aria-hidden="true" />
-          {line && <span>{line}</span>}
-        </span>
-        {/* The live connection, at the most discreet place: an icon after the service state */}
-        <WebSocketIndicator className="shell-ws" />
+    <footer className="statusbar">
+      <span className="live" role="status">
+        <i className={`dot ${tone}`} aria-hidden="true" />
+        {line}
+        {node.length > 0 && <span className="ha-node">{node.map((n) => <span key={n}> · {n}</span>)}</span>}
+        {/* The live connection, the product's addition, drawn by its own styles after the service state */}
+        <span className="atl-out"><WebSocketIndicator className="shell-ws" /></span>
       </span>
       {pending !== null && (
-        <Link to="/approvals" className="shell-approvals-link" data-module="approvals">
-          <CheckCircle size={14} aria-hidden="true" />
+        <Link to="/approvals" className="approvals-link" data-module="approvals">
+          <Icon name="approve" />
           {pending > 0 ? t('shell.approvalsPending', { count: pending }) : t('shell.approvalsNone')}
         </Link>
       )}
-      {ha && (
-        <span className="shell-status-ha">
-          {indicator}
-          {/* The product's addition to the mockup's indicator, out of sight on a phone */}
-          {ha.node && <span className="shell-status-node">{t('shell.haNode', { node: ha.node })}</span>}
-          {ha.leader === true && <span className="shell-status-node">{t('shell.haLeader')}</span>}
-          {ha.leader === false && <span className="shell-status-node">{t('shell.haFollower')}</span>}
-        </span>
-      )}
-      <span className="shell-status-shortcut">
-        <kbd>Ctrl K</kbd> {t('common.search')}
-        <span className="shell-status-escape"><kbd>{t('shell.escapeKey')}</kbd> {t('inspector.close')}</span>
+      {indicator}
+      <span className="shortcut">
+        <kbd>Ctrl K</kbd> {t('common.search')} <span style={{ marginLeft: 10 }}><kbd>{t('shell.escapeKey')}</kbd> {t('inspector.close')}</span>
       </span>
     </footer>
   )

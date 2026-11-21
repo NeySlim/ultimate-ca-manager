@@ -479,12 +479,11 @@
   },
   "commandPalette": {
     "searchPlaceholder": "Пошук команд, сертифікатів, ЦС, користувачів...",
+    "searchLabel": "Search for a command or a certificate",
+    "subtitle": "Certificates, authorities and console navigation",
     "noCommandsFound": "Команди не знайдено",
-    "noResultsInDatabase": "Результатів у базі даних не знайдено",
     "favorites": "Обрані",
     "recent": "Останні",
-    "navigate": "Навігація",
-    "select": "Вибрати",
     "searchSections": {
       "certificates": "Сертифікати",
       "certificateAuthorities": "Центри сертифікації",

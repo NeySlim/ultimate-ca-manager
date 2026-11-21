@@ -35,7 +35,7 @@ describe('NotificationContext: a persistent toast', () => {
     await act(async () => { api.showError('Restart the application before using it.', 0) })
     await act(async () => { await vi.advanceTimersByTimeAsync(60000) })
     const toast = screen.getByText('Restart the application before using it.')
-    const close = toast.closest('li').querySelector('button')
+    const close = toast.closest('#toast').querySelector('#toast-close')
     await act(async () => { fireEvent.click(close) })
     await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
     expect(screen.queryByText('Restart the application before using it.')).toBeNull()

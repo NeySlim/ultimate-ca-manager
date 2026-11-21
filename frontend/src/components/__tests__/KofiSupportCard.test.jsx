@@ -64,14 +64,19 @@ describe('KofiSupportCard', () => {
     expect(screen.getByText('kofi.message')).toBeInTheDocument()
   })
 
-  it('floats in a corner by default, and sits in the page flow when asked to', async () => {
+  it('is the mockup\'s floating card, in a scope of its own; in the page flow when asked to', async () => {
     const floating = renderCard('3.0')
     await loadServerPrefs({})
-    expect(screen.getByLabelText('kofi.label').className).toMatch(/\bfixed\b/)
+    const corner = screen.getByLabelText('kofi.label')
+    expect(corner).toHaveClass('session-banner', 'kofi-card')
+    expect(corner).not.toHaveClass('kofi-inline')
+    expect(corner.parentElement).toHaveClass('atl', 'atl-island')
     floating.unmount()
+    // Inline, in a zone (the overview), the scope is the zone's
     render(<MemoryRouter><KofiSupportCard version="3.0" inline /></MemoryRouter>)
     const card = screen.getByLabelText('kofi.label')
-    expect(card.className).not.toMatch(/\b(fixed|absolute|sticky)\b/)
+    expect(card).toHaveClass('session-banner', 'kofi-card', 'kofi-inline')
+    expect(card.parentElement).not.toHaveClass('atl')
     fireEvent.click(screen.getByLabelText('kofi.dismiss'))
     await waitFor(() => expect(mocks.updatePreferences).toHaveBeenCalledWith(expect.objectContaining({ kofi_seen_version: '3.0' })))
   })

@@ -3172,13 +3172,12 @@
     "dragOrUseButtons": "Faites glisser les utilisateurs entre les listes ou utilisez les boutons"
   },
   "commandPalette": {
-    "searchPlaceholder": "Rechercher commandes, certificats, AC, utilisateurs...",
-    "noCommandsFound": "Aucune commande trouvée",
-    "noResultsInDatabase": "Aucun résultat trouvé dans la base de données",
+    "searchPlaceholder": "Certificat, page ou action…",
+    "searchLabel": "Rechercher une commande ou un certificat",
+    "subtitle": "Certificats, autorités et navigation de la console",
+    "noCommandsFound": "Aucun résultat. Essayez un nom de certificat ou de page.",
     "favorites": "Favoris",
     "recent": "Récents",
-    "navigate": "Naviguer",
-    "select": "Sélectionner",
     "searchSections": {
       "certificates": "Certificats",
       "certificateAuthorities": "Autorités de certification",

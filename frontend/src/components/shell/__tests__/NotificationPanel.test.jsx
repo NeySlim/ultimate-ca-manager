@@ -46,7 +46,7 @@ function setup(permissions = ROLES.admin) {
 }
 const bell = () => screen.getByRole('button', { name: /^shell\.bell\.label\|/ })
 const panel = () => screen.getByRole('complementary', { name: 'shell.bell.title' })
-const row = (key) => panel().querySelector(`[data-notification="${key}"]`)
+const row = (key) => panel().querySelector(`[data-notif="${key}"]`)
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
@@ -75,8 +75,8 @@ describe('Notification panel', () => {
     expect(days).toHaveLength(2)
     expect(days[0]).toMatch(/^shell\.bell\.today\|/)
     expect(days[1]).toMatch(/^shell\.bell\.yesterday\|/)
-    const today = panel().querySelectorAll('.shell-notif-group')[0]
-    expect([...today.querySelectorAll('[data-notification]')].map(li => li.dataset.notification))
+    const today = panel().querySelectorAll('.notif-group')[0]
+    expect([...today.querySelectorAll('[data-notif]')].map(li => li.dataset.notif))
       .toEqual(['crl_missing:3', 'acme_client_renewal_failed:11'])
     expect(row('acme_client_renewal_failed:11').querySelector('time')).toHaveAttribute('dateTime', '2026-11-08T05:40:00.000Z')
   })
@@ -117,7 +117,7 @@ describe('Notification panel', () => {
     await open(user)
     const retry = within(row('acme_client_renewal_failed:11')).getByRole('button', { name: /shell\.bell\.retryLabel/ })
     await waitFor(() => expect(retry).toBeDisabled())
-    expect(retry).toHaveAttribute('aria-describedby', 'shell-writes-note')
+    expect(retry).toHaveAttribute('aria-describedby', 'failover-note')
     await user.click(retry)
     expect(m.renewOrder).not.toHaveBeenCalled()
   })

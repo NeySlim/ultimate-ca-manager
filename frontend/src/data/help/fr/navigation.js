@@ -16,7 +16,7 @@ export default {
       {
         title: 'Recherche et raccourcis',
         items: [
-          { label: 'Recherche', text: 'Appuyez sur Ctrl K (Cmd K sur macOS) ou sélectionnez le champ de recherche pour aller à une page ou trouver un certificat' },
+          { label: 'Recherche', text: 'Appuyez sur Ctrl K (Cmd K sur macOS) ou sélectionnez le champ de recherche pour aller à une page ou trouver un certificat. Flèche bas passe du champ aux résultats, Flèche haut ramène du premier résultat au champ, et Entrée dans le champ ouvre le premier résultat' },
           { label: 'Aide', text: 'Appuyez sur ? hors d’un champ de texte pour ouvrir l’aide de la page courante' },
           { label: 'Largeur téléphone', text: 'La barre supérieure affiche une seule liste de pages au lieu des liens et du menu' },
         ]

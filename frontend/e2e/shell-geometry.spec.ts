@@ -14,12 +14,12 @@ const box = async (locator): Promise<Box> => {
 test('the top bar, its links and the status bar keep the mockup heights', async ({ page, api }) => {
   await page.setViewportSize({ width: 1600, height: 1000 })
   await page.goto('/certificates')
-  const top = await box(page.locator('.shell-topbar'))
+  const top = await box(page.locator('.masthead'))
   expect(top.y).toBeLessThanOrEqual(EPS)
   expect(Math.abs(top.height - 62)).toBeLessThanOrEqual(EPS)
   const nav = page.getByRole('navigation', { name: 'Main navigation' })
   // The four main pages, Activity last, as links of the bar's full height
-  const links = nav.locator('a.shell-navlink')
+  const links = nav.locator(':scope > a[data-nav]')
   await expect(links.nth(3)).toHaveAttribute('href', '/audit')
   for (const link of await links.all()) {
     const b = await box(link)
@@ -30,8 +30,8 @@ test('the top bar, its links and the status bar keep the mockup heights', async 
   expect(Math.abs(status.height - 25)).toBeLessThanOrEqual(EPS)
   expect(Math.abs(status.y + status.height - 1000)).toBeLessThanOrEqual(EPS)
   // The live connection lives in the status bar, not the top bar
-  await expect(page.locator('.shell-topbar .shell-ws')).toHaveCount(0)
-  await expect(page.locator('.shell-statusbar .shell-ws')).toHaveCount(1)
+  await expect(page.locator('.masthead .shell-ws')).toHaveCount(0)
+  await expect(page.locator('.statusbar .shell-ws')).toHaveCount(1)
 })
 
 test('the Modules menu opens under its button, inside the window', async ({ page, api }) => {
@@ -45,7 +45,7 @@ test('the Modules menu opens under its button, inside the window', async ({ page
   await expect(menu).toBeVisible()
   const b = await box(button)
   const m = await box(menu)
-  const top = await box(page.locator('.shell-topbar'))
+  const top = await box(page.locator('.masthead'))
   expect(Math.abs(m.y - (top.y + top.height))).toBeLessThanOrEqual(2)
   expect(m.x).toBeGreaterThanOrEqual(16 - EPS)
   expect(m.x + m.width).toBeLessThanOrEqual(1600 - 16 + EPS)
@@ -64,7 +64,7 @@ for (const width of [1600, 390]) {
     const panel = page.getByRole('complementary', { name: 'Notifications' })
     await expect(panel).toBeVisible()
     const p = await box(panel)
-    const top = await box(page.locator('.shell-topbar'))
+    const top = await box(page.locator('.masthead'))
     expect(Math.abs(p.x + p.width - width)).toBeLessThanOrEqual(EPS)
     expect(Math.abs(p.width - Math.min(420, width))).toBeLessThanOrEqual(EPS)
     if (width > 700) {
@@ -91,36 +91,36 @@ for (const width of [1250, 1100, 1000, 900, 801]) {
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/certificates')
     const nav = page.getByRole('navigation', { name: 'Main navigation' })
-    if (width <= 1100) for (const pin of await nav.locator('.shell-pinned').all()) await expect(pin).toBeHidden()
-    else await expect(nav.locator('.shell-pinned')).toHaveCount(3)
+    if (width <= 1100) for (const pin of await nav.locator('.pinned-link').all()) await expect(pin).toBeHidden()
+    else await expect(nav.locator('.pinned-link')).toHaveCount(3)
     // Every visible item of the bar shows something, and none runs over the search
-    const search = await box(page.locator('.shell-search'))
-    for (const item of await nav.locator('.shell-navlink').all()) {
+    const search = await box(page.locator('.search-command'))
+    for (const item of await nav.locator(':scope > a').all()) {
       if (!(await item.isVisible())) continue
       const b = await box(item)
       expect(b.x + b.width).toBeLessThanOrEqual(search.x + EPS)
       expect(b.width).toBeGreaterThan(30)
     }
-    if (width <= 1000) for (const help of await page.locator('.shell-help').all()) await expect(help).toBeHidden()
+    if (width <= 1000) for (const help of await page.locator('.help-button').all()) await expect(help).toBeHidden()
   })
 }
 
 test('the search field, its key and the status dot keep the mockup sizes', async ({ page, api }) => {
   await page.setViewportSize({ width: 1600, height: 1000 })
   await page.goto('/certificates')
-  const search = await box(page.locator('.shell-search'))
+  const search = await box(page.locator('.search-command'))
   expect(Math.abs(search.width - 177)).toBeLessThanOrEqual(EPS)
   expect(Math.abs(search.height - 35)).toBeLessThanOrEqual(EPS)
-  expect(Math.abs((await box(page.locator('.shell-search kbd'))).height - 21)).toBeLessThanOrEqual(EPS)
-  const dot = await box(page.locator('.shell-statusbar .shell-dot'))
+  expect(Math.abs((await box(page.locator('.search-command kbd'))).height - 21)).toBeLessThanOrEqual(EPS)
+  const dot = await box(page.locator('.statusbar .live .dot'))
   expect(Math.abs(dot.width - 6)).toBeLessThanOrEqual(0.5)
 })
 
 test('wide screens give the bars and the page 34 px margins', async ({ page, api }) => {
   await page.setViewportSize({ width: 1920, height: 1000 })
   await page.goto('/certificates')
-  expect(Math.abs((await box(page.locator('.shell-brand'))).x - 34)).toBeLessThanOrEqual(EPS)
-  expect(Math.abs((await box(page.locator('.shell-statusbar .shell-dot'))).x - 34)).toBeLessThanOrEqual(EPS)
+  expect(Math.abs((await box(page.locator('.masthead .brand'))).x - 34)).toBeLessThanOrEqual(EPS)
+  expect(Math.abs((await box(page.locator('.statusbar .live .dot'))).x - 34)).toBeLessThanOrEqual(EPS)
 })
 
 test('a phone reads the whole page name in the picker, keeps 44 px targets and scrolls the whole document', async ({ page, api }) => {
@@ -130,12 +130,12 @@ test('a phone reads the whole page name in the picker, keeps 44 px targets and s
   const p = await box(picker)
   expect(p.width).toBeGreaterThanOrEqual(133)
   expect(await picker.evaluate(el => getComputedStyle(el).fontSize)).toBe('12px')
-  for (const target of await page.locator('.shell-tools > *:visible, .shell-tools .shell-pop-wrap > button').all()) {
+  for (const target of await page.locator('.global-tools > *:visible, .global-tools .pop-wrap > button').all()) {
     if (!(await target.isVisible())) continue
     const b = await box(target)
     expect(b.height).toBeGreaterThanOrEqual(44 - EPS)
   }
-  await expect(page.locator('.shell-help')).toBeHidden()
+  await expect(page.locator('.help-button')).toBeHidden()
   // The status bar ends the document; the top bar sticks while it scrolls
   // Asked until it holds: the list still grows the document while its rows arrive
   await expect.poll(async () => {
@@ -144,7 +144,7 @@ test('a phone reads the whole page name in the picker, keeps 44 px targets and s
     return Math.abs(status.y + status.height - docHeight)
   }).toBeLessThanOrEqual(1)
   await page.evaluate(() => window.scrollTo({ top: 400, behavior: 'instant' }))
-  expect(Math.abs((await box(page.locator('.shell-topbar'))).y)).toBeLessThanOrEqual(EPS)
+  expect(Math.abs((await box(page.locator('.masthead'))).y)).toBeLessThanOrEqual(EPS)
 })
 
 test('offline, the banner says so and the write buttons wait for the network', async ({ page, context, api }) => {
@@ -154,16 +154,16 @@ test('offline, the banner says so and the write buttons wait for the network', a
   await expect(issue).toBeEnabled()
   await context.setOffline(true)
   try {
-    await expect(page.locator('#shell-offline-banner')).toBeVisible()
+    await expect(page.locator('#offline-banner')).toBeVisible()
     await expect(issue).toBeDisabled()
-    await expect(issue).toHaveAttribute('aria-describedby', 'shell-offline-note')
+    await expect(issue).toHaveAttribute('aria-describedby', 'offline-note')
   } finally {
     await context.setOffline(false)
   }
-  await expect(page.locator('#shell-offline-banner')).toHaveCount(0)
+  await expect(page.locator('#offline-banner')).toHaveCount(0)
   await expect(issue).toBeEnabled()
   // The message of the return is the mockup's pill: 41 px high, 40 px above the window's edge, inverted colours
-  const toast = page.locator('.ui-toast').filter({ hasText: /./ }).last()
+  const toast = page.locator('#toast.visible')
   const t = await box(toast)
   expect(Math.abs(t.height - 41)).toBeLessThanOrEqual(EPS)
   expect(Math.abs(1000 - (t.y + t.height) - 40)).toBeLessThanOrEqual(EPS)
@@ -175,6 +175,26 @@ test('offline, the banner says so and the write buttons wait for the network', a
   expect(colours.radius).toBe('5px')
   await expect(toast.locator('button')).toHaveCount(0)
 })
+
+// The product's deviation from the mockup: from 320 to 800 px nothing covers the brand
+for (const width of [320, 360, 390, 480, 600, 700, 800]) {
+  test(`nothing covers the brand at ${width}px`, async ({ page, api }) => {
+    await page.setViewportSize({ width, height: 800 })
+    await page.goto('/certificates')
+    const brand = await box(page.locator('.masthead .brand'))
+    expect(brand.x).toBeGreaterThanOrEqual(0)
+    const others = page.locator('.masthead > :not(.brand):visible, .masthead .global-tools > :visible')
+    for (const other of await others.all()) {
+      const b = await other.boundingBox()
+      if (!b || b.width === 0) continue
+      const overlap = Math.min(brand.x + brand.width, b.x + b.width) - Math.max(brand.x, b.x)
+      const vertical = Math.min(brand.y + brand.height, b.y + b.height) - Math.max(brand.y, b.y)
+      expect(overlap > EPS && vertical > EPS, await other.evaluate(el => el.className || el.tagName)).toBe(false)
+    }
+    // Nothing runs out of the window either
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
+  })
+}
 
 test('a dialog opens over the mockup veil, on its first field', async ({ page, api }) => {
   await page.setViewportSize({ width: 1600, height: 1000 })

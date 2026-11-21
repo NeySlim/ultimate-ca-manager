@@ -39,4 +39,29 @@ describe('the dialog', () => {
     render(<AtelierDialog title="D" onClose={() => {}}><input aria-label="a" /><input aria-label="b" data-autofocus="" /></AtelierDialog>)
     expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'b' }))
   })
+
+  it('leaves the focus where the action put it when skipReturn says so, and returns it otherwise', async () => {
+    function Host({ skip }) {
+      const [open, setOpen] = useState(false)
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>Ouvrir</button>
+          <button type="button" id="elsewhere">Ailleurs</button>
+          {open && <AtelierDialog title="D" onClose={() => setOpen(false)} skipReturn={() => skip}>
+            <button type="button" onClick={() => { document.getElementById('elsewhere').focus(); setOpen(false) }}>Agir</button>
+          </AtelierDialog>}
+        </>
+      )
+    }
+    for (const skip of [true, false]) {
+      const { unmount } = render(<Host skip={skip} />)
+      const opener = screen.getByRole('button', { name: 'Ouvrir' })
+      opener.focus()
+      fireEvent.click(opener)
+      fireEvent.click(screen.getByRole('button', { name: 'Agir' }))
+      await act(frame)
+      expect(document.activeElement).toBe(skip ? screen.getByRole('button', { name: 'Ailleurs' }) : opener)
+      unmount()
+    }
+  })
 })

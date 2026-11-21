@@ -1,11 +1,11 @@
 /**
- * Banners at the top of the workspace: offline (reading continues, writes wait for the network),
+ * Banners at the top of the workspace, the mockup's stateBanners(): offline (reading continues, writes wait for the network),
  * then, in HA mode, a cluster maintenance (every write suspended, as the server refuses them)
  * or a degraded cluster (silent nodes, what still works). Nothing in the nominal state.
  */
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowsClockwise, Check, Clock, HardDrives, Plug, Warning } from '@phosphor-icons/react'
+import { Icon } from '../atelier/Icon'
 import { formatDate } from '../../lib/utils'
 import { haState, useHealth, useOnline, OFFLINE_NOTE_ID, WRITES_NOTE_ID } from './health'
 
@@ -36,21 +36,22 @@ export function StateBanners({ onShowNodes, onNotice }) {
   const ha = haState(useHealth())
 
   const offline = !online && (
-    <div className="shell-state-banner" id="shell-offline-banner">
-      <Plug size={18} aria-hidden="true" />
+    <div className="state-banner" id="offline-banner">
+      <Icon name="plug" />
       <p id={OFFLINE_NOTE_ID}>
         <strong>{t('shell.offline.title')}</strong>{' '}{t('shell.offline.text')}
       </p>
     </div>
   )
 
+  // A cluster maintenance suspends every write, as the mockup's failover does: its banner
   let cluster = null
   if (ha?.maintenance) {
     const m = ha.maintenance
     const reason = t(`shell.ha.reasons.${m.reason}`, { defaultValue: m.reason || '' })
     cluster = (
-      <div className="shell-state-banner is-warn" id="shell-maintenance-banner">
-        <ArrowsClockwise size={18} aria-hidden="true" />
+      <div className="state-banner tone-warn" id="failover-banner">
+        <Icon name="refresh" />
         <p id={WRITES_NOTE_ID}>
           <strong>{t('shell.ha.maintenanceTitle', { reason })}</strong>{' '}
           {m.expires_at ? t('shell.ha.maintenanceUntil', { date: formatDate(m.expires_at) }) : t('shell.ha.maintenanceOpen')}
@@ -59,25 +60,25 @@ export function StateBanners({ onShowNodes, onNotice }) {
     )
   } else if (ha && ha.stale > 0) {
     cluster = (
-      <div className="shell-state-banner is-warn" id="shell-ha-banner">
-        <Warning size={18} aria-hidden="true" />
-        <div className="shell-ha-what">
+      <div className="state-banner tone-warn" id="ha-banner">
+        <Icon name="warning" />
+        <div className="ha-what">
           <p>
             <strong>{t('shell.ha.degradedTitle')}</strong>{' '}
             {ha.nodes !== null ? t('shell.ha.degradedOf', { count: ha.stale, total: ha.nodes }) : t('shell.ha.degraded', { count: ha.stale })}
           </p>
-          <ul className="shell-ha-can">
-            <li><Check size={13} aria-hidden="true" /><span>{t('shell.ha.canRead')}</span></li>
-            <li><Check size={13} aria-hidden="true" /><span>{ha.node ? t('shell.ha.canWriteOn', { node: ha.node }) : t('shell.ha.canWrite')}</span></li>
+          <ul className="ha-can">
+            <li><Icon name="check" /><span>{t('shell.ha.canRead')}</span></li>
+            <li><Icon name="check" /><span>{ha.node ? t('shell.ha.canWriteOn', { node: ha.node }) : t('shell.ha.canWrite')}</span></li>
             <li>
-              {ha.leaderless ? <Clock size={13} aria-hidden="true" /> : <Check size={13} aria-hidden="true" />}
+              <Icon name={ha.leaderless ? 'clock' : 'check'} />
               <span>{ha.leaderless ? t('shell.ha.scheduleWaits') : t('shell.ha.scheduleOn', { node: ha.leaderNode })}</span>
             </li>
           </ul>
         </div>
         {onShowNodes && (
-          <button type="button" className="shell-btn" onClick={onShowNodes}>
-            <HardDrives size={16} aria-hidden="true" />{t('shell.ha.showNodes')}
+          <button type="button" className="btn" id="ha-banner-nodes" data-action="nodes" onClick={onShowNodes}>
+            <Icon name="server" />{t('shell.ha.showNodes')}
           </button>
         )}
       </div>

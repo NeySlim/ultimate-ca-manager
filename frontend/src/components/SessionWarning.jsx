@@ -7,12 +7,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { Clock, ArrowClockwise } from '@phosphor-icons/react'
+import { Icon } from './atelier/Icon'
 import { useAuth, useNotification } from '../contexts'
 import { authService } from '../services'
 import { focusPageTitle } from '../lib/focusPageTitle'
 import { BANNER_SLOT } from '../lib/sessionBannerSlot'
-import './auth/auth.css'
 
 const WARNING_BEFORE = 5 * 60 * 1000 // Show warning 5 minutes before expiry
 const UNKNOWN_RECHECK = 30 * 1000 // Server unreachable: ask again after this
@@ -151,22 +150,24 @@ export function SessionWarning() {
   const live = <span className="sr-only" aria-live="polite">{announce}</span>
   if (!showWarning) return live
 
+  // The mockup's sessionBanner(): the time left in its own span, inside the sentence
+  const [before, after] = t('session.expiresIn', { time: '\u0000' }).split('\u0000')
   const banner = (
-    <div className="session-banner" role="region" aria-labelledby="session-banner-title">
-      <Clock size={20} aria-hidden="true" />
+    <div className="session-banner" id="session-banner" role="region" aria-labelledby="session-banner-title">
+      <Icon name="clock" />
       <p>
-        <strong id="session-banner-title">{t('session.expiresIn', { time: formatTime(secondsLeft) })}</strong>
+        <strong id="session-banner-title">{before}<span id="session-left">{formatTime(secondsLeft)}</span>{after}</strong>
         <span>{t('session.lockNotice')}</span>
       </p>
-      <button type="button" className="auth-btn is-primary" onClick={extendSession}>
-        <ArrowClockwise size={17} aria-hidden="true" />{t('session.extend')}
+      <button type="button" className="btn primary" id="session-extend" data-action="session-extend" data-write="false" onClick={extendSession}>
+        <Icon name="refresh" />{t('session.extend')}
       </button>
     </div>
   )
-  // Between the console's top bar and its page in the tab order, as the design inserts it;
-  // in place where no console is shown (a gate over it)
+  // Between the console's top bar and its page in the tab order, as the design inserts it (the shell's
+  // slot is under its .atl); in place, with a scope of its own, where no console is shown (a gate over it)
   const slot = document.getElementById(BANNER_SLOT)
-  return <>{live}{slot ? createPortal(banner, slot) : banner}</>
+  return <>{live}{slot ? createPortal(banner, slot) : <div className="atl atl-island">{banner}</div>}</>
 }
 
 export default SessionWarning

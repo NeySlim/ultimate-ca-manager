@@ -1,13 +1,13 @@
-/** Pinned modules, in the stored order, after Activity and before the Modules button. */
+/** Pinned modules, in the stored order, after Activity and before the Modules button (the mockup's pinned links). */
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { moduleById, menuLabelKey } from '../../navigation/registry'
+import { Icon } from '../atelier/Icon'
+import { glyphOf, moduleById, menuLabelKey } from '../../navigation/registry'
 
 export function PinnedModules({ pins, activeId }) {
   const { t } = useTranslation()
   return pins.map(id => {
     const mod = moduleById(id)
-    const Icon = mod.icon
     const active = activeId === id
     const label = t(menuLabelKey(mod))
     return (
@@ -15,12 +15,11 @@ export function PinnedModules({ pins, activeId }) {
         key={id}
         to={mod.path}
         data-module={id}
-        title={label}
-        className={`shell-navlink shell-pinned${active ? ' is-active' : ''}`}
+        className={`pinned-link${active ? ' active' : ''}`}
         aria-current={active ? 'page' : undefined}
+        title={label}
       >
-        <Icon size={16} aria-hidden="true" />
-        <span className="shell-pin-label">{label}</span>
+        <Icon name={glyphOf(mod)} /><span className="pin-label">{label}</span>
       </Link>
     )
   })

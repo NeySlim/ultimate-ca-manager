@@ -477,12 +477,11 @@
   },
   "commandPalette": {
     "searchPlaceholder": "搜索命令、证书、CA、用户...",
+    "searchLabel": "Search for a command or a certificate",
+    "subtitle": "Certificates, authorities and console navigation",
     "noCommandsFound": "未找到命令",
-    "noResultsInDatabase": "数据库中未找到结果",
     "favorites": "收藏",
     "recent": "最近",
-    "navigate": "导航",
-    "select": "选择",
     "searchSections": {
       "certificates": "证书",
       "certificateAuthorities": "证书颁发机构",

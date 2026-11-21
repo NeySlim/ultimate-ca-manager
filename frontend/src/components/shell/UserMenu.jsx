@@ -1,12 +1,12 @@
 /**
- * Account menu, as the mockup draws it: identity (name, role and login), the sign-in method with
+ * Account menu, the mockup's userMenu(): identity (name, role and login), the sign-in method with
  * the inactivity lock, then My account and Sign out. The language is chosen in the account
  * preferences and on the sign-in page; Settings is reached from the Modules menu and the palette.
  */
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useNavigate } from 'react-router-dom'
-import { Users, SignOut } from '@phosphor-icons/react'
+import { useNavigate } from 'react-router-dom'
+import { Icon } from '../atelier/Icon'
 import { useAuth } from '../../contexts/AuthContext'
 import { authService } from '../../services/auth.service'
 import { useDisclosure, moveFocus } from './useDisclosure'
@@ -65,37 +65,40 @@ export function UserMenu() {
 
   const method = !authMethod || authMethod === 'session' ? null : METHOD_KEYS[authMethod] ? t(METHOD_KEYS[authMethod]) : authMethod
 
+  const label = role ? t('shell.accountLabel', { name, role }) : t('shell.accountLabelName', { name })
   return (
-    <div className="shell-pop-wrap" {...rootProps} onKeyDown={onKeyDown}>
+    <div className="pop-wrap user-wrap" {...rootProps} onKeyDown={onKeyDown}>
       <button
         type="button"
         ref={buttonRef}
-        className="shell-avatar"
+        className="avatar"
+        id="user-button"
+        data-action="user-menu"
         aria-expanded={open}
-        aria-controls="shell-user-menu"
-        aria-label={role ? t('shell.accountLabel', { name, role }) : t('shell.accountLabelName', { name })}
+        aria-controls="user-menu"
+        aria-label={label}
         title={name}
         onClick={() => setOpen(!open)}
       >
         {initialsOf(username)}
       </button>
-      <div id="shell-user-menu" ref={panelRef} className="shell-pop shell-user-menu" hidden={!open}>
-        <div className="shell-user-id">
-          <strong>{name}</strong>
-          <span>{role && <>{role} · </>}<span className="shell-mono">{username}</span></span>
+      <div className="pop-menu user-menu" id="user-menu" ref={panelRef} hidden={!open}>
+        <div className="user-id">
+          <strong id="user-name">{name}</strong>
+          <span id="user-role">{role && <>{role} · </>}<span className="mono">{username}</span></span>
           {method || minutes ? (
-            <span className="shell-muted">
+            <span className="muted">
               {method && t('shell.signedInWith', { method })}
               {method && minutes ? ' ' : null}
               {minutes ? t('shell.lockAfter', { count: minutes }) : null}
             </span>
           ) : null}
         </div>
-        <Link to="/account" className="shell-pop-item" onClick={() => close()}>
-          <Users size={17} aria-hidden="true" />{t('common.account')}
-        </Link>
-        <button type="button" className="shell-pop-item" onClick={handleLogout}>
-          <SignOut size={17} aria-hidden="true" />{t('shell.signOut')}
+        <button type="button" className="pop-item" id="user-account" data-action="my-account" onClick={() => { close(); navigate('/account') }}>
+          <Icon name="users" />{t('common.account')}
+        </button>
+        <button type="button" className="pop-item" id="user-logout" data-action="logout" onClick={handleLogout}>
+          <Icon name="logout" />{t('shell.signOut')}
         </button>
       </div>
     </div>

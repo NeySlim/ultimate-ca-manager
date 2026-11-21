@@ -63,12 +63,14 @@ describe('AuthFrame', () => {
     renderFrame()
     fireEvent.click(screen.getByRole('button', { name: 'settings.language' }))
     const menu = screen.getByRole('menu', { name: 'settings.language' })
-    expect(menu).toHaveClass('shell-pop', 'ui-theme-menu')
+    // The theme menu's gabarit, the mockup's themeMenu(), under the scope of its rules
+    expect(menu).toHaveClass('pop-menu', 'theme-menu')
+    expect(menu.closest('.atl')).not.toBeNull()
     const items = screen.getAllByRole('menuitemradio')
     for (const item of items) {
-      expect(item).toHaveClass('ui-pop-item')
-      expect(item.querySelector('.ui-pop-label')).not.toBeNull()
-      expect(item.querySelector('.ui-pop-check svg')).not.toBeNull()
+      expect(item.parentElement).toHaveAttribute('role', 'none')
+      expect(item.querySelector('.pop-label')).not.toBeNull()
+      expect(item.querySelector('.pop-check svg')).not.toBeNull()
     }
     expect(items.map(i => i.tabIndex)).toEqual([-1, -1])
   })

@@ -3,7 +3,8 @@
  * inside and answers Escape), a head with the title and Fermer la fenêtre, then the body.
  * On close the focus goes back to the control that opened it (or the element that replaced it,
  * same id), else to `returnTo` (an id, the mockup's returnFallback), else to the page title.
- * size: 'narrow' (520 px), 'wide' (920 px) or none (760 px).
+ * size: 'narrow' (520 px), 'wide' (920 px) or none (760 px). skipReturn(): true when what the dialog
+ * opened took the focus itself (the inspector), which then stays there.
  */
 import { useContext, useEffect, useLayoutEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -25,7 +26,7 @@ export function AtelierDialog(props) {
   return <div className="atl atl-island"><AtlScopeContext.Provider value><ModalDialog {...props} /></AtlScopeContext.Provider></div>
 }
 
-function ModalDialog({ title, subtitle, size = '', onClose, children, testId, returnTo }) {
+function ModalDialog({ title, subtitle, size = '', onClose, children, testId, returnTo, skipReturn }) {
   const { t } = useTranslation()
   const ref = useRef(null)
   const opener = useRef(null)
@@ -33,6 +34,8 @@ function ModalDialog({ title, subtitle, size = '', onClose, children, testId, re
   close.current = onClose
   const fallback = useRef(returnTo)
   fallback.current = returnTo
+  const skip = useRef(skipReturn)
+  skip.current = skipReturn
 
   useLayoutEffect(() => {
     const dialog = ref.current
@@ -47,6 +50,7 @@ function ModalDialog({ title, subtitle, size = '', onClose, children, testId, re
     return () => {
       if (dialog.open && typeof dialog.close === 'function') dialog.close()
       const back = opener.current
+      if (skip.current?.()) return
       // after React has committed: the opener may be replaced by an element with the same id
       requestAnimationFrame(() => {
         const candidates = [back, back?.id && document.getElementById(back.id), fallback.current && document.getElementById(fallback.current)]

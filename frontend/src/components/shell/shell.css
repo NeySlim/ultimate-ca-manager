@@ -1,167 +1,92 @@
 /*
- * Atelier shell: top bar, Modules mega-menu, account popover, status bar.
- * Tokens only (styles/tokens.css); Aurore effects sit under its family selector.
+ * The shell's own rules; not copies. Its parts are drawn by the mockup's rules (styles/atelier/maquette.css,
+ * under .atl). Here: what the mockup's style.css says of its document (html, body, #app, the Aurore glow),
+ * translated to the product's document, the deviations the shell needs, and the setup card's own styles.
  */
-:root { --shell-status-h: 25px; }
-.shell-root {
-  --shell-bar-h: 62px;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-  min-width: 0;
-  overflow: hidden;
-  background: var(--bg);
-  color: var(--text);
-}
-/* Bar and page; the page and the inspector share the main area, in a column or side by side */
-.shell-stage {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  min-width: 0;
-}
-.shell-main { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
+
+/* The mockup's #app without its study bar (a note on the mockup itself): the masthead, the stage, the status bar. */
+.shell-app { height: 100%; display: grid; grid-template-rows: 62px minmax(0, 1fr) 25px; }
+.shell-app .masthead { grid-row: 1; }
+.shell-app > .shell-main { grid-row: 2; }
+.shell-app .statusbar { grid-row: 3; }
+/* The stage of a page drawn outside the mockup's zones: the page, the inspector beside or under it */
+.shell-main { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
 .shell-main.has-dock-right { flex-direction: row; }
 .shell-content { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
 .shell-page { flex: 1; display: flex; min-height: 0; min-width: 0; overflow: auto; }
 .shell-page:focus { outline: none; }
 .shell-page-wait { flex: 1; display: grid; place-items: center; min-height: 400px; }
+/* Phone width, the mockup's document rules: the whole document scrolls, the masthead sticks, the status bar ends the page */
+@media (max-width: 800px) {
+  html:has(.shell-app) { overflow: visible; }
+  html:has(.shell-app), html:has(.shell-app) body { height: auto; min-height: 100%; }
+  html:has(.shell-app) body { overflow: auto; }
+  html:has(.shell-app) #root { height: auto; min-height: 100dvh; }
+  .shell-app { height: auto; min-height: 100dvh; display: flex; flex-direction: column; }
+  .shell-main, .shell-content, .shell-page { flex: 0 0 auto; min-height: 0; overflow: visible; }
+}
 
-/* Top bar */
-.shell-topbar {
-  position: relative;
-  z-index: 30;
-  flex-shrink: 0;
-  height: var(--shell-bar-h);
-  display: flex;
-  align-items: center;
-  gap: 30px;
-  padding: 0 24px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--line);
-  font-size: 13px;
-  line-height: normal;
+/*
+ * Deviations, under :root so they outrank the copied rule they amend.
+ * The product has no study bar: what the mockup places under it (26 px) moves up by as much
+ * (above 800 px only: a phone's panel covers the screen, its session banner sits at the bottom).
+ */
+@media (min-width: 801px) {
+  :root .shell-app .modules-menu, :root .shell-app .notif-panel { top: 62px; }
+  :root .shell-app .session-banner { top: 74px; }
 }
-.shell-brand { display: flex; align-items: center; gap: 10px; min-width: 144px; color: var(--text); text-decoration: none; flex-shrink: 0; }
-.shell-brand-mark { display: flex; }
-.shell-brand-mark svg { width: 28px; height: 32px; }
-.shell-brand strong { font-size: 21px; font-weight: 600; letter-spacing: -0.5px; }
-.shell-main-nav { display: flex; align-items: stretch; align-self: stretch; gap: 5px; min-width: 0; }
-.shell-fixed { display: flex; align-items: stretch; flex-shrink: 0; position: relative; }
-/* Full-height links of the main bar; the current one is filled and underlined */
-.shell-navlink {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 15px;
-  border: 0;
-  border-radius: 0;
-  background: none;
-  color: var(--muted);
-  font: inherit;
-  font-size: 12px;
-  text-decoration: none;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.shell-navlink:hover { background: var(--hover); }
-.shell-navlink.is-active { background: var(--selected); color: var(--accent); }
-.shell-navlink.is-active::after {
+/* The brand keeps the room of the mockup's, whose "Atelier" label names the mockup itself */
+@media (min-width: 1251px) { :root .shell-app .masthead .brand { min-width: 143.5px; } }
+/* Nothing covers the brand on a phone: it keeps its width, the page picker gives way */
+@media (max-width: 800px) { :root .shell-app .masthead .brand { flex-shrink: 0; } }
+/* The product's count of expiring certificates, on the Certificates link, out of its layout, above its label */
+:root .masthead .main-nav .nav-count { top: 4px; right: 0; pointer-events: none; }
+/* The navigation help link in the Modules menu's foot keeps the foot's line height (the mockup has no link there) */
+:root .modules-menu .menu-foot > .text-link { padding-block: 0; }
+/* The service state's dot says the state (the mockup's dot says its simulation) */
+:root .statusbar .live .dot.good { color: var(--good); }
+:root .statusbar .live .dot.bad { color: var(--bad); }
+:root .statusbar .live .dot.muted { color: var(--muted); }
+:root .statusbar .live > .atl-out:empty { display: none; }
+/* The HA node and its role, the product's addition to the line: kept for assistive technology on a phone */
+@media (max-width: 800px) { :root .statusbar .live .ha-node { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; } }
+/* The live connection's dot, drawn by the product, sits on the line of the text and adds no height to it */
+:root .statusbar .live > .atl-out { display: inline-flex; align-items: center; height: 15px; }
+
+/* Aurore family, the mockup's body rules: a drifting glow behind the console */
+:root[data-theme="aurore"] body { isolation: isolate; }
+:root[data-theme="aurore"] body::before {
   content: '';
-  position: absolute;
-  left: 15px;
-  right: 15px;
-  bottom: 0;
-  height: 2px;
-  background: var(--accent);
-}
-.shell-pin-label { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
-.shell-navicon { position: relative; display: inline-flex; }
-/* Expiry count above the Certificates icon, out of the link's layout: it covers neither the icon nor the label */
-.shell-badge {
-  position: absolute;
-  top: -18px;
-  left: 8px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 8px;
-  background: var(--warn-fill);
-  color: var(--bg);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 16px;
-  text-align: center;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+  position: fixed;
+  inset: -12%;
+  z-index: -1;
   pointer-events: none;
+  background:
+    radial-gradient(1100px 700px at 16% 2%, color-mix(in srgb, var(--grad-a) 36%, transparent), transparent 60%),
+    radial-gradient(700px 500px at 58% 42%, var(--glow-rose), transparent 60%),
+    radial-gradient(800px 600px at 90% 98%, var(--glow-b), transparent 60%);
+  animation: shell-aurore-drift 90s ease-in-out infinite alternate;
+  will-change: transform;
+}
+:root[data-theme="aurore"][data-mode="light"] body::before {
+  background:
+    radial-gradient(1100px 700px at 16% 2%, color-mix(in srgb, var(--grad-a) 16%, transparent), transparent 60%),
+    radial-gradient(700px 500px at 58% 42%, var(--glow-rose), transparent 60%),
+    radial-gradient(800px 600px at 90% 98%, var(--glow-b), transparent 60%);
+}
+@keyframes shell-aurore-drift {
+  from { transform: translate3d(-2%, -1.5%, 0) scale(1); }
+  50% { transform: translate3d(1.5%, 2%, 0) scale(1.04); }
+  to { transform: translate3d(2.5%, -1%, 0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme="aurore"] body::before { animation: none; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-theme="aurore"] body::before { display: none; }
 }
 
-.shell-mobile-nav { display: none; }
-.shell-tools { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.shell-search {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-width: 177px;
-  min-height: 32px;
-  padding: 6px 11px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--panel);
-  color: var(--muted);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.shell-search:hover { background: var(--hover); }
-.shell-search span { text-align: left; }
-.shell-search kbd, .shell-status-shortcut kbd {
-  padding: 0 4px;
-  border: 1px solid var(--control);
-  border-radius: 3px;
-  color: var(--muted);
-  font: inherit;
-  font-size: 12px;
-  line-height: 16px;
-}
-/* The search key keeps the mockup's own kbd box: 2px 4px at the font's line height */
-.shell-search kbd { margin-left: auto; padding: 2px 4px; line-height: normal; }
-.shell-icon-btn {
-  display: inline-grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: none;
-  color: var(--text);
-  font: inherit;
-  cursor: pointer;
-}
-.shell-icon-btn:hover { background: var(--hover); }
-.shell-avatar {
-  display: grid;
-  place-items: center;
-  width: 29px;
-  height: 29px;
-  margin-left: 7px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: var(--raised);
-  color: var(--text);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-.shell-avatar:hover { background: var(--hover); }
-
-/* Buttons and links of the shell's panels, as the list template draws them */
+/* The setup card (components/shell/SetupCard.jsx), shown by the Certificates page */
 .shell-btn {
   display: inline-flex;
   align-items: center;
@@ -186,202 +111,6 @@
 .shell-btn.is-primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .shell-text-link { display: inline-flex; align-items: center; gap: 4px; padding: 3px 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 500; text-decoration: none; cursor: pointer; }
 .shell-text-link:hover { text-decoration: underline; }
-.shell-notif-foot .shell-text-link { display: inline; padding: 0; }
-
-.shell-topbar :focus-visible, .shell-pop :focus-visible, .shell-menu :focus-visible, .shell-statusbar :focus-visible,
-.shell-notif-panel :focus-visible, .shell-state-banner :focus-visible, .shell-setup :focus-visible, .shell-setup-later :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-  box-shadow: none;
-}
-/* Skip link: first tab stop, shown at the top left while focused */
-.shell-skip { position: fixed; left: 16px; top: -60px; z-index: 100; padding: 14px; background: var(--panel); color: var(--text); font-size: 13px; text-decoration: none; }
-.shell-skip:focus { top: 12px; }
-.shell-skip:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; box-shadow: none; }
-
-/* Modules mega-menu */
-.shell-modules { display: flex; align-items: stretch; }
-.shell-menu {
-  position: fixed;
-  top: var(--shell-bar-h);
-  left: 16px;
-  z-index: 40;
-  width: min(1000px, calc(100vw - 32px));
-  max-height: calc(100dvh - var(--shell-bar-h) - 32px);
-  overflow: auto;
-  padding: 14px 14px 12px;
-  background: var(--panel);
-  border: 1px solid var(--control);
-  border-top: 0;
-  border-radius: 0 0 6px 6px;
-  box-shadow: 0 18px 50px color-mix(in srgb, var(--ink) 47%, transparent);
-  font-size: 13px;
-  line-height: normal;
-}
-.shell-menu[hidden] { display: none; }
-.shell-menu-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 0 8px 11px; margin-bottom: 8px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); }
-.shell-menu-head strong { color: var(--text); font-size: 13px; font-weight: 600; }
-.shell-menu-groups { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px 12px; }
-.shell-menu-title { display: flex; align-items: center; margin: 0; padding: 6px 8px; font-size: 12px; font-weight: 500; color: var(--muted); }
-.shell-count { margin-left: 6px; padding: 1px 5px; border: 1px solid var(--line); border-radius: 3px; font-size: 12px; font-variant-numeric: tabular-nums; }
-.shell-menu-group ul { list-style: none; margin: 0; padding: 0; }
-.shell-menu-item { display: flex; align-items: center; gap: 2px; border-radius: 4px; }
-.shell-menu-item:hover { background: var(--hover); }
-.shell-menu-item a { flex: 1; min-width: 0; display: flex; align-items: flex-start; gap: 10px; padding: 7px 8px; border-radius: 4px; color: var(--text); text-decoration: none; }
-.shell-menu-item a > svg { flex-shrink: 0; margin-top: 1px; color: var(--accent); }
-.shell-menu-item strong { display: block; font-size: 13px; font-weight: 500; }
-.shell-menu-item small { display: block; margin-top: 2px; font-size: 12px; line-height: 1.45; color: var(--muted); }
-.shell-menu-item.is-current { background: var(--selected); }
-.shell-menu-item.is-current strong { color: var(--accent); }
-.shell-pin { display: inline-grid; place-items: center; width: 28px; min-height: 28px; margin-right: 2px; padding: 6px; border: 0; border-radius: 4px; background: none; color: var(--muted); cursor: pointer; }
-.shell-pin:hover { background: var(--hover); }
-.shell-pin[aria-pressed="true"] { color: var(--accent); background: var(--selected); }
-.shell-pin[aria-disabled="true"] { opacity: 0.42; cursor: not-allowed; }
-.shell-menu-foot { display: flex; align-items: center; gap: 7px; margin-top: 8px; padding: 10px 8px 0; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
-.shell-menu-foot p { margin: 0; }
-.shell-link-button { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
-.shell-link-button:hover { text-decoration: underline; }
-
-/* Account popover */
-.shell-pop-wrap { position: relative; display: flex; }
-.shell-pop {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 45;
-  width: 260px;
-  max-height: calc(100dvh - var(--shell-bar-h) - 24px);
-  overflow: auto;
-  padding: 6px;
-  background: var(--panel);
-  border: 1px solid var(--control);
-  border-radius: 6px;
-  box-shadow: 0 18px 50px color-mix(in srgb, var(--ink) 40%, transparent);
-}
-.shell-pop[hidden] { display: none; }
-.shell-user-menu { width: 270px; }
-.shell-user-id { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px 11px; border-bottom: 1px solid var(--line); margin-bottom: 6px; font-size: 12px; line-height: 1.5; color: var(--text); }
-.shell-user-id strong { font-size: 13px; }
-.shell-muted { color: var(--muted); }
-.shell-pop-group { display: flex; flex-direction: column; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
-.shell-pop-label { padding: 4px 10px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.shell-pop-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 6px 10px; border: 0; border-radius: 4px; background: none; color: var(--text); font: inherit; font-size: 13px; line-height: normal; text-align: left; text-decoration: none; cursor: pointer; }
-.shell-pop-item:hover { background: var(--hover); }
-.shell-pop-item[aria-pressed="true"] { background: var(--selected); }
-.shell-grow { flex: 1; }
-.shell-swatch { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--line); }
-
-/* Notification bell: count on the button, side panel between the bars */
-.shell-bell { position: relative; }
-.shell-bell-count { position: absolute; top: -4px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--accent); color: var(--bg); font-size: 12px; font-weight: 600; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; }
-.shell-notif-panel {
-  position: fixed;
-  top: var(--shell-bar-h);
-  right: 0;
-  bottom: var(--shell-status-h);
-  z-index: 35;
-  width: min(420px, 100vw);
-  display: flex;
-  flex-direction: column;
-  background: var(--panel);
-  border-left: 1px solid var(--control);
-  box-shadow: -18px 0 50px -20px color-mix(in srgb, var(--ink) 47%, transparent);
-  font-size: 13px;
-  line-height: normal;
-  text-align: left;
-}
-.shell-notif-panel[hidden] { display: none; }
-.shell-notif-panel p, .shell-notif-panel h2, .shell-notif-panel h3 { margin: 0; }
-.shell-notif-head { display: flex; align-items: center; gap: 6px; padding: 14px 12px 12px 18px; border-bottom: 1px solid var(--line); }
-.shell-notif-head > div { flex: 1; min-width: 0; }
-.shell-notif-head h2 { font-size: 16px; font-weight: 600; }
-.shell-notif-head h2:focus { outline: none; }
-.shell-notif-head h2:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.shell-notif-head p { margin-top: 2px; font-size: 12px; color: var(--muted); }
-.shell-notif-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
-.shell-notif-group h3 { position: sticky; top: 0; z-index: 1; padding: 8px 18px; font-size: 12px; font-weight: 600; color: var(--muted); background: var(--raised); border-bottom: 1px solid var(--line); }
-.shell-notif-group ul { list-style: none; margin: 0; padding: 0; }
-.shell-notif-item { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; padding: 13px 18px; border-bottom: 1px solid var(--line); }
-.shell-notif-item.is-unread { box-shadow: inset 3px 0 0 var(--accent); }
-.shell-notif-icon { display: flex; padding-top: 1px; }
-.shell-notif-icon.is-bad, .shell-notif-kind.is-bad { color: var(--bad); }
-.shell-notif-icon.is-warn, .shell-notif-kind.is-warn { color: var(--warn); }
-.shell-notif-icon.is-accent, .shell-notif-kind.is-accent { color: var(--accent); }
-.shell-notif-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; }
-.shell-notif-kind { font-weight: 600; }
-.shell-notif-new { padding: 0 6px; border: 1px solid currentColor; border-radius: 3px; color: var(--accent); }
-.shell-notif-meta time { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
-.shell-notif-title { margin-top: 4px !important; font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
-.shell-notif-item.is-unread .shell-notif-title { font-weight: 600; }
-.shell-notif-detail { margin-top: 2px !important; font-size: 12px; line-height: 1.5; color: var(--muted); overflow-wrap: anywhere; }
-.shell-notif-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
-.shell-notif-empty { display: flex; align-items: center; gap: 8px; padding: 24px 18px; font-size: 13px; color: var(--muted); }
-.shell-notif-foot { display: flex; align-items: flex-start; gap: 9px; padding: 12px 18px; border-top: 1px solid var(--line); font-size: 12px; line-height: 1.5; color: var(--muted); }
-.shell-notif-foot > svg { flex-shrink: 0; margin-top: 2px; }
-
-/* Status bar */
-.shell-statusbar {
-  flex-shrink: 0;
-  height: var(--shell-status-h);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 9px;
-  padding: 0 24px;
-  line-height: normal;
-  background: var(--panel);
-  border-top: 1px solid var(--line);
-  font-size: 12px;
-  color: var(--muted);
-}
-.shell-statusbar > * { white-space: nowrap; }
-.shell-status-live, .shell-status-text, .shell-status-ha { display: inline-flex; align-items: center; gap: 6px; }
-.shell-status-shortcut { display: inline-flex; align-items: center; gap: 5px; }
-.shell-status-ha { gap: 9px; }
-/* The live indicator keeps the 15 px line of the bar: no padding of its own, a 14 px icon */
-.shell-status-live .shell-ws { padding: 0 2px; }
-.shell-status-live .shell-ws svg { width: 14px; height: 14px; }
-.shell-ha-link { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 8px; border: 0; border-radius: 3px; background: none; font: inherit; font-size: 12px; color: inherit; }
-button.shell-ha-link { cursor: pointer; }
-.shell-approvals-link { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 8px; border-radius: 3px; color: var(--accent); font-weight: 500; text-decoration: none; }
-.shell-approvals-link:hover { background: var(--hover); }
-button.shell-ha-link:hover { background: var(--hover); }
-.shell-ha-link.is-good { color: var(--good); }
-.shell-ha-link.is-warn { color: var(--warn); }
-.shell-status-escape { margin-left: 10px; }
-.shell-dot { flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; color: var(--muted); background: currentColor; }
-.shell-dot.is-good { color: var(--good); }
-.shell-dot.is-warn { color: var(--warn); }
-.shell-dot.is-bad { color: var(--bad); }
-
-/* Banners at the top of the workspace (HA): what is suspended, what still works */
-.shell-state-banner { display: flex; align-items: flex-start; gap: 12px; flex-shrink: 0; margin: 12px 24px 0; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--control); border-radius: 5px; font-size: 13px; line-height: 1.5; color: var(--text); }
-.shell-state-banner > svg { flex-shrink: 0; margin-top: 2px; color: var(--muted); }
-.shell-state-banner.is-warn { border-left-color: var(--warn-fill); }
-.shell-state-banner.is-warn > svg { color: var(--warn); }
-.shell-state-banner p { margin: 0; }
-.shell-state-banner > p, .shell-ha-what { flex: 1; min-width: 0; }
-.shell-ha-can { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 6px 0 0; padding: 0; font-size: 12px; color: var(--muted); }
-.shell-ha-can li { display: flex; align-items: center; gap: 6px; }
-.shell-ha-can svg { flex-shrink: 0; color: var(--text); }
-
-/* Cluster nodes dialog (inside the list template's dialog) */
-.shell-nodes-intro, .lv-dialog-body > p.shell-nodes-intro { margin: 0 0 14px; font-size: 12px; line-height: 1.5; color: var(--muted); }
-.shell-node-list { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; }
-.shell-node-card { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 5px; background: var(--raised); }
-.shell-node-card.is-late { border-left: 4px solid var(--warn-fill); }
-.shell-node-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.shell-mono { font-family: 'Fira Code', monospace; font-size: 12px; }
-.shell-node-badge { display: inline-flex; align-items: center; gap: 6px; padding: 0; font-size: 12px; white-space: nowrap; color: var(--text); }
-:root[data-theme="aurore"] .shell-node-badge { padding: 1px 8px 1px 6px; border: 1px solid color-mix(in srgb, currentColor 35%, transparent); border-radius: 999px; background: color-mix(in srgb, currentColor 14%, transparent); }
-.shell-node-badge.is-good, .shell-node-props .is-good { color: var(--good); }
-.shell-node-props .is-warn { color: var(--warn); }
-.shell-node-props { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; margin: 0; font-size: 12px; }
-.shell-node-props dt { color: var(--muted); }
-.shell-node-props dd { margin: 0; }
-.shell-node-props svg { display: inline; vertical-align: -2px; margin-right: 4px; }
-
-/* First run: the "Initial setup" card, its folded line */
 .shell-setup { flex-shrink: 0; margin: 0 0 18px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); overflow: hidden; font-size: 13px; line-height: normal; color: var(--text); }
 .shell-setup p, .shell-setup h2, .shell-setup h3 { margin: 0; }
 .shell-setup-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 16px 19px 12px; }
@@ -410,193 +139,26 @@ button.shell-ha-link:hover { background: var(--hover); }
 .shell-setup-later > svg { flex-shrink: 0; color: var(--accent); }
 .shell-setup-later p { flex: 1; margin: 0; }
 .shell-setup-later strong { font-weight: 600; }
-
-/* Wide screens: 34 px side margins for the bars and the page */
-@media (min-width: 1800px) {
-  .shell-topbar, .shell-statusbar { padding-left: 34px; padding-right: 34px; }
-  .shell-content .lv-stage { --lv-gutter: 34px; }
-}
-@media (max-width: 1700px) {
-  .shell-navlink { padding: 0 12px; }
-  .shell-navlink.is-active::after { left: 12px; right: 12px; }
-}
-@media (max-width: 1440px) {
-  .shell-pin-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .shell-main-nav > .shell-pinned { padding: 0 12px; }
-}
-@media (max-width: 1250px) {
-  .shell-topbar { gap: 15px; }
-  .shell-brand { min-width: 90px; }
-  .shell-navlink { padding: 0 11px; }
-  .shell-navlink.is-active::after { left: 11px; right: 11px; }
-  .shell-tools { gap: 5px; }
-  .shell-search { min-width: 120px; }
-  .shell-search span { display: none; }
-}
-/* Pinned modules leave the bar before the links would run over the search */
-@media (max-width: 1100px) {
-  .shell-main-nav > .shell-pinned { display: none; }
-}
-@media (max-width: 1000px) {
-  .shell-help { display: none; }
-  .shell-topbar { padding: 0 18px; gap: 16px; }
-  .shell-navlink { padding: 0 9px; }
-  .shell-navlink.is-active::after { left: 9px; right: 9px; }
-  .shell-main-nav .shell-navlink svg { display: none; }
-  /* The icon's box leaves the flow with its icon: the label starts at the padding, the count stays above it */
-  .shell-main-nav .shell-navicon { position: absolute; left: 9px; top: 50%; width: 16px; height: 16px; margin-top: -8px; }
-  .shell-search { min-width: 64px; }
-}
-
-/* Phone width: the picker replaces the bar links and the mega-menu */
 @media (max-width: 800px) {
-  .shell-main-nav { display: none; }
-  .shell-brand { min-width: 0; }
-  .shell-brand-mark svg { width: 24px; height: 28px; }
-  /* The picker needs the room: the name stays for screen readers, the search keeps its icon */
-  .shell-brand strong { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .shell-search kbd { display: none; }
-  /* The mockup's picker (12 px, 5px 8px, 190 px at most); touch targets stay 44 px high */
-  .shell-mobile-nav {
-    display: block;
-    flex: 1 1 auto;
-    min-width: 0;
-    max-width: 190px;
-    min-height: 44px;
-    padding: 5px 8px;
-    border: 1px solid var(--control);
-    border-radius: 4px;
-    background: var(--panel);
-    color: var(--text);
-    font: inherit;
-    font-size: 12px;
-  }
-  /* The mockup's 14 px margins: the brand mark alone, the picker 133 px beside four 44 px targets */
-  .shell-topbar { gap: 8px; padding: 0 14px; }
-  .shell-tools { gap: 2px; margin-left: 0; }
-  .shell-search, .shell-icon-btn, .shell-avatar { min-width: 44px; min-height: 44px; justify-content: center; }
-  .shell-avatar { width: 44px; height: 44px; }
-  .shell-search { padding: 0; }
-  .shell-pop { position: fixed; right: 8px; left: 8px; width: auto; top: var(--shell-bar-h); }
-  /* The account menu stays the mockup's 270 px panel under its avatar */
-  .shell-pop.shell-user-menu { position: absolute; top: calc(100% + 8px); right: 0; left: auto; width: 270px; }
-  .shell-pop-item { min-height: 44px; }
-  .shell-status-shortcut { display: none; }
-  .shell-statusbar { height: auto; min-height: 34px; margin-top: auto; padding: 7px 16px; font-size: 12px; flex-wrap: wrap; row-gap: 2px; }
-  /* The mockup's two lines: the node and its role stay for assistive technology, the node list shows them */
-  .shell-status-node { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
-  .shell-notif-panel { top: 0; bottom: 0; z-index: 60; width: 100%; border: 0; }
-  .shell-notif-head { padding: 10px 8px 10px 16px; }
-  .shell-notif-head .shell-icon-btn { width: 40px; height: 40px; min-width: 40px; min-height: 40px; }
-  .shell-notif-actions .shell-btn { min-height: 40px; }
-  .shell-notif-item { padding: 13px 16px; }
-  .shell-state-banner { flex-wrap: wrap; margin: 12px 16px 0; }
-  .shell-state-banner > p, .shell-state-banner .shell-ha-what { flex-basis: calc(100% - 34px); }
-  .shell-state-banner > .shell-btn { margin-left: 30px; }
-  .shell-node-list { grid-template-columns: 1fr; }
   .shell-setup-step { grid-template-columns: 28px minmax(0, 1fr); row-gap: 8px; }
   .shell-setup-step .shell-setup-state, .shell-setup-step .shell-btn { grid-column: 2; justify-self: start; }
   .shell-setup-bar { flex-basis: 110px; }
   .shell-setup-head { flex-wrap: wrap; }
 }
-@media (max-width: 380px) {
-  .shell-brand strong { display: none; }
-}
-/* Phone width: the whole document scrolls, the top bar sticks, the status bar ends the page */
-@media (max-width: 800px) {
-  html:has(.shell-root), html:has(.shell-root) body { height: auto; min-height: 100%; overflow: visible; }
-  html:has(.shell-root) #root { height: auto; min-height: 100dvh; }
-  .shell-root { height: auto; min-height: 100dvh; overflow: visible; }
-  .shell-stage, .shell-main, .shell-content, .shell-page { flex: 0 0 auto; min-height: 0; overflow: visible; }
-  .shell-topbar { position: sticky; top: 0; z-index: 30; }
-}
+.shell-setup :focus-visible, .shell-setup-later :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+:root[data-theme="aurore"] .shell-btn { border-radius: 6px; }
+:root[data-theme="aurore"] .shell-btn:not(.is-primary):not(.is-quiet) { background: color-mix(in srgb, var(--paper) 3%, transparent); border-color: color-mix(in srgb, var(--paper) 10%, transparent); }
+:root[data-theme="aurore"] .shell-btn:not(.is-primary):not(.is-quiet):hover:not(:disabled) { background: color-mix(in srgb, var(--grad-a) 12%, transparent); }
+:root[data-theme="aurore"][data-mode="light"] .shell-btn:not(.is-primary):not(.is-quiet) { background: color-mix(in srgb, var(--paper) 70%, transparent); border-color: var(--control); }
+:root[data-theme="aurore"][data-mode="light"] .shell-btn:not(.is-primary):not(.is-quiet):hover:not(:disabled) { background: color-mix(in srgb, var(--grad-a) 8%, transparent); }
+:root[data-theme="aurore"] :is(.shell-setup, .shell-setup-later) :focus-visible { box-shadow: 0 0 0 5px var(--halo); }
 
-/* Aurore family: a drifting glow behind the page, glass on the bars and menus */
-:root[data-theme="aurore"] body { isolation: isolate; }
-:root[data-theme="aurore"] body::before {
-  content: '';
-  position: fixed;
-  inset: -12%;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(1100px 700px at 16% 2%, color-mix(in srgb, var(--grad-a) 36%, transparent), transparent 60%),
-    radial-gradient(700px 500px at 58% 42%, var(--glow-rose), transparent 60%),
-    radial-gradient(800px 600px at 90% 98%, var(--glow-b), transparent 60%);
-  animation: shell-aurore-drift 90s ease-in-out infinite alternate;
-}
-:root[data-theme="aurore"][data-mode="light"] body::before {
-  background:
-    radial-gradient(1100px 700px at 16% 2%, color-mix(in srgb, var(--grad-a) 16%, transparent), transparent 60%),
-    radial-gradient(700px 500px at 58% 42%, var(--glow-rose), transparent 60%),
-    radial-gradient(800px 600px at 90% 98%, var(--glow-b), transparent 60%);
-}
-@keyframes shell-aurore-drift {
-  from { transform: translate3d(-2%, -1.5%, 0) scale(1); }
-  50% { transform: translate3d(1.5%, 2%, 0) scale(1.04); }
-  to { transform: translate3d(2.5%, -1%, 0) scale(1); }
-}
-:root[data-theme="aurore"] .shell-root { background: transparent; }
-/* The glass sits on a pseudo-element: a backdrop filter on the bar itself would become the
-   containing block of the fixed menus and panel it holds, and squash them into the bar */
-:root[data-theme="aurore"] :is(.shell-topbar, .shell-statusbar) { position: relative; isolation: isolate; background: transparent; border-color: transparent; }
-:root[data-theme="aurore"] :is(.shell-topbar, .shell-statusbar)::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background: color-mix(in srgb, var(--bg) 62%, transparent);
-  -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  backdrop-filter: blur(18px) saturate(1.4);
-}
-:root[data-theme="aurore"] .shell-topbar { border-bottom: 1px solid transparent; border-image: linear-gradient(90deg, var(--grad-a), var(--grad-b) 45%, transparent) 1; }
-:root[data-theme="aurore"] .shell-statusbar { border-top: 1px solid transparent; border-image: linear-gradient(90deg, var(--grad-a), var(--grad-b) 45%, transparent) 1; }
-:root[data-theme="aurore"] :is(.shell-menu, .shell-pop, .shell-notif-panel) {
-  background: color-mix(in srgb, var(--panel) 80%, transparent);
-  -webkit-backdrop-filter: blur(16px) saturate(1.4);
-  backdrop-filter: blur(16px) saturate(1.4);
-  border-color: color-mix(in srgb, var(--paper) 8%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--paper) 6%, transparent), 0 24px 60px -20px color-mix(in srgb, var(--ink) 70%, transparent);
-}
-:root[data-theme="aurore"] .shell-menu { background: color-mix(in srgb, var(--panel) 78%, transparent); }
-:root[data-theme="aurore"][data-mode="light"] :is(.shell-menu, .shell-pop, .shell-notif-panel) {
-  background: color-mix(in srgb, var(--paper) 84%, transparent);
-  border-color: color-mix(in srgb, var(--text) 14%, transparent);
-  box-shadow: inset 0 1px 0 var(--paper), 0 24px 60px -20px color-mix(in srgb, var(--shade) 35%, transparent);
-}
-:root[data-theme="aurore"][data-mode="light"] :is(.shell-topbar, .shell-statusbar)::before { background: color-mix(in srgb, var(--paper) 66%, transparent); }
-:root[data-theme="aurore"][data-mode="light"] .shell-navlink.is-active { background: linear-gradient(180deg, color-mix(in srgb, var(--grad-a) 10%, transparent), transparent), var(--selected); }
-/* Shell buttons in Aurore: 6 px corners; plain ones on a faint glass, as the mockup's .btn */
-:root[data-theme="aurore"] :is(.shell-search, .shell-icon-btn, .shell-btn, .shell-pin) { border-radius: 6px; }
-:root[data-theme="aurore"] :is(.shell-search, .shell-btn:not(.is-primary):not(.is-quiet)) { background: color-mix(in srgb, var(--paper) 3%, transparent); border-color: color-mix(in srgb, var(--paper) 10%, transparent); }
-:root[data-theme="aurore"] :is(.shell-search, .shell-btn:not(.is-primary):not(.is-quiet)):hover:not(:disabled) { background: color-mix(in srgb, var(--grad-a) 12%, transparent); }
-:root[data-theme="aurore"][data-mode="light"] :is(.shell-search, .shell-btn:not(.is-primary):not(.is-quiet)) { background: color-mix(in srgb, var(--paper) 70%, transparent); border-color: var(--control); }
-:root[data-theme="aurore"][data-mode="light"] :is(.shell-search, .shell-btn:not(.is-primary):not(.is-quiet)):hover:not(:disabled) { background: color-mix(in srgb, var(--grad-a) 8%, transparent); }
-:root[data-theme="aurore"] .shell-dot { box-shadow: 0 0 8px currentColor; }
-:root[data-theme="aurore"] :is(.shell-topbar, .shell-pop, .shell-menu, .shell-statusbar, .shell-notif-panel, .shell-state-banner, .shell-setup, .shell-setup-later) :focus-visible {
-  box-shadow: 0 0 0 5px var(--halo);
-}
-:root[data-theme="aurore"] .shell-navlink.is-active { background: linear-gradient(180deg, color-mix(in srgb, var(--grad-a) 18%, transparent), transparent), var(--selected); }
-:root[data-theme="aurore"] .shell-navlink.is-active::after { background: linear-gradient(90deg, var(--grad-a), var(--grad-b)); }
-:root[data-theme="aurore"] .shell-count { border-radius: 999px; padding: 1px 7px; background: color-mix(in srgb, currentColor 14%, transparent); border-color: color-mix(in srgb, currentColor 35%, transparent); }
-:root[data-theme="aurore"] .shell-notif-group h3 { background: color-mix(in srgb, var(--raised) 92%, transparent); }
-:root[data-theme="aurore"][data-mode="light"] .shell-notif-group h3 { background: color-mix(in srgb, var(--bg) 94%, transparent); }
-:root[data-theme="aurore"] .shell-bell-count { background: linear-gradient(135deg, var(--grad-a), var(--grad-b)); color: var(--bg); }
-:root[data-theme="aurore"][data-mode="light"] .shell-bell-count { color: var(--on-accent); }
-:root[data-theme="aurore"] .shell-notif-item.is-unread { box-shadow: inset 3px 0 0 var(--grad-a); }
-:root[data-theme="aurore"] .shell-navlink:not(.is-active):hover { background: color-mix(in srgb, var(--grad-a) 10%, transparent); }
-:root[data-theme="aurore"][data-mode="light"] .shell-navlink:not(.is-active):hover { background: color-mix(in srgb, var(--grad-a) 8%, transparent); }
-@media (max-width: 800px) {
-  :root[data-theme="aurore"] :is(.shell-pop:not(.shell-user-menu):not(.ui-theme-menu), .shell-notif-panel) { background: var(--panel); -webkit-backdrop-filter: none; backdrop-filter: none; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  :root[data-theme="aurore"] body::before { animation: none; }
-  .shell-root *, .shell-root *::before, .shell-root *::after { transition: none !important; }
-}
-@media (prefers-reduced-transparency: reduce) {
-  :root[data-theme="aurore"] :is(.shell-topbar, .shell-statusbar)::before { background: var(--panel); -webkit-backdrop-filter: none; backdrop-filter: none; }
-  :root[data-theme="aurore"] :is(.shell-menu, .shell-pop, .shell-notif-panel) { background: var(--panel); -webkit-backdrop-filter: none; backdrop-filter: none; }
-  :root[data-theme="aurore"] body::before { display: none; }
-}
+/* The Ko-fi card, the product's own, in the gabarit of the mockup's floating card: in the corner over the
+   status bar, or in the page flow; Ko-fi's colours on its rule, its icon and its button */
+:root .session-banner.kofi-card { top: auto; bottom: 37px; left: auto; right: 32px; transform: none; width: min(460px, calc(100vw - 32px)); border-color: var(--line); border-left-color: var(--kofi-coral); }
+:root .session-banner.kofi-card.kofi-inline { position: static; width: auto; max-width: 560px; box-shadow: none; }
+:root .session-banner.kofi-card > .icon { color: var(--kofi-coral-strong); }
+:root .session-banner.kofi-card p > span { color: var(--text); font-size: 13px; }
+:root .session-banner.kofi-card .kofi-button { background: var(--kofi-coral-strong); border-color: var(--kofi-coral-strong); color: var(--paper); }
+:root .session-banner.kofi-card .kofi-button:hover { background: var(--kofi-coral-hover); filter: none; }
+@media (max-width: 800px) { :root .session-banner.kofi-card:not(.kofi-inline) { left: 16px; right: 16px; bottom: 12px; width: auto; } }

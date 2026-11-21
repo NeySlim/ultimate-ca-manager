@@ -93,7 +93,7 @@ describe('TopBar', () => {
     for (let i = 0; i < 13; i++) {
       await user.tab()
       const el = document.activeElement
-      seen.push(el.getAttribute('data-module') || el.getAttribute('aria-label') || el.textContent)
+      seen.push(el.getAttribute('data-module') || el.getAttribute('aria-label') || el.textContent.trim())
     }
     // The phone picker is display:none on desktop (CSS, not applied in jsdom)
     expect(seen.filter(l => l !== 'shell.navigate')).toEqual([
@@ -150,48 +150,54 @@ describe('TopBar expiry badge', () => {
   it('shows the count on the Certificates link, says it, and dismisses it once the link is followed', async () => {
     getStats.mockResolvedValue({ data: { expiring: 3, expired: 2 } })
     const { user } = setup()
-    await waitFor(() => expect(document.querySelector('.shell-badge')).toHaveTextContent('5'))
-    expect(certLink()).toContainElement(document.querySelector('.shell-badge'))
+    await waitFor(() => expect(document.querySelector('.nav-count')).toHaveTextContent('5'))
+    expect(certLink()).toContainElement(document.querySelector('.nav-count'))
     expect(certLink()).toHaveTextContent('shell.expiringCount')
     await user.click(certLink())
-    expect(document.querySelector('.shell-badge')).toBeNull()
+    expect(document.querySelector('.nav-count')).toBeNull()
     expect(JSON.parse(localStorage.getItem('ucm_badge_dismissed')).count).toBe(5)
   })
 
   it('adds no tab stop: the count is part of its link', async () => {
     getStats.mockResolvedValue({ data: { expiring: 1, expired: 0 } })
     setup()
-    await waitFor(() => expect(document.querySelector('.shell-badge')).toHaveTextContent('1'))
+    await waitFor(() => expect(document.querySelector('.nav-count')).toHaveTextContent('1'))
     expect(screen.queryByRole('button', { name: /expiring/ })).toBeNull()
-    expect(document.querySelector('.shell-badge')).toHaveAttribute('aria-hidden', 'true')
+    expect(document.querySelector('.nav-count')).toHaveAttribute('aria-hidden', 'true')
   })
 
   // jsdom has no layout: the cascade of the real stylesheet is what it can check
-  it('keeps the count out of the link geometry: drawn over the icon, no margin, no pointer', async () => {
-    const sheet = document.createElement('style')
-    sheet.textContent = readFileSync(resolve(process.cwd(), 'src/components/shell/shell.css'), 'utf8')
-    document.head.appendChild(sheet)
+  it('keeps the count out of the link geometry: over the link, above its label, no pointer', async () => {
+    const sheets = ['src/styles/atelier/scope.css', 'src/styles/atelier/maquette.css', 'src/components/shell/shell.css'].map((f) => {
+      const sheet = document.createElement('style')
+      sheet.textContent = readFileSync(resolve(process.cwd(), f), 'utf8')
+      document.head.appendChild(sheet)
+      return sheet
+    })
     try {
       getStats.mockResolvedValue({ data: { expiring: 30, expired: 2 } })
-      setup({ activeId: 'certificates' })
-      await waitFor(() => expect(document.querySelector('.shell-badge')).toHaveTextContent('32'))
-      const badge = document.querySelector('.shell-badge')
+      const user = userEvent.setup()
+      render(<MemoryRouter><div className="atl"><TopBar can={canFor(ROLES.admin)} pins={[]} activeId="certificates" hasHelp onOpenSearch={vi.fn()} onOpenHelp={vi.fn()} onTogglePin={vi.fn()} /></div></MemoryRouter>)
+      void user
+      await waitFor(() => expect(document.querySelector('.nav-count')).toHaveTextContent('32'))
+      const badge = document.querySelector('.nav-count')
       const style = getComputedStyle(badge)
       expect(style.position).toBe('absolute')
       expect(style.pointerEvents).toBe('none')
-      expect(getComputedStyle(badge.parentElement).position).toBe('relative')
-      // Its bottom stays above the 16 px icon: it covers neither the icon nor the label beside it
-      expect(parseFloat(style.top) + parseFloat(style.height)).toBeLessThanOrEqual(-2)
+      expect(badge.parentElement).toBe(certLink())
+      expect(getComputedStyle(certLink()).position).toBe('relative')
+      // In the 61 px bar the 12 px label is centred from 23 px down: the count ends above it
+      expect(parseFloat(style.top) + parseFloat(style.height)).toBeLessThanOrEqual(22)
       // The link keeps the padding of every bar link, the underline its symmetric insets
       expect(getComputedStyle(certLink()).paddingRight).toBe(getComputedStyle(certLink()).paddingLeft)
     } finally {
-      sheet.remove()
+      sheets.forEach((s) => s.remove())
     }
   })
 
   it('has no badge when nothing expires', async () => {
     setup()
     await Promise.resolve()
-    expect(document.querySelector('.shell-badge')).toBeNull()
+    expect(document.querySelector('.nav-count')).toBeNull()
   })
 })

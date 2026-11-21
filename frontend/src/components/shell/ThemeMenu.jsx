@@ -1,20 +1,20 @@
 /**
- * Theme menu of the top bar, as the mockup's: 220 px, one choice per line with its icon
- * (System, Dark, Light, Aurore dark, Aurore light), the current one checked; a choice closes
- * the menu and gives the focus back to the button. Nothing else: these five are the product's themes.
+ * Theme menu, the mockup's themeMenu(): a menu button and its radio items (System, Dark, Light,
+ * Aurore dark, Aurore light), the current one checked; a choice closes the menu and gives the
+ * focus back to the button. These five are the product's themes. Shared with the sign-in pages.
  */
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Desktop, Moon, Sun, Sparkle, Check } from '@phosphor-icons/react'
+import { Icon } from '../atelier/Icon'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useDisclosure, moveFocus } from './useDisclosure'
 
 const CHOICES = [
-  { id: 'system', family: 'atelier', mode: 'system', labelKey: 'shell.theme.system', Icon: Desktop },
-  { id: 'dark', family: 'atelier', mode: 'dark', labelKey: 'shell.theme.dark', Icon: Moon },
-  { id: 'light', family: 'atelier', mode: 'light', labelKey: 'shell.theme.light', Icon: Sun },
-  { id: 'aurore', family: 'aurore', mode: 'dark', labelKey: 'shell.theme.aurore', Icon: Sparkle },
-  { id: 'aurore-light', family: 'aurore', mode: 'light', labelKey: 'shell.theme.auroreLight', Icon: Sparkle },
+  { id: 'system', family: 'atelier', mode: 'system', labelKey: 'shell.theme.system', icon: 'monitor' },
+  { id: 'dark', family: 'atelier', mode: 'dark', labelKey: 'shell.theme.dark', icon: 'moon' },
+  { id: 'light', family: 'atelier', mode: 'light', labelKey: 'shell.theme.light', icon: 'sun' },
+  { id: 'aurore', family: 'aurore', mode: 'dark', labelKey: 'shell.theme.aurore', icon: 'sparkles' },
+  { id: 'aurore-light', family: 'aurore', mode: 'light', labelKey: 'shell.theme.auroreLight', icon: 'sparkles' },
 ]
 
 export function ThemeMenu() {
@@ -32,7 +32,7 @@ export function ThemeMenu() {
     ? `${t('shell.theme.system')} (${modeName.toLowerCase()})`
     : t(current?.labelKey || 'shell.theme.menu')
   // The button shows the applied theme: sparkles for Aurore, otherwise the resolved mode
-  const ButtonIcon = themeFamily === 'aurore' ? Sparkle : resolvedMode === 'light' ? Sun : Moon
+  const buttonIcon = themeFamily === 'aurore' ? 'sparkles' : resolvedMode === 'light' ? 'sun' : 'moon'
 
   useEffect(() => {
     if (open) {
@@ -67,38 +67,43 @@ export function ThemeMenu() {
     moveFocus(e, items())
   }
 
+  const label = t('shell.theme.label', { theme: currentName })
   return (
-    <div className="shell-pop-wrap" {...rootProps} onKeyDown={onKeyDown}>
+    <div className="pop-wrap theme-wrap" {...rootProps} onKeyDown={onKeyDown}>
       <button
         type="button"
         ref={buttonRef}
-        className="shell-icon-btn"
+        className="icon-btn quiet"
+        id="theme-button"
+        data-action="theme-menu"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-controls="shell-theme-menu"
-        aria-label={t('shell.theme.label', { theme: currentName })}
-        title={t('shell.theme.label', { theme: currentName })}
+        aria-controls="theme-menu"
+        aria-label={label}
+        title={label}
+        data-mode={resolvedMode}
         onClick={() => setOpen(!open)}
       >
-        <ButtonIcon size={16} aria-hidden="true" data-mode={resolvedMode} />
+        <Icon name={buttonIcon} />
       </button>
-      <div id="shell-theme-menu" ref={panelRef} className="shell-pop ui-theme-menu" role="menu"
-        aria-label={t('shell.theme.menu')} hidden={!open}>
-        {CHOICES.map(({ id, family, mode: choiceMode, labelKey, Icon }) => {
+      <ul className="pop-menu theme-menu" id="theme-menu" ref={panelRef} role="menu" aria-label={t('shell.theme.menu')} hidden={!open}>
+        {CHOICES.map(({ id, family, mode: choiceMode, labelKey, icon }) => {
           const checked = themeFamily === family && mode === choiceMode
           return (
-            <button key={id} type="button" role="menuitemradio" tabIndex={-1} aria-checked={checked}
-              className="ui-pop-item" onClick={() => choose(() => { setThemeFamily(family); setMode(choiceMode) })}>
-              <Icon aria-hidden="true" />
-              <span className="ui-pop-label">
-                {t(labelKey)}
-                {id === 'system' && <small>{t('shell.theme.systemNow', { mode: modeName.toLowerCase() })}</small>}
-              </span>
-              <span className="ui-pop-check" aria-hidden="true"><Check /></span>
-            </button>
+            <li key={id} role="none">
+              <button type="button" role="menuitemradio" tabIndex={-1} aria-checked={checked} data-theme-choice={id}
+                onClick={() => choose(() => { setThemeFamily(family); setMode(choiceMode) })}>
+                <Icon name={icon} />
+                <span className="pop-label">
+                  {t(labelKey)}
+                  {id === 'system' && <small>{t('shell.theme.systemNow', { mode: modeName.toLowerCase() })}</small>}
+                </span>
+                <span className="pop-check"><Icon name="check" /></span>
+              </button>
+            </li>
           )
         })}
-      </div>
+      </ul>
     </div>
   )
 }

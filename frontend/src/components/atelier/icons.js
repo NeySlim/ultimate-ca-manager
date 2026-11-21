@@ -54,3 +54,5 @@ export const PATHS = {
   logout:'<path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5M15 8l4 4-4 4M19 12H9"/>',
   monitor:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>'
 };
+// The brand mark of the mockup's masthead (its icons.js markSrc), verbatim: an image, its colour is the mark's own.
+export const markSrc = 'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 44" fill="none"><path d="M20 3 35 9v12c0 10-15 20-15 20S5 31 5 21V9L20 3Z" stroke="#e66c20" stroke-width="2.5"/><path d="M13 14v10a7 7 0 0 0 14 0V14" stroke="#e66c20" stroke-width="2.5" stroke-linecap="round"/><circle cx="20" cy="12" r="2" fill="#e66c20"/></svg>');

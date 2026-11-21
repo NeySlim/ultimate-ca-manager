@@ -477,12 +477,11 @@
   },
   "commandPalette": {
     "searchPlaceholder": "Buscar comandos, certificados, CAs, usuarios...",
+    "searchLabel": "Search for a command or a certificate",
+    "subtitle": "Certificates, authorities and console navigation",
     "noCommandsFound": "No se encontraron comandos",
-    "noResultsInDatabase": "No se encontraron resultados en la base de datos",
     "favorites": "Favoritos",
     "recent": "Recientes",
-    "navigate": "Navegar",
-    "select": "Seleccionar",
     "searchSections": {
       "certificates": "Certificados",
       "certificateAuthorities": "Autoridades de certificación",

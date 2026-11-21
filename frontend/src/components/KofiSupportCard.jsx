@@ -1,12 +1,14 @@
 /**
- * KofiSupportCard: a dismissible corner card inviting admins to support UCM,
- * shown once per UCM version; `inline` puts it in the page flow, where it covers nothing. The dismissed version is a server-side
+ * KofiSupportCard: a dismissible corner card inviting admins to support UCM, in the gabarit of the
+ * mockup's floating card (its session banner), shown once per UCM version; `inline` puts it in the
+ * page flow, where it covers nothing. The dismissed version is a server-side
  * preference (`kofi_seen_version`), so it follows the user across browsers.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Coffee, X } from '@phosphor-icons/react'
+import { Coffee } from '@phosphor-icons/react'
+import { Icon } from './atelier/Icon'
 import { useAuth } from '../contexts/AuthContext'
 import { usePermission } from '../hooks/usePermission'
 import {
@@ -56,38 +58,18 @@ export function KofiSupportCard({ version = __APP_VERSION__, inline = false }) {
 
   if (!pending || dialogOpen || forcePasswordChange || mustEnroll2fa) return null
 
-  return (
-    <aside
-      aria-label={t('kofi.label')}
-      className={inline
-        ? 'kofi-card w-full sm:w-80 rounded-xl border border-border bg-bg-secondary p-3'
-        : 'kofi-card fixed z-30 bottom-3 left-3 right-3 sm:left-auto sm:right-8 sm:bottom-12 sm:w-80 rounded-xl border border-border bg-bg-secondary shadow-xl p-3'}
-    >
-      <div className="flex items-start gap-3">
-        <div className="kofi-badge flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center">
-          <Coffee size={16} weight="bold" />
-        </div>
-        <p className="flex-1 min-w-0 text-sm text-text-secondary">{t('kofi.message')}</p>
-        <button
-          type="button"
-          onClick={acknowledge}
-          aria-label={t('kofi.dismiss')}
-          className="flex-shrink-0 w-7 h-7 -mt-1 -mr-1 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-ring"
-        >
-          <X size={16} />
-        </button>
-      </div>
-      <div className="mt-2 flex justify-center">
-        <a
-          href={KOFI_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={acknowledge}
-          className="kofi-button inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium focus-ring"
-        >
-          {t('kofi.support')}
-        </a>
-      </div>
+  const card = (
+    <aside aria-label={t('kofi.label')} className={`session-banner kofi-card${inline ? ' kofi-inline' : ''}`}>
+      <Coffee className="icon" weight="bold" aria-hidden="true" />
+      <p><span>{t('kofi.message')}</span></p>
+      <a href={KOFI_URL} target="_blank" rel="noopener noreferrer" onClick={acknowledge} className="btn primary kofi-button">
+        {t('kofi.support')}
+      </a>
+      <button type="button" className="icon-btn quiet" onClick={acknowledge} aria-label={t('kofi.dismiss')}>
+        <Icon name="close" />
+      </button>
     </aside>
   )
+  // In a zone (the overview) the scope is there; floating over another page, the card carries its own
+  return inline ? card : <div className="atl atl-island">{card}</div>
 }

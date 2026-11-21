@@ -477,12 +477,11 @@
   },
   "commandPalette": {
     "searchPlaceholder": "コマンド、証明書、CA、ユーザーを検索...",
+    "searchLabel": "Search for a command or a certificate",
+    "subtitle": "Certificates, authorities and console navigation",
     "noCommandsFound": "コマンドが見つかりません",
-    "noResultsInDatabase": "データベースに結果が見つかりません",
     "favorites": "お気に入り",
     "recent": "最近",
-    "navigate": "ナビゲート",
-    "select": "選択",
     "searchSections": {
       "certificates": "証明書",
       "certificateAuthorities": "認証局",

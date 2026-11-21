@@ -477,12 +477,11 @@
   },
   "commandPalette": {
     "searchPlaceholder": "Befehle, Zertifikate, CAs, Benutzer suchen...",
+    "searchLabel": "Search for a command or a certificate",
+    "subtitle": "Certificates, authorities and console navigation",
     "noCommandsFound": "Keine Befehle gefunden",
-    "noResultsInDatabase": "Keine Ergebnisse in der Datenbank gefunden",
     "favorites": "Favoriten",
     "recent": "Kürzlich",
-    "navigate": "Navigieren",
-    "select": "Auswählen",
     "searchSections": {
       "certificates": "Zertifikate",
       "certificateAuthorities": "Zertifizierungsstellen",

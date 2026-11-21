@@ -52,7 +52,7 @@ test.describe('desktop', () => {
     // An event of the server announced while the dialog is open: the toast is the topmost layer
     await socket
     await createCA(api)
-    await expect(page.locator('.ui-toast').filter({ hasText: /^CA created: / }).first()).toBeVisible()
+    await expect(page.locator('#toast.visible').filter({ hasText: /^CA created: / })).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(dialog).toBeHidden()
     await expect(open).toBeFocused()

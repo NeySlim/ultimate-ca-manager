@@ -61,7 +61,7 @@ test.describe('preferences', () => {
     // The account menu leads to My account, which carries the language
     await page.goto('/')
     await page.getByRole('button', { name: new RegExp(`^Account: ${user.username}, `) }).click()
-    await page.getByRole('link', { name: 'My Account' }).click()
+    await page.getByRole('button', { name: 'My Account' }).click()
     const stored = page.waitForResponse(r => r.url().endsWith('/api/v2/account/preferences') && r.request().method() === 'PUT')
     await page.getByRole('combobox', { name: 'Language' }).selectOption('fr')
     expect((await stored).status()).toBe(200)

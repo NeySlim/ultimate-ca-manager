@@ -132,6 +132,18 @@ export function menuGroupsFor(can) {
     .filter(g => g.modules.length > 0)
 }
 
+// The mockup's icon names (components/atelier/icons.js) for the shell: its own where the mockup has the module,
+// the nearest of its set otherwise. A module missing here draws the certificate, as the mockup's icon() does.
+const GLYPHS = {
+  dashboard: 'grid', certificates: 'cert', cas: 'shield', audit: 'activity',
+  csrs: 'file', templates: 'template', truststore: 'anchor', 'user-certificates': 'cert', tools: 'command',
+  acme: 'refresh', scep: 'globe', est: 'plug', tsa: 'stamp', 'crl-ocsp': 'crl',
+  policies: 'policy', approvals: 'approve', keyRecovery: 'key', reports: 'chart', discovery: 'radar',
+  'ssh-cas': 'terminal', 'ssh-certificates': 'terminal', operations: 'upload', users: 'users', rbac: 'lock',
+  hsm: 'chip', logs: 'rows', settings: 'settings', account: 'users',
+}
+export const glyphOf = (mod) => GLYPHS[mod?.id] || 'cert'
+
 /** Label of a module in the Modules menu and the bar. */
 export const menuLabelKey = (mod) => mod.menuKey || mod.labelKey
 

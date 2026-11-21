@@ -94,3 +94,13 @@
 .atl a.text-link[data-link]{display:inline-block}
 /* A phone-only action of the product (no counterpart in the mockup) takes the mockup's 40 px phone controls. */
 @media (max-width:800px){.atl .phone-only .btn{min-height:40px}}
+/* A toast keeps the lines of its message; one that stays takes the rule and icon of its type, the mockup's failure toast for an error. */
+.atl #toast{white-space:pre-line;overflow-wrap:anywhere}
+/* Tailwind's reset follows the scope in the bundle and gives a search field `textfield`: the browser's own, as in the mockup */
+.atl [type=search]{-webkit-appearance:revert;appearance:revert}
+.atl #toast.failure.tone-warn{border-left-color:var(--warn-fill)}
+.atl #toast.failure.tone-warn .toast-msg .icon{color:var(--warn)}
+.atl #toast.failure.tone-good{border-left-color:var(--good)}
+.atl #toast.failure.tone-good .toast-msg .icon{color:var(--good)}
+.atl #toast.failure.tone-accent{border-left-color:var(--accent)}
+.atl #toast.failure.tone-accent .toast-msg .icon{color:var(--accent)}
