@@ -228,7 +228,7 @@ function GuideChapter({ chapter }) {
             ))}
           </nav>
           <main className="settings-main guide-main" id="main">
-            {/* A phone has no room for the contents: a select of the chapters, another of the sections */}
+            {/* A phone has no room for the contents: a select of the chapters; the sections are in On this page, folded */}
             <div className="field settings-jump guide-jump">
               <label htmlFor="guide-jump-chapter">{t('guide.jumpChapter')}</label>
               <select id="guide-jump-chapter" value={chapter} onChange={(e) => navigate(`/guide/${e.target.value}`)}>
@@ -239,15 +239,6 @@ function GuideChapter({ chapter }) {
                 ))}
               </select>
             </div>
-            {headings.length > 0 && (
-              <div className="field settings-jump guide-jump">
-                <label htmlFor="guide-jump-section">{t('guide.jumpSection')}</label>
-                <select id="guide-jump-section" value={active || ''} onChange={(e) => e.target.value && jump(e.target.value)}>
-                  <option value="">{text?.title}</option>
-                  {headings.map((h) => <option key={h.id} value={h.id}>{h.level === 3 ? `  ${h.text}` : h.text}</option>)}
-                </select>
-              </div>
-            )}
             {englishNotice && <Notice>{t('help.englishOnlyNotice')}</Notice>}
             {/* The chapter's actions at its top, outside the article a reader view keeps */}
             <div className="actions guide-actions">

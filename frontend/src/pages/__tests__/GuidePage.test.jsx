@@ -218,7 +218,7 @@ describe('GuidePage: the contents', () => {
     expect(document.activeElement).toBe(document.getElementById(target.id))
   })
 
-  it('on a phone, the selects go to a chapter and to a section', async () => {
+  it('on a phone, the select goes to a chapter and the folded On this page to a section', async () => {
     show('/guide/cas')
     await screen.findByRole('heading', { level: 1 })
     window.scrollTo.mockClear()
@@ -228,7 +228,8 @@ describe('GuidePage: the contents', () => {
     // Another chapter opens at its top: the document scrolls back
     expect(window.scrollTo).toHaveBeenCalledWith(0, 0)
     const target = guideHeadings('tsa', helpGuides.tsa.content)[1]
-    fireEvent.change(screen.getByLabelText('guide.jumpSection'), { target: { value: target.id } })
+    const fold = document.querySelector('details.guide-onpage-fold')
+    fireEvent.click(within(fold).getByRole('link', { name: target.text }))
     await waitFor(() => expect(where()).toBe(`/guide/tsa#${target.id}`))
   })
 })
