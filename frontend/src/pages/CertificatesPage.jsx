@@ -16,7 +16,7 @@ import { certificatesService, casService } from '../services'
 import { useNotification, useInspector } from '../contexts'
 import { usePermission, useRecentHistory, useWebSocket, usePersistedState } from '../hooks'
 import { extractCN, certificateNames, downloadBlob, warnSkippedExport, exportToCSV, exportToJSON } from '../lib/utils'
-import { CERT_STATUSES, parseOverviewFilters, toListParams, toSearch, withoutFilter } from '../lib/overviewFilters'
+import { CERT_STATUSES, OVERVIEW_FILTER_KEYS, parseOverviewFilters, toListParams, toSearch, withoutFilter } from '../lib/overviewFilters'
 import { fetchPages } from '../lib/fetchAllPages'
 import { SetupCard } from '../components/shell/SetupCard'
 import { canExportPrivateKey } from '../lib/exportPermissions'
@@ -91,17 +91,56 @@ export default function CertificatesPage() {
   const [presets, setPresets] = useState(readPresets)
   useEffect(() => { try { localStorage.setItem(PRESETS_KEY, JSON.stringify(presets)) } catch { /* private mode */ } }, [presets])
 
-  const [page, setPage] = useState(1)
+  // The list's search, sort, page and filters live in the URL, as the mockup's (M:157-158): `q`, `sort`,
+  // `order`, `page`, `ca`, `source`, `template`. Every write builds on the latest URL, even one made in the same
+  // handler, so it keeps the dock's item and section.
+  const query = useMemo(() => new URLSearchParams(location.search), [location.search])
+  const pending = useRef(null)
+  pending.current = { search: location.search, state: location.state }
+  const goSearch = useCallback((search) => {
+    const qs = new URLSearchParams(search).toString()
+    pending.current = { ...pending.current, search: qs ? `?${qs}` : '' }
+    navigate({ pathname: location.pathname, search: pending.current.search }, { replace: true, state: pending.current.state })
+  }, [location.pathname, navigate])
+  const patchList = useCallback((patch) => {
+    const p = new URLSearchParams(pending.current.search)
+    for (const [k, v] of Object.entries(patch)) {
+      p.delete(k)
+      for (const x of [].concat(v ?? [])) if (x !== '') p.append(k, String(x))
+    }
+    goSearch(p.toString())
+  }, [goSearch])
+
+  const page = Math.max(1, parseInt(query.get('page'), 10) || 1)
+  const setPage = useCallback((n) => patchList({ page: n > 1 ? n : '' }), [patchList])
   const [savedPerPage, setPerPage] = usePersistedState('ucm-certs-per-page', PAGE_SIZES[0])
   const perPage = PAGE_SIZES.includes(savedPerPage) ? savedPerPage : PAGE_SIZES[0]
   const [total, setTotal] = useState(0)
-  // The nearest expiry first, as the mockup opens
-  const [sort, setSort] = useState({ key: 'days', asc: true })
+  // The nearest expiry first, as the mockup opens; only another order is written
+  const sortKey = SORT_FIELDS[query.get('sort')] ? query.get('sort') : 'days'
+  const sortAsc = query.get('order') !== 'desc'
+  const sort = useMemo(() => ({ key: sortKey, asc: sortAsc }), [sortKey, sortAsc])
+  const setSort = useCallback((next) => {
+    const s = typeof next === 'function' ? next(sort) : next
+    const plain = s.key === 'days' && s.asc
+    patchList({ sort: plain ? '' : s.key, order: plain ? '' : (s.asc ? 'asc' : 'desc') })
+  }, [sort, patchList])
 
-  const [filterCA, setFilterCA] = usePersistedState('ucm-filter-certs-ca', [])
-  const [filterSource, setFilterSource] = usePersistedState('ucm-filter-certs-source', [])
-  const [filterTemplate, setFilterTemplate] = usePersistedState('ucm-filter-certs-template', [])
-  const [searchValue, setSearchValue] = useState('')
+  // A filter the URL names wins; a bare address takes the saved one. Setting one writes both.
+  const [storedCA, storeCA] = usePersistedState('ucm-filter-certs-ca', [])
+  const [storedSource, storeSource] = usePersistedState('ucm-filter-certs-source', [])
+  const [storedTemplate, storeTemplate] = usePersistedState('ucm-filter-certs-template', [])
+  const urlCA = query.getAll('ca').join(',')
+  const urlSource = query.getAll('source').join(',')
+  const urlTemplate = query.getAll('template').join(',')
+  const filterCA = useMemo(() => (query.has('ca') ? urlCA.split(',') : storedCA), [query, urlCA, storedCA])
+  const filterSource = useMemo(() => (query.has('source') ? urlSource.split(',') : storedSource), [query, urlSource, storedSource])
+  const filterTemplate = useMemo(() => (query.has('template') ? urlTemplate.split(',') : storedTemplate), [query, urlTemplate, storedTemplate])
+  const setFilterCA = useCallback((v) => { storeCA(v); patchList({ ca: v, page: '' }) }, [storeCA, patchList])
+  const setFilterSource = useCallback((v) => { storeSource(v); patchList({ source: v, page: '' }) }, [storeSource, patchList])
+  const setFilterTemplate = useCallback((v) => { storeTemplate(v); patchList({ template: v, page: '' }) }, [storeTemplate, patchList])
+  const searchValue = query.get('q') || ''
+  const setSearchValue = useCallback((v) => patchList({ q: v, page: '' }), [patchList])
   const [typed, setTyped] = useState(null)
   const searchTimer = useRef(0)
   useEffect(() => () => clearTimeout(searchTimer.current), [])
@@ -121,16 +160,18 @@ export default function CertificatesPage() {
   const savedSource = linkView ? NONE : filterSource
   const savedTemplate = linkView ? NONE : filterTemplate
   const linkScopeKey = JSON.stringify(urlFilters.filter(([k]) => k !== 'status'))
+  // Another overview link starts over: no search, page one (a reload of the same link keeps them)
+  const lastLink = useRef(linkScopeKey)
   useEffect(() => {
+    if (lastLink.current === linkScopeKey) return
+    lastLink.current = linkScopeKey
     if (!linkView) return
-    setPage(1)
-    setSearchValue('')
+    patchList({ q: '', page: '' })
     setTyped(null)
-  }, [linkView, linkScopeKey])
-  useEffect(() => { if (linkView) setPage(1) }, [linkView, urlFiltersKey])
+  }, [linkView, linkScopeKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const leaveLink = useCallback(() => {
-    if (linkView) navigate({ pathname: location.pathname, search: '' }, { replace: true })
-  }, [linkView, location.pathname, navigate])
+    if (linkView) patchList(Object.fromEntries(OVERVIEW_FILTER_KEYS.map((k) => [k, ''])))
+  }, [linkView, patchList])
 
   const failed = Boolean(loadError) && certificates.length === 0
   const requestSeq = useRef(0)
@@ -208,7 +249,7 @@ export default function CertificatesPage() {
         setIssueInitialData(location.state.prefill)
         setDialog('issue')
       }
-      navigate(location.pathname, { replace: true, state: {} })
+      navigate({ pathname: location.pathname, search: location.search }, { replace: true, state: {} })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state])
@@ -235,13 +276,8 @@ export default function CertificatesPage() {
   }, [certificates, cas])
 
   const setStatus = useCallback((next) => {
-    setPage(1)
-    const params = new URLSearchParams(linkView ? withoutFilter(location.search, 'status') : location.search)
-    params.delete('view')
-    next.forEach((v) => params.append(linkView ? 'status' : 'view', v))
-    const qs = params.toString()
-    navigate({ pathname: location.pathname, search: qs ? `?${qs}` : '' }, { replace: true })
-  }, [linkView, location.pathname, location.search, navigate])
+    patchList(linkView ? { status: next, view: '', page: '' } : { view: next, page: '' })
+  }, [linkView, patchList])
 
   const orphanCount = certStats.orphan || 0
   const views = [
@@ -263,15 +299,17 @@ export default function CertificatesPage() {
   }
   const searching = typed !== null
 
+  // Everything that narrows the list goes; the order and the open certificate stay
+  const clearList = useCallback(() => {
+    patchList(Object.fromEntries([...OVERVIEW_FILTER_KEYS, 'view', 'q', 'page', 'ca', 'source', 'template'].map((k) => [k, ''])))
+  }, [patchList])
   const resetFilters = useCallback(() => {
     clearTimeout(searchTimer.current)
     setTyped(null)
-    setSearchValue('')
-    if (!linkView) { setFilterCA([]); setFilterSource([]); setFilterTemplate([]) }
-    setPage(1)
-    navigate({ pathname: location.pathname, search: '' }, { replace: true })
+    if (!linkView) { storeCA([]); storeSource([]); storeTemplate([]) }
+    clearList()
     requestAnimationFrame(() => document.getElementById('search')?.focus())
-  }, [linkView, location.pathname, navigate, setFilterCA, setFilterSource, setFilterTemplate])
+  }, [linkView, clearList, storeCA, storeSource, storeTemplate])
   const narrowed = Boolean(searchValue) || savedCA.length > 0 || savedSource.length > 0 || savedTemplate.length > 0
 
   // Presets: the search, the statuses and the filters, and the overview link when one is open
@@ -286,14 +324,16 @@ export default function CertificatesPage() {
     setPresets((prev) => [...prev, { id: Date.now(), name, filters }])
   }
   const applyPreset = (filters = {}) => {
-    setPage(1)
     const linked = parseOverviewFilters(typeof filters.link === 'string' ? filters.link : '')
+    clearList()
     if (linked.length > 0) {
-      navigate({ pathname: location.pathname, search: toSearch(linked) }, { replace: true })
+      const p = new URLSearchParams(pending.current.search)
+      for (const [k, v] of linked) p.append(k, v)
+      goSearch(p.toString())
       return
     }
     const status = [].concat(filters.status || []).filter((v) => CERT_STATUSES.includes(v))
-    navigate({ pathname: location.pathname, search: status.length ? `?${status.map((v) => `view=${v}`).join('&')}` : '' }, { replace: true })
+    patchList({ view: status })
     setFilterCA([].concat(filters.ca || []))
     setFilterSource([].concat(filters.source || []))
     setFilterTemplate([].concat(filters.template || []))
@@ -329,13 +369,12 @@ export default function CertificatesPage() {
     return out
   }, [urlFilters, linkView, viewStatus, savedTemplate, cas, t])
   const removeUrlFilter = useCallback(([key, value]) => {
-    setPage(1)
     if (key === 'template') { setFilterTemplate([]); return }
-    const search = key === WEAK_KEY
-      ? withoutFilter(withoutFilter(location.search, 'key_algo_prefix'), 'key_bits_below')
-      : withoutFilter(location.search, key, value)
-    navigate({ pathname: location.pathname, search }, { replace: true })
-  }, [location.pathname, location.search, navigate, setFilterTemplate])
+    const cur = withoutFilter(pending.current.search, 'page')
+    goSearch(key === WEAK_KEY
+      ? withoutFilter(withoutFilter(cur, 'key_algo_prefix'), 'key_bits_below')
+      : withoutFilter(cur, key, value))
+  }, [goSearch, setFilterTemplate])
   const liveScope = urlFilters.some(([k]) => k === 'live')
 
   // Selection: the ticked rows of the page, or every result
@@ -514,7 +553,7 @@ export default function CertificatesPage() {
         applied={(chips.length > 0 || liveScope) && (
           <AppliedFilters chips={chips.map((c) => ({ key: c.key, label: c.label, onRemove: () => removeUrlFilter(c.remove) }))}
             note={liveScope ? t('certificates.liveScope') : undefined}
-            onClearAll={() => { if (!linkView) setFilterTemplate([]); navigate({ pathname: location.pathname, search: '' }, { replace: true }) }} />
+            onClearAll={() => { if (!linkView) storeTemplate([]); patchList(Object.fromEntries([...OVERVIEW_FILTER_KEYS, 'view', 'template', 'page'].map((k) => [k, '']))) }} />
         )}
         batch={n > 0 && (
           <BatchBar onClear={clearSelection}
