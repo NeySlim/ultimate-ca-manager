@@ -15,6 +15,7 @@ import {
 import { estService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
+import { useDockParam } from '../components/atelier/useDockParam'
 import { pickerCas, unlistedPickerCas } from '../lib/caSelection'
 import { Copyable, Notice, ViewSwitch } from './protocols/atelierParts'
 import { repeatedRows } from './protocols/protocolStates'
@@ -38,6 +39,8 @@ const draftOf = (c) => ({
   response_include_chain: !!c.response_include_chain, username: c.username || '', password: '',
 })
 
+const DEFAULT_ITEM = 'default'
+
 export default function ESTPage() {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
@@ -58,7 +61,10 @@ export default function ESTPage() {
   const [failed, setFailed] = useState([])
   const [announce, setAnnounce] = useState('')
   const [tried, setTried] = useState(false)
-  const [openId, setOpenId] = useState(null)
+  // The open endpoint lives in the URL (`item`); the default one, which has no label, is `default`
+  const estDock = useDockParam()
+  const openId = estDock.item == null ? null : estDock.item === DEFAULT_ITEM ? '' : estDock.item
+  const setOpenId = (id) => (id == null ? estDock.close() : estDock.open(id === '' ? DEFAULT_ITEM : id))
   const stateRef = useRef(null)
 
   const loadData = async () => {

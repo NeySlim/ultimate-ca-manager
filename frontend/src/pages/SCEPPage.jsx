@@ -18,6 +18,7 @@ import { scepService, casService, templatesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
 import { useLinkedId } from '../hooks/useLinkedId'
+import { useDockParam, useDockSelection, asId } from '../components/atelier/useDockParam'
 import { stateLabel } from '../lib/stateLabel'
 import { scepPickerCas, unlistedScepPickerCas } from '../lib/caSelection'
 import { extractData } from '../lib/utils'
@@ -39,6 +40,8 @@ const configDraft = (c) => ({
   challenge_validity: String(c.challenge_validity || 24), getcacert_chain: !!c.getcacert_chain, plain_http: !!c.plain_http,
   enforce_signing_time: !!c.enforce_signing_time, time_skew_minutes: String(c.time_skew_minutes || 10),
 })
+
+const NONE = []
 
 export default function SCEPPage() {
   const { t, i18n } = useTranslation()
@@ -62,7 +65,6 @@ export default function SCEPPage() {
   const [cas, setCas] = useState([])
   const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0, total: 0 })
   const [profileState, setProfileState] = useState('')
-  const [openProfile, setOpenProfile] = useState(null)
   const [profileForm, setProfileForm] = useState(null)
   const [rotate, setRotate] = useState(null)
   const [secret, setSecret] = useState(null)
@@ -75,15 +77,22 @@ export default function SCEPPage() {
   const [perPage, setPerPage] = useState(25)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
-  const [openRequest, setOpenRequest] = useState(null)
   const [rejecting, setRejecting] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
   // The challenge of each CA (the CA-wide endpoint), read when its view opens
   const [challenges, setChallenges] = useState(null)
-  const [openCa, setOpenCa] = useState(null)
   // Intune app registrations
   const [apps, setApps] = useState(null)
-  const [openApp, setOpenApp] = useState(null)
+  // The object open in the view's dock lives in the URL (`item`): a profile, a request, a CA's challenge or an app
+  const scepDock = useDockParam()
+  const itemOf = (v) => (view === v && scepDock.item != null ? asId(scepDock.item) : null)
+  const openIn = (id) => (id == null ? scepDock.close() : scepDock.open(id))
+  const openProfile = itemOf('profiles')
+  const setOpenProfile = openIn
+  const openCa = itemOf('challenges')
+  const setOpenCa = openIn
+  const openApp = itemOf('intune')
+  const setOpenApp = openIn
   const [appForm, setAppForm] = useState(null)
   // Configuration form
   const [saving, setSaving] = useState(false)
@@ -140,6 +149,12 @@ export default function SCEPPage() {
   useEffect(() => { loadRequests() }, [loadRequests])
   useEffect(() => { loadData() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A request off the page (a reload) is read by id
+  const loadRequest = useCallback((id) => scepService.getRequest(asId(id)).then((res) => res?.data), [])
+  const requestSel = useDockSelection(view === 'requests' ? requests : NONE, { ready: view === 'requests' && !requestsLoading, load: loadRequest })
+  const openRequest = view === 'requests' ? requestSel.selected : null
+  const setOpenRequest = requestSel.select
+
   // /scep-config?tab=requests&request=N opens that request, even past the latest page
   const linkedId = useLinkedId('request')
   useEffect(() => {
@@ -148,8 +163,8 @@ export default function SCEPPage() {
     scepService.getRequest(linkedId)
       .then((res) => {
         if (cancelled || !res?.data) return
-        setSearchParams({ tab: 'requests' }, { replace: true })
-        setOpenRequest(res.data)
+        requestSel.hold(res.data)
+        setSearchParams({ tab: 'requests', item: String(res.data.id) }, { replace: true })
         if (res.data.status !== 'pending') showInfo(t('overview.link.handled', { id: res.data.id, status: stateLabel(t, res.data.status) }))
       })
       .catch((error) => {

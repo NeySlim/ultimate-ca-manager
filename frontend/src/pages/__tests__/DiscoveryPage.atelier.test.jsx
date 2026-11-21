@@ -38,6 +38,7 @@ const svc = vi.hoisted(() => ({
 }))
 vi.mock('../../services', () => ({ discoveryService: svc }))
 
+import { renderAtUrl } from '../../test/dockUrl'
 import DiscoveryPage from '../DiscoveryPage'
 import { targetProblem } from '../discovery/discoveryModel'
 
@@ -218,5 +219,18 @@ describe('targetProblem', () => {
     expect(targetProblem('10.0.0.0/15')).toBe('tooWide')
     expect(targetProblem('192.0.2.0/33')).toBe('format')
     expect(targetProblem('web example')).toBe('format')
+  })
+})
+
+describe('the discovery dock in the URL', () => {
+  it('reopens the scan and section of the URL, writes the one opened, and a view change closes it', async () => {
+    const r = renderAtUrl(<DiscoveryPage />, '/discovery?item=2&section=runs')
+    const dock = await r.dock()
+    expect(within(dock).getByRole('tab', { name: 'discovery.scans.runsTab' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(dock).getByRole('heading', { level: 2 })).toHaveTextContent('Réseau B')
+    fireEvent.click(screen.getByRole('button', { name: 'Réseau A' }))
+    expect(r.where()).toBe('/discovery?item=1')
+    fireEvent.click(r.container.querySelector('[data-view="history"]'))
+    await waitFor(() => expect(r.where()).toBe('/discovery?tab=history'))
   })
 })
