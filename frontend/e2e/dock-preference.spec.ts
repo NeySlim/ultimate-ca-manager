@@ -60,7 +60,8 @@ test.describe('desktop', () => {
 for (const width of [1199, 1200]) {
   test.describe(`at ${width} px`, () => {
     test.use({ viewport: { width, height: 900 } })
-    test(`offers the right anchoring only from 1200 px (${width})`, async ({ page }) => {
+    // `api` signs the page in: without it the page is the sign-in screen
+    test(`offers the right anchoring only from 1200 px (${width})`, async ({ page, api }) => {
       const { dock } = await openFirst(page, '/templates')
       await expect(dock.getByRole('button', { name: 'Dock on the right' })).toHaveCount(width >= 1200 ? 1 : 0)
     })
@@ -73,7 +74,11 @@ test.describe('phone', () => {
 
   for (const path of PAGES) {
     test(`${path}: the dock keeps the focus, the page is inert, Escape and Close give the focus back`, async ({ page, api }) => {
-      if (path === '/truststore' || path === '/certificates') await issueCert(api, (await createCA(api)).id)
+      // Each page gets a row of its own: a fresh trust store is empty, issuing a certificate does not fill it
+      if (path === '/truststore' || path === '/certificates') {
+        const cert = await issueCert(api, (await createCA(api)).id)
+        if (path === '/truststore') await api.post('/truststore', { name: cert.common_name, certificate_pem: cert.pem, purpose: 'custom' })
+      }
       const { dock } = await openFirst(page, path)
       await expect(dock).toHaveAttribute('role', 'dialog')
       for (const part of ['.masthead', '.statusbar', '.page-content']) {

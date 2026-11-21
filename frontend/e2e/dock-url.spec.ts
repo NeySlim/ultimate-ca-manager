@@ -25,7 +25,9 @@ test('a reload reopens the certificate, its section and the list as they were; B
   await expect(page).toHaveURL(url => url.searchParams.get('q') === cn && !url.searchParams.has('item'))
 })
 
-test('the sort and page of the certificate list survive a reload', async ({ page }) => {
+test('the sort and page of the certificate list survive a reload', async ({ page, api }) => {
+  // Signed in, with a certificate for the list to sort
+  await issueCert(api, (await createCA(api)).id)
   await page.goto('/certificates?sort=name&order=desc')
   await expect(page.getByRole('main').locator('th.col-name')).toHaveAttribute('aria-sort', 'descending')
   await page.reload()

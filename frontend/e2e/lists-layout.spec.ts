@@ -7,7 +7,9 @@ const rowHeights = (page) => page.locator('.atl tbody tr').evaluateAll((rows) =>
 test.describe('desktop', () => {
   test.use({ viewport: { width: 1600, height: 1000 } })
 
-  test('the density chosen on Certificates gives every list its rows, after a reload too', async ({ page }) => {
+  test('the density chosen on Certificates gives every list its rows, after a reload too', async ({ page, api }) => {
+    // Signed in, with a CA for the CRL / OCSP list to have rows
+    await createCA(api)
     await page.goto('/users')
     await expect(page.locator('.atl tbody tr').first()).toBeVisible()
     expect(new Set(await rowHeights(page))).toEqual(new Set([36]))
