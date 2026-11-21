@@ -30,8 +30,8 @@ test('the top bar, its links and the status bar keep the mockup heights', async 
   expect(Math.abs(status.height - 25)).toBeLessThanOrEqual(EPS)
   expect(Math.abs(status.y + status.height - 1000)).toBeLessThanOrEqual(EPS)
   // The live connection lives in the status bar, not the top bar
-  await expect(page.locator('.masthead .shell-ws')).toHaveCount(0)
-  await expect(page.locator('.statusbar .shell-ws')).toHaveCount(1)
+  await expect(page.locator('.masthead #ws-button')).toHaveCount(0)
+  await expect(page.locator('.statusbar #ws-button')).toHaveCount(1)
 })
 
 test('the Modules menu opens under its button, inside the window', async ({ page, api }) => {

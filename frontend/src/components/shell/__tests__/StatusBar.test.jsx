@@ -128,6 +128,8 @@ describe('StatusBar', () => {
     render(<StatusBar />)
     await screen.findByText(/shell\.statusRunning/)
     expect(screen.getByTestId('ws')).toBeInTheDocument()
+    // drawn with the mockup's rules: nothing of the bar is left to the product's own styles
+    expect(document.querySelector('.statusbar .atl-out')).toBeNull()
   })
 
   it('leaves the role out when the node does not know it', async () => {

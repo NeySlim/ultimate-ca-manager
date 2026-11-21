@@ -46,11 +46,10 @@
 :root .statusbar .live .dot.good { color: var(--good); }
 :root .statusbar .live .dot.bad { color: var(--bad); }
 :root .statusbar .live .dot.muted { color: var(--muted); }
-:root .statusbar .live > .atl-out:empty { display: none; }
 /* The HA node and its role, the product's addition to the line: kept for assistive technology on a phone */
 @media (max-width: 800px) { :root .statusbar .live .ha-node { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; } }
-/* The live connection's dot, drawn by the product, sits on the line of the text and adds no height to it */
-:root .statusbar .live > .atl-out { display: inline-flex; align-items: center; height: 15px; }
+/* The live connection's error tone, beside the mockup's good and warn tones of the bar's state links */
+:root .statusbar .ha-link.bad { color: var(--bad); }
 
 /* Aurore family, the mockup's body rules: a drifting glow behind the console */
 :root[data-theme="aurore"] body { isolation: isolate; }

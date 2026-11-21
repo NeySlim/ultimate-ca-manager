@@ -19,8 +19,11 @@ const PROTOCOL_OBJECTS = [
   ['scep_profiles', 'commandPalette.scepProfile', moduleById('scep').path, glyphOf(moduleById('scep'))],
 ]
 
-/** `can` ({ isAdmin, hasPermission }) keeps the pages and actions the account may open; omitted, all of them. */
-export function CommandPalette({ open, onOpenChange, can }) {
+/**
+ * `can` ({ isAdmin, hasPermission }) keeps the pages and actions the account may open; omitted, all of them.
+ * onOpenHelp: the help of the current page, listed with the actions (on a phone the bar hides its button).
+ */
+export function CommandPalette({ open, onOpenChange, can, onOpenHelp }) {
   const navigate = useNavigate()
   const openInInspector = useOpenEntity()
   // The control focused before the palette opened, and whether the palette handed over to the inspector
@@ -196,6 +199,10 @@ export function CommandPalette({ open, onOpenChange, can }) {
       key: `recent-${item.type}-${item.id}`, icon: getTypeIcon(item.type), name: item.name, hint: item.subtitle || t('commandPalette.recent'),
       run: () => openItem(item.type, item.id),
     })),
+    ...(onOpenHelp && [t('commandPalette.pageHelp'), t('common.help')].some(s => !search || s.toLowerCase().includes(lower)) ? [{
+      key: 'page-help', icon: 'help', name: t('commandPalette.pageHelp'), hint: t('common.help'),
+      run: () => { onOpenChange(false); onOpenHelp() },
+    }] : []),
     ...filteredCommands.map(cmd => ({
       key: `cmd-${cmd.id}`, icon: cmd.action === 'new' || cmd.action === 'upload' ? 'plus' : glyphOf(moduleForPath(cmd.path.split('?')[0])),
       name: t(cmd.labelKey), hint: t(cmd.categoryKey), run: () => executeCommand(cmd),

@@ -35,12 +35,6 @@ export const EXCEPTIONS = [
     values: ['#233143', '#94bfff', '#eaf0f6', '#245bb1', '#1a2036', '#a5b4ff', '#eef0f8', '#3742bd'],
     reason: 'theme picker swatches show a theme other than the active one',
   },
-  {
-    file: 'components/ui/FloatingHelpPanel.jsx',
-    values: ['#f4ecd8', '#5b4636', '#d4c5a9', '#ebe0c8', '#8b6914', '#3d2b1f'],
-    reason: 'fixed sepia reading palette of the help reader',
-  },
-  { file: 'components/EmailTemplateWindow.jsx', values: ['#f4f5f7'], reason: 'email preview canvas imitates a mail client' },
   { file: 'components/atelier/icons.js', values: ['#e66c20'], reason: 'the mockup\'s brand mark, verbatim (an image of the mark)' },
   { file: 'index.css', values: ['#ff5e5b', '#d63b36', '#b8312c'], reason: 'Ko-fi brand colours' },
 ]

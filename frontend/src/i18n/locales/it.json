@@ -491,7 +491,8 @@
       "users": "Utenti",
       "templates": "Modelli",
       "csrs": "CSR"
-    }
+    },
+    "pageHelp": "Help for this page"
   },
   "operations": {
     "title": "Operazioni",
@@ -4385,7 +4386,10 @@
       "mtls": "mTLS modified",
       "ct": "Certificate Transparency modified",
       "ctDetail": "CT settings saved."
-    }
+    },
+    "templateHtmlSource": "HTML source",
+    "templateFormat": "Template format",
+    "templateVariablesLead": "Variables: "
   },
   "account": {
     "profile": "Profilo",
@@ -4981,7 +4985,15 @@
     "quickHelp": "Aiuto rapido",
     "guide": "Guida",
     "guideComingSoon": "Guida dettagliata in arrivo.",
-    "tableOfContents": "Contenuto"
+    "tableOfContents": "Contenuto",
+    "back": "Back to the console",
+    "views": "Help view",
+    "searchLabel": "Search the guide",
+    "searchPlaceholder": "Word, section…",
+    "noMatch": "No section of the guide contains this text.",
+    "overview": "Overview",
+    "term": "{{term}}: ",
+    "contentsLead": "Contents: "
   },
   "time": {
     "today": "Oggi",
@@ -5237,7 +5249,8 @@
     "crossSkipped_one": "{{count}} certificato incrociato escluso; la CA autofirmata viene mantenuta",
     "crossSkipped_other": "{{count}} certificati incrociati esclusi; le CA autofirmate vengono mantenute",
     "unverifiableParentsTitle": "CA padre da confermare nella pagina della CA",
-    "unverifiableParent": "{{ca}} è rimasta senza CA padre: CA padre probabile {{parent}}, firma non verificabile qui ({{algorithm}})"
+    "unverifiableParent": "{{ca}} è rimasta senza CA padre: CA padre probabile {{parent}}, firma non verificabile qui ({{algorithm}})",
+    "filePasswordFor": "Password of {{name}}"
   },
   "webhooks": {
     "eventLabels": {
@@ -6991,7 +7004,8 @@
     "chooseCertificate": "Scegli un certificato...",
     "certLoaded": "Certificato caricato",
     "keyLoaded": "Chiave privata caricata",
-    "noCertsWithKey": "Nessun certificato con chiave privata trovato"
+    "noCertsWithKey": "Nessun certificato con chiave privata trovato",
+    "source": "Certificate source"
   },
   "commands": {
     "nav": {

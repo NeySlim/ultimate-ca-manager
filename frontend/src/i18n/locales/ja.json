@@ -491,7 +491,8 @@
       "users": "ユーザー",
       "templates": "テンプレート",
       "csrs": "CSR"
-    }
+    },
+    "pageHelp": "Help for this page"
   },
   "operations": {
     "title": "オペレーション",
@@ -4385,7 +4386,10 @@
       "mtls": "mTLS modified",
       "ct": "Certificate Transparency modified",
       "ctDetail": "CT settings saved."
-    }
+    },
+    "templateHtmlSource": "HTML source",
+    "templateFormat": "Template format",
+    "templateVariablesLead": "Variables: "
   },
   "account": {
     "profile": "プロフィール",
@@ -4981,7 +4985,15 @@
     "quickHelp": "クイックヘルプ",
     "guide": "ガイド",
     "guideComingSoon": "詳細ガイドは近日公開予定。",
-    "tableOfContents": "目次"
+    "tableOfContents": "目次",
+    "back": "Back to the console",
+    "views": "Help view",
+    "searchLabel": "Search the guide",
+    "searchPlaceholder": "Word, section…",
+    "noMatch": "No section of the guide contains this text.",
+    "overview": "Overview",
+    "term": "{{term}}: ",
+    "contentsLead": "Contents: "
   },
   "time": {
     "today": "今日",
@@ -5237,7 +5249,8 @@
     "crossSkipped_one": "{{count}} 件のクロス証明書を除外しました。自己署名 CA はそのまま保持されます",
     "crossSkipped_other": "{{count}} 件のクロス証明書を除外しました。自己署名 CA はそのまま保持されます",
     "unverifiableParentsTitle": "CA ページで承認が必要な親CA",
-    "unverifiableParent": "{{ca}} は親CAなし: 親CAの候補は {{parent}}、署名はここでは検証できません（{{algorithm}}）"
+    "unverifiableParent": "{{ca}} は親CAなし: 親CAの候補は {{parent}}、署名はここでは検証できません（{{algorithm}}）",
+    "filePasswordFor": "Password of {{name}}"
   },
   "webhooks": {
     "eventLabels": {
@@ -6991,7 +7004,8 @@
     "chooseCertificate": "証明書を選択...",
     "certLoaded": "証明書を読み込みました",
     "keyLoaded": "秘密鍵を読み込みました",
-    "noCertsWithKey": "秘密鍵付きの証明書が見つかりません"
+    "noCertsWithKey": "秘密鍵付きの証明書が見つかりません",
+    "source": "Certificate source"
   },
   "commands": {
     "nav": {

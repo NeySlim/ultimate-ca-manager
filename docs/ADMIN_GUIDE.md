@@ -334,8 +334,8 @@ Use the **Test** button to send a test email and verify connectivity.
 Customize the notification email template via the built-in editor:
 
 1. Navigate to **Settings → SMTP → Email Template**
-2. Click **Edit Template** to open the floating editor window
-3. Switch between **HTML** and **Plain Text** tabs
+2. Click **Edit Template** to open the editor dialog (on a wide screen)
+3. Switch between **HTML** and **Plain Text** above the source
 4. Edit the template source on the left, see the live preview on the right
 5. Available variables: `{{title}}`, `{{content}}`, `{{datetime}}`, `{{instance_url}}`, `{{logo}}`, `{{title_color}}`
 6. Click **Save** to apply, or **Reset to Default** to restore the UCM default template

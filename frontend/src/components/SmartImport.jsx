@@ -1,19 +1,17 @@
 /**
- * SmartImport - Intelligent import component for all crypto formats
- * 
- * Supports: PEM, DER, PKCS12/PFX, PKCS7/P7B, CSR, private keys
- * Can be used standalone or wrapped in a modal
+ * SmartImport: reads every crypto format (PEM, DER, PKCS#12/PFX, PKCS#7/P7B, CSR, private keys),
+ * shows what it found, then imports the objects chosen. Drawn with the mockup's form, list and
+ * notice vocabulary, inside its wide modal() (SmartImportModal).
  */
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { 
-  UploadSimple, FileText, Key, ShieldCheck, Certificate,
-  WarningCircle, CheckCircle, XCircle, LockSimple, Link,
-  CaretDown, CaretRight, ArrowsClockwise, File, Trash, MagnifyingGlass, Question
-} from '@phosphor-icons/react'
-import { Button } from './Button'
-import { Badge } from './Badge'
 import { AtelierDialog } from './atelier/AtelierDialog'
+import { Btn, TextLink } from './atelier/Btn'
+import { Pill } from './atelier/Pill'
+import { Icon } from './atelier/Icon'
+import { Section, Props, RecordList, RecordRow } from './atelier/Detail'
+import { Input, Textarea, ToggleSwitch, ModalActions, Notice } from './atelier/Form'
+import { SkeletonPanel } from './atelier/Skeleton'
 import { apiClient as api } from '../services'
 import { useNotification } from '../contexts/NotificationContext'
 import { formatDate } from '../lib/utils'
@@ -28,282 +26,153 @@ const SUPPORTED_FORMATS = {
 
 const ALL_FORMATS = [...SUPPORTED_FORMATS.text, ...SUPPORTED_FORMATS.binary].join(',')
 
-// Type icons and colors - keys for translations
-const TYPE_CONFIG = {
-  certificate: { icon: Certificate, color: 'blue', labelKey: 'import.typeCertificate' },
-  private_key: { icon: Key, color: 'orange', labelKey: 'import.typePrivateKey' },
-  csr: { icon: FileText, color: 'purple', labelKey: 'import.typeCsr' },
-  ca_certificate: { icon: ShieldCheck, color: 'green', labelKey: 'import.typeCaCertificate' }
-}
+const TYPE_LABELS = { certificate: 'import.typeCertificate', private_key: 'import.typePrivateKey', csr: 'import.typeCsr', ca_certificate: 'import.typeCaCertificate' }
 
-// Object card component
+// One object found: its box to import it, its name, its kind in pills, its details on demand
 export function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
   const { t } = useTranslation()
-  const config = obj.is_ca ? TYPE_CONFIG.ca_certificate : TYPE_CONFIG[obj.type] || TYPE_CONFIG.certificate
-  const Icon = config.icon
+  const labelKey = obj.is_ca ? TYPE_LABELS.ca_certificate : TYPE_LABELS[obj.type] || TYPE_LABELS.certificate
   const displayName = obj.subject || obj.san_dns?.[0] || `${obj.type} #${obj.index + 1}`
-  
+  const box = `import-object-${obj.index}`
   return (
-    <div className={`border rounded-lg transition-colors ${selected ? 'border-accent-primary bg-accent-primary-op5' : 'border-border hover:border-border-hover'}`}>
-      <div className="flex items-center gap-3 p-3 cursor-pointer" onClick={onToggle}>
-        <input 
-          type="checkbox"
-          checked={selected}
-          onChange={(e) => { e.stopPropagation(); onSelect(!selected) }}
-          className="w-4 h-4 rounded border-border text-accent-primary focus:ring-accent-primary"
-        />
-        
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center icon-bg-${config.color}`}>
-          <Icon size={16} />
-        </div>
-        
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-sm truncate">{displayName}</span>
-            {obj.is_encrypted && <LockSimple size={16} className="text-status-warning" title={t('import.encrypted')} />}
-            {obj.matched_key_index !== null && <Link size={16} className="text-status-success" title={t('import.hasMatchingKey')} />}
-          </div>
-          <div className="flex items-center gap-2 text-xs text-text-secondary">
-            <Badge variant={config.color} size="sm">{t(config.labelKey)}</Badge>
-            {obj.is_self_signed && <Badge variant="gray" size="sm">{t('import.selfSigned')}</Badge>}
-            {obj.chain_position === 'root' && <Badge variant="amber" size="sm">{t('common.root')}</Badge>}
-            {obj.chain_position === 'intermediate' && <Badge variant="blue" size="sm">{t('common.intermediate')}</Badge>}
-          </div>
-          {obj.error && <div className="text-xs text-status-danger break-words">{obj.error}</div>}
-        </div>
-        
-        {expanded ? <CaretDown size={16} className="text-text-secondary" /> : <CaretRight size={16} className="text-text-secondary" />}
-      </div>
-      
-      {expanded && (
-        <div className="px-3 pb-3 border-t border-border pt-3 space-y-2 text-sm">
-          {obj.subject && (
-            <div className="flex gap-2">
-              <span className="text-text-secondary w-20 shrink-0">{t('common.subject')}:</span>
-              <span className="font-mono text-xs break-all">{obj.subject}</span>
-            </div>
-          )}
-          {obj.issuer && obj.issuer !== obj.subject && (
-            <div className="flex gap-2">
-              <span className="text-text-secondary w-20 shrink-0">{t('common.issuer')}:</span>
-              <span className="font-mono text-xs break-all">{obj.issuer}</span>
-            </div>
-          )}
-          {obj.san_dns?.length > 0 && (
-            <div className="flex gap-2">
-              <span className="text-text-secondary w-20 shrink-0">{t('details.sanDns')}:</span>
-              <span className="font-mono text-xs">{obj.san_dns.join(', ')}</span>
-            </div>
-          )}
-          {obj.not_before && (
-            <div className="flex gap-2">
-              <span className="text-text-secondary w-20 shrink-0">{t('common.valid')}:</span>
-              <span className="text-xs">{formatDate(obj.not_before)} → {formatDate(obj.not_after)}</span>
-            </div>
-          )}
-          {obj.key_algorithm && (
-            <div className="flex gap-2">
-              <span className="text-text-secondary w-20 shrink-0">{t('common.algorithm')}:</span>
-              <span className="text-xs">{keyAlgorithmLabel(obj.key_algorithm, t, obj.security_level)}{obj.key_size > 0 ? ` (${obj.key_size} bits)` : ''}</span>
-            </div>
-          )}
-        </div>
+    <RecordRow
+      title={<label className="checkbox-line" htmlFor={box}><input type="checkbox" id={box} checked={selected} onChange={() => onSelect(!selected)} />{displayName}</label>}
+      meta={(
+        <>
+          <Pill label={t(labelKey)} icon={obj.type === 'private_key' ? 'key' : obj.type === 'csr' ? 'file' : obj.is_ca ? 'shield' : 'cert'} />
+          {obj.is_self_signed && <> <Pill tone="muted" label={t('import.selfSigned')} /></>}
+          {obj.chain_position === 'root' && <> <Pill label={t('common.root')} icon="anchor" /></>}
+          {obj.chain_position === 'intermediate' && <> <Pill label={t('common.intermediate')} icon="branch" /></>}
+          {obj.is_encrypted && <> <Pill tone="warn" icon="lock" label={t('import.encrypted')} /></>}
+          {obj.matched_key_index !== null && obj.matched_key_index !== undefined && <> <Pill tone="good" icon="link" label={t('import.hasMatchingKey')} /></>}
+        </>
       )}
-    </div>
+      extra={(
+        <>
+          {obj.error && <Notice tone="bad">{obj.error}</Notice>}
+          {expanded && (
+            <Props items={[
+              obj.subject && [t('common.subject'), <span className="mono">{obj.subject}</span>],
+              obj.issuer && obj.issuer !== obj.subject && [t('common.issuer'), <span className="mono">{obj.issuer}</span>],
+              obj.san_dns?.length > 0 && [t('details.sanDns'), <span className="mono">{obj.san_dns.join(', ')}</span>],
+              obj.not_before && [t('common.valid'), `${formatDate(obj.not_before)} → ${formatDate(obj.not_after)}`],
+              obj.key_algorithm && [t('common.algorithm'), `${keyAlgorithmLabel(obj.key_algorithm, t, obj.security_level)}${obj.key_size > 0 ? ` (${obj.key_size} bits)` : ''}`],
+            ]} />
+          )}
+        </>
+      )}
+      action={<TextLink aria-expanded={expanded} onClick={onToggle}>{t('common.details')}</TextLink>}
+    />
   )
 }
 
-// Chain visualization
+// A chain found: its completeness and trust, its path from the root to the leaf, its problems
 function ChainCard({ chain, index }) {
   const { t } = useTranslation()
-  const hasIssues = chain.errors?.length > 0
-  
+  const path = [
+    chain.root && (chain.root.subject?.split(',')[0] || t('common.root')),
+    ...(chain.intermediates || []).map((int, i) => int.subject?.split(',')[0] || `${t('common.intermediate')} ${i + 1}`),
+    chain.leaf && (chain.leaf.subject?.split(',')[0] || chain.leaf.san_dns?.[0] || t('import.leaf')),
+  ].filter(Boolean)
   return (
-    <div className={`border rounded-lg p-3 ${hasIssues ? 'alert-bg-amber' : 'border-border'}`}>
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-sm font-medium">{t('import.chain')} {index + 1}</span>
-        {chain.is_complete ? <Badge variant="green" size="sm">{t('import.complete')}</Badge> : <Badge variant="amber" size="sm">{t('import.incomplete')}</Badge>}
-        {chain.trust_source === 'trust_store' && (
-          <Badge variant="teal" size="sm">✓ {t('import.verifiedTrustStore')}</Badge>
-        )}
-        {chain.trust_source === 'managed_ca' && (
-          <Badge variant="primary" size="sm">✓ {t('import.linkedToCA')}</Badge>
-        )}
-        <span className="text-xs text-text-secondary ml-auto">{chain.chain_length} {t('common.certificates').toLowerCase()}</span>
-      </div>
-      
-      {chain.trust_anchor && (
-        <div className="text-xs text-text-tertiary mb-1.5">
-          {t('import.trustAnchor')}: {chain.trust_anchor}
-        </div>
+    <RecordRow
+      title={`${t('import.chain')} ${index + 1}`}
+      meta={(
+        <>
+          {path.join(' → ')} · {chain.chain_length} {t('common.certificates').toLowerCase()}
+          {chain.trust_anchor && <> · {t('import.trustAnchor')} : {chain.trust_anchor}</>}
+        </>
       )}
-      
-      <div className="flex items-center gap-1 text-xs flex-wrap">
-        {chain.root && (
-          <>
-            <span className="px-2 py-1 rounded badge-bg-amber">{chain.root.subject?.split(',')[0] || t('common.root')}</span>
-            <span className="text-text-secondary">→</span>
-          </>
-        )}
-        {chain.intermediates?.map((int, i) => (
-          <span key={i}>
-            <span className="px-2 py-1 rounded badge-bg-blue">{int.subject?.split(',')[0] || `${t('common.intermediate')} ${i + 1}`}</span>
-            <span className="text-text-secondary mx-1">→</span>
-          </span>
-        ))}
-        {chain.leaf && (
-          <span className="px-2 py-1 rounded icon-bg-teal">{chain.leaf.subject?.split(',')[0] || chain.leaf.san_dns?.[0] || t('import.leaf')}</span>
-        )}
-      </div>
-      
-      {hasIssues && (
-        <div className="mt-2 text-xs text-status-warning">
-          {chain.errors.map((err, i) => (
-            <div key={i} className="flex items-center gap-1"><WarningCircle size={12} />{err}</div>
-          ))}
-        </div>
+      badge={(
+        <span>
+          {chain.is_complete ? <Pill tone="good" label={t('import.complete')} /> : <Pill tone="warn" label={t('import.incomplete')} />}
+          {chain.trust_source === 'trust_store' && <> <Pill tone="good" label={t('import.verifiedTrustStore')} /></>}
+          {chain.trust_source === 'managed_ca' && <> <Pill tone="good" label={t('import.linkedToCA')} /></>}
+        </span>
       )}
-    </div>
+      extra={chain.errors?.length > 0 && chain.errors.map((err, i) => <Notice key={i} tone="warn">{err}</Notice>)}
+    />
   )
 }
 
-// Validation issues
+// What the analysis found wrong (bad), doubtful (warn) or worth knowing
 function ValidationIssues({ validation }) {
   if (!validation) return null
   const { errors, warnings, infos } = validation
-  if (!errors?.length && !warnings?.length && !infos?.length) return null
-  
   return (
-    <div className="space-y-2">
-      {errors?.map((err, i) => (
-        <div key={`e${i}`} className="flex items-start gap-2 text-sm p-2 rounded alert-bg-red">
-          <XCircle size={16} className="shrink-0 mt-0.5" /><span>{err}</span>
-        </div>
-      ))}
-      {warnings?.map((warn, i) => (
-        <div key={`w${i}`} className="flex items-start gap-2 text-sm p-2 rounded alert-bg-amber">
-          <WarningCircle size={16} className="shrink-0 mt-0.5" /><span>{warn}</span>
-        </div>
-      ))}
-      {infos?.map((inf, i) => (
-        <div key={`i${i}`} className="flex items-start gap-2 text-sm p-2 rounded alert-bg-green">
-          <CheckCircle size={16} className="shrink-0 mt-0.5" /><span>{inf}</span>
-        </div>
-      ))}
-    </div>
+    <>
+      {errors?.map((err, i) => <Notice key={`e${i}`} tone="bad">{err}</Notice>)}
+      {warnings?.map((warn, i) => <Notice key={`w${i}`} tone="warn">{warn}</Notice>)}
+      {infos?.map((inf, i) => <Notice key={`i${i}`}>{inf}</Notice>)}
+    </>
   )
 }
 
 // Result of an import: what was created, cross-certificates attached or left out, warnings, errors
 export function ImportResultStep({ importResult, onReset, onDone }) {
   const { t } = useTranslation()
-
-  // Backend returns: csrs_imported, certificates_imported, cas_imported, imported_ids, errors, warnings
-  const totalImported = (importResult?.csrs_imported || 0) + 
-                       (importResult?.certificates_imported || 0) + 
+  const totalImported = (importResult?.csrs_imported || 0) +
+                       (importResult?.certificates_imported || 0) +
                        (importResult?.cas_imported || 0)
   const errors = importResult?.errors || []
   const warnings = importResult?.warnings || []
   const unverifiableParents = importResult?.unverifiable_parents || []
   const cross = crossSummary(importResult)
-  const importedIds = importResult?.imported_ids || {}
-  
+  const done = totalImported > 0 || cross.attached > 0
+  const plural = (n, one) => `${n} ${one}${n > 1 ? 's' : ''}`
+
   return (
-    <div className="space-y-4">
-      <div className="text-center py-6">
-        {totalImported > 0 || cross.attached > 0 ? (
-          <>
-            <CheckCircle size={48} className="text-status-success mx-auto mb-3" weight="fill" />
-            <h3 className="text-lg font-medium">{t('import.importComplete')}</h3>
-            {totalImported > 0 && (
-              <p className="text-sm text-text-secondary">{t('import.successImported', { count: totalImported })}</p>
-            )}
-          </>
-        ) : (
-          <>
-            <WarningCircle size={48} className="text-status-warning mx-auto mb-3" />
-            <h3 className="text-lg font-medium">{t('import.noObjectsImported')}</h3>
-            <p className="text-sm text-text-secondary">{errors.length > 0 ? errors[0] : t('import.allSkipped')}</p>
-          </>
+    <>
+      <Section title={done ? t('import.importComplete') : t('import.noObjectsImported')}>
+        {done
+          ? totalImported > 0 && <p className="small muted">{t('import.successImported', { count: totalImported })}</p>
+          : <p className="small muted">{errors.length > 0 ? errors[0] : t('import.allSkipped')}</p>}
+        {done && (
+          <RecordList label={t('common.imported')}>
+            {importResult?.csrs_imported > 0 && <RecordRow key="csrs" title={plural(importResult.csrs_imported, 'CSR')} />}
+            {importResult?.certificates_imported > 0 && <RecordRow key="certs" title={`${importResult.certificates_imported} ${t('common.certificate')}${importResult.certificates_imported > 1 ? 's' : ''}`} />}
+            {importResult?.cas_imported > 0 && <RecordRow key="cas" title={plural(importResult.cas_imported, 'CA')} />}
+            {cross.attached > 0 && <RecordRow key="cross" title={<span data-testid="cross-attached">{t('import.crossAttached', { count: cross.attached })}</span>} />}
+            {importResult?.keys_matched > 0 && <RecordRow key="keys" title={`${importResult.keys_matched} ${t('import.privateKeysMatched')}`} />}
+          </RecordList>
         )}
-      </div>
-      
-      {/* Show what was imported */}
-      {(totalImported > 0 || cross.attached > 0) && (
-        <div className="space-y-1">
-          <h4 className="text-sm font-medium text-status-success">{t('common.imported')}:</h4>
-          {importResult?.csrs_imported > 0 && (
-            <div className="text-sm pl-4">✓ {importResult.csrs_imported} CSR{importResult.csrs_imported > 1 ? 's' : ''}</div>
-          )}
-          {importResult?.certificates_imported > 0 && (
-            <div className="text-sm pl-4">✓ {importResult.certificates_imported} {t('common.certificate')}{importResult.certificates_imported > 1 ? 's' : ''}</div>
-          )}
-          {importResult?.cas_imported > 0 && (
-            <div className="text-sm pl-4">✓ {importResult.cas_imported} CA{importResult.cas_imported > 1 ? 's' : ''}</div>
-          )}
-          {cross.attached > 0 && (
-            <div className="text-sm pl-4" data-testid="cross-attached">✓ {t('import.crossAttached', { count: cross.attached })}</div>
-          )}
-          {importResult?.keys_matched > 0 && (
-            <div className="text-sm pl-4 text-text-secondary">🔑 {importResult.keys_matched} {t('import.privateKeysMatched')}</div>
-          )}
-        </div>
-      )}
-      
-      {cross.skipped > 0 && (
-        <div className="text-sm pl-4 text-status-warning" data-testid="cross-skipped">
-          {t('import.crossSkipped', { count: cross.skipped })}
-        </div>
-      )}
+      </Section>
+
+      {cross.skipped > 0 && <Notice tone="warn"><span data-testid="cross-skipped">{t('import.crossSkipped', { count: cross.skipped })}</span></Notice>}
 
       {unverifiableParents.length > 0 && (
-        <div className="space-y-1" data-testid="unverifiable-parents">
-          <h4 className="text-sm font-medium text-status-warning">{t('import.unverifiableParentsTitle')}:</h4>
-          {unverifiableParents.map((p) => (
-            <div key={p.ca_id} className="text-sm pl-4">
-              ⚠ {t('import.unverifiableParent', { ca: p.ca_name, parent: p.candidate?.name, algorithm: p.algorithm })}
-            </div>
-          ))}
+        <div data-testid="unverifiable-parents">
+          <Section title={t('import.unverifiableParentsTitle')}>
+            {unverifiableParents.map((p) => (
+              <Notice key={p.ca_id} tone="warn">{t('import.unverifiableParent', { ca: p.ca_name, parent: p.candidate?.name, algorithm: p.algorithm })}</Notice>
+            ))}
+          </Section>
         </div>
       )}
 
-      {warnings.length > 0 && (
-        <div className="space-y-1">
-          <h4 className="text-sm font-medium text-status-warning">{t('common.warnings')}:</h4>
-          {warnings.map((w, i) => <div key={i} className="text-sm pl-4">⚠ {w}</div>)}
-        </div>
-      )}
-      
-      {errors.length > 0 && (
-        <div className="space-y-1">
-          <h4 className="text-sm font-medium text-status-danger">{t('common.errors')}:</h4>
-          {errors.map((e, i) => <div key={i} className="text-sm pl-4">✗ {e}</div>)}
-        </div>
-      )}
-      
-      {/* Actions */}
-      <div className="flex justify-end gap-2 pt-4">
-        <Button type="button" variant="secondary" onClick={onReset}>{t('import.importMore')}</Button>
-        <Button type="button" onClick={onDone}>{t('common.done')}</Button>
-      </div>
-    </div>
+      {warnings.map((w, i) => <Notice key={`w${i}`} tone="warn">{w}</Notice>)}
+      {errors.map((e, i) => <Notice key={`e${i}`} tone="bad">{e}</Notice>)}
+
+      <ModalActions>
+        <Btn onClick={onReset}>{t('import.importMore')}</Btn>
+        <Btn tone="primary" write={false} onClick={onDone}>{t('common.done')}</Btn>
+      </ModalActions>
+    </>
   )
 }
 
 /**
  * SmartImport Widget - can be used standalone or in modal
  */
-export function SmartImportWidget({ onImportComplete, onCancel, compact = false }) {
+export function SmartImportWidget({ onImportComplete, onCancel }) {
   const { t } = useTranslation()
   const { showError, showSuccess } = useNotification()
-  const fileInputRef = useRef(null)
   
   const [step, setStep] = useState('input')
   const [files, setFiles] = useState([]) // { name, type, data (base64 or text), size, password }
   const [pemContent, setPemContent] = useState('')
   const [password, setPassword] = useState('')
   const [useGlobalPassword, setUseGlobalPassword] = useState(false)
-  const [isDragOver, setIsDragOver] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
   const [analysisResult, setAnalysisResult] = useState(null)
@@ -375,13 +244,11 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
     setFiles(prev => [...prev, ...validFiles])
   }, [])
   
-  // Drag & drop handlers
-  const handleDragOver = useCallback((e) => { e.preventDefault(); setIsDragOver(true) }, [])
-  const handleDragLeave = useCallback((e) => { e.preventDefault(); setIsDragOver(false) }, [])
+  // Files dropped on the file field are read as files picked
   const handleDrop = useCallback((e) => {
+    if (!e.dataTransfer?.files?.length) return
     e.preventDefault()
-    setIsDragOver(false)
-    if (e.dataTransfer.files.length > 0) readFiles(e.dataTransfer.files)
+    readFiles(e.dataTransfer.files)
   }, [readFiles])
   const handleFileSelect = useCallback((e) => {
     if (e.target.files.length > 0) readFiles(e.target.files)
@@ -525,247 +392,124 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
     }
   }
   
-  // Render input step
+  const canAnalyze = (pemContent.trim() || files.length > 0) && !isAnalyzing
+
+  // Input: files (picked or dropped), their passwords, the pasted PEM, the password of encrypted content
   const renderInputStep = () => (
-    <div className="space-y-4">
-      {/* Drop zone */}
-      <div
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${isDragOver ? 'border-accent-primary bg-accent-primary-op5' : 'border-border hover:border-border-hover'}`}
-      >
-        <UploadSimple size={40} className="mx-auto mb-3 text-text-secondary" />
-        <p className="text-sm mb-1">
-          {t('import.dropFilesHere')}{' '}
-          <button type="button" onClick={() => fileInputRef.current?.click()} className="text-accent-primary hover:underline">{t('import.browse')}</button>
-        </p>
-        <p className="text-xs text-text-secondary">
-          {t('import.allFormats')}
-        </p>
-        <input 
-          ref={fileInputRef} 
-          type="file" 
-          multiple 
-          accept={ALL_FORMATS}
-          onChange={handleFileSelect} 
-          className="hidden" 
-        />
-      </div>
-      
-      {/* File list with per-file passwords */}
-      {files.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-medium">{t('import.files')} ({files.length})</div>
-            {hasEncryptedFiles && (
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={useGlobalPassword}
-                  onChange={(e) => setUseGlobalPassword(e.target.checked)}
-                  className="w-4 h-4 rounded border-border text-accent-primary focus:ring-accent-primary"
-                />
-                {t('import.useGlobalPassword')}
-              </label>
-            )}
-          </div>
-          {files.map((file, i) => {
-            const isEncryptable = file.name.match(/\.(p12|pfx|key)$/i) || (file.type === 'text' && file.data && file.data.includes('ENCRYPTED'))
-            return (
-              <div key={i} className="py-2 border-b border-border space-y-2">
-                <div className="flex items-center gap-2">
-                  <File size={16} className="text-text-secondary shrink-0" />
-                  <span className="text-sm flex-1 truncate">{file.name}</span>
-                  <Badge variant={file.type === 'binary' ? 'amber' : 'blue'} size="sm">
-                    {file.ext.toUpperCase().slice(1)}
-                  </Badge>
-                  <span className="text-xs text-text-secondary">{(file.size / 1024).toFixed(1)} KB</span>
-                  <button onClick={() => removeFile(i)} className="text-status-danger hover:text-status-danger" aria-label={t('common.remove')}>
-                    <Trash size={14} />
-                  </button>
-                </div>
-                {isEncryptable && !useGlobalPassword && (
-                  <div className="flex items-center gap-2 ml-6">
-                    <LockSimple size={14} className="text-text-secondary shrink-0" />
-                    <input
-                      type="text"
-                      value={file.password || ''}
-                      onChange={(e) => setFilePassword(i, e.target.value)}
-                      placeholder={t('import.filePassword')}
-                      autoComplete="new-password"
-                      style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' }}
-                      className="flex-1 px-2 py-1 text-xs border border-border rounded bg-bg-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
-                    />
-                  </div>
-                )}
-              </div>
-            )
-          })}
+    <>
+      <div className="form-fields">
+        <div className="field full" onDragOver={(e) => { if (e.dataTransfer?.types?.includes?.('Files')) e.preventDefault() }} onDrop={handleDrop}>
+          <span>{t('import.files')}</span>
+          <span className="row-actions">
+            <label className="text-link">
+              <input type="file" multiple accept={ALL_FORMATS} className="sr-only" onChange={handleFileSelect} />
+              {t('common.chooseFile')}
+            </label>
+          </span>
+          <small>{t('import.allFormats')}</small>
+          {files.length > 0 && (
+            <RecordList label={t('import.files')}>
+              {files.map((file, i) => (
+                <RecordRow key={i} title={file.name} meta={`${file.ext.toUpperCase().slice(1)} · ${(file.size / 1024).toFixed(1)} KB`}
+                  action={<button type="button" className="text-link" aria-label={t('common.remove')} onClick={() => removeFile(i)}><Icon name="close" /></button>} />
+              ))}
+            </RecordList>
+          )}
         </div>
-      )}
-      
-      {/* Or paste PEM: the same separator as the tools, in sentence case */}
-      <div className="flex items-center gap-2">
-        <div className="flex-1 h-px bg-border" />
-        <span className="text-xs text-text-secondary">{t('common.orPastePem')}</span>
-        <div className="flex-1 h-px bg-border" />
+        {hasEncryptedFiles && (
+          <ToggleSwitch label={t('import.useGlobalPassword')} checked={useGlobalPassword} onChange={setUseGlobalPassword} />
+        )}
+        {!useGlobalPassword && files.map((file, i) => (encryptedFileIndices.includes(i) && (
+          <Input key={i} type="password" autoComplete="new-password" label={t('import.filePasswordFor', { name: file.name })}
+            value={file.password || ''} onChange={(e) => setFilePassword(i, e.target.value)} />
+        )))}
+        <Textarea label={t('common.orPastePem')} mono rows={6} spellCheck={false} placeholder={t('import.pastePemPlaceholder')}
+          value={pemContent} onChange={(e) => setPemContent(e.target.value)} />
+        {hasEncrypted && (useGlobalPassword || hasEncryptedPem) && (
+          <>
+            <Notice tone="warn">{t('import.encryptedDetected')}</Notice>
+            <Input type="password" autoComplete="new-password" label={t('common.password')} placeholder={t('common.enterPassword')}
+              value={password} onChange={(e) => setPassword(e.target.value)} />
+          </>
+        )}
       </div>
-      
-      <textarea
-        value={pemContent}
-        onChange={(e) => setPemContent(e.target.value)}
-        placeholder={t('import.pastePemPlaceholder')}
-        className="w-full h-32 p-3 font-mono text-xs border border-border rounded-lg bg-bg-secondary resize-none focus:outline-none focus:ring-2 focus:ring-accent-primary"
-      />
-      
-      {/* Global password for encrypted content */}
-      {hasEncrypted && (useGlobalPassword || hasEncryptedPem) && (
-        <div className="ui-notice is-warn">
-          <LockSimple aria-hidden="true" />
-          <div className="ui-notice-body">
-            <strong>{t('import.encryptedDetected')}</strong>
-            <input
-              type="text"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={t('common.enterPassword')}
-              autoComplete="new-password"
-              style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' }}
-              className="mt-2 w-full px-3 py-2 text-sm border border-border rounded-lg bg-bg-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
-            />
-          </div>
-        </div>
-      )}
-      
-      {/* Actions: a dialog ends on its buttons at the right; on a page the action opens the
-          mockup's test zone, button on the left and what it does beside it */}
       {onCancel ? (
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={onCancel}>{t('common.cancel')}</Button>
-          <Button type="button" onClick={handleAnalyze} disabled={(!pemContent.trim() && files.length === 0) || isAnalyzing}>
-            {isAnalyzing ? <><ArrowsClockwise size={16} className="animate-spin" /> {t('import.analyzing')}</> : t('import.analyze')}
-          </Button>
-        </div>
-      ) : (
-        <div>
-          <Button type="button" onClick={handleAnalyze} disabled={(!pemContent.trim() && files.length === 0) || isAnalyzing}>
-            {isAnalyzing ? <ArrowsClockwise size={16} className="animate-spin" /> : <MagnifyingGlass size={16} />}
+        <ModalActions>
+          <Btn onClick={onCancel}>{t('common.cancel')}</Btn>
+          <Btn tone="primary" write={false} icon="search" onClick={handleAnalyze} disabled={!canAnalyze}>
             {isAnalyzing ? t('import.analyzing') : t('import.analyze')}
-          </Button>
-          <p>
-            <Question aria-hidden="true" />
-            <span>{t('import.analyzeHint')}</span>
-          </p>
+          </Btn>
+        </ModalActions>
+      ) : (
+        <div className="settings-actions">
+          <Btn tone="primary" write={false} icon="search" onClick={handleAnalyze} disabled={!canAnalyze}>
+            {isAnalyzing ? t('import.analyzing') : t('import.analyze')}
+          </Btn>
+          <span className="group-hint">{t('import.analyzeHint')}</span>
         </div>
       )}
-    </div>
+    </>
   )
-  
-  // Render preview step  
+
+  // Preview: what was found (counts, chains, key pairs, problems), the objects to import, the options
   const renderPreviewStep = () => {
     const { objects, chains, matching, validation } = analysisResult || {}
-    const stats = {
-      certs: objects?.filter(o => o.type === 'certificate' && !o.is_ca).length || 0,
-      cas: objects?.filter(o => o.is_ca).length || 0,
-      keys: objects?.filter(o => o.type === 'private_key').length || 0,
-      csrs: objects?.filter(o => o.type === 'csr').length || 0
-    }
-    
+    const count = (keep) => objects?.filter(keep).length || 0
+    const option = (key, label) => (
+      <ToggleSwitch key={key} label={t(label)} checked={importOptions[key]} onChange={(on) => setImportOptions(prev => ({ ...prev, [key]: on }))} />
+    )
     return (
-      <div className="space-y-4">
-        {/* Stats */}
-        <div className="flex flex-wrap gap-3 text-sm">
-          {stats.certs > 0 && <Badge variant="blue" icon={Certificate}>{stats.certs} Certificate{stats.certs > 1 ? 's' : ''}</Badge>}
-          {stats.cas > 0 && <Badge variant="green" icon={ShieldCheck}>{stats.cas} CA{stats.cas > 1 ? 's' : ''}</Badge>}
-          {stats.keys > 0 && <Badge variant="orange" icon={Key}>{stats.keys} Key{stats.keys > 1 ? 's' : ''}</Badge>}
-          {stats.csrs > 0 && <Badge variant="purple" icon={FileText}>{stats.csrs} CSR{stats.csrs > 1 ? 's' : ''}</Badge>}
-        </div>
-        
-        {/* Chains */}
+      <>
+        <Props items={[
+          count(o => o.type === 'certificate' && !o.is_ca) > 0 && [t('common.certificates'), count(o => o.type === 'certificate' && !o.is_ca)],
+          count(o => o.is_ca) > 0 && [t('common.cas'), count(o => o.is_ca)],
+          count(o => o.type === 'private_key') > 0 && [t('import.typePrivateKey'), count(o => o.type === 'private_key')],
+          count(o => o.type === 'csr') > 0 && [t('import.typeCsr'), count(o => o.type === 'csr')],
+        ]} />
+
         {chains?.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium">{t('import.certificateChains')}</h3>
-            {chains.map((chain, i) => <ChainCard key={i} chain={chain} index={i} />)}
-          </div>
+          <Section title={t('import.certificateChains')}>
+            <RecordList>{chains.map((chain, i) => <ChainCard key={i} chain={chain} index={i} />)}</RecordList>
+          </Section>
         )}
-        
-        {/* Key matching */}
-        {matching?.matched_pairs?.length > 0 && (
-          <div className="text-sm p-2 rounded flex items-center gap-2 alert-bg-green">
-            <Link size={16} />
-            {t('import.keyPairsDetected', { count: matching.matched_pairs.length })}
-          </div>
-        )}
-        
+
+        {matching?.matched_pairs?.length > 0 && <Notice>{t('import.keyPairsDetected', { count: matching.matched_pairs.length })}</Notice>}
         <ValidationIssues validation={validation} />
-        
-        {/* Objects list */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium">{t('import.detectedObjects')} ({objects?.length || 0})</h3>
-            <button type="button" onClick={selectAll} className="text-xs text-accent-primary hover:underline">
-              {selectedObjects.size === objects?.length ? t('common.deselectAll') : t('common.selectAll')}
-            </button>
-          </div>
-          
-          <div className={`space-y-2 overflow-y-auto pr-1 ${compact ? 'max-h-48' : 'max-h-64'}`}>
+
+        <Section title={<>{t('import.detectedObjects')} ({objects?.length || 0}) <TextLink onClick={selectAll}>{selectedObjects.size === objects?.length ? t('common.deselectAll') : t('common.selectAll')}</TextLink></>}>
+          <RecordList>
             {objects?.map((obj, i) => (
               <ObjectCard key={i} obj={obj} expanded={expandedObjects.has(i)} onToggle={() => toggleExpand(i)} selected={selectedObjects.has(i)} onSelect={() => toggleObject(i)} />
             ))}
+          </RecordList>
+        </Section>
+
+        <Section title={t('import.importOptions')}>
+          <div className="form-fields">
+            {option('skip_duplicates', 'import.skipDuplicates')}
+            {option('import_cas', 'import.importCAs')}
+            {option('import_certs', 'import.importCertificates')}
+            {option('import_keys', 'import.importKeys')}
+            {option('import_csrs', 'import.importCSRs')}
           </div>
-        </div>
-        
-        {/* Import options */}
-        <div className="border-t border-border pt-4">
-          <h3 className="text-sm font-medium mb-2">{t('import.importOptions')}</h3>
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={importOptions.skip_duplicates} onChange={(e) => setImportOptions(prev => ({ ...prev, skip_duplicates: e.target.checked }))} className="w-4 h-4 rounded" />
-              {t('import.skipDuplicates')}
-            </label>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={importOptions.import_cas} onChange={(e) => setImportOptions(prev => ({ ...prev, import_cas: e.target.checked }))} className="w-4 h-4 rounded" />
-              {t('import.importCAs')}
-            </label>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={importOptions.import_certs} onChange={(e) => setImportOptions(prev => ({ ...prev, import_certs: e.target.checked }))} className="w-4 h-4 rounded" />
-              {t('import.importCertificates')}
-            </label>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={importOptions.import_keys} onChange={(e) => setImportOptions(prev => ({ ...prev, import_keys: e.target.checked }))} className="w-4 h-4 rounded" />
-              {t('import.importKeys')}
-            </label>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={importOptions.import_csrs} onChange={(e) => setImportOptions(prev => ({ ...prev, import_csrs: e.target.checked }))} className="w-4 h-4 rounded" />
-              {t('import.importCSRs')}
-            </label>
-          </div>
-        </div>
-        
-        {/* Actions */}
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={() => {
+        </Section>
+
+        <ModalActions>
+          <Btn onClick={() => {
             setStep('input')
             setAnalysisResult(null)
             setSelectedObjects(new Set())
-          }}>{t('common.back')}</Button>
-          <Button type="button" onClick={handleImport} disabled={selectedObjects.size === 0 || isImporting}>
+          }}>{t('common.back')}</Btn>
+          <Btn tone="primary" icon="upload" onClick={handleImport} disabled={selectedObjects.size === 0 || isImporting}>
             {t('import.importObjects', { count: selectedObjects.size })}
-          </Button>
-        </div>
-      </div>
+          </Btn>
+        </ModalActions>
+      </>
     )
   }
-  
-  // Render importing step
-  const renderImportingStep = () => (
-    <div className="flex flex-col items-center justify-center py-12">
-      <ArrowsClockwise size={48} className="text-accent-primary animate-spin mb-4" />
-      <p className="text-sm">{t('import.importingObjects')}</p>
-    </div>
-  )
-  
+
+  const renderImportingStep = () => <SkeletonPanel label={t('import.importingObjects')} />
+
   const renderResultStep = () => (
     <ImportResultStep
       importResult={importResult}
@@ -775,19 +519,16 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
   )
   
   return (
-    <div className={compact ? '' : 'space-y-4'}>
+    <>
       {step === 'input' && renderInputStep()}
       {step === 'preview' && renderPreviewStep()}
       {step === 'importing' && renderImportingStep()}
       {step === 'result' && renderResultStep()}
-    </div>
+    </>
   )
 }
 
-/**
- * SmartImport Modal: the widget in the mockup's wide modal(). The widget keeps the product's own
- * drawing (.atl-out): the mockup has no import screen, and the operations page shows it inline.
- */
+/** SmartImport in the mockup's wide modal(): the mockup has no import screen, the dialog takes its vocabulary. */
 export function SmartImportModal({ isOpen, onClose, onImportComplete }) {
   const { t } = useTranslation()
   if (!isOpen) return null
@@ -797,9 +538,7 @@ export function SmartImportModal({ isOpen, onClose, onImportComplete }) {
   }
   return (
     <AtelierDialog title={t('import.smartImport')} size="wide" onClose={onClose} testId="smart-import-dialog">
-      <div className="atl-out">
-        <SmartImportWidget onImportComplete={handleComplete} onCancel={onClose} compact />
-      </div>
+      <SmartImportWidget onImportComplete={handleComplete} onCancel={onClose} />
     </AtelierDialog>
   )
 }

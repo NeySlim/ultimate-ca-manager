@@ -5,7 +5,7 @@ import { useClipboard } from '../../hooks/useClipboard'
 import { Btn, Pill, Notice, RecordList, RecordRow } from '../../components/atelier'
 import { Input, NumberInput, SecretInput, Select, ToggleSwitch, SegmentedField, ListInput } from '../../components/atelier/Form'
 import { SettingsGroup, SettingsTest } from '../../components/atelier/SettingsView'
-import EmailTemplateWindow from '../../components/EmailTemplateWindow'
+import EmailTemplateDialog from './EmailTemplateDialog'
 import { secretInputProps, smtpSecretTargets } from '../../lib/secretTarget'
 import { useRefocusAfter } from '../../hooks/useRefocus'
 import { shownNumber, typedNumber } from './numberFields'
@@ -151,7 +151,7 @@ export default function EmailSection({ settings, fieldErrors = {}, savedEmail, u
         </RecordList>
       </SettingsGroup>
       {showTemplateEditor && (
-        <div className="atl-out"><EmailTemplateWindow onClose={() => setShowTemplateEditor(false)} /></div>
+        <EmailTemplateDialog onClose={() => setShowTemplateEditor(false)} />
       )}
 
       <SettingsGroup legend={t('settings.expiryAlerts')}>

@@ -76,8 +76,8 @@ export function StatusBar({ onShowNodes, can }) {
         <i className={`dot ${tone}`} aria-hidden="true" />
         {line}
         {node.length > 0 && <span className="ha-node">{node.map((n) => <span key={n}> · {n}</span>)}</span>}
-        {/* The live connection, the product's addition, drawn by its own styles after the service state */}
-        <span className="atl-out"><WebSocketIndicator className="shell-ws" /></span>
+        {/* The live connection, the product's addition, after the service state */}
+        <WebSocketIndicator />
       </span>
       {pending !== null && (
         <Link to="/approvals" className="approvals-link" data-module="approvals">

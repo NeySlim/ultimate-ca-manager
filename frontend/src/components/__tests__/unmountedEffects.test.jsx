@@ -28,21 +28,19 @@ vi.mock('../../services/apiClient', () => ({
   apiClient: { get: (...a) => apiGet(...a), post: vi.fn() },
 }))
 
-// Loaded at module level: its @phosphor-icons/react import takes seconds cold,
-// which inside a test body counts against the 5 s timeout.
-import EmailTemplateWindow from '../EmailTemplateWindow'
+import EmailTemplateDialog from '../../pages/settings/EmailTemplateDialog'
 
-describe('EmailTemplateWindow — a request that outlives the window', () => {
+describe('EmailTemplateDialog — a request that outlives the dialog', () => {
   beforeEach(() => { showError.mockClear(); apiGet.mockReset() })
   afterEach(() => { vi.clearAllMocks() })
 
-  it('does not raise an error toast once the window has been closed', async () => {
+  it('does not raise an error toast once the dialog has been closed', async () => {
     let rejectLoad
     apiGet.mockReturnValue(new Promise((_, reject) => { rejectLoad = reject }))
 
-    const { unmount } = render(<EmailTemplateWindow onClose={() => {}} />)
+    const { unmount } = render(<EmailTemplateDialog onClose={() => {}} />)
 
-    // The user closes the window while the template is still loading.
+    // The user closes the dialog while the template is still loading.
     unmount()
 
     // The request then fails, as it would on a dropped connection.
@@ -54,11 +52,11 @@ describe('EmailTemplateWindow — a request that outlives the window', () => {
     expect(showError).not.toHaveBeenCalled()
   })
 
-  it('still reports the error while the window is open', async () => {
+  it('still reports the error while the dialog is open', async () => {
     let rejectLoad
     apiGet.mockReturnValue(new Promise((_, reject) => { rejectLoad = reject }))
 
-    render(<EmailTemplateWindow onClose={() => {}} />)
+    render(<EmailTemplateDialog onClose={() => {}} />)
 
     await act(async () => {
       rejectLoad(new Error('boom'))

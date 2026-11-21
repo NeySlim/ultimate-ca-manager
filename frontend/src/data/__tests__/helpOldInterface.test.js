@@ -6,14 +6,13 @@ import { describe, it, expect } from 'vitest'
 import { helpGuides } from '../helpGuides'
 import { helpContent } from '../helpContent'
 
-// Per-entry exceptions: the Operations and ACME pages keep a sidebar tab layout; the e-mail template editor is still a floating window
+// Per-entry exceptions: the Operations and ACME pages keep a sidebar tab layout
 const ALLOWED = {
-  'guide settings': [/in a floating window/g],
   'content operations': [/Sidebar Tabs/g],
   'content acme': [/"Let's Encrypt orders" sidebar tab/g],
 }
 const RETIRED = [
-  /widget/i, /edit layout/i, /\bcustomize\b.*sliders/i, /sidebar/i, /floating window/i,
+  /widget/i, /edit layout/i, /\bcustomize\b.*sliders/i, /sidebar/i, /floating window/i, /draggable/i, /help panel/i,
   /green dot/i, /System Health panel/i, /certificate and CA detail panels/i,
   /the dashboard (shows|queue)/i, /updates in real-time via websocket/i,
 ]

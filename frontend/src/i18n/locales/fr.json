@@ -2915,7 +2915,15 @@
     "quickHelp": "Aide rapide",
     "guide": "Guide",
     "guideComingSoon": "Guide détaillé à venir.",
-    "tableOfContents": "Sommaire"
+    "tableOfContents": "Sommaire",
+    "back": "Revenir à la console",
+    "views": "Vue de l’aide",
+    "searchLabel": "Rechercher dans le guide",
+    "searchPlaceholder": "Mot, section…",
+    "noMatch": "Aucune section du guide ne contient ce texte.",
+    "overview": "En bref",
+    "term": "{{term}} : ",
+    "contentsLead": "Sommaire : "
   },
   "hsm": {
     "pkcs11Unavailable": "Dépendances PKCS#11 non disponibles sur cet hôte",
@@ -3082,7 +3090,8 @@
     "crossSkipped_one": "{{count}} certificat croisé écarté ; l’AC auto-signée est conservée",
     "crossSkipped_other": "{{count}} certificats croisés écartés ; les AC auto-signées sont conservées",
     "unverifiableParentsTitle": "Parentes à confirmer sur la page de l’AC",
-    "unverifiableParent": "{{ca}} reste sans parente : parente probable {{parent}}, signature non vérifiable ici ({{algorithm}})"
+    "unverifiableParent": "{{ca}} reste sans parente : parente probable {{parent}}, signature non vérifiable ici ({{algorithm}})",
+    "filePasswordFor": "Mot de passe de {{name}}"
   },
   "importExport": {
     "exportCerts": "Exporter les certificats",
@@ -3162,7 +3171,8 @@
       "users": "Utilisateurs",
       "templates": "Modèles",
       "csrs": "CSR"
-    }
+    },
+    "pageHelp": "Aide de cette page"
   },
   "operations": {
     "title": "Opérations",
@@ -4432,7 +4442,10 @@
       "mtls": "mTLS modifié",
       "ct": "Certificate Transparency modifiée",
       "ctDetail": "Réglages CT enregistrés."
-    }
+    },
+    "templateHtmlSource": "Source HTML",
+    "templateFormat": "Format du modèle",
+    "templateVariablesLead": "Variables : "
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée.",
@@ -6991,7 +7004,8 @@
     "chooseCertificate": "Choisir un certificat...",
     "certLoaded": "Certificat chargé",
     "keyLoaded": "Clé privée chargée",
-    "noCertsWithKey": "Aucun certificat avec clé privée trouvé"
+    "noCertsWithKey": "Aucun certificat avec clé privée trouvé",
+    "source": "Provenance du certificat"
   },
   "commands": {
     "nav": {

@@ -190,9 +190,9 @@
 .atl .release-notes-body a{color:var(--accent)}
 .atl .segmented .swatch{margin-right:6px;vertical-align:-1px}
 /*
- * A panel the product still draws inside a zone (.atl-out: import widget, certificate picker field,
- * setup card, deployment, email template, reconnect overlay) keeps its own look: the mockup's rules on
- * bare elements (button, input, p) outrank the product's classes, so the ones these panels use are given back.
+ * A panel the product still draws inside a zone (.atl-out: the setup card and the deployment panel of
+ * Certificates) keeps its own look: the mockup's rules on bare elements (button, input, p) outrank the
+ * product's classes, so the ones these panels use are given back.
  */
 .atl .atl-out{font-family:'IBM Plex Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 .atl .atl-out .lv-btn,.atl .atl-out .ui-select-trigger,.atl .atl-out button.border{border-style:solid;border-width:1px}
@@ -223,3 +223,11 @@
 /* A notice holding a command line lets it scroll inside the notice instead of widening the page */
 .atl .notice:has(>span>.command-line),.atl .notice>span:has(>.command-line){min-width:0}
 @media(max-width:800px){.atl .ext-row.role-row{grid-template-columns:minmax(0,1fr) 40px;grid-template-areas:none}.atl .ext-row.role-row>select{grid-column:1/-1}.atl .ext-row.role-row>.icon-btn{grid-column:2;grid-row:1}.atl .ext-row.row-head{display:none}.atl .eku-list.two-columns{grid-template-columns:1fr}}
+/* The page help's guide: its contents line above the sections, its steps numbered as the mockup's help lists its items */
+.atl .help-toc{margin:0 0 20px;line-height:1.7}
+.atl .help-grid ol{padding-left:17px;margin:0}
+/* The email template editor: the source and its preview side by side, one height that keeps the dialog below
+   the top bar (the template draws its own canvas) */
+.atl .field textarea.template-source,.atl .template-preview{height:clamp(160px,calc(100dvh - 480px),360px)}
+.atl iframe.template-preview{width:100%;border:1px solid var(--control);border-radius:4px}
+.atl pre.template-preview{margin:0;overflow:auto}

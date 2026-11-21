@@ -17,7 +17,7 @@ import { moduleById } from '../navigation/registry'
 import { usePins } from './shell/pins'
 import { resolveActivePageId } from './shell/activePage'
 import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
-import { FloatingHelpPanel } from './ui/FloatingHelpPanel'
+import { HelpDialog } from './shell/HelpDialog'
 import { UpdatePopup } from './UpdatePopup'
 import { KofiSupportCard } from './KofiSupportCard'
 import { usePermission } from '../hooks'
@@ -37,9 +37,9 @@ export function AppShell() {
   const messages = useNotification()
   const notice = (text) => messages?.showInfo?.(text)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
-  const [helpModalOpen, setHelpModalOpen] = useState(false)
-  // Help key requested by the shell itself (navigation help); cleared on close
-  const [helpOverride, setHelpOverride] = useState(null)
+  // The open help: { key } requested by the shell itself (navigation help, else the page's), { returnTo } the
+  // id that takes the focus back; null when closed
+  const [help, setHelp] = useState(null)
   // Cluster nodes, read from the service status (read:settings), from the bar or the HA banner
   const [nodesOpen, setNodesOpen] = useState(false)
   const ha = haState(useHealth())
@@ -116,17 +116,14 @@ export function AppShell() {
     const handleHelpKey = (e) => {
       if (e.key === '?' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) && !e.target.isContentEditable) {
         e.preventDefault()
-        setHelpModalOpen(prev => !prev)
+        setHelp(prev => (prev ? null : {}))
       }
     }
     window.addEventListener('keydown', handleHelpKey)
     return () => window.removeEventListener('keydown', handleHelpKey)
   }, [])
 
-  const openHelp = (key) => {
-    setHelpOverride(typeof key === 'string' ? key : null)
-    setHelpModalOpen(true)
-  }
+  const openHelp = (key, returnTo) => setHelp({ key: typeof key === 'string' ? key : null, returnTo })
 
   const skipToPage = (e) => {
     e.preventDefault()
@@ -173,13 +170,15 @@ export function AppShell() {
         open={commandPaletteOpen}
         onOpenChange={setPalette}
         can={can}
+        onOpenHelp={hasHelp ? () => openHelp(null, 'shell-search') : undefined}
       />
 
-      {/* Help Panel (floating desktop / bottom sheet mobile) */}
-      <FloatingHelpPanel
-        isOpen={helpModalOpen}
-        onClose={() => { setHelpModalOpen(false); setHelpOverride(null) }}
-        pageKey={helpOverride || helpPageKey}
+      {/* The help of the page, the mockup's help dialog */}
+      <HelpDialog
+        open={!!help}
+        onClose={() => setHelp(null)}
+        pageKey={help?.key || helpPageKey}
+        returnTo={help?.returnTo}
       />
 
       {/* Optional what's-new window after an update (#308) */}

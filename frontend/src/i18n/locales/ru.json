@@ -493,7 +493,8 @@
       "users": "Пользователи",
       "templates": "Шаблоны",
       "csrs": "CSR"
-    }
+    },
+    "pageHelp": "Справка по этой странице"
   },
   "operations": {
     "title": "Операции",
@@ -4539,7 +4540,10 @@
       "mtls": "mTLS изменён",
       "ct": "Certificate Transparency изменена",
       "ctDetail": "Параметры CT сохранены."
-    }
+    },
+    "templateHtmlSource": "Исходный код HTML",
+    "templateFormat": "Формат шаблона",
+    "templateVariablesLead": "Переменные: "
   },
   "account": {
     "profile": "Профиль",
@@ -5145,7 +5149,15 @@
     "quickHelp": "Краткая справка",
     "guide": "Руководство",
     "guideComingSoon": "Подробное руководство скоро появится.",
-    "tableOfContents": "Содержание"
+    "tableOfContents": "Содержание",
+    "back": "Вернуться в консоль",
+    "views": "Вид справки",
+    "searchLabel": "Поиск по руководству",
+    "searchPlaceholder": "Слово, раздел…",
+    "noMatch": "Ни один раздел руководства не содержит этот текст.",
+    "overview": "Кратко",
+    "term": "{{term}}: ",
+    "contentsLead": "Содержание: "
   },
   "time": {
     "today": "Сегодня",
@@ -5447,7 +5459,8 @@
     "crossSkipped_many": "{{count}} перекрёстных сертификатов пропущено; самоподписанные ЦС сохранены",
     "crossSkipped_other": "{{count}} перекрёстных сертификата пропущены; самоподписанные ЦС сохранены",
     "unverifiableParentsTitle": "Родители для подтверждения на странице ЦС",
-    "unverifiableParent": "{{ca}} остался без родителя: вероятный родитель {{parent}}, подпись здесь проверить нельзя ({{algorithm}})"
+    "unverifiableParent": "{{ca}} остался без родителя: вероятный родитель {{parent}}, подпись здесь проверить нельзя ({{algorithm}})",
+    "filePasswordFor": "Пароль файла {{name}}"
   },
   "webhooks": {
     "eventLabels": {
@@ -7275,7 +7288,8 @@
     "chooseCertificate": "Выберите сертификат...",
     "certLoaded": "Сертификат загружен",
     "keyLoaded": "Закрытый ключ загружен",
-    "noCertsWithKey": "Сертификаты с закрытым ключом не найдены"
+    "noCertsWithKey": "Сертификаты с закрытым ключом не найдены",
+    "source": "Источник сертификата"
   },
   "commands": {
     "nav": {

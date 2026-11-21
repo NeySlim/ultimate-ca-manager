@@ -18,7 +18,7 @@ export default {
         items: [
           { label: 'Recherche', text: 'Appuyez sur Ctrl K (Cmd K sur macOS) ou sélectionnez le champ de recherche pour aller à toute page du menu que vous pouvez ouvrir, lancer une action (Émettre un certificat ouvre son formulaire) ou trouver un certificat, une AC, un utilisateur, un modèle, un compte ACME ou un profil SCEP. Flèche bas passe du champ aux résultats, Flèche haut ramène du premier résultat au champ, et Entrée dans le champ ouvre le premier résultat. Un objet trouvé s’ouvre dans le détail de sa page' },
           { label: 'Adresse', text: 'L’objet ouvert dans le panneau de détail d’une page et sa section font partie de l’adresse : un rechargement ou un lien partagé les rouvre, et Précédent du navigateur referme le panneau' },
-          { label: 'Aide', text: 'Appuyez sur ? hors d’un champ de texte pour ouvrir l’aide de la page courante' },
+          { label: 'Aide', text: 'Appuyez sur ? hors d’un champ de texte, ou sélectionnez le bouton d’aide de la barre, pour ouvrir l’aide de la page courante ; sur un écran étroit, où la barre n’a pas de bouton d’aide, cherchez Aide de cette page' },
           { label: 'Largeur téléphone', text: 'La barre supérieure affiche une seule liste de pages au lieu des liens et du menu' },
         ]
       },

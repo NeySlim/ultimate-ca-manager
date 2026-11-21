@@ -119,7 +119,7 @@ describe('design tokens', () => {
     expect(handWrittenClasses().size).toBeGreaterThan(200)
     expect(collect(styleFiles, BARE_VAR, (m) => m[1]).size).toBeGreaterThan(50)
     // Colour utilities fall as components move to the mockup's rules; the floor asks that some are found
-    expect(collect(jsFiles, COLOR_CLASS, (m) => m[2]).size).toBeGreaterThan(20)
+    expect(collect(jsFiles, COLOR_CLASS, (m) => m[2]).size).toBeGreaterThan(10)
   })
 })
 

@@ -57,9 +57,7 @@ export default function ServiceStatusWidget() {
   return (
     <>
       {reconnecting && (
-        <div className="atl-out">
-          <ServiceReconnectOverlay status={reconnectStatus} attempt={attempt} countdown={countdown} onCancel={cancel} />
-        </div>
+        <ServiceReconnectOverlay status={reconnectStatus} attempt={attempt} countdown={countdown} onCancel={cancel} />
       )}
       <SettingsGroup legend={t('settings.serviceStatus')} grid={false}>
         {loading ? (

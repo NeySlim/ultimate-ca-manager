@@ -491,7 +491,8 @@
       "users": "Usuarios",
       "templates": "Plantillas",
       "csrs": "CSRs"
-    }
+    },
+    "pageHelp": "Help for this page"
   },
   "operations": {
     "title": "Operaciones",
@@ -4385,7 +4386,10 @@
       "mtls": "mTLS modified",
       "ct": "Certificate Transparency modified",
       "ctDetail": "CT settings saved."
-    }
+    },
+    "templateHtmlSource": "HTML source",
+    "templateFormat": "Template format",
+    "templateVariablesLead": "Variables: "
   },
   "account": {
     "profile": "Perfil",
@@ -4981,7 +4985,15 @@
     "quickHelp": "Ayuda rápida",
     "guide": "Guía",
     "guideComingSoon": "Guía detallada próximamente.",
-    "tableOfContents": "Contenido"
+    "tableOfContents": "Contenido",
+    "back": "Back to the console",
+    "views": "Help view",
+    "searchLabel": "Search the guide",
+    "searchPlaceholder": "Word, section…",
+    "noMatch": "No section of the guide contains this text.",
+    "overview": "Overview",
+    "term": "{{term}}: ",
+    "contentsLead": "Contents: "
   },
   "time": {
     "today": "Hoy",
@@ -5237,7 +5249,8 @@
     "crossSkipped_one": "{{count}} certificado cruzado omitido; se conserva la CA autofirmada",
     "crossSkipped_other": "{{count}} certificados cruzados omitidos; se conservan las CAs autofirmadas",
     "unverifiableParentsTitle": "CA padre por confirmar en la página de la CA",
-    "unverifiableParent": "{{ca}} quedó sin CA padre: CA padre probable {{parent}}, firma no verificable aquí ({{algorithm}})"
+    "unverifiableParent": "{{ca}} quedó sin CA padre: CA padre probable {{parent}}, firma no verificable aquí ({{algorithm}})",
+    "filePasswordFor": "Password of {{name}}"
   },
   "webhooks": {
     "eventLabels": {
@@ -6991,7 +7004,8 @@
     "chooseCertificate": "Elegir un certificado...",
     "certLoaded": "Certificado cargado",
     "keyLoaded": "Clave privada cargada",
-    "noCertsWithKey": "No se encontraron certificados con clave privada"
+    "noCertsWithKey": "No se encontraron certificados con clave privada",
+    "source": "Certificate source"
   },
   "commands": {
     "nav": {

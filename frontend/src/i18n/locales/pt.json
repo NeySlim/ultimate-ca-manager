@@ -491,7 +491,8 @@
       "users": "Utilizadores",
       "templates": "Modelos",
       "csrs": "CSRs"
-    }
+    },
+    "pageHelp": "Help for this page"
   },
   "operations": {
     "title": "Operações",
@@ -4385,7 +4386,10 @@
       "mtls": "mTLS modified",
       "ct": "Certificate Transparency modified",
       "ctDetail": "CT settings saved."
-    }
+    },
+    "templateHtmlSource": "HTML source",
+    "templateFormat": "Template format",
+    "templateVariablesLead": "Variables: "
   },
   "account": {
     "profile": "Perfil",
@@ -4981,7 +4985,15 @@
     "quickHelp": "Ajuda rápida",
     "guide": "Guia",
     "guideComingSoon": "Guia detalhado em breve.",
-    "tableOfContents": "Conteúdo"
+    "tableOfContents": "Conteúdo",
+    "back": "Back to the console",
+    "views": "Help view",
+    "searchLabel": "Search the guide",
+    "searchPlaceholder": "Word, section…",
+    "noMatch": "No section of the guide contains this text.",
+    "overview": "Overview",
+    "term": "{{term}}: ",
+    "contentsLead": "Contents: "
   },
   "time": {
     "today": "Hoje",
@@ -5237,7 +5249,8 @@
     "crossSkipped_one": "{{count}} certificado cruzado foi omitido; a CA autoassinada é mantida",
     "crossSkipped_other": "{{count}} certificados cruzados foram omitidos; as CAs autoassinadas são mantidas",
     "unverifiableParentsTitle": "Pais a confirmar na página da CA",
-    "unverifiableParent": "{{ca}} ficou sem pai: provável pai {{parent}}, assinatura não verificável aqui ({{algorithm}})"
+    "unverifiableParent": "{{ca}} ficou sem pai: provável pai {{parent}}, assinatura não verificável aqui ({{algorithm}})",
+    "filePasswordFor": "Password of {{name}}"
   },
   "webhooks": {
     "eventLabels": {
@@ -6991,7 +7004,8 @@
     "chooseCertificate": "Escolher um certificado...",
     "certLoaded": "Certificado carregado",
     "keyLoaded": "Chave privada carregada",
-    "noCertsWithKey": "Nenhum certificado com chave privada encontrado"
+    "noCertsWithKey": "Nenhum certificado com chave privada encontrado",
+    "source": "Certificate source"
   },
   "commands": {
     "nav": {

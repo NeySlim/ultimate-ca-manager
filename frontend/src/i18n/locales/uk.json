@@ -493,7 +493,8 @@
       "users": "Користувачі",
       "templates": "Шаблони",
       "csrs": "CSR"
-    }
+    },
+    "pageHelp": "Help for this page"
   },
   "operations": {
     "title": "Операції",
@@ -4539,7 +4540,10 @@
       "mtls": "mTLS modified",
       "ct": "Certificate Transparency modified",
       "ctDetail": "CT settings saved."
-    }
+    },
+    "templateHtmlSource": "HTML source",
+    "templateFormat": "Template format",
+    "templateVariablesLead": "Variables: "
   },
   "account": {
     "profile": "Профіль",
@@ -5145,7 +5149,15 @@
     "quickHelp": "Швидка допомога",
     "guide": "Посібник",
     "guideComingSoon": "Детальний посібник незабаром.",
-    "tableOfContents": "Зміст"
+    "tableOfContents": "Зміст",
+    "back": "Back to the console",
+    "views": "Help view",
+    "searchLabel": "Search the guide",
+    "searchPlaceholder": "Word, section…",
+    "noMatch": "No section of the guide contains this text.",
+    "overview": "Overview",
+    "term": "{{term}}: ",
+    "contentsLead": "Contents: "
   },
   "time": {
     "today": "Сьогодні",
@@ -5447,7 +5459,8 @@
     "crossSkipped_many": "{{count}} перехресних сертифікатів пропущено; самопідписані CA збережено",
     "crossSkipped_other": "{{count}} перехресного сертифіката пропущено; самопідписані CA збережено",
     "unverifiableParentsTitle": "Батьківські ЦС для підтвердження на сторінці ЦС",
-    "unverifiableParent": "{{ca}} залишився без батьківського ЦС: імовірний батьківський {{parent}}, підпис тут неможливо перевірити ({{algorithm}})"
+    "unverifiableParent": "{{ca}} залишився без батьківського ЦС: імовірний батьківський {{parent}}, підпис тут неможливо перевірити ({{algorithm}})",
+    "filePasswordFor": "Password of {{name}}"
   },
   "webhooks": {
     "eventLabels": {
@@ -7275,7 +7288,8 @@
     "chooseCertificate": "Оберіть сертифікат...",
     "certLoaded": "Сертифікат завантажено",
     "keyLoaded": "Приватний ключ завантажено",
-    "noCertsWithKey": "Сертифікатів з приватним ключем не знайдено"
+    "noCertsWithKey": "Сертифікатів з приватним ключем не знайдено",
+    "source": "Certificate source"
   },
   "commands": {
     "nav": {

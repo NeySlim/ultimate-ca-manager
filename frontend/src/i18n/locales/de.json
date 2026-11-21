@@ -491,7 +491,8 @@
       "users": "Benutzer",
       "templates": "Vorlagen",
       "csrs": "CSRs"
-    }
+    },
+    "pageHelp": "Help for this page"
   },
   "operations": {
     "title": "Operationen",
@@ -4385,7 +4386,10 @@
       "mtls": "mTLS modified",
       "ct": "Certificate Transparency modified",
       "ctDetail": "CT settings saved."
-    }
+    },
+    "templateHtmlSource": "HTML source",
+    "templateFormat": "Template format",
+    "templateVariablesLead": "Variables: "
   },
   "account": {
     "profile": "Profil",
@@ -4981,7 +4985,15 @@
     "quickHelp": "Schnellhilfe",
     "guide": "Anleitung",
     "guideComingSoon": "Detaillierte Anleitung folgt.",
-    "tableOfContents": "Inhalt"
+    "tableOfContents": "Inhalt",
+    "back": "Back to the console",
+    "views": "Help view",
+    "searchLabel": "Search the guide",
+    "searchPlaceholder": "Word, section…",
+    "noMatch": "No section of the guide contains this text.",
+    "overview": "Overview",
+    "term": "{{term}}: ",
+    "contentsLead": "Contents: "
   },
   "time": {
     "today": "Heute",
@@ -5237,7 +5249,8 @@
     "crossSkipped_one": "{{count}} Cross-Zertifikat wurde ausgelassen; die selbstsignierte CA bleibt erhalten",
     "crossSkipped_other": "{{count}} Cross-Zertifikate wurden ausgelassen; die selbstsignierten CAs bleiben erhalten",
     "unverifiableParentsTitle": "Übergeordnete CAs zur Bestätigung auf der CA-Seite",
-    "unverifiableParent": "{{ca}} ohne übergeordnete CA: wahrscheinlich {{parent}}, Signatur hier nicht prüfbar ({{algorithm}})"
+    "unverifiableParent": "{{ca}} ohne übergeordnete CA: wahrscheinlich {{parent}}, Signatur hier nicht prüfbar ({{algorithm}})",
+    "filePasswordFor": "Password of {{name}}"
   },
   "webhooks": {
     "eventLabels": {
@@ -6991,7 +7004,8 @@
     "chooseCertificate": "Zertifikat wählen...",
     "certLoaded": "Zertifikat geladen",
     "keyLoaded": "Privater Schlüssel geladen",
-    "noCertsWithKey": "Keine Zertifikate mit privatem Schlüssel gefunden"
+    "noCertsWithKey": "Keine Zertifikate mit privatem Schlüssel gefunden",
+    "source": "Certificate source"
   },
   "commands": {
     "nav": {
