@@ -1,8 +1,7 @@
 import { useState } from 'react'
-import { UploadSimple } from '@phosphor-icons/react'
-import { Modal, Button, Input, Textarea } from '..'
 import { casService } from '../../services'
 import { useNotification } from '../../contexts'
+import { AtelierDialog, Icon } from '../atelier'
 
 /** Attach the private key of a CA that holds only its certificate (#348). */
 export function ImportCaKeyModal({ open, onClose, ca, onSuccess, t }) {
@@ -41,35 +40,28 @@ export function ImportCaKeyModal({ open, onClose, ca, onSuccess, t }) {
     }
   }
 
+  if (!open) return null
   return (
-    <Modal open={open} onOpenChange={(isOpen) => { if (!isOpen) handleClose() }} title={t('cas.importPrivateKey')}>
-      <div className="p-4 space-y-4">
-        <p className="text-sm text-text-secondary">
-          {t('cas.importPrivateKey')} <strong>{ca?.common_name || ca?.descr}</strong>
-        </p>
-        <Textarea
-          label={t('common.privateKeyPEM')}
-          value={keyPem}
-          onChange={(e) => setKeyPem(e.target.value)}
-          placeholder={`-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQE...\n-----END PRIVATE KEY-----`}
-          rows={8}
-          className="font-mono text-xs"
-        />
-        <Input
-          label={t('common.password')}
-          type="password"
-          noAutofill
-          value={passphrase}
-          onChange={(e) => setPassphrase(e.target.value)}
-          placeholder={t('common.optional')}
-        />
-        <div className="flex justify-end gap-2 pt-2 border-t border-border">
-          <Button type="button" variant="secondary" onClick={handleClose}>{t('common.cancel')}</Button>
-          <Button type="button" onClick={handleUpload} disabled={busy || !keyPem.trim()}>
-            <UploadSimple size={16} /> {t('common.upload')}
-          </Button>
+    <AtelierDialog title={t('cas.importPrivateKey')} size="narrow" onClose={handleClose} testId="import-ca-key-dialog">
+      <p className="small muted" style={{ marginBottom: 20 }}>{ca?.common_name || ca?.descr}</p>
+      <div className="form-fields">
+        <div className="field full">
+          <label htmlFor="ca-key-pem">{t('common.privateKeyPEM')}</label>
+          <textarea id="ca-key-pem" className="mono" rows={8} spellCheck={false} value={keyPem} data-autofocus=""
+            placeholder={`-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQE...\n-----END PRIVATE KEY-----`}
+            onChange={(e) => setKeyPem(e.target.value)} />
+        </div>
+        <div className="field full">
+          <label htmlFor="ca-key-passphrase">{t('common.password')} <span className="optional">{t('common.optional')}</span></label>
+          <input id="ca-key-passphrase" type="password" autoComplete="off" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} />
         </div>
       </div>
-    </Modal>
+      <div className="modal-actions">
+        <button type="button" className="btn" onClick={handleClose}>{t('common.cancel')}</button>
+        <button type="button" className="btn primary" data-write="" onClick={handleUpload} disabled={busy || !keyPem.trim()}>
+          <Icon name="upload" />{t('common.upload')}
+        </button>
+      </div>
+    </AtelierDialog>
   )
 }

@@ -6,9 +6,8 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Icon } from '../atelier/Icon'
+import { AtelierDialog } from '../atelier/AtelierDialog'
 import { SideAction } from './SideField'
-import { Modal } from '../Modal'
-import { Button } from '../Button'
 import { casService } from '../../services'
 import { useNotification } from '../../contexts/NotificationContext'
 import { extractData, formatDate } from '../../lib/utils'
@@ -74,28 +73,24 @@ function ParentDialog({ ca, candidate, mode, onClose, onChanged }) {
   }
 
   return (
-    <Modal open onOpenChange={(v) => !v && !busy && onClose()}
-           title={t(linking ? 'cas.linkParentTitle' : 'cas.withdrawParentTitle')} size="md">
-      <form onSubmit={submit} className="p-4 space-y-3">
-        <p className="text-xs text-text-secondary">
-          {linking
-            ? t('cas.linkParentWarning', { name: candidate?.name, algorithm: candidate?.algorithm })
-            : t('cas.withdrawParentWarning')}
-        </p>
+    <AtelierDialog title={t(linking ? 'cas.linkParentTitle' : 'cas.withdrawParentTitle')} size="narrow" onClose={() => !busy && onClose()} testId="parent-dialog">
+      <form onSubmit={submit}>
+        <p className={linking ? 'notice warn' : 'notice'}><Icon name="link" /><span>
+          {linking ? t('cas.linkParentWarning', { name: candidate?.name, algorithm: candidate?.algorithm }) : t('cas.withdrawParentWarning')}
+        </span></p>
         {linking && (
-          <label className="flex items-start gap-2 text-xs text-text-primary cursor-pointer">
-            <input type="checkbox" className="w-4 h-4 mt-0.5 accent-accent-primary" checked={checked}
-                   onChange={(e) => setChecked(e.target.checked)} data-testid="parent-confirm-check" />
+          <label className="checkbox-line">
+            <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} data-testid="parent-confirm-check" />
             <span>{t('cas.linkParentConfirm')}</span>
           </label>
         )}
-        <div className="flex justify-end gap-2 pt-3 border-t border-border">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t('common.cancel')}</Button>
-          <Button type="submit" variant={linking ? 'primary' : 'danger'} loading={busy} disabled={linking && !checked}>
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
+          <button type="submit" className={linking ? 'btn primary' : 'btn danger'} data-write="" disabled={busy || (linking && !checked)}>
             {t(linking ? 'cas.linkToParent' : 'cas.withdrawParentLink')}
-          </Button>
+          </button>
         </div>
       </form>
-    </Modal>
+    </AtelierDialog>
   )
 }

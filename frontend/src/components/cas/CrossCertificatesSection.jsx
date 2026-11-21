@@ -4,12 +4,10 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { UploadSimple } from '@phosphor-icons/react'
 import { Icon } from '../atelier/Icon'
+import { AtelierDialog } from '../atelier/AtelierDialog'
 import { IconBtn } from '../atelier/Btn'
 import { RecordList, RecordRow } from '../atelier/Detail'
-import { Button } from '../Button'
-import { Modal } from '../Modal'
 import { casService } from '../../services'
 import { useNotification } from '../../contexts'
 import { extractData, formatDate, downloadBlob } from '../../lib/utils'
@@ -18,7 +16,6 @@ import { signingCas } from '../../lib/caSelection'
 import { sanitizeDownloadName } from '../../lib/filename'
 
 const STATE_TONE = { revoked: 'bad', expired: 'bad', notYetValid: 'warn' }
-const FIELD = 'w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm text-text-primary focus:outline-none focus:border-accent-primary'
 
 function AttachModal({ open, onClose, ca, onDone }) {
   const { t } = useTranslation()
@@ -46,32 +43,33 @@ function AttachModal({ open, onClose, ca, onDone }) {
     }
   }
 
+  if (!open) return null
   return (
-    <Modal open={open} onOpenChange={(v) => !v && !busy && onClose()} title={t('crossCerts.attachTitle')} size="md">
-      <form onSubmit={submit} className="p-4 space-y-3">
-        <p className="text-xs text-text-secondary">{t('crossCerts.attachHint')}</p>
-        <textarea className={`${FIELD} h-32 font-mono text-xs resize-y`} spellCheck={false}
-                  placeholder="-----BEGIN CERTIFICATE-----" value={pem}
-                  onChange={(e) => { setPem(e.target.value); if (e.target.value) setFile(null) }} />
-        <label className="flex items-center gap-2 px-3 py-2 bg-bg-tertiary border border-border rounded-md cursor-pointer">
-          <UploadSimple size={16} className="text-text-tertiary" />
-          <span className="text-sm text-text-primary truncate">{file ? file.name : t('cas.uploadCertPick')}</span>
-          <input type="file" className="hidden" accept=".pem,.crt,.cer,.der"
-                 onChange={(e) => { const f = e.target.files?.[0] || null; setFile(f); if (f) setPem('') }} />
-        </label>
-        <label className="flex items-center gap-2 text-sm text-text-primary">
-          <input type="checkbox" className="w-4 h-4 accent-accent-primary" checked={served}
-                 onChange={(e) => setServed(e.target.checked)} />
-          {t('crossCerts.serveNow')}
-        </label>
-        <div className="flex justify-end gap-2 pt-3 border-t border-border">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t('common.cancel')}</Button>
-          <Button type="submit" variant="primary" loading={busy} disabled={!pem.trim() && !file}>
-            {t('crossCerts.attach')}
-          </Button>
+    <AtelierDialog title={t('crossCerts.attachTitle')} size="narrow" onClose={() => !busy && onClose()} testId="cross-attach-dialog">
+      <form onSubmit={submit}>
+        <p className="notice"><Icon name="link" /><span>{t('crossCerts.attachHint')}</span></p>
+        <div className="form-fields">
+          <div className="field full">
+            <label htmlFor="cross-attach-pem">{t('cas.uploadCertPaste')}</label>
+            <textarea id="cross-attach-pem" className="mono" rows={6} spellCheck={false} placeholder="-----BEGIN CERTIFICATE-----" value={pem}
+              onChange={(e) => { setPem(e.target.value); if (e.target.value) setFile(null) }} />
+          </div>
+          <div className="field full">
+            <label htmlFor="cross-attach-file">{t('cas.uploadCertPick')}</label>
+            <input id="cross-attach-file" type="file" accept=".pem,.crt,.cer,.der"
+              onChange={(e) => { const f = e.target.files?.[0] || null; setFile(f); if (f) setPem('') }} />
+          </div>
+          <label className="checkbox-line field full">
+            <input type="checkbox" checked={served} onChange={(e) => setServed(e.target.checked)} />
+            {t('crossCerts.serveNow')}
+          </label>
+        </div>
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
+          <button type="submit" className="btn primary" data-write="" disabled={busy || (!pem.trim() && !file)}>{t('crossCerts.attach')}</button>
         </div>
       </form>
-    </Modal>
+    </AtelierDialog>
   )
 }
 
@@ -118,45 +116,36 @@ function CrossSignModal({ open, onClose, ca, onDone }) {
     }
   }
 
+  if (!open) return null
   return (
-    <Modal open={open} onOpenChange={(v) => !v && !busy && onClose()} title={t('crossCerts.signTitle')} size="md">
-      <form onSubmit={submit} className="p-4 space-y-3">
-        <p className="text-xs text-text-secondary">{t('crossCerts.signHint', { name: ca.name || ca.common_name })}</p>
-        <div className="space-y-1">
-          <label htmlFor="cross-sign-issuer" className="block text-xs font-medium text-text-secondary">
-            {t('crossCerts.signIssuer')}
-          </label>
-          <select id="cross-sign-issuer" className={FIELD} value={issuerId} required
-                  onChange={(e) => setIssuerId(e.target.value)}>
-            <option value="" disabled>{t('crossCerts.selectIssuer')}</option>
-            {issuers.map(c => <option key={c.id} value={c.id}>{c.name || c.common_name}</option>)}
-          </select>
-          {unlistedIssuers > 0 && (
-            <p className="text-xs text-text-tertiary">{t('cas.notListedForSigning', { count: unlistedIssuers })}</p>
-          )}
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <label htmlFor="cross-sign-days" className="block text-xs font-medium text-text-secondary">
-              {t('crossCerts.signValidity')}
-            </label>
-            <input id="cross-sign-days" type="number" min="1" className={FIELD} value={validityDays}
-                   onChange={(e) => setValidityDays(e.target.value)} />
+    <AtelierDialog title={t('crossCerts.signTitle')} size="narrow" onClose={() => !busy && onClose()} testId="cross-sign-dialog">
+      <form onSubmit={submit}>
+        <p className="notice"><Icon name="stamp" /><span>{t('crossCerts.signHint', { name: ca.name || ca.common_name })}</span></p>
+        <div className="form-fields">
+          <div className="field full">
+            <label htmlFor="cross-sign-issuer">{t('crossCerts.signIssuer')}</label>
+            <select id="cross-sign-issuer" value={issuerId} required onChange={(e) => setIssuerId(e.target.value)}
+              aria-describedby={unlistedIssuers > 0 ? 'hint-cross-sign-issuer' : undefined}>
+              <option value="" disabled>{t('crossCerts.selectIssuer')}</option>
+              {issuers.map(c => <option key={c.id} value={c.id}>{c.name || c.common_name}</option>)}
+            </select>
+            {unlistedIssuers > 0 && <small id="hint-cross-sign-issuer">{t('cas.notListedForSigning', { count: unlistedIssuers })}</small>}
           </div>
-          <div className="space-y-1">
-            <label htmlFor="cross-sign-pathlen" className="block text-xs font-medium text-text-secondary">
-              {t('cas.pathLength')}
-            </label>
-            <input id="cross-sign-pathlen" type="number" min="0" className={FIELD} value={pathLength}
-                   onChange={(e) => setPathLength(e.target.value)} />
+          <div className="field">
+            <label htmlFor="cross-sign-days">{t('crossCerts.signValidity')}</label>
+            <input id="cross-sign-days" type="number" min="1" value={validityDays} onChange={(e) => setValidityDays(e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="cross-sign-pathlen">{t('cas.pathLength')}</label>
+            <input id="cross-sign-pathlen" type="number" min="0" value={pathLength} onChange={(e) => setPathLength(e.target.value)} />
           </div>
         </div>
-        <div className="flex justify-end gap-2 pt-3 border-t border-border">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t('common.cancel')}</Button>
-          <Button type="submit" variant="primary" loading={busy} disabled={!issuerId}>{t('crossCerts.sign')}</Button>
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
+          <button type="submit" className="btn primary" data-write="" disabled={busy || !issuerId}>{t('crossCerts.sign')}</button>
         </div>
       </form>
-    </Modal>
+    </AtelierDialog>
   )
 }
 

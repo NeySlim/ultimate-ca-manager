@@ -12,15 +12,12 @@
  */
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ShieldWarning, Lock, DownloadSimple, Warning } from '@phosphor-icons/react'
-import { Modal } from '../Modal'
-import { Button } from '../Button'
-import { Input } from '../Input'
 import { casService } from '../../services'
 import { useNotification } from '../../contexts'
 import { usePermission } from '../../hooks/usePermission'
 import { canExportPrivateKey } from '../../lib/exportPermissions'
 import { downloadBlob } from '../../lib/utils'
+import { AtelierDialog, Icon } from '../atelier'
 
 export function TakeOfflineModal({ open, onClose, ca, onSuccess }) {
   const { t } = useTranslation()
@@ -82,125 +79,67 @@ export function TakeOfflineModal({ open, onClose, ca, onSuccess }) {
     [t, ca]
   )
 
+  if (!open) return null
+  // The mockup's modal() and its form grammar: a notice, the mode as format options, the fields, then the actions
   return (
-    <Modal open={open} onOpenChange={(v) => !v && handleClose()} title={title} size="md">
+    <AtelierDialog title={title} size="narrow" onClose={handleClose} testId="take-offline-dialog">
       {step === 'confirm' && (
-        <div className="p-4 space-y-4">
-          <div className="flex items-start gap-3 p-3 rounded-md bg-status-warning-op10 border border-status-warning-op30">
-            <ShieldWarning size={20} className="text-status-warning shrink-0 mt-0.5" />
-            <div className="text-sm text-text-primary space-y-1">
-              <p className="font-medium">{t('cas.offlineExplain.title')}</p>
-              <p className="text-text-secondary text-xs">{t('cas.offlineExplain.body')}</p>
-            </div>
+        <>
+          <p className="notice warn"><Icon name="lock" /><span><strong>{t('cas.offlineExplain.title')}</strong> {t('cas.offlineExplain.body')}</span></p>
+          <ul className="link-list">
+            <li className="small">{t('cas.offlineExplain.bullet1')}</li>
+            <li className="small">{t('cas.offlineExplain.bullet2')}</li>
+            <li className="small">{t('cas.offlineExplain.bullet3')}</li>
+          </ul>
+          <div className="modal-actions">
+            <button type="button" className="btn" onClick={handleClose}>{t('common.cancel')}</button>
+            <button type="button" className="btn primary" onClick={() => setStep('form')}>{t('common.continue')}</button>
           </div>
-
-          <div className="space-y-2 text-xs text-text-secondary">
-            <p>{t('cas.offlineExplain.bullet1')}</p>
-            <p>{t('cas.offlineExplain.bullet2')}</p>
-            <p>{t('cas.offlineExplain.bullet3')}</p>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-border">
-            <Button type="button" variant="secondary" onClick={handleClose}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="button" variant="primary" onClick={() => setStep('form')}>
-              {t('common.continue')}
-            </Button>
-          </div>
-        </div>
+        </>
       )}
 
       {step === 'form' && (
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          <div className="space-y-2">
-            <label className="block text-xs font-medium text-text-secondary">
-              {t('cas.offlineMode')} <span className="status-danger-text">*</span>
-            </label>
-
-            <button
-              type="button"
-              onClick={() => setMode('password_protected')}
-              className={`w-full text-left p-3 rounded-md border transition-all flex items-start gap-3 ${
-                mode === 'password_protected'
-                  ? 'border-accent-primary bg-accent-primary-op10'
-                  : 'border-border hover:border-text-tertiary'
-              }`}
-            >
-              <Lock size={18} className="text-accent-primary shrink-0 mt-0.5" />
-              <div className="text-sm">
-                <div className="font-medium text-text-primary">{t('cas.offlinePasswordProtected')}</div>
-                <div className="text-xs text-text-secondary mt-0.5">{t('cas.offlineModeDesc.passwordProtected')}</div>
+        <form onSubmit={handleSubmit}>
+          <div className="form-fields">
+            <fieldset className="field full">
+              <legend>{t('cas.offlineMode')}</legend>
+              <div className="choice-grid">
+                <label className="format-option">
+                  <input type="radio" name="offlineMode" value="password_protected" checked={mode === 'password_protected'} onChange={() => setMode('password_protected')} />
+                  <span>{t('cas.offlinePasswordProtected')}<small>{t('cas.offlineModeDesc.passwordProtected')}</small></span>
+                </label>
+                {canExportKey && (
+                  <label className="format-option">
+                    <input type="radio" name="offlineMode" value="file_exported" checked={mode === 'file_exported'} onChange={() => setMode('file_exported')} />
+                    <span>{t('cas.offlineFileExported')}<small>{t('cas.offlineModeDesc.fileExported')}</small></span>
+                  </label>
+                )}
               </div>
-            </button>
-
-            {canExportKey && (
-              <button
-                type="button"
-                onClick={() => setMode('file_exported')}
-                className={`w-full text-left p-3 rounded-md border transition-all flex items-start gap-3 ${
-                  mode === 'file_exported'
-                    ? 'border-accent-warning bg-status-warning-op10'
-                    : 'border-border hover:border-text-tertiary'
-                }`}
-              >
-                <DownloadSimple size={18} className="text-accent-warning shrink-0 mt-0.5" />
-                <div className="text-sm">
-                  <div className="font-medium text-text-primary">{t('cas.offlineFileExported')}</div>
-                  <div className="text-xs text-text-secondary mt-0.5">{t('cas.offlineModeDesc.fileExported')}</div>
-                </div>
-              </button>
-            )}
+            </fieldset>
+            {mode === 'file_exported' && <p className="notice warn"><Icon name="warning" /><span>{t('cas.offlineFileExportedWarning')}</span></p>}
+            <div className="field full">
+              <label htmlFor="offline-password">{t('cas.offlinePassword')}</label>
+              <input id="offline-password" type="password" value={password} required autoComplete="new-password" data-autofocus=""
+                aria-describedby="hint-offline-password" aria-invalid={passwordTooShort || undefined} onChange={(e) => setPassword(e.target.value)} />
+              <small id="hint-offline-password">{t('cas.offlinePasswordHint')}</small>
+              {passwordTooShort && <p className="field-error"><Icon name="warning" /><span>{t('cas.passwordTooShort')}</span></p>}
+            </div>
+            <div className="field full">
+              <label htmlFor="offline-confirm">{t('cas.offlinePasswordConfirm')}</label>
+              <input id="offline-confirm" type="password" value={confirm} required autoComplete="new-password"
+                aria-invalid={(confirm.length > 0 && !passwordsMatch) || undefined} onChange={(e) => setConfirm(e.target.value)} />
+              {confirm.length > 0 && !passwordsMatch && <p className="field-error"><Icon name="warning" /><span>{t('cas.passwordMismatch')}</span></p>}
+            </div>
           </div>
-
-          {mode === 'file_exported' && (
-            <div className="flex items-start gap-2 p-2.5 rounded-md bg-status-warning-op10 border border-status-warning-op30 text-xs">
-              <Warning size={14} className="text-status-warning shrink-0 mt-0.5" />
-              <span className="text-text-secondary">{t('cas.offlineFileExportedWarning')}</span>
-            </div>
-          )}
-
-          <Input
-            label={t('cas.offlinePassword')}
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            showStrength
-            autoFocus
-            helperText={t('cas.offlinePasswordHint')}
-            error={passwordTooShort ? t('cas.passwordTooShort') : undefined}
-          />
-
-          <Input
-            label={t('cas.offlinePasswordConfirm')}
-            type="password"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            required
-            error={confirm.length > 0 && !passwordsMatch ? t('cas.passwordMismatch') : undefined}
-          />
-
-          <div className="flex justify-between gap-2 pt-3 border-t border-border">
-            <Button type="button" variant="ghost" onClick={() => setStep('confirm')} disabled={submitting}>
-              {t('common.back')}
-            </Button>
-            <div className="flex gap-2">
-              <Button type="button" variant="secondary" onClick={handleClose} disabled={submitting}>
-                {t('common.cancel')}
-              </Button>
-              <Button
-                type="submit"
-                variant={mode === 'file_exported' ? 'warning-soft' : 'primary'}
-                loading={submitting}
-                disabled={!canSubmit}
-              >
-                {mode === 'file_exported' ? t('cas.takeOfflineAndDownload') : t('cas.takeOffline')}
-              </Button>
-            </div>
+          <div className="modal-actions">
+            <button type="button" className="btn quiet" onClick={() => setStep('confirm')} disabled={submitting}>{t('common.back')}</button>
+            <button type="button" className="btn" onClick={handleClose} disabled={submitting}>{t('common.cancel')}</button>
+            <button type="submit" className={mode === 'file_exported' ? 'btn danger' : 'btn primary'} data-write="" disabled={!canSubmit}>
+              {mode === 'file_exported' ? t('cas.takeOfflineAndDownload') : t('cas.takeOffline')}
+            </button>
           </div>
         </form>
       )}
-    </Modal>
+    </AtelierDialog>
   )
 }
