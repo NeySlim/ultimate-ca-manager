@@ -1441,7 +1441,11 @@
       "profileRequiresHsm": "此配置文件要求 CA 密钥存储在 HSM 上。",
       "profileHorizon": "合规配置文件接受 {{key}} 至 {{date}}，而此 CA 的有效期将超过该日期。",
       "noDigestAllowedByPolicy": "适用于此 CA 的策略不允许任何签名摘要。",
-      "hsmNeedsRead": "在 HSM 密钥上创建 CA 需要 read:hsm 权限。"
+      "hsmNeedsRead": "在 HSM 密钥上创建 CA 需要 read:hsm 权限。",
+      "title": "创建证书颁发机构",
+      "constraintType": "约束 {{n}} 的类型",
+      "constraintValue": "约束 {{n}} 的值",
+      "choose": "请选择…"
     },
     "detail": {
       "hsmBacked": "HSM 支持",
@@ -1526,14 +1530,17 @@
     "viewMode": "显示方式",
     "treeView": "树状视图",
     "state": {
-      "expiring": "即将过期"
+      "expiring": "即将过期",
+      "active": "有效",
+      "expired": "已过期",
+      "revoked": "已吊销"
     },
     "range_one": "{{start}}–{{end}}，共 {{count, number}} 个 CA",
     "range_other": "{{start}}–{{end}}，共 {{count, number}} 个 CA",
     "downloadCertificate": "下载证书 (PEM)",
     "tree": {
       "title": "信任层级",
-      "hint": "方向键移动，Enter 打开，左右键展开或折叠。",
+      "hint": "方向键移动，Enter 选择，左右键展开或折叠。",
       "expandAll": "全部展开",
       "collapseAll": "全部折叠",
       "expand": "展开 {{name}}",
@@ -1547,8 +1554,94 @@
       "orphan": "上级 CA 未知",
       "crossLink": "交叉签名",
       "showMore_one": "再显示 {{count}} 个",
-      "showMore_other": "再显示 {{count}} 个"
-    }
+      "showMore_other": "再显示 {{count}} 个",
+      "noMatchHint": "请修改搜索或筛选条件。",
+      "reset": "重置筛选",
+      "certCount_one": "<0>{{count}}</0>个证书",
+      "certCount_other": "<0>{{count}}</0>个证书",
+      "subCount_one": "<0>{{count}}</0>个下级机构",
+      "subCount_other": "<0>{{count}}</0>个下级机构"
+    },
+    "loadFailed": "无法读取证书颁发机构",
+    "empty": {
+      "title": "没有证书颁发机构",
+      "text": "创建根 CA 或导入现有 CA，然后在该根下创建签发 CA。"
+    },
+    "help": {
+      "title": "阅读层级结构",
+      "text": "根 CA 为中间机构签名，中间机构又可以为签发 CA 签名。虚线连接由交叉证书关联的两个机构：只认识第一个根的客户端也能验证第二个根的链。选中一个机构后，树旁会显示其密钥、CRL 和 OCSP 响应程序，以及其证书和可执行的操作。离线的机构在恢复之前不会签署任何内容。"
+    },
+    "searchLabel": "搜索证书颁发机构",
+    "listMode": "列表",
+    "guidance": {
+      "lead": "根 CA 为中间机构签名。",
+      "offline": "离线的机构在恢复之前不会签署任何内容。",
+      "cross": "虚线连接由交叉证书关联的两个机构。"
+    },
+    "repair": {
+      "counts": "{{cas}} 个 CA，{{certs}} 个证书",
+      "running": "正在修复…",
+      "nextRun": "下次自动运行"
+    },
+    "side": {
+      "identity": "身份",
+      "typeLevel": "类型和层级",
+      "root": "根",
+      "intermediate": "中间",
+      "issuer": "颁发者",
+      "selfSigned": "自签名",
+      "crossIssuedBy": "由 {{name}} 签发的交叉证书",
+      "expiry": "到期",
+      "pathLenNone": "无限制",
+      "subject": "主题",
+      "serial": "序列号",
+      "validFrom": "生效于",
+      "key": "密钥",
+      "algorithm": "算法",
+      "storage": "存放位置",
+      "storageKinds": {
+        "hsm": "HSM",
+        "software": "软件",
+        "offline": "离线",
+        "none": "无密钥"
+      },
+      "signature": "签名",
+      "issuance": "签发",
+      "issued": "已签发证书",
+      "revokedOf": "其中已吊销",
+      "subAuthorities": "下级机构",
+      "none": "无",
+      "crossIssued": "已签发的交叉证书",
+      "revocation": "吊销",
+      "crlPublished": "CRL 发布时间",
+      "crlNext": "下次更新",
+      "crlNumber": "CRL 编号",
+      "ocsp": "OCSP 响应程序",
+      "ocspActive": "已启用",
+      "ocspInactive": "未启用",
+      "cdp": "CRL 分发点",
+      "ocspUrl": "OCSP URL",
+      "crlDue": "下次更新将在 24 小时内到期：如不重新发布，客户端将拒绝过期的 CRL。",
+      "viewCertificates": "查看证书",
+      "issueWith": "使用此 CA 签发",
+      "downloadChain": "下载证书链",
+      "chainDownloaded": "证书链已下载",
+      "moreActions": "其他操作",
+      "actionsTitle": "机构操作",
+      "offlineNote": "离线机构：恢复之前不会签署证书或 CRL。",
+      "blocked": {
+        "pending": "正在等待其证书：该机构尚不能签发。",
+        "revoked": "已吊销的机构：不能再签发。其证书仍可查看。",
+        "chainRevoked": "其上级机构已吊销：该机构不能再签发。",
+        "expired": "已过期的机构：不能再签发。",
+        "offline": "离线机构：恢复后才能签发。",
+        "noKey": "UCM 未持有其私钥：该机构不能签发。"
+      },
+      "extensions": "X.509 扩展",
+      "copyValue": "复制 {{name}}",
+      "show": "显示 {{name}}"
+    },
+    "pageActions": "页面操作"
   },
   "csrs": {
     "uploadCSR": "上传CSR",
@@ -7988,7 +8081,8 @@
       "no_key": "无私钥",
       "incomplete_chain": "证书链不完整",
       "renewal": "续期",
-      "weak_key": "合规性"
+      "weak_key": "合规性",
+      "ca_id": "证书颁发机构"
     },
     "filterValue": {
       "true": "是",

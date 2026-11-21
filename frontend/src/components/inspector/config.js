@@ -1,5 +1,5 @@
-import { Certificate, ShieldCheck, Fingerprint, CheckCircle, Vault, ChartBar } from '@phosphor-icons/react'
-import { certificatesService, casService, truststoreService, userCertificatesService, approvalsService, keyRecoveryService } from '../../services'
+import { Certificate, Fingerprint, CheckCircle, Vault, ChartBar } from '@phosphor-icons/react'
+import { certificatesService, truststoreService, userCertificatesService, approvalsService, keyRecoveryService } from '../../services'
 import { requestTitle } from '../../pages/approvals/approvalModel'
 import { fetchReport, reportName } from '../../pages/reports/reportModel'
 
@@ -10,11 +10,6 @@ export const INSPECTOR_TYPES = {
     fetchById: (id) => certificatesService.getById(id),
     // The PEM of the 3.0 stays, after the four sections of the Atelier detail
     sections: ['overview', 'chain', 'extensions', 'history', 'pem'],
-  },
-  ca: {
-    icon: ShieldCheck, iconClass: 'bg-accent-success-op15 text-accent-success',
-    fetchById: (id) => casService.getById(id),
-    sections: ['overview', 'chain', 'extensions', 'pem'],
   },
   truststore: {
     icon: Fingerprint, iconClass: 'bg-accent-warning-op15 text-accent-warning',

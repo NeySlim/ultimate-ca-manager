@@ -64,7 +64,7 @@ describe('CreateCAModal parent CA picker (#426)', () => {
     render(<CreateCAModal open onClose={vi.fn()} cas={CAS} onSuccess={vi.fn()} />)
     const type = screen.getAllByRole('combobox').find((s) => within(s).queryByText('cas.intermediateCASigned'))
     fireEvent.change(type, { target: { value: 'intermediate' } })
-    const field = screen.getByTestId('field-cas.parentCA')
+    const field = screen.getByLabelText('cas.parentCA').closest('.field')
     expect(within(field).getAllByRole('option').map((o) => o.textContent)).toEqual(['Signing CA'])
     expect(field).toHaveTextContent('cas.notListedForSigning:2')
   })

@@ -356,7 +356,7 @@ const MIGRATED = [
   'pages/SCEPPage.jsx',
   'components/DetailCard.jsx',
   'components/detail/CSRPanel.jsx',
-  'components/detail/CAPanel.jsx',
+  'pages/cas/CASideDetails.jsx',
   'components/detail/CertificatePanel.jsx',
   'components/detail/TrustCertPanel.jsx',
 ]
@@ -371,7 +371,7 @@ describe('the copy path is not re-implemented', () => {
     },
   )
 
-  it.each(['components/detail/CSRPanel.jsx', 'components/detail/CAPanel.jsx',
+  it.each(['components/detail/CSRPanel.jsx', 'pages/cas/CASideDetails.jsx',
     'components/detail/CertificatePanel.jsx', 'components/detail/TrustCertPanel.jsx',
     'components/DetailCard.jsx', 'pages/settings/DeploySection.jsx'])(
     '%s no longer owns an uncleaned copy-reset timer',

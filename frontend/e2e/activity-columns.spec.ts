@@ -96,9 +96,9 @@ test.describe('phone', () => {
     await createCA(api)
     await page.addInitScript(() => { try { localStorage.setItem('ucm-ca-view-mode', 'list') } catch { /* optional */ } })
     await page.goto('/cas')
-    const records = page.locator('.lv-mrecord.is-opening')
+    const records = page.locator('#ca-records .mobile-record.opens')
     await expect(records.first()).toBeVisible()
-    const boxes = await records.locator('.lv-mrecord-open').evaluateAll(list => list.slice(0, 10).map(el => el.getBoundingClientRect().toJSON()))
+    const boxes = await records.locator('.row-top > .icon-btn').evaluateAll(list => list.slice(0, 10).map(el => el.getBoundingClientRect().toJSON()))
     expect(boxes.length).toBeGreaterThan(0)
     for (const b of boxes) {
       expect(b.right).toBeLessThanOrEqual(390)

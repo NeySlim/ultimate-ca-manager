@@ -4,8 +4,7 @@
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CompactField } from '../DetailCard'
-import { Button } from '../Button'
+import { SideField, SideAction } from './SideField'
 import { casService } from '../../services'
 import { useNotification } from '../../contexts/NotificationContext'
 import { PSS_HSM_TYPES } from '../../lib/signatureName'
@@ -19,10 +18,10 @@ export function SignatureSchemeField({ ca, canWrite = false, onChanged }) {
   const pssPossible = ca.has_private_key && (!ca.uses_hsm || PSS_HSM_TYPES.includes(ca.hsm_provider_type))
 
   return (
-    <CompactField autoIcon="signatureAlgorithm" label={t('cas.signatureScheme')}>
+    <SideField label={t('cas.signatureScheme')}>
       <span>{t(isPss ? 'cas.signatureSchemePss' : 'cas.signatureSchemePkcs1v15')}</span>
       {canWrite && !ca.revoked && (isPss || pssPossible) && <SchemeSwitch ca={ca} isPss={isPss} onChanged={onChanged} />}
-    </CompactField>
+    </SideField>
   )
 }
 
@@ -52,9 +51,8 @@ function SchemeSwitch({ ca, isPss, onChanged }) {
   }
 
   return (
-    <Button type="button" size="xs" variant="secondary" className="ml-2"
-      onClick={handleSwitch} disabled={switching}>
+    <SideAction onClick={handleSwitch} disabled={switching}>
       {action}
-    </Button>
+    </SideAction>
   )
 }

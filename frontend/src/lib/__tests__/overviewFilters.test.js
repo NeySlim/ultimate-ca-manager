@@ -41,4 +41,9 @@ describe('overview layout', () => {
   it('a preset shows its cards only', () => {
     expect(visibleCards(presetLayout('manager', null)).sort()).toEqual(['activity', 'compliance', 'hierarchy', 'horizon'])
   })
+
+  it('carries the authority of « Voir les certificats », by number only', () => {
+    expect(parseOverviewFilters('?ca_id=12&ca_id=x&ca_id=7')).toEqual([['ca_id', '12'], ['ca_id', '7']])
+    expect(toListParams(parseOverviewFilters('?ca_id=12'))).toEqual({ ca_id: ['12'] })
+  })
 })

@@ -6,11 +6,9 @@
  */
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ListChecks, UploadSimple, Warning } from '@phosphor-icons/react'
-import { Modal } from '../../components/Modal'
-import { Button } from '../../components/Button'
 import { casService } from '../../services'
 import { useNotification } from '../../contexts'
+import { AtelierDialog, Icon } from '../../components/atelier'
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024
 
@@ -62,64 +60,33 @@ export function UploadCRLModal({ open, onClose, ca, onSuccess }) {
     [t, ca]
   )
 
+  if (!open) return null
   return (
-    <Modal open={open} onOpenChange={(v) => !v && handleClose()} title={title} size="md">
-      <form onSubmit={handleSubmit} className="p-4 space-y-4">
-        <div className="flex items-start gap-3 p-3 rounded-md bg-accent-primary-op10 border border-accent-primary-op30">
-          <ListChecks size={20} className="text-accent-primary shrink-0 mt-0.5" />
-          <p className="text-xs text-text-secondary">{t('cas.uploadCrlHint')}</p>
+    <AtelierDialog title={title} size="narrow" onClose={handleClose} testId="upload-crl-dialog">
+      <form onSubmit={handleSubmit}>
+        <p className="notice"><Icon name="crl" /><span>{t('cas.uploadCrlHint')}</span></p>
+        <div className="form-fields">
+          <div className="field full">
+            <label htmlFor="ucm-ca-crl-pem">{t('cas.uploadCrlPaste')}</label>
+            <textarea id="ucm-ca-crl-pem" className="mono" rows={6} spellCheck={false} placeholder="-----BEGIN X509 CRL-----" value={pemContent}
+              onChange={(e) => { setPemContent(e.target.value); if (e.target.value) setCrlFile(null) }} />
+          </div>
+          <div className="field full">
+            <label htmlFor="ucm-ca-crl-file">{t('cas.uploadCrlPick')}</label>
+            <input id="ucm-ca-crl-file" type="file" accept=".crl,.pem,.der,application/pkix-crl,application/x-pem-file"
+              onChange={(e) => {
+                const f = e.target.files?.[0] || null
+                setCrlFile(f)
+                if (f) setPemContent('')
+              }} />
+            {fileTooLarge && <p className="field-error"><Icon name="warning" /><span>{t('cas.uploadCrlTooLarge')}</span></p>}
+          </div>
         </div>
-
-        <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-text-secondary">
-            {t('cas.uploadCrlPaste')}
-          </label>
-          <textarea
-            className="w-full h-36 px-3 py-2 bg-bg-tertiary border border-border rounded-md text-xs font-mono text-text-primary resize-y focus:outline-none focus:border-accent-primary"
-            placeholder="-----BEGIN X509 CRL-----"
-            value={pemContent}
-            onChange={(e) => { setPemContent(e.target.value); if (e.target.value) setCrlFile(null) }}
-            spellCheck={false}
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label
-            htmlFor="ucm-ca-crl-file"
-            className="flex items-center gap-2 px-3 py-2 bg-bg-tertiary border border-border rounded-md cursor-pointer hover:border-text-tertiary transition-colors"
-          >
-            <UploadSimple size={16} className="text-text-tertiary" />
-            <span className="text-sm text-text-primary truncate">
-              {crlFile ? crlFile.name : t('cas.uploadCrlPick')}
-            </span>
-          </label>
-          <input
-            id="ucm-ca-crl-file"
-            type="file"
-            accept=".crl,.pem,.der,application/pkix-crl,application/x-pem-file"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0] || null
-              setCrlFile(f)
-              if (f) setPemContent('')
-            }}
-          />
-          {fileTooLarge && (
-            <p className="text-xs status-danger-text flex items-center gap-1">
-              <Warning size={12} /> {t('cas.uploadCrlTooLarge')}
-            </p>
-          )}
-        </div>
-
-        <div className="flex justify-end gap-2 pt-3 border-t border-border">
-          <Button type="button" variant="secondary" onClick={handleClose} disabled={submitting}>
-            {t('common.cancel')}
-          </Button>
-          <Button type="submit" variant="primary" loading={submitting} disabled={!canSubmit}>
-            {t('cas.uploadCrl')}
-          </Button>
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={handleClose} disabled={submitting}>{t('common.cancel')}</button>
+          <button type="submit" className="btn primary" data-write="" disabled={!canSubmit}>{t('cas.uploadCrl')}</button>
         </div>
       </form>
-    </Modal>
+    </AtelierDialog>
   )
 }

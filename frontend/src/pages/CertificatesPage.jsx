@@ -307,6 +307,8 @@ export default function CertificatesPage() {
   }
 
   // The overview link's filters, one chip per value; the weak-key link reads as one
+  // An authority reads by its name; the other values by their word
+  const caName = (v) => { const ca = cas.find((c) => String(c.id) === v); return ca?.name || ca?.common_name || `#${v}` }
   const chips = useMemo(() => {
     const byKey = {}
     for (const [key, value] of urlFilters) (byKey[key] = byKey[key] || []).push(value)
@@ -318,7 +320,7 @@ export default function CertificatesPage() {
         continue
       }
       for (const v of values) {
-        out.push({ key: `${key}-${v}`, label: t('table.filterChip', { label: t(`overview.filter.${key}`), value: t(`overview.filterValue.${v}`, { defaultValue: v }) }), remove: [key, v] })
+        out.push({ key: `${key}-${v}`, label: t('table.filterChip', { label: t(`overview.filter.${key}`), value: key === 'ca_id' ? caName(v) : t(`overview.filterValue.${v}`, { defaultValue: v }) }), remove: [key, v] })
       }
     }
     // The template filter lives in the Filters dialog: its chip says it is on
@@ -330,7 +332,7 @@ export default function CertificatesPage() {
       out.unshift({ key: 'view', label: t('table.filterChip', { label: t('certificates.state'), value: viewStatus.map((v) => t(`overview.filterValue.${v}`, { defaultValue: v })).join(', ') }), remove: ['view'] })
     }
     return out
-  }, [urlFilters, linkView, viewStatus, savedTemplate, t])
+  }, [urlFilters, linkView, viewStatus, savedTemplate, cas, t])
   const removeUrlFilter = useCallback(([key, value]) => {
     setPage(1)
     if (key === 'template') { setFilterTemplate([]); return }

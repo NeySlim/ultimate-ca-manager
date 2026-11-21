@@ -51,7 +51,11 @@ for (const route of ROUTES) {
     // opens its object in the inspector over the module's list
     const landing = detail ? route.path.replace(/\/:[^/]+$/, '') : path
     await expect(page).toHaveURL(url => url.pathname === landing || url.pathname === path)
-    if (detail) {
+    if (detail && route.path.startsWith('/cas/')) {
+      // An authority opens in the Authorities page, in the panel beside its hierarchy
+      await expect(page).toHaveURL(new RegExp(`[?&]authority=${detail.id}`))
+      await expect(page.getByRole('complementary', { name: detail.name })).toBeVisible()
+    } else if (detail) {
       // The Atelier dock names its panel by its section and heads it with the object; older inspectors name the panel
       const named = page.getByRole('tabpanel', { name: detail.name }).getByRole('heading', { name: detail.name })
       await expect(named.or(page.locator('#inspector').getByRole('heading', { name: detail.name }))).toBeVisible()

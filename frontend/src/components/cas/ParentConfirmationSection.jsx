@@ -5,9 +5,9 @@
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { LinkSimple, LinkBreak } from '@phosphor-icons/react'
-import { Modal } from '../Modal'
-import { Button } from '../Button'
+import { Icon } from '../atelier/Icon'
+import { AtelierDialog } from '../atelier/AtelierDialog'
+import { SideAction } from './SideField'
 import { casService } from '../../services'
 import { useNotification } from '../../contexts/NotificationContext'
 import { extractData, formatDate } from '../../lib/utils'
@@ -20,33 +20,26 @@ export function ParentConfirmationSection({ ca, canWrite = false, onChanged }) {
 
   if (!candidate && !confirmed) return null
 
+  // Two notices of the side panel (`p.notice` of the mockup), each with its action as a text link
   return (
     <>
       {candidate && (
-        <div className="rounded-lg px-3 py-2 bg-status-warning-op15 border border-status-warning-op40 text-xs text-text-secondary flex items-start gap-2 flex-wrap"
-             data-testid="parent-candidate">
-          <span className="flex-1 min-w-[12rem]">
+        <p className="notice warn" data-testid="parent-candidate">
+          <Icon name="link" />
+          <span>
             {t('cas.parentCandidateBanner', { name: candidate.name, algorithm: candidate.algorithm })}
+            {canWrite && <SideAction onClick={() => setDialog('link')}>{t('cas.linkToParent')}</SideAction>}
           </span>
-          {canWrite && (
-            <Button type="button" size="xs" variant="secondary" onClick={() => setDialog('link')}>
-              <LinkSimple size={12} /> {t('cas.linkToParent')}
-            </Button>
-          )}
-        </div>
+        </p>
       )}
       {confirmed && (
-        <div className="rounded-lg px-3 py-2 bg-tertiary-40 border border-border text-xs text-text-secondary flex items-start gap-2 flex-wrap"
-             data-testid="parent-confirmed">
-          <span className="flex-1 min-w-[12rem]">
+        <p className="notice" data-testid="parent-confirmed">
+          <Icon name="link" />
+          <span>
             {t('cas.parentConfirmedBanner', { user: ca.parent_confirmed_by || '-', date: formatDate(ca.parent_confirmed_at) })}
+            {canWrite && <SideAction onClick={() => setDialog('withdraw')}>{t('cas.withdrawParentLink')}</SideAction>}
           </span>
-          {canWrite && (
-            <Button type="button" size="xs" variant="secondary" onClick={() => setDialog('withdraw')}>
-              <LinkBreak size={12} /> {t('cas.withdrawParentLink')}
-            </Button>
-          )}
-        </div>
+        </p>
       )}
       {dialog && (
         <ParentDialog ca={ca} candidate={candidate} mode={dialog} onClose={() => setDialog(null)} onChanged={onChanged} />
@@ -80,28 +73,24 @@ function ParentDialog({ ca, candidate, mode, onClose, onChanged }) {
   }
 
   return (
-    <Modal open onOpenChange={(v) => !v && !busy && onClose()}
-           title={t(linking ? 'cas.linkParentTitle' : 'cas.withdrawParentTitle')} size="md">
-      <form onSubmit={submit} className="p-4 space-y-3">
-        <p className="text-xs text-text-secondary">
-          {linking
-            ? t('cas.linkParentWarning', { name: candidate?.name, algorithm: candidate?.algorithm })
-            : t('cas.withdrawParentWarning')}
-        </p>
+    <AtelierDialog title={t(linking ? 'cas.linkParentTitle' : 'cas.withdrawParentTitle')} size="narrow" onClose={() => !busy && onClose()} testId="parent-dialog">
+      <form onSubmit={submit}>
+        <p className={linking ? 'notice warn' : 'notice'}><Icon name="link" /><span>
+          {linking ? t('cas.linkParentWarning', { name: candidate?.name, algorithm: candidate?.algorithm }) : t('cas.withdrawParentWarning')}
+        </span></p>
         {linking && (
-          <label className="flex items-start gap-2 text-xs text-text-primary cursor-pointer">
-            <input type="checkbox" className="w-4 h-4 mt-0.5 accent-accent-primary" checked={checked}
-                   onChange={(e) => setChecked(e.target.checked)} data-testid="parent-confirm-check" />
+          <label className="checkbox-line">
+            <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} data-testid="parent-confirm-check" />
             <span>{t('cas.linkParentConfirm')}</span>
           </label>
         )}
-        <div className="flex justify-end gap-2 pt-3 border-t border-border">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>{t('common.cancel')}</Button>
-          <Button type="submit" variant={linking ? 'primary' : 'danger'} loading={busy} disabled={linking && !checked}>
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
+          <button type="submit" className={linking ? 'btn primary' : 'btn danger'} data-write="" disabled={busy || (linking && !checked)}>
             {t(linking ? 'cas.linkToParent' : 'cas.withdrawParentLink')}
-          </Button>
+          </button>
         </div>
       </form>
-    </Modal>
+    </AtelierDialog>
   )
 }

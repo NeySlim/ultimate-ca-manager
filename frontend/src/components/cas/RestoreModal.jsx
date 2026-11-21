@@ -7,12 +7,9 @@
  */
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ShieldCheck, UploadSimple, Warning } from '@phosphor-icons/react'
-import { Modal } from '../Modal'
-import { Button } from '../Button'
-import { Input } from '../Input'
 import { casService } from '../../services'
 import { useNotification } from '../../contexts'
+import { AtelierDialog, Icon } from '../atelier'
 
 export function RestoreModal({ open, onClose, ca, onSuccess }) {
   const { t } = useTranslation()
@@ -61,67 +58,33 @@ export function RestoreModal({ open, onClose, ca, onSuccess }) {
     [t, ca]
   )
 
+  if (!open) return null
   return (
-    <Modal open={open} onOpenChange={(v) => !v && handleClose()} title={title} size="md">
-      <form onSubmit={handleSubmit} className="p-4 space-y-4">
-        <div className="flex items-start gap-3 p-3 rounded-md bg-accent-success-op10 border border-accent-success-op30">
-          <ShieldCheck size={20} className="text-accent-success shrink-0 mt-0.5" />
-          <div className="text-sm text-text-primary">
-            <p className="font-medium">{t('cas.restoreExplain.title')}</p>
-            <p className="text-text-secondary text-xs mt-0.5">
-              {needsFile ? t('cas.restoreExplain.fileExported') : t('cas.restoreExplain.passwordProtected')}
-            </p>
+    <AtelierDialog title={title} size="narrow" onClose={handleClose} testId="restore-ca-dialog">
+      <form onSubmit={handleSubmit}>
+        <p className="notice"><Icon name="refresh" /><span><strong>{t('cas.restoreExplain.title')}</strong> {needsFile ? t('cas.restoreExplain.fileExported') : t('cas.restoreExplain.passwordProtected')}</span></p>
+        <div className="form-fields">
+          {needsFile && (
+            <div className="field full">
+              <label htmlFor="ucm-restore-key-file">{t('cas.offlineKeyFile')}</label>
+              <input id="ucm-restore-key-file" type="file" accept=".key,.pem,application/x-pem-file" required
+                onChange={(e) => setKeyFile(e.target.files?.[0] || null)} />
+              <small>{keyFile ? keyFile.name : t('cas.offlineKeyFilePick')}</small>
+              {keyFile && keyFile.size > 256 * 1024 && <p className="field-error"><Icon name="warning" /><span>{t('cas.offlineKeyFileTooLarge')}</span></p>}
+            </div>
+          )}
+          <div className="field full">
+            <label htmlFor="restore-password">{t('cas.offlinePassword')}</label>
+            <input id="restore-password" type="password" value={password} required autoComplete="current-password" data-autofocus=""
+              aria-describedby="hint-restore-password" onChange={(e) => setPassword(e.target.value)} />
+            <small id="hint-restore-password">{t('cas.restorePasswordHint')}</small>
           </div>
         </div>
-
-        {needsFile && (
-          <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-text-secondary">
-              {t('cas.offlineKeyFile')} <span className="status-danger-text">*</span>
-            </label>
-            <label
-              htmlFor="ucm-restore-key-file"
-              className="flex items-center gap-2 px-3 py-2 bg-bg-tertiary border border-border rounded-md cursor-pointer hover:border-text-tertiary transition-colors"
-            >
-              <UploadSimple size={16} className="text-text-tertiary" />
-              <span className="text-sm text-text-primary truncate">
-                {keyFile ? keyFile.name : t('cas.offlineKeyFilePick')}
-              </span>
-            </label>
-            <input
-              id="ucm-restore-key-file"
-              type="file"
-              accept=".key,.pem,application/x-pem-file"
-              className="hidden"
-              onChange={(e) => setKeyFile(e.target.files?.[0] || null)}
-            />
-            {keyFile && keyFile.size > 256 * 1024 && (
-              <p className="text-xs status-danger-text flex items-center gap-1">
-                <Warning size={12} /> {t('cas.offlineKeyFileTooLarge')}
-              </p>
-            )}
-          </div>
-        )}
-
-        <Input
-          label={t('cas.offlinePassword')}
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          autoFocus
-          helperText={t('cas.restorePasswordHint')}
-        />
-
-        <div className="flex justify-end gap-2 pt-3 border-t border-border">
-          <Button type="button" variant="secondary" onClick={handleClose} disabled={submitting}>
-            {t('common.cancel')}
-          </Button>
-          <Button type="submit" variant="primary" loading={submitting} disabled={!canSubmit}>
-            {t('cas.restore')}
-          </Button>
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={handleClose} disabled={submitting}>{t('common.cancel')}</button>
+          <button type="submit" className="btn primary" data-write="" disabled={!canSubmit}>{t('cas.restore')}</button>
         </div>
       </form>
-    </Modal>
+    </AtelierDialog>
   )
 }

@@ -73,7 +73,6 @@ export { CertificateExtensions, SubjectAltNames } from './detail/CertificateExte
 export { CertificateLintModal } from './CertificateLintModal'
 export { KeyRecoveryRequestModal } from './KeyRecoveryRequestModal'
 export { TemplatePreviewModal } from './TemplatePreviewModal'
-export { CAPanel } from './detail/CAPanel'
 export { CSRPanel } from './detail/CSRPanel'
 export { TrustCertPanel } from './detail/TrustCertPanel'
 export { EkuMultiSelect } from './EkuMultiSelect'

@@ -95,6 +95,8 @@ vi.mock('../../services', () => ({
     getById: vi.fn().mockResolvedValue({ data: {} }),
     export: vi.fn(),
   },
+  crlService: { getOcspStatus: vi.fn().mockResolvedValue({ data: null }), getForCA: vi.fn().mockResolvedValue({ data: null }) },
+  certificatesService: { getAll: vi.fn().mockResolvedValue({ data: [], meta: { total: 0 } }) },
   truststoreService: {
     getAll: (...a) => trustGetAll(...a),
     getStats: vi.fn().mockResolvedValue({ data: { total: 0, root_ca: 0, intermediate_ca: 0, expired: 0, valid: 0 } }),

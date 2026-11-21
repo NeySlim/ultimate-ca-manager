@@ -23,6 +23,34 @@ const names = () => screen.getAllByRole('treeitem').map((el) => el.getAttribute(
   .map((id) => document.getElementById(id).textContent)
 const press = (el, key) => fireEvent.keyDown(el, { key })
 
+describe('HierarchyTree: the mockup caView()', () => {
+  it('draws the panel, its heading and the nodes as the mockup', () => {
+    const { container } = renderTree(smallHierarchy(), { selectedId: 2, total: 6 })
+    const panel = container.querySelector('section.panel.ca-tree-panel')
+    expect(panel.querySelector('header.panel-heading h2#ca-tree-title')).toHaveTextContent('cas.tree.title')
+    expect(panel.querySelector('.panel-heading .actions .chip')).toHaveTextContent('6 cas.total')
+    expect(panel.querySelector('#ca-tree-scroll > .ca-forest > ul#ca-tree.ca-tree[role=tree]')).not.toBeNull()
+    const node = item('Services')
+    expect(node).toHaveAttribute('id', 'ca-node-2')
+    expect(node.querySelector(':scope > .ca-card.active > .ca-card-head > strong#ca-name-2')).toHaveTextContent('Services')
+    expect(node.querySelector('.ca-card-head > button.icon-btn.tree-toggle')).toHaveAttribute('tabindex', '-1')
+    expect(node.querySelector('.ca-count')).toHaveAttribute('aria-hidden', 'true')
+    expect(node.querySelector('.ca-count strong')).toHaveTextContent('12')
+    expect(panel.querySelector('p.ca-guidance')).toHaveTextContent('cas.guidance.lead')
+  })
+
+  it('makes the selected node the tab stop', () => {
+    renderTree(smallHierarchy(), { selectedId: 5 })
+    expect(item('Identities')).toHaveAttribute('tabindex', '0')
+    expect(item('Example Root')).toHaveAttribute('tabindex', '-1')
+  })
+
+  it('draws a revoked authority dashed, as the mockup', () => {
+    const { container } = renderTree([ca(1, { name: 'Gone', status: 'Revoked', revoked: true, certs: 1 }), ca(2, { name: 'Sub', type: 'intermediate', parent_id: 1 })])
+    expect(container.querySelector('[data-ca="1"]')).toHaveClass('state-revoked')
+  })
+})
+
 describe('HierarchyTree: structure', () => {
   it('is one tree whose roots are open and whose deeper nodes are folded', () => {
     renderTree(smallHierarchy())
@@ -91,13 +119,15 @@ describe('HierarchyTree: state', () => {
     ])
     fireEvent.click(screen.getByRole('button', { name: 'cas.tree.expand Services', hidden: true }))
     const stateOf = (name) => item(name).querySelector('[data-state]')
-    expect(stateOf('Example Root')).toHaveTextContent('common.active')
+    expect(stateOf('Example Root')).toHaveTextContent('cas.state.active')
+    expect(stateOf('Example Root')).toHaveClass('badge', 'good')
     expect(stateOf('Example Root').dataset.state).toBe('active')
-    expect(stateOf('Legacy')).toHaveTextContent('common.expired')
+    expect(stateOf('Legacy')).toHaveTextContent('cas.state.expired')
+    expect(stateOf('Legacy')).toHaveClass('badge', 'bad')
     expect(stateOf('Soon')).toHaveTextContent('cas.state.expiring')
     expect(stateOf('Waiting')).toHaveTextContent('cas.awaitingCertificate')
     for (const name of ['Example Root', 'Legacy', 'Soon', 'Waiting']) expect(stateOf(name).querySelector('svg')).not.toBeNull()
-    expect(within(item('Second Root')).getByRole('img', { name: 'cas.offline' })).toBeInTheDocument()
+    expect(item('Second Root').querySelector('.chip[data-mark="offline"]')).toHaveTextContent('cas.offline')
   })
 
   it('writes the marks of a card in words', () => {
@@ -153,9 +183,9 @@ describe('HierarchyTree: keyboard', () => {
   it('opens the detail with Enter and with Space', () => {
     const { onSelect } = renderTree(smallHierarchy())
     press(item('Services'), 'Enter')
-    expect(onSelect).toHaveBeenLastCalledWith(expect.objectContaining({ id: 2 }))
+    expect(onSelect).toHaveBeenLastCalledWith(expect.objectContaining({ id: 2 }), { keyboard: true })
     press(item('Second Root'), ' ')
-    expect(onSelect).toHaveBeenLastCalledWith(expect.objectContaining({ id: 6 }))
+    expect(onSelect).toHaveBeenLastCalledWith(expect.objectContaining({ id: 6 }), { keyboard: true })
   })
 })
 
@@ -165,10 +195,13 @@ describe('HierarchyTree: search', () => {
     expect(names()).toEqual(['Example Root', 'Services', 'Legacy'])
   })
 
-  it('says so when nothing matches', () => {
-    renderTree(smallHierarchy(), { query: 'nothing like it' })
+  it('says so when nothing matches, with the reset of the page', () => {
+    const onReset = vi.fn()
+    renderTree(smallHierarchy(), { query: 'nothing like it', onReset })
     expect(screen.queryByRole('tree')).toBeNull()
     expect(screen.getByRole('status')).toHaveTextContent('cas.tree.noMatch')
+    fireEvent.click(screen.getByRole('button', { name: 'cas.tree.reset' }))
+    expect(onReset).toHaveBeenCalled()
   })
 })
 
@@ -229,7 +262,8 @@ describe('HierarchyTree: cross-certificates', () => {
   it('links the issuer to the root it cross-certified, drawn as cards one under the other', () => {
     const { container } = renderTree(cas(), { crossLinks: [{ from: 1, to: 5 }] })
     expect(container.querySelector('[data-cross-link="1-5"]')).not.toBeNull()
-    expect(container.querySelector('[data-cross-link="1-5"]').closest('svg')).toHaveAttribute('aria-hidden', 'true')
+    expect(container.querySelector('[data-cross-link="1-5"]')).toHaveAttribute('aria-hidden', 'true')
+    expect(container.querySelector('[data-cross-link="1-5"]')).toHaveClass('cross-link')
     // The cross-certified root has no subtree: it is a card all the same, right after its issuer
     expect(names().filter((n) => ['Old root', 'Between', 'New root'].includes(n))).toEqual(['Between', 'Old root', 'New root'])
     expect(item('New root').querySelector('.ca-card')).not.toBeNull()

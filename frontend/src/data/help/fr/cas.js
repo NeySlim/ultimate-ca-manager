@@ -8,11 +8,11 @@ export default {
         title: 'Vues',
         items: [
           { label: 'Onglets', text: 'Toutes, Racines, Intermédiaires et Expirées, chacun avec son compteur, puis Hors ligne, Révoquées et En attente du certificat quand il y en a. L’onglet fait partie de l’adresse' },
-          { label: 'Vue arbre', text: 'La hiérarchie de confiance, ouverte par défaut : chaque racine avec ses sous-autorités à sa droite, repliée au-delà du premier niveau. Un nœud montre son état, ses certificats et ses sous-autorités ; un pointillé relie une AC à celle qui l’a signée en croisé. Les racines sans sous-autorité tiennent sur une ligne, et celles qui n’ont pas non plus de certificat se replient dans un seul groupe dès qu’elles sont nombreuses' },
-          { label: 'Clavier', text: 'Dans l’arbre, les flèches déplacent, droite et gauche déplient et replient, Entrée ouvre l’AC dans le panneau de détail' },
-          { label: 'Recherche', text: 'Filtre les trois vues sur le nom, le nom commun et le sujet ; l’arbre garde la branche qui mène à chaque résultat' },
-          { label: 'Vue colonnes', text: 'Hiérarchie parcourue niveau par niveau, une colonne par niveau' },
-          { label: 'Vue liste', text: 'Tableau plat triable : une action par ligne (télécharger le certificat) et un chevron qui ouvre le détail ; sur un téléphone, chaque AC est une carte qui s’ouvre d’un appui n’importe où, son export dans le détail' },
+          { label: 'Vue arbre', text: 'La hiérarchie de confiance, ouverte par défaut à côté du panneau de l’autorité sélectionnée : chaque racine avec ses sous-autorités à sa droite, repliée au-delà du premier niveau. Un nœud montre son état, ses certificats et ses sous-autorités ; un pointillé relie une AC à celle qui l’a signée en croisé. Les racines sans sous-autorité tiennent sur une ligne, et celles qui n’ont pas non plus de certificat se replient dans un seul groupe dès qu’elles sont nombreuses' },
+          { label: 'Clavier', text: 'Dans l’arbre, les flèches déplacent, droite et gauche déplient et replient, Entrée ou un clic sélectionne l’AC et la montre dans le panneau latéral ; l’AC sélectionnée fait partie de l’adresse' },
+          { label: 'Recherche', text: 'Filtre l’arbre et la liste sur le nom, le nom commun et le sujet ; l’arbre garde la branche qui mène à chaque résultat' },
+          { label: 'Panneau latéral', text: 'À côté de l’arbre (dessous sur un téléphone) : identité, clé, émission et révocation de l’AC sélectionnée, son émetteur, ses sous-autorités et ses certificats croisés en liens, sa CRL (numéro, publication, prochaine mise à jour, alerte un jour avant) et l’état de son répondeur OCSP. Voir les certificats, Émettre avec cette AC (désactivé avec la raison quand l’AC ne peut pas signer), Télécharger la chaîne, puis Autres actions (export, CSR, révocation, mise hors ligne, restauration, épinglages de modèles, suppression). Les autres détails (contraintes, extensions, empreintes, PEM, métadonnées) sont repliés dessous. Une AC ouverte depuis une autre page (chaîne d’un certificat, palette de commandes, approbation) s’ouvre ici' },
+          { label: 'Vue liste', text: 'Tableau plat triable à côté du panneau latéral : une action par ligne (télécharger le certificat) et un chevron qui montre l’AC dans le panneau ; sur un téléphone, chaque AC est une carte qui s’ouvre d’un appui n’importe où' },
         ]
       },
       {
@@ -134,16 +134,16 @@ Toute AC signée par une AC intermédiaire, créant des niveaux de hiérarchie p
 
 ## Vues
 
-Les onglets sous le titre comptent les AC (Toutes, Racines, Intermédiaires, Expirées, puis Hors ligne, Révoquées et En attente du certificat quand il y en a) et filtrent la page ; l’onglet fait partie de l’adresse. Le champ de recherche filtre sur le nom, le nom commun et le sujet. Les trois boutons à côté de lui permettent de basculer entre :
+Les onglets sous le titre comptent les AC (Toutes, Racines, Intermédiaires, Expirées, puis Hors ligne, Révoquées et En attente du certificat quand il y en a) et filtrent la page ; l’onglet fait partie de l’adresse. Le champ de recherche filtre sur le nom, le nom commun et le sujet. Hiérarchie et Liste, à côté de lui, basculent entre les deux vues ; l’autorité montrée dans le panneau latéral fait partie de l’adresse.
 
 ### Vue arbre
-La vue par défaut. Chaque racine à la tête d’une hiérarchie est dessinée avec ses sous-autorités à sa droite, repliée au-delà du premier niveau ; un nœud donne son état, le nombre de ses certificats et de ses sous-autorités, et un pointillé relie une AC à celle qui l’a signée en croisé. Une racine sans sous-autorité tient sur une seule ligne, et les racines qui n’ont pas non plus de certificat se replient dans un seul groupe dès qu’elles sont nombreuses. Les flèches parcourent l’arbre, droite et gauche déplient et replient, et Entrée ouvre l’AC dans le panneau de détail.
+La vue par défaut. Chaque racine à la tête d’une hiérarchie est dessinée avec ses sous-autorités à sa droite, repliée au-delà du premier niveau ; un nœud donne son état, le nombre de ses certificats et de ses sous-autorités, et un pointillé relie une AC à celle qui l’a signée en croisé. Une racine sans sous-autorité tient sur une seule ligne, et les racines qui n’ont pas non plus de certificat se replient dans un seul groupe dès qu’elles sont nombreuses. Les flèches parcourent l’arbre, droite et gauche déplient et replient, et Entrée ou un clic sélectionne l’AC.
 
-### Vue colonnes
-Parcourt la hiérarchie niveau par niveau, une colonne par niveau : sélectionnez une AC pour voir celles qui sont en dessous.
+### Panneau latéral
+À côté de l’arbre (dessous sur un téléphone), l’AC sélectionnée montre son identité, sa clé, ce qu’elle a émis et sa révocation : l’émetteur, les sous-autorités et les certificats croisés sont des liens qui les sélectionnent, la CRL donne son numéro, sa publication et sa prochaine mise à jour (avec une alerte un jour avant), et le répondeur OCSP se lit actif ou inactif. **Voir les certificats** ouvre la liste des certificats sur cette AC, **Émettre avec cette AC** ouvre le formulaire d’émission sur elle (désactivé, avec la raison, quand l’AC ne peut pas signer), **Télécharger la chaîne** télécharge sa chaîne PEM, et **Autres actions** réunit l’export, la CSR, la révocation, la mise hors ligne, la restauration, les épinglages de modèles et la suppression. Les autres détails (contraintes, extensions, empreintes, PEM, métadonnées) sont repliés dessous. Une AC ouverte depuis une autre page s’ouvre ici.
 
 ### Vue liste
-Tableau plat avec colonnes triables. Une ligne porte une action (télécharger le certificat) et un chevron qui ouvre le détail, où se trouvent les autres actions. Sur un téléphone, chaque AC est une carte qui montre les mêmes informations et son chevron ; un appui n’importe où sur elle ouvre le détail, où **Exporter** télécharge le certificat.
+Tableau plat avec colonnes triables, à côté du panneau latéral. Une ligne porte une action (télécharger le certificat) et un chevron qui montre l’AC dans le panneau. Sur un téléphone, chaque AC est une carte qui montre les mêmes informations et son chevron ; un appui n’importe où sur elle montre l’AC.
 
 ## Créer une AC
 
