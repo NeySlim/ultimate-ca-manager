@@ -143,15 +143,15 @@ test('in Aurore a field in error keeps its red ring once focused, not the focus 
   await bar.getByRole('button', { name: 'Undo changes' }).click()
 })
 
-test('the scheduler keeps 36 px rows around 32 px run buttons', async ({ page, api }) => {
+test('the scheduler lists its tasks in the mockup module table, a 36 px run button in each row', async ({ page, api }) => {
   await page.goto('/settings?tab=scheduler')
-  const rows = page.locator('.sf-task-table tbody tr')
+  const rows = page.locator('#set-sec-scheduler .module-table tbody tr')
   await expect(rows.first()).toBeVisible()
   const run = rows.first().getByRole('button', { name: 'Run now' })
-  expect(Math.abs((await box(run)).height - 32)).toBeLessThanOrEqual(EPS)
-  // A row with a reason under the task name grows, a plain one keeps the mockup height
-  const heights = await rows.evaluateAll((els) => els.filter((el) => !el.querySelector('td p + p')).map((el) => el.getBoundingClientRect().height))
-  expect(Math.min(...heights)).toBeLessThanOrEqual(36 + EPS)
+  expect(Math.abs((await box(run)).height - 36)).toBeLessThanOrEqual(EPS)
+  // A row with what its last run said under the task name grows, a plain one stays at the button's height
+  const heights = await rows.evaluateAll((els) => els.filter((el) => !el.querySelector('.rl-meta')).map((el) => el.getBoundingClientRect().height))
+  expect(Math.min(...heights)).toBeLessThanOrEqual(39 + EPS)
 })
 
 test('groups of a frame stand 20 px apart', async ({ page, api }) => {
@@ -186,10 +186,10 @@ test.describe('on a phone', () => {
 
   test('each scheduler task is a card with its run button on the screen', async ({ page, api }) => {
     await page.goto('/settings?tab=scheduler')
-    const run = page.locator('.sf-task-table .sf-task-run button')
+    const run = page.locator('#scheduler-records .mobile-record').getByRole('button', { name: 'Run now' })
     await expect(run.first()).toBeVisible()
     const off = await run.evaluateAll((els) => els.filter((el) => el.getBoundingClientRect().right > window.innerWidth).length)
     expect(off).toBe(0)
-    await expect(page.locator('.sf-task-table thead')).toBeHidden()
+    await expect(page.locator('#set-sec-scheduler table')).toHaveCount(0)
   })
 })
