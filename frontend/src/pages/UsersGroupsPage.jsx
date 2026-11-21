@@ -13,7 +13,7 @@ import { MemberTransferModal } from '../components'
 import {
   Modal as AtelierModal, Input as FieldInput, Select as FieldSelect, ToggleSwitch as FieldToggle, Textarea as FieldTextarea,
   Zone, Icon, Btn, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody, Section, RecordList, RecordRow,
-  SimpleOverview, EmptyBlock, NoMatch, AtelierDialog, useClientList,
+  SimpleOverview, EmptyBlock, NoMatch, AtelierDialog, PermissionGrid, useClientList,
 } from '../components/atelier'
 import { MtlsCertificateDialog } from '../components/mtls/MtlsCertificateDialog'
 import { validityDays } from '../components/mtls/validity'
@@ -25,11 +25,10 @@ import UserApiKeys from '../components/UserApiKeys'
 import { useNotification, useAuth } from '../contexts'
 import { usePermission, useWebSocket, usePersistedState, useCRUDPage } from '../hooks'
 import { downloadBlob } from '../lib/utils'
-import { groupPermissions } from '../lib/rbacPermissions'
 import { reportSilentFailure } from '../lib/silentFailure'
 import { deletedUserWarning, localOnlyRevocationWarning } from '../lib/revocationOutcome'
 import UserSecuritySection from './users/UserSecuritySection'
-import { UserState, UserProfile, UserPermissions, UserMtls } from './users/UserPanels'
+import { UserState, UserProfile, UserPermissions, GroupPermissions, UserMtls } from './users/UserPanels'
 import { ROLE_KEYS, isSso, userName, sourceText } from './users/userFacts'
 import { usersCsv } from './users/usersExport'
 import { dateOf, dateTimeOf } from './admin/adminDates'
@@ -750,13 +749,7 @@ export default function UsersGroupsPage() {
             </Section>
           </div>
         )}
-        {section === 'permissions' && (
-          Array.isArray(selectedGroup.permissions) && selectedGroup.permissions.length > 0 ? (
-            <ul className="perm-list">
-              {selectedGroup.permissions.map((p) => <li key={p}><span className="flag"><Icon name="check" />{t('users.allowed')}</span><span className="mono">{p}</span></li>)}
-            </ul>
-          ) : <p className="muted small">{t('groups.noPermissions')}</p>
-        )}
+        {section === 'permissions' && <GroupPermissions group={selectedGroup} />}
       </DockBody>
     </Dock>
   )
@@ -1066,8 +1059,6 @@ function UserForm({ user, isSelf = false, onSubmit, onCancel }) {
 
 // ============= GROUP FORM =============
 
-const GROUP_ACTION_KEYS = { read: 'groups.actions.read', write: 'groups.actions.write', delete: 'groups.actions.delete' }
-
 function GroupForm({ group, onSubmit, onCancel }) {
   const { t } = useTranslation()
   const [formData, setFormData] = useState({
@@ -1109,11 +1100,6 @@ function GroupForm({ group, onSubmit, onCancel }) {
     }))
   }
 
-  // One row per resource, named as the RBAC page names it; read, write, delete, then any other action the server grants
-  const resources = groupPermissions(availablePerms)
-  const actions = [...new Set(['read', 'write', 'delete', ...availablePerms.map((p) => String(p).split(':')[0])])]
-  const actionLabel = (a) => (GROUP_ACTION_KEYS[a] ? t(GROUP_ACTION_KEYS[a]) : a)
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -1134,40 +1120,15 @@ function GroupForm({ group, onSubmit, onCancel }) {
         <div className="field full">
           <span id="group-perms-label">{t('groups.permissions')}</span>
           <small>{t('groups.permissionsHelp')}</small>
-          {resources.length === 0 ? (
+          {availablePerms.length === 0 ? (
             <small>{t('common.loading')}</small>
           ) : (
-            <div className="compare-scroll">
-              <table className="compare-table group-perms" aria-labelledby="group-perms-label">
-                <thead>
-                  <tr>
-                    <th scope="col">{t('groups.resource')}</th>
-                    {actions.map((a) => <th key={a} scope="col">{actionLabel(a)}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {resources.map((r) => {
-                    const name = r.labelKey ? t(r.labelKey) : r.label
-                    return (
-                      <tr key={r.key}>
-                        <th scope="row">{name}</th>
-                        {actions.map((a) => {
-                          const perm = `${a}:${r.key}`
-                          return (
-                            <td key={a}>
-                              {r.permissions.includes(perm) && (
-                                <input type="checkbox" checked={formData.permissions.includes(perm)} onChange={() => togglePermission(perm)}
-                                  aria-label={t('groups.grant', { action: actionLabel(a), resource: name })} />
-                              )}
-                            </td>
-                          )
-                        })}
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+            // One row per resource, named as the RBAC page names it; read, write, delete, then any other action
+            <PermissionGrid labelledBy="group-perms-label" permissions={availablePerms}
+              cell={({ perm, actionName, resourceName }) => (
+                <input type="checkbox" checked={formData.permissions.includes(perm)} onChange={() => togglePermission(perm)}
+                  aria-label={t('groups.grant', { action: actionName, resource: resourceName })} />
+              )} />
           )}
         </div>
       </div>

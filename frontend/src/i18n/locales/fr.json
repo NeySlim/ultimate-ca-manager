@@ -3298,7 +3298,10 @@
     "range_other": "{{shown}} sur {{count}} rôles",
     "caption": "Rôles. Activez un nom pour ouvrir son détail.",
     "filterByType": "Filtrer par type",
-    "allOf": "Tout {{name}}"
+    "allOf": "Tout {{name}}",
+    "permissionOf": "{{resource}} : {{actions}}",
+    "anyResource": "Toutes les ressources",
+    "anyAction": "toutes les actions"
   },
   "scep": {
     "title": "Protocole SCEP",

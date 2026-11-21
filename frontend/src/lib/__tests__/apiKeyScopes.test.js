@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { API_KEY_SCOPES, apiKeyScopePermissions } from '../apiKeyScopes'
+import { API_KEY_SCOPES, apiKeyScopePermissions, apiKeyScopeLabel } from '../apiKeyScopes'
 
 describe('API key scope presets', () => {
   it('Certificates Only issues X.509 and SSH certificates, and manages no CA', () => {
@@ -22,5 +22,15 @@ describe('API key scope presets', () => {
   it('leaves the wildcard presets to the server', () => {
     expect(apiKeyScopePermissions('readwrite', () => false)).toEqual(['read:*', 'write:*'])
     expect(apiKeyScopePermissions('full', () => false)).toEqual(['*'])
+  })
+})
+
+describe('a key\'s scope in words', () => {
+  const t = (key, o) => (o ? `${key} ${JSON.stringify(o)}` : key)
+
+  it('names a preset, else the permissions by resource and action, never a raw scope', () => {
+    expect(apiKeyScopeLabel(t, ['read:*'])).toBe('account.scopeReadOnly')
+    expect(apiKeyScopeLabel(t, ['read:cas', 'delete:cas'])).toBe(
+      'rbac.permissionOf {"resource":"rbac.categories.certificateAuthorities","actions":"groups.actions.read, groups.actions.delete"}')
   })
 })

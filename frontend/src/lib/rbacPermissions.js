@@ -81,3 +81,22 @@ export function appliedPermissions(stored = [], grantable = []) {
   const allowed = new Set(grantable)
   return normalizePermissions(stored).filter(p => allowed.has(p))
 }
+
+/** Label keys of the actions a grid draws as its columns. */
+export const ACTION_LABEL_KEYS = { read: 'groups.actions.read', write: 'groups.actions.write', delete: 'groups.actions.delete' }
+
+/** Columns of a permission grid: read, write, delete, then any other action the list holds. */
+export function permissionActions(permissions = []) {
+  return [...new Set([...ACTION_ORDER, ...permissions.map((p) => String(p).split(':')[0]).filter((a) => a && a !== '*')])]
+}
+
+const actionName = (t, action) => (action === '*' ? t('rbac.anyAction') : ACTION_LABEL_KEYS[action] ? t(ACTION_LABEL_KEYS[action]) : action)
+
+/** Permissions in words, one resource after another: never an `action:resource` scope on screen. */
+export function describePermissions(t, permissions = []) {
+  const list = (Array.isArray(permissions) ? permissions : [permissions]).filter(Boolean).map((p) => (p === '*' ? '*:*' : p))
+  return groupPermissions(list).map((g) => t('rbac.permissionOf', {
+    resource: g.key === '*' ? t('rbac.anyResource') : g.labelKey ? t(g.labelKey) : g.label,
+    actions: g.permissions.map((p) => actionName(t, String(p).split(':')[0])).join(', '),
+  })).join(' · ')
+}

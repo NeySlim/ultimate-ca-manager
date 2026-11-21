@@ -1,7 +1,7 @@
 /**
  * Roles: no screen of the mockup, drawn as its module list (the users module's frame): the roles
- * with System and Custom chips, then a role's dock, its overview and its permissions, which a
- * custom role edits as check boxes and a system role only reads. The creation form stays the
+ * with System and Custom chips, then a role's dock, its overview and its permissions, in the group
+ * dialog's grid, which a custom role edits as check boxes and a system role only reads. The creation form stays the
  * product's dialog.
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
@@ -9,26 +9,21 @@ import { useTranslation } from 'react-i18next'
 import { Input, FormModal, Select } from '../components/atelier/Form'
 import {
   Zone, Icon, Btn, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody, Section, Props,
-  EmptyBlock, NoMatch, LoadError, LoadCause,
+  EmptyBlock, NoMatch, LoadError, LoadCause, PermissionGrid,
 } from '../components/atelier'
 import { useNotification } from '../contexts'
 import { useModals, usePersistedState } from '../hooks'
 import { useDockSelection } from '../components/atelier/useDockParam'
 import { rolesService } from '../services'
 import {
-  groupPermissions, normalizePermissions, ignoredPermissions, appliedPermissions,
+  groupPermissions, normalizePermissions, ignoredPermissions, appliedPermissions, describePermissions,
 } from '../lib/rbacPermissions'
 
 /** A resource's check box: checked when every action is, mixed when only some are. */
 function CategoryBox({ label, all, some, disabled, onChange }) {
   const ref = useRef(null)
   useEffect(() => { if (ref.current) ref.current.indeterminate = some && !all }, [some, all])
-  return (
-    <label className="checkbox-line">
-      <input ref={ref} type="checkbox" checked={all} disabled={disabled} onChange={onChange} />
-      <strong>{label}</strong>
-    </label>
-  )
+  return <input ref={ref} type="checkbox" checked={all} disabled={disabled} onChange={onChange} aria-label={label} />
 }
 
 const ROLE_SECTIONS = ['overview', 'permissions']
@@ -199,38 +194,28 @@ export default function RBACPage() {
         )}
         {section === 'permissions' && (
           <div className="module-detail rbac-perms">
-            {categories.map((category) => {
-              const perms = category.permissions
-              return (
-                <Section key={category.key} title={category.labelKey ? t(category.labelKey) : category.label}>
-                  <CategoryBox label={t('rbac.allOf', { name: category.labelKey ? t(category.labelKey) : category.label })}
-                    all={perms.every((p) => all.includes(p))} some={perms.some((p) => all.includes(p))}
-                    disabled={role.is_system} onChange={() => toggleCategoryPermissions(category.key)} />
-                  <ul className="perm-list">
-                    {perms.map((perm) => {
-                      const isDirect = direct.includes(perm)
-                      const isInherited = !isDirect && all.includes(perm)
-                      return (
-                        <li key={perm}>
-                          <label className="checkbox-line">
-                            <input type="checkbox" checked={isDirect || isInherited} disabled={role.is_system || isInherited}
-                              onChange={() => togglePermission(perm)} />
-                            {perm.split(':')[0]}
-                          </label>
-                          <span className="mono">{perm}</span>
-                          {isInherited && <span className="small muted">{t('rbac.inherited', { name: role.parent_name })}</span>}
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </Section>
-              )
-            })}
+            <PermissionGrid label={t('common.permissions')} permissions={grantable}
+              lead={{ label: t('common.all'), cell: ({ resource, name }) => (
+                <CategoryBox label={t('rbac.allOf', { name })} all={resource.permissions.every((p) => all.includes(p))}
+                  some={resource.permissions.some((p) => all.includes(p))} disabled={role.is_system} onChange={() => toggleCategoryPermissions(resource.key)} />
+              ) }}
+              cell={({ perm, actionName, resourceName }) => {
+                const isDirect = direct.includes(perm)
+                const isInherited = !isDirect && all.includes(perm)
+                return (
+                  <>
+                    <input type="checkbox" checked={isDirect || isInherited} disabled={role.is_system || isInherited}
+                      onChange={() => togglePermission(perm)} aria-label={t('groups.grant', { action: actionName, resource: resourceName })}
+                      title={isInherited ? t('rbac.inherited', { name: role.parent_name }) : undefined} />
+                    {isInherited && <span className="sr-only">{t('rbac.inherited', { name: role.parent_name })}</span>}
+                  </>
+                )
+              }} />
             {ignored.length > 0 && (
               <Section title={t('rbac.ignoredPermissions')}>
                 <p className="small muted perm-intro">{t('rbac.ignoredPermissionsHint')}</p>
                 <ul className="perm-list" data-testid="rbac-ignored-permissions">
-                  {ignored.map((perm) => <li key={perm}><span className="flag muted"><Icon name="block" />{t('users.notAllowed')}</span><span className="mono">{perm}</span></li>)}
+                  {ignored.map((perm) => <li key={perm}><span className="flag muted"><Icon name="block" />{t('users.notAllowed')}</span><span>{describePermissions(t, [perm])}</span></li>)}
                 </ul>
               </Section>
             )}

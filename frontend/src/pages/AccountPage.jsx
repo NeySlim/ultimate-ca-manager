@@ -15,7 +15,8 @@ import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { reportSilentFailure } from '../lib/silentFailure'
 import { localOnlyRevocationWarning } from '../lib/revocationOutcome'
-import { apiKeyScopePermissions } from '../lib/apiKeyScopes'
+import { apiKeyScopePermissions, apiKeyScopeLabel } from '../lib/apiKeyScopes'
+import { describePermissions } from '../lib/rbacPermissions'
 import { useUnloadGuard } from '../hooks/useSaveParts'
 import { keepDraft, readDraft } from '../lib/draftMemory'
 import { Zone, PageHead, Btn, IconBtn, Pill, Props, RecordList, RecordRow, SkeletonPanel, AtelierDialog } from '../components/atelier'
@@ -676,7 +677,7 @@ export default function AccountPage() {
                     </>
                   ) : t('account.apiKeyPrefixUnavailable')}
                 </span>
-                {key.permissions && <span className="rl-meta">{Array.isArray(key.permissions) ? key.permissions.join(', ') : key.permissions}</span>}
+                {key.permissions && <span className="rl-meta">{apiKeyScopeLabel(t, key.permissions)}</span>}
               </>}
               action={effectivelyActive
                 ? <IconBtn icon="block" write label={`${t('common.revoke')} ${key.name}`} onClick={() => handleRevokeApiKey(key.id)} />
@@ -710,7 +711,7 @@ export default function AccountPage() {
             <div className="form-fields">
               <Input id="key-name" full label={t('account.apiKeyName')} value={apiKeyForm.name} placeholder={t('account.keyNameExample')} required data-autofocus
                 onChange={(e) => setApiKeyForm((f) => ({ ...f, name: e.target.value }))} />
-              <Select id="key-scope" full label={t('account.permissionScope')} value={apiKeyForm.scope} hint={scopePermissions.join(', ')}
+              <Select id="key-scope" full label={t('account.permissionScope')} value={apiKeyForm.scope} hint={describePermissions(t, scopePermissions)}
                 onChange={(val) => setApiKeyForm((f) => ({ ...f, scope: val }))}
                 options={[
                   { value: 'full', label: t('account.scopeFull') },

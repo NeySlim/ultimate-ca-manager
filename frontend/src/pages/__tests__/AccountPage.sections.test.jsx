@@ -201,7 +201,9 @@ describe('AccountPage sections', () => {
     const keys = await screen.findByRole('region', { name: 'account.apiKeys' })
     const row = (await within(keys).findByText('ci')).closest('li')
     expect(row.closest('ul')).toHaveClass('record-list')
-    expect(row).toHaveTextContent('read:certificates')
+    // its permissions in words, never the raw scope
+    expect(row).toHaveTextContent('rbac.permissionOf')
+    expect(row).not.toHaveTextContent('read:certificates')
     expect(row).toHaveTextContent('ucm_ab…')
     expect(within(row).getByRole('button', { name: 'common.revoke ci' })).toBeInTheDocument()
   })

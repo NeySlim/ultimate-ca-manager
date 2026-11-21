@@ -4607,7 +4607,10 @@
     "range_other": "{{shown}} of {{count}} roles",
     "caption": "Roles. Activate a name to open its detail.",
     "filterByType": "Filter by type",
-    "allOf": "All of {{name}}"
+    "allOf": "All of {{name}}",
+    "permissionOf": "{{resource}}: {{actions}}",
+    "anyResource": "All resources",
+    "anyAction": "every action"
   },
   "hsm": {
     "pkcs11Unavailable": "このホストで PKCS#11 の依存関係が利用できません",

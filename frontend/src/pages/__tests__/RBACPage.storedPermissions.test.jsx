@@ -8,7 +8,7 @@ import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key, opts) => (opts && typeof opts.count === 'number' ? `${key}:${opts.count}` : key),
+    t: (key, opts) => (opts && typeof opts.count === 'number' ? `${key}:${opts.count}` : opts ? `${key} ${JSON.stringify(opts)}` : key),
     i18n: { language: 'en', changeLanguage: vi.fn(), on: vi.fn(), off: vi.fn() },
   }),
   Trans: ({ children }) => children,
@@ -56,8 +56,10 @@ describe('RBACPage keeps what it cannot grant', () => {
     expect(await screen.findByText('1/3')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: 'common.permissions' }))
     const ignored = await screen.findByTestId('rbac-ignored-permissions')
-    expect(ignored.textContent).toContain('*')
-    expect(ignored.textContent).toContain('read:dashboard')
+    // named as the grid names them, never by their scope
+    expect(ignored.textContent).toContain('rbac.permissionOf {"resource":"rbac.anyResource","actions":"rbac.anyAction"}')
+    expect(ignored.textContent).toContain('rbac.permissionOf {"resource":"shell.bar.dashboard","actions":"groups.actions.read"}')
+    expect(ignored.textContent).not.toContain('read:dashboard')
 
     fireEvent.click(screen.getByText('common.saveChanges'))
     await waitFor(() => expect(updateRole).toHaveBeenCalled())
@@ -71,8 +73,10 @@ describe('RBACPage keeps what it cannot grant', () => {
     fireEvent.click((await screen.findAllByText('Legacy Role'))[0])
     fireEvent.click(await screen.findByRole('tab', { name: 'common.permissions' }))
     await screen.findByTestId('rbac-ignored-permissions')
-    // certificates comes first; its "read" chip reads as granted through read:certs
-    fireEvent.click(screen.getAllByText('read')[0])
+    // its "read" box on certificates reads as granted through read:certs
+    const read = screen.getByRole('checkbox', { name: 'groups.grant {"action":"groups.actions.read","resource":"rbac.categories.certificates"}' })
+    expect(read).toBeChecked()
+    fireEvent.click(read)
     fireEvent.click(screen.getByText('common.saveChanges'))
     await waitFor(() => expect(updateRole).toHaveBeenCalled())
     expect(updateRole.mock.calls[0][1].permissions).toEqual(['*', 'read:dashboard'])

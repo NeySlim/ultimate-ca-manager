@@ -4607,7 +4607,10 @@
     "range_other": "{{shown}} / 共 {{count}} 个角色",
     "caption": "角色。激活名称以打开其详情。",
     "filterByType": "按类型筛选",
-    "allOf": "全部 {{name}}"
+    "allOf": "全部 {{name}}",
+    "permissionOf": "{{resource}}: {{actions}}",
+    "anyResource": "All resources",
+    "anyAction": "every action"
   },
   "hsm": {
     "pkcs11Unavailable": "此主机上 PKCS#11 依赖项不可用",

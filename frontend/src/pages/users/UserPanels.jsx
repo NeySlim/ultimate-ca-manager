@@ -1,13 +1,14 @@
 /**
  * Panels of the user dock, as the mockup's users module draws them: userProfilePanel() (Identité,
  * Accès), userPermsPanel() (the role, then each permission Autorisé or Non autorisé, read from the
- * effective permissions the server applies), and the record rows of the product's own panels
- * (single sign-on providers, mTLS certificates).
+ * effective permissions the server applies, in the group dialog's grid of named resources), and the
+ * record rows of the product's own panels (single sign-on providers, mTLS certificates). A group's
+ * permissions are read in the same grid.
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Icon, Btn, Pill, Section, Props, RecordList, RecordRow } from '../../components/atelier'
-import { rolesService } from '../../services'
+import { Icon, Btn, Pill, Section, Props, RecordList, RecordRow, PermissionGrid } from '../../components/atelier'
+import { rolesService, groupsService } from '../../services'
 import { dateOf, dateTimeOf } from '../admin/adminDates'
 import { YesNo } from '../admin/YesNo'
 import { ROLE_KEYS, ssoRowsOf, sourceText, grants } from './userFacts'
@@ -75,22 +76,29 @@ export function UserPermissions({ user }) {
   const role = t(ROLE_KEYS[user.role] || 'common.viewer')
   if (state.loading) return <p className="small muted perm-intro" aria-busy="true">{t('users.permsLoading')}</p>
   if (state.error) return <p className="field-error" role="alert"><Icon name="warning" /><span>{t('users.permsFailed')}</span></p>
-  const list = [...new Set([...state.catalog, ...state.effective.filter((p) => p !== '*')])].sort()
   return (
     <>
       <p className="small muted perm-intro">{t('users.permsIntro', { role: user.custom_role_name ? `${role}, ${user.custom_role_name}` : role })}</p>
-      <ul className="perm-list">
-        {list.map((p) => (
-          <li key={p}>
-            {grants(state.effective, p)
-              ? <span className="flag"><Icon name="check" />{t('users.allowed')}</span>
-              : <span className="flag muted"><Icon name="block" />{t('users.notAllowed')}</span>}
-            <span className="mono">{p}</span>
-          </li>
-        ))}
-      </ul>
+      <PermissionGrid label={t('users.tabs.permissions')} permissions={[...new Set([...state.catalog, ...state.effective])]}
+        granted={(p) => grants(state.effective, p)} />
     </>
   )
+}
+
+/** A group's permissions: what the server lets a group grant, and what this one holds beyond it. */
+export function GroupPermissions({ group }) {
+  const { t } = useTranslation()
+  const [catalog, setCatalog] = useState([])
+  useEffect(() => {
+    let live = true
+    groupsService.getAvailablePermissions()
+      .then((res) => { if (live) setCatalog(res.data || res || []) })
+      .catch(() => { if (live) setCatalog([]) })
+    return () => { live = false }
+  }, [])
+  const held = Array.isArray(group.permissions) ? group.permissions : []
+  if (held.length === 0) return <p className="muted small">{t('groups.noPermissions')}</p>
+  return <PermissionGrid label={t('groups.permissions')} permissions={[...new Set([...catalog, ...held])]} granted={(p) => held.includes(p)} />
 }
 
 export function UserMtls({ certs, onAdd, onDelete }) {

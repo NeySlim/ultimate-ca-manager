@@ -4765,7 +4765,10 @@
     "range_many": "{{shown}} из {{count}} ролей",
     "caption": "Роли. Выберите имя, чтобы открыть подробности.",
     "filterByType": "Фильтр по типу",
-    "allOf": "Всё: {{name}}"
+    "allOf": "Всё: {{name}}",
+    "permissionOf": "{{resource}}: {{actions}}",
+    "anyResource": "Все ресурсы",
+    "anyAction": "все действия"
   },
   "hsm": {
     "pkcs11Unavailable": "Зависимости PKCS#11 недоступны на этом узле",

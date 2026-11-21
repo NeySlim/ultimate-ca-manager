@@ -78,6 +78,40 @@ describe('the role dock', () => {
     expect(boxes.every((b) => b.disabled)).toBe(true)
   })
 
+  it('draws a role\'s permissions in the group dialog\'s grid, a whole-resource box first', async () => {
+    page()
+    fireEvent.click(await screen.findByRole('button', { name: 'Cert Team' }))
+    fireEvent.click(within(dock()).getByRole('tab', { name: 'common.permissions' }))
+    const table = within(dock()).getByRole('table', { name: 'common.permissions' })
+    expect(within(table).getAllByRole('columnheader').map((h) => h.textContent))
+      .toEqual(['groups.resource', 'common.all', 'groups.actions.read', 'groups.actions.write', 'groups.actions.delete'])
+    expect(within(table).getAllByRole('rowheader').map((h) => h.textContent)).toEqual(['rbac.categories.certificates', 'rbac.categories.certificateAuthorities'])
+    const certs = within(table).getByRole('rowheader', { name: 'rbac.categories.certificates' }).closest('tr')
+    expect(within(certs).getAllByRole('checkbox').map((c) => [c.getAttribute('aria-label'), c.checked])).toEqual([
+      ['rbac.allOf {"name":"rbac.categories.certificates"}', false],
+      ['groups.grant {"action":"groups.actions.read","resource":"rbac.categories.certificates"}', true],
+      ['groups.grant {"action":"groups.actions.write","resource":"rbac.categories.certificates"}', false],
+    ])
+    expect(dock().textContent).not.toMatch(/(read|write|delete):/)
+    fireEvent.click(within(certs).getByRole('checkbox', { name: /groups\.actions\.write/ }))
+    fireEvent.click(within(dock()).getByRole('button', { name: 'common.saveChanges' }))
+    await waitFor(() => expect(stable.update).toHaveBeenCalled())
+    expect(stable.update.mock.calls[0][1].permissions.sort()).toEqual(['read:certificates', 'write:certificates'])
+  })
+
+  it('marks a permission inherited from the parent role, checked and locked', async () => {
+    stable.list.mockResolvedValue({ data: [{ id: 3, name: 'Child', is_system: false, user_count: 0, inherits_from: 1, parent_name: 'Viewer',
+      permissions: ['write:certificates'], all_permissions: ['write:certificates', 'read:cas'] }] })
+    page()
+    fireEvent.click(await screen.findByRole('button', { name: 'Child' }))
+    fireEvent.click(within(dock()).getByRole('tab', { name: 'common.permissions' }))
+    const box = within(dock()).getByRole('checkbox', { name: 'groups.grant {"action":"groups.actions.read","resource":"rbac.categories.certificateAuthorities"}' })
+    expect(box).toBeChecked()
+    expect(box).toBeDisabled()
+    expect(box.closest('td')).toHaveTextContent('rbac.inherited {"name":"Viewer"}')
+    expect(within(dock()).getByRole('checkbox', { name: /groups\.actions\.write.*certificates/ })).not.toBeDisabled()
+  })
+
   it('grants a whole resource to a custom role and saves it', async () => {
     page()
     fireEvent.click(await screen.findByRole('button', { name: 'Cert Team' }))

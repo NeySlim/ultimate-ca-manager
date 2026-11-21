@@ -1004,7 +1004,7 @@ export const helpContent = {
           { label: 'Delete User', text: 'Deleting a user revokes the certificates they enrolled for mTLS (cessationOfOperation), then deletes them. A certificate the CA cannot revoke does not block the deletion: it stays valid, is named in the warning and the audit log, and must be revoked under Certificates. A failure after some revocations keeps the user and names the certificates already revoked. Removing a user or one of its mTLS certificates warns when the ACME CA that issued a certificate was not told of its revocation' },
           { label: 'API Keys', text: 'In a user\'s details, list their API keys and revoke a leaked or unused one: it stops working at once, and a revoked or expired key can then be deleted. Owners create their keys on their Account page' },
           { label: 'Source', text: 'Shows what opens each account: Local (its UCM password), or each provider attached to it, by type and name (for example OAuth2 · Okta, SAML · AD FS). An account may be attached to several providers.' },
-          { label: 'Permissions', text: 'The Permissions tab of an account lists every permission, Allowed or Not allowed, as authorisation applies it: its role, custom role and groups together' },
+          { label: 'Permissions', text: 'The Permissions tab of an account shows each resource by Read, Write and Delete, Allowed or Not allowed, as authorisation applies it: its role, custom role and groups together; the Permissions tab of a group reads the same grid' },
           { label: 'Export the list', text: 'Downloads every account as a CSV file: name, username, email, source, role, state and last access' },
           { label: 'Groups', text: 'The Groups button of the page head shows the groups, Accounts goes back to the accounts' },
         ]
@@ -1050,7 +1050,7 @@ export const helpContent = {
         icon: Key,
         items: [
           { label: 'Create Role', text: 'Define a new role with a name and description' },
-          { label: 'Permission Matrix', text: 'The Permissions tab of a custom role lists each resource with its actions as check boxes; the box of a resource grants or removes all of them, and Save changes records the role' },
+          { label: 'Permission Matrix', text: 'The Permissions tab of a custom role shows each resource with check boxes under Read, Write and Delete; the box in the All column grants or removes all of them, and Save changes records the role' },
           { label: 'Coverage', text: 'The Overview tab gives the n/N count of the permissions granted to the role' },
           { label: 'User Count', text: 'The Users column gives the accounts holding each role; the System and Custom chips above the list narrow it' },
           { label: 'System role permissions', text: 'A system role shows the permissions UCM applies to it; Admin shows every permission of the matrix' },

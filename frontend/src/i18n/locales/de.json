@@ -4607,7 +4607,10 @@
     "range_other": "{{shown}} of {{count}} roles",
     "caption": "Roles. Activate a name to open its detail.",
     "filterByType": "Filter by type",
-    "allOf": "All of {{name}}"
+    "allOf": "All of {{name}}",
+    "permissionOf": "{{resource}}: {{actions}}",
+    "anyResource": "All resources",
+    "anyAction": "every action"
   },
   "hsm": {
     "pkcs11Unavailable": "PKCS#11-Abhängigkeiten auf diesem Host nicht verfügbar",

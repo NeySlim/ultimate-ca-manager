@@ -218,9 +218,14 @@ describe('the account dock', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Chloé Durand' }))
     fireEvent.click(within(dockOf(container)).getByRole('tab', { name: 'users.tabs.permissions' }))
     await waitFor(() => expect(m.effective).toHaveBeenCalledWith(2))
-    const items = await within(dockOf(container)).findAllByRole('listitem')
-    const state = Object.fromEntries(items.map((li) => [li.querySelector('.mono').textContent, li.querySelector('.flag').textContent]))
-    expect(state).toEqual({ 'delete:certificates': 'users.notAllowed', 'read:*': 'users.allowed', 'read:certificates': 'users.allowed', 'write:certificates': 'users.allowed' })
+    // The group dialog's grid, read only: named resources, read, write and delete, never a raw scope
+    const table = await within(dockOf(container)).findByRole('table', { name: 'users.tabs.permissions' })
+    expect(within(table).getAllByRole('columnheader').map((h) => h.textContent))
+      .toEqual(['groups.resource', 'groups.actions.read', 'groups.actions.write', 'groups.actions.delete'])
+    const certs = within(table).getByRole('rowheader', { name: 'rbac.categories.certificates' }).closest('tr')
+    expect([...certs.querySelectorAll('td')].map((td) => td.textContent)).toEqual(['users.allowed', 'users.allowed', 'users.notAllowed'])
+    expect(within(table).getAllByRole('rowheader')).toHaveLength(1)
+    expect(dockOf(container).textContent).not.toMatch(/(read|write|delete):/)
   })
 
   it('shows each API key with its scope and its creation date', async () => {
@@ -257,6 +262,22 @@ describe('the groups view', () => {
     expect(await within(dockOf(container)).findByText('c.durand')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'users.accounts' }))
     expect(await screen.findByRole('button', { name: 'Chloé Durand' })).toBeTruthy()
+  })
+
+  it('reads a group\'s permissions in the dialog\'s grid, named and marked allowed or not', async () => {
+    const { container } = page('/users?tab=groups')
+    fireEvent.click(await screen.findByRole('button', { name: 'pki-ops' }))
+    await waitFor(() => expect(m.groupById).toHaveBeenCalledWith(3))
+    fireEvent.click(within(dockOf(container)).getByRole('tab', { name: 'groups.permissions' }))
+    const table = await within(dockOf(container)).findByRole('table', { name: 'groups.permissions' })
+    // what the server lets a group grant, and what this group holds beyond it
+    expect(within(table).getAllByRole('rowheader').map((h) => h.textContent))
+      .toEqual(['rbac.categories.certificates', 'rbac.categories.certificateAuthorities', 'rbac.categories.auditLogs'])
+    const row = (name) => [...within(table).getByRole('rowheader', { name }).closest('tr').querySelectorAll('td')].map((td) => td.textContent)
+    expect(row('rbac.categories.auditLogs')).toEqual(['users.allowed', '', ''])
+    expect(row('rbac.categories.certificates')).toEqual(['users.notAllowed', 'users.notAllowed', ''])
+    expect(table.querySelector('input')).toBeNull()
+    expect(dockOf(container).textContent).not.toMatch(/(read|write|delete):/)
   })
 
   it('opens on the groups from the address', async () => {
