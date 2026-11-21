@@ -32,9 +32,9 @@ test('a queue entry opens the object it names', async ({ page, api }) => {
   await expect(entry).toBeVisible()
   await entry.click()
 
-  await expect(page).toHaveURL(url => url.pathname === '/cas' || url.pathname === `/cas/${ca.id}`)
-  // The link names the CA's own page, not another one's
-  await expect(page.getByRole('tabpanel', { name: ca.common_name }).getByRole('heading', { name: ca.common_name })).toBeVisible()
+  // The CA opens in the Authorities page, in the panel beside its hierarchy: its own, not another one's
+  await expect(page).toHaveURL(new RegExp(`/cas\\?(.*&)?authority=${ca.id}(&|$)`))
+  await expect(page.getByRole('complementary', { name: ca.common_name })).toBeVisible()
 })
 
 const DEFAULT_ORDER = ['queue', 'health', 'hierarchy', 'horizon', 'compliance', 'activity', 'trend']
