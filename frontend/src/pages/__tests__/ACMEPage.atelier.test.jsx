@@ -72,6 +72,24 @@ describe('the ACME accounts', () => {
     expect(screen.queryByRole('button', { name: 'acct/zyxwvutsrqpo' })).toBeNull()
   })
 
+  it('shows a read error in place of the list, with a retry and the journal for who may read it', async () => {
+    acmeService.getAccounts = vi.fn().mockRejectedValueOnce(Object.assign(new Error('boom'), { status: 503 })).mockResolvedValue({ data: ACCOUNTS })
+    at('/acme')
+    const error = await screen.findByRole('alert')
+    expect(error).toHaveTextContent('messages.errors.loadFailed.acme')
+    expect(within(error).getByRole('link')).toHaveAttribute('href', '/audit')
+    fireEvent.click(within(error).getByRole('button', { name: 'table.retry' }))
+    expect(await screen.findByRole('button', { name: 'acct/abcdefghijkl' })).toBeInTheDocument()
+  })
+
+  it('offers the directory URL from the empty list, as the mockup does', async () => {
+    acmeService.getAccounts = ok([])
+    at('/acme')
+    const empty = await screen.findByText('acme.emptyAccountsTitle')
+    fireEvent.click(within(empty.closest('.empty')).getByRole('button', { name: 'acme.copyDirectory' }))
+    await waitFor(() => expect(clip.copy).toHaveBeenCalledWith('https://pki.example.com/acme/directory'))
+  })
+
   it('copies the directory URL from the head', async () => {
     at('/acme')
     fireEvent.click(await screen.findByRole('button', { name: 'acme.copyDirectory' }))
