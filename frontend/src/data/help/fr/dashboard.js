@@ -7,7 +7,7 @@ export default {
       {
         title: 'Cartes',
         items: [
-          { label: 'Chiffres', text: 'Les certificats (l’inventaire complet), les éléments à traiter (les interventions, et ceux à surveiller), les certificats expirés, et les échecs ACME, SCEP et EST du jour UTC en cours ; le deuxième affiche la carte À traiter, le dernier mène à la carte Santé de l’automatisation' },
+          { label: 'Chiffres', text: 'Les certificats (l’inventaire complet), les éléments à traiter (les interventions, et ceux à surveiller), les certificats expirés, et les échecs ACME, SCEP et EST du jour UTC en cours ; le deuxième affiche la carte À traiter, le dernier l’affiche sur ses lignes ACME' },
           { label: 'Premiers pas', text: 'Sur une instance vide, un administrateur voit trois étapes au-dessus des chiffres (une AC racine, une AC émettrice, un protocole), chacune menant à son écran ; Plus tard les replie en une ligne qui garde la progression, Reprendre les rouvre' },
           { label: 'À traiter', text: 'Les interventions par urgence, critiques d’abord, six affichées et Afficher les autres pour le reste ; chaque ligne donne le nom et son type, la cause, un délai court avec la date exacte dessous, et un bouton : Renouveler, Relancer ou Publier maintenant là où UCM peut agir, sinon Examiner, Voir l’AC ou Ouvrir. Des pastilles filtrent par type avec leurs totaux, et ce qui reste seulement à surveiller est replié à part' },
           { label: 'Santé de l’automatisation', text: 'Par protocole (ACME, SCEP, EST), la dernière opération, les succès et échecs du jour et de la période, et une courbe par jour ; les échecs ACME ouvrent À traiter sur ACME. Puis le signataire TSA, le planificateur et, avec le droit de lire les paramètres, l’email, les webhooks et le renouvellement automatique, chacun avec son état' },
@@ -36,7 +36,7 @@ La Vue d’ensemble est la page d’accueil : un bandeau de quatre chiffres, pui
 Sur une instance sans aucun certificat, un administrateur voit trois étapes au-dessus des chiffres : créer une AC racine, puis une AC émettrice, puis configurer un protocole (ACME, SCEP ou EST). Chaque étape mène à l’écran qui la réalise ; une étape attend la précédente. **Plus tard** replie les étapes en une ligne qui garde la progression, **Reprendre** les rouvre. Une fois les trois faites, **Émettre un premier certificat** ouvre le formulaire de certificat et **Masquer** ferme les étapes pour de bon.
 
 ## Chiffres
-Quatre chiffres ouvrent la page : les certificats (l’inventaire complet), les éléments à traiter (les interventions, et ceux à surveiller), les certificats expirés, et les échecs ACME, SCEP et EST du jour UTC en cours. Certificats et Expirés ouvrent la liste des certificats ; À traiter affiche la carte À traiter, en la réaffichant si vous l’aviez masquée ; les échecs mènent à la carte Santé de l’automatisation quand elle est affichée. Un chiffre que le serveur n’a pas donné se lit comme un tiret.
+Quatre chiffres ouvrent la page : les certificats (l’inventaire complet), les éléments à traiter (les interventions, et ceux à surveiller), les certificats expirés, et les échecs ACME, SCEP et EST du jour UTC en cours. Certificats et Expirés ouvrent la liste des certificats ; À traiter affiche la carte À traiter, en la réaffichant si vous l’aviez masquée ; les échecs affichent la même carte sur ses lignes ACME. Un chiffre que le serveur n’a pas donné se lit comme un tiret.
 
 ## Cartes
 

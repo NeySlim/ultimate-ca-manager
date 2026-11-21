@@ -60,22 +60,22 @@ describe('figures strip', () => {
     expect(metric('failures').querySelector('.label').textContent).toBe('overview.metrics.failures')
   })
 
-  it('the queue figure shows the whole queue, the failures figure leads to the health card', async () => {
+  it('the queue figure shows the whole queue, the failures figure the queue filtered on ACME (M:356)', async () => {
     const showQueue = vi.fn()
-    const toHealth = vi.fn()
-    render(<MemoryRouter><MetricStrip showQueue={showQueue} go={(id) => (id === 'health' ? toHealth : null)} /></MemoryRouter>)
+    render(<MemoryRouter><MetricStrip showQueue={showQueue} /></MemoryRouter>)
     await waitFor(() => expect(value('queue').textContent).toBe('20'))
     expect(metric('queue').getAttribute('href')).toBe('#card-queue')
     fireEvent.click(metric('queue'))
-    expect(showQueue).toHaveBeenCalledWith('')
+    expect(showQueue).toHaveBeenLastCalledWith('')
     await waitFor(() => expect(value('failures').textContent).toBe('3'))
-    expect(metric('failures').getAttribute('href')).toBe('#card-health')
+    expect(metric('failures').getAttribute('href')).toBe('#card-queue')
     fireEvent.click(metric('failures'))
-    expect(toHealth).toHaveBeenCalledTimes(1)
+    expect(showQueue).toHaveBeenLastCalledWith('acme')
+    expect(showQueue).toHaveBeenCalledTimes(2)
   })
 
-  it('the failures figure leads nowhere when the health card is not on the page', async () => {
-    render(<MemoryRouter><MetricStrip go={() => null} /></MemoryRouter>)
+  it('the failures figure leads nowhere without a queue to show', async () => {
+    render(<MemoryRouter><MetricStrip /></MemoryRouter>)
     await waitFor(() => expect(value('failures').textContent).toBe('3'))
     expect(metric('failures').hasAttribute('href')).toBe(false)
   })
@@ -83,7 +83,7 @@ describe('figures strip', () => {
   it('a route that fails leaves a dash, not a zero, and no link', async () => {
     api.getDashStats.mockRejectedValue(Object.assign(new Error('x'), { status: 500 }))
     api.getHealth.mockRejectedValue(Object.assign(new Error('x'), { status: 403 }))
-    render(<MemoryRouter><MetricStrip go={() => () => {}} /></MemoryRouter>)
+    render(<MemoryRouter><MetricStrip showQueue={() => {}} /></MemoryRouter>)
     await waitFor(() => expect(value('queue').textContent).toBe('20'))
     expect(value('certificates').textContent).toBe('–')
     expect(metric('certificates').hasAttribute('href')).toBe(false)

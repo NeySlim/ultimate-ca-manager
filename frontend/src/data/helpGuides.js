@@ -19,7 +19,7 @@ The Overview is the home page: a strip of four figures, then the cards of the ov
 On an instance without any certificate, an administrator sees three steps above the figures: create a root CA, then an issuing CA, then set up a protocol (ACME, SCEP or EST). Each step leads to the screen that does it; a step waits for the one before. **Later** folds the steps into one line that keeps the progress, **Resume** brings them back. Once the three are done, **Issue a first certificate** opens the certificate form and **Hide** closes the steps for good.
 
 ## Figures
-Four figures head the page: the certificates (the full inventory), the items to handle (the interventions, and those to watch), the expired certificates, and the ACME, SCEP and EST failures of the current UTC day. Certificates and Expired open the certificate list; To handle shows the To handle card, bringing it back if you had hidden it; the failures lead to the Automation health card when it is shown. A figure the server did not give reads as a dash.
+Four figures head the page: the certificates (the full inventory), the items to handle (the interventions, and those to watch), the expired certificates, and the ACME, SCEP and EST failures of the current UTC day. Certificates and Expired open the certificate list; To handle shows the To handle card, bringing it back if you had hidden it; the failures show the same card on its ACME rows. A figure the server did not give reads as a dash.
 
 ## Cards
 

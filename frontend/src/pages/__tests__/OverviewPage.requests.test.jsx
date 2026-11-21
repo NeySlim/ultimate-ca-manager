@@ -89,8 +89,8 @@ describe('requests of the overview', () => {
     await loaded()
     expect(document.getElementById('card-queue')).toBeNull()
     expect(calls()).toEqual(ONCE)
-    // The failures lead to no card; the queue figure brings its card back (the mockup's showQueue)
-    expect(metric('failures').hasAttribute('href')).toBe(false)
+    // Both figures bring the queue card back (the mockup's showQueue), the failures filtered on ACME
+    expect(metric('failures').getAttribute('href')).toBe('#card-queue')
     fireEvent.click(metric('queue'))
     await waitFor(() => expect(document.getElementById('card-queue')).not.toBeNull())
   })
@@ -100,8 +100,23 @@ describe('requests of the overview', () => {
     await loaded()
     fireEvent.click(metric('queue'))
     await waitFor(() => expect(document.activeElement).toBe(document.getElementById('card-queue-title')))
+  })
+
+  it('the failures figure opens the queue filtered on the ACME failures', async () => {
+    api.getQueue.mockResolvedValue({ data: {
+      items: [
+        { kind: 'manual_renewal_due', tier: 'warning', id: 1, label: 'cert-one', href_hint: '/certificates/1' },
+        { kind: 'acme_order_failed', tier: 'critical', id: 7, label: 'order-seven', href_hint: '/acme?order=7' },
+      ],
+      counts: { manual_renewal_due: 1, acme_order_failed: 1 }, total: 2 } })
+    store.prefs = { dashboard: { hidden: ['queue'] } }
+    render(<MemoryRouter><OverviewPage /></MemoryRouter>)
+    await loaded()
     fireEvent.click(metric('failures'))
-    expect(document.activeElement).toBe(document.getElementById('card-health-title'))
+    await waitFor(() => expect(document.getElementById('queue-chip-acme')?.getAttribute('aria-pressed')).toBe('true'))
+    expect(screen.getByText('order-seven')).toBeTruthy()
+    expect(screen.queryByText('cert-one')).toBeNull()
+    await waitFor(() => expect(document.activeElement).toBe(document.getElementById('card-queue-title')))
   })
 
   it('a failure shared by two readers reaches both', async () => {
