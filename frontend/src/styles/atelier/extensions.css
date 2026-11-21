@@ -96,6 +96,9 @@
 @media (max-width:800px){.atl .phone-only .btn{min-height:40px}}
 /* A toast keeps the lines of its message; one that stays takes the rule and icon of its type, the mockup's failure toast for an error. */
 .atl #toast{white-space:pre-line;overflow-wrap:anywhere}
+/* A toast shown takes the pointer (its delay pauses under it, a swipe down closes it); a swipe moves it with the pointer. */
+.atl #toast.visible{pointer-events:auto;touch-action:none;user-select:none}
+.atl #toast[data-swipe="move"]{transform:translate(-50%,var(--toast-swipe-y,0))}
 /* Tailwind's reset follows the scope in the bundle and gives a search field `textfield`: the browser's own, as in the mockup */
 .atl [type=search]{-webkit-appearance:revert;appearance:revert}
 .atl #toast.failure.tone-warn{border-left-color:var(--warn-fill)}
