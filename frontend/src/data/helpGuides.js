@@ -2592,7 +2592,7 @@ Bulk operations and data management. Perform batch actions across multiple resou
 
 ## Import Tab
 
-Same as the Import/Export page: the Smart Import wizard, and the OPNsense integration (connect, browse, and import from OPNsense).
+**Import files…** opens the Smart Import wizard in its dialog. Under it, the OPNsense integration: connect, test the connection, choose the items found and import them.
 
 ## Export Tab
 
@@ -2604,7 +2604,7 @@ Perform batch operations on multiple resources at once.
 
 ### How It Works
 1. Select the **resource type** (Certificates, CAs, CSRs, Templates, Users)
-2. Tick the items in the table (the optional Basket view moves them between two panels instead)
+2. Tick the items in the table; **Selection** shows the ticked items alone, from every page
 3. Choose the **action** to perform
 4. Confirm and execute
 

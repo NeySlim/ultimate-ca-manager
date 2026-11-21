@@ -8,9 +8,9 @@ export default {
         title: 'Disposition de la page',
         content: 'Profil, sécurité et clés d’API sont sur une seule page, chacun dans son cadre ; le sommaire à gauche y mène (sur un téléphone, la liste Aller à la section).',
         items: [
-          { label: 'Actions propres', text: 'Modifier, dans le cadre Profil, ouvre le nom et l’e-mail, Annuler ou Enregistrer agissent aussitôt ; Créer une clé ouvre le formulaire de clé ; la page n’a pas de barre d’enregistrement' },
+          { label: 'Actions propres', text: 'Le nom et l’e-mail se modifient sur place : la barre d’enregistrement, en bas, dit ce qui est modifié et non enregistré, Annuler les modifications remet les valeurs enregistrées et Enregistrer les envoie (Entrée dans un champ aussi) ; Créer une clé ouvre le formulaire de clé' },
           { label: 'Liens', text: 'Un lien vers /account?tab=security ou /account?tab=api-keys ouvre la page sur ce cadre' },
-          { label: 'Modification gardée', text: 'Une modification du profil non enregistrée est gardée dans cet onglet quand vous quittez la page et revient, toujours en cours, à votre retour ; Annuler l’oublie' },
+          { label: 'Modification gardée', text: 'Une modification du profil non enregistrée est marquée Modifié au sommaire, gardée dans cet onglet quand vous quittez la page et retrouvée à votre retour ; Annuler les modifications l’oublie' },
           { label: 'Préférences', text: 'Fermer l’inspecteur en naviguant : les objets ouverts dans l’inspecteur se ferment quand vous changez de page. Le choix est gardé dans ce navigateur' },
         ],
       },

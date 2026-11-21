@@ -14,8 +14,8 @@ export default {
       {
         title: 'Opérations',
         items: [
-          { label: 'Importation', text: 'Importation intelligente avec détection automatique du format, plus synchronisation OPNsense pour récupérer les certificats des pare-feu' },
-          { label: 'Exportation', text: 'Télécharger des bundles de certificats par type de ressource au format PEM ou P7B via des cartes d’action' },
+          { label: 'Importation', text: 'Importer des fichiers… ouvre l’importation intelligente (détection automatique du format) dans sa fenêtre ; l’import OPNsense récupère les certificats d’un pare-feu, sa connexion testée d’abord' },
+          { label: 'Exportation', text: 'Télécharger des bundles de certificats par type de ressource au format PEM ou P7B en lignes avec leur bouton Télécharger' },
           { label: 'Actions en masse', text: 'Sélectionner un type de ressource et effectuer des opérations par lots sur plusieurs éléments' },
         ]
       },
@@ -33,7 +33,7 @@ export default {
     tips: [
       'Utilisez les puces de ressources pour basculer rapidement entre les types de ressources',
       'La recherche et les filtres intégrés (Statut, AC) permettent d’affiner les éléments sans quitter la barre d’outils',
-      'Basculez entre les modes d’affichage Tableau et Panier (panneau de transfert) sur ordinateur',
+      'Sélection montre les éléments cochés seuls, de toutes les pages, pour les vérifier ou les décocher avant l’action',
       'La révocation, le renouvellement, la signature et la suppression demandent une confirmation avant de s’exécuter ; un export démarre aussitôt',
     ],
     warnings: [
@@ -50,7 +50,7 @@ Opérations en masse et gestion des données. Effectuez des actions par lots sur
 
 ## Onglet Importation
 
-Identique à la page Importation & Exportation : l’assistant d’importation intelligente, et l’intégration OPNsense (connexion, navigation et import depuis OPNsense).
+**Importer des fichiers…** ouvre l’assistant d’importation intelligente dans sa fenêtre. En dessous, l’intégration OPNsense : connexion, test de la connexion, choix des éléments trouvés et import.
 
 ## Onglet Exportation
 
@@ -62,7 +62,7 @@ Effectuez des opérations par lots sur plusieurs ressources à la fois.
 
 ### Comment ça fonctionne
 1. Sélectionnez le **type de ressource** (Certificats, AC, CSR, Modèles, Utilisateurs)
-2. Cochez les éléments dans le tableau (la vue Panier, facultative, les déplace entre deux panneaux à la place)
+2. Cochez les éléments dans le tableau ; **Sélection** montre les éléments cochés seuls, de toutes les pages
 3. Choisissez l'**action** à effectuer
 4. Confirmez et exécutez
 

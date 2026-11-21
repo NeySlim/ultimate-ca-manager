@@ -6,7 +6,7 @@ export default {
     sections: [
       {
         title: '页面布局',
-        content: '左侧目录按组（分析、验证、转换）列出工具；所选工具显示在其框中，结果在下方。',
+        content: '左侧目录列出五个工具；所选工具显示在其框中。其按钮在字段下方的一行运行工具，该行随后显示结果；详情在下方。每个 PEM 字段下方的“选择文件…”可读取文件。',
         items: [
           { label: '切换工具', text: '选择其他工具会清除上一个工具的结果' },
           { label: '链接', text: '指向 /tools?tab=<工具>（ssl-checker、csr-decoder、cert-decoder、key-matcher、converter）的链接会打开该工具' },

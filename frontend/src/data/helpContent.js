@@ -1394,9 +1394,9 @@ export const helpContent = {
         title: 'Page layout',
         content: 'Profile, security and API keys are on one page, each in its frame; the table of contents on the left jumps to them (on a phone, the Go to section list).',
         items: [
-          { label: 'Own actions', text: 'Edit in the Profile frame opens the name and email, Cancel or Save act at once; Create key opens the key form; there is no save bar' },
+          { label: 'Own actions', text: 'The name and email are edited in place: the save bar at the bottom says what is changed and not saved, Undo changes puts back the stored values and Save sends them (Enter in a field too); Create key opens the key form' },
           { label: 'Links', text: 'A link to /account?tab=security or /account?tab=api-keys opens the page on that frame' },
-          { label: 'Edit kept', text: 'A profile edit not yet saved is kept in this tab when you leave the page and comes back, still in edit mode, on your return; Cancel forgets it' },
+          { label: 'Edit kept', text: 'A profile change not yet saved is marked Modified in the table of contents, is kept in this tab when you leave the page and comes back on your return; Undo changes forgets it' },
           { label: 'Preferences', text: 'Close the inspector when navigating: the objects open in the inspector close when you go to another page. The choice is kept in this browser' },
         ],
       },
@@ -1501,7 +1501,7 @@ export const helpContent = {
     sections: [
       {
         title: 'Page layout',
-        content: 'The table of contents on the left lists the tools by group (Analysis, Verification, Conversion); the chosen tool shows in its frame with its result below.',
+        content: 'The table of contents on the left lists the five tools; the chosen tool shows in its frame. Its button runs it on the line under the fields, which then says the outcome; the details follow below. A file is read with Choose a file… under each PEM field.',
         items: [
           { label: 'Switching tool', text: 'Choosing another tool clears the result of the previous one' },
           { label: 'Links', text: 'A link to /tools?tab=<tool> (ssl-checker, csr-decoder, cert-decoder, key-matcher, converter) opens that tool' },
@@ -1556,8 +1556,8 @@ export const helpContent = {
         title: 'Operations',
         icon: Stack,
         items: [
-          { label: 'Import', text: 'Smart Import with automatic format detection, plus OPNsense sync to pull certificates from firewalls' },
-          { label: 'Export', text: 'Download certificate bundles per resource type in PEM or P7B format via action cards' },
+          { label: 'Import', text: 'Import files… opens Smart Import (automatic format detection) in its dialog; the OPNsense import pulls certificates from a firewall, its connection tested first' },
+          { label: 'Export', text: 'Download certificate bundles per resource type in PEM or P7B format, one line each with its Download button' },
           { label: 'Bulk Actions', text: 'Select a resource type and perform batch operations on multiple items' },
         ]
       },
@@ -1576,7 +1576,7 @@ export const helpContent = {
     tips: [
       'Use the resource chips to quickly switch between resource types',
       'The inline search and filters (Status, CA) let you narrow down items without leaving the toolbar',
-      'Switch between Table and Basket (transfer panel) view modes on desktop',
+      'Selection shows the ticked items alone, from every page, to check or untick them before the action',
       'Revoke, renew, sign and delete ask for confirmation before they run; an export starts at once',
     ],
     warnings: [

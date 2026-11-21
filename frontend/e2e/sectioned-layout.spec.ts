@@ -164,7 +164,7 @@ test('groups of a frame stand 20 px apart', async ({ page, api }) => {
 
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
-  for (const [path, layout] of [['/settings', '.settings-layout'], ['/account', '.sf-layout'], ['/tools', '.sf-layout'], ['/operations', '.sf-layout']]) {
+  for (const [path, layout] of [['/settings', '.settings-layout'], ['/account', '.settings-layout'], ['/tools', '.settings-layout'], ['/operations', '.settings-layout']]) {
     test(`${path} is no wider than the phone`, async ({ page, api }) => {
       await page.goto(path)
       await expect(page.locator(layout)).toBeVisible()
