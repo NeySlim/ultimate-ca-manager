@@ -54,7 +54,7 @@ export function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
         />
         
         <div className={`w-8 h-8 rounded-lg flex items-center justify-center icon-bg-${config.color}`}>
-          <Icon size={16} className={`text-accent-${config.color}`} />
+          <Icon size={16} />
         </div>
         
         <div className="flex-1 min-w-0">
@@ -648,12 +648,12 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
           </Button>
         </div>
       ) : (
-        <div className="sf-test">
+        <div>
           <Button type="button" onClick={handleAnalyze} disabled={(!pemContent.trim() && files.length === 0) || isAnalyzing}>
             {isAnalyzing ? <ArrowsClockwise size={16} className="animate-spin" /> : <MagnifyingGlass size={16} />}
             {isAnalyzing ? t('import.analyzing') : t('import.analyze')}
           </Button>
-          <p className="sf-test-result">
+          <p>
             <Question aria-hidden="true" />
             <span>{t('import.analyzeHint')}</span>
           </p>

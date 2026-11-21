@@ -14,14 +14,13 @@ import { FieldError } from './SettingsView'
 import { fileContent, usePasswordStrength } from './formHelpers'
 
 const join = (...c) => c.filter(Boolean).join(' ')
-// The product's `sf-short` class placed a short field; it maps to the mockup's `.field.short`
-const placeOf = ({ full, short, className }) => join('field', full && 'full', (short || /\bsf-short\b/.test(className || '')) && 'short')
+const placeOf = ({ full, short }) => join('field', full && 'full', short && 'short')
 const describedBy = (...ids) => ids.filter(Boolean).join(' ') || undefined
 
 /** A labelled control of the mockup: hint under it, `after` (a note, a link of the product), then the error that names it. */
-export function Field({ id, label, hint, error, full, short, className, optional, after, children }) {
+export function Field({ id, label, hint, error, full, short, optional, after, children }) {
   return (
-    <div className={placeOf({ full, short, className })}>
+    <div className={placeOf({ full, short })}>
       {label && <label htmlFor={id}>{label}{optional && <span className="optional"> {optional}</span>}</label>}
       {children}
       {hint && <small id={`hint-${id}`}>{hint}</small>}
@@ -67,7 +66,7 @@ export const Input = forwardRef(function Input({ label, error, helperText, hint,
   const placeholder = hasExistingValue && rest.type === 'password' ? '••••••••••••' : rest.placeholder
   const change = showStrength ? (e) => { setTyped(e.target.value); rest.onChange?.(e) } : rest.onChange
   return (
-    <Field id={fid} label={label} hint={note} error={error} full={full} short={short} className={className} after={after}>
+    <Field id={fid} label={label} hint={note} error={error} full={full} short={short} after={after}>
       <input ref={ref} autoComplete="off" spellCheck={false} {...rest} onChange={change} placeholder={placeholder} id={fid} className={mono ? 'mono' : undefined}
         required={rest.required && !hasExistingValue} aria-invalid={error ? 'true' : undefined}
         aria-describedby={describedBy(note && `hint-${fid}`, reading && `strength-${fid}`, error && `err-${fid}`, rest['aria-describedby'])} />
@@ -132,7 +131,7 @@ export function Select({ label, options = [], value, onChange, placeholder, erro
   const note = helperText ?? hint
   const empty = !options.some((o) => o.value === '' || o.value === null)
   return (
-    <Field id={fid} label={label} hint={note} error={error} full={full} short={short} className={className} after={after}>
+    <Field id={fid} label={label} hint={note} error={error} full={full} short={short} after={after}>
       <select id={fid} value={value ?? ''} disabled={disabled} onChange={(e) => onChange?.(e.target.value)} aria-invalid={error ? 'true' : undefined}
         aria-describedby={describedBy(note && `hint-${fid}`, error && `err-${fid}`)} {...rest}>
         {empty && (placeholder || value === '' || value == null) && <option value="" disabled>{placeholder || ''}</option>}
@@ -149,7 +148,7 @@ export function Textarea({ label, error, helperText, hint, full = true, short, c
   const fid = id ?? auto
   const note = helperText ?? hint
   return (
-    <Field id={fid} label={label} hint={note} error={error} full={full} short={short} className={className} after={after}>
+    <Field id={fid} label={label} hint={note} error={error} full={full} short={short} after={after}>
       <textarea id={fid} value={value} maxLength={maxLength} className={mono ? 'mono' : undefined} aria-invalid={error ? 'true' : undefined}
         aria-describedby={describedBy(note && `hint-${fid}`, error && `err-${fid}`)} {...rest} />
     </Field>

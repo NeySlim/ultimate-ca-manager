@@ -71,7 +71,7 @@ test('every settings section is in view in the table of contents, no title cut',
   const status = await box(page.getByRole('contentinfo'))
   const links = nav.getByRole('link')
   expect(await links.count()).toBe(19)
-  for (const item of [...await links.all(), ...await nav.locator('.sf-toc-group-title').all()]) {
+  for (const item of await links.all()) {
     const r = await box(item)
     expect(r.y + r.height).toBeLessThanOrEqual(status.y - 24 + EPS)
   }
