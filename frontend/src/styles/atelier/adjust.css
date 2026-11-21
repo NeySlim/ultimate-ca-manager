@@ -18,7 +18,3 @@
 :root .atl .mobile-record .row-top>.icon-btn{width:44px;min-height:44px;flex-shrink:0}
 /* Without a checkbox the record starts at its left edge, as the mockup's module records do. */
 :root .atl .mobile-record:not(:has(.check-hit)) :is(.row-meta,.row-status){margin-left:0}
-/* The same for the list template's records (components/list), outside the copied zones. */
-:root .lv-mrecord.is-opening{cursor:pointer}
-:root .lv-mrecord .lv-mrecord-open{width:44px;height:44px;flex-shrink:0}
-:root .lv-mrecord:not(:has(.lv-check-hit)) :is(.lv-mrecord-desc,.lv-mrecord-meta,.lv-mrecord-status){margin-left:0}
