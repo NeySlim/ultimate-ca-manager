@@ -41,7 +41,8 @@ test.describe('desktop', () => {
     const frame = await zone.locator('.table-container').boundingBox()
     const foot = await footer.boundingBox()
     expect(frame && foot).toBeTruthy()
-    expect(Math.round(foot!.height)).toBe(38)
+    // The mockup's 38 px footer under its 1 px rule, as on Users
+    expect(Math.round(foot!.height)).toBe(39)
     expect(Math.abs(foot!.y + foot!.height - (frame!.y + frame!.height))).toBeLessThanOrEqual(1)
     await footer.getByRole('button', { name: 'Next page' }).click()
     await expect(footer).toContainText('2 /')
