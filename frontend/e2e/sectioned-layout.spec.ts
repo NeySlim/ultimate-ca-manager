@@ -143,12 +143,13 @@ test('in Aurore a field in error keeps its red ring once focused, not the focus 
   await bar.getByRole('button', { name: 'Undo changes' }).click()
 })
 
-test('the scheduler lists its tasks in the mockup module table, a 36 px run button in each row', async ({ page, api }) => {
+test('the scheduler lists its tasks in the mockup module table, a mockup button in each row', async ({ page, api }) => {
   await page.goto('/settings?tab=scheduler')
   const rows = page.locator('#set-sec-scheduler .module-table tbody tr')
   await expect(rows.first()).toBeVisible()
   const run = rows.first().getByRole('button', { name: 'Run now' })
-  expect(Math.abs((await box(run)).height - 36)).toBeLessThanOrEqual(EPS)
+  // The mockup's .btn: 32 px
+  expect(Math.abs((await box(run)).height - 32)).toBeLessThanOrEqual(EPS)
   // A row with what its last run said under the task name grows, a plain one stays at the button's height
   const heights = await rows.evaluateAll((els) => els.filter((el) => !el.querySelector('.rl-meta')).map((el) => el.getBoundingClientRect().height))
   expect(Math.min(...heights)).toBeLessThanOrEqual(39 + EPS)
