@@ -6600,7 +6600,7 @@
       "state": {
         "managed": "在 UCM 中",
         "unmanaged": "UCM 未知",
-        "error": "无法访问"
+        "error": "出错"
       },
       "inInventory": "清单中的证书",
       "inDays_one": "{{count}} 天后",

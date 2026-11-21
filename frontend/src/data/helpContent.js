@@ -1976,12 +1976,12 @@ export const helpContent = {
     overview: 'Scan your network to find TLS certificates deployed on servers and endpoints, and match them against your managed PKI inventory. Locate untracked certificates, detect changes, and watch for expiring certificates outside UCM\'s control.',
     sections: [
       {
-        title: 'Tabs',
+        title: 'Views',
         icon: ListChecks,
         items: [
-          { label: 'Discovered', text: 'All certificates found by scans, with status, expiry, and endpoint details' },
-          { label: 'Profiles', text: 'Saved scan configurations, targets, ports, schedule, notifications' },
-          { label: 'History', text: 'Past scan runs with duration, targets scanned, and certificates found' },
+          { label: 'Analyses', text: 'The page opens on the analyses, one per scan profile: its range, what its last run found and when, and the state of that run (Completed, Failed, Running, Scheduled, Never run). A name opens it in the dock, with Analyse now, Edit… and Delete…' },
+          { label: 'Found certificates', text: 'Every certificate the scans met, with host, issuer, expiry and state; the search, the state chips and the analysis filter are applied by the server' },
+          { label: 'Run history', text: 'Every run, of an analysis or a quick scan, newest first, with what it found, the targets scanned and its duration' },
         ]
       },
       {
@@ -1989,7 +1989,7 @@ export const helpContent = {
         icon: Globe,
         items: [
           { label: 'Quick Scan', text: 'Ad-hoc scan without saving a profile, enter targets and ports, results stream live' },
-          { label: 'Targets', text: 'Entered as tags, one per target: hostname, IP, CIDR subnet (192.168.1.0/24), or host:port (10.0.0.1:8443)' },
+          { label: 'Targets', text: 'One per line, or separated by commas: hostname, IP, IPv4 range (192.0.2.0/24) or host:port (mail.example.com:465). A DNS wildcard (*.example.com), an IPv6 range and an IPv4 range of more than 65,536 hosts are refused in the form: the scanner reaches no host for the first two and refuses the third' },
           { label: 'Ports', text: 'Comma-separated TCP ports (e.g. 443, 8443, 636), or the common-ports preset' },
           { label: 'Advanced options', text: 'Reverse DNS resolution (PTR records), timeout, and concurrency' },
           { label: 'Schedule', text: 'Profiles run manually or automatically every 1h / 6h / 12h / 24h / 7d' },
@@ -2000,16 +2000,16 @@ export const helpContent = {
         title: 'Result Statuses',
         icon: ShieldCheck,
         items: [
-          { label: 'Managed', text: 'The certificate\'s SHA-256 fingerprint matches a certificate in UCM\'s inventory' },
-          { label: 'Unmanaged', text: 'Found on the network but not in the inventory, a candidate for bringing under management' },
-          { label: 'Error', text: 'The endpoint answered but its TLS handshake or certificate failed (SNI rejected, unreadable certificate). A refused connection, a timeout, a DNS or network failure leaves no row. Retry a row, or Retry all errors on the current page' },
+          { label: 'In UCM', text: 'The certificate\'s SHA-256 fingerprint matches a certificate in UCM\'s inventory' },
+          { label: 'Unknown to UCM', text: 'Found on the network but not in the inventory, a candidate for bringing under management' },
+          { label: 'In error', text: 'The endpoint answered but its TLS handshake or certificate failed (SNI rejected, unreadable certificate). A refused connection, a timeout, a DNS or network failure leaves no row. Retry a row, or Retry all errors on the current page' },
           { label: 'Changed', text: 'An endpoint presenting a different certificate than the previous scan is flagged with a Last changed timestamp' },
         ]
       },
     ],
     tips: [
-      'Filter results with the status pills: All, Managed, Unmanaged, Error',
-      'Export downloads every discovered certificate as CSV, whatever the filters',
+      'Filter the found certificates with the state chips: All, In UCM, Unknown to UCM, In error',
+      'Export downloads, as CSV, the found certificates the search, state and analysis filters show',
       'Schedule a daily scan of your server subnets with the new-certificate notification enabled',
     ],
     warnings: [

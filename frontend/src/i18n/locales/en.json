@@ -6603,7 +6603,7 @@
       "state": {
         "managed": "In UCM",
         "unmanaged": "Unknown to UCM",
-        "error": "Unreachable"
+        "error": "In error"
       },
       "inInventory": "In the inventory",
       "inDays_one": "in {{count}} day",

@@ -31,7 +31,7 @@ test('the queue groups, rows, due dates and history keep the mockup geometry', a
     expect(await css(group, 'border-radius')).toBe('5px')
 
     // Group head: 8 px 18 px 8 px 12 px, a 14 px semibold heading
-    const head = group.locator('.wk-group-head')
+    const head = group.locator('.work-group-head')
     expect(await css(head, 'padding')).toBe('8px 18px 8px 12px')
     const h2 = head.locator('h2')
     expect(await css(h2, 'font-size')).toBe('14px')
@@ -43,14 +43,14 @@ test('the queue groups, rows, due dates and history keep the mockup geometry', a
     expect(cols[0]).toBe('28px')
     expect(cols[2]).toBe('170px')
     expect(await css(row, 'padding')).toBe('8px 18px 8px 12px')
-    expect(await css(row.locator('.wk-subject'), 'font-size')).toBe('13px')
-    expect(await css(row.locator('.wk-kind'), 'border-radius')).toBe('999px')
-    expect(await css(row.locator('.wk-detail'), 'font-size')).toBe('12px')
-    const due = row.locator('.wk-due strong')
+    expect(await css(row.locator('.work-subject'), 'font-size')).toBe('13px')
+    expect(await css(row.locator('.queue-kind'), 'border-radius')).toBe('999px')
+    expect(await css(row.locator('.work-detail'), 'font-size')).toBe('12px')
+    const due = row.locator('.queue-due strong')
     expect(await css(due, 'font-size')).toBe('13px')
     await expect(due).toHaveText(/\d+ h$/)
     const r = await box(row)
-    const a = await box(row.locator('.wk-action'))
+    const a = await box(row.locator('.work-action'))
     expect(Math.abs(r.x + r.width - 18 - (a.x + a.width))).toBeLessThanOrEqual(1)
 
     // History toggle: a 44 px folded band
@@ -61,12 +61,12 @@ test('the queue groups, rows, due dates and history keep the mockup geometry', a
     // Nothing pushes the page sideways
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 
-    // A name opens the report in the inspector, with its Report and Runs sections
-    await row.locator('.wk-subject').click()
-    const dock = page.getByTestId('inspector-dock')
+    // A name opens the report in the module dock, with its Report and Runs sections
+    await row.locator('.work-subject').click()
+    const dock = page.locator('#inspector')
     await expect(dock.getByRole('tab', { name: 'Report', exact: true })).toBeVisible()
     await expect(dock.getByRole('tab', { name: 'Runs' })).toBeVisible()
-    await expect(row).toHaveClass(/is-opened/)
+    await expect(row).toHaveClass(/opened/)
   } finally {
     await api.put('/reports/schedule', { expiring_certificates: before.expiring_certificates })
   }

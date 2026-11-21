@@ -6817,7 +6817,7 @@
       "state": {
         "managed": "В UCM",
         "unmanaged": "Неизвестен UCM",
-        "error": "Недоступен"
+        "error": "Ошибка"
       },
       "inInventory": "В инвентаре",
       "inDays_one": "через {{count}} день",

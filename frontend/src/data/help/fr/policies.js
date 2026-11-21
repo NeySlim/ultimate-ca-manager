@@ -45,6 +45,10 @@ export default {
 
 Les politiques de certificat définissent les règles et contraintes appliquées lors de l’émission, du renouvellement ou de la révocation de certificats. Les politiques sont évaluées par **ordre de priorité** (nombre plus bas = priorité plus élevée) et peuvent être scopées à des AC spécifiques.
 
+## La liste
+
+Les politiques sont listées dans l’ordre où le serveur les applique, par priorité puis par nom, avec leur portée, leurs opérations, leur priorité, leur approbation et leur état (**Appliquée** ou **Désactivée**) ; les pastilles filtrent par état, la recherche et le filtre d’opération resserrent la liste. Un nom ouvre la politique dans l’inspecteur, avec ses propriétés, ses règles et son approbation ; **Modifier**, **Désactiver** ou **Activer** demandent write:policies, **Supprimer la politique…** demande delete:policies et une confirmation.
+
 ## Opérations
 
 Une politique couvre une ou plusieurs opérations : son exigence d’approbation et ses règles s’appliquent à celles-ci.

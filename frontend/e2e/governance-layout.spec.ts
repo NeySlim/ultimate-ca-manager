@@ -15,7 +15,7 @@ test.describe('desktop', () => {
   test('the schedule dialog keeps the mockup geometry and gives the focus back on Escape', async ({ page, api }) => {
     await page.goto('/reports')
     // The page head sits beside the main area, not inside it
-    const open = page.locator('.lv-head').getByRole('button', { name: 'Schedule a report' })
+    const open = page.locator('.page-head').getByRole('button', { name: 'Schedule a report' })
     await open.focus()
     await open.click()
     const dialog = page.getByRole('dialog')
@@ -27,8 +27,8 @@ test.describe('desktop', () => {
     expect(Math.round((await box(content)).height)).toBe(36)
     expect(await css(content, 'font-size')).toBe('12px')
     // The notice of the mockup above the buttons, 36 px buttons
-    await expect(dialog.locator('.wk-notice')).toBeVisible()
-    const confirm = dialog.locator('.lv-dialog-actions .wk-btn').last()
+    await expect(dialog.locator('.notice')).toBeVisible()
+    const confirm = dialog.locator('.modal-actions .btn').last()
     expect(Math.round((await box(confirm)).height)).toBe(36)
     // A wrong time is said under its field, which takes the focus
     await dialog.getByLabel(/^Sending time/).fill('25:00')
@@ -45,7 +45,7 @@ test.describe('desktop', () => {
     const socket = page.waitForEvent('websocket', (ws) => ws.url().includes('/socket.io'))
       .then((ws) => ws.waitForEvent('framereceived', { predicate: (f) => String(f.payload).includes('"connected"'), timeout: 30000 }))
     await page.goto('/reports')
-    const open = page.locator('.lv-head').getByRole('button', { name: 'Schedule a report' })
+    const open = page.locator('.page-head').getByRole('button', { name: 'Schedule a report' })
     await open.click()
     const dialog = page.getByRole('dialog')
     await expect(dialog.getByLabel('Content')).toBeFocused()
@@ -60,8 +60,8 @@ test.describe('desktop', () => {
 
   test('the close button of a queue dialog fades only in Aurore, as the mockup', async ({ page, api }) => {
     await page.goto('/reports')
-    await page.locator('.lv-head').getByRole('button', { name: 'Schedule a report' }).click()
-    const close = page.getByRole('dialog').locator('.lv-dialog-head .lv-btn')
+    await page.locator('.page-head').getByRole('button', { name: 'Schedule a report' }).click()
+    const close = page.getByRole('dialog').locator('.modal-head .icon-btn')
     await expect(close).toBeVisible()
     const family = (name: string) => page.evaluate((n) => document.documentElement.setAttribute('data-theme', n), name)
     await family('atelier')
@@ -77,11 +77,11 @@ test.describe('desktop', () => {
     try {
       await page.goto('/reports')
       const group = page.getByRole('main').locator('[data-work-group]').first()
-      await group.locator('.wk-row input[type=checkbox]').first().check()
+      await group.locator('.work-row input[type=checkbox]').first().check()
       await page.getByRole('button', { name: 'Clear selection' }).click()
       await expect(page.getByRole('heading', { level: 1 })).toBeFocused()
       // The group box is clear or ticked, never mixed
-      expect(await group.locator('.wk-group-head input').evaluate((e: HTMLInputElement) => e.indeterminate)).toBe(false)
+      expect(await group.locator('.work-group-head input').evaluate((e: HTMLInputElement) => e.indeterminate)).toBe(false)
     } finally {
       await api.put('/reports/schedule', { expiring_certificates: before.expiring_certificates })
     }
@@ -118,7 +118,7 @@ test.describe('phone', () => {
 
   test('the reports head keeps its actions on the title line, 40 px, nothing sideways', async ({ page, api }) => {
     await page.goto('/reports')
-    const head = page.locator('.lv-head')
+    const head = page.locator('.page-head')
     const h1 = await box(head.locator('h1'))
     const primary = head.getByRole('button', { name: 'Schedule a report' })
     const p = await box(primary)
@@ -131,10 +131,10 @@ test.describe('phone', () => {
 
   test('the reports head keeps the mockup one action; the PDF composer is under the queue, 40 px', async ({ page, api }) => {
     await page.goto('/reports')
-    const head = page.locator('.lv-head')
+    const head = page.locator('.page-head')
     await expect(head.getByRole('button', { name: 'Schedule a report' })).toBeVisible()
     await expect(head.getByRole('button', { name: 'Build a PDF…' })).toBeHidden()
-    const pdf = page.getByRole('main').locator('.wk-phone-only').getByRole('button', { name: 'Build a PDF…' })
+    const pdf = page.getByRole('main').locator('.phone-only').getByRole('button', { name: 'Build a PDF…' })
     await expect(pdf).toBeVisible()
     expect(Math.round((await box(pdf)).height)).toBe(40)
   })
@@ -145,7 +145,7 @@ test.describe('phone', () => {
     const folded = main.getByRole('button', { name: /^Not scheduled/ })
     if ((await folded.getAttribute('aria-expanded')) === 'false') await folded.click()
     await main.getByRole('button', { name: 'Certificate Inventory', exact: true }).first().click()
-    const download = page.locator('.ins-actions').getByRole('button', { name: 'Download' })
+    const download = page.locator('#inspector .dock-heading .actions').getByRole('button', { name: 'Download' })
     await expect(download).toBeVisible()
     expect(Math.round((await box(download)).height)).toBe(40)
   })

@@ -6603,7 +6603,7 @@
       "state": {
         "managed": "Dans UCM",
         "unmanaged": "Inconnu d’UCM",
-        "error": "Injoignable"
+        "error": "En erreur"
       },
       "inInventory": "Dans l’inventaire",
       "inDays_one": "dans {{count}} jour",
