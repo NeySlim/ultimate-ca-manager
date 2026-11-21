@@ -63,7 +63,7 @@ function Opener() {
     <>
       <button type="button" data-open="7" onClick={() => openEntity('certificate', 7)}>open-7</button>
       <button type="button" onClick={() => openEntity('certificate', 8)}>open-8</button>
-      <button type="button" onClick={() => openEntity('ca', 3)}>open-ca</button>
+      <button type="button" onClick={() => openEntity('truststore', 3)}>open-trusted</button>
     </>
   )
 }
@@ -134,8 +134,8 @@ describe('the zone inspector frame (dockFrame)', () => {
 
   it('keeps the product panel of another object opened from here', async () => {
     mount()
-    await open('open-ca')
-    expect(await within(dock()).findByTestId('legacy-object')).toHaveTextContent('ca:3')
+    await open('open-trusted')
+    expect(await within(dock()).findByTestId('legacy-object')).toHaveTextContent('truststore:3')
     expect(screen.getByTestId('legacy-object').closest('.atl-out')).not.toBeNull()
     expect(dock()).toHaveAttribute('aria-label', 'inspector.region')
   })

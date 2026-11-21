@@ -34,7 +34,7 @@ test.describe('desktop', () => {
     // The actions are full-width buttons of at least 36 px
     const issue = await box(side.getByRole('button', { name: 'Issue with this CA' }))
     expect(issue.height).toBeGreaterThanOrEqual(36)
-    expect(Math.round(issue.width)).toBe(Math.round(panel.width - 40))
+    expect(Math.round(issue.width)).toBe(Math.round((await box(side.locator('.ca-actions'))).width))
   })
 })
 
