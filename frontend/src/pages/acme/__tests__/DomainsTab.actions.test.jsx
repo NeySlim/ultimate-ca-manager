@@ -11,7 +11,7 @@
  * table, and rendered inside the card on a narrow screen.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 
 // The shared page setup keeps i18n working while stubbing the services away.
 import '../../__tests__/pageRenderingSetup.jsx'
@@ -75,5 +75,34 @@ describe.each([
     const actions = document.querySelector('tbody .table-actions')
     expect(actions).toBeTruthy()
     for (const label of expected) expect(actions.querySelector(`[title="${label}"]`)).toBeTruthy()
+  })
+})
+
+describe.each([
+  ['DomainsTab', DomainsTab, ['acme.provider', 'acme.issuingCA', 'acme.wildcard', 'atelier.state']],
+  ['LocalDomainsTab', LocalDomainsTab, ['acme.issuingCA', 'atelier.state']],
+])('%s list', (_name, Tab, sortable) => {
+  const many = Array.from({ length: 30 }, (_, i) => ({
+    id: i + 1, domain: `d${String(30 - i).padStart(2, '0')}.example.test`, dns_provider_name: 'cf', issuing_ca_name: null, is_wildcard_allowed: i % 2 === 0, auto_approve: i === 4,
+  }))
+  const renderTab = () => render(
+    <Tab acmeDomains={many} localDomains={many} dnsProviders={[]} cas={[]} onAdd={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onTest={vi.fn()} canWrite canDelete />,
+  )
+
+  it('sorts by domain first, then from each header, and pages by 25', () => {
+    const { container } = renderTab()
+    const names = () => [...container.querySelectorAll('tbody .entity-name')].map((b) => b.textContent)
+    const footer = container.querySelector('footer.table-footer')
+    expect(names()).toHaveLength(25)
+    expect(names()[0]).toBe('d01.example.test')
+    expect(footer).toHaveTextContent('table.range')
+    fireEvent.click(screen.getByRole('button', { name: 'table.nextPage' }))
+    expect(names()).toEqual(['d26.example.test', 'd27.example.test', 'd28.example.test', 'd29.example.test', 'd30.example.test'])
+    fireEvent.click(screen.getByRole('button', { name: 'atelier.state' }))
+    expect(names()[0]).toBe('d26.example.test')
+    for (const name of sortable) {
+      fireEvent.click(screen.getByRole('button', { name }))
+      expect(screen.getByRole('columnheader', { name })).toHaveAttribute('aria-sort', 'ascending')
+    }
   })
 })

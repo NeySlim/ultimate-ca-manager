@@ -4,8 +4,10 @@
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Btn, ListView, Dock, DockBody, Section, Props, EmptyBlock, Pill } from '../../components/atelier'
+import { Btn, ListView, Dock, DockBody, Section, Props, EmptyBlock, Pill, useClientList } from '../../components/atelier'
 import { SlotDock } from '../protocols/dockSlot'
+
+const BY_DOMAIN = { key: 'name', asc: true }
 
 export default function LocalDomainsTab({ localDomains, onAdd, onEdit, onDelete, canWrite, canDelete }) {
   const { t } = useTranslation()
@@ -16,6 +18,11 @@ export default function LocalDomainsTab({ localDomains, onAdd, onEdit, onDelete,
     ...(canWrite ? [{ icon: 'settings', label: t('common.edit'), onClick: () => onEdit(d), write: true }] : []),
     ...(canDelete ? [{ icon: 'close', label: t('common.delete'), onClick: () => onDelete(d), write: true }] : []),
   ]
+  // The API sends every domain: sorted and paged here
+  const list = useClientList(localDomains, {
+    initial: BY_DOMAIN,
+    sorts: { name: (d) => d.domain, ca: (d) => d.issuing_ca_name || t('acme.defaultCA'), state: (d) => (d.auto_approve ? 0 : 1) },
+  })
   const dock = open && (
     <Dock label={t('atelier.detailOf', { name: t('acme.localDomains') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
       tabs={[{ key: open.id, title: open.domain, icon: 'globe' }]} onClose={() => setOpenId(null)}>
@@ -39,13 +46,13 @@ export default function LocalDomainsTab({ localDomains, onAdd, onEdit, onDelete,
   )
   return (
     <>
-      <ListView label={t('acme.localDomains')} caption={t('acme.domainsCaption')} icon="globe" rows={localDomains}
+      <ListView label={t('acme.localDomains')} caption={t('acme.domainsCaption')} icon="globe" list={list} nameSort="name"
         title={(d) => d.domain} status={approval} openedId={openId} onOpen={(d) => setOpenId(d.id)}
-        columns={[{ id: 'ca', label: t('acme.issuingCA'), cell: (d) => d.issuing_ca_name || t('acme.defaultCA'), grow: true }, { status: true }]}
+        columns={[{ id: 'ca', label: t('acme.issuingCA'), cell: (d) => d.issuing_ca_name || t('acme.defaultCA'), grow: true, sort: 'ca' }, { status: true, sort: 'state' }]}
         rowActions={actions}
         empty={<EmptyBlock id="acme-local-domains" icon="globe" title={t('acme.noLocalDomains')} text={t('acme.noLocalDomainsDesc')}
           action={canWrite ? { label: t('acme.addDomain'), icon: 'plus', onClick: onAdd, primary: true } : undefined} />}
-        footer={{ range: t('acme.domainsRange', { count: localDomains.length }) }} />
+        footer={{ range: list.paged ? t('table.range', { start: list.start, end: list.end, total: list.total }) : t('acme.domainsRange', { count: list.total }) }} />
       <SlotDock>{dock}</SlotDock>
     </>
   )

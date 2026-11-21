@@ -2,7 +2,7 @@
  * The orders tab under a rate limit: a page that keeps answering 429 leaves a partial list with a notice.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import './pageRenderingSetup.jsx'
 import { acmeService } from '../../services/acme.service'
@@ -38,6 +38,9 @@ describe('ACMEPage orders under a rate limit', () => {
     mockAcme((page) => (page.page === 2 ? Promise.reject(rateLimited()) : Promise.resolve(pageOf(page))))
     await openOrdersTab()
     expect(await screen.findByText('o1.example.com')).toBeInTheDocument()
+    // The first page of 100 only: one page of 100 rows
+    fireEvent.change(screen.getByRole('combobox', { name: 'table.perPageLabel' }), { target: { value: '100' } })
+    expect(screen.getByText('1 / 1')).toBeInTheDocument()
     expect(screen.queryByText('o101.example.com')).toBeNull()
     expect(screen.getByRole('status')).toHaveTextContent('acme.ordersListPartial')
     expect(acmeService.getClientOrders.mock.calls.filter(([, , p]) => p.page === 2)).toHaveLength(3)
@@ -50,8 +53,12 @@ describe('ACMEPage orders under a rate limit', () => {
       return Promise.resolve(pageOf(page))
     })
     await openOrdersTab()
-    expect(await screen.findByText('o150.example.com')).toBeInTheDocument()
+    // The 150 orders are all there, on the list's six pages of 25
+    expect(await screen.findByText('1 / 6')).toBeInTheDocument()
     expect(screen.getByText('o1.example.com')).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('combobox', { name: 'table.perPageLabel' }), { target: { value: '100' } })
+    fireEvent.click(screen.getByRole('button', { name: 'table.nextPage' }))
+    expect(screen.getByText('o150.example.com')).toBeInTheDocument()
     expect(screen.queryByText('acme.ordersListPartial')).toBeNull()
   })
 })
