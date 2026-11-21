@@ -9,7 +9,7 @@ import { LogoIcon } from '../Logo'
 import { ThemeMenu } from '../shell/ThemeMenu'
 import { FieldError } from '../atelier/SettingsView'
 import { AtlScopeContext } from '../atelier/scope'
-import { AuthLanguageMenu } from './AuthLanguageMenu'
+import { LanguageMenu } from '../shell/LanguageMenu'
 import { useThemeColor } from '../../lib/themeColor'
 import '../../styles/atelier/scope.css'
 import '../../styles/atelier/maquette.css'
@@ -40,7 +40,7 @@ export const AuthFrame = forwardRef(function AuthFrame({ title, lead, children, 
           <main className="auth" id="main" tabIndex={-1}>
             {tools && (
               <div className="auth-tools">
-                <AuthLanguageMenu />
+                <LanguageMenu />
                 <ThemeMenu />
               </div>
             )}

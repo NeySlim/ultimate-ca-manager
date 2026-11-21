@@ -25,7 +25,7 @@ export default {
       {
         title: 'Menu du compte',
         items: [
-          { label: 'Compte', text: 'Votre nom, votre rôle et la méthode de connexion avec le verrouillage après inactivité, puis Mon compte et Se déconnecter. La langue se choisit dans Mon compte et sur la page de connexion ; les Paramètres sont dans le menu Modules et la recherche' },
+          { label: 'Compte', text: 'Votre nom, votre rôle et la méthode de connexion avec le verrouillage après inactivité, puis Mon compte et Se déconnecter ; au téléphone, la langue aussi. La langue se choisit par le bouton globe de la barre du haut, dans Mon compte et sur la page de connexion ; les Paramètres sont dans le menu Modules et la recherche' },
         ]
       },
       {

@@ -28,7 +28,7 @@ import { validityDays } from '../components/mtls/validity'
 import { ExportDialog } from './certificates/dialogs/ExportDialog'
 import { ROLE_KEYS } from './users/userFacts'
 import { languages } from '../i18n'
-import { persistPreference } from '../stores/userPreferencesStore'
+import { chooseLanguage } from '../lib/chooseLanguage'
 
 // Profile edit left pending, kept for the tab (lib/draftMemory)
 const PROFILE_DRAFT = 'account:profile'
@@ -527,11 +527,7 @@ export default function AccountPage() {
     e.preventDefault()
     if (profileChanged && !saving) handleSaveProfile()
   }
-  const changeLanguage = (code) => {
-    i18n.changeLanguage(code)
-    try { localStorage.setItem('i18nextLng', code) } catch { /* Safari private mode */ }
-    persistPreference('language', code)
-  }
+  const changeLanguage = (code) => chooseLanguage(i18n, code)
   const closeKeyModal = () => { setShowApiKeyModal(false); setApiKeyForm(NO_KEY_FORM) }
   const close2FA = () => { setShow2FAModal(false); setQrData(null); setConfirmCode('') }
   const closeWebAuthn = () => { setShowWebAuthnModal(false); setWebauthnName('') }

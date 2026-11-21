@@ -1,6 +1,6 @@
 /**
  * The masthead, the mockup's nav(): brand, main pages (Activity included), pinned modules and the
- * Modules button, the Modules menu, the phone's page picker, then search, theme, bell, help and account.
+ * Modules button, the Modules menu, the phone's page picker, then search, language, theme, bell, help and account.
  */
 import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -11,6 +11,7 @@ import { glyphOf, isVisible, moduleById } from '../../navigation/registry'
 import { FIXED_IDS } from './pins'
 import { ModulesButton, ModulesMenu } from './ModulesMenu'
 import { PinnedModules } from './PinnedModules'
+import { LanguageMenu } from './LanguageMenu'
 import { ThemeMenu } from './ThemeMenu'
 import { NotificationBell } from './NotificationBell'
 import { UserMenu } from './UserMenu'
@@ -64,6 +65,7 @@ export function TopBar({ can, pins, onTogglePin, activeId, onOpenSearch, onOpenH
         <button type="button" className="btn search-command" id="shell-search" data-action="command" aria-label={t('shell.search')} onClick={onOpenSearch}>
           <Icon name="search" /><span>{t('shell.searchPlaceholder')}</span><kbd>Ctrl K</kbd>
         </button>
+        <LanguageMenu />
         <ThemeMenu />
         <NotificationBell can={can} />
         {hasHelp && (

@@ -44,3 +44,7 @@
 /* While useNavRoom measures, every link takes its natural width. */
 :root .atl .main-nav[data-room=measure]>*{flex-shrink:0}
 
+/* On a phone the language leaves the bar for the account menu, the page picker keeping its room. */
+@media(max-width:800px){:root .atl .global-tools .language-wrap{display:none}}
+@media(min-width:801px){:root .atl .user-menu .user-lang{display:none}}
+:root .atl .user-menu .user-lang select{min-height:32px;padding:4px 8px;font-size:13px}
