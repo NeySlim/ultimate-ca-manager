@@ -223,3 +223,5 @@
 /* A notice holding a command line lets it scroll inside the notice instead of widening the page */
 .atl .notice:has(>span>.command-line),.atl .notice>span:has(>.command-line){min-width:0}
 @media(max-width:800px){.atl .ext-row.role-row{grid-template-columns:minmax(0,1fr) 40px;grid-template-areas:none}.atl .ext-row.role-row>select{grid-column:1/-1}.atl .ext-row.role-row>.icon-btn{grid-column:2;grid-row:1}.atl .ext-row.row-head{display:none}.atl .eku-list.two-columns{grid-template-columns:1fr}}
+/* Inspector, deployments: the binding a work-queue link names, marked as the mockup's current setup step. */
+.atl .record-list>li[aria-current=true]{background:var(--selected)}
