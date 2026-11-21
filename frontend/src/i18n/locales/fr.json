@@ -8327,6 +8327,14 @@
     "skip": "Aller au chapitre",
     "openInTab": "Ouvrir dans un nouvel onglet",
     "paletteEntry": "Guide",
-    "paletteHint": "S’ouvre dans un nouvel onglet"
+    "paletteHint": "S’ouvre dans un nouvel onglet",
+    "searchLabel": "Chercher dans tout le guide",
+    "searchPlaceholder": "Chercher dans le guide…",
+    "searchLoading": "Chargement du guide…",
+    "results_one": "{{count}} résultat",
+    "results_other": "{{count}} résultats",
+    "resultsShown": "Les {{shown}} premiers sont listés.",
+    "noResults": "Aucun résultat. Essayez un autre mot.",
+    "resultsLabel": "Résultats dans le guide"
   }
 }

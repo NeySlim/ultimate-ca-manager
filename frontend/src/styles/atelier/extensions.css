@@ -320,9 +320,35 @@
 .atl .guide-print{justify-content:flex-end}
 /* The whole guide one chapter after the other, in the reading column's width. */
 .atl .guide-all-main{display:grid;gap:22px;max-width:780px;margin:0 auto;width:100%}
+/* The guide's search in the masthead: the mockup's search field, its results under it. */
+.atl .guide-search{position:relative;flex:0 1 420px;min-width:0;display:flex}
+/* The field takes the room the masthead leaves it. */
+.atl .guide-search .search{min-width:0}
+/* The results: the mockup's menu panel under the field, scrolled within the window. */
+.atl .guide-results{position:absolute;top:calc(100% + 8px);left:0;z-index:20;width:min(620px,calc(100vw - 32px));max-height:min(70dvh,560px);overflow:auto;background:var(--panel);border:1px solid var(--control);border-radius:6px;box-shadow:0 18px 50px color-mix(in srgb,var(--ink) 44%,transparent);padding:10px}
+/* The count of results and the no-result message, in the menu head's tone. */
+.atl .guide-results-count,.atl .guide-results-note{font-size:12px;color:var(--muted);padding:4px 8px 8px}
+/* A chapter's results under its name. */
+.atl .guide-results-group+.guide-results-group{margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
+/* The chapter's name, small and muted, as a group of the Modules menu. */
+.atl .guide-results-head{font-size:12px;font-weight:600;color:var(--muted);padding:6px 8px 2px}
+/* The results' list without its marks. */
+.atl .guide-results ul{list-style:none;margin:0;padding:0}
+/* A result: the palette's result, its title over its excerpt. */
+.atl .guide-result{width:100%;flex-direction:column;align-items:flex-start;gap:3px}
+/* The excerpt of a result. */
+.atl .guide-excerpt{font-size:12px;line-height:1.5;color:var(--muted);overflow-wrap:anywhere}
+/* A term found: the warning's background under the text's colour, underlined by the warning's fill so it shows on every theme. */
+.atl mark.guide-hit{background:var(--warnbg);color:var(--text);box-shadow:inset 0 -2px 0 var(--warn-fill);border-radius:2px;padding:0 1px}
 /* The way back to the console keeps its words beside the search. */
 .atl .guide-back{flex-shrink:0}
 @media(max-width:800px){
+/* A phone: the way back to the console keeps its icon, its words for the screen reader. */
+.atl .guide-back .guide-back-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+/* A phone: the back button is a square target. */
+.atl .guide-back{width:40px;min-height:40px;padding:6px}
+/* A phone: the results take the window's width under the masthead. */
+.atl .guide-results{position:fixed;top:62px;left:8px;right:8px;width:auto;max-height:calc(100dvh - 76px)}
 /* A phone: one column, the contents being the selects above the chapter. */
 .atl .guide-layout{grid-template-columns:minmax(0,1fr)}
 /* A phone: the article gives the text its width. */

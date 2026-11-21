@@ -8741,6 +8741,16 @@
     "skip": "Перейти к главе",
     "openInTab": "Открыть в новой вкладке",
     "paletteEntry": "Руководство",
-    "paletteHint": "Открывается в новой вкладке"
+    "paletteHint": "Открывается в новой вкладке",
+    "searchLabel": "Поиск по всему руководству",
+    "searchPlaceholder": "Поиск в руководстве…",
+    "searchLoading": "Загрузка руководства…",
+    "results_one": "{{count}} результат",
+    "results_few": "{{count}} результата",
+    "results_many": "{{count}} результатов",
+    "results_other": "{{count}} результата",
+    "resultsShown": "Показаны первые {{shown}}.",
+    "noResults": "Ничего не найдено. Попробуйте другое слово.",
+    "resultsLabel": "Результаты в руководстве"
   }
 }

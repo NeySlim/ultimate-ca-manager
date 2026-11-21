@@ -229,6 +229,37 @@ describe('GuidePage: languages', () => {
   })
 })
 
+describe('GuidePage: the words of a search', () => {
+  it('stay marked in the chapter opened from a result, not in the contents', async () => {
+    show('/guide/cas?q=Root%20ca')
+    await screen.findByRole('heading', { level: 1 })
+    const article = document.getElementById('guide-article')
+    const found = [...article.querySelectorAll('mark.guide-hit')].map((m) => m.textContent.toLowerCase())
+    expect(found.length).toBeGreaterThan(3)
+    expect(new Set(found)).toEqual(new Set(['root', 'ca']))
+    expect(toc().querySelector('mark')).toBeNull()
+  })
+
+  // Each language below is read by one test only: a translated page is loaded once per language and kept
+  it('are marked whatever their accents in a translated chapter', async () => {
+    h.lang = 'zh'
+    h.load.mockResolvedValue({ default: { helpGuides: { title: 'Autorités', content: '## Autorité racine\nUne autorité signe.' } } })
+    show('/guide/cas?q=autorite')
+    await screen.findByRole('heading', { level: 1, name: 'Autorités' })
+    expect([...document.querySelectorAll('#guide-article mark')].map((m) => m.textContent)).toEqual(['Autorité', 'autorité'])
+  })
+
+  it('loads no index before the search is used, every chapter at its first focus', async () => {
+    h.lang = 'ru'
+    h.load.mockResolvedValue({ default: { helpGuides: { title: 'Autorités', content: '## Vue\ntexte' } } })
+    show('/guide/cas')
+    await screen.findByRole('heading', { level: 1, name: 'Autorités' })
+    expect(h.load.mock.calls.map((c) => c[1])).toEqual(['cas'])
+    fireEvent.focus(screen.getByRole('searchbox', { name: 'guide.searchLabel' }))
+    await waitFor(() => expect(new Set(h.load.mock.calls.map((c) => c[1]))).toEqual(new Set(GUIDE_CHAPTERS.map((c) => c.key))))
+  })
+})
+
 describe('GuidePage: printing', () => {
   it('lays every chapter one after the other for the whole guide', async () => {
     const print = vi.spyOn(window, 'print').mockImplementation(() => {})

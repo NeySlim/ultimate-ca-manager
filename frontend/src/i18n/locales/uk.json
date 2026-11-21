@@ -8741,6 +8741,16 @@
     "skip": "Skip to the chapter",
     "openInTab": "Open in a new tab",
     "paletteEntry": "Guide",
-    "paletteHint": "Opens in a new tab"
+    "paletteHint": "Opens in a new tab",
+    "searchLabel": "Search the whole guide",
+    "searchPlaceholder": "Search the guide…",
+    "searchLoading": "Loading the guide…",
+    "results_one": "{{count}} result",
+    "results_other": "{{count}} results",
+    "results_few": "{{count}} results",
+    "results_many": "{{count}} results",
+    "resultsShown": "The first {{shown}} are listed.",
+    "noResults": "No results. Try another word.",
+    "resultsLabel": "Results in the guide"
   }
 }

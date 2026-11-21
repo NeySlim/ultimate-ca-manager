@@ -12,7 +12,8 @@ import { Icon } from '../components/atelier/Icon'
 import { markSrc } from '../components/atelier/icons'
 import { Notice } from '../components/atelier/Form'
 import { LoadingSpinner } from '../components/LoadingSpinner'
-import { GuideContent, QuickHelp, guideHeadings, mergeHelpContent } from '../components/help'
+import { GuideContent, QuickHelp, guideHeadings, mergeHelpContent, queryTerms } from '../components/help'
+import { GuideSearch } from '../components/help/GuideSearch'
 import { helpLanguage, loadTranslatedPage, loadTranslatedPages, useEnglishHelp } from '../data/helpData'
 import { GUIDE_CHAPTERS, chapterOfAnchor, guideChapter, guideGroups, openPagePath } from '../navigation/guide'
 import { usePermission } from '../hooks/usePermission'
@@ -61,7 +62,7 @@ function GuideHead({ children }) {
     <header className="masthead guide-head">
       <Link to="/" className="brand"><img src={markSrc} width="28" height="32" alt="" /><strong>UCM</strong><span>{t('guide.title')}</span></Link>
       <div className="guide-head-tools">{children}</div>
-      <Link to="/" className="btn guide-back">{t('help.back')}</Link>
+      <Link to="/" className="btn guide-back"><Icon name="grid" /><span className="guide-back-label">{t('help.back')}</span></Link>
     </header>
   )
 }
@@ -69,7 +70,9 @@ function GuideHead({ children }) {
 function GuideChapter({ chapter }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { hash } = useLocation()
+  const { hash, search } = useLocation()
+  // The terms of the search that led here stay marked in the chapter
+  const highlight = queryTerms(new URLSearchParams(search).get('q') || '')
   const { lang, englishNotice } = useHelpLanguage()
   const english = useEnglishHelp()
   const { isAdmin, hasPermission } = usePermission()
@@ -151,7 +154,7 @@ function GuideChapter({ chapter }) {
   return (
     <div className="atl guide-app">
       <a className="skip guide-skip" href="#guide-article" onClick={(e) => { e.preventDefault(); titleRef.current?.focus() }}>{t('guide.skip')}</a>
-      <GuideHead />
+      <GuideHead><GuideSearch lang={lang} /></GuideHead>
       <div className="guide-scroll" ref={scrollRef}>
         <div className="stage guide-stage">
           <div className="settings-layout guide-layout">
@@ -207,9 +210,9 @@ function GuideChapter({ chapter }) {
                 {!text ? (
                   <div className="guide-wait" role="status" aria-label={t('common.loading')}><LoadingSpinner size="lg" /></div>
                 ) : text.quick ? (
-                  <QuickHelp content={text.quick} />
+                  <QuickHelp content={text.quick} highlight={highlight} />
                 ) : (
-                  <div className="guide-body"><GuideContent chapter={chapter} markdown={text.markdown} englishMarkdown={text.english} levelOffset={0} /></div>
+                  <div className="guide-body"><GuideContent chapter={chapter} markdown={text.markdown} englishMarkdown={text.english} levelOffset={0} highlight={highlight} /></div>
                 )}
               </article>
               <footer className="guide-foot">
