@@ -189,3 +189,22 @@
 .atl .atl-out thead{position:static}
 .atl .atl-out .ui-table th:where(:first-child){width:auto;padding:0 14px}
 .atl .atl-out .ui-table td:where(:first-child){width:auto;padding:3px 14px}
+/*
+ * Settings integrations (SSO, AD, Microsoft CA, Windows, webhooks, deployment, CT). A test, a notice,
+ * a row list of a folded part of a dialog form spans its two columns; a role mapping row has four
+ * controls (group, base role, custom role, remove) under the names of its columns; a list of
+ * checkboxes (webhook events) runs on two columns.
+ */
+.atl .advanced-panel>.settings-test,.atl .form-fields>.settings-test{grid-column:1/-1}
+.atl .advanced-panel>.notice,.atl .form-fields .form-fields>.notice{grid-column:1/-1;margin:0}
+.atl .ext-row.role-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 36px}
+.atl .ext-row.row-head{font-size:12px;color:var(--muted)}
+.atl .eku-list.two-columns{grid-template-columns:1fr 1fr;gap:0 16px}
+.atl .text-link.bad{color:var(--bad)}
+/* A checkbox field out of a settings grid (a dialog form, a folded part) keeps its box beside its words */
+.atl .checkbox-line.field{flex-direction:row}
+/* A row of actions led by a labelled field (a filter) lines its buttons up with the control, not the label */
+.atl .settings-actions:has(>.field){align-items:flex-end}
+/* A notice holding a command line lets it scroll inside the notice instead of widening the page */
+.atl .notice:has(>span>.command-line),.atl .notice>span:has(>.command-line){min-width:0}
+@media(max-width:800px){.atl .ext-row.role-row{grid-template-columns:minmax(0,1fr) 40px;grid-template-areas:none}.atl .ext-row.role-row>select{grid-column:1/-1}.atl .ext-row.role-row>.icon-btn{grid-column:2;grid-row:1}.atl .ext-row.row-head{display:none}.atl .eku-list.two-columns{grid-template-columns:1fr}}
