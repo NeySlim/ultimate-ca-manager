@@ -19,6 +19,7 @@ vi.mock('../../lib/passwordStrength', async (orig) => ({
 
 import ForgotPasswordPage from '../ForgotPasswordPage'
 import ResetPasswordPage from '../ResetPasswordPage'
+import { findAlert } from '../../test/filledAlert'
 
 const renderAt = (entry) => render(
   <MemoryRouter initialEntries={[entry]}>
@@ -80,18 +81,18 @@ describe('ResetPasswordPage', () => {
     submit()
     // A field error sits under its field, red, and the field takes the focus
     expect(fresh).toHaveAttribute('aria-invalid', 'true')
-    expect(document.getElementById(fresh.getAttribute('aria-describedby').split(' ').find(id => id.endsWith('-error'))))
+    expect(document.getElementById(fresh.getAttribute('aria-describedby').split(' ').find(id => id.startsWith('err-'))))
       .toHaveTextContent('auth.passwordMinLength')
     expect(document.activeElement).toBe(fresh)
-    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByRole('alert')).toBeEmptyDOMElement()
     expect(await screen.findByText('passwordStrength.weak')).toBeInTheDocument()
     fireEvent.change(fresh, { target: { value: 'long enough 1' } })
     expect(fresh).not.toHaveAttribute('aria-invalid')
     fireEvent.change(confirm, { target: { value: 'other' } })
     submit()
     expect(confirm).toHaveAttribute('aria-invalid', 'true')
-    expect(confirm).toHaveAttribute('aria-describedby', 'reset-confirm-error')
-    expect(screen.getByText('common.passwordMismatch').closest('.auth-field')).toContainElement(confirm)
+    expect(confirm).toHaveAttribute('aria-describedby', 'err-reset-confirm')
+    expect(screen.getByText('common.passwordMismatch').closest('.field')).toContainElement(confirm)
     expect(document.activeElement).toBe(confirm)
     fireEvent.change(confirm, { target: { value: 'long enough 1' } })
     submit()
@@ -107,6 +108,6 @@ describe('ResetPasswordPage', () => {
     fireEvent.change(screen.getByLabelText('common.newPassword'), { target: { value: 'long enough 1' } })
     fireEvent.change(screen.getByLabelText('common.confirmPassword'), { target: { value: 'long enough 1' } })
     fireEvent.click(screen.getByRole('button', { name: 'auth.resetPasswordTitle' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Token expired')
+    expect(await findAlert()).toHaveTextContent('Token expired')
   })
 })

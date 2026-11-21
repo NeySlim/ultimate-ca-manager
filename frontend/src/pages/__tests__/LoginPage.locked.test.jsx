@@ -82,7 +82,7 @@ describe('LoginPage lock screen', () => {
     expect(user).toHaveValue('alice')
     expect(user).toHaveAttribute('readonly')
     // An SSO door would open another account: not offered to a password account
-    expect(screen.queryByText('Company SSO')).toBeNull()
+    expect(screen.queryByText(/^Company SSO · /)).toBeNull()
     expect(screen.queryByText('auth.forgotPassword')).toBeNull()
     fireEvent.change(user, { target: { value: 'mallory' } })
     fireEvent.change(screen.getByLabelText('auth.page.password'), { target: { value: 'pw' } })
@@ -119,7 +119,7 @@ describe('LoginPage lock screen', () => {
     const user = screen.getByLabelText('auth.page.username')
     expect(user).not.toHaveAttribute('readonly')
     expect(user).toHaveValue('')
-    expect(screen.getByText('Company SSO')).toBeInTheDocument()
+    expect(screen.getByText(/^Company SSO · /)).toBeInTheDocument()
     fireEvent.change(user, { target: { value: 'bob' } })
     fireEvent.change(screen.getByLabelText('auth.page.password'), { target: { value: 'pw' } })
     fireEvent.click(screen.getByRole('button', { name: 'auth.page.submit' }))

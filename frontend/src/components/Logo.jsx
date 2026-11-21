@@ -14,7 +14,7 @@ const sizes = {
   xl: 64,
 }
 
-function LogoIcon({ size = 32, className }) {
+export function LogoIcon({ size = 32, className }) {
   const uid = useId()
   const g1 = `ucm-g1-${uid}`
   const g2 = `ucm-g2-${uid}`

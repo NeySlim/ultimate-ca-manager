@@ -10,7 +10,7 @@ import { authService } from '../services/auth.service'
 import { accountService } from '../services/account.service'
 import { apiClient } from '../services/apiClient'
 import { setAppTimezone } from '../stores/timezoneStore'
-import { saveLock, markJustLocked } from '../lib/sessionLock'
+import { saveLock, markJustLocked, markSignedOut } from '../lib/sessionLock'
 import { setDateFormat, setShowTime } from '../stores/dateFormatStore'
 import { applyServerPreferences, getPreferences, setAuthenticated as setPrefsAuthenticated } from '../stores/userPreferencesStore'
 import i18n from '../i18n'
@@ -190,6 +190,7 @@ export function AuthProvider({ children }) {
       setMustEnroll2fa(false)
       setPrefsAuthenticated(false)
       setLoading(false)
+      markSignedOut()
       debug('🔓 Local session cleared')
     }
   }

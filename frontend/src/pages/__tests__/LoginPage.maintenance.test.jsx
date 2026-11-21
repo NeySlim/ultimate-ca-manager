@@ -59,7 +59,7 @@ async function submitPassword() {
   fireEvent.click(screen.getByText('auth.page.submit'))
 }
 async function submitLdap() {
-  fireEvent.click(await screen.findByText('Corporate LDAP'))
+  fireEvent.click(await screen.findByText(/^Corporate LDAP · /))
   fireEvent.change(await screen.findByLabelText('auth.page.username'), { target: { value: 'alice' } })
   fireEvent.change(screen.getByLabelText('auth.page.password'), { target: { value: 'pw' } })
   fireEvent.submit(screen.getByLabelText('auth.page.password').closest('form'))
@@ -149,7 +149,7 @@ describe('LoginPage during a maintenance', () => {
     renderLogin()
     await submitPassword()
     await screen.findByRole('status')
-    fireEvent.click(screen.getByText('Corporate LDAP'))
+    fireEvent.click(screen.getByText(/^Corporate LDAP · /))
     expect(screen.queryByRole('status')).toBeNull()
     await tick(5000)
     expect(s.loginPassword).toHaveBeenCalledTimes(1)

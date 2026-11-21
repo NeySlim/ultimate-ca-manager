@@ -42,3 +42,16 @@ export function takeJustLocked() {
   justLocked = false
   return was
 }
+
+// Set by a sign-out and taken once by the sign-in page: it says so and focuses its title, as the design does.
+let justSignedOut = false
+
+export function markSignedOut() {
+  justSignedOut = true
+}
+
+export function takeSignedOut() {
+  const was = justSignedOut
+  justSignedOut = false
+  return was
+}

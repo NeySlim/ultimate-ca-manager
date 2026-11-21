@@ -36,6 +36,7 @@
     "disableTwoFactor": "Désactiver l’authentification à deux facteurs",
     "enableTwoFactor": "Activer l’authentification à deux facteurs",
     "scanQRCode": "1. Scannez ce code QR avec votre application d’authentification:",
+    "qrCodeAlt": "Code QR du secret de l’application d’authentification",
     "enterDigitCode": "2. Entrez le code à 6 chiffres:",
     "backupCodes": "Codes de secours - Conservez-les!",
     "verifyAndEnable": "Vérifier et activer",
@@ -964,7 +965,8 @@
       "canRetry": "Vous pouvez réessayer.",
       "lockedAnnounce": "Session expirée : l’écran est verrouillé, la page en cours est conservée.",
       "signedIn": "Connecté : {{name}}, {{role}}.",
-      "signedInNoRole": "Connecté : {{name}}."
+      "signedInNoRole": "Connecté : {{name}}.",
+      "signedOut": "Vous êtes déconnecté. Vos préférences d’affichage sont conservées."
     }
   },
   "cas": {

@@ -5,8 +5,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { CheckCircle, Warning } from '@phosphor-icons/react'
 import { AuthFrame } from '../components/auth/AuthFrame'
+import { Icon } from '../components/atelier/Icon'
 import { openChannel } from './settings/sso/signInTestChannel'
 
 export const CLOSE_DELAY_MS = 1500
@@ -45,14 +45,11 @@ export default function SsoTestCompletePage() {
   // A window of its own: no theme, language or footer, the sign-in frame only
   return (
     <AuthFrame title={t('sso.signInTestCompleteTitle')} tools={false} footer={false}>
-      <div role="status" className={`auth-result ${done ? 'is-good' : 'is-warn'}`}>
-        {done ? <CheckCircle size={20} aria-hidden="true" /> : <Warning size={20} aria-hidden="true" />}
-        <span className="auth-result-text">
-          <span>{t(RESULTS[result])}</span>
-          {stillOpen && <span>{t('sso.signInTestCompleteClose')}</span>}
-        </span>
-      </div>
-      <Link to="/settings?tab=sso" className="auth-link">{t('sso.signInTestCompleteBack')}</Link>
+      <p role="status" className={done ? 'notice' : 'notice warn'}>
+        <Icon name={done ? 'check' : 'warning'} />
+        <span>{t(RESULTS[result])}{stillOpen && <> {t('sso.signInTestCompleteClose')}</>}</span>
+      </p>
+      <Link to="/settings?tab=sso" className="text-link auth-switch">{t('sso.signInTestCompleteBack')}</Link>
     </AuthFrame>
   )
 }

@@ -4,8 +4,9 @@
 import { useRef, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { CaretRight, Warning } from '@phosphor-icons/react'
 import { AuthFrame, AuthField } from '../components/auth/AuthFrame'
+import { describedBy } from '../components/auth/describedBy'
+import { Icon } from '../components/atelier/Icon'
 import { PasswordMeter } from '../components/auth/PasswordMeter'
 import { authService } from '../services'
 
@@ -61,8 +62,8 @@ export default function ResetPasswordPage() {
   if (success) {
     return (
       <AuthFrame ref={titleRef} title={t('auth.passwordReset')} lead={t('auth.passwordResetSuccess')}>
-        <button type="button" className="auth-btn is-primary auth-submit" onClick={() => navigate('/login')}>
-          <CaretRight size={17} aria-hidden="true" />{t('auth.goToLogin')}
+        <button type="button" className="btn primary auth-submit" onClick={() => navigate('/login')}>
+          <Icon name="right" />{t('auth.goToLogin')}
         </button>
       </AuthFrame>
     )
@@ -71,17 +72,17 @@ export default function ResetPasswordPage() {
   if (!token) {
     return (
       <AuthFrame ref={titleRef} title={t('auth.invalidLink')} lead={t('auth.invalidLinkDesc')}>
-        <Link to="/forgot-password" className="auth-btn is-primary auth-submit">
-          <CaretRight size={17} aria-hidden="true" />{t('auth.requestNewResetLink')}
+        <Link to="/forgot-password" className="btn primary auth-submit">
+          <Icon name="send" />{t('auth.requestNewResetLink')}
         </Link>
-        <Link to="/login" className="auth-link">{t('auth.backToLogin')}</Link>
+        <Link to="/login" className="text-link auth-switch">{t('auth.backToLogin')}</Link>
       </AuthFrame>
     )
   }
 
   return (
     <AuthFrame ref={titleRef} title={t('auth.resetPasswordTitle')} lead={t('auth.resetPasswordDesc')}>
-      <form className="auth-form" onSubmit={handleSubmit} noValidate aria-busy={loading || undefined}>
+      <form className="auth-form" id="reset-form" onSubmit={handleSubmit} noValidate aria-busy={loading || undefined}>
         <AuthField id="reset-new" label={t('common.newPassword')} error={fieldErrors.password}>
           <input
             ref={newRef}
@@ -92,10 +93,10 @@ export default function ResetPasswordPage() {
             value={password}
             onChange={(e) => { setPassword(e.target.value); if (fieldErrors.password) setFieldErrors({}) }}
             aria-invalid={fieldErrors.password ? 'true' : undefined}
-            aria-describedby={fieldErrors.password ? 'reset-new-hint reset-new-error' : 'reset-new-hint'}
+            aria-describedby={describedBy('reset-new', fieldErrors.password, 'reset-new-hint')}
           />
           <PasswordMeter password={password} />
-          <small id="reset-new-hint" className="auth-wait">{t('auth.minCharacters')}</small>
+          <small id="reset-new-hint">{t('auth.minCharacters')}</small>
         </AuthField>
         <AuthField id="reset-confirm" label={t('common.confirmPassword')} error={fieldErrors.confirm}>
           <input
@@ -107,17 +108,15 @@ export default function ResetPasswordPage() {
             value={confirmPassword}
             onChange={(e) => { setConfirmPassword(e.target.value); if (fieldErrors.confirm) setFieldErrors({}) }}
             aria-invalid={fieldErrors.confirm ? 'true' : undefined}
-            aria-describedby={fieldErrors.confirm ? 'reset-confirm-error' : undefined}
+            aria-describedby={describedBy('reset-confirm', fieldErrors.confirm)}
           />
         </AuthField>
-        {error && (
-          <div className="auth-error" role="alert"><Warning size={14} aria-hidden="true" /><span>{error}</span></div>
-        )}
-        <button type="submit" className="auth-btn is-primary auth-submit" disabled={loading}>
-          <CaretRight size={17} aria-hidden="true" />{loading ? t('auth.resetting') : t('auth.resetPasswordTitle')}
+        <div className="form-error" id="reset-error" role="alert">{error ? <><Icon name="warning" /><span>{error}</span></> : null}</div>
+        <button type="submit" className="btn primary auth-submit" disabled={loading}>
+          <Icon name="check" />{loading ? t('auth.resetting') : t('auth.resetPasswordTitle')}
         </button>
       </form>
-      <Link to="/login" className="auth-link">{t('auth.backToLogin')}</Link>
+      <Link to="/login" className="text-link auth-switch">{t('auth.backToLogin')}</Link>
     </AuthFrame>
   )
 }

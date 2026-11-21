@@ -5,8 +5,9 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { CaretRight, ArrowClockwise } from '@phosphor-icons/react'
 import { AuthFrame, AuthField } from '../components/auth/AuthFrame'
+import { describedBy } from '../components/auth/describedBy'
+import { Icon } from '../components/atelier/Icon'
 import { authService } from '../services'
 
 export default function ForgotPasswordPage() {
@@ -40,7 +41,7 @@ export default function ForgotPasswordPage() {
     }
   }
 
-  const back = <Link to="/login" className="auth-link">{t('auth.backToLogin')}</Link>
+  const back = <Link to="/login" className="text-link auth-switch">{t('auth.backToLogin')}</Link>
 
   if (sent) {
     return (
@@ -50,8 +51,8 @@ export default function ForgotPasswordPage() {
         lead={<>{t('auth.checkEmailDescBefore')} <strong>{email}</strong>{t('auth.checkEmailDescAfter')}</>}
       >
         <p className="auth-wait">{t('auth.checkEmailHint')}</p>
-        <button type="button" className="auth-btn auth-submit" onClick={() => setSent(false)}>
-          <ArrowClockwise size={17} aria-hidden="true" />{t('auth.tryAnotherEmail')}
+        <button type="button" className="btn auth-submit" onClick={() => setSent(false)}>
+          <Icon name="refresh" />{t('auth.tryAnotherEmail')}
         </button>
         {back}
       </AuthFrame>
@@ -60,7 +61,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <AuthFrame ref={titleRef} title={t('auth.forgotPasswordTitle')} lead={t('auth.forgotPasswordDesc')}>
-      <form className="auth-form" onSubmit={handleSubmit} noValidate aria-busy={loading || undefined}>
+      <form className="auth-form" id="reset-form" onSubmit={handleSubmit} noValidate aria-busy={loading || undefined}>
         <AuthField id="reset-email" label={t('common.emailAddress')} error={error}>
           <input
             ref={emailRef}
@@ -71,11 +72,11 @@ export default function ForgotPasswordPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             aria-invalid={error ? 'true' : undefined}
-            aria-describedby={error ? 'reset-email-error' : undefined}
+            aria-describedby={describedBy('reset-email', error)}
           />
         </AuthField>
-        <button type="submit" className="auth-btn is-primary auth-submit" disabled={loading}>
-          <CaretRight size={17} aria-hidden="true" />{loading ? t('auth.sending') : t('auth.sendResetLink')}
+        <button type="submit" className="btn primary auth-submit" disabled={loading}>
+          <Icon name="send" />{loading ? t('auth.sending') : t('auth.sendResetLink')}
         </button>
       </form>
       {back}

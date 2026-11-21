@@ -38,6 +38,7 @@ vi.mock('../../services/auth-methods.service', () => ({
 }))
 
 import LoginPage from '../LoginPage'
+import { findAlert } from '../../test/filledAlert'
 
 const tooMany = () => Object.assign(new Error('Too many failed attempts.'), { status: 429, retryAfter: 30 })
 
@@ -52,7 +53,7 @@ async function submitPassword() {
   fireEvent.click(screen.getByText('auth.page.submit'))
 }
 async function submitLdap() {
-  fireEvent.click(await screen.findByText('Corporate LDAP'))
+  fireEvent.click(await screen.findByText(/^Corporate LDAP · /))
   fireEvent.change(await screen.findByLabelText('auth.page.username'), { target: { value: 'alice' } })
   fireEvent.change(screen.getByLabelText('auth.page.password'), { target: { value: 'pw' } })
   fireEvent.submit(screen.getByLabelText('auth.page.password').closest('form'))
@@ -70,7 +71,7 @@ describe('LoginPage 429 banner across methods', () => {
     s.ldapLogin.mockRejectedValue(tooMany())
     renderLogin()
     await submitLdap()
-    const alert = await screen.findByRole('alert')
+    const alert = await findAlert()
     expect(alert).toHaveTextContent('auth.page.tooManyWait|30')
     expect(s.showError).not.toHaveBeenCalled()
   })
@@ -81,7 +82,7 @@ describe('LoginPage 429 banner across methods', () => {
     renderLogin()
     await typeUsername()
     await submitPassword()
-    await screen.findByRole('alert')
+    await findAlert()
     await submitLdap()
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Invalid LDAP credentials'))
     expect(screen.getByRole('alert')).not.toHaveTextContent('auth.page.tooManyWait')
@@ -93,10 +94,10 @@ describe('LoginPage 429 banner across methods', () => {
     renderLogin()
     await typeUsername()
     await submitPassword()
-    await screen.findByRole('alert')
+    await findAlert()
     await submitLdap()
     await screen.findByText('auth.twoFactorTitle')
-    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeEmptyDOMElement() // the live region stays, empty
   })
 
   async function reachKeyStep() {
@@ -111,7 +112,7 @@ describe('LoginPage 429 banner across methods', () => {
     s.login2FAWebAuthn.mockRejectedValue(tooMany())
     await reachKeyStep()
     fireEvent.click(screen.getByText('auth.twoFactorUseSecurityKey'))
-    expect(await screen.findByRole('alert')).toHaveTextContent('auth.page.tooManyWait')
+    expect(await findAlert()).toHaveTextContent('auth.page.tooManyWait')
     expect(s.showError).not.toHaveBeenCalled()
   })
 
@@ -119,10 +120,10 @@ describe('LoginPage 429 banner across methods', () => {
     s.login2FAWebAuthn.mockRejectedValueOnce(tooMany()).mockRejectedValue(Object.assign(new Error('x'), { name: 'NotAllowedError' }))
     await reachKeyStep()
     fireEvent.click(screen.getByText('auth.twoFactorUseSecurityKey'))
-    await screen.findByRole('alert')
+    await findAlert()
     fireEvent.click(screen.getByText('auth.twoFactorUseSecurityKey'))
     await waitFor(() => expect(s.showInfo).toHaveBeenCalledWith('auth.twoFactorKeyCancelled'))
-    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeEmptyDOMElement() // the live region stays, empty
   })
 
   it('shows the server 429 of a passkey sign-in, and a later ordinary failure removes it', async () => {
@@ -131,7 +132,7 @@ describe('LoginPage 429 banner across methods', () => {
     renderLogin()
     await typeUsername()
     fireEvent.click(await screen.findByText('auth.page.keyButton'))
-    expect(await screen.findByRole('alert')).toHaveTextContent('auth.page.tooManyWait')
+    expect(await findAlert()).toHaveTextContent('auth.page.tooManyWait')
     fireEvent.click(await screen.findByText('auth.page.keyButton'))
     await waitFor(() => expect(s.authenticateWebAuthn).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('no'))
@@ -144,10 +145,10 @@ describe('LoginPage 429 banner across methods', () => {
     renderLogin()
     await typeUsername()
     await submitPassword()
-    await screen.findByRole('alert')
+    await findAlert()
     fireEvent.change(screen.getByLabelText('auth.page.password'), { target: { value: 'pw' } })
     fireEvent.click(screen.getByText('auth.page.submit'))
     await screen.findByText('auth.twoFactorTitle')
-    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeEmptyDOMElement() // the live region stays, empty
   })
 })

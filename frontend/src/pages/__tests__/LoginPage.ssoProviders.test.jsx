@@ -76,14 +76,14 @@ describe('LoginPage — SSO provider loading', () => {
   it('shows the SSO button when providers load', async () => {
     services.getSsoProviders.mockResolvedValue(PROVIDERS)
     renderLogin()
-    expect(await screen.findByText('Company SSO')).toBeInTheDocument()
+    expect(await screen.findByText(/^Company SSO · /)).toBeInTheDocument()
   })
 
   it('keeps the SSO button when /auth/methods fails', async () => {
     services.getSsoProviders.mockResolvedValue(PROVIDERS)
     services.detectMethods.mockRejectedValue(networkError())
     renderLogin()
-    expect(await screen.findByText('Company SSO')).toBeInTheDocument()
+    expect(await screen.findByText(/^Company SSO · /)).toBeInTheDocument()
   })
 
   it('reloads the providers when the browser comes back online', async () => {
@@ -94,11 +94,11 @@ describe('LoginPage — SSO provider loading', () => {
 
     // Login form is shown without SSO buttons after the failed load.
     expect(await screen.findByText('auth.page.lead')).toBeInTheDocument()
-    expect(screen.queryByText('Company SSO')).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Company SSO · /)).not.toBeInTheDocument()
 
     await act(async () => { window.dispatchEvent(new Event('online')) })
 
-    expect(await screen.findByText('Company SSO')).toBeInTheDocument()
+    expect(await screen.findByText(/^Company SSO · /)).toBeInTheDocument()
     expect(services.getSsoProviders).toHaveBeenCalledTimes(2)
   })
 
@@ -112,14 +112,14 @@ describe('LoginPage — SSO provider loading', () => {
 
     await act(async () => { await vi.advanceTimersByTimeAsync(0) })
     expect(services.getSsoProviders).toHaveBeenCalledTimes(1)
-    expect(screen.queryByText('Company SSO')).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Company SSO · /)).not.toBeInTheDocument()
 
     // First retry after 2 s fails, second one after another 4 s succeeds.
     await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
     expect(services.getSsoProviders).toHaveBeenCalledTimes(2)
     await act(async () => { await vi.advanceTimersByTimeAsync(4000) })
     expect(services.getSsoProviders).toHaveBeenCalledTimes(3)
-    expect(screen.getByText('Company SSO')).toBeInTheDocument()
+    expect(screen.getByText(/^Company SSO · /)).toBeInTheDocument()
 
     // No further requests once the providers are loaded.
     await act(async () => { await vi.advanceTimersByTimeAsync(60000) })

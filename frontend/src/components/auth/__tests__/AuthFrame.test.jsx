@@ -36,9 +36,32 @@ describe('AuthFrame', () => {
     expect(screen.getByLabelText('Field')).toBeInTheDocument()
   })
 
+  it("is the mockup's authPage() tree, drawn under the .atl scope", () => {
+    const { container } = renderFrame()
+    const root = container.firstElementChild
+    expect(root).toHaveClass('atl')
+    expect(root.firstElementChild).toHaveClass('skip')
+    const app = root.querySelector(':scope > #app.auth-mode')
+    const main = app.querySelector(':scope > main.auth#main')
+    expect([...main.children].map(el => el.className)).toEqual(['auth-tools', 'auth-card', 'auth-foot'])
+    const card = main.querySelector('section.auth-card')
+    expect(card).toHaveAttribute('aria-labelledby', 'main-title')
+    expect([...card.children].slice(0, 3).map(el => el.className || el.id)).toEqual(['auth-brand', 'main-title', 'auth-lead'])
+    expect(card.querySelector('.auth-brand > strong')).toHaveTextContent('UCM')
+    expect(main.querySelector('.auth-foot > a')).toHaveClass('text-link')
+  })
+
+  it('moves the focus to the page from the skip link, the address untouched', () => {
+    renderFrame()
+    // The click is cancelled: the browser writes no #main in the address
+    expect(fireEvent.click(screen.getByText('auth.page.skipToContent'))).toBe(false)
+    expect(document.activeElement).toBe(document.getElementById('main'))
+  })
+
   it('shows a field error as text beside its field', () => {
     renderFrame({ error: 'Required.' })
-    expect(screen.getByText('Required.').closest('.auth-field-error')).toHaveAttribute('id', 'f-error')
+    expect(screen.getByText('Required.').closest('.field-error')).toHaveAttribute('id', 'err-f')
+    expect(screen.getByText('Required.').closest('.field')).toContainElement(screen.getByLabelText('Field'))
   })
 
   it('changes the language from its menu, by keyboard, and gives the focus back', () => {
@@ -59,16 +82,19 @@ describe('AuthFrame', () => {
     expect(button).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('lays the language menu out as the theme menu beside it: same panel, items and check', () => {
+  it("lays the language menu out as the mockup's theme menu: same panel, items and check", () => {
     renderFrame()
     fireEvent.click(screen.getByRole('button', { name: 'settings.language' }))
     const menu = screen.getByRole('menu', { name: 'settings.language' })
-    expect(menu).toHaveClass('shell-pop', 'ui-theme-menu')
+    expect(menu.tagName).toBe('UL')
+    expect(menu).toHaveClass('pop-menu', 'theme-menu')
+    expect(menu.parentElement).toHaveClass('pop-wrap')
+    expect(screen.getByRole('button', { name: 'settings.language' })).toHaveClass('icon-btn', 'quiet')
     const items = screen.getAllByRole('menuitemradio')
     for (const item of items) {
-      expect(item).toHaveClass('ui-pop-item')
-      expect(item.querySelector('.ui-pop-label')).not.toBeNull()
-      expect(item.querySelector('.ui-pop-check svg')).not.toBeNull()
+      expect(item.parentElement).toHaveAttribute('role', 'none')
+      expect(item.querySelector('.pop-label')).not.toBeNull()
+      expect(item.querySelector('.pop-check svg.icon')).not.toBeNull()
     }
     expect(items.map(i => i.tabIndex)).toEqual([-1, -1])
   })

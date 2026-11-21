@@ -4,9 +4,8 @@
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Warning } from '@phosphor-icons/react'
 import { AuthFrame } from '../components/auth/AuthFrame'
-import { LoadingSpinner } from '../components/LoadingSpinner'
+import { Icon } from '../components/atelier/Icon'
 import { isWebUrl, openChannel } from './settings/sso/signInTestChannel'
 
 export const LAUNCH_WAIT_MS = 30000
@@ -39,10 +38,11 @@ export default function SsoTestLaunchPage() {
 
   return (
     <AuthFrame title={t('sso.signInTest')} tools={false} footer={false}>
-      <div role="status" className={`auth-result${failed ? ' is-warn' : ''}`}>
-        {failed ? <Warning size={20} aria-hidden="true" /> : <LoadingSpinner size="sm" />}
+      {/* The mockup's notice: neutral while the provider opens, warning when it cannot */}
+      <p role="status" className={failed ? 'notice warn' : 'notice'}>
+        <Icon name={failed ? 'warning' : 'clock'} />
         <span>{failed ? t('sso.signInTestFailed') : t('sso.signInTestLaunching')}</span>
-      </div>
+      </p>
     </AuthFrame>
   )
 }

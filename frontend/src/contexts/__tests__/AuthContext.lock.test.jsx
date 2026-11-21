@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import { AuthProvider, useAuth } from '../AuthContext'
 import { authService } from '../../services/auth.service'
-import { readLock, takeJustLocked } from '../../lib/sessionLock'
+import { readLock, takeJustLocked, takeSignedOut } from '../../lib/sessionLock'
 
 vi.mock('../../services/auth.service', () => ({
   authService: { getCurrentUser: vi.fn(), login: vi.fn(), logout: vi.fn() },
@@ -26,6 +26,7 @@ describe('AuthContext lock', () => {
     vi.clearAllMocks()
     sessionStorage.clear()
     takeJustLocked()
+    takeSignedOut()
     authService.getCurrentUser.mockResolvedValue({
       data: { authenticated: true, user: { username: 'alice', full_name: 'Alice Martin', role: 'operator' }, permissions: ['read:certificates'], auth_method: 'password' },
     })
@@ -65,5 +66,16 @@ describe('AuthContext lock', () => {
     await act(async () => { await auth.logout() })
     expect(readLock()).toBeNull()
     expect(takeJustLocked()).toBe(false)
+  })
+
+  it('tells the sign-in page of a sign-out, once, and of no lock', async () => {
+    authService.logout.mockResolvedValue({})
+    render(<AuthProvider><Probe /></AuthProvider>)
+    await waitFor(() => expect(screen.getByTestId('state').textContent).toBe('true|alice|1'))
+    act(() => { auth.lock() })
+    expect(takeSignedOut()).toBe(false)
+    await act(async () => { await auth.logout() })
+    expect(takeSignedOut()).toBe(true)
+    expect(takeSignedOut()).toBe(false)
   })
 })

@@ -52,7 +52,7 @@ test.describe('sign-in card at 1600 px', () => {
     await page.context().clearCookies()
     await page.goto('/login')
     await expect(page.getByRole('region', { name: 'Sign in', exact: true })).toBeVisible()
-    const durations = await page.evaluate(() => ['#login-user', '#login-pass', '.auth-submit', '.auth-password .auth-icon-btn', '.auth-foot a', '.auth-tools .shell-icon-btn']
+    const durations = await page.evaluate(() => ['#login-user', '#login-pass', '.auth-submit', '#login-reveal', '.auth-foot a', '.auth-tools .shell-icon-btn']
       .map(s => getComputedStyle(document.querySelector(s) as Element).transitionDuration))
     expect(durations).toEqual(['0s', '0s', '0s', '0s', '0s', '0s'])
   })
@@ -95,7 +95,7 @@ test.describe('sign-in card at phone width', () => {
   test('the theme and language menus open 8 px under their button, never over it', async ({ page }) => {
     await page.context().clearCookies()
     await page.goto('/login')
-    for (const [name, menu] of [[/^Theme: /, '#shell-theme-menu'], ['Language', '#auth-language-menu']] as const) {
+    for (const [name, menu] of [[/^Theme: /, '#shell-theme-menu'], ['Language', '#language-menu']] as const) {
       const button = page.getByRole('button', { name, exact: true })
       const b = await box(button)
       await button.click()

@@ -663,7 +663,8 @@
       "canRetry": "现在可以重试。",
       "lockedAnnounce": "会话已过期：屏幕已锁定，当前页面已保留。",
       "signedIn": "已登录：{{name}}，{{role}}。",
-      "signedInNoRole": "已登录：{{name}}。"
+      "signedInNoRole": "已登录：{{name}}。",
+      "signedOut": "您已退出登录。您的显示偏好已保留。"
     }
   },
   "dashboard": {
@@ -4336,6 +4337,7 @@
     "disableTwoFactor": "禁用双因素认证",
     "enableTwoFactor": "启用双因素认证",
     "scanQRCode": "1. 使用身份验证器应用扫描此二维码：",
+    "qrCodeAlt": "身份验证器密钥的二维码",
     "enterDigitCode": "2. 输入 6 位代码：",
     "backupCodes": "备份验证码 - 请保存！",
     "verifyAndEnable": "验证并启用",
