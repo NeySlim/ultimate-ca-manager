@@ -68,6 +68,7 @@ describe('a module list sorted and paged in memory', () => {
     act(() => result.current.pagination.onPage(2))
     expect(result.current.rows.map((r) => r.id)).toEqual([26, 27, 28, 29, 30])
     expect([result.current.start, result.current.end, result.current.total]).toEqual([26, 30, 30])
+    expect(result.current.counts(40)).toEqual({ shown: '26–30', count: 30 })
     act(() => result.current.onSort('size'))
     expect(result.current.sort).toEqual({ key: 'size', asc: true })
     expect(result.current.pagination.page).toBe(1)
@@ -105,6 +106,7 @@ describe('a module list sorted and paged in memory', () => {
     expect(result.current.paged).toBe(false)
     expect(result.current.pagination).toBeUndefined()
     expect(result.current.rows).toHaveLength(8)
+    expect(result.current.counts(30)).toEqual({ shown: 8, count: 30 })
   })
   it('stays on the last page when rows leave it', () => {
     const { result, rerender } = renderHook(({ list }) => useClientList(list, { sorts, perPage: 10 }), { initialProps: { list: items } })

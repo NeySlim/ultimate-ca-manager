@@ -26,7 +26,7 @@ export function compareValues(a, b, asc, collator) {
  * @param {{key, asc}|null} [o.initial]  null keeps the API's order until a header is clicked
  * @param {number} [o.perPage]
  * @param {string} [o.resetKey]  the filters: a change goes back to page one
- * @returns {{ rows, sort, onSort, total, start, end, paged, pagination }}  pagination only past the smallest page size
+ * @returns {{ rows, sort, onSort, total, start, end, paged, pagination, counts }}  pagination only past the smallest page size
  */
 export function useClientList(rows, { sorts = {}, initial = null, perPage: firstPerPage = 25, sizes = PAGE_SIZES, resetKey = '' } = {}) {
   const { i18n } = useTranslation()
@@ -58,6 +58,8 @@ export function useClientList(rows, { sorts = {}, initial = null, perPage: first
     start: total ? (paged ? (current - 1) * perPage + 1 : 1) : 0,
     end: paged ? Math.min(current * perPage, total) : total,
     paged,
+    // The arguments of a module's « {{shown}} of {{count}} » range: « 1–25 of 30 » once paged, « 12 of 139 » before
+    counts: (all) => (paged ? { shown: `${(current - 1) * perPage + 1}–${Math.min(current * perPage, total)}`, count: total } : { shown: total, count: all ?? total }),
     pagination: paged ? {
       page: current, pages, perPage, sizes,
       onPage: setPage,

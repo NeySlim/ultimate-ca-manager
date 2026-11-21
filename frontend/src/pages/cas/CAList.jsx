@@ -1,28 +1,29 @@
 /**
  * CAs page: the flat list of the authorities, in the mockup's module table (`listView()`): name with
- * its chips, type, state, parent, certificates, expiry, algorithm; sorted on the page, one action per
- * row and the chevron that shows the authority beside the list. On a phone each one is a record.
+ * its chips, type, state, parent, certificates, expiry, algorithm; sorted and paged on the page, one
+ * action per row and the chevron that shows the authority beside the list. On a phone each one is a record.
  */
-import { useMemo, useState } from 'react'
-import { DataTable } from '../../components/atelier'
+import { useMemo } from 'react'
+import { DataTable, TableFooter, useClientList } from '../../components/atelier'
 import { formatDate } from '../../lib/utils'
 import { caState, nameOfCA } from './caTree'
 import { CAStatePill, CAMarks } from './CAState'
 
 const STATE_ORDER = { active: 0, expiring: 1, pending: 2, expired: 3, revoked: 4 }
 const SORTERS = {
-  name: (r) => r.label.toLowerCase(),
+  name: (r) => r.label,
   type: (r) => r.type_label,
   state: (r) => STATE_ORDER[r.state],
-  parent: (r) => r.parent_name.toLowerCase(),
+  parent: (r) => r.parent_name,
   certs: (r) => r.certs,
-  expiry: (r) => (r.valid_to ? Date.parse(r.valid_to) : Infinity),
+  expiry: (r) => (r.valid_to ? Date.parse(r.valid_to) : null),
   algorithm: (r) => r.algorithm,
 }
+const BY_NAME = { key: 'name', asc: true }
 
-export function CAList({ cas, allCAs, selectedId, onSelect, onDownload, empty, t }) {
-  const [sort, setSort] = useState({ key: 'name', asc: true })
-  const rows = useMemo(() => {
+/** resetKey: the search and the view, whose change goes back to page one. */
+export function CAList({ cas, allCAs, selectedId, onSelect, onDownload, empty, resetKey, t }) {
+  const all = useMemo(() => {
     const byId = new Map((allCAs || cas).map((ca) => [ca.id, ca]))
     const list = cas.map((ca) => ({
       ...ca,
@@ -34,14 +35,10 @@ export function CAList({ cas, allCAs, selectedId, onSelect, onDownload, empty, t
       certs: ca.certs || 0,
       algorithm: ca.key_type || ca.key_algorithm || '',
     }))
-    const key = SORTERS[sort.key]
-    return list.sort((a, b) => {
-      const x = key(a)
-      const y = key(b)
-      const order = x < y ? -1 : x > y ? 1 : a.id - b.id
-      return sort.asc ? order : -order
-    })
-  }, [cas, allCAs, sort, t])
+    // Equal values keep the order of the ids, as before the sort
+    return list.sort((a, b) => a.id - b.id)
+  }, [cas, allCAs, t])
+  const list = useClientList(all, { sorts: SORTERS, initial: BY_NAME, resetKey })
 
   const columns = [
     { id: 'name', label: t('common.name'), sort: 'name', entity: true, grow: true, title: (r) => r.subject || r.label,
@@ -63,13 +60,13 @@ export function CAList({ cas, allCAs, selectedId, onSelect, onDownload, empty, t
       label={t('common.cas')}
       caption={t('common.cas')}
       columns={columns}
-      rows={rows}
+      rows={list.rows}
       rowLabel={(r) => r.label}
       onOpen={onSelect}
       openLabel={(r) => t('cas.side.show', { name: r.label })}
       openedId={selectedId}
-      sort={sort}
-      onSort={(key) => setSort((s) => ({ key, asc: s.key === key ? !s.asc : true }))}
+      sort={list.sort}
+      onSort={list.onSort}
       rowActions={(r) => (r.state === 'pending' ? [] : [{ icon: 'download', label: t('cas.downloadCertificate'), onClick: () => onDownload?.(r) }])}
       card={(r) => ({
         meta: [r.type_label, r.parent_name, t('cas.certificateCount', { count: r.certs }), r.algorithm,
@@ -78,6 +75,7 @@ export function CAList({ cas, allCAs, selectedId, onSelect, onDownload, empty, t
         end: r.valid_to && r.state !== 'pending' ? formatDate(r.valid_to, { time: false }) : undefined,
       })}
       empty={empty}
+      footer={list.total > 0 && <TableFooter range={t('cas.range', { start: list.start, end: list.end, count: list.total })} pagination={list.pagination} />}
     />
   )
 }

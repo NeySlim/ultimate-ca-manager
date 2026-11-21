@@ -9,7 +9,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Zone, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody,
-  Section, Props, RecordList, RecordRow, LoadError, LoadCause, EmptyBlock, NoMatch,
+  Section, Props, RecordList, RecordRow, LoadError, LoadCause, EmptyBlock, NoMatch, useClientList,
 } from '../components/atelier'
 import { CRLDeploySection } from '../components/CRLDeploySection'
 import { casService, crlService } from '../services'
@@ -333,6 +333,13 @@ export default function CRLOCSPPage() {
   const present = STATE_ORDER.filter((s) => rows.some((r) => stateOf(r) === s))
   const active = present.includes(state) ? state : ''
   const shown = searched.filter((r) => !active || stateOf(r) === active)
+  const list = useClientList(shown, {
+    resetKey: `${query}|${active}`,
+    sorts: {
+      name, number: (r) => (r.has_crl ? r.crl_number : null), published: (r) => r.crl_updated && Date.parse(r.crl_updated),
+      next: (r) => r.crl_next_update && Date.parse(r.crl_next_update), ocsp: (r) => (r.ocsp_enabled ? 0 : 1), state: (r) => STATE_ORDER.indexOf(stateOf(r)),
+    },
+  })
   const views = [
     { id: '', label: t('common.all'), count: searched.length },
     ...present.map((s) => ({ id: s, label: t(`crlOcsp.states.${s}`), count: searched.filter((r) => stateOf(r) === s).length })),
@@ -578,7 +585,7 @@ export default function CRLOCSPPage() {
   return (
     <Zone dock={dock}>
       <PageHead title={t('shell.moduleLabel.crlOcsp')} total={t('crlOcsp.unit', { count: rows.length })} intent={t('shell.moduleDesc.crlOcsp')} />
-      <ListView label={t('shell.moduleLabel.crlOcsp')} caption={t('crlOcsp.caption')} icon="crl" rows={shown} loading={loading}
+      <ListView label={t('shell.moduleLabel.crlOcsp')} caption={t('crlOcsp.caption')} icon="crl" list={list} loading={loading} nameSort="name"
         filters={{ views, active, onChange: setState, label: t('crlOcsp.filterByState'), aside }}
         toolbar={(
           <Toolbar>
@@ -588,11 +595,11 @@ export default function CRLOCSPPage() {
         )}
         title={name} status={pill} openedId={openId} onOpen={openCa}
         columns={[
-          { id: 'number', label: 'CRL', cell: number, grow: true },
-          { id: 'published', label: t('crlOcsp.columns.published'), cell: published },
-          { id: 'next', label: t('crlOcsp.nextUpdate'), cell: next },
-          { id: 'ocsp', label: 'OCSP', cell: ocsp },
-          { status: true },
+          { id: 'number', label: 'CRL', cell: number, grow: true, sort: 'number' },
+          { id: 'published', label: t('crlOcsp.columns.published'), cell: published, sort: 'published' },
+          { id: 'next', label: t('crlOcsp.nextUpdate'), cell: next, sort: 'next' },
+          { id: 'ocsp', label: 'OCSP', cell: ocsp, sort: 'ocsp' },
+          { status: true, sort: 'state' },
         ]}
         error={loadError && (
           <LoadError id="crl" journal={auditPath} title={t('messages.errors.loadFailed.crl')} onRetry={() => { setLoading(true); loadData() }}
@@ -604,7 +611,7 @@ export default function CRLOCSPPage() {
           <EmptyBlock id="crl" icon="crl" title={t('crlOcsp.emptyTitle')} text={t('crlOcsp.emptyText')}
             action={canWrite('cas') ? { label: t('crlOcsp.createCa'), icon: 'plus', to: '/cas' } : undefined} />
         )}
-        footer={{ range: t('crlOcsp.range', { shown: shown.length, count: rows.length }) }} />
+        footer={{ range: t('crlOcsp.range', list.counts(rows.length)) }} />
     </Zone>
   )
 }
