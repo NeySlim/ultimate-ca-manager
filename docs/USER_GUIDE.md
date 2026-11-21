@@ -235,12 +235,12 @@ The PDF templates, the executive report among them, download the same way, **Bui
 
 Open **Modules** > **Governance** > **Certificate Discovery**. It scans your network for TLS certificates and matches them against the inventory.
 
-1. In **Scan Profiles**, create a scan profile with targets (hosts, IPs, CIDR subnets), ports and a schedule
-2. Run it manually or let it run on schedule
-3. Review **Discovered**: each certificate is Managed, Unmanaged or in Error, and a changed certificate is flagged
-4. **History** lists past runs
+1. The page opens on the analyses: **New analysis…** creates one with its range (hosts, IPs, IPv4 ranges), ports and a schedule
+2. Run it with **Analyse now** in its dock or let it run on schedule
+3. Review **Found certificates**: each certificate is In UCM, Unknown to UCM or In error, and a changed certificate is flagged
+4. **Run history** lists past runs
 
-**Quick Scan** scans targets without saving a profile. Running scans and managing profiles requires administrator rights.
+**Quick scan…** scans targets without saving an analysis. A DNS wildcard, an IPv6 range and an IPv4 range of more than 65,536 hosts are refused. Running scans and managing analyses requires administrator rights.
 
 ---
 

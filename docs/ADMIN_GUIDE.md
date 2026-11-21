@@ -916,10 +916,10 @@ EST (RFC 7030) is configured under **Modules** > **Protocols** > **EST**:
 
 Configure certificate discovery under **Modules** > **Governance** > **Certificate Discovery**:
 
-1. **Scan Profiles**: Create profiles with target hosts/CIDR ranges, port lists, and scan options
+1. **Analyses**: Create scan profiles (the page's analyses) with target hosts and IPv4 ranges, port lists, and scan options
 2. **Scheduling**: Enable scheduled scans with configurable intervals
-3. **Results**: View discovered certificates, filter by status, expiry, issuer
-4. **Quick Scan**: One-off scans without creating a profile
+3. **Found certificates**: View discovered certificates, filter by state, analysis or search
+4. **Quick scan…**: One-off scans without creating an analysis
 5. **SNI support**: Enable SNI for virtual host scanning
 
 ### Windows Autoenrollment (XCEP/WSTEP): Kerberos/SPNEGO
