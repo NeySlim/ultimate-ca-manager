@@ -2020,12 +2020,12 @@ Click **Test** to send a test email and verify the configuration.
 
 ### Email Template Editor
 
-Click **Edit Template** to open the split-pane template editor in a floating window:
-- **HTML tab**: Edit the HTML email template with live preview on the right
-- **Plain Text tab**: Edit the plain text version for email clients that don't support HTML
-- Available variables: \`{{title}}\`, \`{{content}}\`, \`{{datetime}}\`, \`{{instance_url}}\`, \`{{logo}}\`, \`{{title_color}}\`
-- Click **Reset to Default** to restore the built-in UCM-branded template
-- The window is resizable and draggable for comfortable editing
+Click **Edit Template** to open the template editor, a wide dialog with the source beside its live preview (on a wide screen only):
+- **HTML**: Edit the HTML email template; the preview on the right follows as you type
+- **Plain Text**: Edit the plain text version for email clients that don't support HTML
+- The variables of the chosen format are listed above the source: \`{{title}}\`, \`{{content}}\`, \`{{datetime}}\`, \`{{instance_url}}\`, plus \`{{logo}}\` and \`{{title_color}}\` in HTML
+- **Reset to Default**, shown for a custom template, restores the built-in UCM-branded template after a confirmation
+- **Save** keeps both versions; **Close** or Escape leaves without saving
 
 ### Expiry Alerts
 

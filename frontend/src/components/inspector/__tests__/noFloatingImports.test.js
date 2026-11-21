@@ -1,7 +1,6 @@
 /**
  * The pre-Atelier interface and the shell's inspector are gone: their files must not
- * exist and nothing may import them. ui/FloatingWindow and useFloatingWindow are not in that set:
- * the help panel and the email template editor still use them.
+ * exist and nothing may import them. The floating windows went last (help, email template).
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
@@ -23,6 +22,11 @@ const LEGACY = {
   'components/inspector/placement.js': /\/inspector\/placement['"]/,
   'components/inspector/certificate/CertificateDetail.jsx': /\/inspector\/certificate\//,
   'components/detail/CertificatePanel.jsx': /\/detail\/|\bCertificatePanel\b|\bTrustCertPanel\b/,
+  // The old shell's floating windows: the help and the email template editor are the mockup's dialogs
+  'components/ui/FloatingWindow.jsx': /\bFloatingWindow\b|\/FloatingWindow['"]/,
+  'hooks/useFloatingWindow.js': /\buseFloatingWindow\b/,
+  'components/ui/FloatingHelpPanel.jsx': /\bFloatingHelpPanel\b/,
+  'components/EmailTemplateWindow.jsx': /\bEmailTemplateWindow\b/,
 }
 
 function sources(dir, out = []) {
@@ -98,20 +102,4 @@ describe('legacy interface', () => {
       .map(([rel]) => rel)
     expect(users).toEqual([])
   })
-
-  const live = liveModules(files, [])
-  const importersOf = (target) => {
-    const name = target.split('/').pop().replace(/\.jsx?$/, '')
-    return files
-      .filter(([rel]) => rel !== target)
-      .filter(([, text]) => importStatements(text).some((st) => new RegExp(`/${name}['"]`).test(st)))
-      .map(([rel]) => rel)
-  }
-
-  it.each(['ui/FloatingWindow.jsx', 'hooks/useFloatingWindow.js'])(
-    'keeps %s out of the legacy set while a live module imports it', (shared) => {
-      const users = importersOf(`${shared.startsWith('ui/') ? 'components/' : ''}${shared}`)
-      expect(users.some((u) => live.has(u))).toBe(true)
-      expect(Object.keys(LEGACY)).not.toContain(shared)
-    })
 })

@@ -493,7 +493,8 @@
       "users": "Користувачі",
       "templates": "Шаблони",
       "csrs": "CSR"
-    }
+    },
+    "pageHelp": "Help for this page"
   },
   "operations": {
     "title": "Операції",
@@ -4539,7 +4540,10 @@
       "mtls": "mTLS modified",
       "ct": "Certificate Transparency modified",
       "ctDetail": "CT settings saved."
-    }
+    },
+    "templateHtmlSource": "HTML source",
+    "templateFormat": "Template format",
+    "templateVariablesLead": "Variables: "
   },
   "account": {
     "profile": "Профіль",
@@ -5145,7 +5149,15 @@
     "quickHelp": "Швидка допомога",
     "guide": "Посібник",
     "guideComingSoon": "Детальний посібник незабаром.",
-    "tableOfContents": "Зміст"
+    "tableOfContents": "Зміст",
+    "back": "Back to the console",
+    "views": "Help view",
+    "searchLabel": "Search the guide",
+    "searchPlaceholder": "Word, section…",
+    "noMatch": "No section of the guide contains this text.",
+    "overview": "Overview",
+    "term": "{{term}}: ",
+    "contentsLead": "Contents: "
   },
   "time": {
     "today": "Сьогодні",

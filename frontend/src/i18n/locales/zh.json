@@ -491,7 +491,8 @@
       "users": "用户",
       "templates": "模板",
       "csrs": "CSR"
-    }
+    },
+    "pageHelp": "Help for this page"
   },
   "operations": {
     "title": "操作",
@@ -4385,7 +4386,10 @@
       "mtls": "mTLS 已修改",
       "ct": "证书透明度已修改",
       "ctDetail": "CT 设置已保存。"
-    }
+    },
+    "templateHtmlSource": "HTML source",
+    "templateFormat": "Template format",
+    "templateVariablesLead": "Variables: "
   },
   "account": {
     "profile": "个人资料",
@@ -4981,7 +4985,15 @@
     "quickHelp": "快速帮助",
     "guide": "指南",
     "guideComingSoon": "详细指南即将推出。",
-    "tableOfContents": "目录"
+    "tableOfContents": "目录",
+    "back": "Back to the console",
+    "views": "Help view",
+    "searchLabel": "Search the guide",
+    "searchPlaceholder": "Word, section…",
+    "noMatch": "No section of the guide contains this text.",
+    "overview": "Overview",
+    "term": "{{term}}: ",
+    "contentsLead": "Contents: "
   },
   "time": {
     "today": "今天",

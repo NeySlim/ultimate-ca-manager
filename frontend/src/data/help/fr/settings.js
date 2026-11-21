@@ -255,12 +255,12 @@ Cliquez sur **Tester** pour envoyer un e-mail de test et vérifier la configurat
 
 ### Éditeur de modèle d’e-mail
 
-Cliquez sur **Modifier le modèle** pour ouvrir l’éditeur de modèle en panneau divisé dans une fenêtre flottante :
-- **Onglet HTML** : Modifiez le modèle d’e-mail HTML avec aperçu en direct à droite
-- **Onglet Texte brut** : Modifiez la version texte brut pour les clients e-mail qui ne prennent pas en charge HTML
-- Variables disponibles : \`{{title}}\`, \`{{content}}\`, \`{{datetime}}\`, \`{{instance_url}}\`, \`{{logo}}\`, \`{{title_color}}\`
-- Cliquez sur **Rétablir les valeurs par défaut** pour restaurer le modèle UCM intégré
-- La fenêtre est redimensionnable et déplaçable pour un édition confortable
+Cliquez sur **Modifier le modèle** pour ouvrir l’éditeur de modèle, un dialogue large où la source est à côté de son aperçu en direct (sur un écran large seulement) :
+- **HTML** : modifiez le modèle d’e-mail HTML ; l’aperçu à droite suit la saisie
+- **Texte brut** : modifiez la version texte brut pour les clients e-mail qui ne prennent pas en charge HTML
+- Les variables du format choisi sont listées au-dessus de la source : \`{{title}}\`, \`{{content}}\`, \`{{datetime}}\`, \`{{instance_url}}\`, et \`{{logo}}\` et \`{{title_color}}\` en HTML
+- **Réinitialiser**, présent pour un modèle personnalisé, restaure le modèle UCM intégré après confirmation
+- **Enregistrer** garde les deux versions ; **Fermer** ou Échap quitte sans enregistrer
 
 ### Alertes d’expiration
 

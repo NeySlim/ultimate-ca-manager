@@ -33,21 +33,20 @@ vi.mock('../../CommandPalette', async () => {
   const actual = await vi.importActual('../../CommandPalette')
   return {
     ...actual,
-    CommandPalette: ({ open, onOpenChange, can }) => (
+    CommandPalette: ({ open, onOpenChange, can, onOpenHelp }) => (
       <div data-testid="palette" data-open={String(open)} data-read-logs={String(!!can?.isAdmin())}
         data-write-certs={String(!!can?.hasPermission('write:certificates'))}>
         {open && <button type="button" onClick={() => onOpenChange(false)}>close palette</button>}
+        {open && onOpenHelp && <button type="button" onClick={() => { onOpenChange(false); onOpenHelp() }}>palette help</button>}
       </div>
     ),
   }
 })
-vi.mock('../../ui/FloatingHelpPanel', () => ({
-  FloatingHelpPanel: ({ isOpen, pageKey }) => <div data-testid="help" data-open={String(isOpen)} data-key={pageKey} />,
-}))
 vi.mock('../../UpdatePopup', () => ({ UpdatePopup: () => <div data-testid="update-popup" /> }))
 vi.mock('../../KofiSupportCard', () => ({ KofiSupportCard: () => <div data-testid="kofi" /> }))
 
 import { AppShell } from '../../AppShell'
+import { helpContent } from '../../../data/helpContent'
 import { Zone } from '../../atelier/Zone'
 import { resetHealthForTests } from '../health'
 import { InspectorProvider, useInspector } from '../../../contexts/InspectorContext'
@@ -167,12 +166,12 @@ describe('AppShell', () => {
 
   it('keeps the overlays mounted', () => {
     setup('/certificates')
-    for (const id of ['palette', 'help', 'update-popup', 'kofi']) expect(screen.getByTestId(id)).toBeInTheDocument()
+    for (const id of ['palette', 'update-popup', 'kofi']) expect(screen.getByTestId(id)).toBeInTheDocument()
   })
 
   it.each(['/', '/dashboard'])('leaves the support message to the overview on %s: nothing floats over its cards', (path) => {
     setup(path)
-    for (const id of ['palette', 'help', 'update-popup']) expect(screen.getByTestId(id)).toBeInTheDocument()
+    for (const id of ['palette', 'update-popup']) expect(screen.getByTestId(id)).toBeInTheDocument()
     expect(screen.queryByTestId('kofi')).toBeNull()
   })
 
@@ -201,19 +200,42 @@ describe('AppShell', () => {
     expect(screen.getByTestId('palette')).toHaveAttribute('data-open', 'true')
   })
 
-  it('opens the help of the current page with ? and from the help button', async () => {
+  // The mockup's help(): its wide modal() with the sections in a .help-grid, not a floating window
+  const helpDialog = () => screen.queryByTestId('help-dialog')
+  it('opens the help of the current page in the wide dialog with ?, closes it with ? and Back to the console', async () => {
     const user = setup('/certificates')
+    expect(helpDialog()).toBeNull()
     await user.keyboard('?')
-    expect(screen.getByTestId('help')).toHaveAttribute('data-open', 'true')
-    expect(screen.getByTestId('help')).toHaveAttribute('data-key', 'certificates')
+    const dialog = helpDialog()
+    expect(dialog.tagName).toBe('DIALOG')
+    expect(dialog).toHaveClass('wide')
+    expect(within(dialog).getByRole('heading', { level: 2 })).toHaveTextContent(helpContent.certificates.title)
+    expect(dialog.querySelector('.help-grid section h3')).toBeTruthy()
+    expect(document.querySelector('.fixed')).toBeNull()
+    await user.keyboard('?')
+    expect(helpDialog()).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'common.help' }))
+    await user.click(within(helpDialog()).getByRole('button', { name: 'help.back' }))
+    expect(helpDialog()).toBeNull()
   })
 
   it('opens the navigation help from the Modules menu, then returns to the page help', async () => {
     const user = setup('/certificates')
     await user.click(screen.getByRole('button', { name: /shell\.modules$/ }))
     await user.click(screen.getByRole('button', { name: /shell\.navHelp/ }))
-    expect(screen.getByTestId('help')).toHaveAttribute('data-key', 'navigation')
-    expect(screen.getByTestId('help')).toHaveAttribute('data-open', 'true')
+    expect(within(helpDialog()).getByRole('heading', { level: 2 })).toHaveTextContent(helpContent.navigation.title)
+    await user.keyboard('?')
+    expect(helpDialog()).toBeNull()
+    await user.keyboard('?')
+    expect(within(helpDialog()).getByRole('heading', { level: 2 })).toHaveTextContent(helpContent.certificates.title)
+  })
+
+  it('opens the help of the page from the palette, the way to it on a phone', async () => {
+    const user = setup('/certificates')
+    await user.click(screen.getByRole('button', { name: 'shell.search' }))
+    await user.click(screen.getByRole('button', { name: 'palette help' }))
+    expect(screen.getByTestId('palette')).toHaveAttribute('data-open', 'false')
+    expect(within(helpDialog()).getByRole('heading', { level: 2 })).toHaveTextContent(helpContent.certificates.title)
   })
 
   it('marks the module of the URL current in the bar', () => {
