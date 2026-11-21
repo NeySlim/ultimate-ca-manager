@@ -221,17 +221,12 @@ export default function CertificatesPage() {
     }
   }, [addToHistory, openEntity])
 
-  // Deep link: the detail is read by id, even when the row is filtered out
+  // The deep link /certificates/:id becomes the dock's ?item=, which a reload keeps; the inspector reads it by id
   useEffect(() => {
-    if (urlCertId && !loading) {
-      const id = parseInt(urlCertId, 10)
-      if (!isNaN(id)) {
-        openEntity('certificate', id)
-        navigate('/certificates', { replace: true })
-      }
-    }
+    if (!urlCertId) return
+    navigate(/^\d+$/.test(urlCertId) ? `/certificates?item=${urlCertId}` : '/certificates', { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlCertId, loading])
+  }, [urlCertId])
 
   // Orphans: a certificate whose CA is gone
   const rows = useMemo(() => {

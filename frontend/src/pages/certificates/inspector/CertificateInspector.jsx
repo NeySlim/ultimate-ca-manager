@@ -5,10 +5,13 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { pageOf } from '../../../lib/pageOf'
 import { Dock } from '../../../components/atelier'
+import { useDockParam, asId } from '../../../components/atelier/useDockParam'
 import { useInspector } from '../../../contexts'
 import { CertificateBody } from './CertificateBody'
+import { SECTIONS } from './certificateSections'
 
 // The certificate rows carry their id in data-open: its tab takes that key, so the focus finds the row back
 const tabKey = (o) => String(o.entityId)
@@ -16,15 +19,29 @@ const tabKey = (o) => String(o.entityId)
 export function CertificateInspector() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { opened = [], activeKey, setActiveKey, closeEntity, closeAll, height, width, position, setGeometry, collapsed, setCollapsed } = useInspector()
+  const { opened = [], activeKey, setActiveKey, openEntity, closeEntity, closeAll, height, width, position, setGeometry, collapsed, setCollapsed } = useInspector()
   const [titles, setTitles] = useState({})
-  const [section, setSection] = useState('overview')
-  const count = useRef(opened.length)
-  // A certificate newly opened starts on Aperçu, as the mockup's openCert()
+  // The active certificate and its section live in the URL (`item`, `section`), as every dock's object
+  const { item, section, setSection, open: openInUrl, close: closeInUrl } = useDockParam({ sections: SECTIONS })
+  const active = opened.find((o) => o.key === activeKey) || opened[0]
+  const activeId = active ? String(active.entityId) : null
+  // Whichever moved last leads: the URL (a link, a reload, Back) or the inspector (a row, a tab, a close)
+  const seen = useRef({ item: undefined, activeId: undefined, count: 0 })
+  const here = pageOf(useLocation().pathname) === '/certificates'
   useEffect(() => {
-    if (opened.length > count.current) setSection('overview')
-    count.current = opened.length
-  }, [opened.length])
+    const prev = seen.current
+    seen.current = { item, activeId, count: opened.length }
+    // Another page's URL (the Trust Store an action leads to) says nothing of this dock
+    if (!here || item === activeId) return
+    if (item !== prev.item && (prev.item !== undefined || item != null)) {
+      const tab = opened.find((o) => String(o.entityId) === item)
+      if (item == null) closeAll()
+      else if (tab) setActiveKey(tab.key)
+      else openEntity('certificate', asId(item))
+    } else if (activeId == null) closeInUrl()
+    // A certificate newly opened starts on Aperçu, as the mockup's openCert(); a tab switch keeps the section
+    else openInUrl(activeId, opened.length > prev.count || prev.activeId == null ? {} : { section })
+  }, [item, activeId, here]) // eslint-disable-line react-hooks/exhaustive-deps
   const onTitle = useCallback((key, title) => setTitles((prev) => (prev[key] === title ? prev : { ...prev, [key]: title })), [])
   // An authority opens in its own zone, as the mockup's « Inspecter l'autorité » goes to the authorities
   const onOpenCa = useCallback((id) => navigate(`/cas/${id}`), [navigate])
