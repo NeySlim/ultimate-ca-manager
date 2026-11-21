@@ -88,7 +88,7 @@ The default view. Each root that heads a hierarchy is drawn with its sub-authori
 Beside the tree (under it on a phone) the selected CA shows its identity, its key, what it issued and its revocation: issuer, sub-authorities and cross-certificates are links that select them, the CRL gives its number, its publication and its next update (with a warning a day ahead), and the OCSP responder reads active or inactive. **View certificates** opens the certificate list on this CA, **Issue with this CA** opens the issue form on it (disabled, with the reason, when the CA cannot sign), **Download the chain** downloads its PEM chain, and **Other actions** holds export, CSR, revocation, taking offline, restore, template pins and deletion. The other details (constraints, extensions, fingerprints, PEM, metadata) are folded below. A CA opened from another page opens here.
 
 ### List View
-Flat table with sortable columns, beside the side panel. A row carries one action (download the certificate) and a chevron that shows the CA in the panel. On a phone each CA is a card with the same facts and its chevron; a tap anywhere on it shows the CA.
+Flat table with sortable columns, beside the side panel, 25 authorities a page (10, 50 or 100 on choice). A row carries one action (download the certificate) and a chevron that shows the CA in the panel. On a phone each CA is a card with the same facts and its chevron; a tap anywhere on it shows the CA.
 
 ## Creating a CA
 

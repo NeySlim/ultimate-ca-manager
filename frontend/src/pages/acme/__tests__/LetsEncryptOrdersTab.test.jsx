@@ -37,6 +37,31 @@ describe('LetsEncryptOrdersTab', () => {
     expect(document.querySelector('footer.table-footer')).toHaveTextContent('acme.clientOrdersRange')
   })
 
+  it('sorts every column and pages a long list by 25, back to page one on a chip', () => {
+    const many = Array.from({ length: 40 }, (_, i) => ({ id: 10 + i, primary_domain: `h${String(i).padStart(2, '0')}.example.com`, status: i % 4 ? 'valid' : 'invalid',
+      environment: 'production', challenge_type: 'http-01', created_at: `2026-0${1 + (i % 9)}-01T00:00:00Z`, renewal_failures: i === 7 ? 3 : 0 }))
+    const { container } = renderTab({ clientOrders: many })
+    const footer = container.querySelector('footer.table-footer')
+    const bodyRows = () => container.querySelectorAll('tbody tr')
+    expect(bodyRows()).toHaveLength(25)
+    expect(footer).toHaveTextContent('1 / 2')
+    fireEvent.click(within(footer).getByRole('button', { name: 'table.nextPage' }))
+    expect(bodyRows()).toHaveLength(15)
+    fireEvent.click(container.querySelector('[data-status="valid"]'))
+    expect(footer).toHaveTextContent('1 / 2')
+    fireEvent.click(within(screen.getByRole('group', { name: 'acme.filterByState' })).getAllByRole('button')[0])
+    fireEvent.click(screen.getByRole('button', { name: 'acme.renewalFailuresLabel' }))
+    fireEvent.click(screen.getByRole('button', { name: 'acme.renewalFailuresLabel' }))
+    expect(bodyRows()[0]).toHaveTextContent('h07.example.com')
+    fireEvent.click(screen.getByRole('button', { name: 'atelier.name' }))
+    fireEvent.click(screen.getByRole('button', { name: 'atelier.name' }))
+    expect(bodyRows()[0]).toHaveTextContent('h39.example.com')
+    for (const name of ['acme.accountOrCa', 'acme.environment', 'acme.method', 'common.created', 'atelier.state']) {
+      fireEvent.click(screen.getByRole('button', { name }))
+      expect(screen.getByRole('columnheader', { name })).toHaveAttribute('aria-sort', 'ascending')
+    }
+  })
+
   it('filters orders by state', () => {
     renderTab()
     fireEvent.click(within(screen.getByRole('group', { name: 'acme.filterByState' })).getByRole('button', { name: /valid/i }))

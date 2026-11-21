@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Input, Modal, Textarea, ToggleSwitch } from '../../components/atelier/Form'
-import { Btn, Icon, IconBtn, Pill, ListView, Dock, DockBody, Section, Props, EmptyBlock, NoMatch } from '../../components/atelier'
+import { Btn, Icon, IconBtn, Pill, ListView, Dock, DockBody, Section, Props, EmptyBlock, NoMatch, Toolbar, SearchField, useClientList } from '../../components/atelier'
 import { useDockId } from '../../components/atelier/useDockParam'
 import { SlotDock } from '../protocols/dockSlot'
 import { Copyable } from '../protocols/atelierParts'
@@ -41,6 +41,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
 
   const [eabCredentials, setEabCredentials] = useState([])
   const [eabFilterStatus, setEabFilterStatus] = useState('')
+  const [eabQuery, setEabQuery] = useState('')
   const [showLocalCreate, setShowLocalCreate] = useState(false)
   const [newEabSecret, setNewEabSecret] = useState(null)
   const [eabLabel, setEabLabel] = useState('')
@@ -68,10 +69,17 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
       .finally(() => setLoading(false))
   }
 
+  // The search reads the label, the key id, the domains, the notes and the bound account
+  const searchedEabCredentials = useMemo(() => {
+    const q = eabQuery.trim().toLowerCase()
+    if (!q) return eabCredentials
+    return eabCredentials.filter((c) => [c.label, c.kid, (c.allowed_domains || []).join(' '), c.notes, c.used_by_account_id]
+      .some((v) => String(v || '').toLowerCase().includes(q)))
+  }, [eabCredentials, eabQuery])
   const filteredEabCredentials = useMemo(() => {
-    if (!eabFilterStatus) return eabCredentials
-    return eabCredentials.filter(c => c.status === eabFilterStatus)
-  }, [eabCredentials, eabFilterStatus])
+    if (!eabFilterStatus) return searchedEabCredentials
+    return searchedEabCredentials.filter(c => c.status === eabFilterStatus)
+  }, [searchedEabCredentials, eabFilterStatus])
 
   const handleCreateEabCredential = async () => {
     try {
@@ -234,13 +242,22 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
     </Dock>
   )
 
+  // The API sends the credentials whole (no page nor sort parameter): sorted and paged here
+  const list = useClientList(filteredEabCredentials, {
+    resetKey: `${eabQuery}|${eabFilterStatus}`,
+    sorts: {
+      name: (c) => c.label, kid: (c) => c.kid, domains: (c) => (isUnrestricted(c.allowed_domains) ? '*' : (c.allowed_domains || []).join(', ')),
+      created: (c) => c.created_at && Date.parse(c.created_at), state: (c) => ({ active: 0, used: 1, revoked: 2 })[c.status] ?? null,
+    },
+  })
+
   return (
     <>
-      <ListView label="EAB" caption={t('acme.eab.caption')} icon="lock" rows={filteredEabCredentials} loading={loading}
+      <ListView label="EAB" caption={t('acme.eab.caption')} icon="lock" list={list} nameSort="name" loading={loading}
         filters={{
           views: ['', 'active', 'used', 'revoked'].map((s) => ({
             id: s, label: s ? t(`acme.eab.status${s.charAt(0).toUpperCase() + s.slice(1)}`) : t('common.all'),
-            count: s ? eabCredentials.filter((c) => c.status === s).length : eabCredentials.length,
+            count: s ? searchedEabCredentials.filter((c) => c.status === s).length : searchedEabCredentials.length,
           })),
           active: eabFilterStatus, onChange: setEabFilterStatus, label: t('acme.filterByState'),
           aside: (
@@ -250,21 +267,26 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
             </label>
           ),
         }}
+        toolbar={(
+          <Toolbar>
+            <SearchField id="acme-eab-search" name="q" label={t('acme.eab.search')} placeholder={t('acme.eab.search')} value={eabQuery} onChange={setEabQuery} />
+          </Toolbar>
+        )}
         title={name} status={pill} openedId={openId} onOpen={(c) => setOpenId(c.id)}
         columns={[
-          { id: 'kid', label: t('acme.eab.kid'), cell: (c) => <span className="mono">{c.kid}</span> },
-          { id: 'domains', label: t('acme.eab.allowedDomains'), cell: (c) => <span data-testid={`eab-domains-${c.id}`}>{domainsText(c)}</span>, grow: true },
-          { id: 'created', label: t('acme.eab.created'), cell: (c) => dateOf(c.created_at, locale) },
-          { status: true },
+          { id: 'kid', label: t('acme.eab.kid'), cell: (c) => <span className="mono">{c.kid}</span>, sort: 'kid' },
+          { id: 'domains', label: t('acme.eab.allowedDomains'), cell: (c) => <span data-testid={`eab-domains-${c.id}`}>{domainsText(c)}</span>, grow: true, sort: 'domains' },
+          { id: 'created', label: t('acme.eab.created'), cell: (c) => dateOf(c.created_at, locale), sort: 'created' },
+          { status: true, sort: 'state' },
         ]}
         rowActions={canDelete ? (c) => [removeAction(c)] : undefined}
         empty={eabCredentials.length ? (
-          <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')} onReset={() => setEabFilterStatus('')} />
+          <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')} onReset={() => { setEabQuery(''); setEabFilterStatus('') }} />
         ) : (
           <EmptyBlock id="acme-eab" icon="lock" title={t('acme.eab.empty')} text={t('acme.eab.emptyDesc')}
             action={canWrite ? { label: t('acme.eab.new'), icon: 'plus', onClick: () => setShowLocalCreate(true), primary: true } : undefined} />
         )}
-        footer={{ range: t('acme.eab.totalCount', { count: filteredEabCredentials.length }) }} />
+        footer={{ range: list.paged ? t('table.range', { start: list.start, end: list.end, total: list.total }) : t('acme.eab.totalCount', { count: list.total }) }} />
       <SlotDock>{dock}</SlotDock>
 
       {editingNotesId !== null && (

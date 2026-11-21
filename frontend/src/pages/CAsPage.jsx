@@ -284,7 +284,7 @@ export default function CAsPage() {
       <div className="scroll-view" id="view-scroll">
         <div className="ca-layout">
           {viewMode === 'list' ? (
-            <CAList cas={listed} allCAs={cas} selectedId={selectedId} onSelect={onSelect} onDownload={handleDownload} t={t}
+            <CAList cas={listed} allCAs={cas} resetKey={`${searchQuery}|${activeView}`} selectedId={selectedId} onSelect={onSelect} onDownload={handleDownload} t={t}
               empty={(
                 <div className="empty">
                   <Icon name="search" /><h3>{t('cas.tree.noMatch')}</h3><p>{t('cas.tree.noMatchHint')}</p>

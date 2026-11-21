@@ -2355,6 +2355,7 @@
       "statusRevoked": "Widerrufen",
       "statusExpired": "Abgelaufen",
       "totalCount": "{{count}} Anmeldedaten",
+      "search": "Search credentials",
       "created": "Erstellt",
       "usedAt": "Verwendet",
       "boundTo": "Gebunden an Konto",

@@ -206,6 +206,44 @@ describe('DiscoveryPage found certificates and history (the product views)', () 
     renderAt('/discovery?tab=history')
     await screen.findByRole('button', { name: 'discovery.adHocScan' })
     expect(names()).toEqual(['discovery.adHocScan', 'Sous-domaines', 'Réseau A', 'Réseau A'])
+    expect(screen.getByRole('columnheader', { name: 'discovery.startedAt' })).toHaveAttribute('aria-sort', 'descending')
+  })
+
+  it('sorts the runs from their headers and pages a long history by 25', async () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({ id: 100 + i, scan_profile_id: 1, profile_name: 'Réseau A', status: 'completed', certs_found: i, targets_scanned: 10, duration_seconds: 30 - i, started_at: `2026-10-${String(i + 1).padStart(2, '0')}T04:00:00Z` }))
+    svc.getRuns.mockResolvedValue({ data: [...RUNS, ...many] })
+    const { container } = renderAt('/discovery?tab=history')
+    await screen.findByRole('button', { name: 'discovery.adHocScan' })
+    const footer = container.querySelector('footer.table-footer')
+    expect(names()).toHaveLength(25)
+    expect(footer).toHaveTextContent('1 / 2')
+    fireEvent.click(within(footer).getByRole('button', { name: 'table.nextPage' }))
+    expect(names()).toHaveLength(9)
+    fireEvent.click(screen.getByRole('button', { name: 'discovery.certsFound' }))
+    fireEvent.click(screen.getByRole('button', { name: 'discovery.certsFound' }))
+    expect(footer).toHaveTextContent('1 / 2')
+    expect(container.querySelector('tbody tr')).toHaveTextContent('29')
+    fireEvent.click(screen.getByRole('button', { name: 'discovery.duration' }))
+    expect(container.querySelector('tbody tr')).toHaveTextContent('Réseau A')
+    for (const name of ['atelier.name', 'discovery.targetsScanned', 'atelier.state']) {
+      fireEvent.click(screen.getByRole('button', { name }))
+      expect(screen.getByRole('columnheader', { name })).toHaveAttribute('aria-sort', 'ascending')
+    }
+  })
+
+  it('sorts the analyses from their headers, by name first', async () => {
+    renderAt('/discovery')
+    await screen.findByRole('button', { name: 'Réseau A' })
+    expect(screen.getByRole('columnheader', { name: 'atelier.name' })).toHaveAttribute('aria-sort', 'ascending')
+    fireEvent.click(screen.getByRole('button', { name: 'atelier.name' }))
+    expect(names()[0]).toBe('Sous-domaines')
+    fireEvent.click(screen.getByRole('button', { name: 'discovery.scans.found' }))
+    fireEvent.click(screen.getByRole('button', { name: 'discovery.scans.found' }))
+    expect(names()[0]).toBe('Réseau A')
+    for (const name of ['discovery.form.range', 'discovery.scans.last', 'atelier.state']) {
+      fireEvent.click(screen.getByRole('button', { name }))
+      expect(screen.getByRole('columnheader', { name })).toHaveAttribute('aria-sort', 'ascending')
+    }
   })
 })
 

@@ -12,7 +12,7 @@ export default {
           { label: 'Clavier', text: 'Dans l’arbre, les flèches déplacent, droite et gauche déplient et replient, Entrée ou un clic sélectionne l’AC et la montre dans le panneau latéral ; l’AC sélectionnée fait partie de l’adresse' },
           { label: 'Recherche', text: 'Filtre l’arbre et la liste sur le nom, le nom commun et le sujet ; l’arbre garde la branche qui mène à chaque résultat' },
           { label: 'Panneau latéral', text: 'À côté de l’arbre (dessous sur un téléphone) : identité, clé, émission et révocation de l’AC sélectionnée, son émetteur, ses sous-autorités et ses certificats croisés en liens, sa CRL (numéro, publication, prochaine mise à jour, alerte un jour avant) et l’état de son répondeur OCSP. Voir les certificats, Émettre avec cette AC (désactivé avec la raison quand l’AC ne peut pas signer), Télécharger la chaîne, puis Autres actions (export, CSR, révocation, mise hors ligne, restauration, épinglages de modèles, suppression). Les autres détails (contraintes, extensions, empreintes, PEM, métadonnées) sont repliés dessous. Une AC ouverte depuis une autre page (chaîne d’un certificat, palette de commandes, approbation) s’ouvre ici' },
-          { label: 'Vue liste', text: 'Tableau plat triable à côté du panneau latéral : une action par ligne (télécharger le certificat) et un chevron qui montre l’AC dans le panneau ; sur un téléphone, chaque AC est une carte qui s’ouvre d’un appui n’importe où' },
+          { label: 'Vue liste', text: 'Tableau plat triable à côté du panneau latéral, 25 autorités par page (10, 50 ou 100 au choix) : une action par ligne (télécharger le certificat) et un chevron qui montre l’AC dans le panneau ; sur un téléphone, chaque AC est une carte qui s’ouvre d’un appui n’importe où' },
         ]
       },
       {
@@ -143,7 +143,7 @@ La vue par défaut. Chaque racine à la tête d’une hiérarchie est dessinée 
 À côté de l’arbre (dessous sur un téléphone), l’AC sélectionnée montre son identité, sa clé, ce qu’elle a émis et sa révocation : l’émetteur, les sous-autorités et les certificats croisés sont des liens qui les sélectionnent, la CRL donne son numéro, sa publication et sa prochaine mise à jour (avec une alerte un jour avant), et le répondeur OCSP se lit actif ou inactif. **Voir les certificats** ouvre la liste des certificats sur cette AC, **Émettre avec cette AC** ouvre le formulaire d’émission sur elle (désactivé, avec la raison, quand l’AC ne peut pas signer), **Télécharger la chaîne** télécharge sa chaîne PEM, et **Autres actions** réunit l’export, la CSR, la révocation, la mise hors ligne, la restauration, les épinglages de modèles et la suppression. Les autres détails (contraintes, extensions, empreintes, PEM, métadonnées) sont repliés dessous. Une AC ouverte depuis une autre page s’ouvre ici.
 
 ### Vue liste
-Tableau plat avec colonnes triables, à côté du panneau latéral. Une ligne porte une action (télécharger le certificat) et un chevron qui montre l’AC dans le panneau. Sur un téléphone, chaque AC est une carte qui montre les mêmes informations et son chevron ; un appui n’importe où sur elle montre l’AC.
+Tableau plat avec colonnes triables, à côté du panneau latéral, 25 autorités par page (10, 50 ou 100 au choix). Une ligne porte une action (télécharger le certificat) et un chevron qui montre l’AC dans le panneau. Sur un téléphone, chaque AC est une carte qui montre les mêmes informations et son chevron ; un appui n’importe où sur elle montre l’AC.
 
 ## Créer une AC
 

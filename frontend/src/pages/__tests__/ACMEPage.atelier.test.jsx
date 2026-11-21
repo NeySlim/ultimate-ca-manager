@@ -72,6 +72,38 @@ describe('the ACME accounts', () => {
     expect(screen.queryByRole('button', { name: 'acct/zyxwvutsrqpo' })).toBeNull()
   })
 
+  it('sorts its columns from their headers and pages a long list by 25', async () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({
+      id: 100 + i, account_id: `bulk${String(i).padStart(12, '0')}`, contact: [`mailto:a${i}@example.com`], status: 'valid', orders_count: i + 3, created_at: `2026-03-${String(i + 1).padStart(2, '0')}T00:00:00Z`,
+    }))
+    acmeService.getAccounts = ok([...ACCOUNTS, ...many])
+    const { container } = at('/acme')
+    await screen.findByRole('button', { name: 'acct/abcdefghijkl' })
+    const footer = container.querySelector('footer.table-footer')
+    const bodyRows = () => container.querySelectorAll('tbody tr')
+    expect(bodyRows()).toHaveLength(25)
+    expect(footer).toHaveTextContent('1 / 2')
+    fireEvent.click(within(footer).getByRole('button', { name: 'table.nextPage' }))
+    expect(bodyRows()).toHaveLength(7)
+    fireEvent.click(screen.getByRole('button', { name: 'acme.orders' }))
+    expect(footer).toHaveTextContent('1 / 2')
+    fireEvent.click(screen.getByRole('button', { name: 'acme.orders' }))
+    expect(screen.getByRole('columnheader', { name: 'acme.orders' })).toHaveAttribute('aria-sort', 'descending')
+    expect(bodyRows()[0]).toHaveTextContent('a29@example.com')
+    fireEvent.click(screen.getByRole('button', { name: 'acme.createdOn' }))
+    expect(bodyRows()[0]).toHaveTextContent('ops@example.com')
+    fireEvent.click(screen.getByRole('button', { name: 'atelier.state' }))
+    fireEvent.click(screen.getByRole('button', { name: 'atelier.state' }))
+    expect(bodyRows()[0]).toHaveTextContent('acme.accountState.deactivated')
+    for (const name of ['atelier.name', 'acme.contact']) expect(screen.getByRole('button', { name })).toBeInTheDocument()
+    // A search goes back to page one, and a short result has no page controls
+    fireEvent.click(within(footer).getByRole('button', { name: 'table.nextPage' }))
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'bulk' } })
+    expect(footer).toHaveTextContent('1 / 2')
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'ops@' } })
+    expect(within(footer).queryByRole('button', { name: 'table.nextPage' })).toBeNull()
+  })
+
   it('shows a read error in place of the list, with a retry and the journal for who may read it', async () => {
     acmeService.getAccounts = vi.fn().mockRejectedValueOnce(Object.assign(new Error('boom'), { status: 503 })).mockResolvedValue({ data: ACCOUNTS })
     at('/acme')

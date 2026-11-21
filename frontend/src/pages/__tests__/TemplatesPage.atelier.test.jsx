@@ -80,6 +80,28 @@ describe('Templates list', () => {
     expect(names()).toEqual(['Web Server', 'Archive'])
   })
 
+  it('sorts every column and pages a long list by 25', async () => {
+    const many = Array.from({ length: 28 }, (_, i) => ({ ...OLD, id: 10 + i, name: `Bulk ${String(i + 1).padStart(2, '0')}`, usage_count: i }))
+    getAll.mockReset().mockResolvedValue({ data: [TLS, OLD, ...many] })
+    const { container } = renderPage()
+    await screen.findByRole('button', { name: 'Archive' })
+    const footer = container.querySelector('.table-footer')
+    const names = () => [...container.querySelectorAll('tbody .entity-name')].map((b) => b.textContent)
+    expect(names()).toHaveLength(25)
+    expect(footer).toHaveTextContent('1–25 of 30 templates')
+    fireEvent.click(within(footer).getByRole('button', { name: 'Next page' }))
+    expect(names()).toEqual(['Bulk 25', 'Bulk 26', 'Bulk 27', 'Bulk 28', 'Web Server'])
+    fireEvent.click(container.querySelector('[data-sort="usage_count"]'))
+    fireEvent.click(container.querySelector('[data-sort="usage_count"]'))
+    expect(footer).toHaveTextContent('1–25 of 30 templates')
+    expect(names()[0]).toBe('Bulk 28')
+    for (const key of ['source', 'key', 'state']) {
+      fireEvent.click(container.querySelector(`[data-sort="${key}"]`))
+      expect(container.querySelector(`[data-sort="${key}"]`).closest('th')).toHaveAttribute('aria-sort', 'ascending')
+    }
+    expect(names()[0]).toBe('Web Server')
+  })
+
   it('offers Import and Create Template only with write:templates', async () => {
     perms.write = false
     const { container } = renderPage()

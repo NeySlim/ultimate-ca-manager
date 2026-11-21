@@ -9,6 +9,8 @@ test('a managed CA added on screen enters the trust store', async ({ page, api }
   await dialog.getByRole('button', { name: 'Add 1 selected' }).click()
   await expect(dialog).toBeHidden()
 
+  // The list pages by 25: the search brings the new row onto the first page
+  await page.getByRole('main').getByRole('searchbox').fill(ca.common_name)
   await expect(page.getByRole('main').getByText(ca.common_name).first()).toBeVisible()
   const data = await api.get('/truststore?per_page=500')
   const list = (Array.isArray(data) ? data : data.items || data.certificates) as any[]

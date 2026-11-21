@@ -4,10 +4,12 @@
  * row and in the dock, each behind its right.
  */
 import { useTranslation } from 'react-i18next'
-import { Btn, ListView, Dock, DockBody, Section, Props, EmptyBlock, Pill } from '../../components/atelier'
+import { Btn, ListView, Dock, DockBody, Section, Props, EmptyBlock, Pill, useClientList } from '../../components/atelier'
 import { useDockId } from '../../components/atelier/useDockParam'
 import { SlotDock } from '../protocols/dockSlot'
 import { YesNo } from '../protocols/atelierParts'
+
+const BY_DOMAIN = { key: 'name', asc: true }
 
 export default function DomainsTab({ acmeDomains, onAdd, onEdit, onDelete, onTest, canWrite, canDelete }) {
   const { t } = useTranslation()
@@ -20,6 +22,14 @@ export default function DomainsTab({ acmeDomains, onAdd, onEdit, onDelete, onTes
     ...(canWrite ? [{ icon: 'settings', label: t('common.edit'), onClick: () => onEdit(d), write: true }] : []),
     ...(canDelete ? [{ icon: 'close', label: t('common.delete'), onClick: () => onDelete(d), write: true }] : []),
   ]
+  // The API sends every domain: sorted and paged here
+  const list = useClientList(acmeDomains, {
+    initial: BY_DOMAIN,
+    sorts: {
+      name: (d) => d.domain, provider: (d) => d.dns_provider_name || d.dns_provider_type, ca: (d) => d.issuing_ca_name || t('acme.defaultCA'),
+      wildcard: (d) => (d.is_wildcard_allowed ? 0 : 1), state: (d) => (d.auto_approve ? 0 : 1),
+    },
+  })
   const dock = open && (
     <Dock label={t('atelier.detailOf', { name: t('acme.domains') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
       tabs={[{ key: open.id, title: open.domain, icon: 'globe' }]} onClose={() => setOpenId(null)}>
@@ -46,18 +56,18 @@ export default function DomainsTab({ acmeDomains, onAdd, onEdit, onDelete, onTes
   )
   return (
     <>
-      <ListView label={t('acme.domains')} caption={t('acme.domainsCaption')} icon="globe" rows={acmeDomains}
+      <ListView label={t('acme.domains')} caption={t('acme.domainsCaption')} icon="globe" list={list} nameSort="name"
         title={(d) => d.domain} status={approval} openedId={openId} onOpen={(d) => setOpenId(d.id)}
         columns={[
-          { id: 'provider', label: t('acme.provider'), cell: (d) => d.dns_provider_name || d.dns_provider_type || '—', grow: true },
-          { id: 'ca', label: t('acme.issuingCA'), cell: (d) => d.issuing_ca_name || t('acme.defaultCA') },
-          { id: 'wildcard', label: t('acme.wildcard'), cell: (d) => t(d.is_wildcard_allowed ? 'common.yes' : 'common.no') },
-          { status: true },
+          { id: 'provider', label: t('acme.provider'), cell: (d) => d.dns_provider_name || d.dns_provider_type || '—', grow: true, sort: 'provider' },
+          { id: 'ca', label: t('acme.issuingCA'), cell: (d) => d.issuing_ca_name || t('acme.defaultCA'), sort: 'ca' },
+          { id: 'wildcard', label: t('acme.wildcard'), cell: (d) => t(d.is_wildcard_allowed ? 'common.yes' : 'common.no'), sort: 'wildcard' },
+          { status: true, sort: 'state' },
         ]}
         rowActions={actions}
         empty={<EmptyBlock id="acme-domains" icon="globe" title={t('acme.noDomainsYet')} text={t('acme.noDomainsDesc')}
           action={canWrite ? { label: t('acme.addDomain'), icon: 'plus', onClick: onAdd, primary: true } : undefined} />}
-        footer={{ range: t('acme.domainsRange', { count: acmeDomains.length }) }} />
+        footer={{ range: list.paged ? t('table.range', { start: list.start, end: list.end, total: list.total }) : t('acme.domainsRange', { count: list.total }) }} />
       <SlotDock>{dock}</SlotDock>
     </>
   )

@@ -503,6 +503,7 @@
       "statusRevoked": "Révoqué",
       "statusExpired": "Expiré",
       "totalCount": "{{count}} identifiant(s)",
+      "search": "Search credentials",
       "created": "Créé",
       "usedAt": "Utilisé",
       "boundTo": "Lié au compte",

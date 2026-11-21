@@ -11,7 +11,7 @@ import { TemplatePreviewModal } from '../components'
 import { Modal, Input, Select, Textarea, ToggleSwitch } from '../components/atelier/Form'
 import {
   Zone, Icon, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody, Section, Props,
-  LoadError, LoadCause, EmptyBlock, NoMatch,
+  LoadError, LoadCause, EmptyBlock, NoMatch, useClientList,
 } from '../components/atelier'
 import { useDockSelection } from '../components/atelier/useDockParam'
 import { templatesService } from '../services'
@@ -35,6 +35,7 @@ import { CertMenu } from './certificates/inspector/CertMenu'
 import { PhoneMoreActions } from './pki/PhoneMoreActions'
 
 const TEMPLATE_SECTIONS = ['overview', 'subject', 'extensions', 'enrollment']
+const BY_NAME = { key: 'name', asc: true }
 
 export default function TemplatesPage() {
   const { t } = useTranslation()
@@ -65,11 +66,10 @@ export default function TemplatesPage() {
   const [showImportModal, setShowImportModal] = useState(false)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
 
-  // List: the search, the source and state filters (kept), the sort, the open tab and the menu
+  // List: the search, the source and state filters (kept), the open tab and the menu
   const [query, setQuery] = useState('')
   const [source, setSource] = usePersistedState('ucm-templates-source', '')
   const [state, setState] = usePersistedState('ucm-templates-state', '')
-  const [sort, setSort] = useState({ key: 'name', asc: true })
   const [menuOpen, setMenuOpen] = useState(false)
   const [loadError, setLoadError] = useState(null)
   // The open template and its section live in the URL; the palette's former ?selected= still opens it
@@ -258,15 +258,16 @@ export default function TemplatesPage() {
   }, [templates, source, query]) // eslint-disable-line react-hooks/exhaustive-deps
   const present = ['active', 'inactive'].filter((s) => templates.some((tpl) => tplState(tpl) === s))
   const active = present.includes(state) ? state : ''
-  const rows = useMemo(() => {
-    const list = searched.filter((tpl) => !active || tplState(tpl) === active)
-    const value = { name: (x) => String(x.name || '').toLowerCase(), validity_days: (x) => x.validity_days || 0, usage_count: (x) => x.usage_count || 0 }[sort.key]
-    return [...list].sort((a, b) => {
-      const va = value(a)
-      const vb = value(b)
-      return (va < vb ? -1 : va > vb ? 1 : 0) * (sort.asc ? 1 : -1)
-    })
-  }, [searched, active, sort])
+  const rows = useMemo(() => searched.filter((tpl) => !active || tplState(tpl) === active), [searched, active])
+  // The API sends every template: sorted and paged here
+  const tplList = useClientList(rows, {
+    initial: BY_NAME,
+    resetKey: `${query}|${source}|${active}`,
+    sorts: {
+      name: (x) => x.name, source: tplSource, validity_days: (x) => x.validity_days || VALIDITY.TEMPLATE_DEFAULT_DAYS,
+      key: (x) => keyLabel(x.key_type), usage_count: (x) => x.usage_count || 0, state: (x) => (tplState(x) === 'active' ? 0 : 1),
+    },
+  })
   const views = [
     { id: '', label: t('common.all'), count: searched.length },
     ...present.map((s) => ({ id: s, label: t(`templates.module.states.${s}`), count: searched.filter((tpl) => tplState(tpl) === s).length })),
@@ -410,7 +411,7 @@ export default function TemplatesPage() {
           <PhoneMoreActions title={t('common.templates')} items={[{ id: 'import', icon: 'upload', label: t('common.import'), write: true, onClick: () => setShowImportModal(true) }]} />
           <Btn tone="primary" icon="plus" id="template-new" onClick={create.onClick}>{create.label}</Btn>
         </>} />
-      <ListView label={t('common.templates')} caption={t('templates.module.caption')} icon="template" rows={rows} loading={loading}
+      <ListView label={t('common.templates')} caption={t('templates.module.caption')} icon="template" list={tplList} loading={loading}
         filters={{ views, active, onChange: setState, label: t('templates.module.filterByState') }}
         toolbar={(
           <Toolbar>
@@ -420,13 +421,13 @@ export default function TemplatesPage() {
           </Toolbar>
         )}
         title={(tpl) => tpl.name || t('common.unnamed')} status={tplPill} openedId={open?.id} onOpen={openTemplate}
-        sort={sort} onSort={(key) => setSort((s) => ({ key, asc: s.key === key ? !s.asc : true }))} nameSort="name"
+        nameSort="name"
         columns={[
-          { id: 'source', label: t('templates.source'), cell: tplSource, grow: true },
+          { id: 'source', label: t('templates.source'), cell: tplSource, grow: true, sort: 'source' },
           { id: 'validity', label: t('common.validity'), cell: tplValidity, sort: 'validity_days' },
-          { id: 'key', label: t('templates.module.defaultKey'), cell: tplKey },
+          { id: 'key', label: t('templates.module.defaultKey'), cell: tplKey, sort: 'key' },
           { id: 'uses', label: t('templates.module.uses'), cell: tplUses, sort: 'usage_count' },
-          { status: true },
+          { status: true, sort: 'state' },
         ]}
         error={loadError && (
           <LoadError id="templates" title={t('messages.errors.loadFailed.templates')} onRetry={loadData} journal={hasPermission?.('read:audit') ? '/audit' : undefined}
@@ -438,7 +439,7 @@ export default function TemplatesPage() {
         ) : (
           <EmptyBlock id="templates" icon="template" title={t('templates.noTemplates')} text={t('templates.noTemplatesDescription')} action={create} />
         )}
-        footer={{ range: t('templates.module.range', { shown: rows.length, count: templates.length }) }} />
+        footer={{ range: t('templates.module.range', tplList.counts(templates.length)) }} />
     </Zone>
   )
 }

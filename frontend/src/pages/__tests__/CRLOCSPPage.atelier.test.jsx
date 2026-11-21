@@ -107,6 +107,39 @@ describe('the CRL / OCSP list', () => {
     expect(screen.queryByRole('button', { name: 'Services CA' })).toBeNull()
   })
 
+  it('sorts every column from its header and pages a long list by 25', async () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({ id: 100 + i, refid: `m${i}`, descr: `Branch CA ${i + 1}`, has_private_key: true, ocsp_enabled: i === 7 }))
+    cas.getAll.mockResolvedValue({ data: [...CAS, ...many] })
+    const { container } = page()
+    await screen.findByRole('button', { name: 'Services CA' })
+    const footer = container.querySelector('footer.table-footer')
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(25)
+    expect(footer).toHaveTextContent('crlOcsp.range {"shown":"1–25","count":34}')
+    fireEvent.click(within(footer).getByRole('button', { name: 'table.nextPage' }))
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(9)
+    // A header sorts from page one; the second click reverses
+    fireEvent.click(screen.getByRole('button', { name: 'CRL' }))
+    expect(screen.getByRole('columnheader', { name: 'CRL' })).toHaveAttribute('aria-sort', 'ascending')
+    expect(footer).toHaveTextContent('"shown":"1–25"')
+    expect(container.querySelector('tbody tr')).toHaveTextContent('crlOcsp.numberOf {"number":4}')
+    fireEvent.click(screen.getByRole('button', { name: 'CRL' }))
+    expect(container.querySelector('tbody tr')).toHaveTextContent('crlOcsp.numberOf {"number":1842}')
+    fireEvent.click(screen.getByRole('button', { name: 'OCSP' }))
+    expect(container.querySelectorAll('tbody tr')[1]).toHaveTextContent('crlOcsp.ocspActive')
+    fireEvent.click(screen.getByRole('button', { name: 'atelier.state' }))
+    expect(container.querySelector('tbody tr')).toHaveTextContent('crlOcsp.states.current')
+    fireEvent.click(screen.getByRole('button', { name: 'atelier.name' }))
+    expect([...container.querySelectorAll('tbody tr .entity-name')].slice(0, 3).map((n) => n.textContent))
+      .toEqual(['Branch CA 1', 'Branch CA 2', 'Branch CA 3'])
+    for (const name of ['crlOcsp.columns.published', 'crlOcsp.nextUpdate']) {
+      expect(screen.getByRole('button', { name })).toBeInTheDocument()
+    }
+    // A search shorter than a page has no page controls
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'old' } })
+    expect(within(footer).queryByRole('button', { name: 'table.nextPage' })).toBeNull()
+    expect(footer).toHaveTextContent('crlOcsp.range {"shown":1,"count":34}')
+  })
+
   it('computes the state on the CRL dates (M12), never on the publish cadence', () => {
     expect(crlState({ has_crl: false }, NOW)).toBe('none')
     expect(crlState({ has_crl: true, crl_next_update: '2026-11-08T11:00:00Z', crl_next_publish: '2026-12-01T00:00:00Z' }, NOW)).toBe('expired')

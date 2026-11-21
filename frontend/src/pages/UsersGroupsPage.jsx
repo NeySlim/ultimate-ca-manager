@@ -13,7 +13,7 @@ import { MemberTransferModal } from '../components'
 import {
   Modal as AtelierModal, Input as FieldInput, Select as FieldSelect, ToggleSwitch as FieldToggle, Textarea as FieldTextarea,
   Zone, Icon, Btn, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody, Section, RecordList, RecordRow,
-  SimpleOverview, EmptyBlock, NoMatch, AtelierDialog,
+  SimpleOverview, EmptyBlock, NoMatch, AtelierDialog, useClientList,
 } from '../components/atelier'
 import { MtlsCertificateDialog } from '../components/mtls/MtlsCertificateDialog'
 import { validityDays } from '../components/mtls/validity'
@@ -134,7 +134,6 @@ export default function UsersGroupsPage() {
     setActiveTab(tab)
     // The new tab's URL carries no open object: the dock closes with it
     setSearchParams({ tab })
-    setPage(1)
   }
 
   // ============= USER ACTIONS =============
@@ -607,8 +606,6 @@ export default function UsersGroupsPage() {
   const [query, setQuery] = useState('')
   const [userView, setUserView] = usePersistedState('ucm-users-state', '')
   const [roleFilter, setRoleFilter] = usePersistedState('ucm-users-role', '')
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(25)
   const [disabling, setDisabling] = useState(null)
 
   const roleLabel = (u) => t(ROLE_KEYS[u.role] || 'common.viewer')
@@ -627,11 +624,20 @@ export default function UsersGroupsPage() {
   ]
   const shownUsers = USER_VIEWS[userView] ? searchedUsers.filter(USER_VIEWS[userView]) : searchedUsers
   const shownGroups = useMemo(() => groups.filter((g) => matches([g.name, g.description])), [groups, q]) // eslint-disable-line react-hooks/exhaustive-deps
-  const shown = groupsTab ? shownGroups : shownUsers
-  const pages = Math.max(1, Math.ceil(shown.length / perPage))
-  const current = Math.min(page, pages)
-  const paged = shown.slice((current - 1) * perPage, current * perPage)
-  useEffect(() => { setPage(1) }, [q, userView, roleFilter, activeTab])
+  // Both lists come whole from the API: sorted and paged here, back to page one on a new filter or tab
+  const resetKey = `${q}|${userView}|${roleFilter}|${activeTab}`
+  const userList = useClientList(shownUsers, {
+    resetKey,
+    sorts: {
+      name: userName, login: (u) => u.username, email: (u) => u.email, source: (u) => sourceText(t, u),
+      role: roleLabel, state: (u) => (u.active ? 0 : 1), seen: (u) => u.last_login && Date.parse(u.last_login),
+    },
+  })
+  const groupList = useClientList(shownGroups, {
+    resetKey,
+    sorts: { name: (g) => g.name, description: (g) => g.description, members: (g) => g.members?.length ?? g.member_count ?? 0 },
+  })
+  const list = groupsTab ? groupList : userList
 
   // The full list in a file: identity, source, role and state of every account (U07, without the sessions)
   const handleExport = () => {
@@ -761,10 +767,9 @@ export default function UsersGroupsPage() {
   const create = canWrite('users') ? { label: createLabel, icon: 'plus', onClick: handleOpenCreateModal, primary: true } : undefined
   const narrowed = Boolean(q || (!groupsTab && (userView || roleFilter)))
   const total = (groupsTab ? groups : users).length
-  const footer = shown.length > 10 ? {
-    range: t(groupsTab ? 'groups.pageRange' : 'users.pageRange', { start: (current - 1) * perPage + 1, end: Math.min(current * perPage, shown.length), count: shown.length }),
-    pagination: { page: current, pages, perPage, sizes: [10, 25, 50, 100], onPage: setPage, onPerPage: (n) => { setPerPage(n); setPage(1) } },
-  } : { range: t(groupsTab ? 'groups.range' : 'users.range', { shown: shown.length, count: total }) }
+  const footer = list.paged
+    ? { range: t(groupsTab ? 'groups.pageRange' : 'users.pageRange', { start: list.start, end: list.end, count: list.total }) }
+    : { range: t(groupsTab ? 'groups.range' : 'users.range', { shown: list.total, count: total }) }
   const empty = narrowed && (groupsTab ? groups : users).length ? (
     <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')}
       onReset={() => { setQuery(''); setUserView(''); setRoleFilter('') }} />
@@ -915,24 +920,24 @@ export default function UsersGroupsPage() {
             {create && <Btn tone="primary" icon="plus" id="users-new" aria-label={create.label} onClick={create.onClick}>{t('common.create')}</Btn>}
           </>} />
         {groupsTab ? (
-          <ListView label={t('common.groups')} caption={t('groups.caption')} icon="users" rows={paged} loading={loading} toolbar={toolbar}
+          <ListView label={t('common.groups')} caption={t('groups.caption')} icon="users" list={groupList} nameSort="name" loading={loading} toolbar={toolbar}
             title={(g) => g.name} status={() => null} openedId={selectedGroup?.id} onOpen={openGroup}
             columns={[
-              { id: 'description', label: t('common.description'), cell: (g) => g.description || '—', grow: true, muted: true },
-              { id: 'members', label: t('groups.members'), cell: (g) => t('groups.memberCount', { count: g.members?.length ?? g.member_count ?? 0 }) },
+              { id: 'description', label: t('common.description'), cell: (g) => g.description || '—', grow: true, muted: true, sort: 'description' },
+              { id: 'members', label: t('groups.members'), cell: (g) => t('groups.memberCount', { count: g.members?.length ?? g.member_count ?? 0 }), sort: 'members' },
             ]}
             empty={empty} footer={footer} />
         ) : (
-          <ListView label={t('users.title')} caption={t('users.caption')} icon="users" rows={paged} loading={loading} toolbar={toolbar}
+          <ListView label={t('users.title')} caption={t('users.caption')} icon="users" list={userList} nameSort="name" loading={loading} toolbar={toolbar}
             filters={{ views, active: USER_VIEWS[userView] ? userView : '', onChange: setUserView, label: t('users.filterByState') }}
             title={userName} status={(u) => <UserState user={u} />} openedId={selectedUser?.id} onOpen={openUser}
             columns={[
-              { id: 'login', label: t('users.login'), cell: (u) => <span className="mono">{u.username}</span> },
-              { id: 'email', label: t('users.email'), cell: (u) => u.email || '—', grow: true, muted: true },
-              { id: 'source', label: t('users.source'), cell: (u) => (isSso(u) ? t('users.views.sso') : t('users.authSource.local')) },
-              { id: 'role', label: t('common.role'), cell: roleLabel },
-              { status: true },
-              { id: 'seen', label: t('users.lastSeen'), cell: lastSeen },
+              { id: 'login', label: t('users.login'), cell: (u) => <span className="mono">{u.username}</span>, sort: 'login' },
+              { id: 'email', label: t('users.email'), cell: (u) => u.email || '—', grow: true, muted: true, sort: 'email' },
+              { id: 'source', label: t('users.source'), cell: (u) => (isSso(u) ? t('users.views.sso') : t('users.authSource.local')), sort: 'source' },
+              { id: 'role', label: t('common.role'), cell: roleLabel, sort: 'role' },
+              { status: true, sort: 'state' },
+              { id: 'seen', label: t('users.lastSeen'), cell: lastSeen, sort: 'seen' },
             ]}
             empty={empty} footer={footer} />
         )}

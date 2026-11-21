@@ -2355,6 +2355,7 @@
       "statusRevoked": "失効",
       "statusExpired": "期限切れ",
       "totalCount": "{{count}} 件",
+      "search": "Search credentials",
       "created": "作成日",
       "usedAt": "使用日",
       "boundTo": "バインド先アカウント",

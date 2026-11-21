@@ -2355,6 +2355,7 @@
       "statusRevoked": "已吊销",
       "statusExpired": "已过期",
       "totalCount": "{{count}} 个凭据",
+      "search": "Search credentials",
       "created": "创建时间",
       "usedAt": "使用时间",
       "boundTo": "已绑定账户",

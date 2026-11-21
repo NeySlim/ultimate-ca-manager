@@ -2443,6 +2443,7 @@
       "statusRevoked": "Отозваны",
       "statusExpired": "Истекли",
       "totalCount": "Учётных данных: {{count}}",
+      "search": "Поиск учётных данных",
       "created": "Создано",
       "usedAt": "Использовано",
       "boundTo": "Привязано к учётной записи",

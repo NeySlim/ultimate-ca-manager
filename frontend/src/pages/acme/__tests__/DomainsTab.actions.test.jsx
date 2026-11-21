@@ -95,3 +95,38 @@ describe.each([
     expect(within(await again.dock()).getByRole('heading', { level: 2 })).toHaveTextContent(name)
   })
 })
+
+describe.each([
+  ['DomainsTab', DomainsTab, ['acme.provider', 'acme.issuingCA', 'acme.wildcard', 'atelier.state']],
+  ['LocalDomainsTab', LocalDomainsTab, ['acme.issuingCA', 'atelier.state']],
+])('%s list', (_name, Tab, sortable) => {
+  const many = Array.from({ length: 30 }, (_, i) => ({
+    id: i + 1, domain: `d${String(30 - i).padStart(2, '0')}.example.test`, dns_provider_name: 'cf', issuing_ca_name: null, is_wildcard_allowed: i % 2 === 0, auto_approve: i === 4,
+  }))
+  const props = { acmeDomains: many, localDomains: many, dnsProviders: [], cas: [], onAdd: vi.fn(), onEdit: vi.fn(), onDelete: vi.fn(), onTest: vi.fn(), canWrite: true, canDelete: true }
+  const renderTab = () => render(<MemoryRouter><Tab {...props} /></MemoryRouter>)
+
+  it('sorts by domain first, then from each header, and pages by 25', () => {
+    const { container } = renderTab()
+    const names = () => [...container.querySelectorAll('tbody .entity-name')].map((b) => b.textContent)
+    const footer = container.querySelector('footer.table-footer')
+    expect(names()).toHaveLength(25)
+    expect(names()[0]).toBe('d01.example.test')
+    expect(footer).toHaveTextContent('table.range')
+    fireEvent.click(screen.getByRole('button', { name: 'table.nextPage' }))
+    expect(names()).toEqual(['d26.example.test', 'd27.example.test', 'd28.example.test', 'd29.example.test', 'd30.example.test'])
+    fireEvent.click(screen.getByRole('button', { name: 'atelier.state' }))
+    expect(names()[0]).toBe('d26.example.test')
+    for (const name of sortable) {
+      fireEvent.click(screen.getByRole('button', { name }))
+      expect(screen.getByRole('columnheader', { name })).toHaveAttribute('aria-sort', 'ascending')
+    }
+  })
+
+  it('opens from the URL a domain the shown page does not hold', async () => {
+    // id 1 is d30, on the second page of the domain order
+    const r = renderAtUrl(<WithDockSlot><Tab {...props} /></WithDockSlot>, '/acme?tab=domains&item=1')
+    expect([...r.container.querySelectorAll('tbody .entity-name')].map((b) => b.textContent)).not.toContain('d30.example.test')
+    expect(within(await r.dock()).getByRole('heading', { level: 2 })).toHaveTextContent('d30.example.test')
+  })
+})
