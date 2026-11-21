@@ -33,6 +33,7 @@ vi.mock('../../hooks', () => ({
 const api = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn(), approve: vi.fn(), reject: vi.fn(), recover: vi.fn() }))
 vi.mock('../../services', () => ({ keyRecoveryService: api }))
 
+import { renderAtUrl } from '../../test/dockUrl'
 import KeyRecoveryPage from '../KeyRecoveryPage'
 
 const ADMIN = ['admin:key_recovery', 'write:key_recovery', 'read:key_recovery']
@@ -249,5 +250,17 @@ describe('KeyRecoveryPage linked request', () => {
     // One row in the queue, and the dock's tab and heading
     expect(within(group('À récupérer')).getAllByText('cn-linked')).toHaveLength(1)
     expect(within(dock).getByRole('button', { name: 'Récupérer la clé de cn-linked' })).toBeInTheDocument()
+  })
+})
+
+describe('the key recovery dock in the URL', () => {
+  it('reopens the request and section of the URL, past the list, then writes the one opened', async () => {
+    const r = renderAtUrl(<KeyRecoveryPage />, '/key-recovery?item=900&section=log')
+    const dock = await screen.findByRole('complementary')
+    await waitFor(() => expect(within(dock).getByRole('heading', { level: 2, name: 'cn-linked' })).toBeInTheDocument())
+    expect(within(dock).getAllByRole('tab')[1]).toHaveAttribute('aria-selected', 'true')
+    expect(api.get).toHaveBeenCalledWith(900)
+    fireEvent.click(screen.getByRole('button', { name: 'cn-one' }))
+    expect(r.where()).toBe('/key-recovery?item=1')
   })
 })

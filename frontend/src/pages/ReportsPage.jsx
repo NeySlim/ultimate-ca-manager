@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import { Zone, PageHead, WorkView, Btn, RecordRow, LoadError, LoadCause } from '../components/atelier'
 import { reportsService, certificatesService } from '../services'
 import { usePermission } from '../hooks'
+import { useDockParam } from '../components/atelier/useDockParam'
 import { formatDate } from '../lib/utils'
 import { compactDue } from '../lib/relativeTime'
 import {
@@ -17,6 +18,8 @@ import {
 } from './reports/reportModel'
 import { useReportActions } from './reports/useReportActions'
 import { ReportDock } from './reports/ReportDetail'
+
+const REPORT_SECTIONS = ['report', 'runs', 'preview']
 
 export default function ReportsPage() {
   const { t } = useTranslation()
@@ -27,8 +30,10 @@ export default function ReportsPage() {
   const [state, setState] = useState('loading')
   const [failure, setFailure] = useState(null)
   const [stats, setStats] = useState(null)
-  const [openKey, setOpenKey] = useState(null)
-  const [section, setSection] = useState('report')
+  // The open report and its section live in the URL (`item`, `section`)
+  const reportDock = useDockParam({ sections: REPORT_SECTIONS, fallback: 'report' })
+  const openKey = reportDock.item
+  const { section, setSection } = reportDock
   const readsCertificates = canRead('certificates')
 
   const load = useCallback(async ({ quiet = false } = {}) => {
@@ -69,10 +74,9 @@ export default function ReportsPage() {
   const entries = REPORT_KEYS.map((key) => ({ key, schedule: scheduleOf(schedules, key) }))
   const unscheduled = entries.filter((e) => !e.schedule.enabled)
   const opened = entries.find((e) => e.key === openKey) || null
-  const open = (e) => {
-    if (e.key !== openKey) setSection('report')
-    setOpenKey(e.key)
-  }
+  const open = (e) => reportDock.open(e.key)
+  // A report the product does not have leaves the URL
+  useEffect(() => { if (openKey && !REPORT_KEYS.includes(openKey)) reportDock.close() }, [openKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const downloadButton = (e, disabled) => canExport && (
     <Btn icon="download" disabled={disabled || undefined} onClick={() => actions.download(e.key)}
@@ -105,7 +109,7 @@ export default function ReportsPage() {
   ) : undefined
 
   const dock = opened && (
-    <ReportDock entry={opened} section={section} onSection={setSection} onClose={() => setOpenKey(null)} actions={actions} />
+    <ReportDock entry={opened} section={section} onSection={setSection} onClose={reportDock.close} actions={actions} />
   )
 
   return (
