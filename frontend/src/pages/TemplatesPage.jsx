@@ -254,7 +254,7 @@ export default function TemplatesPage() {
   }, [templates, source, query]) // eslint-disable-line react-hooks/exhaustive-deps
   const present = ['active', 'inactive'].filter((s) => templates.some((tpl) => tplState(tpl) === s))
   const active = present.includes(state) ? state : ''
-  const rows = useMemo(() => searched.filter((tpl) => !active || tplState(tpl) === active), [searched, active]) // eslint-disable-line react-hooks/exhaustive-deps
+  const rows = useMemo(() => searched.filter((tpl) => !active || tplState(tpl) === active), [searched, active])
   // The API sends every template: sorted and paged here
   const tplList = useClientList(rows, {
     initial: BY_NAME,
