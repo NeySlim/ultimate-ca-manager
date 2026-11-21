@@ -3,7 +3,7 @@
  * (workView, its groups, rows, selection and history), and the overview card with its menu.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 
 const size = vi.hoisted(() => ({ isMobile: false }))
 vi.mock('react-i18next', () => ({
