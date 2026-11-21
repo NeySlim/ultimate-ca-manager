@@ -12,12 +12,12 @@ import { useTranslation } from 'react-i18next'
 import { Certificate, LinkSimple } from '@phosphor-icons/react'
 import { Button, Modal, Input, Select, LoadingSpinner, MemberTransferModal } from '../components'
 import {
+  Modal as AtelierModal, Input as FieldInput, Select as FieldSelect, ToggleSwitch as FieldToggle,
   Zone, Icon, Btn, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody, Section, RecordList, RecordRow,
   SimpleOverview, EmptyBlock, NoMatch, AtelierDialog,
 } from '../components/atelier'
 import { usersService, groupsService, rolesService, casService, accountService, ssoService } from '../services'
 import { hiddenFromIssuance, listedForIssuance, pickerCas, unlistedPickerCas } from '../lib/caSelection'
-import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
 import UserSecurityKeys from '../components/UserSecurityKeys'
 import UserApiKeys from '../components/UserApiKeys'
@@ -785,7 +785,36 @@ export default function UsersGroupsPage() {
 
   return (
     <>
-      <Zone dock={groupsTab ? groupDock : userDock} after={disabling && (
+      <Zone dock={groupsTab ? groupDock : userDock} after={<>
+        {/* User Modal */}
+        <AtelierModal
+          open={showUserModal}
+          onOpenChange={(open) => { setShowUserModal(open); if (!open) setEditingUser(null) }}
+          title={editingUser ? t('users.editUser') : t('users.createUser')}
+          size="md"
+        >
+          <UserForm
+            user={editingUser}
+            isSelf={Boolean(me && editingUser && editingUser.id === me.id)}
+            onSubmit={editingUser ? handleUpdateUser : handleCreateUser}
+            onCancel={() => { setShowUserModal(false); setEditingUser(null) }}
+          />
+        </AtelierModal>
+
+        {/* Group Modal */}
+        <AtelierModal
+          open={showGroupModal}
+          onOpenChange={(open) => { setShowGroupModal(open); if (!open) setEditingGroup(null) }}
+          title={editingGroup ? t('groups.editGroup') : t('groups.createGroup')}
+          size="md"
+        >
+          <GroupForm
+            group={editingGroup}
+            onSubmit={editingGroup ? handleUpdateGroup : handleCreateGroup}
+            onCancel={() => { setShowGroupModal(false); setEditingGroup(null) }}
+          />
+        </AtelierModal>
+        {disabling && (
         <AtelierDialog title={t('users.disableTitle')} subtitle={userName(disabling)} size="narrow" onClose={() => setDisabling(null)} returnTo="user-disable">
           <div className="notice warn"><Icon name="warning" /><span>{t('users.disableText', { login: disabling.username })}</span></div>
           <div className="modal-actions">
@@ -793,7 +822,8 @@ export default function UsersGroupsPage() {
             <Btn tone="danger" id="user-disable-confirm" onClick={confirmDisable}>{t('users.disableConfirm')}</Btn>
           </div>
         </AtelierDialog>
-      )}>
+        )}
+      </>}>
         <PageHead title={groupsTab ? t('common.groups') : t('users.title')}
           total={groupsTab ? t('groups.unit', { count: groups.length }) : t('users.unit', { count: users.length })}
           intent={groupsTab ? t('groups.intent') : t('users.intent')}
@@ -828,35 +858,6 @@ export default function UsersGroupsPage() {
             empty={empty} footer={footer} />
         )}
       </Zone>
-
-      {/* User Modal */}
-      <Modal
-        open={showUserModal}
-        onOpenChange={(open) => { setShowUserModal(open); if (!open) setEditingUser(null) }}
-        title={editingUser ? t('users.editUser') : t('users.createUser')}
-        size="md"
-      >
-        <UserForm
-          user={editingUser}
-          isSelf={Boolean(me && editingUser && editingUser.id === me.id)}
-          onSubmit={editingUser ? handleUpdateUser : handleCreateUser}
-          onCancel={() => { setShowUserModal(false); setEditingUser(null) }}
-        />
-      </Modal>
-
-      {/* Group Modal */}
-      <Modal
-        open={showGroupModal}
-        onOpenChange={(open) => { setShowGroupModal(open); if (!open) setEditingGroup(null) }}
-        title={editingGroup ? t('groups.editGroup') : t('groups.createGroup')}
-        size="md"
-      >
-        <GroupForm
-          group={editingGroup}
-          onSubmit={editingGroup ? handleUpdateGroup : handleCreateGroup}
-          onCancel={() => { setShowGroupModal(false); setEditingGroup(null) }}
-        />
-      </Modal>
 
       {/* Attach a provider (#136): the providers the account has keep opening it */}
       <Modal
@@ -1162,86 +1163,39 @@ function UserForm({ user, isSelf = false, onSubmit, onCancel }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4">
-      <Input
-        label={t('common.username')}
-        value={formData.username}
-        onChange={(e) => setFormData(p => ({ ...p, username: e.target.value }))}
-        required
-        disabled={!!user}
-        placeholder={t('users.usernamePlaceholder')}
-      />
-      <Input
-        label={t('common.email')}
-        type="email"
-        value={formData.email}
-        onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))}
-        required
-        placeholder={t('users.emailPlaceholder')}
-      />
-      <Input
-        label={t('common.name')}
-        value={formData.full_name}
-        onChange={(e) => setFormData(p => ({ ...p, full_name: e.target.value }))}
-        placeholder={t('users.namePlaceholder')}
-      />
-      <Input
-        label={user ? t('common.newPassword') : t('common.password')}
-        type="password"
-        noAutofill
-        value={formData.password}
-        onChange={(e) => setFormData(p => ({ ...p, password: e.target.value }))}
-        required={!user}
-        hasExistingValue={!!user}
-        showStrength={!user}
-      />
-      {user && isSelf && formData.password && (
-        <Input
-          label={t('common.currentPassword')}
-          type="password"
-          noAutofill
-          value={formData.current_password}
-          onChange={(e) => setFormData(p => ({ ...p, current_password: e.target.value }))}
-          required
-        />
-      )}
-      <Select
-        label={t('common.role')}
-        value={formData.role}
-        onChange={(val) => setFormData(p => ({ ...p, role: val }))}
-        options={[
-          { value: 'admin', label: t('users.admin') },
-          { value: 'operator', label: t('common.operator') },
-          { value: 'auditor', label: t('common.auditor') },
-          { value: 'viewer', label: t('common.viewer') }
-        ]}
-      />
-      {customRoles.length > 0 && (
-        <Select
-          label={t('rbac.customRole')}
-          value={formData.custom_role_id}
-          onChange={(val) => setFormData(p => ({ ...p, custom_role_id: val }))}
+    <form onSubmit={handleSubmit}>
+      <div className="form-fields">
+        <FieldInput label={t('common.username')} value={formData.username} onChange={(e) => setFormData(p => ({ ...p, username: e.target.value }))}
+          required disabled={!!user} placeholder={t('users.usernamePlaceholder')} data-autofocus={user ? undefined : true} />
+        <FieldInput label={t('common.email')} type="email" value={formData.email} onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))}
+          required placeholder={t('users.emailPlaceholder')} />
+        <FieldInput label={t('common.name')} value={formData.full_name} onChange={(e) => setFormData(p => ({ ...p, full_name: e.target.value }))}
+          placeholder={t('users.namePlaceholder')} full />
+        <FieldInput label={user ? t('common.newPassword') : t('common.password')} type="password" noAutofill value={formData.password}
+          onChange={(e) => setFormData(p => ({ ...p, password: e.target.value }))} required={!user} hasExistingValue={!!user} showStrength={!user} />
+        {user && isSelf && formData.password && (
+          <FieldInput label={t('common.currentPassword')} type="password" noAutofill value={formData.current_password}
+            onChange={(e) => setFormData(p => ({ ...p, current_password: e.target.value }))} required />
+        )}
+        <FieldSelect label={t('common.role')} value={formData.role} onChange={(val) => setFormData(p => ({ ...p, role: val }))}
           options={[
-            { value: '', label: t('rbac.noCustomRole') },
-            ...customRoles.map(r => ({ value: String(r.id), label: r.name }))
-          ]}
-        />
-      )}
-      {user && (
-        <ToggleSwitch
-          checked={!!formData.active}
-          onChange={(val) => setFormData(p => ({ ...p, active: val }))}
-          label={t('common.status')}
-          description={t('users.activeDescription')}
-        />
-      )}
-      <div className="flex justify-end gap-2 pt-4 border-t border-border">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          {t('common.cancel')}
-        </Button>
-        <Button type="submit" disabled={loading}>
-          {loading ? <LoadingSpinner size="sm" /> : (user ? t('common.save') : t('common.create'))}
-        </Button>
+            { value: 'admin', label: t('users.admin') },
+            { value: 'operator', label: t('common.operator') },
+            { value: 'auditor', label: t('common.auditor') },
+            { value: 'viewer', label: t('common.viewer') },
+          ]} />
+        {customRoles.length > 0 && (
+          <FieldSelect label={t('rbac.customRole')} value={formData.custom_role_id} onChange={(val) => setFormData(p => ({ ...p, custom_role_id: val }))}
+            options={[{ value: '', label: t('rbac.noCustomRole') }, ...customRoles.map(r => ({ value: String(r.id), label: r.name }))]} />
+        )}
+        {user && (
+          <FieldToggle checked={!!formData.active} onChange={(val) => setFormData(p => ({ ...p, active: val }))}
+            label={t('common.status')} description={t('users.activeDescription')} />
+        )}
+      </div>
+      <div className="modal-actions">
+        <button type="button" className="btn" data-action="close-modal" onClick={onCancel}>{t('common.cancel')}</button>
+        <button type="submit" className="btn primary" disabled={loading || undefined}>{user ? t('common.save') : t('common.create')}</button>
       </div>
     </form>
   )
@@ -1308,55 +1262,36 @@ function GroupForm({ group, onSubmit, onCancel }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4">
-      <Input
-        label={t('groups.groupName')}
-        value={formData.name}
-        onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
-        required
-        placeholder={t('groups.namePlaceholder')}
-      />
-      <Input
-        label={t('common.description')}
-        value={formData.description}
-        onChange={(e) => setFormData(p => ({ ...p, description: e.target.value }))}
-        placeholder={t('groups.descriptionPlaceholder')}
-      />
-      <div>
-        <label className="block text-sm font-medium text-text-primary mb-1">{t('groups.permissions')}</label>
-        <p className="text-xs text-text-tertiary mb-2">{t('groups.permissionsHelp')}</p>
-        <div className="max-h-64 overflow-y-auto rounded-md border border-border p-3 space-y-3">
+    <form onSubmit={handleSubmit}>
+      <div className="form-fields">
+        <FieldInput label={t('groups.groupName')} value={formData.name} onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
+          required placeholder={t('groups.namePlaceholder')} data-autofocus />
+        <FieldInput label={t('common.description')} value={formData.description} onChange={(e) => setFormData(p => ({ ...p, description: e.target.value }))}
+          placeholder={t('groups.descriptionPlaceholder')} />
+        {/* One fieldset per resource, its grantable actions as check lines */}
+        <div className="field full">
+          <span>{t('groups.permissions')}</span>
+          <small>{t('groups.permissionsHelp')}</small>
           {Object.keys(groupedPerms).length === 0 ? (
-            <div className="text-xs text-text-tertiary">{t('common.loading')}</div>
-          ) : (
-            Object.entries(groupedPerms).map(([resource, perms]) => (
-              <div key={resource}>
-                <div className="text-xs font-semibold uppercase text-text-tertiary mb-1">{resource}</div>
-                <div className="grid grid-cols-2 gap-1">
-                  {perms.map(perm => (
-                    <label key={perm} className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.permissions.includes(perm)}
-                        onChange={() => togglePermission(perm)}
-                        className="rounded border-border"
-                      />
-                      <span className="font-mono text-xs">{perm}</span>
-                    </label>
-                  ))}
-                </div>
+            <small>{t('common.loading')}</small>
+          ) : Object.entries(groupedPerms).map(([resource, perms]) => (
+            <fieldset key={resource} className="field full">
+              <legend>{resource}</legend>
+              <div className="choice-grid">
+                {perms.map(perm => (
+                  <label key={perm} className="checkbox-line">
+                    <input type="checkbox" checked={formData.permissions.includes(perm)} onChange={() => togglePermission(perm)} />
+                    <span className="mono">{perm}</span>
+                  </label>
+                ))}
               </div>
-            ))
-          )}
+            </fieldset>
+          ))}
         </div>
       </div>
-      <div className="flex justify-end gap-2 pt-4 border-t border-border">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          {t('common.cancel')}
-        </Button>
-        <Button type="submit" disabled={loading}>
-          {loading ? <LoadingSpinner size="sm" /> : (group ? t('common.save') : t('common.create'))}
-        </Button>
+      <div className="modal-actions">
+        <button type="button" className="btn" data-action="close-modal" onClick={onCancel}>{t('common.cancel')}</button>
+        <button type="submit" className="btn primary" disabled={loading || undefined}>{group ? t('common.save') : t('common.create')}</button>
       </div>
     </form>
   )

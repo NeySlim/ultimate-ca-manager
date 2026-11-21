@@ -71,6 +71,12 @@ describe('the SSH CA list', () => {
     expect(screen.getByRole('button', { name: 'Hosts CA' })).toBeInTheDocument()
   })
 
+  it('links to the SSH certificates at their registered address', async () => {
+    page()
+    await screen.findByRole('button', { name: 'Users CA' })
+    expect(screen.getByRole('link', { name: 'sshCertificates.title' })).toHaveAttribute('href', '/ssh/certificates')
+  })
+
   it('gives a reader no create, import, edit or delete', async () => {
     m.write = false
     m.del = false

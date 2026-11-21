@@ -326,7 +326,7 @@ export default function SSHCAsPage() {
     </>}>
       <PageHead title={t('sshCas.title')} total={t('sshCas.subtitle', { count: sshCas.length })} intent={t('sshCas.intent')}
         actions={<>
-          <Btn tone="quiet" icon="terminal" id="ssh-switch" to="/ssh-certificates">{t('sshCertificates.title')}</Btn>
+          <Btn tone="quiet" icon="terminal" id="ssh-switch" to="/ssh/certificates">{t('sshCertificates.title')}</Btn>
           {canWrite('ssh_cas') && <Btn icon="upload" id="ssh-ca-import" write onClick={() => setShowImportModal(true)}>{t('common.import')}</Btn>}
           {create && <Btn tone="primary" icon="plus" id="ssh-ca-new" onClick={create.onClick}>{create.label}</Btn>}
         </>} />

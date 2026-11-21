@@ -46,6 +46,7 @@ vi.mock('../../services', () => ({
   groupsService: {
     getAll: () => Promise.resolve({ data: [{ id: 3, name: 'pki-ops', description: 'Exploitation', member_count: 1 }] }),
     getById: (...a) => m.groupById(...a),
+    getAvailablePermissions: () => Promise.resolve({ data: ['read:certificates', 'write:certificates', 'read:cas'] }),
   },
   rolesService: {
     getAll: () => Promise.resolve({ data: [] }), listRoles: () => Promise.resolve({ data: [] }),
@@ -223,5 +224,32 @@ describe('the groups view', () => {
   it('opens on the groups from the address', async () => {
     page('/users?tab=groups')
     expect(await screen.findByRole('button', { name: 'pki-ops' })).toBeTruthy()
+  })
+})
+
+describe('the account and group dialogs', () => {
+  it('opens the account form in the mockup dialog, its fields in the grid and its actions under the rule', async () => {
+    const { container } = page()
+    await screen.findByRole('button', { name: 'Chloé Durand' })
+    fireEvent.click(screen.getByRole('button', { name: 'users.createUser' }))
+    const dialog = await waitFor(() => { const d = document.querySelector('dialog'); expect(d).toBeTruthy(); return d })
+    expect(container.querySelector('.atl')).toContainElement(dialog)
+    expect(dialog).toHaveAttribute('aria-labelledby', 'modal-title')
+    const fields = dialog.querySelector('form .form-fields')
+    expect(within(fields).getByLabelText('common.username')).toBeRequired()
+    expect(within(fields).getByLabelText('common.role').tagName).toBe('SELECT')
+    expect([...dialog.querySelectorAll('.modal-actions > button')].map((b) => [b.className, b.textContent]))
+      .toEqual([['btn', 'common.cancel'], ['btn primary', 'common.create']])
+  })
+
+  it('lists the group permissions as check lines, by resource', async () => {
+    page()
+    await screen.findByRole('button', { name: 'Chloé Durand' })
+    fireEvent.click(screen.getByRole('button', { name: 'common.groups' }))
+    await screen.findByRole('button', { name: 'pki-ops' })
+    fireEvent.click(screen.getByRole('button', { name: 'groups.createGroup' }))
+    const dialog = await waitFor(() => { const d = document.querySelector('dialog'); expect(d).toBeTruthy(); return d })
+    const certs = await within(dialog).findByRole('group', { name: 'certificates' })
+    expect([...certs.querySelectorAll('label.checkbox-line')].map((l) => l.textContent)).toEqual(['read:certificates', 'write:certificates'])
   })
 })

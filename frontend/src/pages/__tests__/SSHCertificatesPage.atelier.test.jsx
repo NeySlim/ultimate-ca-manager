@@ -76,6 +76,12 @@ describe('the SSH certificate list', () => {
     await waitFor(() => expect(lastParams()).toMatchObject({ sort_by: 'valid_to', sort_order: 'desc' }))
   })
 
+  it('links to the SSH authorities at their registered address', async () => {
+    page()
+    await screen.findByRole('button', { name: 'alice' })
+    expect(screen.getByRole('link', { name: 'sshCas.title' })).toHaveAttribute('href', '/ssh/cas')
+  })
+
   it('shortens a long principal list in its cell', async () => {
     page()
     const row = (await screen.findByRole('button', { name: 'alice' })).closest('tr')

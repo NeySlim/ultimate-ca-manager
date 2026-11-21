@@ -137,14 +137,14 @@ export default function SSHCertificatesPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Deep link: /ssh-certificates/:id opens that certificate once the page holds it
+  // Deep link: /ssh/certificates/:id opens that certificate once the page holds it
   useEffect(() => {
     if (urlCertId && !loading && certificates.length > 0) {
       const id = parseInt(urlCertId, 10)
       if (!isNaN(id)) {
         const found = certificates.find((c) => c.id === id)
         if (found) setSelectedCert(found)
-        navigate('/ssh-certificates', { replace: true })
+        navigate('/ssh/certificates', { replace: true })
       }
     }
   }, [urlCertId, loading, certificates.length]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -376,7 +376,7 @@ export default function SSHCertificatesPage() {
     </>}>
       <PageHead title={t('sshCertificates.title')} total={t('sshCertificates.subtitle', { count: total })} intent={t('sshCertificates.intent')}
         actions={<>
-          <Btn tone="quiet" icon="terminal" id="ssh-switch" to="/ssh-cas">{t('sshCas.title')}</Btn>
+          <Btn tone="quiet" icon="terminal" id="ssh-switch" to="/ssh/cas">{t('sshCas.title')}</Btn>
           {canWrite('ssh') && <Btn icon="upload" id="ssh-cert-import" write onClick={() => setDialog('import')}>{t('common.import')}</Btn>}
           {issue && <Btn tone="primary" icon="plus" id="ssh-cert-new" onClick={issue.onClick}>{issue.label}</Btn>}
         </>} />
