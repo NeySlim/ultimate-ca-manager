@@ -12,7 +12,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Input } from '../components/atelier/Form'
 import {
   Zone, AtelierDialog, Icon, Btn, Pill, PageHead, Toolbar, SearchField, FilterSelect, BatchBar, ListView, Dock, DockBody, Section, Props,
-  LoadError, LoadCause, EmptyBlock, NoMatch,
+  LoadError, LoadCause, EmptyBlock, NoMatch, useClientList,
 } from '../components/atelier'
 import { SmartImportModal } from '../components/SmartImport'
 import { truststoreService, casService } from '../services'
@@ -29,6 +29,7 @@ import { PemPanel } from './certificates/inspector/PemPanel'
 import { PhoneMoreActions } from './pki/PhoneMoreActions'
 
 // The anchor types the server stores (purpose), in the order of the type filter
+const BY_NAME = { key: 'name', asc: true }
 const PURPOSES = ['root_ca', 'intermediate_ca', 'client_auth', 'code_signing', 'system', 'custom']
 const PURPOSE_LABELS = {
   root_ca: 'common.rootCA', intermediate_ca: 'common.intermediate', client_auth: 'trustStore.clientAuth',
@@ -54,11 +55,10 @@ export default function TrustStorePage() {
   const [syncing, setSyncing] = useState(false)
   const [syncLimit, setSyncLimit] = useState(500)
   const [showImportModal, setShowImportModal] = useState(false)
-  // The search, the type and state filters (kept), the sort and the open dock tab
+  // The search, the type and state filters (kept) and the open dock tab
   const [query, setQuery] = useState('')
   const [purpose, setPurpose] = usePersistedState('ucm-truststore-type', '')
   const [state, setState] = usePersistedState('ucm-truststore-state', '')
-  const [sort, setSort] = useState({ key: 'name', asc: true })
   const [section, setSection] = useState('overview')
   
   // Add from managed CAs modal state
@@ -104,20 +104,13 @@ export default function TrustStorePage() {
     return () => window.removeEventListener('ucm:data-changed', handler)
   }, [loadCertificates])
 
-  // The search and the type filter, then the state chip and the sort
+  // The search and the type filter, then the state chip; the sort and the pages are the list's (useClientList)
   const searched = useMemo(() => {
     const q = query.trim().toLowerCase()
     return certificates.filter((c) => (!purpose || c.purpose === purpose)
       && (!q || [c.name, c.subject, c.issuer, c.purpose, c.description].some((v) => String(v || '').toLowerCase().includes(q))))
   }, [certificates, purpose, query])
-  const filteredCertificates = useMemo(() => {
-    const value = { name: (c) => String(c.name || '').toLowerCase(), not_after: (c) => c.not_after || '' }[sort.key]
-    return searched.filter((c) => !state || (c._expiry_status || 'valid') === state).sort((a, b) => {
-      const va = value(a)
-      const vb = value(b)
-      return (va < vb ? -1 : va > vb ? 1 : 0) * (sort.asc ? 1 : -1)
-    })
-  }, [searched, state, sort])
+  const filteredCertificates = useMemo(() => searched.filter((c) => !state || (c._expiry_status || 'valid') === state), [searched, state])
 
   // The list row holds the anchor; its detail completes it once read
   const handleSelectCert = async (cert) => {
@@ -379,13 +372,27 @@ export default function TrustStorePage() {
     ...present.map((s) => ({ id: s, label: t(`trustStore.module.states.${s}`), count: searched.filter((c) => tsState(c) === s).length })),
   ]
   const rows = filteredCertificates
+  // The API sends every anchor (no page nor sort parameter): sorted and paged here
+  const list = useClientList(rows, {
+    initial: BY_NAME,
+    resetKey: `${query}|${purpose}|${state}`,
+    sorts: {
+      name: (c) => c.name, subject: (c) => c.subject, usage: (c) => c.description, type: tsType,
+      not_after: (c) => c.not_after && Date.parse(c.not_after), state: (c) => ['valid', 'expiring', 'expired'].indexOf(tsState(c)),
+    },
+  })
   const narrowed = Boolean(query.trim() || purpose || active)
   const write = canWrite('truststore')
   const add = write ? { label: t('trustStore.addCertificate'), icon: 'plus', onClick: handleOpenAddModal, write: true } : undefined
   const selection = canDelete('truststore') ? {
     selected: selectedIds,
     onToggle: (id) => setSelectedIds((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next }),
-    onTogglePage: (on) => setSelectedIds(on ? new Set(rows.map((c) => c.id)) : new Set()),
+    // The page's anchors join the ones ticked on other pages, or leave them
+    onTogglePage: (on) => setSelectedIds((prev) => {
+      const next = new Set(prev)
+      list.rows.forEach((c) => (on ? next.add(c.id) : next.delete(c.id)))
+      return next
+    }),
   } : undefined
   const ticked = rows.filter((c) => selectedIds.has(c.id)).length
 
@@ -461,7 +468,7 @@ export default function TrustStorePage() {
           ]} />
           {write && <Btn tone="primary" icon="plus" id="truststore-add" onClick={handleOpenAddModal}>{t('trustStore.add')}</Btn>}
         </>} />
-      <ListView label={t('shell.moduleLabel.truststore')} caption={t('trustStore.module.caption')} icon="anchor" rows={rows} loading={loading}
+      <ListView label={t('shell.moduleLabel.truststore')} caption={t('trustStore.module.caption')} icon="anchor" list={list} loading={loading}
         filters={{ views, active, onChange: setState, label: t('trustStore.module.filterByState') }}
         toolbar={<>
           <Toolbar>
@@ -476,13 +483,13 @@ export default function TrustStorePage() {
           )}
         </>}
         title={(c) => c.name || '—'} status={tsPill} openedId={open?.id} onOpen={handleSelectCert} selection={selection}
-        sort={sort} onSort={(key) => setSort((s) => ({ key, asc: s.key === key ? !s.asc : true }))} nameSort="name"
+        nameSort="name"
         columns={[
-          { id: 'subject', label: t('trustStore.module.subject'), cell: (c) => c.subject || '—', grow: true },
-          { id: 'usage', label: t('trustStore.module.usage'), cell: tsUsage },
-          { id: 'type', label: t('common.type'), cell: tsType },
+          { id: 'subject', label: t('trustStore.module.subject'), cell: (c) => c.subject || '—', grow: true, sort: 'subject' },
+          { id: 'usage', label: t('trustStore.module.usage'), cell: tsUsage, sort: 'usage' },
+          { id: 'type', label: t('common.type'), cell: tsType, sort: 'type' },
           { id: 'expires', label: t('trustStore.module.expires'), cell: tsExpires, sort: 'not_after' },
-          { status: true },
+          { status: true, sort: 'state' },
         ]}
         error={loadError && (
           <LoadError id="truststore" title={t('messages.errors.loadFailed.truststore')} onRetry={loadCertificates} journal={hasPermission?.('read:audit') ? '/audit' : undefined}
@@ -494,7 +501,7 @@ export default function TrustStorePage() {
         ) : (
           <EmptyBlock id="truststore" icon="anchor" title={t('trustStore.module.emptyTitle')} text={t('trustStore.addCertificatesForChain')} action={add} />
         )}
-        footer={{ range: t('trustStore.module.range', { shown: rows.length, count: certificates.length }) }} />
+        footer={{ range: t('trustStore.module.range', list.counts(certificates.length)) }} />
     </Zone>
   )
 }
