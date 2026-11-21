@@ -82,9 +82,8 @@ function setConfig(overrides = {}) {
 }
 
 async function openSettingsTab() {
-  render(<MemoryRouter><TSAPage /></MemoryRouter>)
-  const tabs = await screen.findAllByText('tsa.groups.settings')
-  fireEvent.click(tabs[tabs.length - 1])
+  render(<MemoryRouter initialEntries={['/tsa-config?tab=config']}><TSAPage /></MemoryRouter>)
+  await screen.findByText('tsa.signingCertDesc')
 }
 
 describe('TSAPage — one-click signer issuance (#312)', () => {

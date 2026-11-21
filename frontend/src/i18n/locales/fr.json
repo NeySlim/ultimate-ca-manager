@@ -2325,7 +2325,49 @@
     "namedUrlsOff": "Les chemins CDP/AIA utilisent l’identifiant interne. Activez pour utiliser un slug issu du nom de l’AC dans les nouveaux certificats.",
     "namedUrlsEnable": "Utiliser le nom de l’AC",
     "namedUrlsConfirm": "Activer les URLs de protocole nommées pour « {{name}} » ? Un slug issu du nom de l’AC apparaîtra dans les URLs CDP/AIA des nouveaux certificats émis. Les URLs existantes continuent de fonctionner. Cette option ne pourra plus être désactivée.",
-    "namedUrlsEnabled": "URLs nommées activées : {{slug}}"
+    "namedUrlsEnabled": "URLs nommées activées : {{slug}}",
+    "unit_one": "{{count}} autorité",
+    "unit_other": "{{count}} autorités",
+    "range_one": "{{shown}} sur {{count}} autorité",
+    "range_other": "{{shown}} sur {{count}} autorités",
+    "caption": "CRL / OCSP. Activez un nom pour ouvrir son détail.",
+    "filterByState": "Filtrer par état",
+    "search": "Rechercher une autorité",
+    "createCa": "Créer une AC",
+    "states": {
+      "current": "À jour",
+      "soon": "Moins de 24 h",
+      "expired": "Échue",
+      "none": "Sans CRL"
+    },
+    "numberOf": "n° {{number}}",
+    "ocspActive": "Actif",
+    "ocspInactive": "Inactif",
+    "columns": {
+      "published": "Publiée"
+    },
+    "tabs": {
+      "publication": "Publication"
+    },
+    "responderDisabled": "désactivé",
+    "responderRunning": "en marche",
+    "responderStopped": "arrêté",
+    "responderAside": "Répondeur OCSP : {{state}}, {{count}} requêtes, {{rate}} % en cache",
+    "summaryNone": "Aucune CRL publiée pour cette autorité.",
+    "summaryRevoked_one": "La CRL n° {{number}} liste {{count}} certificat révoqué.",
+    "summaryRevoked_other": "La CRL n° {{number}} liste {{count}} certificats révoqués.",
+    "summary": {
+      "soon": "Sa prochaine mise à jour tombe dans moins de 24 h.",
+      "expired": "Sa date de prochaine mise à jour est passée : régénérez-la."
+    },
+    "days_one": "{{count}} jour",
+    "days_other": "{{count}} jours",
+    "hours_one": "{{count}} heure",
+    "hours_other": "{{count}} heures",
+    "ocspResponderOf": "Répondre en OCSP pour cette autorité",
+    "statsAllAuthorities": "Requêtes et réponses en cache comptent toutes les autorités du répondeur.",
+    "serial": "N° de série {{serial}}",
+    "slug": "Nom dans les URL"
   },
   "deploy": {
     "title": "Déploiement de certificats",
@@ -6372,7 +6414,29 @@
     "labelName": "Libellé",
     "labelPlaceholder": "ex. agence",
     "responseIncludeChain": "Inclure la chaîne AC dans les réponses d’enrôlement",
-    "responseIncludeChainHelp": "Les réponses RFC 7030 ne contiennent que le certificat émis ; à activer pour les clients legacy qui construisent leur bundle depuis la réponse d’enrôlement au lieu de /cacerts."
+    "responseIncludeChainHelp": "Les réponses RFC 7030 ne contiennent que le certificat émis ; à activer pour les clients legacy qui construisent leur bundle depuis la réponse d’enrôlement au lieu de /cacerts.",
+    "unit_one": "{{count}} point d’enrôlement",
+    "unit_other": "{{count}} points d’enrôlement",
+    "range_one": "{{shown}} sur {{count}} point d’enrôlement",
+    "range_other": "{{shown}} sur {{count}} points d’enrôlement",
+    "caption": "EST. Activez un nom pour ouvrir son détail.",
+    "defaultEndpoint": "Point par défaut",
+    "columns": {
+      "auth": "Authentification"
+    },
+    "auth": {
+      "cert": "Certificat client",
+      "certOrPassword": "Certificat client ou mot de passe"
+    },
+    "aside": "{{total}} enrôlements, {{failed}} en échec",
+    "summaryTotals": "{{total}} enrôlements depuis le début sur tous les points, {{successful}} réussis, {{failed}} en échec.",
+    "labelsRepeated": "Deux libellés sont identiques : renommez-en un avant d’enregistrer.",
+    "removeLabel": "Retirer le libellé {{label}}",
+    "addLabel": "Ajouter un libellé",
+    "passwordKept": "Un mot de passe est enregistré : laissez vide pour le garder.",
+    "views": {
+      "list": "Points d’enrôlement"
+    }
   },
   "discovery": {
     "aboutDiscovery": "À propos de la découverte",
@@ -6983,6 +7047,28 @@
       "management": "Gestion",
       "settings": "Paramètres",
       "info": "Informations"
+    },
+    "serviceName": "Service d’horodatage",
+    "unit_one": "{{count}} service",
+    "unit_other": "{{count}} services",
+    "range_one": "{{shown}} sur {{count}} service",
+    "range_other": "{{shown}} sur {{count}} services",
+    "caption": "TSA. Activez un nom pour ouvrir son détail.",
+    "filterByState": "Filtrer par état",
+    "columns": {
+      "ca": "Autorité",
+      "digest": "Hachage",
+      "policy": "Politique"
+    },
+    "configure": "Configurer",
+    "summaryTotals": "{{total}} demandes reçues depuis le début, {{successful}} servies par un jeton, {{failed}} refusées.",
+    "sections": {
+      "service": "Service",
+      "signer": "Signature des jetons"
+    },
+    "views": {
+      "list": "Services",
+      "config": "Configuration"
     }
   },
   "sshCas": {
@@ -8144,5 +8230,14 @@
     "detailOf": "Détail : {{name}}",
     "sectionsOf": "Sections : {{name}}",
     "settingsSections": "Sections des paramètres"
+  },
+  "protocols": {
+    "copyValue": "Copier {{name}}",
+    "removeUrl": "Retirer {{url}}",
+    "newUrl": "Nouvelle URL : {{name}}",
+    "view": "Vue",
+    "sections_one": "{{count}} section",
+    "sections_other": "{{count}} sections",
+    "sectionsOf": "Sections : {{name}}"
   }
 }

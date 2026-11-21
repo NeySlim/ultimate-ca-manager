@@ -108,9 +108,8 @@ import { tsaService } from '../../services/tsa.service'
 /** Render the page and open the Settings tab (the layout starts on the
  *  mobile tab menu under jsdom's matchMedia mock). */
 async function openSettingsTab() {
-  render(<MemoryRouter><TSAPage /></MemoryRouter>)
-  const settingsTabs = await screen.findAllByText('tsa.groups.settings')
-  fireEvent.click(settingsTabs[settingsTabs.length - 1])
+  render(<MemoryRouter initialEntries={['/tsa-config?tab=config']}><TSAPage /></MemoryRouter>)
+  await screen.findByText('tsa.signingCertDesc')
 }
 
 describe('TSAPage — require_dedicated_cert toggle', () => {
@@ -129,7 +128,7 @@ describe('TSAPage — require_dedicated_cert toggle', () => {
     const label = await screen.findByText('tsa.requireDedicatedCert')
     fireEvent.click(label)
 
-    fireEvent.click(screen.getByText('common.saveConfiguration'))
+    fireEvent.click(screen.getByText('common.save'))
 
     await waitFor(() => expect(tsaService.updateConfig).toHaveBeenCalled())
     expect(tsaService.updateConfig).toHaveBeenCalledWith(

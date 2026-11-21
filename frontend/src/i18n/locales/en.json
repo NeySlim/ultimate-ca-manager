@@ -2725,7 +2725,49 @@
     "namedUrlsOff": "CDP/AIA paths use the internal id. Enable to use a slug from the CA name in new certificates.",
     "namedUrlsEnable": "Use CA name",
     "namedUrlsConfirm": "Enable named protocol URLs for \"{{name}}\"? A slug derived from the CA name will appear in CDP/AIA URLs of newly issued certificates. Existing URLs keep working. This cannot be disabled later.",
-    "namedUrlsEnabled": "Named URLs enabled: {{slug}}"
+    "namedUrlsEnabled": "Named URLs enabled: {{slug}}",
+    "unit_one": "{{count}} authority",
+    "unit_other": "{{count}} authorities",
+    "range_one": "{{shown}} of {{count}} authority",
+    "range_other": "{{shown}} of {{count}} authorities",
+    "caption": "CRL / OCSP. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
+    "search": "Search authorities",
+    "createCa": "Create an authority",
+    "states": {
+      "current": "Up to date",
+      "soon": "Under 24 h",
+      "expired": "Expired",
+      "none": "No CRL"
+    },
+    "numberOf": "No. {{number}}",
+    "ocspActive": "Active",
+    "ocspInactive": "Inactive",
+    "columns": {
+      "published": "Published"
+    },
+    "tabs": {
+      "publication": "Publication"
+    },
+    "responderDisabled": "disabled",
+    "responderRunning": "running",
+    "responderStopped": "stopped",
+    "responderAside": "OCSP responder: {{state}}, {{count}} requests, {{rate}} % from cache",
+    "summaryNone": "No CRL published yet for this authority.",
+    "summaryRevoked_one": "CRL no. {{number}} lists {{count}} revoked certificate.",
+    "summaryRevoked_other": "CRL no. {{number}} lists {{count}} revoked certificates.",
+    "summary": {
+      "soon": "Its next update falls within 24 hours.",
+      "expired": "Its next update date has passed: regenerate it."
+    },
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "hours_one": "{{count}} hour",
+    "hours_other": "{{count}} hours",
+    "ocspResponderOf": "Answer OCSP for this authority",
+    "statsAllAuthorities": "Requests and cache hits count every authority of the responder.",
+    "serial": "Serial {{serial}}",
+    "slug": "Name in the URLs"
   },
   "deploy": {
     "title": "Certificate Deployment",
@@ -6372,7 +6414,29 @@
     "labelName": "Label",
     "labelPlaceholder": "e.g. branch-office",
     "responseIncludeChain": "Include CA chain in enroll responses",
-    "responseIncludeChainHelp": "RFC 7030 responses contain only the issued certificate; enable for legacy clients that build their bundle from the enroll response instead of /cacerts."
+    "responseIncludeChainHelp": "RFC 7030 responses contain only the issued certificate; enable for legacy clients that build their bundle from the enroll response instead of /cacerts.",
+    "unit_one": "{{count}} enrollment endpoint",
+    "unit_other": "{{count}} enrollment endpoints",
+    "range_one": "{{shown}} of {{count}} endpoint",
+    "range_other": "{{shown}} of {{count}} endpoints",
+    "caption": "EST. Activate a name to open its detail.",
+    "defaultEndpoint": "Default endpoint",
+    "columns": {
+      "auth": "Authentication"
+    },
+    "auth": {
+      "cert": "Client certificate",
+      "certOrPassword": "Client certificate or password"
+    },
+    "aside": "{{total}} enrollments, {{failed}} failed",
+    "summaryTotals": "{{total}} enrollments since the start on every endpoint, {{successful}} succeeded, {{failed}} failed.",
+    "labelsRepeated": "Two labels are the same: rename one before saving.",
+    "removeLabel": "Remove label {{label}}",
+    "addLabel": "Add a label",
+    "passwordKept": "A password is saved: leave empty to keep it.",
+    "views": {
+      "list": "Endpoints"
+    }
   },
   "discovery": {
     "aboutDiscovery": "About Discovery",
@@ -6983,6 +7047,28 @@
       "management": "Management",
       "settings": "Settings",
       "info": "Information"
+    },
+    "serviceName": "Time-stamping service",
+    "unit_one": "{{count}} service",
+    "unit_other": "{{count}} services",
+    "range_one": "{{shown}} of {{count}} service",
+    "range_other": "{{shown}} of {{count}} services",
+    "caption": "TSA. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
+    "columns": {
+      "ca": "Authority",
+      "digest": "Hash",
+      "policy": "Policy"
+    },
+    "configure": "Configure",
+    "summaryTotals": "{{total}} requests received since the start, {{successful}} answered with a token, {{failed}} refused.",
+    "sections": {
+      "service": "Service",
+      "signer": "Token signing"
+    },
+    "views": {
+      "list": "Services",
+      "config": "Configuration"
     }
   },
   "sshCas": {
@@ -8144,5 +8230,14 @@
     "detailOf": "Detail: {{name}}",
     "sectionsOf": "Sections: {{name}}",
     "settingsSections": "Settings sections"
+  },
+  "protocols": {
+    "copyValue": "Copy {{name}}",
+    "removeUrl": "Remove {{url}}",
+    "newUrl": "New URL: {{name}}",
+    "view": "View",
+    "sections_one": "{{count}} section",
+    "sections_other": "{{count}} sections",
+    "sectionsOf": "Sections: {{name}}"
   }
 }

@@ -85,10 +85,10 @@ async function openSettings(ca_refid) {
   tsaService.getConfig.mockResolvedValue({
     data: { enabled: true, ca_refid, policy_oid: '1.2.3.4.1', signer_cert_refid: '', signer: { configured: false } },
   })
-  render(<MemoryRouter><TSAPage /></MemoryRouter>)
-  const tabs = await screen.findAllByText('tsa.groups.settings')
-  fireEvent.click(tabs[tabs.length - 1])
-  return screen.findByTestId('field-tsa.signingCA')
+  render(<MemoryRouter initialEntries={['/tsa-config?tab=config']}><TSAPage /></MemoryRouter>)
+  await screen.findByText('tsa.signingCertDesc')
+  // The settings picker is the configuration form's own select, in its .field with the hint
+  return (await screen.findByRole('combobox', { name: 'tsa.signingCA' })).closest('.field')
 }
 
 const labels = (field) => within(field).getAllByRole('option').filter((o) => o.value !== '').map((o) => o.textContent)
@@ -116,7 +116,7 @@ describe('TSAPage signing CA pickers (#426)', () => {
     await openSettings('ca-sign')
     fireEvent.click(await screen.findByText('tsa.signerGenerate'))
     await screen.findByText('tsa.signerGenerateModalDesc')
-    const [, field] = screen.getAllByTestId('field-tsa.signingCA')
+    const field = screen.getByTestId('field-tsa.signingCA')
     expect(labels(field)).toEqual(['Signing CA'])
     fireEvent.click(screen.getByText('cas.showHiddenCas:1'))
     expect(labels(field)).toEqual(['Signing CA', 'Hidden root'])
@@ -126,7 +126,7 @@ describe('TSAPage signing CA pickers (#426)', () => {
     await openSettings('ca-sign')
     fireEvent.click(await screen.findByText('tsa.signerGenerate'))
     await screen.findByText('tsa.signerGenerateModalDesc')
-    const [, field] = screen.getAllByTestId('field-tsa.signingCA')
+    const field = screen.getByTestId('field-tsa.signingCA')
     expect(labels(field)).toEqual(['Signing CA'])
     expect(field).toHaveTextContent('cas.notListedForSigning:2')
     fireEvent.click(within(field).getByText('choose-keyless'))

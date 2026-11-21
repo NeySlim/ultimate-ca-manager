@@ -2799,7 +2799,59 @@
     "namedUrlsOff": "Пути CDP/AIA используют внутренний идентификатор. Включите, чтобы в новых сертификатах использовался слаг из имени ЦС.",
     "namedUrlsEnable": "Использовать имя ЦС",
     "namedUrlsConfirm": "Включить именованные URL протоколов для «{{name}}»? В URL CDP/AIA вновь выпущенных сертификатов появится слаг, образованный от имени ЦС. Существующие URL продолжат работать. Отключить это позже нельзя.",
-    "namedUrlsEnabled": "Именованные URL включены: {{slug}}"
+    "namedUrlsEnabled": "Именованные URL включены: {{slug}}",
+    "unit_one": "{{count}} центр",
+    "unit_other": "{{count}} центра",
+    "unit_few": "{{count}} центра",
+    "unit_many": "{{count}} центров",
+    "range_one": "{{shown}} из {{count}} центра",
+    "range_other": "{{shown}} из {{count}} центров",
+    "range_few": "{{shown}} из {{count}} центров",
+    "range_many": "{{shown}} из {{count}} центров",
+    "caption": "CRL / OCSP. Активируйте имя, чтобы открыть подробности.",
+    "filterByState": "Фильтр по состоянию",
+    "search": "Поиск центров",
+    "createCa": "Создать ЦС",
+    "states": {
+      "current": "Актуальна",
+      "soon": "Менее 24 ч",
+      "expired": "Просрочена",
+      "none": "Без CRL"
+    },
+    "numberOf": "№ {{number}}",
+    "ocspActive": "Активен",
+    "ocspInactive": "Неактивен",
+    "columns": {
+      "published": "Опубликована"
+    },
+    "tabs": {
+      "publication": "Публикация"
+    },
+    "responderDisabled": "отключён",
+    "responderRunning": "работает",
+    "responderStopped": "остановлен",
+    "responderAside": "OCSP-ответчик: {{state}}, запросов: {{count}}, из кэша {{rate}} %",
+    "summaryNone": "Для этого центра CRL ещё не опубликован.",
+    "summaryRevoked_one": "CRL № {{number}} содержит {{count}} отозванный сертификат.",
+    "summaryRevoked_other": "CRL № {{number}} содержит {{count}} отозванных сертификата.",
+    "summaryRevoked_few": "CRL № {{number}} содержит {{count}} отозванных сертификата.",
+    "summaryRevoked_many": "CRL № {{number}} содержит {{count}} отозванных сертификатов.",
+    "summary": {
+      "soon": "Следующее обновление менее чем через 24 ч.",
+      "expired": "Дата следующего обновления прошла: перевыпустите его."
+    },
+    "days_one": "{{count}} день",
+    "days_other": "{{count}} дня",
+    "days_few": "{{count}} дня",
+    "days_many": "{{count}} дней",
+    "hours_one": "{{count}} час",
+    "hours_other": "{{count}} часа",
+    "hours_few": "{{count}} часа",
+    "hours_many": "{{count}} часов",
+    "ocspResponderOf": "Отвечать по OCSP для этого центра",
+    "statsAllAuthorities": "Запросы и попадания в кэш учитывают все центры ответчика.",
+    "serial": "Серийный № {{serial}}",
+    "slug": "Имя в URL"
   },
   "deploy": {
     "title": "Развёртывание сертификатов",
@@ -6576,7 +6628,33 @@
     "labelName": "Метка",
     "labelPlaceholder": "например, branch-office",
     "responseIncludeChain": "Включать цепочку ЦС в ответы на регистрацию",
-    "responseIncludeChainHelp": "Ответы RFC 7030 содержат только выпущенный сертификат; включите для устаревших клиентов, которые собирают набор из ответа на регистрацию, а не из /cacerts."
+    "responseIncludeChainHelp": "Ответы RFC 7030 содержат только выпущенный сертификат; включите для устаревших клиентов, которые собирают набор из ответа на регистрацию, а не из /cacerts.",
+    "unit_one": "{{count}} точка регистрации",
+    "unit_other": "{{count}} точки регистрации",
+    "unit_few": "{{count}} точки регистрации",
+    "unit_many": "{{count}} точек регистрации",
+    "range_one": "{{shown}} из {{count}} точки",
+    "range_other": "{{shown}} из {{count}} точек",
+    "range_few": "{{shown}} из {{count}} точек",
+    "range_many": "{{shown}} из {{count}} точек",
+    "caption": "EST. Активируйте имя, чтобы открыть подробности.",
+    "defaultEndpoint": "Точка по умолчанию",
+    "columns": {
+      "auth": "Аутентификация"
+    },
+    "auth": {
+      "cert": "Клиентский сертификат",
+      "certOrPassword": "Клиентский сертификат или пароль"
+    },
+    "aside": "Регистраций: {{total}}, с ошибкой: {{failed}}",
+    "summaryTotals": "Регистраций с начала работы на всех точках: {{total}}, успешных: {{successful}}, с ошибкой: {{failed}}.",
+    "labelsRepeated": "Две метки совпадают: переименуйте одну перед сохранением.",
+    "removeLabel": "Удалить метку {{label}}",
+    "addLabel": "Добавить метку",
+    "passwordKept": "Пароль сохранён: оставьте поле пустым, чтобы сохранить его.",
+    "views": {
+      "list": "Точки регистрации"
+    }
   },
   "discovery": {
     "aboutDiscovery": "Об обнаружении",
@@ -7191,6 +7269,32 @@
       "management": "Управление",
       "settings": "Настройки",
       "info": "Информация"
+    },
+    "serviceName": "Служба меток времени",
+    "unit_one": "{{count}} служба",
+    "unit_other": "{{count}} службы",
+    "unit_few": "{{count}} службы",
+    "unit_many": "{{count}} служб",
+    "range_one": "{{shown}} из {{count}} службы",
+    "range_other": "{{shown}} из {{count}} служб",
+    "range_few": "{{shown}} из {{count}} служб",
+    "range_many": "{{shown}} из {{count}} служб",
+    "caption": "TSA. Активируйте имя, чтобы открыть подробности.",
+    "filterByState": "Фильтр по состоянию",
+    "columns": {
+      "ca": "Центр",
+      "digest": "Хеш",
+      "policy": "Политика"
+    },
+    "configure": "Настроить",
+    "summaryTotals": "Получено запросов с начала работы: {{total}}, выдано меток: {{successful}}, отклонено: {{failed}}.",
+    "sections": {
+      "service": "Служба",
+      "signer": "Подпись меток"
+    },
+    "views": {
+      "list": "Службы",
+      "config": "Конфигурация"
     }
   },
   "sshCas": {
@@ -8468,5 +8572,16 @@
     "detailOf": "Сведения: {{name}}",
     "sectionsOf": "Разделы: {{name}}",
     "settingsSections": "Разделы параметров"
+  },
+  "protocols": {
+    "copyValue": "Копировать: {{name}}",
+    "removeUrl": "Удалить {{url}}",
+    "newUrl": "Новый URL: {{name}}",
+    "view": "Вид",
+    "sections_one": "{{count}} раздел",
+    "sections_other": "{{count}} раздела",
+    "sections_few": "{{count}} раздела",
+    "sections_many": "{{count}} разделов",
+    "sectionsOf": "Разделы: {{name}}"
   }
 }

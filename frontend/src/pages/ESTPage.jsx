@@ -1,359 +1,270 @@
 /**
- * EST Management Page
- * Enrollment over Secure Transport (RFC 7030) configuration and information
+ * EST: the mockup's est module, a simplePage() list (Autorité, Authentification, État) with its
+ * one-object dock, on the endpoints the product really serves: the default one and one per CA
+ * label (/.well-known/est/<label>/). Its configuration takes the mockup's settingsView(). Named
+ * profiles with their own activation, authentication and last request (M09) are a function the
+ * product lacks: activation and HTTP Basic credentials are shared by every endpoint.
  */
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router-dom'
 import {
-  Globe, Gear, Copy, Info, ShieldCheck, Plugs, Warning, CheckCircle,
-  ChartBar, Lock, ArrowsClockwise, Tag
-} from '@phosphor-icons/react'
-import {
-  ResponsiveLayout,
-  Button, Input, Select, Card,
-  LoadingSpinner, EmptyState, HelpCard,
-  CompactStats
-} from '../components'
+  Zone, Btn, IconBtn, Icon, Pill, PageHead, ListView, Dock, DockBody, Section, Props, SettingsView, SkeletonPanel,
+  LoadError, LoadCause, EmptyBlock,
+} from '../components/atelier'
 import { estService, casService } from '../services'
 import { useNotification } from '../contexts'
-import { usePermission, useClipboard } from '../hooks'
-import { ToggleSwitch } from '../components/ui/ToggleSwitch'
-import MappingEditor from './settings/MappingEditor'
+import { usePermission } from '../hooks'
 import { pickerCas, unlistedPickerCas } from '../lib/caSelection'
+import { Copyable, Notice, ViewSwitch } from './protocols/atelierParts'
+import { repeatedRows } from './protocols/protocolStates'
+
+const ENDPOINTS = ['cacerts', 'simpleenroll', 'simplereenroll', 'csrattrs', 'serverkeygen']
+const FIELDS = ['enabled', 'ca_id', 'validity_days', 'response_include_chain', 'username', 'password']
+
+// Rows carry a stable id so editing a label neither reorders the list nor collides mid-typing;
+// the API's object keeps the first row of a repeated label, and a repeated label blocks the save
+let nextRowId = 0
+const toRows = (obj) => Object.entries(obj || {}).map(([key, val]) => ({ id: ++nextRowId, key, val }))
+const toObject = (rows) => {
+  const seen = new Set()
+  return Object.fromEntries(rows.filter((r) => !seen.has(r.key) && seen.add(r.key)).map((r) => [r.key, r.val]))
+}
+
+// The API returns labels enriched ({label: {ca_refid, ca_name}}); the PATCH takes {label: ca_refid}
+const flatLabels = (labels) => Object.fromEntries(Object.entries(labels || {}).map(([label, v]) => [label, (v && typeof v === 'object') ? (v.ca_refid || '') : v]))
+const draftOf = (c) => ({
+  enabled: !!c.enabled, ca_id: c.ca_id != null ? String(c.ca_id) : '', validity_days: String(c.validity_days || 365),
+  response_include_chain: !!c.response_include_chain, username: c.username || '', password: '',
+})
 
 export default function ESTPage() {
   const { t } = useTranslation()
-  const { showSuccess, showError, showInfo } = useNotification()
-  const { hasPermission, canWrite } = usePermission()
-  const { copy } = useClipboard()
+  const { showSuccess, showError } = useNotification()
+  const { hasPermission } = usePermission()
+  const canEdit = hasPermission('write:est')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const view = searchParams.get('tab') === 'config' ? 'config' : 'list'
 
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
   const [config, setConfig] = useState({})
+  const [draft, setDraft] = useState(draftOf({}))
+  const [rows, setRows] = useState([])
   const [cas, setCas] = useState([])
   const [stats, setStats] = useState({ total: 0, successful: 0, failed: 0 })
-  const [activeTab, setActiveTab] = useState('settings')
   const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    loadData()
-  }, [])
+  const [failed, setFailed] = useState([])
+  const [announce, setAnnounce] = useState('')
+  const [tried, setTried] = useState(false)
+  const [openId, setOpenId] = useState(null)
+  const stateRef = useRef(null)
 
   const loadData = async () => {
-    setLoading(true)
+    setLoadError(null)
     try {
-      const [configRes, casRes, statsRes] = await Promise.all([
-        estService.getConfig(),
-        casService.getAll(),
-        estService.getStats()
-      ])
-      // The API returns labels enriched ({label: {ca_refid, ca_name}}); the
-      // editor and the PATCH both work on the flat {label: ca_refid} shape.
-      const rawConfig = configRes.data || {}
-      const flatLabels = Object.fromEntries(
-        Object.entries(rawConfig.labels || {}).map(
-          ([label, v]) => [label, (v && typeof v === 'object') ? (v.ca_refid || '') : v]
-        )
-      )
-      setConfig({ ...rawConfig, labels: flatLabels })
+      const [configRes, casRes, statsRes] = await Promise.all([estService.getConfig(), casService.getAll(), estService.getStats()])
+      const raw = configRes.data || {}
+      const c = { ...raw, labels: flatLabels(raw.labels), label_names: Object.fromEntries(Object.entries(raw.labels || {}).map(([k, v]) => [k, v?.ca_name])) }
+      setConfig(c)
+      setDraft(draftOf(c))
+      setRows(toRows(c.labels))
       setCas(casRes.data || [])
       setStats(statsRes.data || { total: 0, successful: 0, failed: 0 })
     } catch (error) {
+      setLoadError(error)
       showError(error.message || t('messages.errors.loadFailed.est'))
     } finally {
       setLoading(false)
     }
   }
+  useEffect(() => { loadData() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const saved = draftOf(config)
+  const labels = toObject(rows)
+  const labelsChanged = JSON.stringify(labels) !== JSON.stringify(config.labels || {})
+  const changed = [...FIELDS.filter((k) => String(draft[k]) !== String(saved[k])), ...(labelsChanged ? ['labels'] : [])]
+  const repeated = repeatedRows(rows)
+  const setView = (v) => setSearchParams(v === 'config' ? { tab: 'config' } : {}, { replace: true })
 
   const handleSaveConfig = async () => {
-    if (!canWrite('est')) return
+    if (!canEdit) return
+    setTried(true)
+    if (repeated.size) {
+      setAnnounce(t('est.labelsRepeated'))
+      return
+    }
     setSaving(true)
+    setFailed([])
     try {
-      await estService.updateConfig(config)
+      const payload = {
+        ...config, enabled: draft.enabled, ca_id: draft.ca_id ? parseInt(draft.ca_id, 10) : null,
+        validity_days: parseInt(draft.validity_days, 10), response_include_chain: draft.response_include_chain,
+        username: draft.username, labels,
+      }
+      delete payload.label_names
+      // An empty password keeps the saved one
+      if (draft.password) payload.password = draft.password
+      else delete payload.password
+      await estService.updateConfig(payload)
       showSuccess(t('messages.success.update.settings'))
+      setAnnounce(t('messages.success.update.settings'))
+      setTried(false)
+      await loadData()
+      stateRef.current?.focus()
     } catch (error) {
+      setFailed([t('est.serverSettings')])
       showError(error.message || t('messages.errors.updateFailed.settings'))
     } finally {
       setSaving(false)
     }
   }
 
-  const copyToClipboard = async (text) => {
-    if (await copy(text)) showInfo(t('est.copied'))
-  }
-
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+  const caOf = (id) => cas.find((c) => String(c.id) === String(id))
+  const caByRefid = (refid) => cas.find((c) => c.refid === refid)
+  const caLabel = (ca) => ca?.name || ca?.descr || ca?.subject
+  const basic = Boolean(config.username && config.password_set)
+  const auth = t(basic ? 'est.auth.certOrPassword' : 'est.auth.cert')
+  const state = config.enabled ? 'active' : 'disabled'
+  const endpoints = useMemo(() => (loading || loadError ? [] : [
+    { id: '', name: t('est.defaultEndpoint'), path: '/.well-known/est', ca: caLabel(caOf(config.ca_id)) || config.ca_name || '—' },
+    ...Object.entries(config.labels || {}).map(([label, refid]) => ({
+      id: label, name: label, path: `/.well-known/est/${label}`, ca: caLabel(caByRefid(refid)) || config.label_names?.[label] || '—',
+    })),
+  ]), [config, cas, loading, loadError, t]) // eslint-disable-line react-hooks/exhaustive-deps
+  const open = openId === null ? null : endpoints.find((e) => e.id === openId) || null
+  const pill = () => <Pill label={t(state === 'active' ? 'common.active' : 'common.disabled')} tone={state === 'active' ? 'good' : 'muted'} />
 
-  const estEndpoints = useMemo(() => [
-    { key: 'cacerts', path: '/.well-known/est/cacerts' },
-    { key: 'simpleenroll', path: '/.well-known/est/simpleenroll' },
-    { key: 'simplereenroll', path: '/.well-known/est/simplereenroll' },
-    { key: 'csrattrs', path: '/.well-known/est/csrattrs' },
-    { key: 'serverkeygen', path: '/.well-known/est/serverkeygen' },
-  ], [])
-
-  const tabs = useMemo(() => [
-    { id: 'settings', label: t('est.groups.settings'), icon: Gear },
-    { id: 'info', label: t('est.endpoints'), icon: Info }
-  ], [t])
-
-  const headerStats = useMemo(() => [
-    { icon: ChartBar, label: t('est.totalEnrollments'), value: stats.total },
-    { icon: CheckCircle, label: t('est.successfulEnrollments'), value: stats.successful, variant: 'success' },
-    { icon: Warning, label: t('est.failedEnrollments'), value: stats.failed, variant: stats.failed > 0 ? 'danger' : 'default' },
-  ], [stats, t])
-
-  const helpContent = (
-    <div className="p-4 space-y-4">
-      <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary-op5 to-transparent">
-        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-          <ChartBar size={16} className="text-accent-primary" />
-          {t('est.stats')}
-        </h3>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-            <p className="text-2xl font-bold text-text-primary">{stats.total}</p>
-            <p className="text-xs text-text-secondary">{t('est.totalEnrollments')}</p>
-          </div>
-          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-            <p className="text-2xl font-bold status-success-text">{stats.successful}</p>
-            <p className="text-xs text-text-secondary">{t('est.successfulEnrollments')}</p>
-          </div>
-          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-            <p className="text-2xl font-bold text-status-danger">{stats.failed}</p>
-            <p className="text-xs text-text-secondary">{t('est.failedEnrollments')}</p>
-          </div>
+  const dock = open && (
+    <Dock label={t('atelier.detailOf', { name: 'EST' })} tabsLabel={t('atelier.openItem')} activeKey={open.id || 'default'}
+      tabs={[{ key: open.id || 'default', title: open.name, icon: 'plug' }]} onClose={() => setOpenId(null)}>
+      <DockBody icon="plug" title={open.name} badge={pill()} section="overview" onSection={() => {}}
+        sectionsLabel={t('atelier.sectionsOf', { name: open.name })} sections={[['overview', t('atelier.overview')]]}
+        actions={canEdit && <Btn icon="settings" id="est-configure" onClick={() => setView('config')}>{t('tsa.configure')}</Btn>}>
+        <div className="module-detail">
+          <Section title={t('atelier.properties')}>
+            <Props items={[
+              [t('tsa.columns.ca'), open.ca], [t('est.columns.auth'), auth], [t('atelier.state'), pill()],
+              [t('est.validityDays'), String(config.validity_days || 365)],
+            ]} />
+            {!config.enabled && <Notice tone="warn">{t('est.estDisabledDesc')}</Notice>}
+          </Section>
+          <Section title={t('est.endpoints')}>
+            <Props items={ENDPOINTS.map((ep) => [t(`est.${ep}`), <Copyable key={ep} url value={`${baseUrl}${open.path}/${ep}`} label={t(`est.${ep}`)} />])} />
+          </Section>
+          <Section title={t('atelier.summary')}>
+            <p className="summary">{stats.total > 0
+              ? t('est.summaryTotals', { total: stats.total, successful: stats.successful || 0, failed: stats.failed || 0 })
+              : t('est.noStats')}</p>
+          </Section>
         </div>
-      </Card>
-
-      <div className="space-y-3">
-        <HelpCard variant="info" title={t('est.aboutEst')}>
-          {t('est.aboutEstDesc')}
-        </HelpCard>
-      </div>
-    </div>
+      </DockBody>
+    </Dock>
   )
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full w-full">
-        <LoadingSpinner size="lg" />
-      </div>
-    )
-  }
+  const onChange = (key, value) => setDraft((d) => ({ ...d, [key]: value }))
+  const off = !canEdit
+  const labelOptions = pickerCas(cas, ...Object.values(labels)).filter((ca) => ca.refid)
+  const unlistedLabels = unlistedPickerCas(cas, ...Object.values(labels))
+  const updateRow = (id, patch) => setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+  const labelErrors = tried && repeated.size ? 'error' : ''
+  const sections = [
+    {
+      id: 'service', label: t('est.serverSettings'), icon: 'plug', desc: t('est.enableEstDesc'),
+      groups: [{
+        legend: t('est.serverSettings'),
+        fields: [
+          { key: 'enabled', label: t('est.enableEst'), checkbox: true, disabled: off },
+          {
+            key: 'ca_id', label: t('common.issuingCA'), disabled: off || !draft.enabled,
+            hint: unlistedPickerCas(cas, config.ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, config.ca_id) }) : undefined,
+            options: [['', t('common.acmeSelectCA')], ...pickerCas(cas, config.ca_id).map((ca) => [String(ca.id), ca.name || ca.subject])],
+          },
+          { key: 'validity_days', label: t('est.validityDays'), hint: t('est.validityDaysHelp'), numeric: true, short: true, disabled: off || !draft.enabled },
+          { key: 'response_include_chain', label: t('est.responseIncludeChain'), hint: t('est.responseIncludeChainHelp'), checkbox: true, disabled: off || !draft.enabled },
+        ],
+      }],
+    },
+    {
+      id: 'labels', label: t('est.labels'), icon: 'branch', desc: t('est.labelsDesc'), error: labelErrors && t('est.labelsRepeated'),
+      extraKeys: [['labels', t('est.labels')]],
+      groups: [],
+      children: (
+        <fieldset className="settings-group">
+          <legend>{t('est.labels')}</legend>
+          <div className="row-list" id="est-labels">
+            {rows.map((row, i) => {
+              const duplicate = repeated.has(row.id) ? t('common.duplicateKey', { key: row.key }) : ''
+              return (
+                <div className="ext-row" key={row.id}>
+                  <label className="sr-only" htmlFor={`est-label-${i}`}>{t('est.labelName')} {i + 1}</label>
+                  <input id={`est-label-${i}`} value={row.key} placeholder={t('est.labelPlaceholder')} disabled={off || undefined}
+                    aria-invalid={duplicate ? 'true' : undefined} aria-describedby={duplicate ? `est-label-err-${i}` : undefined}
+                    onChange={(e) => updateRow(row.id, { key: e.target.value })} />
+                  <label className="sr-only" htmlFor={`est-label-ca-${i}`}>{t('common.issuingCA')} {i + 1}</label>
+                  <select id={`est-label-ca-${i}`} value={row.val} disabled={off || undefined} onChange={(e) => updateRow(row.id, { val: e.target.value })}>
+                    <option value="">{t('common.acmeSelectCA')}</option>
+                    {labelOptions.map((ca) => <option key={ca.refid} value={ca.refid}>{ca.name || ca.subject}</option>)}
+                  </select>
+                  <IconBtn icon="close" label={t('est.removeLabel', { label: row.key || i + 1 })} disabled={off || undefined}
+                    onClick={() => setRows((rs) => rs.filter((r) => r.id !== row.id))} />
+                  {duplicate && <p className="field-error" id={`est-label-err-${i}`}><Icon name="warning" /><span>{duplicate}</span></p>}
+                </div>
+              )
+            })}
+          </div>
+          {unlistedLabels > 0 && <p className="muted small">{t('cas.notListedForSigning', { count: unlistedLabels })}</p>}
+          {canEdit && (
+            <button type="button" className="btn quiet add-row" id="est-label-add" onClick={() => setRows((rs) => [...rs, { id: ++nextRowId, key: '', val: '' }])}>
+              <Icon name="plus" />{t('est.addLabel')}
+            </button>
+          )}
+        </fieldset>
+      ),
+    },
+    {
+      id: 'basic', label: t('est.basicAuth'), icon: 'lock', desc: t('est.basicAuthDesc'),
+      groups: [{
+        legend: t('est.basicAuth'),
+        fields: [
+          { key: 'username', label: t('est.username'), disabled: off || !draft.enabled },
+          { key: 'password', label: t('est.password'), type: 'password', placeholder: config.password_set ? '••••••••' : '', disabled: off || !draft.enabled,
+            hint: config.password_set ? t('est.passwordKept') : undefined },
+        ],
+      }],
+    },
+  ]
+
+  const listView = (
+    <ListView label="EST" caption={t('est.caption')} icon="plug" rows={endpoints} loading={loading}
+      filters={{ views: [{ id: '', label: t('common.all'), count: endpoints.length }, ...(endpoints.length ? [{ id: state, label: t(state === 'active' ? 'common.active' : 'common.disabled'), count: endpoints.length }] : [])], active: '', onChange: () => {}, label: t('tsa.filterByState'),
+        aside: t('est.aside', { total: stats.total || 0, failed: stats.failed || 0 }) }}
+      title={(r) => r.name} status={pill} openedId={open ? (open.id || '') : null} onOpen={(r) => setOpenId(r.id)}
+      columns={[
+        { id: 'ca', label: t('tsa.columns.ca'), cell: (r) => r.ca, grow: true },
+        { id: 'auth', label: t('est.columns.auth'), cell: () => auth },
+        { status: true },
+      ]}
+      error={loadError && (
+        <LoadError id="est" title={t('messages.errors.loadFailed.est')} onRetry={() => { setLoading(true); loadData() }}
+          cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/est/config', message: loadError.message }} />} />
+      )}
+      empty={<EmptyBlock id="est" icon="plug" title={t('est.defaultEndpoint')} />}
+      footer={{ range: t('est.range', { shown: endpoints.length, count: endpoints.length }) }} />
+  )
 
   return (
-    <ResponsiveLayout
-      title={t('est.title')}
-      icon={Globe}
-      subtitle={config.enabled ? t('common.enabled') : t('common.disabled')}
-      tabs={tabs}
-      activeTab={activeTab}
-      onTabChange={setActiveTab}
-      tabLayout="sidebar"
-      sidebarContentClass=""
-      tabGroups={[
-        { labelKey: 'est.groups.management', tabs: ['settings'], color: 'icon-bg-blue' },
-        { labelKey: 'est.groups.settings', tabs: ['info'], color: 'icon-bg-emerald' },
-      ]}
-      stats={headerStats}
-      helpPageKey="est"
-    >
-      {/* Settings Tab */}
-      {/* A form, so the browser refuses to save while a field is invalid (a repeated label) */}
-      {activeTab === 'settings' && (
-        <form
-          className="p-4 md:p-6 max-w-3xl mx-auto space-y-6"
-          onSubmit={(e) => { e.preventDefault(); handleSaveConfig() }}
-        >
-          <Card className="p-4">
-            <div className="flex items-start gap-4">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                config.enabled ? 'status-success-bg' : 'bg-bg-tertiary'
-              }`}>
-                <Plugs size={24} className={config.enabled ? 'status-success-text' : 'text-text-tertiary'} weight="duotone" />
-              </div>
-              <div className="flex-1">
-                <ToggleSwitch
-                  checked={config.enabled || false}
-                  onChange={(val) => setConfig({ ...config, enabled: val })}
-                  label={t('est.enableEst')}
-                  description={t('est.enableEstDesc')}
-                />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-4 space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-              <Gear size={16} />
-              {t('est.serverSettings')}
-            </h3>
-
-            <Select
-              label={t('common.issuingCA')}
-              placeholder={t('common.acmeSelectCA')}
-              options={pickerCas(cas, config.ca_id).map(ca => ({ value: ca.id.toString(), label: ca.name || ca.subject }))}
-              value={config.ca_id?.toString() || ''}
-              onChange={(val) => setConfig({ ...config, ca_id: parseInt(val) })}
-              disabled={!config.enabled}
-              helperText={unlistedPickerCas(cas, config.ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, config.ca_id) }) : undefined}
-            />
-
-            <Input
-              label={t('est.validityDays')}
-              type="number"
-              value={config.validity_days || 365}
-              onChange={(e) => setConfig({ ...config, validity_days: parseInt(e.target.value) })}
-              min="1"
-              max="3650"
-              disabled={!config.enabled}
-              helperText={t('est.validityDaysHelp')}
-            />
-
-            <ToggleSwitch
-              checked={config.response_include_chain || false}
-              onChange={(val) => setConfig({ ...config, response_include_chain: val })}
-              label={t('est.responseIncludeChain')}
-              size="sm"
-              disabled={!config.enabled}
-            />
-            <p className="text-xs text-text-tertiary">{t('est.responseIncludeChainHelp')}</p>
-          </Card>
-
-          <Card className="p-4 space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-              <Tag size={16} />
-              {t('est.labels')}
-            </h3>
-            <p className="text-xs text-text-secondary">{t('est.labelsDesc')}</p>
-            <MappingEditor
-              value={config.labels || {}}
-              onChange={(labels) => setConfig({ ...config, labels })}
-              keyLabel={t('est.labelName')}
-              valueLabel={t('common.issuingCA')}
-              keyPlaceholder={t('est.labelPlaceholder')}
-              valueOptions={pickerCas(cas, ...Object.values(config.labels || {}))
-                .filter(ca => ca.refid)
-                .map(ca => ({ value: ca.refid, label: ca.name || ca.subject }))}
-            />
-            {unlistedPickerCas(cas, ...Object.values(config.labels || {})) > 0 && (
-              <p className="text-xs text-text-tertiary">
-                {t('cas.notListedForSigning', { count: unlistedPickerCas(cas, ...Object.values(config.labels || {})) })}
-              </p>
-            )}
-          </Card>
-
-          <Card className="p-4 space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-              <Lock size={16} />
-              {t('est.basicAuth')}
-            </h3>
-            <p className="text-xs text-text-secondary">{t('est.basicAuthDesc')}</p>
-
-            <Input
-              label={t('est.username')}
-              value={config.username || ''}
-              onChange={(e) => setConfig({ ...config, username: e.target.value })}
-              disabled={!config.enabled}
-            />
-
-            <Input
-              label={t('est.password')}
-              type="password"
-              value={config.password || ''}
-              onChange={(e) => setConfig({ ...config, password: e.target.value })}
-              placeholder={config.password_set ? '••••••••' : ''}
-              disabled={!config.enabled}
-            />
-          </Card>
-
-          {hasPermission('write:est') && (
-            <div className="flex justify-end">
-              <Button type="submit" disabled={saving}>
-                {saving ? <LoadingSpinner size="sm" /> : <Gear size={14} />}
-                {saving ? t('common.saving') : t('common.saveConfiguration')}
-              </Button>
-            </div>
-          )}
-        </form>
+    <Zone dock={view === 'list' ? dock : null}>
+      <PageHead title="EST" intent={t('shell.moduleDesc.est')}
+        total={view === 'config' ? t('protocols.sections', { count: sections.length }) : t('est.unit', { count: endpoints.length })}
+        actions={<ViewSwitch id="est-view" label={t('protocols.view')} value={view} onChange={setView}
+          options={[{ value: 'list', label: t('est.views.list') }, { value: 'config', label: t('tsa.views.config') }]} />} />
+      {view === 'list' ? listView : loading ? <SkeletonPanel label={t('common.loading')} /> : loadError ? listView : (
+        <SettingsView sections={sections} values={draft} changed={changed} onChange={onChange} onSave={handleSaveConfig}
+          onReset={() => { setDraft(saved); setRows(toRows(config.labels)); setTried(false) }} saving={saving} failed={failed} announce={announce}
+          stateRef={stateRef} tocLabel={t('protocols.sectionsOf', { name: 'EST' })} />
       )}
-
-      {/* Endpoints / Info Tab */}
-      {activeTab === 'info' && (
-        <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-4">
-          {!config.enabled && (
-            <Card className="p-4 status-warning-border status-warning-bg border">
-              <div className="flex items-start gap-3">
-                <Warning size={20} className="status-warning-text flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium status-warning-text">{t('est.estDisabled')}</p>
-                  <p className="text-xs text-text-secondary">{t('est.estDisabledDesc')}</p>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          <Card className="p-4 space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-              <Globe size={16} />
-              {t('est.endpoints')}
-            </h3>
-            <p className="text-xs text-text-secondary">{t('est.endpointsDesc')}</p>
-
-            <div className="space-y-3">
-              {estEndpoints.map(ep => (
-                <div key={ep.key} className="p-3 bg-bg-tertiary rounded-lg">
-                  <div className="flex items-start justify-between gap-2 mb-1">
-                    <div>
-                      <p className="text-sm font-medium text-text-primary">{t(`est.${ep.key}`)}</p>
-                      <p className="text-xs text-text-secondary">{t(`est.${ep.key}Desc`)}</p>
-                    </div>
-                    <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(`${baseUrl}${ep.path}`)} aria-label={t('common.copy')}>
-                      <Copy size={14} />
-                    </Button>
-                  </div>
-                  <code className="text-xs font-mono text-text-primary break-all">
-                    {baseUrl}{ep.path}
-                  </code>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card className="p-4 space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-              <Info size={16} />
-              {t('est.aboutEst')}
-            </h3>
-            <p className="text-sm text-text-secondary">{t('est.aboutEstDesc')}</p>
-          </Card>
-
-          <Card className="p-4 space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-              <CheckCircle size={16} />
-              {t('est.stats')}
-            </h3>
-            {stats.total > 0 ? (
-              <div className="grid grid-cols-3 gap-3">
-                <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-                  <p className="text-2xl font-bold text-text-primary">{stats.total}</p>
-                  <p className="text-xs text-text-secondary">{t('est.totalEnrollments')}</p>
-                </div>
-                <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-                  <p className="text-2xl font-bold status-success-text">{stats.successful}</p>
-                  <p className="text-xs text-text-secondary">{t('est.successfulEnrollments')}</p>
-                </div>
-                <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-                  <p className="text-2xl font-bold text-status-danger">{stats.failed}</p>
-                  <p className="text-xs text-text-secondary">{t('est.failedEnrollments')}</p>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-text-tertiary italic">{t('est.noStats')}</p>
-            )}
-          </Card>
-        </div>
-      )}
-    </ResponsiveLayout>
+    </Zone>
   )
 }

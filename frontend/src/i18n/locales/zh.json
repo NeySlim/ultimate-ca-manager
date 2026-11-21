@@ -2725,7 +2725,49 @@
     "namedUrlsOff": "CDP/AIA 路径使用内部 ID。启用后,新证书将使用由 CA 名称生成的短标识。",
     "namedUrlsEnable": "使用 CA 名称",
     "namedUrlsConfirm": "为“{{name}}”启用命名协议 URL?由 CA 名称生成的短标识将出现在新签发证书的 CDP/AIA URL 中。现有 URL 仍然有效。启用后无法再禁用。",
-    "namedUrlsEnabled": "已启用命名 URL:{{slug}}"
+    "namedUrlsEnabled": "已启用命名 URL:{{slug}}",
+    "unit_one": "{{count}} 个机构",
+    "unit_other": "{{count}} 个机构",
+    "range_one": "{{shown}} / {{count}} 个机构",
+    "range_other": "{{shown}} / {{count}} 个机构",
+    "caption": "CRL / OCSP。激活名称以打开详情。",
+    "filterByState": "按状态筛选",
+    "search": "搜索机构",
+    "createCa": "创建 CA",
+    "states": {
+      "current": "最新",
+      "soon": "不足 24 小时",
+      "expired": "已过期",
+      "none": "无 CRL"
+    },
+    "numberOf": "第 {{number}} 号",
+    "ocspActive": "已启用",
+    "ocspInactive": "未启用",
+    "columns": {
+      "published": "发布时间"
+    },
+    "tabs": {
+      "publication": "发布"
+    },
+    "responderDisabled": "已禁用",
+    "responderRunning": "运行中",
+    "responderStopped": "已停止",
+    "responderAside": "OCSP 响应器：{{state}}，{{count}} 次请求，{{rate}}% 来自缓存",
+    "summaryNone": "此机构尚未发布 CRL。",
+    "summaryRevoked_one": "CRL 第 {{number}} 号列出 {{count}} 个已吊销证书。",
+    "summaryRevoked_other": "CRL 第 {{number}} 号列出 {{count}} 个已吊销证书。",
+    "summary": {
+      "soon": "下次更新在 24 小时内。",
+      "expired": "其下次更新日期已过：请重新生成。"
+    },
+    "days_one": "{{count}} 天",
+    "days_other": "{{count}} 天",
+    "hours_one": "{{count}} 小时",
+    "hours_other": "{{count}} 小时",
+    "ocspResponderOf": "为此机构提供 OCSP 响应",
+    "statsAllAuthorities": "请求和缓存命中统计响应器的所有机构。",
+    "serial": "序列号 {{serial}}",
+    "slug": "URL 中的名称"
   },
   "deploy": {
     "title": "证书部署",
@@ -6369,7 +6411,29 @@
     "labelName": "标签",
     "labelPlaceholder": "例如 branch-office",
     "responseIncludeChain": "在注册响应中包含 CA 链",
-    "responseIncludeChainHelp": "RFC 7030 响应仅包含签发的证书；为从注册响应（而非 /cacerts）构建证书包的旧客户端启用。"
+    "responseIncludeChainHelp": "RFC 7030 响应仅包含签发的证书；为从注册响应（而非 /cacerts）构建证书包的旧客户端启用。",
+    "unit_one": "{{count}} 个注册端点",
+    "unit_other": "{{count}} 个注册端点",
+    "range_one": "{{shown}} / {{count}} 个端点",
+    "range_other": "{{shown}} / {{count}} 个端点",
+    "caption": "EST。激活名称以打开详情。",
+    "defaultEndpoint": "默认端点",
+    "columns": {
+      "auth": "认证"
+    },
+    "auth": {
+      "cert": "客户端证书",
+      "certOrPassword": "客户端证书或密码"
+    },
+    "aside": "{{total}} 次注册，{{failed}} 次失败",
+    "summaryTotals": "自启动以来所有端点共 {{total}} 次注册，{{successful}} 次成功，{{failed}} 次失败。",
+    "labelsRepeated": "有两个标签相同：保存前请重命名其中一个。",
+    "removeLabel": "移除标签 {{label}}",
+    "addLabel": "添加标签",
+    "passwordKept": "已保存密码：留空则保留。",
+    "views": {
+      "list": "注册端点"
+    }
   },
   "discovery": {
     "aboutDiscovery": "关于发现",
@@ -6980,6 +7044,28 @@
       "management": "管理",
       "settings": "设置",
       "info": "信息"
+    },
+    "serviceName": "时间戳服务",
+    "unit_one": "{{count}} 个服务",
+    "unit_other": "{{count}} 个服务",
+    "range_one": "{{shown}} / {{count}} 个服务",
+    "range_other": "{{shown}} / {{count}} 个服务",
+    "caption": "TSA。激活名称以打开详情。",
+    "filterByState": "按状态筛选",
+    "columns": {
+      "ca": "机构",
+      "digest": "哈希",
+      "policy": "策略"
+    },
+    "configure": "配置",
+    "summaryTotals": "自启动以来共收到 {{total}} 个请求，{{successful}} 个已签发令牌，{{failed}} 个被拒绝。",
+    "sections": {
+      "service": "服务",
+      "signer": "令牌签名"
+    },
+    "views": {
+      "list": "服务",
+      "config": "配置"
     }
   },
   "sshCas": {
@@ -8141,5 +8227,14 @@
     "detailOf": "详情：{{name}}",
     "sectionsOf": "分区：{{name}}",
     "settingsSections": "设置分区"
+  },
+  "protocols": {
+    "copyValue": "复制{{name}}",
+    "removeUrl": "移除 {{url}}",
+    "newUrl": "新 URL：{{name}}",
+    "view": "视图",
+    "sections_one": "{{count}} 个部分",
+    "sections_other": "{{count}} 个部分",
+    "sectionsOf": "部分：{{name}}"
   }
 }

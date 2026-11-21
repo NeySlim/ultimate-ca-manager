@@ -31,3 +31,7 @@
 .atl .card-trend .horizon-legend strong{font-weight:500;color:var(--text);font-variant-numeric:tabular-nums}
 /* Overview: the soonest expiries of the horizon card, above its status list (the mockup's gap under its bars). */
 .atl .card-horizon .algo-list+.status-list{margin-top:20px}
+/* Protocol pages: a form inside a dock section keeps the mockup's 12 px rhythm around it (the mockup's docks hold no form). */
+.atl .module-detail .dock-form{margin:12px 0}
+/* The page switch of a protocol page that holds more than the mockup's list, in the page head. */
+.atl .page-head .view-switch{min-height:34px;max-width:240px}

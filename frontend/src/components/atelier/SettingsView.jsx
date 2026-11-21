@@ -15,22 +15,24 @@ export function FieldError({ id, message }) {
   return <p className="field-error" id={id}><Icon name="warning" /><span>{message}</span></p>
 }
 
-const keysOf = (s) => s.groups.flatMap((g) => g.fields).filter((f) => !f.readonly).map((f) => f.key)
+// A section's own control that is not a field (a list of rows) names its key in extraKeys: [[key, label]]
+const keysOf = (s) => [...s.groups.flatMap((g) => g.fields).filter((f) => !f.readonly).map((f) => f.key), ...(s.extraKeys || []).map(([k]) => k)]
 
 /**
  * One field: a checkbox line, a read-only value, a select, or a text input, with its hint and
- * its error. field: { key, label, hint, checkbox, readonly, options: [[value, label]], short, wide, numeric }
+ * its error. field: { key, label, hint, checkbox, readonly, options: [[value, label]], short, wide, numeric,
+ * disabled, type (an input's type, e.g. password), placeholder }
  */
 export function SettingsField({ field: f, value, error, onChange }) {
   const id = `set-${f.key}`
   const ids = [f.hint && `hint-${id}`, error && `err-${id}`].filter(Boolean).join(' ') || undefined
   const hint = f.hint ? <small id={`hint-${id}`}>{f.hint}</small> : null
   if (f.checkbox) {
-    return (
-      <label className="checkbox-line field full">
-        <input type="checkbox" id={id} data-setting={f.key} checked={!!value} onChange={(e) => onChange(f.key, e.target.checked)} />{f.label}
-      </label>
-    )
+    const box = <input type="checkbox" id={id} data-setting={f.key} checked={!!value} disabled={f.disabled || undefined} aria-describedby={ids}
+      onChange={(e) => onChange(f.key, e.target.checked)} />
+    // The mockup's checkbox has no hint; one that has keeps it under the line, in the same cell
+    if (f.hint) return <div className="field full"><label className="checkbox-line">{box}{f.label}</label>{hint}</div>
+    return <label className="checkbox-line field full">{box}{f.label}</label>
   }
   if (f.readonly) {
     return <div className="field full"><label htmlFor={id}>{f.label}</label><input id={id} value={f.readonly} readOnly aria-describedby={ids} />{hint}</div>
@@ -39,7 +41,7 @@ export function SettingsField({ field: f, value, error, onChange }) {
     return (
       <div className={f.short ? 'field short' : 'field'}>
         <label htmlFor={id}>{f.label}</label>
-        <select id={id} data-setting={f.key} value={value ?? ''} aria-describedby={ids} aria-invalid={error ? 'true' : undefined} onChange={(e) => onChange(f.key, e.target.value)}>
+        <select id={id} data-setting={f.key} value={value ?? ''} disabled={f.disabled || undefined} aria-describedby={ids} aria-invalid={error ? 'true' : undefined} onChange={(e) => onChange(f.key, e.target.value)}>
           {f.options.map(([o, l]) => <option key={o} value={o}>{l}</option>)}
         </select>
         {hint}
@@ -49,8 +51,8 @@ export function SettingsField({ field: f, value, error, onChange }) {
   return (
     <div className={['field', f.wide ? 'full' : f.short ? 'short' : ''].join(' ')}>
       <label htmlFor={id}>{f.label}</label>
-      <input id={id} data-setting={f.key} value={value ?? ''} inputMode={f.numeric ? 'numeric' : undefined} autoComplete="off" spellCheck={false}
-        aria-describedby={ids} aria-invalid={error ? 'true' : undefined} onChange={(e) => onChange(f.key, e.target.value)} />
+      <input id={id} data-setting={f.key} value={value ?? ''} inputMode={f.numeric ? 'numeric' : undefined} autoComplete={f.type === 'password' ? 'new-password' : 'off'} spellCheck={false}
+        type={f.type || undefined} placeholder={f.placeholder} disabled={f.disabled || undefined} aria-describedby={ids} aria-invalid={error ? 'true' : undefined} onChange={(e) => onChange(f.key, e.target.value)} />
       {hint}
       {error && <FieldError id={`err-${id}`} message={error} />}
     </div>
@@ -139,7 +141,7 @@ export function SettingsToc({ sections, flags, current, label, onJump }) {
 
 /**
  * @param {object} p
- * @param {Array} p.sections  { id, label, icon, desc, groups: [{ legend, fields }], test?, error?, children? }
+ * @param {Array} p.sections  { id, label, icon, desc, groups: [{ legend, fields }], test?, error?, children?, extraKeys? }
  * @param {object} p.values  the draft, field by field
  * @param {object} p.errors  field key -> message
  * @param {string[]} p.changed  keys of the fields changed against the saved values
@@ -156,7 +158,7 @@ export function SettingsToc({ sections, flags, current, label, onJump }) {
 export function SettingsView({ sections, values, errors = {}, changed = [], onChange, onSave, onReset, lastSaved, saving = false, failed = [], announce = '', history, stateRef, current, tocLabel, onJump }) {
   const { t } = useTranslation()
   const dirty = changed.length > 0
-  const labelOf = Object.fromEntries(sections.flatMap((s) => s.groups.flatMap((g) => g.fields)).map((f) => [f.key, f.label]))
+  const labelOf = Object.fromEntries([...sections.flatMap((s) => s.groups.flatMap((g) => g.fields)).map((f) => [f.key, f.label]), ...sections.flatMap((s) => s.extraKeys || [])])
   const flags = Object.fromEntries(sections.map((s) => {
     const keys = keysOf(s)
     return [s.id, keys.some((k) => errors[k]) || s.error ? 'error' : keys.some((k) => changed.includes(k)) ? 'modified' : '']

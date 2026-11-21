@@ -2,6 +2,7 @@
  * The default CA picker and the label mapping of the EST page list the CAs
  * able to sign, keep the saved ones visible and count the others (#426).
  */
+import { MemoryRouter } from 'react-router-dom'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 
@@ -25,14 +26,6 @@ vi.mock('../../hooks', () => ({
 vi.mock('../../services', () => ({
   estService: { getConfig: mocks.getConfig, getStats: vi.fn().mockResolvedValue({ data: {} }) },
   casService: { getAll: mocks.getAll },
-}))
-vi.mock('../settings/MappingEditor', () => ({
-  default: ({ value, valueOptions = [] }) => (
-    <div data-testid="labels">
-      <span data-testid="label-values">{JSON.stringify(value)}</span>
-      <ul>{valueOptions.map((o) => <li key={o.value}>{o.label}</li>)}</ul>
-    </div>
-  ),
 }))
 // A native select exposes the options and the helper text that the real one hides in a portal.
 vi.mock('../../components', async (orig) => ({
@@ -60,15 +53,16 @@ const CAS = [
 async function renderPage(config) {
   mocks.getConfig.mockResolvedValue({ data: { enabled: true, ...config } })
   mocks.getAll.mockResolvedValue({ data: CAS })
-  render(<ESTPage />)
+  render(<MemoryRouter initialEntries={['/est-config?tab=config']}><ESTPage /></MemoryRouter>)
   return {
-    caField: await screen.findByTestId('field-common.issuingCA'),
-    labels: await screen.findByTestId('labels'),
+    caField: (await screen.findByRole('combobox', { name: 'common.issuingCA' })).closest('.field'),
+    labels: await screen.findByRole('group', { name: 'est.labels' }),
   }
 }
 
 const caLabels = (field) => within(field).getAllByRole('option').filter((o) => o.value !== '').map((o) => o.textContent)
-const labelOptions = (box) => within(box).getAllByRole('listitem').map((o) => o.textContent)
+// The CAs a label row may map to: the options of its select (one row is enough)
+const labelOptions = (box) => within(box).getAllByRole('combobox')[0] && [...within(box).getAllByRole('combobox')[0].options].filter((o) => o.value !== '').map((o) => o.textContent)
 
 describe('ESTPage CA pickers (#426)', () => {
   it('default CA: offers only the CA that can sign and counts the others', async () => {
@@ -86,15 +80,16 @@ describe('ESTPage CA pickers (#426)', () => {
   it('labels: offers only the CA that can sign and counts the others', async () => {
     const { labels } = await renderPage({ labels: { web: { ca_refid: 'ca-sign', ca_name: 'Signing CA' } } })
     expect(labelOptions(labels)).toEqual(['Signing CA'])
-    expect(labels.parentElement).toHaveTextContent('cas.notListedForSigning:2')
+    expect(labels).toHaveTextContent('cas.notListedForSigning:2')
   })
 
   it('labels: flattens the loaded mapping and keeps a label CA without a key listed', async () => {
     const { labels } = await renderPage({
       labels: { web: { ca_refid: 'ca-sign', ca_name: 'Signing CA' }, lab: { ca_refid: 'ca-keyless', ca_name: 'Keyless root' } },
     })
-    expect(JSON.parse(within(labels).getByTestId('label-values').textContent)).toEqual({ web: 'ca-sign', lab: 'ca-keyless' })
+    expect(within(labels).getAllByRole('textbox').map((i) => i.value)).toEqual(['web', 'lab'])
+    expect(within(labels).getAllByRole('combobox').map((s) => s.value)).toEqual(['ca-sign', 'ca-keyless'])
     expect(labelOptions(labels)).toEqual(['Signing CA', 'Keyless root'])
-    expect(labels.parentElement).toHaveTextContent('cas.notListedForSigning:1')
+    expect(labels).toHaveTextContent('cas.notListedForSigning:1')
   })
 })
