@@ -6,8 +6,8 @@ import { withoutAdminOnly } from './settings/adminOnlySettings'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
-import { ListBullets, Download, HardDrives, Lock, Palette, Info, Timer, WarningCircle, Certificate, Eye, Rocket, CheckCircle, Bell, LockKey, UsersThree, WindowsLogo, ClockClockwise, IdentificationBadge, CloudArrowUp, SlidersHorizontal, PaperPlaneTilt, Archive } from '@phosphor-icons/react'
-import { Button, Input, ConfirmModal, LoadingSpinner, Modal, ServiceReconnectOverlay } from '../components'
+import { ListBullets, HardDrives, Lock, Palette, Info, Timer, Certificate, Eye, Rocket, Bell, UsersThree, WindowsLogo, ClockClockwise, IdentificationBadge, CloudArrowUp, SlidersHorizontal, PaperPlaneTilt, Archive } from '@phosphor-icons/react'
+import { ServiceReconnectOverlay } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
 import CertificatePickerModal from '../components/CertificatePickerModal'
 import { settingsService, systemService, casService, ssoService, mtlsService, mscaService, auditService } from '../services'
@@ -36,6 +36,7 @@ import BackupSection from './settings/BackupSection'
 import { ceilingNotice } from './settings/backupCeiling'
 import RestoreReport from './settings/RestoreReport'
 import { BackupDialog, RestoreDialog } from './settings/BackupDialogs'
+import { EnableEncryptionDialog, MasterKeyBackupDialog } from './settings/EncryptionDialogs'
 import { loginUrl } from '../navigation/safeNext'
 import { useRestoreJob, UNCANCELLABLE_PHASES } from './settings/useRestoreJob'
 import AuditSection from './settings/AuditSection'
@@ -363,8 +364,6 @@ export default function SettingsPage() {
   const [showEnableEncryptionModal, setShowEnableEncryptionModal] = useState(false)
   const [showDisableEncryptionModal, setShowDisableEncryptionModal] = useState(false)
   const [encryptionLoading, setEncryptionLoading] = useState(false)
-  const [encryptionConfirmText, setEncryptionConfirmText] = useState('')
-  const [encryptionChecks, setEncryptionChecks] = useState({ backup: false, keyFile: false, lostKeys: false })
 
   // Master-key backup modal — shown immediately after enable-encryption succeeds.
   // Holds the freshly-generated key so the user can download it BEFORE leaving
@@ -373,7 +372,6 @@ export default function SettingsPage() {
   const [showBackupKeyModal, setShowBackupKeyModal] = useState(false)
   const [backupKeyMaterial, setBackupKeyMaterial] = useState(null)
   const [backupKeyDownloaded, setBackupKeyDownloaded] = useState(false)
-  const [backupKeyConfirmed, setBackupKeyConfirmed] = useState(false)
 
   // Anomaly detection state
   const [anomalies, setAnomalies] = useState([])
@@ -965,8 +963,6 @@ export default function SettingsPage() {
         count: response?.data?.key_files_removed ?? 0,
       }))
       setShowEnableEncryptionModal(false)
-      setEncryptionConfirmText('')
-      setEncryptionChecks({ backup: false, keyFile: false, lostKeys: false })
       await loadEncryptionStatus()
 
       // CRITICAL: prompt the operator to back up the master key right now.
@@ -976,7 +972,6 @@ export default function SettingsPage() {
       if (masterKey) {
         setBackupKeyMaterial(masterKey)
         setBackupKeyDownloaded(false)
-        setBackupKeyConfirmed(false)
         setShowBackupKeyModal(true)
       }
     } catch (error) {
@@ -2397,97 +2392,14 @@ export default function SettingsPage() {
         onClose={() => setMscaCaControl(null)}
       />
 
-      {/* Enable Encryption Modal */}
-      <Modal
+      <EnableEncryptionDialog
         open={showEnableEncryptionModal}
-        onClose={() => {
-          setShowEnableEncryptionModal(false)
-          setEncryptionConfirmText('')
-          setEncryptionChecks({ backup: false, keyFile: false, lostKeys: false })
-        }}
-        title={t('settings.enableEncryption')}
-        maxWidth="lg"
-      >
-        <div className="p-4 space-y-4">
-          <div className="p-3 rounded-lg bg-status-warning-op10 border border-status-warning-op30">
-            <div className="flex items-start gap-2">
-              <WarningCircle size={20} className="text-status-warning flex-shrink-0 mt-0.5" weight="fill" />
-              <div className="text-sm text-text-primary">
-                <p className="font-semibold mb-1">{t('settings.encryptionWarningTitle')}</p>
-                <p className="text-text-secondary">{t('settings.encryptionWarningDesc')}</p>
-              </div>
-            </div>
-          </div>
+        loading={encryptionLoading}
+        onConfirm={handleEnableEncryption}
+        onClose={() => setShowEnableEncryptionModal(false)}
+      />
 
-          <div className="space-y-3">
-            <label className="flex items-start gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={encryptionChecks.keyFile}
-                onChange={(e) => setEncryptionChecks(prev => ({ ...prev, keyFile: e.target.checked }))}
-                className="rounded border-border bg-bg-tertiary mt-0.5"
-              />
-              <span className="text-sm text-text-primary">{t('settings.encryptionCheckKeyFile')}</span>
-            </label>
-            <label className="flex items-start gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={encryptionChecks.backup}
-                onChange={(e) => setEncryptionChecks(prev => ({ ...prev, backup: e.target.checked }))}
-                className="rounded border-border bg-bg-tertiary mt-0.5"
-              />
-              <span className="text-sm text-text-primary">{t('settings.encryptionCheckBackup')}</span>
-            </label>
-            <label className="flex items-start gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={encryptionChecks.lostKeys}
-                onChange={(e) => setEncryptionChecks(prev => ({ ...prev, lostKeys: e.target.checked }))}
-                className="rounded border-border bg-bg-tertiary mt-0.5"
-              />
-              <span className="text-sm text-text-primary">{t('settings.encryptionCheckLostKeys')}</span>
-            </label>
-          </div>
-
-          <div>
-            <label className="block text-sm text-text-secondary mb-1">
-              {t('settings.typeToConfirm', { word: 'ENCRYPT' })}
-            </label>
-            <Input
-              value={encryptionConfirmText}
-              onChange={(e) => setEncryptionConfirmText(e.target.value)}
-              placeholder="ENCRYPT"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button type="button" variant="outline" onClick={() => {
-              setShowEnableEncryptionModal(false)
-              setEncryptionConfirmText('')
-              setEncryptionChecks({ backup: false, keyFile: false, lostKeys: false })
-            }}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleEnableEncryption}
-              disabled={
-                encryptionLoading ||
-                encryptionConfirmText !== 'ENCRYPT' ||
-                !encryptionChecks.backup ||
-                !encryptionChecks.keyFile ||
-                !encryptionChecks.lostKeys
-              }
-            >
-              {encryptionLoading ? <LoadingSpinner size="sm" /> : <LockKey size={16} />}
-              {t('settings.enableEncryption')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Disable Encryption Modal */}
-      <ConfirmModal
+      <AtlConfirmModal
         open={showDisableEncryptionModal}
         onClose={() => setShowDisableEncryptionModal(false)}
         onConfirm={handleDisableEncryption}
@@ -2498,88 +2410,17 @@ export default function SettingsPage() {
         loading={encryptionLoading}
       />
 
-      {/* Backup Master Key Modal — shown immediately after enabling encryption.
-          Operator MUST download the key + confirm storage before closing. */}
-      <Modal
+      {/* The master key, shown once after enabling: downloaded and its storage confirmed before it closes */}
+      <MasterKeyBackupDialog
         open={showBackupKeyModal}
-        onClose={() => {
-          // Disallow dismiss without explicit confirmation. Closing without
-          // backup is the #1 cause of "I lost my master.key" support tickets.
-          if (backupKeyConfirmed) {
-            setShowBackupKeyModal(false)
-            setBackupKeyMaterial(null)
-            setBackupKeyDownloaded(false)
-            setBackupKeyConfirmed(false)
-          }
+        downloaded={backupKeyDownloaded}
+        onDownload={handleDownloadMasterKey}
+        onDone={() => {
+          setShowBackupKeyModal(false)
+          setBackupKeyMaterial(null)
+          setBackupKeyDownloaded(false)
         }}
-        title={t('settings.masterKeyBackupTitle')}
-        size="md"
-        showClose={backupKeyConfirmed}
-      >
-        <div className="p-4 space-y-4">
-          <div className="p-3 rounded-lg bg-status-danger-op10 border border-status-danger-op30">
-            <div className="flex items-start gap-2">
-              <WarningCircle size={20} className="text-status-danger flex-shrink-0 mt-0.5" weight="fill" />
-              <div className="text-sm text-text-primary">
-                <p className="font-semibold mb-1">{t('settings.masterKeyBackupCritical')}</p>
-                <p className="text-text-secondary">{t('settings.masterKeyBackupDesc')}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-sm text-text-secondary space-y-2">
-            <p>{t('settings.masterKeyBackupInstructions')}</p>
-            <ul className="list-disc list-inside text-xs space-y-1 pl-2">
-              <li>{t('settings.masterKeyBackupTip1')}</li>
-              <li>{t('settings.masterKeyBackupTip2')}</li>
-              <li>{t('settings.masterKeyBackupTip3')}</li>
-            </ul>
-          </div>
-
-          <div className="flex justify-center">
-            <Button
-              type="button"
-              variant={backupKeyDownloaded ? 'outline' : 'primary'}
-              onClick={handleDownloadMasterKey}
-            >
-              <Download size={16} />
-              {backupKeyDownloaded
-                ? t('settings.masterKeyDownloadAgain')
-                : t('settings.masterKeyDownloadNow')}
-            </Button>
-          </div>
-
-          <label className={`flex items-start gap-2 cursor-pointer p-3 rounded-lg border ${backupKeyDownloaded ? 'border-border bg-bg-tertiary' : 'border-border-op50 bg-tertiary-op40 opacity-60'}`}>
-            <input
-              type="checkbox"
-              checked={backupKeyConfirmed}
-              onChange={(e) => setBackupKeyConfirmed(e.target.checked)}
-              disabled={!backupKeyDownloaded}
-              className="rounded border-border bg-bg-tertiary mt-0.5"
-            />
-            <span className="text-sm text-text-primary">
-              {t('settings.masterKeyBackupConfirm')}
-            </span>
-          </label>
-
-          <div className="flex justify-end pt-4 border-t border-border">
-            <Button
-              type="button"
-              variant="primary"
-              disabled={!backupKeyConfirmed}
-              onClick={() => {
-                setShowBackupKeyModal(false)
-                setBackupKeyMaterial(null)
-                setBackupKeyDownloaded(false)
-                setBackupKeyConfirmed(false)
-              }}
-            >
-              <CheckCircle size={16} />
-              {t('common.done')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      />
 
       {/* Smart Import Modal for HTTPS certificate */}
       <SmartImportModal

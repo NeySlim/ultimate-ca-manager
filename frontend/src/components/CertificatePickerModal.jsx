@@ -1,48 +1,42 @@
 /**
- * CertificatePickerModal - Modal for selecting a certificate with search + pagination
- * Used in Settings (HTTPS cert) and anywhere a certificate needs to be chosen from a large list.
+ * A certificate picked from the server's list, in the mockup's dialog: the command palette's
+ * search and results (`.command-search`, `.command-result`), a click picks, then the table
+ * footer pages the list the server holds. Used by Settings (the HTTPS certificate).
  */
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  MagnifyingGlass, Certificate, Key, ShieldCheck, CaretLeft, CaretRight, Check
-} from '@phosphor-icons/react'
-import { Modal, Button, Input, Badge, EmptyState, LoadingSpinner } from '../components'
+import { AtelierDialog } from './atelier/AtelierDialog'
+import { Icon } from './atelier/Icon'
+import { TableFooter } from './atelier/TableFooter'
 import { certificatesService } from '../services'
 import { daysRemaining, formatDate, certificateNames } from '../lib/utils'
 
-export default function CertificatePickerModal({ isOpen, onClose, onSelect, filters = {} }) {
+const PER_PAGE = 15
+
+export default function CertificatePickerModal({ isOpen, ...props }) {
+  return isOpen ? <Picker {...props} /> : null
+}
+
+function Picker({ onClose, onSelect, filters = {} }) {
   const { t } = useTranslation()
   const [certificates, setCertificates] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
-  const [selectedId, setSelectedId] = useState(null)
-  const perPage = 15
   // A string key keeps the callback stable when the caller passes a fresh array
   const statusKey = [].concat(filters.status || 'valid').join(',')
 
-  const loadCertificates = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
-      const params = {
-        status: statusKey.split(','),
-        page,
-        per_page: perPage,
-      }
-      if (search.trim()) {
-        params.search = search.trim()
-      }
-      if (filters.has_private_key) {
-        params.has_private_key = true
-      }
+      const params = { status: statusKey.split(','), page, per_page: PER_PAGE }
+      if (search.trim()) params.search = search.trim()
+      if (filters.has_private_key) params.has_private_key = true
       const data = await certificatesService.getAll(params)
       const items = data.data || []
-      const meta = data.meta || {}
-
       setCertificates(items)
-      setTotal(meta.total ?? items.length)
+      setTotal(data.meta?.total ?? items.length)
     } catch {
       setCertificates([])
     } finally {
@@ -50,177 +44,54 @@ export default function CertificatePickerModal({ isOpen, onClose, onSelect, filt
     }
   }, [page, search, statusKey, filters?.has_private_key])
 
-  useEffect(() => {
-    if (isOpen) {
-      loadCertificates()
-    }
-  }, [isOpen, loadCertificates])
+  useEffect(() => { load() }, [load])
 
-  useEffect(() => {
-    if (isOpen) {
-      setPage(1)
-    }
-  }, [search, isOpen])
-
-  // Reset state when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setSearch('')
-      setPage(1)
-      setSelectedId(null)
-    }
-  }, [isOpen])
-
-  const totalPages = Math.max(1, Math.ceil(total / perPage))
-
-  const handleConfirm = () => {
-    if (selectedId) {
-      const cert = certificates.find(c => c.id === selectedId)
-      onSelect(cert)
-      onClose()
-    }
+  const pages = Math.max(1, Math.ceil(total / PER_PAGE))
+  const pick = (cert) => {
+    onSelect(cert)
+    onClose()
   }
 
   return (
-    <Modal open={isOpen} onClose={onClose} title={t('settings.selectCertificate')} size="lg">
-      <div className="p-4 space-y-4">
-        {/* Search */}
-        <div className="relative">
-          <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('settings.certPickerSearch')}
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-primary-op30"
-          />
-        </div>
-
-        {/* Certificate list */}
-        <div className="min-h-[320px] max-h-[420px] overflow-y-auto border border-border rounded-lg">
-          {loading ? (
-            <div className="flex items-center justify-center h-40">
-              <LoadingSpinner size="md" />
-            </div>
-          ) : certificates.length === 0 ? (
-            <div className="flex items-center justify-center h-40">
-              <EmptyState
-                icon={Certificate}
-                title={t('settings.noValidCertificates')}
-                compact
-              />
-            </div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-bg-tertiary sticky top-0 z-10">
-                <tr className="text-left text-xs text-text-secondary">
-                  <th className="px-3 py-2 w-8"></th>
-                  <th className="px-3 py-2">{t('common.commonName')}</th>
-                  <th className="px-3 py-2 hidden sm:table-cell">{t('common.issuer')}</th>
-                  <th className="px-3 py-2">{t('common.validUntil')}</th>
-                  <th className="px-3 py-2 hidden sm:table-cell">{t('common.keyType')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {certificates.map(cert => {
-                  const isSelected = selectedId === cert.id
-                  const daysLeft = daysRemaining(cert.valid_to)
-                  const { name, subtitle } = certificateNames(cert)
-                  return (
-                    <tr
-                      key={cert.id}
-                      onClick={() => setSelectedId(cert.id)}
-                      className={`cursor-pointer border-b border-border transition-colors ${
-                        isSelected
-                          ? 'bg-accent-primary-op10 border-l-2 border-l-accent-primary'
-                          : 'hover:bg-bg-secondary'
-                      }`}
-                    >
-                      <td className="px-3 py-2.5 text-center">
-                        {isSelected && <Check size={16} weight="bold" className="text-accent-primary" />}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="font-medium text-text-primary truncate max-w-[250px]">
-                          {name || t('common.certificate')}
-                        </div>
-                        {subtitle && (
-                          <div className="text-xs text-text-secondary truncate max-w-[250px]" title={subtitle}>{subtitle}</div>
-                        )}
-                        {cert.san_count > 1 && (
-                          <div className="text-xs text-text-secondary">
-                            {cert.san_count} {t('details.sans')}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5 hidden sm:table-cell text-text-secondary truncate max-w-[200px]">
-                        {cert.issuer_name || '-'}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <Badge
-                          variant={daysLeft < 30 ? 'warning' : daysLeft < 90 ? 'amber' : 'success'}
-                          size="sm"
-                        >
-                          {formatDate(cert.valid_to)}
-                        </Badge>
-                      </td>
-                      <td className="px-3 py-2.5 hidden sm:table-cell">
-                        <span className="text-xs font-mono text-text-secondary">
-                          {cert.key_algorithm || '-'}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        {/* Pagination */}
-        {!loading && total > perPage && (
-          <div className="flex items-center justify-between text-xs text-text-secondary">
-            <span>{t('common.showingOf', { count: certificates.length, total })}</span>
-            <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                size="xs"
-                variant="ghost"
-                disabled={page <= 1}
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-              >
-                <CaretLeft size={14} />
-              </Button>
-              <span className="px-2">{page} / {totalPages}</span>
-              <Button
-                type="button"
-                size="xs"
-                variant="ghost"
-                disabled={page >= totalPages}
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              >
-                <CaretRight size={14} />
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex justify-end gap-2 pt-2 border-t border-border">
-          <Button type="button" variant="secondary" size="sm" onClick={onClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            disabled={!selectedId}
-            onClick={handleConfirm}
-          >
-            <ShieldCheck size={16} />
-            {t('settings.applySelectedCertificate')}
-          </Button>
-        </div>
+    <AtelierDialog title={t('settings.selectCertificate')} onClose={onClose} testId="certificate-picker">
+      <div className="command-search">
+        <Icon name="search" />
+        <input type="search" data-autofocus aria-label={t('settings.certPickerSearch')} placeholder={t('settings.certPickerSearch')}
+          value={search} autoComplete="off" spellCheck={false} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
       </div>
-    </Modal>
+      {loading ? (
+        <p className="small muted" role="status">{t('common.loading')}</p>
+      ) : certificates.length === 0 ? (
+        <p className="event-detail">{t('settings.noValidCertificates')}</p>
+      ) : (
+        <div className="command-results">
+          {certificates.map((cert) => {
+            const { name, subtitle } = certificateNames(cert)
+            const left = daysRemaining(cert.valid_to)
+            const facts = [
+              cert.san_count > 1 && `${cert.san_count} ${t('details.sans')}`,
+              cert.issuer_name,
+              `${t('common.validUntil')} ${formatDate(cert.valid_to)}`,
+            ].filter(Boolean).join(' · ')
+            return (
+              <button key={cert.id} type="button" className="command-result" onClick={() => pick(cert)}>
+                <Icon name="cert" />
+                <span className="name">
+                  <span>
+                    <strong>{name || t('common.certificate')}</strong>
+                    {subtitle && <span className="muted" title={subtitle}> · {subtitle}</span>}
+                  </span>
+                  <small className={left < 30 ? 'warn' : 'muted'} style={{ display: 'block' }}>{facts}</small>
+                </span>
+                {cert.key_algorithm && <span className="hint mono">{cert.key_algorithm}</span>}
+              </button>
+            )
+          })}
+        </div>
+      )}
+      {!loading && total > PER_PAGE && (
+        <TableFooter range={t('common.showingOf', { count: certificates.length, total })} pagination={{ page, pages, onPage: setPage }} />
+      )}
+    </AtelierDialog>
   )
 }
