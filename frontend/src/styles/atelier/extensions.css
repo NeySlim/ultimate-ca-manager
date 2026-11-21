@@ -190,9 +190,9 @@
 .atl .release-notes-body a{color:var(--accent)}
 .atl .segmented .swatch{margin-right:6px;vertical-align:-1px}
 /*
- * A panel the product still draws inside a zone (.atl-out: import widget, certificate picker field,
- * setup card, deployment, email template, reconnect overlay) keeps its own look: the mockup's rules on
- * bare elements (button, input, p) outrank the product's classes, so the ones these panels use are given back.
+ * A panel the product still draws inside a zone (.atl-out: the setup card and the deployment panel of
+ * Certificates) keeps its own look: the mockup's rules on bare elements (button, input, p) outrank the
+ * product's classes, so the ones these panels use are given back.
  */
 .atl .atl-out{font-family:'IBM Plex Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 .atl .atl-out .lv-btn,.atl .atl-out .ui-select-trigger,.atl .atl-out button.border{border-style:solid;border-width:1px}

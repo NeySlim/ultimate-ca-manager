@@ -194,21 +194,17 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
           </>
         )}
         {formData.auth_method === 'certificate' && (
-          // The product's certificate picker (upload, managed list) keeps its own look in the mockup's field
-          <div className="field full">
-            <div className="atl-out">
-              <CertificateInput
-                label={t('msca.clientCert')}
-                keyLabel={t('msca.clientKey')}
-                requireKey
-                value={{ cert_pem: formData.client_cert_pem, key_pem: formData.client_key_pem }}
-                onChange={({ cert_pem, key_pem }) => {
-                  updateField('client_cert_pem', cert_pem)
-                  updateField('client_key_pem', key_pem)
-                }}
-              />
-            </div>
-          </div>
+          // The certificate picker's fields span the form's two columns
+          <CertificateInput
+            label={t('msca.clientCert')}
+            keyLabel={t('msca.clientKey')}
+            requireKey
+            value={{ cert_pem: formData.client_cert_pem, key_pem: formData.client_key_pem }}
+            onChange={({ cert_pem, key_pem }) => {
+              updateField('client_cert_pem', cert_pem)
+              updateField('client_key_pem', key_pem)
+            }}
+          />
         )}
         {formData.auth_method === 'kerberos' && (
           <>

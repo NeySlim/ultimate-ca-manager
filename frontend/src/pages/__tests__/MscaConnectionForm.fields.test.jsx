@@ -32,4 +32,11 @@ describe('Microsoft CA form fields', () => {
     expect(onSave).toHaveBeenCalledTimes(1)
     expect(onSave.mock.calls[0][0]).not.toHaveProperty('use_ssl')
   })
+
+  it('draws the client certificate picker in the form\'s own fields, nothing left to the product\'s styles', () => {
+    const { container } = renderForm({ auth_method: 'certificate' })
+    expect(screen.getByRole('group', { name: 'certInput.source' })).toHaveClass('segmented')
+    expect(screen.getByRole('group', { name: 'certInput.source' }).closest('.form-fields')).toBeTruthy()
+    expect(container.querySelector('.atl-out')).toBeNull()
+  })
 })

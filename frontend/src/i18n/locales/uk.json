@@ -5459,7 +5459,8 @@
     "crossSkipped_many": "{{count}} перехресних сертифікатів пропущено; самопідписані CA збережено",
     "crossSkipped_other": "{{count}} перехресного сертифіката пропущено; самопідписані CA збережено",
     "unverifiableParentsTitle": "Батьківські ЦС для підтвердження на сторінці ЦС",
-    "unverifiableParent": "{{ca}} залишився без батьківського ЦС: імовірний батьківський {{parent}}, підпис тут неможливо перевірити ({{algorithm}})"
+    "unverifiableParent": "{{ca}} залишився без батьківського ЦС: імовірний батьківський {{parent}}, підпис тут неможливо перевірити ({{algorithm}})",
+    "filePasswordFor": "Password of {{name}}"
   },
   "webhooks": {
     "eventLabels": {
@@ -7287,7 +7288,8 @@
     "chooseCertificate": "Оберіть сертифікат...",
     "certLoaded": "Сертифікат завантажено",
     "keyLoaded": "Приватний ключ завантажено",
-    "noCertsWithKey": "Сертифікатів з приватним ключем не знайдено"
+    "noCertsWithKey": "Сертифікатів з приватним ключем не знайдено",
+    "source": "Certificate source"
   },
   "commands": {
     "nav": {

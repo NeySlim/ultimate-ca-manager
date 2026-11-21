@@ -1,23 +1,15 @@
 /**
- * CertificateInput — Unified certificate/key input component
- * 
- * Three input modes:
- * 1. Paste PEM text directly
- * 2. Upload a file (PEM, DER, PFX, P7B — auto-detected)
- * 3. Select from managed certificates
- * 
- * Uses the SmartImport analyze API for file parsing.
+ * The certificate and key a connection presents, in the mockup's form vocabulary: its source in a
+ * `.segmented` field (paste the PEM, read a file, or take a managed certificate), the PEM in monospace
+ * textareas, the file as « Choisir un fichier… » (or dropped on the field), what was read in a status line.
+ * Its fields are `.field.full`, for the two-column grid of the form that holds it.
+ * Files are read by the SmartImport analyze API.
  */
-import { useState, useRef, useCallback } from 'react'
+import { useState, useCallback, useId } from 'react'
 import { useTranslation } from 'react-i18next'
-import { 
-  TextAlignLeft, UploadSimple, Certificate, LockSimple,
-  CheckCircle, X, File as FileIcon
-} from '@phosphor-icons/react'
-import { Button } from './Button'
-import { Textarea } from './Textarea'
-import { SelectComponent as Select } from './Select'
-import { cn, certificateLabel } from '../lib/utils'
+import { Icon } from './atelier/Icon'
+import { Input, Select, Textarea, Notice, SegmentedField } from './atelier/Form'
+import { certificateLabel } from '../lib/utils'
 import { fetchAllPages } from '../lib/fetchAllPages'
 import { apiClient as api, certificatesService } from '../services'
 
@@ -29,9 +21,9 @@ const MANAGED_PER_PAGE = 100
 const MANAGED_MAX_CERTS = 500
 
 const MODES = [
-  { key: 'paste', icon: TextAlignLeft, labelKey: 'certInput.modePaste' },
-  { key: 'upload', icon: UploadSimple, labelKey: 'certInput.modeUpload' },
-  { key: 'managed', icon: Certificate, labelKey: 'certInput.modeManaged' },
+  { key: 'paste', labelKey: 'certInput.modePaste' },
+  { key: 'upload', labelKey: 'certInput.modeUpload' },
+  { key: 'managed', labelKey: 'certInput.modeManaged' },
 ]
 
 export function CertificateInput({
@@ -42,7 +34,6 @@ export function CertificateInput({
   showKeyField = true,
   certLabel,
   keyLabel,
-  className,
 }) {
   const { t } = useTranslation()
   const [mode, setMode] = useState('paste')
@@ -52,8 +43,7 @@ export function CertificateInput({
   const [needsPassword, setNeedsPassword] = useState(false)
   const [managedCerts, setManagedCerts] = useState(null)
   const [loadingCerts, setLoadingCerts] = useState(false)
-  const [isDragOver, setIsDragOver] = useState(false)
-  const fileInputRef = useRef(null)
+  const fid = useId()
 
   // Load managed certificates on demand, walking the pages: the listing
   // pages on `per_page` (100 max) and filters on `has_private_key` itself.
@@ -154,14 +144,13 @@ export function CertificateInput({
     }
   }
 
-  // Drag & drop
-  const handleDragOver = useCallback((e) => { e.preventDefault(); setIsDragOver(true) }, [])
-  const handleDragLeave = useCallback((e) => { e.preventDefault(); setIsDragOver(false) }, [])
+  // A file dropped on the file field is read as one picked
   const handleDrop = useCallback((e) => {
-    e.preventDefault()
-    setIsDragOver(false)
-    if (e.dataTransfer.files?.[0]) handleFile(e.dataTransfer.files[0])
+    const file = e.dataTransfer?.files?.[0]
+    if (file) { e.preventDefault(); handleFile(file) }
   }, [handleFile])
+
+  const removeFile = () => { setUploadedFile(null); setNeedsPassword(false); setFilePassword(''); onChange({ cert_pem: '', key_pem: '' }) }
 
   // Select managed cert — get cert PEM from detail, key PEM from export
   const handleSelectManaged = async (certId) => {
@@ -195,185 +184,80 @@ export function CertificateInput({
   const effectiveKeyLabel = keyLabel || t('certInput.privateKey')
 
   return (
-    <div className={cn('space-y-3', className)}>
-      {/* Mode switcher */}
-      <div className="ui-segmented" role="group">
-        {MODES.map(m => {
-          const Icon = m.icon
-          return (
-            <button
-              key={m.key}
-              type="button"
-              onClick={() => handleModeChange(m.key)}
-              aria-pressed={mode === m.key}
-            >
-              <Icon size={14} aria-hidden="true" />
-              {t(m.labelKey)}
-            </button>
-          )
-        })}
-      </div>
+    <>
+      <SegmentedField id={`${fid}-source`} label={t('certInput.source')} options={MODES.map(m => ({ value: m.key, label: t(m.labelKey) }))}
+        pressed={(v) => mode === v} onPick={handleModeChange} />
 
-      {/* Mode: Paste PEM */}
       {mode === 'paste' && (
-        <div className="space-y-3">
-          <Textarea
-            label={effectiveCertLabel}
-            value={value.cert_pem}
-            onChange={(e) => onChange({ ...value, cert_pem: e.target.value })}
-            rows={4}
-            placeholder="-----BEGIN CERTIFICATE-----"
-            className="font-mono text-xs"
-          />
+        <>
+          <Textarea id={`${fid}-cert`} label={effectiveCertLabel} mono rows={4} spellCheck={false} placeholder="-----BEGIN CERTIFICATE-----"
+            value={value.cert_pem} onChange={(e) => onChange({ ...value, cert_pem: e.target.value })} />
           {showKeyField && (
-            <Textarea
-              label={effectiveKeyLabel}
-              value={value.key_pem}
-              onChange={(e) => onChange({ ...value, key_pem: e.target.value })}
-              rows={4}
-              placeholder="-----BEGIN PRIVATE KEY-----"
-              className="font-mono text-xs"
-            />
+            <Textarea id={`${fid}-key`} label={effectiveKeyLabel} mono rows={4} spellCheck={false} placeholder="-----BEGIN PRIVATE KEY-----"
+              value={value.key_pem} onChange={(e) => onChange({ ...value, key_pem: e.target.value })} />
           )}
-        </div>
+        </>
       )}
 
-      {/* Mode: Upload file */}
       {mode === 'upload' && (
-        <div className="space-y-3">
-          {/* Drop zone */}
-          {!uploadedFile?.parsed && (
-            <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={cn(
-                'flex flex-col items-center gap-2 p-6 border-2 border-dashed rounded-lg cursor-pointer transition-colors',
-                isDragOver
-                  ? 'border-accent-primary bg-accent-primary-op5'
-                  : 'border-border hover:border-border-hover hover:bg-bg-secondary'
-              )}
-            >
-              <UploadSimple size={24} className="text-text-tertiary" />
-              <div className="text-sm text-text-secondary text-center">
-                {uploading ? t('certInput.analyzing') : t('certInput.dropOrClick')}
-              </div>
-              <div className="text-xs text-text-tertiary">
-                PEM, DER, PKCS#12/PFX, P7B
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept={ACCEPT_FORMATS}
-                onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); e.target.value = '' }}
-                className="hidden"
-              />
-            </div>
-          )}
-
-          {/* Password prompt for encrypted files */}
-          {needsPassword && (
-            <div className="flex gap-2 items-end">
-              <div className="ui-field flex-1">
-                <label className="ui-label" htmlFor="cert-input-file-password">
-                  <LockSimple size={12} aria-hidden="true" />
-                  {t('certInput.filePassword')}
+        <>
+          <div className="field full" onDragOver={(e) => { if (e.dataTransfer?.types?.includes?.('Files')) e.preventDefault() }} onDrop={handleDrop}>
+            <span>{effectiveCertLabel}</span>
+            {uploadedFile?.parsed ? (
+              <p className="group-hint" role="status">
+                <Icon name="check" /> {uploadedFile.name}{' '}
+                <button type="button" className="text-link" onClick={removeFile}>{t('tools.removeFile')}</button>
+              </p>
+            ) : (
+              <span className="row-actions">
+                <label className="text-link">
+                  <input type="file" accept={ACCEPT_FORMATS} className="sr-only"
+                    onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); e.target.value = '' }} />
+                  {t('common.chooseFile')}
                 </label>
-                <input
-                  id="cert-input-file-password"
-                  type="password"
-                  value={filePassword}
-                  onChange={(e) => setFilePassword(e.target.value)}
-                  placeholder={t('certInput.enterPassword')}
-                  className="ui-control"
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handlePasswordSubmit() } }}
-                />
+              </span>
+            )}
+            <small aria-live="polite">{uploading ? t('certInput.analyzing') : 'PEM, DER, PKCS#12/PFX, P7B'}</small>
+          </div>
+
+          {needsPassword && (
+            <div className="field full">
+              <div className="settings-actions">
+                <Input id={`${fid}-password`} type="password" label={t('certInput.filePassword')} placeholder={t('certInput.enterPassword')}
+                  value={filePassword} onChange={(e) => setFilePassword(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handlePasswordSubmit() } }} />
+                <button type="button" className="btn" onClick={handlePasswordSubmit} disabled={!filePassword}>{t('common.ok')}</button>
               </div>
-              <Button type="button" size="sm" onClick={handlePasswordSubmit} disabled={!filePassword}>
-                {t('common.ok')}
-              </Button>
             </div>
           )}
 
-          {/* Upload result */}
-          {uploadedFile?.parsed && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-secondary">
-              <CheckCircle size={16} className="text-status-success shrink-0" />
-              <FileIcon size={14} className="text-text-tertiary shrink-0" />
-              <span className="text-sm text-text-primary flex-1 truncate">{uploadedFile.name}</span>
-              <button
-                type="button"
-                onClick={() => { setUploadedFile(null); setNeedsPassword(false); setFilePassword(''); onChange({ cert_pem: '', key_pem: '' }) }}
-                className="text-text-tertiary hover:text-text-primary"
-              >
-                <X size={14} />
-              </button>
-            </div>
-          )}
+          {uploadedFile?.error && <Notice tone="bad">{uploadedFile.error}</Notice>}
 
-          {uploadedFile?.error && (
-            <div className="text-xs text-status-danger px-1">{uploadedFile.error}</div>
-          )}
-
-          {/* Show parsed PEM preview (read-only) */}
           {uploadedFile?.parsed && value.cert_pem && (
-            <div className="space-y-2">
-              <div className="text-xs text-text-tertiary">{effectiveCertLabel}</div>
-              <pre className="text-xs font-mono text-text-secondary bg-bg-secondary rounded p-2 max-h-20 overflow-auto">
-                {value.cert_pem.substring(0, 200)}...
-              </pre>
-              {value.key_pem && (
-                <>
-                  <div className="text-xs text-text-tertiary">{effectiveKeyLabel}</div>
-                  <div className="text-xs text-status-success flex items-center gap-1">
-                    <LockSimple size={12} /> {t('certInput.keyExtracted')}
-                  </div>
-                </>
-              )}
+            <div className="field full">
+              <span>{effectiveCertLabel}</span>
+              <pre className="code-preview">{value.cert_pem.substring(0, 200)}...</pre>
+              {value.key_pem && <small><Icon name="lock" /> {t('certInput.keyExtracted')}</small>}
             </div>
           )}
-        </div>
+        </>
       )}
 
-      {/* Mode: Select managed cert */}
       {mode === 'managed' && (
-        <div className="space-y-3">
-          <Select
-            label={t('certInput.selectCertificate')}
-            value=""
-            onChange={(certId) => handleSelectManaged(certId)}
-            options={[
-              { value: '', label: t('certInput.chooseCertificate') },
-              ...(managedCerts || []).map(c => ({
-                value: String(c.id),
-                label: `${certificateLabel(c) || c.subject || `#${c.id}`}${c.key_type ? ` (${c.key_type})` : ''}${c.has_private_key ? ' 🔑' : ''}`,
-              }))
-            ]}
-            disabled={loadingCerts}
-          />
-          {loadingCerts && (
-            <div className="text-xs text-text-tertiary">{t('common.loading')}...</div>
-          )}
-          {/* Show what was selected */}
-          {value.cert_pem && (
-            <div className="space-y-1">
-              <div className="flex items-center gap-1 text-xs text-status-success">
-                <CheckCircle size={12} /> {t('certInput.certLoaded')}
-              </div>
-              {value.key_pem && (
-                <div className="flex items-center gap-1 text-xs text-status-success">
-                  <LockSimple size={12} /> {t('certInput.keyLoaded')}
-                </div>
-              )}
-            </div>
-          )}
-          {requireKey && managedCerts && !loadingCerts && managedCerts.length === 0 && (
-            <div className="text-xs text-text-tertiary">{t('certInput.noCertsWithKey')}</div>
-          )}
-        </div>
+        <Select id={`${fid}-managed`} full label={t('certInput.selectCertificate')} value="" disabled={loadingCerts}
+          onChange={(certId) => handleSelectManaged(certId)}
+          hint={loadingCerts ? t('common.loading')
+            : requireKey && managedCerts && managedCerts.length === 0 ? t('certInput.noCertsWithKey')
+            : value.cert_pem ? [t('certInput.certLoaded'), value.key_pem && t('certInput.keyLoaded')].filter(Boolean).join(' · ') : undefined}
+          options={[
+            { value: '', label: t('certInput.chooseCertificate') },
+            ...(managedCerts || []).map(c => ({
+              value: String(c.id),
+              label: `${certificateLabel(c) || c.subject || `#${c.id}`}${c.key_type ? ` (${c.key_type})` : ''}${c.has_private_key ? ' 🔑' : ''}`,
+            })),
+          ]} />
       )}
-    </div>
+    </>
   )
 }
 

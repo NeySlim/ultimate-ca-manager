@@ -5249,7 +5249,8 @@
     "crossSkipped_one": "{{count}} certificado cruzado foi omitido; a CA autoassinada é mantida",
     "crossSkipped_other": "{{count}} certificados cruzados foram omitidos; as CAs autoassinadas são mantidas",
     "unverifiableParentsTitle": "Pais a confirmar na página da CA",
-    "unverifiableParent": "{{ca}} ficou sem pai: provável pai {{parent}}, assinatura não verificável aqui ({{algorithm}})"
+    "unverifiableParent": "{{ca}} ficou sem pai: provável pai {{parent}}, assinatura não verificável aqui ({{algorithm}})",
+    "filePasswordFor": "Password of {{name}}"
   },
   "webhooks": {
     "eventLabels": {
@@ -7003,7 +7004,8 @@
     "chooseCertificate": "Escolher um certificado...",
     "certLoaded": "Certificado carregado",
     "keyLoaded": "Chave privada carregada",
-    "noCertsWithKey": "Nenhum certificado com chave privada encontrado"
+    "noCertsWithKey": "Nenhum certificado com chave privada encontrado",
+    "source": "Certificate source"
   },
   "commands": {
     "nav": {

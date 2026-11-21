@@ -5249,7 +5249,8 @@
     "crossSkipped_one": "{{count}} cross-certificate was left out; the self-signed CA is kept",
     "crossSkipped_other": "{{count}} cross-certificates were left out; the self-signed CAs are kept",
     "unverifiableParentsTitle": "Parents to confirm on the CA page",
-    "unverifiableParent": "{{ca}} left without a parent: probable parent {{parent}}, signature not verifiable here ({{algorithm}})"
+    "unverifiableParent": "{{ca}} left without a parent: probable parent {{parent}}, signature not verifiable here ({{algorithm}})",
+    "filePasswordFor": "Password of {{name}}"
   },
   "webhooks": {
     "eventLabels": {
@@ -7003,7 +7004,8 @@
     "chooseCertificate": "Choose a certificate...",
     "certLoaded": "Certificate loaded",
     "keyLoaded": "Private key loaded",
-    "noCertsWithKey": "No certificates with private key found"
+    "noCertsWithKey": "No certificates with private key found",
+    "source": "Certificate source"
   },
   "commands": {
     "nav": {
