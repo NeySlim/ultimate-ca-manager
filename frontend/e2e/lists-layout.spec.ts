@@ -81,4 +81,17 @@ test.describe('phone', () => {
     expect(foot!.x + foot!.width).toBeLessThanOrEqual(390)
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
   })
+
+  // `api` signs the page in
+  test('a toolbar of a search field and one icon button keeps them on one line', async ({ page, api }) => {
+    for (const path of ['/acme', '/crl-ocsp']) {
+      await page.goto(path)
+      const toolbar = page.locator('.atl .page-content .toolbar').first()
+      await expect(toolbar.locator('.search')).toBeVisible()
+      const field = (await toolbar.locator('.search').boundingBox())!
+      const button = (await toolbar.locator('> .icon-btn').boundingBox())!
+      expect(button.y, path).toBeLessThan(field.y + field.height)
+      expect(button.x + button.width, path).toBeLessThanOrEqual(390)
+    }
+  })
 })

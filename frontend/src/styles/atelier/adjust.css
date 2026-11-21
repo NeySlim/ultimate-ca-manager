@@ -18,3 +18,7 @@
 :root .atl .mobile-record .row-top>.icon-btn{width:44px;min-height:44px;flex-shrink:0}
 /* Without a checkbox the record starts at its left edge, as the mockup's module records do. */
 :root .atl .mobile-record:not(:has(.check-hit)) :is(.row-meta,.row-status){margin-left:0}
+
+/* On a phone a toolbar of a search field and one icon button (ACME, CRL / OCSP) keeps the button on the
+   field's line; the copied rule gives the field the whole line, written for the Certificates toolbar. */
+@media(max-width:800px){:root .atl .toolbar:not(:has(>:not(.search,.search-status,.icon-btn))):has(>.icon-btn:only-of-type) .search{flex-basis:0}}
