@@ -10,6 +10,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Zone, Btn, Icon, PageHead, Toolbar, SearchField, FilterSelect, ListView, LoadError, LoadCause, EmptyBlock, NoMatch,
+  useClientList,
 } from '../components/atelier'
 import { discoveryService } from '../services'
 import { useNotification } from '../contexts'
@@ -27,6 +28,9 @@ const pageOf = (res) => {
   const data = res?.data ?? res
   return Array.isArray(data) ? { items: data, total: data.length } : { items: data?.items ?? [], total: data?.total ?? data?.items?.length ?? 0 }
 }
+
+const BY_NAME = { key: 'name', asc: true }
+const LATEST_FIRST = { key: 'started', asc: false }
 
 export default function DiscoveryPage() {
   const { t } = useTranslation()
@@ -163,21 +167,40 @@ export default function DiscoveryPage() {
   const last = useMemo(() => lastRuns(runs), [runs])
   const stateOfScan = useCallback((p) => scanState(p, last.get(p.id)), [last])
   const q = query.trim().toLowerCase()
-  const scanSearched = useMemo(() => [...profiles]
-    .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+  const scanSearched = useMemo(() => profiles
     .filter((p) => !q || [p.name, p.description, ...(Array.isArray(p.targets) ? p.targets : [])].some((v) => String(v || '').toLowerCase().includes(q))), [profiles, q])
   const scanPresent = Object.keys(SCAN_TONES).filter((s) => profiles.some((p) => stateOfScan(p) === s))
   const scanActive = scanPresent.includes(scanView) ? scanView : ''
   const scanRows = scanSearched.filter((p) => !scanActive || stateOfScan(p) === scanActive)
+  const scanStates = Object.keys(SCAN_TONES)
+  const scanList = useClientList(scanRows, {
+    initial: BY_NAME,
+    resetKey: `${q}|${scanActive}`,
+    sorts: {
+      name: (p) => p.name, range: (p) => facts.range(p),
+      found: (p) => { const run = last.get(p.id); return run?.status === 'completed' ? run.certs_found ?? 0 : null },
+      last: (p) => { const at = last.get(p.id)?.started_at || p.last_scan_at; return at ? Date.parse(at) : null },
+      state: (p) => scanStates.indexOf(stateOfScan(p)),
+    },
+  })
 
   // ── Runs ──
-  const runSearched = useMemo(() => [...runs]
-    .sort((a, b) => new Date(b.started_at) - new Date(a.started_at))
+  const runSearched = useMemo(() => runs
     .filter((r) => (!profileFilter || String(r.scan_profile_id) === String(profileFilter))
       && (!q || String(runTitle(r, t)).toLowerCase().includes(q))), [runs, profileFilter, q, t])
   const runPresent = Object.keys(RUN_TONES).filter((s) => runs.some((r) => runState(r) === s))
   const runActive = runPresent.includes(runView) ? runView : ''
   const runRows = runSearched.filter((r) => !runActive || runState(r) === runActive)
+  // The page reads the last 200 runs (the API has no search nor state filter): sorted and paged here
+  const runStates = Object.keys(RUN_TONES)
+  const runList = useClientList(runRows, {
+    initial: LATEST_FIRST,
+    resetKey: `${q}|${runActive}|${profileFilter}`,
+    sorts: {
+      name: (r) => runTitle(r, t), started: (r) => r.started_at && Date.parse(r.started_at), found: (r) => r.certs_found ?? 0,
+      targets: (r) => r.targets_scanned, duration: (r) => r.duration_seconds, state: (r) => runStates.indexOf(runState(r)),
+    },
+  })
 
   const openedItem = opened && (opened.view === 'profiles' ? profiles : opened.view === 'history' ? runs : found.items).find((x) => x.id === opened.id)
   const open = (v) => (x) => { if (opened?.view !== v || opened?.id !== x.id) setSection('overview'); setOpened({ view: v, id: x.id }) }
@@ -252,23 +275,23 @@ export default function DiscoveryPage() {
       {progressNote}
 
       {view === 'profiles' && (
-        <ListView label={t('shell.moduleLabel.discovery')} caption={t('discovery.scans.caption')} icon="radar" rows={scanRows} loading={loading}
+        <ListView label={t('shell.moduleLabel.discovery')} caption={t('discovery.scans.caption')} icon="radar" list={scanList} nameSort="name" loading={loading}
           filters={{ views: [{ id: '', label: t('common.all'), count: scanSearched.length },
             ...scanPresent.map((s) => ({ id: s, label: t(`discovery.scans.state.${s}`), count: scanSearched.filter((p) => stateOfScan(p) === s).length }))],
           active: scanActive, onChange: setScanView, label: t('discovery.filterByState') }}
           toolbar={<Toolbar>{search('scan-search', t('discovery.searchProfiles'))}</Toolbar>}
           title={(p) => p.name} status={(p) => <ScanPill state={stateOfScan(p)} />} openedId={openedId} onOpen={open('profiles')}
           columns={[
-            { id: 'range', label: t('discovery.form.range'), cell: (p) => facts.range(p), grow: true },
-            { id: 'found', label: t('discovery.scans.found'), cell: (p) => facts.found(p, last.get(p.id)) },
-            { id: 'last', label: t('discovery.scans.last'), cell: (p) => facts.last(p, last.get(p.id)) },
-            { status: true },
+            { id: 'range', label: t('discovery.form.range'), cell: (p) => facts.range(p), grow: true, sort: 'range' },
+            { id: 'found', label: t('discovery.scans.found'), cell: (p) => facts.found(p, last.get(p.id)), sort: 'found' },
+            { id: 'last', label: t('discovery.scans.last'), cell: (p) => facts.last(p, last.get(p.id)), sort: 'last' },
+            { status: true, sort: 'state' },
           ]}
           error={error}
           empty={q || scanActive ? noMatch : (
             <EmptyBlock id="discovery" icon="radar" title={t('discovery.scans.empty')} text={t('discovery.scans.emptyText')} action={createScan} />
           )}
-          footer={{ range: t('discovery.scans.range', { shown: scanRows.length, count: profiles.length }) }} />
+          footer={{ range: t('discovery.scans.range', scanList.counts(profiles.length)) }} />
       )}
 
       {view === 'discovered' && (
@@ -311,7 +334,7 @@ export default function DiscoveryPage() {
       )}
 
       {view === 'history' && (
-        <ListView label={t('discovery.views.history')} caption={t('discovery.runs.caption')} icon="clock" rows={runRows} loading={loading}
+        <ListView label={t('discovery.views.history')} caption={t('discovery.runs.caption')} icon="clock" list={runList} nameSort="name" loading={loading}
           filters={{ views: [{ id: '', label: t('common.all'), count: runSearched.length },
             ...runPresent.map((s) => ({ id: s, label: t(`discovery.runs.state.${s}`), count: runSearched.filter((r) => runState(r) === s).length }))],
           active: runActive, onChange: setRunView, label: t('discovery.filterByState') }}
@@ -323,15 +346,15 @@ export default function DiscoveryPage() {
           )}
           title={(r) => runTitle(r, t)} status={(r) => <RunPill run={r} />} openedId={openedId} onOpen={open('history')}
           columns={[
-            { id: 'started', label: t('discovery.startedAt'), cell: (r) => (r.started_at ? formatDate(r.started_at, { time: true }) : '—') },
-            { id: 'found', label: t('discovery.certsFound'), cell: (r) => r.certs_found ?? 0, fit: true },
-            { id: 'targets', label: t('discovery.targetsScanned'), cell: (r) => r.targets_scanned ?? '—', fit: true },
-            { id: 'duration', label: t('discovery.duration'), cell: (r) => durationLabel(r.duration_seconds) || '—', grow: true, muted: true },
-            { status: true },
+            { id: 'started', label: t('discovery.startedAt'), cell: (r) => (r.started_at ? formatDate(r.started_at, { time: true }) : '—'), sort: 'started' },
+            { id: 'found', label: t('discovery.certsFound'), cell: (r) => r.certs_found ?? 0, fit: true, sort: 'found' },
+            { id: 'targets', label: t('discovery.targetsScanned'), cell: (r) => r.targets_scanned ?? '—', fit: true, sort: 'targets' },
+            { id: 'duration', label: t('discovery.duration'), cell: (r) => durationLabel(r.duration_seconds) || '—', grow: true, muted: true, sort: 'duration' },
+            { status: true, sort: 'state' },
           ]}
           error={error}
           empty={q || runActive || profileFilter ? noMatch : <EmptyBlock id="history" icon="clock" title={t('discovery.noHistory')} text={t('discovery.noHistoryDesc')} />}
-          footer={{ range: t('discovery.runs.range', { shown: runRows.length, count: runs.length }) }} />
+          footer={{ range: t('discovery.runs.range', runList.counts(runs.length)) }} />
       )}
       <p className="phone-only">{others.map((v) => (
         <Btn key={v} icon={VIEW_ICONS[v]} data-view={v} onClick={() => goView(v)}>{t(`discovery.views.${v}`)}</Btn>
