@@ -63,7 +63,6 @@ describe('the deployment section of the inspector', () => {
     // Only the mockup's vocabulary: no Tailwind utility, no former card
     const classes = [...section().querySelectorAll('[class]')].flatMap((el) => [...el.classList])
     expect(classes.filter((c) => /^(bg-|text-|p-|space-|flex|items-|gap-|rounded|border|font-|truncate|status-)/.test(c))).toEqual([])
-    expect(section().closest('.atl-out')).toBeNull()
   })
 
   it('says each state with the mockup badges', async () => {

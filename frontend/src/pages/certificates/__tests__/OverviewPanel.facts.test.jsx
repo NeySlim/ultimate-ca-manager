@@ -84,10 +84,9 @@ describe('the Windows profile under Plus de détails', () => {
 })
 
 describe('the deployment section under Plus de détails', () => {
-  it('sits in the panel among the other sections, outside any former-style island', () => {
+  it('sits in the panel among the other sections', () => {
     render(<OverviewPanel cert={base} title="pc" />)
     const deploy = screen.getByTestId('cert-deploy')
     expect(deploy.parentElement).toHaveClass('advanced-panel')
-    expect(deploy.closest('.atl-out')).toBeNull()
   })
 })

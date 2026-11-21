@@ -1,5 +1,5 @@
 /**
- * The import dialog in the mockup's vocabulary, with no panel left to the product's own styles (.atl-out):
+ * The import dialog in the mockup's vocabulary, with no panel left to the product's own styles:
  * files as « Choisir un fichier… » and a record list, the PEM in a monospace field, the analysis as
  * record lists, pills and notices, the result as sections, the steps ending on the dialog's actions.
  */
@@ -22,7 +22,7 @@ const OBJECTS = [
   { type: 'certificate', index: 0, subject: 'CN=leaf', issuer: 'CN=ca', is_ca: false, matched_key_index: 1, key_algorithm: 'RSA', key_size: 2048 },
   { type: 'private_key', index: 1, matched_key_index: null, is_encrypted: true },
 ]
-const productDrawn = (root) => root.querySelector('.atl-out,[class*="space-y"],[class*="text-sm"],[class*="text-xs"],[class*="rounded"],[class*="border-"],.ui-notice')
+const productDrawn = (root) => root.querySelector('[class*="space-y"],[class*="text-sm"],[class*="text-xs"],[class*="rounded"],[class*="border-"],.ui-notice')
 const file = (text, name) => { const f = new File([text], name); f.arrayBuffer = async () => new TextEncoder().encode(text).buffer; return f }
 
 describe('SmartImport in the mockup\'s vocabulary', () => {

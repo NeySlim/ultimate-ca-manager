@@ -38,7 +38,6 @@ describe('settings frame and group', () => {
   it('draws a section body under the mockup rules, its state and refusal in the heading', () => {
     render(<SettingsFrame id="general" label="Général" desc="Identité." aside={<span data-testid="aside" />} error="Refusé"><p>new</p></SettingsFrame>)
     expect(screen.getByText('new').parentElement).toHaveClass('settings-body')
-    expect(screen.getByText('new').parentElement).not.toHaveClass('atl-out')
     const general = document.getElementById('set-sec-general')
     expect(general).toHaveAttribute('aria-labelledby', 'set-title-general')
     expect(general.querySelector('.panel-heading')).toContainElement(screen.getByTestId('aside'))

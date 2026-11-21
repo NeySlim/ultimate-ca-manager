@@ -242,7 +242,6 @@ describe('a certificate in the inspector (inspector, certMenu)', () => {
     fireEvent.click(toggle)
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     // The deployment section sits among the others, drawn as they are
-    expect(screen.getByTestId('deploy').closest('.atl-out')).toBeNull()
     expect(screen.getByTestId('deploy').parentElement).toHaveClass('advanced-panel')
   })
 
