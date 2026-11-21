@@ -12,6 +12,9 @@ const LoginPage = lazyWithRetry(() => import('./pages/LoginPage'))
 const ForgotPasswordPage = lazyWithRetry(() => import('./pages/ForgotPasswordPage'))
 const ResetPasswordPage = lazyWithRetry(() => import('./pages/ResetPasswordPage'))
 const DevShowcasePage = lazyWithRetry(() => import('./pages/DevShowcasePage'))
+// The Atelier gabarits drawn with the mockup's records: a development build only (dev server, or `vite build --mode gabarits`)
+const GABARITS = import.meta.env.DEV || import.meta.env.MODE === 'gabarits'
+const GabaritsPage = GABARITS ? lazyWithRetry(() => import('./pages/dev/GabaritsPage')) : null
 const SsoTestCompletePage = lazyWithRetry(() => import('./pages/SsoTestCompletePage'))
 const SsoTestLaunchPage = lazyWithRetry(() => import('./pages/SsoTestLaunchPage'))
 
@@ -138,6 +141,7 @@ export function AppRoutes() {
           {moduleRoutes()}
           {/* Component showcase: accessible by URL only, not a module */}
           <Route path="/dev/components" element={<ProtectedRoute><DevShowcasePage /></ProtectedRoute>} />
+          {GabaritsPage && <Route path="/dev/gabarits" element={<ProtectedRoute><GabaritsPage /></ProtectedRoute>} />}
         </Route>
         
         <Route path="*" element={<Navigate to="/" replace />} />
