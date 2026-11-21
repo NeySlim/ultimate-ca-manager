@@ -15,10 +15,10 @@ import {
 } from '@phosphor-icons/react'
 import { useNotification } from '../contexts'
 import { usePermission } from './index'
-import { ExportModal } from '../components/ExportModal'
 import { CertificateLintModal } from '../components/CertificateLintModal'
 import { KeyRecoveryRequestModal } from '../components/KeyRecoveryRequestModal'
-import { RevokeCertificateModal } from '../components/RevokeCertificateModal'
+import { ExportDialog as AtelierExport } from '../pages/certificates/dialogs/ExportDialog'
+import { RevokeDialog as AtelierRevoke } from '../pages/certificates/dialogs/RevokeDialog'
 import { TakeOfflineModal } from '../components/cas/TakeOfflineModal'
 import { RestoreModal } from '../components/cas/RestoreModal'
 import { ImportCaKeyModal } from '../components/cas/ImportCaKeyModal'
@@ -55,11 +55,11 @@ const definedOnly = (obj) => Object.fromEntries(Object.entries(obj || {}).filter
  * @param {() => void} [p.onMutate]  called just before a mutating request
  * @param {object} [p.permissions]  { canWrite, canDelete, hasPermission } override
  * @param {Function} [p.t]  translator override
- * @param {{ Export?, Revoke?, Issue? }} [p.dialogs]  a zone's own export, revocation and issue dialogs, same props as the defaults
+ * @param {{ Export?, Revoke?, Issue? }} [p.dialogs]  other export, revocation and issue dialogs, same props as the mockup's defaults
  */
 export function useEntityActions({ type, entity, entityId, onChanged, onClose, onOpenEntity, onMutate, afterMutation = 'close', permissions, t: tOverride, dialogs }) {
-  const ExportDialog = dialogs?.Export || ExportModal
-  const RevokeDialog = dialogs?.Revoke || RevokeCertificateModal
+  const ExportDialog = dialogs?.Export || AtelierExport
+  const RevokeDialog = dialogs?.Revoke || AtelierRevoke
   const IssueDialog = dialogs?.Issue || IssueCertificateDialog
   const { t: hookT } = useTranslation()
   const t = tOverride || hookT

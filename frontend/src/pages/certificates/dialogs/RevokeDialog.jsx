@@ -1,13 +1,13 @@
 /**
  * The mockup's revokeDialog(): the warning, the name, « Motif » (the RFC 5280 reasons), what the
  * reason means, Annuler and the danger button. The product asks about the other member of a hybrid
- * pair (RFC 9763). Same props as components/RevokeCertificateModal.
+ * pair (RFC 9763). Props: open, onClose, onConfirm(reason[, { revokeRelated }]), certificate, loading, count, title, warning, allowHold.
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AtelierDialog, Icon } from '../../../components/atelier'
 import { certificatesService } from '../../../services'
-import { REVOCATION_REASONS } from '../../../components/RevokeCertificateModal'
+import { REVOCATION_REASONS } from '../../../lib/revocationReasons'
 
 export function RevokeDialog(props) {
   if (!props.open) return null

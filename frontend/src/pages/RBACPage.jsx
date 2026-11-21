@@ -6,7 +6,7 @@
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Input, FormModal, FormSelect } from '../components'
+import { Input, FormModal, Select } from '../components/atelier/Form'
 import {
   Zone, Icon, Btn, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody, Section, Props,
   EmptyBlock, NoMatch, LoadError, LoadCause,
@@ -245,18 +245,23 @@ export default function RBACPage() {
         disabled={!formData.name}
       >
         <Input
+          id="rbac-role-name"
+          data-autofocus=""
           label={t('rbac.roleName')}
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
           placeholder={t('rbac.roleNamePlaceholder')}
         />
         <Input
+          id="rbac-role-description"
           label={t('common.description')}
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           placeholder={t('rbac.roleDescription')}
         />
-        <FormSelect
+        <Select
+          id="rbac-role-inherits"
+          full
           label={t('rbac.inheritsFrom')}
           value={formData.inherits_from?.toString() || '__none__'}
           onChange={(value) => setFormData({ ...formData, inherits_from: value && value !== '__none__' ? parseInt(value) : null })}

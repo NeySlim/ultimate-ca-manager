@@ -11,7 +11,7 @@
  *
  * The built-in Operator role holds write:certificates but not read:private_keys
  * (private_keys is admin-only, backend/auth/permissions.py), so it is the state
- * that told the surfaces apart: the row dialog hid PKCS#12, the detail panel
+ * that told the surfaces apart: the row dialog refused PKCS#12, the detail panel
  * offered it, and the server answered 403.
  */
 import { fireEvent, render, screen } from '@testing-library/react'
@@ -45,7 +45,7 @@ vi.mock('../../contexts', () => ({
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ permissions: ['*'] }) }))
 
 import { ActionsHarness } from '../../test/ActionsHarness'
-import { ExportModal } from '../../components/ExportModal'
+import { ExportDialog as ExportModal } from '../../pages/certificates/dialogs/ExportDialog'
 import { canExportPrivateKey } from '../../lib/exportPermissions'
 
 // Verbatim from backend/auth/permissions.py.
@@ -96,6 +96,8 @@ const CERT = {
 }
 
 const KEY_FORMATS = ['PKCS#12', 'JKS']
+// The mockup's export dialog shows every format; one the account may not export is a disabled radio
+const keyFormat = (label) => screen.getByText(label).closest('label').querySelector('input[type="radio"]')
 
 describe('canExportPrivateKey mirrors the server gate', () => {
   it('requires read:private_keys for a managed certificate', () => {
@@ -132,7 +134,7 @@ describe('canExportPrivateKey mirrors the server gate', () => {
 describe('certificate surfaces agree on the same state', () => {
   const operator = permissionApi(OPERATOR_PERMISSIONS)
 
-  it('hides PKCS#12 and JKS in the row dialog for an Operator', () => {
+  it('refuses PKCS#12 and JKS in the row dialog for an Operator', () => {
     render(
       <ExportModal
         open
@@ -144,11 +146,11 @@ describe('certificate surfaces agree on the same state', () => {
         onExport={vi.fn()}
       />
     )
-    KEY_FORMATS.forEach(label => expect(screen.queryByText(label)).toBeNull())
+    KEY_FORMATS.forEach(label => expect(keyFormat(label)).toBeDisabled())
     expect(screen.getByText('PEM')).toBeInTheDocument()
   })
 
-  it('hides them in the detail panel too, for that same Operator', () => {
+  it('refuses them in the detail panel too, for that same Operator', () => {
     render(
       <ActionsHarness
         entity={CERT}
@@ -156,7 +158,7 @@ describe('certificate surfaces agree on the same state', () => {
       />
     )
     fireEvent.click(screen.getAllByRole('button', { name: /export/i })[0])
-    KEY_FORMATS.forEach(label => expect(screen.queryByText(label)).toBeNull())
+    KEY_FORMATS.forEach(label => expect(keyFormat(label)).toBeDisabled())
     // The panel still exports the certificate itself.
     expect(screen.getByText('PEM')).toBeInTheDocument()
   })
@@ -174,7 +176,7 @@ describe('certificate surfaces agree on the same state', () => {
         onExport={vi.fn()}
       />
     )
-    KEY_FORMATS.forEach(label => expect(screen.getByText(label)).toBeInTheDocument())
+    KEY_FORMATS.forEach(label => expect(keyFormat(label)).toBeEnabled())
     unmount()
 
     render(
@@ -184,6 +186,6 @@ describe('certificate surfaces agree on the same state', () => {
       />
     )
     fireEvent.click(screen.getAllByRole('button', { name: /export/i })[0])
-    KEY_FORMATS.forEach(label => expect(screen.getByText(label)).toBeInTheDocument())
+    KEY_FORMATS.forEach(label => expect(keyFormat(label)).toBeEnabled())
   })
 })

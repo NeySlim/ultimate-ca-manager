@@ -9,22 +9,20 @@ import { showNotices } from '../lib/notices'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { FileText, SignIn, UploadSimple, ClipboardText, Plus, X, Certificate } from '@phosphor-icons/react'
+import { EkuMultiSelect } from '../components'
+import { Input, Select, Textarea, ToggleSwitch, SegmentedField, SecretInput } from '../components/atelier/Form'
 import {
-  Button, Modal, Input, Select, FileUpload, Textarea, EkuMultiSelect
-} from '../components'
-import {
-  Zone, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody, Section, Props, EmptyBlock, NoMatch, LoadError, LoadCause,
+  Zone, AtelierDialog, Icon, FieldError, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, ListView, Dock, DockBody, Section, Props, EmptyBlock, NoMatch, LoadError, LoadCause,
 } from '../components/atelier'
 import { SmartImportModal } from '../components/SmartImport'
 import { csrsService, casService, mscaService, ekuService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
-import { extractData, cn, downloadBlob } from '../lib/utils'
+import { extractData, downloadBlob } from '../lib/utils'
 import { getSanValidationError, sanRowsToPayload } from '../lib/sanValidate'
 import { VALIDITY } from '../constants/config'
 import { hiddenFromIssuance, listedForIssuance, signingCas, unlistedSigningCas } from '../lib/caSelection'
-import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
+import { withHiddenCas, pickOrToggle } from '../components/cas/hiddenCasOption'
 import { soleImported } from '../lib/importResult'
 import {
   CSR_LABELS, KEY_ALGORITHMS, algorithmForKeyType, algorithmName, findAlgorithm,
@@ -140,6 +138,8 @@ export default function CSRsPage() {
   // Upload modal
   const [uploadMode, setUploadMode] = useState('file') // 'file' or 'paste'
   const [pastedPEM, setPastedPEM] = useState('')
+  const [uploadFile, setUploadFile] = useState(null)
+  const [genSubjectOpen, setGenSubjectOpen] = useState(false)
   
   // Key upload modal
   const [showKeyModal, setShowKeyModal] = useState(false)
@@ -352,6 +352,7 @@ export default function CSRsPage() {
       const created = await csrsService.upload(text)
       showSuccess(t('messages.success.create.csr'))
       closeModal('upload')
+      setUploadFile(null)
       loadData()
       openCreatedCSR(created)
     } catch (error) {
@@ -675,419 +676,180 @@ export default function CSRsPage() {
     setShowRekeyChoice(true)
   }
 
+  // EOBO: switched on, the enrollee is prefilled from the request (subject, then SAN UPN, SAN email, subject email)
+  const toggleEobo = (enabled) => {
+    setEoboEnabled(enabled)
+    if (!enabled || !selectedCSR) return
+    if (!enrolleeName && selectedCSR.subject) setEnrolleeName(selectedCSR.subject)
+    if (enrolleeUpn) return
+    const first = (value) => {
+      try {
+        const list = typeof value === 'string' ? JSON.parse(value) : value
+        return Array.isArray(list) && list.length > 0 ? list[0] : ''
+      } catch { return '' }
+    }
+    // Priority 1: SAN UPN (Microsoft OID 1.3.6.1.4.1.311.20.2.3); 2: SAN email; 3: subject emailAddress
+    const foundUpn = (selectedCSR.san_upn && first(selectedCSR.san_upn)) || (selectedCSR.san_email && first(selectedCSR.san_email)) || selectedCSR.email || ''
+    if (foundUpn) setEnrolleeUpn(foundUpn)
+  }
+  const closeUpload = () => { closeModal('upload'); setPastedPEM(''); setUploadMode('file'); setUploadFile(null) }
+  const closeSign = () => { closeModal('sign'); setSignMode('local'); setSelectedMsca(''); setSelectedTemplate(''); setEoboEnabled(false); setEnrolleeName(''); setEnrolleeUpn('') }
+  const closeGenerate = () => { if (generating) return; closeModal('generate'); resetGenerateForm() }
+  const closeKey = () => { setShowKeyModal(false); setKeyPem(''); setKeyPassphrase('') }
+  const uploadTooLarge = uploadFile && uploadFile.size > 1024 * 1024
+  const signOptions = withHiddenCas(
+    listedForIssuance(signingCas(cas), showHiddenCas, signCA).map(ca => ({ value: String(ca.id), label: ca.descr || ca.name || ca.common_name })),
+    { count: hiddenFromIssuance(signingCas(cas), signCA), shown: showHiddenCas, t })
+
   const dialogs = (
     <>
-      {/* Upload CSR Modal */}
-      <Modal
-        open={modals.upload}
-        onOpenChange={() => { closeModal('upload'); setPastedPEM(''); setUploadMode('file') }}
-        title={t('csrs.uploadCSR')}
-      >
-        <div className="p-4 space-y-4">
-          {/* Mode tabs */}
-          <div className="flex gap-1 p-1 bg-bg-tertiary rounded-lg">
-            <button
-              onClick={() => setUploadMode('file')}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                uploadMode === 'file' 
-                  ? "bg-bg-primary text-text-primary shadow-sm" 
-                  : "text-text-secondary hover:text-text-primary"
+      {/* Upload CSR: a file or the pasted PEM */}
+      {modals.upload && (
+        <AtelierDialog title={t('csrs.uploadCSR')} size="narrow" onClose={closeUpload} testId="csr-upload-dialog">
+          <form noValidate onSubmit={(e) => { e.preventDefault(); if (uploadMode === 'paste') handlePasteUpload(); else if (uploadFile && !uploadTooLarge) handleUpload([uploadFile]) }}>
+            <div className="form-fields">
+              <SegmentedField label={t('common.source')} pressed={(v) => uploadMode === v} onPick={setUploadMode}
+                options={[{ value: 'file', label: t('common.uploadFile') }, { value: 'paste', label: t('csrs.pastePEM') }]} />
+              {uploadMode === 'file' ? (
+                <div className="field full">
+                  <label htmlFor="csr-upload-file">{t('csrs.uploadCSRDescription')}</label>
+                  <input id="csr-upload-file" type="file" accept=".pem,.csr" aria-describedby="hint-csr-upload-file"
+                    onChange={(e) => setUploadFile(e.target.files?.[0] || null)} />
+                  <small id="hint-csr-upload-file">.pem, .csr · 1 MB</small>
+                  {uploadTooLarge && <FieldError id="err-csr-upload-file" message={t('csrs.uploadTooLarge')} />}
+                </div>
+              ) : (
+                <Textarea id="csr-upload-pem" label={t('csrs.pasteCSRDescription')} mono rows={10} value={pastedPEM} spellCheck={false}
+                  onChange={(e) => setPastedPEM(e.target.value)}
+                  placeholder={'-----BEGIN CERTIFICATE REQUEST-----\nMIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...\n-----END CERTIFICATE REQUEST-----'} />
               )}
-            >
-              <UploadSimple size={16} /> {t('common.uploadFile')}
-            </button>
-            <button
-              onClick={() => setUploadMode('paste')}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                uploadMode === 'paste' 
-                  ? "bg-bg-primary text-text-primary shadow-sm" 
-                  : "text-text-secondary hover:text-text-primary"
-              )}
-            >
-              <ClipboardText size={16} /> {t('csrs.pastePEM')}
-            </button>
-          </div>
-
-          {uploadMode === 'file' ? (
-            <>
-              <p className="text-sm text-text-secondary">
-                {t('csrs.uploadCSRDescription')}
-              </p>
-              <FileUpload
-                accept=".pem,.csr"
-                onUpload={handleUpload}
-                maxSize={1024 * 1024}
-              />
-            </>
-          ) : (
-            <>
-              <p className="text-sm text-text-secondary">
-                {t('csrs.pasteCSRDescription')}
-              </p>
-              <Textarea
-                value={pastedPEM}
-                onChange={(e) => setPastedPEM(e.target.value)}
-                placeholder="-----BEGIN CERTIFICATE REQUEST-----
-MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
------END CERTIFICATE REQUEST-----"
-                rows={10}
-                className="font-mono text-xs"
-              />
-              <div className="flex justify-end gap-2 pt-2 border-t border-border">
-                <Button type="button" variant="secondary" onClick={() => { closeModal('upload'); setPastedPEM('') }}>
-                  {t('common.cancel')}
-                </Button>
-                <Button type="button" onClick={handlePasteUpload} disabled={!pastedPEM.trim()}>
-                  <UploadSimple size={16} /> {t('common.upload')}
-                </Button>
-              </div>
-            </>
-          )}
-        </div>
-      </Modal>
-
-      {/* Sign CSR Modal */}
-      <Modal
-        open={modals.sign}
-        onOpenChange={() => { closeModal('sign'); setSignMode('local'); setSelectedMsca(''); setSelectedTemplate(''); setEoboEnabled(false); setEnrolleeName(''); setEnrolleeUpn('') }}
-        title={t('common.signCSR')}
-      >
-        <div className="p-4 space-y-4">
-          <p className="text-sm text-text-secondary">
-            {t('csrs.signCSRDescription')}
-          </p>
-
-          {/* Mode toggle — only show if MS CA connections exist */}
-          {mscaConnections.length > 0 && (
-            <div className="flex gap-1 p-1 bg-tertiary-50 rounded-lg">
-              <button
-                type="button"
-                className={`flex-1 px-3 py-1.5 text-sm rounded-md transition-colors ${signMode === 'local' ? 'bg-bg-primary text-text-primary shadow-sm font-medium' : 'text-text-secondary hover:text-text-primary'}`}
-                onClick={() => setSignMode('local')}
-              >
-                {t('msca.signLocal')}
-              </button>
-              <button
-                type="button"
-                className={`flex-1 px-3 py-1.5 text-sm rounded-md transition-colors ${signMode === 'msca' ? 'bg-bg-primary text-text-primary shadow-sm font-medium' : 'text-text-secondary hover:text-text-primary'}`}
-                onClick={() => setSignMode('msca')}
-              >
-                {t('msca.signMicrosoft')}
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn" data-action="close-modal" onClick={closeUpload}>{t('common.cancel')}</button>
+              <button type="submit" className="btn primary" disabled={(uploadMode === 'paste' ? !pastedPEM.trim() : !uploadFile || uploadTooLarge) || undefined}>
+                <Icon name="upload" />{t('common.upload')}
               </button>
             </div>
-          )}
+          </form>
+        </AtelierDialog>
+      )}
 
-          {signMode === 'local' ? (
-            <>
-              <Select
-                label={t('common.certificateAuthority')}
-                options={listedForIssuance(signingCas(cas), showHiddenCas, signCA).map(ca => ({ value: String(ca.id), label: ca.descr || ca.name || ca.common_name }))}
-                value={signCA}
-                onChange={setSignCA}
-                placeholder={t('csrs.selectCA')}
-                helperText={unlistedSigningCas(cas) > 0 ? t('cas.notListedForSigning', { count: unlistedSigningCas(cas) }) : undefined}
-              />
-              <HiddenCasToggle count={hiddenFromIssuance(signingCas(cas), signCA)} shown={showHiddenCas} onToggle={() => setShowHiddenCas(v => !v)} />
-
-              <Select
-                label={t('csrs.certTypeForSign')}
-                options={[
-                  { value: 'server', label: t('certificates.certTypes.server') },
-                  { value: 'client', label: t('certificates.certTypes.client') },
-                  { value: 'combined', label: t('certificates.certTypes.combined') },
-                  { value: 'intermediate_ca', label: t('certificates.certTypes.intermediateCA') },
-                  { value: 'code_signing', label: t('certificates.certTypes.codeSigning') },
-                  { value: 'email', label: t('certificates.certTypes.email') },
-                ]}
-                value={signCertType}
-                onChange={setSignCertType}
-              />
-
-              <Input
-                label={t('csrs.validityPeriod')}
-                type="number"
-                value={validityDays}
-                onChange={(e) => setValidityDays(parseInt(e.target.value))}
-                min="1"
-                max="3650"
-              />
-
-              <EkuMultiSelect
-                value={signExtraEkus}
-                onChange={setSignExtraEkus}
-                defaults={EKU_DEFAULTS_BY_TYPE[signCertType] || []}
-                knownEkus={knownEkus}
-              />
-
-              {signCertType !== 'intermediate_ca' && (
-                <div>
-                  <label className="text-sm font-medium text-text-primary mb-1 block">
-                    {t('csrs.signAddNames')}
-                  </label>
-                  <p className="text-xs text-text-secondary mb-2">{t('csrs.signAddNamesHelp')}</p>
-                  <SanRows
-                    rows={signSans}
-                    onChange={setSignSans}
-                    types={['Email', 'DNS', 'IP', 'URI']}
-                    allowEmpty
-                    t={t}
-                  />
-                </div>
+      {/* Sign CSR: locally, or through a Microsoft CA when connections exist */}
+      {modals.sign && (
+        <AtelierDialog title={t('common.signCSR')} subtitle={t('csrs.signCSRDescription')} onClose={closeSign} testId="csr-sign-dialog">
+          <form noValidate onSubmit={(e) => { e.preventDefault(); handleSign() }}>
+            <div className="form-fields">
+              {mscaConnections.length > 0 && (
+                <SegmentedField label={t('csrs.signWith')} pressed={(v) => signMode === v} onPick={setSignMode}
+                  options={[{ value: 'local', label: t('msca.signLocal') }, { value: 'msca', label: t('msca.signMicrosoft') }]} />
               )}
-            </>
-          ) : (
-            <>
-              <Select
-                label={t('msca.selectConnection')}
-                options={mscaConnections.map(c => ({ value: String(c.id), label: `${c.name} (${c.server})` }))}
-                value={selectedMsca}
-                onChange={handleMscaConnectionChange}
-                placeholder={t('msca.selectConnection')}
-              />
-
-              {selectedMsca && (
-                <Select
-                  label={t('msca.selectTemplate')}
-                  options={mscaTemplates.map(t => ({ value: t, label: t }))}
-                  value={selectedTemplate}
-                  onChange={setSelectedTemplate}
-                  placeholder={loadingTemplates ? t('msca.loadingTemplates') : t('msca.selectTemplate')}
-                  disabled={loadingTemplates}
-                />
-              )}
-
-              {selectedMsca && (
-                <div className="space-y-3">
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={eoboEnabled}
-                      onChange={(e) => {
-                        const enabled = e.target.checked
-                        setEoboEnabled(enabled)
-                        if (enabled && selectedCSR) {
-                          if (!enrolleeName && selectedCSR.subject) {
-                            setEnrolleeName(selectedCSR.subject)
-                          }
-                          if (!enrolleeUpn) {
-                            // Priority 1: SAN UPN (Microsoft OID 1.3.6.1.4.1.311.20.2.3)
-                            let foundUpn = ''
-                            if (selectedCSR.san_upn) {
-                              try {
-                                const upns = typeof selectedCSR.san_upn === 'string'
-                                  ? JSON.parse(selectedCSR.san_upn)
-                                  : selectedCSR.san_upn
-                                if (Array.isArray(upns) && upns.length > 0) {
-                                  foundUpn = upns[0]
-                                }
-                              } catch { /* ignore parse errors */ }
-                            }
-                            // Priority 2: SAN email
-                            if (!foundUpn && selectedCSR.san_email) {
-                              try {
-                                const emails = typeof selectedCSR.san_email === 'string'
-                                  ? JSON.parse(selectedCSR.san_email)
-                                  : selectedCSR.san_email
-                                if (Array.isArray(emails) && emails.length > 0) {
-                                  foundUpn = emails[0]
-                                }
-                              } catch { /* ignore parse errors */ }
-                            }
-                            // Priority 3: subject emailAddress
-                            if (!foundUpn && selectedCSR.email) {
-                              foundUpn = selectedCSR.email
-                            }
-                            if (foundUpn) {
-                              setEnrolleeUpn(foundUpn)
-                            }
-                          }
-                        }
-                      }}
-                      className="rounded border-border"
-                    />
-                    <span className="text-text-secondary">{t('msca.eobo.enable')}</span>
-                  </label>
-
-                  {eoboEnabled && (
-                    <div className="space-y-3 pl-6 border-l-2 border-border">
-                      <Input
-                        label={t('msca.eobo.enrolleeName')}
-                        value={enrolleeName}
-                        onChange={(e) => setEnrolleeName(e.target.value)}
-                        placeholder={t('msca.eobo.enrolleeNamePlaceholder')}
-                      />
-                      <Input
-                        label={t('msca.eobo.enrolleeUpn')}
-                        value={enrolleeUpn}
-                        onChange={(e) => setEnrolleeUpn(e.target.value)}
-                        placeholder={t('msca.eobo.enrolleeUpnPlaceholder')}
-                        required
-                      />
-                      <p className="text-xs text-text-tertiary">
-                        {t('msca.eobo.hint')}
-                      </p>
-                    </div>
+              {signMode === 'local' ? (
+                <>
+                  <Select id="csr-sign-ca" label={t('common.certificateAuthority')} options={signOptions} value={signCA} full
+                    onChange={pickOrToggle(setSignCA, () => setShowHiddenCas(v => !v))} placeholder={t('csrs.selectCA')}
+                    helperText={unlistedSigningCas(cas) > 0 ? t('cas.notListedForSigning', { count: unlistedSigningCas(cas) }) : undefined} />
+                  <Select id="csr-sign-type" label={t('csrs.certTypeForSign')} value={signCertType} onChange={setSignCertType}
+                    options={[
+                      { value: 'server', label: t('certificates.certTypes.server') },
+                      { value: 'client', label: t('certificates.certTypes.client') },
+                      { value: 'combined', label: t('certificates.certTypes.combined') },
+                      { value: 'intermediate_ca', label: t('certificates.certTypes.intermediateCA') },
+                      { value: 'code_signing', label: t('certificates.certTypes.codeSigning') },
+                      { value: 'email', label: t('certificates.certTypes.email') },
+                    ]} />
+                  <Input id="csr-sign-days" label={t('csrs.validityPeriod')} type="number" min="1" max="3650" short
+                    value={Number.isNaN(validityDays) ? '' : validityDays} onChange={(e) => setValidityDays(parseInt(e.target.value))} />
+                  <EkuMultiSelect value={signExtraEkus} onChange={setSignExtraEkus} defaults={EKU_DEFAULTS_BY_TYPE[signCertType] || []} knownEkus={knownEkus} />
+                  {signCertType !== 'intermediate_ca' && (
+                    <SanRows id="csr-sign-san" legend={t('csrs.signAddNames')} hint={t('csrs.signAddNamesHelp')} rows={signSans} onChange={setSignSans}
+                      types={['Email', 'DNS', 'IP', 'URI']} allowEmpty t={t} />
                   )}
-                </div>
+                </>
+              ) : (
+                <>
+                  <Select id="csr-sign-msca" label={t('msca.selectConnection')} full value={selectedMsca} onChange={handleMscaConnectionChange}
+                    options={mscaConnections.map(c => ({ value: String(c.id), label: `${c.name} (${c.server})` }))} placeholder={t('msca.selectConnection')} />
+                  {selectedMsca && (
+                    <Select id="csr-sign-msca-template" label={t('msca.selectTemplate')} full value={selectedTemplate} onChange={setSelectedTemplate}
+                      options={mscaTemplates.map(name => ({ value: name, label: name }))} disabled={loadingTemplates}
+                      placeholder={loadingTemplates ? t('msca.loadingTemplates') : t('msca.selectTemplate')} />
+                  )}
+                  {selectedMsca && (
+                    <ToggleSwitch id="csr-sign-eobo" label={t('msca.eobo.enable')} checked={eoboEnabled} onChange={toggleEobo} />
+                  )}
+                  {selectedMsca && eoboEnabled && (
+                    <>
+                      <Input id="csr-sign-enrollee" label={t('msca.eobo.enrolleeName')} value={enrolleeName} onChange={(e) => setEnrolleeName(e.target.value)}
+                        placeholder={t('msca.eobo.enrolleeNamePlaceholder')} />
+                      <Input id="csr-sign-upn" label={t('msca.eobo.enrolleeUpn')} value={enrolleeUpn} onChange={(e) => setEnrolleeUpn(e.target.value)}
+                        placeholder={t('msca.eobo.enrolleeUpnPlaceholder')} required helperText={t('msca.eobo.hint')} />
+                    </>
+                  )}
+                </>
               )}
-            </>
-          )}
-
-          <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => closeModal('sign')}>{t('common.cancel')}</Button>
-            <Button
-              type="button"
-              onClick={handleSign}
-              disabled={signMode === 'local' ? !signCA : (!selectedMsca || !selectedTemplate)}
-            >
-              <SignIn size={16} /> {t('common.signCSR')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Generate CSR Modal */}
-      <Modal
-        open={modals.generate}
-        onOpenChange={() => { closeModal('generate'); resetGenerateForm() }}
-        title={t('csrs.generateCSR')}
-        size="lg"
-      >
-        <div className="p-4 space-y-4">
-          <p className="text-sm text-text-secondary">
-            {t('csrs.generateDescription')}
-          </p>
-
-          {/* Common Name (required) */}
-          <Input
-            label={`${t('common.commonName')} *`}
-            value={genCN}
-            onChange={(e) => setGenCN(e.target.value)}
-            placeholder="example.com"
-          />
-
-          {/* Key Type */}
-          <Select
-            label={t('common.keyType')}
-            options={groupedOptions(csrKeys, t,
-              k => algorithmName(k, t, 'csrKey'), k => k.csr)}
-            value={genKeyType}
-            onChange={setGenKeyChoice}
-          />
-          <BrainpoolNotice label={KEY_ALGORITHMS.find(k => k.csr === genKeyType)?.label} />
-
-          {/* Subject Details */}
-          <details className="group">
-            <summary className="cursor-pointer text-sm font-medium text-text-primary flex items-center gap-1 py-1">
-              <span className="transition-transform group-open:rotate-90">▶</span>
-              {t('certificates.subjectDetails')}
-            </summary>
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <Input
-                label={t('common.country')}
-                value={genCountry}
-                onChange={(e) => setGenCountry(e.target.value)}
-                placeholder="US"
-                maxLength={2}
-              />
-              <Input
-                label={t('common.state')}
-                value={genState}
-                onChange={(e) => setGenState(e.target.value)}
-                placeholder={t('certificates.statePlaceholder')}
-              />
-              <Input
-                label={t('common.locality')}
-                value={genLocality}
-                onChange={(e) => setGenLocality(e.target.value)}
-                placeholder={t('certificates.localityPlaceholder')}
-              />
-              <Input
-                label={t('common.email')}
-                type="email"
-                value={genEmail}
-                onChange={(e) => setGenEmail(e.target.value)}
-                placeholder={t('certificates.emailPlaceholder')}
-              />
-              <Input
-                label={t('common.organization')}
-                value={genOrg}
-                onChange={(e) => setGenOrg(e.target.value)}
-                placeholder={t('certificates.orgPlaceholder')}
-              />
-              <Input
-                label={t('csrs.department')}
-                value={genOU}
-                onChange={(e) => setGenOU(e.target.value)}
-                placeholder={t('csrs.departmentPlaceholder')}
-              />
             </div>
-          </details>
+            <div className="modal-actions">
+              <button type="button" className="btn" data-action="close-modal" onClick={closeSign}>{t('common.cancel')}</button>
+              <button type="submit" className="btn primary" disabled={(signMode === 'local' ? !signCA : (!selectedMsca || !selectedTemplate)) || undefined}>
+                <Icon name="stamp" />{t('common.signCSR')}
+              </button>
+            </div>
+          </form>
+        </AtelierDialog>
+      )}
 
-          {/* SANs */}
-          <div>
-            <label className="text-sm font-medium text-text-primary mb-2 block">
-              {t('csrs.sansList')}
-            </label>
-            <SanRows
-              rows={genSans}
-              onChange={setGenSans}
-              types={['DNS', 'IP', 'Email', 'URI', 'UPN']}
-              t={t}
-            />
-          </div>
+      {/* Generate CSR: the name, the key, the subject folded, the alternative names */}
+      {modals.generate && (
+        <AtelierDialog title={t('csrs.generateCSR')} subtitle={t('csrs.generateDescription')} size="wide" onClose={closeGenerate} testId="csr-generate-dialog">
+          <form noValidate onSubmit={(e) => { e.preventDefault(); handleGenerate() }}>
+            <div className="form-fields">
+              <Input id="csr-gen-cn" label={`${t('common.commonName')} *`} value={genCN} onChange={(e) => setGenCN(e.target.value)} placeholder="example.com" required data-autofocus="" />
+              <Select id="csr-gen-key" label={t('common.keyType')} value={genKeyType} onChange={setGenKeyChoice}
+                options={groupedOptions(csrKeys, t, k => algorithmName(k, t, 'csrKey'), k => k.csr)}
+                after={<BrainpoolNotice atelier label={KEY_ALGORITHMS.find(k => k.csr === genKeyType)?.label} />} />
+              <div className="field full advanced">
+                <button type="button" className="advanced-toggle" aria-expanded={genSubjectOpen} aria-controls="csr-gen-subject" onClick={() => setGenSubjectOpen(v => !v)}>
+                  <Icon name={genSubjectOpen ? 'down' : 'right'} /><span>{t('certificates.subjectDetails')}</span>
+                </button>
+                <div className="subject-grid" id="csr-gen-subject" hidden={!genSubjectOpen}>
+                  <Input id="csr-gen-country" label={t('common.country')} value={genCountry} onChange={(e) => setGenCountry(e.target.value)} placeholder="US" maxLength={2} />
+                  <Input id="csr-gen-state" label={t('common.state')} value={genState} onChange={(e) => setGenState(e.target.value)} placeholder={t('certificates.statePlaceholder')} />
+                  <Input id="csr-gen-locality" label={t('common.locality')} value={genLocality} onChange={(e) => setGenLocality(e.target.value)} placeholder={t('certificates.localityPlaceholder')} />
+                  <Input id="csr-gen-email" label={t('common.email')} type="email" value={genEmail} onChange={(e) => setGenEmail(e.target.value)} placeholder={t('certificates.emailPlaceholder')} />
+                  <Input id="csr-gen-org" label={t('common.organization')} value={genOrg} onChange={(e) => setGenOrg(e.target.value)} placeholder={t('certificates.orgPlaceholder')} />
+                  <Input id="csr-gen-ou" label={t('csrs.department')} value={genOU} onChange={(e) => setGenOU(e.target.value)} placeholder={t('csrs.departmentPlaceholder')} />
+                </div>
+              </div>
+              <SanRows id="csr-gen-san" legend={t('csrs.sansList')} rows={genSans} onChange={setGenSans} types={['DNS', 'IP', 'Email', 'URI', 'UPN']} t={t} />
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn" data-action="close-modal" onClick={closeGenerate} disabled={generating || undefined}>{t('common.cancel')}</button>
+              <button type="submit" className="btn primary" disabled={!genCN.trim() || generating || undefined}>
+                <Icon name="plus" />{generating ? t('common.generating') : t('csrs.generateCSR')}
+              </button>
+            </div>
+          </form>
+        </AtelierDialog>
+      )}
 
-          <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => { closeModal('generate'); resetGenerateForm() }}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="button" onClick={handleGenerate} disabled={!genCN.trim() || generating}>
-              <Plus size={16} /> {generating ? t('common.generating') : t('csrs.generateCSR')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Upload Private Key Modal */}
-      <Modal
-        open={showKeyModal}
-        onOpenChange={() => { setShowKeyModal(false); setKeyPem(''); setKeyPassphrase('') }}
-        title={t('csrs.uploadPrivateKey')}
-      >
-        <div className="p-4 space-y-4">
-          <p className="text-sm text-text-secondary">
-            {t('csrs.uploadPrivateKey')} <strong>{selectedCSR?.common_name || selectedCSR?.cn}</strong>
-          </p>
-          <Textarea
-            label={t('common.privateKeyPEM')}
-            value={keyPem}
-            onChange={(e) => setKeyPem(e.target.value)}
-            placeholder="-----BEGIN PRIVATE KEY-----
-MIIEvgIBADANBgkqhkiG9w0BAQE...
------END PRIVATE KEY-----"
-            rows={8}
-            className="font-mono text-xs"
-          />
-          <Input
-            label={t('csrs.passphrase')}
-            type="password"
-            noAutofill
-            value={keyPassphrase}
-            onChange={(e) => setKeyPassphrase(e.target.value)}
-            placeholder={t('csrs.passphraseHint')}
-          />
-          <div className="flex justify-end gap-2 pt-2 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => { setShowKeyModal(false); setKeyPem(''); setKeyPassphrase('') }}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="button" onClick={handleUploadKey} disabled={!keyPem.trim()}>
-              <UploadSimple size={16} /> {t('csrs.uploadKey')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      {/* Upload the private key of the open request */}
+      {showKeyModal && (
+        <AtelierDialog title={t('csrs.uploadPrivateKey')} subtitle={selectedCSR?.common_name || selectedCSR?.cn} size="narrow" onClose={closeKey} testId="csr-key-dialog">
+          <form noValidate onSubmit={(e) => { e.preventDefault(); handleUploadKey() }}>
+            <div className="form-fields">
+              <Textarea id="csr-key-pem" label={t('common.privateKeyPEM')} mono rows={8} value={keyPem} spellCheck={false} data-autofocus=""
+                onChange={(e) => setKeyPem(e.target.value)}
+                placeholder={'-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQE...\n-----END PRIVATE KEY-----'} />
+              <SecretInput id="csr-key-passphrase" label={t('csrs.passphrase')} full value={keyPassphrase} onChange={(e) => setKeyPassphrase(e.target.value)}
+                placeholder={t('csrs.passphraseHint')} />
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn" data-action="close-modal" onClick={closeKey}>{t('common.cancel')}</button>
+              <button type="submit" className="btn primary" disabled={!keyPem.trim() || undefined}><Icon name="upload" />{t('csrs.uploadKey')}</button>
+            </div>
+          </form>
+        </AtelierDialog>
+      )}
 
       {/* Smart Import Modal */}
       <SmartImportModal
@@ -1102,56 +864,26 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
         }}
       />
 
-      {/* Re-key Choice Modal */}
-      <Modal
-        open={showRekeyChoice}
-        onOpenChange={() => setShowRekeyChoice(false)}
-        title={t('csrs.rekeyTitle')}
-      >
-        <div className="p-4 space-y-4">
-          <p className="text-sm text-text-secondary">
-            {t('csrs.rekeyDescription', { cn: rekeyCSR?.common_name || rekeyCSR?.cn || '' })}
-          </p>
-          <div className="grid grid-cols-1 gap-3">
-            <button
-              type="button"
-              onClick={() => handleRekeyAsCSR(rekeyCSR)}
-              className="flex items-start gap-3 p-4 rounded-lg border border-border hover:border-accent-primary hover:bg-accent-primary-op5 transition-colors text-left"
-            >
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 icon-bg-orange">
-                <FileText size={20} weight="duotone" />
-              </div>
-              <div>
-                <div className="font-medium text-sm text-text-primary">{t('csrs.rekeyAsCSR')}</div>
-                <div className="text-xs text-text-secondary mt-0.5">{t('csrs.rekeyAsCSRDescription')}</div>
-              </div>
+      {/* Re-key: a new request, or a certificate issued at once (write:certificates) */}
+      {showRekeyChoice && (
+        <AtelierDialog title={t('csrs.rekeyTitle')} size="narrow" onClose={() => setShowRekeyChoice(false)} testId="csr-rekey-dialog">
+          <p className="muted" style={{ marginBottom: 20 }}>{t('csrs.rekeyDescription', { cn: rekeyCSR?.common_name || rekeyCSR?.cn || '' })}</p>
+          <div className="choice-grid">
+            <button type="button" className="format-option" style={{ textAlign: 'left' }} onClick={() => handleRekeyAsCSR(rekeyCSR)}>
+              <Icon name="file" /><span>{t('csrs.rekeyAsCSR')}<small>{t('csrs.rekeyAsCSRDescription')}</small></span>
             </button>
-            {/* Issuing lands on the certificates page, which needs
-                write:certificates: without it the navigation arrived and
-                nothing opened. */}
+            {/* Issuing lands on the certificates page, which needs write:certificates */}
             {canWrite('certificates') && (
-              <button
-                type="button"
-                onClick={() => handleRekeyAsCert(rekeyCSR)}
-                className="flex items-start gap-3 p-4 rounded-lg border border-border hover:border-accent-primary hover:bg-accent-primary-op5 transition-colors text-left"
-              >
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 icon-bg-emerald">
-                  <Certificate size={20} weight="duotone" />
-                </div>
-                <div>
-                  <div className="font-medium text-sm text-text-primary">{t('csrs.rekeyAsCert')}</div>
-                  <div className="text-xs text-text-secondary mt-0.5">{t('csrs.rekeyAsCertDescription')}</div>
-                </div>
+              <button type="button" className="format-option" style={{ textAlign: 'left' }} onClick={() => handleRekeyAsCert(rekeyCSR)}>
+                <Icon name="cert" /><span>{t('csrs.rekeyAsCert')}<small>{t('csrs.rekeyAsCertDescription')}</small></span>
               </button>
             )}
           </div>
-          <div className="flex justify-end pt-2 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => setShowRekeyChoice(false)}>
-              {t('common.cancel')}
-            </Button>
+          <div className="modal-actions">
+            <button type="button" className="btn" data-action="close-modal" onClick={() => setShowRekeyChoice(false)}>{t('common.cancel')}</button>
           </div>
-        </div>
-      </Modal>
+        </AtelierDialog>
+      )}
     </>
   )
 
@@ -1319,37 +1051,35 @@ const SAN_PLACEHOLDERS = {
   UPN: 'user@domain.local', URI: 'https://example.com',
 }
 
-// Typed SAN rows; without `allowEmpty` the last row cannot be removed.
-function SanRows({ rows, onChange, types, allowEmpty = false, t }) {
+// Typed SAN rows, the issue form's row-list of san-row; without `allowEmpty` the last row cannot be removed.
+function SanRows({ id, legend, hint, rows, onChange, types, allowEmpty = false, t }) {
   const update = (i, patch) => onChange(rows.map((row, j) => (j === i ? { ...row, ...patch } : row)))
   return (
-    <div className="space-y-2">
-      {rows.map((san, i) => (
-        <div key={i} className="flex gap-2 items-center">
-          <Select
-            options={types.map(type => ({ value: type, label: type }))}
-            value={san.type}
-            onChange={(val) => update(i, { type: val })}
-            className="w-24 shrink-0"
-          />
-          <Input
-            value={san.value}
-            onChange={(e) => update(i, { value: e.target.value })}
-            placeholder={SAN_PLACEHOLDERS[san.type]}
-            className="flex-1"
-          />
-          {(allowEmpty || rows.length > 1) && (
-            <Button type="button" variant="ghost" size="sm" aria-label={t('common.remove')}
-              onClick={() => onChange(rows.filter((_, j) => j !== i))}>
-              <X size={14} />
-            </Button>
-          )}
-        </div>
-      ))}
-      <Button type="button" variant="outline" size="sm"
-        onClick={() => onChange([...rows, { type: types[0], value: '' }])}>
-        <Plus size={14} /> {t('certificates.addSan')}
-      </Button>
-    </div>
+    <fieldset className="field full" aria-describedby={hint ? `hint-${id}` : undefined}>
+      <legend>{legend}</legend>
+      {hint && <small id={`hint-${id}`}>{hint}</small>}
+      <div className="row-list">
+        {rows.map((san, i) => (
+          <div className="san-row" key={i}>
+            <label className="sr-only" htmlFor={`${id}-type-${i}`}>{t('certificates.issueForm.sanType', { n: i + 1 })}</label>
+            <select id={`${id}-type-${i}`} value={san.type} onChange={(e) => update(i, { type: e.target.value })}>
+              {types.map(type => <option key={type} value={type}>{type}</option>)}
+            </select>
+            <label className="sr-only" htmlFor={`${id}-value-${i}`}>{t('certificates.issueForm.sanValue', { n: i + 1 })}</label>
+            <input id={`${id}-value-${i}`} value={san.value} placeholder={SAN_PLACEHOLDERS[san.type]} autoComplete="off" spellCheck="false"
+              onChange={(e) => update(i, { value: e.target.value })} />
+            {(allowEmpty || rows.length > 1) ? (
+              <button type="button" className="icon-btn" aria-label={t('certificates.issueForm.removeSan', { n: i + 1 })}
+                onClick={() => onChange(rows.filter((_, j) => j !== i))}>
+                <Icon name="close" />
+              </button>
+            ) : <span />}
+          </div>
+        ))}
+      </div>
+      <button type="button" className="btn quiet add-row" onClick={() => onChange([...rows, { type: types[0], value: '' }])}>
+        <Icon name="plus" />{t('certificates.addSan')}
+      </button>
+    </fieldset>
   )
 }

@@ -26,8 +26,8 @@ vi.mock('../../contexts', () => ({
 }))
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ permissions: ['*'] }) }))
 vi.mock('../../components/CertificateLintModal', () => ({ CertificateLintModal: () => null }))
-vi.mock('../../components/RevokeCertificateModal', () => ({
-  RevokeCertificateModal: ({ open, onConfirm }) => (open
+vi.mock('../../pages/certificates/dialogs/RevokeDialog', () => ({
+  RevokeDialog: ({ open, onConfirm }) => (open
     ? <button type="button" onClick={() => onConfirm('keyCompromise', {})}>confirm-revoke</button>
     : null),
 }))

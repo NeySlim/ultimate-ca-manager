@@ -7,12 +7,10 @@
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FileArrowUp, Warning } from '@phosphor-icons/react'
+import { TemplatePreviewModal } from '../components'
+import { Modal, Input, Select, Textarea, ToggleSwitch } from '../components/atelier/Form'
 import {
-  Button, Modal, Input, Select, Textarea, LoadingSpinner, TemplatePreviewModal,
-} from '../components'
-import {
-  Zone, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody, Section, Props,
+  Zone, Icon, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody, Section, Props,
   LoadError, LoadCause, EmptyBlock, NoMatch,
 } from '../components/atelier'
 import { templatesService } from '../services'
@@ -196,13 +194,9 @@ export default function TemplatesPage() {
 
   const dialogs = (
     <>
-      {/* Template Modal */}
-      <Modal
-        open={showTemplateModal}
-        onOpenChange={(open) => { setShowTemplateModal(open); if (!open) setEditingTemplate(null) }}
-        title={editingTemplate ? t('templates.editTemplate') : t('templates.createTemplate')}
-        size="xl"
-      >
+      {/* Template: create or edit */}
+      <Modal open={showTemplateModal} onClose={() => { setShowTemplateModal(false); setEditingTemplate(null) }}
+        title={editingTemplate ? t('templates.editTemplate') : t('templates.createTemplate')} size="xl" testId="template-form-dialog">
         <TemplateForm
           template={editingTemplate}
           onSubmit={editingTemplate ? handleUpdateTemplate : handleCreateTemplate}
@@ -210,56 +204,29 @@ export default function TemplatesPage() {
         />
       </Modal>
 
-      {/* Import Modal */}
-      <Modal
-        open={showImportModal}
-        onOpenChange={setShowImportModal}
-        title={t('templates.importTemplate')}
-        size="md"
-      >
-        <div className="p-4 space-y-4">
-          <p className="text-sm text-text-secondary">
-            {t('templates.importDescription')}
-          </p>
-          
-          <div>
-            <label className="block text-xs font-medium text-text-primary mb-1">{t('templates.templateFile')}</label>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".json"
-              onChange={(e) => { setImportFile(e.target.files[0]); setImportJson('') }}
-              className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-sm file:bg-accent-primary file:text-on-accent hover:file:bg-accent-primary-op80"
-            />
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <div className="flex-1 border-t border-border"></div>
-            <span className="text-xs text-text-secondary">{t('templates.orPasteJson')}</span>
-            <div className="flex-1 border-t border-border"></div>
-          </div>
-          
-          <div>
-            <label className="block text-xs font-medium text-text-primary mb-1">{t('templates.pasteJsonContent')}</label>
-            <textarea
-              value={importJson}
+      {/* Import: a JSON file, or the JSON pasted */}
+      <Modal open={showImportModal} onClose={() => { if (!importing) setShowImportModal(false) }} title={t('templates.importTemplate')}
+        subtitle={t('templates.importDescription')} size="sm" testId="template-import-dialog">
+        <form noValidate onSubmit={(e) => { e.preventDefault(); handleImportTemplate() }}>
+          <div className="form-fields">
+            <div className="field full">
+              <label htmlFor="tpl-import-file">{t('templates.templateFile')}</label>
+              <input id="tpl-import-file" ref={fileRef} type="file" accept=".json" onChange={(e) => { setImportFile(e.target.files[0]); setImportJson('') }} />
+            </div>
+            <Textarea id="tpl-import-json" label={t('templates.pasteJsonContent')} mono rows={6} spellCheck={false} value={importJson}
+              hint={t('templates.orPasteJson')}
               onChange={(e) => { setImportJson(e.target.value); setImportFile(null); if (fileRef.current) fileRef.current.value = '' }}
-              placeholder='{"name": "My Template", "validity_days": 365, ...}'
-              rows={6}
-              className="w-full px-2 py-1.5 bg-bg-secondary border border-border rounded-sm text-sm text-text-primary font-mono placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-accent-primary resize-y"
-            />
+              placeholder='{"name": "My Template", "validity_days": 365, ...}' />
           </div>
-          
-          <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => setShowImportModal(false)}>{t('common.cancel')}</Button>
-            <Button type="button" onClick={handleImportTemplate} disabled={importing || (!importFile && !importJson.trim())}>
-              {importing ? <LoadingSpinner size="sm" /> : <FileArrowUp size={16} />}
-              {t('templates.importTemplate')}
-            </Button>
+          <div className="modal-actions">
+            <button type="button" className="btn" data-action="close-modal" onClick={() => setShowImportModal(false)} disabled={importing || undefined}>{t('common.cancel')}</button>
+            <button type="submit" className="btn primary" disabled={importing || (!importFile && !importJson.trim()) || undefined}>
+              <Icon name="upload" />{importing ? t('common.loading') : t('templates.importTemplate')}
+            </button>
           </div>
-        </div>
+        </form>
       </Modal>
-      
+
       {/* Template Preview Modal */}
       <TemplatePreviewModal
         open={showPreviewModal}
@@ -580,54 +547,39 @@ function StoredExtensionsError({ error }) {
   const { t } = useTranslation()
   if (!error) return null
   return (
-    <div className="p-3 rounded-lg border border-status-danger-op30 bg-status-danger-op10 text-xs text-text-secondary" role="alert"
-      data-testid="custom-extensions-stored-error">
-      <div>{t('customExtensions.storedInvalid')}</div>
-      <div className="font-mono mt-1 break-all">{error}</div>
-    </div>
+    <p className="notice warn" role="alert" data-testid="custom-extensions-stored-error" style={{ margin: '4px 0' }}>
+      <Icon name="warning" />
+      <span>{t('customExtensions.storedInvalid')} <span className="mono" style={{ overflowWrap: 'anywhere' }}>{error}</span></span>
+    </p>
   )
 }
 
-function CnPatternFields({ formData, set, checkboxCls }) {
+function CnPatternFields({ formData, set }) {
   const { t } = useTranslation()
   const source = cnPatternSource(formData.template_type, formData.ad_derived_subject)
   const nonUnique = cnPatternNonUnique(formData.subject_cn_pattern)
   return (
-    <div className="mt-4" data-testid="cn-pattern">
-      <Input
-        label={t('templates.cnPattern')}
-        value={formData.subject_cn_pattern}
-        onChange={(e) => set('subject_cn_pattern', e.target.value)}
-        placeholder="{hostname}-WiFi"
-        maxLength={255}
-      />
+    <div className="field full" data-testid="cn-pattern">
+      <label htmlFor="tpl-cn-pattern">{t('templates.cnPattern')}</label>
+      <input id="tpl-cn-pattern" value={formData.subject_cn_pattern} onChange={(e) => set('subject_cn_pattern', e.target.value)} placeholder="{hostname}-WiFi"
+        maxLength={255} autoComplete="off" spellCheck="false" aria-describedby="hint-tpl-cn-pattern" />
       {/* Braces go in as values: i18next reads {{x}} in a string as its own variable */}
-      <p className="text-xs text-text-secondary mt-1">
-        {t('templates.cnPatternDescription', { open: '{{', close: '}}' })}
-      </p>
+      <small id="hint-tpl-cn-pattern">{t('templates.cnPatternDescription', { open: '{{', close: '}}' })}</small>
       {source === 'request' ? (
-        <p className="text-xs text-text-tertiary mt-1" data-testid="cn-pattern-unavailable">{t('templates.cnPatternUnavailable')}</p>
+        <small data-testid="cn-pattern-unavailable">{t('templates.cnPatternUnavailable')}</small>
       ) : (
-        <p className="text-xs text-text-secondary mt-1" data-testid="cn-pattern-variables">
+        <small data-testid="cn-pattern-variables">
           {t('templates.cnPatternVariables')}{' '}
-          <span className="font-mono">{CN_PATTERN_VARIABLES[source].map(v => `{${v}}`).join(' ')}</span>
-        </p>
+          <span className="mono">{CN_PATTERN_VARIABLES[source].map(v => `{${v}}`).join(' ')}</span>
+        </small>
       )}
       {nonUnique.length > 0 && (
-        <p className="text-xs text-status-warning mt-1" role="note" data-testid="cn-pattern-non-unique">
-          {t('templates.cnPatternNotUnique', { variables: nonUnique.join(', ') })}
-        </p>
+        <small className="brainpool" role="note" data-testid="cn-pattern-non-unique">
+          <Icon name="warning" /><span>{t('templates.cnPatternNotUnique', { variables: nonUnique.join(', ') })}</span>
+        </small>
       )}
-      <label className={`${checkboxCls} mt-2`}>
-        <input
-          type="checkbox"
-          checked={formData.subject_cn_keep_path}
-          onChange={(e) => set('subject_cn_keep_path', e.target.checked)}
-          className="accent-accent-primary"
-        />
-        {t('templates.cnPatternKeepPath')}
-      </label>
-      <p className="text-xs text-text-secondary mt-1">{t('templates.cnPatternKeepPathDescription')}</p>
+      <ToggleSwitch checked={formData.subject_cn_keep_path} onChange={(v) => set('subject_cn_keep_path', v)}
+        label={t('templates.cnPatternKeepPath')} description={t('templates.cnPatternKeepPathDescription')} />
     </div>
   )
 }
@@ -721,297 +673,176 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
     }
   }
 
-  const checkboxCls = 'flex items-center gap-1.5 text-sm text-text-primary cursor-pointer select-none'
-  const sectionTitle = 'text-sm font-medium text-text-primary mb-3'
+  const checkLine = (checked, onChange, label, description) => (
+    <ToggleSwitch checked={checked} onChange={onChange} label={label} description={description} />
+  )
+  const checkGrid = (field, items, labelOf = (v) => v) => (
+    <div className="choice-grid">
+      {items.map(item => (
+        <label key={item} className="checkbox-line">
+          <input type="checkbox" checked={formData[field].includes(item)} onChange={() => toggleCheckbox(field, item)} />
+          {labelOf(item)}
+        </label>
+      ))}
+    </div>
+  )
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4">
-      {/* Basic Info */}
-      <div className="grid grid-cols-2 gap-4">
-        <Input
-          label={t('templates.templateName')}
-          value={formData.name}
-          onChange={(e) => set('name', e.target.value)}
-          placeholder={t('templates.namePlaceholder')}
-          required
-        />
-        <Select
-          label={t('templates.templateType')}
-          value={formData.template_type}
+    <form onSubmit={handleSubmit}>
+      <div className="form-fields">
+        <Input id="tpl-name" label={t('templates.templateName')} value={formData.name} onChange={(e) => set('name', e.target.value)}
+          placeholder={t('templates.namePlaceholder')} required data-autofocus="" />
+        <Select id="tpl-type" label={t('templates.templateType')} value={formData.template_type}
           onChange={(val) => setFormData(p => ({ ...p, template_type: val, ...(TYPE_EXTENSION_DEFAULTS[val] || {}) }))}
-          options={TEMPLATE_TYPE_OPTIONS.map(v => ({ value: v, label: v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) }))}
-        />
-      </div>
+          options={TEMPLATE_TYPE_OPTIONS.map(v => ({ value: v, label: v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) }))} />
+        <Textarea id="tpl-description" label={t('common.description')} value={formData.description} onChange={(e) => set('description', e.target.value)}
+          placeholder={t('templates.descriptionPlaceholder')} rows={2} />
 
-      <Textarea
-        label={t('common.description')}
-        value={formData.description}
-        onChange={(e) => set('description', e.target.value)}
-        placeholder={t('templates.descriptionPlaceholder')}
-        rows={2}
-      />
+        {/* Key Settings */}
+        <fieldset className="field full">
+          <legend>{t('templates.keySettings')}</legend>
+          <div className="form-fields">
+            <Select id="tpl-key" label={t('common.keyType')} value={formData.key_type} onChange={(val) => set('key_type', val)} options={keyTypeOptions}
+              after={<BrainpoolNotice atelier label={formData.key_type} />} />
+            <Select id="tpl-digest" label={t('common.digest')} value={formData.digest} onChange={(val) => set('digest', val)}
+              options={DIGEST_OPTIONS.map(v => ({ value: v, label: v.toUpperCase() }))} />
+          </div>
+        </fieldset>
 
-      {/* Key Settings */}
-      <div className="border-t border-border pt-4">
-        <h4 className={sectionTitle}>{t('templates.keySettings')}</h4>
-        <div className="grid grid-cols-2 gap-4">
-          <Select
-            label={t('common.keyType')}
-            value={formData.key_type}
-            onChange={(val) => set('key_type', val)}
-            options={keyTypeOptions}
-          />
-          <Select
-            label={t('common.digest')}
-            value={formData.digest}
-            onChange={(val) => set('digest', val)}
-            options={DIGEST_OPTIONS.map(v => ({ value: v, label: v.toUpperCase() }))}
-          />
-        </div>
-        <div className="mt-2"><BrainpoolNotice label={formData.key_type} /></div>
-      </div>
+        {/* Validity */}
+        <Input id="tpl-validity" label={t('templates.defaultValidity')} type="number" value={formData.validity_days}
+          onChange={(e) => set('validity_days', parseInt(e.target.value) || VALIDITY.TEMPLATE_DEFAULT_DAYS)} helperText={t('templates.maxValidityHint')} />
 
-      {/* Validity */}
-      <div className="grid grid-cols-2 gap-4">
-        <Input
-          label={t('templates.defaultValidity')}
-          type="number"
-          value={formData.validity_days}
-          onChange={(e) => set('validity_days', parseInt(e.target.value) || VALIDITY.TEMPLATE_DEFAULT_DAYS)}
-        />
-        <p className="text-xs text-text-tertiary self-end">{t('templates.maxValidityHint')}</p>
-      </div>
-
-      {/* Subject Template */}
-      <div className="border-t border-border pt-4">
-        <h4 className={sectionTitle}>{t('templates.subjectTemplate')}</h4>
-        <div className="grid grid-cols-3 gap-4">
-          <Input label={t('templates.country')} value={formData.subject.C} onChange={(e) => updateSubject('C', e.target.value)} placeholder="US" />
-          <Input label={t('templates.state')} value={formData.subject.ST} onChange={(e) => updateSubject('ST', e.target.value)} placeholder="California" />
-          <Input label={t('common.locality')} value={formData.subject.L} onChange={(e) => updateSubject('L', e.target.value)} placeholder="San Francisco" />
-          <Input label={t('templates.organization')} value={formData.subject.O} onChange={(e) => updateSubject('O', e.target.value)} placeholder={t('templates.orgPlaceholder')} />
-          <Input label="OU" value={formData.subject.OU} onChange={(e) => updateSubject('OU', e.target.value)} placeholder="IT Department" />
-          <Input label={t('templates.commonName')} value={formData.subject.CN} onChange={(e) => updateSubject('CN', e.target.value)} placeholder={t('templates.cnPlaceholder')} />
-          <div className="col-span-3">
+        {/* Subject Template */}
+        <fieldset className="field full">
+          <legend>{t('templates.subjectTemplate')}</legend>
+          <div className="subject-grid">
+            <Input id="tpl-c" label={t('templates.country')} value={formData.subject.C} onChange={(e) => updateSubject('C', e.target.value)} placeholder="US" />
+            <Input id="tpl-st" label={t('templates.state')} value={formData.subject.ST} onChange={(e) => updateSubject('ST', e.target.value)} placeholder="California" />
+            <Input id="tpl-l" label={t('common.locality')} value={formData.subject.L} onChange={(e) => updateSubject('L', e.target.value)} placeholder="San Francisco" />
+            <Input id="tpl-o" label={t('templates.organization')} value={formData.subject.O} onChange={(e) => updateSubject('O', e.target.value)} placeholder={t('templates.orgPlaceholder')} />
+            <Input id="tpl-ou" label="OU" value={formData.subject.OU} onChange={(e) => updateSubject('OU', e.target.value)} placeholder="IT Department" />
+            <Input id="tpl-cn" label={t('templates.commonName')} value={formData.subject.CN} onChange={(e) => updateSubject('CN', e.target.value)} placeholder={t('templates.cnPlaceholder')} />
             {/* Not type="email": copies of built-in templates hold the {email} placeholder */}
-            <Input label={t('common.email')} value={formData.subject.emailAddress} onChange={(e) => updateSubject('emailAddress', e.target.value)} placeholder={t('certificates.emailPlaceholder')} />
+            <Input id="tpl-email" label={t('common.email')} full value={formData.subject.emailAddress} onChange={(e) => updateSubject('emailAddress', e.target.value)} placeholder={t('certificates.emailPlaceholder')} />
           </div>
-        </div>
-        <label className={`${checkboxCls} mt-3`}>
-          <input
-            type="checkbox"
-            checked={formData.ad_derived_subject}
-            onChange={(e) => set('ad_derived_subject', e.target.checked)}
-            className="accent-accent-primary"
-          />
-          {t('templates.adDerivedSubject')}
-        </label>
-        <p className="text-xs text-text-secondary mt-1">{t('templates.adDerivedSubjectDescription')}</p>
-        <CnPatternFields formData={formData} set={set} checkboxCls={checkboxCls} />
-      </div>
+          {checkLine(formData.ad_derived_subject, (v) => set('ad_derived_subject', v), t('templates.adDerivedSubject'), t('templates.adDerivedSubjectDescription'))}
+          <CnPatternFields formData={formData} set={set} />
+        </fieldset>
 
-      {/* Enrollment */}
-      <div className="border-t border-border pt-4">
-        <h4 className={sectionTitle}>{t('templates.enrollment')}</h4>
-        <label className={checkboxCls}>
-          <input
-            type="checkbox"
-            checked={formData.autoenroll_enabled}
-            onChange={(e) => set('autoenroll_enabled', e.target.checked)}
-            className="accent-accent-primary"
-          />
-          {t('templates.autoenrollEnabled')}
-        </label>
-        <p className="text-xs text-text-secondary mt-1">{t('templates.autoenrollEnabledDescription')}</p>
+        {/* Enrollment */}
+        <fieldset className="field full">
+          <legend>{t('templates.enrollment')}</legend>
+          {checkLine(formData.autoenroll_enabled, (v) => set('autoenroll_enabled', v), t('templates.autoenrollEnabled'), t('templates.autoenrollEnabledDescription'))}
+          <Input id="tpl-ad-group" label={t('templates.allowedAdGroup')} value={formData.allowed_ad_group} onChange={(e) => set('allowed_ad_group', e.target.value)}
+            placeholder={t('templates.allowedAdGroupPlaceholder')} helperText={t('templates.allowedAdGroupDescription')} />
+          <fieldset className="field full" aria-describedby="hint-tpl-pinned">
+            <legend>{t('templates.pinnedSubjectFields')}</legend>
+            <small id="hint-tpl-pinned">{t('templates.pinnedSubjectFieldsDescription')}</small>
+            <div className="subject-grid">
+              <Input id="tpl-pin-c" label={t('templates.pinnedCountry')} value={formData.pinned_subject_fields.C} onChange={(e) => updatePinned('C', e.target.value)} placeholder="US" />
+              <Input id="tpl-pin-st" label={t('templates.pinnedState')} value={formData.pinned_subject_fields.ST} onChange={(e) => updatePinned('ST', e.target.value)} placeholder="California" />
+              <Input id="tpl-pin-l" label={t('templates.pinnedLocality')} value={formData.pinned_subject_fields.L} onChange={(e) => updatePinned('L', e.target.value)} placeholder="San Francisco" />
+              <Input id="tpl-pin-o" label={t('templates.pinnedOrganization')} value={formData.pinned_subject_fields.O} onChange={(e) => updatePinned('O', e.target.value)} placeholder={t('templates.orgPlaceholder')} />
+              <Input id="tpl-pin-ou" label={t('templates.pinnedOrganizationalUnit')} value={formData.pinned_subject_fields.OU} onChange={(e) => updatePinned('OU', e.target.value)} placeholder="IT Department" />
+            </div>
+          </fieldset>
+        </fieldset>
 
-        <Input
-          label={t('templates.allowedAdGroup')}
-          value={formData.allowed_ad_group}
-          onChange={(e) => set('allowed_ad_group', e.target.value)}
-          placeholder={t('templates.allowedAdGroupPlaceholder')}
-          className="mt-3"
-        />
-        <p className="text-xs text-text-secondary mt-1">{t('templates.allowedAdGroupDescription')}</p>
+        {/* Extensions */}
+        <fieldset className="field full">
+          <legend>{t('templates.extensions')}</legend>
+          <fieldset className="field full">
+            <legend>{t('common.keyUsage')}</legend>
+            {checkGrid('key_usage', KEY_USAGE_OPTIONS)}
+          </fieldset>
+          <fieldset className="field full">
+            <legend>{t('common.extKeyUsage')}</legend>
+            {checkGrid('extended_key_usage', ekuOptions)}
+          </fieldset>
+          <fieldset className="field full" aria-describedby="hint-tpl-san">
+            <legend>{t('common.subjectAltNames')}</legend>
+            {checkGrid('san_types', SAN_TYPE_OPTIONS, (st) => t(SAN_TYPE_LABEL_KEYS[st], st.toUpperCase()))}
+            <small id="hint-tpl-san">{t('templates.sanTypesHint')}</small>
+            {checkLine(formData.enforce_san_types, (v) => set('enforce_san_types', v), t('templates.enforceSanTypes'), t('templates.enforceSanTypesDescription'))}
+          </fieldset>
+        </fieldset>
 
-        <div className="mt-4">
-          <p className="text-xs font-medium text-text-primary">{t('templates.pinnedSubjectFields')}</p>
-          <p className="text-xs text-text-secondary mt-1 mb-2">{t('templates.pinnedSubjectFieldsDescription')}</p>
-          <div className="grid grid-cols-3 gap-4">
-            <Input label={t('templates.pinnedCountry')} value={formData.pinned_subject_fields.C} onChange={(e) => updatePinned('C', e.target.value)} placeholder="US" />
-            <Input label={t('templates.pinnedState')} value={formData.pinned_subject_fields.ST} onChange={(e) => updatePinned('ST', e.target.value)} placeholder="California" />
-            <Input label={t('templates.pinnedLocality')} value={formData.pinned_subject_fields.L} onChange={(e) => updatePinned('L', e.target.value)} placeholder="San Francisco" />
-            <Input label={t('templates.pinnedOrganization')} value={formData.pinned_subject_fields.O} onChange={(e) => updatePinned('O', e.target.value)} placeholder={t('templates.orgPlaceholder')} />
-            <Input label={t('templates.pinnedOrganizationalUnit')} value={formData.pinned_subject_fields.OU} onChange={(e) => updatePinned('OU', e.target.value)} placeholder="IT Department" />
+        {/* qcStatements + policy OIDs */}
+        <fieldset className="field full" aria-describedby="hint-tpl-qc">
+          <legend>{t('templates.qc.title')}</legend>
+          <small id="hint-tpl-qc">{t('templates.qc.hint')}</small>
+          <p className="notice warn" style={{ margin: '4px 0' }}><Icon name="warning" /><span>{t('templates.qc.legalWarning')}</span></p>
+          <div className="choice-grid">
+            <label className="checkbox-line">
+              <input type="checkbox" checked={formData.qc.compliance} onChange={(e) => setQc('compliance', e.target.checked)} />
+              {t('templates.qc.compliance')}
+            </label>
+            <label className="checkbox-line">
+              <input type="checkbox" checked={formData.qc.sscd} onChange={(e) => setQc('sscd', e.target.checked)} />
+              {t('templates.qc.sscd')}
+            </label>
           </div>
-        </div>
-      </div>
-
-      {/* Extensions */}
-      <div className="border-t border-border pt-4 space-y-4">
-        <h4 className={sectionTitle}>{t('templates.extensions')}</h4>
-
-        {/* Key Usage */}
-        <div>
-          <label className="block text-xs font-medium text-text-secondary mb-2">{t('common.keyUsage')}</label>
-          <div className="flex flex-wrap gap-x-4 gap-y-2">
-            {KEY_USAGE_OPTIONS.map(ku => (
-              <label key={ku} className={checkboxCls}>
-                <input type="checkbox" checked={formData.key_usage.includes(ku)} onChange={() => toggleCheckbox('key_usage', ku)} className="accent-accent-primary" />
-                {ku}
-              </label>
-            ))}
+          <div className="form-fields">
+            <Select id="tpl-qc-type" label={t('templates.qc.type')} value={formData.qc.type} onChange={(val) => setQc('type', val)}
+              options={[{ value: '', label: t('templates.qc.none') }, ...QC_TYPES.map(v => ({ value: v, label: t(`templates.qc.types.${v}`) }))]} />
+            <Select id="tpl-qc-semantics" label={t('templates.qc.semantics')} value={formData.qc.semantics} onChange={(val) => setQc('semantics', val)}
+              options={[{ value: '', label: t('templates.qc.none') }, ...QC_SEMANTICS.map(v => ({ value: v, label: t(`templates.qc.semanticsValues.${v}`) }))]} />
+            <Input id="tpl-qc-cc" label={t('templates.qc.ccLegislation')} value={formData.qc.cc_legislation} onChange={(e) => setQc('cc_legislation', e.target.value)}
+              placeholder="FR, DE" helperText={t('templates.qc.ccLegislationHint')} />
+            <Input id="tpl-qc-retention" label={t('templates.qc.retentionPeriod')} type="number" min="1" value={formData.qc.retention_period}
+              onChange={(e) => setQc('retention_period', e.target.value)} />
           </div>
-        </div>
-
-        {/* Extended Key Usage */}
-        <div>
-          <label className="block text-xs font-medium text-text-secondary mb-2">{t('common.extKeyUsage')}</label>
-          <div className="flex flex-wrap gap-x-4 gap-y-2">
-            {ekuOptions.map(eku => (
-              <label key={eku} className={checkboxCls}>
-                <input type="checkbox" checked={formData.extended_key_usage.includes(eku)} onChange={() => toggleCheckbox('extended_key_usage', eku)} className="accent-accent-primary" />
-                {eku}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* SAN Types */}
-        <div>
-          <label className="block text-xs font-medium text-text-secondary mb-2">{t('common.subjectAltNames')}</label>
-          <div className="flex flex-wrap gap-x-4 gap-y-2">
-            {SAN_TYPE_OPTIONS.map(st => (
-              <label key={st} className={checkboxCls}>
-                <input type="checkbox" checked={formData.san_types.includes(st)} onChange={() => toggleCheckbox('san_types', st)} className="accent-accent-primary" />
-                {t(SAN_TYPE_LABEL_KEYS[st], st.toUpperCase())}
-              </label>
-            ))}
-          </div>
-          <p className="text-xs text-text-secondary mt-1">{t('templates.sanTypesHint')}</p>
-          <label className={`${checkboxCls} mt-2`}>
-            <input
-              type="checkbox"
-              checked={formData.enforce_san_types}
-              onChange={(e) => set('enforce_san_types', e.target.checked)}
-              className="accent-accent-primary"
-            />
-            {t('templates.enforceSanTypes')}
-          </label>
-          <p className="text-xs text-text-secondary mt-1">{t('templates.enforceSanTypesDescription')}</p>
-        </div>
-      </div>
-
-      {/* qcStatements + policy OIDs */}
-      <div className="border-t border-border pt-4 space-y-4">
-        <h4 className={sectionTitle}>{t('templates.qc.title')}</h4>
-        <p className="text-xs text-text-secondary">{t('templates.qc.hint')}</p>
-        <div className="p-3 rounded-lg border border-status-warning-op30 bg-status-warning-op10 flex items-start gap-2 text-xs text-text-secondary">
-          <Warning size={16} className="text-status-warning shrink-0 mt-0.5" weight="bold" />
-          <span>{t('templates.qc.legalWarning')}</span>
-        </div>
-
-        <div className="flex flex-wrap gap-x-6 gap-y-2">
-          <label className={checkboxCls}>
-            <input type="checkbox" checked={formData.qc.compliance} onChange={(e) => setQc('compliance', e.target.checked)} className="accent-accent-primary" />
-            {t('templates.qc.compliance')}
-          </label>
-          <label className={checkboxCls}>
-            <input type="checkbox" checked={formData.qc.sscd} onChange={(e) => setQc('sscd', e.target.checked)} className="accent-accent-primary" />
-            {t('templates.qc.sscd')}
-          </label>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Select
-            label={t('templates.qc.type')}
-            value={formData.qc.type}
-            onChange={(val) => setQc('type', val)}
-            options={[{ value: '', label: t('templates.qc.none') }, ...QC_TYPES.map(v => ({ value: v, label: t(`templates.qc.types.${v}`) }))]}
-          />
-          <Select
-            label={t('templates.qc.semantics')}
-            value={formData.qc.semantics}
-            onChange={(val) => setQc('semantics', val)}
-            options={[{ value: '', label: t('templates.qc.none') }, ...QC_SEMANTICS.map(v => ({ value: v, label: t(`templates.qc.semanticsValues.${v}`) }))]}
-          />
-          <Input
-            label={t('templates.qc.ccLegislation')}
-            value={formData.qc.cc_legislation}
-            onChange={(e) => setQc('cc_legislation', e.target.value)}
-            placeholder="FR, DE"
-            helperText={t('templates.qc.ccLegislationHint')}
-          />
-          <Input
-            label={t('templates.qc.retentionPeriod')}
-            type="number"
-            min="1"
-            value={formData.qc.retention_period}
-            onChange={(e) => setQc('retention_period', e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-text-secondary mb-2">{t('templates.qc.limitValue')}</label>
-          <div className="grid grid-cols-3 gap-4">
-            <Input label={t('templates.qc.limitCurrency')} value={formData.qc.limit_currency} onChange={(e) => setQc('limit_currency', e.target.value)} placeholder="EUR" />
-            <Input label={t('templates.qc.limitAmount')} type="number" value={formData.qc.limit_amount} onChange={(e) => setQc('limit_amount', e.target.value)} />
-            <Input label={t('templates.qc.limitExponent')} type="number" value={formData.qc.limit_exponent} onChange={(e) => setQc('limit_exponent', e.target.value)} />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-text-secondary mb-2">{t('templates.qc.pds')}</label>
-          <p className="text-xs text-text-secondary mb-2">{t('templates.qc.pdsHint')}</p>
-          <div className="space-y-2">
-            {formData.qc.pds.map((entry, i) => (
-              <div key={i} className="grid grid-cols-[1fr_6rem_auto] gap-2 items-end">
-                <Input label={t('templates.qc.pdsUrl')} value={entry.url} onChange={(e) => updatePds(i, 'url', e.target.value)} placeholder="https://example.com/pds_en.pdf" />
-                <Input label={t('templates.qc.pdsLanguage')} value={entry.language} onChange={(e) => updatePds(i, 'language', e.target.value)} placeholder="en" maxLength={2} />
-                <Button type="button" size="sm" variant="secondary" onClick={() => setQc('pds', formData.qc.pds.filter((_, j) => j !== i))}>
-                  {t('common.remove')}
-                </Button>
+          <fieldset className="field full">
+            <legend>{t('templates.qc.limitValue')}</legend>
+            <div className="subject-grid">
+              <Input id="tpl-qc-currency" label={t('templates.qc.limitCurrency')} value={formData.qc.limit_currency} onChange={(e) => setQc('limit_currency', e.target.value)} placeholder="EUR" />
+              <Input id="tpl-qc-amount" label={t('templates.qc.limitAmount')} type="number" value={formData.qc.limit_amount} onChange={(e) => setQc('limit_amount', e.target.value)} />
+              <Input id="tpl-qc-exponent" label={t('templates.qc.limitExponent')} type="number" value={formData.qc.limit_exponent} onChange={(e) => setQc('limit_exponent', e.target.value)} />
+            </div>
+          </fieldset>
+          <fieldset className="field full" aria-describedby="hint-tpl-pds">
+            <legend>{t('templates.qc.pds')}</legend>
+            <small id="hint-tpl-pds">{t('templates.qc.pdsHint')}</small>
+            <div className="row-list">
+              {formData.qc.pds.map((entry, i) => (
+                <div key={i} className="ext-row">
+                  <label className="sr-only" htmlFor={`tpl-pds-url-${i}`}>{t('templates.qc.pdsUrl')}</label>
+                  <input id={`tpl-pds-url-${i}`} value={entry.url} onChange={(e) => updatePds(i, 'url', e.target.value)} placeholder="https://example.com/pds_en.pdf" autoComplete="off" spellCheck="false" />
+                  <label className="sr-only" htmlFor={`tpl-pds-lang-${i}`}>{t('templates.qc.pdsLanguage')}</label>
+                  <input id={`tpl-pds-lang-${i}`} value={entry.language} onChange={(e) => updatePds(i, 'language', e.target.value)} placeholder="en" maxLength={2} autoComplete="off" />
+                  <button type="button" className="icon-btn" aria-label={t('common.remove')} title={t('common.remove')}
+                    onClick={() => setQc('pds', formData.qc.pds.filter((_, j) => j !== i))}>
+                    <Icon name="close" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button type="button" className="btn quiet add-row" onClick={() => setQc('pds', [...formData.qc.pds, { url: '', language: 'en' }])}>
+              <Icon name="plus" />{t('templates.qc.addPds')}
+            </button>
+          </fieldset>
+          <Textarea id="tpl-policy-oids" label={t('templates.qc.policyOids')} value={formData.policy_oids} onChange={(e) => set('policy_oids', e.target.value)}
+            placeholder="0.4.0.194112.1.2" rows={2} helperText={t('templates.qc.policyOidsHint')}
+            after={(
+              <div className="actions">
+                {ETSI_POLICY_PRESETS.map(pr => (
+                  <button key={pr.oid} type="button" className="btn" onClick={() => addPolicyPreset(pr.oid)} title={pr.oid}>{pr.label}</button>
+                ))}
               </div>
-            ))}
-          </div>
-          <Button type="button" size="sm" variant="secondary" className="mt-2"
-            onClick={() => setQc('pds', [...formData.qc.pds, { url: '', language: 'en' }])}>
-            {t('templates.qc.addPds')}
-          </Button>
-        </div>
+            )} />
+        </fieldset>
 
-        <div>
-          <Textarea
-            label={t('templates.qc.policyOids')}
-            value={formData.policy_oids}
-            onChange={(e) => set('policy_oids', e.target.value)}
-            placeholder="0.4.0.194112.1.2"
-            rows={2}
-            helperText={t('templates.qc.policyOidsHint')}
-          />
-          <div className="flex flex-wrap gap-2 mt-2">
-            {ETSI_POLICY_PRESETS.map(pr => (
-              <Button key={pr.oid} type="button" size="sm" variant="secondary" onClick={() => addPolicyPreset(pr.oid)} title={pr.oid}>
-                {pr.label}
-              </Button>
-            ))}
-          </div>
-        </div>
+        {/* Custom extensions (#437) */}
+        <CustomExtensionsEditor rows={formData.custom_extensions} onChange={(rows) => set('custom_extensions', rows)}
+          before={<StoredExtensionsError error={template?.custom_extensions_error} />} />
       </div>
 
-      {/* Custom extensions (#437) */}
-      <div className="border-t border-border pt-4 space-y-2">
-        <h4 className={sectionTitle}>{t('customExtensions.title')}</h4>
-        <StoredExtensionsError error={template?.custom_extensions_error} />
-        <CustomExtensionsEditor rows={formData.custom_extensions} onChange={(rows) => set('custom_extensions', rows)} />
-      </div>
-
-      <div className="flex justify-end gap-2 pt-4 border-t border-border">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          {t('common.cancel')}
-        </Button>
-        <Button type="submit" disabled={loading || !formData.name.trim() || !customExt.valid}>
-          {loading ? <LoadingSpinner size="sm" /> : (template ? t('common.update') : t('common.create'))}
-        </Button>
+      <div className="modal-actions">
+        <button type="button" className="btn" data-action="close-modal" onClick={onCancel} disabled={loading || undefined}>{t('common.cancel')}</button>
+        <button type="submit" className="btn primary" disabled={loading || !formData.name.trim() || !customExt.valid || undefined}>
+          {loading ? t('common.saving') : (template ? t('common.update') : t('common.create'))}
+        </button>
       </div>
     </form>
   )

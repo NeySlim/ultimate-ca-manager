@@ -62,22 +62,6 @@ vi.mock('../../services/tsa.service', () => ({
   },
 }))
 
-// A native select exposes the options and the helper text that the real one hides in a portal.
-// The extra button picks a CA the way a saved value would, even one no longer listed.
-vi.mock('../../components', async (orig) => ({
-  ...(await orig()),
-  Select: ({ label, options = [], value, onChange, helperText }) => (
-    <div data-testid={`field-${label}`}>
-      <select aria-label={label} value={value ?? ''} onChange={(e) => onChange?.(e.target.value)}>
-        <option value="">-</option>
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      <button onClick={() => onChange?.('ca-keyless')}>choose-keyless</button>
-      {helperText && <p>{helperText}</p>}
-    </div>
-  ),
-}))
-
 import TSAPage from '../TSAPage'
 import { tsaService } from '../../services/tsa.service'
 
@@ -91,7 +75,17 @@ async function openSettings(ca_refid) {
   return (await screen.findByRole('combobox', { name: 'tsa.signingCA' })).closest('.field')
 }
 
-const labels = (field) => within(field).getAllByRole('option').filter((o) => o.value !== '').map((o) => o.textContent)
+const labels = (field) => within(field).getAllByRole('option').filter((o) => o.value !== '' && o.value !== '__hidden_cas__').map((o) => o.textContent)
+const generationField = () => within(screen.getByRole('dialog')).getByLabelText('tsa.signingCA').closest('.field')
+// Picks a CA the way a saved value would, even one the select does not list
+function chooseUnlisted(field, value) {
+  const select = within(field).getByRole('combobox')
+  const stray = document.createElement('option')
+  stray.value = value
+  select.appendChild(stray)
+  fireEvent.change(select, { target: { value } })
+  stray.remove()
+}
 
 describe('TSAPage signing CA pickers (#426)', () => {
   beforeEach(() => {
@@ -116,9 +110,11 @@ describe('TSAPage signing CA pickers (#426)', () => {
     await openSettings('ca-sign')
     fireEvent.click(await screen.findByText('tsa.signerGenerate'))
     await screen.findByText('tsa.signerGenerateModalDesc')
-    const field = screen.getByTestId('field-tsa.signingCA')
+    const field = generationField()
     expect(labels(field)).toEqual(['Signing CA'])
-    fireEvent.click(screen.getByText('cas.showHiddenCas:1'))
+    // The link of the issue form: the select's last option shows the hidden CAs
+    fireEvent.change(within(field).getByRole('combobox'), { target: { value: '__hidden_cas__' } })
+    expect(within(field).getByRole('option', { name: 'cas.hideHiddenCas' })).toBeInTheDocument()
     expect(labels(field)).toEqual(['Signing CA', 'Hidden root'])
   })
 
@@ -126,10 +122,10 @@ describe('TSAPage signing CA pickers (#426)', () => {
     await openSettings('ca-sign')
     fireEvent.click(await screen.findByText('tsa.signerGenerate'))
     await screen.findByText('tsa.signerGenerateModalDesc')
-    const field = screen.getByTestId('field-tsa.signingCA')
+    const field = generationField()
     expect(labels(field)).toEqual(['Signing CA'])
     expect(field).toHaveTextContent('cas.notListedForSigning:2')
-    fireEvent.click(within(field).getByText('choose-keyless'))
+    chooseUnlisted(field, 'ca-keyless')
     expect(labels(field)).toEqual(['Signing CA', 'Keyless root'])
     expect(field).toHaveTextContent('cas.notListedForSigning:1')
   })

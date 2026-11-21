@@ -22,10 +22,11 @@ describe('confirmation and prompt in the interface language', () => {
     render(<NotificationProvider><Probe /></NotificationProvider>)
     await act(async () => { api.showConfirm('Quitter ?', { confirmText: 'Quitter la page', variant: 'danger' }) })
     const dialog = screen.getByRole('dialog', { name: 'Confirmer' })
-    expect(dialog.className).toContain('lv-dialog')
+    expect(dialog.tagName).toBe('DIALOG')
+    expect(dialog.className).toBe('narrow')
     expect(screen.getByRole('button', { name: 'Annuler' })).toBeInTheDocument()
     expect(screen.queryByText('Cancel')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Quitter la page' }).className).toContain('is-danger')
+    expect(screen.getByRole('button', { name: 'Quitter la page' }).className).toBe('btn danger')
   })
 
   it('prompt: translated buttons, Enter submits the typed value', async () => {

@@ -108,7 +108,7 @@ describe('deleting a trust store entry from its actions', () => {
 
     render(<ActionsHarness type="user_certificate" entity={{ id: 11, name: 'alice@example.test', status: 'valid' }} />)
     fireEvent.click(screen.getByText('Revoke'))
-    fireEvent.submit(await screen.findByText('revocation.confirm').then(el => el.closest('form')))
+    fireEvent.click(await screen.findByRole('button', { name: 'revocation.confirm' }))
 
     await waitFor(() => expect(userCertificatesService.revoke).toHaveBeenCalledTimes(1))
     expect(userCertificatesService.revoke.mock.calls[0][0]).toBe(11)

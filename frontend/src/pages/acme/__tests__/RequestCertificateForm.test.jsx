@@ -17,17 +17,6 @@ vi.mock('../../../services', () => ({
   policiesService: { getEffective: (...args) => getEffective(...args) },
 }))
 
-vi.mock('../../../components', () => ({
-  Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-  Input: ({ label, helperText, ...props }) => <input aria-label={label} {...props} />,
-  Select: ({ label, value, onChange, options }) => (
-    <select aria-label={label} value={value ?? ''} onChange={(e) => onChange(e.target.value)}>
-      <option value="" />
-      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
-  ),
-}))
-
 import RequestCertificateForm from '../RequestCertificateForm'
 
 const renderForm = (props = {}) => {
@@ -47,7 +36,7 @@ const renderForm = (props = {}) => {
 }
 
 const submit = () => {
-  fireEvent.change(screen.getByRole('textbox', { name: '' }), { target: { value: 'example.com' } })
+  fireEvent.change(screen.getByLabelText(/^acme\.domains/), { target: { value: 'example.com' } })
   fireEvent.click(screen.getByText('acme.requestCertificate'))
 }
 

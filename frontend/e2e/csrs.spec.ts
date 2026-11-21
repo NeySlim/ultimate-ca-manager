@@ -23,8 +23,10 @@ test('a CSR imported on screen is signed by a CA', async ({ page, api }) => {
   await expect(panel.getByText(cn).first()).toBeVisible()
   await panel.getByRole('button', { name: 'Sign', exact: true }).click()
   const sign = page.getByRole('dialog', { name: 'Sign CSR' })
-  await sign.getByLabel('Certificate Authority').click()
-  await page.getByRole('option', { name: new RegExp(ca.common_name) }).click()
+  // A native select, as the mockup's: the option is picked by its value
+  const picker = sign.getByLabel('Certificate Authority')
+  const value = await picker.locator('option', { hasText: ca.common_name }).first().getAttribute('value')
+  await picker.selectOption(value!)
   await sign.getByRole('button', { name: 'Sign CSR' }).click()
   await expect(sign).toBeHidden()
 

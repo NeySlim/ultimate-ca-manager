@@ -795,7 +795,9 @@
     },
     "identifier": "Identifiant",
     "emptyAccountsTitle": "Aucun compte ACME",
-    "emptyAccountsText": "Les clients ACME (certbot, cert-manager, acme.sh) créent leur compte eux-mêmes auprès du répertoire : copiez son URL dans leur configuration."
+    "emptyAccountsText": "Les clients ACME (certbot, cert-manager, acme.sh) créent leur compte eux-mêmes auprès du répertoire : copiez son URL dans leur configuration.",
+    "termsOfServiceTitle": "Titre",
+    "termsOfServiceBody": "Texte"
   },
   "audit": {
     "event": "Événement",
@@ -2810,7 +2812,9 @@
       "details": "Détails",
       "emptyTitle": "Aucune demande de signature",
       "emptyText": "Les CSR déposées par les équipes ou par les protocoles arrivent ici pour vérification. Vous pouvez aussi coller une CSR dans le formulaire d’émission."
-    }
+    },
+    "signWith": "Signer avec",
+    "uploadTooLarge": "Le fichier dépasse 1 Mo."
   },
   "dashboard": {
     "goodMorning": "Bonjour",
@@ -7913,7 +7917,8 @@
       "warning": "Avertissement",
       "notice": "Remarque",
       "info": "Info"
-    }
+    },
+    "profileLabel": "Profil"
   },
   "keyRecovery": {
     "title": "Récupération de clés",

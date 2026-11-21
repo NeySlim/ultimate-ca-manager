@@ -16,32 +16,6 @@ vi.mock('../../../contexts', () => ({
 }))
 vi.mock('../../../hooks/useClipboard', () => ({ useClipboard: () => ({ copy: vi.fn() }) }))
 vi.mock('../../../services', () => ({ scepService: mocks }))
-vi.mock('../../../components', () => ({
-  Button: ({ children, loading: _loading, ...props }) => <button {...props}>{children}</button>,
-  Input: ({ label, helperText: _h, noAutofill: _n, ...props }) => <label>{label}<input {...props} /></label>,
-  Select: ({ label, value, onChange, options = [], placeholder, helperText }) => (
-    <div data-testid={`field-${label}`}>
-      <label>{label}
-        <select value={value} onChange={(e) => onChange(e.target.value)}>
-          <option value="">{placeholder}</option>
-          {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-      </label>
-      {helperText && <p>{helperText}</p>}
-    </div>
-  ),
-  Card: ({ children }) => <section>{children}</section>,
-  Badge: ({ children }) => <span>{children}</span>,
-  Modal: ({ open, children }) => open ? <div role="dialog">{children}</div> : null,
-  EmptyState: ({ title }) => <p>{title}</p>,
-  HelpCard: ({ children }) => <aside>{children}</aside>,
-}))
-vi.mock('../../../components/ui/ToggleSwitch', () => ({
-  ToggleSwitch: ({ label, checked, onChange }) => (
-    <label>{label}<input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} /></label>
-  ),
-}))
-
 import ScepProfileForm from '../ScepProfileForm'
 
 const CAS = [
@@ -52,7 +26,7 @@ const CAS = [
 ]
 const PROFILE = (ca_refid) => ({ id: 9, name: 'Devices', url_slug: 'devices', ca_refid, enabled: true, auto_approve: false })
 
-const optionLabels = () => within(screen.getByTestId('field-common.certificateAuthority'))
+const optionLabels = () => within(screen.getByLabelText('common.certificateAuthority').closest('.field'))
   .getAllByRole('option').filter((o) => o.value !== '').map((o) => o.textContent)
 
 const onClose = vi.fn()
@@ -62,27 +36,27 @@ describe('ScepProfileForm CA picker (#426)', () => {
     render(<ScepProfileForm profile={null} cas={CAS} templates={[]} onClose={onClose} onSaved={vi.fn()} />)
     await screen.findByRole('dialog')
     expect(optionLabels()).toEqual(['Signing CA'])
-    expect(screen.getByTestId('field-common.certificateAuthority')).toHaveTextContent('cas.notListedForScep:3')
+    expect(screen.getByLabelText('common.certificateAuthority').closest('.field')).toHaveTextContent('cas.notListedForScep:3')
   })
 
   it('keeps the profile CA listed when it holds no key and counts one less', async () => {
     render(<ScepProfileForm profile={PROFILE('ca-2')} cas={CAS} templates={[]} onClose={onClose} onSaved={vi.fn()} />)
     await screen.findByRole('dialog')
     expect(optionLabels()).toEqual(['Signing CA', 'Keyless root'])
-    expect(screen.getByTestId('field-common.certificateAuthority')).toHaveTextContent('cas.notListedForScep:2')
+    expect(screen.getByLabelText('common.certificateAuthority').closest('.field')).toHaveTextContent('cas.notListedForScep:2')
   })
 })
 
 describe('ScepProfileForm template picker', () => {
   const TEMPLATES = [{ id: 3, name: 'Retired', is_active: false }, { id: 5, name: 'Device', is_active: true }]
-  const templateLabels = () => within(screen.getByTestId('field-scep.profileTemplate'))
+  const templateLabels = () => within(screen.getByLabelText('scep.profileTemplate').closest('.field'))
     .getAllByRole('option').filter((o) => o.value !== '').map((o) => o.textContent)
 
   it('keeps the deactivated template the profile binds, even once switched away from', async () => {
     render(<ScepProfileForm profile={{ ...PROFILE('ca-1'), template_id: 3 }} cas={CAS} templates={TEMPLATES} onClose={onClose} onSaved={vi.fn()} />)
     await screen.findByRole('dialog')
     expect(templateLabels()).toEqual(['Retired', 'Device'])
-    fireEvent.change(within(screen.getByTestId('field-scep.profileTemplate')).getByRole('combobox'), { target: { value: '5' } })
+    fireEvent.change(within(screen.getByLabelText('scep.profileTemplate').closest('.field')).getByRole('combobox'), { target: { value: '5' } })
     expect(templateLabels()).toEqual(['Retired', 'Device'])
   })
 

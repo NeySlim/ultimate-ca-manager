@@ -1,12 +1,16 @@
-import { useState } from 'react'
+/**
+ * The DNS providers to choose from, as the mockup's format cards (`.format-grid` of `.format-option`
+ * radios): the brand mark, the name; a search above them past six, the manual and RFC 2136 ones
+ * first, then the popular ones, then the others.
+ */
+import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { MagnifyingGlass } from '@phosphor-icons/react'
 import { ProviderIcon, getProviderColor } from '../../components/ProviderIcons'
-import { cn } from '../../lib/utils'
 
 export default function ProviderTypeGrid({ label, providers, value, onChange, disabled }) {
   const [search, setSearch] = useState('')
   const { t } = useTranslation()
+  const id = useId().replace(/:/g, '')
 
   const filtered = providers.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -23,84 +27,44 @@ export default function ProviderTypeGrid({ label, providers, value, onChange, di
     .filter(p => p.type !== 'manual' && p.type !== 'rfc2136' && !popularOrder.includes(p.type))
     .sort((a, b) => a.name.localeCompare(b.name))
 
-  const renderCard = (pt) => {
-    const brandColor = getProviderColor(pt.type)
-    const isSelected = value === pt.type
-    return (
-      <button
-        key={pt.type}
-        type="button"
-        disabled={disabled}
-        onClick={() => !disabled && onChange(pt.type)}
-        className={cn(
-          "flex flex-col items-center gap-1.5 p-2.5 rounded-lg border text-center transition-all duration-200 min-h-[72px]",
-          "hover:scale-[1.03] hover:shadow-md",
-          disabled && "opacity-50 cursor-not-allowed",
-          isSelected
-            ? "border-accent-primary bg-accent-primary-op10 ring-2 ring-accent-primary-op40 shadow-sm"
-            : "border-border-op50 bg-tertiary-op40 hover:border-secondary-op40 hover:bg-tertiary-op70"
-        )}
-      >
-        <span className="w-8 h-8 rounded-lg flex items-center justify-center text-paper shadow-sm"
-          style={{ backgroundColor: brandColor }}>
-          <ProviderIcon type={pt.type} size={18} />
-        </span>
-        <span className={cn("text-xs font-medium leading-tight", isSelected ? "text-accent-primary" : "text-text-primary")}>
-          {pt.name}
-        </span>
-      </button>
-    )
-  }
+  const renderCard = (pt) => (
+    <label key={pt.type} className="format-option">
+      <input type="radio" name={`${id}-provider`} value={pt.type} checked={value === pt.type} disabled={disabled} onChange={() => !disabled && onChange(pt.type)} />
+      {/* The provider's brand colour behind its mark: a logo, not a theme colour */}
+      <span aria-hidden="true" style={{ display: 'inline-grid', placeItems: 'center', width: 26, height: 26, borderRadius: 4, flexShrink: 0, color: 'var(--paper)', backgroundColor: getProviderColor(pt.type) }}>
+        <ProviderIcon type={pt.type} size={16} />
+      </span>
+      <span>{pt.name}</span>
+    </label>
+  )
+  const grid = (list) => <div className="format-grid" style={{ margin: '0 0 6px' }}>{list.map(renderCard)}</div>
 
   return (
-    <div className="space-y-2">
-      {label && <label className="block text-sm font-medium text-text-primary">{label}</label>}
-
+    <fieldset className="field full">
+      {label && <legend>{label}</legend>}
       {providers.length > 6 && (
-        <div className="relative">
-          <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" />
-          <input
-            type="text"
-            className="w-full pl-9 pr-3 py-2 border border-border rounded-lg text-sm text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent-primary transition-colors"
-            placeholder={t('common.search') + '...'}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+        <>
+          <label className="sr-only" htmlFor={`${id}-search`}>{t('common.search')}</label>
+          <input id={`${id}-search`} type="search" autoComplete="off" placeholder={t('common.search') + '...'} value={search} onChange={(e) => setSearch(e.target.value)} />
+        </>
       )}
-
-      <div className="max-h-80 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
-        {search === '' && (manualProvider || rfc2136Provider) && (
-          <div className="grid grid-cols-3 gap-2">
-            {manualProvider && renderCard(manualProvider)}
-            {rfc2136Provider && renderCard(rfc2136Provider)}
-          </div>
-        )}
+      <div role="radiogroup" aria-label={label} style={{ maxHeight: 320, overflow: 'auto' }}>
+        {search === '' && (manualProvider || rfc2136Provider) && grid([manualProvider, rfc2136Provider].filter(Boolean))}
         {search === '' && popularProviders.length > 0 && (
           <>
-            <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">{t('common.popular', 'Popular')}</p>
-            <div className="grid grid-cols-3 gap-2">
-              {popularProviders.map(renderCard)}
-            </div>
+            <p className="small muted">{t('common.popular', 'Popular')}</p>
+            {grid(popularProviders)}
           </>
         )}
         {search === '' && otherProviders.length > 0 && (
           <>
-            <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary pt-1">{t('common.other', 'Other')}</p>
-            <div className="grid grid-cols-3 gap-2">
-              {otherProviders.map(renderCard)}
-            </div>
+            <p className="small muted">{t('common.other', 'Other')}</p>
+            {grid(otherProviders)}
           </>
         )}
-        {search !== '' && (
-          <div className="grid grid-cols-3 gap-2">
-            {filtered.map(renderCard)}
-          </div>
-        )}
-        {filtered.length === 0 && (
-          <p className="text-xs text-text-tertiary text-center py-4">{t('common.noResults', 'No results')}</p>
-        )}
+        {search !== '' && grid(filtered)}
+        {filtered.length === 0 && <p className="small muted">{t('common.noResults', 'No results')}</p>}
       </div>
-    </div>
+    </fieldset>
   )
 }

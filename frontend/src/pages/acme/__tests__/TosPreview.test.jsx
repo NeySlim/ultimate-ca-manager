@@ -137,8 +137,7 @@ describe('TosPreview', () => {
     const ul = container.querySelector('ul')
     expect(ul).not.toBeNull()
     expect(ul.querySelectorAll('li')).toHaveLength(2)
-    // Bullets come from the shared markdown classes on the wrapper —
-    // Tailwind preflight strips default list styling otherwise.
-    expect(container.firstChild.className).toContain('[&_ul]:list-disc')
+    // Under the zone's scope the browser's own bullets come back; the list is indented as the mockup's help lists
+    expect(ul.style.paddingLeft).toBe('17px')
   })
 })

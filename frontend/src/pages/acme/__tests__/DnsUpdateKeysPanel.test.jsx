@@ -257,8 +257,11 @@ describe('DnsUpdateKeysPanel', () => {
   })
 
   describe('snippets in the dialog', () => {
+    // The clients are the mockup's segmented buttons, one snippet shown at a time
     const openTab = async (user, name) => {
-      await user.click(await screen.findByRole('tab', { name }))
+      const button = await screen.findByRole('button', { name })
+      await user.click(button)
+      expect(button).toHaveAttribute('aria-pressed', 'true')
     }
 
     it('sets the algorithm in the cert-manager, certbot and lego snippets of a sha256 key', async () => {

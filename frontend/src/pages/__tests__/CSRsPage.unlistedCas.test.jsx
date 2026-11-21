@@ -109,20 +109,6 @@ vi.mock('../../services', () => ({
   ekuService: { getKnown: vi.fn().mockResolvedValue({ data: { ekus: [] } }) },
 }))
 
-// A native select exposes the options and the helper text that the real one hides in a portal.
-vi.mock('../../components', async (orig) => ({
-  ...(await orig()),
-  Select: ({ label, options = [], value, onChange, helperText }) => (
-    <div data-testid={`field-${label}`}>
-      <select aria-label={label} value={value ?? ''} onChange={(e) => onChange?.(e.target.value)}>
-        <option value="">-</option>
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      {helperText && <p>{helperText}</p>}
-    </div>
-  ),
-}))
-
 import CSRsPage from '../CSRsPage'
 import { openRow } from '../../test/atelierRows'
 
@@ -141,7 +127,7 @@ describe('CSRsPage signing CA picker (#426)', () => {
     await waitFor(() => expect(getAll).toHaveBeenCalled())
     await openRow('pending.example.com')
     fireEvent.click(await screen.findByText('csrs.sign'))
-    const field = await screen.findByTestId('field-common.certificateAuthority')
+    const field = (await screen.findByLabelText('common.certificateAuthority')).closest('.field')
     expect(within(field).getAllByRole('option').filter((o) => o.value !== '').map((o) => o.textContent)).toEqual(['Signing CA'])
     expect(field).toHaveTextContent('cas.notListedForSigning:2')
   })

@@ -185,10 +185,7 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
   }
 
   const selectCA = async (user) => {
-    const dialog = signDialog()
-    const trigger = dialog.querySelectorAll('[role="combobox"]')[0]
-    await user.click(trigger)
-    await user.click(await screen.findByRole('option', { name: 'CA 1' }))
+    await user.selectOptions(within(signDialog()).getByLabelText('common.certificateAuthority'), 'CA 1')
   }
 
   it('opens the certificate signed locally as a normal cert', async () => {
@@ -208,10 +205,7 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
     await openSignModal()
     await selectCA(user)
 
-    // Second combobox in the modal is the cert-type Select
-    const typeTrigger = signDialog().querySelectorAll('[role="combobox"]')[1]
-    await user.click(typeTrigger)
-    await user.click(await screen.findByRole('option', { name: 'certificates.certTypes.intermediateCA' }))
+    await user.selectOptions(within(signDialog()).getByLabelText('csrs.certTypeForSign'), 'certificates.certTypes.intermediateCA')
 
     clickSignSubmit()
     await waitFor(() => expect(sign).toHaveBeenCalled())
@@ -293,9 +287,7 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
     ] })
 
     await openMscaSignModal()
-    const connTrigger = signDialog().querySelectorAll('[role="combobox"]')[0]
-    await user.click(connTrigger)
-    await user.click(await screen.findByRole('option', { name: /MSCA1/ }))
+    await user.selectOptions(within(signDialog()).getByLabelText('msca.selectConnection'), '5')
 
     await waitFor(() => expect(within(signDialog()).getByRole('button', { name: 'common.signCSR' })).not.toBeDisabled())
     clickSignSubmit()
@@ -313,9 +305,7 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
     ] })
 
     await openMscaSignModal()
-    const connTrigger = signDialog().querySelectorAll('[role="combobox"]')[0]
-    await user.click(connTrigger)
-    await user.click(await screen.findByRole('option', { name: /MSCA1/ }))
+    await user.selectOptions(within(signDialog()).getByLabelText('msca.selectConnection'), '5')
 
     await waitFor(() => expect(within(signDialog()).getByRole('button', { name: 'common.signCSR' })).not.toBeDisabled())
     clickSignSubmit()
