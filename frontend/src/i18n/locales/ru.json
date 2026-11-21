@@ -2093,7 +2093,9 @@
     "actions": {
       "read": "Чтение",
       "write": "Запись",
-      "delete": "Удаление"
+      "delete": "Удаление",
+      "export": "Экспорт",
+      "admin": "Администрирование"
     },
     "grant": "{{resource}}: {{action}}"
   },

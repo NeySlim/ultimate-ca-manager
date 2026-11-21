@@ -67,6 +67,13 @@ describe('permissions in words', () => {
     expect(describePermissions(t, ['read:*', 'write:*'])).toBe('rbac.permissionOf {"resource":"rbac.anyResource","actions":"groups.actions.read, groups.actions.write"}')
   })
 
+  it('names the export and administration actions the server grants beyond read, write and delete', () => {
+    expect(describePermissions(t, ['export:audit', 'admin:users'])).toBe([
+      'rbac.permissionOf {"resource":"rbac.categories.auditLogs","actions":"groups.actions.export"}',
+      'rbac.permissionOf {"resource":"rbac.categories.userManagement","actions":"groups.actions.admin"}',
+    ].join(' · '))
+  })
+
   it('keeps an unknown resource or action by its name', () => {
     expect(describePermissions(t, ['purge:widgets'])).toBe('rbac.permissionOf {"resource":"widgets","actions":"purge"}')
   })

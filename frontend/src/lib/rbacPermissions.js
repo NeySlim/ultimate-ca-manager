@@ -83,7 +83,10 @@ export function appliedPermissions(stored = [], grantable = []) {
 }
 
 /** Label keys of the actions a grid draws as its columns. */
-export const ACTION_LABEL_KEYS = { read: 'groups.actions.read', write: 'groups.actions.write', delete: 'groups.actions.delete' }
+export const ACTION_LABEL_KEYS = {
+  read: 'groups.actions.read', write: 'groups.actions.write', delete: 'groups.actions.delete',
+  export: 'groups.actions.export', admin: 'groups.actions.admin',
+}
 
 /** Columns of a permission grid: read, write, delete, then any other action the list holds. */
 export function permissionActions(permissions = []) {

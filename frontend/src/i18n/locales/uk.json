@@ -2093,7 +2093,9 @@
     "actions": {
       "read": "Read",
       "write": "Write",
-      "delete": "Delete"
+      "delete": "Delete",
+      "export": "Export",
+      "admin": "Administer"
     },
     "grant": "{{action}}: {{resource}}"
   },
