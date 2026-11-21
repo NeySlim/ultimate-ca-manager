@@ -3,7 +3,7 @@
  * revocation); one left with none says so.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({ create: vi.fn(), list: vi.fn(), update: vi.fn() }))
 
@@ -29,20 +29,6 @@ vi.mock('../../hooks', async () => {
   }
 })
 
-vi.mock('../../components', () => ({
-  ResponsiveLayout: ({ children, actions, slideOverContent }) => <div>{actions}{children}{slideOverContent}</div>,
-  ResponsiveDataTable: ({ data, onRowClick }) => (data || []).map(r => (
-    <button key={r.id} onClick={() => onRowClick(r)}>{`row-${r.name}`}</button>
-  )),
-  Card: ({ children }) => <div>{children}</div>,
-  Badge: ({ children }) => <span>{children}</span>,
-  LoadingSpinner: () => null,
-  Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-  Input: ({ label, ...props }) => <input aria-label={label} {...props} />,
-  Textarea: ({ label, ...props }) => <textarea aria-label={label} {...props} />,
-  Modal: ({ open, children }) => (open ? <div>{children}</div> : null),
-  Select: () => null,
-}))
 
 import PoliciesPage from '../PoliciesPage'
 
@@ -50,12 +36,12 @@ async function openCreate() {
   mocks.list.mockResolvedValue({ data: [] })
   mocks.create.mockResolvedValue({ data: { id: 1 } })
   render(<PoliciesPage />)
-  fireEvent.click(await screen.findByText('policies.createPolicy'))
+  fireEvent.click((await screen.findAllByText('policies.createPolicy'))[0])
   fireEvent.change(screen.getByLabelText('policies.policyName'), { target: { value: 'Ops' } })
 }
 
 const form = () => screen.getByLabelText('policies.policyName').closest('form')
-const tick = (key) => fireEvent.click(screen.getByText(key).closest('label').querySelector('input'))
+const tick = (key) => fireEvent.click(within(form()).getByText(key).closest('label').querySelector('input'))
 
 describe('PoliciesPage operations', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -89,8 +75,8 @@ describe('PoliciesPage operations', () => {
   it('says when an old policy governs nothing', async () => {
     mocks.list.mockResolvedValue({ data: [{ id: 3, name: 'Old revocation', policy_type: 'revocation', operations: [], rules: {} }] })
     render(<PoliciesPage />)
-    fireEvent.click(await screen.findByText('row-Old revocation'))
-    expect(await screen.findByText('policies.noOperation')).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: 'Old revocation' }))
+    expect((await screen.findAllByText('policies.noOperation')).length).toBeGreaterThan(0)
   })
 })
 

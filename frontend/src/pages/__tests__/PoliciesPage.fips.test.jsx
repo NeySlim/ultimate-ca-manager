@@ -29,20 +29,6 @@ vi.mock('../../hooks', async () => {
   }
 })
 
-vi.mock('../../components', () => ({
-  ResponsiveLayout: ({ children, actions, slideOverContent }) => <div>{actions}{children}{slideOverContent}</div>,
-  ResponsiveDataTable: ({ data, onRowClick }) => (data || []).map(r => (
-    <button key={r.id} onClick={() => onRowClick(r)}>{`row-${r.name}`}</button>
-  )),
-  Card: ({ children }) => <div>{children}</div>,
-  Badge: ({ children }) => <span>{children}</span>,
-  LoadingSpinner: () => null,
-  Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-  Input: ({ label, ...props }) => <input aria-label={label} {...props} />,
-  Textarea: ({ label, ...props }) => <textarea aria-label={label} {...props} />,
-  Modal: ({ open, children }) => (open ? <div>{children}</div> : null),
-  Select: () => null,
-}))
 
 import PoliciesPage from '../PoliciesPage'
 
@@ -54,7 +40,7 @@ describe('PoliciesPage FIPS system policy (#399)', () => {
     mocks.getEffective.mockResolvedValue({ data: { allowed_key_types: ['RSA-2048'], allowed_digests: ['sha256'], fips: true } })
     render(<PoliciesPage />)
     expect(await screen.findByText('policies.fipsRulesTitle')).toBeTruthy()
-    fireEvent.click(screen.getByText('policies.createPolicy'))
+    fireEvent.click(screen.getAllByText('policies.createPolicy')[0])
     expect(screen.getByText('common.keyTypes.rsa2048')).toBeTruthy()
     expect(screen.queryByText('common.keyTypes.ed25519')).toBeNull()
     expect(screen.queryByText('common.keyTypes.ed448')).toBeNull()
@@ -66,8 +52,8 @@ describe('PoliciesPage FIPS system policy (#399)', () => {
     mocks.update.mockResolvedValue({ data: { id: 3 } })
     render(<PoliciesPage />)
     await screen.findByText('policies.fipsRulesTitle')
-    fireEvent.click(await screen.findByText('row-Legacy'))
-    fireEvent.click(await screen.findByText('common.edit'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Legacy' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'common.edit' }))
     expect(screen.queryByText('common.keyTypes.ed448')).toBeNull()
     fireEvent.click(screen.getByText('common.keyTypes.ed25519'))
     fireEvent.submit(screen.getByLabelText('policies.policyName').closest('form'))
@@ -79,7 +65,7 @@ describe('PoliciesPage FIPS system policy (#399)', () => {
     mocks.list.mockResolvedValue({ data: [] })
     mocks.getEffective.mockResolvedValue({ data: { allowed_key_types: null, allowed_digests: null } })
     render(<PoliciesPage />)
-    fireEvent.click(await screen.findByText('policies.createPolicy'))
+    fireEvent.click((await screen.findAllByText('policies.createPolicy'))[0])
     await waitFor(() => expect(mocks.getEffective).toHaveBeenCalled())
     expect(screen.getByText('common.keyTypes.ed25519')).toBeTruthy()
     expect(screen.queryByText('policies.fipsRulesTitle')).toBeNull()

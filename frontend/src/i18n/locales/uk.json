@@ -6148,6 +6148,16 @@
     "searchPlaceholder": "Пошук політик...",
     "selectGroup": "Оберіть групу...",
     "subtitle": "Керування правилами видачі, вимогами до ключів та процесами затвердження",
+    "unit_one": "{{count}} policy",
+    "unit_few": "{{count}} policies",
+    "unit_many": "{{count}} policies",
+    "unit_other": "{{count}} policies",
+    "range_one": "{{shown}} of {{count}} policy",
+    "range_few": "{{shown}} of {{count}} policies",
+    "range_many": "{{shown}} of {{count}} policies",
+    "range_other": "{{shown}} of {{count}} policies",
+    "caption": "Policies. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
     "fipsRulesTitle": "Правила FIPS активні (лише читання)",
     "fipsRulesDesc": "Режим FIPS застосовує системну політику перед цими: ключі RSA парної довжини від 2048 до 16384 біт, EC від P-256 до P-521, а також Ed25519, Ed448 і ML-DSA, коли завантажений модуль FIPS їх схвалює; підписи від SHA-256 до SHA-512. Політики тут можуть лише звужувати її.",
     "targetCA": "Цільовий CA",
@@ -6163,7 +6173,9 @@
     },
     "allowedDigests": "Дозволені дайджести підпису",
     "allowedKeyTypesHelp": "Нічого не вибрано: дозволено будь-який тип ключа.",
+    "anyKeyType": "Any key type",
     "allowedDigestsHelp": "Нічого не вибрано: дозволено будь-який дайджест.",
+    "anyDigest": "Any hash",
     "operations": "Операції",
     "operationHelp": {
       "issuance": "Форма видачі, підписання CSR і масове підписання, а також оновлення, які виконує оператор",
@@ -6172,7 +6184,12 @@
     },
     "operationsRequired": "Виберіть принаймні одну операцію",
     "noOperation": "Немає операцій",
-    "rulesRevocationOnly": "Правила діють лише для видачі та оновлення: політика відкликання обмежується своїм ЦС, шаблоном і шаблоном DNS-імені."
+    "noDescription": "No description.",
+    "rulesRevocationOnly": "Правила діють лише для видачі та оновлення: політика відкликання обмежується своїм ЦС, шаблоном і шаблоном DNS-імені.",
+    "state": {
+      "applied": "Applied",
+      "inactive": "Disabled"
+    }
   },
   "reports": {
     "complianceReport": "Звіт відповідності",

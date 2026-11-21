@@ -29,20 +29,6 @@ vi.mock('../../hooks', async () => {
   }
 })
 
-vi.mock('../../components', () => ({
-  ResponsiveLayout: ({ children, actions, slideOverContent }) => <div>{actions}{children}{slideOverContent}</div>,
-  ResponsiveDataTable: ({ data, onRowClick }) => (data || []).map(r => (
-    <button key={r.id} onClick={() => onRowClick(r)}>{`row-${r.name}`}</button>
-  )),
-  Card: ({ children }) => <div>{children}</div>,
-  Badge: ({ children }) => <span>{children}</span>,
-  LoadingSpinner: () => null,
-  Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-  Input: ({ label, ...props }) => <input aria-label={label} {...props} />,
-  Textarea: ({ label, ...props }) => <textarea aria-label={label} {...props} />,
-  Modal: ({ open, children }) => (open ? <div>{children}</div> : null),
-  Select: () => null,
-}))
 
 import PoliciesPage from '../PoliciesPage'
 
@@ -50,7 +36,7 @@ async function openCreate() {
   mocks.list.mockResolvedValue({ data: [] })
   mocks.create.mockResolvedValue({ data: { id: 1 } })
   render(<PoliciesPage />)
-  fireEvent.click(await screen.findByText('policies.createPolicy'))
+  fireEvent.click((await screen.findAllByText('policies.createPolicy'))[0])
   fireEvent.change(screen.getByLabelText('policies.policyName'), { target: { value: 'FIPS' } })
 }
 
@@ -77,8 +63,8 @@ describe('PoliciesPage signature hash rule (#397)', () => {
     mocks.list.mockResolvedValue({ data: [{ id: 7, name: 'Hashes', policy_type: 'issuance', rules: { allowed_digests: ['sha384'] } }] })
     mocks.update.mockResolvedValue({ data: { id: 7 } })
     render(<PoliciesPage />)
-    fireEvent.click(await screen.findByText('row-Hashes'))
-    fireEvent.click(await screen.findByText('common.edit'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Hashes' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'common.edit' }))
     fireEvent.submit(screen.getByLabelText('policies.policyName').closest('form'))
     await waitFor(() => expect(mocks.update).toHaveBeenCalled())
     expect(mocks.update.mock.calls[0][1].rules.allowed_key_types).toEqual([])

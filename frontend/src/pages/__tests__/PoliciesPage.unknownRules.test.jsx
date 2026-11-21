@@ -29,20 +29,6 @@ vi.mock('../../hooks', async () => {
   }
 })
 
-vi.mock('../../components', () => ({
-  ResponsiveLayout: ({ children, actions, slideOverContent }) => <div>{actions}{children}{slideOverContent}</div>,
-  ResponsiveDataTable: ({ data, onRowClick }) => (data || []).map(r => (
-    <button key={r.id} onClick={() => onRowClick(r)}>{`row-${r.name}`}</button>
-  )),
-  Card: ({ children }) => <div>{children}</div>,
-  Badge: ({ children }) => <span>{children}</span>,
-  LoadingSpinner: () => null,
-  Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-  Input: ({ label, ...props }) => <input aria-label={label} {...props} />,
-  Textarea: ({ label, ...props }) => <textarea aria-label={label} {...props} />,
-  Modal: ({ open, children }) => (open ? <div>{children}</div> : null),
-  Select: () => null,
-}))
 
 import PoliciesPage from '../PoliciesPage'
 
@@ -50,8 +36,8 @@ async function editedRules(rules) {
   mocks.list.mockResolvedValue({ data: [{ id: 9, name: 'Api', operations: ['issuance'], rules }] })
   mocks.update.mockResolvedValue({ data: { id: 9 } })
   render(<PoliciesPage />)
-  fireEvent.click(await screen.findByText('row-Api'))
-  fireEvent.click(await screen.findByText('common.edit'))
+  fireEvent.click(await screen.findByRole('button', { name: 'Api' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'common.edit' }))
   fireEvent.click(screen.getByText('SHA-512'))
   fireEvent.submit(screen.getByLabelText('policies.policyName').closest('form'))
   await waitFor(() => expect(mocks.update).toHaveBeenCalled())

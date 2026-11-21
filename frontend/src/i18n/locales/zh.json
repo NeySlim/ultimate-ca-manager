@@ -5960,6 +5960,12 @@
     "searchPlaceholder": "搜索策略...",
     "selectGroup": "选择用户组...",
     "subtitle": "管理签发规则、密钥要求和审批工作流",
+    "unit_one": "{{count}} 条策略",
+    "unit_other": "{{count}} 条策略",
+    "range_one": "{{shown}} / {{count}} 条策略",
+    "range_other": "{{shown}} / {{count}} 条策略",
+    "caption": "策略。激活名称以打开其详情。",
+    "filterByState": "按状态筛选",
     "fipsRulesTitle": "FIPS 规则已启用（只读）",
     "fipsRulesDesc": "FIPS 模式会优先应用系统策略：长度为偶数、2048 至 16384 位的 RSA 密钥，EC P-256 至 P-521，以及在已加载的 FIPS 模块批准时的 Ed25519、Ed448 和 ML-DSA 密钥；SHA-256 至 SHA-512 签名。此处的策略只能进一步收窄该范围。",
     "targetCA": "目标 CA",
@@ -5975,7 +5981,9 @@
     },
     "allowedDigests": "允许的签名摘要",
     "allowedKeyTypesHelp": "未选择任何项：允许所有密钥类型。",
+    "anyKeyType": "任意密钥类型",
     "allowedDigestsHelp": "未选择任何项：允许所有摘要。",
+    "anyDigest": "任意哈希",
     "operations": "操作",
     "operationHelp": {
       "issuance": "签发表单、CSR 签署和批量签署，以及操作员执行的续期",
@@ -5984,7 +5992,12 @@
     },
     "operationsRequired": "请至少选择一项操作",
     "noOperation": "无操作",
-    "rulesRevocationOnly": "规则仅适用于签发和续期：吊销策略仅按其 CA、模板和 DNS 模式限定范围。"
+    "noDescription": "无描述。",
+    "rulesRevocationOnly": "规则仅适用于签发和续期：吊销策略仅按其 CA、模板和 DNS 模式限定范围。",
+    "state": {
+      "applied": "已应用",
+      "inactive": "已停用"
+    }
   },
   "reports": {
     "complianceReport": "合规报告",

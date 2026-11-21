@@ -5963,6 +5963,12 @@
     "searchPlaceholder": "ポリシーを検索...",
     "selectGroup": "グループを選択...",
     "subtitle": "発行ルール、鍵要件、承認ワークフローを管理します",
+    "unit_one": "{{count}} policy",
+    "unit_other": "{{count}} policies",
+    "range_one": "{{shown}} of {{count}} policy",
+    "range_other": "{{shown}} of {{count}} policies",
+    "caption": "Policies. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
     "fipsRulesTitle": "FIPS ルールが有効です（読み取り専用）",
     "fipsRulesDesc": "FIPS モードでは、これらより先にシステムポリシーが適用されます: 2048 から 16384 ビットの偶数長の RSA 鍵、EC P-256 から P-521、そして読み込まれた FIPS モジュールが承認する場合は Ed25519、Ed448、ML-DSA の鍵、SHA-256 から SHA-512 の署名。ここで設定するポリシーは、それをさらに絞り込むことしかできません。",
     "targetCA": "対象CA",
@@ -5978,7 +5984,9 @@
     },
     "allowedDigests": "許可する署名ハッシュ",
     "allowedKeyTypesHelp": "未選択の場合: すべての鍵タイプが許可されます。",
+    "anyKeyType": "Any key type",
     "allowedDigestsHelp": "未選択の場合: すべてのハッシュが許可されます。",
+    "anyDigest": "Any hash",
     "operations": "オペレーション",
     "operationHelp": {
       "issuance": "発行フォーム、CSR 署名と一括署名、およびオペレーターが行う更新",
@@ -5987,7 +5995,12 @@
     },
     "operationsRequired": "オペレーションを 1 つ以上選択してください",
     "noOperation": "オペレーションなし",
-    "rulesRevocationOnly": "ルールは発行と更新にのみ適用されます。失効ポリシーは CA、テンプレート、DNS パターンでスコープされます。"
+    "noDescription": "No description.",
+    "rulesRevocationOnly": "ルールは発行と更新にのみ適用されます。失効ポリシーは CA、テンプレート、DNS パターンでスコープされます。",
+    "state": {
+      "applied": "Applied",
+      "inactive": "Disabled"
+    }
   },
   "reports": {
     "complianceReport": "コンプライアンスレポート",

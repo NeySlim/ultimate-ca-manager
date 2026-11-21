@@ -5960,6 +5960,12 @@
     "searchPlaceholder": "Pesquisar políticas...",
     "selectGroup": "Selecionar grupo...",
     "subtitle": "Gerencie regras de emissão, requisitos de chave e fluxos de aprovação",
+    "unit_one": "{{count}} policy",
+    "unit_other": "{{count}} policies",
+    "range_one": "{{shown}} of {{count}} policy",
+    "range_other": "{{shown}} of {{count}} policies",
+    "caption": "Policies. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
     "fipsRulesTitle": "Regras FIPS ativas (somente leitura)",
     "fipsRulesDesc": "O modo FIPS aplica uma política do sistema antes destas: chaves RSA de comprimento par de 2048 a 16384 bits, EC P-256 a P-521, e Ed25519, Ed448 e ML-DSA quando o módulo FIPS carregado as aprova; assinaturas SHA-256 a SHA-512. As políticas aqui só podem restringi-la mais.",
     "targetCA": "CA Alvo",
@@ -5975,7 +5981,9 @@
     },
     "allowedDigests": "Hashes de Assinatura Permitidos",
     "allowedKeyTypesHelp": "Nenhum selecionado: qualquer tipo de chave é permitido.",
+    "anyKeyType": "Any key type",
     "allowedDigestsHelp": "Nenhum selecionado: qualquer hash é permitido.",
+    "anyDigest": "Any hash",
     "operations": "Operações",
     "operationHelp": {
       "issuance": "O formulário de emissão, a assinatura de CSR e em lote, e as renovações feitas por um operador",
@@ -5984,7 +5992,12 @@
     },
     "operationsRequired": "Selecione pelo menos uma operação",
     "noOperation": "Nenhuma operação",
-    "rulesRevocationOnly": "As regras aplicam-se apenas à emissão e à renovação: uma política de revogação é delimitada pela sua CA, modelo e padrão DNS."
+    "noDescription": "No description.",
+    "rulesRevocationOnly": "As regras aplicam-se apenas à emissão e à renovação: uma política de revogação é delimitada pela sua CA, modelo e padrão DNS.",
+    "state": {
+      "applied": "Applied",
+      "inactive": "Disabled"
+    }
   },
   "reports": {
     "complianceReport": "Relatório de Conformidade",

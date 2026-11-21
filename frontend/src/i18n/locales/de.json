@@ -5960,6 +5960,12 @@
     "searchPlaceholder": "Richtlinien suchen...",
     "selectGroup": "Gruppe auswählen...",
     "subtitle": "Ausstellungsregeln, Schlüsselanforderungen und Genehmigungsworkflows verwalten",
+    "unit_one": "{{count}} policy",
+    "unit_other": "{{count}} policies",
+    "range_one": "{{shown}} of {{count}} policy",
+    "range_other": "{{shown}} of {{count}} policies",
+    "caption": "Policies. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
     "fipsRulesTitle": "FIPS-Regeln aktiv (schreibgeschützt)",
     "fipsRulesDesc": "Der FIPS-Modus wendet vorab eine Systemrichtlinie an: RSA-Schlüssel gerader Länge von 2048 bis 16384 Bit, EC von P-256 bis P-521 sowie Ed25519, Ed448 und ML-DSA, wenn das geladene FIPS-Modul sie zulässt; Signaturen von SHA-256 bis SHA-512. Richtlinien an dieser Stelle können sie nur weiter einschränken.",
     "targetCA": "Ziel-CA",
@@ -5975,7 +5981,9 @@
     },
     "allowedDigests": "Erlaubte Signatur-Hashes",
     "allowedKeyTypesHelp": "Keine Auswahl: Jeder Schlüsseltyp ist erlaubt.",
+    "anyKeyType": "Any key type",
     "allowedDigestsHelp": "Keine Auswahl: Jeder Hash ist erlaubt.",
+    "anyDigest": "Any hash",
     "operations": "Operationen",
     "operationHelp": {
       "issuance": "Das Ausstellungsformular, CSR-Signierung und Massensignierung sowie die von einem Operator ausgeführten Erneuerungen",
@@ -5984,7 +5992,12 @@
     },
     "operationsRequired": "Wählen Sie mindestens eine Operation aus",
     "noOperation": "Keine Operation",
-    "rulesRevocationOnly": "Die Regeln gelten nur für Ausstellung und Erneuerung: eine Widerrufsrichtlinie wird durch ihre CA, Vorlage und ihr DNS-Muster eingegrenzt."
+    "noDescription": "No description.",
+    "rulesRevocationOnly": "Die Regeln gelten nur für Ausstellung und Erneuerung: eine Widerrufsrichtlinie wird durch ihre CA, Vorlage und ihr DNS-Muster eingegrenzt.",
+    "state": {
+      "applied": "Applied",
+      "inactive": "Disabled"
+    }
   },
   "reports": {
     "complianceReport": "Compliance-Bericht",

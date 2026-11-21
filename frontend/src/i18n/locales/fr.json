@@ -5474,6 +5474,12 @@
   "policies": {
     "title": "Politiques de certificats",
     "subtitle": "Gérer les règles d’émission, les exigences de clés et les workflows d’approbation",
+    "unit_one": "{{count}} politique",
+    "unit_other": "{{count}} politiques",
+    "range_one": "{{shown}} sur {{count}} politique",
+    "range_other": "{{shown}} sur {{count}} politiques",
+    "caption": "Politiques. Activez un nom pour ouvrir son détail.",
+    "filterByState": "Filtrer par état",
     "fipsRulesTitle": "Règles FIPS actives (lecture seule)",
     "fipsRulesDesc": "Le mode FIPS applique en amont une politique système : clés RSA de longueur paire de 2048 à 16384 bits, EC P-256 à P-521, et Ed25519, Ed448 et ML-DSA quand le module FIPS chargé les approuve ; signatures SHA-256 à SHA-512. Les politiques définies ici ne peuvent que la restreindre.",
     "total": "Total",
@@ -5486,9 +5492,9 @@
     "policyName": "Nom de la politique",
     "policyNamePlaceholder": "ex. Politique TLS Production",
     "descriptionPlaceholder": "Décrivez l’objectif de cette politique",
-    "scope": "Périmètre",
+    "scope": "Portée",
     "targetCA": "AC cible",
-    "allCAs": "Toutes les AC",
+    "allCAs": "Toutes les autorités",
     "allTypes": "Tous les types",
     "allStatuses": "Tous les statuts",
     "priority": "Priorité",
@@ -5511,7 +5517,7 @@
     "invalidEmails": "Adresses invalides : {{emails}}",
     "enable": "Activer",
     "disable": "Désactiver",
-    "noPolicies": "Aucune politique définie",
+    "noPolicies": "Aucune politique d’émission",
     "noPoliciesDesc": "Créez des politiques de certificats pour appliquer les règles d’émission, les exigences de clés et les workflows d’approbation.",
     "searchPlaceholder": "Rechercher des politiques...",
     "loadFailed": "Échec du chargement des politiques",
@@ -5531,7 +5537,9 @@
     },
     "allowedDigests": "Algorithmes de hachage de signature autorisés",
     "allowedKeyTypesHelp": "Aucun sélectionné : tous les types de clés sont autorisés.",
+    "anyKeyType": "Tous les types de clé",
     "allowedDigestsHelp": "Aucun sélectionné : tous les hachages sont autorisés.",
+    "anyDigest": "Tous les hachages",
     "operations": "Opérations",
     "operationHelp": {
       "issuance": "Le formulaire d’émission, la signature de CSR et la signature en masse, ainsi que les renouvellements effectués par un opérateur",
@@ -5540,7 +5548,12 @@
     },
     "operationsRequired": "Sélectionnez au moins une opération",
     "noOperation": "Aucune opération",
-    "rulesRevocationOnly": "Les règles s’appliquent uniquement à l’émission et au renouvellement : une politique de révocation est limitée par son AC, son modèle et son motif DNS."
+    "noDescription": "Aucune description.",
+    "rulesRevocationOnly": "Les règles s’appliquent uniquement à l’émission et au renouvellement : une politique de révocation est limitée par son AC, son modèle et son motif DNS.",
+    "state": {
+      "applied": "Appliquée",
+      "inactive": "Désactivée"
+    }
   },
   "approvals": {
     "title": "Demandes d’approbation",

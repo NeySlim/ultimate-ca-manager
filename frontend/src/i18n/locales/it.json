@@ -5960,6 +5960,12 @@
     "searchPlaceholder": "Cerca policy...",
     "selectGroup": "Seleziona gruppo...",
     "subtitle": "Gestisci regole di emissione, requisiti delle chiavi e flussi di approvazione",
+    "unit_one": "{{count}} policy",
+    "unit_other": "{{count}} policies",
+    "range_one": "{{shown}} of {{count}} policy",
+    "range_other": "{{shown}} of {{count}} policies",
+    "caption": "Policies. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
     "fipsRulesTitle": "Regole FIPS attive (sola lettura)",
     "fipsRulesDesc": "La modalità FIPS applica una policy di sistema prima di queste: chiavi RSA di lunghezza pari da 2048 a 16384 bit, EC da P-256 a P-521, ed Ed25519, Ed448 e ML-DSA quando il modulo FIPS caricato le approva; firme da SHA-256 a SHA-512. Le policy qui definite possono solo restringerla.",
     "targetCA": "CA di destinazione",
@@ -5975,7 +5981,9 @@
     },
     "allowedDigests": "Hash di firma consentiti",
     "allowedKeyTypesHelp": "Nessuno selezionato: qualsiasi tipo di chiave è consentito.",
+    "anyKeyType": "Any key type",
     "allowedDigestsHelp": "Nessuno selezionato: qualsiasi hash è consentito.",
+    "anyDigest": "Any hash",
     "operations": "Operazioni",
     "operationHelp": {
       "issuance": "Il modulo di emissione, la firma CSR e la firma massiva, e i rinnovi eseguiti da un operatore",
@@ -5984,7 +5992,12 @@
     },
     "operationsRequired": "Seleziona almeno un'operazione",
     "noOperation": "Nessuna operazione",
-    "rulesRevocationOnly": "Le regole si applicano solo a emissione e rinnovo: una politica di revoca è limitata dalla sua CA, dal template e dal pattern DNS."
+    "noDescription": "No description.",
+    "rulesRevocationOnly": "Le regole si applicano solo a emissione e rinnovo: una politica di revoca è limitata dalla sua CA, dal template e dal pattern DNS.",
+    "state": {
+      "applied": "Applied",
+      "inactive": "Disabled"
+    }
   },
   "reports": {
     "complianceReport": "Report di conformità",

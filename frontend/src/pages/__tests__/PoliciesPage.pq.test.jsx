@@ -30,20 +30,6 @@ vi.mock('../../hooks', async () => {
   }
 })
 
-vi.mock('../../components', () => ({
-  ResponsiveLayout: ({ children, actions, slideOverContent }) => <div>{actions}{children}{slideOverContent}</div>,
-  ResponsiveDataTable: ({ data, onRowClick }) => data.map(row => (
-    <button key={row.id} type="button" onClick={() => onRowClick(row)}>{row.name}</button>
-  )),
-  Card: ({ children }) => <div>{children}</div>,
-  Badge: ({ children }) => <span>{children}</span>,
-  LoadingSpinner: () => null,
-  Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-  Input: ({ label, ...props }) => <input aria-label={label} {...props} />,
-  Textarea: ({ label, ...props }) => <textarea aria-label={label} {...props} />,
-  Modal: ({ open, children }) => (open ? <div>{children}</div> : null),
-  Select: () => null,
-}))
 
 import PoliciesPage from '../PoliciesPage'
 
@@ -51,7 +37,7 @@ async function openCreate(effective) {
   mocks.list.mockResolvedValue({ data: [] })
   mocks.getEffective.mockResolvedValue({ data: effective })
   render(<PoliciesPage />)
-  fireEvent.click(await screen.findByText('policies.createPolicy'))
+  fireEvent.click((await screen.findAllByText('policies.createPolicy'))[0])
   await waitFor(() => expect(mocks.getEffective).toHaveBeenCalled())
 }
 
@@ -59,8 +45,8 @@ async function openEdit(policy, effective) {
   mocks.list.mockResolvedValue({ data: [policy] })
   mocks.getEffective.mockResolvedValue({ data: effective })
   render(<PoliciesPage />)
-  fireEvent.click(await screen.findByText(policy.name))
-  fireEvent.click(await screen.findByText('common.edit'))
+  fireEvent.click(await screen.findByRole('button', { name: policy.name }))
+  fireEvent.click(await screen.findByRole('button', { name: 'common.edit' }))
   await waitFor(() => expect(mocks.getEffective).toHaveBeenCalled())
 }
 
@@ -100,7 +86,7 @@ describe('PoliciesPage ML-DSA key types', () => {
     await openEdit(policy, { allowed_key_types: null, allowed_digests: null, fips: true })
     const form = within(screen.getByLabelText('policies.policyName').closest('form'))
     await waitFor(() => expect(form.queryByText(nameOf(PQ[0]))).toBeNull())
-    expect(form.getByRole('button', { name: nameOf(PQ[1]) })).toBeTruthy()
+    expect(form.getByRole('checkbox', { name: nameOf(PQ[1]) })).toBeTruthy()
     expect(form.queryByText(nameOf(PQ[2]))).toBeNull()
   })
 

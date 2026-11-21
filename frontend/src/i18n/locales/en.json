@@ -5461,6 +5461,12 @@
   "policies": {
     "title": "Certificate Policies",
     "subtitle": "Manage issuance rules, key requirements, and approval workflows",
+    "unit_one": "{{count}} policy",
+    "unit_other": "{{count}} policies",
+    "range_one": "{{shown}} of {{count}} policy",
+    "range_other": "{{shown}} of {{count}} policies",
+    "caption": "Policies. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
     "fipsRulesTitle": "FIPS rules active (read only)",
     "fipsRulesDesc": "FIPS mode applies a system policy ahead of these: RSA keys of an even length from 2048 to 16384 bits, EC P-256 to P-521, and Ed25519, Ed448 and ML-DSA when the loaded FIPS module approves them; SHA-256 to SHA-512 signatures. Policies here can only narrow it.",
     "total": "Total",
@@ -5475,7 +5481,7 @@
     "descriptionPlaceholder": "Describe the purpose of this policy",
     "scope": "Scope",
     "targetCA": "Target CA",
-    "allCAs": "All CAs",
+    "allCAs": "All authorities",
     "allTypes": "All Types",
     "allStatuses": "All Statuses",
     "priority": "Priority",
@@ -5498,7 +5504,7 @@
     "invalidEmails": "Invalid addresses: {{emails}}",
     "enable": "Enable",
     "disable": "Disable",
-    "noPolicies": "No policies defined",
+    "noPolicies": "No issuance policy",
     "noPoliciesDesc": "Create certificate policies to enforce issuance rules, key requirements, and approval workflows.",
     "searchPlaceholder": "Search policies...",
     "loadFailed": "Failed to load policies",
@@ -5518,7 +5524,9 @@
     },
     "allowedDigests": "Allowed Signature Hashes",
     "allowedKeyTypesHelp": "None selected: any key type is allowed.",
+    "anyKeyType": "Any key type",
     "allowedDigestsHelp": "None selected: any hash is allowed.",
+    "anyDigest": "Any hash",
     "operations": "Operations",
     "operationHelp": {
       "issuance": "The issue form, CSR signing and bulk signing, and the renewals an operator performs",
@@ -5527,7 +5535,12 @@
     },
     "operationsRequired": "Select at least one operation",
     "noOperation": "No operation",
-    "rulesRevocationOnly": "Rules apply to issuance and renewal only: a revocation policy is scoped by its CA, template and DNS pattern."
+    "noDescription": "No description.",
+    "rulesRevocationOnly": "Rules apply to issuance and renewal only: a revocation policy is scoped by its CA, template and DNS pattern.",
+    "state": {
+      "applied": "Applied",
+      "inactive": "Disabled"
+    }
   },
   "approvals": {
     "title": "Approval Requests",
