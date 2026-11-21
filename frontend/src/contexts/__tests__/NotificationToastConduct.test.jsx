@@ -194,15 +194,14 @@ describe('toast: announced under a modal dialog', () => {
     expect(within(dialog).queryByRole('status')).toBeNull()
   })
 
-  it('leaves the announcement to the line under the confirmation dialog, whose layer spares live regions', async () => {
+  it('announces a message inside the confirmation dialog, the mockup\'s native modal one', async () => {
     mount()
     await act(async () => { api.showConfirm('Revoke?') })
     const confirm = await screen.findByTestId('confirm-dialog')
-    expect(screen.getByTestId('confirm-dialog').ownerDocument.body.querySelector('[aria-hidden="true"]')).not.toBeNull()
-    expect(line().closest('[aria-hidden="true"]')).toBeNull()
+    expect(confirm.tagName).toBe('DIALOG')
     await act(async () => { api.showSuccess('Saved.') })
     await wait(50)
-    expect(within(confirm).queryByRole('status')).toBeNull()
+    expect(within(confirm).getByRole('status')).toHaveTextContent('Saved.')
     expect(line()).toHaveTextContent('Saved.')
   })
 

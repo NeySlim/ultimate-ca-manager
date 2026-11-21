@@ -5,6 +5,7 @@ import { createContext, useContext, useState, useCallback, useEffect, useLayoutE
 import { createPortal } from 'react-dom'
 import { Warning } from '@phosphor-icons/react'
 import { Icon } from '../components/atelier/Icon'
+import { AtelierDialog } from '../components/atelier/AtelierDialog'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
 import { ListDialog } from '../components/list/ListDialog'
@@ -13,6 +14,91 @@ import { useTranslation } from 'react-i18next'
 const NotificationContext = createContext()
 // A message that stays takes the mockup's failure toast; its icon and rule follow its type (extensions.css)
 const TOAST_TONES = { success: ['check', 'good'], error: ['warning', 'bad'], warning: ['warning', 'warn'], info: ['bell', 'accent'] }
+
+// A question asked from a dialog still drawn by Radix (outside the converted zones) stays in a Radix
+// layer: Radix holds the pointer and the focus inside its own layers, a native <dialog> would get neither.
+const radixDialogOpen = () => !!document.querySelector('.lv-dialog[data-state="open"]')
+
+function AskDialog({ legacy, title, testId, onClose, children }) {
+  if (legacy) {
+    return (
+      <ListDialog open onOpenChange={(open) => !open && onClose()} title={title} className="ui-modal" testId={testId}>
+        {children}
+      </ListDialog>
+    )
+  }
+  return <AtelierDialog title={title} size="narrow" onClose={onClose} testId={testId}>{children}</AtelierDialog>
+}
+
+// A destructive action is announced in the mockup's warning notice; the safe action takes the focus
+function ConfirmBody({ dialog, legacy, t, onAnswer }) {
+  const danger = dialog.variant === 'danger'
+  const cancel = dialog.cancelText !== null && (dialog.cancelText || t('common.cancel'))
+  const confirm = dialog.confirmText || t('common.confirm')
+  if (legacy) {
+    return (
+      <>
+        {danger ? (
+          <div className="ui-notice is-warn ui-dialog-notice">
+            <Warning aria-hidden="true" />
+            <p className="ui-notice-body">{dialog.message}</p>
+          </div>
+        ) : <p className="ui-dialog-message">{dialog.message}</p>}
+        <div className="ui-dialog-actions">
+          {cancel && <Button type="button" variant="secondary" onClick={() => onAnswer(false)} data-autofocus>{cancel}</Button>}
+          <Button type="button" variant={danger ? 'danger' : 'primary'} onClick={() => onAnswer(true)} data-autofocus={cancel ? undefined : true}>{confirm}</Button>
+        </div>
+      </>
+    )
+  }
+  return (
+    <>
+      {danger
+        ? <div className="notice warn"><Icon name="warning" /><span>{dialog.message}</span></div>
+        : <p className="event-detail">{dialog.message}</p>}
+      <div className="modal-actions">
+        {cancel && <button type="button" className="btn" data-action="close-modal" data-autofocus="" onClick={() => onAnswer(false)}>{cancel}</button>}
+        <button type="button" className={danger ? 'btn danger' : 'btn primary'} data-write="" data-autofocus={cancel ? undefined : ''}
+          onClick={() => onAnswer(true)}>{confirm}</button>
+      </div>
+    </>
+  )
+}
+
+// The answer typed in the mockup's field: its label is the question, Entrée sends it
+function PromptBody({ dialog, legacy, t, value, onValue, onAnswer }) {
+  const cancel = dialog.cancelText || t('common.cancel')
+  const ok = dialog.confirmText || t('common.ok')
+  const submit = (e) => { e.preventDefault(); onAnswer(true) }
+  if (legacy) {
+    return (
+      <form onSubmit={submit}>
+        {dialog.message && <p className="ui-dialog-message">{dialog.message}</p>}
+        <Input type={dialog.type || 'text'} value={value} onChange={(e) => onValue(e.target.value)} placeholder={dialog.placeholder}
+          aria-label={dialog.message || dialog.title} autoFocus />
+        <div className="ui-dialog-actions">
+          <Button type="button" variant="secondary" onClick={() => onAnswer(false)}>{cancel}</Button>
+          <Button type="submit">{ok}</Button>
+        </div>
+      </form>
+    )
+  }
+  return (
+    <form onSubmit={submit} noValidate>
+      <div className="form-fields">
+        <div className="field full">
+          <label htmlFor="prompt-answer">{dialog.message || dialog.title}</label>
+          <input id="prompt-answer" type={dialog.type || 'text'} value={value} placeholder={dialog.placeholder} autoComplete="off" spellCheck={false}
+            data-autofocus="" onChange={(e) => onValue(e.target.value)} />
+        </div>
+      </div>
+      <div className="modal-actions">
+        <button type="button" className="btn" data-action="close-modal" onClick={() => onAnswer(false)}>{cancel}</button>
+        <button type="submit" className="btn primary">{ok}</button>
+      </div>
+    </form>
+  )
+}
 
 export function NotificationProvider({ children }) {
   const { t } = useTranslation()
@@ -89,6 +175,7 @@ export function NotificationProvider({ children }) {
   const showConfirm = useCallback((message, options = {}) => {
     return new Promise((resolve) => {
       setConfirmDialog({
+        legacy: radixDialogOpen(),
         message,
         title: options.title,
         confirmText: options.confirmText,
@@ -113,6 +200,7 @@ export function NotificationProvider({ children }) {
     return new Promise((resolve) => {
       setPromptValue(options.defaultValue || '')
       setPromptDialog({
+        legacy: radixDialogOpen(),
         message,
         title: options.title,
         placeholder: options.placeholder || '',
@@ -146,67 +234,18 @@ export function NotificationProvider({ children }) {
       {children}
       <ToastLine toast={toasts[toasts.length - 1]} onClose={removeToast} onPause={setPause} closeLabel={t('common.closeMessage')} />
 
-      {/* Confirmation and prompt: the narrow Atelier dialog, its buttons in the interface language */}
-      <ListDialog
-        open={!!confirmDialog}
-        onOpenChange={(open) => !open && handleConfirm(false)}
-        title={confirmDialog?.title || t('common.confirm')}
-        className="ui-modal"
-        testId="confirm-dialog"
-      >
-        {/* A destructive action is announced in the mockup's warning notice; the safe action takes the focus */}
-        {confirmDialog?.variant === 'danger' ? (
-          <div className="ui-notice is-warn ui-dialog-notice">
-            <Warning aria-hidden="true" />
-            <p className="ui-notice-body">{confirmDialog?.message}</p>
-          </div>
-        ) : (
-          <p className="ui-dialog-message">{confirmDialog?.message}</p>
-        )}
-        <div className="ui-dialog-actions">
-          {confirmDialog?.cancelText !== null && (
-            <Button type="button" variant="secondary" onClick={() => handleConfirm(false)} data-autofocus>
-              {confirmDialog?.cancelText || t('common.cancel')}
-            </Button>
-          )}
-          <Button
-            type="button"
-            variant={confirmDialog?.variant === 'danger' ? 'danger' : 'primary'}
-            onClick={() => handleConfirm(true)}
-            data-autofocus={confirmDialog?.cancelText === null ? true : undefined}
-          >
-            {confirmDialog?.confirmText || t('common.confirm')}
-          </Button>
-        </div>
-      </ListDialog>
+      {/* Confirmation and prompt: the mockup's narrow modal(); inside a dialog still drawn by Radix, its own layer */}
+      {confirmDialog && (
+        <AskDialog legacy={confirmDialog.legacy} title={confirmDialog.title || t('common.confirm')} testId="confirm-dialog" onClose={() => handleConfirm(false)}>
+          <ConfirmBody dialog={confirmDialog} legacy={confirmDialog.legacy} t={t} onAnswer={handleConfirm} />
+        </AskDialog>
+      )}
 
-      <ListDialog
-        open={!!promptDialog}
-        onOpenChange={(open) => !open && handlePrompt(false)}
-        title={promptDialog?.title || t('common.inputRequired')}
-        className="ui-modal"
-        testId="prompt-dialog"
-      >
-        <form onSubmit={(e) => { e.preventDefault(); handlePrompt(true) }}>
-          {promptDialog?.message && <p className="ui-dialog-message">{promptDialog.message}</p>}
-          <Input
-            type={promptDialog?.type || 'text'}
-            value={promptValue}
-            onChange={(e) => setPromptValue(e.target.value)}
-            placeholder={promptDialog?.placeholder}
-            aria-label={promptDialog?.message || promptDialog?.title}
-            autoFocus
-          />
-          <div className="ui-dialog-actions">
-            <Button type="button" variant="secondary" onClick={() => handlePrompt(false)}>
-              {promptDialog?.cancelText || t('common.cancel')}
-            </Button>
-            <Button type="submit">
-              {promptDialog?.confirmText || t('common.ok')}
-            </Button>
-          </div>
-        </form>
-      </ListDialog>
+      {promptDialog && (
+        <AskDialog legacy={promptDialog.legacy} title={promptDialog.title || t('common.inputRequired')} testId="prompt-dialog" onClose={() => handlePrompt(false)}>
+          <PromptBody dialog={promptDialog} legacy={promptDialog.legacy} t={t} value={promptValue} onValue={setPromptValue} onAnswer={handlePrompt} />
+        </AskDialog>
+      )}
     </NotificationContext.Provider>
   )
 }
