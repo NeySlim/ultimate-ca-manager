@@ -1,13 +1,16 @@
 /**
- * ForcePasswordChange Component - Modal to force password change
- * Shown after login if force_password_change flag is set
+ * Forced password change after sign-in (first sign-in, or an administrator's reset): the server
+ * refuses everything else until it is done, so the sign-in card offers the change or a sign-out,
+ * nothing past it. Drawn in the mockup's authPage() card, the step that follows the sign-in.
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Lock, Warning, SignOut } from '@phosphor-icons/react'
-import { Modal, Button, Input } from '../components'
 import { useAuth, useNotification } from '../contexts'
 import { accountService, usersService } from '../services'
+import { AuthFrame, AuthField } from './auth/AuthFrame'
+import { describedBy } from './auth/describedBy'
+import { PasswordMeter } from './auth/PasswordMeter'
+import { Icon } from './atelier/Icon'
 
 export function ForcePasswordChange({ onComplete }) {
   const { t } = useTranslation()
@@ -20,6 +23,8 @@ export function ForcePasswordChange({ onComplete }) {
     confirm_password: ''
   })
   const [errors, setErrors] = useState({})
+  const newRef = useRef(null)
+  const confirmRef = useRef(null)
 
   // Load password policy from backend
   useEffect(() => {
@@ -31,38 +36,32 @@ export function ForcePasswordChange({ onComplete }) {
     })
   }, [])
 
+  // Field errors beside their field, the first one focused, as the sign-in form does
   const validate = () => {
     const newErrors = {}
-    
     if (!formData.new_password) {
       newErrors.new_password = t('password.newRequired')
-    } else {
-      const minLen = policy?.min_length || 8
-      if (formData.new_password.length < minLen) {
-        newErrors.new_password = t('password.minLength')
-      }
+    } else if (formData.new_password.length < (policy?.min_length || 8)) {
+      newErrors.new_password = t('password.minLength')
     }
-    
     if (formData.new_password !== formData.confirm_password) {
       newErrors.confirm_password = t('common.passwordMismatch')
     }
-    
     setErrors(newErrors)
+    if (newErrors.new_password) newRef.current?.focus()
+    else if (newErrors.confirm_password) confirmRef.current?.focus()
     return Object.keys(newErrors).length === 0
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
     if (!validate()) return
-    
     setLoading(true)
     try {
       await accountService.changePassword({
         new_password: formData.new_password,
         force_change: true
       })
-      
       showSuccess(t('password.changeSuccess'))
       onComplete?.()
     } catch (error) {
@@ -70,66 +69,53 @@ export function ForcePasswordChange({ onComplete }) {
         showError(t(error.data.details.i18n_key, error.data.details.i18n_values || {}))
       } else {
         showError(error.message || t('password.changeFailed'))
-        if (error.message?.includes('current')) {
-          setErrors({ current_password: t('password.incorrect') })
-        }
       }
     } finally {
       setLoading(false)
     }
   }
 
+  const set = (key) => (e) => {
+    setFormData(prev => ({ ...prev, [key]: e.target.value }))
+    if (errors[key]) setErrors(prev => ({ ...prev, [key]: undefined }))
+  }
+
   return (
-    <Modal
-      open={true}
-      onClose={() => {}} // The server refuses everything else until the change
-      showClose={false}
-      title={t('password.changeRequired')}
-    >
-      <form onSubmit={handleSubmit} className="p-4 space-y-4">
-        <div className="flex items-start gap-3 p-3 rounded-lg bg-accent-warning-op10 border border-accent-warning-op30">
-          <Warning size={20} className="text-accent-warning flex-shrink-0 mt-0.5" />
-          <div className="text-sm">
-            <p className="font-medium text-accent-warning">{t('password.changeRequired')}</p>
-            <p className="text-text-secondary mt-1">
-              {t('password.securityReason')}
-            </p>
-          </div>
-        </div>
-
-        <Input
-          label={t('common.newPassword')}
-          type="password"
-          value={formData.new_password}
-          onChange={(e) => setFormData(prev => ({ ...prev, new_password: e.target.value }))}
-          error={errors.new_password}
-          autoComplete="new-password"
-          showStrength
-          required
-        />
-        
-        <Input
-          label={t('common.confirmNewPassword')}
-          type="password"
-          value={formData.confirm_password}
-          onChange={(e) => setFormData(prev => ({ ...prev, confirm_password: e.target.value }))}
-          error={errors.confirm_password}
-          autoComplete="new-password"
-          required
-        />
-
-        <div className="flex justify-between pt-2">
-          <Button variant="ghost" onClick={logout} type="button">
-            <SignOut size={16} />
-            {t('common.logout')}
-          </Button>
-          <Button type="submit" disabled={loading}>
-            <Lock size={16} />
-            {loading ? t('common.loading') : t('common.changePassword')}
-          </Button>
-        </div>
+    <AuthFrame title={t('password.changeRequired')} lead={t('password.securityReason')}>
+      <form className="auth-form" id="password-form" onSubmit={handleSubmit} noValidate aria-busy={loading || undefined}>
+        <AuthField id="force-new" label={t('common.newPassword')} error={errors.new_password}>
+          <input
+            ref={newRef}
+            id="force-new"
+            name="new-password"
+            type="password"
+            autoComplete="new-password"
+            value={formData.new_password}
+            onChange={set('new_password')}
+            aria-invalid={errors.new_password ? 'true' : undefined}
+            aria-describedby={describedBy('force-new', errors.new_password)}
+          />
+          <PasswordMeter password={formData.new_password} />
+        </AuthField>
+        <AuthField id="force-confirm" label={t('common.confirmNewPassword')} error={errors.confirm_password}>
+          <input
+            ref={confirmRef}
+            id="force-confirm"
+            name="confirm-password"
+            type="password"
+            autoComplete="new-password"
+            value={formData.confirm_password}
+            onChange={set('confirm_password')}
+            aria-invalid={errors.confirm_password ? 'true' : undefined}
+            aria-describedby={describedBy('force-confirm', errors.confirm_password)}
+          />
+        </AuthField>
+        <button type="submit" className="btn primary auth-submit" disabled={loading}>
+          <Icon name="lock" />{loading ? t('common.loading') : t('common.changePassword')}
+        </button>
       </form>
-    </Modal>
+      <button type="button" className="text-link auth-switch" onClick={logout}>{t('common.logout')}</button>
+    </AuthFrame>
   )
 }
 
