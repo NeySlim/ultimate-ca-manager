@@ -1,8 +1,13 @@
+/**
+ * The mockup's complianceCard() over GET /dashboard/compliance: the key algorithms with their
+ * share, then one tile per check. A tile the server gives a list filter for opens that list.
+ */
 import { useTranslation } from 'react-i18next'
-import { CheckCircle, Key, Warning } from '@phosphor-icons/react'
+import { Link } from 'react-router-dom'
+import { Icon } from '../atelier'
 import { overviewService } from '../../services'
 import { listHref } from '../../lib/overviewFilters'
-import { CardFrame, MaybeLink, num, useCardData } from './shared'
+import { OverviewCard, num, useCardData } from './shared'
 
 const COUNTERS = ['rsa_below_3072', 'weak_signature_hash', 'server_lifetime_over_398_days',
   'incomplete_chain', 'no_private_key']
@@ -19,49 +24,58 @@ export function ComplianceCard() {
   const link = (entry) => (entry?.filter_available ? listHref(entry.filter_hint) : null)
   const share = (n) => (data.total > 0 && typeof n === 'number' ? Math.min(100, (n / data.total) * 100) : 0)
 
+  const tile = (name) => {
+    const n = counters[name]?.count
+    const known = typeof n === 'number' && Number.isFinite(n)
+    const neutral = NEUTRAL.includes(name)
+    const tone = !known || neutral ? '' : n > 0 ? 'warn' : 'good'
+    const inner = (
+      <>
+        <span className={tone ? `tile-value ${tone}` : 'tile-value'}>
+          {known && <Icon name={neutral ? 'key' : n > 0 ? 'warning' : 'check'} />}<strong>{num(n)}</strong>
+        </span>
+        <span className="tile-label">{t(`overview.compliance.${name}`)}</span>
+        <small>{t(`overview.compliance.sub_${name}`)}</small>
+      </>
+    )
+    const to = link(counters[name])
+    return to
+      ? <Link key={name} className="tile" to={to} data-check={name}>{inner}</Link>
+      : <div key={name} className="tile" data-check={name}>{inner}</div>
+  }
+
   return (
-    <CardFrame id="compliance" title={t('overview.cards.compliance')} state={state} onRetry={state.reload}
-      empty={state.status === 'ready' && data.total === 0} count={num(data.total)}
-      sub={t('overview.compliance.sub')}>
-      <div className="ov-body">
-        <div className={`ov-compliance${algos.length > 0 ? ' has-algo' : ''}`}>
-          {algos.length > 0 && (
-            <div className="ov-tile is-algo">
-              <h3 className="ov-tile-label" id="overview-compliance-algos">{t('overview.compliance.byAlgorithm')}</h3>
-              <ul className="ov-algo-list" aria-labelledby="overview-compliance-algos">
-                {algos.map((entry) => (
+    <OverviewCard id="compliance" state={state} route="GET /api/v2/dashboard/compliance"
+      empty={state.status === 'ready' && data.total === 0}
+      sub={t('overview.compliance.sub', { count: num(data.total) })}>
+      <div className="panel-content">
+        <div className="tiles">
+          <div className="tile algo">
+            <h3 className="tile-label">{t('overview.compliance.byAlgorithm')}</h3>
+            <ul className="algo-list">
+              {algos.map((entry) => {
+                const name = entry.key_algo ?? t('overview.compliance.unknownAlgo')
+                const inner = (
+                  <>
+                    <span>{name}</span><strong>{num(entry.count)}</strong>
+                    <span className="algo-bar" aria-hidden="true"><span style={{ width: `${share(entry.count)}%` }} /></span>
+                  </>
+                )
+                const to = link(entry)
+                const label = t('overview.compliance.algoLabel', { name, count: num(entry.count) })
+                return (
                   <li key={entry.key_algo ?? 'none'}>
-                    <MaybeLink to={link(entry)} className="ov-algo-row">
-                      <span>{entry.key_algo ?? t('overview.compliance.unknownAlgo')}</span>
-                      <strong>{num(entry.count)}</strong>
-                      <span className="ov-algo-bar" aria-hidden="true">
-                        <span data-testid="algo-bar" style={{ width: `${share(entry.count)}%` }} />
-                      </span>
-                    </MaybeLink>
+                    {to
+                      ? <Link to={to} className="algo-row" data-check={`algo-${entry.key_algo}`} aria-label={label}>{inner}</Link>
+                      : <span className="algo-row" aria-label={label}>{inner}</span>}
                   </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <div className="ov-tiles">
-            {COUNTERS.map((name) => {
-              const n = counters[name]?.count
-              const known = typeof n === 'number' && Number.isFinite(n)
-              const tone = !known || NEUTRAL.includes(name) ? '' : n > 0 ? 'is-warn' : 'is-good'
-              const Icon = NEUTRAL.includes(name) ? Key : n > 0 ? Warning : CheckCircle
-              return (
-                <MaybeLink key={name} to={link(counters[name])} className="ov-tile" data-testid={`compliance-${name}`}>
-                  <span className={`ov-tile-value ${tone}`}>
-                    {known && <Icon size={16} aria-hidden="true" />}
-                    <strong>{num(n)}</strong>
-                  </span>
-                  <span className="ov-tile-label">{t(`overview.compliance.${name}`)}</span>
-                </MaybeLink>
-              )
-            })}
+                )
+              })}
+            </ul>
           </div>
+          {COUNTERS.map(tile)}
         </div>
       </div>
-    </CardFrame>
+    </OverviewCard>
   )
 }

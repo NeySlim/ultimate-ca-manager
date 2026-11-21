@@ -3,7 +3,7 @@
  * that cannot look healthy while tasks fail or its published state is old.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within, configure, waitFor } from '@testing-library/react'
+import { render, within, configure, waitFor, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import fr from '../../../i18n/locales/fr.json'
 
@@ -11,6 +11,8 @@ const lang = vi.hoisted(() => ({ fr: false }))
 const api = vi.hoisted(() => ({ getHealth: vi.fn() }))
 const frLookup = (key) => key.split('.').reduce((node, part) => (node == null ? node : node[part]), fr)
 vi.mock('react-i18next', () => ({
+  // As i18next: the count inside its <strong>, then the words
+  Trans: ({ i18nKey, count, components }) => (components?.strong ? <><strong>{count}</strong> {i18nKey}</> : i18nKey),
   useTranslation: () => ({
     t: (key, arg) => {
       const opts = typeof arg === 'object' && arg ? arg : {}
@@ -35,6 +37,7 @@ vi.mock('../../../hooks/usePermission', () => ({
 }))
 
 import { HealthCard } from '..'
+import { OverviewContext } from '../shared'
 
 // A loaded machine slows the first render past the default second
 configure({ asyncUtilTimeout: 5000 })
@@ -47,11 +50,10 @@ const show = async (protocols) => {
   // The answer comes after the first render, as on a loaded machine: the card is read once loaded
   api.getHealth.mockImplementation(() => new Promise((done) => setTimeout(() => done({ data: { protocols } }), 20)))
   render(<MemoryRouter><HealthCard /></MemoryRouter>)
-  const card = await screen.findByTestId('card-health')
-  await waitFor(() => expect(within(card).queryByRole('status')).toBeNull())
-  return card
+  await waitFor(() => expect(document.querySelector('#card-health:not(.sk-card)')).not.toBeNull())
+  return document.getElementById('card-health')
 }
-const row = (card, name) => within(card).getByTestId(`health-${name}`)
+const row = (card, name) => card.querySelector(`[data-protocol="${name}"]`)
 
 beforeEach(() => { vi.clearAllMocks(); lang.fr = false; perms.admin = true; perms.granted = [] })
 
@@ -78,15 +80,15 @@ describe('TSA signer on the health card', () => {
     const line = row(card, 'tsa')
     expect(line.textContent).toContain('overview.health.tsaState.ca_certificate')
     expect(line.getAttribute('data-severity')).toBe('warning')
-    expect(line.querySelector('.text-status-warning')).not.toBeNull()
-    expect(line.querySelector('.text-status-danger')).toBeNull()
+    expect(line.querySelector('.badge.warn')).not.toBeNull()
+    expect(line.querySelector('.badge.bad')).toBeNull()
   })
 
   it('an expiring signer stays critical', async () => {
     const card = await show({ tsa: tsa({ state: 'expiring', days_left: 3, alert: true, severity: 'critical' }) })
     const line = row(card, 'tsa')
     expect(line.getAttribute('data-severity')).toBe('critical')
-    expect(line.querySelector('.text-status-danger')).not.toBeNull()
+    expect(line.querySelector('.badge.bad')).not.toBeNull()
   })
 
   it('no signer reads as not configured, neutral, with the link to configure it', async () => {
@@ -95,7 +97,7 @@ describe('TSA signer on the health card', () => {
     const line = row(card, 'tsa')
     expect(line.textContent).toContain('Non configuré')
     expect(line.getAttribute('data-alert')).toBe('false')
-    expect(line.querySelector('.text-status-danger')).toBeNull()
+    expect(line.querySelector('.badge.bad')).toBeNull()
     expect(within(line).getByRole('link').getAttribute('href')).toBe('/tsa-config')
   })
 
@@ -106,7 +108,7 @@ describe('TSA signer on the health card', () => {
 
   it('is not listed while the server leaves it out', async () => {
     const card = await show({ scheduler: sched({}) })
-    expect(within(card).queryByTestId('health-tsa')).toBeNull()
+    expect(row(card, 'tsa')).toBeNull()
   })
 })
 
@@ -140,14 +142,14 @@ describe('mail, webhook and auto-renewal witnesses', () => {
     const card = await show({ smtp: witness('not_configured') })
     const line = row(card, 'smtp')
     expect(line.textContent).toContain('Non configuré')
-    expect(line.querySelector('.text-status-danger')).toBeNull()
+    expect(line.querySelector('.badge.bad')).toBeNull()
   })
 
   it('shows only the witnesses the server sent (the right to read the setting)', async () => {
     const card = await show({ scheduler: sched({}), webhooks: witness('active', { count: 1 }) })
-    expect(within(card).queryByTestId('health-smtp')).toBeNull()
-    expect(within(card).queryByTestId('health-auto_renewal')).toBeNull()
-    expect(within(card).getByTestId('health-webhooks')).toBeTruthy()
+    expect(row(card, 'smtp')).toBeNull()
+    expect(row(card, 'auto_renewal')).toBeNull()
+    expect(row(card, 'webhooks')).not.toBeNull()
   })
 
   it('each row links to its settings tab', async () => {
@@ -184,7 +186,7 @@ describe('row links follow the navigation guards', () => {
 })
 
 describe('states in the user language', () => {
-  it('reads a known state in French and an unknown one as sent', async () => {
+  it('reads a failure in French and an unknown state as sent; a good state stays silent, as in the mockup', async () => {
     lang.fr = true
     const card = await show({
       acme: { periods: [], last_operation_at: '2026-11-01T10:00:00Z', last_status: 'failed' },
@@ -192,7 +194,7 @@ describe('states in the user language', () => {
       est: { periods: [], last_operation_at: null, last_status: 'ok' },
     })
     expect(row(card, 'acme').textContent).toContain('Échec')
-    expect(row(card, 'est').textContent).toContain('OK')
+    expect(row(card, 'est').querySelector('.badge')).toBeNull()
     expect(row(card, 'scep').textContent).toContain('quarantined')
     expect(card.textContent).not.toMatch(/\bfailed\b/)
   })
@@ -230,67 +232,68 @@ describe('protocol rows', () => {
   const periods = (rows) => rows.map(([ok, failed], i) => ({ date: `2026-11-${13 + i}`, ok, failed }))
   const busy = { periods: periods([[1, 0], [0, 0], [2, 3], [0, 0], [0, 0], [0, 0], [4, 1]]), last_operation_at: '2026-11-19T10:00:00Z', last_status: 'ok' }
   const idle = { periods: periods(Array(7).fill([0, 0])), last_operation_at: null, last_status: null }
+  const spark = (line) => line.querySelector('svg.spark')
 
-  it('draws a curve only for a protocol that has data', async () => {
+  it('draws the mockup sparkline for every protocol with daily figures, titled by its figures', async () => {
     const card = await show({ acme: busy, scep: idle })
-    expect(within(row(card, 'acme')).getByTestId('health-spark').getAttribute('role')).toBe('img')
-    expect(within(row(card, 'scep')).queryByTestId('health-spark')).toBeNull()
+    expect(spark(row(card, 'acme')).getAttribute('role')).toBe('img')
+    expect(spark(row(card, 'acme')).getAttribute('aria-labelledby')).toBe('spark-acme')
+    expect(spark(row(card, 'scep'))).not.toBeNull()
     expect(row(card, 'scep').textContent).not.toContain('–')
   })
 
-  it('a protocol idle over the period says so in one line, without columns of zeros', async () => {
-    const card = await show({ acme: busy, scep: idle, est: { ...idle, last_operation_at: '2026-08-19T10:00:00Z', last_status: 'ok' } })
-    for (const name of ['scep', 'est']) {
-      expect(row(card, name).querySelector('.ov-health-stats')).toBeNull()
-      expect(row(card, name).textContent).not.toMatch(/successes|failures|overview\.health\.today/)
-    }
-    expect(row(card, 'scep').querySelector('.ov-health-idle').textContent).toBe('overview.health.idle:7')
-    const est = row(card, 'est').querySelector('.ov-health-idle')
-    expect(est.textContent).toMatch(/^overview\.health\.idle:7 overview\.health\.lastOperation$/)
-    expect(est.querySelector('[title]')).not.toBeNull()
-    expect(row(card, 'est').querySelector('.ov-health-name .ov-pill.is-good')).not.toBeNull()
-    expect(row(card, 'acme').querySelector('.ov-health-stats')).not.toBeNull()
-    expect(row(card, 'acme').querySelector('.ov-health-idle')).toBeNull()
+  it('a protocol without operation says it is idle under its name, with its period', async () => {
+    const card = await show({ scep: idle })
+    expect(row(card, 'scep').querySelector('.health-name small').textContent).toBe('overview.health.idle:7')
   })
 
-  it('the idle line reads in French with the relative date of the last operation', async () => {
+  it('the last operation reads under the name, with the exact date behind it', async () => {
     lang.fr = true
     const card = await show({ est: { ...idle, last_operation_at: '2020-01-01T10:00:00Z' } })
-    expect(row(card, 'est').querySelector('.ov-health-idle').textContent).toMatch(/^Aucune opération sur 7 jours\. Dernière opération .+/)
+    const small = row(card, 'est').querySelector('.health-name small')
+    expect(small.textContent).toMatch(/^Dernière opération .+/)
+    expect(small.getAttribute('title')).toMatch(/2020/)
   })
 
-  it('a protocol without daily figures keeps its last operation, or says none is recorded', async () => {
+  it('a protocol without daily figures keeps its name and idle line, without figures', async () => {
     const card = await show({ acme: { periods: null, last_operation_at: null, last_status: null } })
-    expect(row(card, 'acme').textContent).toContain('overview.health.noOperation')
-    expect(row(card, 'acme').querySelector('.ov-health-idle, .ov-health-stats')).toBeNull()
+    expect(row(card, 'acme').textContent).toContain('overview.health.idle:7')
+    expect(row(card, 'acme').querySelector('.health-stats, svg.spark')).toBeNull()
   })
 
   it('the curve reads as its figures, oldest day first', async () => {
     lang.fr = true
     const card = await show({ acme: busy })
-    expect(within(row(card, 'acme')).getByTestId('health-spark').getAttribute('aria-label'))
+    expect(spark(row(card, 'acme')).querySelector('title').textContent)
       .toBe('ACME, par jour, du plus ancien au plus récent. Succès : 1, 0, 2, 0, 0, 0, 4. Échecs : 0, 0, 3, 0, 0, 0, 1.')
   })
 
-  it('gives today and the whole period in figures', async () => {
-    const card = await show({ acme: busy })
-    const text = row(card, 'acme').textContent
-    expect(text).toContain('overview.health.todayoverview.health.successes:4overview.health.failures:1')
-    expect(text).toContain('overview.days:7overview.health.successes:7overview.health.failures:4')
-    expect(row(card, 'acme').querySelectorAll('.ov-health-fail')).toHaveLength(2)
+  it('gives today and the whole period in figures, ACME failures leading to the queue', async () => {
+    const showQueue = vi.fn()
+    api.getHealth.mockResolvedValue({ data: { protocols: { acme: busy } } })
+    render(<MemoryRouter><OverviewContext.Provider value={{ showQueue }}><HealthCard /></OverviewContext.Provider></MemoryRouter>)
+    await waitFor(() => expect(document.querySelector('#card-health [data-protocol="acme"]')).not.toBeNull())
+    const stats = [...document.querySelectorAll('[data-protocol="acme"] .health-stat')]
+    expect(stats.map((s) => s.querySelector('.health-span').textContent)).toEqual(['overview.health.today', 'overview.days:7'])
+    expect(stats.map((s) => s.querySelector('.health-values strong').textContent)).toEqual(['4', '7'])
+    const fails = [...document.querySelectorAll('[data-protocol="acme"] button.fail-link')]
+    expect(fails.map((b) => b.textContent)).toEqual(['overview.health.failures:1', 'overview.health.failures:4'])
+    fireEvent.click(fails[0])
+    expect(showQueue).toHaveBeenCalledWith('acme')
   })
 
-  it('a day without failure shows its zero without the alert mark', async () => {
-    const card = await show({ est: { ...busy, periods: periods([[3, 0], [2, 0]]) } })
-    expect(row(card, 'est').querySelectorAll('.ov-health-fail')).toHaveLength(0)
-    expect(row(card, 'est').textContent).toContain('overview.health.failures:0')
+  it('a failure of another protocol is said in red, not as a link; a zero stays muted', async () => {
+    const card = await show({ est: { ...busy, periods: periods([[3, 1], [2, 0]]) } })
+    expect(row(card, 'est').querySelectorAll('.fail-link')).toHaveLength(0)
+    expect([...row(card, 'est').querySelectorAll('.health-values > span:last-child')].map((s) => s.className)).toEqual(['muted', 'bad'])
   })
 
-  it('the state is a pill with an icon: good, failed, or neutral', async () => {
+  it('a good state stays silent; a failure is a bad badge and an unknown state a neutral one, each with its icon', async () => {
     const card = await show({ acme: busy, scep: { ...busy, last_status: 'failed' }, est: { ...busy, last_status: 'quarantined' } })
-    expect(row(card, 'acme').querySelector('.ov-pill.is-good svg')).not.toBeNull()
-    expect(row(card, 'scep').querySelector('.ov-pill.is-bad svg')).not.toBeNull()
-    expect(row(card, 'est').querySelector('.ov-pill').className).not.toMatch(/is-(good|bad|warn)/)
+    expect(row(card, 'acme').querySelector('.badge')).toBeNull()
+    expect(row(card, 'scep').querySelector('.badge.bad svg')).not.toBeNull()
+    expect(row(card, 'est').querySelector('.badge').className).toBe('badge')
+    expect(row(card, 'est').querySelector('.badge svg')).not.toBeNull()
   })
 })
 
@@ -300,12 +303,12 @@ describe('summary under the rows', () => {
       acme: { periods: [], last_operation_at: null, last_status: 'failed' },
       scheduler: sched({ stale: true }), smtp: witness('ready'),
     })
-    expect(card.querySelector('.ov-health-foot').textContent).toBe('overview.health.alerts:2')
-    expect(card.querySelector('.ov-health-foot.is-good')).toBeNull()
+    expect(card.querySelector('.health-foot').textContent).toBe('overview.health.alerts:2')
+    expect(card.querySelector('.health-foot.good')).toBeNull()
   })
 
   it('says so when nothing does', async () => {
     const card = await show({ scheduler: sched({}), smtp: witness('not_configured') })
-    expect(card.querySelector('.ov-health-foot.is-good').textContent).toBe('overview.health.allFine')
+    expect(card.querySelector('.health-foot.good').textContent).toBe('overview.health.allFine')
   })
 })

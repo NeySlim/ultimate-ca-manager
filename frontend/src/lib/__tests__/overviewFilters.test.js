@@ -39,6 +39,6 @@ describe('overview layout', () => {
     expect(layout.hidden).toEqual(['health'])
   })
   it('a preset shows its cards only', () => {
-    expect(visibleCards(presetLayout('manager', null)).sort()).toEqual(['activity', 'compliance', 'hierarchy', 'horizon', 'states', 'trend'])
+    expect(visibleCards(presetLayout('manager', null)).sort()).toEqual(['activity', 'compliance', 'hierarchy', 'horizon'])
   })
 })

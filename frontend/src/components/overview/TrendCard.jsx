@@ -1,8 +1,13 @@
+/**
+ * Certificates issued, revoked and expired per day (GET /dashboard/certificate-trend): a card of
+ * the product the mockup has not, in its card() with the mockup's segmented period and legend.
+ */
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { dashboardService } from '../../services'
 import { monotonePath, niceMax, tickIndexes } from '../../lib/overviewChart'
-import { CardFrame, useCardData, useLang } from './shared'
+import { Icon } from '../atelier'
+import { OverviewCard, useCardData, useLang } from './shared'
 
 const TREND_PERIODS = [7, 15, 30]
 const SERIES = ['issued', 'revoked', 'expired']
@@ -24,7 +29,7 @@ function dayLabel(date, lang, short) {
 
 function Key({ series }) {
   return (
-    <svg className="ov-key" viewBox="0 0 18 10" data-series={series} aria-hidden="true">
+    <svg className="trend-key" viewBox="0 0 18 10" data-series={series} aria-hidden="true">
       <line x1="1" x2="17" y1="5" y2="5" strokeDasharray={DASH[series]} />
     </svg>
   )
@@ -70,38 +75,38 @@ function Chart({ trend, labels, lang, alt, hint }) {
 
   return (
     // The arrow keys read the chart day by day, as the pointer does
-    <div className="ov-chart" ref={frame} tabIndex={0} role="group" aria-label={hint} onKeyDown={onKeyDown} onBlur={() => setAt(null)}
+    <div className="trend-chart" ref={frame} tabIndex={0} role="group" aria-label={hint} onKeyDown={onKeyDown} onBlur={() => setAt(null)}
       onPointerMove={(e) => setAt(nearest(e.clientX, e.currentTarget.querySelector('svg').getBoundingClientRect()))}
       onPointerLeave={() => setAt(null)}>
       <svg viewBox={`0 0 ${W} ${H}`} height={H} role="img" aria-label={alt} data-testid="trend-chart">
         {[0, 0.5, 1].map((k) => (
           <g key={k}>
-            <line className="ov-chart-grid" x1={PAD.left} x2={W - PAD.right} y1={y(top * k)} y2={y(top * k)} />
-            <text className="ov-chart-axis" x={PAD.left - 8} y={y(top * k) + 4} textAnchor="end">{top * k}</text>
+            <line className="trend-grid" x1={PAD.left} x2={W - PAD.right} y1={y(top * k)} y2={y(top * k)} />
+            <text className="trend-axis" x={PAD.left - 8} y={y(top * k) + 4} textAnchor="end">{top * k}</text>
           </g>
         ))}
         {tickIndexes(n, n <= 7 ? 7 : 5).map((i) => (
-          <text key={trend[i].date} className="ov-chart-axis" x={x(i)} y={H - 6}
+          <text key={trend[i].date} className="trend-axis" x={x(i)} y={H - 6}
             textAnchor={i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}>
             {dayLabel(trend[i].date, lang, n <= 7)}
           </text>
         ))}
-        {area && <path className="ov-series-area" data-series="issued" d={area} />}
+        {area && <path className="trend-area" data-series="issued" d={area} />}
         {SERIES.map((s) => (
-          <path key={s} className="ov-series" data-series={s} data-testid={`trend-line-${s}`} strokeDasharray={DASH[s]}
+          <path key={s} className="trend-series" data-series={s} data-testid={`trend-line-${s}`} strokeDasharray={DASH[s]}
             d={monotonePath(points(s))} />
         ))}
         {at !== null && (
           <g>
-            <line className="ov-chart-cross" x1={x(at)} x2={x(at)} y1={PAD.top} y2={base} />
+            <line className="trend-cross" x1={x(at)} x2={x(at)} y1={PAD.top} y2={base} />
             {SERIES.map((s) => (
-              <circle key={s} className="ov-series-dot" data-series={s} cx={x(at)} cy={y(value(day[s]))} r="4.5" />
+              <circle key={s} className="trend-dot" data-series={s} cx={x(at)} cy={y(value(day[s]))} r="4.5" />
             ))}
           </g>
         )}
       </svg>
       {day && (
-        <div className="ov-chart-tip" aria-live="polite" data-testid="trend-tip"
+        <div className="trend-tip" aria-live="polite" data-testid="trend-tip"
           style={at > (n - 1) / 2 ? { right: `${100 - (x(at) / W) * 100 + 2}%` } : { left: `${(x(at) / W) * 100 + 2}%` }}>
           <strong>{dayLabel(day.date, lang, false)}</strong>
           {SERIES.map((s) => (
@@ -134,26 +139,28 @@ export function TrendCard() {
   const alt = t('overview.trend.alt', { count: trend.length, ...totals })
 
   return (
-    <CardFrame id="trend" title={t('overview.cards.trend')} state={state} onRetry={state.reload}
+    <OverviewCard id="trend" state={state} route="GET /api/v2/dashboard/certificate-trend"
       sub={t('overview.trend.sub', { count: days })}
-      empty={state.status === 'ready' && quiet} emptyHint={t('overview.trend.quiet', { count: days })}
+      empty={state.status === 'ready' && quiet && (
+        <div className="queue-empty"><Icon name="check" /><h3>{t('overview.state.empty')}</h3><p>{t('overview.trend.quiet', { count: days })}</p></div>
+      )}
       tools={(
-        <div className="ov-segmented" role="group" aria-label={t('overview.trend.period')}>
+        <div className="segmented" role="group" aria-label={t('overview.trend.period')}>
           {TREND_PERIODS.map((d) => (
-            <button key={d} type="button" aria-pressed={days === d} onClick={() => setDays(d)}
+            <button key={d} type="button" id={`trend-${d}`} aria-pressed={days === d} onClick={() => setDays(d)}
               aria-label={t('overview.days', { count: d })}>
               {t('overview.trend.short', { count: d })}
             </button>
           ))}
         </div>
       )}>
-      <div className="ov-body">
-        <Chart trend={trend} labels={labels} lang={lang} alt={alt} hint={t('overview.trend.keys')} />
-        <ul className="ov-legend">
+      <div className="panel-content">
+        <ul className="horizon-legend">
           {SERIES.map((s) => (
-            <li key={s}><Key series={s} /><span>{labels[s]}</span><strong>{totals[s]}</strong></li>
+            <li key={s}><Key series={s} />{labels[s]}<strong>{totals[s]}</strong></li>
           ))}
         </ul>
+        <Chart trend={trend} labels={labels} lang={lang} alt={alt} hint={t('overview.trend.keys')} />
         <table className="sr-only">
           <caption>{alt}</caption>
           <thead>
@@ -166,6 +173,6 @@ export function TrendCard() {
           </tbody>
         </table>
       </div>
-    </CardFrame>
+    </OverviewCard>
   )
 }

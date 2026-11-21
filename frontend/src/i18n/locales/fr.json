@@ -7666,33 +7666,34 @@
   },
   "overview": {
     "title": "Vue d’ensemble",
-    "allHidden": "Toutes les cartes sont masquées. Choisissez un préréglage pour les afficher de nouveau.",
+    "allHidden": "Choisissez les cartes à afficher ou appliquez une présélection.",
     "presets": {
-      "label": "Préréglages de disposition",
+      "label": "Présélection des cartes",
       "operator": "Opérateur",
       "manager": "Responsable",
       "all": "Toutes les cartes",
-      "short": "Préréglage",
-      "allHint": "Toutes les cartes, dans l’ordre initial"
+      "short": "Présélection",
+      "allHint": "Toutes les cartes, ordre initial",
+      "rowLabel": "Présélections"
     },
     "cards": {
       "queue": "À traiter",
       "health": "Santé de l’automatisation",
       "hierarchy": "Hiérarchie",
-      "horizon": "Horizon d’expiration",
+      "horizon": "Horizon des expirations",
       "compliance": "Conformité",
       "activity": "Dernières opérations",
-      "trend": "Activité des certificats",
-      "states": "Répartition des états"
+      "trend": "Activité des certificats"
     },
     "state": {
       "loading": "Chargement…",
       "error": "Cette carte n’a pas pu être chargée.",
-      "retry": "Réessayer",
       "forbidden": "Vous n’avez pas accès à cette carte.",
       "empty": "Rien à afficher.",
       "partial": "Une partie de cette carte n’a pas pu être chargée.",
-      "partialForbidden": "Vous n’avez pas accès à une partie de cette carte."
+      "partialForbidden": "Vous n’avez pas accès à une partie de cette carte.",
+      "forbiddenTitle": "Accès refusé",
+      "errorTitle": "Impossible de charger « {{name}} »"
     },
     "queue": {
       "sub": "Par urgence : les éléments critiques d’abord, puis par échéance ; ce qui reste à surveiller vient en dernier.",
@@ -7708,8 +7709,6 @@
       "watch_one": "{{count}} à surveiller",
       "watch_other": "{{count}} à surveiller",
       "watchNote": "renouvellements par le client, autorités et ancres de confiance loin de l’expiration : rien à faire aujourd’hui",
-      "watchShow": "Afficher les lignes à surveiller",
-      "watchHide": "Masquer les lignes à surveiller",
       "show": "Afficher",
       "hide": "Masquer",
       "partial": "{{shown}} sur {{total}} listés : la file montre ses éléments les plus urgents.",
@@ -7731,17 +7730,25 @@
         "ca": "Autorités",
         "deploy": "Déploiements"
       },
-      "less": "Réduire"
+      "less": "Réduire",
+      "again": "Réessayer",
+      "emptyTitle": "Rien à traiter",
+      "emptyType": "Aucune ligne de type « {{name}} ».",
+      "seeAll": "Voir toute la file",
+      "watchShow_one": "Afficher {{count}} ligne à surveiller",
+      "watchShow_other": "Afficher les {{count}} lignes à surveiller",
+      "watchHide_one": "Masquer {{count}} ligne à surveiller",
+      "watchHide_other": "Masquer les {{count}} lignes à surveiller"
     },
     "kind": {
-      "acme_order_failed": "Commande ACME échouée",
+      "acme_order_failed": "Échec ACME",
       "acme_client_renewal_failed": "Renouvellement du client ACME échoué",
-      "approval_pending": "Approbation en attente",
+      "approval_pending": "Approbation",
       "scep_request_pending": "Requête SCEP en attente",
       "key_recovery_pending": "Récupération de clé en attente",
-      "crl_due": "CRL à publier",
+      "crl_due": "Publication de CRL",
       "crl_missing": "CRL manquante",
-      "manual_renewal_due": "Renouvellement manuel à faire",
+      "manual_renewal_due": "Renouvellement manuel",
       "client_renewal_overdue": "Renouvellement client en retard",
       "auto_renewal_blocked": "Renouvellement auto bloqué",
       "renewal_declined": "Renouvellement refusé",
@@ -7751,14 +7758,20 @@
       "truststore_expiring": "Certificat du magasin de confiance expirant ou expiré"
     },
     "compliance": {
-      "rsa_below_3072": "RSA sous 3072 bits",
+      "rsa_below_3072": "Clés faibles",
       "weak_signature_hash": "Hachage de signature faible",
-      "server_lifetime_over_398_days": "Certificats serveur de plus de 398 jours",
+      "server_lifetime_over_398_days": "Validité > 398 j",
       "incomplete_chain": "Chaîne incomplète",
-      "no_private_key": "Pas de clé privée",
+      "no_private_key": "Sans clé privée dans UCM",
       "byAlgorithm": "Algorithmes de clé",
       "unknownAlgo": "Inconnu",
-      "sub": "Sur les certificats actifs. Un chiffre qui a une liste l’ouvre, filtrée."
+      "sub": "Sur les {{count}} certificats actifs. Une tuile qui a une liste l’ouvre, filtrée.",
+      "algoLabel": "{{name}} : {{count}} certificats",
+      "sub_rsa_below_3072": "RSA < 3072",
+      "sub_weak_signature_hash": "Signature obsolète",
+      "sub_server_lifetime_over_398_days": "Certificats Serveur TLS",
+      "sub_incomplete_chain": "Intermédiaire absent",
+      "sub_no_private_key": "CSR externe ou import"
     },
     "health": {
       "acme": "ACME",
@@ -7817,15 +7830,20 @@
       "idle_one": "Aucune opération sur {{count}} jour.",
       "idle_other": "Aucune opération sur {{count}} jours.",
       "today": "Aujourd’hui",
-      "successes_one": "{{count}} succès",
-      "successes_other": "{{count}} succès",
       "failures_one": "{{count}} échec",
       "failures_other": "{{count}} échecs",
       "sparkAlt": "{{name}}, par jour, du plus ancien au plus récent. Succès : {{ok}}. Échecs : {{failed}}.",
       "alerts_one": "{{count}} ligne signale un problème.",
       "alerts_other": "{{count}} lignes signalent un problème.",
       "seeQueue": "Voir dans À traiter",
-      "allFine": "Aucune ligne ne signale de problème."
+      "allFine": "Aucune ligne ne signale de problème.",
+      "failLink_one": "{{count}} échec {{name}} sur {{span}} : voir les commandes à relancer dans À traiter",
+      "failLink_other": "{{count}} échecs {{name}} sur {{span}} : voir les commandes à relancer dans À traiter",
+      "taskCount_one": "{{count}} tâche",
+      "taskCount_other": "{{count}} tâches",
+      "lastRun": "dernier passage {{when}}",
+      "runs_one": "<strong>{{count}}</strong> succès",
+      "runs_other": "<strong>{{count}}</strong> succès"
     },
     "filter": {
       "status": "Statut",
@@ -7858,18 +7876,25 @@
     "hierarchy": {
       "crlOn": "CRL activée",
       "crlOff": "CRL désactivée",
-      "ocspOn": "OCSP activé",
-      "ocspOff": "OCSP désactivé",
-      "issued7d": "Émis, 7 jours :",
+      "ocspOn": "OCSP actif",
+      "ocspOff": "OCSP inactif",
       "offline": "Hors ligne",
       "crossSigned": "Signée croisée",
-      "sub": "Autorités : {{total}}, racines : {{roots}}. CRL, OCSP et certificats émis sur 7 jours.",
+      "sub": "{{authorities}} sous {{roots}}. CRL, OCSP et émissions sur 7 jours.",
       "explore": "Explorer",
       "branch": "Branche {{name}}",
       "bounded": "{{shown}} autorités affichées sur {{total}}, les arbres les plus actifs d’abord.",
-      "all": "Tout voir ({{total}})",
       "below_one": "{{count}} de plus en dessous",
-      "below_other": "{{count}} de plus en dessous"
+      "below_other": "{{count}} de plus en dessous",
+      "active": ", active",
+      "issued_one": "{{count}} émission sur 7 j",
+      "issued_other": "{{count}} émissions sur 7 j",
+      "authorities_one": "{{count}} autorité",
+      "authorities_other": "{{count}} autorités",
+      "roots_one": "{{count}} racine",
+      "roots_other": "{{count}} racines",
+      "emptyTitle": "Aucune autorité de certification",
+      "emptyText": "Créez une racine hors ligne ou importez une AC existante, puis une AC émettrice sous cette racine."
     },
     "horizon": {
       "expiring": "Expire bientôt",
@@ -7878,9 +7903,13 @@
       "tsaSigner": "Signataire TSA",
       "ocspResponder": "Répondeur OCSP",
       "sub": "Les prochains certificats à expirer, le plus proche d’abord.",
-      "expiresIn_one": "Expire dans {{count}} jour",
-      "expiresIn_other": "Expire dans {{count}} jours",
-      "elapsed": "{{percent}} % de la validité écoulés"
+      "elapsed": "{{percent}} % de la validité écoulés",
+      "state": {
+        "valid": "Valides",
+        "expiring": "À renouveler",
+        "expired": "Expirés",
+        "revoked": "Révoqués"
+      }
     },
     "activity": {
       "all": "Tout voir",
@@ -7894,9 +7923,7 @@
     "refresh": "Actualiser",
     "intent": "Ce qui demande votre intervention aujourd’hui, puis l’état de l’automatisation, de la hiérarchie et de la conformité.",
     "actions": {
-      "issue": "Émettre",
-      "newCa": "Nouvelle AC",
-      "discovery": "Découverte réseau"
+      "issue": "Émettre"
     },
     "days_one": "{{count}} jour",
     "days_other": "{{count}} jours",
@@ -7904,34 +7931,25 @@
       "cards": "Cartes",
       "cardsLabel": "Cartes : afficher, masquer, réordonner",
       "dialogTitle": "Cartes de la vue d’ensemble",
-      "dialogSub": "Afficher, masquer et réordonner.",
+      "dialogSub": "Afficher, masquer et réordonner",
       "saved": "L’ordre et les cartes masquées sont enregistrés avec votre compte.",
       "up": "Monter {{name}}",
       "down": "Descendre {{name}}",
-      "grip": "Déplacer la carte {{name}} : faites-la glisser ou utilisez les flèches du clavier",
-      "gripHint": "Glisser pour déplacer, ou flèches du clavier",
-      "menu": "Options de la carte {{name}}",
-      "menuTitle": "Options de la carte",
-      "earlier": "Placer avant",
-      "later": "Placer après",
       "hide": "Masquer la carte",
       "customize": "Personnaliser les cartes…",
-      "moved": "{{name}} est maintenant la carte {{position}} sur {{total}}.",
-      "hidden": "{{name}} est masquée. Le bouton Cartes la réaffiche."
+      "hidden": "Carte « {{name}} » masquée. Le bouton Cartes permet de la réafficher.",
+      "listLabel": "Cartes, dans l’ordre de la page",
+      "queueShown": "Carte À traiter réaffichée."
     },
     "metrics": {
-      "label": "Chiffres clés",
-      "cas_one": "{{count}} autorité",
-      "cas_other": "{{count}} autorités",
-      "pending_one": "{{count}} demande en attente",
-      "pending_other": "{{count}} demandes en attente",
-      "ssh_one": "{{count}} certificat SSH",
-      "ssh_other": "{{count}} certificats SSH",
-      "queueSub": "À faire : {{act}}, à surveiller : {{watch}}",
-      "expiringSoon_one": "{{count}} expire bientôt",
-      "expiringSoon_other": "{{count}} expirent bientôt",
+      "queueSub": "{{act}}, {{watch}} à surveiller",
       "failures": "Échecs du jour",
-      "failuresSub": "ACME, SCEP et EST, jour UTC"
+      "failuresSub": "ACME, SCEP et EST, jour UTC",
+      "certificates": "Certificats",
+      "inventory": "Inventaire complet",
+      "interventions_one": "{{count}} intervention",
+      "interventions_other": "{{count}} interventions",
+      "toCheck": "À contrôler"
     },
     "cause": {
       "acme_order_failed": "Une commande ACME s’est terminée invalide dans les 7 derniers jours",
@@ -7962,10 +7980,8 @@
       "alt_other": "Activité des certificats sur {{count}} jours : {{issued}} émis, {{revoked}} révoqués, {{expired}} expirés.",
       "keys": "Graphique : les flèches gauche et droite le lisent jour par jour"
     },
-    "states": {
-      "sub": "Les certificats par état. Chaque ligne ouvre sa liste.",
-      "alt": "{{total}} certificats : {{valid}} valides, {{expiring}} expirent bientôt, {{expired}} expirés, {{revoked}} révoqués."
-    }
+    "clockToday": "aujourd’hui à {{time}}",
+    "allHiddenTitle": "Toutes les cartes sont masquées"
   },
   "sectioned": {
     "flagModified": "Modifié",

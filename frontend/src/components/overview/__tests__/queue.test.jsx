@@ -1,12 +1,14 @@
 /**
- * Work queue card: chips that filter, rows on two levels with their delay, the operations the
- * API offers as buttons (a link otherwise), and what only needs watching folded apart.
+ * Work queue card, the mockup's queueRow(): chips that filter, rows on two levels with their delay,
+ * the operations the API offers as buttons (the way to the object otherwise), what only needs
+ * watching folded apart, and a failed relaunch that offers to start again.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
+  Trans: ({ i18nKey }) => i18nKey,
   useTranslation: () => ({ t: (k, o) => {
     if (o && 'defaultValue' in o) return o.defaultValue
     return o && Object.keys(o).length > 0 ? `${k}:${Object.values(o).join(',')}` : k
@@ -26,6 +28,8 @@ vi.mock('../../../hooks/useWebSocket', () => ({
   ConnectionState: { CONNECTED: 'connected', DISCONNECTED: 'disconnected', CONNECTING: 'connecting', ERROR: 'error' },
 }))
 vi.mock('../../../hooks/usePermission', () => ({ usePermission: () => ({ hasPermission: api.can }) }))
+const nav = vi.hoisted(() => vi.fn())
+vi.mock('react-router-dom', async (orig) => ({ ...(await orig()), useNavigate: () => nav }))
 
 import { QueueCard } from '..'
 import { OverviewContext } from '../shared'
@@ -41,8 +45,9 @@ const answer = (items, counts) => ({ data: {
 const notify = { showSuccess: vi.fn(), showError: vi.fn(), showPrompt: vi.fn(), showConfirm: vi.fn() }
 const show = (page = { notify }) => render(
   <MemoryRouter><OverviewContext.Provider value={page}><QueueCard /></OverviewContext.Provider></MemoryRouter>)
-const rows = () => screen.getAllByTestId('queue-row')
-const names = () => rows().map((r) => r.querySelector('.ov-queue-subject').textContent)
+// The rows on screen: neither folded nor in the closed group to watch
+const rows = () => [...document.querySelectorAll('#card-queue li.queue-row')].filter((r) => !r.hidden && !r.closest('ol').hidden)
+const names = () => rows().map((r) => r.querySelector('.queue-subject, .queue-head > strong').textContent)
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -76,7 +81,7 @@ describe('chips', () => {
     fireEvent.click(screen.getByText('overview.queue.group.renew'))
     expect(names()).toEqual(['manual_renewal_due-1', 'manual_renewal_due-5'])
     expect(screen.getByText('overview.queue.group.renew').closest('button').getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getByTestId('card-queue').textContent).toContain('overview.queue.subFiltered:2,5,overview.queue.group.renew')
+    expect(document.getElementById('card-queue').textContent).toContain('overview.queue.subFiltered:2,5,overview.queue.group.renew')
     fireEvent.click(screen.getByText('overview.queue.group.all'))
     expect(rows()).toHaveLength(5)
   })
@@ -91,56 +96,54 @@ describe('chips', () => {
 })
 
 describe('rows', () => {
-  it('give the name as a link, the type as a pill and the cause, on two levels', async () => {
+  it('give the name, the type as a pill and the cause, on two levels; the name opens the object', async () => {
     api.getQueue.mockResolvedValue(answer([row('manual_renewal_due', 1)], { manual_renewal_due: 1 }))
     show()
-    const link = await screen.findByText('manual_renewal_due-1')
-    expect(link.closest('a').getAttribute('href')).toBe('/x/manual_renewal_due/1')
+    const name = await screen.findByText('manual_renewal_due-1')
+    expect(name.className).toBe('text-link queue-subject')
+    fireEvent.click(name)
+    expect(nav).toHaveBeenCalledWith('/x/manual_renewal_due/1')
     const line = rows()[0]
-    expect(line.querySelector('.ov-pill').textContent).toBe('manual_renewal_due')
+    expect(line.querySelector('.queue-head .queue-kind').textContent).toBe('manual_renewal_due')
     expect(line.getAttribute('data-kind')).toBe('manual_renewal_due')
+    expect(line.getAttribute('data-type')).toBe('renew')
   })
 
-  it('a critical row says so in words, not only in colour', async () => {
+  it('a critical row says so in words and by its icon, not only in colour', async () => {
     api.getQueue.mockResolvedValue(answer([
       row('crl_missing', 1, { tier: 'critical' }), row('approval_pending', 2),
     ], { crl_missing: 1, approval_pending: 1 }))
     show()
     await screen.findByText('crl_missing-1')
     expect(rows()[0].getAttribute('data-tier')).toBe('critical')
-    expect(rows()[0].textContent).toContain('overview.queue.critical')
-    expect(rows()[0].querySelector('.ov-pill.is-bad')).not.toBeNull()
+    expect(rows()[0].querySelector('.sr-only').textContent).toBe('overview.queue.critical')
     expect(rows()[1].textContent).not.toContain('overview.queue.critical')
-    expect(rows()[1].querySelector('.ov-pill.is-bad')).toBeNull()
+    expect(rows()[1].getAttribute('data-type')).toBe('approval')
   })
 
-  it('a deadline reads as a delay, late in words, with the exact date in the tooltip', async () => {
+  it('a deadline reads as a short delay, late in red, with the exact date under it', async () => {
     api.getQueue.mockResolvedValue(answer([
       row('manual_renewal_due', 1, { due_at: at(-190) }), row('manual_renewal_due', 2, { due_at: at(3) }),
       row('manual_renewal_due', 3, { due_at: at(40) }), row('manual_renewal_due', 4, { due_at: null }),
     ], { manual_renewal_due: 4 }))
     show()
     await screen.findByText('manual_renewal_due-1')
-    const due = rows().map((r) => r.querySelector('.ov-queue-due'))
-    expect(due[0].querySelector('strong').textContent).toBe('overview.queue.overdue:6 months')
-    expect(due[0].getAttribute('data-late')).toBe('true')
-    expect(due[0].className).toContain('is-bad')
-    expect(due[0].getAttribute('title')).toMatch(/2026/)
-    expect(due[0].querySelector('small').textContent).toBe(due[0].getAttribute('title'))
-    expect(due[1].querySelector('strong').textContent).toBe('in 3 days')
-    expect(due[1].className).toContain('is-warn')
-    expect(due[2].querySelector('strong').textContent).toBe('in 40 days')
-    expect(due[2].className).not.toMatch(/is-(warn|bad)/)
-    expect(due[3].textContent).toBe('–')
+    const due = rows().map((r) => r.querySelector('.queue-due'))
+    expect(due.map((d) => d.className)).toEqual(['queue-due bad', 'queue-due warn', 'queue-due', 'queue-due'])
+    expect(due[0].querySelector('strong').textContent).toMatch(/^time\.compact\./)
+    expect(due[0].querySelector('small').textContent).toMatch(/2026/)
+    expect(due[1].querySelector('strong').textContent).not.toBe(due[2].querySelector('strong').textContent)
+    expect(due[3].querySelector('strong').textContent).toBe('–')
+    expect(rows()[3].getAttribute('data-due')).toBeNull()
   })
 
   it('a date that tells when it happened is never called late', async () => {
     api.getQueue.mockResolvedValue(answer([row('acme_order_failed', 1, { due_at: at(-2) })], { acme_order_failed: 1 }))
     show()
     await screen.findByText('acme_order_failed-1')
-    const due = rows()[0].querySelector('.ov-queue-due')
-    expect(due.querySelector('strong').textContent).toBe('2 days ago')
-    expect(due.getAttribute('data-late')).toBe('false')
+    const due = rows()[0].querySelector('.queue-due')
+    expect(due.className).toBe('queue-due')
+    expect(due.querySelector('strong').textContent).toMatch(/^time\.compact\..*[Aa]go/)
   })
 })
 
@@ -151,10 +154,10 @@ describe('a missing CRL', () => {
     ], { crl_missing: 1, crl_due: 1 }))
     show()
     await screen.findByText('crl_missing-1')
-    const due = rows().map((r) => r.querySelector('.ov-queue-due'))
+    const due = rows().map((r) => r.querySelector('.queue-due'))
     expect(due[0].textContent).toBe('–')
-    expect(due[0].getAttribute('data-late')).toBeNull()
-    expect(due[1].querySelector('strong').textContent).toBe('overview.queue.overdue:3 days')
+    expect(due[0].className).toBe('queue-due')
+    expect(due[1].className).toBe('queue-due bad')
   })
 })
 
@@ -163,26 +166,30 @@ describe('row operations', () => {
     row('manual_renewal_due', 7), row('acme_client_renewal_failed', 8), row('crl_due', 9), row('approval_pending', 10),
     row('ca_expiring', 11, { tier: 'critical' }), row('acme_order_failed', 12),
   ], { manual_renewal_due: 1, acme_client_renewal_failed: 1, crl_due: 1, approval_pending: 1, ca_expiring: 1, acme_order_failed: 1 })
-  const control = (i) => rows()[i].querySelector('.ov-queue-action').firstElementChild
+  const control = (i) => rows()[i].querySelector('.queue-action').firstElementChild
 
-  it('offers a button where the API has the operation and a link to the object elsewhere', async () => {
+  it('offers a button where the API has the operation, and the way to the object elsewhere', async () => {
     api.getQueue.mockResolvedValue(three())
     show()
     await screen.findByText('manual_renewal_due-7')
     expect([0, 1, 2, 3, 4, 5].map((i) => `${control(i).tagName} ${control(i).textContent}`)).toEqual([
       'BUTTON common.renew', 'BUTTON overview.queue.retry', 'BUTTON overview.queue.publish',
-      'A overview.queue.review', 'A overview.queue.viewCa', 'A overview.queue.open',
+      'BUTTON overview.queue.review', 'A overview.queue.viewCa', 'BUTTON overview.queue.open',
     ])
-    expect(control(3).getAttribute('href')).toBe('/x/approval_pending/10')
-    expect(control(0).getAttribute('aria-label')).toBe('common.renew: manual_renewal_due-7')
+    expect([0, 1, 2].map((i) => control(i).hasAttribute('data-write'))).toEqual([true, true, true])
+    expect(control(3).hasAttribute('data-write')).toBe(false)
+    fireEvent.click(control(3))
+    expect(nav).toHaveBeenCalledWith('/x/approval_pending/10')
+    expect(control(4).getAttribute('href')).toBe('/x/ca_expiring/11')
+    expect(control(0).getAttribute('aria-label')).toBe('common.renew manual_renewal_due-7')
   })
 
-  it('without the write permission every row is a link', async () => {
+  it('without the write permission no row has an operation', async () => {
     api.can.mockReturnValue(false)
     api.getQueue.mockResolvedValue(three())
     show()
     await screen.findByText('manual_renewal_due-7')
-    expect([0, 1, 2].map((i) => control(i).tagName)).toEqual(['A', 'A', 'A'])
+    expect([0, 1, 2].map((i) => control(i).textContent)).toEqual(['overview.queue.open', 'overview.queue.open', 'overview.queue.open'])
     expect(api.can).toHaveBeenCalledWith('write:certificates')
     expect(api.can).toHaveBeenCalledWith('write:acme')
     expect(api.can).toHaveBeenCalledWith('write:crl')
@@ -192,7 +199,7 @@ describe('row operations', () => {
     api.getQueue.mockResolvedValue(three())
     show(null)
     await screen.findByText('manual_renewal_due-7')
-    expect(control(0).tagName).toBe('A')
+    expect(control(0).textContent).toBe('overview.queue.open')
   })
 
   it('Renew asks for the duration, renews, says so and reloads the queue', async () => {
@@ -225,10 +232,10 @@ describe('row operations', () => {
     expect(notify.showSuccess).not.toHaveBeenCalled()
   })
 
-  it('Retry and Publish call their route with the row id; a refusal is shown', async () => {
+  it('Retry and Publish call their route with the row id; a refusal is shown with a way to start again', async () => {
     api.getQueue.mockResolvedValue(three())
     api.renewOrder.mockResolvedValue({})
-    api.regenerate.mockRejectedValue(new Error('CA cannot sign'))
+    api.regenerate.mockRejectedValueOnce(new Error('CA cannot sign')).mockResolvedValueOnce({})
     show()
     await screen.findByText('manual_renewal_due-7')
     fireEvent.click(control(1))
@@ -236,7 +243,21 @@ describe('row operations', () => {
     await waitFor(() => expect(notify.showSuccess).toHaveBeenCalledWith('overview.queue.retried'))
     fireEvent.click(control(2))
     await waitFor(() => expect(api.regenerate).toHaveBeenCalledWith(9))
-    await waitFor(() => expect(notify.showError).toHaveBeenCalledWith('CA cannot sign'))
+    await waitFor(() => expect(notify.showError).toHaveBeenCalledWith('CA cannot sign', expect.objectContaining({ action: expect.any(Object) })))
+    const { action } = notify.showError.mock.calls[0][1]
+    expect(action.label).toBe('overview.queue.again')
+    await act(async () => { action.onClick() })
+    await waitFor(() => expect(api.regenerate).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(notify.showSuccess).toHaveBeenCalledWith('notifications.crlRegenerated:crl_due-9'))
+  })
+
+  it('a failed renewal offers no start again: its prompt is the way to try again', async () => {
+    api.getQueue.mockResolvedValue(three())
+    api.getById.mockRejectedValue(new Error('gone'))
+    show()
+    await screen.findByText('manual_renewal_due-7')
+    fireEvent.click(control(0))
+    await waitFor(() => expect(notify.showError).toHaveBeenCalledWith('gone', undefined))
   })
 
   it('a second click while an operation runs starts nothing', async () => {
@@ -264,11 +285,11 @@ describe('to watch', () => {
     await screen.findByText('manual_renewal_due-2')
     expect(names()).toEqual(['ca_expiring-1', 'manual_renewal_due-2'])
     expect(screen.getByText('overview.queue.watch:3')).toBeTruthy()
-    const toggle = screen.getByRole('button', { name: 'overview.queue.watchShow' })
+    const toggle = screen.getByRole('button', { name: 'overview.queue.watchShow:3' })
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
     fireEvent.click(toggle)
     expect(names()).toEqual(['ca_expiring-1', 'manual_renewal_due-2', 'client_renewal_overdue-3', 'ca_expiring-4', 'truststore_expiring-5'])
-    fireEvent.click(screen.getByRole('button', { name: 'overview.queue.watchHide' }))
+    fireEvent.click(screen.getByRole('button', { name: 'overview.queue.watchHide:3' }))
     expect(rows()).toHaveLength(2)
   })
 
@@ -286,7 +307,7 @@ describe('to watch', () => {
     api.getQueue.mockResolvedValue(answer([row('ca_expiring', 4)], { ca_expiring: 1 }))
     show()
     expect(await screen.findByText('overview.queue.none')).toBeTruthy()
-    expect(screen.queryAllByTestId('queue-row')).toHaveLength(0)
+    expect(document.querySelectorAll('#queue-list')).toHaveLength(0)
   })
 })
 

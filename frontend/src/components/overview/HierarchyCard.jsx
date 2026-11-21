@@ -1,38 +1,52 @@
+/**
+ * The mockup's hierarchyCard() and hierNode() over the CA list and GET /dashboard/issuance:
+ * one tree per root, each authority a card with its state, CRL, OCSP and issuances on 7 days,
+ * bounded to a few lines on a large installation.
+ */
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { CaretRight, CheckCircle, GitBranch, LinkSimple, Lock, Prohibit, ShieldCheck } from '@phosphor-icons/react'
+import { EmptyBlock, Icon } from '../atelier'
 import { casService, overviewService } from '../../services'
 import { HIERARCHY_LIMIT, boundedTree, nameOf } from '../../lib/overviewHierarchy'
 import { stateLabel } from '../../lib/stateLabel'
-import { CardFrame, Pill, num, settle, useCardData } from './shared'
+import { OverviewCard, num, settle, useCardData } from './shared'
 
 const DAYS = 7
+// A CA state that is not active: its badge tone and icon (the mockup's caStates)
+const STATE_BADGE = { pending: ['warn', 'clock'], revoked: ['bad', 'block'], expired: ['bad', 'warning'] }
 
 function Node({ ca, tree, issued, t }) {
   const children = tree.shown.get(ca.id) || []
   const hidden = (tree.kids.get(ca.id) || []).length - children.length
-  const sevenDays = issued === null ? '–' : (issued.get(ca.refid) ?? 0)
-  const inactive = ca.status && ca.status !== 'Active'
-  const Icon = ca.parent_id ? GitBranch : ShieldCheck
+  const count = issued === null ? '–' : (issued.get(ca.refid) ?? 0)
+  const state = String(ca.status || 'active').toLowerCase()
+  const [tone, icon] = STATE_BADGE[state] || ['warn', 'warning']
+  const crl = <span><Icon name={ca.cdp_enabled ? 'check' : 'block'} />{t(ca.cdp_enabled ? 'overview.hierarchy.crlOn' : 'overview.hierarchy.crlOff')}</span>
   return (
-    <li>
-      <Link to={`/cas/${ca.id}`} className="ov-hier-node" data-state={String(ca.status || 'active').toLowerCase()}>
-        <span className="ov-hier-head">
-          <Icon size={15} aria-hidden="true" />
+    <li className="hier-node">
+      <Link className={`hier-card state-${state}`} to={`/cas/${ca.id}`} data-ca-link={ca.id}>
+        <span className="hier-head">
+          <Icon name={ca.parent_id ? 'branch' : 'shield'} />
           <strong>{nameOf(ca)}</strong>
-          {inactive && <Pill tone={ca.status === 'Pending' ? 'warn' : 'bad'}>{stateLabel(t, ca.status)}</Pill>}
+          {state === 'active'
+            ? <span className="sr-only">{t('overview.hierarchy.active')}</span>
+            : <span className={`badge ${tone}`}><Icon name={icon} />{stateLabel(t, ca.status)}</span>}
         </span>
-        <span className="ov-hier-meta">
-          {ca.offline && <Pill icon={Lock}>{t('overview.hierarchy.offline')}</Pill>}
-          {ca.cross_certificate_count > 0 && <Pill icon={LinkSimple}>{t('overview.hierarchy.crossSigned')}</Pill>}
-          <Pill tone={ca.cdp_enabled ? undefined : 'plain'} icon={ca.cdp_enabled ? CheckCircle : Prohibit}>
-            {t(ca.cdp_enabled ? 'overview.hierarchy.crlOn' : 'overview.hierarchy.crlOff')}
-          </Pill>
-          <Pill tone={ca.ocsp_enabled ? undefined : 'plain'} icon={ca.ocsp_enabled ? CheckCircle : Prohibit}>
-            {t(ca.ocsp_enabled ? 'overview.hierarchy.ocspOn' : 'overview.hierarchy.ocspOff')}
-          </Pill>
-          {hidden > 0 && <Pill tone="plain" data-testid="hierarchy-hidden">{t('overview.hierarchy.below', { count: hidden })}</Pill>}
-          {sevenDays !== 0 && <span className="ov-hier-issued ov-num">{t('overview.hierarchy.issued7d')} {sevenDays}</span>}
+        <span className="hier-meta">
+          {ca.parent_id ? (
+            <>
+              {crl}
+              <span><Icon name={ca.ocsp_enabled ? 'check' : 'block'} />{t(ca.ocsp_enabled ? 'overview.hierarchy.ocspOn' : 'overview.hierarchy.ocspOff')}</span>
+              <span><Icon name="cert" />{t('overview.hierarchy.issued', { count })}</span>
+            </>
+          ) : (
+            <>
+              {ca.offline && <span><Icon name="lock" />{t('overview.hierarchy.offline')}</span>}
+              {crl}
+              {ca.cross_certificate_count > 0 && <span><Icon name="link" />{t('overview.hierarchy.crossSigned')}</span>}
+            </>
+          )}
+          {hidden > 0 && <span data-hidden-below=""><Icon name="branch" />{t('overview.hierarchy.below', { count: hidden })}</span>}
         </span>
       </Link>
       {children.length > 0 && (
@@ -45,14 +59,18 @@ function Node({ ca, tree, issued, t }) {
 /** Without the authorities, the issuances per CA are all the card still has: no link to a page that may be forbidden. */
 function IssuedOnly({ entries, t }) {
   return (
-    <ul className="ov-plain-rows">
-      {entries.slice(0, HIERARCHY_LIMIT).map((e) => (
-        <li key={e.caref ?? e.ca_id}>
-          <span>{e.ca_name || e.caref || '–'}</span>
-          <span className="ov-muted ov-num">{t('overview.hierarchy.issued7d')} {num(e.issued)}</span>
-        </li>
-      ))}
-    </ul>
+    <div className="panel-content hier-columns">
+      <ul className="hier-tree">
+        {entries.slice(0, HIERARCHY_LIMIT).map((e) => (
+          <li key={e.caref ?? e.ca_id} className="hier-node">
+            <span className="hier-card">
+              <span className="hier-head"><Icon name="branch" /><strong>{e.ca_name || e.caref || '–'}</strong></span>
+              <span className="hier-meta"><span><Icon name="cert" />{t('overview.hierarchy.issued', { count: num(e.total) })}</span></span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
@@ -67,37 +85,35 @@ export function HierarchyCard() {
   const casLoaded = Array.isArray(state.data?.cas)
   const cas = casLoaded ? state.data.cas : []
   const byCa = state.data?.issuance?.by_ca
-  // Issuances per CA in the window; null when the response carries no per-CA series at all
-  const issued = Array.isArray(byCa) ? new Map(byCa.map((e) => [e.caref, e.issued])) : null
+  // Issuances and renewals per CA in the window; null when the response carries no per-CA series at all
+  const issued = Array.isArray(byCa) ? new Map(byCa.map((e) => [e.caref, e.total ?? e.issued])) : null
   const tree = boundedTree(cas, issued)
   const total = typeof state.meta?.total === 'number' ? state.meta.total : cas.length
+  const sub = casLoaded && [
+    t('overview.hierarchy.sub', {
+      authorities: t('overview.hierarchy.authorities', { count: total }), roots: t('overview.hierarchy.roots', { count: tree.rootCount }),
+    }),
+    tree.listed < cas.length ? t('overview.hierarchy.bounded', { shown: tree.listed, total }) : null,
+  ].filter(Boolean).join(' ')
 
   return (
-    <CardFrame id="hierarchy" title={t('overview.cards.hierarchy')} state={state} onRetry={state.reload}
-      missing={state.data?.missing}
-      empty={state.status === 'ready' && casLoaded && cas.length === 0}
-      count={casLoaded ? num(state.meta?.total) : undefined}
-      sub={casLoaded ? t('overview.hierarchy.sub', { total, roots: tree.rootCount }) : undefined}
-      tools={casLoaded && (
-        <Link to="/cas" className="ov-link">{t('overview.hierarchy.explore')}<CaretRight size={13} aria-hidden="true" /></Link>
-      )}>
-      <div className="ov-body">
-        {casLoaded ? (
-          <div className="ov-hier-columns">
-            {tree.roots.map((ca) => (
-              <ul key={ca.id} className="ov-hier-tree" aria-label={t('overview.hierarchy.branch', { name: nameOf(ca) })}>
-                <Node ca={ca} tree={tree} issued={issued} t={t} />
-              </ul>
-            ))}
-          </div>
-        ) : <IssuedOnly entries={Array.isArray(byCa) ? byCa : []} t={t} />}
-        {casLoaded && tree.listed < cas.length && (
-          <p className="ov-hier-more">
-            <span>{t('overview.hierarchy.bounded', { shown: tree.listed, total })}</span>
-            <Link to="/cas" className="ov-link">{t('overview.hierarchy.all', { total })}<CaretRight size={13} aria-hidden="true" /></Link>
-          </p>
-        )}
-      </div>
-    </CardFrame>
+    <OverviewCard id="hierarchy" state={state} route="GET /api/v2/cas" missing={state.data?.missing}
+      empty={state.status === 'ready' && casLoaded && cas.length === 0 && (
+        <div className="panel-content hier-columns">
+          <EmptyBlock id="cas" icon="shield" title={t('overview.hierarchy.emptyTitle')} text={t('overview.hierarchy.emptyText')} />
+        </div>
+      )}
+      sub={sub || undefined}
+      tools={casLoaded && <Link to="/cas" className="text-link" data-nav="cas">{t('overview.hierarchy.explore')} <Icon name="right" /></Link>}>
+      {casLoaded ? (
+        <div className="panel-content hier-columns">
+          {tree.roots.map((ca) => (
+            <ul key={ca.id} className="hier-tree" aria-label={t('overview.hierarchy.branch', { name: nameOf(ca) })}>
+              <Node ca={ca} tree={tree} issued={issued} t={t} />
+            </ul>
+          ))}
+        </div>
+      ) : <IssuedOnly entries={Array.isArray(byCa) ? byCa : []} t={t} />}
+    </OverviewCard>
   )
 }

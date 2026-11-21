@@ -7670,7 +7670,8 @@
       "manager": "Responsable",
       "all": "Todas las tarjetas",
       "short": "Preset",
-      "allHint": "Every card, in the initial order"
+      "allHint": "Every card, in the initial order",
+      "rowLabel": "Presets"
     },
     "cards": {
       "queue": "Por tramitar",
@@ -7679,17 +7680,17 @@
       "horizon": "Horizonte de expiración",
       "compliance": "Cumplimiento",
       "activity": "Últimas operaciones",
-      "trend": "Certificate activity",
-      "states": "Status distribution"
+      "trend": "Certificate activity"
     },
     "state": {
       "loading": "Cargando...",
       "error": "No se pudo cargar esta tarjeta.",
-      "retry": "Reintentar",
       "forbidden": "No tiene acceso a esta tarjeta.",
       "empty": "Nada que mostrar.",
       "partial": "No se pudo cargar una parte de esta tarjeta.",
-      "partialForbidden": "No tiene acceso a una parte de esta tarjeta."
+      "partialForbidden": "No tiene acceso a una parte de esta tarjeta.",
+      "forbiddenTitle": "No access",
+      "errorTitle": "Could not load “{{name}}”"
     },
     "queue": {
       "sub": "By urgency: critical items first, then by due date; what only needs watching comes last.",
@@ -7705,8 +7706,6 @@
       "watch_one": "{{count}} to watch",
       "watch_other": "{{count}} to watch",
       "watchNote": "client-side renewals, authorities and trust anchors far from expiry: nothing to do today",
-      "watchShow": "Show the rows to watch",
-      "watchHide": "Hide the rows to watch",
       "show": "Show",
       "hide": "Hide",
       "partial": "{{shown}} of {{total}} listed: the queue shows its most urgent items.",
@@ -7728,7 +7727,15 @@
         "ca": "Authorities",
         "deploy": "Deployments"
       },
-      "less": "Show fewer"
+      "less": "Show fewer",
+      "again": "Retry",
+      "emptyTitle": "Nothing to handle",
+      "emptyType": "No row of type “{{name}}”.",
+      "seeAll": "See the whole queue",
+      "watchShow_one": "Show the {{count}} row to watch",
+      "watchShow_other": "Show the {{count}} rows to watch",
+      "watchHide_one": "Hide the {{count}} row to watch",
+      "watchHide_other": "Hide the {{count}} rows to watch"
     },
     "kind": {
       "acme_order_failed": "Orden ACME fallida",
@@ -7748,14 +7755,20 @@
       "truststore_expiring": "Certificado del almacén de confianza por caducar o caducado"
     },
     "compliance": {
-      "rsa_below_3072": "RSA por debajo de 3072 bits",
+      "rsa_below_3072": "Weak keys",
       "weak_signature_hash": "Hash de firma débil",
-      "server_lifetime_over_398_days": "Certificados de servidor de más de 398 días",
+      "server_lifetime_over_398_days": "Validity > 398 d",
       "incomplete_chain": "Cadena incompleta",
-      "no_private_key": "Sin clave privada",
+      "no_private_key": "No private key in UCM",
       "byAlgorithm": "Algoritmos de clave",
       "unknownAlgo": "Desconocido",
-      "sub": "Over the live certificates. A figure with a list opens it, filtered."
+      "sub": "Over the {{count}} active certificates. A tile that has a list opens it, filtered.",
+      "algoLabel": "{{name}}: {{count}} certificates",
+      "sub_rsa_below_3072": "RSA < 3072",
+      "sub_weak_signature_hash": "Obsolete signature",
+      "sub_server_lifetime_over_398_days": "TLS server certificates",
+      "sub_incomplete_chain": "Intermediate missing",
+      "sub_no_private_key": "External CSR or import"
     },
     "health": {
       "acme": "ACME",
@@ -7814,15 +7827,20 @@
       "idle_one": "No operation over {{count}} day.",
       "idle_other": "No operation over {{count}} days.",
       "today": "Today",
-      "successes_one": "{{count}} success",
-      "successes_other": "{{count}} successes",
       "failures_one": "{{count}} failure",
       "failures_other": "{{count}} failures",
       "sparkAlt": "{{name}}, per day, oldest first. Successes: {{ok}}. Failures: {{failed}}.",
       "alerts_one": "{{count}} line reports a problem.",
       "alerts_other": "{{count}} lines report a problem.",
       "seeQueue": "See To handle",
-      "allFine": "No line reports a problem."
+      "allFine": "No line reports a problem.",
+      "failLink_one": "{{count}} {{name}} failure over {{span}}: see the orders to retry in To handle",
+      "failLink_other": "{{count}} {{name}} failures over {{span}}: see the orders to retry in To handle",
+      "taskCount_one": "{{count}} task",
+      "taskCount_other": "{{count}} tasks",
+      "lastRun": "last run {{when}}",
+      "runs_one": "<strong>{{count}}</strong> success",
+      "runs_other": "<strong>{{count}}</strong> successes"
     },
     "filter": {
       "status": "Estado",
@@ -7857,16 +7875,23 @@
       "crlOff": "CRL desactivada",
       "ocspOn": "OCSP activado",
       "ocspOff": "OCSP desactivado",
-      "issued7d": "Emitidos, 7 días:",
       "offline": "Sin conexión",
       "crossSigned": "Con firma cruzada",
-      "sub": "Authorities: {{total}}, roots: {{roots}}. CRL, OCSP and certificates issued over 7 days.",
+      "sub": "{{authorities}} under {{roots}}. CRL, OCSP and issuances over 7 days.",
       "explore": "Explore",
       "branch": "Branch {{name}}",
       "bounded": "{{shown}} of {{total}} authorities shown, the most active trees first.",
-      "all": "See all ({{total}})",
       "below_one": "{{count}} more below",
-      "below_other": "{{count}} more below"
+      "below_other": "{{count}} more below",
+      "active": ", active",
+      "issued_one": "{{count}} issuance in 7 d",
+      "issued_other": "{{count}} issuances in 7 d",
+      "authorities_one": "{{count}} authority",
+      "authorities_other": "{{count}} authorities",
+      "roots_one": "{{count}} root",
+      "roots_other": "{{count}} roots",
+      "emptyTitle": "No certificate authority",
+      "emptyText": "Create an offline root or import an existing CA, then an issuing CA under that root."
     },
     "horizon": {
       "expiring": "Por expirar",
@@ -7875,9 +7900,13 @@
       "tsaSigner": "Firmante TSA",
       "ocspResponder": "Respondedor OCSP",
       "sub": "The certificates that expire next, soonest first.",
-      "expiresIn_one": "Expires in {{count}} day",
-      "expiresIn_other": "Expires in {{count}} days",
-      "elapsed": "{{percent}} % of the validity elapsed"
+      "elapsed": "{{percent}} % of the validity elapsed",
+      "state": {
+        "valid": "Valid",
+        "expiring": "To renew",
+        "expired": "Expired",
+        "revoked": "Revoked"
+      }
     },
     "activity": {
       "all": "Ver todo",
@@ -7891,9 +7920,7 @@
     "refresh": "Actualizar",
     "intent": "What needs your action today, then the state of automation, of the hierarchy and of compliance.",
     "actions": {
-      "issue": "Issue",
-      "newCa": "New CA",
-      "discovery": "Network discovery"
+      "issue": "Issue"
     },
     "days_one": "{{count}} day",
     "days_other": "{{count}} days",
@@ -7905,30 +7932,21 @@
       "saved": "The order and the hidden cards are saved with your account.",
       "up": "Move {{name}} up",
       "down": "Move {{name}} down",
-      "grip": "Move the card {{name}}: drag it, or use the arrow keys",
-      "gripHint": "Drag to move, or use the arrow keys",
-      "menu": "Options of the card {{name}}",
-      "menuTitle": "Card options",
-      "earlier": "Move earlier",
-      "later": "Move later",
       "hide": "Hide the card",
       "customize": "Customize the cards…",
-      "moved": "{{name}} is now card {{position}} of {{total}}.",
-      "hidden": "{{name}} is hidden. The Cards button shows it again."
+      "hidden": "{{name}} is hidden. The Cards button shows it again.",
+      "listLabel": "Cards, in the order of the page",
+      "queueShown": "To handle card shown again."
     },
     "metrics": {
-      "label": "Key figures",
-      "cas_one": "{{count}} authority",
-      "cas_other": "{{count}} authorities",
-      "pending_one": "{{count}} pending request",
-      "pending_other": "{{count}} pending requests",
-      "ssh_one": "{{count}} SSH certificate",
-      "ssh_other": "{{count}} SSH certificates",
-      "queueSub": "To act on: {{act}}, to watch: {{watch}}",
-      "expiringSoon_one": "{{count}} expiring soon",
-      "expiringSoon_other": "{{count}} expiring soon",
+      "queueSub": "{{act}}, {{watch}} to watch",
       "failures": "Failures today",
-      "failuresSub": "ACME, SCEP and EST, UTC day"
+      "failuresSub": "ACME, SCEP and EST, UTC day",
+      "certificates": "Certificates",
+      "inventory": "Full inventory",
+      "interventions_one": "{{count}} intervention",
+      "interventions_other": "{{count}} interventions",
+      "toCheck": "To check"
     },
     "cause": {
       "acme_order_failed": "An ACME order ended invalid in the last 7 days",
@@ -7959,10 +7977,8 @@
       "alt_other": "Certificate activity over {{count}} days: {{issued}} issued, {{revoked}} revoked, {{expired}} expired.",
       "keys": "Chart: the left and right arrow keys read it day by day"
     },
-    "states": {
-      "sub": "Certificates by state. Each line opens its list.",
-      "alt": "{{total}} certificates: {{valid}} valid, {{expiring}} expiring, {{expired}} expired, {{revoked}} revoked."
-    }
+    "clockToday": "today at {{time}}",
+    "allHiddenTitle": "Every card is hidden"
   },
   "sectioned": {
     "flagModified": "Modified",

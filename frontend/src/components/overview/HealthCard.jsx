@@ -1,14 +1,19 @@
+/**
+ * The mockup's healthCard() over GET /dashboard/health: one row per protocol with its last
+ * operation, today and the whole period in figures and its curve, then the services that only
+ * report a state, and the summary under them.
+ */
 import { useContext } from 'react'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { CaretRight, CheckCircle, MinusCircle, Warning, WarningCircle } from '@phosphor-icons/react'
+import { Icon } from '../atelier'
 import { overviewService } from '../../services'
 import { usePermission } from '../../hooks/usePermission'
 import { isVisible, moduleForPath } from '../../navigation/registry'
-import { relativeTime } from '../../lib/overviewTime'
 import { formatDate } from '../../lib/utils'
 import { stateLabel } from '../../lib/stateLabel'
-import { CardFrame, OverviewContext, Pill, num, useCardData, useLang } from './shared'
+import { clockOf } from '../../lib/overviewTime'
+import { OverviewCard, OverviewContext, num, useCardData, useLang } from './shared'
 
 // Protocols with a daily series, then the services that only report a state
 const SERIES = ['acme', 'scep', 'est']
@@ -20,8 +25,7 @@ const ROW_LINKS = {
   tsa: '/tsa-config', scheduler: '/settings?tab=scheduler', smtp: '/settings?tab=email',
   webhooks: '/settings?tab=webhooks', auto_renewal: '/settings?tab=autoRenewal',
 }
-const TONE_ICON = { good: CheckCircle, warn: Warning, bad: WarningCircle }
-const TONE_CLASS = { warn: 'text-status-warning font-medium', bad: 'text-status-danger font-medium' }
+const TONE_ICON = { good: 'check', warn: 'warning', bad: 'warning' }
 
 /** The row's link, only when the navigation guard of its page lets this user in. */
 function rowLink(name, can) {
@@ -58,17 +62,18 @@ function summary(name, p, t) {
 function toneOf({ alert, warning, caution, state }) {
   if (alert) return warning ? 'warn' : 'bad'
   if (caution) return 'warn'
-  return GOOD_STATES.includes(String(state || '').toLowerCase()) ? 'good' : undefined
+  return GOOD_STATES.includes(String(state || '').toLowerCase()) ? 'good' : ''
 }
 
-function StatePill({ info }) {
+/** A state in words, with its icon (the mockup's badge); the tone only repeats it in colour. */
+function StateBadge({ info }) {
+  if (!info.text || info.text === '–') return null
   const tone = toneOf(info)
-  if (info.text === '–') return null
-  return <Pill tone={tone} icon={TONE_ICON[tone] || MinusCircle} className={TONE_CLASS[tone]}>{info.text}</Pill>
+  return <span className={tone ? `badge ${tone}` : 'badge'} data-tone={tone || 'neutral'}><Icon name={TONE_ICON[tone] || 'block'} />{info.text}</span>
 }
 
-/** One point per day: successes above the baseline, failures as ticks under it. Drawn only with something to show. */
-function Sparkline({ periods, label }) {
+/** The mockup's sparkline(): one point per day, successes above the baseline, failures as ticks below it. */
+function Sparkline({ id, periods, label }) {
   const w = 140
   const h = 40
   const top = 5
@@ -81,32 +86,34 @@ function Sparkline({ periods, label }) {
   const x = (i) => (5 + i * step).toFixed(1)
   const y = (n) => (base - 3 - (n / peak) * (base - 3 - top)).toFixed(1)
   return (
-    <svg className="ov-spark" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" role="img" aria-label={label}
-      data-testid="health-spark">
-      <line className="ov-spark-base" x1="0" x2={w} y1={base} y2={base} vectorEffect="non-scaling-stroke" />
+    <svg className="spark" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" role="img" aria-labelledby={`spark-${id}`}>
+      <title id={`spark-${id}`}>{label}</title>
+      <line className="spark-base" x1="0" x2={w} y1={base} y2={base} vectorEffect="non-scaling-stroke" />
       {failed.map((n, i) => n > 0 && (
-        <line key={`f${periods[i].date}`} className="ov-spark-fail" x1={x(i)} x2={x(i)} y1={base + 3}
+        <line key={`f${periods[i].date}`} className="spark-fail" x1={x(i)} x2={x(i)} y1={base + 3}
           y2={(base + 4 + (n / peakFailed) * (h - base - 5)).toFixed(1)} vectorEffect="non-scaling-stroke" />
       ))}
-      <polyline className="ov-spark-line" points={ok.map((n, i) => `${x(i)},${y(n)}`).join(' ')} vectorEffect="non-scaling-stroke" />
+      <polyline className="spark-line" points={ok.map((n, i) => `${x(i)},${y(n)}`).join(' ')} vectorEffect="non-scaling-stroke" />
       {ok.map((n, i) => (
-        <line key={periods[i].date} className={`ov-spark-dot${i === ok.length - 1 ? ' is-last' : ''}`}
+        <line key={periods[i].date} className={`spark-dot ${i === ok.length - 1 ? 'last' : ''}`}
           x1={x(i)} x2={x(i)} y1={y(n)} y2={y(n)} vectorEffect="non-scaling-stroke" />
       ))}
     </svg>
   )
 }
 
-function Stat({ span, ok, failed, t }) {
+/** The mockup's healthStat(): the span, the successes, the failures (a link to the queue for ACME). */
+function Stat({ span, ok, failed, onFailures, label, t }) {
+  let failure = <span className="muted">{t('overview.health.failures', { count: 0 })}</span>
+  if (failed > 0) {
+    failure = onFailures
+      ? <button type="button" className="fail-link" aria-label={label} onClick={onFailures}><Icon name="warning" />{t('overview.health.failures', { count: failed })}</button>
+      : <span className="bad"><Icon name="warning" />{t('overview.health.failures', { count: failed })}</span>
+  }
   return (
-    <div className="ov-health-stat">
-      <span className="ov-muted">{span}</span>
-      <span className="ov-health-values">
-        <span className="ov-num">{t('overview.health.successes', { count: ok })}</span>
-        {failed > 0
-          ? <span className="ov-health-fail ov-num"><Warning size={13} aria-hidden="true" />{t('overview.health.failures', { count: failed })}</span>
-          : <span className="ov-muted ov-num">{t('overview.health.failures', { count: 0 })}</span>}
-      </span>
+    <div className="health-stat">
+      <span className="health-span">{span}</span>
+      <span className="health-values"><span><Trans i18nKey="overview.health.runs" count={ok} components={{ strong: <strong /> }} /></span>{failure}</span>
     </div>
   )
 }
@@ -126,102 +133,89 @@ export function HealthCard() {
   const acmeToday = count((protocols.acme?.periods || []).at(-1)?.failed)
   const lastRun = protocols.scheduler?.last_operation_at
   const days = state.data?.days
+  const toQueue = page?.showQueue ? () => page.showQueue('acme') : null
 
   const name = (id) => {
     const link = rowLink(id, can)
     const label = t(`overview.health.${id}`)
-    return link ? <Link to={link}>{label}</Link> : <strong>{label}</strong>
+    return <strong>{link ? <Link to={link}>{label}</Link> : label}</strong>
   }
   const rowProps = (id) => {
     const info = infos[id]
-    return { 'data-testid': `health-${id}`, 'data-alert': info.alert ? 'true' : 'false',
+    return { 'data-protocol': id, 'data-alert': info.alert ? 'true' : 'false',
       'data-severity': info.alert ? (info.warning ? 'warning' : 'critical') : undefined }
   }
 
   return (
-    <CardFrame id="health" title={t('overview.cards.health')} state={state} onRetry={state.reload}
+    <OverviewCard id="health" state={state} route="GET /api/v2/dashboard/health"
       empty={state.status === 'ready' && series.length + services.length === 0}
       sub={[
+        lastRun ? t('overview.health.subScheduler', { when: clockOf(lastRun, t, lang) }) : null,
         typeof days === 'number' ? t('overview.health.sub', { count: days }) : null,
-        lastRun ? t('overview.health.subScheduler', { when: relativeTime(lastRun, lang) }) : null,
       ].filter(Boolean).join(' ')}>
-      {series.length > 0 && (
-        <ul className="ov-health-list">
-          {series.map((id) => {
-            const p = protocols[id]
-            const periods = Array.isArray(p.periods) ? p.periods : []
-            const today = periods.at(-1)
-            const drawn = sum(periods, 'ok') + sum(periods, 'failed') > 0
-            // Days were counted and none saw an operation: one line instead of four zeros
-            const idle = periods.length > 0 && !drawn
-            const last = p.last_operation_at && (
-              <span title={formatDate(p.last_operation_at)}>
-                {t('overview.health.lastOperation', { when: relativeTime(p.last_operation_at, lang) })}
-              </span>
-            )
-            return (
-              <li key={id} className="ov-health-row" {...rowProps(id)}>
-                <div className="ov-health-name">
-                  {name(id)}
-                  {!idle && <small>{last || t('overview.health.noOperation')}</small>}
-                  <StatePill info={infos[id]} />
+      <ul className="health-list panel-content">
+        {series.map((id) => {
+          const p = protocols[id]
+          const periods = Array.isArray(p.periods) ? p.periods : []
+          const today = periods.at(-1)
+          const label = t(`overview.health.${id}`)
+          return (
+            <li key={id} className="health-row" {...rowProps(id)}>
+              <div className="health-name">
+                {name(id)}
+                <small title={p.last_operation_at ? formatDate(p.last_operation_at, { time: true }) : undefined}>
+                  {p.last_operation_at
+                    ? t('overview.health.lastOperation', { when: clockOf(p.last_operation_at, t, lang) })
+                    : t('overview.health.idle', { count: periods.length || days || 7 })}
+                </small>
+                {/* A good state stays silent, as in the mockup; a failure or an unknown state is said */}
+                {toneOf(infos[id]) !== 'good' && <StateBadge info={infos[id]} />}
+              </div>
+              {periods.length > 0 && (
+                <div className="health-stats">
+                  <Stat span={t('overview.health.today')} ok={count(today?.ok)} failed={count(today?.failed)} t={t}
+                    onFailures={id === 'acme' ? toQueue : null} label={t('overview.health.failLink', { count: count(today?.failed), name: label, span: t('overview.health.today') })} />
+                  <Stat span={t('overview.days', { count: periods.length })} ok={sum(periods, 'ok')} failed={sum(periods, 'failed')} t={t}
+                    onFailures={id === 'acme' ? toQueue : null} label={t('overview.health.failLink', { count: sum(periods, 'failed'), name: label, span: t('overview.days', { count: periods.length }) })} />
                 </div>
-                {idle && (
-                  <p className="ov-health-idle">
-                    {t('overview.health.idle', { count: periods.length })}{last && ' '}{last}
-                  </p>
+              )}
+              {periods.length > 0 && (
+                <Sparkline id={id} periods={periods} label={t('overview.health.sparkAlt', {
+                  name: label, ok: periods.map((d) => count(d.ok)).join(', '), failed: periods.map((d) => count(d.failed)).join(', '),
+                })} />
+              )}
+            </li>
+          )
+        })}
+        {services.map((id) => {
+          const p = protocols[id]
+          return (
+            <li key={id} className="health-row" {...rowProps(id)}>
+              <div className="health-name">
+                {name(id)}
+                {id === 'scheduler' && (
+                  <small title={p.last_operation_at ? formatDate(p.last_operation_at, { time: true }) : undefined}>
+                    {t('overview.health.taskCount', { count: num(p.tasks) })}
+                    {p.last_operation_at ? `, ${t('overview.health.lastRun', { when: clockOf(p.last_operation_at, t, lang) })}` : ''}
+                  </small>
                 )}
-                {!idle && periods.length > 0 && (
-                  <div className="ov-health-stats">
-                    <Stat span={t('overview.health.today')} ok={count(today?.ok)} failed={count(today?.failed)} t={t} />
-                    <Stat span={t('overview.days', { count: periods.length })} ok={sum(periods, 'ok')} failed={sum(periods, 'failed')} t={t} />
-                  </div>
-                )}
-                {drawn && (
-                  <Sparkline periods={periods} label={t('overview.health.sparkAlt', {
-                    name: t(`overview.health.${id}`),
-                    ok: periods.map((d) => count(d.ok)).join(', '), failed: periods.map((d) => count(d.failed)).join(', '),
-                  })} />
-                )}
-              </li>
-            )
-          })}
-        </ul>
-      )}
-      {services.length > 0 && (
-        <ul className="ov-services">
-          {services.map((id) => {
-            const p = protocols[id]
-            return (
-              <li key={id} className="ov-service" {...rowProps(id)}>
-                <span className="ov-service-name">
-                  {name(id)}
-                  {id === 'scheduler' && (
-                    <small title={p.last_operation_at ? formatDate(p.last_operation_at) : undefined}>
-                      {t('overview.health.tasks')} {num(p.tasks)}
-                      {p.last_operation_at ? ` · ${relativeTime(p.last_operation_at, lang)}` : ''}
-                    </small>
-                  )}
-                </span>
-                <StatePill info={infos[id]} />
-              </li>
-            )
-          })}
-        </ul>
-      )}
+              </div>
+              <div className="health-stats"><StateBadge info={infos[id]} /></div>
+            </li>
+          )
+        })}
+      </ul>
       {alerts > 0 ? (
-        <p className="ov-health-foot">
-          <Warning size={14} aria-hidden="true" />
+        <p className="health-foot">
+          <Icon name="warning" />
           <span>{t('overview.health.alerts', { count: alerts })}</span>
-          {acmeToday > 0 && page?.showQueue && (
-            <button type="button" className="ov-link" onClick={() => page.showQueue('acme')}>
-              {t('overview.health.seeQueue')}<CaretRight size={12} aria-hidden="true" />
-            </button>
+          {acmeToday > 0 && toQueue && (
+            <button type="button" className="text-link" onClick={toQueue}>{t('overview.health.seeQueue')} <Icon name="right" /></button>
           )}
         </p>
       ) : (
-        <p className="ov-health-foot is-good"><CheckCircle size={14} aria-hidden="true" /><span>{t('overview.health.allFine')}</span></p>
+        <p className="health-foot good"><Icon name="check" /><span>{t('overview.health.allFine')}</span></p>
       )}
-    </CardFrame>
+    </OverviewCard>
   )
 }

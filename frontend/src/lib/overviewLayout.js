@@ -1,8 +1,9 @@
 /** Overview card layout: default order, presets, and the stored preference (`dashboard` key). */
-export const CARD_IDS = ['queue', 'health', 'hierarchy', 'horizon', 'trend', 'states', 'compliance', 'activity']
+// The mockup's six cards in its order (dashCards), then the product's trend, on a line of its own
+export const CARD_IDS = ['queue', 'health', 'hierarchy', 'horizon', 'compliance', 'activity', 'trend']
 export const PRESETS = {
   operator: ['queue', 'health', 'hierarchy', 'horizon'],
-  manager: ['compliance', 'states', 'trend', 'horizon', 'hierarchy', 'activity'],
+  manager: ['compliance', 'horizon', 'hierarchy', 'activity'],
   all: CARD_IDS,
 }
 
@@ -40,13 +41,6 @@ export function moveCard(layout, id, target) {
   const order = layout.order.filter((c) => c !== id)
   order.splice(to, 0, id)
   return { ...layout, order }
-}
-
-/** One step among the cards shown (hidden ones are skipped); unchanged at either end. */
-export function stepCard(layout, id, delta) {
-  const shown = visibleCards(layout)
-  const target = shown[shown.indexOf(id) + delta]
-  return shown.includes(id) && target ? moveCard(layout, id, target) : layout
 }
 
 export function setCardHidden(layout, id, hidden) {

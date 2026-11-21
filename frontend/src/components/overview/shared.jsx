@@ -1,21 +1,17 @@
 /**
- * Shared frame of the overview cards: one fetch, four states (loading, error,
- * missing permission, empty), and a number that is a dash when the API gave none.
+ * Shared frame of the overview cards: one fetch per card, and the mockup's card() around its
+ * body, with the states the product reads separately (skeleton, error, missing right, empty).
  */
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
-import {
-  ArrowDown, ArrowUp, CheckCircle, DotsSixVertical, DotsThree, EyeSlash, SquaresFour, WarningCircle,
-} from '@phosphor-icons/react'
+import { Bar, Card, Icon, LoadCause, LoadError, skWidth } from '../atelier'
 import { ConnectionState, useWebSocket } from '../../hooks/useWebSocket'
+import { usePermission } from '../../hooks/usePermission'
 import { REFRESH_EVENT } from '../../lib/overviewRefresh'
-import './overview.css'
 
 /**
- * What the page gives its cards: `share(key, run)` (one request for two readers), `grip(id)`,
- * `step(id, delta)`, `hide(id)`, `customize()`, `showQueue(group)`, `notify` (toasts and prompts).
- * Null for a card rendered alone.
+ * What the page gives its cards: `share(key, run)` (one request for two readers), `hide(id)`,
+ * `customize(id)`, `showQueue(group)`, `notify` (toasts and prompts). Null for a card rendered alone.
  */
 export const OverviewContext = createContext(null)
 
@@ -29,9 +25,9 @@ const COALESCE_MS = 2000
 const OFFLINE_POLL_MS = 60000
 
 /**
- * {status: 'loading'|'ready'|'error'|'forbidden', data, reload}. After the first load the card
- * reloads in the background (the figures stay on screen) when one of `watch` (resources of the
- * `ucm:data-changed` bus) changes, when the live link comes back, and when the tab returns.
+ * {status: 'loading'|'ready'|'error'|'forbidden', data, error, reload}. After the first load the
+ * card reloads in the background (the figures stay on screen) when one of `watch` (resources of
+ * the `ucm:data-changed` bus) changes, when the live link comes back, and when the tab returns.
  */
 export function useCardData(fetcher, watch = [], shareKey = null) {
   const [state, setState] = useState({ status: 'loading', data: null })
@@ -50,7 +46,7 @@ export function useCardData(fetcher, watch = [], shareKey = null) {
     } catch (error) {
       // A background reload that fails leaves the figures shown; with none yet, the card says the error
       if (mine !== seq.current) return
-      const failed = { status: error?.status === 403 ? 'forbidden' : 'error', data: null }
+      const failed = { status: error?.status === 403 ? 'forbidden' : 'error', data: null, error }
       setState((s) => (quiet && s.status === 'ready' ? s : failed))
     }
   }, [])
@@ -125,132 +121,78 @@ export function useLang() {
   return i18n?.language || 'en'
 }
 
-/** A state in words, with its icon; the tone only repeats it in colour. */
-export function Pill({ tone, icon: Icon, children, className = '', ...rest }) {
+/** The mockup's dashSkeleton() card: its title, a thin line, five bars, at its usual height. */
+export function CardSkeleton({ id, title }) {
+  const { t } = useTranslation()
   return (
-    <span className={`ov-pill${tone ? ` is-${tone}` : ''}${className ? ` ${className}` : ''}`} {...rest}>
-      {Icon && <Icon size={12} weight="bold" aria-hidden="true" />}
-      <span>{children}</span>
-    </span>
+    <section className={`panel dash-card card-${id} sk-card`} id={`card-${id}`} data-card={id} aria-labelledby={`sk-${id}-title`} aria-busy="true">
+      <header className="panel-heading">
+        <div><h2 id={`sk-${id}-title`}>{title}</h2><Bar width="55%" kind="thin" /></div>
+      </header>
+      <p className="sr-only" role="status">{t('overview.state.loading')}</p>
+      <div className="panel-content sk-body" aria-hidden="true">
+        {[0, 1, 2, 3, 4].map((i) => <Bar key={i} width={skWidth(i, 40, 55)} />)}
+      </div>
+    </section>
   )
 }
 
-function CardMenu({ id, title, page }) {
-  const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
-  const root = useRef(null)
-  const button = useRef(null)
-  useEffect(() => {
-    if (!open) return undefined
-    const onDown = (e) => { if (!root.current?.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [open])
-  const onKeyDown = (e) => {
-    if (open && e.key === 'Escape') { e.preventDefault(); setOpen(false); button.current?.focus() }
-  }
-  const run = (action) => () => { setOpen(false); action() }
+/** A card with nothing to show: the mockup's queue-empty block (icon, title, sentence). */
+export function CardEmpty({ id, icon = 'check', title, text, children }) {
   return (
-    <div className="ov-menu-wrap" ref={root} onKeyDown={onKeyDown}>
-      <button type="button" ref={button} className="ov-btn is-quiet is-icon ov-menu-btn" aria-expanded={open}
-        aria-controls={`overview-${id}-menu`} aria-label={t('overview.layout.menu', { name: title })}
-        title={t('overview.layout.menuTitle')} onClick={() => setOpen(!open)}>
-        <DotsThree size={18} weight="bold" aria-hidden="true" />
-      </button>
-      {open && (
-        <div className="ov-menu" id={`overview-${id}-menu`}>
-          <button type="button" disabled={!page.canStep(id, -1)} onClick={run(() => page.step(id, -1))}>
-            <ArrowUp size={15} aria-hidden="true" />{t('overview.layout.earlier')}
-          </button>
-          <button type="button" disabled={!page.canStep(id, 1)} onClick={run(() => page.step(id, 1))}>
-            <ArrowDown size={15} aria-hidden="true" />{t('overview.layout.later')}
-          </button>
-          <button type="button" onClick={run(() => page.hide(id))}>
-            <EyeSlash size={15} aria-hidden="true" />{t('overview.layout.hide')}
-          </button>
-          <button type="button" onClick={run(() => page.customize())}>
-            <SquaresFour size={15} aria-hidden="true" />{t('overview.layout.customize')}
-          </button>
-        </div>
-      )}
+    <div className="queue-empty" id={id}>
+      <Icon name={icon} />
+      <h3>{title}</h3>
+      {text && <p>{text}</p>}
+      {children}
     </div>
   )
 }
 
 /**
- * The common frame: title with its counter, a sentence under it, tools on the right, then one
- * of the four states or the card's body. Inside the page it also carries the grip and the menu.
+ * The mockup's card() for one overview card: `state` from useCardData; `route` the request the
+ * card reads, named by its load error; `empty` (a node, or true for the common block) replaces
+ * the body; `missing` lists the parts of the card that did not load.
  */
-export function CardFrame({ id, title, count, sub, tools, state, empty, emptyHint, onRetry, children, missing }) {
+export function OverviewCard({ id, count, sub, tools, state, route, empty, missing, children }) {
   const { t } = useTranslation()
   const page = useContext(OverviewContext)
-  const { status } = state
-  const ready = status === 'ready'
+  const { hasPermission } = usePermission()
+  const title = t(`overview.cards.${id}`)
+  if (state.status === 'loading') return <CardSkeleton id={id} title={title} />
+  const ready = state.status === 'ready'
   let body
-  if (status === 'loading') {
+  if (state.status === 'forbidden') {
+    body = <CardEmpty icon="lock" title={t('overview.state.forbiddenTitle')} text={t('overview.state.forbidden')} />
+  } else if (state.status === 'error') {
+    const error = { status: state.error?.status, request: state.error?.request || route, message: state.error?.message }
     body = (
-      <>
-        <p role="status" className="ov-state">{t('overview.state.loading')}</p>
-        <div className="ov-skeleton" aria-hidden="true"><span /><span /><span /></div>
-      </>
-    )
-  } else if (status === 'forbidden') {
-    body = <p className="ov-state">{t('overview.state.forbidden')}</p>
-  } else if (status === 'error') {
-    body = (
-      <div role="alert" className="ov-state is-error">
-        <WarningCircle size={16} aria-hidden="true" />
-        <span>{t('overview.state.error')}</span>
-        <button type="button" className="ov-btn" onClick={onRetry}>{t('overview.state.retry')}</button>
+      <div className="panel-content">
+        <LoadError id={`card-${id}`} title={t('overview.state.errorTitle', { name: title })}
+          cause={<LoadCause error={error} fallback={t('overview.state.error')} />} onRetry={state.reload}
+          journal={hasPermission('read:audit') ? '/audit' : undefined} />
       </div>
     )
   } else if (empty) {
-    body = (
-      <div className="ov-state is-empty">
-        <CheckCircle size={26} aria-hidden="true" />
-        <p>{t('overview.state.empty')}</p>
-        {emptyHint && <small>{emptyHint}</small>}
-      </div>
-    )
+    body = empty === true ? <CardEmpty title={t('overview.state.empty')} /> : empty
   } else {
     body = children
   }
   const note = ready && missing?.length > 0 && (
-    <p role="note" className="ov-note">
-      {t(missing.some((m) => m.forbidden) ? 'overview.state.partialForbidden' : 'overview.state.partial')}
-    </p>
+    <div className="panel-content">
+      <p role="note" className="notice warn">
+        <Icon name="warning" />
+        <span>{t(missing.some((m) => m.forbidden) ? 'overview.state.partialForbidden' : 'overview.state.partial')}</span>
+      </p>
+    </div>
   )
   return (
-    <section data-testid={`card-${id}`} id={`card-${id}`} aria-labelledby={`overview-${id}-title`}
-      className={`ov-card ov-card-${id}`}>
-      <header className="ov-card-head">
-        {page?.grip && (
-          <span role="button" tabIndex={0} className="ov-grip" aria-label={t('overview.layout.grip', { name: title })}
-            title={t('overview.layout.gripHint')} {...page.grip(id)}>
-            <DotsSixVertical size={16} weight="bold" aria-hidden="true" />
-          </span>
-        )}
-        <div className="ov-card-titles">
-          <h2 tabIndex={-1}>
-            <span id={`overview-${id}-title`}>{title}</span>
-            {ready && count !== undefined && <span className="ov-counter" data-testid={`${id}-total`}>{count}</span>}
-          </h2>
-          {ready && !empty && sub && <p>{sub}</p>}
-        </div>
-        <div className="ov-card-tools">
-          {ready && tools}
-          {page?.hide && <CardMenu id={id} title={title} page={page} />}
-        </div>
-      </header>
+    <Card id={id} title={title} count={ready ? count : undefined} sub={ready && !empty ? sub : undefined}
+      tools={ready ? tools : undefined}
+      onHide={page?.hide ? () => page.hide(id) : undefined}
+      onCustomize={page?.customize ? () => page.customize(id) : undefined}>
       {note}
       {body}
-    </section>
+    </Card>
   )
-}
-
-/** An in-app link when there is somewhere to go, the same content as plain text otherwise. */
-export function MaybeLink({ to, className, children, ...rest }) {
-  return to
-    ? <Link to={to} className={className} {...rest}>{children}</Link>
-    : <div className={className} {...rest}>{children}</div>
 }
