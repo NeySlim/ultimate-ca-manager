@@ -88,11 +88,11 @@ vi.mock('../../services/user-certificates.service', () => ({
   userCertificatesService: { export: vi.fn() },
 }))
 
-// A native select exposes the options and the helper text that the real one hides in a portal.
-// The extra button sets a value the way a saved selection would, even one no longer listed.
-vi.mock('../../components', async (orig) => ({
+// The field's options and hint in one box; the extra button sets a value the way a saved
+// selection would, even one no longer listed (a native select would refuse it).
+vi.mock('../../components/atelier/Form', async (orig) => ({
   ...(await orig()),
-  Select: ({ label, options = [], value, onChange, helperText }) => (
+  Select: ({ label, options = [], value, onChange, hint: helperText }) => (
     <div data-testid={`field-${label}`}>
       <select aria-label={label} value={value ?? ''} onChange={(e) => onChange?.(e.target.value)}>
         <option value="">-</option>

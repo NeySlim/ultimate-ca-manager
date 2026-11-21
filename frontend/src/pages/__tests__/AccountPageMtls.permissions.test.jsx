@@ -168,10 +168,10 @@ describe('AccountPage mTLS modal — backend authorization gates', () => {
     const securityTabs = await screen.findAllByText('common.security')
     fireEvent.click(securityTabs[0])
     await screen.findByText('Account mTLS certificate')
-    fireEvent.click(screen.getByLabelText('common.export'))
+    fireEvent.click(screen.getByRole('button', { name: 'common.export Account mTLS certificate' }))
     fireEvent.click(screen.getByText('PKCS#12'))
     fireEvent.click(screen.getByText('export.includeRoot'))
-    fireEvent.change(screen.getByPlaceholderText('export.passwordLengthHint'), {
+    fireEvent.change(screen.getByLabelText(/export\.password/), {
       target: { value: 'account-export-password' },
     })
     fireEvent.click(screen.getByText('export.download'))
@@ -208,7 +208,7 @@ describe('AccountPage mTLS export of a post-quantum certificate', () => {
     render(<MemoryRouter><AccountPage /></MemoryRouter>)
     fireEvent.click((await screen.findAllByText('common.security'))[0])
     await screen.findByText('Account mTLS certificate')
-    fireEvent.click(screen.getByLabelText('common.export'))
+    fireEvent.click(screen.getByRole('button', { name: 'common.export Account mTLS certificate' }))
     expect(screen.getByText('PKCS#12').closest('label').querySelector('input').disabled).toBe(!offered)
     expect(screen.getByText('JKS').closest('label').querySelector('input').disabled).toBe(!offered)
     expect(screen.getByText('PEM').closest('label').querySelector('input')).toBeEnabled()

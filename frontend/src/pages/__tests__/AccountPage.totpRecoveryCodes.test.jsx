@@ -89,9 +89,12 @@ describe('AccountPage: TOTP recovery codes', () => {
     fireEvent.click(screen.getByText('account.verifyAndEnable'))
 
     await waitFor(() => expect(m.confirm2FA).toHaveBeenCalledWith('123456'))
-    for (const code of CODES) expect(await screen.findByText(code)).toBeInTheDocument()
+    // The codes sit in a read-only field of the dialog, one per line, to be copied
+    const box = await screen.findByLabelText('account.backupCodes')
+    expect(box).toHaveAttribute('readonly')
+    expect(box.value.split('\n')).toEqual(CODES)
     expect(screen.queryByText('account.verifyAndEnable')).not.toBeInTheDocument()
     fireEvent.click(screen.getByText('account.backupCodesSaved'))
-    await waitFor(() => expect(screen.queryByText(CODES[0])).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByLabelText('account.backupCodes')).not.toBeInTheDocument())
   })
 })
