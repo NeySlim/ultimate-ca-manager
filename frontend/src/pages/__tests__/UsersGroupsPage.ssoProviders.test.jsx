@@ -3,7 +3,7 @@
  * and detaches one or resets its identity behind a confirmation that says what it closes.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
@@ -150,6 +150,20 @@ describe('UsersGroupsPage single sign-on providers of an account', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /users\.sso\.attach$/ }).pop())
     await waitFor(() => expect(mocks.attachSso).toHaveBeenCalledWith(8, { provider_id: 2, remove_password: false }))
     expect(mocks.showConfirm).not.toHaveBeenCalled()
+  })
+
+  it('attaches in the mockup dialog of the zone: its fields, then Annuler and the primary action', async () => {
+    await open(LOCAL)
+    fireEvent.click(await screen.findByRole('button', { name: /users\.sso\.attach/ }))
+    const dialog = await screen.findByRole('dialog', { name: /users\.sso\.attachTitle/ })
+    expect(dialog.tagName).toBe('DIALOG')
+    expect(dialog.closest('.atl')).not.toBeNull()
+    expect(dialog.querySelector('.form-fields #sso-attach-provider')).not.toBeNull()
+    expect(screen.getByRole('checkbox', { name: 'users.sso.removePassword' }).closest('label')).toHaveClass('checkbox-line')
+    const actions = dialog.querySelector('.modal-actions')
+    expect([...actions.querySelectorAll('button')].map((b) => b.className)).toEqual(['btn', 'btn primary'])
+    fireEvent.click(within(actions).getByRole('button', { name: 'common.cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
   it('removes the local password only when ticked, and after a confirmation', async () => {
