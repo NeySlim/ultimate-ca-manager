@@ -40,6 +40,7 @@ export const IconBtn = forwardRef(function IconBtn({ icon, label, quiet = false,
 /** `.text-link`: a button, or a link with `to`; the icon follows the words unless `iconFirst`. */
 export const TextLink = forwardRef(function TextLink({ icon, iconFirst = false, to, children, type = 'button', ...rest }, ref) {
   const body = iconFirst ? <>{icon && <Icon name={icon} />}{children}</> : <>{children}{icon && <> <Icon name={icon} /></>}</>
-  if (to) return <Link ref={ref} className="text-link" to={to} {...rest}>{body}</Link>
+  // The mockup draws these as buttons: the link keeps their box (extensions.css, a.text-link[data-link])
+  if (to) return <Link ref={ref} className="text-link" data-link="" to={to} {...rest}>{body}</Link>
   return <button ref={ref} type={type} className="text-link" {...rest}>{body}</button>
 })

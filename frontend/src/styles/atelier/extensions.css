@@ -90,3 +90,7 @@
 /* A page action the mockup's phone head hides (every button but the primary one) keeps a way in under the queue. */
 .atl .phone-only{display:none}
 @media (max-width:800px){.atl .phone-only{display:flex}}
+/* A mockup text-link button the product renders as a link (it navigates): the button's box. */
+.atl a.text-link[data-link]{display:inline-block}
+/* A phone-only action of the product (no counterpart in the mockup) takes the mockup's 40 px phone controls. */
+@media (max-width:800px){.atl .phone-only .btn{min-height:40px}}

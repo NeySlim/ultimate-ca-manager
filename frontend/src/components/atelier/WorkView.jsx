@@ -81,7 +81,7 @@ function WorkSkeleton({ history }) {
   return (
     <div className="work-view" aria-busy="true">
       <p className="sr-only" role="status">{t('work.loading')}</p>
-      <p className="work-hint" aria-hidden="true"><Bar width="14px" /><Bar width="420px" /></p>
+      <p className="work-hint" aria-hidden="true"><Bar width="14px" /><Bar width="min(420px, 100%)" /></p>
       {[2, 1].map((n, g) => (
         <section key={g} className="panel work-group" aria-hidden="true">
           <header className="work-group-head"><span className="check-hit"><Bar width="16px" kind="box" /></span><Bar width="160px" /></header>
