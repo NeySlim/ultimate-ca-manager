@@ -68,6 +68,31 @@ for (const width of [1199, 1200]) {
   })
 }
 
+test.describe('at 1200 px with the dock at the right', () => {
+  test.use({ viewport: { width: 1200, height: 900 } })
+  // Beside the right dock the list folds its secondary columns: no horizontal scroll, the chevron in view
+  test('the lists fit beside the dock', async ({ page, api }) => {
+    await issueCert(api, (await createCA(api)).id)
+    const prefs = (await api.get('/account/preferences')) || {}
+    await api.put('/account/preferences', { ...prefs, inspector: { position: 'right', height: 278, width: 460 } })
+    try {
+      for (const path of ['/certificates', '/users', '/templates']) {
+        await openFirst(page, path)
+        await expect(app(page)).toHaveClass(/dock-right/)
+        const fits = () => page.evaluate(() => {
+          const region = document.querySelector('.atl .page-content .table-scroll') as HTMLElement
+          const box = region.closest('.table-container')!.getBoundingClientRect()
+          const chevron = region.querySelector('tbody tr td:last-child button:last-of-type')
+          return region.scrollWidth - region.clientWidth <= 1 && (!chevron || chevron.getBoundingClientRect().right <= box.right + 1)
+        })
+        await expect.poll(fits, { message: path }).toBe(true)
+      }
+    } finally {
+      await api.put('/account/preferences', { ...prefs, inspector: { position: 'bottom', height: 278, width: 460 } })
+    }
+  })
+})
+
 test.describe('phone', () => {
   test.use({ viewport: { width: 390, height: 844 } })
   const PAGES = ['/templates', '/users', '/truststore', '/certificates']

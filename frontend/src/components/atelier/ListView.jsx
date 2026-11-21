@@ -16,7 +16,8 @@ import { TableFooter } from './TableFooter'
  * @param {string} p.icon  the module's icon, before each name
  * @param {(row) => string} p.title
  * @param {(row) => import('react').ReactNode} p.status
- * @param {Array<{id, label, cell(row), grow?, muted?} | {status: true}>} p.columns
+ * @param {Array<{id, label, cell(row), grow?, muted?, fold?} | {status: true}>} p.columns  beside the right dock the state stays and the
+ *   others fold from the last one (DataTable)
  * @param {{range, note?, pagination?}} p.footer
  * @param {import('react').ReactNode} [p.error]  a LoadError in place of the table
  * @param {{key, asc}} [p.sort]  with onSort, the columns naming a `sort` key sort the list (the server's order); nameSort for the name
@@ -32,8 +33,8 @@ export function ListView({ filters, label, caption, icon, rows: allRows, rowKey,
   const cols = [
     { id: 'name', label: t('atelier.name'), entity: true, icon: () => icon, cell: title, sort: nameSort, extra: nameExtra, skeleton: { base: 55, spread: 35 } },
     ...columns.map((c, i) => (c.status
-      ? { id: 'status', label: t('atelier.state'), cell: status, sort: c.sort, skeleton: { width: '74px', kind: 'pill' } }
-      : { id: c.id || `col-${i}`, label: c.label, cell: c.cell, grow: !!c.grow, tone: c.muted ? 'muted' : undefined, fit: c.fit, title: c.title, sort: c.sort })),
+      ? { id: 'status', label: t('atelier.state'), cell: status, sort: c.sort, fold: c.fold ?? false, skeleton: { width: '74px', kind: 'pill' } }
+      : { id: c.id || `col-${i}`, label: c.label, cell: c.cell, grow: !!c.grow, tone: c.muted ? 'muted' : undefined, fit: c.fit, title: c.title, sort: c.sort, fold: c.fold })),
   ]
   const card = (row) => ({
     meta: columns.filter((c) => !c.status).slice(0, 3).map((c) => c.cell(row)),
