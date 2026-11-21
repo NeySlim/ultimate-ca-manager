@@ -139,6 +139,19 @@ test.describe('phone', () => {
     expect(Math.round((await box(pdf)).height)).toBe(40)
   })
 
+  test('discovery: the actions under the list wrap inside the page, nothing sideways', async ({ page, api }) => {
+    await page.goto('/discovery')
+    const row = page.getByRole('main').locator('.phone-only')
+    await expect(row.getByRole('button', { name: 'Quick scan…' })).toBeVisible()
+    const content = await box(page.locator('.page-content'))
+    for (const b of await row.getByRole('button').all()) {
+      const r = await box(b)
+      expect(r.x).toBeGreaterThanOrEqual(content.x - 0.5)
+      expect(r.x + r.width).toBeLessThanOrEqual(content.x + content.width + 0.5)
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  })
+
   test('the buttons of a report inspector heading are 40 px, as the mockup dock', async ({ page, api }) => {
     await page.goto('/reports')
     const main = page.getByRole('main')

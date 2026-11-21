@@ -93,6 +93,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Changed
 
 - **The search palette lists every page of the menu and runs its actions.** Trust Store, user certificates, TSA, CRL and OCSP, key recovery, discovery and system logs join the pages, only what the account may open is listed, Issue New Certificate, Create New CA and Upload CSR open their form, and the search also finds ACME accounts and SCEP profiles.
+- **Discovery no longer scrolls sideways on a phone.** The view and quick scan buttons under its list wrap inside the page, as every phone row of page actions now does.
 - **The legend under the certificate list follows the close on navigate setting.** While My Account closes the inspector on a page change, the legend says the open certificates close, instead of saying they stay available.
 - **The Failures figure of the overview opens the queue on its ACME rows.** It showed the Automation health card; it now shows the To handle card filtered on ACME, bringing the card back if it was hidden.
 - **An object opened from any page shows in the dock of its zone.** A certificate opened from the search, an approval, an authority or another page goes to the Certificates page and its inspector, as a trusted certificate goes to the Trust Store and an authority to the Authorities page, the console keeping no inspector of its own. The search lists again the certificates and authorities it finds, and the Extensions tab names a qcStatements transaction limit and copies the whole value of a raw extension.
