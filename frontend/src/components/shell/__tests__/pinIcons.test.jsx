@@ -1,35 +1,51 @@
-/** Pins keep the mockup's line icons: a pinned page's icon is not filled, the pin is upright. */
+/** The shell draws the mockup's pictograms: a module's own in the bar and the menu, the pin in the menu. */
 import { describe, it, expect, vi } from 'vitest'
 import { render } from '@testing-library/react'
-import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
-import { PushPinSimple } from '@phosphor-icons/react'
 import { tStub, canFor, ROLES } from './shellTestUtils'
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: tStub, i18n: { language: 'en' } }) }))
 
 import { PinnedModules } from '../PinnedModules'
-import { ModulesMenu } from '../ModulesMenu'
-import { moduleById } from '../../../navigation/registry'
+import { ModulesButton, ModulesMenu } from '../ModulesMenu'
+import { useDisclosure } from '../useDisclosure'
+import { PATHS } from '../../atelier/icons'
+import { MODULES, glyphOf, moduleById } from '../../../navigation/registry'
 
-const drawnOf = (Icon) => {
+const drawn = (name) => {
   const box = document.createElement('div')
-  box.innerHTML = renderToStaticMarkup(<Icon size={16} />)
+  box.innerHTML = `<svg>${PATHS[name]}</svg>`
   return box.querySelector('svg').innerHTML
 }
 
-describe('pin icons', () => {
-  it('draws the icon of an open pinned module in its line weight, as when it is closed', () => {
-    const { container } = render(<MemoryRouter><PinnedModules pins={['reports']} activeId="reports" /></MemoryRouter>)
-    const link = container.querySelector('a[data-module="reports"]')
-    expect(link).toHaveClass('is-active')
-    expect(link.querySelector('svg').innerHTML).toBe(drawnOf(moduleById('reports').icon))
+function Menu({ pins }) {
+  const menu = useDisclosure()
+  return (
+    <>
+      <ModulesButton menu={menu} can={canFor(ROLES.admin)} pins={pins} activeId="" />
+      <ModulesMenu menu={menu} can={canFor(ROLES.admin)} pins={pins} onTogglePin={() => true} activeId="" />
+    </>
+  )
+}
+
+describe('shell icons', () => {
+  it('gives every module a pictogram of the mockup\'s set', () => {
+    for (const m of MODULES) expect(PATHS[glyphOf(m)], m.id).toBeTruthy()
+    expect(glyphOf(moduleById('acme'))).toBe('refresh')
+    expect(glyphOf(moduleById('approvals'))).toBe('approve')
   })
 
-  it('uses the upright pin in the Modules menu', () => {
-    const { container, getByRole } = render(<MemoryRouter><ModulesMenu can={canFor(ROLES.admin)} pins={['reports']} onTogglePin={() => true} activeId="" /></MemoryRouter>)
-    getByRole('button', { name: /shell\.modules$/ }).click()
-    const pin = container.querySelector('.shell-pin[aria-pressed="true"] svg')
-    expect(pin.innerHTML).toBe(drawnOf(PushPinSimple))
+  it('draws a pinned module with its own pictogram, open or not', () => {
+    const { container } = render(<MemoryRouter><PinnedModules pins={['reports']} activeId="reports" /></MemoryRouter>)
+    const link = container.querySelector('a[data-module="reports"]')
+    expect(link).toHaveClass('pinned-link', 'active')
+    expect(link.querySelector('svg').innerHTML).toBe(drawn('chart'))
+  })
+
+  it('uses the mockup\'s pin in the Modules menu', () => {
+    const { container, getByRole } = render(<MemoryRouter><Menu pins={['reports']} /></MemoryRouter>)
+    getByRole('button', { name: /shell\.modules/ }).click()
+    const pin = container.querySelector('.pin-btn[aria-pressed="true"] svg')
+    expect(pin.innerHTML).toBe(drawn('pin'))
   })
 })

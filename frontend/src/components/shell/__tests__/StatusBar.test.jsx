@@ -53,9 +53,9 @@ describe('StatusBar', () => {
     vi.stubGlobal('fetch', answer({ status: 'ok', version: '3.0.0', ha: false }))
     const { container } = render(<StatusBar />)
     await screen.findByText(/shell\.statusRunning/)
-    const keys = [...container.querySelectorAll('.shell-status-shortcut kbd')].map((k) => k.textContent)
+    const keys = [...container.querySelectorAll('.shortcut kbd')].map((k) => k.textContent)
     expect(keys).toEqual(['Ctrl K', 'shell.escapeKey'])
-    expect(container.querySelector('.shell-status-escape')).toHaveTextContent('shell.escapeKey inspector.close')
+    expect(container.querySelector('.shortcut > span')).toHaveTextContent('shell.escapeKey inspector.close')
   })
 
   it('shows no HA part outside HA mode', async () => {
@@ -72,9 +72,9 @@ describe('StatusBar', () => {
       cluster: { leader_node_id: 'n1', nodes: 3, stale: 0 },
     }))
     render(<StatusBar />)
-    expect(await screen.findByText('shell.haNode|n2')).toBeInTheDocument()
-    expect(screen.getByText('shell.haFollower')).toBeInTheDocument()
-    expect(screen.getByText('shell.haNodes|3').closest('.shell-ha-link')).toHaveClass('is-good')
+    expect(await screen.findByText(/shell\.haNode\|n2/)).toBeInTheDocument()
+    expect(screen.getByText(/shell\.haFollower/)).toBeInTheDocument()
+    expect(screen.getByText('shell.haNodes|3').closest('.ha-link')).toHaveClass('good')
   })
 
   // On a phone the mockup's bar holds the version line, then approvals and the cluster state on one
@@ -85,9 +85,9 @@ describe('StatusBar', () => {
       cluster: { leader_node_id: 'n1', nodes: 2, stale: 1 },
     }))
     const { container } = render(<StatusBar />)
-    await screen.findByText('shell.haNode|n1')
-    expect([...container.querySelectorAll('.shell-status-node')].map((e) => e.textContent)).toEqual(['shell.haNode|n1', 'shell.haLeader'])
-    expect(screen.getByText('shell.haLate|1').closest('.shell-status-node')).toBeNull()
+    await screen.findByText(/shell\.haNode\|n1/)
+    expect(container.querySelector('.live .ha-node').textContent).toBe(' · shell.haNode|n1 · shell.haLeader')
+    expect(screen.getByText('shell.haLate|1').closest('.ha-node')).toBeNull()
   })
 
   it('says how many nodes are late, as a warning, in place of the node count', async () => {
@@ -96,7 +96,7 @@ describe('StatusBar', () => {
       cluster: { leader_node_id: 'n1', nodes: 3, stale: 1 },
     }))
     render(<StatusBar />)
-    expect((await screen.findByText('shell.haLate|1')).closest('.shell-ha-link')).toHaveClass('is-warn')
+    expect((await screen.findByText('shell.haLate|1')).closest('.ha-link')).toHaveClass('warn')
     expect(screen.queryByText('shell.haNodes|3')).toBeNull()
   })
 
@@ -106,7 +106,7 @@ describe('StatusBar', () => {
       cluster: { leader_node_id: 'n1', nodes: 2, stale: 0 }, maintenance: { reason: 'restore', phase: 'draining' },
     }))
     render(<StatusBar />)
-    expect((await screen.findByText('shell.haMaintenanceShort')).closest('.shell-ha-link')).toHaveClass('is-warn')
+    expect((await screen.findByText('shell.haMaintenanceShort')).closest('.ha-link')).toHaveClass('warn')
   })
 
   it('opens the node list from the indicator when it may, and is plain text otherwise', async () => {
@@ -133,9 +133,9 @@ describe('StatusBar', () => {
   it('leaves the role out when the node does not know it', async () => {
     vi.stubGlobal('fetch', answer({ status: 'ok', version: '3.0.0', ha: true, node_id: 'n2', leader: null, cluster: null }))
     render(<StatusBar />)
-    await screen.findByText('shell.haNode|n2')
-    expect(screen.queryByText('shell.haLeader')).toBeNull()
-    expect(screen.queryByText('shell.haFollower')).toBeNull()
+    await screen.findByText(/shell\.haNode\|n2/)
+    expect(screen.queryByText(/shell\.haLeader/)).toBeNull()
+    expect(screen.queryByText(/shell\.haFollower/)).toBeNull()
     expect(screen.queryByText(/shell\.haNodes/)).toBeNull()
   })
 

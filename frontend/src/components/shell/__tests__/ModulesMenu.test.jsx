@@ -14,7 +14,8 @@ vi.mock('react-i18next', () => ({
 }))
 const showInfo = vi.hoisted(() => vi.fn())
 
-import { ModulesMenu } from '../ModulesMenu'
+import { ModulesButton, ModulesMenu } from '../ModulesMenu'
+import { useDisclosure } from '../useDisclosure'
 import { togglePinList } from '../pins'
 import { groupsFor, menuGroupsFor, MAIN_IDS } from '../../../navigation/registry'
 
@@ -27,7 +28,14 @@ function Host({ permissions, initialPins = [], activeId = 'dashboard', onHelp })
     setPins(next)
     return true
   }
-  return <ModulesMenu can={canFor(permissions)} pins={pins} onTogglePin={toggle} activeId={activeId} onOpenHelp={onHelp} onNotice={showInfo} />
+  // The bar holds the button among its links and the menu after them, sharing one disclosure
+  const menu = useDisclosure()
+  return (
+    <>
+      <nav aria-label="bar"><ModulesButton menu={menu} can={canFor(permissions)} pins={pins} activeId={activeId} /></nav>
+      <ModulesMenu menu={menu} can={canFor(permissions)} pins={pins} onTogglePin={toggle} activeId={activeId} onOpenHelp={onHelp} onNotice={showInfo} />
+    </>
+  )
 }
 
 function setup(props = {}, path = '/') {
@@ -65,7 +73,7 @@ describe('Modules menu: what each role sees', () => {
     const user = setup({ permissions: ROLES.admin })
     await user.click(button())
     const groups = menuGroupsFor(canFor(ROLES.admin))
-    const counters = within(menu()).getAllByRole('heading', { level: 2 }).map(h => h.querySelector('.shell-count').textContent)
+    const counters = within(menu()).getAllByRole('heading', { level: 2 }).map(h => h.querySelector('.counter').textContent)
     expect(counters).toEqual(groups.map(g => String(g.modules.length)))
     const pages = groups.reduce((n, g) => n + g.modules.length, 0)
     expect(within(menu()).getByText(new RegExp(`shell\\.modulePages`)).textContent).toContain('shell.pinCount')
@@ -113,13 +121,13 @@ describe('Modules menu: what each role sees', () => {
 
   it('highlights the Modules button for a module view, not for a fixed link or a pinned module', () => {
     setup({ activeId: 'reports' })
-    expect(button().className).toContain('is-active')
+    expect(button().className).toContain('active')
     cleanup()
     setup({ activeId: 'audit' })
-    expect(button().className).not.toContain('is-active')
+    expect(button().className).not.toContain('active')
     cleanup()
     setup({ activeId: 'reports', initialPins: ['reports'] })
-    expect(button().className).not.toContain('is-active')
+    expect(button().className).not.toContain('active')
   })
 })
 

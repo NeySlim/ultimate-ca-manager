@@ -25,7 +25,11 @@ vi.mock('../../../contexts/NotificationContext', () => ({ useNotification: () =>
 vi.mock('../../WebSocketIndicator', () => ({ WebSocketIndicator: () => null }))
 vi.mock('../../../services', () => ({
   certificatesService: { getStats: probe.getStats },
+  settingsService: { getExpiryAlerts: vi.fn().mockResolvedValue({ data: {} }) },
+  acmeService: {}, crlService: {},
 }))
+vi.mock('../../../services/dashboard.service', () => ({ dashboardService: { getQueue: vi.fn().mockResolvedValue({ data: { items: [] } }) } }))
+vi.mock('../../../services/audit.service', () => ({ default: { getLogs: vi.fn().mockResolvedValue({ data: [] }) } }))
 vi.mock('../../CommandPalette', async () => {
   const actual = await vi.importActual('../../CommandPalette')
   return {
@@ -44,6 +48,8 @@ vi.mock('../../UpdatePopup', () => ({ UpdatePopup: () => <div data-testid="updat
 vi.mock('../../KofiSupportCard', () => ({ KofiSupportCard: () => <div data-testid="kofi" /> }))
 
 import { AppShell } from '../../AppShell'
+import { Zone } from '../../atelier/Zone'
+import { resetHealthForTests } from '../health'
 import { InspectorProvider, useInspector } from '../../../contexts/InspectorContext'
 
 let inspector
@@ -60,6 +66,7 @@ function setup(path = '/') {
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route element={<AppShell />}>
+            <Route path="/zone" element={<Zone><h1>zone body</h1></Zone>} />
             <Route path="*" element={<p>page body <button type="button" className="lv-btn is-primary">Issue</button></p>} />
           </Route>
         </Routes>
@@ -84,6 +91,7 @@ describe('AppShell', () => {
     const skip = screen.getByRole('link', { name: 'shell.skipToContent' })
     expect(skip).toHaveFocus()
     await user.keyboard('{Enter}')
+    // A page drawn outside the mockup's zones has no #main: the skip link falls back to the page slot
     expect(document.getElementById('shell-page')).toHaveFocus()
     expect(document.getElementById('shell-page')).toContainElement(screen.getByText(/page body/))
   })
@@ -107,13 +115,45 @@ describe('AppShell', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'shell.search' })).toHaveFocus())
   })
 
+  // The mockup's stateBanners() open the page content of a zone; the shell holds them above other pages
+  it.each([['/zone', true], ['/certificates', false]])('puts the state banners where the page draws them: %s', async (path, zone) => {
+    resetHealthForTests()
+    let online = true
+    const spy = vi.spyOn(navigator, 'onLine', 'get').mockImplementation(() => online)
+    try {
+      setup(path)
+      act(() => { online = false; window.dispatchEvent(new Event('offline')) })
+      const banner = await screen.findByText('shell.offline.title')
+      const box = banner.closest('#offline-banner')
+      if (zone) {
+        expect(box.parentElement).toHaveClass('page-content')
+        expect(box.nextElementSibling).toHaveTextContent('zone body')
+        expect(document.querySelector('.shell-banners')).toBeNull()
+      } else {
+        expect(box.closest('.shell-banners')).not.toBeNull()
+        expect(box.closest('.atl')).not.toBeNull()
+      }
+    } finally {
+      act(() => { online = true; window.dispatchEvent(new Event('online')) })
+      spy.mockRestore()
+    }
+  })
+
+  it('opens the notification panel after the masthead, as the mockup, not inside it', async () => {
+    const user = setup('/certificates')
+    await user.click(screen.getByRole('button', { name: /shell\.bell\.label/ }))
+    const panel = document.getElementById('notif-panel')
+    expect(panel.parentElement).toBe(document.getElementById('notif-slot'))
+    expect(document.querySelector('header.masthead')).not.toContainElement(panel)
+  })
+
   it('suspends the write controls of every page during a cluster maintenance, and gives them back after', async () => {
     const maintenance = { status: 'ok', version: '3.0.0', ha: true, node_id: 'n1', leader: true,
       cluster: { leader_node_id: 'n1', nodes: 2, stale: 0 }, maintenance: { reason: 'manual' } }
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => maintenance }))
     setup('/certificates')
     await waitFor(() => expect(screen.getByRole('button', { name: 'Issue' })).toBeDisabled())
-    expect(screen.getByRole('button', { name: 'Issue' })).toHaveAttribute('aria-describedby', 'shell-writes-note')
+    expect(screen.getByRole('button', { name: 'Issue' })).toHaveAttribute('aria-describedby', 'failover-note')
   })
 
   it('renders the bar, the page and the status bar, and no sidebar', async () => {
@@ -171,16 +211,23 @@ describe('AppShell', () => {
     expect(current.map(a => a.getAttribute('data-module'))).toEqual(['certificates'])
   })
 
-  it('keeps the status bar out of the area that makes room for the dock', () => {
+  it('is the mockup\'s frame: the masthead, the stage, the status bar, the bars under the scope of its rules', () => {
     setup('/certificates')
+    const app = document.querySelector('.shell-app')
     const bar = screen.getByRole('contentinfo')
-    const stage = document.querySelector('.shell-stage')
-    expect(stage).not.toBeNull()
-    expect(stage).toContainElement(screen.getByRole('banner'))
-    expect(stage).toContainElement(screen.getByText('page body'))
-    expect(stage).not.toContainElement(bar)
-    expect(bar.parentElement).toHaveClass('shell-root')
-    expect(bar.parentElement.lastElementChild === bar || bar.previousElementSibling === stage).toBe(true)
+    const masthead = screen.getByRole('banner')
+    const main = document.querySelector('.shell-main')
+    expect(masthead).toHaveClass('masthead')
+    expect(bar).toHaveClass('statusbar')
+    // Each bar in a scope of no box of its own; the page slot outside any scope (a page brings its own)
+    for (const el of [masthead, bar]) expect(el.parentElement).toHaveClass('atl', 'atl-island')
+    expect(main.parentElement).toBe(app)
+    expect(main.closest('.atl')).toBeNull()
+    expect(main).toContainElement(screen.getByText('page body'))
+    expect(main).not.toContainElement(bar)
+    // The order of the mockup: masthead, its session banner and notification panel slots, the stage, the status bar
+    const order = [masthead, document.getElementById('session-banner-slot'), document.getElementById('notif-slot'), main, bar]
+    for (let i = 1; i < order.length; i++) expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('puts the open inspector in the page flow: under the page, or beside it on the right', () => {
@@ -196,7 +243,7 @@ describe('AppShell', () => {
     expect(dock.previousElementSibling).toHaveClass('shell-content')
     expect(dock).toHaveClass('is-bottom')
     expect(main).not.toHaveClass('has-dock-right')
-    expect(document.querySelector('.shell-stage')).not.toContainElement(screen.getByRole('contentinfo'))
+    expect(main).not.toContainElement(screen.getByRole('contentinfo'))
     act(() => inspector.setGeometry({ position: 'right' }))
     expect(main).toHaveClass('has-dock-right')
     expect(dock).toHaveClass('is-right')
@@ -206,10 +253,11 @@ describe('AppShell', () => {
   it.each(['/certificates', '/'])('has one bottom bar on %s', (path) => {
     setup(path)
     const content = document.querySelector('.shell-content')
-    // The banners' live region reads nothing aloud in the nominal state and draws nothing
-    expect([...content.children].filter(c => !c.matches('.sr-only[role="status"]'))).toHaveLength(1)
+    // The banners' place draws nothing in the nominal state: an empty stage, then the page
+    expect([...content.children].map(c => c.className)).toEqual(['atl atl-island', 'shell-page'])
+    expect(content.querySelector('.shell-banners').textContent).toBe('')
     // The notification panel's own foot is not a bar of the page
-    expect(document.querySelectorAll('footer:not(.shell-notif-foot)')).toHaveLength(1)
+    expect(document.querySelectorAll('footer:not(.notif-foot)')).toHaveLength(1)
     expect(screen.queryByText(/^windows\./)).toBeNull()
   })
 })
@@ -260,7 +308,7 @@ describe('following a link to a page whose code is still loading', () => {
       </InspectorProvider>
     )
     expect(await screen.findByText('certificates page')).toBeVisible()
-    const activity = () => document.querySelector('.shell-navlink[data-module="audit"]')
+    const activity = () => document.querySelector('.main-nav a[data-module="audit"]')
     const before = document.title
     await user.click(activity())
     await waitFor(() => expect(activity()).toHaveAttribute('aria-current', 'page'))

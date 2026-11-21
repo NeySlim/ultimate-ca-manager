@@ -75,7 +75,7 @@ describe('NotificationBell', () => {
     await waitFor(() => expect(bell()).toHaveAccessibleName(/shell\.bell\.unread\|4/))
     await user.click(bell())
     const panel = screen.getByRole('complementary', { name: 'shell.bell.title' })
-    const rows = within(panel).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
+    const rows = within(panel).getAllByRole('listitem').map(li => li.getAttribute('data-notif'))
     // Newest first, the undated approval last
     expect(rows).toEqual(['acme_order_failed:7', 'audit:41', 'audit:43', 'approval_pending:3'])
     expect(m.getQueue).toHaveBeenCalledWith(expect.arrayContaining(['acme_order_failed', 'approval_pending', 'truststore_expiring']))
@@ -118,10 +118,10 @@ describe('NotificationBell', () => {
     const user = setup()
     await waitFor(() => expect(bell()).toHaveAccessibleName(/\|4/))
     await user.click(bell())
-    const unread = document.querySelectorAll('.shell-notif-item.is-unread').length
+    const unread = document.querySelectorAll('.notif-item.unread').length
     expect(bell()).toHaveAccessibleName(`shell.bell.label|shell.bell.unread|${unread}`)
     await user.click(screen.getByRole('button', { name: /shell\.bell\.markRead: web\.example/ }))
-    expect(document.querySelectorAll('.shell-notif-item.is-unread').length).toBe(unread - 1)
+    expect(document.querySelectorAll('.notif-item.unread').length).toBe(unread - 1)
     expect(bell()).toHaveAccessibleName(`shell.bell.label|shell.bell.unread|${unread - 1}`)
     expect(m.persistPreference).toHaveBeenLastCalledWith('notifications_read', ['acme_order_failed:7'])
   })
@@ -134,7 +134,7 @@ describe('NotificationBell', () => {
     expect(m.persistPreference).toHaveBeenCalledTimes(1)
     expect(m.persistPreference.mock.calls[0][1]).toHaveLength(4)
     expect(bell()).toHaveAccessibleName('shell.bell.label|shell.bell.noneUnread')
-    expect(document.querySelector('.shell-notif-head [role="status"]')).toHaveTextContent('shell.bell.summary|4|shell.bell.allRead')
+    expect(document.querySelector('.notif-head [role="status"]')).toHaveTextContent('shell.bell.summary|4|shell.bell.allRead')
   })
 
   it('reads the marks from the user preferences and drops marks of items that left', async () => {
@@ -209,8 +209,8 @@ describe('NotificationBell', () => {
     await waitFor(() => expect(bell()).toHaveAccessibleName(/\|4/))
     await user.click(bell())
     await user.click(screen.getByRole('button', { name: /shell\.bell\.markRead: web\.example/ }))
-    const line = document.querySelector('[data-notification="acme_order_failed:7"]')
-    expect(line.querySelector('.shell-notif-actions a, .shell-notif-actions button')).toHaveFocus()
+    const line = document.querySelector('[data-notif="acme_order_failed:7"]')
+    expect(line.querySelector('.notif-actions a, .notif-actions button')).toHaveFocus()
     await user.click(screen.getByRole('button', { name: 'shell.bell.markAllRead' }))
     expect(screen.getByRole('heading', { name: 'shell.bell.title' })).toHaveFocus()
   })
@@ -232,7 +232,7 @@ describe('NotificationBell', () => {
       { kind: 'acme_order_failed', tier: 'critical', id: 100 + i, label: `h${i}.example`, due_at: null, href_hint: '/acme' })) } })
     m.getLogs.mockResolvedValue({ data: [] })
     setup()
-    await waitFor(() => expect(document.querySelector('.shell-bell-count')).toHaveTextContent('12'))
+    await waitFor(() => expect(document.querySelector('.notif-count')).toHaveTextContent('12'))
   })
 
   it('names a CRL line after its authority', async () => {
@@ -242,12 +242,13 @@ describe('NotificationBell', () => {
     const user = setup()
     await waitFor(() => expect(bell()).toHaveAccessibleName(/\|1/))
     await user.click(bell())
-    expect(document.querySelector('.shell-notif-title')).toHaveTextContent('shell.bell.crlTitle|Services CA')
+    expect(document.querySelector('.notif-title')).toHaveTextContent('shell.bell.crlTitle|Services CA')
   })
 
   it('makes the rest of the shell inert behind the full-screen panel of a phone, and only there', async () => {
     const shell = document.createElement('div')
-    shell.innerHTML = '<div class="shell-main"></div><footer class="shell-statusbar"></footer>'
+    shell.className = 'shell-app'
+    shell.innerHTML = '<div class="shell-main"></div><footer class="statusbar"></footer>'
     document.body.appendChild(shell)
     const matchMedia = vi.fn().mockReturnValue({ matches: true })
     vi.stubGlobal('matchMedia', matchMedia)
@@ -255,7 +256,7 @@ describe('NotificationBell', () => {
       const user = setup()
       await user.click(bell())
       expect(shell.querySelector('.shell-main')).toHaveAttribute('inert')
-      expect(shell.querySelector('.shell-statusbar')).toHaveAttribute('inert')
+      expect(shell.querySelector('.statusbar')).toHaveAttribute('inert')
       await user.keyboard('{Escape}')
       expect(shell.querySelector('.shell-main')).not.toHaveAttribute('inert')
       matchMedia.mockReturnValue({ matches: false })
@@ -282,7 +283,7 @@ describe('NotificationBell', () => {
     const user = userEvent.setup()
     await waitFor(() => expect(bell()).toHaveAccessibleName(/\|5/))
     await user.click(bell())
-    const rows = within(screen.getByRole('complementary', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
+    const rows = within(screen.getByRole('complementary', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notif'))
     expect(rows).toContain('audit:60')
     expect(rows).not.toContain('audit:61')
   })
@@ -301,7 +302,7 @@ describe('NotificationBell', () => {
     const user = userEvent.setup()
     await waitFor(() => expect(bell()).toHaveAccessibleName(/\|5/))
     await user.click(bell())
-    const rows = within(screen.getByRole('complementary', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
+    const rows = within(screen.getByRole('complementary', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notif'))
     expect(rows).toContain('audit:80')
     for (let i = 0; i < refused.length; i++) expect(rows).not.toContain(`audit:${70 + i}`)
   })
@@ -315,7 +316,7 @@ describe('NotificationBell', () => {
     await waitFor(() => expect(bell()).toHaveAccessibleName(/\|4/))
     const user = userEvent.setup()
     await user.click(bell())
-    const rows = within(screen.getByRole('complementary', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
+    const rows = within(screen.getByRole('complementary', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notif'))
     expect(rows).toContain('audit:41')
     expect(rows).not.toContain('audit:100')
   })
@@ -340,7 +341,7 @@ describe('NotificationBell', () => {
     const user = userEvent.setup()
     await waitFor(() => expect(bell()).toHaveAccessibleName(/\|5/))
     await user.click(bell())
-    const rows = within(screen.getByRole('complementary', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
+    const rows = within(screen.getByRole('complementary', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notif'))
     expect(rows).toContain('audit:300')
     expect(rows.some(r => r.startsWith('audit:2'))).toBe(false)
   })

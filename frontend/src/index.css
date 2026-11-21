@@ -2475,12 +2475,7 @@ button, a, input, select, textarea {
   color: var(--text-tertiary);
 }
 
-/* Ko-fi support card and About link */
-.kofi-card {
-  background-image: linear-gradient(to right, color-mix(in srgb, var(--kofi-coral) 10%, var(--bg-secondary)), var(--bg-secondary));
-  border-left: 3px solid var(--kofi-coral);
-}
-.kofi-badge { background-color: var(--kofi-coral-strong); color: var(--paper); }
+/* Ko-fi button of the support card (drawn in components/shell/shell.css) and the About link icon */
 .kofi-button { background-color: var(--kofi-coral-strong); color: var(--paper); transition: background-color 150ms; }
 .kofi-button:hover { background-color: var(--kofi-coral-hover); }
 /* Pulled toward the text colour: darker on light themes, lighter on dark ones (≥ 3:1) */

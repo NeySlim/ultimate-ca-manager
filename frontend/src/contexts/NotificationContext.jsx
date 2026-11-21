@@ -1,17 +1,17 @@
 /**
  * Notification Context - Toast notifications + Confirmation dialogs
  */
-import { createContext, useContext, useState, useCallback, useMemo } from 'react'
-import * as Toast from '@radix-ui/react-toast'
-import { CheckCircle, Warning, Info, X } from '@phosphor-icons/react'
+import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
+import { Warning } from '@phosphor-icons/react'
+import { Icon } from '../components/atelier/Icon'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
 import { ListDialog } from '../components/list/ListDialog'
-import { yieldEscapeToDialog } from '../components/list/dialogEscape'
 import { useTranslation } from 'react-i18next'
 
 const NotificationContext = createContext()
-const TOAST_ICONS = { success: CheckCircle, error: Warning, warning: Warning, info: Info }
+// A message that stays takes the mockup's failure toast; its icon and rule follow its type (extensions.css)
+const TOAST_TONES = { success: ['check', 'good'], error: ['warning', 'bad'], warning: ['warning', 'warn'], info: ['bell', 'accent'] }
 
 export function NotificationProvider({ children }) {
   const { t } = useTranslation()
@@ -101,45 +101,8 @@ export function NotificationProvider({ children }) {
 
   return (
     <NotificationContext.Provider value={value}>
-      <Toast.Provider swipeDirection="down">
-        {children}
-        
-        {/* The mockup's inverted pill; a toast that stays or carries an action is its failure toast:
-            a framed line with the tone's rule and icon, the action, and a close button */}
-        {toasts.map(toast => {
-          const held = toast.duration === 0 || !!toast.action
-          const Icon = TOAST_ICONS[toast.type] || Info
-          return (
-            <Toast.Root
-              key={toast.id}
-              className={`ui-toast${held ? ` is-held is-${toast.type}` : ''}`}
-              type={toast.type === 'error' ? 'foreground' : 'background'}
-              open={true}
-              duration={toast.duration > 0 ? toast.duration : Infinity}
-              onOpenChange={() => removeToast(toast.id)}
-              onEscapeKeyDown={yieldEscapeToDialog}
-            >
-              {held && <Icon className="ui-toast-icon" aria-hidden="true" />}
-              <Toast.Description className="ui-toast-text">{toast.message}</Toast.Description>
-              {toast.action && (
-                <Toast.Action asChild altText={toast.action.label}>
-                  <button type="button" className="lv-btn" onClick={() => toast.action.onClick()}>{toast.action.label}</button>
-                </Toast.Action>
-              )}
-              {held && (
-                <Toast.Close asChild>
-                  <button type="button" className="lv-btn is-icon" aria-label={t('common.closeMessage')}>
-                    <X size={16} aria-hidden="true" />
-                  </button>
-                </Toast.Close>
-              )}
-            </Toast.Root>
-          )
-        })}
-
-        {/* Bottom centre, 40 px above the window's edge: a toast never covers a page header's commands */}
-        <Toast.Viewport className="ui-toast-viewport fixed bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-[300] outline-none" />
-      </Toast.Provider>
+      {children}
+      <ToastLine toast={toasts[toasts.length - 1]} onClose={removeToast} closeLabel={t('common.closeMessage')} />
 
       {/* Confirmation and prompt: the narrow Atelier dialog, its buttons in the interface language */}
       <ListDialog
@@ -203,6 +166,49 @@ export function NotificationProvider({ children }) {
         </form>
       </ListDialog>
     </NotificationContext.Provider>
+  )
+}
+
+/**
+ * The mockup's toast(): one line at the bottom centre, a newer message in place of the one shown (an
+ * older one still running comes back when it ends). A passing message is the inverted pill; one that
+ * stays or carries an action is the framed failure line, its action and Fermer le message. The line
+ * stays mounted, so each message is announced: an error assertively, the others politely.
+ */
+function ToastLine({ toast, onClose, closeLabel }) {
+  // Escape outside a dialog or a menu closes the message shown; one typed in a dialog stays the dialog's
+  useEffect(() => {
+    if (!toast) return undefined
+    const onKey = (e) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || e.target?.closest?.('dialog, [role="dialog"], [role="alertdialog"], [role="menu"]')) return
+      onClose(toast.id)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [toast, onClose])
+  const held = !!toast && (toast.duration === 0 || !!toast.action)
+  const [icon, tone] = TOAST_TONES[toast?.type] || TOAST_TONES.info
+  const cls = toast ? `visible${held ? ` failure tone-${tone}` : ''}` : undefined
+  return (
+    <div className="atl atl-island">
+      <div id="toast" role="status" aria-live={toast?.type === 'error' ? 'assertive' : 'polite'} className={cls}>
+        {toast && !held && toast.message}
+        {toast && held && (
+          <>
+            <span className="toast-msg"><Icon name={icon} /><span className="toast-text">{toast.message}</span></span>
+            {toast.action && (
+              <button type="button" className="btn" id="toast-retry" data-write="false"
+                onClick={() => { toast.action.onClick(); onClose(toast.id) }}>
+                <Icon name="refresh" />{toast.action.label}
+              </button>
+            )}
+            <button type="button" className="icon-btn" id="toast-close" aria-label={closeLabel} onClick={() => onClose(toast.id)}>
+              <Icon name="close" />
+            </button>
+          </>
+        )}
+      </div>
+    </div>
   )
 }
 

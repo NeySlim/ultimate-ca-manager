@@ -83,8 +83,8 @@ export function haState(health) {
 }
 
 // Ids of the banner sentences that say why a control is disabled
-export const WRITES_NOTE_ID = 'shell-writes-note'
-export const OFFLINE_NOTE_ID = 'shell-offline-note'
+export const WRITES_NOTE_ID = 'failover-note'
+export const OFFLINE_NOTE_ID = 'offline-note'
 
 const subscribeNetwork = (cb) => {
   window.addEventListener('online', cb)

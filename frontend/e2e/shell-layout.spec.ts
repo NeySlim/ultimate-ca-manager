@@ -58,21 +58,29 @@ test('the expiry count sits on its own link: no other link covered, the link kee
     for (const path of ['/certificates', '/cas']) {
       await page.goto(path)
       const nav = page.getByRole('navigation', { name: 'Main navigation' })
-      const badge = nav.locator('.shell-badge')
+      const badge = nav.locator('.nav-count')
       await expect(badge).toBeVisible()
-      const own = nav.locator('a.shell-navlink[data-module="certificates"]')
+      const own = nav.locator(':scope > a[data-module="certificates"]')
       await expect(own).toContainText(/certificates? expir/)
       const b = await box(badge)
       // It covers neither the icon of its own link nor its label
-      expect(apart(b, await box(own.locator('> span:not(.shell-navicon):not(.sr-only)'))), `${path} at ${width}: label`).toBe(true)
+      // The label is the link's bare text, as the mockup's: measured as a range
+      const label = await own.evaluate((a) => {
+        const r = document.createRange()
+        const text = [...a.childNodes].find(n => n.nodeType === 3 && n.textContent.trim())
+        r.selectNodeContents(text)
+        const { x, y, width, height } = r.getBoundingClientRect()
+        return { x, y, width, height }
+      })
+      expect(apart(b, label), `${path} at ${width}: label`).toBe(true)
       const icon = own.locator('svg')
       if (await icon.isVisible()) expect(apart(b, await box(icon)), `${path} at ${width}: icon`).toBe(true)
       // A link folded away at this width (a pin another test set) covers nothing
-      for (const link of await nav.locator('a.shell-navlink:not([data-module="certificates"]):visible').all()) {
+      for (const link of await nav.locator(':scope > a:not([data-module="certificates"]):visible').all()) {
         expect(apart(b, await box(link)), `${path} at ${width}: ${await link.getAttribute('data-module')}`).toBe(true)
       }
       // The count adds no tab stop and is not clipped by its own pill
-      await expect(nav.locator('button.shell-badge')).toHaveCount(0)
+      await expect(nav.locator('button.nav-count')).toHaveCount(0)
       expect(await badge.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
     }
   }

@@ -33,8 +33,11 @@ export const AuthFrame = forwardRef(function AuthFrame({ title, lead, children, 
       <main className="auth" id="main" tabIndex={-1}>
         {tools && (
           <div className="auth-tools">
-            <AuthLanguageMenu />
-            <ThemeMenu />
+            {/* The menus are the console's (the mockup's themeMenu()), drawn under its scope */}
+            <div className="atl atl-island">
+              <AuthLanguageMenu />
+              <ThemeMenu />
+            </div>
           </div>
         )}
         <section className="auth-card" aria-labelledby="auth-title">

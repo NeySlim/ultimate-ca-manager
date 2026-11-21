@@ -1,8 +1,7 @@
 /** Theme menu: same ThemeContext as Appearance, applied mode icon, keyboard loop and focus return. */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
-import { renderToStaticMarkup } from 'react-dom/server'
-import { Sparkle, Moon } from '@phosphor-icons/react'
+import { PATHS } from '../../atelier/icons'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 
@@ -27,9 +26,10 @@ import { ThemeMenu } from '../ThemeMenu'
 
 const trigger = () => screen.getByRole('button', { name: /^shell\.theme\.label\|/ })
 const drawn = (svg) => svg.innerHTML
-const drawnOf = (Icon) => {
+// The mockup's pictogram, as Icon draws it
+const drawnOf = (name) => {
   const box = document.createElement('div')
-  box.innerHTML = renderToStaticMarkup(<Icon size={16} />)
+  box.innerHTML = `<svg>${PATHS[name]}</svg>`
   return box.querySelector('svg').innerHTML
 }
 
@@ -55,7 +55,8 @@ describe('ThemeMenu', () => {
       'shell.theme.light', 'shell.theme.aurore', 'shell.theme.auroreLight'])
     expect(within(menu).queryByRole('group')).toBeNull()
     expect(within(menu).queryByRole('separator')).toBeNull()
-    expect([...menu.children].map(c => c.getAttribute('role'))).toEqual(Array(5).fill('menuitemradio'))
+    // The mockup's list: one item per choice, each holding its radio button
+    expect([...menu.children].map(c => `${c.tagName}:${c.getAttribute('role')}:${c.firstElementChild.getAttribute('role')}`)).toEqual(Array(5).fill('LI:none:menuitemradio'))
   })
 
   it('applies family and mode together, closes, and gives the focus back to the button', async () => {
@@ -85,7 +86,7 @@ describe('ThemeMenu', () => {
   it('shows the applied theme in the icon and the title', () => {
     theme.value = { themeFamily: 'atelier', mode: 'system', resolvedMode: 'light' }
     setup()
-    expect(trigger().querySelector('svg')).toHaveAttribute('data-mode', 'light')
+    expect(trigger()).toHaveAttribute('data-mode', 'light')
     expect(trigger().getAttribute('title')).toBe('shell.theme.label|shell.theme.system (shell.theme.light)')
   })
 
@@ -112,17 +113,17 @@ describe('ThemeMenu', () => {
     expect(trigger()).toHaveAttribute('aria-haspopup', 'menu')
   })
 
-  it('draws sparkles for the Aurore family and a 16 px icon, else the applied mode', () => {
+  it('draws sparkles for the Aurore family, else the applied mode, with the mockup\'s icon', () => {
     theme.value = { themeFamily: 'aurore', mode: 'light', resolvedMode: 'light' }
     const { unmount } = render(<MemoryRouter><ThemeMenu /></MemoryRouter>)
     expect(trigger()).toHaveAccessibleName('shell.theme.label|shell.theme.auroreLight')
     const svg = trigger().querySelector('svg')
-    expect(svg).toHaveAttribute('width', '16')
-    expect(drawn(svg)).toBe(drawnOf(Sparkle))
+    expect(svg).toHaveClass('icon')
+    expect(drawn(svg)).toBe(drawnOf('sparkles'))
     unmount()
     theme.value = { themeFamily: 'atelier', mode: 'dark', resolvedMode: 'dark' }
     render(<MemoryRouter><ThemeMenu /></MemoryRouter>)
-    expect(drawn(trigger().querySelector('svg'))).toBe(drawnOf(Moon))
+    expect(drawn(trigger().querySelector('svg'))).toBe(drawnOf('moon'))
   })
 
   it('loops the arrow keys over the options', async () => {

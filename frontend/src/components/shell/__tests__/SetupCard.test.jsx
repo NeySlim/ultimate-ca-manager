@@ -173,6 +173,6 @@ describe('SetupCard', () => {
     setup()
     await waitFor(() => expect(card()).not.toBeNull())
     await waitFor(() => expect(within(card()).getByRole('button', { name: 'shell.setup.steps.root.action' })).toBeDisabled())
-    expect(within(card()).getByRole('button', { name: 'shell.setup.steps.root.action' })).toHaveAttribute('aria-describedby', 'shell-writes-note')
+    expect(within(card()).getByRole('button', { name: 'shell.setup.steps.root.action' })).toHaveAttribute('aria-describedby', 'failover-note')
   })
 })

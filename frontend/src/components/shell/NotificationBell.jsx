@@ -3,13 +3,11 @@
  * work queue and the journal (see notifications.js), grouped by day, newest first. A line
  * offers only the actions that exist: open its page, retry or publish when the API can, mark read.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import {
-  Archive, ArrowClockwise, ArrowsClockwise, Bell, CaretRight, Check, CheckCircle, FileX, PaperPlaneTilt, RocketLaunch,
-  ShieldWarning, Users, Vault, Warning, X,
-} from '@phosphor-icons/react'
+import { Icon } from '../atelier/Icon'
 import { formatDate } from '../../lib/utils'
 import { getAppTimezone } from '../../stores/timezoneStore'
 import { acmeService, crlService, settingsService } from '../../services'
@@ -17,13 +15,16 @@ import { useDisclosure, moveFocus } from './useDisclosure'
 import { useNotifications } from './notifications'
 import { guardProps, useWriteGuard } from './health'
 
+// The mockup's icons: warning for ACME, crl, approve, archive for a backup, users for a session; the nearest for the rest
 const KIND_ICON = {
-  acme_order_failed: Warning, acme_client_renewal_failed: Warning, approval_pending: CheckCircle,
-  crl_due: FileX, crl_missing: FileX, manual_renewal_due: ArrowsClockwise, auto_renewal_blocked: ArrowsClockwise,
-  ca_expiring: ShieldWarning, deploy_binding_left_behind: RocketLaunch, https_binding_left_behind: RocketLaunch,
-  truststore_expiring: Vault, system_backup: Archive, system_restore: Archive,
-  session_revoke: Users, session_revoke_all: Users,
+  acme_order_failed: 'warning', acme_client_renewal_failed: 'warning', approval_pending: 'approve',
+  crl_due: 'crl', crl_missing: 'crl', manual_renewal_due: 'refresh', auto_renewal_blocked: 'refresh',
+  ca_expiring: 'shield', deploy_binding_left_behind: 'server', https_binding_left_behind: 'server',
+  truststore_expiring: 'anchor', system_backup: 'archive', system_restore: 'archive',
+  session_revoke: 'users', session_revoke_all: 'users',
 }
+// The panel follows the bar, as the mockup's notifPanel(): AppShell gives it this place
+export const NOTIF_SLOT = 'notif-slot'
 // Tones of the mockup: approvals in the accent, CRLs and sessions a warning, failures and the rest by their tier
 const toneOf = (item) => item.kind === 'approval_pending' ? 'accent'
   : item.kind.startsWith('session_') || item.kind.startsWith('crl_') ? 'warn'
@@ -33,7 +34,7 @@ const toneOf = (item) => item.kind === 'approval_pending' ? 'accent'
 const titleOf = (item, t) => (item.kind.startsWith('crl_') && item.title ? t('shell.bell.crlTitle', { name: item.title }) : item.title)
 
 // Behind the full-screen panel of a phone, the rest of the shell leaves the tab order and the reading
-const COVERED = '.shell-skip, .shell-brand, .shell-mobile-nav, .shell-main-nav, .shell-tools > :not(.shell-bell-wrap), .shell-main, .shell-statusbar'
+const COVERED = '.shell-app .skip, .masthead .brand, .masthead .mobile-nav, .masthead .main-nav, .global-tools > :not(.notif-button), .shell-main, .shell-app .statusbar'
 const PHONE = '(max-width: 800px)'
 
 // A future due date (a CRL to publish) is shown at the time of reading
@@ -107,7 +108,7 @@ export function NotificationBell({ can }) {
   const [focusAfter, setFocusAfter] = useState(null)
   useEffect(() => {
     if (!focusAfter) return
-    const line = panelRef.current?.querySelector(`[data-notification="${CSS.escape(focusAfter)}"] .shell-notif-actions`)
+    const line = panelRef.current?.querySelector(`[data-notif="${CSS.escape(focusAfter)}"] .notif-actions`)
     ;(line?.querySelector('a, button:not([disabled])') || titleRef.current)?.focus()
     setFocusAfter(null)
   }, [focusAfter])
@@ -133,11 +134,11 @@ export function NotificationBell({ can }) {
   const actionOf = (item) => {
     if (item.source !== 'queue') return null
     if (item.kind === 'acme_client_renewal_failed' && can?.hasPermission?.('write:acme')) {
-      return { icon: ArrowClockwise, label: t('shell.bell.retry'), aria: t('shell.bell.retryLabel', { name: item.title }),
+      return { icon: 'refresh', label: t('shell.bell.retry'), aria: t('shell.bell.retryLabel', { name: item.title }),
         run: () => acmeService.renewOrder(item.id), done: t('overview.queue.retried') }
     }
     if ((item.kind === 'crl_due' || item.kind === 'crl_missing') && can?.hasPermission?.('write:crl')) {
-      return { icon: PaperPlaneTilt, label: t('shell.bell.publish'), aria: t('shell.bell.publishLabel', { name: item.title }),
+      return { icon: 'send', label: t('shell.bell.publish'), aria: t('shell.bell.publishLabel', { name: item.title }),
         run: () => crlService.regenerate(item.id), done: t('notifications.crlRegenerated', { name: item.title }) }
     }
     return null
@@ -167,102 +168,110 @@ export function NotificationBell({ can }) {
     g.items.push({ ...item, when })
   }
 
+  // The panel's place after the bar; in place when the shell gives none (a test, a gate)
+  const [slot, setSlot] = useState(null)
+  useLayoutEffect(() => { setSlot(document.getElementById(NOTIF_SLOT)) }, [])
+
+  const panel = (
+    <aside className="notif-panel" id="notif-panel" ref={panelRef} aria-labelledby="notif-title" hidden={!open} onKeyDown={onKeyDown}>
+      <header className="notif-head">
+        <div>
+          <h2 id="notif-title" ref={titleRef} tabIndex={-1}>{t('shell.bell.title')}</h2>
+          <p id="notif-summary" role="status">{t('shell.bell.summary', { state: summary, count: items.length })}</p>
+        </div>
+        <button type="button" className="btn quiet" id="notif-read-all" data-action="notif-read-all" disabled={unread === 0} onClick={readAll}>
+          <Icon name="check" />{t('shell.bell.markAllRead')}
+        </button>
+        <button type="button" className="icon-btn quiet" id="notif-close" data-action="notif-close" aria-label={t('shell.bell.close')} onClick={() => close(true)}>
+          <Icon name="close" />
+        </button>
+      </header>
+      <div className="notif-scroll" id="notif-scroll">
+        {items.length === 0 ? (
+          <p className="notif-empty"><Icon name="check" />{t('shell.bell.empty')}</p>
+        ) : groups.map((g, gi) => (
+          <section key={g.label} className="notif-group" aria-labelledby={`notif-day-${gi}`}>
+            <h3 id={`notif-day-${gi}`}>{g.label}</h3>
+            <ul>
+              {g.items.map(item => {
+                const tone = toneOf(item)
+                const title = titleOf(item, t)
+                const name = title || kindLabel(item)
+                const detail = item.detail || t(`overview.cause.${item.kind}`, { defaultValue: '' })
+                const action = actionOf(item)
+                return (
+                  <li key={item.key} className={`notif-item${item.unread ? ' unread' : ''}`} data-notif={item.key}>
+                    <span className={`notif-icon ${tone}`} aria-hidden="true"><Icon name={KIND_ICON[item.kind] || 'warning'} /></span>
+                    <div className="notif-main">
+                      <p className="notif-meta">
+                        <span className={`notif-kind ${tone}`}>{kindLabel(item)}</span>
+                        {item.unread && <span className="notif-new">{t('shell.bell.new')}</span>}
+                        {item.when !== null && <time dateTime={new Date(item.when).toISOString()}>{hm(item.when)}</time>}
+                      </p>
+                      {title && <p className="notif-title">{title}</p>}
+                      {detail && <p className="notif-detail">{detail}</p>}
+                      <div className="notif-actions">
+                        {action && (
+                          <button type="button" className="btn" aria-label={action.aria}
+                            aria-busy={busy === item.key || undefined}
+                            {...guardProps(guard, !!busy)}
+                            onClick={() => act(item, action)}>
+                            <Icon name={action.icon} />{action.label}
+                          </button>
+                        )}
+                        {item.href && (
+                          <Link to={item.href} className="btn" data-notif-open={item.key}
+                            aria-label={`${t('shell.bell.open')}: ${name}`}
+                            onClick={() => { markRead(item.key); close() }}>
+                            <Icon name="right" />{t('shell.bell.open')}
+                          </Link>
+                        )}
+                        {item.unread && (
+                          <button type="button" className="btn quiet" data-notif-read={item.key}
+                            aria-label={`${t('shell.bell.markRead')}: ${name}`}
+                            onClick={() => readOne(item.key)}>
+                            {t('shell.bell.markRead')}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        ))}
+      </div>
+      <p className="sr-only" role="status">{said}</p>
+      {canSettings && (
+        <footer className="notif-foot">
+          <Icon name="send" />
+          <p>
+            {mail === null ? null : <>{mail ? t('shell.bell.mailOn') : t('shell.bell.mailOff')} </>}
+            <Link className="text-link" to="/settings?tab=email" data-notif-settings="" onClick={() => close()}>{t('shell.bell.mailSettings')}</Link>
+          </p>
+        </footer>
+      )}
+    </aside>
+  )
+
   return (
-    <div className="shell-pop-wrap shell-bell-wrap" ref={rootProps.ref} onKeyDown={onKeyDown}>
+    <>
       <button
         type="button"
-        ref={buttonRef}
-        className="shell-icon-btn shell-bell"
+        ref={(el) => { buttonRef.current = el; rootProps.ref.current = el }}
+        className="icon-btn quiet notif-button"
+        id="notif-button"
+        data-action="notif"
         aria-expanded={open}
-        aria-controls="shell-bell-panel"
+        aria-controls="notif-panel"
         aria-label={t('shell.bell.label', { state: buttonState })}
         onClick={() => setOpen(!open)}
       >
-        <Bell size={16} aria-hidden="true" />
-        {unread > 0 && <span className="shell-bell-count" aria-hidden="true">{unread}</span>}
+        <Icon name="bell" />
+        {unread > 0 && <span className="notif-count" id="notif-count" aria-hidden="true">{unread}</span>}
       </button>
-      <aside id="shell-bell-panel" ref={panelRef} className="shell-notif-panel"
-        aria-labelledby="shell-bell-title" hidden={!open}>
-        <header className="shell-notif-head">
-          <div>
-            <h2 id="shell-bell-title" ref={titleRef} tabIndex={-1}>{t('shell.bell.title')}</h2>
-            <p role="status">{t('shell.bell.summary', { state: summary, count: items.length })}</p>
-          </div>
-          <button type="button" className="shell-btn is-quiet" disabled={unread === 0} onClick={readAll}>
-            <Check size={17} aria-hidden="true" />{t('shell.bell.markAllRead')}
-          </button>
-          <button type="button" className="shell-icon-btn" aria-label={t('shell.bell.close')} onClick={() => close(true)}>
-            <X size={16} aria-hidden="true" />
-          </button>
-        </header>
-        <div className="shell-notif-scroll">
-          {items.length === 0 ? (
-            <p className="shell-notif-empty"><Check size={16} aria-hidden="true" />{t('shell.bell.empty')}</p>
-          ) : groups.map((g, gi) => (
-            <section key={g.label} className="shell-notif-group" aria-labelledby={`shell-notif-day-${gi}`}>
-              <h3 id={`shell-notif-day-${gi}`}>{g.label}</h3>
-              <ul>
-                {g.items.map(item => {
-                  const tone = toneOf(item)
-                  const Icon = KIND_ICON[item.kind] || Warning
-                  const title = titleOf(item, t)
-                  const name = title || kindLabel(item)
-                  const detail = item.detail || t(`overview.cause.${item.kind}`, { defaultValue: '' })
-                  const action = actionOf(item)
-                  return (
-                    <li key={item.key} className={`shell-notif-item${item.unread ? ' is-unread' : ''}`} data-notification={item.key}>
-                      <span className={`shell-notif-icon is-${tone}`} aria-hidden="true"><Icon size={18} /></span>
-                      <div className="shell-notif-main">
-                        <p className="shell-notif-meta">
-                          <span className={`shell-notif-kind is-${tone}`}>{kindLabel(item)}</span>
-                          {item.unread && <span className="shell-notif-new">{t('shell.bell.new')}</span>}
-                          {item.when !== null && <time dateTime={new Date(item.when).toISOString()}>{hm(item.when)}</time>}
-                        </p>
-                        {title && <p className="shell-notif-title">{title}</p>}
-                        {detail && <p className="shell-notif-detail">{detail}</p>}
-                        <div className="shell-notif-actions">
-                          {action && (
-                            <button type="button" className="shell-btn" aria-label={action.aria}
-                              aria-busy={busy === item.key || undefined}
-                              {...guardProps(guard, !!busy)}
-                              onClick={() => act(item, action)}>
-                              <action.icon size={17} aria-hidden="true" />{action.label}
-                            </button>
-                          )}
-                          {item.href && (
-                            <Link to={item.href} className="shell-btn"
-                              aria-label={`${t('shell.bell.open')}: ${name}`}
-                              onClick={() => { markRead(item.key); close() }}>
-                              <CaretRight size={17} aria-hidden="true" />{t('shell.bell.open')}
-                            </Link>
-                          )}
-                          {item.unread && (
-                            <button type="button" className="shell-btn is-quiet"
-                              aria-label={`${t('shell.bell.markRead')}: ${name}`}
-                              onClick={() => readOne(item.key)}>
-                              {t('shell.bell.markRead')}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-            </section>
-          ))}
-        </div>
-        <p className="sr-only" role="status">{said}</p>
-        {canSettings && (
-          <footer className="shell-notif-foot">
-            <PaperPlaneTilt size={14} aria-hidden="true" />
-            <p>
-              {mail === null ? null : <>{mail ? t('shell.bell.mailOn') : t('shell.bell.mailOff')} </>}
-              <Link className="shell-text-link" to="/settings?tab=email" onClick={() => close()}>{t('shell.bell.mailSettings')}</Link>
-            </p>
-          </footer>
-        )}
-      </aside>
-    </div>
+      {slot ? createPortal(panel, slot) : panel}
+    </>
   )
 }

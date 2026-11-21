@@ -1,4 +1,4 @@
-/** Phone-width picker: one native select over the main pages, then the groups of the mega-menu. */
+/** Phone-width picker, the mockup's select.mobile-nav: the main pages, then the groups of the Modules menu. */
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { isVisible, menuGroupsFor, menuLabelKey, moduleById, MAIN_IDS } from '../../navigation/registry'
@@ -12,7 +12,8 @@ export function MobileModulePicker({ can, activeId }) {
   const listed = main.some(m => m.id === current) || groups.some(g => g.modules.some(m => m.id === current))
   return (
     <select
-      className="shell-mobile-nav"
+      className="mobile-nav"
+      id="mobile-nav"
       aria-label={t('shell.navigate')}
       value={listed ? current : ''}
       onChange={(e) => {

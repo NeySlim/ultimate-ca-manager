@@ -1,7 +1,9 @@
 /**
- * AppShell Component - Atelier layout: top bar, page, status bar
+ * The console's frame, the mockup's render(): masthead, session banner and notification panel,
+ * the stage (the page, its banners, the inspector), the status bar. The shell's own parts are
+ * drawn under .atl (atl-island: no box of its own); the page slot is not, a page brings its own.
  */
-import { Suspense, useState, useEffect } from 'react'
+import { Suspense, useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Outlet, useLocation } from 'react-router-dom'
 import { LoadingSpinner } from './LoadingSpinner'
@@ -24,6 +26,8 @@ import { InspectorDock } from './inspector/InspectorDock'
 import { useDockPlacement } from './inspector/placement'
 import { useThemeColor } from '../lib/themeColor'
 import { BANNER_SLOT } from '../lib/sessionBannerSlot'
+import { NOTIF_SLOT } from './shell/NotificationBell'
+import { ShellBannersContext } from './shell/bannersSlot'
 
 export function AppShell() {
   const { t } = useTranslation()
@@ -46,6 +50,11 @@ export function AppShell() {
   const showNodes = hasPermission('read:settings') ? () => setNodesOpen(true) : undefined
   // Offline or in maintenance, every write control of every page waits, pointing to the banner
   useCentralWriteGuard(useWriteGuard())
+  // A zone drawn from the mockup shows the banners in its page content and claims them
+  const [claims, setClaims] = useState(0)
+  const claim = useCallback(() => { setClaims(c => c + 1); return () => setClaims(c => c - 1) }, [])
+  const bannerNode = <StateBanners onShowNodes={showNodes} onNotice={notice} />
+  const banners = { claim, node: bannerNode }
 
   // Derive the active nav item from the URL (see resolveActivePageId)
   const activePage = resolveActivePageId(location.pathname)
@@ -123,29 +132,34 @@ export function AppShell() {
     setHelpModalOpen(true)
   }
 
+  const skipToPage = (e) => {
+    e.preventDefault()
+    ;(document.getElementById('main') || document.getElementById('shell-page'))?.focus()
+  }
+
   return (
-    <div className="shell-root">
-      <a className="shell-skip" href="#shell-page" onClick={(e) => { e.preventDefault(); document.getElementById('shell-page')?.focus() }}>
-        {t('shell.skipToContent')}
-      </a>
-      {/* The stage holds the page and the inspector; the status bar stays under both */}
-      <div className="shell-stage">
-      <TopBar
-        can={can}
-        pins={pins}
-        onTogglePin={togglePin}
-        activeId={activePage}
-        onOpenSearch={() => setCommandPaletteOpen(true)}
-        onOpenHelp={openHelp}
-        hasHelp={hasHelp}
-        onNotice={notice}
-      />
-      {/* The session expiry banner comes here, after the bar's buttons in the tab order */}
-      <div id={BANNER_SLOT} style={{ display: 'contents' }} />
+    <ShellBannersContext.Provider value={banners}>
+    <div className="shell-app">
+      <div className="atl atl-island">
+        <a className="skip" href="#main" onClick={skipToPage}>{t('shell.skipToContent')}</a>
+        <TopBar
+          can={can}
+          pins={pins}
+          onTogglePin={togglePin}
+          activeId={activePage}
+          onOpenSearch={() => setCommandPaletteOpen(true)}
+          onOpenHelp={openHelp}
+          hasHelp={hasHelp}
+          onNotice={notice}
+        />
+        {/* The session expiry banner and the notification panel follow the bar, in the tab order too */}
+        <div id={BANNER_SLOT} style={{ display: 'contents' }} />
+        <div id={NOTIF_SLOT} style={{ display: 'contents' }} />
+      </div>
 
       <div className={`shell-main${dockPlacement === 'right' ? ' has-dock-right' : ''}`}>
         <div className="shell-content">
-          <StateBanners onShowNodes={showNodes} onNotice={notice} />
+          {claims === 0 && <div className="atl atl-island"><div className="stage shell-banners">{bannerNode}</div></div>}
           <div className="shell-page" id="shell-page" tabIndex={-1}>
             {/* A page whose code is still loading waits here, the bars on screen. One boundary per page:
                 a navigation (a transition) then shows the wait and the link asked for at once */}
@@ -156,9 +170,8 @@ export function AppShell() {
         </div>
         <InspectorDock />
       </div>
-      </div>
 
-      <StatusBar onShowNodes={showNodes} can={can} />
+      <div className="atl atl-island"><StatusBar onShowNodes={showNodes} can={can} /></div>
       {showNodes && <NodesDialog open={nodesOpen} onClose={() => setNodesOpen(false)} ha={ha} />}
 
       <CommandPalette
@@ -179,5 +192,6 @@ export function AppShell() {
       {/* Ko-fi support card, once per version for admins; the overview shows it in its own flow */}
       {!onOverview && <KofiSupportCard />}
     </div>
+    </ShellBannersContext.Provider>
   )
 }

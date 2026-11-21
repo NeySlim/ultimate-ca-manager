@@ -41,6 +41,7 @@ export const EXCEPTIONS = [
     reason: 'fixed sepia reading palette of the help reader',
   },
   { file: 'components/EmailTemplateWindow.jsx', values: ['#f4f5f7'], reason: 'email preview canvas imitates a mail client' },
+  { file: 'components/atelier/icons.js', values: ['#e66c20'], reason: 'the mockup\'s brand mark, verbatim (an image of the mark)' },
   { file: 'index.css', values: ['#ff5e5b', '#d63b36', '#b8312c'], reason: 'Ko-fi brand colours' },
 ]
 

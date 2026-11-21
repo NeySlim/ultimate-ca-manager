@@ -2,8 +2,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 
 const getServiceStatus = vi.hoisted(() => vi.fn())
 
@@ -105,10 +103,10 @@ describe('offline', () => {
   it('shows the neutral offline banner of the mockup, whose sentence the guard points to', async () => {
     vi.stubGlobal('fetch', answer({ status: 'ok', version: '3.0', ha: false }))
     const { container } = render(<StateBanners />)
-    expect(container.querySelector('.shell-state-banner')).toBeNull()
+    expect(container.querySelector('.state-banner')).toBeNull()
     goOnline(false)
-    const banner = container.querySelector('#shell-offline-banner')
-    expect(banner).not.toHaveClass('is-warn')
+    const banner = container.querySelector('#offline-banner')
+    expect(banner).not.toHaveClass('tone-warn')
     expect(banner.querySelector('p')).toHaveAttribute('id', OFFLINE_NOTE_ID)
     expect(banner).toHaveTextContent('shell.offline.title shell.offline.text')
   })
@@ -123,7 +121,7 @@ describe('offline', () => {
     goOnline(true)
     expect(onNotice).toHaveBeenCalledWith('shell.offline.back')
     expect(screen.getByRole('status')).toHaveTextContent('')
-    expect(document.getElementById('shell-offline-banner')).toBeNull()
+    expect(document.getElementById('offline-banner')).toBeNull()
   })
 })
 
@@ -132,14 +130,14 @@ describe('StateBanners', () => {
     vi.stubGlobal('fetch', answer({ status: 'ok', version: '3.0', ha: false }))
     const { container } = render(<><Probe /><StateBanners /></>)
     await waitFor(() => expect(screen.getByTestId('probe')).toHaveTextContent('3.0/false'))
-    expect(container.querySelector('.shell-state-banner')).toBeNull()
+    expect(container.querySelector('.state-banner')).toBeNull()
   })
 
   it('renders nothing for a healthy cluster', async () => {
     vi.stubGlobal('fetch', answer(HA()))
     const { container } = render(<><Probe /><StateBanners /></>)
     await waitFor(() => expect(screen.getByTestId('probe')).toHaveTextContent('3.0/false'))
-    expect(container.querySelector('.shell-state-banner')).toBeNull()
+    expect(container.querySelector('.state-banner')).toBeNull()
   })
 
   it('says the writes are suspended during a maintenance, in the sentence the guard points to', async () => {
@@ -192,41 +190,32 @@ describe('NodesDialog', () => {
     expect(screen.getByText('shell.nodes.introLate|1')).toBeInTheDocument()
   })
 
-  it('is the list template dialog of the mockup: wide, its state on one line, closed by its Close button', async () => {
+  it('is the mockup\'s wide modal: its state on one line, closed by its Close button', async () => {
     getServiceStatus.mockResolvedValue({ data: { cluster: { nodes: [
       { node_id: 'n1', leader: true, stopped: false, stale: false, version: '3.0', heartbeat_at: new Date().toISOString() }] } } })
     const onClose = vi.fn()
     render(<NodesDialog open onClose={onClose} ha={{ stale: 0 }} />)
     const dialog = await screen.findByRole('dialog', { name: 'shell.nodes.title' })
-    expect(dialog).toHaveClass('lv-dialog', 'is-wide')
+    expect(dialog.tagName).toBe('DIALOG')
+    expect(dialog).toHaveClass('wide')
     const state = (await screen.findByText('shell.nodes.live')).closest('span')
-    expect(state.tagName).toBe('SPAN')
-    expect(state.querySelector('svg')).toHaveAttribute('width', '13')
+    expect(state).toHaveClass('good')
+    expect(state.querySelector('svg')).toHaveClass('icon')
     const close = screen.getByRole('button', { name: 'common.close' })
-    expect(close).toHaveClass('lv-btn', 'is-primary')
+    expect(close).toHaveClass('btn', 'primary')
     expect(close).toHaveAttribute('data-write', 'false')
     await userEvent.click(close)
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  // jsdom has no layout and no specificity: the line and the intro spacing are measured in a browser
-  it('draws the role as a bare badge in the text colour', async () => {
-    const sheets = ['src/components/shell/shell.css'].map(f => {
-      const el = document.createElement('style')
-      el.textContent = readFileSync(resolve(process.cwd(), f), 'utf8')
-      document.head.appendChild(el)
-      return el
-    })
-    try {
-      getServiceStatus.mockResolvedValue({ data: { cluster: { nodes: [
-        { node_id: 'n2', leader: false, stopped: false, stale: false, version: '3.0', heartbeat_at: new Date().toISOString() }] } } })
-      render(<NodesDialog open onClose={() => {}} ha={{ stale: 0 }} />)
-      const badge = (await screen.findByText('shell.nodes.secondary')).closest('.shell-node-badge')
-      expect(getComputedStyle(badge).paddingLeft).toBe('0px')
-      expect(getComputedStyle(badge).color).toBe('var(--text)')
-    } finally {
-      sheets.forEach(el => el.remove())
-    }
+  it('draws the role as the mockup\'s badge: the leader in its good tone, a secondary plain', async () => {
+    getServiceStatus.mockResolvedValue({ data: { cluster: { nodes: [
+      { node_id: 'n1', leader: true, stopped: false, stale: false, version: '3.0', heartbeat_at: new Date().toISOString() },
+      { node_id: 'n2', leader: false, stopped: false, stale: true, version: '3.0', heartbeat_at: new Date().toISOString() }] } } })
+    render(<NodesDialog open onClose={() => {}} ha={{ stale: 1 }} />)
+    expect((await screen.findByText('shell.nodes.leader')).closest('.badge')).toHaveClass('good')
+    expect(screen.getByText('shell.nodes.secondary').closest('.badge').className).toBe('badge')
+    expect(document.getElementById('node-n2')).toHaveClass('node-card', 'late')
   })
 
   it('says when the list cannot be read', async () => {

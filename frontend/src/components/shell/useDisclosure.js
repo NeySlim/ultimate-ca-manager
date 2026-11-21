@@ -1,7 +1,8 @@
 /**
  * Open state shared by the shell's popovers: closes on Escape (focus back to
  * the button), on a click outside, when focus leaves, and on a route change.
- * `{ light: false }` keeps a panel open on a click outside or a focus leaving it.
+ * `{ light: false }` keeps a panel open on a click outside or a focus leaving it. `partRef` marks a
+ * panel drawn apart from the root (the mockup's Modules menu follows the bar's links): inside too.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
@@ -11,6 +12,8 @@ export function useDisclosure({ light = true } = {}) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
   const buttonRef = useRef(null)
+  const partRef = useRef(null)
+  const inside = (el) => !!(rootRef.current?.contains(el) || partRef.current?.contains(el))
 
   const close = useCallback((restoreFocus = false) => {
     setOpen(false)
@@ -21,7 +24,7 @@ export function useDisclosure({ light = true } = {}) {
 
   useEffect(() => {
     if (!open || !light) return undefined
-    const onDown = (e) => { if (!rootRef.current?.contains(e.target)) setOpen(false) }
+    const onDown = (e) => { if (!inside(e.target)) setOpen(false) }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
   }, [open, light])
@@ -33,10 +36,10 @@ export function useDisclosure({ light = true } = {}) {
     }
   }
   const onBlur = (e) => {
-    if (light && open && e.relatedTarget && !rootRef.current?.contains(e.relatedTarget)) setOpen(false)
+    if (light && open && e.relatedTarget && !inside(e.relatedTarget)) setOpen(false)
   }
 
-  return { open, setOpen, close, rootRef, buttonRef, rootProps: { ref: rootRef, onKeyDown, onBlur } }
+  return { open, setOpen, close, rootRef, buttonRef, partRef, rootProps: { ref: rootRef, onKeyDown, onBlur }, partProps: { ref: partRef, onKeyDown, onBlur } }
 }
 
 /** Arrow, Home and End moves over `items` (an array of elements); returns true when the key was handled. */
