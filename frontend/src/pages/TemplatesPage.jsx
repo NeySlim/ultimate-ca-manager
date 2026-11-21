@@ -33,6 +33,7 @@ import { customExtensionsPayload, rowsFromStored, truncateHex } from '../lib/cus
 import { CustomExtensionsEditor } from '../components/CustomExtensionsEditor'
 import { CN_PATTERN_VARIABLES, cnPatternNonUnique, cnPatternSource } from '../lib/cnPattern'
 import { CertMenu } from './certificates/inspector/CertMenu'
+import { PhoneMoreActions } from './pki/PhoneMoreActions'
 
 export default function TemplatesPage() {
   const { t } = useTranslation()
@@ -435,6 +436,7 @@ export default function TemplatesPage() {
       <PageHead title={t('common.templates')} total={t('templates.module.unit', { count: templates.length })} intent={t('shell.moduleDesc.templates')}
         actions={write && <>
           <Btn icon="upload" id="template-import" write onClick={() => setShowImportModal(true)}>{t('common.import')}</Btn>
+          <PhoneMoreActions title={t('common.templates')} items={[{ id: 'import', icon: 'upload', label: t('common.import'), write: true, onClick: () => setShowImportModal(true) }]} />
           <Btn tone="primary" icon="plus" id="template-new" onClick={create.onClick}>{create.label}</Btn>
         </>} />
       <ListView label={t('common.templates')} caption={t('templates.module.caption')} icon="template" rows={rows} loading={loading}

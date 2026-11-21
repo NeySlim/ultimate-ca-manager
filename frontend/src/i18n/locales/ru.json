@@ -8637,6 +8637,8 @@
     "openItem": "Открытый элемент",
     "detailOf": "Сведения: {{name}}",
     "sectionsOf": "Разделы: {{name}}",
-    "settingsSections": "Разделы параметров"
+    "settingsSections": "Разделы параметров",
+    "pageActions": "Другие действия страницы {{name}}",
+    "pageActionsTitle": "Действия страницы"
   }
 }

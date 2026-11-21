@@ -38,6 +38,7 @@ import { issueWithSubjectOverride } from '../lib/uniqueSubject'
 import { dateOf } from './admin/adminDates'
 import { PemPanel } from './certificates/inspector/PemPanel'
 import { CertMenu } from './certificates/inspector/CertMenu'
+import { PhoneMoreActions } from './pki/PhoneMoreActions'
 
 const DEFAULT_CSR_KEY_TYPE = findAlgorithm(CSR_LABELS[0]).csr
 
@@ -1274,6 +1275,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
       <PageHead title={t('common.csrs')} total={t('csrs.module.unit', { count: pendingTotal + historyTotal })} intent={t('shell.moduleDesc.csrs')}
         actions={write && <>
           <Btn icon="upload" id="csr-import" write onClick={() => setShowImportModal(true)}>{t('common.import')}</Btn>
+          <PhoneMoreActions title={t('common.csrs')} items={[{ id: 'import', icon: 'upload', label: t('common.import'), write: true, onClick: () => setShowImportModal(true) }]} />
           <Btn tone="primary" icon="plus" id="csr-generate" onClick={() => openModal('generate')}>{t('csrs.generateCSR')}</Btn>
         </>} />
       <ListView label={t('common.csrs')} caption={t('csrs.module.caption')} icon="file" rows={rows} loading={loading}

@@ -8634,6 +8634,8 @@
     "openItem": "Open item",
     "detailOf": "Detail: {{name}}",
     "sectionsOf": "Sections: {{name}}",
-    "settingsSections": "Settings sections"
+    "settingsSections": "Settings sections",
+    "pageActions": "Other actions of {{name}}",
+    "pageActionsTitle": "Page actions"
   }
 }

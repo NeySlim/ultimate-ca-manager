@@ -8280,6 +8280,8 @@
     "openItem": "已打开的项目",
     "detailOf": "详情：{{name}}",
     "sectionsOf": "分区：{{name}}",
-    "settingsSections": "设置分区"
+    "settingsSections": "设置分区",
+    "pageActions": "{{name}} 页面的其他操作",
+    "pageActionsTitle": "页面操作"
   }
 }

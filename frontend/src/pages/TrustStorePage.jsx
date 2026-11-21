@@ -27,6 +27,7 @@ import { useOpenEntity } from '../hooks/useOpenEntity'
 import { certificateKeyLabel, serialHex } from '../lib/certificateDetail'
 import { dateOf, dateTimeOf } from './admin/adminDates'
 import { PemPanel } from './certificates/inspector/PemPanel'
+import { PhoneMoreActions } from './pki/PhoneMoreActions'
 
 // The anchor types the server stores (purpose), in the order of the type filter
 const PURPOSES = ['root_ca', 'intermediate_ca', 'client_auth', 'code_signing', 'system', 'custom']
@@ -497,6 +498,11 @@ export default function TrustStorePage() {
           {certificates.length > 0 && <Btn icon="download" id="truststore-bundle" onClick={() => handleExportBundle('pem')}>{t('trustStore.exportBundle')}</Btn>}
           {write && <Btn icon="refresh" id="truststore-sync" write disabled={syncing || undefined} onClick={() => openModal('sync')}>{syncing ? t('trustStore.syncing') : t('trustStore.sync')}</Btn>}
           {write && <Btn icon="upload" id="truststore-import" write onClick={() => setShowImportModal(true)}>{t('common.import')}</Btn>}
+          <PhoneMoreActions title={t('shell.moduleLabel.truststore')} items={[
+            certificates.length > 0 && { id: 'bundle', icon: 'download', label: t('trustStore.exportBundle'), onClick: () => handleExportBundle('pem') },
+            write && { id: 'sync', icon: 'refresh', label: t('trustStore.sync'), write: true, disabled: syncing, onClick: () => openModal('sync') },
+            write && { id: 'import', icon: 'upload', label: t('common.import'), write: true, onClick: () => setShowImportModal(true) },
+          ]} />
           {write && <Btn tone="primary" icon="plus" id="truststore-add" onClick={handleOpenAddModal}>{t('trustStore.add')}</Btn>}
         </>} />
       <ListView label={t('shell.moduleLabel.truststore')} caption={t('trustStore.module.caption')} icon="anchor" rows={rows} loading={loading}

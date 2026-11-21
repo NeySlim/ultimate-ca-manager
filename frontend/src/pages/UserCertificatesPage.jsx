@@ -29,6 +29,7 @@ import { ExportDialog } from './certificates/dialogs/ExportDialog'
 import { RevokeDialog } from './certificates/dialogs/RevokeDialog'
 import { CertMenu } from './certificates/inspector/CertMenu'
 import { STATES as CERT_STATES } from './certificates/certState'
+import { PhoneMoreActions } from './pki/PhoneMoreActions'
 
 // The states the server filters on, in the order of the chips (a certificate's states, as the Certificates zone draws them)
 const STATES = { valid: CERT_STATES.valid, expiring: CERT_STATES.expiring, expired: CERT_STATES.expired, revoked: CERT_STATES.revoked }
@@ -304,7 +305,10 @@ export default function UserCertificatesPage() {
       {shared.modals}
     </>}>
       <PageHead title={t('userCertificates.title')} total={t('userCertificates.module.unit', { count: certStats.total || 0 })} intent={t('shell.moduleDesc.userCertificates')}
-        actions={<Btn icon="download" data-action="user-certs-export" disabled={!total || undefined} onClick={() => setListExport(true)}>{t('userCertificates.module.exportList')}</Btn>} />
+        actions={<>
+          <Btn icon="download" data-action="user-certs-export" disabled={!total || undefined} onClick={() => setListExport(true)}>{t('userCertificates.module.exportList')}</Btn>
+          <PhoneMoreActions title={t('userCertificates.title')} items={[{ id: 'export-list', icon: 'download', label: t('userCertificates.module.exportList'), disabled: !total, onClick: () => setListExport(true) }]} />
+        </>} />
       <ListView label={t('userCertificates.title')} caption={t('userCertificates.module.caption')} icon="cert" rows={certificates} loading={loading}
         filters={{ views, active, onChange: chooseState, label: t('userCertificates.module.filterByState') }}
         toolbar={(

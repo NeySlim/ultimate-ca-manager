@@ -8283,6 +8283,8 @@
     "openItem": "Élément ouvert",
     "detailOf": "Détail : {{name}}",
     "sectionsOf": "Sections : {{name}}",
-    "settingsSections": "Sections des paramètres"
+    "settingsSections": "Sections des paramètres",
+    "pageActions": "Autres actions de la page {{name}}",
+    "pageActionsTitle": "Actions de la page"
   }
 }
