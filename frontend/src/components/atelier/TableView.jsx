@@ -1,12 +1,13 @@
 /**
  * The mockup's tableView(): the list section of a page (`section.table-workspace`) with its toolbar,
  * the active filters, the selection bar, the table and its footer, and the caption under it
- * (what stays available, the row height and the column count). The density and the shown
- * columns are the user's, kept in the browser when the page names a storage key.
+ * (what stays available, the row height and the column count). The shown columns are the user's,
+ * kept in the browser when the page names a storage key; the density is one for every list (density.js).
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { usePersistedState } from '../../hooks/usePersistedState'
+import { useComfortable, setComfortable } from './density'
 import { DataTable } from './DataTable'
 import { Toolbar, ToolsDivider, ColumnsButton, DensityButton } from './Toolbar'
 import { IconBtn } from './Btn'
@@ -20,9 +21,9 @@ import { AtelierDialog } from './AtelierDialog'
  * @param {import('react').ReactNode} [p.tools]  more tools after the divider (a page's own)
  * @param {import('react').ReactNode} [p.applied]  AppliedFilters
  * @param {import('react').ReactNode} [p.batch]  BatchBar, while rows are ticked
- * @param {string} [p.storageKey]  keeps the density and the hidden columns
+ * @param {string} [p.storageKey]  keeps the hidden columns and their widths
  * @param {{ note: string }} [p.columnsDialog]  offers the Colonnes dialog; columns with `always` stay shown
- * @param {boolean} [p.density]  offers the density toggle
+ * @param {boolean} [p.density]  offers the density toggle, which sets every list's
  * @param {{ label: string, onClick }} [p.exporter]  the export icon of the toolbar
  * @param {string} [p.captionNote]  first half of the caption under the table
  */
@@ -30,7 +31,7 @@ export function TableView({
   label, tableLabel, search, tools, applied, batch, storageKey, columnsDialog, density = false, exporter, captionNote, busy, columns, ...table
 }) {
   const { t } = useTranslation()
-  const [comfortable, setComfortable] = usePersistedState(storageKey ? `${storageKey}-density` : null, false)
+  const comfortable = useComfortable()
   // Kept as { hidden } so that showing every column is remembered too (an empty list would read as « no choice »)
   const [prefs, setPrefs] = usePersistedState(storageKey ? `${storageKey}-columns` : null, { hidden: columns.filter((c) => c.defaultHidden).map((c) => c.id) })
   const [widths, setWidths] = usePersistedState(storageKey ? `${storageKey}-widths` : null, {})
@@ -50,7 +51,7 @@ export function TableView({
   const count = shown.length
 
   return (
-    <section className={comfortable ? 'table-workspace comfortable' : 'table-workspace'} aria-label={label} aria-busy={busy || undefined}>
+    <section className="table-workspace" aria-label={label} aria-busy={busy || undefined}>
       <Toolbar>
         {search}
         {(columnsDialog || density || exporter || tools) && <ToolsDivider />}
