@@ -66,8 +66,9 @@ describe('opacity utilities (-opNN)', () => {
   })
 
   it('finds a non-trivial number of classes, so the scan itself cannot silently pass', () => {
-    // Guards against a regex or path change turning the test above into a no-op.
-    expect(declaredClasses().size).toBeGreaterThan(50)
-    expect(usedClasses().size).toBeGreaterThan(50)
+    // Guards against a regex or path change turning the test above into a no-op. The count falls as
+    // pages move to the mockup's rules, so the floor only asks that the scan still finds some.
+    expect(declaredClasses().size).toBeGreaterThan(20)
+    expect(usedClasses().size).toBeGreaterThan(20)
   })
 })
