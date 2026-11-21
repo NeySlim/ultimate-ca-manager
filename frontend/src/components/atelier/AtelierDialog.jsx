@@ -25,7 +25,10 @@ export function AtelierDialog({ title, subtitle, size = '', onClose, children, t
     if (typeof dialog.showModal === 'function') {
       try { dialog.showModal() } catch { dialog.setAttribute('open', '') }
     } else dialog.setAttribute('open', '')
-    if (!dialog.contains(document.activeElement)) dialog.querySelector('input,button')?.focus()
+    // A dialog may name its first field (data-autofocus), as the mockup's dialogs focus one after opening
+    const named = dialog.querySelector('[data-autofocus]')
+    if (named) named.focus()
+    else if (!dialog.contains(document.activeElement)) dialog.querySelector('input,button')?.focus()
     return () => {
       if (dialog.open && typeof dialog.close === 'function') dialog.close()
       const back = opener.current

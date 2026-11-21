@@ -91,6 +91,16 @@ function OpenTabs({ tabs, activeKey, onSelect, onClose, label, moreTitle, hidden
     el.classList.toggle('tight', el.scrollWidth > el.clientWidth)
   })
   useEffect(() => { if (!hidden.length) setMenu(false) }, [hidden.length])
+  // A click or the focus elsewhere closes the menu, as the mockup's focusout does
+  useEffect(() => {
+    if (!menu) return undefined
+    const inside = (el) => menuRef.current?.contains(el) || buttonRef.current?.contains(el)
+    const away = (e) => { if (!inside(e.target)) setMenu(false) }
+    const out = (e) => { if (e.relatedTarget && !inside(e.relatedTarget)) setMenu(false) }
+    document.addEventListener('pointerdown', away)
+    document.addEventListener('focusout', out)
+    return () => { document.removeEventListener('pointerdown', away); document.removeEventListener('focusout', out) }
+  }, [menu, menuRef, buttonRef])
   const onKey = (e, key) => {
     if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); onClose(key); return }
     const i = shown.indexOf(key)

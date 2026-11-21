@@ -112,7 +112,7 @@ export function SettingsSection({ section: s, values, errors, onChange }) {
 }
 
 /** The table of contents: a link per section, marked « À corriger » or « Modifié »; `current` is the shown one. */
-export function SettingsToc({ sections, flags, current, label }) {
+export function SettingsToc({ sections, flags, current, label, onJump }) {
   const { t } = useTranslation()
   return (
     <nav className="settings-toc" id="settings-toc" aria-label={label}>
@@ -124,6 +124,7 @@ export function SettingsToc({ sections, flags, current, label }) {
                 if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
                 e.preventDefault()
                 jumpTo(s.id)
+                onJump?.(s.id)
               }}>
               <Icon name={s.icon} /><span>{s.label}</span>
               {flags[s.id] === 'error' ? <span className="toc-flag bad"><Icon name="warning" />{t('sectioned.flagError')}</span>
@@ -150,8 +151,9 @@ export function SettingsToc({ sections, flags, current, label }) {
  * @param {string} [p.announce]  the polite announcement after a save or a refusal
  * @param {{ title, text, children }} [p.history]
  * @param {import('react').Ref} [p.stateRef]  takes the focus after a save or a reset
+ * @param {string} [p.current]  the section shown (a link that names one); `onJump` hears each jump, to keep it in the address
  */
-export function SettingsView({ sections, values, errors = {}, changed = [], onChange, onSave, onReset, lastSaved, saving = false, failed = [], announce = '', history, stateRef, current, tocLabel }) {
+export function SettingsView({ sections, values, errors = {}, changed = [], onChange, onSave, onReset, lastSaved, saving = false, failed = [], announce = '', history, stateRef, current, tocLabel, onJump }) {
   const { t } = useTranslation()
   const dirty = changed.length > 0
   const labelOf = Object.fromEntries(sections.flatMap((s) => s.groups.flatMap((g) => g.fields)).map((f) => [f.key, f.label]))
@@ -170,12 +172,12 @@ export function SettingsView({ sections, values, errors = {}, changed = [], onCh
   return (
     <div className="scroll-view" id="view-scroll">
       <div className="settings-layout">
-        <SettingsToc sections={sections} flags={flags} current={current} label={tocLabel} />
+        <SettingsToc sections={sections} flags={flags} current={current} label={tocLabel} onJump={onJump} />
         <div className="settings-main">
           <form className="settings-form" id="settings-form" noValidate onSubmit={(e) => { e.preventDefault(); onSave?.() }}>
             <div className="field settings-jump">
               <label htmlFor="settings-jump">{t('sectioned.jumpLabel')}</label>
-              <select id="settings-jump" value={current || sections[0]?.id} onChange={(e) => jumpTo(e.target.value)}>
+              <select id="settings-jump" value={current || sections[0]?.id} onChange={(e) => { jumpTo(e.target.value); onJump?.(e.target.value) }}>
                 {sections.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
               </select>
             </div>

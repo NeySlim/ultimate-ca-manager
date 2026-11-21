@@ -26,12 +26,12 @@ const sections = [
 ]
 const saved = { instance: 'UCM', timezone: 'UTC', smtpPort: '587', notify: true }
 
-function Page({ errors = {}, onSave = () => {}, test, failed }) {
+function Page({ errors = {}, onSave = () => {}, test, failed, onJump }) {
   const [values, setValues] = useState(saved)
   const changed = Object.keys(saved).filter((k) => String(values[k]) !== String(saved[k]))
   const s = test ? sections.map((x) => (x.id === 'smtp' ? { ...x, test } : x)) : sections
   return <SettingsView sections={s} values={values} errors={errors} changed={changed} failed={failed} tocLabel="Sections"
-    onChange={(k, v) => setValues((p) => ({ ...p, [k]: v }))} onReset={() => setValues(saved)} onSave={onSave} lastSaved={{ at: '6 nov.', by: 'admin' }} />
+    onChange={(k, v) => setValues((p) => ({ ...p, [k]: v }))} onReset={() => setValues(saved)} onSave={onSave} lastSaved={{ at: '6 nov.', by: 'admin' }} onJump={onJump} />
 }
 
 describe('the configuration form', () => {
@@ -87,14 +87,16 @@ describe('the configuration form', () => {
     rerender(<Page test={{ label: 'Tester SMTP', hint: 'x', onTest, result: { ok: false, text: 'Échec.' } }} />)
     expect(document.getElementById('test-result-smtp')).toHaveClass('test-result', 'bad')
   })
-  it('jumps to a section from the select and the contents, its title focused', () => {
-    render(<Page />)
+  it('jumps to a section from the select and the contents, its title focused, and tells the page', () => {
+    const onJump = vi.fn()
+    render(<Page onJump={onJump} />)
     const title = document.getElementById('set-title-smtp')
     fireEvent.change(screen.getByLabelText('sectioned.jumpLabel'), { target: { value: 'smtp' } })
     expect(document.activeElement).toBe(title)
     document.body.focus()
     fireEvent.click(screen.getByRole('link', { name: /SMTP/ }))
     expect(document.activeElement).toBe(title)
+    expect(onJump.mock.calls).toEqual([['smtp'], ['smtp']])
   })
   it('says which sections failed to save', () => {
     render(<Page failed={['SMTP']} />)

@@ -35,4 +35,8 @@ describe('the dialog', () => {
     await act(frame)
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Repli' }))
   })
+  it('gives the first focus to the field the dialog names', () => {
+    render(<AtelierDialog title="D" onClose={() => {}}><input aria-label="a" /><input aria-label="b" data-autofocus="" /></AtelierDialog>)
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'b' }))
+  })
 })
