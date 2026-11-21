@@ -82,7 +82,8 @@ const OWED = {
 
 async function openAlice() {
   render(<MemoryRouter><UsersGroupsPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByText('alice@example.test'))
+  fireEvent.click(await screen.findByRole('button', { name: 'alice' }))
+  fireEvent.click(await screen.findByRole('tab', { name: 'users.mtls.title' }))
   return screen.findByText('enrolled-alice')
 }
 
@@ -116,7 +117,7 @@ describe('Users page: a removal the ACME CA was not told of', () => {
       meta: { acme_local_only: true },
     }
     users.deleteMtlsCertificate.mockResolvedValue(removed)
-    const row = (await openAlice()).closest('div.flex.items-center.justify-between')
+    const row = (await openAlice()).closest('li')
     fireEvent.click(within(row).getByLabelText('common.delete'))
     await waitFor(() => expect(stable.notify.showWarning).toHaveBeenCalledWith(removed.message))
     expect(users.deleteMtlsCertificate).toHaveBeenCalledWith(5, 3)
@@ -125,7 +126,7 @@ describe('Users page: a removal the ACME CA was not told of', () => {
 
   it('reports a plain success when nothing was left to the CA', async () => {
     users.deleteMtlsCertificate.mockResolvedValue(null)
-    const row = (await openAlice()).closest('div.flex.items-center.justify-between')
+    const row = (await openAlice()).closest('li')
     fireEvent.click(within(row).getByLabelText('common.delete'))
     await waitFor(() => expect(stable.notify.showSuccess).toHaveBeenCalledWith('users.mtls.deleted'))
     expect(stable.notify.showWarning).not.toHaveBeenCalled()

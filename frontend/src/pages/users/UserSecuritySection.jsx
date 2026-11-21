@@ -1,18 +1,18 @@
 import { useTranslation } from 'react-i18next'
-import { ShieldCheck } from '@phosphor-icons/react'
-import { CompactSection, CompactGrid, CompactField } from '../../components'
+import { Section, Props } from '../../components/atelier'
+import { YesNo } from '../admin/YesNo'
 
 // The 2FA state the login applies, as the users API reports it.
-export default function UserSecuritySection({ user }) {
+export default function UserSecuritySection({ user, children }) {
   const { t } = useTranslation()
-  const yesNo = (value) => (value ? t('common.yes') : t('common.no'))
   return (
-    <CompactSection title={t('common.security')} icon={ShieldCheck} iconClass="icon-bg-purple">
-      <CompactGrid columns={1}>
-        <CompactField autoIcon="enable2FA" label={t('common.twoFactorAuth')} value={yesNo(user.two_factor_enabled)} />
-        <CompactField autoIcon="totp" label={t('common.totp', 'TOTP')} value={yesNo(user.totp_enabled)} />
-        <CompactField autoIcon="totp" label={t('users.exempt2faLabel')} value={yesNo(user.totp_exempt)} />
-      </CompactGrid>
-    </CompactSection>
+    <Section title={t('common.security')}>
+      <Props items={[
+        [t('common.twoFactorAuth'), <YesNo key="2fa" value={user.two_factor_enabled} />],
+        [t('common.totp', 'TOTP'), <YesNo key="totp" value={user.totp_enabled} />],
+        [t('users.exempt2faLabel'), <YesNo key="exempt" value={user.totp_exempt} />],
+      ]} />
+      {children}
+    </Section>
   )
 }

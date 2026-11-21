@@ -1835,7 +1835,8 @@
       "revoked": "Ключ API відкликано",
       "deleted": "Ключ API видалено",
       "loadFailed": "Не вдалося завантажити ключі API",
-      "updateFailed": "Не вдалося змінити ключ API"
+      "updateFailed": "Не вдалося змінити ключ API",
+      "meta": "{{scope}} · created on {{created}} · last used {{used}} · expires {{expires}}"
     },
     "createUser": "Створити користувача",
     "editUser": "Редагувати користувача",
@@ -1926,7 +1927,60 @@
     "require2fa": "Вимагати 2FA",
     "exempt2faOn": "Користувача звільнено від обовʼязкової 2FA",
     "exempt2faOff": "Тепер користувач підпадає під обовʼязкову 2FA",
-    "exempt2faLabel": "Звільнено від 2FA"
+    "exempt2faLabel": "Звільнено від 2FA",
+    "title": "Users and roles",
+    "intent": "Accounts, groups, SSO and permissions.",
+    "unit_one": "{{count}} account",
+    "unit_other": "{{count}} accounts",
+    "unit_few": "{{count}} accounts",
+    "unit_many": "{{count}} accounts",
+    "range_one": "{{shown}} of {{count}} account",
+    "range_other": "{{shown}} of {{count}} accounts",
+    "range_few": "{{shown}} of {{count}} accounts",
+    "range_many": "{{shown}} of {{count}} accounts",
+    "pageRange_one": "{{start}}–{{end}} of {{count}} account",
+    "pageRange_other": "{{start}}–{{end}} of {{count}} accounts",
+    "pageRange_few": "{{start}}–{{end}} of {{count}} accounts",
+    "pageRange_many": "{{start}}–{{end}} of {{count}} accounts",
+    "caption": "Users and roles. Activate a name to open its detail.",
+    "views": {
+      "active": "Active",
+      "disabled": "Disabled",
+      "sso": "SSO"
+    },
+    "filterByState": "Filter by state",
+    "filterByRole": "Filter by role",
+    "search": "Name, username, email…",
+    "login": "Username",
+    "email": "Email",
+    "lastSeen": "Last access",
+    "exportList": "Export the list",
+    "accounts": "Accounts",
+    "tabs": {
+      "profile": "Profile",
+      "permissions": "Permissions"
+    },
+    "identity": "Identity",
+    "access": "Access",
+    "twoFactor": "Two-factor authentication",
+    "sourceSso": "SSO, {{providers}}",
+    "selfNotice": "Your own account cannot be disabled from this page.",
+    "permsIntro": "Role {{role}}: the effective permissions, custom role and groups included.",
+    "permsLoading": "Reading the effective permissions…",
+    "permsFailed": "The effective permissions could not be read.",
+    "allowed": "Allowed",
+    "notAllowed": "Not allowed",
+    "disableEllipsis": "Disable…",
+    "disableTitle": "Disable this account?",
+    "disableText": "{{login}} will no longer be able to sign in.",
+    "disableConfirm": "Disable the account",
+    "roleDesc": {
+      "admin": "Every operation, settings and accounts included.",
+      "operator": "Issue, renew and revoke; neither accounts nor access control.",
+      "auditor": "Read-only access to all operational data, the journal included.",
+      "viewer": "Read-only access to certificates, CAs and templates."
+    },
+    "customRoleOf": "Custom role: {{name}}"
   },
   "groups": {
     "group": "Група",
@@ -1953,7 +2007,23 @@
     "memberCount_many": "{{count}} учасників",
     "memberCount_other": "{{count}} учасників",
     "subtitle": "{{count}} груп",
-    "memberCount": "{{count}} учасників"
+    "memberCount": "{{count}} учасників",
+    "intent": "Groups of accounts and the permissions they grant.",
+    "unit_one": "{{count}} group",
+    "unit_other": "{{count}} groups",
+    "unit_few": "{{count}} groups",
+    "unit_many": "{{count}} groups",
+    "range_one": "{{shown}} of {{count}} group",
+    "range_other": "{{shown}} of {{count}} groups",
+    "range_few": "{{shown}} of {{count}} groups",
+    "range_many": "{{shown}} of {{count}} groups",
+    "pageRange_one": "{{start}}–{{end}} of {{count}} group",
+    "pageRange_other": "{{start}}–{{end}} of {{count}} groups",
+    "pageRange_few": "{{start}}–{{end}} of {{count}} groups",
+    "pageRange_many": "{{start}}–{{end}} of {{count}} groups",
+    "caption": "Groups. Activate a name to open its detail.",
+    "search": "Name, description…",
+    "manageMembers": "Manage members"
   },
   "acme": {
     "title": "Протокол ACME",
@@ -4433,7 +4503,18 @@
       "delete:ssh_cas": "Видаляти SSH ЦС"
     },
     "ignoredPermissions": "Ігноровані дозволи",
-    "ignoredPermissionsHint": "Збережені в цій ролі, але не застосовуються: зарезервовані для адміністраторів або невідомі. Вони зберігаються без змін."
+    "ignoredPermissionsHint": "Збережені в цій ролі, але не застосовуються: зарезервовані для адміністраторів або невідомі. Вони зберігаються без змін.",
+    "unit_one": "{{count}} role",
+    "unit_other": "{{count}} roles",
+    "unit_few": "{{count}} roles",
+    "unit_many": "{{count}} roles",
+    "range_one": "{{shown}} of {{count}} role",
+    "range_other": "{{shown}} of {{count}} roles",
+    "range_few": "{{shown}} of {{count}} roles",
+    "range_many": "{{shown}} of {{count}} roles",
+    "caption": "Roles. Activate a name to open its detail.",
+    "filterByType": "Filter by type",
+    "allOf": "All of {{name}}"
   },
   "hsm": {
     "statusUnavailable": "Функції HSM недоступні",
@@ -4538,7 +4619,37 @@
       "notRead": "Перевірте зʼєднання, щоб прочитати дані, які повідомляє модуль.",
       "softhsmFips": "SoftHSM не є валідованим модулем: у режимі FIPS ключі на ньому не захищені відповідно до FIPS."
     },
-    "syncingKeys": "Синхронізація..."
+    "syncingKeys": "Синхронізація...",
+    "unit_one": "{{count}} location",
+    "unit_other": "{{count}} locations",
+    "unit_few": "{{count}} locations",
+    "unit_many": "{{count}} locations",
+    "keyCount_one": "{{count}} key",
+    "keyCount_other": "{{count}} keys",
+    "keyCount_few": "{{count}} keys",
+    "keyCount_many": "{{count}} keys",
+    "range_one": "{{shown}} of {{count}} location",
+    "range_other": "{{shown}} of {{count}} locations",
+    "range_few": "{{shown}} of {{count}} locations",
+    "range_many": "{{shown}} of {{count}} locations",
+    "states": {
+      "connected": "Connected",
+      "error": "Error",
+      "disconnected": "Disconnected",
+      "unknown": "Not tested"
+    },
+    "columns": {
+      "type": "Type",
+      "keys": "Keys",
+      "checked": "Last check"
+    },
+    "never": "Never",
+    "caption": "HSM. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
+    "filterByType": "Filter by type",
+    "copyValue": "Copy {{name}}",
+    "summaryKeys": "Keys: {{names}}.",
+    "deleteKey": "Delete key {{name}}"
   },
   "sso": {
     "subtitle": "Налаштуйте провайдерів LDAP, OAuth2 або SAML для централізованої автентифікації",

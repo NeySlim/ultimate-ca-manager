@@ -277,6 +277,20 @@
   .sf-task-table td .lv-btn { min-height: 40px; }
 }
 
+/* On a phone a task is a card: its name, each value after its column's name, the run button
+   on its own line, so nothing scrolls sideways and the button stays on the screen */
+@media (max-width: 800px) {
+  .sf-task-table, .sf-task-table tbody { display: block; width: 100%; }
+  .sf-task-table thead { display: none; }
+  .sf-task-table tbody tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .sf-task-table tbody tr:last-child { border-bottom: 0; }
+  :root .ui-table.sf-task-table tbody td { display: block; width: auto; padding: 0; border: 0; height: auto; text-align: left; font-size: 12px; white-space: normal; }
+  .sf-task-table tbody td:first-child { flex: 1 1 100%; font-size: 13px; }
+  .sf-task-table tbody td[data-label]::before { content: attr(data-label) " "; color: var(--muted); }
+  .sf-task-table tbody td.sf-task-run { flex: 1 1 100%; padding-top: 6px; }
+  .sf-task-table tbody td.sf-task-run .lv-btn { min-height: 40px; }
+}
+
 @media (max-height: 999px) and (min-width: 900px) {
   .sf-toc { max-height: calc(100dvh - 200px); overflow-y: auto; scrollbar-width: thin; }
   .sf-toc :is(a, button):focus-visible { outline-offset: -2px; }

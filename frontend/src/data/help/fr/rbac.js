@@ -17,9 +17,9 @@ export default {
         title: 'Rôles personnalisés',
         items: [
           { label: 'Créer un rôle', text: 'Définir un nouveau rôle avec un nom et une description' },
-          { label: 'Matrice de permissions', text: 'Cocher/décocher les permissions par catégorie (AC, Certificats, Clés privées, etc.)' },
-          { label: 'Couverture', text: 'Une barre et un décompte n/N des permissions accordées au rôle' },
-          { label: 'Nombre d’utilisateurs', text: 'Voir combien d’utilisateurs sont assignés à chaque rôle' },
+          { label: 'Matrice de permissions', text: 'L’onglet Permissions d’un rôle personnalisé liste chaque ressource et ses actions en cases à cocher ; la case d’une ressource les accorde ou les retire toutes, et Enregistrer les modifications enregistre le rôle' },
+          { label: 'Couverture', text: 'L’onglet Aperçu donne le décompte n/N des permissions accordées au rôle' },
+          { label: 'Nombre d’utilisateurs', text: 'La colonne Utilisateurs donne les comptes qui portent chaque rôle ; les pastilles Système et Personnalisé au-dessus de la liste la restreignent' },
           { label: 'Permissions des rôles système', text: 'Un rôle système affiche les permissions que UCM lui applique ; Admin affiche toutes les permissions de la matrice' },
           { label: "Permissions des AC SSH (v2.248)", text: "read:ssh_cas, write:ssh_cas et delete:ssh_cas régissent les AC SSH : write:ssh ne les crée ni ne les modifie plus. Les rôles, groupes et clés d’API qui détenaient une permission SSH ont reçu la permission correspondante à la mise à jour" },
         ]

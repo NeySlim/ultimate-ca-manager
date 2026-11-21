@@ -1783,7 +1783,8 @@
       "revoked": "API 密钥已吊销",
       "deleted": "API 密钥已删除",
       "loadFailed": "无法加载 API 密钥",
-      "updateFailed": "无法更新 API 密钥"
+      "updateFailed": "无法更新 API 密钥",
+      "meta": "{{scope}} · 创建于 {{created}} · 上次使用 {{used}} · 到期 {{expires}}"
     },
     "createUser": "创建用户",
     "editUser": "编辑用户",
@@ -1872,7 +1873,54 @@
     "require2fa": "要求双重验证",
     "exempt2faOn": "用户已豁免双重验证强制要求",
     "exempt2faOff": "用户现在受双重验证强制要求约束",
-    "exempt2faLabel": "豁免双重验证"
+    "exempt2faLabel": "豁免双重验证",
+    "title": "用户和角色",
+    "intent": "账户、组、SSO 和权限。",
+    "unit_one": "{{count}} 个账户",
+    "unit_other": "{{count}} 个账户",
+    "range_one": "{{shown}} / 共 {{count}} 个账户",
+    "range_other": "{{shown}} / 共 {{count}} 个账户",
+    "pageRange_one": "{{start}}–{{end}} / 共 {{count}} 个账户",
+    "pageRange_other": "{{start}}–{{end}} / 共 {{count}} 个账户",
+    "caption": "用户和角色。激活名称以打开其详情。",
+    "views": {
+      "active": "活动",
+      "disabled": "已停用",
+      "sso": "SSO"
+    },
+    "filterByState": "按状态筛选",
+    "filterByRole": "按角色筛选",
+    "search": "姓名、用户名、邮箱…",
+    "login": "用户名",
+    "email": "邮箱",
+    "lastSeen": "上次访问",
+    "exportList": "导出列表",
+    "accounts": "账户",
+    "tabs": {
+      "profile": "资料",
+      "permissions": "权限"
+    },
+    "identity": "身份",
+    "access": "访问",
+    "twoFactor": "双重认证",
+    "sourceSso": "SSO，{{providers}}",
+    "selfNotice": "无法在此页面停用您自己的账户。",
+    "permsIntro": "角色 {{role}}：有效权限，包括自定义角色和组。",
+    "permsLoading": "正在读取有效权限…",
+    "permsFailed": "无法读取有效权限。",
+    "allowed": "允许",
+    "notAllowed": "不允许",
+    "disableEllipsis": "停用…",
+    "disableTitle": "停用此账户？",
+    "disableText": "{{login}} 将无法再登录。",
+    "disableConfirm": "停用账户",
+    "roleDesc": {
+      "admin": "所有操作，包括设置和账户。",
+      "operator": "签发、续期和吊销；不含账户和访问控制。",
+      "auditor": "只读访问所有运营数据，包括日志。",
+      "viewer": "只读访问证书、CA 和模板。"
+    },
+    "customRoleOf": "自定义角色：{{name}}"
   },
   "groups": {
     "group": "组",
@@ -1895,7 +1943,17 @@
     "memberCount_one": "{{count}} 个成员",
     "memberCount_other": "{{count}} 个成员",
     "subtitle": "{{count}} 个组",
-    "memberCount": "{{count}}个成员"
+    "memberCount": "{{count}}个成员",
+    "intent": "账户组及其授予的权限。",
+    "unit_one": "{{count}} 个组",
+    "unit_other": "{{count}} 个组",
+    "range_one": "{{shown}} / 共 {{count}} 个组",
+    "range_other": "{{shown}} / 共 {{count}} 个组",
+    "pageRange_one": "{{start}}–{{end}} / 共 {{count}} 个组",
+    "pageRange_other": "{{start}}–{{end}} / 共 {{count}} 个组",
+    "caption": "组。激活名称以打开其详情。",
+    "search": "名称、描述…",
+    "manageMembers": "管理成员"
   },
   "acme": {
     "title": "ACME协议",
@@ -4345,7 +4403,14 @@
       "delete:ssh_cas": "删除SSH CA"
     },
     "ignoredPermissions": "已忽略的权限",
-    "ignoredPermissionsHint": "已保存在此角色中但不生效：仅限管理员或未知的权限。它们会按原样保留。"
+    "ignoredPermissionsHint": "已保存在此角色中但不生效：仅限管理员或未知的权限。它们会按原样保留。",
+    "unit_one": "{{count}} 个角色",
+    "unit_other": "{{count}} 个角色",
+    "range_one": "{{shown}} / 共 {{count}} 个角色",
+    "range_other": "{{shown}} / 共 {{count}} 个角色",
+    "caption": "角色。激活名称以打开其详情。",
+    "filterByType": "按类型筛选",
+    "allOf": "全部 {{name}}"
   },
   "hsm": {
     "statusUnavailable": "HSM功能不可用",
@@ -4448,7 +4513,31 @@
       "notRead": "测试连接以读取模块报告的信息。",
       "softhsmFips": "SoftHSM 不是经过验证的模块：在 FIPS 模式下，其上的密钥不受 FIPS 保护。"
     },
-    "syncingKeys": "正在同步..."
+    "syncingKeys": "正在同步...",
+    "unit_one": "{{count}} 个位置",
+    "unit_other": "{{count}} 个位置",
+    "keyCount_one": "{{count}} 个密钥",
+    "keyCount_other": "{{count}} 个密钥",
+    "range_one": "{{shown}} / 共 {{count}} 个位置",
+    "range_other": "{{shown}} / 共 {{count}} 个位置",
+    "states": {
+      "connected": "已连接",
+      "error": "出错",
+      "disconnected": "已断开",
+      "unknown": "未测试"
+    },
+    "columns": {
+      "type": "类型",
+      "keys": "密钥",
+      "checked": "上次检查"
+    },
+    "never": "从未",
+    "caption": "HSM。激活名称以打开其详情。",
+    "filterByState": "按状态筛选",
+    "filterByType": "按类型筛选",
+    "copyValue": "复制{{name}}",
+    "summaryKeys": "密钥：{{names}}。",
+    "deleteKey": "删除密钥 {{name}}"
   },
   "sso": {
     "subtitle": "配置LDAP、OAuth2或SAML提供商进行集中认证。",

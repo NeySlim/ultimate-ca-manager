@@ -43,8 +43,8 @@ vi.mock('../../services', () => ({
 
 import RBACPage from '../RBACPage'
 
-describe('RBACPage users tile', () => {
-  it('does not add custom-role holders a second time', async () => {
+describe('RBACPage users column', () => {
+  it('gives each role its own holders, never a sum', async () => {
     render(<MemoryRouter><RBACPage /></MemoryRouter>)
     await screen.findAllByText('Cert Team')
     expect(screen.getAllByText('7').length).toBeGreaterThan(0)

@@ -1835,7 +1835,8 @@
       "revoked": "Ключ API отозван",
       "deleted": "Ключ API удалён",
       "loadFailed": "Не удалось загрузить ключи API",
-      "updateFailed": "Не удалось обновить ключ API"
+      "updateFailed": "Не удалось обновить ключ API",
+      "meta": "{{scope}} · создан {{created}} · последнее использование {{used}} · истекает {{expires}}"
     },
     "createUser": "Создать пользователя",
     "editUser": "Изменение пользователя",
@@ -1926,7 +1927,60 @@
     "require2fa": "Требовать 2FA",
     "exempt2faOn": "Пользователь освобождён от обязательной 2FA",
     "exempt2faOff": "Для пользователя снова действует обязательная 2FA",
-    "exempt2faLabel": "Без 2FA"
+    "exempt2faLabel": "Без 2FA",
+    "title": "Пользователи и роли",
+    "intent": "Учётные записи, группы, SSO и права.",
+    "unit_one": "{{count}} учётная запись",
+    "unit_other": "{{count}} учётной записи",
+    "unit_few": "{{count}} учётные записи",
+    "unit_many": "{{count}} учётных записей",
+    "range_one": "{{shown}} из {{count}} учётной записи",
+    "range_other": "{{shown}} из {{count}} учётных записей",
+    "range_few": "{{shown}} из {{count}} учётных записей",
+    "range_many": "{{shown}} из {{count}} учётных записей",
+    "pageRange_one": "{{start}}–{{end}} из {{count}} учётной записи",
+    "pageRange_other": "{{start}}–{{end}} из {{count}} учётных записей",
+    "pageRange_few": "{{start}}–{{end}} из {{count}} учётных записей",
+    "pageRange_many": "{{start}}–{{end}} из {{count}} учётных записей",
+    "caption": "Пользователи и роли. Выберите имя, чтобы открыть подробности.",
+    "views": {
+      "active": "Активные",
+      "disabled": "Отключённые",
+      "sso": "SSO"
+    },
+    "filterByState": "Фильтр по состоянию",
+    "filterByRole": "Фильтр по роли",
+    "search": "Имя, логин, почта…",
+    "login": "Логин",
+    "email": "Почта",
+    "lastSeen": "Последний доступ",
+    "exportList": "Экспортировать список",
+    "accounts": "Учётные записи",
+    "tabs": {
+      "profile": "Профиль",
+      "permissions": "Права"
+    },
+    "identity": "Идентификация",
+    "access": "Доступ",
+    "twoFactor": "Двухфакторная аутентификация",
+    "sourceSso": "Через SSO: {{providers}}",
+    "selfNotice": "Собственную учётную запись нельзя отключить на этой странице.",
+    "permsIntro": "Роль {{role}}: действующие права с учётом пользовательской роли и групп.",
+    "permsLoading": "Чтение действующих прав…",
+    "permsFailed": "Не удалось прочитать действующие права.",
+    "allowed": "Разрешено",
+    "notAllowed": "Не разрешено",
+    "disableEllipsis": "Отключить…",
+    "disableTitle": "Отключить эту учётную запись?",
+    "disableText": "{{login}} больше не сможет войти.",
+    "disableConfirm": "Отключить учётную запись",
+    "roleDesc": {
+      "admin": "Все операции, включая настройки и учётные записи.",
+      "operator": "Выпуск, продление и отзыв; без учётных записей и управления доступом.",
+      "auditor": "Только чтение всех рабочих данных, включая журнал.",
+      "viewer": "Только чтение сертификатов, ЦС и шаблонов."
+    },
+    "customRoleOf": "Пользовательская роль: {{name}}"
   },
   "groups": {
     "group": "Группа",
@@ -1953,7 +2007,23 @@
     "memberCount_many": "{{count}} участников",
     "memberCount_other": "{{count}} участника",
     "subtitle": "Групп: {{count}}",
-    "memberCount": "Участников: {{count}}"
+    "memberCount": "Участников: {{count}}",
+    "intent": "Группы учётных записей и предоставляемые ими права.",
+    "unit_one": "{{count}} группа",
+    "unit_other": "{{count}} группы",
+    "unit_few": "{{count}} группы",
+    "unit_many": "{{count}} групп",
+    "range_one": "{{shown}} из {{count}} группы",
+    "range_other": "{{shown}} из {{count}} групп",
+    "range_few": "{{shown}} из {{count}} групп",
+    "range_many": "{{shown}} из {{count}} групп",
+    "pageRange_one": "{{start}}–{{end}} из {{count}} группы",
+    "pageRange_other": "{{start}}–{{end}} из {{count}} групп",
+    "pageRange_few": "{{start}}–{{end}} из {{count}} групп",
+    "pageRange_many": "{{start}}–{{end}} из {{count}} групп",
+    "caption": "Группы. Выберите имя, чтобы открыть подробности.",
+    "search": "Имя, описание…",
+    "manageMembers": "Управление участниками"
   },
   "acme": {
     "title": "Протокол ACME",
@@ -4435,7 +4505,18 @@
       "delete:ssh_cas": "Удаление ЦС SSH"
     },
     "ignoredPermissions": "Игнорируемые права",
-    "ignoredPermissionsHint": "Сохранены в этой роли, но не применяются: зарезервированы для администраторов или неизвестны. Остаются как есть."
+    "ignoredPermissionsHint": "Сохранены в этой роли, но не применяются: зарезервированы для администраторов или неизвестны. Остаются как есть.",
+    "unit_one": "{{count}} роль",
+    "unit_other": "{{count}} роли",
+    "unit_few": "{{count}} роли",
+    "unit_many": "{{count}} ролей",
+    "range_one": "{{shown}} из {{count}} роли",
+    "range_other": "{{shown}} из {{count}} ролей",
+    "range_few": "{{shown}} из {{count}} ролей",
+    "range_many": "{{shown}} из {{count}} ролей",
+    "caption": "Роли. Выберите имя, чтобы открыть подробности.",
+    "filterByType": "Фильтр по типу",
+    "allOf": "Всё: {{name}}"
   },
   "hsm": {
     "statusUnavailable": "Функции HSM недоступны",
@@ -4540,7 +4621,37 @@
       "notRead": "Проверьте подключение, чтобы прочитать данные, которые сообщает модуль.",
       "softhsmFips": "SoftHSM не является валидированным модулем: в режиме FIPS ключи на нём не защищены по FIPS."
     },
-    "syncingKeys": "Синхронизация..."
+    "syncingKeys": "Синхронизация...",
+    "unit_one": "{{count}} хранилище",
+    "unit_other": "{{count}} хранилища",
+    "unit_few": "{{count}} хранилища",
+    "unit_many": "{{count}} хранилищ",
+    "keyCount_one": "{{count}} ключ",
+    "keyCount_other": "{{count}} ключа",
+    "keyCount_few": "{{count}} ключа",
+    "keyCount_many": "{{count}} ключей",
+    "range_one": "{{shown}} из {{count}} хранилища",
+    "range_other": "{{shown}} из {{count}} хранилищ",
+    "range_few": "{{shown}} из {{count}} хранилищ",
+    "range_many": "{{shown}} из {{count}} хранилищ",
+    "states": {
+      "connected": "Подключён",
+      "error": "Ошибка",
+      "disconnected": "Отключён",
+      "unknown": "Не проверен"
+    },
+    "columns": {
+      "type": "Тип",
+      "keys": "Ключи",
+      "checked": "Последняя проверка"
+    },
+    "never": "Никогда",
+    "caption": "HSM. Выберите имя, чтобы открыть подробности.",
+    "filterByState": "Фильтр по состоянию",
+    "filterByType": "Фильтр по типу",
+    "copyValue": "Копировать: {{name}}",
+    "summaryKeys": "Ключи: {{names}}.",
+    "deleteKey": "Удалить ключ {{name}}"
   },
   "sso": {
     "subtitle": "Настройка провайдеров LDAP, OAuth2 или SAML для централизованной аутентификации.",

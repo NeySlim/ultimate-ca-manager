@@ -1,38 +1,39 @@
 /**
- * UsersGroupsPage - User and Group management
- * Pattern: ResponsiveLayout + ResponsiveDataTable + Modal actions
- * 
- * DESKTOP: Dense table with hover rows, inline slide-over details
- * MOBILE: Card-style list with full-screen details
+ * Utilisateurs et rôles: the mockup's users module, a listView() of the accounts (Identifiant,
+ * Courriel, Source, Rôle, État, Dernier accès) with its state chips, and the dock of an account
+ * (Profil, Permissions, Clés API). What the product has more (search and role filter, groups,
+ * single sign-on providers, 2FA, security keys, mTLS certificates, creation, edit and removal)
+ * takes the mockup's toolbar, dock actions, record rows and further dock tabs; its forms stay
+ * the product's dialogs.
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { 
-  User, Users, UsersThree, Plus, Trash, PencilSimple, Key,
-  CheckCircle, XCircle, Crown, Clock, ShieldCheck, UserCircle, Certificate, Download,
-  LinkSimple, LinkBreak, ArrowCounterClockwise
-} from '@phosphor-icons/react'
+import { Certificate, LinkSimple } from '@phosphor-icons/react'
+import { Button, Modal, Input, Select, LoadingSpinner, MemberTransferModal } from '../components'
 import {
-  ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Input, Select,
-  LoadingSpinner, MemberTransferModal,
-  CompactSection, CompactGrid, CompactField, CompactHeader
-} from '../components'
+  Zone, Icon, Btn, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody, Section, RecordList, RecordRow,
+  SimpleOverview, EmptyBlock, NoMatch, AtelierDialog,
+} from '../components/atelier'
 import { usersService, groupsService, rolesService, casService, accountService, ssoService } from '../services'
 import { hiddenFromIssuance, listedForIssuance, pickerCas, unlistedPickerCas } from '../lib/caSelection'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
 import UserSecurityKeys from '../components/UserSecurityKeys'
 import UserApiKeys from '../components/UserApiKeys'
-import { useNotification, useMobile, useAuth } from '../contexts'
+import { useNotification, useAuth } from '../contexts'
 import { usePermission, useWebSocket, usePersistedState, useCRUDPage } from '../hooks'
-import { formatDate, cn } from '../lib/utils'
+import { formatDate, downloadBlob } from '../lib/utils'
 import { reportSilentFailure } from '../lib/silentFailure'
 import { deletedUserWarning, localOnlyRevocationWarning } from '../lib/revocationOutcome'
 import UserSecuritySection from './users/UserSecuritySection'
+import { UserState, UserProfile, UserPermissions, UserMtls } from './users/UserPanels'
+import { ROLE_KEYS, isSso, userName, sourceText } from './users/userFacts'
+import { usersCsv } from './users/usersExport'
+import { dateOf, dateTimeOf } from './admin/adminDates'
 export default function UsersGroupsPage() {
-  const { t } = useTranslation()
-  const { isMobile } = useMobile()
+  const { t, i18n } = useTranslation()
+  const locale = i18n?.language || 'en'
   const { user: me } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const { showSuccess, showError, showWarning, showConfirm, showPrompt } = useNotification()
@@ -112,14 +113,6 @@ export default function UsersGroupsPage() {
   // Expected tenant of an attachment to a multi-tenant provider: { user, row, tenant }
   const [tenantEdit, setTenantEdit] = useState(null)
   const [tenantSaving, setTenantSaving] = useState(false)
-
-  // Pagination
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(25)
-  
-  // Filters
-  const [filterRole, setFilterRole] = usePersistedState('ucm-filter-users-role', [])
-  const [filterStatus, setFilterStatus] = usePersistedState('ucm-filter-users-status', '')
 
   // Tab change
   const handleTabChange = (tab) => {
@@ -609,673 +602,231 @@ export default function UsersGroupsPage() {
     }
   }
 
-  // ============= FILTERED DATA =============
-  
-  const filteredUsers = useMemo(() => {
-    let result = [...users]
-    if (filterRole.length > 0) result = result.filter(u => filterRole.includes(u.role))
-    if (filterStatus === 'active') result = result.filter(u => u.active)
-    if (filterStatus === 'disabled') result = result.filter(u => !u.active)
-    return result
-  }, [users, filterRole, filterStatus])
 
-  const filteredGroups = useMemo(() => groups, [groups])
+  // ============= LIST =============
 
-  // ============= STATS =============
-  
-  const stats = useMemo(() => {
-    if (activeTab === 'users') {
-      const active = users.filter(u => u.active).length
-      const disabled = users.filter(u => !u.active).length
-      const admins = users.filter(u => u.role === 'admin').length
-      return [
-        { icon: CheckCircle, label: t('common.active'), value: active, variant: 'success' },
-        { icon: XCircle, label: t('common.disabled'), value: disabled, variant: 'secondary' },
-        { icon: Crown, label: t('users.admin'), value: admins, variant: 'primary' },
-        { icon: User, label: t('common.total'), value: users.length, variant: 'default' }
-      ]
-    } else {
-      return [
-        { icon: Users, label: t('common.groups'), value: groups.length, variant: 'primary' },
-        { icon: User, label: t('common.users'), value: users.length, variant: 'secondary' }
-      ]
-    }
-  }, [activeTab, users, groups, t])
+  const [query, setQuery] = useState('')
+  const [userView, setUserView] = usePersistedState('ucm-users-state', '')
+  const [roleFilter, setRoleFilter] = usePersistedState('ucm-users-role', '')
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(25)
+  const [section, setSection] = useState('profile')
+  const [disabling, setDisabling] = useState(null)
 
-  // ============= COLUMNS =============
-  
-  const userColumns = useMemo(() => [
-    {
-      key: 'username',
-      header: t('common.user'),
-      priority: 1,
-      sortable: true,
-      render: (val, row) => {
-        // Color avatar based on role AND status - theme-aware
-        const avatarColors = {
-          admin: 'icon-bg-violet',
-          operator: 'icon-bg-blue',
-          auditor: 'icon-bg-orange',
-          viewer: 'icon-bg-teal'
-        }
-        // Override with orange for disabled users
-        const colorClass = row.active 
-          ? (avatarColors[row.role] || avatarColors.viewer)
-          : 'icon-bg-orange'
-        return (
-          <div className="flex items-center gap-2">
-            <div className={cn(
-              "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
-              colorClass
-            )}>
-              {val?.charAt(0)?.toUpperCase() || '?'}
-            </div>
-            <div className="min-w-0">
-              <div className="font-medium text-text-primary truncate">{val || '—'}</div>
-              <div className="text-xs text-text-secondary truncate">{row.email || '—'}</div>
-            </div>
-          </div>
-        )
-      },
-      // Mobile: Avatar + Username left, Status badge right
-      mobileRender: (val, row) => {
-        const avatarColors = {
-          admin: 'icon-bg-violet',
-          operator: 'icon-bg-blue',
-          auditor: 'icon-bg-orange',
-          viewer: 'icon-bg-teal'
-        }
-        const colorClass = row.active 
-          ? (avatarColors[row.role] || avatarColors.viewer)
-          : 'icon-bg-orange'
-        return (
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <div className={cn(
-                "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
-                colorClass
-              )}>
-                {val?.charAt(0)?.toUpperCase() || '?'}
-              </div>
-              <span className="font-medium truncate">{val || '—'}</span>
-            </div>
-            <Badge variant={row.active ? 'success' : 'orange'} size="sm" dot>
-              {row.active ? t('common.active') : t('common.disabled')}
-            </Badge>
-          </div>
-        )
-      }
-    },
-    {
-      key: 'role',
-      header: t('common.role'),
-      priority: 2,
-      sortable: true,
-      render: (val, row) => {
-        // Colorful role badges for ALL roles
-        const roleConfig = {
-          admin: { variant: 'violet', dot: true },
-          operator: { variant: 'primary', dot: false },
-          auditor: { variant: 'orange', dot: false },
-          viewer: { variant: 'teal', dot: false }
-        }
-        const config = roleConfig[val] || roleConfig.viewer
-        const roleLabels = {
-          admin: t('users.admin'),
-          operator: t('common.operator'),
-          auditor: t('common.auditor'),
-          viewer: t('common.viewer')
-        }
-        return (
-          <Badge variant={config.variant} size="sm" dot={config.dot}>
-            {val === 'admin' && <Crown weight="fill" className="h-3 w-3 mr-1" />}
-            {roleLabels[val] || t('common.viewer')}
-          </Badge>
-        )
-      },
-      // Mobile: show email + role badge (status already shown in username row)
-      mobileRender: (val, row) => {
-        const roleConfig = {
-          admin: { variant: 'violet', dot: true },
-          operator: { variant: 'primary', dot: false },
-          auditor: { variant: 'orange', dot: false },
-          viewer: { variant: 'teal', dot: false }
-        }
-        const config = roleConfig[val] || roleConfig.viewer
-        const roleLabels = {
-          admin: t('users.admin'),
-          operator: t('common.operator'),
-          auditor: t('common.auditor'),
-          viewer: t('common.viewer')
-        }
-        return (
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-text-secondary truncate">{row.email || '—'}</span>
-            <Badge variant={config.variant} size="sm" dot={config.dot}>
-              {val === 'admin' && <Crown weight="fill" className="h-2.5 w-2.5 mr-0.5" />}
-              {roleLabels[val] || t('common.viewer')}
-            </Badge>
-          </div>
-        )
-      }
-    },
-    {
-      key: 'active',
-      header: t('common.status'),
-      priority: 3,
-      hideOnMobile: true,
-      sortable: true,
-      render: (val) => (
-        <Badge 
-          variant={val ? 'success' : 'orange'} 
-          size="sm" 
-          icon={val ? CheckCircle : XCircle} 
-          dot 
-          pulse={val}
-        >
-          {val ? t('common.active') : t('common.disabled')}
-        </Badge>
-      )
-    },
-    {
-      key: 'auth_source',
-      header: t('users.source'),
-      priority: 4,
-      hideOnMobile: true,
-      sortable: true,
-      render: (val, row) => {
-        const rows = row.sso_identities || []
-        if (!rows.length) {
-          return <Badge variant="default" size="sm">{t('users.authSource.local')}</Badge>
-        }
-        // Every provider that opens the account, by type and name
-        const type = (kind) => ({
-          ldap: t('users.authSource.ldap'), oauth2: t('users.authSource.oauth2'), saml: t('users.authSource.saml'),
-        }[kind] || kind || '')
-        const label = rows
-          .map(r => [type(r.provider_type), r.provider_name || t('users.sso.deletedProvider')].filter(Boolean).join(' · '))
-          .join(', ')
-        return (
-          <Badge variant={rows.length > 1 ? 'violet' : 'primary'} size="sm" title={label}>
-            {label}
-          </Badge>
-        )
-      }
-    },
-    {
-      key: 'last_login',
-      header: t('common.lastLogin'),
-      hideOnMobile: true,
-      sortable: true,
-      render: (val) => (
-        <span className="text-xs text-text-secondary whitespace-nowrap">
-          {val ? formatDate(val) : t('common.never')}
-        </span>
-      )
-    }
-  ], [t])
+  const roleLabel = (u) => t(ROLE_KEYS[u.role] || 'common.viewer')
+  const lastSeen = (u) => (u.last_login ? dateTimeOf(u.last_login, locale) : t('common.never'))
+  const groupsTab = activeTab === 'groups'
+  const q = query.trim().toLowerCase()
+  const matches = (values) => !q || values.some((v) => String(v || '').toLowerCase().includes(q))
 
-  const groupColumns = useMemo(() => [
-    {
-      key: 'name',
-      header: t('groups.group'),
-      priority: 1,
-      sortable: true,
-      render: (val, row) => {
-        const memberCount = row.members?.length || row.member_count || 0
-        return (
-          <div className="flex items-center gap-2">
-            <div className={cn(
-              "w-6 h-6 rounded-lg flex items-center justify-center shrink-0",
-              memberCount > 0 ? "icon-bg-blue" : "icon-bg-teal"
-            )}>
-              <UsersThree size={14} weight="duotone" />
-            </div>
-            <span className="font-medium">{val}</span>
-          </div>
-        )
-      }
-    },
-    {
-      key: 'description',
-      header: t('common.description'),
-      priority: 2,
-      hideOnMobile: true,
-      render: (val) => (
-        <span className="text-text-secondary truncate">{val || '—'}</span>
-      )
-    },
-    {
-      key: 'member_count',
-      header: t('groups.members'),
-      priority: 3,
-      sortable: true,
-      render: (val, row) => {
-        const count = row.members?.length || val || 0
-        return (
-          <Badge variant={count > 0 ? 'primary' : 'secondary'} size="sm" dot>
-            {t('groups.memberCount', { count })}
-          </Badge>
-        )
-      }
-    }
-  ], [t])
-
-  // ============= ROW ACTIONS =============
-  
-  const userRowActions = useCallback((row) => [
-    { label: t('common.edit'), icon: PencilSimple, onClick: () => { setEditingUser(row); setShowUserModal(true) } },
-    { label: row.active ? t('common.deactivate') : t('users.activate'), icon: row.active ? XCircle : CheckCircle, onClick: () => handleToggleUser(row) },
-    { label: t('users.resetPassword'), icon: Key, onClick: () => handleResetPassword(row) },
-    ...(canWrite('users') ? [
-      { label: t('users.sso.attach'), icon: LinkSimple, onClick: () => handleOpenLinkModal(row) },
-    ] : []),
-    ...(canDelete('users') ? [
-      { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDeleteUser(row) }
-    ] : [])
-  ], [canWrite, canDelete, t])
-
-  const groupRowActions = useCallback((row) => [
-    { label: t('common.edit'), icon: PencilSimple, onClick: () => { setEditingGroup(row); setShowGroupModal(true) } },
-    ...(canDelete('users') ? [
-      { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDeleteGroup(row) }
-    ] : [])
-  ], [canDelete, t])
-
-  // Help is now provided via FloatingHelpPanel (helpPageKey="usersGroups")
-
-  // ============= DETAIL PANEL =============
-  
-  const userDetailContent = selectedUser && (
-    <div className="p-3 space-y-4">
-      <CompactHeader
-        icon={UserCircle}
-        iconClass={selectedUser.active ? "bg-accent-primary-op20" : "bg-text-muted-op20"}
-        title={selectedUser.username}
-        subtitle={selectedUser.email}
-        badge={
-          <Badge variant={selectedUser.active ? 'success' : 'secondary'} size="sm" icon={selectedUser.active ? CheckCircle : XCircle}>
-            {selectedUser.active ? t('common.active') : t('common.disabled')}
-          </Badge>
-        }
-      />
-
-      {/* Actions */}
-      <div className="flex flex-wrap gap-2">
-        {canWrite('users') && (
-          <>
-            <Button type="button" size="sm" variant="secondary" onClick={() => { setEditingUser(selectedUser); setShowUserModal(true) }}>
-              <PencilSimple size={14} /> {t('common.edit')}
-            </Button>
-            <Button type="button" size="sm" variant="secondary" onClick={() => handleToggleUser(selectedUser)}>
-              {selectedUser.active ? <XCircle size={14} /> : <CheckCircle size={14} />}
-              {selectedUser.active ? t('common.deactivate') : t('users.activate')}
-            </Button>
-            <Button type="button" size="sm" variant="secondary" onClick={() => handleResetPassword(selectedUser)}>
-              <Key size={14} /> {t('users.resetPassword')}
-            </Button>
-            {selectedUser.totp_enabled && (
-              <Button type="button" size="sm" variant="secondary" onClick={() => handleReset2FA(selectedUser)}>
-                <ShieldCheck size={14} /> {t('users.reset2fa')}
-              </Button>
-            )}
-            <Button type="button" size="sm" variant="secondary" onClick={() => handleToggle2faExempt(selectedUser)}>
-              <ShieldCheck size={14} /> {selectedUser.totp_exempt ? t('users.require2fa') : t('users.exempt2fa')}
-            </Button>
-            <Button type="button" size="sm" variant="secondary" onClick={() => handleOpenLinkModal(selectedUser)}>
-              <LinkSimple size={14} /> {t('users.sso.attach')}
-            </Button>
-          </>
-        )}
-        {canDelete('users') && (
-          <Button type="button" size="sm" variant="danger-soft" onClick={() => handleDeleteUser(selectedUser)}>
-            <Trash size={14} /> {t('common.delete')}
-          </Button>
-        )}
-      </div>
-
-      <CompactSection title={t('users.sso.providers')} icon={LinkSimple} iconClass="icon-bg-violet">
-        {ssoRows(selectedUser).length === 0 ? (
-          <p className="text-xs text-text-secondary">{t('users.sso.noProviders')}</p>
-        ) : (
-          <ul className="space-y-2">
-            {ssoRows(selectedUser).map(row => (
-              <li key={row.id} className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="truncate text-sm text-text-primary" title={row.orphan_of || rowName(row)}>{rowName(row)}</span>
-                  <Badge variant={{ bound: 'success', pending: 'orange', orphan: 'secondary' }[row.state] || 'default'} size="sm">
-                    {t(`users.sso.state.${row.state}`)}
-                  </Badge>
-                  {row.state === 'pending' && (row.provider_tenants || []).length > 0 && (
-                    <span className="truncate font-mono text-xs text-text-secondary">
-                      {row.expected_tenant ? t('users.sso.expectedTenantShort', { tenant: row.expected_tenant }) : t('users.sso.noExpectedTenant')}
-                    </span>
-                  )}
-                </div>
-                {canWrite('users') && (
-                  <div className="flex gap-1">
-                    {row.external_id && (
-                      <Button type="button" size="sm" variant="secondary" onClick={() => handleResetSso(selectedUser, row)}>
-                        <ArrowCounterClockwise size={14} /> {t('users.sso.resetIdentity')}
-                      </Button>
-                    )}
-                    {!row.external_id && (row.provider_tenants || []).length > 0 && (
-                      <Button type="button" size="sm" variant="secondary" onClick={() => openTenantEdit(selectedUser, row)}>
-                        {t('users.sso.setTenant')}
-                      </Button>
-                    )}
-                    <Button type="button" size="sm" variant="secondary" onClick={() => handleDetachSso(selectedUser, row)}>
-                      <LinkBreak size={14} /> {t('users.sso.detach')}
-                    </Button>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </CompactSection>
-
-      <CompactSection title={t('common.user') + ' ' + t('common.info')} icon={UserCircle} iconClass="icon-bg-blue">
-        <CompactGrid columns={1}>
-          <CompactField autoIcon="name" label={t('common.name')} value={selectedUser.full_name || '—'} />
-          <CompactField autoIcon="email" label={t('common.email')} value={selectedUser.email} />
-          <CompactField autoIcon="role" label={t('common.role')} value={selectedUser.role} />
-          {selectedUser.custom_role_name && (
-            <CompactField autoIcon="customRole" label={t('rbac.customRole')} value={selectedUser.custom_role_name} />
-          )}
-        </CompactGrid>
-      </CompactSection>
-
-      <CompactSection title={t('common.lastLogin')} icon={Clock} iconClass="icon-bg-green">
-        <CompactGrid columns={1}>
-          <CompactField autoIcon="created" label={t('common.created')} value={formatDate(selectedUser.created_at)} />
-          <CompactField autoIcon="lastLogin" label={t('common.lastLogin')} value={selectedUser.last_login ? formatDate(selectedUser.last_login) : t('common.never')} />
-        </CompactGrid>
-      </CompactSection>
-
-      <UserSecuritySection user={selectedUser} />
-
-      {canWrite('users') && <UserSecurityKeys user={selectedUser} />}
-
-      {canWrite('users') && <UserApiKeys user={selectedUser} />}
-
-      {/* mTLS Certificates (admin only) */}
-      {canWrite('users') && (
-        <CompactSection title={t('users.mtls.title')} icon={Certificate} iconClass="icon-bg-orange">
-          <div className="p-2">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs text-text-secondary">{t('users.mtls.description')}</p>
-              <Button type="button" size="xs" onClick={handleOpenMtlsModal}>
-                <Plus size={12} className="mr-1" />
-                {t('common.add')}
-              </Button>
-            </div>
-            {userMtlsCerts.length === 0 ? (
-              <p className="text-xs text-text-tertiary py-2 text-center">{t('users.mtls.noCerts')}</p>
-            ) : (
-              <div className="space-y-1.5">
-                {userMtlsCerts.map(cert => (
-                  <div key={cert.id} className="flex items-center justify-between p-2 bg-tertiary-50 border border-border rounded-lg">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium text-text-primary truncate">{cert.name || cert.cert_subject}</p>
-                      <p className="text-xs text-text-tertiary">
-                        {t('common.expires')} {formatDate(cert.valid_until)}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                      <Badge variant={cert.enabled ? 'success' : 'warning'} size="sm">
-                        {cert.enabled ? t('common.active') : t('common.disabled')}
-                      </Badge>
-                      <Button type="button" size="xs" variant="ghost" onClick={() => handleDeleteUserMtls(cert.id)} aria-label={t('common.delete')}>
-                        <Trash size={14} className="text-status-danger" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </CompactSection>
-      )}
-    </div>
-  )
-
-  const groupDetailContent = selectedGroup && (
-    <div className="p-3 space-y-4">
-      <CompactHeader
-        icon={Users}
-        iconClass="bg-accent-primary-op20"
-        title={selectedGroup.name}
-        subtitle={t('groups.memberCount', { count: selectedGroup.members?.length || 0 })}
-      />
-
-      {/* Actions */}
-      <div className="flex flex-wrap gap-2">
-        {canWrite('users') && (
-          <Button type="button" size="sm" variant="secondary" onClick={() => { setEditingGroup(selectedGroup); setShowGroupModal(true) }}>
-            <PencilSimple size={14} /> {t('common.edit')}
-          </Button>
-        )}
-        {canDelete('users') && (
-          <Button type="button" size="sm" variant="danger-soft" onClick={() => handleDeleteGroup(selectedGroup)}>
-            <Trash size={14} /> {t('common.delete')}
-          </Button>
-        )}
-      </div>
-
-      <CompactSection title={t('groups.group') + ' ' + t('common.info')} icon={Users} iconClass="icon-bg-orange">
-        <CompactGrid columns={1}>
-          <CompactField autoIcon="name" label={t('common.name')} value={selectedGroup.name} />
-          <CompactField autoIcon="description" label={t('common.description')} value={selectedGroup.description || '—'} />
-          <CompactField autoIcon="created" label={t('common.created')} value={formatDate(selectedGroup.created_at)} />
-        </CompactGrid>
-      </CompactSection>
-
-      <CompactSection title={t('groups.permissions')} icon={ShieldCheck} iconClass="icon-bg-violet">
-        {(Array.isArray(selectedGroup.permissions) && selectedGroup.permissions.length > 0) ? (
-          <div className="flex flex-wrap gap-1">
-            {selectedGroup.permissions.map(p => (
-              <Badge key={p} size="sm">{p}</Badge>
-            ))}
-          </div>
-        ) : (
-          <div className="text-sm text-text-tertiary">{t('groups.noPermissions')}</div>
-        )}
-      </CompactSection>
-
-      <CompactSection title={t('groups.members')} icon={Users} iconClass="icon-bg-blue">
-        <div className="space-y-3">
-          {/* Manage Members Button */}
-          {canWrite('users') && (
-            <div className="flex justify-end">
-              <Button type="button" size="sm" onClick={() => setShowMemberModal(true)}>
-                <Users size={14} /> {t('groups.members')}
-              </Button>
-            </div>
-          )}
-
-          {/* Members Preview */}
-          {(selectedGroup.members?.length || 0) === 0 ? (
-            <p className="text-sm text-text-tertiary text-center py-4">
-              {t('groups.noMembers')}
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {selectedGroup.members.slice(0, 5).map(member => (
-                <div
-                  key={member.id || member.user_id || member.username}
-                  className="flex items-center gap-3 px-3 py-2 bg-tertiary-op50 border border-border rounded-lg"
-                >
-                  <div className="w-6 h-6 rounded-full bg-accent-primary-op20 flex items-center justify-center">
-                    <User size={14} className="text-accent-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-text-primary truncate">
-                      {member.username}
-                    </p>
-                    {member.email && (
-                      <p className="text-xs text-text-tertiary truncate">
-                        {member.email}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {selectedGroup.members.length > 5 && (
-                <button
-                  onClick={() => setShowMemberModal(true)}
-                  className="w-full text-sm text-accent-primary hover:text-accent-primary-op80 py-2"
-                >
-                  + {selectedGroup.members.length - 5} {t('groups.members')}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </CompactSection>
-    </div>
-  )
-
-  // ============= RENDER =============
-  
-  const currentData = activeTab === 'users' ? filteredUsers : filteredGroups
-  const currentColumns = activeTab === 'users' ? userColumns : groupColumns
-  const currentRowActions = activeTab === 'users' ? userRowActions : groupRowActions
-  const currentSelected = activeTab === 'users' ? selectedUser : selectedGroup
-  const currentDetailContent = activeTab === 'users' ? userDetailContent : groupDetailContent
-  
-  const handleSelect = async (item) => {
-    if (activeTab === 'users') {
-      setSelectedUser(item)
-      setSelectedGroup(null)
-    } else {
-      // Load full group details with members
-      setSelectedGroup(item) // Show immediately
-      setSelectedUser(null)
-      try {
-        const res = await groupsService.getById(item.id)
-        setSelectedGroup(res.data) // Update with members
-      } catch (error) { reportSilentFailure('handleSelect', error) }
-    }
-  }
-
-  const handleApplyFilterPreset = useCallback((filters) => {
-    if (filters.role) setFilterRole(Array.isArray(filters.role) ? filters.role : [filters.role])
-    else setFilterRole([])
-    if (filters.status) setFilterStatus(filters.status)
-    else setFilterStatus('')
-  }, [])
-
-  const handleOpenCreateModal = () => {
-    if (activeTab === 'users') {
-      setEditingUser(null)
-      setShowUserModal(true)
-    } else {
-      setEditingGroup(null)
-      setShowGroupModal(true)
-    }
-  }
-
-  // Tabs
-  const tabs = [
-    { id: 'users', label: t('common.users'), icon: User, count: users.length },
-    { id: 'groups', label: t('common.groups'), icon: Users, count: groups.length }
+  const searchedUsers = useMemo(() => users.filter((u) => (!roleFilter || u.role === roleFilter)
+    && matches([u.username, u.email, u.full_name, u.role])), [users, roleFilter, q]) // eslint-disable-line react-hooks/exhaustive-deps
+  const USER_VIEWS = { active: (u) => u.active, disabled: (u) => !u.active, sso: isSso }
+  const views = [
+    { id: '', label: t('common.all'), count: searchedUsers.length },
+    { id: 'active', label: t('users.views.active'), count: searchedUsers.filter(USER_VIEWS.active).length },
+    { id: 'disabled', label: t('users.views.disabled'), count: searchedUsers.filter(USER_VIEWS.disabled).length },
+    { id: 'sso', label: t('users.views.sso'), count: searchedUsers.filter(USER_VIEWS.sso).length },
   ]
+  const shownUsers = USER_VIEWS[userView] ? searchedUsers.filter(USER_VIEWS[userView]) : searchedUsers
+  const shownGroups = useMemo(() => groups.filter((g) => matches([g.name, g.description])), [groups, q]) // eslint-disable-line react-hooks/exhaustive-deps
+  const shown = groupsTab ? shownGroups : shownUsers
+  const pages = Math.max(1, Math.ceil(shown.length / perPage))
+  const current = Math.min(page, pages)
+  const paged = shown.slice((current - 1) * perPage, current * perPage)
+  useEffect(() => { setPage(1) }, [q, userView, roleFilter, activeTab])
+
+  // The full list in a file: identity, source, role and state of every account (U07, without the sessions)
+  const handleExport = () => {
+    downloadBlob(usersCsv(users, {
+      head: [t('atelier.name'), t('users.login'), t('users.email'), t('users.source'), t('common.role'), t('atelier.state'), t('users.lastSeen')],
+      row: (u) => [userName(u), u.username, u.email, sourceText(t, u), roleLabel(u), u.active ? t('common.active') : t('common.disabled'), u.last_login || ''],
+    }), 'users.csv')
+  }
+
+  // ============= DETAIL =============
+
+  const self = (u) => Boolean(me && u && u.id === me.id)
+  const openUser = (u) => { if (u.id !== selectedUser?.id) setSection('profile'); setSelectedUser(u); setSelectedGroup(null) }
+  const openGroup = async (g) => {
+    if (g.id !== selectedGroup?.id) setSection('overview')
+    setSelectedGroup(g)
+    setSelectedUser(null)
+    try {
+      const res = await groupsService.getById(g.id)
+      setSelectedGroup(res.data)
+    } catch (error) { reportSilentFailure('openGroup', error) }
+  }
+
+  const confirmDisable = async () => {
+    const u = disabling
+    setDisabling(null)
+    if (u) await handleToggleUser(u)
+  }
+
+  const sso = {
+    attach: handleOpenLinkModal, detach: handleDetachSso, reset: handleResetSso, tenant: openTenantEdit,
+  }
+
+  const userActions = (u) => (
+    <>
+      {canWrite('users') && <Btn icon="settings" write id="user-edit" onClick={() => { setEditingUser(u); setShowUserModal(true) }}>{t('common.edit')}</Btn>}
+      {canWrite('users') && <Btn icon="key" write id="user-reset" onClick={() => handleResetPassword(u)}>{`${t('users.resetPassword')}…`}</Btn>}
+      {canWrite('users') && !self(u) && (u.active
+        ? <Btn tone="danger" icon="block" id="user-disable" onClick={() => setDisabling(u)}>{t('users.disableEllipsis')}</Btn>
+        : <Btn icon="check" write id="user-enable" onClick={() => handleToggleUser(u)}>{t('users.activate')}</Btn>)}
+      {canDelete('users') && !self(u) && <Btn tone="danger" icon="block" id="user-delete" onClick={() => handleDeleteUser(u)}>{t('common.delete')}</Btn>}
+    </>
+  )
+
+  const userSections = [
+    ['profile', t('users.tabs.profile')], ['permissions', t('users.tabs.permissions')], ['keys', t('users.apiKeys.title')],
+    ['security', t('common.security')], ...(canWrite('users') ? [['mtls', t('users.mtls.title')]] : []),
+  ]
+
+  const userDock = selectedUser && !groupsTab && (
+    <Dock label={t('atelier.detailOf', { name: t('users.title') })} tabsLabel={t('atelier.openItem')} activeKey={selectedUser.id}
+      tabs={[{ key: selectedUser.id, title: userName(selectedUser), icon: 'users' }]} onClose={() => setSelectedUser(null)}>
+      <DockBody icon="users" title={userName(selectedUser)} badge={<UserState user={selectedUser} />} actions={userActions(selectedUser)}
+        sections={userSections} section={userSections.some(([id]) => id === section) ? section : 'profile'} onSection={setSection}
+        sectionsLabel={t('atelier.sectionsOf', { name: userName(selectedUser) })}>
+        {(section === 'profile' || !userSections.some(([id]) => id === section)) && (
+          <UserProfile user={selectedUser} self={self(selectedUser)} canWrite={canWrite('users')} sso={sso} />
+        )}
+        {section === 'permissions' && <UserPermissions user={selectedUser} />}
+        {section === 'keys' && <UserApiKeys user={selectedUser} canRevoke={canWrite('users')} />}
+        {section === 'security' && (
+          <div className="module-detail">
+            <UserSecuritySection user={selectedUser}>
+              {canWrite('users') && (
+                <div className="copy-url">
+                  {selectedUser.totp_enabled && <Btn icon="lock" write onClick={() => handleReset2FA(selectedUser)}>{t('users.reset2fa')}</Btn>}{' '}
+                  <Btn icon="lock" write onClick={() => handleToggle2faExempt(selectedUser)}>{selectedUser.totp_exempt ? t('users.require2fa') : t('users.exempt2fa')}</Btn>
+                </div>
+              )}
+            </UserSecuritySection>
+            {canWrite('users') && <UserSecurityKeys user={selectedUser} />}
+          </div>
+        )}
+        {section === 'mtls' && canWrite('users') && <UserMtls certs={userMtlsCerts} onAdd={handleOpenMtlsModal} onDelete={handleDeleteUserMtls} />}
+      </DockBody>
+    </Dock>
+  )
+
+  const groupSections = [['overview', t('atelier.overview')], ['members', t('groups.members')], ['permissions', t('groups.permissions')]]
+  const groupDock = selectedGroup && groupsTab && (
+    <Dock label={t('atelier.detailOf', { name: t('common.groups') })} tabsLabel={t('atelier.openItem')} activeKey={selectedGroup.id}
+      tabs={[{ key: selectedGroup.id, title: selectedGroup.name, icon: 'users' }]} onClose={() => setSelectedGroup(null)}>
+      <DockBody icon="users" title={selectedGroup.name} sections={groupSections}
+        section={groupSections.some(([id]) => id === section) ? section : 'overview'} onSection={setSection}
+        sectionsLabel={t('atelier.sectionsOf', { name: selectedGroup.name })}
+        actions={<>
+          {canWrite('users') && <Btn icon="settings" write id="group-edit" onClick={() => { setEditingGroup(selectedGroup); setShowGroupModal(true) }}>{t('common.edit')}</Btn>}
+          {canDelete('users') && <Btn tone="danger" icon="block" id="group-delete" onClick={() => handleDeleteGroup(selectedGroup)}>{t('common.delete')}</Btn>}
+        </>}>
+        {(section === 'overview' || !groupSections.some(([id]) => id === section)) && (
+          <SimpleOverview properties={[
+            [t('common.name'), selectedGroup.name],
+            [t('common.description'), selectedGroup.description || '—'],
+            [t('groups.members'), t('groups.memberCount', { count: selectedGroup.members?.length ?? selectedGroup.member_count ?? 0 })],
+            [t('common.created'), dateOf(selectedGroup.created_at, locale) || '—'],
+          ]} />
+        )}
+        {section === 'members' && (
+          <div className="module-detail">
+            <Section title={t('groups.members')}>
+              <RecordList empty={t('groups.noMembers')}>
+                {(selectedGroup.members || []).map((m) => (
+                  <RecordRow key={m.id || m.user_id || m.username} title={m.username} meta={m.email} />
+                ))}
+              </RecordList>
+              {canWrite('users') && <div className="copy-url"><Btn icon="users" write onClick={() => setShowMemberModal(true)}>{t('groups.manageMembers')}</Btn></div>}
+            </Section>
+          </div>
+        )}
+        {section === 'permissions' && (
+          Array.isArray(selectedGroup.permissions) && selectedGroup.permissions.length > 0 ? (
+            <ul className="perm-list">
+              {selectedGroup.permissions.map((p) => <li key={p}><span className="flag"><Icon name="check" />{t('users.allowed')}</span><span className="mono">{p}</span></li>)}
+            </ul>
+          ) : <p className="muted small">{t('groups.noPermissions')}</p>
+        )}
+      </DockBody>
+    </Dock>
+  )
+
+  const createLabel = groupsTab ? t('groups.createGroup') : t('users.createUser')
+  const handleOpenCreateModal = () => {
+    if (groupsTab) { setEditingGroup(null); setShowGroupModal(true) } else { setEditingUser(null); setShowUserModal(true) }
+  }
+  const create = canWrite('users') ? { label: createLabel, icon: 'plus', onClick: handleOpenCreateModal, primary: true } : undefined
+  const narrowed = Boolean(q || (!groupsTab && (userView || roleFilter)))
+  const total = (groupsTab ? groups : users).length
+  const footer = shown.length > 10 ? {
+    range: t(groupsTab ? 'groups.pageRange' : 'users.pageRange', { start: (current - 1) * perPage + 1, end: Math.min(current * perPage, shown.length), count: shown.length }),
+    pagination: { page: current, pages, perPage, sizes: [10, 25, 50, 100], onPage: setPage, onPerPage: (n) => { setPerPage(n); setPage(1) } },
+  } : { range: t(groupsTab ? 'groups.range' : 'users.range', { shown: shown.length, count: total }) }
+  const empty = narrowed && (groupsTab ? groups : users).length ? (
+    <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')}
+      onReset={() => { setQuery(''); setUserView(''); setRoleFilter('') }} />
+  ) : (
+    <EmptyBlock id={groupsTab ? 'groups' : 'users'} icon="users" title={groupsTab ? t('groups.noGroups') : t('users.noUsers')} action={create} />
+  )
+  const toolbar = (
+    <Toolbar>
+      <SearchField id="users-search" name="q" label={t(groupsTab ? 'groups.search' : 'users.search')} placeholder={t(groupsTab ? 'groups.search' : 'users.search')}
+        value={query} onChange={setQuery} />
+      {!groupsTab && (
+        <FilterSelect id="users-role" label={t('users.filterByRole')} value={roleFilter} onChange={setRoleFilter}
+          options={[{ value: '', label: t('common.allRoles') }, ...Object.entries(ROLE_KEYS).map(([value, key]) => ({ value, label: t(key) }))]} />
+      )}
+    </Toolbar>
+  )
 
   return (
     <>
-      <ResponsiveLayout
-        title={activeTab === 'users' ? t('common.users') : t('common.groups')}
-        subtitle={activeTab === 'users' ? t('users.subtitle', { count: currentData.length }) : t('groups.subtitle', { count: currentData.length })}
-        icon={activeTab === 'users' ? User : Users}
-        stats={stats}
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        tabLayout="sidebar"
-        helpPageKey="usersGroups"
-        splitView={true}
-        splitEmptyContent={
-          <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
-              {activeTab === 'users' ? <User size={24} className="text-text-tertiary" /> : <Users size={24} className="text-text-tertiary" />}
-            </div>
-            <p className="text-sm text-text-secondary">
-              {activeTab === 'users' ? t('users.noUsers') : t('groups.noGroups')}
-            </p>
+      <Zone dock={groupsTab ? groupDock : userDock} after={disabling && (
+        <AtelierDialog title={t('users.disableTitle')} subtitle={userName(disabling)} size="narrow" onClose={() => setDisabling(null)} returnTo="user-disable">
+          <div className="notice warn"><Icon name="warning" /><span>{t('users.disableText', { login: disabling.username })}</span></div>
+          <div className="modal-actions">
+            <button type="button" className="btn" data-action="close-modal" onClick={() => setDisabling(null)}>{t('common.cancel')}</button>
+            <Btn tone="danger" id="user-disable-confirm" onClick={confirmDisable}>{t('users.disableConfirm')}</Btn>
           </div>
-        }
-        slideOverOpen={!!currentSelected}
-        slideOverTitle={currentSelected?.username || currentSelected?.name || t('common.details')}
-        slideOverContent={currentDetailContent}
-        slideOverWidth="lg"
-        onSlideOverClose={() => { setSelectedUser(null); setSelectedGroup(null) }}
-      >
-        <div className="flex flex-col h-full min-h-0">
-          <ResponsiveDataTable
-          data={currentData}
-          columns={currentColumns}
-          loading={loading}
-          onRowClick={handleSelect}
-          selectedId={currentSelected?.id}
-          searchable
-          searchPlaceholder={`${t('common.search')} ${activeTab}...`}
-          searchKeys={activeTab === 'users' ? ['username', 'email', 'full_name', 'role'] : ['name', 'description']}
-          toolbarFilters={activeTab === 'users' ? [
-            {
-              key: 'role',
-              type: 'multiSelect',
-              label: t('common.role'),
-              value: filterRole,
-              onChange: setFilterRole,
-              placeholder: t('common.allRoles'),
-              options: [
-                { value: 'admin', label: t('users.admin') },
-                { value: 'operator', label: t('common.operator') },
-                { value: 'auditor', label: t('common.auditor') },
-                { value: 'viewer', label: t('common.viewer') }
-              ]
-            },
-            {
-              key: 'status',
-              value: filterStatus,
-              onChange: setFilterStatus,
-              placeholder: t('common.allStatus'),
-              options: [
-                { value: 'active', label: t('common.active') },
-                { value: 'disabled', label: t('common.disabled') }
-              ]
-            }
-          ] : []}
-          filterPresetsKey="ucm-users-presets"
-          densityStorageKey="ucm-users-density"
-          onApplyFilterPreset={handleApplyFilterPreset}
-          toolbarActions={canWrite('users') && (
-            isMobile ? (
-              <Button type="button" size="lg" onClick={handleOpenCreateModal} className="w-11 h-11 p-0">
-                <Plus size={22} weight="bold" />
-              </Button>
-            ) : (
-              <Button type="button" size="sm" onClick={handleOpenCreateModal}>
-                <Plus size={14} weight="bold" />
-                {activeTab === 'users' ? t('users.createUser') : t('groups.createGroup')}
-              </Button>
-            )
-          )}
-          sortable
-          defaultSort={{ key: activeTab === 'users' ? 'username' : 'name', direction: 'asc' }}
-          pagination={true}
-          emptyIcon={activeTab === 'users' ? User : Users}
-          emptyTitle={activeTab === 'users' ? t('users.noUsers') : t('groups.noGroups')}
-          emptyDescription={activeTab === 'users' ? t('users.createUser') : t('groups.createGroup')}
-          emptyAction={canWrite('users') && (
-            <Button type="button" onClick={handleOpenCreateModal}>
-              <Plus size={16} /> {activeTab === 'users' ? t('users.createUser') : t('groups.createGroup')}
-            </Button>
-          )}
-        />
-        </div>
-      </ResponsiveLayout>
+        </AtelierDialog>
+      )}>
+        <PageHead title={groupsTab ? t('common.groups') : t('users.title')}
+          total={groupsTab ? t('groups.unit', { count: groups.length }) : t('users.unit', { count: users.length })}
+          intent={groupsTab ? t('groups.intent') : t('users.intent')}
+          actions={<>
+            <Btn tone="quiet" icon="users" id="users-switch" onClick={() => handleTabChange(groupsTab ? 'users' : 'groups')}>
+              {groupsTab ? t('users.accounts') : t('common.groups')}
+            </Btn>
+            {!groupsTab && <Btn icon="download" data-action="users-export" disabled={!users.length || undefined} onClick={handleExport}>{t('users.exportList')}</Btn>}
+            {create && <Btn tone="primary" icon="plus" id="users-new" onClick={create.onClick}>{create.label}</Btn>}
+          </>} />
+        {groupsTab ? (
+          <ListView label={t('common.groups')} caption={t('groups.caption')} icon="users" rows={paged} loading={loading} toolbar={toolbar}
+            title={(g) => g.name} status={() => null} openedId={selectedGroup?.id} onOpen={openGroup}
+            columns={[
+              { id: 'description', label: t('common.description'), cell: (g) => g.description || '—', grow: true, muted: true },
+              { id: 'members', label: t('groups.members'), cell: (g) => t('groups.memberCount', { count: g.members?.length ?? g.member_count ?? 0 }) },
+            ]}
+            empty={empty} footer={footer} />
+        ) : (
+          <ListView label={t('users.title')} caption={t('users.caption')} icon="users" rows={paged} loading={loading} toolbar={toolbar}
+            filters={{ views, active: USER_VIEWS[userView] ? userView : '', onChange: setUserView, label: t('users.filterByState') }}
+            title={userName} status={(u) => <UserState user={u} />} openedId={selectedUser?.id} onOpen={openUser}
+            columns={[
+              { id: 'login', label: t('users.login'), cell: (u) => <span className="mono">{u.username}</span> },
+              { id: 'email', label: t('users.email'), cell: (u) => u.email || '—', grow: true, muted: true },
+              { id: 'source', label: t('users.source'), cell: (u) => (isSso(u) ? t('users.views.sso') : t('users.authSource.local')) },
+              { id: 'role', label: t('common.role'), cell: roleLabel },
+              { status: true },
+              { id: 'seen', label: t('users.lastSeen'), cell: lastSeen },
+            ]}
+            empty={empty} footer={footer} />
+        )}
+      </Zone>
 
       {/* User Modal */}
       <Modal

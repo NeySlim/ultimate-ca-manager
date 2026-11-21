@@ -1783,7 +1783,8 @@
       "revoked": "Chave de API revogada",
       "deleted": "Chave de API excluída",
       "loadFailed": "Não foi possível carregar as chaves de API",
-      "updateFailed": "Não foi possível alterar a chave de API"
+      "updateFailed": "Não foi possível alterar a chave de API",
+      "meta": "{{scope}} · created on {{created}} · last used {{used}} · expires {{expires}}"
     },
     "createUser": "Criar utilizador",
     "editUser": "Editar utilizador",
@@ -1872,7 +1873,54 @@
     "require2fa": "Exigir 2FA",
     "exempt2faOn": "Utilizador isento da obrigatoriedade de 2FA",
     "exempt2faOff": "O utilizador está agora sujeito à obrigatoriedade de 2FA",
-    "exempt2faLabel": "Isento de 2FA"
+    "exempt2faLabel": "Isento de 2FA",
+    "title": "Users and roles",
+    "intent": "Accounts, groups, SSO and permissions.",
+    "unit_one": "{{count}} account",
+    "unit_other": "{{count}} accounts",
+    "range_one": "{{shown}} of {{count}} account",
+    "range_other": "{{shown}} of {{count}} accounts",
+    "pageRange_one": "{{start}}–{{end}} of {{count}} account",
+    "pageRange_other": "{{start}}–{{end}} of {{count}} accounts",
+    "caption": "Users and roles. Activate a name to open its detail.",
+    "views": {
+      "active": "Active",
+      "disabled": "Disabled",
+      "sso": "SSO"
+    },
+    "filterByState": "Filter by state",
+    "filterByRole": "Filter by role",
+    "search": "Name, username, email…",
+    "login": "Username",
+    "email": "Email",
+    "lastSeen": "Last access",
+    "exportList": "Export the list",
+    "accounts": "Accounts",
+    "tabs": {
+      "profile": "Profile",
+      "permissions": "Permissions"
+    },
+    "identity": "Identity",
+    "access": "Access",
+    "twoFactor": "Two-factor authentication",
+    "sourceSso": "SSO, {{providers}}",
+    "selfNotice": "Your own account cannot be disabled from this page.",
+    "permsIntro": "Role {{role}}: the effective permissions, custom role and groups included.",
+    "permsLoading": "Reading the effective permissions…",
+    "permsFailed": "The effective permissions could not be read.",
+    "allowed": "Allowed",
+    "notAllowed": "Not allowed",
+    "disableEllipsis": "Disable…",
+    "disableTitle": "Disable this account?",
+    "disableText": "{{login}} will no longer be able to sign in.",
+    "disableConfirm": "Disable the account",
+    "roleDesc": {
+      "admin": "Every operation, settings and accounts included.",
+      "operator": "Issue, renew and revoke; neither accounts nor access control.",
+      "auditor": "Read-only access to all operational data, the journal included.",
+      "viewer": "Read-only access to certificates, CAs and templates."
+    },
+    "customRoleOf": "Custom role: {{name}}"
   },
   "groups": {
     "group": "Grupo",
@@ -1895,7 +1943,17 @@
     "memberCount_one": "{{count}} membro",
     "memberCount_other": "{{count}} membros",
     "subtitle": "{{count}} grupos",
-    "memberCount": "{{count}} membros"
+    "memberCount": "{{count}} membros",
+    "intent": "Groups of accounts and the permissions they grant.",
+    "unit_one": "{{count}} group",
+    "unit_other": "{{count}} groups",
+    "range_one": "{{shown}} of {{count}} group",
+    "range_other": "{{shown}} of {{count}} groups",
+    "pageRange_one": "{{start}}–{{end}} of {{count}} group",
+    "pageRange_other": "{{start}}–{{end}} of {{count}} groups",
+    "caption": "Groups. Activate a name to open its detail.",
+    "search": "Name, description…",
+    "manageMembers": "Manage members"
   },
   "acme": {
     "title": "Protocolo ACME",
@@ -4345,7 +4403,14 @@
       "delete:ssh_cas": "Excluir CAs SSH"
     },
     "ignoredPermissions": "Permissões ignoradas",
-    "ignoredPermissionsHint": "Armazenadas nesta função, mas não aplicadas: reservadas aos administradores ou desconhecidas. São mantidas como estão."
+    "ignoredPermissionsHint": "Armazenadas nesta função, mas não aplicadas: reservadas aos administradores ou desconhecidas. São mantidas como estão.",
+    "unit_one": "{{count}} role",
+    "unit_other": "{{count}} roles",
+    "range_one": "{{shown}} of {{count}} role",
+    "range_other": "{{shown}} of {{count}} roles",
+    "caption": "Roles. Activate a name to open its detail.",
+    "filterByType": "Filter by type",
+    "allOf": "All of {{name}}"
   },
   "hsm": {
     "statusUnavailable": "Funcionalidades HSM não estão disponíveis",
@@ -4448,7 +4513,31 @@
       "notRead": "Teste a ligação para ler o que o módulo reporta.",
       "softhsmFips": "O SoftHSM não é um módulo validado: no modo FIPS, as chaves nele armazenadas não são protegidas por FIPS."
     },
-    "syncingKeys": "Sincronizando..."
+    "syncingKeys": "Sincronizando...",
+    "unit_one": "{{count}} location",
+    "unit_other": "{{count}} locations",
+    "keyCount_one": "{{count}} key",
+    "keyCount_other": "{{count}} keys",
+    "range_one": "{{shown}} of {{count}} location",
+    "range_other": "{{shown}} of {{count}} locations",
+    "states": {
+      "connected": "Connected",
+      "error": "Error",
+      "disconnected": "Disconnected",
+      "unknown": "Not tested"
+    },
+    "columns": {
+      "type": "Type",
+      "keys": "Keys",
+      "checked": "Last check"
+    },
+    "never": "Never",
+    "caption": "HSM. Activate a name to open its detail.",
+    "filterByState": "Filter by state",
+    "filterByType": "Filter by type",
+    "copyValue": "Copy {{name}}",
+    "summaryKeys": "Keys: {{names}}.",
+    "deleteKey": "Delete key {{name}}"
   },
   "sso": {
     "subtitle": "Configure provedores LDAP, OAuth2 ou SAML para autenticação centralizada",

@@ -2747,7 +2747,17 @@
     "memberCount_one": "{{count}} membre",
     "memberCount_other": "{{count}} membres",
     "subtitle": "{{count}} groupes",
-    "memberCount": "{{count}} membres"
+    "memberCount": "{{count}} membres",
+    "intent": "Groupes de comptes et permissions qu’ils accordent.",
+    "unit_one": "{{count}} groupe",
+    "unit_other": "{{count}} groupes",
+    "range_one": "{{shown}} sur {{count}} groupe",
+    "range_other": "{{shown}} sur {{count}} groupes",
+    "pageRange_one": "{{start}}–{{end}} sur {{count}} groupe",
+    "pageRange_other": "{{start}}–{{end}} sur {{count}} groupes",
+    "caption": "Groupes. Activez un nom pour ouvrir son détail.",
+    "search": "Nom, description…",
+    "manageMembers": "Gérer les membres"
   },
   "help": {
     "englishOnlyNotice": "L’aide est disponible en anglais, en français, en russe et en chinois.",
@@ -2871,7 +2881,31 @@
       "notRead": "Testez la connexion pour lire ce que le module signale.",
       "softhsmFips": "SoftHSM n’est pas un module validé : en mode FIPS, les clés qu’il contient ne sont pas protégées par FIPS."
     },
-    "syncingKeys": "Synchronisation..."
+    "syncingKeys": "Synchronisation...",
+    "unit_one": "{{count}} emplacement",
+    "unit_other": "{{count}} emplacements",
+    "keyCount_one": "{{count}} clé",
+    "keyCount_other": "{{count}} clés",
+    "range_one": "{{shown}} sur {{count}} emplacement",
+    "range_other": "{{shown}} sur {{count}} emplacements",
+    "states": {
+      "connected": "Connecté",
+      "error": "En erreur",
+      "disconnected": "Déconnecté",
+      "unknown": "Non testé"
+    },
+    "columns": {
+      "type": "Type",
+      "keys": "Clés",
+      "checked": "Dernier contrôle"
+    },
+    "never": "Jamais",
+    "caption": "HSM. Activez un nom pour ouvrir son détail.",
+    "filterByState": "Filtrer par état",
+    "filterByType": "Filtrer par type",
+    "copyValue": "Copier {{name}}",
+    "summaryKeys": "Clés : {{names}}.",
+    "deleteKey": "Supprimer la clé {{name}}"
   },
   "import": {
     "smartImport": "Import intelligent",
@@ -3165,7 +3199,14 @@
       "delete:ssh_cas": "Supprimer des AC SSH"
     },
     "ignoredPermissions": "Permissions ignorées",
-    "ignoredPermissionsHint": "Enregistrées sur ce rôle mais non appliquées : réservées aux administrateurs ou inconnues. Elles sont conservées telles quelles."
+    "ignoredPermissionsHint": "Enregistrées sur ce rôle mais non appliquées : réservées aux administrateurs ou inconnues. Elles sont conservées telles quelles.",
+    "unit_one": "{{count}} rôle",
+    "unit_other": "{{count}} rôles",
+    "range_one": "{{shown}} sur {{count}} rôle",
+    "range_other": "{{shown}} sur {{count}} rôles",
+    "caption": "Rôles. Activez un nom pour ouvrir son détail.",
+    "filterByType": "Filtrer par type",
+    "allOf": "Tout {{name}}"
   },
   "scep": {
     "title": "Protocole SCEP",
@@ -4952,7 +4993,8 @@
       "revoked": "Clé API révoquée",
       "deleted": "Clé API supprimée",
       "loadFailed": "Impossible de charger les clés API",
-      "updateFailed": "Impossible de modifier la clé API"
+      "updateFailed": "Impossible de modifier la clé API",
+      "meta": "{{scope}} · créée le {{created}} · dernier usage {{used}} · expire {{expires}}"
     },
     "createUser": "Créer un utilisateur",
     "editUser": "Modifier l’utilisateur",
@@ -5041,7 +5083,54 @@
     "require2fa": "Imposer la 2FA",
     "exempt2faOn": "Utilisateur exempté de l’obligation 2FA",
     "exempt2faOff": "Utilisateur de nouveau soumis à l’obligation 2FA",
-    "exempt2faLabel": "Exempté de 2FA"
+    "exempt2faLabel": "Exempté de 2FA",
+    "title": "Utilisateurs et rôles",
+    "intent": "Comptes, groupes, SSO et permissions.",
+    "unit_one": "{{count}} compte",
+    "unit_other": "{{count}} comptes",
+    "range_one": "{{shown}} sur {{count}} compte",
+    "range_other": "{{shown}} sur {{count}} comptes",
+    "pageRange_one": "{{start}}–{{end}} sur {{count}} compte",
+    "pageRange_other": "{{start}}–{{end}} sur {{count}} comptes",
+    "caption": "Utilisateurs et rôles. Activez un nom pour ouvrir son détail.",
+    "views": {
+      "active": "Actifs",
+      "disabled": "Désactivés",
+      "sso": "SSO"
+    },
+    "filterByState": "Filtrer par état",
+    "filterByRole": "Filtrer par rôle",
+    "search": "Nom, identifiant, courriel…",
+    "login": "Identifiant",
+    "email": "Courriel",
+    "lastSeen": "Dernier accès",
+    "exportList": "Exporter la liste",
+    "accounts": "Comptes",
+    "tabs": {
+      "profile": "Profil",
+      "permissions": "Permissions"
+    },
+    "identity": "Identité",
+    "access": "Accès",
+    "twoFactor": "Double authentification",
+    "sourceSso": "SSO, {{providers}}",
+    "selfNotice": "Votre propre compte ne peut pas être désactivé depuis cette page.",
+    "permsIntro": "Rôle {{role}} : permissions effectives, rôle personnalisé et groupes compris.",
+    "permsLoading": "Lecture des permissions effectives…",
+    "permsFailed": "Impossible de lire les permissions effectives.",
+    "allowed": "Autorisé",
+    "notAllowed": "Non autorisé",
+    "disableEllipsis": "Désactiver…",
+    "disableTitle": "Désactiver ce compte ?",
+    "disableText": "{{login}} ne pourra plus se connecter.",
+    "disableConfirm": "Désactiver le compte",
+    "roleDesc": {
+      "admin": "Toutes les opérations, y compris les paramètres et les comptes.",
+      "operator": "Émettre, renouveler et révoquer ; ni comptes ni contrôle d’accès.",
+      "auditor": "Lecture seule de toutes les données d’exploitation, journal compris.",
+      "viewer": "Lecture seule des certificats, des AC et des modèles."
+    },
+    "customRoleOf": "Rôle personnalisé : {{name}}"
   },
   "validation": {
     "required": "Ce champ est requis",

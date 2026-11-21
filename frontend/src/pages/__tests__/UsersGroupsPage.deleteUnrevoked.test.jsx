@@ -72,17 +72,13 @@ vi.mock('../../services', () => ({
 
 vi.mock('../../components', async (orig) => ({
   ...(await orig()),
-  ResponsiveLayout: ({ children, slideOverContent }) => <div>{children}{slideOverContent}</div>,
-  ResponsiveDataTable: ({ data = [], onRowClick }) => data.map(row => (
-    <button key={row.id} type="button" onClick={() => onRowClick(row)}>{`row-${row.id}`}</button>
-  )),
 }))
 
 import UsersGroupsPage from '../UsersGroupsPage'
 
 const deleteUser = async () => {
   render(<MemoryRouter><UsersGroupsPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByText('row-9'))
+  fireEvent.click(await screen.findByRole('button', { name: 'alice' }))
   fireEvent.click(await screen.findByRole('button', { name: /common\.delete/ }))
 }
 

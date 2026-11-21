@@ -84,10 +84,6 @@ vi.mock('../../services', () => ({
 
 vi.mock('../../components', async (orig) => ({
   ...(await orig()),
-  ResponsiveLayout: ({ children, slideOverContent }) => <div>{children}{slideOverContent}</div>,
-  ResponsiveDataTable: ({ data = [], onRowClick }) => data.map(row => (
-    <button key={row.id} type="button" onClick={() => onRowClick(row)}>{`row-${row.id}`}</button>
-  )),
   Select: ({ label, value, onChange, options = [] }) => (
     <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="">-</option>
@@ -101,7 +97,7 @@ import UsersGroupsPage from '../UsersGroupsPage'
 const open = async (user) => {
   mocks.users = [user]
   render(<MemoryRouter><UsersGroupsPage /></MemoryRouter>)
-  fireEvent.click(await screen.findByText(`row-${user.id}`))
+  fireEvent.click(await screen.findByRole('button', { name: user.username }))
 }
 
 const choose = async (providerId) => {

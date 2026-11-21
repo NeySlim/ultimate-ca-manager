@@ -9,11 +9,14 @@ export default {
         items: [
           { label: 'Créer un utilisateur', text: 'Ajouter un nouvel utilisateur avec nom d’utilisateur, e-mail et mot de passe initial' },
           { label: 'Rôles', text: 'Attribuer des rôles système ou personnalisés pour contrôler les permissions' },
-          { label: 'Statut', text: 'Activer ou désactiver les comptes utilisateurs' },
+          { label: 'Statut', text: 'Les pastilles au-dessus de la liste comptent les comptes Tous, Actifs, Désactivés et SSO. Désactiver… demande une confirmation ; votre propre compte ne peut être ni désactivé ni supprimé depuis cette page' },
           { label: 'Réinitialisation du mot de passe', text: 'Réinitialiser le mot de passe d’un utilisateur (action administrateur). Les sessions ouvertes de l’utilisateur sont fermées, comme par une réinitialisation de la 2FA' },
           { label: 'Supprimer un utilisateur', text: "Supprimer un utilisateur révoque les certificats qu’il a inscrits pour mTLS (cessationOfOperation), puis les supprime. Un certificat que l’AC ne peut pas révoquer ne bloque pas la suppression : il reste valide, est nommé dans l’avertissement et le journal d’audit, et doit être révoqué sous Certificats. Un échec après certaines révocations conserve l’utilisateur et nomme les certificats déjà révoqués. Retirer un utilisateur ou l’un de ses certificats mTLS avertit quand l’AC ACME qui a émis un certificat n’a pas été informée de sa révocation" },
           { label: 'Clés API', text: 'Dans le détail d’un utilisateur, liste ses clés API et révoque une clé compromise ou inutilisée : elle cesse de fonctionner immédiatement, et une clé révoquée ou expirée peut ensuite être supprimée. Les propriétaires créent leurs clés depuis leur page Compte' },
           { label: 'Source', text: 'Indique ce qui ouvre chaque compte : Local (son mot de passe UCM), ou chaque fournisseur qui lui est rattaché, par type et par nom (par exemple OAuth2 · Okta, SAML · AD FS). Un compte peut être rattaché à plusieurs fournisseurs.' },
+          { label: 'Permissions', text: 'L’onglet Permissions d’un compte liste chaque permission, Autorisé ou Non autorisé, telle que l’autorisation l’applique : rôle, rôle personnalisé et groupes réunis' },
+          { label: 'Exporter la liste', text: 'Télécharge tous les comptes en CSV : nom, identifiant, courriel, source, rôle, état et dernier accès' },
+          { label: 'Groupes', text: 'Le bouton Groupes de l’en-tête affiche les groupes, Comptes revient aux comptes' },
         ]
       },
       {

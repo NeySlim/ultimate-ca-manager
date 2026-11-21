@@ -53,10 +53,11 @@ describe('RBACPage keeps what it cannot grant', () => {
     render(<MemoryRouter><RBACPage /></MemoryRouter>)
     fireEvent.click((await screen.findAllByText('Legacy Role'))[0])
 
+    expect(await screen.findByText('1/3')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'common.permissions' }))
     const ignored = await screen.findByTestId('rbac-ignored-permissions')
     expect(ignored.textContent).toContain('*')
     expect(ignored.textContent).toContain('read:dashboard')
-    expect(screen.getByText('1/3')).toBeInTheDocument()
 
     fireEvent.click(screen.getByText('common.saveChanges'))
     await waitFor(() => expect(updateRole).toHaveBeenCalled())
@@ -68,6 +69,7 @@ describe('RBACPage keeps what it cannot grant', () => {
     updateRole.mockClear()
     render(<MemoryRouter><RBACPage /></MemoryRouter>)
     fireEvent.click((await screen.findAllByText('Legacy Role'))[0])
+    fireEvent.click(await screen.findByRole('tab', { name: 'common.permissions' }))
     await screen.findByTestId('rbac-ignored-permissions')
     // certificates comes first; its "read" chip reads as granted through read:certs
     fireEvent.click(screen.getAllByText('read')[0])

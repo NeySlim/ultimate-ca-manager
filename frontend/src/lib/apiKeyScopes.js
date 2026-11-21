@@ -19,3 +19,13 @@ export const API_KEY_SCOPES = {
 export function apiKeyScopePermissions(scope, holds = () => true) {
   return (API_KEY_SCOPES[scope] || ['*']).filter(p => p.includes('*') || holds(p))
 }
+
+const SCOPE_LABELS = { full: 'account.scopeFull', read: 'account.scopeReadOnly', readwrite: 'account.scopeReadWrite', certificates: 'account.scopeCertificates' }
+
+/** A key's scope in words when it is one of the presets, else the permissions it holds. */
+export function apiKeyScopeLabel(t, permissions) {
+  const list = Array.isArray(permissions) ? permissions : [permissions].filter(Boolean)
+  const same = (a) => a.length === list.length && a.every((p) => list.includes(p))
+  const preset = Object.keys(API_KEY_SCOPES).find((k) => same(API_KEY_SCOPES[k]))
+  return preset ? t(SCOPE_LABELS[preset]) : list.join(', ')
+}

@@ -47,12 +47,6 @@ vi.mock('../../services', () => ({
     syncKeys: (...a) => syncKeys(...a),
   },
 }))
-vi.mock('../../components/ui/responsive', () => ({
-  ResponsiveLayout: ({ children, slideOverContent }) => <div>{children}{slideOverContent}</div>,
-  ResponsiveDataTable: ({ data, onRowClick }) => (
-    <ul>{data.map(p => <li key={p.id}><button onClick={() => onRowClick(p)}>{p.name}</button></li>)}</ul>
-  ),
-}))
 
 import HSMPage, { syncKeysMessage } from '../HSMPage'
 

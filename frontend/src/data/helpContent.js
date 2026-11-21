@@ -982,11 +982,14 @@ export const helpContent = {
         items: [
           { label: 'Create User', text: 'Add a new user with username, email, and initial password' },
           { label: 'Roles', text: 'Assign system or custom roles to control permissions' },
-          { label: 'Status', text: 'Enable or disable user accounts' },
+          { label: 'Status', text: 'The chips above the list count All, Active, Disabled and SSO accounts. Disable… asks for a confirmation; your own account cannot be disabled or deleted from this page' },
           { label: 'Password Reset', text: 'Reset a user\'s password (admin action). The user\'s open sessions are signed out, as they are by a 2FA reset' },
           { label: 'Delete User', text: 'Deleting a user revokes the certificates they enrolled for mTLS (cessationOfOperation), then deletes them. A certificate the CA cannot revoke does not block the deletion: it stays valid, is named in the warning and the audit log, and must be revoked under Certificates. A failure after some revocations keeps the user and names the certificates already revoked. Removing a user or one of its mTLS certificates warns when the ACME CA that issued a certificate was not told of its revocation' },
           { label: 'API Keys', text: 'In a user\'s details, list their API keys and revoke a leaked or unused one: it stops working at once, and a revoked or expired key can then be deleted. Owners create their keys on their Account page' },
           { label: 'Source', text: 'Shows what opens each account: Local (its UCM password), or each provider attached to it, by type and name (for example OAuth2 · Okta, SAML · AD FS). An account may be attached to several providers.' },
+          { label: 'Permissions', text: 'The Permissions tab of an account lists every permission, Allowed or Not allowed, as authorisation applies it: its role, custom role and groups together' },
+          { label: 'Export the list', text: 'Downloads every account as a CSV file: name, username, email, source, role, state and last access' },
+          { label: 'Groups', text: 'The Groups button of the page head shows the groups, Accounts goes back to the accounts' },
         ]
       },
       {
@@ -1030,9 +1033,9 @@ export const helpContent = {
         icon: Key,
         items: [
           { label: 'Create Role', text: 'Define a new role with a name and description' },
-          { label: 'Permission Matrix', text: 'Check/uncheck permissions by category (CAs, Certs, Private Keys, etc.)' },
-          { label: 'Coverage', text: 'A bar and an n/N count of the permissions granted to the role' },
-          { label: 'User Count', text: 'See how many users are assigned to each role' },
+          { label: 'Permission Matrix', text: 'The Permissions tab of a custom role lists each resource with its actions as check boxes; the box of a resource grants or removes all of them, and Save changes records the role' },
+          { label: 'Coverage', text: 'The Overview tab gives the n/N count of the permissions granted to the role' },
+          { label: 'User Count', text: 'The Users column gives the accounts holding each role; the System and Custom chips above the list narrow it' },
           { label: 'System role permissions', text: 'A system role shows the permissions UCM applies to it; Admin shows every permission of the matrix' },
           { label: 'SSH CA permissions (v2.248)', text: 'read:ssh_cas, write:ssh_cas and delete:ssh_cas govern SSH CAs, so write:ssh no longer creates or edits them. Roles, groups and API keys holding an SSH permission received the matching one on upgrade' },
         ]
@@ -1591,7 +1594,7 @@ export const helpContent = {
           { label: 'Test Connection', text: 'Verify the HSM is reachable and credentials are valid; for a PKCS#11 module, also record what it reports (library, manufacturer, library and firmware versions), shown on the provider page' },
           { label: 'Generate', text: 'Create a new key pair directly on the HSM' },
           { label: 'Sync keys', text: 'Reads the provider\'s keys again from the token: new keys are added, keys gone from the token are removed, except those a CA uses, which are kept. When the token listing fails, nothing is removed. The message gives the counts, the keys kept and the unreadable keys; the button stays disabled while the synchronization runs' },
-          { label: 'Status', text: 'Monitor provider connection health' },
+          { label: 'Status', text: 'The list gives each provider\'s type, keys, last check (its last connection test) and state: Connected, Error, Disconnected or Not tested. A provider\'s detail has its overview, keys and configuration' },
           { label: 'Certification', text: 'Declare the certification of the HSM: Common Criteria EAL 4+, EUCC high, FIPS 140-3 level 3, FIPS 140-2 level 3 or other. Left empty, it is not declared. The eu-acm compliance profile accepts only Common Criteria EAL 4+, EUCC high, and FIPS 140-3 level 3 (until 31 December 2030) for an HSM-backed CA' },
           { label: 'Name already held (v2.249)', text: 'Generating a key under a name OpenBao or Azure Key Vault already holds is refused (409): bring an existing key in with a key sync (POST /api/v2/hsm/providers/<id>/sync)' },
           { label: 'One generation at a time (v2.249)', text: 'Key generations take turns on each provider, and one still waiting after 60 seconds gets a 409. A key whose record could not be stored is removed from the HSM' },

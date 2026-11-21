@@ -1,21 +1,17 @@
 /**
- * HSM Page - UCM
- * Hardware Security Module management
- * 
- * Migrated to ResponsiveLayout for consistent UX
+ * HSM: the mockup's hsm module, a simplePage() list (Type, Clés, Dernier contrôle, État) with its
+ * one-object dock, on the server's providers. What the product has more (search and type filter,
+ * test, key sync, the keys and the configuration of a provider, creation, edit and removal) takes
+ * the mockup's toolbar, dock actions, record rows and further dock tabs.
  */
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { 
-  Key, Plus, Trash, PencilSimple, CheckCircle, XCircle, TestTube,
-  Cloud, HardDrive, ArrowsClockwise, Lock, Warning, Copy, ShieldCheck, Cpu
-} from '@phosphor-icons/react'
-import { 
-  Badge, Button, FormModal, Input, Select, Textarea, ExperimentalBadge,
-  CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
-} from '../components'
-import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
-import { useNotification, useMobile } from '../contexts'
+import {
+  Zone, Icon, Btn, IconBtn, Pill, PageHead, Toolbar, SearchField, FilterSelect, ListView, Dock, DockBody,
+  Section, Props, RecordList, RecordRow, LoadError, LoadCause, EmptyBlock, NoMatch,
+} from '../components/atelier'
+import { FormModal, Input, Select, Textarea } from '../components'
+import { useNotification } from '../contexts'
 import { usePermission, useClipboard, usePersistedState } from '../hooks'
 import { hsmService } from '../services'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
@@ -23,22 +19,20 @@ import { secretInputProps } from '../lib/secretTarget'
 import { KEY_GROUPS, listAlgorithms } from '../lib/keyAlgorithms'
 import { useFipsMode, useKeyPlatform } from '../lib/policyAlgorithms'
 import { BrainpoolNotice, UntestedKeyNotice } from '../components/BrainpoolNotice'
+import { dateTimeOf } from './admin/adminDates'
 
 const PROVIDER_TYPES = [
-  { value: 'pkcs11', label: 'PKCS#11 (Local HSM)', icon: HardDrive },
-  { value: 'aws-cloudhsm', label: 'AWS CloudHSM', icon: Cloud },
-  { value: 'azure-keyvault', label: 'Azure Key Vault', icon: Cloud },
-  { value: 'google-kms', label: 'Google Cloud KMS', icon: Cloud },
-  { value: 'openbao', label: 'OpenBao / Vault Transit', icon: Lock },
+  { value: 'pkcs11', label: 'PKCS#11 (Local HSM)' },
+  { value: 'aws-cloudhsm', label: 'AWS CloudHSM' },
+  { value: 'azure-keyvault', label: 'Azure Key Vault' },
+  { value: 'google-kms', label: 'Google Cloud KMS' },
+  { value: 'openbao', label: 'OpenBao / Vault Transit' },
 ]
 
-const PROVIDER_ICONS = {
-  'pkcs11': HardDrive,
-  'aws-cloudhsm': Cloud,
-  'azure-keyvault': Cloud,
-  'google-kms': Cloud,
-  'openbao': Lock,
-}
+// The provider's status as the server records it after a test; the state chips keep this order
+const STATES = { connected: 'good', error: 'bad', disconnected: 'muted', unknown: 'muted' }
+const stateOf = (p) => (STATES[p.status] ? p.status : 'unknown')
+const typeLabel = (p) => PROVIDER_TYPES.find((x) => x.value === p.provider_type)?.label || p.provider_type
 
 // Everything the sync route reports: counts, then what was kept or changed and why
 export function syncKeysMessage(t, d) {
@@ -57,87 +51,152 @@ export function syncKeysMessage(t, d) {
   return { text: parts.join(' '), notable: parts.length > 1 }
 }
 
-export default function HSMPage() {
+/** A configuration value that may be copied: the value in mono, then the mockup's quiet copy button. */
+function Copyable({ value, label }) {
   const { t } = useTranslation()
+  const { copy } = useClipboard()
+  const { showSuccess } = useNotification()
+  if (!value) return '—'
+  return (
+    <>
+      <span className="mono">{value}</span>{' '}
+      <IconBtn quiet icon="copy" label={t('hsm.copyValue', { name: label })} onClick={() => { copy(value); showSuccess(t('common.copied')) }} />
+    </>
+  )
+}
+
+/** The configuration of a provider, per type, as terms and values; secrets never shown. */
+export function ProviderConfig({ provider: p }) {
+  const { t } = useTranslation()
+  const items = {
+    pkcs11: [
+      [t('hsm.pkcs11Config.slotId'), p.pkcs11_slot_id ?? 'Auto'],
+      [t('hsm.pkcs11Config.token'), p.pkcs11_token_label || '—'],
+      [t('hsm.pkcs11Config.libraryPath'), <Copyable key="lib" value={p.pkcs11_library_path} label={t('hsm.pkcs11Config.libraryPath')} />],
+    ],
+    'aws-cloudhsm': [
+      [t('hsm.awsConfig.clusterId'), <Copyable key="cl" value={p.aws_cluster_id} label={t('hsm.awsConfig.clusterId')} />],
+      [t('hsm.pkcs11Config.tokenLabel'), p.pkcs11_token_label || '—'],
+      [t('hsm.awsConfig.cryptoUser'), p.aws_crypto_user || '—'],
+    ],
+    'azure-keyvault': [
+      [t('hsm.azureConfig.vaultUrl'), <Copyable key="vault" value={p.azure_vault_url} label={t('hsm.azureConfig.vaultUrl')} />],
+      [t('hsm.azureConfig.tenant'), p.azure_tenant_id ? <span className="mono">{p.azure_tenant_id}</span> : '—'],
+      [t('hsm.azureConfig.client'), p.azure_client_id ? <span className="mono">{p.azure_client_id}</span> : '—'],
+    ],
+    'google-kms': [
+      [t('hsm.gcpConfig.project'), p.gcp_project_id || '—'],
+      [t('hsm.gcpConfig.location'), p.gcp_location || '—'],
+      [t('hsm.gcpConfig.keyRing'), p.gcp_keyring || '—'],
+    ],
+    openbao: [
+      [t('hsm.openbaoConfig.url'), <Copyable key="url" value={p.openbao_url} label={t('hsm.openbaoConfig.url')} />],
+      [t('hsm.openbaoConfig.mountPath'), p.openbao_mount_path || 'transit'],
+      p.openbao_namespace && [t('hsm.openbaoConfig.namespace'), p.openbao_namespace],
+    ],
+  }[p.provider_type] || []
+  return <div className="module-detail"><Section title={t('common.config')}><Props items={items} /></Section></div>
+}
+
+// Providers served by the PKCS#11 driver record what their module reports
+const PKCS11_DRIVEN = ['pkcs11', 'aws-cloudhsm']
+
+export function ModuleSection({ provider, fips }) {
+  const { t } = useTranslation()
+  if (!PKCS11_DRIVEN.includes(provider.provider_type)) return null
+  const m = provider.module_info
+  return (
+    <Section title={t('hsm.module.title')}>
+      {fips && provider.softhsm && <p className="notice warn"><Icon name="warning" /><span>{t('hsm.module.softhsmFips')}</span></p>}
+      {m ? (
+        <Props items={[
+          [t('hsm.module.library'), m.library], [t('hsm.module.manufacturer'), m.manufacturer],
+          [t('hsm.module.libraryVersion'), m.library_version], [t('hsm.module.firmwareVersion'), m.firmware_version],
+        ]} />
+      ) : <p className="muted small">{t('hsm.module.notRead')}</p>}
+    </Section>
+  )
+}
+
+/** The PKCS#11 dependencies the host lacks, in the mockup's warning notice. */
+function Pkcs11Notice({ status }) {
+  const { t } = useTranslation()
+  return (
+    <div className="notice warn" id="hsm-pkcs11-notice">
+      <Icon name="warning" />
+      <span>
+        <strong>{t('hsm.pkcs11Unavailable')}</strong>
+        {!status.pkcs11_installed && <> {t('hsm.pkcs11Missing')}.</>}
+        {!status.softhsm_found && <> {t('hsm.softhsmMissing')}.</>}
+        {status.install_command && <> <span className="mono">{status.install_command}</span></>}
+      </span>
+    </div>
+  )
+}
+
+export default function HSMPage() {
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language || 'en'
   const fips = useFipsMode()
   const { canWrite, canDelete } = usePermission()
-  const { copy } = useClipboard()
-  const [providers, setProviders] = useState([])
-  const [keys, setKeys] = useState([])
-  const [selectedProvider, setSelectedProvider] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [showModal, setShowModal] = useState(false)
-  const [modalMode, setModalMode] = useState('create')
-  const [showKeyModal, setShowKeyModal] = useState(false)
-  const [testing, setTesting] = useState(false)
-  const [filterType, setFilterType] = usePersistedState('ucm-filter-hsm-type', [])
-  const [filterStatus, setFilterStatus] = usePersistedState('ucm-filter-hsm-status', [])
-  const [hsmStatus, setHsmStatus] = useState(null)
   const { showSuccess, showWarning, showError, showConfirm } = useNotification()
+  const [providers, setProviders] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
+  const [hsmStatus, setHsmStatus] = useState(null)
+  const [openId, setOpenId] = useState(null)
+  const [detail, setDetail] = useState(null)
+  const [keys, setKeys] = useState([])
+  const [section, setSection] = useState('overview')
+  const [modal, setModal] = useState(null)
+  const [testing, setTesting] = useState(false)
   const [syncingId, setSyncingId] = useState(null)
   const syncingRef = useRef(false)
-  const { isMobile } = useMobile()
-
-  useEffect(() => {
-    loadData()
-    loadHsmStatus()
-  }, [])
-
-  useEffect(() => {
-    if (selectedProvider) {
-      loadKeys(selectedProvider.id)
-    }
-  }, [selectedProvider])
+  const [state, setState] = usePersistedState('ucm-hsm-state', '')
+  const [type, setType] = usePersistedState('ucm-hsm-type', '')
+  const [query, setQuery] = useState('')
 
   const loadData = async () => {
+    setLoadError(null)
     try {
       const response = await hsmService.getProviders()
       setProviders(response.data || [])
     } catch (error) {
+      setLoadError(error)
       showError(t('messages.errors.loadFailed.hsmProviders'))
     } finally {
       setLoading(false)
     }
   }
-
-  const loadHsmStatus = async () => {
-    try {
-      const response = await hsmService.getStatus()
-      setHsmStatus(response.data)
-    } catch (error) {
-      // Non-critical — HSM may not be configured
-    }
-  }
-
   const loadKeys = async (providerId) => {
     try {
       const response = await hsmService.getKeys(providerId)
       setKeys(response.data || [])
-    } catch { /* non-critical */ }
+    } catch { /* the keys tab says none were read */ }
   }
 
-  const handleApplyFilterPreset = useCallback((filters) => {
-    if (filters.enabled) setFilterStatus(Array.isArray(filters.enabled) ? filters.enabled : [filters.enabled])
-    else setFilterStatus([])
-    if (filters.provider_type) setFilterType(Array.isArray(filters.provider_type) ? filters.provider_type : [filters.provider_type])
-    else setFilterType([])
-  }, [])
+  useEffect(() => {
+    loadData()
+    hsmService.getStatus().then((r) => setHsmStatus(r.data)).catch(() => { /* HSM may not be configured */ })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleCreate = () => {
-    setSelectedProvider(null)
-    setModalMode('create')
-    setShowModal(true)
+  const listed = providers.find((p) => p.id === openId) || null
+  const open = listed ? { ...listed, ...(detail?.id === openId ? detail : {}) } : null
+  useEffect(() => {
+    setKeys([])
+    if (openId != null) loadKeys(openId)
+  }, [openId])
+
+  const openProvider = (p) => {
+    if (p.id !== openId) { setSection('overview'); setDetail(null) }
+    setOpenId(p.id)
   }
 
   const handleEdit = async (provider) => {
     try {
-      // Fetch full provider details (config is excluded from list endpoint).
-      // Without this, the edit modal would default to PKCS#11 and show the
-      // wrong form for remote providers like OpenBao.
+      // The list leaves the config out: the form needs the full provider to show its type's fields
       const response = await hsmService.getProvider(provider.id)
-      setSelectedProvider(response.data)
-      setModalMode('edit')
-      setShowModal(true)
+      setModal({ kind: 'provider', provider: response.data })
     } catch (error) {
       showError(error.message || t('messages.errors.loadFailed.hsmProviders'))
     }
@@ -149,8 +208,8 @@ export default function HSMPage() {
     try {
       await hsmService.deleteProvider(provider.id)
       showSuccess(t('messages.success.delete.provider'))
+      setOpenId(null)
       loadData()
-      setSelectedProvider(null)
     } catch (error) {
       showError(error.message || t('messages.errors.deleteFailed.provider'))
     }
@@ -163,11 +222,9 @@ export default function HSMPage() {
       if (response.data?.success) {
         showSuccess(response.data.message || t('messages.success.hsm.connectionOk'))
         loadData()
-        // The open panel shows the row as it was before the test read the module
+        // The open dock shows the provider as it was before the test read the module
         const fresh = await hsmService.getProvider(provider.id).catch(() => null)
-        if (fresh?.data) {
-          setSelectedProvider(prev => (prev && prev.id === provider.id ? { ...prev, ...fresh.data } : prev))
-        }
+        if (fresh?.data) setDetail(fresh.data)
       } else {
         showError(response.data?.message || t('messages.errors.hsm.testFailed'))
       }
@@ -188,7 +245,7 @@ export default function HSMPage() {
       const { text, notable } = syncKeysMessage(t, response.data || {})
       ;(notable ? showWarning : showSuccess)(text)
       loadData()
-      if (selectedProvider?.id === provider.id) loadKeys(provider.id)
+      if (openId === provider.id) loadKeys(provider.id)
     } catch (error) {
       showError(error.message || t('messages.errors.hsm.syncFailed'))
     } finally {
@@ -198,15 +255,17 @@ export default function HSMPage() {
   }
 
   const handleSave = async (formData) => {
+    const editing = modal?.provider
     try {
-      if (modalMode === 'create') {
+      if (editing) {
+        await hsmService.updateProvider(editing.id, formData)
+        showSuccess(t('messages.success.update.provider'))
+        setDetail(null)
+      } else {
         await hsmService.createProvider(formData)
         showSuccess(t('messages.success.create.provider'))
-      } else {
-        await hsmService.updateProvider(selectedProvider.id, formData)
-        showSuccess(t('messages.success.update.provider'))
       }
-      setShowModal(false)
+      setModal(null)
       loadData()
     } catch (error) {
       showError(error.message || t('messages.errors.createFailed.provider'))
@@ -215,10 +274,10 @@ export default function HSMPage() {
 
   const handleGenerateKey = async (keyData) => {
     try {
-      await hsmService.addKey(selectedProvider.id, keyData)
+      await hsmService.addKey(openId, keyData)
       showSuccess(t('messages.success.create.key'))
-      setShowKeyModal(false)
-      loadKeys(selectedProvider.id)
+      setModal(null)
+      loadKeys(openId)
     } catch (error) {
       showError(error.message || t('messages.errors.createFailed.generic'))
     }
@@ -230,446 +289,123 @@ export default function HSMPage() {
     try {
       await hsmService.deleteKey(key.id)
       showSuccess(t('messages.success.delete.key'))
-      loadKeys(selectedProvider.id)
+      loadKeys(openId)
     } catch (error) {
       showError(error.message || t('messages.errors.deleteFailed.key'))
     }
   }
 
-  // Table columns with icon-bg classes
-  const columns = [
-    {
-      key: 'name',
-      header: t('common.providerName'),
-      priority: 1,
-      sortable: true,
-      render: (val, row) => {
-        const Icon = PROVIDER_ICONS[row.provider_type] || Lock
-        return (
-          <div className="flex items-center gap-2">
-            <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-              row.enabled ? 'icon-bg-violet' : 'icon-bg-gray'
-            }`}>
-              <Icon size={14} weight="duotone" />
-            </div>
-            <span className="font-medium truncate">{val}</span>
-          </div>
-        )
-      },
-      mobileRender: (val, row) => {
-        const Icon = PROVIDER_ICONS[row.provider_type] || Lock
-        return (
-          <div className="flex items-center justify-between gap-2 w-full">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-                row.enabled ? 'icon-bg-violet' : 'icon-bg-gray'
-              }`}>
-                <Icon size={14} weight="duotone" />
-              </div>
-              <span className="font-medium truncate">{val}</span>
-            </div>
-            <Badge variant={row.enabled ? 'success' : 'secondary'} size="sm" dot pulse={row.enabled}>
-              {row.enabled ? t('common.enabled') : t('common.disabled')}
-            </Badge>
-          </div>
-        )
-      }
-    },
-    {
-      key: 'provider_type',
-      header: t('common.type'),
-      priority: 2,
-      sortable: true,
-      hideOnMobile: true,
-      render: (val) => {
-        const type = PROVIDER_TYPES.find(t => t.value === val)
-        const isCloud = val !== 'pkcs11'
-        return (
-          <Badge variant={isCloud ? 'cyan' : 'secondary'} size="sm" icon={isCloud ? Cloud : HardDrive}>
-            {type?.label.split(' ')[0] || val}
-          </Badge>
-        )
-      },
-      mobileRender: (val) => {
-        const type = PROVIDER_TYPES.find(t => t.value === val)
-        const isCloud = val !== 'pkcs11'
-        return (
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-text-tertiary">{t('common.type')}:</span>
-            <span className="text-text-secondary">{type?.label.split(' ')[0] || val}</span>
-          </div>
-        )
-      }
-    },
-    {
-      key: 'enabled',
-      header: t('common.status'),
-      priority: 1,
-      sortable: true,
-      hideOnMobile: true,
-      render: (val) => (
-        <Badge variant={val ? 'success' : 'secondary'} size="sm" dot pulse={val}>
-          {val ? t('common.enabled') : t('common.disabled')}
-        </Badge>
-      )
-    },
-    {
-      key: 'key_count',
-      header: t('hsm.stats.keys'),
-      priority: 2,
-      hideOnMobile: true,
-      render: (val) => (
-        <Badge variant={val > 0 ? 'purple' : 'secondary'} size="sm" icon={Key}>
-          {val || 0}
-        </Badge>
-      )
-    }
+  const stateLabel = (p) => t(`hsm.states.${stateOf(p)}`)
+  const pill = (p) => <Pill label={stateLabel(p)} tone={STATES[stateOf(p)]} />
+  const checked = (p) => dateTimeOf(p.last_tested_at, locale) || t('hsm.never')
+  const keyCount = (p) => t('hsm.keyCount', { count: p.key_count || 0 })
+
+  const searched = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return providers.filter((p) => (!type || p.provider_type === type)
+      && (!q || [p.name, p.provider_type, typeLabel(p)].some((v) => String(v || '').toLowerCase().includes(q))))
+  }, [providers, type, query])
+  const present = Object.keys(STATES).filter((s) => providers.some((p) => stateOf(p) === s))
+  const active = present.includes(state) ? state : ''
+  const rows = searched.filter((p) => !active || stateOf(p) === active)
+  const views = [
+    { id: '', label: t('common.all'), count: searched.length },
+    ...present.map((s) => ({ id: s, label: t(`hsm.states.${s}`), count: searched.filter((p) => stateOf(p) === s).length })),
   ]
+  const narrowed = Boolean(query.trim() || type || active)
+  const usesLocalPkcs11 = providers.some((p) => (p.provider_type || p.type) === 'pkcs11')
+  const create = canWrite('hsm') ? { label: t('hsm.newProvider'), icon: 'plus', onClick: () => setModal({ kind: 'provider', provider: null }), primary: true } : undefined
 
-  const stats = useMemo(() => {
-    const enabledCount = providers.filter(p => p.enabled).length
-    const disabledCount = providers.filter(p => !p.enabled).length
-    const totalKeys = providers.reduce((acc, p) => acc + (p.key_count || 0), 0)
-    const cloudCount = providers.filter(p => p.provider_type !== 'pkcs11').length
-    return [
-      { label: t('hsm.stats.providers'), value: providers.length, icon: Lock, variant: 'primary' },
-      { label: t('common.enabled'), value: enabledCount, icon: CheckCircle, variant: 'success' },
-      { label: t('common.disabled'), value: disabledCount, icon: XCircle, variant: 'neutral' },
-      { label: t('hsm.stats.keys'), value: totalKeys, icon: Key, variant: 'purple' },
-      { label: t('hsm.stats.cloud'), value: cloudCount, icon: Cloud, variant: 'cyan' },
-    ]
-  }, [providers, t])
-
-  const filteredProviders = useMemo(() => {
-    let result = providers
-    if (filterType.length > 0) {
-      result = result.filter(p => filterType.includes(p.provider_type))
-    }
-    if (filterStatus.length > 0) {
-      result = result.filter(p => {
-        const status = p.enabled ? 'enabled' : 'disabled'
-        return filterStatus.includes(status)
-      })
-    }
-    return result
-  }, [providers, filterType, filterStatus])
-
-  // Help content
-  // Help content now provided via FloatingHelpPanel (helpPageKey="hsm")
-
-  // Details panel content
-  const renderDetails = (provider) => {
-    const Icon = PROVIDER_ICONS[provider.provider_type] || Lock
-    const typeLabel = PROVIDER_TYPES.find(t => t.value === provider.provider_type)?.label || provider.provider_type
-
-    return (
-      <div className="p-3 space-y-3">
-        <CompactHeader
-          icon={Icon}
-          iconClass={provider.enabled ? 'icon-bg-violet' : 'bg-bg-tertiary'}
-          title={provider.name}
-          subtitle={typeLabel}
-          badge={
-            <Badge variant={provider.enabled ? 'success' : 'secondary'} size="sm">
-              {provider.enabled ? 'Enabled' : 'Disabled'}
-            </Badge>
-          }
-        />
-
-        <CompactStats stats={[
-          { icon: Key, value: t('hsm.keysInHsm', { count: provider.key_count || 0 }).replace('{{count}} keys in this HSM', `${provider.key_count || 0} keys`) },
-          { icon: CheckCircle, value: provider.last_connected_at ? t('common.connected') : t('common.never') },
-        ]} />
-
-        <div className="flex gap-2">
-          <Button type="button" size="sm" variant="secondary" className="flex-1" onClick={() => handleTest(provider)} disabled={testing}>
-            {testing ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
-            {testing ? t('common.testing') : t('common.test')}
-          </Button>
+  const dock = open && (
+    <Dock label={t('atelier.detailOf', { name: t('shell.moduleLabel.hsm') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
+      tabs={[{ key: open.id, title: open.name, icon: 'chip' }]} onClose={() => setOpenId(null)}>
+      <DockBody icon="chip" title={open.name} badge={pill(open)} section={section} onSection={setSection}
+        sectionsLabel={t('atelier.sectionsOf', { name: open.name })}
+        sections={[['overview', t('atelier.overview')], ['keys', t('hsm.hsmKeys')], ['config', t('common.config')]]}
+        actions={<>
+          <Btn icon="refresh" id="hsm-test" disabled={testing || undefined} onClick={() => handleTest(open)}>{testing ? t('common.testing') : t('common.test')}</Btn>
           {canWrite('hsm') && (
-          <Button type="button" size="sm" variant="secondary" onClick={() => handleSyncKeys(provider)}
-            disabled={syncingId !== null}>
-            <ArrowsClockwise size={14} className={syncingId === provider.id ? 'animate-spin' : undefined} />
-            {syncingId === provider.id ? t('hsm.syncingKeys') : t('common.syncKeys')}
-          </Button>
+            <Btn icon="key" id="hsm-sync" write disabled={syncingId !== null || undefined} onClick={() => handleSyncKeys(open)}>
+              {syncingId === open.id ? t('hsm.syncingKeys') : t('common.syncKeys')}
+            </Btn>
           )}
-          {canWrite('hsm') && (
-          <Button type="button" size="sm" variant="secondary" onClick={() => handleEdit(provider)}>
-            <PencilSimple size={14} />
-          </Button>
-          )}
-          {canDelete('hsm') && (
-          <Button type="button" size="sm" variant="danger" onClick={() => handleDelete(provider)}>
-            <Trash size={14} />
-          </Button>
-          )}
-        </div>
-
-        <CompactSection title={t('hsm.certification.label')} icon={ShieldCheck} collapsible={false}>
-          <CompactField
-            label={t('hsm.certification.label')}
-            value={provider.certification ? t(`hsm.certification.values.${provider.certification}`, provider.certification) : t('hsm.certification.notDeclared')}
-          />
-        </CompactSection>
-
-        <ModuleSection provider={provider} fips={fips} />
-
-        {provider.last_error && (
-          <div className="p-3 rounded-lg bg-status-danger-op10 border border-status-danger-op30">
-            <div className="flex items-center gap-2 text-status-danger text-xs">
-              <Warning size={14} />
-              <span className="font-medium">{t('hsm.connectionError')}</span>
-            </div>
-            <p className="text-2xs text-text-secondary mt-1">{provider.last_error}</p>
+          {canWrite('hsm') && <Btn icon="settings" id="hsm-edit" write onClick={() => handleEdit(open)}>{t('common.edit')}</Btn>}
+          {canDelete('hsm') && <Btn tone="danger" icon="block" id="hsm-delete" onClick={() => handleDelete(open)}>{t('hsm.deleteProvider')}</Btn>}
+        </>}>
+        {section === 'overview' && (
+          <div className="module-detail">
+            <Section title={t('atelier.properties')}>
+              <Props items={[
+                [t('hsm.columns.type'), typeLabel(open)], [t('hsm.columns.keys'), keyCount(open)], [t('hsm.columns.checked'), checked(open)],
+                [t('atelier.state'), pill(open)],
+                [t('hsm.certification.label'), open.certification ? t(`hsm.certification.values.${open.certification}`, open.certification) : t('hsm.certification.notDeclared')],
+              ]} />
+              {open.error_message && (
+                <p className="notice warn" id="hsm-error"><Icon name="warning" /><span><strong>{t('hsm.connectionError')}</strong> : {open.error_message}</span></p>
+              )}
+            </Section>
+            <Section title={t('atelier.summary')}>
+              <p className="summary">{keys.length ? t('hsm.summaryKeys', { names: keys.map((k) => k.label).join(', ') }) : t('hsm.noKeysInHsm')}</p>
+            </Section>
+            <ModuleSection provider={open} fips={fips} />
           </div>
         )}
-
-        <CompactSection title={t('common.config')}>
-          {provider.provider_type === 'pkcs11' && (
-            <>
-              <CompactGrid>
-                <CompactField autoIcon="slotId" label={t('hsm.pkcs11Config.slotId')} value={provider.pkcs11_slot_id ?? 'Auto'} copyable />
-                <CompactField autoIcon="token" label={t('hsm.pkcs11Config.token')} value={provider.pkcs11_token_label || '-'} copyable />
-              </CompactGrid>
-              <div className="mt-2 text-xs">
-                <span className="text-text-tertiary block mb-0.5">{t('hsm.pkcs11Config.libraryPath')}:</span>
-                <div className="relative group">
-                  <p className="font-mono text-2xs text-text-secondary break-all bg-tertiary-op50 p-1.5 rounded pr-7">
-                    {provider.pkcs11_library_path || '-'}
-                  </p>
-                  {provider.pkcs11_library_path && (
-                    <button
-                      type="button"
-                      onClick={() => { copy(provider.pkcs11_library_path); showSuccess(t('common.copied')) }}
-                      className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-all"
-                      aria-label={t('common.copy')}
-                    >
-                      <Copy size={12} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-          {provider.provider_type === 'aws-cloudhsm' && (
-            <CompactGrid>
-              <CompactField autoIcon="clusterId" label={t('hsm.awsConfig.clusterId')} value={provider.aws_cluster_id} mono copyable />
-              <CompactField autoIcon="tokenLabel" label={t('hsm.pkcs11Config.tokenLabel')} value={provider.pkcs11_token_label} mono copyable />
-              <CompactField autoIcon="cryptoUser" label={t('hsm.awsConfig.cryptoUser')} value={provider.aws_crypto_user} copyable />
-            </CompactGrid>
-          )}
-          {provider.provider_type === 'azure-keyvault' && (
-            <>
-              <div className="text-xs mb-2">
-                <span className="text-text-tertiary block mb-0.5">{t('hsm.azureConfig.vaultUrl')}:</span>
-                <div className="relative group">
-                  <p className="font-mono text-2xs text-text-secondary break-all bg-tertiary-op50 p-1.5 rounded pr-7">
-                    {provider.azure_vault_url || '-'}
-                  </p>
-                  {provider.azure_vault_url && (
-                    <button
-                      type="button"
-                      onClick={() => { copy(provider.azure_vault_url); showSuccess(t('common.copied')) }}
-                      className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-all"
-                      aria-label={t('common.copy')}
-                    >
-                      <Copy size={12} />
-                    </button>
-                  )}
-                </div>
-              </div>
-              <CompactGrid>
-                <CompactField autoIcon="tenant" label={t('hsm.azureConfig.tenant')} value={provider.azure_tenant_id} mono copyable />
-                <CompactField autoIcon="client" label={t('hsm.azureConfig.client')} value={provider.azure_client_id} mono copyable />
-              </CompactGrid>
-            </>
-          )}
-          {provider.provider_type === 'google-kms' && (
-            <CompactGrid>
-              <CompactField autoIcon="project" label={t('hsm.gcpConfig.project')} value={provider.gcp_project_id} copyable />
-              <CompactField autoIcon="location" label={t('hsm.gcpConfig.location')} value={provider.gcp_location} copyable />
-              <CompactField autoIcon="keyRing" label={t('hsm.gcpConfig.keyRing')} value={provider.gcp_keyring} copyable />
-            </CompactGrid>
-          )}
-          {provider.provider_type === 'openbao' && (
-            <CompactGrid>
-              <CompactField autoIcon="url" label={t('hsm.openbaoConfig.url')} value={provider.openbao_url} copyable />
-              <CompactField autoIcon="mountPath" label={t('hsm.openbaoConfig.mountPath')} value={provider.openbao_mount_path || 'transit'} copyable />
-              {provider.openbao_namespace && (
-                <CompactField autoIcon="namespace" label={t('hsm.openbaoConfig.namespace')} value={provider.openbao_namespace} copyable />
-              )}
-            </CompactGrid>
-          )}
-        </CompactSection>
-
-        <CompactSection title={t('hsm.hsmKeys')}>
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-text-tertiary">{t('hsm.keysInHsm', { count: keys.length })}</span>
-            {canWrite('hsm') && (
-            <Button type="button" size="sm" variant="secondary" onClick={() => setShowKeyModal(true)}>
-              <Plus size={12} /> {t('common.generate')}
-            </Button>
-            )}
+        {section === 'keys' && (
+          <div className="module-detail">
+            <Section title={t('hsm.keysInHsm', { count: keys.length })}>
+              <RecordList empty={t('hsm.noKeysInHsm')}>
+                {keys.map((k) => (
+                  <RecordRow key={k.id} title={k.label} meta={[k.algorithm || k.key_type, k.purpose].filter(Boolean).join(' · ')}
+                    action={canDelete('hsm') && (
+                      <Btn icon="block" write aria-label={t('hsm.deleteKey', { name: k.label })} onClick={() => handleDeleteKey(k)}>{t('common.delete')}</Btn>
+                    )} />
+                ))}
+              </RecordList>
+              {canWrite('hsm') && <div className="copy-url"><Btn icon="plus" id="hsm-generate" write onClick={() => setModal({ kind: 'key' })}>{t('common.generate')}</Btn></div>}
+            </Section>
           </div>
-          {keys.length === 0 ? (
-            <p className="text-xs text-text-tertiary text-center py-4">{t('hsm.noKeysInHsm')}</p>
-          ) : (
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {keys.map(key => (
-                <div key={key.id} className="flex items-center justify-between p-2 bg-tertiary-op50 rounded text-xs">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Key size={14} className="text-text-tertiary flex-shrink-0" />
-                    <div className="min-w-0">
-                      <p className="font-medium text-text-primary truncate">{key.label}</p>
-                      <p className="text-text-tertiary">{key.key_type} {key.key_size}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={key.status === 'active' ? 'success' : 'danger'} size="sm">
-                      {key.status}
-                    </Badge>
-                    {canDelete('hsm') && (
-                    <Button type="button" size="sm" variant="ghost" onClick={() => handleDeleteKey(key)} aria-label={t('common.delete')}>
-                      <Trash size={12} className="text-status-danger" />
-                    </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CompactSection>
-      </div>
-    )
-  }
+        )}
+        {section === 'config' && <ProviderConfig provider={open} />}
+      </DockBody>
+    </Dock>
+  )
 
   return (
-    <>
-      {hsmStatus && !hsmStatus.ready && (() => {
-        // The PKCS#11 / SoftHSM warning is only relevant when the user is
-        // actually trying to use a local PKCS#11 provider. Hide it otherwise:
-        // remote providers (OpenBao, Azure Key Vault, AWS CloudHSM, Google KMS)
-        // do not need python-pkcs11 or SoftHSM on the UCM host.
-        const usesLocalPkcs11 = providers.some(p => (p.provider_type || p.type) === 'pkcs11')
-        if (!usesLocalPkcs11) return null
-        return (
-        <div className="mx-4 mt-4 mb-0 p-3 rounded-lg border border-status-warning-op30 bg-status-warning-op10 flex items-start gap-3">
-          <Warning size={20} className="text-status-warning shrink-0 mt-0.5" weight="bold" />
-          <div className="text-sm">
-            <p className="font-medium text-status-warning mb-1">
-              {t('hsm.pkcs11Unavailable')}
-            </p>
-            <ul className="text-text-secondary space-y-0.5 text-xs">
-              {!hsmStatus.pkcs11_installed && <li>• {t('hsm.pkcs11Missing')}</li>}
-              {!hsmStatus.softhsm_found && <li>• {t('hsm.softhsmMissing')}</li>}
-            </ul>
-            {hsmStatus.install_command && (
-              <code className="block mt-2 px-2 py-1 rounded bg-bg-tertiary text-xs font-mono">
-                {hsmStatus.install_command}
-              </code>
-            )}
-          </div>
-        </div>
-        )
-      })()}
-      <ResponsiveLayout
-        title={t('common.hsm')}
-        subtitle={t('hsm.subtitle', { count: providers.length })}
-        icon={Key}
-        badge={<ExperimentalBadge />}
-        stats={stats}
-        helpPageKey="hsm"
-        splitView={true}
-        splitEmptyContent={
-          <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
-              <Lock size={24} className="text-text-tertiary" weight="duotone" />
-            </div>
-            <p className="text-sm text-text-secondary">{t('hsm.selectProvider')}</p>
-          </div>
-        }
-        slideOverOpen={!!selectedProvider}
-        slideOverTitle={selectedProvider?.name || t('hsm.providerDetails')}
-        slideOverContent={selectedProvider && renderDetails(selectedProvider)}
-        slideOverWidth="lg"
-        onSlideOverClose={() => setSelectedProvider(null)}
-      >
-        <div className="flex flex-col h-full min-h-0">
-          <ResponsiveDataTable
-            data={filteredProviders}
-            columns={columns}
-            loading={loading}
-            onRowClick={setSelectedProvider}
-            selectedId={selectedProvider?.id}
-            searchable
-            searchPlaceholder={t('common.searchProviders')}
-            searchKeys={['name', 'provider_type']}
-            toolbarFilters={[
-              {
-                key: 'enabled',
-                label: t('common.status'),
-                type: 'multiSelect',
-                value: filterStatus,
-                onChange: setFilterStatus,
-                placeholder: t('common.allStatus'),
-                options: [
-                  { value: 'true', label: t('common.enabled') },
-                  { value: 'false', label: t('common.disabled') }
-                ]
-              },
-              {
-                key: 'provider_type',
-                label: t('common.type'),
-                type: 'multiSelect',
-                value: filterType,
-                onChange: setFilterType,
-                placeholder: t('common.allTypes'),
-                options: PROVIDER_TYPES.map(t => ({ value: t.value, label: t.label.split(' ')[0] }))
-              }
-            ]}
-            filterPresetsKey="ucm-hsm-presets"
-            densityStorageKey="ucm-hsm-density"
-            onApplyFilterPreset={handleApplyFilterPreset}
-            toolbarActions={canWrite('hsm') ? (
-              isMobile ? (
-                <Button type="button" size="lg" onClick={handleCreate} className="w-11 h-11 p-0">
-                  <Plus size={22} weight="bold" />
-                </Button>
-              ) : (
-                <Button type="button" size="sm" onClick={handleCreate}>
-                  <Plus size={16} /> {t('hsm.newProvider')}
-                </Button>
-              )
-            ) : null}
-            emptyIcon={Lock}
-            emptyTitle={t('hsm.noHSM')}
-            emptyDescription={t('hsm.noHSMDescription')}
-            emptyAction={canWrite('hsm') ?
-              <Button type="button" onClick={handleCreate}>
-                <Plus size={16} /> {t('hsm.newProvider')}
-              </Button>
-            : null}
-          />
-        </div>
-      </ResponsiveLayout>
-
-      {showModal && (
-        <ProviderModal
-          provider={modalMode === 'edit' ? selectedProvider : null}
-          hsmStatus={hsmStatus}
-          onSave={handleSave}
-          onClose={() => setShowModal(false)}
-        />
-      )}
-
-      {showKeyModal && selectedProvider && (
-        <KeyModal
-          provider={selectedProvider}
-          onSave={handleGenerateKey}
-          onClose={() => setShowKeyModal(false)}
-        />
-      )}
-    </>
+    <Zone dock={dock} after={<>
+      {modal?.kind === 'provider' && <ProviderModal provider={modal.provider} hsmStatus={hsmStatus} onSave={handleSave} onClose={() => setModal(null)} />}
+      {modal?.kind === 'key' && open && <KeyModal provider={open} onSave={handleGenerateKey} onClose={() => setModal(null)} />}
+    </>}>
+      <PageHead title={t('shell.moduleLabel.hsm')} total={t('hsm.unit', { count: providers.length })} intent={t('shell.moduleDesc.hsm')}
+        actions={create && <Btn tone="primary" icon="plus" id="hsm-new" onClick={create.onClick}>{create.label}</Btn>} />
+      {hsmStatus && !hsmStatus.ready && usesLocalPkcs11 && <Pkcs11Notice status={hsmStatus} />}
+      <ListView label={t('shell.moduleLabel.hsm')} caption={t('hsm.caption')} icon="chip" rows={rows} loading={loading}
+        filters={{ views, active, onChange: setState, label: t('hsm.filterByState') }}
+        toolbar={(
+          <Toolbar>
+            <SearchField id="hsm-search" name="q" label={t('common.searchProviders')} placeholder={t('common.searchProviders')} value={query} onChange={setQuery} />
+            <FilterSelect id="hsm-type" label={t('hsm.filterByType')} value={type} onChange={setType}
+              options={[{ value: '', label: t('common.allTypes') }, ...PROVIDER_TYPES.map((x) => ({ value: x.value, label: x.label }))]} />
+          </Toolbar>
+        )}
+        title={(p) => p.name} status={pill} openedId={openId} onOpen={openProvider}
+        columns={[
+          { id: 'type', label: t('hsm.columns.type'), cell: typeLabel, grow: true },
+          { id: 'keys', label: t('hsm.columns.keys'), cell: keyCount },
+          { id: 'checked', label: t('hsm.columns.checked'), cell: checked },
+          { status: true },
+        ]}
+        error={loadError && (
+          <LoadError id="hsm" title={t('messages.errors.loadFailed.hsmProviders')} onRetry={() => { setLoading(true); loadData() }}
+            cause={<LoadCause error={{ status: loadError.status, request: loadError.status && 'GET /api/v2/hsm/providers', message: loadError.message }} />} />
+        )}
+        empty={narrowed && providers.length ? (
+          <NoMatch title={t('table.noResults')} text={t('table.adjustFilters')} resetLabel={t('table.clearFilters')}
+            onReset={() => { setQuery(''); setType(''); setState('') }} />
+        ) : (
+          <EmptyBlock id="hsm" icon="chip" title={t('hsm.noHSM')} text={t('hsm.noHSMDescription')} action={create} />
+        )}
+        footer={{ range: t('hsm.range', { shown: rows.length, count: providers.length }) }} />
+    </Zone>
   )
 }
 
@@ -680,31 +416,6 @@ const SECRET_TARGETS = {
   'azure-keyvault': ['azure_client_secret', ['azure_vault_url', 'azure_tenant_id', 'azure_client_id']],
   openbao: ['openbao_token', ['openbao_url', 'openbao_mount_path', 'openbao_namespace',
     'openbao_tls_skip_verify']],
-}
-
-// Providers served by the PKCS#11 driver record what their module reports
-const PKCS11_DRIVEN = ['pkcs11', 'aws-cloudhsm']
-
-export function ModuleSection({ provider, fips }) {
-  const { t } = useTranslation()
-  if (!PKCS11_DRIVEN.includes(provider.provider_type)) return null
-  return (
-    <CompactSection title={t('hsm.module.title')} icon={Cpu} collapsible={false}>
-      {fips && provider.softhsm && (
-        <p className="text-xs text-status-warning mb-2">{t('hsm.module.softhsmFips')}</p>
-      )}
-      {provider.module_info ? (
-        <CompactGrid>
-          <CompactField label={t('hsm.module.library')} value={provider.module_info.library} />
-          <CompactField label={t('hsm.module.manufacturer')} value={provider.module_info.manufacturer} />
-          <CompactField label={t('hsm.module.libraryVersion')} value={provider.module_info.library_version} />
-          <CompactField label={t('hsm.module.firmwareVersion')} value={provider.module_info.firmware_version} />
-        </CompactGrid>
-      ) : (
-        <p className="text-xs text-text-secondary">{t('hsm.module.notRead')}</p>
-      )}
-    </CompactSection>
-  )
 }
 
 export const HSM_CERTIFICATIONS = ['cc-eal4+', 'eucc-high', 'fips-140-3-l3', 'fips-140-2-l3', 'other']
@@ -803,25 +514,7 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
 
       {formData.provider_type === 'pkcs11' && (
         <div className="space-y-4">
-          {hsmStatus && !hsmStatus.ready && (
-            <div className="p-3 rounded-lg border border-status-warning-op30 bg-status-warning-op10 flex items-start gap-3">
-              <Warning size={18} className="text-status-warning shrink-0 mt-0.5" weight="bold" />
-              <div className="text-xs">
-                <p className="font-medium text-status-warning mb-1">
-                  {t('hsm.pkcs11Unavailable')}
-                </p>
-                <ul className="text-text-secondary space-y-0.5">
-                  {!hsmStatus.pkcs11_installed && <li>• {t('hsm.pkcs11Missing')}</li>}
-                  {!hsmStatus.softhsm_found && <li>• {t('hsm.softhsmMissing')}</li>}
-                </ul>
-                {hsmStatus.install_command && (
-                  <code className="block mt-2 px-2 py-1 rounded bg-bg-tertiary font-mono">
-                    {hsmStatus.install_command}
-                  </code>
-                )}
-              </div>
-            </div>
-          )}
+          {hsmStatus && !hsmStatus.ready && <Pkcs11Notice status={hsmStatus} />}
           <Input label={t('hsm.pkcs11Config.libraryPath')} value={formData.pkcs11_library_path} onChange={e => handleChange('pkcs11_library_path', e.target.value)} placeholder={t('hsm.pkcs11Config.libraryPathPlaceholder')} />
           <div className="grid grid-cols-2 gap-4">
             <Input label={t('hsm.pkcs11Config.slotId')} type="number" value={formData.pkcs11_slot_id} onChange={e => handleChange('pkcs11_slot_id', e.target.value ? parseInt(e.target.value) : '')} />
