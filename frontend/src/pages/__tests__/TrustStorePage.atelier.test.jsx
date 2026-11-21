@@ -33,13 +33,14 @@ vi.mock('../../hooks', async () => {
 })
 const getAll = vi.fn()
 const del = vi.fn()
+const managed = vi.hoisted(() => ({ cas: [] }))
 vi.mock('../../services', () => ({
   truststoreService: {
     getAll: (...a) => getAll(...a),
     getById: (id) => Promise.resolve({ data: ROWS.find((r) => r.id === id) }),
     delete: (...a) => del(...a),
   },
-  casService: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
+  casService: { getAll: () => Promise.resolve({ data: managed.cas }) },
 }))
 vi.mock('../../components/SmartImport', () => ({ SmartImportModal: () => null }))
 
@@ -131,5 +132,23 @@ describe('the anchor dock in the URL', () => {
     expect(r.where()).toBe('/truststore?item=1')
     fireEvent.click(within(await r.dock()).getByRole('tab', { name: 'PEM' }))
     expect(r.where()).toBe('/truststore?item=1&section=pem')
+  })
+})
+
+describe('adding from the managed CAs', () => {
+  it('names each CA root or intermediate from its own certificate, translated', async () => {
+    managed.cas = [
+      { id: 7, descr: 'Example Root CA', subject: 'CN=Example Root CA', issuer: 'CN=Example Root CA', is_root: true, type: 'root' },
+      { id: 8, descr: 'Example Issuing CA', subject: 'CN=Example Issuing CA', issuer: 'CN=Example Root CA', is_root: false, type: 'intermediate' },
+    ]
+    renderPage()
+    await screen.findByRole('button', { name: 'Bank Root' })
+    fireEvent.click(document.querySelector('#truststore-add'))
+    const dialog = await screen.findByTestId('truststore-add-dialog')
+    const line = async (name) => (await within(dialog).findByText(name)).closest('label')
+    expect(await line('Example Root CA')).toHaveTextContent('Root CA')
+    expect(await line('Example Issuing CA')).toHaveTextContent('Intermediate CA')
+    expect(await line('Example Issuing CA')).not.toHaveTextContent('Root CA')
+    managed.cas = []
   })
 })
