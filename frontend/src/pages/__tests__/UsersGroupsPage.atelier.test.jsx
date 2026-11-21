@@ -109,6 +109,13 @@ describe('the account list', () => {
     expect(screen.getByRole('button', { name: 'Chloé Durand' })).toBeTruthy()
   })
 
+  it("words the head's main action as a short verb, named in full", async () => {
+    page()
+    const create = await screen.findByRole('button', { name: 'users.createUser' })
+    expect(create).toHaveAttribute('id', 'users-new')
+    expect(create).toHaveTextContent(/^common\.create$/)
+  })
+
   it('exports the whole list, a formula-like cell neutralised', async () => {
     page()
     await screen.findByRole('button', { name: 'Chloé Durand' })

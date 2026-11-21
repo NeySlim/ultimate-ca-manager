@@ -802,7 +802,8 @@ export default function UsersGroupsPage() {
               {groupsTab ? t('users.accounts') : t('common.groups')}
             </Btn>
             {!groupsTab && <Btn icon="download" data-action="users-export" disabled={!users.length || undefined} onClick={handleExport}>{t('users.exportList')}</Btn>}
-            {create && <Btn tone="primary" icon="plus" id="users-new" onClick={create.onClick}>{create.label}</Btn>}
+            {/* The head's main action is a short verb, as the mockup's « Émettre »: on a phone it sits beside the title on one line */}
+            {create && <Btn tone="primary" icon="plus" id="users-new" aria-label={create.label} onClick={create.onClick}>{t('common.create')}</Btn>}
           </>} />
         {groupsTab ? (
           <ListView label={t('common.groups')} caption={t('groups.caption')} icon="users" rows={paged} loading={loading} toolbar={toolbar}
