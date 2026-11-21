@@ -6,7 +6,7 @@
  * size: 'narrow' (520 px), 'wide' (920 px) or none (760 px). skipReturn(): true when what the dialog
  * opened took the focus itself (the inspector), which then stays there.
  */
-import { useContext, useEffect, useLayoutEffect, useRef } from 'react'
+import { useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Icon } from './Icon'
 import { AtlScopeContext } from './scope'
@@ -36,6 +36,9 @@ function ModalDialog({ title, subtitle, size = '', onClose, children, testId, re
   fallback.current = returnTo
   const skip = useRef(skipReturn)
   skip.current = skipReturn
+  // The mockup's one dialog is #modal-title; a question asked above an open dialog names its own title
+  const own = useId()
+  const [titleId] = useState(() => (document.getElementById('modal-title') ? `modal-title-${own.replace(/:/g, '')}` : 'modal-title'))
 
   useLayoutEffect(() => {
     const dialog = ref.current
@@ -73,14 +76,14 @@ function ModalDialog({ title, subtitle, size = '', onClose, children, testId, re
   }, [])
 
   return (
-    <dialog ref={ref} className={size} aria-labelledby="modal-title" role="dialog" aria-modal="true" data-testid={testId}
+    <dialog ref={ref} className={size} aria-labelledby={titleId} role="dialog" aria-modal="true" data-testid={testId}
       onKeyDown={(e) => {
         // A toast above the dialog yields an Escape typed here (marked, already prevented)
         if (e.key === 'Escape' && (!e.defaultPrevented || escapeYielded(e.nativeEvent))) { e.preventDefault(); close.current?.() }
       }}>
       <header className="modal-head">
         <div>
-          <h2 id="modal-title">{title}</h2>
+          <h2 id={titleId}>{title}</h2>
           {subtitle && <p>{subtitle}</p>}
         </div>
         <button type="button" className="icon-btn quiet" data-action="close-modal" aria-label={t('common.closeWindow')} onClick={() => close.current?.()}>

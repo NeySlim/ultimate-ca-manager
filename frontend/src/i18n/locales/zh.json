@@ -1754,7 +1754,9 @@
       "details": "详情",
       "emptyTitle": "没有签名请求",
       "emptyText": "团队或协议提交的 CSR 会到达这里等待检查。您也可以将 CSR 粘贴到签发表单中。"
-    }
+    },
+    "signWith": "签名方式",
+    "uploadTooLarge": "文件超过 1 MB。"
   },
   "templates": {
     "template": "模板",
@@ -2779,7 +2781,9 @@
     },
     "identifier": "标识符",
     "emptyAccountsTitle": "没有 ACME 账户",
-    "emptyAccountsText": "ACME 客户端（certbot、cert-manager、acme.sh）会自行在目录中创建账户：请将目录 URL 复制到它们的配置中。"
+    "emptyAccountsText": "ACME 客户端（certbot、cert-manager、acme.sh）会自行在目录中创建账户：请将目录 URL 复制到它们的配置中。",
+    "termsOfServiceTitle": "标题",
+    "termsOfServiceBody": "正文"
   },
   "scep": {
     "title": "SCEP协议",
@@ -7875,7 +7879,8 @@
       "info": "信息"
     },
     "profile_etsi": "ETSI (EN 319 412)",
-    "etsiNote": "ETSI 规则适用于合格证书和与 eIDAS 相关的证书；其他证书可能出现不适用的结果。"
+    "etsiNote": "ETSI 规则适用于合格证书和与 eIDAS 相关的证书；其他证书可能出现不适用的结果。",
+    "profileLabel": "配置文件"
   },
   "keyRecovery": {
     "title": "密钥恢复",

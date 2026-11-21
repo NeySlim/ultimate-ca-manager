@@ -1754,7 +1754,9 @@
       "details": "Details",
       "emptyTitle": "No signing request",
       "emptyText": "CSRs submitted by teams or by the protocols arrive here to be checked. You can also paste a CSR into the issue form."
-    }
+    },
+    "signWith": "Sign with",
+    "uploadTooLarge": "The file is larger than 1 MB."
   },
   "templates": {
     "template": "テンプレート",
@@ -2779,7 +2781,9 @@
     },
     "identifier": "Identifier",
     "emptyAccountsTitle": "No ACME account",
-    "emptyAccountsText": "ACME clients (certbot, cert-manager, acme.sh) create their account themselves with the directory: copy its URL into their configuration."
+    "emptyAccountsText": "ACME clients (certbot, cert-manager, acme.sh) create their account themselves with the directory: copy its URL into their configuration.",
+    "termsOfServiceTitle": "Title",
+    "termsOfServiceBody": "Text"
   },
   "scep": {
     "title": "SCEPプロトコル",
@@ -7878,7 +7882,8 @@
       "info": "情報"
     },
     "profile_etsi": "ETSI (EN 319 412)",
-    "etsiNote": "ETSI のルールは適格証明書および eIDAS 関連の証明書に適用されます。それ以外の証明書では該当しない指摘が出る場合があります。"
+    "etsiNote": "ETSI のルールは適格証明書および eIDAS 関連の証明書に適用されます。それ以外の証明書では該当しない指摘が出る場合があります。",
+    "profileLabel": "Profile"
   },
   "keyRecovery": {
     "title": "鍵リカバリ",

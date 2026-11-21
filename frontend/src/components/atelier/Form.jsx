@@ -18,13 +18,14 @@ const join = (...c) => c.filter(Boolean).join(' ')
 const placeOf = ({ full, short, className }) => join('field', full && 'full', (short || /\bsf-short\b/.test(className || '')) && 'short')
 const describedBy = (...ids) => ids.filter(Boolean).join(' ') || undefined
 
-/** A labelled control of the mockup: hint under it, then the error that names it. */
-export function Field({ id, label, hint, error, full, short, className, optional, children }) {
+/** A labelled control of the mockup: hint under it, `after` (a note, a link of the product), then the error that names it. */
+export function Field({ id, label, hint, error, full, short, className, optional, after, children }) {
   return (
     <div className={placeOf({ full, short, className })}>
       {label && <label htmlFor={id}>{label}{optional && <span className="optional"> {optional}</span>}</label>}
       {children}
       {hint && <small id={`hint-${id}`}>{hint}</small>}
+      {after}
       {error && <FieldError id={`err-${id}`} message={error} />}
     </div>
   )
@@ -35,7 +36,7 @@ export function Field({ id, label, hint, error, full, short, className, optional
  * that typing replaces it. showStrength keeps the product's server-scored meter (no gabarit in the mockup).
  */
 // eslint-disable-next-line no-unused-vars
-export const Input = forwardRef(function Input({ label, error, helperText, hint, full, short, className, id, hasExistingValue, showStrength, mono, noAutofill, icon, ...rest }, ref) {
+export const Input = forwardRef(function Input({ label, error, helperText, hint, full, short, className, id, hasExistingValue, showStrength, mono, noAutofill, icon, after, ...rest }, ref) {
   const { t } = useTranslation()
   const auto = useId()
   const fid = id ?? auto
@@ -43,7 +44,7 @@ export const Input = forwardRef(function Input({ label, error, helperText, hint,
   const note = hasExistingValue ? t('common.enterNewToChange') : (helperText ?? hint)
   const placeholder = hasExistingValue && rest.type === 'password' ? '••••••••••••' : rest.placeholder
   return (
-    <Field id={fid} label={label} hint={note} error={error} full={full} short={short} className={className}>
+    <Field id={fid} label={label} hint={note} error={error} full={full} short={short} className={className} after={after}>
       <input ref={ref} autoComplete="off" spellCheck={false} {...rest} placeholder={placeholder} id={fid} className={mono ? 'mono' : undefined}
         required={rest.required && !hasExistingValue} aria-invalid={error ? 'true' : undefined}
         aria-describedby={describedBy(note && `hint-${fid}`, error && `err-${fid}`, rest['aria-describedby'])} />
@@ -101,13 +102,13 @@ export function ListInput({ value = [], onChange, validate, invalidMessage, id, 
  * empty first entry when no option is empty. `searchable` is accepted: the native list types ahead.
  */
 // eslint-disable-next-line no-unused-vars
-export function Select({ label, options = [], value, onChange, placeholder, error, disabled, helperText, hint, full, short, className, id, searchable, ...rest }) {
+export function Select({ label, options = [], value, onChange, placeholder, error, disabled, helperText, hint, full, short, className, id, searchable, after, ...rest }) {
   const auto = useId()
   const fid = id ?? auto
   const note = helperText ?? hint
   const empty = !options.some((o) => o.value === '' || o.value === null)
   return (
-    <Field id={fid} label={label} hint={note} error={error} full={full} short={short} className={className}>
+    <Field id={fid} label={label} hint={note} error={error} full={full} short={short} className={className} after={after}>
       <select id={fid} value={value ?? ''} disabled={disabled} onChange={(e) => onChange?.(e.target.value)} aria-invalid={error ? 'true' : undefined}
         aria-describedby={describedBy(note && `hint-${fid}`, error && `err-${fid}`)} {...rest}>
         {empty && (placeholder || value === '' || value == null) && <option value="" disabled>{placeholder || ''}</option>}
@@ -119,12 +120,12 @@ export function Select({ label, options = [], value, onChange, placeholder, erro
 
 /** A textarea; `mono` sets it in the mockup's monospace (keys, PEM, scripts). */
 // eslint-disable-next-line no-unused-vars
-export function Textarea({ label, error, helperText, hint, full = true, short, className, id, mono, showCount, maxLength, value = '', ...rest }) {
+export function Textarea({ label, error, helperText, hint, full = true, short, className, id, mono, showCount, maxLength, value = '', after, ...rest }) {
   const auto = useId()
   const fid = id ?? auto
   const note = helperText ?? hint
   return (
-    <Field id={fid} label={label} hint={note} error={error} full={full} short={short} className={className}>
+    <Field id={fid} label={label} hint={note} error={error} full={full} short={short} className={className} after={after}>
       <textarea id={fid} value={value} maxLength={maxLength} className={mono ? 'mono' : undefined} aria-invalid={error ? 'true' : undefined}
         aria-describedby={describedBy(note && `hint-${fid}`, error && `err-${fid}`)} {...rest} />
     </Field>

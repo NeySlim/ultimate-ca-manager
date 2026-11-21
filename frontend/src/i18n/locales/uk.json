@@ -1818,7 +1818,9 @@
       "details": "Details",
       "emptyTitle": "No signing request",
       "emptyText": "CSRs submitted by teams or by the protocols arrive here to be checked. You can also paste a CSR into the issue form."
-    }
+    },
+    "signWith": "Sign with",
+    "uploadTooLarge": "The file is larger than 1 MB."
   },
   "templates": {
     "template": "Шаблон",
@@ -2889,7 +2891,9 @@
     },
     "identifier": "Identifier",
     "emptyAccountsTitle": "No ACME account",
-    "emptyAccountsText": "ACME clients (certbot, cert-manager, acme.sh) create their account themselves with the directory: copy its URL into their configuration."
+    "emptyAccountsText": "ACME clients (certbot, cert-manager, acme.sh) create their account themselves with the directory: copy its URL into their configuration.",
+    "termsOfServiceTitle": "Title",
+    "termsOfServiceBody": "Text"
   },
   "scep": {
     "title": "Протокол SCEP",
@@ -8189,7 +8193,8 @@
       "info": "Інфо"
     },
     "profile_etsi": "ETSI (EN 319 412)",
-    "etsiNote": "Правила ETSI застосовуються до кваліфікованих сертифікатів і сертифікатів, пов'язаних з eIDAS; для інших сертифікатів можуть з'явитися зауваження, що не стосуються їх."
+    "etsiNote": "Правила ETSI застосовуються до кваліфікованих сертифікатів і сертифікатів, пов'язаних з eIDAS; для інших сертифікатів можуть з'явитися зауваження, що не стосуються їх.",
+    "profileLabel": "Profile"
   },
   "keyRecovery": {
     "title": "Відновлення ключів",
