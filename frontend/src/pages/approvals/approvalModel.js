@@ -3,8 +3,6 @@
  * deadline and urgency group. The deadline is the server's (services/approval_gate.py):
  * expires_at, else seven days after creation.
  */
-import { Warning } from '@phosphor-icons/react'
-import { ClockIcon } from '../../components/work/workIcons'
 import { casService } from '../../services'
 import { compactAgo } from '../../lib/relativeTime'
 import { formatDate } from '../../lib/utils'
@@ -37,8 +35,8 @@ export const requestKind = (req, t) => t('approvals.work.kind', {
   source: REQUEST_TYPES.includes(req?.request_type) ? t(`approvals.work.source.${req.request_type}`) : (req?.request_type || ''),
 })
 
-export function stateOf(req, t) {
-  const status = req?.status
+export function stateOf(req, t, now = Date.now()) {
+  const status = isLapsed(req, now) ? 'expired' : req?.status
   return {
     tone: STATE_TONES[status] || 'muted',
     label: STATE_TONES[status] ? t(`approvals.work.state.${status}`) : (status || ''),
@@ -62,14 +60,20 @@ export function requestFacts(req, t, { caName } = {}) {
   ].filter(Boolean)
 }
 
-/** Urgency groups of the open requests, in the mockup's order; empty ones are left out by the queue. */
+/** A pending request past its deadline: the server expires it at its next read, nobody may decide it. */
+export const isLapsed = (req, now = Date.now()) => req?.status === 'pending' && (requestDeadline(req)?.getTime() ?? Infinity) < now
+
+/**
+ * Urgency groups of the open requests, in the mockup's order; empty ones are left out by the
+ * queue. The mockup's « En retard » is not drawn: a request past its deadline (isLapsed) is
+ * expired, not late, and the page leaves it out of the open ones.
+ */
 export function approvalGroups(pending, t, now = Date.now()) {
   const due = (r) => requestDeadline(r)?.getTime() ?? Infinity
   const sorted = [...pending].sort((a, b) => due(a) - due(b))
   return [
-    { id: 'overdue', label: t('approvals.work.groups.overdue'), icon: Warning, tone: 'bad', test: (r) => due(r) < now },
-    { id: 'soon', label: t('approvals.work.groups.soon'), icon: ClockIcon, tone: 'warn', test: (r) => due(r) >= now && due(r) - now < 48 * HOUR },
-    { id: 'later', label: t('approvals.work.groups.later'), icon: ClockIcon, tone: '', test: (r) => due(r) - now >= 48 * HOUR },
+    { id: 'soon', label: t('approvals.work.groups.soon'), icon: 'clock', tone: 'warn', test: (r) => due(r) - now < 48 * HOUR },
+    { id: 'later', label: t('approvals.work.groups.later'), icon: 'clock', tone: '', test: (r) => due(r) - now >= 48 * HOUR },
   ].map(({ test, ...g }) => ({ ...g, requests: sorted.filter(test) }))
 }
 

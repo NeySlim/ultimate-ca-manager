@@ -31,3 +31,8 @@
 .atl .card-trend .horizon-legend strong{font-weight:500;color:var(--text);font-variant-numeric:tabular-nums}
 /* Overview: the soonest expiries of the horizon card, above its status list (the mockup's gap under its bars). */
 .atl .card-horizon .algo-list+.status-list{margin-top:20px}
+/* Work queues: a row without an action its group has elsewhere keeps the action's place, so the due dates line up. */
+.atl .work-action .slot{visibility:hidden}
+/* A page action the mockup's phone head hides (every button but the primary one) keeps a way in under the queue. */
+.atl .phone-only{display:none}
+@media (max-width:800px){.atl .phone-only{display:flex}}

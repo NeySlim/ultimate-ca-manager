@@ -1,8 +1,9 @@
 /**
- * A report in the inspector, through the shared InspectorObject: heading, the
- * Report, Runs and Preview sections, the certificates it lists, its actions by right.
+ * A report in the module dock: heading, the Report, Runs and Preview sections, the
+ * certificates it lists, its actions by right behind « ⋯ ».
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { useState } from 'react'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
@@ -29,16 +30,23 @@ const api = vi.hoisted(() => ({ generate: vi.fn(), getSchedule: vi.fn(), downloa
 const certs = vi.hoisted(() => ({ getStats: vi.fn() }))
 vi.mock('../../../services', () => ({ reportsService: api, certificatesService: certs }))
 
-import { InspectorObject } from '../../../components/inspector/InspectorObject'
+import { ReportDock } from '../ReportDetail'
+import { useReportActions } from '../useReportActions'
 import { setAppTimezone } from '../../../stores/timezoneStore'
 
-const entry = (key, schedule) => ({ key: `report:${key}`, type: 'report', entityId: key, data: { key, schedule } })
-const show = (e) => render(<MemoryRouter><InspectorObject entry={e} onTitle={() => {}} /></MemoryRouter>)
+function Harness({ e }) {
+  const [section, setSection] = useState('report')
+  const actions = useReportActions({ schedules: { [e.key]: e.schedule } })
+  return <div className="atl"><ReportDock entry={e} section={section} onSection={setSection} onClose={() => {}} actions={actions} />{actions.dialog}</div>
+}
+const entry = (key, schedule) => ({ key, schedule })
+const show = (e) => render(<MemoryRouter><Harness e={e} /></MemoryRouter>)
+const more = () => screen.getByRole('button', { name: /^Autres actions pour/ })
 const WEEKLY = { enabled: true, frequency: 'weekly', time: '08:00', day_of_week: 0, recipients: ['pki@example.com'], format: 'csv' }
 
 beforeEach(() => { vi.clearAllMocks(); setAppTimezone('UTC'); stable.perms = ['read:audit', 'export:audit', 'write:settings'] })
 
-describe('ReportDetail in the inspector', () => {
+describe('ReportDock', () => {
   it('heads with the name and schedule state, the Report section first', () => {
     show(entry('expiring_certificates', WEEKLY))
     expect(screen.getByRole('heading', { level: 2, name: 'Certificats expirants' })).toBeInTheDocument()
@@ -66,15 +74,15 @@ describe('ReportDetail in the inspector', () => {
 
   it('titles its « ⋯ » dialog and names the report in it', async () => {
     show(entry('expiring_certificates', WEEKLY))
-    fireEvent.click(screen.getByTestId('inspector-more-actions'))
-    const dialog = await screen.findByTestId('inspector-actions-dialog')
+    fireEvent.click(more())
+    const dialog = await screen.findByTestId('report-menu-dialog')
     expect(dialog).toHaveTextContent('Actions du rapport')
     expect(dialog).toHaveTextContent('Certificats expirants')
   })
 
   it('titles the test dialog as its button, in the mockup\'s words', async () => {
     show(entry('expiring_certificates', WEEKLY))
-    fireEvent.click(screen.getByTestId('inspector-more-actions'))
+    fireEvent.click(more())
     fireEvent.click(await screen.findByRole('button', { name: 'Envoyer un test…' }))
     const dialog = await screen.findByRole('dialog', { name: 'Envoyer un test' })
     expect(dialog).toHaveTextContent('Envoyer un rapport test « Certificats expirants » pour vérifier la livraison par courriel.')
@@ -114,7 +122,7 @@ describe('ReportDetail in the inspector', () => {
     beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(Date.UTC(2026, 10, 20, 10))); setAppTimezone('Europe/Paris') })
     afterEach(() => { vi.useRealTimers() })
     const openEdit = async () => {
-      fireEvent.click(screen.getByTestId('inspector-more-actions'))
+      fireEvent.click(more())
       fireEvent.click(await screen.findByRole('button', { name: 'Modifier la planification…' }))
       return screen.findByTestId('schedule-form')
     }
@@ -165,6 +173,6 @@ describe('ReportDetail in the inspector', () => {
     show(entry('expiring_certificates', WEEKLY))
     expect(screen.queryByRole('button', { name: 'Télécharger' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Calculer' })).toBeDisabled()
-    expect(screen.queryByTestId('inspector-more-actions')).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Autres actions pour/ })).toBeNull()
   })
 })

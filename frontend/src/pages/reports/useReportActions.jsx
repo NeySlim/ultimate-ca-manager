@@ -1,15 +1,13 @@
 /**
- * What can be done with a report, from the queue or the inspector: download it
- * now, schedule it (or change its schedule), suspend its schedule, send a test
- * e-mail, build a PDF from chosen sections. Several downloads run one after the
- * other and end on one message, or on a line-by-line outcome when one failed; a
- * suspension of several is one update.
+ * What can be done with a report, from the queue or its dock: download it now, schedule it (the
+ * mockup's scheduleDialog(), or change its schedule), suspend its schedule, send a test e-mail,
+ * build a PDF from chosen sections. Several downloads run one after the other and end on one
+ * message, or on a line-by-line outcome when one failed; a suspension of several is one update.
  */
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { PaperPlaneTilt, FilePdf, Warning, Question } from '@phosphor-icons/react'
-import { Modal } from '../../components/Modal'
-import { WorkButton, BulkOutcome, runEach, rememberFocus, ClockIcon } from '../../components/work'
+import { AtelierDialog, Btn, Icon } from '../../components/atelier'
+import { BulkOutcome, runEach } from '../../components/work'
 import { reportsService } from '../../services'
 import { useNotification } from '../../contexts'
 import { downloadBlob } from '../../lib/utils'
@@ -27,11 +25,9 @@ export function useReportActions({ schedules, pdfSections = [], onDone } = {}) {
   const [form, setForm] = useState({})
   const [errors, setErrors] = useState({})
   const [busy, setBusy] = useState(false)
-  const back = useRef(null)
-  const close = () => { setDlg(null); setErrors({}) }
-  // Every way out gives the focus back to the control that opened the dialog (or `from`, when that one left)
-  const show = (next, from) => { back.current = rememberFocus(from); setErrors({}); setDlg(next) }
-  const leave = () => { close(); back.current?.() }
+  // Every way out gives the focus back to the control that opened the dialog (else to `from`, an id)
+  const show = (next, from) => { setErrors({}); setDlg({ ...next, from }) }
+  const leave = () => { setDlg(null); setErrors({}) }
 
   const done = async () => { reportsChanged(); await onDone?.() }
 
@@ -122,7 +118,9 @@ export function useReportActions({ schedules, pdfSections = [], onDone } = {}) {
     }
   }
 
-  const openPdf = () => { setForm({ sections: [] }); show({ kind: 'pdf' }) }
+  const openPdf = (from) => { setForm({ sections: [] }); show({ kind: 'pdf' }, from) }
+  // The product's further actions on a report, in the dialog the mockup's « ⋯ » opens (certMenu())
+  const openMenu = (key, items) => show({ kind: 'menu', key, items })
   const buildPdf = async () => {
     setBusy(true)
     try {
@@ -139,11 +137,11 @@ export function useReportActions({ schedules, pdfSections = [], onDone } = {}) {
   }
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }))
-  const fieldError = (name) => errors[name] && (
-    <p className="wk-field-error" id={`err-${name}`}><Warning aria-hidden="true" /><span>{errors[name]}</span></p>
+  // The mockup's fieldError(): the error after the field, named after it, read after its hint
+  const fieldError = (id, name) => errors[name] && (
+    <p className="field-error" id={`err-${id}`}><Icon name="warning" /><span>{errors[name]}</span></p>
   )
-  // The error comes first, then the hint, as the mockup reads them
-  const describe = (hint, name) => [errors[name] && `err-${name}`, hint].filter(Boolean).join(' ')
+  const describe = (hint, id, name) => [hint, errors[name] && `err-${id}`].filter(Boolean).join(' ')
   const utc = !!form.utc
 
   const titles = {
@@ -151,46 +149,58 @@ export function useReportActions({ schedules, pdfSections = [], onDone } = {}) {
     test: t('reports.testSend'),
     pdf: t('reports.work.dialog.pdfTitle'),
     outcome: t('work.bulk.title'),
+    menu: t('reports.work.actionsTitle'),
   }
   const subtitles = {
     schedule: form.fixed ? reportName(form.key, t) : t('reports.work.dialog.scheduleSubtitle'),
     test: reportName(form.key, t),
     pdf: t('reports.work.dialog.pdfSubtitle'),
     outcome: t('reports.work.downloadedOutcome', { count: dlg?.outcome?.length || 0 }),
+    menu: dlg?.key ? reportName(dlg.key, t) : '',
   }
+  const cancel = <Btn data-action="close-modal" onClick={leave}>{t('common.cancel')}</Btn>
 
-  const dialog = (
-    <Modal open={!!dlg} onOpenChange={(v) => { if (!v) leave() }} title={dlg ? titles[dlg.kind] : ''}
-      subtitle={dlg ? subtitles[dlg.kind] : ''} size={dlg?.kind === 'schedule' || dlg?.kind === 'test' ? 'sm' : 'md'}>
-      {dlg?.kind === 'outcome' && (
+  const dialog = dlg && (
+    <AtelierDialog key={dlg.kind} title={titles[dlg.kind]} subtitle={subtitles[dlg.kind]} onClose={leave} returnTo={dlg.from}
+      size={dlg.kind === 'pdf' ? '' : 'narrow'} testId={`report-${dlg.kind}-dialog`}>
+      {dlg.kind === 'outcome' && (
         <BulkOutcome outcome={dlg.outcome} nameOf={(key) => reportName(key, t)} onClose={leave} />
       )}
-      {dlg?.kind === 'schedule' && (
-        <form className="wk-dialog" noValidate onSubmit={(e) => { e.preventDefault(); saveSchedule() }} data-testid="schedule-form">
-          <div className="wk-fields">
-            <div className="wk-field is-full">
+      {dlg.kind === 'menu' && (
+        <div className="columns-list">
+          {dlg.items.map((item) => (
+            <button key={item.id} type="button" className="btn" data-write="" onClick={() => { leave(); item.onClick() }}>
+              <Icon name={item.icon} />{item.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {dlg.kind === 'schedule' && (
+        <form id="schedule-form" noValidate onSubmit={(e) => { e.preventDefault(); saveSchedule() }} data-testid="schedule-form">
+          <div className="form-fields">
+            <div className="field full">
               <label htmlFor="sch-kind">{t('reports.work.dialog.content')}</label>
-              <select id="sch-kind" value={form.key} disabled={form.fixed} onChange={(e) => pick(e.target.value)} autoFocus={!form.fixed}>
+              <select id="sch-kind" name="kind" value={form.key} disabled={form.fixed} onChange={(e) => pick(e.target.value)} data-autofocus={form.fixed ? undefined : ''}>
                 {REPORT_KEYS.map((k) => <option key={k} value={k}>{reportName(k, t)}</option>)}
               </select>
             </div>
-            <div className="wk-field">
+            <div className="field">
               <label htmlFor="sch-freq">{t('reports.frequency')}</label>
-              <select id="sch-freq" value={form.frequency} onChange={set('frequency')} autoFocus={form.fixed}>
+              <select id="sch-freq" name="freq" value={form.frequency} onChange={set('frequency')} data-autofocus={form.fixed ? '' : undefined}>
                 <option value="daily">{t('reports.daily')}</option>
                 <option value="weekly">{t('reports.weekly')}</option>
                 <option value="monthly">{t('reports.monthly')}</option>
               </select>
             </div>
-            <div className="wk-field">
+            <div className="field">
               <label htmlFor="sch-time">{t(utc ? 'reports.work.dialog.timeUtc' : 'reports.work.dialog.time')}</label>
-              <input id="sch-time" value={form.time || ''} onChange={set('time')} inputMode="numeric" autoComplete="off"
-                aria-invalid={!!errors.time || undefined} aria-describedby={describe('hint-sch-time', 'time')} />
-              {fieldError('time')}
+              <input id="sch-time" name="time" value={form.time || ''} onChange={set('time')} inputMode="numeric" autoComplete="off"
+                aria-invalid={!!errors.time || undefined} aria-describedby={describe('hint-sch-time', 'sch-time', 'time')} />
+              {fieldError('sch-time', 'time')}
               <small id="hint-sch-time">{t(utc ? 'reports.work.dialog.timeHintUtc' : 'reports.work.dialog.timeHint')}</small>
             </div>
             {form.frequency === 'weekly' && (
-              <div className="wk-field">
+              <div className="field">
                 <label htmlFor="sch-dow">{t('reports.dayOfWeek')}</label>
                 <select id="sch-dow" value={form.day_of_week} onChange={set('day_of_week')}>
                   {DAYS.map((d, i) => <option key={d} value={i}>{t(`reports.days.${d}`)}</option>)}
@@ -198,7 +208,7 @@ export function useReportActions({ schedules, pdfSections = [], onDone } = {}) {
               </div>
             )}
             {form.frequency === 'monthly' && (
-              <div className="wk-field">
+              <div className="field">
                 <label htmlFor="sch-dom">{t('reports.dayOfMonth')}</label>
                 <select id="sch-dom" value={form.day_of_month} onChange={set('day_of_month')}>
                   {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}
@@ -206,7 +216,7 @@ export function useReportActions({ schedules, pdfSections = [], onDone } = {}) {
               </div>
             )}
             {!isPdf(form.key) && (
-              <div className="wk-field">
+              <div className="field">
                 <label htmlFor="sch-format">{t('reports.format')}</label>
                 <select id="sch-format" value={form.format} onChange={set('format')}>
                   <option value="csv">CSV</option>
@@ -214,59 +224,60 @@ export function useReportActions({ schedules, pdfSections = [], onDone } = {}) {
                 </select>
               </div>
             )}
-            <div className="wk-field is-full">
+            <div className="field full">
               <label htmlFor="sch-to">{t('reports.recipients')}</label>
-              <input id="sch-to" value={form.recipients || ''} onChange={set('recipients')} autoComplete="off" spellCheck={false}
-                placeholder="pki@example.com" aria-invalid={!!errors.recipients || undefined} aria-describedby={describe('hint-sch-to', 'recipients')} />
-              {fieldError('recipients')}
+              <input id="sch-to" name="recipients" value={form.recipients || ''} onChange={set('recipients')} autoComplete="off" spellCheck={false}
+                placeholder="pki@example.com" aria-invalid={!!errors.recipients || undefined} aria-describedby={describe('hint-sch-to', 'sch-to', 'recipients')} />
+              {fieldError('sch-to', 'recipients')}
               <small id="hint-sch-to">{t('reports.work.dialog.recipientsHint')}</small>
             </div>
           </div>
-          <p className="wk-notice"><Question aria-hidden="true" /><span>{t('reports.work.dialog.scheduleNote')}</span></p>
-          <div className="lv-dialog-actions">
-            <WorkButton onClick={leave}>{t('common.cancel')}</WorkButton>
-            <WorkButton type="submit" primary icon={ClockIcon} disabled={busy}>{t('reports.work.dialog.save')}</WorkButton>
+          <div className="notice" style={{ margin: '16px 0 0' }}><Icon name="help" />{t('reports.work.dialog.scheduleNote')}</div>
+          <div className="modal-actions">
+            {cancel}
+            <Btn type="submit" tone="primary" icon="clock" disabled={busy || undefined}>{t('reports.work.dialog.save')}</Btn>
           </div>
         </form>
       )}
-      {dlg?.kind === 'test' && (
-        <form className="wk-dialog" noValidate onSubmit={(e) => { e.preventDefault(); sendTest() }}>
-          <p className="ui-dialog-message">{t('reports.testSendDesc', { type: reportName(form.key, t) })}</p>
-          <div className="wk-field">
-            <label htmlFor="test-email">{t('reports.recipientEmail')}</label>
-            <input id="test-email" type="email" value={form.email || ''} onChange={set('email')} autoFocus placeholder="admin@example.com"
-              aria-invalid={!!errors.email || undefined} aria-describedby={errors.email ? 'err-email' : undefined} />
-            {fieldError('email')}
+      {dlg.kind === 'test' && (
+        <form noValidate onSubmit={(e) => { e.preventDefault(); sendTest() }}>
+          <p className="small muted">{t('reports.testSendDesc', { type: reportName(form.key, t) })}</p>
+          <div className="form-fields">
+            <div className="field full">
+              <label htmlFor="test-email">{t('reports.recipientEmail')}</label>
+              <input id="test-email" type="email" value={form.email || ''} onChange={set('email')} data-autofocus="" placeholder="admin@example.com"
+                autoComplete="off" spellCheck={false} aria-invalid={!!errors.email || undefined} aria-describedby={errors.email ? 'err-test-email' : undefined} />
+              {fieldError('test-email', 'email')}
+            </div>
           </div>
-          <div className="lv-dialog-actions">
-            <WorkButton onClick={leave}>{t('common.cancel')}</WorkButton>
-            <WorkButton type="submit" primary icon={PaperPlaneTilt} disabled={busy}>{t('reports.send')}</WorkButton>
+          <div className="modal-actions">
+            {cancel}
+            <Btn type="submit" tone="primary" icon="send" disabled={busy || undefined}>{t('reports.send')}</Btn>
           </div>
         </form>
       )}
-      {dlg?.kind === 'pdf' && (
-        <form className="wk-dialog" noValidate onSubmit={(e) => { e.preventDefault(); buildPdf() }}>
-          <fieldset className="wk-fields wk-pdf-sections">
+      {dlg.kind === 'pdf' && (
+        <form noValidate onSubmit={(e) => { e.preventDefault(); buildPdf() }}>
+          <fieldset className="columns-list">
             <legend className="sr-only">{t('reports.pdf.sections')}</legend>
             {pdfSections.map((id) => (
-              <label key={id} className="wk-check-line">
+              <label key={id} className="checkbox-line">
                 <input type="checkbox" checked={form.sections?.includes(id) || false}
-                  onChange={() => setForm((f) => ({ ...f, sections: f.sections.includes(id) ? f.sections.filter((s) => s !== id) : [...f.sections, id] }))} />
+                  onChange={() => setForm((f) => ({ ...f, sections: f.sections.includes(id) ? f.sections.filter((x) => x !== id) : [...f.sections, id] }))} />
                 <span>{t(`reports.pdf.section.${id}`, { defaultValue: id.replace(/_/g, ' ') })}</span>
               </label>
             ))}
           </fieldset>
-          <div className="lv-dialog-actions">
-            <WorkButton quiet onClick={() => setForm((f) => ({ ...f, sections: [...pdfSections] }))}>{t('common.selectAll')}</WorkButton>
-            <WorkButton quiet onClick={() => setForm((f) => ({ ...f, sections: [] }))}>{t('common.deselectAll')}</WorkButton>
-            <span className="wk-spacer" />
-            <WorkButton onClick={leave}>{t('common.cancel')}</WorkButton>
-            <WorkButton type="submit" primary icon={FilePdf} disabled={busy || !form.sections?.length}>{t('reports.pdf.generateCustom')}</WorkButton>
+          <div className="modal-actions">
+            <Btn tone="quiet" onClick={() => setForm((f) => ({ ...f, sections: [...pdfSections] }))}>{t('common.selectAll')}</Btn>
+            <Btn tone="quiet" onClick={() => setForm((f) => ({ ...f, sections: [] }))}>{t('common.deselectAll')}</Btn>
+            {cancel}
+            <Btn type="submit" tone="primary" icon="download" write={false} disabled={busy || !form.sections?.length || undefined}>{t('reports.pdf.generateCustom')}</Btn>
           </div>
         </form>
       )}
-    </Modal>
+    </AtelierDialog>
   )
 
-  return { download, downloadMany, openSchedule, suspend, openTest, openPdf, dialog }
+  return { download, downloadMany, openSchedule, suspend, openTest, openPdf, openMenu, dialog }
 }

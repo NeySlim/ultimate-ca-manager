@@ -7,9 +7,8 @@
  */
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Prohibit, Warning, Question } from '@phosphor-icons/react'
-import { Modal } from '../../components/Modal'
-import { WorkButton, BulkOutcome, runEach, rememberFocus, CheckIcon } from '../../components/work'
+import { AtelierDialog, Btn, Icon } from '../../components/atelier'
+import { BulkOutcome, runEach } from '../../components/work'
 import { approvalsService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useOpenEntity } from '../../hooks/useOpenEntity'
@@ -41,23 +40,21 @@ export function useApprovalDecision({ onDone, refocus } = {}) {
   const [busy, setBusy] = useState(false)
   const [outcome, setOutcome] = useState(null)
   const box = useRef(null)
-  const back = useRef(null)
 
   const open = (kind, requests) => {
-    back.current = rememberFocus()
     setAsk({ kind, requests })
     setComment('')
     setInvalid(false)
     setOutcome(null)
   }
   const close = () => { setAsk(null); setOutcome(null); setComment('') }
-  // Leaving without deciding gives the focus back to the opening control; leaving the outcome, to the queue
-  const settle = () => (refocus ? requestAnimationFrame(refocus) : back.current?.())
+  // Leaving without deciding: the dialog gives the focus back to its opener; after a decision, to the
+  // queue (the action of the row now at the same place), once the dialog's own return has run
+  const settle = () => requestAnimationFrame(() => requestAnimationFrame(() => (refocus ? refocus() : undefined)))
   const dismiss = () => {
     const decided = !!outcome
     close()
     if (decided) settle()
-    else back.current?.()
   }
 
   // One request: the messages of today's single decision
@@ -141,52 +138,50 @@ export function useApprovalDecision({ onDone, refocus } = {}) {
     : t(`approvals.work.dialog.${approve ? 'approve' : 'reject'}${many ? 'Many' : 'One'}`)
   const subtitle = !ask ? '' : many ? t('work.dialog.requests', { count: ask.requests.length }) : t('work.dialog.request', { id: ask.requests[0].id })
 
-  const dialog = (
-    <Modal open={!!ask} onOpenChange={(v) => { if (!v) dismiss() }} title={title} subtitle={subtitle} size="md">
-      {ask && outcome ? (
+  const describedBy = invalid ? 'decision-hint err-decision' : 'decision-hint'
+  const dialog = ask && (
+    <AtelierDialog title={title} subtitle={subtitle} onClose={dismiss} testId="decision-dialog">
+      {outcome ? (
         <BulkOutcome outcome={outcome} nameOf={(req) => `#${req.id} · ${requestTitle(req, t)}`} onClose={dismiss} />
-      ) : ask && (
-        <form className="wk-dialog" noValidate onSubmit={(e) => { e.preventDefault(); confirm() }}>
-          <div className="wk-review">
-            <ul className="wk-dialog-list" data-testid="decision-list">
+      ) : (
+        <form noValidate onSubmit={(e) => { e.preventDefault(); confirm() }}>
+          <div className="review-summary">
+            <ul className="decision-list" data-testid="decision-list">
               {ask.requests.map((req) => (
                 <li key={req.id}>
-                  <strong>#{req.id}</strong> · {requestTitle(req, t)} <span className="wk-muted">({requesterOf(req, t)})</span>
+                  <strong>#{req.id}</strong> · {requestTitle(req, t)} <span className="muted">({requesterOf(req, t)})</span>
                 </li>
               ))}
             </ul>
           </div>
-          <div className="wk-field">
+          <div className="field decision-field">
             <label htmlFor="decision-reason">
               {t('approvals.work.dialog.reason')}
-              {approve && <> <span className="wk-optional">{t('approvals.work.dialog.optional')}</span></>}
+              {approve && <> <span className="optional">{t('approvals.work.dialog.optional')}</span></>}
             </label>
-            <textarea id="decision-reason" ref={box} rows={3} maxLength={REASON_MAX} value={comment} autoFocus
+            <textarea id="decision-reason" ref={box} rows={3} maxLength={REASON_MAX} value={comment} data-autofocus=""
               onChange={(e) => { setComment(e.target.value); if (invalid) setInvalid(false) }}
-              aria-invalid={invalid || undefined}
-              aria-describedby={invalid ? 'decision-hint decision-error' : 'decision-hint'} />
+              aria-invalid={invalid || undefined} aria-describedby={describedBy} />
             <small id="decision-hint">{t(approve ? 'approvals.work.dialog.approveHint' : 'approvals.work.dialog.rejectHint')}</small>
             {invalid && (
-              <p className="wk-field-error" id="decision-error"><Warning aria-hidden="true" /><span>{t('approvals.work.dialog.reasonRequired', { min: REASON_MIN })}</span></p>
+              <p className="field-error" id="err-decision"><Icon name="warning" /><span>{t('approvals.work.dialog.reasonRequired', { min: REASON_MIN })}</span></p>
             )}
           </div>
-          <p className="wk-notice">
-            <Question aria-hidden="true" />
-            <span>
-              {t(many ? 'approvals.work.dialog.decidedNoteMany' : 'approvals.work.dialog.decidedNote')}
-              {approve && !many && ask.requests[0].request_type === 'csr' && <> {t('approvals.work.dialog.csrNote')}</>}
-            </span>
-          </p>
-          <div className="lv-dialog-actions">
-            <WorkButton onClick={dismiss}>{t('common.cancel')}</WorkButton>
-            <WorkButton type="submit" primary={approve} danger={!approve} icon={approve ? CheckIcon : Prohibit} disabled={busy}
-              data-testid="decision-confirm">
+          <div className="notice" style={{ margin: '16px 0 0' }}>
+            <Icon name="help" />
+            {t(many ? 'approvals.work.dialog.decidedNoteMany' : 'approvals.work.dialog.decidedNote')}
+            {approve && !many && ask.requests[0].request_type === 'csr' && <> {t('approvals.work.dialog.csrNote')}</>}
+          </div>
+          <div className="modal-actions">
+            <Btn data-action="close-modal" onClick={dismiss}>{t('common.cancel')}</Btn>
+            <Btn type="submit" tone={approve ? 'primary' : 'danger'} icon={approve ? 'check' : 'block'} disabled={busy || undefined}
+              data-confirm-decision={approve ? 'approve' : 'refuse'} data-testid="decision-confirm">
               {t(approve ? 'approvals.work.approve' : 'approvals.work.reject')}{many ? ` (${ask.requests.length})` : ''}
-            </WorkButton>
+            </Btn>
           </div>
         </form>
       )}
-    </Modal>
+    </AtelierDialog>
   )
 
   return { open, dialog }

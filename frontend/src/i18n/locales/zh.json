@@ -5545,7 +5545,6 @@
       "votes_one": "已批准 {{count}}/{{need}}",
       "votes_other": "已批准 {{count}}/{{need}}",
       "groups": {
-        "overdue": "已逾期",
         "soon": "48 小时内处理",
         "later": "稍后"
       },
@@ -8097,12 +8096,10 @@
     "selectRow": "选择 {{name}}",
     "selectAll": "全选：{{group}}",
     "loading": "正在加载队列…",
-    "retry": "重试",
     "viewLog": "查看日志",
     "bulkLabel": "批量操作",
     "selected_one": "已选择 {{count}} 项",
     "selected_other": "已选择 {{count}} 项",
-    "cancelSelection": "取消选择",
     "historyEmpty": "暂无内容。",
     "bulk": {
       "title": "结果",

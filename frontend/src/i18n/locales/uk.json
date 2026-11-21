@@ -5727,7 +5727,6 @@
       "votes_few": "{{count}} of {{need}} approvals",
       "votes_many": "{{count}} of {{need}} approvals",
       "groups": {
-        "overdue": "Overdue",
         "soon": "To handle within 48 h",
         "later": "Later"
       },
@@ -8413,14 +8412,12 @@
     "selectRow": "Select {{name}}",
     "selectAll": "Select all: {{group}}",
     "loading": "Loading the queue…",
-    "retry": "Retry",
     "viewLog": "View the log",
     "bulkLabel": "Bulk actions",
     "selected_one": "{{count}} item selected",
     "selected_other": "{{count}} items selected",
     "selected_few": "{{count}} items selected",
     "selected_many": "{{count}} items selected",
-    "cancelSelection": "Clear selection",
     "historyEmpty": "Nothing yet.",
     "bulk": {
       "title": "Outcome",

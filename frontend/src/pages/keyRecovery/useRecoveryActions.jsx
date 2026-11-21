@@ -7,9 +7,8 @@
  */
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Prohibit, DownloadSimple, Warning, Question } from '@phosphor-icons/react'
-import { Modal } from '../../components/Modal'
-import { WorkButton, BulkOutcome, runEach, rememberFocus, CheckIcon } from '../../components/work'
+import { AtelierDialog, Btn, Icon } from '../../components/atelier'
+import { BulkOutcome, runEach } from '../../components/work'
 import { keyRecoveryService } from '../../services'
 import { useNotification } from '../../contexts'
 import { downloadBlob } from '../../lib/utils'
@@ -31,20 +30,18 @@ export function useRecoveryActions({ onDone, refocus } = {}) {
   const [outcome, setOutcome] = useState(null)
   const pwd = useRef(null)
   const noteBox = useRef(null)
-  const back = useRef(null)
 
   const open = (kind, requests) => {
-    back.current = rememberFocus()
     setAsk({ kind, requests }); setNote(''); setPassword(''); setLegacy(false); setInvalid(false); setOutcome(null)
   }
   const close = () => { setAsk(null); setOutcome(null); setPassword(''); setNote('') }
-  // Leaving without acting gives the focus back to the opening control; leaving the outcome, to the queue
-  const settle = () => (refocus ? requestAnimationFrame(refocus) : back.current?.())
+  // Leaving without acting: the dialog gives the focus back to its opener; after an action, to the
+  // queue (the row now at the same place), once the dialog's own return has run
+  const settle = () => requestAnimationFrame(() => requestAnimationFrame(() => (refocus ? refocus() : undefined)))
   const dismiss = () => {
     const acted = !!outcome
     close()
     if (acted) settle()
-    else back.current?.()
   }
 
   const finish = async (report = false) => {
@@ -112,75 +109,74 @@ export function useRecoveryActions({ onDone, refocus } = {}) {
       : t(`keyRecovery.work.dialog.${kind}${many ? 'Many' : 'One'}`)
   const subtitle = !ask ? '' : many ? t('work.dialog.requests', { count: ask.requests.length }) : t('work.dialog.request', { id: ask.requests[0].id })
 
-  const dialog = (
-    <Modal open={!!ask} onOpenChange={(v) => { if (!v) dismiss() }} title={title} subtitle={subtitle} size="md">
-      {ask && outcome ? (
+  const list = (requests) => (
+    <div className="review-summary">
+      <ul className="decision-list">
+        {requests.map((req) => (
+          <li key={req.id}><strong>#{req.id}</strong> · {nameOf(req)} <span className="muted">({req.requested_by})</span></li>
+        ))}
+      </ul>
+    </div>
+  )
+  const actions = (submit) => (
+    <div className="modal-actions">
+      <Btn data-action="close-modal" onClick={dismiss}>{t('common.cancel')}</Btn>
+      {submit}
+    </div>
+  )
+
+  const dialog = ask && (
+    <AtelierDialog title={title} subtitle={subtitle} onClose={dismiss} testId="recovery-dialog">
+      {outcome ? (
         <BulkOutcome outcome={outcome} nameOf={(req) => `#${req.id} · ${nameOf(req)}`} onClose={dismiss} />
-      ) : ask && kind === 'recover' ? (
-        <form className="wk-dialog" noValidate onSubmit={(e) => { e.preventDefault(); recover() }}>
-          <p className="wk-notice is-warn"><Warning aria-hidden="true" /><span>{t('keyRecovery.recoverWarning')}</span></p>
-          <div className="wk-review">
-            <ul className="wk-dialog-list">
-              <li><strong>#{ask.requests[0].id}</strong> · {nameOf(ask.requests[0])} <span className="wk-muted">({ask.requests[0].requested_by})</span></li>
-            </ul>
-          </div>
-          <div className="wk-field">
+      ) : kind === 'recover' ? (
+        <form noValidate onSubmit={(e) => { e.preventDefault(); recover() }}>
+          <div className="notice warn" style={{ margin: '0 0 16px' }}><Icon name="warning" />{t('keyRecovery.recoverWarning')}</div>
+          {list(ask.requests.slice(0, 1))}
+          <div className="field decision-field">
             <label htmlFor="recover-password">{t('keyRecovery.p12Password')}</label>
-            <input id="recover-password" ref={pwd} type="password" autoComplete="new-password" value={password} autoFocus
+            <input id="recover-password" ref={pwd} type="password" autoComplete="new-password" value={password} data-autofocus=""
               onChange={(e) => { setPassword(e.target.value); if (invalid) setInvalid(false) }}
-              aria-invalid={invalid || undefined} aria-describedby={invalid ? 'recover-error recover-hint' : 'recover-hint'} />
-            {invalid && <p className="wk-field-error" id="recover-error" role="alert"><Warning aria-hidden="true" /><span>{t('keyRecovery.passwordTooShort')}</span></p>}
+              aria-invalid={invalid || undefined} aria-describedby={invalid ? 'recover-hint err-recover' : 'recover-hint'} />
+            {invalid && <p className="field-error" id="err-recover" role="alert"><Icon name="warning" /><span>{t('keyRecovery.passwordTooShort')}</span></p>}
             <small id="recover-hint">{t('keyRecovery.p12PasswordHint')}</small>
           </div>
-          <label className="wk-check-line">
+          <label className="checkbox-line decision-field">
             <input type="checkbox" checked={legacy} onChange={(e) => setLegacy(e.target.checked)} />
-            <span>{t('export.legacyPkcs12')}<br /><span className="wk-muted">{t('export.legacyPkcs12Desc')}</span></span>
+            <span>{t('export.legacyPkcs12')}<br /><small className="muted">{t('export.legacyPkcs12Desc')}</small></span>
           </label>
-          <div className="lv-dialog-actions">
-            <WorkButton onClick={dismiss}>{t('common.cancel')}</WorkButton>
-            <WorkButton type="submit" primary icon={DownloadSimple} disabled={busy}>{t('keyRecovery.download')}</WorkButton>
-          </div>
+          {actions(<Btn type="submit" tone="primary" icon="download" disabled={busy || undefined}>{t('keyRecovery.download')}</Btn>)}
         </form>
-      ) : ask && (
-        <form className="wk-dialog" noValidate onSubmit={(e) => { e.preventDefault(); decide() }}>
-          <div className="wk-review">
-            <ul className="wk-dialog-list">
-              {ask.requests.map((req) => (
-                <li key={req.id}><strong>#{req.id}</strong> · {nameOf(req)} <span className="wk-muted">({req.requested_by})</span></li>
-              ))}
-            </ul>
-          </div>
-          <div className="wk-field">
+      ) : (
+        <form noValidate onSubmit={(e) => { e.preventDefault(); decide() }}>
+          {list(ask.requests)}
+          <div className="field decision-field">
             <label htmlFor="recovery-note">
               {kind === 'approve'
-                ? <>{t('keyRecovery.work.dialog.note')} <span className="wk-optional">{t('keyRecovery.work.dialog.optional')}</span></>
+                ? <>{t('keyRecovery.work.dialog.note')} <span className="optional">{t('keyRecovery.work.dialog.optional')}</span></>
                 : t('approvals.work.dialog.reason')}
             </label>
-            <textarea id="recovery-note" ref={noteBox} rows={3} maxLength={REASON_MAX} value={note} autoFocus
+            <textarea id="recovery-note" ref={noteBox} rows={3} maxLength={REASON_MAX} value={note} data-autofocus=""
               onChange={(e) => { setNote(e.target.value); if (invalid) setInvalid(false) }}
               aria-invalid={invalid || undefined}
-              aria-describedby={invalid ? 'recovery-note-hint recovery-note-error' : 'recovery-note-hint'} />
+              aria-describedby={invalid ? 'recovery-note-hint err-recovery-note' : 'recovery-note-hint'} />
             <small id="recovery-note-hint">{t(kind === 'approve' ? 'keyRecovery.work.dialog.noteHint' : 'approvals.work.dialog.rejectHint')}</small>
             {invalid && (
-              <p className="wk-field-error" id="recovery-note-error"><Warning aria-hidden="true" /><span>{t('approvals.work.dialog.reasonRequired', { min: REASON_MIN })}</span></p>
+              <p className="field-error" id="err-recovery-note"><Icon name="warning" /><span>{t('approvals.work.dialog.reasonRequired', { min: REASON_MIN })}</span></p>
             )}
           </div>
-          <p className="wk-notice">
-            <Question aria-hidden="true" />
-            <span>
-              {t(`keyRecovery.work.dialog.${kind === 'approve' ? 'approveNote' : 'rejectNote'}${many ? 'Many' : ''}`)}
-            </span>
-          </p>
-          <div className="lv-dialog-actions">
-            <WorkButton onClick={dismiss}>{t('common.cancel')}</WorkButton>
-            <WorkButton type="submit" primary={kind === 'approve'} danger={kind === 'reject'} icon={kind === 'approve' ? CheckIcon : Prohibit}
-              disabled={busy} data-testid="recovery-confirm">
-              {t(kind === 'approve' ? 'keyRecovery.work.approve' : 'keyRecovery.work.reject')}{many ? ` (${ask.requests.length})` : ''}
-            </WorkButton>
+          <div className="notice" style={{ margin: '16px 0 0' }}>
+            <Icon name="help" />{t(`keyRecovery.work.dialog.${kind === 'approve' ? 'approveNote' : 'rejectNote'}${many ? 'Many' : ''}`)}
           </div>
+          {actions(
+            <Btn type="submit" tone={kind === 'approve' ? 'primary' : 'danger'} icon={kind === 'approve' ? 'check' : 'block'}
+              disabled={busy || undefined} data-testid="recovery-confirm">
+              {t(kind === 'approve' ? 'keyRecovery.work.approve' : 'keyRecovery.work.reject')}{many ? ` (${ask.requests.length})` : ''}
+            </Btn>,
+          )}
         </form>
       )}
-    </Modal>
+    </AtelierDialog>
   )
 
   return { open, dialog }

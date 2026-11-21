@@ -67,11 +67,11 @@ describe('KeyRecoveryPage queue', () => {
   it('keeps the place of Approve… on one\'s own request, so the due dates of a group line up', async () => {
     renderPage()
     await screen.findByText('cn-one')
-    const slot = rowOf('cn-mine').querySelector('.wk-action > :first-child')
-    expect(slot).toHaveClass('is-placeholder')
+    const slot = rowOf('cn-mine').querySelector('.work-action > :first-child')
+    expect(slot).toHaveClass('slot')
     expect(slot).toHaveAttribute('aria-hidden', 'true')
     expect(within(rowOf('cn-mine')).queryByRole('button', { name: /Approuver/ })).toBeNull()
-    expect(rowOf('cn-one').querySelector('.is-placeholder')).toBeNull()
+    expect(rowOf('cn-one').querySelector('.slot')).toBeNull()
     // A key to recover keeps the check column, empty: its text lines up with the group above
     expect(rowOf('cn-two')).not.toHaveClass('no-check')
     expect(within(rowOf('cn-two')).queryByRole('checkbox')).toBeNull()
@@ -124,7 +124,7 @@ describe('KeyRecoveryPage queue', () => {
     fireEvent.change(within(dialog).getByLabelText('Mot de passe PKCS#12'), { target: { value: 'court' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Télécharger .p12' }))
     const error = await within(dialog).findByText('Le mot de passe doit faire au moins 8 caractères.')
-    const field = error.closest('.wk-field')
+    const field = error.closest('.field')
     expect([...field.children].map((el) => el.tagName)).toEqual(['LABEL', 'INPUT', 'P', 'SMALL'])
     expect(within(field).getByText('Au moins 8 caractères.')).toBeInTheDocument()
     expect(api.recover).not.toHaveBeenCalled()
@@ -232,18 +232,22 @@ describe('KeyRecoveryPage queue', () => {
 })
 
 describe('KeyRecoveryPage linked request', () => {
-  it('shows a linked request outside the list and opens it in the inspector', async () => {
+  it('shows a linked request outside the list and opens it in the module dock', async () => {
     renderPage('/key-recovery?request=900')
-    expect(await screen.findByText('cn-linked')).toBeInTheDocument()
-    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('key_recovery', 900, { data: expect.objectContaining({ id: 900 }) }))
-    expect(rowOf('cn-linked')).toHaveClass('is-opened')
+    const dock = await screen.findByRole('complementary', { name: 'Détail : Récupération de clés' })
+    expect(within(dock).getByRole('heading', { level: 2, name: 'cn-linked' })).toBeInTheDocument()
+    expect(within(dock).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Demande', 'Journal'])
+    expect(screen.getAllByText('cn-linked')[0].closest('li')).toHaveClass('opened')
+    expect(openEntity).not.toHaveBeenCalled()
   })
 
   it('the listed copy of the linked request wins over the copy read on opening', async () => {
     api.list.mockImplementation(async () => ({ data: { requests: rows.map((r) => (r.id === 900 ? { ...r, status: 'approved' } : { ...r })), dual_control: true } }))
     renderPage('/key-recovery?request=900')
-    await waitFor(() => expect(openEntity).toHaveBeenCalled())
+    const dock = await screen.findByRole('complementary', { name: 'Détail : Récupération de clés' })
     expect(within(group('À récupérer')).getByText('cn-linked')).toBeInTheDocument()
-    expect(screen.getAllByText('cn-linked')).toHaveLength(1)
+    // One row in the queue, and the dock's tab and heading
+    expect(within(group('À récupérer')).getAllByText('cn-linked')).toHaveLength(1)
+    expect(within(dock).getByRole('button', { name: 'Récupérer la clé de cn-linked' })).toBeInTheDocument()
   })
 })

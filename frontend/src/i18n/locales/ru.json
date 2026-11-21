@@ -5788,7 +5788,6 @@
       "votes_few": "{{count}} из {{need}} утверждений",
       "votes_many": "{{count}} из {{need}} утверждений",
       "groups": {
-        "overdue": "Просрочено",
         "soon": "Обработать в течение 48 ч",
         "later": "Позже"
       },
@@ -8416,14 +8415,12 @@
     "selectRow": "Выбрать {{name}}",
     "selectAll": "Выбрать все: {{group}}",
     "loading": "Загрузка очереди…",
-    "retry": "Повторить",
     "viewLog": "Открыть журнал",
     "bulkLabel": "Групповые действия",
     "selected_one": "Выбран {{count}} элемент",
     "selected_other": "Выбрано {{count}} элемента",
     "selected_few": "Выбрано {{count}} элемента",
     "selected_many": "Выбрано {{count}} элементов",
-    "cancelSelection": "Снять выделение",
     "historyEmpty": "Пока ничего.",
     "bulk": {
       "title": "Итог",

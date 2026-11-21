@@ -36,7 +36,7 @@ describe('BulkOutcome', () => {
       outcome={[{ item: 1, ok: true }, { item: 2, ok: false, reason: 'Request has expired' }, { item: 3, ok: true }]} />)
     expect(screen.getByRole('status')).toHaveTextContent('2 réussies, 1 échouée')
     const failed = screen.getByText('#2').closest('li')
-    expect(failed).toHaveClass('is-failed')
+    expect(failed.querySelector('.badge.bad')).toHaveTextContent('échouée')
     expect(failed).toHaveTextContent('Request has expired')
     fireEvent.click(screen.getByRole('button', { name: 'Fermer' }))
     expect(onClose).toHaveBeenCalled()

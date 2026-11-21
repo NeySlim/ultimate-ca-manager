@@ -5545,7 +5545,6 @@
       "votes_one": "{{count}} of {{need}} approvals",
       "votes_other": "{{count}} of {{need}} approvals",
       "groups": {
-        "overdue": "Overdue",
         "soon": "To handle within 48 h",
         "later": "Later"
       },
@@ -8097,12 +8096,10 @@
     "selectRow": "Select {{name}}",
     "selectAll": "Select all: {{group}}",
     "loading": "Loading the queue…",
-    "retry": "Retry",
     "viewLog": "View the log",
     "bulkLabel": "Bulk actions",
     "selected_one": "{{count}} item selected",
     "selected_other": "{{count}} items selected",
-    "cancelSelection": "Clear selection",
     "historyEmpty": "Nothing yet.",
     "bulk": {
       "title": "Outcome",

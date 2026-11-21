@@ -5619,7 +5619,6 @@
       "votes_one": "{{count}} approbation sur {{need}}",
       "votes_other": "{{count}} approbations sur {{need}}",
       "groups": {
-        "overdue": "En retard",
         "soon": "À traiter sous 48 h",
         "later": "Plus tard"
       },
@@ -8100,12 +8099,10 @@
     "selectRow": "Sélectionner {{name}}",
     "selectAll": "Tout sélectionner : {{group}}",
     "loading": "Chargement de la file…",
-    "retry": "Réessayer",
     "viewLog": "Voir le journal",
     "bulkLabel": "Actions groupées",
     "selected_one": "{{count}} élément sélectionné",
     "selected_other": "{{count}} éléments sélectionnés",
-    "cancelSelection": "Annuler la sélection",
     "historyEmpty": "Rien pour l’instant.",
     "bulk": {
       "title": "Bilan",

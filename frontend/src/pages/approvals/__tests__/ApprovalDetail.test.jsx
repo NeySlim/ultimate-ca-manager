@@ -1,10 +1,10 @@
 /**
- * An approval request in the inspector: what it asks for (protocol, identity,
- * CSR), its state in the user's language, its log, and a decision taken there
- * that reads the request again and tells the queue.
+ * An approval request in the module dock: what it asks for (protocol, identity,
+ * CSR), its state in the user's language, its log, and the decision buttons that
+ * ask the page for a decision.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 const stable = vi.hoisted(() => ({ i18n: null, canWrite: true }))
@@ -22,11 +22,11 @@ const api = vi.hoisted(() => ({ approve: vi.fn(), reject: vi.fn(), getById: vi.f
 const cas = vi.hoisted(() => ({ getAll: vi.fn(async () => ({ data: [{ id: 1, common_name: 'Root CA' }, { id: 4, common_name: 'Services CA G2', parent_id: 1 }] })) }))
 vi.mock('../../../services', () => ({ approvalsService: api, casService: cas }))
 
-import { ApprovalDetail } from '../ApprovalDetail'
+import { ApprovalDock } from '../ApprovalDetail'
 
 const PROTOCOL = {
   id: 51, request_type: 'est_enroll', status: 'pending', requester_username: 'est:basic:device', policy_name: 'Équipements',
-  created_at: '2026-11-07T16:20:00Z', expires_at: '2026-11-14T16:20:00Z', approvals: [], required_approvals: 1,
+  created_at: new Date(Date.now() - 20 * 3600000).toISOString(), expires_at: new Date(Date.now() + 28 * 3600000).toISOString(), approvals: [], required_approvals: 1,
   request_summary: {
     cn: 'device.example', protocol: 'est', operation: 'enroll', identity: 'basic:device',
     csr: '-----BEGIN CERTIFICATE REQUEST-----\nMIIB\n-----END CERTIFICATE REQUEST-----',
@@ -34,7 +34,7 @@ const PROTOCOL = {
 }
 const show = (req, section = 'request', props = {}) => render(
   <MemoryRouter>
-    <ApprovalDetail data={req} objectKey="approval:51" title="Enrôlement EST : device.example" section={section} onSection={() => {}} {...props} />
+    <div className="atl"><ApprovalDock req={req} section={section} onSection={() => {}} onClose={() => {}} onDecide={() => {}} {...props} /></div>
   </MemoryRouter>,
 )
 
@@ -75,13 +75,13 @@ describe('ApprovalDetail', () => {
   })
 
   it('lists the log, newest first', () => {
-    show({ ...PROTOCOL, approvals: [{ username: 'alice', action: 'approve', comment: 'ok', timestamp: '2026-11-08T09:00:00Z' }] }, 'log')
+    show({ ...PROTOCOL, approvals: [{ username: 'alice', action: 'approve', comment: 'ok', timestamp: new Date().toISOString() }] }, 'log')
     const items = screen.getAllByRole('listitem').map((li) => li.querySelector('strong').textContent)
     expect(items).toEqual(['Demande approuvée', 'Demande déposée'])
     // The detail under the label, who and when on the right, as the mockup's journal
     const [approved, submitted] = screen.getAllByRole('listitem')
     expect(approved).toHaveTextContent('ok')
-    expect(approved.querySelector(':scope > .wk-rl-meta')).toHaveTextContent(/^alice · /)
+    expect(approved.querySelector(':scope > .rl-meta')).toHaveTextContent(/^alice · /)
     expect(submitted).toHaveTextContent('Enrôlement EST : device.example.')
   })
 
@@ -92,19 +92,16 @@ describe('ApprovalDetail', () => {
     expect(screen.queryByRole('button', { name: /Refuser/ })).toBeNull()
   })
 
-  it('approves from the inspector, then reads the request again and tells the queue', async () => {
-    const onChanged = vi.fn()
-    const heard = vi.fn()
-    window.addEventListener('ucm:data-changed', heard)
-    api.approve.mockResolvedValue({ data: { certificate_issued: false, deferred: true } })
-    api.getById.mockResolvedValue({ data: { ...PROTOCOL, status: 'approved' } })
-    show(PROTOCOL, 'request', { onChanged })
+  it('asks the page for a decision from its heading, and offers none once the deadline passed', () => {
+    const onDecide = vi.fn()
+    const { unmount } = show(PROTOCOL, 'request', { onDecide })
     fireEvent.click(screen.getByRole('button', { name: 'Approuver Enrôlement EST : device.example' }))
-    const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByTestId('decision-confirm'))
-    await waitFor(() => expect(api.approve).toHaveBeenCalledWith(51, undefined))
-    await waitFor(() => expect(onChanged).toHaveBeenCalledWith(expect.objectContaining({ status: 'approved' })))
-    expect(heard.mock.calls.some(([e]) => e.detail?.type === 'approval')).toBe(true)
-    window.removeEventListener('ucm:data-changed', heard)
+    fireEvent.click(screen.getByRole('button', { name: 'Refuser Enrôlement EST : device.example' }))
+    expect(onDecide.mock.calls).toEqual([['approve'], ['reject']])
+    unmount()
+    show({ ...PROTOCOL, expires_at: new Date(Date.now() - 60000).toISOString() })
+    expect(screen.getAllByText('Expirée').length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: /^Approuver/ })).toBeNull()
+    expect(screen.queryByText('À traiter avant', { selector: 'dt' })).toBeNull()
   })
 })
