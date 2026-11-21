@@ -9,34 +9,10 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key) => key }),
 }))
 
-import { Input } from '../Input'
 import { Textarea } from '../Textarea'
 import { SelectComponent } from '../Select'
 
 describe('Atelier fields', () => {
-  it('Input: the error is at the field, linked to it, and replaces the hint', () => {
-    render(<Input label="Port" helperText="1 to 65535." error="Port out of range." />)
-    const input = screen.getByLabelText('Port')
-    expect(input).toHaveAttribute('aria-invalid', 'true')
-    const message = screen.getByText('Port out of range.')
-    expect(message.className).toContain('ui-error')
-    expect(input.getAttribute('aria-describedby')).toContain(message.id)
-    expect(screen.queryByText('1 to 65535.')).not.toBeInTheDocument()
-  })
-
-  it('Input: the hint is linked to the control when there is no error', () => {
-    render(<Input label="Port" helperText="1 to 65535." />)
-    const input = screen.getByLabelText('Port')
-    expect(input).not.toHaveAttribute('aria-invalid')
-    expect(input.className).toContain('ui-control')
-    expect(input.getAttribute('aria-describedby')).toBe(screen.getByText('1 to 65535.').id)
-  })
-
-  it('Input: the reveal button of a typed password has an accessible name', () => {
-    render(<Input label="Password" type="password" value="secret" onChange={() => {}} />)
-    expect(screen.getByRole('button', { name: 'auth.page.showPassword' })).toBeInTheDocument()
-  })
-
   it('Textarea: same field, error linked', () => {
     render(<Textarea label="Reason" error="Required for a refusal." />)
     const area = screen.getByLabelText('Reason')

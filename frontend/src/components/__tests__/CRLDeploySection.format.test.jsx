@@ -35,10 +35,6 @@ vi.mock('../index', () => ({
   CompactSection: ({ children }) => <section>{children}</section>,
 }))
 
-vi.mock('../Modal', () => ({
-  Modal: ({ open, children }) => open ? <div role="dialog">{children}</div> : null,
-}))
-
 import { CRLDeploySection } from '../CRLDeploySection'
 
 describe('CRLDeploySection format options', () => {
