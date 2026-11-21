@@ -342,6 +342,20 @@
 .atl mark.guide-hit{background:var(--warnbg);color:var(--text);box-shadow:inset 0 -2px 0 var(--warn-fill);border-radius:2px;padding:0 1px}
 /* The way back to the console keeps its words beside the search. */
 .atl .guide-back{flex-shrink:0}
+/* The help dialog's way to the whole guide closes its toolbar, at the right. */
+.atl .toolbar>.help-open-guide{margin-left:auto;flex-shrink:0}
+@media(max-width:1000px){
+/* A narrow window: the help's way to the guide keeps its words, which the mockup's narrow toolbar drops. */
+.atl .toolbar>.help-open-guide>.help-open-label{display:inline}
+}
+@media(max-width:800px){
+/* A phone: the help's way to the guide is an icon, its words for the screen reader, beside the views. */
+.atl .toolbar>.help-open-guide{width:40px;min-height:40px;padding:6px;justify-content:center}
+/* The words of that icon, out of sight. */
+.atl .toolbar>.help-open-guide>.help-open-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+/* A phone: the help's search takes the line under the views and that icon. */
+.atl .toolbar:has(>.help-open-guide)>.search{order:1}
+}
 @media(max-width:800px){
 /* A phone: the way back to the console keeps its icon, its words for the screen reader. */
 .atl .guide-back .guide-back-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}

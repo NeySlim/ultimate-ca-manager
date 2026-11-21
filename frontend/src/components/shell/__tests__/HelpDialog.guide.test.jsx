@@ -10,7 +10,12 @@ const h = vi.hoisted(() => ({ evaluated: false }))
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key) => key, i18n: { language: 'en', resolvedLanguage: 'en' } }),
 }))
-vi.mock('../../../data/helpContent', () => ({ helpContent: { acme: { title: 'Both', sections: [{ title: 'Q', content: 'q' }] } } }))
+vi.mock('../../../data/helpContent', () => ({
+  helpContent: {
+    acme: { title: 'Both', sections: [{ title: 'Q', content: 'q' }] },
+    navigation: { title: 'Quick only', sections: [{ title: 'N', content: 'n' }] },
+  },
+}))
 vi.mock('../../../data/helpGuides', () => {
   h.evaluated = true
   return {
@@ -35,13 +40,34 @@ describe('HelpDialog and the guide page', () => {
     expect(h.evaluated).toBe(true)
   })
 
-  it('opens the chapter of the page in a new tab', async () => {
+  it('opens the chapter of the page in a new tab, from the toolbar above the help', async () => {
     open('acme')
+    const dialog = await screen.findByTestId('help-dialog')
     const link = await screen.findByRole('link', { name: 'guide.openInTab' })
     expect(link).toHaveAttribute('href', '/guide/acme')
     expect(link).toHaveAttribute('target', '_blank')
     expect(link.getAttribute('rel')).toContain('noopener')
-    expect(link.closest('.modal-actions')).toBeTruthy()
+    // In the toolbar, after the views and the search, before the text; the foot keeps the way back only
+    const bar = link.closest('.toolbar')
+    expect(bar).toBeTruthy()
+    expect(bar.lastElementChild).toBe(link)
+    expect(bar.compareDocumentPosition(dialog.querySelector('.help-grid')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(link.closest('.modal-actions')).toBeNull()
+    expect(within(dialog.querySelector('.modal-actions')).getAllByRole('button').map((b) => b.textContent)).toEqual(['help.back'])
+  })
+
+  it('keeps the button in the quick help tab', async () => {
+    open('acme')
+    fireEvent.click(await screen.findByRole('button', { name: 'help.quickHelp' }))
+    expect(screen.getByRole('link', { name: 'guide.openInTab' }).closest('.toolbar')).toBeTruthy()
+  })
+
+  it('shows the toolbar with the button for a page that has only a quick help', async () => {
+    open('navigation')
+    const link = await screen.findByRole('link', { name: 'guide.openInTab' })
+    expect(link).toHaveAttribute('href', '/guide/navigation')
+    expect(link.closest('.toolbar')).toBeTruthy()
+    expect(screen.queryByRole('group', { name: 'help.views' })).toBeNull()
   })
 
   it('carries the section reached from the contents line', async () => {
@@ -51,8 +77,9 @@ describe('HelpDialog and the guide page', () => {
     expect(screen.getByRole('link', { name: 'guide.openInTab' })).toHaveAttribute('href', '/guide/acme#acme-second')
   })
 
-  it('opens the guide at its start for a page with no chapter of its own', async () => {
+  it('offers no button for a page that has no chapter of its own', async () => {
     open('importExport')
-    expect(await screen.findByRole('link', { name: 'guide.openInTab' })).toHaveAttribute('href', '/guide')
+    await screen.findByTestId('help-dialog')
+    expect(screen.queryByRole('link', { name: 'guide.openInTab' })).toBeNull()
   })
 })
