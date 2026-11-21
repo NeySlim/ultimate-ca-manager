@@ -11,7 +11,7 @@ export default {
           { label: 'Actions propres', text: 'Le nom et l’e-mail se modifient sur place : la barre d’enregistrement, en bas, dit ce qui est modifié et non enregistré, Annuler les modifications remet les valeurs enregistrées et Enregistrer les envoie (Entrée dans un champ aussi) ; Créer une clé ouvre le formulaire de clé' },
           { label: 'Liens', text: 'Un lien vers /account?tab=security ou /account?tab=api-keys ouvre la page sur ce cadre' },
           { label: 'Modification gardée', text: 'Une modification du profil non enregistrée est marquée Modifié au sommaire, gardée dans cet onglet quand vous quittez la page et retrouvée à votre retour ; Annuler les modifications l’oublie' },
-          { label: 'Préférences', text: 'Fermer l’inspecteur en naviguant : les objets ouverts dans l’inspecteur se ferment quand vous changez de page. Le choix est gardé dans ce navigateur' },
+          { label: 'Préférences', text: 'Fermer l’inspecteur en naviguant : les objets ouverts dans l’inspecteur se ferment quand vous changez de page. Désactivé par défaut : ils restent ouverts, en onglets. Le choix est gardé dans ce navigateur' },
         ],
       },
       {

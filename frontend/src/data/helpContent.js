@@ -1397,7 +1397,7 @@ export const helpContent = {
           { label: 'Own actions', text: 'The name and email are edited in place: the save bar at the bottom says what is changed and not saved, Undo changes puts back the stored values and Save sends them (Enter in a field too); Create key opens the key form' },
           { label: 'Links', text: 'A link to /account?tab=security or /account?tab=api-keys opens the page on that frame' },
           { label: 'Edit kept', text: 'A profile change not yet saved is marked Modified in the table of contents, is kept in this tab when you leave the page and comes back on your return; Undo changes forgets it' },
-          { label: 'Preferences', text: 'Close the inspector when navigating: the objects open in the inspector close when you go to another page. The choice is kept in this browser' },
+          { label: 'Preferences', text: 'Close the inspector when navigating: the objects open in the inspector close when you go to another page. Off by default: they stay open, as their tabs. The choice is kept in this browser' },
         ],
       },
       {

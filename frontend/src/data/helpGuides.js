@@ -407,7 +407,7 @@ Tick two certificates in the list and click **Compare** in the selection bar to 
 - **Sorting**: By name, expiry date, creation date, status
 - **Columns**: Common name, description, state, issuer, source, expiry and key algorithm by default; the **Columns** button adds the compliance grade, the hybrid link and the creation date
 - **Row actions**: Export on the row; the other actions in the inspector a click on the row opens: Export and Renew in its heading, Rename, Revoke, Delete and the rest in its ⋯ menu
-- **Inspector**: opens under the list, inside the page margins, or on its right from 1400 px wide. A certificate opened from another page (the search, an approval, an authority) comes here, in this inspector. Drag its edge or use the arrow keys on it to resize it, fold it to its tab strip, enlarge it. Open certificates stay as tabs; those that do not fit go into a +N menu. Its tabs are Overview, Chain, Extensions, History and PEM; History lists the dates of the record and, with read:audit, the audit entries of this certificate among the latest 100 on certificates
+- **Inspector**: opens under the list, inside the page margins, or on its right from 1200 px wide; its place and size follow your account on every page. A certificate opened from another page (the search, an approval, an authority) comes here, in this inspector. Drag its edge or use the arrow keys on it to resize it, fold it to its tab strip, enlarge it. Open certificates stay as tabs; those that do not fit go into a +N menu. Its tabs are Overview, Chain, Extensions, History and PEM; History lists the dates of the record and, with read:audit, the audit entries of this certificate among the latest 100 on certificates
 
 ## Conformance linting
 
