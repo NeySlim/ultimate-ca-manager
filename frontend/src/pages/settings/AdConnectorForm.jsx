@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { TestTube, FloppyDisk, Plus, Trash, CheckCircle, XCircle } from '@phosphor-icons/react'
-import { Button, Input, Textarea } from '../../components'
+import { Btn, Icon, Props } from '../../components/atelier'
+import { Input, NumberInput, SecretInput, Textarea, ToggleSwitch } from '../../components/atelier/Form'
 import { formatDate } from '../../lib/utils'
 import { adConnectorsService } from '../../services'
 import { useNotification } from '../../contexts'
@@ -109,171 +109,82 @@ export default function AdConnectorForm({ config, onSave, onCancel }) {
 
   const resultFor = (host) => testResults?.find(r => r.server === host.trim())
 
+  // The mockup's dialog form: fields in `.form-fields`, the domain controllers as rows, the test, then the actions
   return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4">
-      <Input
-        label={t('adConnector.name')}
-        value={formData.name}
-        onChange={(e) => updateField('name', e.target.value)}
-        placeholder={t('adConnector.namePlaceholder')}
-        maxLength={100}
-        required
-      />
-      {config?.id && (
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-          <dt className="text-text-secondary">{t('adConnector.realm')}</dt>
-          <dd className="font-mono text-text-primary">{config.realm || '-'}</dd>
-          <dt className="text-text-secondary">{t('adConnector.domainSid')}</dt>
-          <dd className="font-mono text-text-primary break-all">{config.domain_sid || t('adConnector.domainSidUnknown')}</dd>
-        </dl>
-      )}
-      <div className="space-y-2">
-        <label className="block text-xs font-medium text-text-secondary leading-[20px]">
-          <span className="flex items-center gap-1 h-[20px]">
-            {t('adConnector.servers')}
-            <span className="status-danger-text">*</span>
-          </span>
-        </label>
-        <p className="text-xs text-text-tertiary">{t('adConnector.serversHint')}</p>
-        {rows.map((row) => {
-          const host = row.value.trim()
-          const result = host ? resultFor(host) : null
-          const probed = !result && host ? health[host] : null
-          return (
-            <div key={row.id}>
-              <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
-                <Input
-                  value={row.value}
-                  onChange={(e) => updateRow(row.id, e.target.value)}
-                  placeholder={t('adConnector.serverPlaceholder')}
-                  required={!servers.length}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => removeRow(row.id)}
-                  disabled={rows.length === 1}
-                  aria-label={t('common.remove')}
-                >
-                  <Trash size={14} className="text-status-danger" />
-                </Button>
-              </div>
-              {result && (
-                <p className={`flex items-start gap-1 mt-1 text-xs ${result.success ? 'text-status-success' : 'text-status-danger'}`}>
-                  {result.success
-                    ? <CheckCircle size={14} weight="bold" className="shrink-0 mt-px" />
-                    : <XCircle size={14} weight="bold" className="shrink-0 mt-px" />}
-                  <span className="break-all">{result.message}</span>
-                </p>
-              )}
-              {probed && (
-                <p className={`flex items-start gap-1 mt-1 text-xs ${probed.healthy ? 'text-status-success' : 'text-status-danger'}`}>
-                  {probed.healthy
-                    ? <CheckCircle size={14} weight="bold" className="shrink-0 mt-px" />
-                    : <XCircle size={14} weight="bold" className="shrink-0 mt-px" />}
-                  <span className="break-all">
-                    {probed.healthy
-                      ? t('adConnector.healthUp')
-                      : t('adConnector.healthDown', { since: formatDate(probed.since) })}
-                  </span>
-                </p>
-              )}
-            </div>
-          )
-        })}
-        <Button type="button" size="sm" variant="secondary" onClick={addRow}>
-          <Plus size={14} /> {t('adConnector.addServer')}
-        </Button>
-      </div>
+    <form onSubmit={handleSubmit}>
+      <div className="form-fields">
+        <Input id="ad-name" label={t('adConnector.name')} value={formData.name} onChange={(e) => updateField('name', e.target.value)}
+          placeholder={t('adConnector.namePlaceholder')} maxLength={100} required data-autofocus="" />
+        {config?.id && (
+          <div className="field full">
+            <Props items={[
+              [t('adConnector.realm'), <span key="r" className="mono">{config.realm || '—'}</span>],
+              [t('adConnector.domainSid'), <span key="s" className="mono">{config.domain_sid || t('adConnector.domainSidUnknown')}</span>],
+            ]} />
+          </div>
+        )}
+        <fieldset className="field full" aria-describedby="hint-ad-servers">
+          <legend>{t('adConnector.servers')}</legend>
+          <small id="hint-ad-servers">{t('adConnector.serversHint')}</small>
+          <div className="row-list">
+            {rows.map((row, index) => {
+              const host = row.value.trim()
+              const result = host ? resultFor(host) : null
+              const probed = !result && host ? health[host] : null
+              const state = result ? { ok: result.success, text: result.message }
+                : probed ? { ok: probed.healthy, text: probed.healthy ? t('adConnector.healthUp') : t('adConnector.healthDown', { since: formatDate(probed.since) }) }
+                  : null
+              return (
+                <div key={row.id}>
+                  <div className="inline-row">
+                    <label className="sr-only" htmlFor={`ad-server-${row.id}`}>{`${t('adConnector.servers')} ${index + 1}`}</label>
+                    <input id={`ad-server-${row.id}`} value={row.value} onChange={(e) => updateRow(row.id, e.target.value)}
+                      placeholder={t('adConnector.serverPlaceholder')} required={!servers.length} autoComplete="off" spellCheck={false} />
+                    <button type="button" className="icon-btn" aria-label={t('common.remove')} title={t('common.remove')}
+                      disabled={rows.length === 1 || undefined} onClick={() => removeRow(row.id)}>
+                      <Icon name="close" />
+                    </button>
+                  </div>
+                  {state && (
+                    <p className={`test-result ${state.ok ? 'good' : 'bad'}`}><Icon name={state.ok ? 'check' : 'warning'} /><span>{state.text}</span></p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          <button type="button" className="btn quiet add-row" onClick={addRow}><Icon name="plus" />{t('adConnector.addServer')}</button>
+        </fieldset>
 
-      <Input
-        label={t('adConnector.port')}
-        type="number"
-        value={formData.port}
-        onChange={(e) => updateField('port', parseInt(e.target.value, 10) || 389)}
-        required
-      />
-
-      <Input
-        label={t('adConnector.probeInterval')}
-        type="number"
-        min={60}
-        max={86400}
-        value={formData.health_probe_interval}
-        onChange={(e) => updateField('health_probe_interval', parseInt(e.target.value, 10) || 120)}
-        helperText={t('adConnector.probeIntervalHint')}
-        required
-      />
-
-      <div className="flex items-center gap-4">
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={formData.use_ssl} onChange={(e) => updateField('use_ssl', e.target.checked)} className="rounded" />
-          {t('adConnector.useSsl')}
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={formData.verify_ssl} onChange={(e) => updateField('verify_ssl', e.target.checked)} className="rounded" />
-          {t('adConnector.verifySsl')}
-        </label>
-      </div>
-
-      {formData.verify_ssl && (
-        <Textarea
-          label={t('adConnector.caBundle')}
-          value={formData.ca_bundle}
-          onChange={(e) => updateField('ca_bundle', e.target.value)}
-          rows={3}
-          placeholder="-----BEGIN CERTIFICATE-----"
-          className="font-mono text-xs"
-        />
-      )}
-
-      <Input
-        label={t('adConnector.baseDn')}
-        value={formData.base_dn}
-        onChange={(e) => updateField('base_dn', e.target.value)}
-        placeholder={t('adConnector.baseDnPlaceholder')}
-        required
-      />
-      {/* The switch asks for both, the same rule the API applies. A
-          blank password on a stored one means "unchanged", and handleSubmit
-          drops it from the payload. */}
-      <Input
-        label={t('adConnector.bindDn')}
-        value={formData.bind_dn}
-        onChange={(e) => updateField('bind_dn', e.target.value)}
-        placeholder={t('adConnector.bindDnPlaceholder')}
-        required={formData.enabled}
-      />
-      <Input
-        label={t('adConnector.bindPassword')}
-        type="password"
-        value={formData.bind_password}
-        onChange={(e) => updateField('bind_password', e.target.value)}
-        required={formData.enabled && !config?.bind_password}
-        hasExistingValue={Boolean(config?.bind_password)}
-        {...secretInputProps(t, secretTarget)}
-      />
-
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={formData.enabled} onChange={(e) => updateField('enabled', e.target.checked)} className="rounded" />
-        {t('common.enabled')}
-      </label>
-
-      <div className="flex justify-between gap-2 pt-4 border-t border-border">
-        <Button type="button" variant="secondary" onClick={handleTestConnection} disabled={!servers.length || testing}>
-          <TestTube size={16} />
-          {testing ? t('common.testing') : t('adConnector.testConnection')}
-        </Button>
-        <div className="flex gap-2">
-          <Button type="button" variant="secondary" onClick={onCancel}>
-            {t('common.cancel')}
-          </Button>
-          <Button type="submit">
-            <FloppyDisk size={16} />
-            {t('common.save')}
-          </Button>
+        <NumberInput id="ad-port" label={t('adConnector.port')} value={formData.port}
+          onChange={(e) => updateField('port', parseInt(e.target.value, 10) || 389)} required />
+        <NumberInput id="ad-probe" label={t('adConnector.probeInterval')} value={formData.health_probe_interval}
+          onChange={(e) => updateField('health_probe_interval', parseInt(e.target.value, 10) || 120)} hint={t('adConnector.probeIntervalHint')} required />
+        <ToggleSwitch checked={formData.use_ssl} onChange={(v) => updateField('use_ssl', v)} label={t('adConnector.useSsl')} />
+        <ToggleSwitch checked={formData.verify_ssl} onChange={(v) => updateField('verify_ssl', v)} label={t('adConnector.verifySsl')} />
+        {formData.verify_ssl && (
+          <Textarea id="ad-ca-bundle" label={t('adConnector.caBundle')} value={formData.ca_bundle} onChange={(e) => updateField('ca_bundle', e.target.value)}
+            rows={3} placeholder="-----BEGIN CERTIFICATE-----" mono />
+        )}
+        <Input id="ad-base-dn" full label={t('adConnector.baseDn')} value={formData.base_dn} onChange={(e) => updateField('base_dn', e.target.value)}
+          placeholder={t('adConnector.baseDnPlaceholder')} required />
+        {/* The switch asks for both, the same rule the API applies. A blank password on a stored
+            one means "unchanged", and handleSubmit drops it from the payload. */}
+        <Input id="ad-bind-dn" label={t('adConnector.bindDn')} value={formData.bind_dn} onChange={(e) => updateField('bind_dn', e.target.value)}
+          placeholder={t('adConnector.bindDnPlaceholder')} required={formData.enabled} />
+        <SecretInput id="ad-bind-password" label={t('adConnector.bindPassword')} value={formData.bind_password}
+          onChange={(e) => updateField('bind_password', e.target.value)} required={formData.enabled && !config?.bind_password}
+          hasExistingValue={Boolean(config?.bind_password)} {...secretInputProps(t, secretTarget)} />
+        <ToggleSwitch checked={formData.enabled} onChange={(v) => updateField('enabled', v)} label={t('common.enabled')} />
+        <div className="settings-test">
+          <Btn icon="send" onClick={handleTestConnection} disabled={!servers.length || testing || undefined}>
+            {testing ? t('common.testing') : t('adConnector.testConnection')}
+          </Btn>
         </div>
+      </div>
+
+      <div className="modal-actions">
+        <button type="button" className="btn" data-action="close-modal" onClick={onCancel}>{t('common.cancel')}</button>
+        <Btn type="submit" tone="primary" icon="check">{t('common.save')}</Btn>
       </div>
     </form>
   )

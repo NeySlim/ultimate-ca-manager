@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key) => key }),
@@ -19,20 +19,6 @@ vi.mock('../../../services', () => ({
     getTargets: vi.fn().mockResolvedValue({ data: [] }),
   },
   policiesService: { getEffective },
-}))
-
-vi.mock('../../../components', () => ({
-  Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-  Badge: ({ children }) => <span>{children}</span>,
-  HelpCard: ({ children }) => <div>{children}</div>,
-  DetailSection: ({ children }) => <section>{children}</section>,
-  DetailContent: ({ children }) => <div>{children}</div>,
-  DetailHeader: ({ title }) => <header>{title}</header>,
-  EmptyState: ({ action }) => <button onClick={action.onClick}>{action.label}</button>,
-}))
-
-vi.mock('../../../components/Modal', () => ({
-  Modal: ({ open, children }) => open ? <div role="dialog">{children}</div> : null,
 }))
 
 import DeploySection from '../DeploySection'
@@ -87,7 +73,7 @@ describe('DeploySection HTTP API target (#428)', () => {
     const dialog = screen.getByRole('dialog')
     const inputs = dialog.querySelectorAll('input, textarea, select')
     const byPlaceholder = (fragment) => [...inputs].find(el => (el.placeholder || '').includes(fragment))
-    fireEvent.change(inputs[0], { target: { value: 'fw' } })
+    fireEvent.change(screen.getByLabelText('common.name'), { target: { value: 'fw' } })
     fireEvent.change(byPlaceholder('/api/trust/cert/add'), { target: { value: 'https://fw.example.net/api/x' } })
     fireEvent.change(byPlaceholder('Authorization'), { target: { value: 'X-Api-Key: k' } })
     fireEvent.change(byPlaceholder('{{name|json}}'), { target: { value: '{"cert": {{cert_pem|json}}}' } })
@@ -115,10 +101,9 @@ describe('DeploySection HTTP API target (#428)', () => {
     expect(screen.getByText('deploy.httpSendsKey')).toBeInTheDocument()
     expect(screen.queryByTitle('deploy.showPublicKey')).not.toBeInTheDocument()
 
-    const buttons = screen.getAllByRole('button')
-    fireEvent.click(buttons.find(b => b.textContent === '' && !b.title) || buttons[2])
+    fireEvent.click(screen.getByRole('button', { name: 'common.edit' }))
     const dialog = await screen.findByRole('dialog')
-    expect(screen.queryByText('deploy.kind_http')).not.toBeInTheDocument()  // the kind is fixed after creation
+    expect(within(dialog).queryByText('deploy.kind_http')).not.toBeInTheDocument()  // the kind is fixed after creation
     fireEvent.submit(dialog.querySelector('form'))
     await vi.waitFor(() => expect(deployService.updateTarget).toHaveBeenCalled())
     const [id, payload] = deployService.updateTarget.mock.calls[0]
@@ -137,8 +122,7 @@ describe('DeploySection HTTP API target (#428)', () => {
     deployService.updateTarget = vi.fn().mockResolvedValue({ data: {} })
     render(<DeploySection />)
     await screen.findByText('POST https://fw.example.net/api')
-    const buttons = screen.getAllByRole('button')
-    fireEvent.click(buttons.find(b => b.textContent === '' && !b.title) || buttons[2])
+    fireEvent.click(screen.getByRole('button', { name: 'common.edit' }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(screen.getByText('common.remove'))
     expect(screen.getByText('deploy.httpHeadersRemoved')).toBeInTheDocument()

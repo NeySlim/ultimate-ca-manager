@@ -1,24 +1,22 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CheckCircle, WarningCircle, XCircle } from '@phosphor-icons/react'
-import { Badge, Input, HelpCard } from '../../components'
-import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
+import { Pill, RecordList } from '../../components/atelier'
+import { Input, ToggleSwitch, Notice } from '../../components/atelier/Form'
+import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { windowsProfilesService } from '../../services'
 import { useNotification } from '../../contexts'
 import { groupEntriesByRealm } from '../../lib/windowsProfile'
 import CopyableUrl from './CopyableUrl'
-import { FormGroup, useSavePart, keptPartDraft } from '../../components/sectioned'
+import { useSavePart, keptPartDraft } from '../../components/sectioned'
 
 function KeytabStatus({ settings, t }) {
   if (!settings.keytab_set) return null
   if (!settings.keytab_valid) {
-    return <Badge variant="danger" icon={XCircle}>{t('xcepWstep.keytabInvalid', { error: settings.keytab_error })}</Badge>
+    return <Pill tone="bad" label={t('xcepWstep.keytabInvalid', { error: settings.keytab_error })} />
   }
   const realms = groupEntriesByRealm(settings.keytab_entries).map(g => g.realm)
   return (
-    <Badge variant="success" icon={CheckCircle}>
-      {t('xcepWstep.keytabServed', { count: (settings.keytab_entries || []).length, realms: realms.join(', ') })}
-    </Badge>
+    <Pill tone="good" label={t('xcepWstep.keytabServed', { count: (settings.keytab_entries || []).length, realms: realms.join(', ') })} />
   )
 }
 
@@ -96,72 +94,42 @@ export default function WindowsSettingsPanel({ hasPermission, onLoaded }) {
 
   return (
     <>
-      <FormGroup title={t('xcepWstep.sharedTitle')}>
-        <div className="space-y-4">
-          <p className="text-xs text-text-secondary">{t('xcepWstep.sharedDescription')}</p>
-
-          {defaultWithoutRealm && (
-            <HelpCard variant="warning" title={t('xcepWstep.noRealmTitle')}>
-              {t('xcepWstep.noRealmKerberosRefused', { name: defaultProfile.name })}
-            </HelpCard>
-          )}
-          {hasKerberos && !settings.library_available && (
-            <HelpCard variant="warning" title={t('xcepWstep.kerberosLibraryWarningTitle')}>
-              <p>{t('xcepWstep.kerberosLibraryWarningDesc')}</p>
-              <p className="mt-2">{t('xcepWstep.kerberosLibraryWarningFix')}</p>
-              <code className="block mt-1 text-xs font-mono text-text-primary bg-bg-tertiary px-2 py-1.5 rounded break-all">
-                apt-get install libkrb5-dev build-essential python3-dev && pip install pyspnego[kerberos]
-              </code>
-            </HelpCard>
-          )}
-
-          <ToggleSwitch
-            label={t('xcepWstep.xcepTitle')}
-            description={t('xcepWstep.xcepDescription')}
-            checked={Boolean(draft.xcep_enabled)}
-            disabled={!canWrite}
-            onChange={set('xcep_enabled')}
-          />
-          {hasWstep && (
-            <ToggleSwitch
-              label={t('xcepWstep.wstepTitle')}
-              description={t('xcepWstep.wstepDescription')}
-              checked={Boolean(draft.wstep_enabled)}
-              disabled={!hasPermission('write:wstep')}
-              onChange={set('wstep_enabled')}
-            />
-          )}
-          {hasKerberos && (
-            <>
-              <ToggleSwitch
-                label={t('xcepWstep.kerberosTitle')}
-                description={t('xcepWstep.kerberosDescription')}
-                checked={Boolean(draft.kerberos_enabled)}
-                disabled={!hasPermission('write:kerberos')}
-                onChange={set('kerberos_enabled')}
-              />
-              <Input
-                label={t('xcepWstep.spn')}
-                value={draft.kerberos_spn}
-                disabled={!hasPermission('write:kerberos')}
-                onChange={(e) => set('kerberos_spn')(e.target.value)}
-                placeholder={t('xcepWstep.spnPlaceholder')}
-              />
-              <div className="flex items-center gap-2 flex-wrap">
+      <SettingsGroup legend={t('xcepWstep.sharedTitle')} hint={t('xcepWstep.sharedDescription')}>
+        {defaultWithoutRealm && (
+          <Notice tone="warn"><strong>{t('xcepWstep.noRealmTitle')}</strong>{' '}{t('xcepWstep.noRealmKerberosRefused', { name: defaultProfile.name })}</Notice>
+        )}
+        {hasKerberos && !settings.library_available && (
+          <Notice tone="warn">
+            <strong>{t('xcepWstep.kerberosLibraryWarningTitle')}</strong>{' '}{t('xcepWstep.kerberosLibraryWarningDesc')}{' '}{t('xcepWstep.kerberosLibraryWarningFix')}
+            <span className="command-line"><code>apt-get install libkrb5-dev build-essential python3-dev && pip install pyspnego[kerberos]</code></span>
+          </Notice>
+        )}
+        <ToggleSwitch label={t('xcepWstep.xcepTitle')} description={t('xcepWstep.xcepDescription')}
+          checked={Boolean(draft.xcep_enabled)} disabled={!canWrite} onChange={set('xcep_enabled')} />
+        {hasWstep && (
+          <ToggleSwitch label={t('xcepWstep.wstepTitle')} description={t('xcepWstep.wstepDescription')}
+            checked={Boolean(draft.wstep_enabled)} disabled={!hasPermission('write:wstep')} onChange={set('wstep_enabled')} />
+        )}
+        {hasKerberos && (
+          <>
+            <ToggleSwitch label={t('xcepWstep.kerberosTitle')} description={t('xcepWstep.kerberosDescription')}
+              checked={Boolean(draft.kerberos_enabled)} disabled={!hasPermission('write:kerberos')} onChange={set('kerberos_enabled')} />
+            <Input id="set-kerberos_spn" label={t('xcepWstep.spn')} value={draft.kerberos_spn} disabled={!hasPermission('write:kerberos')}
+              onChange={(e) => set('kerberos_spn')(e.target.value)} placeholder={t('xcepWstep.spnPlaceholder')} />
+            <div className="field">
+              <span>{t('xcepWstep.keytab')}</span>
+              <span className="row-actions">
                 <KeytabStatus settings={settings} t={t} />
-                {!settings.keytab_set && (
-                  <Badge variant="warning" icon={WarningCircle}>{t('xcepWstep.keytabNoneServed')}</Badge>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      </FormGroup>
+                {!settings.keytab_set && <Pill tone="warn" label={t('xcepWstep.keytabNoneServed')} />}
+              </span>
+            </div>
+          </>
+        )}
+      </SettingsGroup>
 
       {settings.xcep_enabled && (
-        <FormGroup title={t('xcepWstep.urlsTitle')}>
-          <div className="space-y-3">
-            <p className="text-xs text-text-secondary">{t('xcepWstep.urlsRoutedByRealm')}</p>
+        <SettingsGroup legend={t('xcepWstep.urlsTitle')} hint={t('xcepWstep.urlsRoutedByRealm')} grid={false}>
+          <RecordList>
             <CopyableUrl
               label={t('xcepWstep.urlUsernamePassword')}
               value={`${baseUrl}/ADPolicyProvider_CEP_UsernamePassword/service.svc`}
@@ -172,8 +140,8 @@ export default function WindowsSettingsPanel({ hasPermission, onLoaded }) {
               value={`${baseUrl}/ADPolicyProvider_CEP_Kerberos/service.svc`}
               description={t('xcepWstep.urlKerberosDesc')}
             />
-          </div>
-        </FormGroup>
+          </RecordList>
+        </SettingsGroup>
       )}
     </>
   )

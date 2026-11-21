@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CheckCircle, XCircle } from '@phosphor-icons/react'
-import { Button, Badge, Input } from '../../components'
-import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
+import { Btn } from '../../components/atelier'
+import { Input, ToggleSwitch } from '../../components/atelier/Form'
 import { ssoService, rolesService } from '../../services'
 import { useNotification } from '../../contexts'
 import { secretInputProps, secretRequiredForTarget } from '../../lib/secretTarget'
@@ -313,12 +312,6 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     { value: 'viewer', label: t('common.viewer') },
   ]
 
-  const connectionBadge = connectionStatus === 'success'
-    ? <Badge variant="success" size="sm" className="ml-2"><CheckCircle size={12} weight="bold" className="mr-1" />{t('sso.testConnectionSuccess')}</Badge>
-    : connectionStatus === 'error'
-    ? <Badge variant="danger" size="sm" className="ml-2"><XCircle size={12} weight="bold" className="mr-1" />{t('sso.testConnectionFailed')}</Badge>
-    : null
-
   const isLdap = formData.provider_type === 'ldap'
   const isOauth2 = formData.provider_type === 'oauth2'
   const isSaml = formData.provider_type === 'saml'
@@ -328,90 +321,61 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
   // A sign-in test runs on the saved provider: the screen says so when the form differs
   const dirty = JSON.stringify(formData) !== JSON.stringify(savedForm)
 
-  const sharedProps = { formData, handleChange, provider, testingConnection, connectionBadge, roleOptions, defaultRoleOptions, customRoles, handleTestConnection, dirty,
+  const sharedProps = { formData, handleChange, provider, testingConnection, connectionStatus, roleOptions, defaultRoleOptions, customRoles, handleTestConnection, dirty,
     secretProps: secretTarget ? secretInputProps(t, secretTarget) : {} }
 
+  // The mockup's dialog form: the fields in `.form-fields`, each part of the provider folded, then the actions
   return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4">
-      {/* General Settings */}
-      <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-4">
-          <Input
-            label={t('common.providerName')}
-            value={formData.name}
-            onChange={e => handleChange('name', e.target.value)}
-            required
-            placeholder={t('sso.providerNamePlaceholder')}
+    <form onSubmit={handleSubmit}>
+      <div className="form-fields">
+        <Input id="sso-name" label={t('common.providerName')} value={formData.name} onChange={e => handleChange('name', e.target.value)}
+          required placeholder={t('sso.providerNamePlaceholder')} data-autofocus="" />
+        <Input id="sso-display-name" label={t('sso.displayName')} value={formData.display_name} onChange={e => handleChange('display_name', e.target.value)}
+          placeholder={t('sso.displayNamePlaceholder')} />
+        <ToggleSwitch checked={formData.enabled} onChange={(val) => handleChange('enabled', val)} label={t('common.enableProvider')} />
+        <ToggleSwitch checked={formData.is_default} onChange={(val) => handleChange('is_default', val)} label={t('sso.isDefault')} />
+        <ToggleSwitch checked={formData.enforce_2fa} onChange={(val) => handleChange('enforce_2fa', val)}
+          label={t('sso.enforce2fa')} description={t('sso.enforce2faHelp')} />
+
+        {isLdap && (
+          <SsoLdapFields
+            {...sharedProps}
+            testMappingUsername={testMappingUsername}
+            setTestMappingUsername={setTestMappingUsername}
+            testingMapping={testingMapping}
+            testMappingResult={testMappingResult}
+            handleTestMapping={handleTestMapping}
+            setFormData={setFormData}
           />
-          <Input
-            label={t('sso.displayName')}
-            value={formData.display_name}
-            onChange={e => handleChange('display_name', e.target.value)}
-            placeholder={t('sso.displayNamePlaceholder')}
+        )}
+
+        {isOauth2 && (
+          <SsoOAuth2Fields
+            {...sharedProps}
+            oauth2Preset={oauth2Preset}
+            applyOAuth2Preset={applyOAuth2Preset}
+            oauthCallbackUrl={oauthCallbackUrl}
           />
-        </div>
-        <div className="flex gap-6">
-          <ToggleSwitch
-            checked={formData.enabled}
-            onChange={(val) => handleChange('enabled', val)}
-            label={t('common.enableProvider')}
+        )}
+
+        {isSaml && (
+          <SsoSamlFields
+            {...sharedProps}
+            fetchingMetadata={fetchingMetadata}
+            fetchIdpMetadata={fetchIdpMetadata}
+            availableCerts={availableCerts}
+            spEntityId={spEntityId}
+            spMetadataUrl={spInfo?.metadata_url || `${baseUrl}/api/v2/sso/saml/metadata`}
+            spOriginUnconfigured={spInfo ? !spInfo.origin_configured : false}
+            samlAcsUrl={samlAcsUrl}
+            samlSloUrl={samlSloUrl}
           />
-          <ToggleSwitch
-            checked={formData.is_default}
-            onChange={(val) => handleChange('is_default', val)}
-            label={t('sso.isDefault')}
-          />
-        </div>
-        <ToggleSwitch
-          checked={formData.enforce_2fa}
-          onChange={(val) => handleChange('enforce_2fa', val)}
-          label={t('sso.enforce2fa')}
-          description={t('sso.enforce2faHelp')}
-        />
+        )}
       </div>
 
-      {isLdap && (
-        <SsoLdapFields
-          {...sharedProps}
-          testMappingUsername={testMappingUsername}
-          setTestMappingUsername={setTestMappingUsername}
-          testingMapping={testingMapping}
-          testMappingResult={testMappingResult}
-          handleTestMapping={handleTestMapping}
-          setFormData={setFormData}
-        />
-      )}
-
-      {isOauth2 && (
-        <SsoOAuth2Fields
-          {...sharedProps}
-          oauth2Preset={oauth2Preset}
-          applyOAuth2Preset={applyOAuth2Preset}
-          oauthCallbackUrl={oauthCallbackUrl}
-        />
-      )}
-
-      {isSaml && (
-        <SsoSamlFields
-          {...sharedProps}
-          fetchingMetadata={fetchingMetadata}
-          fetchIdpMetadata={fetchIdpMetadata}
-          availableCerts={availableCerts}
-          spEntityId={spEntityId}
-          spMetadataUrl={spInfo?.metadata_url || `${baseUrl}/api/v2/sso/saml/metadata`}
-          spOriginUnconfigured={spInfo ? !spInfo.origin_configured : false}
-          samlAcsUrl={samlAcsUrl}
-          samlSloUrl={samlSloUrl}
-        />
-      )}
-
-      <div className="flex justify-end gap-2 pt-4 border-t border-border">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          {t('common.cancel')}
-        </Button>
-        <Button type="submit">
-          {provider ? t('common.save') : t('common.create')}
-        </Button>
+      <div className="modal-actions">
+        <button type="button" className="btn" data-action="close-modal" onClick={onCancel}>{t('common.cancel')}</button>
+        <Btn type="submit" tone="primary" icon="check">{provider ? t('common.save') : t('common.create')}</Btn>
       </div>
     </form>
   )

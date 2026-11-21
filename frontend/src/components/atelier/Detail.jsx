@@ -16,9 +16,9 @@ export function Props({ items }) {
 }
 
 /** The records, or `empty` in a muted sentence when there are none. */
-export function RecordList({ children, empty }) {
+export function RecordList({ children, empty, label }) {
   const list = [].concat(children || []).filter(Boolean)
-  return list.length ? <ul className="record-list">{list}</ul> : <p className="muted small">{empty}</p>
+  return list.length ? <ul className="record-list" aria-label={label}>{list}</ul> : <p className="muted small">{empty}</p>
 }
 
 export function RecordRow({ title, meta, badge, action, extra }) {

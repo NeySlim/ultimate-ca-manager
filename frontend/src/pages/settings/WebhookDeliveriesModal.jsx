@@ -1,28 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowsClockwise, ArrowClockwise, CaretLeft, CaretRight } from '@phosphor-icons/react'
-import { Modal, Button, Badge } from '../../components'
+import { Btn, Icon, Pill, RecordList, RecordRow, TableFooter } from '../../components/atelier'
+import { Modal, SegmentedField } from '../../components/atelier/Form'
 import { useNotification } from '../../contexts'
 import { settingsService } from '../../services'
+import { relativeAgo, relativeDue } from '../../lib/relativeTime'
 
 const PER_PAGE = 25
-const STATUS_VARIANT = { delivered: 'success', failed: 'danger', pending: 'warning' }
-
-function rel(iso) {
-  if (!iso) return '—'
-  const d = Date.now() - new Date(iso).getTime()
-  const future = d < 0
-  const s = Math.abs(d) / 1000
-  let t
-  if (s < 60) t = '<1 min'
-  else if (s < 3600) t = `${Math.round(s / 60)} min`
-  else if (s < 86400) t = `${Math.round(s / 3600)} h`
-  else t = `${Math.round(s / 86400)} d`
-  return future ? `in ${t}` : `${t} ago`
-}
+const STATUS_TONE = { delivered: 'good', failed: 'bad', pending: 'warn' }
 
 export default function WebhookDeliveriesModal({ webhook, onClose, canRetry }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { showSuccess, showError } = useNotification()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
@@ -66,92 +54,54 @@ export default function WebhookDeliveriesModal({ webhook, onClose, canRetry }) {
     }
   }
 
+  const number = new Intl.NumberFormat(i18n?.language || undefined)
+  const when = (d) => (d.status === 'delivered' ? relativeAgo(d.delivered_at, t)
+    : d.status === 'pending' ? `${t('webhooks.deliveries.next')} ${relativeDue(d.next_attempt_at, t)}`
+      : relativeAgo(d.created_at, t)) || '—'
+
+  // The mockup's dialog: the state as a segmented choice, the deliveries as records, the table footer to page them
   return (
-    <Modal open={!!webhook} onClose={onClose}
+    <Modal open={!!webhook} onClose={onClose} size="lg"
            title={webhook ? t('webhooks.deliveries.title', { name: webhook.name }) : ''}>
-      <div className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex gap-1">
-            {['', 'pending', 'delivered', 'failed'].map((s) => (
-              <Button key={s || 'all'} type="button" size="sm"
-                      variant={statusFilter === s ? 'primary' : 'secondary'}
-                      onClick={() => { setStatusFilter(s); setPage(1) }}>
-                {s ? t(`webhooks.deliveries.status.${s}`) : t('common.all')}
-              </Button>
-            ))}
-          </div>
-          <Button type="button" size="sm" variant="secondary" onClick={load}>
-            <ArrowsClockwise size={14} />{t('common.refresh')}
-          </Button>
+      <div className="settings-stack">
+        <div className="settings-actions">
+          <SegmentedField id="webhook-deliveries-status" full={false} label={t('webhooks.deliveries.statusCol')}
+            options={['', 'pending', 'delivered', 'failed'].map((s) => ({ value: s, label: s ? t(`webhooks.deliveries.status.${s}`) : t('common.all') }))}
+            pressed={(s) => statusFilter === s} onPick={(s) => { setStatusFilter(s); setPage(1) }} />
+          <Btn icon="refresh" onClick={load}>{t('common.refresh')}</Btn>
         </div>
 
         {loading ? (
-          <div className="p-6 text-center text-sm text-text-secondary">{t('common.loading')}</div>
-        ) : items.length === 0 ? (
-          <div className="p-6 text-center text-sm text-text-secondary">{t('webhooks.deliveries.empty')}</div>
+          <p className="muted small" role="status">{t('common.loading')}</p>
         ) : (
-          <div className="max-h-[55vh] overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-bg-secondary">
-                <tr className="text-left text-xs text-text-tertiary border-b border-border-op30">
-                  <th className="py-2 pr-3 font-medium">{t('webhooks.deliveries.event')}</th>
-                  <th className="py-2 px-3 font-medium">{t('webhooks.deliveries.statusCol')}</th>
-                  <th className="py-2 px-3 font-medium text-right">{t('webhooks.deliveries.attempts')}</th>
-                  <th className="py-2 px-3 font-medium">{t('webhooks.deliveries.when')}</th>
-                  {canRetry && <th className="py-2 pl-3" />}
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((d) => (
-                  <tr key={d.id} className="border-b border-border-op30 last:border-0 align-top">
-                    <td className="py-2 pr-3 font-mono text-xs text-text-primary">{d.event_type}</td>
-                    <td className="py-2 px-3">
-                      <Badge variant={STATUS_VARIANT[d.status] || 'secondary'} size="sm">{d.status}</Badge>
-                      {d.last_error && (
-                        <p className="text-xs text-status-warning mt-1 font-mono max-w-[260px] truncate" title={d.last_error}>
-                          {d.last_response_code ? `${d.last_response_code} · ` : ''}{d.last_error}
-                        </p>
-                      )}
-                    </td>
-                    <td className="py-2 px-3 text-right text-text-secondary tabular-nums">{d.attempts}/{d.max_attempts}</td>
-                    <td className="py-2 px-3 text-text-secondary whitespace-nowrap">
-                      {d.status === 'delivered' ? rel(d.delivered_at)
-                        : d.status === 'pending' ? `${t('webhooks.deliveries.next')} ${rel(d.next_attempt_at)}`
-                        : rel(d.created_at)}
-                    </td>
-                    {canRetry && (
-                      <td className="py-2 pl-3 text-right">
-                        {d.status !== 'pending' && (
-                          <Button type="button" size="sm" variant="secondary"
-                                  onClick={() => handleRetry(d.id)} disabled={!!retrying[d.id]}>
-                            <ArrowClockwise size={13} />{t('webhooks.deliveries.retry')}
-                          </Button>
-                        )}
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <RecordList empty={t('webhooks.deliveries.empty')}>
+            {items.map((d) => (
+              <RecordRow key={d.id} title={<span className="mono">{d.event_type}</span>}
+                meta={`${when(d)} · ${t('webhooks.deliveries.attempts')} ${d.attempts}/${d.max_attempts}`}
+                extra={d.last_error && (
+                  <span className="rl-error" title={d.last_error}><Icon name="warning" /><span className="mono">{d.last_response_code ? `${d.last_response_code} · ` : ''}{d.last_error}</span></span>
+                )}
+                badge={<Pill tone={STATUS_TONE[d.status] || 'muted'} label={t(`webhooks.deliveries.status.${d.status}`, { defaultValue: d.status })} />}
+                action={canRetry && d.status !== 'pending' && (
+                  <Btn icon="refresh" write onClick={() => handleRetry(d.id)} disabled={!!retrying[d.id] || undefined}>{t('webhooks.deliveries.retry')}</Btn>
+                )} />
+            ))}
+          </RecordList>
         )}
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between text-xs text-text-secondary">
-            <span className="tabular-nums">{page} / {totalPages} ({total})</span>
-            <div className="flex gap-1">
-              <Button type="button" size="sm" variant="secondary" aria-label={t('common.back')}
-                      disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                <CaretLeft size={14} />
-              </Button>
-              <Button type="button" size="sm" variant="secondary" aria-label={t('common.next')}
-                      disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
-                <CaretRight size={14} />
-              </Button>
-            </div>
-          </div>
+          <PageFooter page={page} pages={totalPages} total={total} number={number} onPage={setPage} t={t} />
         )}
       </div>
     </Modal>
+  )
+}
+
+/** The table footer of the mockup: the range in words, previous, the page, next. */
+function PageFooter({ page, pages, total, number, onPage, t }) {
+  return (
+    <TableFooter
+      range={t('table.range', { start: number.format((page - 1) * PER_PAGE + 1), end: number.format(Math.min(page * PER_PAGE, total)), total })}
+      pagination={{ page, pages, onPage }} />
   )
 }

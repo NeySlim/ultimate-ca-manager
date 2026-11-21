@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Trash, Plus } from '@phosphor-icons/react'
-import { Button, Input, Select } from '../../components'
+import { Icon } from '../../components/atelier/Icon'
+import { FieldError } from '../../components/atelier/SettingsView'
 
 // A stored entry is a base-role string or {role, custom_role}. The string
 // form is kept whenever no custom role is chosen, so old payloads round-trip.
@@ -34,8 +34,13 @@ const repeatedRows = (rows) => {
   return repeated
 }
 
-export default function RoleMappingEditor({ value, onChange, keyLabel, keyPlaceholder, roleOptions = [], customRoles = [] }) {
+/**
+ * External group → base role and custom role, as MappingEditor's rows with a fourth column
+ * (`.ext-row.role-row`); the column names head the rows, each control is named by its row.
+ */
+export default function RoleMappingEditor({ value, onChange, legend, hint, keyLabel, keyPlaceholder, roleOptions = [], customRoles = [] }) {
   const { t } = useTranslation()
+  const uid = useId().replace(/:/g, '')
   const [rows, setRows] = useState(() => toRows(value))
   const lastEmitted = useRef(JSON.stringify(value || {}))
 
@@ -67,35 +72,41 @@ export default function RoleMappingEditor({ value, onChange, keyLabel, keyPlaceh
     const names = current && !customRoles.includes(current) ? [...customRoles, current] : customRoles
     return [none, ...names.map(n => ({ value: n, label: n }))]
   }
+  const options = (list) => list.map(o => <option key={o.value} value={o.value}>{o.label}</option>)
 
   return (
-    <div className="space-y-2">
-      <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 text-xs text-text-secondary">
-        <span>{keyLabel}</span><span>{t('sso.baseRole')}</span><span>{t('sso.customRole')}</span><span />
+    <fieldset className="field full" aria-describedby={hint ? `hint-${uid}` : undefined}>
+      {legend && <legend>{legend}</legend>}
+      {hint && <small id={`hint-${uid}`}>{hint}</small>}
+      <div className="row-list">
+        {rows.length > 0 && (
+          <div className="ext-row role-row row-head" aria-hidden="true">
+            <span>{keyLabel}</span><span>{t('sso.baseRole')}</span><span>{t('sso.customRole')}</span><span />
+          </div>
+        )}
+        {rows.map((row, i) => {
+          const duplicate = repeated.has(row.id) ? t('common.duplicateKey', { key: row.key }) : ''
+          const id = `${uid}-${row.id}`
+          return (
+            <div key={row.id} className="ext-row role-row">
+              <label className="sr-only" htmlFor={`${id}-key`}>{`${keyLabel} ${i + 1}`}</label>
+              <input id={`${id}-key`} name="extOid" ref={el => el?.setCustomValidity(duplicate)} value={row.key} placeholder={keyPlaceholder}
+                autoComplete="off" spellCheck={false} aria-invalid={duplicate ? 'true' : undefined}
+                aria-describedby={duplicate ? `err-${id}-key` : undefined}
+                onChange={e => updateRow(row.id, { key: e.target.value })} />
+              <label className="sr-only" htmlFor={`${id}-role`}>{`${t('sso.baseRole')} ${i + 1}`}</label>
+              <select id={`${id}-role`} value={row.role} onChange={e => updateRow(row.id, { role: e.target.value })}>{options(baseOptions)}</select>
+              <label className="sr-only" htmlFor={`${id}-custom`}>{`${t('sso.customRole')} ${i + 1}`}</label>
+              <select id={`${id}-custom`} value={row.custom} onChange={e => updateRow(row.id, { custom: e.target.value })}>{options(customOptionsFor(row.custom))}</select>
+              <button type="button" className="icon-btn" aria-label={t('common.remove')} title={t('common.remove')} onClick={() => removeRow(row.id)}>
+                <Icon name="close" />
+              </button>
+              {duplicate && <FieldError id={`err-${id}-key`} message={duplicate} />}
+            </div>
+          )
+        })}
       </div>
-      {rows.map(row => {
-        const duplicate = repeated.has(row.id) ? t('common.duplicateKey', { key: row.key }) : ''
-        return (
-        <div key={row.id} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-start">
-          <Input
-            ref={el => el?.setCustomValidity(duplicate)}
-            value={row.key}
-            onChange={e => updateRow(row.id, { key: e.target.value })}
-            placeholder={keyPlaceholder}
-            error={duplicate || undefined}
-            size="sm"
-          />
-          <Select value={row.role} onChange={role => updateRow(row.id, { role })} options={baseOptions} size="sm" />
-          <Select value={row.custom} onChange={custom => updateRow(row.id, { custom })} options={customOptionsFor(row.custom)} size="sm" />
-          <Button type="button" size="sm" variant="ghost" onClick={() => removeRow(row.id)} aria-label={t('common.remove')}>
-            <Trash size={14} className="text-status-danger" />
-          </Button>
-        </div>
-        )
-      })}
-      <Button size="sm" variant="secondary" onClick={addRow} type="button">
-        <Plus size={14} /> {t('common.add')}
-      </Button>
-    </div>
+      <button type="button" className="btn quiet add-row" onClick={addRow}><Icon name="plus" />{t('common.add')}</button>
+    </fieldset>
   )
 }

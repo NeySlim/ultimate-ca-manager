@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Pulse, CheckCircle, XCircle, Warning, ArrowsClockwise } from '@phosphor-icons/react'
-import { Modal } from './Modal'
-import { Button } from './Button'
-import { Badge } from './Badge'
+import { Btn, Props, RecordList, RecordRow, Section } from './atelier'
+import { Modal, Notice } from './atelier/Form'
 import { useNotification } from '../contexts'
 import { mscaService } from '../services'
 import { formatDate } from '../lib/utils'
@@ -38,9 +36,12 @@ export function MscaCaControlModal({ connection, open, onClose }) {
     }
   }, [connId, t, showError])
 
+  // Read when the dialog opens on a connection, not again each time `load` is rebuilt
+  const loadRef = useRef(load)
+  loadRef.current = load
   useEffect(() => {
-    if (open) load()
-  }, [open, load])
+    if (open) loadRef.current()
+  }, [open, connId])
 
   const handleApprove = async (rid) => {
     setBusyId(rid)
@@ -81,91 +82,39 @@ export function MscaCaControlModal({ connection, open, onClose }) {
   const caDays = health?.ca_cert?.days_until_expiry
   const crlExpired = health?.crl?.expired
 
+  // The mockup's dialog: the health as props, the warnings as notices, the pending requests as records
   return (
-    <Modal open={open} onClose={onClose}
-           title={t('msca.caControlTitle', { name: connection?.name || '' })}>
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-text-secondary">{t('msca.caControlSubtitle')}</p>
-          <Button type="button" size="sm" variant="secondary" onClick={load} disabled={loading}>
-            <ArrowsClockwise size={14} className={loading ? 'animate-spin' : ''} />
-            {t('common.refresh')}
-          </Button>
-        </div>
-
-        {/* Health */}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <div className="p-2.5 rounded-lg bg-tertiary-50 border border-border">
-            <p className="text-2xs text-text-tertiary uppercase">{t('msca.healthService')}</p>
-            <p className={`text-sm font-medium ${svcOk ? 'text-status-success' : 'text-status-danger'}`}>
-              {health?.certsvc_status || '—'}
-            </p>
-          </div>
-          <div className="p-2.5 rounded-lg bg-tertiary-50 border border-border">
-            <p className="text-2xs text-text-tertiary uppercase">{t('msca.healthCaExpiry')}</p>
-            <p className={`text-sm font-medium ${caDays != null && caDays < 90 ? 'text-status-warning' : 'text-text-primary'}`}>
-              {caDays != null ? t('msca.daysCount', { count: caDays }) : '—'}
-            </p>
-          </div>
-          <div className="p-2.5 rounded-lg bg-tertiary-50 border border-border">
-            <p className="text-2xs text-text-tertiary uppercase">{t('msca.healthCrl')}</p>
-            <p className={`text-sm font-medium ${crlExpired ? 'text-status-danger' : 'text-text-primary'}`}>
-              {health?.crl?.next_update ? formatDate(health.crl.next_update) : '—'}
-            </p>
-          </div>
-          <div className="p-2.5 rounded-lg bg-tertiary-50 border border-border">
-            <p className="text-2xs text-text-tertiary uppercase">{t('msca.healthPending')}</p>
-            <p className="text-sm font-medium text-text-primary">{health?.pending_count ?? '—'}</p>
-          </div>
-        </div>
-
-        {(health?.warnings || []).length > 0 && (
-          <div className="space-y-1">
-            {health.warnings.map((w, i) => (
-              <p key={i} className="flex items-start gap-1.5 text-2xs text-status-warning">
-                <Warning size={13} className="mt-0.5 shrink-0" />{w}
-              </p>
+    <Modal open={open} onClose={onClose} title={t('msca.caControlTitle', { name: connection?.name || '' })} subtitle={t('msca.caControlSubtitle')}>
+      <div className="settings-stack">
+      <div className="settings-actions">
+        <Btn icon="refresh" onClick={load} disabled={loading || undefined}>{t('common.refresh')}</Btn>
+      </div>
+      <Section title={t('msca.caControl')}>
+        <Props items={[
+          [t('msca.healthService'), <span key="s" className={health?.certsvc_status ? (svcOk ? 'good' : 'bad') : undefined}>{health?.certsvc_status || '—'}</span>],
+          [t('msca.healthCaExpiry'), <span key="e" className={caDays != null && caDays < 90 ? 'warn' : undefined}>{caDays != null ? t('msca.daysCount', { count: caDays }) : '—'}</span>],
+          [t('msca.healthCrl'), <span key="c" className={crlExpired ? 'bad' : undefined}>{health?.crl?.next_update ? formatDate(health.crl.next_update) : '—'}</span>],
+          [t('msca.healthPending'), health?.pending_count ?? '—'],
+        ]} />
+      </Section>
+      {(health?.warnings || []).map((w, i) => <Notice key={i} tone="warn">{w}</Notice>)}
+      <Section title={<>{t('msca.pendingRequests')}{pending.length > 0 && <span className="counter">{pending.length}</span>}</>}>
+        {loading ? (
+          <p className="muted small">{t('common.loading')}</p>
+        ) : (
+          <RecordList empty={t('msca.noPending')}>
+            {pending.map((r) => (
+              <RecordRow key={r.request_id}
+                title={<><span className="mono">#{r.request_id}</span> {r.subject_cn || '—'}</>}
+                meta={`${r.requester_name} · ${r.template} · ${r.submitted_when}`}
+                action={<>
+                  <Btn tone="primary" icon="check" onClick={() => handleApprove(r.request_id)} disabled={busyId === r.request_id || undefined}>{t('msca.approve')}</Btn>
+                  <Btn tone="danger" icon="close" onClick={() => handleDeny(r.request_id)} disabled={busyId === r.request_id || undefined}>{t('msca.deny')}</Btn>
+                </>} />
             ))}
-          </div>
+          </RecordList>
         )}
-
-        {/* Pending requests */}
-        <div>
-          <p className="text-sm font-medium text-text-primary mb-2">
-            {t('msca.pendingRequests')} {pending.length > 0 && <Badge variant="warning" size="sm">{pending.length}</Badge>}
-          </p>
-          {loading ? (
-            <p className="p-4 text-center text-sm text-text-secondary">{t('common.loading')}</p>
-          ) : pending.length === 0 ? (
-            <p className="p-4 text-center text-sm text-text-tertiary flex items-center justify-center gap-1.5">
-              <CheckCircle size={16} weight="fill" className="text-status-success" />
-              {t('msca.noPending')}
-            </p>
-          ) : (
-            <div className="border border-border rounded-lg divide-y divide-border-op30 max-h-[40vh] overflow-y-auto">
-              {pending.map((r) => (
-                <div key={r.request_id} className="p-2.5 flex items-center gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs text-text-primary truncate">
-                      <span className="font-mono text-text-tertiary">#{r.request_id}</span> {r.subject_cn || '—'}
-                    </p>
-                    <p className="text-2xs text-text-tertiary truncate">
-                      {r.requester_name} · {r.template} · {r.submitted_when}
-                    </p>
-                  </div>
-                  <Button type="button" size="sm" variant="primary"
-                          onClick={() => handleApprove(r.request_id)} disabled={busyId === r.request_id}>
-                    <CheckCircle size={13} /> {t('msca.approve')}
-                  </Button>
-                  <Button type="button" size="sm" variant="danger"
-                          onClick={() => handleDeny(r.request_id)} disabled={busyId === r.request_id}>
-                    <XCircle size={13} /> {t('msca.deny')}
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      </Section>
       </div>
     </Modal>
   )

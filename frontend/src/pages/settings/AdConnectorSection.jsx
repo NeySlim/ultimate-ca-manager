@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { IdentificationBadge, TestTube, Power, PencilSimple, Plus, Trash, ArrowsClockwise } from '@phosphor-icons/react'
-import { Button, Badge, HelpCard, Modal, ResponsiveDataTable } from '../../components'
+import { Btn, ListView, Toolbar, SearchField, EmptyBlock, NoMatch, Pill, RecordList, RecordRow } from '../../components/atelier'
+import { Modal, Notice } from '../../components/atelier/Form'
 import { adConnectorsService } from '../../services'
 import { useNotification } from '../../contexts'
 import { formatDate } from '../../lib/utils'
@@ -13,9 +13,9 @@ function connectorHealthBadge(connector, t) {
   if (!connector.enabled) return null
   if (!connector.health_fresh) return null
   return {
-    up: { variant: 'success', label: t('adConnector.healthStateUp') },
-    down: { variant: 'danger', label: t('adConnector.healthStateDown') },
-    degraded: { variant: 'warning', label: t('adConnector.healthStateDegraded') },
+    up: { tone: 'good', label: t('adConnector.healthStateUp') },
+    down: { tone: 'bad', label: t('adConnector.healthStateDown') },
+    degraded: { tone: 'warn', label: t('adConnector.healthStateDegraded') },
   }[connector.health?.state] || null
 }
 
@@ -27,6 +27,7 @@ export default function AdConnectorSection({ hasPermission }) {
   const [editing, setEditing] = useState(null) // a connector, or {} for a new one
   const [testingId, setTestingId] = useState(null)
   const [refusal, setRefusal] = useState(null) // { name, message, profiles, total }
+  const [search, setSearch] = useState('')
   const canWrite = hasPermission('write:ad_connector')
 
   const load = useCallback(async () => {
@@ -103,107 +104,74 @@ export default function AdConnectorSection({ hasPermission }) {
     }
   }
 
-  const columns = useMemo(() => [
-    {
-      key: 'name',
-      header: t('adConnector.name'),
-      priority: 1,
-      render: (value, row) => (
-        <div className="min-w-0">
-          <div className="font-medium text-text-primary truncate">{value}</div>
-          <div className="text-xs text-text-secondary truncate">{row.realm || t('adConnector.noRealm')}</div>
-        </div>
-      ),
-    },
-    {
-      key: 'servers',
-      header: t('adConnector.servers'),
-      hideOnMobile: true,
-      render: (servers, row) => {
-        const list = servers || []
-        if (!list.length) return <span className="text-text-tertiary">-</span>
-        return list.length > 1
-          ? t('adConnector.serverSummary', { server: list[0], port: row.port, count: list.length - 1 })
-          : `${list[0]}:${row.port}`
-      },
-    },
-    {
-      key: 'enabled',
-      header: t('common.status'),
-      priority: 2,
-      render: (_value, row) => {
-        const health = connectorHealthBadge(row, t)
-        return (
-          <div className="flex items-center gap-1 flex-wrap">
-            <Badge variant={row.enabled ? 'success' : 'secondary'} size="sm">
-              {row.enabled ? t('common.enabled') : t('common.disabled')}
-            </Badge>
-            {health && <Badge variant={health.variant} size="sm">{health.label}</Badge>}
-          </div>
-        )
-      },
-    },
-    {
-      key: 'domain_sid',
-      header: t('adConnector.domainSid'),
-      hideOnMobile: true,
-      render: (value) => value
-        ? <span className="font-mono text-xs break-all" data-testid="domain-sid">{value}</span>
-        : <span className="text-xs text-text-tertiary">{t('adConnector.domainSidUnknown')}</span>,
-    },
-    {
-      key: 'last_test_at',
-      header: t('adConnector.testConnection'),
-      hideOnMobile: true,
-      render: (value, row) => {
-        if (!value) return <span className="text-text-tertiary">-</span>
-        const mark = { success: '✓', partial: '!' }[row.last_test_result] || '✗'
-        return `${mark} ${formatDate(value)}`
-      },
-    },
-  ], [t])
-
-  const rowActions = (row) => {
-    const actions = [{
-      label: t('adConnector.testConnection'),
-      icon: testingId === row.id ? ArrowsClockwise : TestTube,
-      onClick: () => handleTest(row),
-    }]
-    if (canWrite) {
-      actions.push(
-        { label: row.enabled ? t('common.disable') : t('common.enable'), icon: Power, onClick: () => handleToggle(row) },
-        { label: t('common.edit'), icon: PencilSimple, onClick: () => setEditing(row) },
-        { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDelete(row) },
-      )
-    }
-    return actions
+  // The search reads the name and the realm, as the product's table did
+  const needle = search.trim().toLowerCase()
+  const shown = needle ? connectors.filter(c => [c.name, c.realm].some(v => (v || '').toLowerCase().includes(needle))) : connectors
+  const servers = (row) => {
+    const list = row.servers || []
+    if (!list.length) return '—'
+    return list.length > 1
+      ? t('adConnector.serverSummary', { server: list[0], port: row.port, count: list.length - 1 })
+      : `${list[0]}:${row.port}`
+  }
+  const lastTest = (row) => {
+    if (!row.last_test_at) return '—'
+    const mark = { success: '✓', partial: '!' }[row.last_test_result] || '✗'
+    return `${mark} ${formatDate(row.last_test_at)}`
+  }
+  const state = (row) => {
+    const health = connectorHealthBadge(row, t)
+    return (
+      <span className="row-actions">
+        <Pill tone={row.enabled ? 'good' : 'muted'} label={row.enabled ? t('common.enabled') : t('common.disabled')} />
+        {health && <Pill tone={health.tone} label={health.label} />}
+      </span>
+    )
   }
 
+  const rowActions = (row) => [
+    { icon: 'send', label: t('adConnector.testConnection'), onClick: () => { if (testingId !== row.id) handleTest(row) } },
+    ...(canWrite ? [
+      { icon: row.enabled ? 'block' : 'check', label: row.enabled ? t('common.disable') : t('common.enable'), write: true, onClick: () => handleToggle(row) },
+      { icon: 'close', label: t('common.delete'), write: true, onClick: () => handleDelete(row) },
+    ] : []),
+  ]
+
+  // The connectors as the mockup's module list: the name opens the form, the row holds test, switch and delete
   return (
     <>
+      <Notice><strong>{t('adConnector.helpTitle')}</strong>{' '}{t('adConnector.helpDescription')}</Notice>
 
-      <HelpCard variant="info" title={t('adConnector.helpTitle')}>
-        {t('adConnector.helpDescription')}
-      </HelpCard>
-
-      <ResponsiveDataTable
-        data={connectors}
-        columns={columns}
-        keyField="id"
-        loading={loading}
-        searchable
-        searchKeys={['name', 'realm']}
-        searchPlaceholder={t('adConnector.searchPlaceholder')}
+      <ListView label={t('adConnector.title')} icon="globe" rows={shown} loading={loading}
+        title={(row) => row.name} status={state}
+        openedId={editing?.id} onOpen={canWrite ? setEditing : undefined}
+        toolbar={(
+          <Toolbar>
+            <SearchField id="ad-connector-search" label={t('common.search')} placeholder={t('adConnector.searchPlaceholder')} value={search} onChange={setSearch} />
+          </Toolbar>
+        )}
+        columns={[
+          { id: 'realm', label: t('adConnector.realm'), cell: (row) => row.realm || t('adConnector.noRealm') },
+          { id: 'servers', label: t('adConnector.servers'), cell: servers, grow: true },
+          { id: 'sid', label: t('adConnector.domainSid'), cell: (row) => (row.domain_sid
+            ? <span className="mono" data-testid="domain-sid">{row.domain_sid}</span>
+            : <span className="muted">{t('adConnector.domainSidUnknown')}</span>) },
+          { id: 'test', label: t('adConnector.testConnection'), cell: lastTest },
+          { status: true },
+        ]}
         rowActions={rowActions}
-        toolbarActions={canWrite ? (
-          <Button type="button" size="sm" onClick={() => setEditing({})}>
-            <Plus size={14} /> {t('adConnector.add')}
-          </Button>
-        ) : undefined}
-        emptyIcon={IdentificationBadge}
-        emptyTitle={t('adConnector.notConfigured')}
-        emptyDescription={t('adConnector.notConfiguredDesc')}
-      />
+        empty={connectors.length ? (
+          <NoMatch title={t('common.noResults')} resetLabel={t('common.clear')} onReset={() => setSearch('')} />
+        ) : (
+          <EmptyBlock id="ad-connectors" icon="globe" title={t('adConnector.notConfigured')} text={t('adConnector.notConfiguredDesc')}
+            action={canWrite ? { label: t('adConnector.add'), icon: 'plus', onClick: () => setEditing({}), primary: true } : undefined} />
+        )} />
+
+      {canWrite && connectors.length > 0 && (
+        <div className="settings-actions">
+          <Btn tone="primary" icon="plus" onClick={() => setEditing({})}>{t('adConnector.add')}</Btn>
+        </div>
+      )}
 
       <Modal
         open={Boolean(editing)}
@@ -225,23 +193,21 @@ export default function AdConnectorSection({ hasPermission }) {
         open={Boolean(refusal)}
         onClose={() => setRefusal(null)}
         title={t('adConnector.deleteRefusedTitle', { name: refusal?.name })}
-        size="md"
+        size="sm"
       >
         {refusal && (
-          <div className="p-4 space-y-3">
-            <p className="text-sm text-text-primary">{t('adConnector.deleteRefused', { count: refusal.total })}</p>
-            <ul className="list-disc pl-5 text-sm text-text-primary" data-testid="refusal-profiles">
-              {refusal.profiles.map(profile => <li key={profile.id}>{profile.name}</li>)}
-            </ul>
-            {refusal.total > refusal.profiles.length && (
-              <p className="text-sm text-text-secondary">
-                {t('adConnector.deleteRefusedMore', { count: refusal.total - refusal.profiles.length })}
-              </p>
-            )}
-            <div className="flex justify-end pt-2 border-t border-border">
-              <Button type="button" variant="secondary" onClick={() => setRefusal(null)}>{t('common.close')}</Button>
+          <>
+            <p>{t('adConnector.deleteRefused', { count: refusal.total })}</p>
+            <div data-testid="refusal-profiles">
+              <RecordList>{refusal.profiles.map(profile => <RecordRow key={profile.id} title={profile.name} />)}</RecordList>
             </div>
-          </div>
+            {refusal.total > refusal.profiles.length && (
+              <p className="small muted">{t('adConnector.deleteRefusedMore', { count: refusal.total - refusal.profiles.length })}</p>
+            )}
+            <div className="modal-actions">
+              <button type="button" className="btn primary" data-write="false" data-action="close-modal" onClick={() => setRefusal(null)}>{t('common.close')}</button>
+            </div>
+          </>
         )}
       </Modal>
     </>

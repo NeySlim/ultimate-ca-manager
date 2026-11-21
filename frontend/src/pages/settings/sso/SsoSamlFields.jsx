@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { Shield, Globe, TreeStructure, UserPlus, Download } from '@phosphor-icons/react'
-import { Button, Input, Select, Textarea, LoadingSpinner, HelpCard, CompactSection } from '../../../components'
-import { ToggleSwitch } from '../../../components/ui/ToggleSwitch'
+import { Btn, RecordList } from '../../../components/atelier'
+import { Input, Select, Textarea, ToggleSwitch, Fold, Notice } from '../../../components/atelier/Form'
 import CopyableUrl from '../CopyableUrl'
 import MappingEditor from '../MappingEditor'
 import RoleMappingEditor from '../RoleMappingEditor'
@@ -33,7 +32,7 @@ export default function SsoSamlFields({
   handleChange,
   provider,
   testingConnection,
-  connectionBadge,
+  connectionStatus,
   fetchingMetadata,
   fetchIdpMetadata,
   availableCerts,
@@ -51,173 +50,94 @@ export default function SsoSamlFields({
   const { t } = useTranslation()
 
   return (
-    <div className="space-y-3">
-      {spOriginUnconfigured && (
-        <HelpCard variant="warning" className="text-xs">{t('sso.spOriginNotConfigured')}</HelpCard>
-      )}
-      {/* Identity Provider */}
-      <CompactSection
-        title={<span className="flex items-center">{t('sso.idpSection')}{connectionBadge}</span>}
-        icon={Shield}
-        collapsible
-        defaultOpen
-      >
-        <div className="space-y-3">
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
-              <Input
-                label={t('sso.metadataUrl')}
-                value={formData.saml_metadata_url}
-                onChange={e => handleChange('saml_metadata_url', e.target.value)}
-                placeholder="https://idp.example.com/saml/metadata"
-              />
-            </div>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={fetchIdpMetadata}
-              disabled={fetchingMetadata || !formData.saml_metadata_url}
-              className="mb-0.5 gap-1.5 whitespace-nowrap"
-            >
-              {fetchingMetadata ? <LoadingSpinner size="xs" /> : <Download size={14} />}
+    <>
+      {spOriginUnconfigured && <Notice tone="warn">{t('sso.spOriginNotConfigured')}</Notice>}
+      <Fold title={t('sso.idpSection')} defaultOpen>
+        {/* The metadata URL and the button that reads it, on one line (the issue form's inline row) */}
+        <div className="field full">
+          <label htmlFor="sso-saml-metadata">{t('sso.metadataUrl')}</label>
+          <div className="inline-row">
+            <input id="sso-saml-metadata" value={formData.saml_metadata_url} autoComplete="off" spellCheck={false}
+              placeholder="https://idp.example.com/saml/metadata" aria-describedby="hint-sso-saml-metadata"
+              onChange={e => handleChange('saml_metadata_url', e.target.value)} />
+            <Btn icon="download" onClick={fetchIdpMetadata} disabled={fetchingMetadata || !formData.saml_metadata_url || undefined}>
               {t('sso.fetchMetadata')}
-            </Button>
+            </Btn>
           </div>
-          <HelpCard variant="info" className="text-xs">{t('sso.metadataUrlHelp')}</HelpCard>
-          <Input label={t('sso.entityId')} value={formData.saml_entity_id} onChange={e => handleChange('saml_entity_id', e.target.value)} placeholder="https://idp.example.com/saml/metadata" />
-          <Input label={t('sso.ssoURL')} value={formData.saml_sso_url} onChange={e => handleChange('saml_sso_url', e.target.value)} placeholder="https://idp.example.com/saml/sso" />
-          <Input label={t('sso.sloURL')} value={formData.saml_slo_url} onChange={e => handleChange('saml_slo_url', e.target.value)} placeholder="https://idp.example.com/saml/slo" />
-          <Textarea
-            label={t('sso.certificate')}
-            value={formData.saml_certificate}
-            onChange={e => handleChange('saml_certificate', e.target.value)}
-            rows={4}
-            placeholder="-----BEGIN CERTIFICATE-----..."
-            className="font-mono text-xs"
-          />
-          <ToggleSwitch
-            checked={formData.saml_sign_requests}
-            onChange={(val) => handleChange('saml_sign_requests', val)}
-            label={t('sso.signRequests')}
-            description={t('sso.signRequestsHelp')}
-          />
-          <ToggleSwitch
-            checked={formData.saml_allow_idp_initiated}
-            onChange={(val) => handleChange('saml_allow_idp_initiated', val)}
-            label={t('sso.allowIdpInitiated')}
-            description={t('sso.allowIdpInitiatedHelp')}
-          />
-          <Select
-            label={t('sso.spCertificate')}
-            value={formData.saml_sp_cert_source}
-            onChange={value => handleChange('saml_sp_cert_source', value)}
-            options={availableCerts.length > 0
-              ? availableCerts.map(c => ({
-                  value: c.id,
-                  label: c.not_after ? `${c.label} (${formatDate(c.not_after)})` : c.label,
-                }))
-              : [{ value: 'https', label: t('sso.httpsDefault') }]
-            }
-          />
-          <Select
-            label={t('sso.nameIdFormat')}
-            value={formData.saml_name_id_format}
-            onChange={value => handleChange('saml_name_id_format', value)}
-            options={NAME_ID_FORMATS.map(f => ({ value: f.value, label: t(f.labelKey) }))}
-            helperText={t('sso.nameIdFormatHelp')}
-          />
-          <ToggleSwitch checked={formData.saml_verify_ssl} onChange={(val) => handleChange('saml_verify_ssl', val)} label={t('sso.verifySsl')} size="sm" />
-          {!formData.saml_verify_ssl && <p className="text-xs text-status-warning">{t('sso.sslWarning')}</p>}
-          {formData.saml_verify_ssl && (
-            <Textarea
-              label={t('sso.caBundleLabel')}
-              value={formData.saml_ca_bundle}
-              onChange={e => handleChange('saml_ca_bundle', e.target.value)}
-              placeholder="-----BEGIN CERTIFICATE-----&#10;..."
-              rows={4}
-              mono
-              helperText={t('sso.caBundleHelp')}
-            />
-          )}
-          {provider?.id && (
-            <TestConnectionButton onClick={handleTestConnection} testing={testingConnection} dirty={dirty} icon={Shield} />
-          )}
-          <SignInTestPanel provider={provider} dirty={dirty} formData={formData} handleChange={handleChange} />
+          <small id="hint-sso-saml-metadata">{t('sso.metadataUrlHelp')}</small>
         </div>
-      </CompactSection>
+        <Input id="sso-saml-entity" full label={t('sso.entityId')} value={formData.saml_entity_id} onChange={e => handleChange('saml_entity_id', e.target.value)} placeholder="https://idp.example.com/saml/metadata" />
+        <Input id="sso-saml-sso-url" label={t('sso.ssoURL')} value={formData.saml_sso_url} onChange={e => handleChange('saml_sso_url', e.target.value)} placeholder="https://idp.example.com/saml/sso" />
+        <Input id="sso-saml-slo-url" label={t('sso.sloURL')} value={formData.saml_slo_url} onChange={e => handleChange('saml_slo_url', e.target.value)} placeholder="https://idp.example.com/saml/slo" />
+        <Textarea id="sso-saml-certificate" label={t('sso.certificate')} value={formData.saml_certificate} onChange={e => handleChange('saml_certificate', e.target.value)}
+          rows={4} placeholder="-----BEGIN CERTIFICATE-----..." mono />
+        <ToggleSwitch checked={formData.saml_sign_requests} onChange={(val) => handleChange('saml_sign_requests', val)}
+          label={t('sso.signRequests')} description={t('sso.signRequestsHelp')} />
+        <ToggleSwitch checked={formData.saml_allow_idp_initiated} onChange={(val) => handleChange('saml_allow_idp_initiated', val)}
+          label={t('sso.allowIdpInitiated')} description={t('sso.allowIdpInitiatedHelp')} />
+        <Select id="sso-saml-sp-cert" label={t('sso.spCertificate')} value={formData.saml_sp_cert_source}
+          onChange={value => handleChange('saml_sp_cert_source', value)}
+          options={availableCerts.length > 0
+            ? availableCerts.map(c => ({ value: c.id, label: c.not_after ? `${c.label} (${formatDate(c.not_after)})` : c.label }))
+            : [{ value: 'https', label: t('sso.httpsDefault') }]} />
+        <Select id="sso-saml-nameid" label={t('sso.nameIdFormat')} value={formData.saml_name_id_format}
+          onChange={value => handleChange('saml_name_id_format', value)}
+          options={NAME_ID_FORMATS.map(f => ({ value: f.value, label: t(f.labelKey) }))} hint={t('sso.nameIdFormatHelp')} />
+        <ToggleSwitch checked={formData.saml_verify_ssl} onChange={(val) => handleChange('saml_verify_ssl', val)} label={t('sso.verifySsl')} />
+        {!formData.saml_verify_ssl && <Notice tone="warn">{t('sso.sslWarning')}</Notice>}
+        {formData.saml_verify_ssl && (
+          <Textarea id="sso-saml-ca-bundle" label={t('sso.caBundleLabel')} value={formData.saml_ca_bundle} onChange={e => handleChange('saml_ca_bundle', e.target.value)}
+            placeholder={'-----BEGIN CERTIFICATE-----\n...'} rows={4} mono hint={t('sso.caBundleHelp')} />
+        )}
+        {provider?.id && (
+          <TestConnectionButton onClick={handleTestConnection} testing={testingConnection} dirty={dirty} status={connectionStatus} />
+        )}
+        <SignInTestPanel provider={provider} dirty={dirty} formData={formData} handleChange={handleChange} />
+      </Fold>
 
-      {/* SP Endpoints */}
-      <CompactSection title={t('sso.spSection')} icon={Globe} collapsible defaultOpen={false}>
-        <div className="space-y-3">
-          <HelpCard variant="info" className="text-xs">{t('sso.spMetadataHelp')}</HelpCard>
-          <CopyableUrl label={t('sso.spMetadataXml')} value={spMetadataUrl} description={t('sso.spMetadataXmlDesc')} />
-          <CopyableUrl label={t('sso.spEntityId')} value={spEntityId} />
-          <CopyableUrl label={t('sso.acsUrl')} value={samlAcsUrl} description={t('sso.acsUrlDesc')} />
-          <CopyableUrl label={t('sso.spSloUrl')} value={samlSloUrl} />
+      <Fold title={t('sso.spSection')}>
+        <Notice>{t('sso.spMetadataHelp')}</Notice>
+        <div className="field full">
+          <RecordList>
+            <CopyableUrl label={t('sso.spMetadataXml')} value={spMetadataUrl} description={t('sso.spMetadataXmlDesc')} />
+            <CopyableUrl label={t('sso.spEntityId')} value={spEntityId} />
+            <CopyableUrl label={t('sso.acsUrl')} value={samlAcsUrl} description={t('sso.acsUrlDesc')} />
+            <CopyableUrl label={t('sso.spSloUrl')} value={samlSloUrl} />
+          </RecordList>
         </div>
-      </CompactSection>
+      </Fold>
 
-      {/* Attribute & Role Mapping */}
-      <CompactSection title={t('sso.attributeRoleMappingSection')} icon={TreeStructure} collapsible defaultOpen={false}>
-        <div className="space-y-3">
-          <div>
-            <p className="text-xs font-medium text-text-secondary mb-1">{t('sso.attributeMapping')}</p>
-            <p className="text-xs text-text-tertiary mb-2">{t('sso.attributeMappingHelp')}</p>
-            <MappingEditor
-              value={formData.attribute_mapping}
-              onChange={val => handleChange('attribute_mapping', val)}
-              keyLabel={t('sso.ssoAttribute')}
-              valueLabel={t('sso.ucmField')}
-              keyPlaceholder="e.g., preferred_username"
-              valuePlaceholder="e.g., username"
-            />
-            <LegacyGroupsNotice mapping={formData.attribute_mapping} />
-            <div className="mt-2">
-              <p className="text-xs text-text-tertiary mb-1">{t('sso.samlGroupShortcuts')}</p>
-              <div className="flex flex-wrap gap-1.5">
-                {SAML_GROUP_SHORTCUTS.map(({ name, originKey }) => (
-                  <Button
-                    key={name}
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    disabled={Object.prototype.hasOwnProperty.call(formData.attribute_mapping || {}, name)}
-                    onClick={() => handleChange('attribute_mapping', { ...(formData.attribute_mapping || {}), [name]: 'groups' })}
-                    className="gap-1"
-                  >
-                    <span className="font-mono">{name}</span>
-                    <span className="text-text-tertiary">{t(originKey)}</span>
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="pt-2 border-t border-border">
-            <p className="text-xs font-medium text-text-secondary mb-1">{t('sso.roleMapping')}</p>
-            <p className="text-xs text-text-tertiary mb-2">{t('sso.roleMappingHelp')}</p>
-            <RoleMappingEditor
-              value={formData.role_mapping}
-              onChange={val => handleChange('role_mapping', val)}
-              keyLabel={t('sso.externalGroup')}
-              keyPlaceholder="e.g., pki-admins"
-              roleOptions={roleOptions}
-              customRoles={customRoles}
-            />
+      <Fold title={t('sso.attributeRoleMappingSection')}>
+        <MappingEditor legend={t('sso.attributeMapping')} hint={t('sso.attributeMappingHelp')}
+          value={formData.attribute_mapping} onChange={val => handleChange('attribute_mapping', val)}
+          keyLabel={t('sso.ssoAttribute')} valueLabel={t('sso.ucmField')} keyPlaceholder="e.g., preferred_username" valuePlaceholder="e.g., username" />
+        <LegacyGroupsNotice mapping={formData.attribute_mapping} />
+        <div className="field full">
+          <span id="sso-saml-shortcuts">{t('sso.samlGroupShortcuts')}</span>
+          <div className="row-actions" role="group" aria-labelledby="sso-saml-shortcuts">
+            {SAML_GROUP_SHORTCUTS.map(({ name, originKey }) => (
+              <button key={name} type="button" className="btn"
+                disabled={Object.prototype.hasOwnProperty.call(formData.attribute_mapping || {}, name) || undefined}
+                onClick={() => handleChange('attribute_mapping', { ...(formData.attribute_mapping || {}), [name]: 'groups' })}>
+                <span className="mono">{name}</span>
+                <span className="muted">{t(originKey)}</span>
+              </button>
+            ))}
           </div>
         </div>
-      </CompactSection>
+        <RoleMappingEditor legend={t('sso.roleMapping')} hint={t('sso.roleMappingHelp')}
+          value={formData.role_mapping} onChange={val => handleChange('role_mapping', val)}
+          keyLabel={t('sso.externalGroup')} keyPlaceholder="e.g., pki-admins" roleOptions={roleOptions} customRoles={customRoles} />
+      </Fold>
 
-      {/* Provisioning */}
-      <CompactSection title={t('sso.provisioningSection')} icon={UserPlus} collapsible defaultOpen={!hasRoleRules(formData.role_mapping)}>
-        <div className="space-y-3">
-          <ProvisioningNotice formData={formData} />
-          <Select label={t('sso.defaultRole')} value={formData.default_role} onChange={value => handleChange('default_role', value)} options={defaultRoleOptions} />
-          <ToggleSwitch checked={formData.auto_create_users} onChange={(val) => handleChange('auto_create_users', val)} label={t('sso.autoCreateUsers')} />
-          <ToggleSwitch checked={formData.auto_update_users} onChange={(val) => handleChange('auto_update_users', val)} label={t('sso.autoUpdateUsers')} />
-          <ToggleSwitch checked={formData.sync_role_on_login} onChange={(val) => handleChange('sync_role_on_login', val)} label={t('sso.syncRoleOnLogin')} description={t('sso.syncRoleOnLoginHelp')} />
-        </div>
-      </CompactSection>
-    </div>
+      <Fold title={t('sso.provisioningSection')} defaultOpen={!hasRoleRules(formData.role_mapping)}>
+        <ProvisioningNotice formData={formData} />
+        <Select id="sso-saml-default-role" label={t('sso.defaultRole')} value={formData.default_role} onChange={value => handleChange('default_role', value)} options={defaultRoleOptions} />
+        <ToggleSwitch checked={formData.auto_create_users} onChange={(val) => handleChange('auto_create_users', val)} label={t('sso.autoCreateUsers')} />
+        <ToggleSwitch checked={formData.auto_update_users} onChange={(val) => handleChange('auto_update_users', val)} label={t('sso.autoUpdateUsers')} />
+        <ToggleSwitch checked={formData.sync_role_on_login} onChange={(val) => handleChange('sync_role_on_login', val)}
+          label={t('sso.syncRoleOnLogin')} description={t('sso.syncRoleOnLoginHelp')} />
+      </Fold>
+    </>
   )
 }

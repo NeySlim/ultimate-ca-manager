@@ -51,6 +51,7 @@ import SsoProviderForm from './settings/SsoProviderForm'
 import WebhookForm from './settings/WebhookForm'
 import MscaConnectionForm from './settings/MscaConnectionForm'
 import MscaCaControlModal from '../components/MscaCaControlModal'
+import { Modal as AtlModal, ConfirmModal as AtlConfirmModal } from '../components/atelier/Form'
 import AdConnectorSection from './settings/AdConnectorSection'
 import XcepWstepSection from './settings/XcepWstepSection'
 import GeneralSection from './settings/GeneralSection'
@@ -121,7 +122,7 @@ const SECTION_ICONS = {
   ct: 'eye', autoRenewal: 'refresh', deploy: 'upload', microsoftCA: 'plug', adConnector: 'globe', xcepWstep: 'monitor', about: 'help',
 }
 // Sections drawn with the mockup's fields; the others keep the product's own styles (`.atl-out`) until converted
-const CONVERTED_SECTIONS = new Set(['general', 'security', 'email', 'https', 'appearance', 'backup', 'audit', 'database', 'updates', 'scheduler', 'autoRenewal', 'about'])
+const CONVERTED_SECTIONS = new Set(['general', 'security', 'email', 'https', 'appearance', 'backup', 'audit', 'database', 'updates', 'scheduler', 'autoRenewal', 'about', 'sso', 'adConnector', 'microsoftCA', 'xcepWstep', 'webhooks', 'deploy', 'ct'])
 
 // Groups of the table of contents, named by what they hold; the frames follow the same
 // order. Four groups keep every entry in view on a 1000 px high window.
@@ -2387,7 +2388,7 @@ export default function SettingsPage() {
       <RestoreReport data={restoreReport} onClose={() => setRestoreReport(null)} />
 
       {/* SSO Provider Modal */}
-      <Modal
+      <AtlModal
         open={showSsoModal}
         onClose={() => { setShowSsoModal(false); setEditingSsoProvider(null); setEditingSsoType(null) }}
         title={editingSsoProvider ? t('sso.editProvider') : t('sso.newProvider')}
@@ -2399,10 +2400,10 @@ export default function SettingsPage() {
           onSave={handleSsoSave}
           onCancel={() => { setShowSsoModal(false); setEditingSsoProvider(null); setEditingSsoType(null) }}
         />
-      </Modal>
+      </AtlModal>
 
       {/* SSO Delete Confirmation */}
-      <ConfirmModal
+      <AtlConfirmModal
         open={!!ssoConfirmDelete}
         onClose={() => setSsoConfirmDelete(null)}
         onConfirm={handleSsoDelete}
@@ -2413,7 +2414,7 @@ export default function SettingsPage() {
       />
 
       {/* Webhook Modal */}
-      <Modal
+      <AtlModal
         open={showWebhookModal}
         onClose={() => { setShowWebhookModal(false); setEditingWebhook(null) }}
         title={editingWebhook ? t('webhooks.editWebhook') : t('webhooks.addWebhook')}
@@ -2424,10 +2425,10 @@ export default function SettingsPage() {
           onSave={handleWebhookSave}
           onCancel={() => { setShowWebhookModal(false); setEditingWebhook(null) }}
         />
-      </Modal>
+      </AtlModal>
 
       {/* Webhook Delete Confirmation */}
-      <ConfirmModal
+      <AtlConfirmModal
         open={!!webhookConfirmDelete}
         onClose={() => setWebhookConfirmDelete(null)}
         onConfirm={handleWebhookDelete}
@@ -2438,7 +2439,7 @@ export default function SettingsPage() {
       />
 
       {/* Microsoft CA Connection Modal */}
-      <Modal
+      <AtlModal
         open={showMscaModal}
         onClose={() => { setShowMscaModal(false); setEditingMsca(null) }}
         title={editingMsca ? t('msca.editConnection') : t('msca.addConnection')}
@@ -2449,10 +2450,10 @@ export default function SettingsPage() {
           onSave={handleMscaSave}
           onCancel={() => { setShowMscaModal(false); setEditingMsca(null) }}
         />
-      </Modal>
+      </AtlModal>
 
       {/* Microsoft CA Delete Confirmation */}
-      <ConfirmModal
+      <AtlConfirmModal
         open={!!mscaConfirmDelete}
         onClose={() => setMscaConfirmDelete(null)}
         onConfirm={handleMscaDelete}

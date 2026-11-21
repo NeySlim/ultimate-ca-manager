@@ -255,6 +255,32 @@ export function ChoiceField({ name, legend, value, onChange, options, disabled, 
   )
 }
 
+/**
+ * A folded part of a form: the issue form's « Avancé » (`.field.full.advanced`), its toggle naming the
+ * part (and a `sub` line), then the two-column panel. The fields stay mounted: a field the form
+ * refuses (`invalid`) opens the part that holds it.
+ */
+export function Fold({ id, title, sub, defaultOpen = false, children }) {
+  const auto = useId()
+  const fid = id ?? `fold${auto.replace(/:/g, '')}`
+  const [open, setOpen] = useState(defaultOpen)
+  const root = useRef(null)
+  useEffect(() => {
+    const el = root.current
+    const reveal = () => setOpen(true)
+    el?.addEventListener('invalid', reveal, true)
+    return () => el?.removeEventListener('invalid', reveal, true)
+  }, [])
+  return (
+    <div className="field full advanced" ref={root}>
+      <button type="button" className="advanced-toggle" id={`${fid}-toggle`} aria-expanded={open} aria-controls={fid} onClick={() => setOpen((v) => !v)}>
+        <Icon name={open ? 'down' : 'right'} /><span>{title}</span>{sub && <small>{sub}</small>}
+      </button>
+      <div className="advanced-panel" id={fid} hidden={!open}>{children}</div>
+    </div>
+  )
+}
+
 export function FormFields({ children }) {
   return <div className="form-fields">{children}</div>
 }
@@ -263,9 +289,9 @@ export function ModalActions({ children }) {
   return <div className="modal-actions">{children}</div>
 }
 
-/** The mockup's `.notice`, `warn` or `bad` with the warning icon, else the help icon. */
-export function Notice({ tone, children, id }) {
-  return <div className={join('notice', tone)} id={id} role={tone === 'bad' ? 'alert' : undefined}><Icon name={tone ? 'warning' : 'help'} /><span>{children}</span></div>
+/** The mockup's `.notice`, `warn` or `bad` with the warning icon, else the help icon; `role` announces it (a `bad` one is an alert). */
+export function Notice({ tone, children, id, role }) {
+  return <div className={join('notice', tone)} id={id} role={role ?? (tone === 'bad' ? 'alert' : undefined)}><Icon name={tone ? 'warning' : 'help'} /><span>{children}</span></div>
 }
 
 const SIZES = { sm: 'narrow', md: '', lg: 'wide', xl: 'wide' }

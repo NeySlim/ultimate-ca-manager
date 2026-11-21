@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Badge, Button } from '../../../components'
+import { Notice, Pill, Props } from '../../../components/atelier'
 
 // The message the login page shows for each refusal code (LoginPage.jsx).
 const LOGIN_ERROR_KEYS = {
@@ -21,17 +21,9 @@ const LOGIN_ERROR_KEYS = {
 
 // A SAML candidate reads "Name (FriendlyName)": only the Name is mapped (SAML Core §2.7.3.1).
 const attributeName = (candidate) => candidate.replace(/ \([^()]*\)$/, '')
+const ROLE_TONE = { admin: 'bad', operator: 'warn' }
 
-function Row({ label, children }) {
-  return (
-    <p>
-      <span className="text-text-secondary font-medium">{label}:</span>{' '}
-      {children}
-    </p>
-  )
-}
-
-/** What the login would have done with the identity the IdP returned to a sign-in test. */
+/** What the login would have done with the identity the IdP returned to a sign-in test, as the mockup's props. */
 export default function SignInTestReport({ report, formData, handleChange }) {
   const { t } = useTranslation()
   const accepted = report.verdict === 'accepted'
@@ -43,95 +35,76 @@ export default function SignInTestReport({ report, formData, handleChange }) {
     handleChange?.('attribute_mapping', { ...mapped, [name]: 'groups' })
   }
 
+  const accountLine = account.outcome && (
+    <>
+      {account.outcome === 'open' && t('sso.signInTestAccountOpen', { username: account.username })}
+      {account.outcome === 'create' && t('sso.signInTestAccountCreate', { username: account.username })}
+      {account.outcome === 'disabled' && t('sso.signInTestAccountDisabled', { username: account.username })}
+      {account.outcome === 'refused' && (account.username
+        ? t('sso.signInTestAccountRefused', { username: account.username })
+        : t('sso.signInTestAccountNone'))}
+      {account.binds_identity && <span className="muted"> · {t('sso.signInTestAccountBinds')}</span>}
+    </>
+  )
+
   return (
-    <div role="status" className="space-y-1">
-      <Row label={t('sso.signInTestVerdict')}>
-        <Badge variant={accepted ? 'success' : 'danger'} size="sm">
-          {accepted ? t('sso.signInTestAccepted') : t('sso.signInTestRefused')}
-        </Badge>
-        {!accepted && report.code && (
-          <span className="ml-1 text-text-tertiary">
-            {LOGIN_ERROR_KEYS[report.code] ? t(LOGIN_ERROR_KEYS[report.code]) : null}{' '}
-            <span className="font-mono">({report.code})</span>
-          </span>
-        )}
-      </Row>
-      {report.reason && <Row label={t('sso.signInTestReason')}>{report.reason}</Row>}
-      {identity && (
-        <Row label={t('sso.signInTestIdentity')}>
-          <span className="font-mono">{identity.username}</span>
-          {identity.email && <span className="text-text-tertiary"> · {identity.email}</span>}
+    <div className="field full" role="status">
+      <Props items={[
+        [t('sso.signInTestVerdict'), <>
+          <Pill tone={accepted ? 'good' : 'bad'} label={accepted ? t('sso.signInTestAccepted') : t('sso.signInTestRefused')} />
+          {!accepted && report.code && (
+            <> <span className="muted">{LOGIN_ERROR_KEYS[report.code] ? t(LOGIN_ERROR_KEYS[report.code]) : null}{' '}<span className="mono">({report.code})</span></span></>
+          )}
+        </>],
+        report.reason && [t('sso.signInTestReason'), report.reason],
+        identity && [t('sso.signInTestIdentity'), <>
+          <span className="mono">{identity.username}</span>
+          {identity.email && <span className="muted"> · {identity.email}</span>}
           {identity.external_id && (
-            <span className="text-text-tertiary"> · {t('sso.signInTestExternalId')} <span className="font-mono">{identity.external_id}</span></span>
+            <span className="muted"> · {t('sso.signInTestExternalId')} <span className="mono">{identity.external_id}</span></span>
           )}
-        </Row>
-      )}
-      {identity && (
-        <Row label={t('sso.signInTestGroups')}>
+        </>],
+        identity && [t('sso.signInTestGroups'), <>
           {report.groups?.length > 0
-            ? report.groups.map(g => <Badge key={g} variant="secondary" size="sm" className="mr-1">{g}</Badge>)
-            : <span className="text-text-tertiary italic">{t('sso.signInTestNoGroups')}</span>}
-          {report.groups_more > 0 && (
-            <span className="text-text-tertiary">{t('sso.signInTestMore', { number: report.groups_more })}</span>
-          )}
-        </Row>
-      )}
-      {report.group_source && <Row label={t('sso.signInTestGroupSource')}>{report.group_source}</Row>}
-      {accepted && (
-        <Row label={t('sso.signInTestRole')}>
-          <Badge variant={report.role === 'admin' ? 'danger' : report.role === 'operator' ? 'warning' : 'info'} size="sm">
-            {report.role}
-          </Badge>
-          {report.custom_role && <Badge variant="secondary" size="sm" className="ml-1">{report.custom_role}</Badge>}
+            ? <span className="row-actions">{report.groups.map(g => <span key={g} className="chip">{g}</span>)}</span>
+            : <span className="muted">{t('sso.signInTestNoGroups')}</span>}
+          {report.groups_more > 0 && <span className="muted">{t('sso.signInTestMore', { number: report.groups_more })}</span>}
+        </>],
+        report.group_source && [t('sso.signInTestGroupSource'), report.group_source],
+        accepted && [t('sso.signInTestRole'), <>
+          <Pill tone={ROLE_TONE[report.role] || 'muted'} icon="users" label={report.role} />
+          {report.custom_role && <> <span className="chip">{report.custom_role}</span></>}
           {report.role_change && (
-            <span className="ml-1 text-text-tertiary">
-              {t('sso.signInTestRoleChange', { from: report.role_change[0], to: report.role_change[1] })}
-            </span>
+            <> <span className="muted">{t('sso.signInTestRoleChange', { from: report.role_change[0], to: report.role_change[1] })}</span></>
           )}
-        </Row>
-      )}
-      {account.outcome && (
-        <Row label={t('sso.signInTestAccount')}>
-          {account.outcome === 'open' && t('sso.signInTestAccountOpen', { username: account.username })}
-          {account.outcome === 'create' && t('sso.signInTestAccountCreate', { username: account.username })}
-          {account.outcome === 'disabled' && t('sso.signInTestAccountDisabled', { username: account.username })}
-          {account.outcome === 'refused' && (account.username
-            ? t('sso.signInTestAccountRefused', { username: account.username })
-            : t('sso.signInTestAccountNone'))}
-          {account.binds_identity && <span className="text-text-tertiary"> · {t('sso.signInTestAccountBinds')}</span>}
-        </Row>
-      )}
-      {report.diagnosis && <Row label={t('sso.signInTestDiagnosis')}>{report.diagnosis}</Row>}
-      {report.detail && !report.diagnosis && <Row label={t('sso.signInTestDetail')}>{report.detail}</Row>}
+        </>],
+        accountLine && [t('sso.signInTestAccount'), accountLine],
+        report.diagnosis && [t('sso.signInTestDiagnosis'), report.diagnosis],
+        report.detail && !report.diagnosis && [t('sso.signInTestDetail'), report.detail],
+      ]} />
       {!accepted && report.candidates?.length > 0 && (
-        <div>
-          <p className="text-text-secondary font-medium">{t('sso.signInTestCandidates')}</p>
-          <div className="flex flex-wrap gap-1 mt-1">
+        <>
+          <small>{t('sso.signInTestCandidates')}</small>
+          <span className="row-actions">
             {report.candidates.map(name => {
               const attribute = attributeName(name)
               return (
-                <Button key={name} type="button" variant="secondary" size="sm"
-                  disabled={mapped[attribute] === 'groups'} onClick={() => mapToGroups(attribute)}>
+                <button key={name} type="button" className="btn" disabled={mapped[attribute] === 'groups' || undefined} onClick={() => mapToGroups(attribute)}>
                   {t('sso.signInTestMapToGroups', { name })}
-                </Button>
+                </button>
               )
             })}
-          </div>
-          <p className="text-text-tertiary mt-1">{t('sso.signInTestMapHint')}</p>
-        </div>
+          </span>
+          <small>{t('sso.signInTestMapHint')}</small>
+        </>
       )}
       {report.not_verified?.length > 0 && (
-        <div className="status-warning-text">
-          <p className="font-medium">{t('sso.signInTestNotVerified')}</p>
-          <ul className="list-disc ml-4">
-            {report.not_verified.map(item => <li key={item}>{item}</li>)}
-          </ul>
-        </div>
+        <Notice tone="warn">
+          <strong>{t('sso.signInTestNotVerified')}</strong>{' '}{report.not_verified.join(' · ')}
+        </Notice>
       )}
-      {report.provider_enabled === false && (
-        <p className="text-text-tertiary">{t('sso.signInTestProviderDisabled')}</p>
-      )}
-      <p className="text-text-tertiary">{t('sso.signInTestNothingDone')}</p>
+      {report.provider_enabled === false && <small>{t('sso.signInTestProviderDisabled')}</small>}
+      <small>{t('sso.signInTestNothingDone')}</small>
     </div>
   )
 }

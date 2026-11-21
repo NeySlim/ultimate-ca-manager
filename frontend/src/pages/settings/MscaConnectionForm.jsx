@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { TestTube } from '@phosphor-icons/react'
-import { Button, Input, Select, Textarea } from '../../components'
+import { Btn } from '../../components/atelier'
+import { Input, NumberInput, SecretInput, Select, Textarea, ToggleSwitch, Notice } from '../../components/atelier/Form'
 import CertificateInput from '../../components/CertificateInput'
 import { mscaService } from '../../services'
 import { useNotification } from '../../contexts'
@@ -174,246 +174,123 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
     { value: 'basic', label: t('msca.authBasic') },
   ]
 
+  // The mockup's dialog form: the connection in `.form-fields`, the CRL sync and the WinRM channel under their switches, then test and actions
   return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4">
-      <Input
-        label={`${t('msca.connectionName')} *`}
-        value={formData.name}
-        onChange={(e) => updateField('name', e.target.value)}
-        required
-      />
-      <Input
-        label={`${t('msca.server')} *`}
-        value={formData.server}
-        onChange={(e) => updateField('server', e.target.value)}
-        placeholder={t('msca.serverPlaceholder')}
-        required
-      />
-      <Input
-        label={t('msca.caName')}
-        value={formData.ca_name}
-        onChange={(e) => updateField('ca_name', e.target.value)}
-        placeholder={t('msca.caNamePlaceholder')}
-      />
+    <form onSubmit={handleSubmit}>
+      <div className="form-fields">
+        <Input id="msca-name" label={t('msca.connectionName')} value={formData.name} onChange={(e) => updateField('name', e.target.value)} required data-autofocus="" />
+        <Input id="msca-server" label={t('msca.server')} value={formData.server} onChange={(e) => updateField('server', e.target.value)}
+          placeholder={t('msca.serverPlaceholder')} required />
+        <Input id="msca-ca-name" label={t('msca.caName')} value={formData.ca_name} onChange={(e) => updateField('ca_name', e.target.value)}
+          placeholder={t('msca.caNamePlaceholder')} />
+        <Select id="msca-auth" label={t('msca.authMethod')} options={authMethods} value={formData.auth_method} onChange={(val) => updateField('auth_method', val)} />
 
-      <Select
-        label={t('msca.authMethod')}
-        options={authMethods}
-        value={formData.auth_method}
-        onChange={(val) => updateField('auth_method', val)}
-      />
-
-      {/* Auth-specific fields */}
-      {formData.auth_method === 'basic' && (
-        <>
-          <Input
-            label={`${t('msca.username')} *`}
-            value={formData.username}
-            onChange={(e) => updateField('username', e.target.value)}
-          />
-          <Input
-            label={t('msca.password')}
-            type="password"
-            value={formData.password}
-            onChange={(e) => updateField('password', e.target.value)}
-            placeholder={connection ? '••••••••' : ''}
-            {...secretInputProps(t, basicSecret)}
-          />
-        </>
-      )}
-
-      {formData.auth_method === 'certificate' && (
-        <CertificateInput
-          label={t('msca.clientCert')}
-          keyLabel={t('msca.clientKey')}
-          requireKey
-          value={{ cert_pem: formData.client_cert_pem, key_pem: formData.client_key_pem }}
-          onChange={({ cert_pem, key_pem }) => {
-            updateField('client_cert_pem', cert_pem)
-            updateField('client_key_pem', key_pem)
-          }}
-        />
-      )}
-
-      {formData.auth_method === 'kerberos' && (
-        <>
-          <div className="p-3 rounded-lg bg-accent-warning-op10 border border-accent-warning-op30 text-sm status-warning-text">
-            {t('msca.kerberosOptionalNote')}
-          </div>
-          <Input
-            label={t('msca.kerberosPrincipal')}
-            value={formData.kerberos_principal}
-            onChange={(e) => updateField('kerberos_principal', e.target.value)}
-            placeholder={t('msca.kerberosPrincipalPlaceholder')}
-          />
-          <Input
-            label={t('msca.kerberosKeytab')}
-            value={formData.kerberos_keytab_path}
-            onChange={(e) => updateField('kerberos_keytab_path', e.target.value)}
-            placeholder={t('msca.kerberosKeytabPlaceholder')}
-          />
-        </>
-      )}
-
-      {availableTemplates.length > 0 ? (
-        <Select
-          label={t('msca.defaultTemplate')}
-          options={availableTemplates.map(tpl => ({ value: tpl, label: tpl }))}
-          value={formData.default_template}
-          onChange={(val) => updateField('default_template', val)}
-        />
-      ) : (
-        <div className="space-y-1">
-          <Input
-            label={t('msca.defaultTemplate')}
-            value={formData.default_template}
-            onChange={(e) => updateField('default_template', e.target.value)}
-            placeholder={t('msca.defaultTemplatePlaceholder')}
-          />
-          {connection?.id && !fetchingTemplates && (
-            <p className="text-xs text-text-tertiary">{t('msca.templatesFetchHint')}</p>
-          )}
-          {fetchingTemplates && (
-            <p className="text-xs text-text-tertiary">{t('msca.loadingTemplates')}</p>
-          )}
-        </div>
-      )}
-
-      {/* SSL Settings */}
-      <div className="flex items-center gap-4">
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={formData.verify_ssl} onChange={(e) => updateField('verify_ssl', e.target.checked)} className="rounded" />
-          {t('msca.verifySsl')}
-        </label>
-      </div>
-
-      {formData.verify_ssl && (
-        <Textarea
-          label={t('msca.caBundle')}
-          value={formData.ca_bundle}
-          onChange={(e) => updateField('ca_bundle', e.target.value)}
-          rows={3}
-          placeholder="-----BEGIN CERTIFICATE-----"
-          className="font-mono text-xs"
-        />
-      )}
-
-      {/* CRL revocation sync (one-way CA → UCM) */}
-      <div className="space-y-2">
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={formData.crl_sync_enabled} onChange={(e) => updateField('crl_sync_enabled', e.target.checked)} className="rounded" />
-          {t('msca.crlSyncEnable')}
-        </label>
-        {formData.crl_sync_enabled && (
+        {/* Auth-specific fields */}
+        {formData.auth_method === 'basic' && (
           <>
-            <p className="text-xs text-text-tertiary">{t('msca.crlSyncHint')}</p>
-            <Input
-              label={t('msca.crlUrl')}
-              value={formData.crl_url}
-              onChange={(e) => updateField('crl_url', e.target.value)}
-              placeholder={t('msca.crlUrlPlaceholder')}
-            />
+            <Input id="msca-username" label={t('msca.username')} value={formData.username} onChange={(e) => updateField('username', e.target.value)} />
+            <SecretInput id="msca-password" label={t('msca.password')} value={formData.password} onChange={(e) => updateField('password', e.target.value)}
+              placeholder={connection ? '••••••••' : ''} {...secretInputProps(t, basicSecret)} />
           </>
         )}
-      </div>
-
-      {/* WinRM admin channel (revoke/unrevoke/publish CRL/inventory on the CA) */}
-      <div className="space-y-2 pt-2 border-t border-border">
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={formData.winrm_enabled} onChange={(e) => updateField('winrm_enabled', e.target.checked)} className="rounded" />
-          {t('msca.winrmEnable')}
-        </label>
-        {formData.winrm_enabled && (
-          <div className="space-y-3 pl-1">
-            <p className="text-xs text-text-tertiary">{t('msca.winrmHint')}</p>
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                label={t('msca.winrmHost')}
-                value={formData.winrm_host}
-                onChange={(e) => updateField('winrm_host', e.target.value)}
-                placeholder={formData.server || t('msca.winrmHostPlaceholder')}
-              />
-              <Input
-                label={t('msca.winrmPort')}
-                type="number"
-                value={formData.winrm_port}
-                onChange={(e) => updateField('winrm_port', e.target.value)}
+        {formData.auth_method === 'certificate' && (
+          // The product's certificate picker (upload, managed list) keeps its own look in the mockup's field
+          <div className="field full">
+            <div className="atl-out">
+              <CertificateInput
+                label={t('msca.clientCert')}
+                keyLabel={t('msca.clientKey')}
+                requireKey
+                value={{ cert_pem: formData.client_cert_pem, key_pem: formData.client_key_pem }}
+                onChange={({ cert_pem, key_pem }) => {
+                  updateField('client_cert_pem', cert_pem)
+                  updateField('client_key_pem', key_pem)
+                }}
               />
             </div>
-            <Select
-              label={t('msca.winrmTransport')}
-              options={[
-                { value: 'kerberos', label: `Kerberos (${t('common.recommended')})` },
-                { value: 'ntlm', label: 'NTLM' },
-              ]}
-              value={formData.winrm_transport}
-              onChange={(val) => updateField('winrm_transport', val)}
-            />
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={formData.winrm_use_ssl} onChange={(e) => updateField('winrm_use_ssl', e.target.checked)} className="rounded" />
-                {t('msca.winrmUseSsl')}
-              </label>
-              {formData.winrm_use_ssl && (
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={formData.winrm_verify_ssl} onChange={(e) => updateField('winrm_verify_ssl', e.target.checked)} className="rounded" />
-                  {t('msca.winrmVerifySsl')}
-                </label>
-              )}
-            </div>
-            <p className="text-xs text-text-tertiary">{t('msca.winrmCredsHint')}</p>
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                label={t('msca.winrmUsername')}
-                value={formData.winrm_username}
-                onChange={(e) => updateField('winrm_username', e.target.value)}
-                placeholder={t('msca.winrmUsernamePlaceholder')}
-              />
-              <Input
-                label={t('msca.winrmPassword')}
-                type="password"
-                value={formData.winrm_password}
-                onChange={(e) => updateField('winrm_password', e.target.value)}
-                placeholder={connection?.winrm_username ? '••••••••' : ''}
-                {...secretInputProps(t, winrmSecret)}
-              />
-            </div>
-            <Input
-              label={t('msca.caConfig')}
-              value={formData.ca_config}
-              onChange={(e) => updateField('ca_config', e.target.value)}
-              placeholder={t('msca.caConfigPlaceholder')}
-            />
-            {connection?.id && (
-              <Button type="button" variant="secondary" size="sm" onClick={handleTestAdminChannel} disabled={testingAdmin}>
-                <TestTube size={14} />
-                {testingAdmin ? t('common.testing') : t('msca.testAdminChannel')}
-              </Button>
-            )}
-            <label className="flex items-center gap-2 text-sm pt-1">
-              <input type="checkbox" checked={formData.inventory_sync_enabled} onChange={(e) => updateField('inventory_sync_enabled', e.target.checked)} className="rounded" />
-              {t('msca.inventorySyncEnable')}
-            </label>
-            {formData.inventory_sync_enabled && (
-              <p className="text-xs text-text-tertiary">{t('msca.inventorySyncHint')}</p>
-            )}
           </div>
         )}
+        {formData.auth_method === 'kerberos' && (
+          <>
+            <Notice tone="warn">{t('msca.kerberosOptionalNote')}</Notice>
+            <Input id="msca-krb-principal" label={t('msca.kerberosPrincipal')} value={formData.kerberos_principal}
+              onChange={(e) => updateField('kerberos_principal', e.target.value)} placeholder={t('msca.kerberosPrincipalPlaceholder')} />
+            <Input id="msca-krb-keytab" label={t('msca.kerberosKeytab')} value={formData.kerberos_keytab_path}
+              onChange={(e) => updateField('kerberos_keytab_path', e.target.value)} placeholder={t('msca.kerberosKeytabPlaceholder')} />
+          </>
+        )}
+
+        {availableTemplates.length > 0 ? (
+          <Select id="msca-template" label={t('msca.defaultTemplate')} options={availableTemplates.map(tpl => ({ value: tpl, label: tpl }))}
+            value={formData.default_template} onChange={(val) => updateField('default_template', val)} />
+        ) : (
+          <Input id="msca-template" label={t('msca.defaultTemplate')} value={formData.default_template}
+            onChange={(e) => updateField('default_template', e.target.value)} placeholder={t('msca.defaultTemplatePlaceholder')}
+            hint={fetchingTemplates ? t('msca.loadingTemplates') : connection?.id ? t('msca.templatesFetchHint') : undefined} />
+        )}
+
+        <ToggleSwitch checked={formData.verify_ssl} onChange={(v) => updateField('verify_ssl', v)} label={t('msca.verifySsl')} />
+        {formData.verify_ssl && (
+          <Textarea id="msca-ca-bundle" label={t('msca.caBundle')} value={formData.ca_bundle} onChange={(e) => updateField('ca_bundle', e.target.value)}
+            rows={3} placeholder="-----BEGIN CERTIFICATE-----" mono />
+        )}
+
+        {/* CRL revocation sync (one-way CA → UCM) */}
+          <ToggleSwitch checked={formData.crl_sync_enabled} onChange={(v) => updateField('crl_sync_enabled', v)} label={t('msca.crlSyncEnable')}
+            description={formData.crl_sync_enabled ? t('msca.crlSyncHint') : undefined} />
+          {formData.crl_sync_enabled && (
+            <Input id="msca-crl-url" full label={t('msca.crlUrl')} value={formData.crl_url} onChange={(e) => updateField('crl_url', e.target.value)}
+              placeholder={t('msca.crlUrlPlaceholder')} />
+          )}
+
+        {/* WinRM admin channel (revoke/unrevoke/publish CRL/inventory on the CA) */}
+          <ToggleSwitch checked={formData.winrm_enabled} onChange={(v) => updateField('winrm_enabled', v)} label={t('msca.winrmEnable')}
+            description={formData.winrm_enabled ? t('msca.winrmHint') : undefined} />
+          {formData.winrm_enabled && (
+            <>
+              <Input id="msca-winrm-host" label={t('msca.winrmHost')} value={formData.winrm_host} onChange={(e) => updateField('winrm_host', e.target.value)}
+                placeholder={formData.server || t('msca.winrmHostPlaceholder')} />
+              <NumberInput id="msca-winrm-port" label={t('msca.winrmPort')} value={formData.winrm_port} onChange={(e) => updateField('winrm_port', e.target.value)} />
+              <Select id="msca-winrm-transport" label={t('msca.winrmTransport')}
+                options={[
+                  { value: 'kerberos', label: `Kerberos (${t('common.recommended')})` },
+                  { value: 'ntlm', label: 'NTLM' },
+                ]}
+                value={formData.winrm_transport} onChange={(val) => updateField('winrm_transport', val)} />
+              <ToggleSwitch checked={formData.winrm_use_ssl} onChange={(v) => updateField('winrm_use_ssl', v)} label={t('msca.winrmUseSsl')} />
+              {formData.winrm_use_ssl && (
+                <ToggleSwitch checked={formData.winrm_verify_ssl} onChange={(v) => updateField('winrm_verify_ssl', v)} label={t('msca.winrmVerifySsl')} />
+              )}
+              <Notice>{t('msca.winrmCredsHint')}</Notice>
+              <Input id="msca-winrm-user" label={t('msca.winrmUsername')} value={formData.winrm_username} onChange={(e) => updateField('winrm_username', e.target.value)}
+                placeholder={t('msca.winrmUsernamePlaceholder')} />
+              <SecretInput id="msca-winrm-password" label={t('msca.winrmPassword')} value={formData.winrm_password}
+                onChange={(e) => updateField('winrm_password', e.target.value)} placeholder={connection?.winrm_username ? '••••••••' : ''}
+                {...secretInputProps(t, winrmSecret)} />
+              <Input id="msca-ca-config" full label={t('msca.caConfig')} value={formData.ca_config} onChange={(e) => updateField('ca_config', e.target.value)}
+                placeholder={t('msca.caConfigPlaceholder')} />
+              {connection?.id && (
+                <div className="settings-test">
+                  <Btn icon="send" onClick={handleTestAdminChannel} disabled={testingAdmin || undefined}>
+                    {testingAdmin ? t('common.testing') : t('msca.testAdminChannel')}
+                  </Btn>
+                </div>
+              )}
+              <ToggleSwitch checked={formData.inventory_sync_enabled} onChange={(v) => updateField('inventory_sync_enabled', v)}
+                label={t('msca.inventorySyncEnable')} description={formData.inventory_sync_enabled ? t('msca.inventorySyncHint') : undefined} />
+            </>
+          )}
+
+        <div className="settings-test">
+          <Btn icon="send" onClick={handleTestConnection} disabled={!formData.server || testing || undefined}>
+            {testing ? t('common.testing') : t('msca.testConnection')}
+          </Btn>
+        </div>
       </div>
 
-      <div className="flex justify-between gap-2 pt-4 border-t border-border">
-        <Button type="button" variant="secondary" onClick={handleTestConnection} disabled={!formData.server || testing}>
-          <TestTube size={16} />
-          {testing ? t('common.testing') : t('msca.testConnection')}
-        </Button>
-        <div className="flex gap-2">
-          <Button type="button" variant="secondary" onClick={onCancel}>
-            {t('common.cancel')}
-          </Button>
-          <Button type="submit">
-            {connection ? t('common.save') : t('common.create')}
-          </Button>
-        </div>
+      <div className="modal-actions">
+        <button type="button" className="btn" data-action="close-modal" onClick={onCancel}>{t('common.cancel')}</button>
+        <Btn type="submit" tone="primary" icon="check">{connection ? t('common.save') : t('common.create')}</Btn>
       </div>
     </form>
   )

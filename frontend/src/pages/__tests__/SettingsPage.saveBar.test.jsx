@@ -236,13 +236,10 @@ describe('SettingsPage: one page, one save bar', { timeout: 20000 }, () => {
     delete Element.prototype.scrollIntoView
   })
 
-  it('draws the converted sections with the mockup rules, keeps the others under .atl-out, in no outer form', async () => {
+  it('draws every section with the mockup rules, in no outer form', async () => {
     await loaded()
     const body = (id) => document.querySelector(`#set-sec-${id} > .settings-body`)
-    for (const id of ['general', 'security', 'email', 'https', 'appearance', 'backup', 'audit', 'database', 'updates', 'scheduler', 'autoRenewal', 'about']) {
-      expect(body(id), id).not.toHaveClass('atl-out')
-    }
-    for (const id of ['sso', 'webhooks', 'deploy']) expect(body(id), id).toHaveClass('atl-out')
+    for (const id of ['general', 'security', 'email', 'https', 'appearance', 'backup', 'audit', 'database', 'updates', 'scheduler', 'autoRenewal', 'about', 'sso', 'adConnector', 'microsoftCA', 'xcepWstep', 'webhooks', 'deploy', 'ct']) expect(body(id), id).not.toHaveClass('atl-out')
     expect(document.getElementById('settings-form').tagName).toBe('DIV')
     expect(document.getElementById('settings-form').closest('.atl')).not.toBeNull()
   })

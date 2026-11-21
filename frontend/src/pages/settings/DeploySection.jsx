@@ -7,15 +7,14 @@
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CloudArrowUp, Globe, Plus, TestTube, PencilSimple, Trash, ArrowsClockwise, Copy, Check } from '@phosphor-icons/react'
-import { Button, Badge, HelpCard, EmptyState } from '../../components'
-import { Modal } from '../../components/Modal'
+import { Btn, IconBtn, Pill, RecordList, RecordRow, SkeletonPanel, EmptyBlock } from '../../components/atelier'
+import { Modal, Input, NumberInput, Select, Textarea, ToggleSwitch, ChoiceField, Notice } from '../../components/atelier/Form'
+import { SettingsGroup } from '../../components/atelier/SettingsView'
 import { deployService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks/useClipboard'
 import { extractData, formatDate } from '../../lib/utils'
 import { useFipsMode } from '../../lib/policyAlgorithms'
-import { FormGroup } from '../../components/sectioned'
 
 const EMPTY_FORM = {
   kind: 'ssh', name: '', host: '', port: 22, username: '', private_key: '', enabled: true,
@@ -32,7 +31,6 @@ const TEMPLATE_HINT_VARS = {
   example: '{{name}}', jsonExample: '{{cert_pem|json}}', jsonstrExample: '{{cn|jsonstr}}', b64Example: '{{cert_pem|b64}}', urlExample: '{{cn|urlencode}}',
 }
 const HTTP_TEMPLATE_EXAMPLE = '{"name": {{name|json}}, "cert": {{cert_pem|json}}, "chain": {{chain_pem|json}}}'
-const INPUT_CLASS = 'ui-control w-full'
 
 export default function DeploySection() {
   const { t } = useTranslation()
@@ -177,259 +175,133 @@ export default function DeploySection() {
     username: 'ucm-deploy',
   }))
 
+  const closeForm = () => { if (!saving) setFormOpen(false) }
+  let list
+  if (loading) list = <SkeletonPanel label={t('common.loading')} />
+  else if (targets.length === 0) {
+    list = (
+      <EmptyBlock id="deploy" icon="upload" title={t('deploy.noTargets')} text={t('deploy.noTargetsDescription')}
+        action={{ label: t('deploy.addTarget'), icon: 'plus', onClick: openCreate, primary: true }} />
+    )
+  } else {
+    // The mockup's record list: name and state, the connection, its key or what it sends, then the actions
+    list = (
+      <SettingsGroup legend={t('deploy.targets')} grid={false}>
+        <RecordList>
+          {targets.map(target => (
+            <RecordRow key={target.id} title={target.name}
+              meta={<span className="mono">{target.kind === 'http' ? `${target.http_method} ${target.url}` : `${target.username}@${target.host}:${target.port}`}</span>}
+              extra={(
+                <span className="rl-meta">
+                  {target.kind === 'http'
+                    ? (target.allow_private_key ? t('deploy.httpSendsKey') : t('deploy.httpCertOnly'))
+                    : target.host_key_pinned
+                      ? t('deploy.hostKeyPinned', { fingerprint: target.host_key_fingerprint })
+                      : t('deploy.hostKeyNotPinned')}
+                  {target.last_success_at && ` · ${t('deploy.lastSuccess', { date: formatDate(target.last_success_at) })}`}
+                </span>
+              )}
+              badge={(
+                <span className="row-actions">
+                  <Pill icon={target.kind === 'http' ? 'globe' : 'terminal'} label={t(`deploy.kind_${target.kind === 'http' ? 'http' : 'ssh'}`)} />
+                  <Pill tone={target.enabled ? 'good' : 'muted'} label={target.enabled ? t('common.enabled') : t('common.disabled')} />
+                  {target.failure_count > 0 && <Pill tone="bad" label={t('deploy.failures', { count: target.failure_count })} />}
+                </span>
+              )}
+              action={<>
+                {target.kind !== 'http' && <IconBtn icon="key" label={t('deploy.showPublicKey')} onClick={() => setPublicKeyFor(target)} />}
+                <IconBtn icon="send" label={t('deploy.testConnection')} disabled={testing === target.id || undefined} onClick={() => handleTest(target)} />
+                <IconBtn icon="settings" label={t('common.edit')} onClick={() => openEdit(target)} />
+                <IconBtn icon="close" write label={t('common.delete')} onClick={() => handleDelete(target)} />
+              </>} />
+          ))}
+        </RecordList>
+        <div className="settings-actions">
+          <Btn tone="primary" icon="plus" onClick={openCreate}>{t('deploy.addTarget')}</Btn>
+        </div>
+      </SettingsGroup>
+    )
+  }
+
   return (
     <>
+      <Notice><strong>{t('deploy.helpTitle')}</strong>{' '}{t('deploy.helpDescription')}</Notice>
+      {list}
 
-      <HelpCard variant="info" title={t('deploy.helpTitle')}>
-        {t('deploy.helpDescription')}
-      </HelpCard>
-
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="w-6 h-6 border-2 border-accent-primary-op30 border-t-accent-primary rounded-full animate-spin" />
-        </div>
-      ) : targets.length === 0 ? (
-        <EmptyState
-          icon={CloudArrowUp}
-          title={t('deploy.noTargets')}
-          description={t('deploy.noTargetsDescription')}
-          action={{ label: t('deploy.addTarget'), onClick: openCreate, write: true }}
-        />
-      ) : (
-        <FormGroup title={t('deploy.targets')}>
-          <div className="space-y-3">
-            {targets.map(target => (
-              <div key={target.id} className="flex items-center justify-between p-4 bg-tertiary-50 border border-border rounded-lg">
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="w-10 h-10 rounded-lg bg-accent-primary-op10 flex items-center justify-center flex-shrink-0">
-                    {target.kind === 'http'
-                      ? <Globe size={20} className="text-accent-primary" />
-                      : <CloudArrowUp size={20} className="text-accent-primary" />}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-text-primary truncate">{target.name}</span>
-                      <Badge variant={target.enabled ? 'success' : 'secondary'} size="sm">
-                        {target.enabled ? t('common.enabled') : t('common.disabled')}
-                      </Badge>
-                      {target.failure_count > 0 && (
-                        <Badge variant="danger" size="sm">{t('deploy.failures', { count: target.failure_count })}</Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-text-secondary truncate font-mono">
-                      {target.kind === 'http'
-                        ? `${target.http_method} ${target.url}`
-                        : `${target.username}@${target.host}:${target.port}`}
-                    </p>
-                    <p className="text-2xs text-text-tertiary truncate">
-                      {target.kind === 'http'
-                        ? (target.allow_private_key ? t('deploy.httpSendsKey') : t('deploy.httpCertOnly'))
-                        : target.host_key_pinned
-                          ? t('deploy.hostKeyPinned', { fingerprint: target.host_key_fingerprint })
-                          : t('deploy.hostKeyNotPinned')}
-                      {target.last_success_at && ` · ${t('deploy.lastSuccess', { date: formatDate(target.last_success_at) })}`}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                  {target.kind !== 'http' && (
-                    <Button type="button" size="sm" variant="secondary" onClick={() => setPublicKeyFor(target)} title={t('deploy.showPublicKey')}>
-                      <Copy size={14} />
-                    </Button>
-                  )}
-                  <Button type="button" size="sm" variant="secondary" onClick={() => handleTest(target)} disabled={testing === target.id} title={t('deploy.testConnection')}>
-                    {testing === target.id ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
-                  </Button>
-                  <Button type="button" size="sm" variant="secondary" onClick={() => openEdit(target)}>
-                    <PencilSimple size={14} />
-                  </Button>
-                  <Button type="button" size="sm" variant="danger" onClick={() => handleDelete(target)}>
-                    <Trash size={14} />
-                  </Button>
-                </div>
-              </div>
-            ))}
-            <Button type="button" variant="secondary" onClick={openCreate} data-write>
-              <Plus size={16} /> {t('deploy.addTarget')}
-            </Button>
-          </div>
-        </FormGroup>
-      )}
-
-      {/* Create / edit modal */}
-      <Modal open={formOpen} onOpenChange={(v) => !v && !saving && setFormOpen(false)}
-             title={editing ? t('deploy.editTarget') : t('deploy.addTarget')} size="md">
-        <form onSubmit={handleSubmit} className="p-4 space-y-3">
-          {!editing && (
-            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={t('deploy.kind')}>
-              {['ssh', 'http'].map(kind => (
-                <button key={kind} type="button" role="radio" aria-checked={form.kind === kind}
-                        onClick={() => setForm({ ...form, kind })}
-                        className={`flex items-center gap-2 p-3 rounded-md border text-left text-sm ${
-                          form.kind === kind ? 'border-accent-primary bg-accent-primary-op10' : 'border-border bg-bg-tertiary'}`}>
-                  {kind === 'http' ? <Globe size={18} /> : <CloudArrowUp size={18} />}
-                  <span>
-                    <span className="block text-text-primary">{t(`deploy.kind_${kind}`)}</span>
-                    <span className="block text-2xs text-text-tertiary">{t(`deploy.kind_${kind}Hint`)}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="block text-xs font-medium text-text-secondary">{t('common.name')}</label>
-              <input className={INPUT_CLASS}
-                     value={form.name} onChange={field('name')} required maxLength={120} />
-            </div>
+      {/* Create / edit: the mockup's dialog form */}
+      <Modal open={formOpen} onClose={closeForm} title={editing ? t('deploy.editTarget') : t('deploy.addTarget')}>
+        <form onSubmit={handleSubmit}>
+          <div className="form-fields">
+            {!editing && (
+              <ChoiceField name="deploy-kind" legend={t('deploy.kind')} value={form.kind} onChange={(kind) => setForm({ ...form, kind })}
+                options={['ssh', 'http'].map(kind => ({ value: kind, label: t(`deploy.kind_${kind}`), hint: t(`deploy.kind_${kind}Hint`) }))} />
+            )}
+            <Input id="deploy-name" label={t('common.name')} value={form.name} onChange={field('name')} required maxLength={120} data-autofocus="" />
             {!isHttp && (
-              <div className="space-y-1">
-                <label className="block text-xs font-medium text-text-secondary">{t('deploy.sshUser')}</label>
-                <input className={INPUT_CLASS}
-                       value={form.username} onChange={field('username')} required maxLength={120} />
-              </div>
+              <Input id="deploy-user" label={t('deploy.sshUser')} value={form.username} onChange={field('username')} required maxLength={120} />
+            )}
+            {isHttp && (
+              <>
+                <Select id="deploy-method" label={t('deploy.httpMethod')} value={form.http_method} onChange={(v) => setForm({ ...form, http_method: v })}
+                  options={['POST', 'PUT', 'PATCH'].map(m => ({ value: m, label: m }))} />
+                <Input id="deploy-url" full mono label={t('deploy.httpUrl')} type="url" placeholder="https://firewall.example.net/api/trust/cert/add"
+                  value={form.url} onChange={field('url')} required maxLength={2048} />
+                <Textarea id="deploy-headers" mono rows={3} spellCheck={false}
+                  label={editing ? t('deploy.httpHeadersRotate', { count: editing.http_header_names?.length || 0 }) : t('deploy.httpHeaders')}
+                  placeholder={'Authorization: Bearer ...\nX-Api-Key: ...'} value={form.http_headers} onChange={field('http_headers')}
+                  hint={editing?.http_header_names?.length > 0 ? (
+                    <>
+                      {form.clear_headers
+                        ? t('deploy.httpHeadersRemoved')
+                        : t('deploy.httpHeadersStored', { names: editing.http_header_names.join(', ') })}
+                      {' '}
+                      <button type="button" className="text-link" onClick={form.clear_headers ? clearHeaders : removeStoredHeaders}>
+                        {form.clear_headers ? t('deploy.httpHeadersKeep') : t('common.remove')}
+                      </button>
+                    </>
+                  ) : undefined} />
+                <Textarea id="deploy-body" mono rows={6} spellCheck={false} required label={t('deploy.bodyTemplate')}
+                  placeholder={HTTP_TEMPLATE_EXAMPLE} value={form.body_template} onChange={field('body_template')}
+                  hint={<>{t('deploy.bodyTemplateHint', TEMPLATE_HINT_VARS)}{' '}<span className="mono">{HTTP_TEMPLATE_VARIABLES.map(v => `{{${v}}}`).join(' ')}</span></>} />
+                <ToggleSwitch checked={form.allow_private_key} onChange={(v) => setForm({ ...form, allow_private_key: v })}
+                  label={t('deploy.allowPrivateKey')} description={t('deploy.allowPrivateKeyHint', { keyVariable: '{{key_pem}}' })} />
+                <Textarea id="deploy-tls-ca" mono rows={3} spellCheck={false} label={t('deploy.tlsCaPem')} placeholder="-----BEGIN CERTIFICATE-----"
+                  value={form.tls_ca_pem} onChange={field('tls_ca_pem')} hint={t('deploy.tlsCaPemHint')} />
+              </>
+            )}
+            {!isHttp && (
+              <>
+                <Input id="deploy-host" mono label={t('deploy.host')} value={form.host} onChange={field('host')} required maxLength={255}
+                  hint={<><button type="button" className="text-link" onClick={applySameHostPreset}>{t('deploy.sameHost')}</button>{' '}{t('deploy.sameHostHint')}</>} />
+                <NumberInput id="deploy-port" label={t('deploy.port')} value={form.port} onChange={field('port')} />
+                <Textarea id="deploy-key" mono rows={4} spellCheck={false}
+                  label={editing ? t('deploy.privateKeyRotate') : t(fips ? 'deploy.privateKeyOptionalFips' : 'deploy.privateKeyOptional')}
+                  placeholder={t('deploy.privateKeyPlaceholder')} value={form.private_key} onChange={field('private_key')} />
+              </>
+            )}
+            {editing && (
+              <ToggleSwitch checked={form.enabled} onChange={(v) => setForm({ ...form, enabled: v })} label={t('common.enabled')} />
             )}
           </div>
-          {isHttp && (
-            <>
-              <div className="grid grid-cols-4 gap-3">
-                <div className="space-y-1">
-                  <label className="block text-xs font-medium text-text-secondary">{t('deploy.httpMethod')}</label>
-                  <select className={INPUT_CLASS} value={form.http_method} onChange={field('http_method')}>
-                    {['POST', 'PUT', 'PATCH'].map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1 col-span-3">
-                  <label className="block text-xs font-medium text-text-secondary">{t('deploy.httpUrl')}</label>
-                  <input className={`${INPUT_CLASS} font-mono`} type="url" placeholder="https://firewall.example.net/api/trust/cert/add"
-                         value={form.url} onChange={field('url')} required maxLength={2048} />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <label className="block text-xs font-medium text-text-secondary">
-                  {editing ? t('deploy.httpHeadersRotate', { count: editing.http_header_names?.length || 0 }) : t('deploy.httpHeaders')}
-                </label>
-                <textarea className={`${INPUT_CLASS} h-16 text-xs font-mono resize-y`} spellCheck={false}
-                          placeholder={'Authorization: Bearer ...\nX-Api-Key: ...'}
-                          value={form.http_headers} onChange={field('http_headers')} />
-                {editing?.http_header_names?.length > 0 && (
-                  <p className="text-2xs text-text-tertiary">
-                    {form.clear_headers
-                      ? t('deploy.httpHeadersRemoved')
-                      : t('deploy.httpHeadersStored', { names: editing.http_header_names.join(', ') })}
-                    {' '}
-                    <button type="button" className="text-accent-primary hover:underline"
-                            onClick={form.clear_headers ? clearHeaders : removeStoredHeaders}>
-                      {form.clear_headers ? t('deploy.httpHeadersKeep') : t('common.remove')}
-                    </button>
-                  </p>
-                )}
-              </div>
-              <div className="space-y-1">
-                <label className="block text-xs font-medium text-text-secondary">{t('deploy.bodyTemplate')}</label>
-                <textarea className={`${INPUT_CLASS} h-28 text-xs font-mono resize-y`} spellCheck={false} required
-                          placeholder={HTTP_TEMPLATE_EXAMPLE}
-                          value={form.body_template} onChange={field('body_template')} />
-                <p className="text-2xs text-text-tertiary">{t('deploy.bodyTemplateHint', TEMPLATE_HINT_VARS)}</p>
-                <p className="text-2xs text-text-tertiary font-mono break-words">
-                  {HTTP_TEMPLATE_VARIABLES.map(v => `{{${v}}}`).join(' ')}
-                </p>
-              </div>
-              <label className="flex items-start gap-3 p-3 bg-bg-tertiary border border-border rounded-md cursor-pointer">
-                <input type="checkbox" className="mt-0.5 w-4 h-4 accent-accent-primary" checked={form.allow_private_key}
-                       onChange={(e) => setForm({ ...form, allow_private_key: e.target.checked })} />
-                <div>
-                  <div className="text-sm text-text-primary">{t('deploy.allowPrivateKey')}</div>
-                  <div className="text-xs text-text-tertiary">{t('deploy.allowPrivateKeyHint', { keyVariable: '{{key_pem}}' })}</div>
-                </div>
-              </label>
-              <div className="space-y-1">
-                <label className="block text-xs font-medium text-text-secondary">{t('deploy.tlsCaPem')}</label>
-                <textarea className={`${INPUT_CLASS} h-16 text-xs font-mono resize-y`} spellCheck={false}
-                          placeholder="-----BEGIN CERTIFICATE-----"
-                          value={form.tls_ca_pem} onChange={field('tls_ca_pem')} />
-                <p className="text-2xs text-text-tertiary">{t('deploy.tlsCaPemHint')}</p>
-              </div>
-            </>
-          )}
-          {!isHttp && (
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1 col-span-2">
-              <label className="block text-xs font-medium text-text-secondary">{t('deploy.host')}</label>
-              <input className="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm text-text-primary font-mono focus:outline-none focus:border-accent-primary"
-                     value={form.host} onChange={field('host')} required maxLength={255} />
-              <div className="flex items-start gap-2 text-2xs">
-                <button
-                  type="button"
-                  className="text-accent-primary hover:underline whitespace-nowrap"
-                  onClick={applySameHostPreset}
-                >
-                  {t('deploy.sameHost')}
-                </button>
-                <span className="text-text-tertiary">{t('deploy.sameHostHint')}</span>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label className="block text-xs font-medium text-text-secondary">{t('deploy.port')}</label>
-              <input type="number" min={1} max={65535}
-                     className="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm text-text-primary focus:outline-none focus:border-accent-primary"
-                     value={form.port} onChange={field('port')} />
-            </div>
-          </div>
-          )}
-          {!isHttp && (
-          <div className="space-y-1">
-            <label className="block text-xs font-medium text-text-secondary">
-              {editing ? t('deploy.privateKeyRotate') : t(fips ? 'deploy.privateKeyOptionalFips' : 'deploy.privateKeyOptional')}
-            </label>
-            <textarea className="w-full h-20 px-3 py-2 bg-bg-tertiary border border-border rounded-md text-xs font-mono text-text-primary resize-y focus:outline-none focus:border-accent-primary"
-                      placeholder={t('deploy.privateKeyPlaceholder')}
-                      value={form.private_key} onChange={field('private_key')} spellCheck={false} />
-          </div>
-          )}
-          {editing && (
-            <label className="flex items-center gap-2 text-sm text-text-primary">
-              <input type="checkbox" checked={form.enabled}
-                     onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />
-              {t('common.enabled')}
-            </label>
-          )}
-          <div className="flex items-center justify-between gap-2 pt-3 border-t border-border">
-            <div>
-              {!isHttp && editing?.host_key_pinned && (
-                <Button type="button" size="sm" variant="danger" onClick={handleResetHostKey} disabled={saving}>
-                  {t('deploy.resetHostKey')}
-                </Button>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Button type="button" variant="secondary" onClick={() => setFormOpen(false)} disabled={saving}>
-                {t('common.cancel')}
-              </Button>
-              <Button type="submit" variant="primary" loading={saving}>
-                {editing ? t('common.save') : t('common.create')}
-              </Button>
-            </div>
+          <div className="modal-actions">
+            {!isHttp && editing?.host_key_pinned && (
+              <Btn tone="danger" onClick={handleResetHostKey} disabled={saving || undefined}>{t('deploy.resetHostKey')}</Btn>
+            )}
+            <button type="button" className="btn" data-action="close-modal" disabled={saving || undefined} onClick={() => setFormOpen(false)}>{t('common.cancel')}</button>
+            <Btn type="submit" tone="primary" icon="check" disabled={saving || undefined}>{editing ? t('common.save') : t('common.create')}</Btn>
           </div>
         </form>
       </Modal>
 
-      {/* Public key modal — install on the target's authorized_keys */}
-      <Modal open={!!publicKeyFor} onOpenChange={(v) => !v && setPublicKeyFor(null)}
-             title={t('deploy.publicKeyTitle')} size="md">
-        <div className="p-4 space-y-3">
-          <p className="text-xs text-text-secondary">{t('deploy.publicKeyHint', { username: publicKeyFor?.username || '' })}</p>
-          <pre className="p-3 bg-bg-tertiary border border-border rounded-md text-2xs font-mono text-text-primary whitespace-pre-wrap break-all">
-            {publicKeyFor?.public_key || t('deploy.publicKeyUnavailable')}
-          </pre>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={copyPublicKey} disabled={!publicKeyFor?.public_key}>
-              {isCopied() ? <Check size={14} /> : <Copy size={14} />} {t('common.copy')}
-            </Button>
-            <Button type="button" variant="primary" onClick={() => setPublicKeyFor(null)}>
-              {t('common.close')}
-            </Button>
-          </div>
+      {/* Public key: install it in the target's authorized_keys */}
+      <Modal open={!!publicKeyFor} onClose={() => setPublicKeyFor(null)} title={t('deploy.publicKeyTitle')}>
+        <div className="settings-stack">
+          <p className="small muted">{t('deploy.publicKeyHint', { username: publicKeyFor?.username || '' })}</p>
+          <pre className="public-key mono">{publicKeyFor?.public_key || t('deploy.publicKeyUnavailable')}</pre>
+        </div>
+        <div className="modal-actions">
+          <Btn icon={isCopied() ? 'check' : 'copy'} onClick={copyPublicKey} disabled={!publicKeyFor?.public_key || undefined}>{t('common.copy')}</Btn>
+          <button type="button" className="btn primary" data-write="false" data-action="close-modal" onClick={() => setPublicKeyFor(null)}>{t('common.close')}</button>
         </div>
       </Modal>
     </>
