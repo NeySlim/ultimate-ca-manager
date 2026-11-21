@@ -67,7 +67,8 @@ describe('SetupCard', () => {
     expect(within(steps[1]).getByRole('button', { name: 'shell.setup.steps.issuing.action' })).toBeDisabled()
     expect(within(steps[2]).getByText('shell.setup.stateAfter|1')).toBeInTheDocument()
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0')
-    expect(m.persistPreference).toHaveBeenCalledWith(SETUP_PREF, 'started')
+    // Recorded by an effect once the card is drawn: asked until it holds
+    await waitFor(() => expect(m.persistPreference).toHaveBeenCalledWith(SETUP_PREF, 'started'))
   })
 
   it('is not shown to an instance that already has a CA, unless it was started on an empty one', async () => {
