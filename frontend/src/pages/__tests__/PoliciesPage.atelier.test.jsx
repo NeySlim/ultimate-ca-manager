@@ -34,6 +34,7 @@ vi.mock('../../services', () => ({
   groupsService: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
 }))
 
+import { renderAtUrl } from '../../test/dockUrl'
 import PoliciesPage from '../PoliciesPage'
 
 const render = (ui) => rtl(<MemoryRouter>{ui}</MemoryRouter>)
@@ -132,5 +133,18 @@ describe('PoliciesPage on the mockup module list', () => {
     expect(within(alert).getByRole('link', { name: /work.viewLog/ })).toHaveAttribute('href', '/audit')
     fireEvent.click(within(alert).getByRole('button', { name: 'table.retry' }))
     expect(await screen.findByRole('button', { name: 'Clients' })).toBeInTheDocument()
+  })
+})
+
+describe('the policy dock in the URL', () => {
+  it('reopens the policy of the URL, writes the one opened and drops one that is gone', async () => {
+    const r = renderAtUrl(<PoliciesPage />, '/policies?item=3')
+    expect(within(await r.dock()).getByRole('heading', { level: 2 })).toHaveTextContent('Clients')
+    fireEvent.click(screen.getByRole('button', { name: 'Serveurs TLS' }))
+    expect(r.where()).toBe('/policies?item=1')
+    r.unmount()
+    const gone = renderAtUrl(<PoliciesPage />, '/policies?item=99')
+    await screen.findByRole('button', { name: 'Clients' })
+    await waitFor(() => expect(gone.where()).toBe('/policies'))
   })
 })

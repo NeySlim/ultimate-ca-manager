@@ -55,14 +55,15 @@ export function CommandPalette({ open, onOpenChange }) {
     onOpenChange(false)
   }
 
-  // Get path for item type
+  // The page that docks the record, opened on it (`?item=`, the dock's object in the URL)
   const getTypePath = (type, id) => {
+    const at = encodeURIComponent(id)
     switch (type) {
-      case 'certificates': case 'certificate': return `/certificates?selected=${id}`
-      case 'cas': case 'ca': return `/cas?selected=${id}`
-      case 'users': case 'user': return `/users?selected=${id}`
-      case 'csrs': case 'csr': return `/csrs?selected=${id}`
-      case 'templates': case 'template': return `/templates?selected=${id}`
+      case 'certificates': case 'certificate': return `/certificates?item=${at}`
+      case 'cas': case 'ca': return `/cas?authority=${at}`
+      case 'users': case 'user': return `/users?item=${at}`
+      case 'csrs': case 'csr': return `/csrs?item=${at}`
+      case 'templates': case 'template': return `/templates?item=${at}`
       default: return '/'
     }
   }

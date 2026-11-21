@@ -17,6 +17,7 @@ import { acmeService, casService, certificatesService, templatesService } from '
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
 import { useLinkedId } from '../hooks/useLinkedId'
+import { useDockSelection, asId } from '../components/atelier/useDockParam'
 import { stateLabel } from '../lib/stateLabel'
 import { downloadBlob, publicBaseUrl } from '../lib/utils'
 import { fetchPages } from '../lib/fetchAllPages'
@@ -50,6 +51,9 @@ const SERVER_VIEWS = ['accounts', 'localorders', 'localdomains', 'eab', 'config'
 const CLIENT_VIEWS = ['letsencrypt', 'letsencryptorders', 'upstream', 'dns', 'domains']
 const ACME_TABS = [...SERVER_VIEWS, ...CLIENT_VIEWS, 'history']
 
+const NONE = []
+const ACCOUNT_SECTIONS = ['account', 'orders', 'challenges']
+
 export default function ACMEPage() {
   const { t, i18n } = useTranslation()
   const locale = i18n?.language || 'en'
@@ -59,8 +63,6 @@ export default function ACMEPage() {
 
   // Data states - ACME Server
   const [accounts, setAccounts] = useState([])
-  const [selectedAccount, setSelectedAccount] = useState(null)
-  const [selectedCert, setSelectedCert] = useState(null)
   const [orders, setOrders] = useState([])
   const [challenges, setChallenges] = useState([])
   const [acmeSettings, setAcmeSettings] = useState({})
@@ -80,7 +82,6 @@ export default function ACMEPage() {
   const [dnsProviderTypes, setDnsProviderTypes] = useState([])
   const [acmeDomains, setAcmeDomains] = useState([])
   const [localDomains, setLocalDomains] = useState([])
-  const [selectedClientOrder, setSelectedClientOrder] = useState(null)
   const [selectedDnsProvider, setSelectedDnsProvider] = useState(null)
   const [selectedAcmeDomain, setSelectedAcmeDomain] = useState(null)
 
@@ -93,14 +94,26 @@ export default function ACMEPage() {
   const linkedTab = searchParams.get('tab')
   const linkedOrder = useLinkedId('order')
   const activeTab = ACME_TABS.includes(linkedTab) ? linkedTab : 'accounts'
-  const setActiveTab = (tab) => {
-    setSelectedClientOrder(null)
-    setSelectedAccount(null)
-    setSelectedCert(null)
-    setSearchParams(tab === 'accounts' ? {} : { tab }, { replace: true })
+  // The new view's URL carries no object: its dock closes
+  const setActiveTab = (tab) => setSearchParams(tab === 'accounts' ? {} : { tab }, { replace: true })
+
+  // The object open in the view's dock lives in the URL (`item`, the account's `section` too)
+  const accountSel = useDockSelection(activeTab === 'accounts' ? accounts : NONE, { ready: false, sections: ACCOUNT_SECTIONS, fallback: 'account' })
+  const selectedAccount = activeTab === 'accounts' ? accountSel.selected : null
+  const setSelectedAccount = accountSel.select
+  const { section: activeDetailTab, setSection: setActiveDetailTab } = accountSel
+  const orderSel = useDockSelection(activeTab === 'letsencryptorders' ? clientOrders : NONE, { ready: activeTab === 'letsencryptorders' && !loading })
+  const selectedClientOrder = activeTab === 'letsencryptorders' ? orderSel.selected : null
+  const setSelectedClientOrder = orderSel.select
+  const certSel = useDockSelection(activeTab === 'history' ? history : NONE, { ready: activeTab === 'history' && !historyLoading })
+  const selectedCert = activeTab === 'history' ? certSel.selected : null
+  const setSelectedCert = certSel.select
+  // An order shown from elsewhere (a link, a new request): its view and its dock in one URL step
+  const showOrder = (tab, order) => {
+    if (tab === 'letsencryptorders') orderSel.hold(order)
+    setSearchParams({ tab, item: String(order.id) }, { replace: true })
   }
   const [linkedLocalOrder, setLinkedLocalOrder] = useState(null)
-  const [activeDetailTab, setActiveDetailTab] = useState('account')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
   const [preflightLoading, setPreflightLoading] = useState(false)
@@ -148,9 +161,8 @@ export default function ACMEPage() {
       if (cancelled || !order) return
       const stillFailing = client ? order.renewal_failures > 0 : String(order.status).toLowerCase() === 'invalid'
       // Followed from the open page, the tab does not remount: switch to the order's tab
-      setActiveTab(linkedTab)
-      if (client) setSelectedClientOrder(order)
-      else setLinkedLocalOrder(order)
+      if (!client) setLinkedLocalOrder(order)
+      showOrder(linkedTab, order)
       if (!stillFailing) {
         showInfo(t('overview.link.handled', { id: order.id, status: stateLabel(t, order.status) }))
       }
@@ -287,22 +299,28 @@ export default function ACMEPage() {
     }
   }
 
-  // Select an account and load its details
-  const selectAccount = useCallback(async (account) => {
-    try {
-      const [accountRes, ordersRes, challengesRes] = await Promise.all([
-        acmeService.getAccountById(account.id),
-        acmeService.getOrders(account.id),
-        acmeService.getChallenges(account.id),
-      ])
-      setSelectedAccount(accountRes.data || accountRes)
-      setOrders(ordersRes.data || [])
-      setChallenges(challengesRes.data || [])
-      setActiveDetailTab('account')
-    } catch (error) {
-      showError(error.message || t('messages.errors.loadFailed.generic'))
-    }
-  }, [showError])
+  // Select an account; its details, orders and challenges are read once its id is in the URL (a click or a reload)
+  const selectAccount = setSelectedAccount
+  const accountItem = activeTab === 'accounts' ? accountSel.item : null
+  useEffect(() => {
+    if (!accountItem || loading) return undefined
+    let live = true
+    const id = asId(accountItem)
+    setOrders([])
+    setChallenges([])
+    Promise.all([acmeService.getAccountById(id), acmeService.getOrders(id), acmeService.getChallenges(id)])
+      .then(([accountRes, ordersRes, challengesRes]) => {
+        if (!live) return
+        setSelectedAccount(accountRes.data || accountRes)
+        setOrders(ordersRes.data || [])
+        setChallenges(challengesRes.data || [])
+      }, (error) => {
+        if (!live) return
+        showError(error.message || t('messages.errors.loadFailed.generic'))
+        if (!accounts.some((a) => String(a.id) === accountItem)) setSelectedAccount(null)
+      })
+    return () => { live = false }
+  }, [accountItem, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Settings handlers
   const handleSaveConfig = async () => {
@@ -439,9 +457,7 @@ export default function ACMEPage() {
       }
       setShowRequestModal(false)
       loadData()
-      if (payload.order) {
-        setSelectedClientOrder(payload.order)
-      }
+      if (payload.order) showOrder('letsencryptorders', payload.order)
     } catch (error) {
       showError(error.message || t('acme.certificateRequestFailed'))
     }

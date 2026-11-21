@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { GROUP_PQ, KEY_ALGORITHMS } from '../../lib/keyAlgorithms'
 
 const mocks = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), update: vi.fn(), getEffective: vi.fn() }))
@@ -36,7 +37,7 @@ import PoliciesPage from '../PoliciesPage'
 async function openCreate(effective) {
   mocks.list.mockResolvedValue({ data: [] })
   mocks.getEffective.mockResolvedValue({ data: effective })
-  render(<PoliciesPage />)
+  render(<MemoryRouter><PoliciesPage /></MemoryRouter>)
   fireEvent.click((await screen.findAllByText('policies.createPolicy'))[0])
   await waitFor(() => expect(mocks.getEffective).toHaveBeenCalled())
 }
@@ -44,7 +45,7 @@ async function openCreate(effective) {
 async function openEdit(policy, effective) {
   mocks.list.mockResolvedValue({ data: [policy] })
   mocks.getEffective.mockResolvedValue({ data: effective })
-  render(<PoliciesPage />)
+  render(<MemoryRouter><PoliciesPage /></MemoryRouter>)
   fireEvent.click(await screen.findByRole('button', { name: policy.name }))
   fireEvent.click(await screen.findByRole('button', { name: 'common.edit' }))
   await waitFor(() => expect(mocks.getEffective).toHaveBeenCalled())

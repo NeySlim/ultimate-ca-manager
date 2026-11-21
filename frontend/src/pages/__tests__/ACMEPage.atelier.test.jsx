@@ -143,3 +143,30 @@ describe('the ACME page switch', () => {
     expect(await screen.findByRole('combobox', { name: 'protocols.view' })).toHaveValue('localdomains')
   })
 })
+
+describe('the ACME docks in the URL', () => {
+  it('writes the account opened and its section', async () => {
+    at('/acme')
+    fireEvent.click(await screen.findByRole('button', { name: 'acct/abcdefghijkl' }))
+    await waitFor(() => expect(location.search).toBe('?item=5'))
+    const dock = await screen.findByRole('complementary', { name: /atelier.detailOf/ })
+    fireEvent.click(within(dock).getByRole('tab', { name: 'acme.orders' }))
+    expect(location.search).toBe('?item=5&section=orders')
+  })
+
+  it('reopens an account and its section on reload', async () => {
+    at('/acme?item=5&section=challenges')
+    const dock = await screen.findByRole('complementary', { name: /atelier.detailOf/ })
+    expect(within(dock).getByRole('tab', { name: 'common.challenges' })).toHaveAttribute('aria-selected', 'true')
+    await waitFor(() => expect(acmeService.getAccountById).toHaveBeenCalledWith(5))
+    expect(await within(dock).findByText('acme.challengeTxt')).toBeInTheDocument()
+  })
+
+  it('a view change closes the dock', async () => {
+    at('/acme?item=5')
+    await screen.findByRole('complementary', { name: /atelier.detailOf/ })
+    fireEvent.change(document.getElementById('acme-view'), { target: { value: 'history' } })
+    await waitFor(() => expect(location.search).toBe('?tab=history'))
+    expect(screen.queryByRole('complementary', { name: /atelier.detailOf/ })).toBeNull()
+  })
+})

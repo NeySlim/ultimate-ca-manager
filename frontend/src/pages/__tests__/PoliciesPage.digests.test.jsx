@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 
 const mocks = vi.hoisted(() => ({ create: vi.fn(), list: vi.fn(), update: vi.fn() }))
 
@@ -35,7 +36,7 @@ import PoliciesPage from '../PoliciesPage'
 async function openCreate() {
   mocks.list.mockResolvedValue({ data: [] })
   mocks.create.mockResolvedValue({ data: { id: 1 } })
-  render(<PoliciesPage />)
+  render(<MemoryRouter><PoliciesPage /></MemoryRouter>)
   fireEvent.click((await screen.findAllByText('policies.createPolicy'))[0])
   fireEvent.change(screen.getByLabelText('policies.policyName'), { target: { value: 'FIPS' } })
 }
@@ -62,7 +63,7 @@ describe('PoliciesPage signature hash rule (#397)', () => {
   it('keeps a policy without key types unrestricted when edited', async () => {
     mocks.list.mockResolvedValue({ data: [{ id: 7, name: 'Hashes', policy_type: 'issuance', rules: { allowed_digests: ['sha384'] } }] })
     mocks.update.mockResolvedValue({ data: { id: 7 } })
-    render(<PoliciesPage />)
+    render(<MemoryRouter><PoliciesPage /></MemoryRouter>)
     fireEvent.click(await screen.findByRole('button', { name: 'Hashes' }))
     fireEvent.click(await screen.findByRole('button', { name: 'common.edit' }))
     fireEvent.submit(screen.getByLabelText('policies.policyName').closest('form'))

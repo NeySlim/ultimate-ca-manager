@@ -29,6 +29,8 @@ describe('CommandPalette results', () => {
       certificates: [{ id: 7, name: 'web.example.com', subject: 'CN=web', status: 'valid' }],
       cas: [{ id: 3, name: 'Root CA', subject: 'CN=Root' }],
       users: [{ id: 5, name: 'alice', subject: 'alice@example.com' }],
+      templates: [{ id: 6, name: 'Code Signing', description: 'Signs code' }],
+      csrs: [{ id: 9, name: 'csr.example.com', subject: 'CN=csr' }],
     })
   })
 
@@ -53,10 +55,11 @@ describe('CommandPalette results', () => {
     await waitFor(() => expect(mocks.openEntity).toHaveBeenCalledWith('ca', 3, expect.any(Object)))
   })
 
-  it('sends a user to its page', async () => {
-    await search()
-    fireEvent.click(await screen.findByText('alice'))
-    expect(mocks.navigate).toHaveBeenCalledWith('/users?selected=5')
-    expect(mocks.openEntity).not.toHaveBeenCalled()
-  })
+  it.each([['alice', '/users?item=5'], ['Code Signing', '/templates?item=6'], ['csr.example.com', '/csrs?item=9']])(
+    'opens %s in its page\'s dock (the dock\'s ?item=)', async (name, to) => {
+      await search()
+      fireEvent.click(await screen.findByText(name))
+      expect(mocks.navigate).toHaveBeenCalledWith(to)
+      expect(mocks.openEntity).not.toHaveBeenCalled()
+    })
 })

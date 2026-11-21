@@ -11,6 +11,7 @@ import { approvalsService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { useLinkedId } from '../hooks/useLinkedId'
+import { useDockParam, asId } from '../components/atelier/useDockParam'
 import { formatDate } from '../lib/utils'
 import { stateLabel } from '../lib/stateLabel'
 import {
@@ -23,6 +24,8 @@ import { useApprovalDecision } from './approvals/useApprovalDecision'
 // The decided requests the history shows, newest first
 const HISTORY_SIZE = 100
 
+const APPROVAL_SECTIONS = ['request', 'log']
+
 export default function ApprovalsPage() {
   const { t } = useTranslation()
   const { showError, showInfo } = useNotification()
@@ -33,8 +36,11 @@ export default function ApprovalsPage() {
   const [failure, setFailure] = useState(null)
   const [linked, setLinked] = useState(null)
   const [caNames, setCaNames] = useState({})
-  const [openId, setOpenId] = useState(null)
-  const [section, setSection] = useState('request')
+  // The open request and its section live in the URL (`item`, `section`); the work queue's ?request= and the
+  // e-mails' ?id= open it too
+  const reqDock = useDockParam({ sections: APPROVAL_SECTIONS, fallback: 'request', aliases: ['request', 'id'] })
+  const openId = reqDock.item == null ? null : asId(reqDock.item)
+  const { section, setSection } = reqDock
   const spot = useRef(-1)
 
   const load = useCallback(async ({ quiet = false } = {}) => {
@@ -78,8 +84,6 @@ export default function ApprovalsPage() {
       .then((res) => {
         if (cancelled || !res?.data) return
         setLinked(res.data)
-        setOpenId(res.data.id)
-        setSection('request')
         if (res.data.status !== 'pending') {
           showInfo(t('overview.link.handled', { id: res.data.id, status: stateLabel(t, res.data.status) }))
         }
@@ -112,10 +116,18 @@ export default function ApprovalsPage() {
     decision.open(kind, reqs)
   }
   const mayDecide = canWrite('approvals')
-  const open = (req) => {
-    if (req.id !== openId) setSection('request')
-    setOpenId(req.id)
-  }
+  const open = (req) => reqDock.open(req.id)
+  // An open request the list does not hold (a reload) is read by id; one that no longer exists leaves the URL
+  useEffect(() => {
+    if (state !== 'ready' || openId == null || linkedId || requests.some((r) => r.id === openId) || linked?.id === openId) return undefined
+    let cancelled = false
+    approvalsService.getById(openId).then((res) => {
+      if (cancelled) return
+      if (res?.data) setLinked(res.data)
+      else reqDock.close()
+    }, () => { if (!cancelled) reqDock.close() })
+    return () => { cancelled = true }
+  }, [state, openId, linkedId, requests, linked]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const groups = approvalGroups(pending, t).map((g) => ({
     ...g,
@@ -135,7 +147,7 @@ export default function ApprovalsPage() {
   const bulk = mayDecide ? (ids) => <DecisionButtons onDecide={(kind) => ask(kind, ids.map((id) => byId.get(id)).filter(Boolean))} /> : undefined
 
   const dock = opened && (
-    <ApprovalDock req={opened} section={section} onSection={setSection} onClose={() => setOpenId(null)}
+    <ApprovalDock req={opened} section={section} onSection={setSection} onClose={reqDock.close}
       onDecide={(kind) => ask(kind, [opened])} />
   )
 

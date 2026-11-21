@@ -18,6 +18,7 @@ import { SmartImportModal } from '../components/SmartImport'
 import { truststoreService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals, usePersistedState } from '../hooks'
+import { useDockSelection, asId } from '../components/atelier/useDockParam'
 import { downloadBlob, warnSkippedExport } from '../lib/utils'
 import { soleImported } from '../lib/importResult'
 import { trustStoreExpiryStatus } from '../lib/expiry'
@@ -35,6 +36,8 @@ const PURPOSE_LABELS = {
   code_signing: 'common.codeSigning', system: 'common.system', custom: 'common.custom',
 }
 
+const TRUST_SECTIONS = ['overview', 'details', 'pem']
+
 export default function TrustStorePage() {
   const { t, i18n } = useTranslation()
   const locale = i18n?.language || 'en'
@@ -48,7 +51,6 @@ export default function TrustStorePage() {
   const [loading, setLoading] = useState(true)
   const [certificates, setCertificates] = useState([])
   const [loadError, setLoadError] = useState(null)
-  const [selectedCert, setSelectedCert] = useState(null)
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [syncing, setSyncing] = useState(false)
@@ -59,7 +61,12 @@ export default function TrustStorePage() {
   const [purpose, setPurpose] = usePersistedState('ucm-truststore-type', '')
   const [state, setState] = usePersistedState('ucm-truststore-state', '')
   const [sort, setSort] = useState({ key: 'name', asc: true })
-  const [section, setSection] = useState('overview')
+  // The open anchor and its section live in the URL (`item`, `section`); its detail is read below,
+  // so an anchor the filters hide still opens
+  const tsDock = useDockSelection(certificates, { ready: false, sections: TRUST_SECTIONS })
+  const selectedCert = tsDock.selected
+  const setSelectedCert = (v) => tsDock.select(typeof v === 'function' ? v(tsDock.selected) : v)
+  const { section, setSection } = tsDock
   
   // Add from managed CAs modal state
   const [managedCAs, setManagedCAs] = useState([])
@@ -120,25 +127,25 @@ export default function TrustStorePage() {
   }, [searched, state, sort])
 
   // The list row holds the anchor; its detail completes it once read
-  const handleSelectCert = async (cert) => {
-    if (cert.id !== selectedCert?.id) setSection('overview')
-    if (cert.name) setSelectedCert(cert)
-    try {
-      const response = await truststoreService.getById(cert.id)
-      setSelectedCert((prev) => ({ ...(prev?.id === cert.id ? prev : {}), ...(response.data || cert) }))
-    } catch {
-      if (!cert.name) setSelectedCert(null)
-    }
-  }
-
-  // Deep-link: /truststore/:id opens that anchor, even one the filters hide
+  const handleSelectCert = (cert) => setSelectedCert(cert)
+  const tsItem = tsDock.item
   useEffect(() => {
-    if (urlCertId && !loading) {
-      const id = parseInt(urlCertId, 10)
-      if (!isNaN(id)) handleSelectCert(certificates.find((c) => c.id === id) || { id })
-      navigate('/truststore', { replace: true })
-    }
-  }, [urlCertId, loading]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!tsItem || loading) return undefined
+    let live = true
+    const row = certificates.find((c) => String(c.id) === tsItem)
+    truststoreService.getById(row?.id ?? asId(tsItem)).then((response) => {
+      if (!live) return
+      if (response?.data) setSelectedCert({ ...row, ...response.data })
+      else if (!row) setSelectedCert(null)
+    }, () => { if (live && !row) setSelectedCert(null) })
+    return () => { live = false }
+  }, [tsItem, loading]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The work queue's /truststore/:id becomes the dock's ?item=, which a reload keeps
+  useEffect(() => {
+    if (urlCertId && /^\d+$/.test(urlCertId)) navigate(`/truststore?item=${urlCertId}`, { replace: true })
+    else if (urlCertId) navigate('/truststore', { replace: true })
+  }, [urlCertId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadManagedCAs = async () => {
     setLoadingCAs(true)

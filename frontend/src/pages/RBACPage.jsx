@@ -13,6 +13,7 @@ import {
 } from '../components/atelier'
 import { useNotification } from '../contexts'
 import { useModals, usePersistedState } from '../hooks'
+import { useDockSelection } from '../components/atelier/useDockParam'
 import { rolesService } from '../services'
 import {
   groupPermissions, normalizePermissions, ignoredPermissions, appliedPermissions,
@@ -30,6 +31,8 @@ function CategoryBox({ label, all, some, disabled, onChange }) {
   )
 }
 
+const ROLE_SECTIONS = ['overview', 'permissions']
+
 export default function RBACPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showConfirm } = useNotification()
@@ -41,12 +44,15 @@ export default function RBACPage() {
   // What a custom role may grant, as the server enforces it
   const [grantable, setGrantable] = useState([])
   const categories = useMemo(() => groupPermissions(grantable), [grantable])
-  const [selectedRole, setSelectedRole] = useState(null)
-  const [section, setSection] = useState('overview')
+  // The open role and its section live in the URL (`item`, `section`); an unsaved permission edit is held
+  const roleDock = useDockSelection(roles, { ready: !loading && !loadError, sections: ROLE_SECTIONS })
+  const { section, setSection, select: setSelectedRole } = roleDock
   // Legacy names normalised once, so toggles and display read the same list
+  const selectedRole = useMemo(() => (roleDock.selected
+    ? { ...roleDock.selected, permissions: normalizePermissions(roleDock.selected.permissions) } : null), [roleDock.selected])
   const selectRole = useCallback((role) => {
     setSelectedRole(role ? { ...role, permissions: normalizePermissions(role.permissions) } : null)
-  }, [])
+  }, [setSelectedRole])
   const [kind, setKind] = usePersistedState('ucm-rbac-kind', '')
   const [query, setQuery] = useState('')
 

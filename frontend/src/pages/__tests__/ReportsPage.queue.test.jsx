@@ -35,6 +35,7 @@ const api = vi.hoisted(() => ({
 const certs = vi.hoisted(() => ({ getStats: vi.fn() }))
 vi.mock('../../services', () => ({ reportsService: api, certificatesService: certs }))
 
+import { renderAtUrl } from '../../test/dockUrl'
 import ReportsPage from '../ReportsPage'
 import { setAppTimezone } from '../../stores/timezoneStore'
 
@@ -196,5 +197,19 @@ describe('ReportsPage queue', () => {
     const alert = await screen.findByRole('alert')
     fireEvent.click(within(alert).getByRole('button', { name: 'Réessayer' }))
     expect(await screen.findByText('Certificats expirants')).toBeInTheDocument()
+  })
+})
+
+describe('the report dock in the URL', () => {
+  it('reopens the report and section of the URL, writes the one opened, drops an unknown one', async () => {
+    const r = renderAtUrl(<ReportsPage />, '/reports?item=expiring_certificates&section=runs')
+    const dock = await screen.findByRole('complementary', { name: 'Détail : Rapports' })
+    expect(within(dock).getByRole('heading', { level: 2, name: 'Certificats expirants' })).toBeInTheDocument()
+    expect(within(dock).getByRole('tab', { name: 'Exécutions' })).toHaveAttribute('aria-selected', 'true')
+    fireEvent.click(within(dock).getByRole('tab', { name: 'Aperçu' }))
+    expect(r.where()).toBe('/reports?item=expiring_certificates&section=preview')
+    r.unmount()
+    const gone = renderAtUrl(<ReportsPage />, '/reports?item=nope')
+    await waitFor(() => expect(gone.where()).toBe('/reports'))
   })
 })

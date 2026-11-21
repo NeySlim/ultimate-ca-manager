@@ -17,6 +17,7 @@ import { userCertificatesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, usePersistedState } from '../hooks'
 import { useEntityActions } from '../hooks/useEntityActions'
+import { useDockSelection, asId } from '../components/atelier/useDockParam'
 import { extractCN, isOnHold, downloadBlob, exportToJSON } from '../lib/utils'
 import { fetchPages } from '../lib/fetchAllPages'
 import { canExportPrivateKey } from '../lib/exportPermissions'
@@ -64,6 +65,8 @@ function ExportListDialog({ count, onExport, onClose }) {
   )
 }
 
+const USER_CERT_SECTIONS = ['overview']
+
 export default function UserCertificatesPage() {
   const { t, i18n } = useTranslation()
   const locale = i18n?.language || 'en'
@@ -82,8 +85,12 @@ export default function UserCertificatesPage() {
   const [searchValue, setSearchValue] = useState('')
   // The server sorts the whole list; null keeps its default (newest first)
   const [sort, setSort] = useState(null)
-  const [open, setOpen] = useState(null)
-  const [section, setSection] = useState('overview')
+  // The open enrolment and its section live in the URL (`item`, `section`); its detail is read below,
+  // so an id off the list's page still opens
+  const certDock = useDockSelection(certificates, { ready: false, sections: USER_CERT_SECTIONS })
+  const open = certDock.selected
+  const { section, setSection } = certDock
+  const setOpen = (v) => certDock.select(typeof v === 'function' ? v(certDock.selected) : v)
   const [menuOpen, setMenuOpen] = useState(false)
   const [listExport, setListExport] = useState(false)
   // Export: the dialog owns the format, password and PKCS#12 profile (#331)
@@ -132,14 +139,20 @@ export default function UserCertificatesPage() {
   }, [loadData])
 
   // The list row first, then the enrolment's detail
-  const openCert = async (row) => {
-    if (row.id !== open?.id) setSection('overview')
-    setOpen(row)
-    try {
-      const res = await userCertificatesService.getById(row.id)
-      if (res?.data) setOpen((prev) => (prev?.id === row.id ? { ...prev, ...res.data } : prev))
-    } catch { /* the row stays shown */ }
-  }
+  const openCert = (row) => setOpen(row)
+  const certItem = certDock.item
+  useEffect(() => {
+    if (!certItem || loading) return undefined
+    let live = true
+    const row = certificates.find((r) => String(r.id) === certItem)
+    // A listed row stays shown when its detail cannot be read; an unknown id leaves the URL
+    userCertificatesService.getById(row?.id ?? asId(certItem)).then((res) => {
+      if (!live) return
+      if (res?.data) setOpen({ ...row, ...res.data })
+      else if (!row) setOpen(null)
+    }, () => { if (live && !row) setOpen(null) })
+    return () => { live = false }
+  }, [certItem, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Lint and key recovery come from the shared actions; export, revocation and deletion stay this page's
   const shared = useEntityActions({ type: 'user_certificate', entity: open, entityId: open?.id, onChanged: setOpen, onClose: () => setOpen(null) })

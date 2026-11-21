@@ -3,15 +3,16 @@
  * dock: provider, issuing CA, wildcard and approval per domain; test, edit and delete stay on the
  * row and in the dock, each behind its right.
  */
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Btn, ListView, Dock, DockBody, Section, Props, EmptyBlock, Pill } from '../../components/atelier'
+import { useDockId } from '../../components/atelier/useDockParam'
 import { SlotDock } from '../protocols/dockSlot'
 import { YesNo } from '../protocols/atelierParts'
 
 export default function DomainsTab({ acmeDomains, onAdd, onEdit, onDelete, onTest, canWrite, canDelete }) {
   const { t } = useTranslation()
-  const [openId, setOpenId] = useState(null)
+  // The open object lives in the URL (`item`)
+  const { openId, setOpenId } = useDockId()
   const open = acmeDomains.find((d) => d.id === openId)
   const approval = (d) => <Pill label={t(d.auto_approve ? 'common.auto' : 'common.manual')} tone={d.auto_approve ? 'good' : 'warn'} icon={d.auto_approve ? 'check' : 'clock'} />
   const actions = (d) => [

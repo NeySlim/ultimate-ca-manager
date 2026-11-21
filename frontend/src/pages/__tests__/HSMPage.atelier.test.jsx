@@ -5,6 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -37,6 +38,7 @@ const svc = vi.hoisted(() => ({
 }))
 vi.mock('../../services', () => ({ hsmService: svc }))
 
+import { renderAtUrl } from '../../test/dockUrl'
 import HSMPage from '../HSMPage'
 
 const P = [
@@ -60,7 +62,7 @@ const rowOf = (name) => screen.getAllByRole('row').find((r) => within(r).queryBy
 
 describe('the HSM list', () => {
   it('draws the head, the state chips and the four columns of the mockup', async () => {
-    const { container } = render(<HSMPage />)
+    const { container } = render(<MemoryRouter><HSMPage /></MemoryRouter>)
     await screen.findByRole('button', { name: 'Partition 1' })
     expect(container.querySelector('.atl h1#main-title')).toHaveTextContent('shell.moduleLabel.hsm')
     expect(container.querySelector('.page-head .total')).toHaveTextContent('hsm.unit {"count":2}')
@@ -72,7 +74,7 @@ describe('the HSM list', () => {
   })
 
   it('reads the last test date and the state the server records (last_tested_at, status)', async () => {
-    render(<HSMPage />)
+    render(<MemoryRouter><HSMPage /></MemoryRouter>)
     await screen.findByRole('button', { name: 'Partition 1' })
     expect(rowOf('Partition 1')).toHaveTextContent('8 nov. 2026, 11:58')
     expect(rowOf('Partition 1')).toHaveTextContent('hsm.states.connected')
@@ -81,7 +83,7 @@ describe('the HSM list', () => {
   })
 
   it('filters by state, by type and by search, and puts everything back from the no-match block', async () => {
-    render(<HSMPage />)
+    render(<MemoryRouter><HSMPage /></MemoryRouter>)
     await screen.findByRole('button', { name: 'Partition 1' })
     fireEvent.click(screen.getByRole('button', { name: /hsm\.states\.error/ }))
     expect(screen.queryByRole('button', { name: 'Partition 1' })).toBeNull()
@@ -98,19 +100,19 @@ describe('the HSM list', () => {
 
   it('says why the list is empty and offers the creation to who may write', async () => {
     svc.getProviders.mockResolvedValue({ data: [] })
-    const { unmount } = render(<HSMPage />)
+    const { unmount } = render(<MemoryRouter><HSMPage /></MemoryRouter>)
     expect(await screen.findByText('hsm.noHSM')).toBeTruthy()
     expect(screen.getAllByRole('button', { name: 'hsm.newProvider' })).toHaveLength(2)
     unmount()
     perms.write = false
-    render(<HSMPage />)
+    render(<MemoryRouter><HSMPage /></MemoryRouter>)
     await screen.findByText('hsm.noHSM')
     expect(screen.queryByRole('button', { name: 'hsm.newProvider' })).toBeNull()
   })
 
   it('shows a failed read with its cause and reads again on Réessayer', async () => {
     svc.getProviders.mockRejectedValueOnce(Object.assign(new Error('down'), { status: 503 }))
-    render(<HSMPage />)
+    render(<MemoryRouter><HSMPage /></MemoryRouter>)
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('messages.errors.loadFailed.hsmProviders')
     fireEvent.click(within(alert).getByRole('button', { name: 'table.retry' }))
@@ -120,11 +122,11 @@ describe('the HSM list', () => {
 
   it('warns about the missing PKCS#11 dependencies only when a local PKCS#11 provider exists', async () => {
     svc.getStatus.mockResolvedValue({ data: { ready: false, pkcs11_installed: false, softhsm_found: true, install_command: 'pip install python-pkcs11' } })
-    const { container, unmount } = render(<HSMPage />)
+    const { container, unmount } = render(<MemoryRouter><HSMPage /></MemoryRouter>)
     await waitFor(() => expect(container.querySelector('#hsm-pkcs11-notice')).toHaveTextContent('hsm.pkcs11Missing'))
     unmount()
     svc.getProviders.mockResolvedValue({ data: [P[1]] })
-    const second = render(<HSMPage />)
+    const second = render(<MemoryRouter><HSMPage /></MemoryRouter>)
     await screen.findByRole('button', { name: 'Bao transit' })
     expect(second.container.querySelector('#hsm-pkcs11-notice')).toBeNull()
   })
@@ -132,7 +134,7 @@ describe('the HSM list', () => {
 
 describe('the HSM dock', () => {
   it('opens a provider with its overview, the server error, its keys and its configuration', async () => {
-    const { container } = render(<HSMPage />)
+    const { container } = render(<MemoryRouter><HSMPage /></MemoryRouter>)
     fireEvent.click(await screen.findByRole('button', { name: 'Bao transit' }))
     const dock = container.querySelector('aside#inspector')
     expect(within(dock).getByRole('heading', { level: 2 })).toHaveTextContent('Bao transit')
@@ -152,7 +154,7 @@ describe('the HSM dock', () => {
   it('gives each action to the permission it needs', async () => {
     perms.write = false
     perms.del = false
-    const { container } = render(<HSMPage />)
+    const { container } = render(<MemoryRouter><HSMPage /></MemoryRouter>)
     fireEvent.click(await screen.findByRole('button', { name: 'Partition 1' }))
     const dock = container.querySelector('aside#inspector')
     expect(within(dock).getByRole('button', { name: 'common.test' })).toBeTruthy()
@@ -167,12 +169,25 @@ describe('the HSM dock', () => {
   it('tests a provider and shows what the server read, then closes on Fermer', async () => {
     svc.testProvider.mockResolvedValue({ data: { success: true, message: 'ok' } })
     svc.getProvider.mockResolvedValue({ data: { ...P[0], module_info: { library: 'SoftHSM', manufacturer: 'OpenDNSSEC', library_version: '2.6', firmware_version: '2.6' } } })
-    const { container } = render(<HSMPage />)
+    const { container } = render(<MemoryRouter><HSMPage /></MemoryRouter>)
     fireEvent.click(await screen.findByRole('button', { name: 'Partition 1' }))
     fireEvent.click(screen.getByRole('button', { name: 'common.test' }))
     await waitFor(() => expect(notify.showSuccess).toHaveBeenCalledWith('ok'))
     expect(await screen.findByText('OpenDNSSEC')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'inspector.close' }))
     expect(container.querySelector('aside#inspector')).toBeNull()
+  })
+})
+
+describe('the provider dock in the URL', () => {
+  it('reopens the provider and section of the URL with its keys, then writes the one opened', async () => {
+    const r = renderAtUrl(<HSMPage />, '/hsm?item=2&section=config')
+    const dock = await r.dock()
+    expect(within(dock).getByRole('tab', { name: 'common.config' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(dock).getByRole('heading', { level: 2 })).toHaveTextContent('Bao transit')
+    fireEvent.click(screen.getByRole('button', { name: 'Partition 1' }))
+    expect(r.where()).toBe('/hsm?item=1')
+    fireEvent.click(within(await r.dock()).getByRole('tab', { name: 'hsm.hsmKeys' }))
+    expect(r.where()).toBe('/hsm?item=1&section=keys')
   })
 })

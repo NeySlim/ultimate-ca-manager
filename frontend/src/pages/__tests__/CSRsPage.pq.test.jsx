@@ -28,7 +28,8 @@ const mocks = vi.hoisted(() => ({ navigate: vi.fn(), create: vi.fn(), row: null,
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
-  return { ...actual, useNavigate: () => mocks.navigate }
+  // The page's own moves are observed; the dock's URL writes (a location object, a step back) go through
+  return { ...actual, useNavigate: () => { const real = actual.useNavigate(); return (to, o) => (typeof to === 'string' ? mocks.navigate(to, o) : real(to, o)) } }
 })
 
 const mobile = {

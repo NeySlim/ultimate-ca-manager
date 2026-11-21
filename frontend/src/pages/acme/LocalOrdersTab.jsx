@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Btn, IconBtn, Pill, ListView, Toolbar, Dock, DockBody, Section, Props, EmptyBlock } from '../../components/atelier'
+import { useDockSelection, asId } from '../../components/atelier/useDockParam'
 import { apiClient } from '../../services'
 import { buildQueryString } from '../../services/apiClient'
 import { useNotification } from '../../contexts'
@@ -30,7 +31,11 @@ export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked }) {
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('')
   const [loading, setLoading] = useState(true)
-  const [opened, setOpened] = useState(null)
+  // The open order lives in the URL (`item`); one off the page (a link, a reload) is read by id
+  const loadOrder = useCallback((id) => apiClient.get(`/acme/orders/${asId(id)}`).then((res) => res?.data), [])
+  const orderSel = useDockSelection(items, { ready: !loading, load: loadOrder })
+  const opened = orderSel.selected
+  const setOpened = orderSel.select
 
   const load = useCallback(async (p = page, s = status) => {
     setLoading(true)
@@ -54,7 +59,7 @@ export default function LocalOrdersTab({ linkedOrder = null, onCloseLinked }) {
   }, [page, status, showError, t])
 
   useEffect(() => { load(page, status) }, [page, status]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (linkedOrder) setOpened(linkedOrder) }, [linkedOrder])
+  useEffect(() => { if (linkedOrder) setOpened(linkedOrder) }, [linkedOrder]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDelete = async (row) => {
     const confirmed = await showConfirm(t('acme.deleteLocalOrderConfirmDesc', { domain: row.domain }), {

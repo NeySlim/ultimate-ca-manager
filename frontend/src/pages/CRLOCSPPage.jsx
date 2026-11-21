@@ -16,6 +16,7 @@ import { casService, crlService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { useLinkedId } from '../hooks/useLinkedId'
+import { useDockParam, asId } from '../components/atelier/useDockParam'
 import { downloadBlob } from '../lib/utils'
 import { findAlgorithm } from '../lib/keyAlgorithms'
 import { dateTimeOf } from './admin/adminDates'
@@ -29,6 +30,8 @@ const VALIDITY = [1, 2, 3, 7, 14, 30, 90, 180, 365, 1095, 1825]
 const PUBLISH = [6, 12, 24, 48, 72]
 const DELTA = [1, 2, 4, 8, 12, 24]
 const URL_FIELDS = { cdp: 'cdp_urls', ocsp: 'ocsp_urls', aia: 'aia_ca_issuers_urls' }
+
+const CRL_SECTIONS = ['overview', 'publication', 'ocsp', 'distribution']
 
 export default function CRLOCSPPage() {
   const { t, i18n } = useTranslation()
@@ -44,9 +47,11 @@ export default function CRLOCSPPage() {
   const [crls, setCrls] = useState([])
   const [ocspStatus, setOcspStatus] = useState({ enabled: false, running: false })
   const [ocspStats, setOcspStats] = useState({ total_requests: 0, cache_hits: 0 })
-  const [openId, setOpenId] = useState(null)
   const [selectedCRL, setSelectedCRL] = useState(null)
-  const [section, setSection] = useState('overview')
+  // The open authority and its section live in the URL (`item`, `section`); the work queue's ?ca= opens it too
+  const crlDock = useDockParam({ sections: CRL_SECTIONS, aliases: ['ca'] })
+  const openId = crlDock.item == null ? null : asId(crlDock.item)
+  const { section, setSection } = crlDock
   const [query, setQuery] = useState('')
   const [state, setState] = useState('')
   const [regenerating, setRegenerating] = useState(false)
@@ -110,18 +115,30 @@ export default function CRLOCSPPage() {
     }
   }
 
-  const openCa = (ca, tab = 'overview') => {
-    if (ca.id !== openId) {
-      setSection(tab)
-      setAdding({ type: null, value: '' })
-      setEligible(null)
-      setOcspResponder(null)
-    }
-    setOpenId(ca.id)
+  const readCa = (ca) => {
     setCpsDraft({ uri: ca.cps_uri || '', oid: ca.cps_oid || '2.5.29.32.0' })
     loadCRLForCA(ca.id)
     crlService.getOcspResponder(ca.id).then((res) => setOcspResponder(res.data?.responder || null)).catch(() => setOcspResponder(null))
   }
+  const openCa = (ca, tab = 'overview') => {
+    if (ca.id !== openId || tab !== 'overview') crlDock.open(ca.id, tab === 'overview' ? {} : { section: tab })
+    if (ca.id === openId && tab === 'overview') readCa(ca)
+  }
+  // The authority's CRL, responder and CPS draft are read once it opens, by a click or by the URL
+  const readFor = useRef(null)
+  useEffect(() => {
+    if (!open) { readFor.current = null; return }
+    if (readFor.current === open.id) return
+    readFor.current = open.id
+    setAdding({ type: null, value: '' })
+    setEligible(null)
+    setOcspResponder(null)
+    readCa(open)
+  }, [open?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  // An authority the URL names that the list no longer holds leaves it
+  useEffect(() => {
+    if (!loading && crlDock.item && !rows.some((r) => String(r.id) === crlDock.item)) crlDock.close()
+  }, [loading, rows, crlDock.item]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // /crl-ocsp?ca=N (a CRL to publish, from the work queue) opens that authority on its publication
   const linkedCa = useLinkedId('ca')
@@ -363,7 +380,7 @@ export default function CRLOCSPPage() {
 
   const dock = open && (
     <Dock label={t('atelier.detailOf', { name: t('shell.moduleLabel.crlOcsp') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
-      tabs={[{ key: open.id, title: name(open), icon: 'crl' }]} onClose={() => { setOpenId(null); setSelectedCRL(null) }}>
+      tabs={[{ key: open.id, title: name(open), icon: 'crl' }]} onClose={() => { crlDock.close(); setSelectedCRL(null) }}>
       <DockBody icon="crl" title={name(open)} badge={pill(open)} section={section} onSection={setSection}
         sectionsLabel={t('atelier.sectionsOf', { name: name(open) })}
         sections={[['overview', t('atelier.overview')], ['publication', t('crlOcsp.tabs.publication')], ['ocsp', 'OCSP'], ['distribution', t('crlOcsp.cdpNote')]]}

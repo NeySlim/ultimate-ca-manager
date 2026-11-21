@@ -57,6 +57,7 @@ vi.mock('../../../hooks', async () => ({
 }))
 vi.mock('../../../stores/timezoneStore', () => ({ getAppTimezone: () => 'UTC' }))
 
+import { MemoryRouter } from 'react-router-dom'
 import LocalOrdersTab from '../LocalOrdersTab'
 import { WithDockSlot } from '../../protocols/__tests__/withDockSlot'
 
@@ -141,5 +142,14 @@ describe('LocalOrdersTab', () => {
       const urls = mocks.get.mock.calls.map(([url]) => url)
       expect(urls.filter((url) => url.includes('page=1')).length).toBeGreaterThan(1)
     })
+  })
+})
+
+describe('LocalOrdersTab in the URL', () => {
+  it('reopens the order of the URL, read by id when the page does not hold it', async () => {
+    mocks.get.mockImplementation(async (url) => (url.startsWith('/acme/orders?') ? response([], 1, 80) : { data: { ...order, id: 99, domain: 'far.example.com' } }))
+    render(<MemoryRouter initialEntries={['/acme?tab=localorders&item=99']}><WithDockSlot><LocalOrdersTab /></WithDockSlot></MemoryRouter>)
+    expect(await screen.findByRole('heading', { level: 2, name: 'far.example.com' })).toBeInTheDocument()
+    expect(mocks.get).toHaveBeenCalledWith('/acme/orders/99')
   })
 })

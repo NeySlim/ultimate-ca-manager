@@ -15,6 +15,7 @@ import {
 import { sshCertificatesService, sshCasService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useWebSocket, useClipboard, usePersistedState } from '../hooks'
+import { useDockSelection, asId } from '../components/atelier/useDockParam'
 import { formatDate, downloadBlob } from '../lib/utils'
 import { sanitizeDownloadName } from '../lib/filename'
 import { SSH_EDDSA_KEY_TYPES, SSH_FIPS_DEFAULT_KEY_TYPE, sshEddsaRefused, sshKeyOptions, useKeyPlatform } from '../lib/policyAlgorithms'
@@ -65,6 +66,8 @@ const listOf = (value) => (Array.isArray(value) ? value : value ? String(value).
 
 // ============= MAIN COMPONENT =============
 
+const SSH_CERT_SECTIONS = ['overview', 'grants', 'certificate']
+
 export default function SSHCertificatesPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -80,8 +83,12 @@ export default function SSHCertificatesPage() {
   const [cas, setCas] = useState([])
   const [loading, setLoading] = useState(true)
   const [certStats, setCertStats] = useState({ valid: 0, expired: 0, revoked: 0, total: 0 })
-  const [selectedCert, setSelectedCert] = useState(null)
-  const [section, setSection] = useState('overview')
+  // The open certificate and its section live in the URL (`item`, `section`); its detail is read below,
+  // so a certificate off the list's page still opens
+  const certDock = useDockSelection(certificates, { ready: false, sections: SSH_CERT_SECTIONS })
+  const selectedCert = certDock.selected
+  const setSelectedCert = certDock.select
+  const { section, setSection } = certDock
 
   const [dialog, setDialog] = useState(null)
   const [revokingCert, setRevokingCert] = useState(null)
@@ -137,29 +144,30 @@ export default function SSHCertificatesPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Deep link: /ssh/certificates/:id opens that certificate once the page holds it
+  // The deep link /ssh/certificates/:id becomes the dock's ?item=, which a reload keeps
   useEffect(() => {
-    if (urlCertId && !loading && certificates.length > 0) {
-      const id = parseInt(urlCertId, 10)
-      if (!isNaN(id)) {
-        const found = certificates.find((c) => c.id === id)
-        if (found) setSelectedCert(found)
-        navigate('/ssh/certificates', { replace: true })
-      }
-    }
-  }, [urlCertId, loading, certificates.length]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (urlCertId && /^\d+$/.test(urlCertId)) navigate(`/ssh/certificates?item=${urlCertId}`, { replace: true })
+    else if (urlCertId) navigate('/ssh/certificates', { replace: true })
+  }, [urlCertId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const certItem = certDock.item
+  useEffect(() => {
+    if (!certItem || loading) return undefined
+    let live = true
+    const row = certificates.find((c) => String(c.id) === certItem)
+    // A listed row stays shown when its detail cannot be read; an unknown id leaves the URL
+    Promise.resolve(sshCertificatesService.getById(row?.id ?? asId(certItem))).then((res) => {
+      if (!live) return
+      if (res?.data) setSelectedCert({ ...row, ...res.data })
+      else if (!row) setSelectedCert(null)
+    }, () => { if (live && !row) setSelectedCert(null) })
+    return () => { live = false }
+  }, [certItem, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ============= ACTIONS =============
 
-  const handleSelectCert = useCallback(async (cert) => {
-    try {
-      const res = await sshCertificatesService.getById(cert.id)
-      setSelectedCert(res.data || cert)
-    } catch {
-      setSelectedCert(cert)
-    }
-  }, [])
-  const openCert = (cert) => { if (selectedCert?.id !== cert.id) setSection('overview'); handleSelectCert(cert) }
+  const handleSelectCert = setSelectedCert
+  const openCert = (cert) => handleSelectCert(cert)
 
   const handleRevoke = (cert) => { setRevokingCert(cert); setDialog('revoke') }
   const closeRevoke = () => { setDialog(null); setRevokingCert(null) }

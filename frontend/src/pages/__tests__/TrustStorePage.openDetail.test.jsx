@@ -147,7 +147,7 @@ describe('TrustStorePage — opens detail after add/import', () => {
   })
 })
 
-const Where = () => <span data-testid="where">{useLocation().pathname}</span>
+const Where = () => { const l = useLocation(); return <span data-testid="where">{l.pathname + l.search}</span> }
 
 describe('TrustStorePage: the work-queue link /truststore/:id opens the anchor', () => {
   beforeEach(() => {
@@ -156,7 +156,7 @@ describe('TrustStorePage: the work-queue link /truststore/:id opens the anchor',
     getById.mockReset().mockImplementation((id) => Promise.resolve({ data: { id, name: `Anchor ${id}` } }))
   })
 
-  it('opens the detail of the anchor named in the link, then drops the id from the address', async () => {
+  it('opens the detail of the anchor named in the link, then keeps it as the dock\'s item', async () => {
     render(
       <MemoryRouter initialEntries={['/truststore/7']}>
         <Routes>
@@ -171,6 +171,6 @@ describe('TrustStorePage: the work-queue link /truststore/:id opens the anchor',
     expect(await screen.findByRole('heading', { name: 'Anchor 7' })).toBeTruthy()
     expect(getById).toHaveBeenCalledTimes(1)
     expect(openEntity).not.toHaveBeenCalled()
-    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/truststore'))
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/truststore?item=7'))
   })
 })

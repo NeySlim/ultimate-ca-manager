@@ -65,7 +65,8 @@ export const helpContent = {
         title: 'Search and shortcuts',
         icon: Stack,
         items: [
-          { label: 'Search', text: 'Press Ctrl K (Cmd K on macOS) or select the search field to jump to a page or find a certificate. Down Arrow moves from the field to the results, Up Arrow from the first result back to the field, and Enter in the field opens the first result' },
+          { label: 'Search', text: 'Press Ctrl K (Cmd K on macOS) or select the search field to jump to a page or find a certificate. Down Arrow moves from the field to the results, Up Arrow from the first result back to the field, and Enter in the field opens the first result. A certificate, authority, template, user or CSR found opens in the detail of its page' },
+          { label: 'Address', text: 'The object open in a page\'s detail dock and its section are part of the address: a reload or a shared link reopens them, and the browser\'s Back closes the dock' },
           { label: 'Help', text: 'Press ? outside a text field to open the help of the current page' },
           { label: 'Phone width', text: 'The top bar shows a single list of pages instead of the links and the menu' },
         ]
@@ -365,7 +366,7 @@ export const helpContent = {
     ],
     tips: [
       'Star ⭐ important certificates to add them to your favorites list',
-      'The tabs above the list filter by state and count each one; the tab is part of the address, so a reload or a shared link keeps it. The CA, source and template filters are remembered across reloads',
+      'The tabs above the list filter by state and count each one; the tab is part of the address, so a reload or a shared link keeps it. The search, the sort, the page and the CA, source and template filters are part of the address too; a bare address applies the CA, source and template filters saved in this browser',
       'Only the name and the chevron open a certificate in the inspector; a row keeps one action, Export. The inspector heading has Export and Renew; its ⋯ opens the Certificate actions dialog: copy the common name, view its activity in the audit log, revoke, then lint, key upload, rename, favorites, adding the issuing CA to the trust store, and delete. Tick rows to compare two certificates or to export them; while rows are ticked, names and row actions wait. Inspect the authority, in the chain, opens it on the Authorities page. Escape closes the inspector from anywhere on the page',
       'The Expiry column gives days below 60, then months, then years and months (45 d, 16 mo, 1 y 4 mo, 9 y, Expired); hover it for the exact date and time. The list shows 12 certificates a page by default (25, 50 or 100 on choice, remembered), with a page number field beyond 20 pages. Columns opens a dialog to choose the columns; the name and the state always show. Under 800 px wide, each certificate is a record with its state and expiry date, and the inspector takes the whole screen; the page scrolls down to its pages. Below 1000 px wide the overview keeps two columns, the chain staying in its own tab',
       'Renewing keeps the same record (id, refid, creation date). Renew from the page generates a new key; the automatic renewal keeps the key. A certificate whose key UCM does not hold (SCEP, EST, WSTEP or ACME enrolment, import without the key) is refused (409): renew it through its protocol or sign a new request',

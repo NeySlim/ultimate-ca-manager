@@ -35,6 +35,7 @@ const est = vi.hoisted(() => ({ getConfig: vi.fn(), updateConfig: vi.fn(), getSt
 const cas = vi.hoisted(() => ({ getAll: vi.fn() }))
 vi.mock('../../services', () => ({ tsaService: tsa, estService: est, casService: cas }))
 
+import { renderAtUrl } from '../../test/dockUrl'
 import TSAPage from '../TSAPage'
 import ESTPage from '../ESTPage'
 
@@ -150,5 +151,27 @@ describe('the EST page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'common.save' }))
     await waitFor(() => expect(est.updateConfig).toHaveBeenCalledTimes(2))
     expect(est.updateConfig.mock.calls[1][0].password).toBe('s3cret')
+  })
+})
+
+describe('the EST and TSA docks in the URL', () => {
+  it('writes the endpoint opened, the default one by name, and reopens it on reload', async () => {
+    const r = renderAtUrl(<ESTPage />, '/est-config')
+    fireEvent.click(await screen.findByRole('button', { name: 'est.defaultEndpoint' }))
+    expect(r.where()).toBe('/est-config?item=default')
+    fireEvent.click(screen.getByRole('button', { name: 'iot' }))
+    expect(r.where()).toBe('/est-config?item=iot')
+    r.unmount()
+    const again = renderAtUrl(<ESTPage />, '/est-config?item=default')
+    expect(await again.dock()).toHaveTextContent('/.well-known/est/simpleenroll')
+  })
+
+  it('writes the time-stamping service opened and reopens it on reload', async () => {
+    const r = renderAtUrl(<TSAPage />, '/tsa-config')
+    fireEvent.click(await screen.findByRole('button', { name: 'tsa.serviceName' }))
+    expect(r.where()).toBe('/tsa-config?item=tsa')
+    r.unmount()
+    const again = renderAtUrl(<TSAPage />, '/tsa-config?item=tsa')
+    expect(within(await again.dock()).getByRole('heading', { level: 2 })).toHaveTextContent('tsa.serviceName')
   })
 })

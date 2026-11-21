@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 
 const mocks = vi.hoisted(() => ({ create: vi.fn(), list: vi.fn(), update: vi.fn() }))
 
@@ -35,7 +36,7 @@ import PoliciesPage from '../PoliciesPage'
 async function openCreate() {
   mocks.list.mockResolvedValue({ data: [] })
   mocks.create.mockResolvedValue({ data: { id: 1 } })
-  render(<PoliciesPage />)
+  render(<MemoryRouter><PoliciesPage /></MemoryRouter>)
   fireEvent.click((await screen.findAllByText('policies.createPolicy'))[0])
   fireEvent.change(screen.getByLabelText('policies.policyName'), { target: { value: 'Ops' } })
 }
@@ -74,7 +75,7 @@ describe('PoliciesPage operations', () => {
 
   it('says when an old policy governs nothing', async () => {
     mocks.list.mockResolvedValue({ data: [{ id: 3, name: 'Old revocation', policy_type: 'revocation', operations: [], rules: {} }] })
-    render(<PoliciesPage />)
+    render(<MemoryRouter><PoliciesPage /></MemoryRouter>)
     fireEvent.click(await screen.findByRole('button', { name: 'Old revocation' }))
     expect((await screen.findAllByText('policies.noOperation')).length).toBeGreaterThan(0)
   })

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 
 beforeAll(() => {
   global.ResizeObserver = global.ResizeObserver || class { observe() {} unobserve() {} disconnect() {} }
@@ -197,5 +197,37 @@ describe('CSR dock', () => {
     expect(within(menu).queryByRole('button', { name: /Re-key/ })).toBeNull()
     expect(within(menu).queryByRole('button', { name: /Upload Key/ })).toBeNull()
     expect(within(menu).getByRole('button', { name: /Delete/ })).toBeTruthy()
+  })
+})
+
+describe('CSR dock in the URL', () => {
+  let where
+  function Where() { const l = useLocation(); where = l.pathname + l.search; return null }
+  const at = (url) => render(<MemoryRouter initialEntries={[url]}><CSRsPage /><Where /></MemoryRouter>)
+  const dockIn = (container) => waitFor(() => { const d = container.querySelector('#inspector'); expect(d).toBeTruthy(); return d })
+
+  it('reopens the request and its section a link names (a reload)', async () => {
+    const { container } = at('/csrs?item=139&section=pem')
+    const dock = await dockIn(container)
+    expect(within(dock).getByRole('tab', { name: 'PEM' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(dock).getByRole('heading', { name: 'CSR-139' })).toBeTruthy()
+  })
+
+  it('opens the request of a palette result (?selected=), even off the list\'s page', async () => {
+    const { container } = at('/csrs?selected=777')
+    const dock = await dockIn(container)
+    expect(within(dock).getByRole('heading', { name: 'CSR-777' })).toBeTruthy()
+  })
+
+  it('writes the open request and its section, and the chip change closes it', async () => {
+    const { container } = at('/csrs')
+    fireEvent.click(await screen.findByRole('button', { name: 'CSR-139' }))
+    expect(where).toBe('/csrs?item=139')
+    const dock = await dockIn(container)
+    fireEvent.click(within(dock).getByRole('tab', { name: 'Details' }))
+    expect(where).toBe('/csrs?item=139&section=details')
+    fireEvent.click(container.querySelector('[data-status="history"]'))
+    await waitFor(() => expect(where).toBe('/csrs?tab=history'))
+    expect(container.querySelector('#inspector')).toBeNull()
   })
 })

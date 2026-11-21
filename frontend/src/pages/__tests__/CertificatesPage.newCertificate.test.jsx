@@ -177,7 +177,10 @@ describe('CertificatesPage — finding a new certificate (#368)', () => {
     mockIsMobile = true
     render(
       <MemoryRouter initialEntries={['/certificates/401']}>
-        <Routes><Route path="/certificates/:id" element={<CertificatesPage />} /></Routes>
+        <Routes>
+          <Route path="/certificates/:id" element={<CertificatesPage />} />
+          <Route path="/certificates" element={<CertificatesPage />} />
+        </Routes>
       </MemoryRouter>
     )
     // The inspector, full screen on a phone, reads and shows it

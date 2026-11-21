@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => stable.i18n,
@@ -251,5 +251,29 @@ describe('the account and group dialogs', () => {
     const dialog = await waitFor(() => { const d = document.querySelector('dialog'); expect(d).toBeTruthy(); return d })
     const certs = await within(dialog).findByRole('group', { name: 'certificates' })
     expect([...certs.querySelectorAll('label.checkbox-line')].map((l) => l.textContent)).toEqual(['read:certificates', 'write:certificates'])
+  })
+})
+
+describe('the open account or group in the URL', () => {
+  let where
+  function Where() { const l = useLocation(); where = l.pathname + l.search; return null }
+  const at = (url) => render(<MemoryRouter initialEntries={[url]}><UsersGroupsPage /><Where /></MemoryRouter>)
+
+  it('opens the account of a palette result (?selected=) and writes it as item', async () => {
+    const { container } = at('/users?selected=2')
+    await waitFor(() => expect(dockOf(container)).toBeTruthy())
+    expect(within(dockOf(container)).getByRole('heading', { level: 2 })).toHaveTextContent('Chloé Durand')
+    fireEvent.click(within(dockOf(container)).getByRole('tab', { name: 'common.security' }))
+    expect(where).toBe('/users?item=2&section=security')
+  })
+
+  it('reopens a group and its section on reload, and the tab change closes it', async () => {
+    const { container } = at('/users?tab=groups&item=3&section=members')
+    await waitFor(() => expect(dockOf(container)).toBeTruthy())
+    expect(within(dockOf(container)).getByRole('tab', { name: 'groups.members' })).toHaveAttribute('aria-selected', 'true')
+    await waitFor(() => expect(m.groupById).toHaveBeenCalledWith(3))
+    fireEvent.click(screen.getByRole('button', { name: 'users.accounts' }))
+    await waitFor(() => expect(where).toBe('/users?tab=users'))
+    expect(dockOf(container)).toBeNull()
   })
 })

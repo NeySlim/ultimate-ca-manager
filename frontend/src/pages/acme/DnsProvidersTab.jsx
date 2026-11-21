@@ -2,15 +2,16 @@
  * DNS providers of the ACME client (DNS-01), drawn as the mockup's module list with its dock: type
  * and default per provider; test, edit and delete stay on the row and in the dock.
  */
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Btn, ListView, Dock, DockBody, Section, Props, EmptyBlock, Pill } from '../../components/atelier'
+import { useDockId } from '../../components/atelier/useDockParam'
 import { SlotDock } from '../protocols/dockSlot'
 import { Notice } from '../protocols/atelierParts'
 
 export default function DnsProvidersTab({ dnsProviders, onAddProvider, onEditProvider, onTestProvider, onDeleteProvider, canWrite, canDelete }) {
   const { t } = useTranslation()
-  const [openId, setOpenId] = useState(null)
+  // The open object lives in the URL (`item`)
+  const { openId, setOpenId } = useDockId()
   const open = dnsProviders.find((p) => p.id === openId)
   const state = (p) => (p.enabled === false
     ? <Pill label={t('common.disabled')} tone="muted" />

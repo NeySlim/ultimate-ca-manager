@@ -11,6 +11,7 @@ import { keyRecoveryService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { useLinkedId } from '../hooks/useLinkedId'
+import { useDockParam, asId } from '../components/atelier/useDockParam'
 import { stateLabel } from '../lib/stateLabel'
 import { formatDate } from '../lib/utils'
 import { compactAgo } from '../lib/relativeTime'
@@ -19,13 +20,17 @@ import { useRecoveryActions } from './keyRecovery/useRecoveryActions'
 import { KeyRecoveryDock, RecoveryButtons } from './keyRecovery/KeyRecoveryDetail'
 const when = (d) => formatDate(d, { time: true })
 
+const RECOVERY_SECTIONS = ['request', 'log']
+
 export default function KeyRecoveryPage() {
   const { t } = useTranslation()
   const { showError, showInfo } = useNotification()
   const { hasPermission, username } = usePermission()
   const spot = useRef(-1)
-  const [openId, setOpenId] = useState(null)
-  const [section, setSection] = useState('request')
+  // The open request and its section live in the URL (`item`, `section`); the work queue's ?request= opens it too
+  const recDock = useDockParam({ sections: RECOVERY_SECTIONS, fallback: 'request', aliases: ['request'] })
+  const openId = recDock.item == null ? null : asId(recDock.item)
+  const { section, setSection } = recDock
 
   const [requests, setRequests] = useState([])
   const [dualControl, setDualControl] = useState(true)
@@ -64,8 +69,6 @@ export default function KeyRecoveryPage() {
         if (cancelled) return
         const row = res?.data || res
         setLinked(row)
-        setOpenId(row.id)
-        setSection('request')
         if (row.status !== 'pending') {
           showInfo(t('overview.link.handled', { id: row.id, status: stateLabel(t, row.status) }))
         }
@@ -94,10 +97,14 @@ export default function KeyRecoveryPage() {
     actions.open(kind, reqs)
   }
   const who = { hasPermission, username, dualControl }
-  const open = (req) => {
-    if (req.id !== openId) setSection('request')
-    setOpenId(req.id)
-  }
+  const open = (req) => recDock.open(req.id)
+  // An open request past the 500 the list holds (a reload) is read by id; one that no longer exists leaves the URL
+  useEffect(() => {
+    if (state !== 'ready' || openId == null || linkedId || requests.some((r) => r.id === openId) || linked?.id === openId) return undefined
+    let cancelled = false
+    keyRecoveryService.get(openId).then((res) => { if (!cancelled) setLinked(res?.data || res) }, () => { if (!cancelled) recDock.close() })
+    return () => { cancelled = true }
+  }, [state, openId, linkedId, requests, linked]) // eslint-disable-line react-hooks/exhaustive-deps
   const opened = all.find((r) => r.id === openId) || null
 
   const groups = recoveryGroups(all, t, dualControl).map((g) => {
@@ -145,7 +152,7 @@ export default function KeyRecoveryPage() {
   const open_ = all.filter((r) => ['pending', 'approved'].includes(r.status)).length
 
   const dock = opened && (
-    <KeyRecoveryDock req={opened} section={section} onSection={setSection} onClose={() => setOpenId(null)}
+    <KeyRecoveryDock req={opened} section={section} onSection={setSection} onClose={recDock.close}
       onAsk={(kind) => ask(kind, [opened])} />
   )
 

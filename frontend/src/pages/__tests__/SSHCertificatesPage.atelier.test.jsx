@@ -38,6 +38,7 @@ vi.mock('../../services', () => ({
   sshCasService: { getAll: () => Promise.resolve({ data: [{ id: 4, name: 'Users CA', descr: 'Users CA', ca_type: 'user' }] }) },
 }))
 
+import { renderAtUrl } from '../../test/dockUrl'
 import SSHCertificatesPage from '../SSHCertificatesPage'
 
 const ALICE = { id: 1, key_id: 'alice', cert_type: 'user', principals: ['ops', 'dba', 'web'], ca_name: 'Users CA', serial: 7,
@@ -120,5 +121,18 @@ describe('the SSH certificate dock', () => {
     await waitFor(() => expect(again.container.querySelector('aside#inspector')).toBeTruthy())
     expect(within(again.container.querySelector('aside#inspector')).queryByRole('button', { name: 'sshCertificates.revokeCertificate' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'sshCertificates.issueCertificate' })).toBeNull()
+  })
+})
+
+describe('the SSH certificate dock in the URL', () => {
+  it('reopens the certificate and section of the URL off the list\'s page, and writes the section', async () => {
+    getAll.mockResolvedValue({ data: [], meta: { total: 40 } })
+    const r = renderAtUrl(<SSHCertificatesPage />, '/ssh/certificates?item=1&section=grants')
+    const dock = await r.dock()
+    await waitFor(() => expect(within(dock).getByRole('heading', { level: 2 })).toHaveTextContent('alice'))
+    expect(within(dock).getByRole('tab', { name: 'sshCertificates.grants' })).toHaveAttribute('aria-selected', 'true')
+    expect(getById).toHaveBeenCalledWith(1)
+    fireEvent.click(within(dock).getByRole('tab', { name: 'sshCertificates.certificate' }))
+    expect(r.where()).toBe('/ssh/certificates?item=1&section=certificate')
   })
 })

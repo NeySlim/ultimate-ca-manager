@@ -14,6 +14,7 @@ import {
 import { discoveryService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useWebSocket } from '../hooks'
+import { useDockParam, asId } from '../components/atelier/useDockParam'
 import { formatDate, downloadBlob } from '../lib/utils'
 import { ScanDialog, RemoveDialog } from './discovery/DiscoveryDialogs'
 import {
@@ -22,6 +23,7 @@ import {
 import { lastRuns, scanState, runState, SCAN_TONES, RUN_TONES, durationLabel, cnOf, useScanFacts, runTitle, foundTitle } from './discovery/discoveryModel'
 
 const VIEWS = ['profiles', 'discovered', 'history']
+const DISCOVERY_SECTIONS = ['overview', 'runs']
 const VIEW_ICONS = { profiles: 'radar', discovered: 'cert', history: 'clock' }
 const pageOf = (res) => {
   const data = res?.data ?? res
@@ -48,8 +50,11 @@ export default function DiscoveryPage() {
   const [stats, setStats] = useState({ total: 0, managed: 0, unmanaged: 0, errors: 0 })
   const [scanning, setScanning] = useState(false)
   const [progress, setProgress] = useState(null)
-  const [opened, setOpened] = useState(null) // { view, id }
-  const [section, setSection] = useState('overview')
+  // The object open in the view's dock and its section live in the URL (`item`, `section`)
+  const discDock = useDockParam({ sections: DISCOVERY_SECTIONS })
+  const opened = discDock.item == null ? null : { view, id: asId(discDock.item) }
+  const setOpened = (o) => (o ? discDock.open(o.id) : discDock.close())
+  const { section, setSection } = discDock
   const [dialog, setDialog] = useState(null)
   const [busy, setBusy] = useState(false)
 
@@ -99,8 +104,8 @@ export default function DiscoveryPage() {
     return () => off.forEach((u) => u?.())
   }, [subscribe])
 
+  // The new view's URL carries no object: its dock closes
   const goView = (next) => {
-    setOpened(null)
     setQuery('')
     setPage(1)
     setSearchParams(next === 'profiles' ? {} : { tab: next })
@@ -180,7 +185,7 @@ export default function DiscoveryPage() {
   const runRows = runSearched.filter((r) => !runActive || runState(r) === runActive)
 
   const openedItem = opened && (opened.view === 'profiles' ? profiles : opened.view === 'history' ? runs : found.items).find((x) => x.id === opened.id)
-  const open = (v) => (x) => { if (opened?.view !== v || opened?.id !== x.id) setSection('overview'); setOpened({ view: v, id: x.id }) }
+  const open = () => (x) => discDock.open(x.id)
   const openedId = openedItem && opened.view === view ? opened.id : null
 
   const dock = openedItem && opened.view === view && (

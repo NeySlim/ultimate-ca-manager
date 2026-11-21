@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 
 const mocks = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), update: vi.fn(), getEffective: vi.fn() }))
 
@@ -35,7 +36,7 @@ import PoliciesPage from '../PoliciesPage'
 async function openCreate(effective) {
   mocks.list.mockResolvedValue({ data: [] })
   mocks.getEffective.mockResolvedValue({ data: effective })
-  render(<PoliciesPage />)
+  render(<MemoryRouter><PoliciesPage /></MemoryRouter>)
   fireEvent.click((await screen.findAllByText('policies.createPolicy'))[0])
   await waitFor(() => expect(mocks.getEffective).toHaveBeenCalled())
 }

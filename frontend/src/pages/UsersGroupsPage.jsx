@@ -32,6 +32,12 @@ import { UserState, UserProfile, UserPermissions, UserMtls } from './users/UserP
 import { ROLE_KEYS, isSso, userName, sourceText } from './users/userFacts'
 import { usersCsv } from './users/usersExport'
 import { dateOf, dateTimeOf } from './admin/adminDates'
+import { useDockSelection, asId } from '../components/atelier/useDockParam'
+
+const NONE = []
+const USER_SECTIONS = ['profile', 'permissions', 'keys', 'security', 'mtls']
+const GROUP_SECTIONS = ['overview', 'members', 'permissions']
+
 export default function UsersGroupsPage() {
   const { t, i18n } = useTranslation()
   const locale = i18n?.language || 'en'
@@ -62,7 +68,6 @@ export default function UsersGroupsPage() {
   const {
     items: users, setItems: setUsers,
     loading,
-    selectedItem: selectedUser, setSelectedItem: setSelectedUser,
     showModal: showUserModal, setShowModal: setShowUserModal,
     editing: editingUser, setEditing: setEditingUser,
     loadData,
@@ -80,8 +85,17 @@ export default function UsersGroupsPage() {
     return () => window.removeEventListener('ucm:data-changed', handler)
   }, [])
 
-  // Selection
-  const [selectedGroup, setSelectedGroup] = useState(null)
+  // The open user or group and its section live in the URL (`item`, `section`), read in the tab shown;
+  // the palette's former ?selected= still opens a user
+  const groupsTab = activeTab === 'groups'
+  const userDockUrl = useDockSelection(groupsTab ? NONE : users, { ready: !loading && !groupsTab, fallback: 'profile', sections: USER_SECTIONS, aliases: ['selected'] })
+  const groupDockUrl = useDockSelection(groupsTab ? groups : NONE, { ready: !loading && groupsTab, sections: GROUP_SECTIONS })
+  const selectedUser = groupsTab ? null : userDockUrl.selected
+  const setSelectedUser = userDockUrl.select
+  const selectedGroup = groupsTab ? groupDockUrl.selected : null
+  const setSelectedGroup = groupDockUrl.select
+  const section = groupsTab ? groupDockUrl.section : userDockUrl.section
+  const setSection = groupsTab ? groupDockUrl.setSection : userDockUrl.setSection
 
   // Modals
   const [showGroupModal, setShowGroupModal] = useState(false)
@@ -118,9 +132,8 @@ export default function UsersGroupsPage() {
   // Tab change
   const handleTabChange = (tab) => {
     setActiveTab(tab)
+    // The new tab's URL carries no open object: the dock closes with it
     setSearchParams({ tab })
-    setSelectedUser(null)
-    setSelectedGroup(null)
     setPage(1)
   }
 
@@ -596,12 +609,10 @@ export default function UsersGroupsPage() {
   const [roleFilter, setRoleFilter] = usePersistedState('ucm-users-role', '')
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(25)
-  const [section, setSection] = useState('profile')
   const [disabling, setDisabling] = useState(null)
 
   const roleLabel = (u) => t(ROLE_KEYS[u.role] || 'common.viewer')
   const lastSeen = (u) => (u.last_login ? dateTimeOf(u.last_login, locale) : t('common.never'))
-  const groupsTab = activeTab === 'groups'
   const q = query.trim().toLowerCase()
   const matches = (values) => !q || values.some((v) => String(v || '').toLowerCase().includes(q))
 
@@ -633,16 +644,18 @@ export default function UsersGroupsPage() {
   // ============= DETAIL =============
 
   const self = (u) => Boolean(me && u && u.id === me.id)
-  const openUser = (u) => { if (u.id !== selectedUser?.id) setSection('profile'); setSelectedUser(u); setSelectedGroup(null) }
-  const openGroup = async (g) => {
-    if (g.id !== selectedGroup?.id) setSection('overview')
-    setSelectedGroup(g)
-    setSelectedUser(null)
-    try {
-      const res = await groupsService.getById(g.id)
-      setSelectedGroup(res.data)
-    } catch (error) { reportSilentFailure('openGroup', error) }
-  }
+  const openUser = (u) => setSelectedUser(u)
+  const openGroup = (g) => setSelectedGroup(g)
+  // The members come with the group's own record, whether it was opened here or by a link
+  const groupItem = groupsTab ? groupDockUrl.item : null
+  useEffect(() => {
+    if (!groupItem || loading) return undefined
+    let live = true
+    groupsService.getById(selectedGroup?.id ?? asId(groupItem)).then((res) => {
+      if (live && res?.data) groupDockUrl.select(res.data)
+    }, (error) => reportSilentFailure('openGroup', error))
+    return () => { live = false }
+  }, [groupItem, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const confirmDisable = async () => {
     const u = disabling

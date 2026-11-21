@@ -14,6 +14,7 @@ import {
 import { policiesService, casService, groupsService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, usePersistedState } from '../hooks'
+import { useDockSelection } from '../components/atelier/useDockParam'
 import { formatDate } from '../lib/utils'
 import { useKeyPlatform } from '../lib/policyAlgorithms'
 import { KEY_ALGORITHMS, KEY_GROUPS, isBrainpool, isUsable } from '../lib/keyAlgorithms'
@@ -243,6 +244,8 @@ function PolicyDialog({ editing, cas, groups, keyTypeOptions, saving, onSave, on
   )
 }
 
+const POLICY_SECTIONS = ['overview']
+
 export default function PoliciesPage() {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
@@ -265,9 +268,11 @@ export default function PoliciesPage() {
   const [groups, setGroups] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
-  const [openId, setOpenId] = useState(null)
-  const [section, setSection] = useState('overview')
   const [dialog, setDialog] = useState(null) // { kind: 'form', editing } | { kind: 'delete', policy }
+  // The open policy and its section live in the URL (`item`, `section`)
+  const policyDock = useDockSelection(policies, { ready: !loading && !loadError, sections: POLICY_SECTIONS })
+  const openId = policyDock.selected?.id ?? null
+  const { section, setSection } = policyDock
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState(false)
   const [query, setQuery] = useState('')
@@ -335,7 +340,7 @@ export default function PoliciesPage() {
       await policiesService.delete(policy.id)
       showSuccess(t('policies.deleted'))
       setDialog(null)
-      setOpenId(null)
+      policyDock.select(null)
       loadData()
     } catch {
       showError(t('policies.deleteFailed'))
@@ -371,7 +376,7 @@ export default function PoliciesPage() {
 
   const dock = open && (
     <Dock label={t('atelier.detailOf', { name: t('common.policies') })} tabsLabel={t('atelier.openItem')} activeKey={open.id}
-      tabs={[{ key: open.id, title: open.name, icon: 'policy' }]} onClose={() => setOpenId(null)}>
+      tabs={[{ key: open.id, title: open.name, icon: 'policy' }]} onClose={() => policyDock.select(null)}>
       <DockBody icon="policy" title={open.name} badge={pill(open)} section={section} onSection={setSection}
         sectionsLabel={t('atelier.sectionsOf', { name: open.name })} sections={[['overview', t('atelier.overview')]]}
         actions={<>
@@ -453,7 +458,7 @@ export default function PoliciesPage() {
           </Toolbar>
         )}
         title={(p) => p.name} status={pill} openedId={openId}
-        onOpen={(p) => { if (p.id !== openId) setSection('overview'); setOpenId(p.id) }}
+        onOpen={(p) => policyDock.select(p)}
         columns={[
           { id: 'scope', label: t('policies.scope'), cell: scopeOf, grow: true },
           { id: 'operations', label: t('policies.operations'), cell: operationsOf },

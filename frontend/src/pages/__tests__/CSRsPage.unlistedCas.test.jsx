@@ -34,7 +34,8 @@ const navigate = vi.fn()
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
-  return { ...actual, useNavigate: () => navigate }
+  // The page's own moves are observed; the dock's URL writes (a location object, a step back) go through
+  return { ...actual, useNavigate: () => { const real = actual.useNavigate(); return (to, o) => (typeof to === 'string' ? navigate(to, o) : real(to, o)) } }
 })
 
 vi.mock('../../contexts', () => ({

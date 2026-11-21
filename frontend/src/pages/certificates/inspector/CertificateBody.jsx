@@ -27,8 +27,8 @@ import { ExtensionsPanel } from './ExtensionsPanel'
 import { HistoryPanel } from './HistoryPanel'
 import { PemPanel } from './PemPanel'
 import { CertMenu } from './CertMenu'
+import { SECTIONS } from './certificateSections'
 
-const SECTIONS = ['overview', 'chain', 'extensions', 'history', 'pem']
 const DIALOGS = { Export: ExportDialog, Revoke: RevokeDialog, Issue: IssueCertificateDialog }
 // The menu icons of the product's own actions, after the mockup's three
 const MENU_ICONS = { lint: 'policy', uploadKey: 'upload', rename: 'file', unhold: 'refresh', keyRecovery: 'key', delete: 'close' }

@@ -57,6 +57,7 @@ vi.mock('../../services', () => ({
   },
 }))
 
+import { renderAtUrl } from '../../test/dockUrl'
 import ApprovalsPage from '../ApprovalsPage'
 
 const REQUEST = { id: 1, request_type: 'certificate', status: 'pending', requester_username: 'alice', created_at: new Date().toISOString() }
@@ -234,5 +235,23 @@ describe('ApprovalsPage deep link', () => {
     const dock = await screen.findByRole('complementary', { name: 'atelier.detailOf' })
     expect(within(dock).getByRole('heading', { level: 2, name: /linked\.example\.com$/ })).toBeTruthy()
     expect(openEntity).not.toHaveBeenCalled()
+  })
+})
+
+describe('the approval dock in the URL', () => {
+  it('turns the e-mail\'s ?id= into the dock\'s item, and a reload reads a request the list lacks', async () => {
+    list.mockResolvedValue({ data: [] })
+    const linked = { ...REQUEST, id: 42, request_summary: { cn: 'linked.example.com' } }
+    getById.mockResolvedValue({ data: linked })
+    const r = renderAtUrl(<ApprovalsPage />, '/approvals?id=42')
+    const dock = await screen.findByRole('complementary', { name: 'atelier.detailOf' })
+    fireEvent.click(within(dock).getAllByRole('tab')[1])
+    expect(r.where()).toBe('/approvals?item=42&section=log')
+    r.unmount()
+    getById.mockClear()
+    renderAtUrl(<ApprovalsPage />, '/approvals?item=42&section=log')
+    const again = await screen.findByRole('complementary', { name: 'atelier.detailOf' })
+    expect(getById).toHaveBeenCalledWith(42)
+    expect(within(again).getAllByRole('tab')[1]).toHaveAttribute('aria-selected', 'true')
   })
 })

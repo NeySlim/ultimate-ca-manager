@@ -15,6 +15,7 @@ import { Input, Select, FormModal } from '../components/atelier/Form'
 import { tsaService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
+import { useDockParam } from '../components/atelier/useDockParam'
 import { hiddenFromIssuance, listedForIssuance, pickerCas, unlistedPickerCas } from '../lib/caSelection'
 import { withHiddenCas, pickOrToggle } from '../components/cas/hiddenCasOption'
 import { certificateLabel } from '../lib/utils'
@@ -62,7 +63,10 @@ export default function TSAPage() {
   const [saving, setSaving] = useState(false)
   const [failed, setFailed] = useState([])
   const [announce, setAnnounce] = useState('')
-  const [opened, setOpened] = useState(false)
+  // The service open in the dock lives in the URL (`item=tsa`)
+  const tsaDock = useDockParam()
+  const opened = tsaDock.item === 'tsa'
+  const setOpened = (on) => (on ? tsaDock.open('tsa') : tsaDock.close())
   const [generateOpen, setGenerateOpen] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [genForm, setGenForm] = useState(null)

@@ -38,6 +38,7 @@ vi.mock('../../services', () => ({
   },
 }))
 
+import { renderAtUrl } from '../../test/dockUrl'
 import UserCertificatesPage from '../UserCertificatesPage'
 
 const ROWS = [
@@ -106,5 +107,18 @@ describe('User certificate dock', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'admin@mtls' }))
     const dock = await waitFor(() => { const d = container.querySelector('#inspector'); expect(d).toBeTruthy(); return d })
     expect(within(dock).queryByRole('button', { name: 'Inspect the certificate' })).toBeNull()
+  })
+})
+
+describe('the enrolment dock in the URL', () => {
+  it('reopens the enrolment of the URL, even off the list\'s page, and writes the one opened', async () => {
+    getAll.mockReset().mockResolvedValue({ data: { items: [], total: 30 } })
+    const r = renderAtUrl(<UserCertificatesPage />, '/user-certificates?item=4')
+    expect(await r.dock()).toHaveTextContent('CN=Issuing CA')
+    r.unmount()
+    getAll.mockReset().mockResolvedValue({ data: { items: ROWS, total: 4 } })
+    const again = renderAtUrl(<UserCertificatesPage />, '/user-certificates')
+    fireEvent.click(await screen.findByRole('button', { name: 'admin@mtls' }))
+    expect(again.where()).toBe('/user-certificates?item=4')
   })
 })

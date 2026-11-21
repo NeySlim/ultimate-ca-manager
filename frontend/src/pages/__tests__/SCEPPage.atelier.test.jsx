@@ -42,6 +42,7 @@ vi.mock('../../services', () => ({
   templatesService: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
 }))
 
+import { renderAtUrl } from '../../test/dockUrl'
 import SCEPPage from '../SCEPPage'
 
 const PROFILES = [
@@ -203,5 +204,24 @@ describe('the Intune registrations', () => {
     await waitFor(() => expect(scep.deleteIntuneApp).toHaveBeenCalledWith(7))
     expect(notify.showError).toHaveBeenCalledWith('Cannot delete: used by 2 SCEP profile(s): Windows, iOS')
     expect(notify.showConfirm).toHaveBeenCalledWith('scep.intuneAppDeleteConfirm {"name":"Corp Intune"}', expect.anything())
+  })
+})
+
+describe('the SCEP docks in the URL', () => {
+  it('writes the profile opened and reopens it on reload', async () => {
+    const r = renderAtUrl(<SCEPPage />, '/scep-config')
+    fireEvent.click(await screen.findByRole('button', { name: 'Équipements réseau' }))
+    expect(r.where()).toBe('/scep-config?item=1')
+    r.unmount()
+    const again = renderAtUrl(<SCEPPage />, '/scep-config?item=2')
+    expect(within(await again.dock()).getByRole('heading', { level: 2 })).toHaveTextContent('Postes nomades')
+  })
+
+  it('reopens a request on reload, read by id when the page does not hold it', async () => {
+    scep.getRequests.mockResolvedValue({ data: [], meta: { total: 40 } })
+    scep.getRequest.mockResolvedValue({ data: REQUEST })
+    const r = renderAtUrl(<SCEPPage />, '/scep-config?tab=requests&item=9')
+    expect(within(await r.dock()).getByRole('heading', { level: 2 })).toHaveTextContent('device-9')
+    expect(scep.getRequest).toHaveBeenCalledWith(9)
   })
 })

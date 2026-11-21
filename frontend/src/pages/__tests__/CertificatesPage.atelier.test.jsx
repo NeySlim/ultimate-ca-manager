@@ -417,6 +417,52 @@ describe('CertificatesPage: the selection (batchbar, largeBatch)', () => {
   })
 })
 
+describe('CertificatesPage: the list in the URL (shared link, reload)', () => {
+  it('reads the search, sort, page and filters a link carries', async () => {
+    await mount('/certificates?q=web&sort=name&order=desc&page=3&ca=2&source=acme&template=modified')
+    expect(lastParams()).toMatchObject({ search: 'web', sort_by: 'subject', sort_order: 'desc', page: 3, ca_id: ['2'], source: ['acme'], template_modified: 'true' })
+    expect(screen.getByRole('searchbox', { name: 'certificates.searchLabel' })).toHaveValue('web')
+    expect(zone().querySelector('th.col-name').getAttribute('aria-sort')).toBe('descending')
+  })
+
+  it('writes the search, sort, page and filters as they change, a new query back on page one', async () => {
+    await mount()
+    fireEvent.change(screen.getByRole('searchbox', { name: 'certificates.searchLabel' }), { target: { value: 'web' } })
+    await waitFor(() => expect(where()).toBe('?q=web'), { timeout: 2000 })
+    fireEvent.click(screen.getByRole('button', { name: 'common.commonName' }))
+    await waitFor(() => expect(where()).toBe('?q=web&sort=name&order=asc'))
+    fireEvent.click(screen.getByRole('button', { name: 'table.nextPage' }))
+    await waitFor(() => expect(where()).toBe('?q=web&sort=name&order=asc&page=2'))
+    fireEvent.change(screen.getByRole('combobox', { name: 'certificates.filterBySource' }), { target: { value: 'acme' } })
+    await waitFor(() => expect(where()).toBe('?q=web&sort=name&order=asc&source=acme'))
+    expect(lastParams()).toMatchObject({ page: 1, source: ['acme'], search: 'web' })
+    await waitFor(() => expect(JSON.parse(window.localStorage.getItem('ucm-filter-certs-source'))).toEqual(['acme']))
+  })
+
+  it('keeps the saved filters for a bare address', async () => {
+    window.localStorage.setItem('ucm-filter-certs-source', JSON.stringify(['manual']))
+    await mount('/certificates')
+    expect(lastParams().source).toEqual(['manual'])
+  })
+
+  it('keeps the open certificate when the list changes, and Réinitialiser leaves it', async () => {
+    await mount('/certificates?item=7&section=chain&q=web&page=2')
+    fireEvent.click(tab('valid'))
+    await waitFor(() => expect(where()).toBe('?item=7&section=chain&q=web&view=valid'))
+    fireEvent.click(screen.getByRole('button', { name: /certificates\.clearSearchAndFilters/ }))
+    await waitFor(() => expect(where()).toBe('?item=7&section=chain'))
+  })
+
+  it('keeps the search and page of an overview link on reload, and a removed chip goes back to page one', async () => {
+    await mount('/certificates?status=expiring&sig_hash=sha1&q=web&page=2')
+    expect(lastParams()).toMatchObject({ status: ['expiring'], sig_hash: ['sha1'], search: 'web', page: 2 })
+    const chips = zone().querySelector('.applied-filters')
+    fireEvent.click(within(chips).getAllByRole('button', { name: /table\.removeFilter/ })[0])
+    await waitFor(() => expect(where()).toBe('?sig_hash=sha1&q=web'))
+    expect(lastParams()).toMatchObject({ page: 1, search: 'web' })
+  })
+})
+
 describe('CertificatesPage: overview links and saved filters', () => {
   it('sends the link filters alone, one removable chip each', async () => {
     window.localStorage.setItem('ucm-filter-certs-source', JSON.stringify(['acme']))
@@ -465,7 +511,7 @@ describe('CertificatesPage: overview links and saved filters', () => {
     dialog = await screen.findByTestId('filters-dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Old ACME' }))
     await waitFor(() => expect(lastParams()).toMatchObject({ status: ['expired'], source: ['acme'] }))
-    expect(where()).toBe('?view=expired')
+    expect(where()).toBe('?view=expired&source=acme')
   })
 
   it('a preset with several states applies them all: no state pressed, one chip', async () => {
