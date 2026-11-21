@@ -226,6 +226,25 @@ describe('SettingsPage: one page, one save bar', { timeout: 20000 }, () => {
     delete Element.prototype.scrollIntoView
   })
 
+  it('lands a link to ?section= as one to ?tab=', async () => {
+    const scrolled = []
+    Element.prototype.scrollIntoView = vi.fn(function scroll() { scrolled.push(this.id) })
+    await loaded('/settings?section=audit')
+    await waitFor(() => expect(scrolled).toContain('set-sec-audit'))
+    expect(document.activeElement).toBe(document.getElementById('set-title-audit'))
+    expect(tocLink('settings.tabs.audit')).toHaveAttribute('aria-current', 'true')
+    delete Element.prototype.scrollIntoView
+  })
+
+  it('draws the converted sections with the mockup rules, keeps the others under .atl-out, in no outer form', async () => {
+    await loaded()
+    const body = (id) => document.querySelector(`#set-sec-${id} > .settings-body`)
+    for (const id of ['general', 'security', 'email', 'https']) expect(body(id), id).not.toHaveClass('atl-out')
+    for (const id of ['audit', 'backup', 'about']) expect(body(id), id).toHaveClass('atl-out')
+    expect(document.getElementById('settings-form').tagName).toBe('DIV')
+    expect(document.getElementById('settings-form').closest('.atl')).not.toBeNull()
+  })
+
   it('jumps from the table of contents and writes the section in the address', async () => {
     const scrolled = []
     Element.prototype.scrollIntoView = vi.fn(function scroll() { scrolled.push(this.id) })

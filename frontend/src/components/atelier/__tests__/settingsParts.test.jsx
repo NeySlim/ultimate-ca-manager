@@ -1,0 +1,132 @@
+/**
+ * The pieces a settings page composes (settingsView() split): a column that is not a form when the
+ * sections hold their own, a frame that keeps a section the product still draws under .atl-out, a
+ * group with its sentence, a test with its outcome announced, a save bar outside any form, a table
+ * of contents that links to a page address, and the quiet focus of a link landing.
+ */
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (k, p) => (p ? `${k} ${JSON.stringify(p)}` : k) }),
+}))
+
+import { SettingsLayout, SettingsFrame, SettingsGroup, SettingsTest, SettingsSaveBar, SettingsToc, SettingsJump } from '../SettingsView'
+import { jumpTo } from '../helpers'
+
+describe('settings layout', () => {
+  it('holds the sections in a div when they bring forms of their own, a form otherwise', () => {
+    const { rerender } = render(<SettingsLayout toc={<nav />}><form data-testid="own"><input aria-label="x" /></form></SettingsLayout>)
+    expect(document.getElementById('settings-form').tagName).toBe('DIV')
+    expect(screen.getByTestId('own').parentElement).toBe(document.getElementById('settings-form'))
+    const onSubmit = vi.fn()
+    rerender(<SettingsLayout toc={<nav />} onSubmit={onSubmit}><input aria-label="y" /></SettingsLayout>)
+    expect(document.getElementById('settings-form').tagName).toBe('FORM')
+    fireEvent.submit(document.getElementById('settings-form'))
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+  })
+
+  it('puts the history after the column, inside the main part', () => {
+    render(<SettingsLayout toc={<nav />} history={<section data-testid="history" />}><p>x</p></SettingsLayout>)
+    const main = document.querySelector('.settings-main')
+    expect(main.lastElementChild).toBe(screen.getByTestId('history'))
+    expect(main.firstElementChild).toBe(document.getElementById('settings-form'))
+  })
+})
+
+describe('settings frame and group', () => {
+  it('keeps a section the product still draws under .atl-out, a converted one under the mockup rules', () => {
+    render(<>
+      <SettingsFrame id="backup" label="Sauvegarde" legacy><p>old</p></SettingsFrame>
+      <SettingsFrame id="general" label="Général" desc="Identité." aside={<span data-testid="aside" />} error="Refusé"><p>new</p></SettingsFrame>
+    </>)
+    expect(screen.getByText('old').parentElement).toHaveClass('settings-body', 'atl-out', 'sf-body')
+    expect(screen.getByText('new').parentElement).toHaveClass('settings-body')
+    expect(screen.getByText('new').parentElement).not.toHaveClass('atl-out')
+    const general = document.getElementById('set-sec-general')
+    expect(general).toHaveAttribute('aria-labelledby', 'set-title-general')
+    expect(general.querySelector('.panel-heading')).toContainElement(screen.getByTestId('aside'))
+    expect(screen.getByRole('alert')).toHaveTextContent('Refusé')
+  })
+
+  it('draws a group with its legend, its sentence, a grid of fields or a stack of blocks', () => {
+    const { container } = render(<>
+      <SettingsGroup legend="Instance" hint="Ce que fait le groupe."><div className="field" /></SettingsGroup>
+      <SettingsGroup legend="État" grid={false}><dl /></SettingsGroup>
+    </>)
+    const [fields, blocks] = container.querySelectorAll('fieldset.settings-group')
+    expect(fields.querySelector('legend')).toHaveTextContent('Instance')
+    expect(fields.querySelector('.group-hint')).toHaveTextContent('Ce que fait le groupe.')
+    expect(fields.querySelector('.settings-grid > .field')).not.toBeNull()
+    expect(blocks.querySelector('.settings-stack > dl')).not.toBeNull()
+    expect(blocks.querySelector('.group-hint')).toBeNull()
+  })
+})
+
+describe('settings test', () => {
+  it('shows the hint at rest, then the outcome announced in its tone', () => {
+    const onTest = vi.fn()
+    const { rerender } = render(<SettingsTest id="email" label="Tester" hint="Avec les valeurs enregistrées." onTest={onTest} />)
+    expect(document.getElementById('test-result-email')).toHaveClass('test-result', 'muted')
+    fireEvent.click(screen.getByRole('button', { name: 'Tester' }))
+    expect(onTest).toHaveBeenCalled()
+    rerender(<SettingsTest id="email" label="Tester" busy onTest={onTest} result={{ ok: true, text: 'Envoyé.' }} />)
+    expect(screen.getByRole('button', { name: 'Tester' })).toBeDisabled()
+    expect(screen.getByRole('status')).toHaveTextContent('Envoyé.')
+    expect(screen.getByRole('status')).toHaveClass('good')
+  })
+})
+
+describe('settings save bar', () => {
+  it('saves by its button outside any form, and names the pending fields or counts them', () => {
+    const onSave = vi.fn()
+    const onReset = vi.fn()
+    const { rerender } = render(<SettingsSaveBar dirty pending={['Port']} onSave={onSave} onReset={onReset} announce="Enregistré." />)
+    expect(screen.getByRole('button', { name: 'common.save' })).toHaveAttribute('type', 'button')
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }))
+    fireEvent.click(screen.getByRole('button', { name: 'sectioned.undo' }))
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(onReset).toHaveBeenCalledTimes(1)
+    expect(document.getElementById('settings-state')).toHaveTextContent('sectioned.pendingFields {"fields":"Port"}')
+    expect(document.getElementById('settings-savebar')).toHaveClass('dirty')
+    expect(document.getElementById('settings-announce')).toHaveTextContent('Enregistré.')
+    rerender(<SettingsSaveBar dirty count={3} sections={['SMTP']} onSave={onSave} />)
+    expect(document.getElementById('settings-state')).toHaveTextContent('sectioned.pendingCount {"count":3,"sections":"SMTP"}')
+    rerender(<SettingsSaveBar dirty={false} lastSaved={{ at: '6 nov.' }} onSave={onSave} />)
+    expect(screen.getByRole('button', { name: 'common.save' })).toBeDisabled()
+    expect(document.getElementById('settings-state')).toHaveTextContent('sectioned.lastSaved {"date":"6 nov."}')
+  })
+})
+
+describe('settings table of contents', () => {
+  const sections = [{ id: 'general', label: 'Général', icon: 'settings' }, { id: 'email', label: 'SMTP', icon: 'send' }]
+  it('links each entry to the address the page gives, the mockup anchor otherwise', () => {
+    const { rerender } = render(<SettingsToc sections={sections} label="Sections" />)
+    expect(screen.getByRole('link', { name: /SMTP/ })).toHaveAttribute('href', '#set-sec-email')
+    rerender(<SettingsToc sections={sections} label="Sections" current="email" hrefFor={(id) => `/settings?tab=${id}`} />)
+    expect(screen.getByRole('link', { name: /SMTP/ })).toHaveAttribute('href', '/settings?tab=email')
+    expect(screen.getByRole('link', { name: /SMTP/ })).toHaveAttribute('aria-current', 'true')
+  })
+
+  it('jumps from the phone select and tells the page', () => {
+    const onJump = vi.fn()
+    render(<><SettingsJump sections={sections} onJump={onJump} /><SettingsFrame id="email" label="SMTP"><p>x</p></SettingsFrame></>)
+    fireEvent.change(screen.getByLabelText('sectioned.jumpLabel'), { target: { value: 'email' } })
+    expect(document.activeElement).toBe(document.getElementById('set-title-email'))
+    expect(onJump).toHaveBeenCalledWith('email')
+  })
+})
+
+describe('jumpTo', () => {
+  it('lands a link quietly: the title holds the focus without its outline until it loses it', () => {
+    render(<SettingsFrame id="email" label="SMTP"><button type="button">next</button></SettingsFrame>)
+    const title = document.getElementById('set-title-email')
+    jumpTo('email', { quiet: true })
+    expect(document.activeElement).toBe(title)
+    expect(title).toHaveAttribute('data-quiet-focus')
+    screen.getByRole('button', { name: 'next' }).focus()
+    expect(title).not.toHaveAttribute('data-quiet-focus')
+    jumpTo('email')
+    expect(title).not.toHaveAttribute('data-quiet-focus')
+  })
+})
