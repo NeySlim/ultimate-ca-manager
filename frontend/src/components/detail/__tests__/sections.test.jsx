@@ -21,7 +21,6 @@ vi.mock('../../cas/IssuanceVisibilityField', () => ({ IssuanceVisibilityField: (
 import { CertificatePanel } from '../CertificatePanel'
 import { CAPanel } from '../CAPanel'
 import { TrustCertPanel } from '../TrustCertPanel'
-import { CSRPanel } from '../CSRPanel'
 import { DETAIL_SECTIONS } from '../sections'
 
 const PEM = '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----'
@@ -52,15 +51,6 @@ const TRUST = {
   not_before: '2024-01-01T00:00:00Z', not_after: FUTURE, key_type: 'RSA 2048',
   certificate_pem: PEM, fingerprint_sha256: 'aa', fingerprint_sha1: 'bb', added_at: '2024-01-01T00:00:00Z',
 }
-const CSR = {
-  id: 4, common_name: 'csr.example.com', key_algorithm: 'RSA', key_size: 2048,
-  created_at: '2024-01-01T00:00:00Z', sans: ['csr.example.com'], pem: PEM,
-}
-const SIGNED = {
-  id: 5, common_name: 'signed.example.com', signed_by: 'CA', valid_from: '2024-01-01T00:00:00Z',
-  valid_to: FUTURE, days_remaining: 100, key_algorithm: 'RSA', key_size: 2048,
-}
-
 const OVERVIEW_CERT = ['common.subject', 'common.validity', 'common.technicalDetails', 'details.subjectAltNames',
   'certificates.ctScts', 'common.issuer', 'compliance.title', 'common.fingerprints', 'details.revocationDetails', 'details.metadata']
 const OVERVIEW_CA = ['common.subject', 'common.issuer', 'common.validity', 'common.technicalDetails',
@@ -77,12 +67,6 @@ const PANELS = [
       extensions: ['details.extensions'], pem: ['details.pemCertificate'] } },
   { name: 'TrustCertPanel', ui: (section) => <TrustCertPanel cert={TRUST} section={section} />,
     expected: { overview: OVERVIEW_TRUST, chain: ['common.issuer'], extensions: [], pem: ['details.pemCertificate'] } },
-  { name: 'CSRPanel (pending)', ui: (section) => <CSRPanel csr={CSR} section={section} />,
-    expected: { overview: ['common.subject', 'common.keyInformation', 'common.subjectAltNames', 'common.timeline'],
-      chain: [], extensions: [], pem: ['details.csrPem'] } },
-  { name: 'CSRPanel (signed)', ui: (section) => <CSRPanel csr={SIGNED} variant="signed" section={section} />,
-    expected: { overview: ['common.signingDetails', 'common.subject', 'common.keyInformation', 'common.timeline'],
-      chain: [], extensions: [], pem: [] } },
 ]
 
 afterEach(cleanup)

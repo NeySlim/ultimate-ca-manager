@@ -11,7 +11,7 @@ const files = readdirSync(DIR).filter(f => /\.(jsx?|js)$/.test(f))
 
 describe('components/detail', () => {
   it('has panels to check', () => {
-    expect(files).toEqual(expect.arrayContaining(['CertificatePanel.jsx', 'CAPanel.jsx', 'TrustCertPanel.jsx', 'CSRPanel.jsx']))
+    expect(files).toEqual(expect.arrayContaining(['CertificatePanel.jsx', 'CAPanel.jsx', 'TrustCertPanel.jsx']))
   })
 
   it.each(files)('%s imports no service and sends no request', (file) => {
