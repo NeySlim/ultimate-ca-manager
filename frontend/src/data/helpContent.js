@@ -75,7 +75,7 @@ export const helpContent = {
         title: 'Account menu',
         icon: Users,
         items: [
-          { label: 'Account', text: 'Your name, role and sign-in method with the inactivity lock, then My account and Sign out; on a phone, the language as well. The language is chosen from the globe button of the top bar, on My account and on the sign-in page; Settings is in the Modules menu and the search' },
+          { label: 'Account', text: 'Your name, role and sign-in method with the inactivity lock, then My account, Settings (for who may open it) and Sign out; on a phone, the language as well. The language is chosen from the globe button of the top bar, on My account and on the sign-in page; Settings is also in the Modules menu and the search' },
         ]
       },
       {

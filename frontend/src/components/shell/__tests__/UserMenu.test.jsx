@@ -1,4 +1,4 @@
-/** Account menu of the mockup: identity, method and lock, My account, Sign out; the language on a phone. */
+/** Account menu of the mockup: identity, method and lock, My account, Settings for who may see it, Sign out; the language on a phone. */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -77,13 +77,37 @@ describe('UserMenu', () => {
     expect(screen.queryByText(/shell\.signedInWith/)).toBeNull()
   })
 
-  it('has My account and Sign out only: Settings lives elsewhere', async () => {
+  it('has My account and Sign out only for who may not see Settings', async () => {
     const user = setup()
     await user.click(trigger())
     const menu = document.getElementById('user-menu')
     const items = [...menu.querySelectorAll('a, button')].map(el => el.textContent)
     expect(items).toEqual(['common.account', 'shell.signOut'])
     expect(screen.queryByRole('group')).toBeNull()
+  })
+
+  it('puts Settings between My account and Sign out for who may see it, with the module glyph', async () => {
+    const user = setup(canFor(ROLES.admin))
+    await user.click(trigger())
+    const menu = document.getElementById('user-menu')
+    const items = [...menu.querySelectorAll('a, button')]
+    expect(items.map(el => el.textContent)).toEqual(['common.account', 'common.settings', 'shell.signOut'])
+    expect(items[1]).toHaveClass('pop-item')
+    expect(items[1].querySelector('svg.icon')).not.toBeNull()
+  })
+
+  it('goes to Settings and closes, the keyboard walking the three items', async () => {
+    const user = setup(canFor(ROLES.admin))
+    await user.click(trigger())
+    expect(screen.getByRole('button', { name: 'common.account' })).toHaveFocus()
+    await user.keyboard('{ArrowDown}')
+    expect(screen.getByRole('button', { name: 'common.settings' })).toHaveFocus()
+    await user.keyboard('{ArrowDown}')
+    expect(screen.getByRole('button', { name: 'shell.signOut' })).toHaveFocus()
+    await user.keyboard('{ArrowUp}')
+    await user.keyboard('{Enter}')
+    expect(screen.getByTestId('where')).toHaveTextContent('/settings')
+    expect(trigger()).toHaveAttribute('aria-expanded', 'false')
   })
 
   it('offers the language on a phone, the bar having no room for it, by the account path', async () => {
